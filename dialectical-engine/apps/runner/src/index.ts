@@ -1423,6 +1423,12 @@ export interface WalkingSkeletonSettings {
     readonly modelId: string | null;
     readonly failureCode: string | null;
   }>;
+  /** Probe sealed synthesis identities outside the selected plan's debate panel. */
+  readonly claimTimeSynthesisRoleProbe?: (providerRef: string) => Promise<{
+    readonly state: "HEALTHY" | "ABSENT";
+    readonly modelId: string | null;
+    readonly failureCode: string | null;
+  }>;
   readonly scoringOperator?: ScoringOperatorRegisterInput;
   readonly runDeathPolicy?: RunDeathPolicy;
   readonly hiddenNodeScoreThreshold?: {
@@ -2858,6 +2864,36 @@ export class WalkingSkeletonRunner {
         "T9: the sealed synthesis-role family is required before any role is resolved"
       );
     }
+    // A plan selects debate voices; the register separately selects synthesis roles.
+    // Reuse in-panel verdicts, including absence, and probe only out-of-panel roles.
+    const synthesisMakers = [...configuredMakers];
+    const synthesisFailures = new Map<string, string>();
+    const panelRefs = new Set(run.discoveredPanel.map((member) => member.provider_ref));
+    for (const roleRef of new Set([
+      synthesisRolePolicy.synthesizerRoleRef, synthesisRolePolicy.evaluatorRoleRef
+    ])) {
+      if (panelRefs.has(roleRef)) continue;
+      const configured = configuredByProviderRef.get(roleRef);
+      if (configured === undefined || this.settings.claimTimeSynthesisRoleProbe === undefined) continue;
+      let observation;
+      try {
+        observation = await this.settings.claimTimeSynthesisRoleProbe(roleRef);
+      } catch (error) {
+        observation = {
+          state: "ABSENT" as const, modelId: null,
+          failureCode: error instanceof TypedDomainError ? error.code : "CLAIM_PROVIDER_PROBE_FAILED"
+        };
+      }
+      const healthy = observation.state === "HEALTHY" && observation.modelId !== null;
+      const failureCode = healthy ? null : observation.failureCode ?? "CLAIM_PROVIDER_ABSENT";
+      await this.#providerProbes.record({
+        probeEvidenceRef: randomUUID(), providerRef: roleRef, maker: configured.maker,
+        state: healthy ? "HEALTHY" : "ABSENT",
+        modelId: healthy ? observation.modelId : null, failureCode, probedAt: new Date()
+      });
+      if (healthy) synthesisMakers.push(configured);
+      else synthesisFailures.set(roleRef, failureCode!);
+    }
     // J24 discriminator (3) — the sealed refs are resolved against the
     // CLAIM-ELIGIBLE providers, i.e. after probing removed the absent ones. The
     // r1 defect was exactly here: the late resolver looked the ref up in the
@@ -2871,7 +2907,7 @@ export class WalkingSkeletonRunner {
       const roleRef = role === "SYNTHESIZER"
         ? synthesisRolePolicy.synthesizerRoleRef
         : synthesisRolePolicy.evaluatorRoleRef;
-      if (configuredMakers.some((maker) => maker.providerRef === roleRef)) continue;
+      if (synthesisMakers.some((maker) => maker.providerRef === roleRef)) continue;
       const absent = absentAtClaim.find((entry) => entry.member.provider_ref === roleRef);
       // J26(c): a refusal's own shape. No hold, no attempts, no legs — the three
       // zeros the first draft wrote were measurements nobody took.
@@ -2883,7 +2919,7 @@ export class WalkingSkeletonRunner {
           call_site_key: `${role}:${roleRef}`,
           role_ref: roleRef,
           role,
-          absent_failure_code: absent?.failureCode ?? null
+          absent_failure_code: absent?.failureCode ?? synthesisFailures.get(roleRef) ?? null
         }
       });
       // J26(b): the refusal is TERMINAL for this work item. It is never released
@@ -4378,7 +4414,7 @@ export class WalkingSkeletonRunner {
       // CLAIM-ELIGIBLE set now, and the claim-time discriminator above has
       // already refused this run if either sealed ref is missing from it, so
       // reaching this throw means a provider went away AFTER a healthy claim.
-      const configured = configuredMakers.find((maker) => maker.providerRef === roleRef);
+      const configured = synthesisMakers.find((maker) => maker.providerRef === roleRef);
       if (configured === undefined) {
         throw new TypedDomainError(
           "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED",

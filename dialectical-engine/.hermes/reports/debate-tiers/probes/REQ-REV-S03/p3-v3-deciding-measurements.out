@@ -1,0 +1,125 @@
+
+===== TIE-BREAKER: isExactProviderRuntimeRefresh 300-335 [apps/runner/src/dev-api-environment.ts] =====
+    }
+    const published = await readPrivateFile(path);
+    if (published !== source) throw new TypeError("DEV_API_ENVIRONMENT_PUBLISH_FAILED");
+    return false;
+  } finally {
+    await lock.close();
+    await unlink(lockPath);
+  }
+}
+
+function isExactProviderRuntimeRefresh(existing: string, expected: string): boolean {
+  try {
+    const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    const expectedValues = parseExactEnvironment(expected, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    for (const key of DEVELOPMENT_API_ENVIRONMENT_KEYS) {
+      if (key === "PROVIDER_DISCOVERY_TARGETS_JSON" || key === "SUPPORT_MODEL_TARGET_JSON") continue;
+      if (existingValues.get(key) !== expectedValues.get(key)) return false;
+    }
+    parseDevelopmentProviderPanelTargets(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+    parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Accepts an environment that differs only in the provider targets AND the three keys that
+ * move with the deployment register receipt. A register version is never edited in place
+ * (`register.register_row` rejects UPDATE and DELETE), so a deployment that grows its
+ * configured provider set publishes a NEW version and the custody receipt follows it; the
+ * assembler has already asserted that the receipt it was handed is the one on disk, so the
+ * only environment this admits is the one this stack just produced. Everything else -
+ * credentials, database URLs, ports - must still match exactly, which is what keeps the
+ * drift guard meaningful.
+ */
+
+===== R31's forced shape 96,126 [apps/runner/src/dev-provider-panel.ts] =====
+    throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+  }
+  const rows = DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider) => {
+    const observation = byRef.get(provider.providerRef);
+    if (observation === undefined || observation.baseUrl !== expectedBaseUrl(provider.port)) {
+      throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+    }
+    const healthy = observation.model !== DEVELOPMENT_UNAVAILABLE_CLI_MODEL;
+    if ((healthy && observation.authorizationHeader === undefined)
+      || (!healthy && observation.authorizationHeader !== undefined)
+      || observation.model === REMOVED_SCAFFOLD_MODEL
+      || observation.providerRef === REMOVED_SCAFFOLD_PROVIDER_REF) {
+      throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_INVALID");
+    }
+    return Object.freeze({
+      provider_ref: provider.providerRef,
+      base_url: observation.baseUrl,
+      model: observation.model,
+      ...(observation.authorizationHeader === undefined
+        ? {} : { authorization_header: observation.authorizationHeader })
+    });
+  });
+  const targetsJson = JSON.stringify(rows);
+  const targets = parseProviderDiscoveryTargets(targetsJson, configuredProviders);
+  const healthyProviderRefs = Object.freeze(targets.flatMap((target) =>
+    target.model === DEVELOPMENT_UNAVAILABLE_CLI_MODEL ? [] : [target.providerRef]
+  ));
+  return Object.freeze({
+    configuredProviders,
+    requiredDistinctMakers: DEVELOPMENT_MINIMUM_DISTINCT_MAKERS,
+    healthyProviderRefs,
+
+===== R33: probes every configured target 125,145 [apps/api/src/provider-discovery.ts] =====
+  const fetchImplementation = input.fetchImplementation ?? fetch;
+  const clock = input.clock ?? (() => new Date());
+  const resolve = async (): Promise<readonly DiscoveredPanelMember[]> => {
+    const now = clock();
+    const latest = await input.probes.readLatest(expectedRefs);
+    const latestByRef = new Map(latest.map((record) => [record.providerRef, record] as const));
+    const observations = await Promise.all(input.targets.map(async (target) => {
+      const record = latestByRef.get(target.providerRef);
+      return isFreshMatchingRecord(record, target, now, input.probeFreshnessMs)
+        ? record
+        : probeTarget({
+            target,
+            probes: input.probes,
+            timeoutMs: input.probeTimeoutMs,
+            fetchImplementation,
+            clock
+          });
+    }));
+    return Object.freeze(observations.flatMap((record) => (
+      record.state === "HEALTHY" && record.modelId !== null
+        ? [Object.freeze({
+
+===== R33: auth only when present 40,50 [apps/api/src/provider-discovery.ts] =====
+  const probeEvidenceRef = randomUUID();
+  const probedAt = input.clock();
+  let state: ProviderProbeRecord;
+  try {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (input.target.authorizationHeader !== undefined) {
+      headers.authorization = input.target.authorizationHeader;
+    }
+    const response = await input.fetchImplementation(
+      `${input.target.baseUrl}/chat/completions`,
+      {
+
+===== authorization_header optional 165,180 [packages/providers/src/index.ts] =====
+    const row = candidate as Readonly<Record<string, unknown>>;
+    if (Object.keys(row).some((key) => ![
+      "provider_ref", "base_url", "model", "authorization_header"
+    ].includes(key))) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+    }
+    const providerRef = requiredProviderTargetText(
+      row.provider_ref,
+      "PROVIDER_DISCOVERY_TARGET_PROVIDER_REF_INVALID"
+    );
+    if (targetsByRef.has(providerRef)) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_DUPLICATE");
+    }
+    const maker = configuredByRef.get(providerRef);
+    if (maker === undefined) throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+    const authorizationHeader = row.authorization_header === undefined

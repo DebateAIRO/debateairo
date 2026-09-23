@@ -4,14 +4,14 @@ lang: ro
 title: "Cum citești o dezbatere"
 status: shipped
 sources:
-  - apps/ui/components/GuideModal.tsx:8
-  - apps/ui/components/GuideModal.tsx:15
-  - apps/ui/components/GuideModal.tsx:22
-  - apps/ui/components/GuideModal.tsx:28
-  - apps/ui/components/GuideModal.tsx:41
-verified_against: "2b670d30"
-ratified_by: V
-ratified_on: "2026-09-04"
+  - apps/ui/app/debate/[id]/DebatePageClient.tsx:1164
+  - apps/ui/app/debate/[id]/DebatePageClient.tsx:1169
+  - apps/ui/app/debate/[id]/DebatePageClient.tsx:1174
+  - apps/ui/components/NodeDetailDrawer.tsx:121
+  - apps/ui/components/NodeDetailDrawer.tsx:281
+verified_against: "b7ca2c41"
+ratified_by: ""
+ratified_on: ""
 ---
 
-O dezbatere este un arbore de argumente construit împreună de mai multe modele. Mai întâi apare scheletul, apoi sunt adăugate afirmațiile, iar progresul este afișat. Fiecare afirmație indică modelul și partea: **Pro** susține afirmația-părinte, iar **Con** i se opune. Poți contesta o afirmație sau o propoziție selectată, compara versiunile unei afirmații, comuta între Tree și Outline și exporta în Markdown.
+Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea Challenge schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Exportul este JSON condiționat, nu Markdown.

@@ -34,10 +34,13 @@ function digestOf(value: string): string {
   return `sha256:${createHash("sha256").update(value).digest("hex").slice(0,16)}`;
 }
 
-async function start(): Promise<HermesSupportRelayHandle> {
+async function start(
+  developmentStackProfile?: "support-preview"
+): Promise<HermesSupportRelayHandle> {
   const handle = await startHermesSupportRelay({
     port: 0,
     timeoutMs: 1_000,
+    ...(developmentStackProfile === undefined ? {} : { developmentStackProfile }),
     testOnlyCommand: { binary: process.execPath,prefixArguments: [fakeCli] },
     testOnlyGlmApiKey: "zai-test-only"
   });
@@ -132,6 +135,17 @@ describe("Support-only Hermes GLM relay",() => {
       base_url: `${relay.baseUrl}/v1`,
       model: HERMES_GLM_MODEL,
       authorization_header: relay.authorizationHeader
+    });
+  });
+
+  it("marks only the selected support-preview target",async () => {
+    const relay = await start("support-preview");
+    expect(JSON.parse(relay.targetJson)).toEqual({
+      provider_ref: HERMES_SUPPORT_PROVIDER_REF,
+      base_url: `${relay.baseUrl}/v1`,
+      model: HERMES_GLM_MODEL,
+      authorization_header: relay.authorizationHeader,
+      development_stack_profile: "support-preview"
     });
   });
 

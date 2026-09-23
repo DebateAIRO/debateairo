@@ -175,7 +175,7 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
       tier_source: "ASKER",
       tier_provenance_ref: "asker:ui-selection",
       composition_budget_tier: "low",
-      depth: 1,
+      depth: 2,
       decision_scope: "personal"
     });
     expect(config).not.toHaveProperty("agent_count");

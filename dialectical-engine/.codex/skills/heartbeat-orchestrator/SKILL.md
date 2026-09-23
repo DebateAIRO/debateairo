@@ -91,11 +91,11 @@ Run it on every event (a seat's exit notification, a watchdog line, a V message)
 | Codex | `codex exec -c model='"gpt-5.6-sol"' … "<pointer>" </dev/null > <log> 2>&1`, background | `codex exec resume <id>` | per-seat log |
 | Grok | `~/.grok/bin/grok -p "<pointer>" -m <model> --permission-mode bypassPermissions --cwd <lane> > <log> 2>&1`, background | `grok --resume <id>` | per-seat log + session jsonl |
 | watchdog | the harness's Monitor, or a background `until`/`while` loop writing `logs/watchdog.status` — its change signature covers the SEATS' transcripts, worktrees and scratch dirs (`logs/watchdog.paths`, one glob per line, re-read every minute), not only the mission tree: a seat working outside the tree is not stagnation | — | `logs/watchdog.status` |
-| dev server for V | a `.claude/launch.json` entry, started only when V says "serve <S>" | — | preview logs |
+| dev server for V | the product's FULL stage list from the lane (panel, env, API, RUNNER, UI, TLS — read the product's own stack CLI for the list; a missing stage means asks are accepted and never executed), each long-lived stage a DETACHED process under a restart loop with a PID file, started only when V says "serve <S>"; never a harness preview server (the app stops it when the session idles) and never a bare dev server (a Next dev server OOMs after ~2 h of polling) | — | `logs/serve-*.log` + `logs/serve-*-supervisor.log` |
 
 Forbidden: `osascript`, `open -a`, Terminal windows, browser windows, GUI apps, serving the Hermes
 dashboard unasked. The harness's browser pane is yours for verification. The launch law is
-unchanged: a short pointer prompt naming an ABSOLUTE packet path (big prompts stay off argv); the prompt's order is READ the ticket's comments, then CLAIM (the spine's comment-before-claim law), then the packet's steps;
+unchanged: a short pointer prompt naming an ABSOLUTE packet path (big prompts stay off argv) — it names "the paths the packet allows", never a count that the self-report line makes wrong; the prompt's order is READ the ticket's comments, then CLAIM (the spine's comment-before-claim law), then the packet's steps;
 launchers written fresh from a heredoc, read back and grepped for the values they must carry; the
 log appears within 2 minutes; per-seat log paths distinct; the watchdog armed AT launch; janitor
 between attempts — processes by PID, worktrees, untracked files, locks. A CLI whose stdout buffers
@@ -163,19 +163,26 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   BUILD(S-*) is done: assemble `.hermes/reports/<m>/review-packages/<S>-p<r>/` — the diff vs base,
   every cluster command with its three-run table, the cluster map, the acceptance oracle (DONE.md on
   a UI slice, the SPEC acceptance otherwise), the dev-stack recipe — which gives every lens its OWN ports and process/file names
-  (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares) and
+  (`<seat>-stub-api.mjs`), says kill by PID or port (never `pkill -f` a filename every seat shares — the launch line writes `$!` to
+  `logs/<seat>.<proc>.pid` and the kill line reads it) and
   records the listener baseline of every no-touch port at assembly time, so compliance is falsifiable.
   Re-verify every quoted commit
-  and count at assembly time.
+  and count at assembly time. The package diff is the PRODUCT range only — housekeeping paths
+  (`.codex/skills` mirrors, launchers) excluded with `git diff <a>..<b> -- . ':!.codex/skills'` — and the
+  README states the FIX commits' own stat. No housekeeping commit lands on a slice branch (a mirror
+  sync on `slice/tiers-s01` sat in every later review range and re-billed each reviewer ~25k tokens);
+  the pointer carries the `.claude` path instead.
 - Lenses by `risk_tier`, in parallel, each a blind background seat in its own detached worktree at
   the slice head: low → correctness/tests · medium → + security/data-safety · high → + product-truth.
   **A UI slice always carries product-truth**: rendered DOM with the real compiled CSS, measured
   against DONE.md's artboards in both modes.
 - Union the lens verdicts into `reviews/REV-<S>-p<r>-UNION.md`: PASS only when every lens passed.
   Two lenses disagreeing on ONE finding get a single-finding re-check node, never a re-review.
-- REWORK → FIX(S) nodes split by file surface (parallel), every finding of the pass assigned,
+- REWORK → FIX(S) nodes split by FINDING surface — every file a finding needs to change sits in ONE node, and two nodes whose files overlap run one after the other; parallel only when disjoint (FIX-S01-p1 split a lock's semantics from its appearance and the fix landed on one side), every finding of the pass assigned,
   returned to the author sessions when resumable → REV(S) pass r+1, scoped to the findings plus the
-  previous pass's probes. A pass-3 REWORK is a V row. N-findings still open at TEST(S) are
+  previous pass's probes — the package README names each promoted probe's measurement and the head it
+  was written against, never an outcome a probe as promoted cannot produce (a mutant's direction inverts
+  between heads). A pass-3 REWORK is a V row. N-findings still open at TEST(S) are
   ticketed residue, shown to V at the test point.
 - Planning reviews (REQ-REV, ARCH-REV) are one pass by default: you fold N-findings into
   DECISIONS.md and ticket comments; only B-findings spawn a rework node, in the same session when
@@ -199,8 +206,12 @@ escalates to V after ONE failed workaround.
   Then extract the final artboards verbatim into `docs/missions/<m>/design/<S>/`, write
   `slices/<S>/DONE.md` (per screen and state: the artboard reference, numbered browser steps in both
   modes, V's words quoted — no judgment of yours; the §3 measurements EXTRACTED from the artboards' declarations by a script — every declaration of every drawn class, never hand-picked: a hand transcription dropped `white-space: nowrap` on debate-tiers S01) and get V's yes. BUILD(S-*) is not READY before
-  that yes; there is no proceed-by-default on a UI slice. Attach the graph
-  (`scripts/graph.sh <m> .hermes/reports/<m>/mission-graph.md`).
+  that yes; there is no proceed-by-default on a UI slice. Attach the graph:
+  `scripts/graph.sh <m> .hermes/reports/<m>/mission-graph.md` also writes `mission-graph-nodes.mmd` (work
+  nodes, findings hidden) and `mission-graph-full.mmd` beside it — then render them to PNG with `scripts/graph-png/`
+  (make-pages.py + serve.py; the harness's browser pane in a NEW tab renders and posts the PNGs back — headless
+  Chrome hangs here) and SEND the PNGs with SendUserFile (display: render) in the gate message; a repo path is
+  not an attachment and V cannot open `.mmd` (V, 2026-09-10: "i cannot see the flowchart" / "do a png").
 - **TEST(S)**: post the acceptance steps, the residue list and the one-line serve command; serve
   the lane only when V says so; the slice ticket closes only on V's veto. **WHOLE**: after every
   MERGE(S), post the integrated-suite result and the push command — V pushes. **V DECISIONS
@@ -222,14 +233,19 @@ Each freeze commit goes into COMMON §6 (`freeze commits` row); every review pac
 A freeze commit EXCLUDES the paths a RUNNING seat may write (its packet's `allowed` list, as `:!` pathspecs)
 — a mid-run sweep records a half-written file under another node's name.
 Write `LEDGER.md` AT EACH SEAT EXIT — seat, ticket, model, dispatched, exited, handoff marker,
-how SKILLS LOADED was verified, self-report path, verdict — and a `Ruling:` line for every decision
+how SKILLS LOADED was verified, self-report path, verdict — a seat's verification claims quoted AS
+CLAIMS ("the handoff claims …"), only what you measured (disk, board, your own re-run) stated as fact
+(a consume comment once repeated a false "activation state unchanged") — and a `Ruling:` line for every decision
 you took on V's behalf (what — why — cost if wrong). Deliver on N−1 when a seat dies: survivors told,
 a replacement re-elected or the waiver recorded. A phase report at each V gate, a closure report
-before CLOSE, every self-report collected before FULLY DONE, the graph rendered from the board at
+before CLOSE, every self-report collected before FULLY DONE, the graph rendered from the board AND sent to V (SendUserFile) at
 every gate. Close sub-tickets as verdicts are consumed — a board that only grows carries no state.
 
 ## 10. Version discipline
 
 Fail closed on skew: a rule newer than the installed skill or the spine is not dispatched — amend
-the spine in the same commit. A seat charged with a rule it cannot discover from the repo is your
+the spine in the same commit. The `.codex/skills/<name>/SKILL.md` copies a Codex seat auto-loads from its
+working tree are byte-identical to `.claude/skills/<name>/SKILL.md` — `scripts/sync-codex-skills.sh` at every
+protocol commit, and a lane that predates a sync gets the pointer "cite only the `.claude` path" until it is
+rebased (a tracked pre-v4.0.0 copy was loaded by FIX-S01-p1-F2 and `skills-check.sh` caught it by phrase). A seat charged with a rule it cannot discover from the repo is your
 defect.

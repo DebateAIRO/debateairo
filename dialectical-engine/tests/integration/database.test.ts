@@ -5438,6 +5438,62 @@ describe("T10/T11 · the served root and its label, through the production runne
     }
   });
 
+  it.each(["HEALTHY", "ABSENT", "MISSING_PROBE"] as const)(
+    "keeps a sealed synthesis provider outside the debate panel separate: %s",
+    async (state) => {
+      const work = await createRunnerWork(`separate-synthesis-${state}-${randomUUID()}`);
+      const author = await startProviderDouble([judgementDouble("A single panel author's position", 0.4)]);
+      const synthesis = await startProviderDouble([resil01Composition, evaluatorSatisfied()]);
+      const roleRef = "provider:test-layer:secondary";
+      const probes: string[] = [];
+      try {
+        const settings = runnerSettings();
+        const runner = runnerWithEndpoint(author.endpoint, {
+          ...settings,
+          scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+          additionalMakers: [{
+            provider: createPostgresProviderGateway(database.pool, {
+              endpoint: synthesis.endpoint, model: "test-layer/synthesis-model", maker: "synthesis-only"
+            }),
+            providerRef: roleRef, maker: "synthesis-only"
+          }],
+          synthesisRolePolicy: {
+            ...settings.synthesisRolePolicy,
+            synthesizerRoleRef: roleRef, evaluatorRoleRef: roleRef
+          },
+          ...(state === "MISSING_PROBE" ? {} : {
+            claimTimeSynthesisRoleProbe: async (providerRef: string) => {
+              probes.push(providerRef);
+              return state === "HEALTHY"
+                ? { state: "HEALTHY" as const, modelId: "test-layer/synthesis-model", failureCode: null }
+                : { state: "ABSENT" as const, modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" };
+            }
+          })
+        });
+        if (state === "HEALTHY") {
+          await expect(runner.executeWorkItem(work.workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
+          expect(author.calls()).toBe(1);
+          expect(synthesis.calls()).toBe(2);
+          // The shared synthesis/evaluator identity is probed once; it authors no panel roots.
+          expect(probes).toEqual([roleRef]);
+          const frozen = await new RunRepository(database.pool).readFrozenHead(work.runId);
+          expect(frozen.discoveredPanel.map((member) => member.provider_ref)).toEqual([settings.providerRef]);
+        } else {
+          await expect(runner.executeWorkItem(work.workItemId))
+            .rejects.toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+          expect(author.calls()).toBe(0);
+          expect(synthesis.calls()).toBe(0);
+          expect(probes).toEqual(state === "MISSING_PROBE" ? [] : [roleRef]);
+          const item = await database.pool.query("SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [work.workItemId]);
+          expect(item.rows[0]).toEqual({ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER" });
+        }
+      } finally {
+        await author.stop();
+        await synthesis.stop();
+      }
+    }
+  );
+
   /**
    * codex r2 B2 / J29 — a round reference must RESOLVE, and resolve INSIDE THIS
    * RUN. The foreign key already refuses `artifact:ghost` (it resolves to

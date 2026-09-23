@@ -206,6 +206,26 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
     expect(apiSource).not.toContain(supportDatabaseUrl);
   }, 120_000);
 
+  it("opens development initialization writes on one bounded five-second pool", async () => {
+    const module = await import("../../apps/runner/src/support-config-cli-credentials.js");
+    const pool = await module.createDevelopmentSupportConfigInitializationPool(
+      credentialFilePath
+    );
+    try {
+      const options = (pool as unknown as {
+        options: Readonly<Record<string, unknown>>;
+      }).options;
+      expect(options).toMatchObject({
+        max: 1,
+        connectionTimeoutMillis: 5_000,
+        statement_timeout: 5_000,
+        query_timeout: 5_000
+      });
+    } finally {
+      await pool.end();
+    }
+  });
+
   it("gives the operator LOGIN only its support publish and status capability", async () => {
     const master = parseExactMaster(await readFile(credentialFilePath, "utf8"));
     const operatorPool = createPool(loginUrlFor(master.get(SUPPORT_KEY)!));

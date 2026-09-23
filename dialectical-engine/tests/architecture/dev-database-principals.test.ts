@@ -18,15 +18,18 @@ describe("DEV-03 development database principal provisioning source contract", (
     expect(cli).not.toMatch(/console\.(?:log|error)\([^)]*(?:DATABASE_URL|password)/s);
   });
 
-  it("keeps all eleven fixed wrappers least-privileged and file-backed", async () => {
+  it("keeps all twelve fixed wrappers least-privileged and file-backed", async () => {
     const source = await readFile("apps/runner/src/dev-database-principals.ts", "utf8");
-    expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toHaveLength(11);
+    expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toHaveLength(12);
     expect(source).toContain(`roleName: "debateai_dev_support",
     capabilityRole: "debateai_support",
     environmentKey: "SUPPORT_DATABASE_URL"`);
     expect(source).toContain(`roleName: "debateai_dev_support_config_operator",
     capabilityRole: "debateai_support_config_operator",
     environmentKey: "SUPPORT_CONFIG_OPERATOR_DATABASE_URL"`);
+    expect(source).toContain(`roleName: "debateai_dev_evaluator_worker",
+    capabilityRole: "debateai_evaluator_worker",
+    environmentKey: "EVALUATOR_DATABASE_URL"`);
     expect(source).toContain("LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS");
     expect(source).toContain("SET LOCAL password_encryption='scram-sha-256'");
     expect(source).toContain("DEV_DATABASE_PRINCIPAL_ADMIN_REQUIRED");

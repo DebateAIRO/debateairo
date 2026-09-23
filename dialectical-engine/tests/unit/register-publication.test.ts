@@ -695,24 +695,37 @@ describe("closed PostgreSQL publication port", () => {
     ]);
   });
 
-  it.each(MALFORMED_RESULT_KINDS)("rework B4 rejects %s status results and releases once", async (kind) => {
-    const valid = {
-      support_register_version: "5", schema_version: 1, base_register_version: "4", publication_id: id,
-      request_sha256: "a".repeat(64), snapshot_sha256: "b".repeat(64),
-      support_snapshot_sha256: "c".repeat(64), changed_keys: ["support_enabled"],
-      source_ref: "src:support", recorded_at: new Date("2026-09-04T00:00:00.000Z"),
-      configuration_text: "[]"
-    };
-    const fixture = fakePool([malformedResultRows(kind, valid, {
-      missing: "configuration_text", wrongType: "schema_version", conflict: "support_register_version"
-    })]);
+  it("returns null for an empty status before the first Support publication and releases once", async () => {
+    const fixture = fakePool([[]]);
 
     await expect(createPostgresRegisterPublicationPort(fixture.pool).readSupportStatus())
-      .rejects.toThrow(/SUPPORT_CONFIG_SNAPSHOT_INVALID/u);
+      .resolves.toBeNull();
     expect(fixture.events.map((event) => event.sql)).toEqual([
       expect.stringContaining("register.read_support_configuration_status"), "RELEASE"
     ]);
   });
+
+  it.each(MALFORMED_RESULT_KINDS.filter((kind) => kind !== "zero-row"))(
+    "rework B4 rejects %s nonempty status results and releases once",
+    async (kind) => {
+      const valid = {
+        support_register_version: "5", schema_version: 1, base_register_version: "4", publication_id: id,
+        request_sha256: "a".repeat(64), snapshot_sha256: "b".repeat(64),
+        support_snapshot_sha256: "c".repeat(64), changed_keys: ["support_enabled"],
+        source_ref: "src:support", recorded_at: new Date("2026-09-04T00:00:00.000Z"),
+        configuration_text: "[]"
+      };
+      const fixture = fakePool([malformedResultRows(kind, valid, {
+        missing: "configuration_text", wrongType: "schema_version", conflict: "support_register_version"
+      })]);
+
+      await expect(createPostgresRegisterPublicationPort(fixture.pool).readSupportStatus())
+        .rejects.toThrow(/SUPPORT_CONFIG_SNAPSHOT_INVALID/u);
+      expect(fixture.events.map((event) => event.sql)).toEqual([
+        expect.stringContaining("register.read_support_configuration_status"), "RELEASE"
+      ]);
+    }
+  );
 
   it("does not roll back after an ambiguous COMMIT failure and always releases", async () => {
     const requestSha256 = computeGeneralPublicationRequestSha256({ publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general" });

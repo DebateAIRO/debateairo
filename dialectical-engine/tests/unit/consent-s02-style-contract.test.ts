@@ -312,10 +312,12 @@ describe("S02-C8 consent-ui style contract", () => {
     expectDecl(".consentRow", "padding", "11px 0");
     expectDecl(".consentRow", "cursor", "pointer");
 
-    // The hairline is on the FIRST row only (`:2` has it, `:6` does not). Asserted from BOTH
-    // sides — the rule that adds it and the shared rule that must not — and then counted, so a
-    // second `border-bottom` on any `.consentRow` selector fails even if both sides still hold.
-    expectDecl(".consentGroup > .consentRow:first-child", "border-bottom", "1px solid var(--line)");
+    // The hairline separates rows: every row but the LAST carries it (`:2` has it, `:6` — the
+    // artboard's last row — does not), which with three rows is `:not(:last-child)`. Asserted
+    // from BOTH sides — the rule that adds it and the shared rule that must not — and then
+    // counted, so a second `border-bottom` on any `.consentRow` selector fails even if both
+    // sides still hold.
+    expectDecl(".consentGroup > .consentRow:not(:last-child)", "border-bottom", "1px solid var(--line)");
     expect(declsOf(".consentRow").has("border-bottom")).toBe(false);
     const rowBorders = blockRules().filter(
       (rule) =>
@@ -323,7 +325,7 @@ describe("S02-C8 consent-ui style contract", () => {
         declarations(rule.body).some((decl) => decl.prop === "border-bottom")
     );
     expect(rowBorders.map((rule) => rule.selector)).toEqual([
-      ".consentGroup > .consentRow:first-child"
+      ".consentGroup > .consentRow:not(:last-child)"
     ]);
 
     // The 17px square IS the input (`appearance: none` + a pseudo-element), so it keeps native
@@ -514,8 +516,8 @@ describe("S02-C8 consent-ui style contract", () => {
     // INSIDE this block — `:488-495` is above the opening marker and outside C8's contract.
     //
     // The block's focusable inventory, TRANSCRIBED (`grep -n` over the two surfaces it styles):
-    //   .consentBox         <input type="checkbox">   SignUpFlow.tsx:206, :217            2 nodes
-    //   .consentPolicyLink  <button type="button">    SignUpFlow.tsx:234                  1 node
+    //   .consentBox         <input type="checkbox">   SignUpFlow.tsx (three rows)          3 nodes
+    //   .consentPolicyLink  <button type="button">    SignUpFlow.tsx (privacy, terms)      2 nodes
     //   .policyClose        <button>                  PrivacyPolicyModal.tsx:180          1 node
     //   .policyBody         <div tabIndex={0}>        PrivacyPolicyModal.tsx:195          1 node
     //   .policyPill         <button type="button">    PrivacyPolicyModal.tsx:198          8 nodes

@@ -273,7 +273,8 @@ function createObservedHistoryPool(): Readonly<{
       : typeof statement === "object" && statement !== null && "text" in statement
         ? String((statement as { text:unknown }).text)
         : "";
-    if (/pg_(?:try_)?advisory_lock\s*\(/i.test(sql)) counters.advisoryLocks += 1;
+    // Run content leases are taken in shared mode (pg_try_advisory_lock_shared); count them as leases.
+    if (/pg_(?:try_)?advisory_lock(?:_shared)?\s*\(/i.test(sql)) counters.advisoryLocks += 1;
     if (/INSERT\s+INTO\s+core\.question_liveness_event/i.test(sql)) counters.livenessWrites += 1;
     if (/INSERT\s+INTO\s+memory\.question_key/i.test(sql)) counters.memoryWrites += 1;
   };

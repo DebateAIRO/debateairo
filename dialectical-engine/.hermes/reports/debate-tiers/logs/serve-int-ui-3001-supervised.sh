@@ -6,7 +6,7 @@
 # with a doubled heap, and logs every death. Stop with: kill $(cat serve-ui-3001-supervised.pid) — the
 # loop dies, then kill the child in serve-ui-3001.pid. Written fresh 2026-09-10 23:1x.
 set -u
-LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/integration-debate-tiers/dialectical-engine
+LANE=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine
 LOGDIR=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/logs
 LOG=$LOGDIR/serve-int-ui-3001.log
 PIDF=$LOGDIR/serve-int-ui-3001.pid

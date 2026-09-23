@@ -5,6 +5,7 @@ import {
   parseDevelopmentProviderPanelTargets
 } from "../../apps/runner/src/dev-provider-panel.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
 
 describe("real development CLI provider panel", () => {
   it("loads the exact live CLI targets without changing the fixed maker order", () => {
@@ -30,6 +31,21 @@ describe("real development CLI provider panel", () => {
     expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(rows.map((row, index) =>
       index === 0 ? { ...row, base_url: "https://external.example/v1" } : row
     )))).toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
+  });
+
+  it("accepts only the selected support-preview relay ports", () => {
+    const rows = JSON.parse(TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+    const previewRows = rows.map((row, index) => ({
+      ...row,
+      base_url: `http://127.0.0.1:${SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE.providerPorts[index]}/v1`
+    }));
+    const source = JSON.stringify(previewRows);
+    expect(loadDevelopmentProviderPanelFromEnvironment({
+      DEBATEAI_DEV_AUTH_STACK_PROFILE: "support-preview",
+      DEBATEAI_DEV_PROVIDER_TARGETS_JSON: source
+    }).targetsJson).toBe(source);
+    expect(() => parseDevelopmentProviderPanelTargets(source))
+      .toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
   });
 
   it("rejects the removed scaffold and healthy-looking targets without relay credentials", () => {

@@ -2,22 +2,23 @@
 
 import { useEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
 import { redactSupportText } from "@debateai/kernel";
+import type { SupportAction } from "@debateai/support-kb/catalog";
+import { resolveSupportActions } from "@debateai/support-kb/navigation";
+import { requestPreferences } from "../../lib/consent.js";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
-import { ConsentToggle } from "./ConsentToggle.js";
-import { DebatePicker } from "./DebatePicker.js";
 import { supportCaseLink } from "./caseLink.js";
-import {
-  supportConsentRecordFrom,type SupportConsentRecord
-} from "./consent.js";
 import {
   browserSupportConversationStorage,
   clearStoredSupportConversation,
+  hasExactKeys,
   restoreSupportConversation,
+  supportActionsFrom,
+  supportSourcesFrom,
   writeStoredSupportConversation,
   SUPPORT_CONVERSATION_STORAGE_KEY,
   type SupportConversationMessage,
-  type SupportOwnContext
+  type SupportSource
 } from "./conversation.js";
 import { isStaleSupportSession, supportPost, SupportHttpError } from "./http.js";
 
@@ -52,8 +53,8 @@ type SupportSession = Readonly<{
   sessionId: string;
   token: string;
   identityBound: boolean;
-  /** DL3-F6: the server's own-context consent for THIS session, or null. */
-  consentOwnContextAt?: string | null;
+  /** The language the session was opened in; its actions resolve in it. */
+  language?: SupportAssistantLanguage;
 }>;
 export type SupportCaseAcknowledgement = Readonly<{
   text: string;
@@ -66,23 +67,15 @@ type SupportReply = Readonly<{
   outcome: SupportAssistantOutcome;
   text: string;
   link?: string;
+  sources?: readonly SupportSource[];
+  actions?: readonly SupportAction[];
   caseAcknowledgement?: SupportCaseAcknowledgement;
 }>;
 type SupportSessionStart = SupportSession | SupportReply;
-type OwnContextSelection = SupportOwnContext;
-
 export type SupportAssistantClient = Readonly<{
   createSession(language: SupportAssistantLanguage): Promise<SupportSessionStart>;
-  sendMessage(
-    session: SupportSession,
-    text: string,
-    language: SupportAssistantLanguage,
-    context?: OwnContextSelection
-  ): Promise<SupportReply>;
+  sendMessage(session: SupportSession,text: string): Promise<SupportReply>;
   isSignedIn?(): Promise<boolean>;
-  setConsent?(
-    session: SupportSession,on: boolean
-  ): Promise<SupportReply | SupportConsentRecord | null>;
   rate(
     session: SupportSession,messageId: string,rating: "yes" | "no"
   ): Promise<SupportCaseAcknowledgement | SupportReply | null>;
@@ -202,11 +195,17 @@ function caseAcknowledgement(body: Readonly<Record<string,unknown>>): SupportCas
   });
 }
 
-function replyFrom(body: Readonly<Record<string,unknown>>): SupportReply | null {
+function replyFrom(
+  body: Readonly<Record<string,unknown>>,
+  context?: Readonly<{ signedIn: boolean;language: SupportAssistantLanguage }>
+): SupportReply | null {
   if (typeof body.outcome !== "string"
     || !SUPPORT_ASSISTANT_OUTCOMES.has(body.outcome as SupportAssistantOutcome)
     || typeof body.text !== "string") return null;
   const acknowledgement = caseAcknowledgement(body);
+  const sources = supportSourcesFrom(body.sources);
+  const actions = supportActionsFrom(body.actions,context);
+  if (sources === null || actions === null) return null;
   const responseLink = typeof body.refusal_link === "string"
     ? body.refusal_link
     : acknowledgement === null && typeof body.link === "string" ? body.link : undefined;
@@ -214,6 +213,8 @@ function replyFrom(body: Readonly<Record<string,unknown>>): SupportReply | null 
     messageId: String(body.message_id ?? ""),
     outcome: body.outcome as SupportAssistantOutcome,
     text: body.text,
+    sources,
+    actions,
     ...(responseLink === undefined ? {} : { link: responseLink }),
     ...(acknowledgement === null ? {} : { caseAcknowledgement: acknowledgement })
   });
@@ -226,8 +227,22 @@ function isSupportReply(value: unknown): value is SupportReply {
     && "text" in value && typeof value.text === "string";
 }
 
+class SupportSnapshotUnavailableError extends Error {
+  constructor() {
+    super("SUPPORT_KB_SNAPSHOT_UNAVAILABLE");
+    this.name = "SupportSnapshotUnavailableError";
+  }
+}
+
 async function readJson(response: Response): Promise<Record<string,unknown>> {
-  const body = await response.json() as Record<string,unknown>;
+  const value = await response.json() as unknown;
+  const body = value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string,unknown> : {};
+  // dev: the exact restart envelope, and nothing wider, asks for a new session.
+  if (response.status === 409 && hasExactKeys(body,["error","restart_session"])
+    && body.error === "SUPPORT_KB_SNAPSHOT_UNAVAILABLE" && body.restart_session === true) {
+    throw new SupportSnapshotUnavailableError();
+  }
   if (!response.ok
     && (typeof body.outcome !== "string" || typeof body.text !== "string")) {
     // DL3-F3: the status travels with the failure so a stale session (404) can
@@ -253,36 +268,19 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
       throw new Error("SUPPORT_RESPONSE_INVALID");
     }
     const session = body.session as Record<string,unknown>;
-    const consent = supportConsentRecordFrom(body);
     return Object.freeze({
       sessionId: String(session.session_id),token: String(body.session_token),
-      identityBound: session.identity_bound === true,
-      // DL3-F6: the served record states this session's own-context consent.
-      // It used to be discarded here, so the control could only guess.
-      ...(consent === null ? {} : { consentOwnContextAt: consent.consentOwnContextAt })
+      identityBound: session.identity_bound === true,language
     });
   },
-  async sendMessage(session,text,language,context) {
+  async sendMessage(session,text) {
     const body = await readJson(await supportPost(
       `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/messages`,
-      {
-        text,language,
-        ...(context !== undefined && "runId" in context ? { run_id: context.runId } : {}),
-        ...(context !== undefined && "latest" in context ? { latest: true } : {})
-      },session.token
+      { text },session.token
     ));
-    const reply = replyFrom(body);
+    const reply = replyFrom(body,{ signedIn: session.identityBound,language: session.language ?? "en" });
     if (reply === null) throw new Error("SUPPORT_RESPONSE_INVALID");
     return reply;
-  },
-  async setConsent(session,on) {
-    const body = await readJson(await supportPost(
-      `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/consent`,
-      { on },session.token
-    ));
-    // DL3-F6: a terminal reply (SHREDDED, DISABLED…) still wins; otherwise the
-    // route answers with the updated session record, which is the consent fact.
-    return replyFrom(body) ?? supportConsentRecordFrom(body);
   },
   async rate(session,messageId,rating) {
     const body = await readJson(await supportPost(
@@ -296,7 +294,7 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
       `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/escalate`,
       { language },session.token
     ));
-    const terminal = replyFrom(body);
+    const terminal = replyFrom(body,{ signedIn: session.identityBound,language });
     if (terminal !== null) return terminal;
     if (typeof body.case_token !== "string" || typeof body.text !== "string") {
       throw new Error("SUPPORT_RESPONSE_INVALID");
@@ -337,13 +335,12 @@ function caseOpenedMessage(
 export { SUPPORT_CONVERSATION_STORAGE_KEY };
 
 export function Assistant({
-  client = supportAssistantClient,signedIn,onLanguageChange,initialContext,
+  client = supportAssistantClient,signedIn,onLanguageChange,
   fullPage = false,auxiliaryContent,onClose
 }: Readonly<{
   client?: SupportAssistantClient;
   signedIn?: boolean;
   onLanguageChange?: (language: SupportAssistantLanguage) => void;
-  initialContext?: Readonly<{ runId: string }>;
   fullPage?: boolean;
   auxiliaryContent?: ReactNode;
   onClose?: () => void;
@@ -370,18 +367,13 @@ export function Assistant({
   // known, so a signed-out first paint can never show a signed-in transcript.
   const [identityResolved,setIdentityResolved] = useState(signedIn !== undefined);
   const [restored,setRestored] = useState(false);
-  const [ownContext,setOwnContext] = useState<OwnContextSelection>(
-    initialContext ?? { latest: true }
-  );
   const [activeTopic,setActiveTopic] = useState("reading");
-  const [contextOpen,setContextOpen] = useState(false);
   const [pageStatus,setPageStatus] = useState<SupportPageStatus | null>(null);
   const [statusUnavailable,setStatusUnavailable] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (initialContext !== undefined) setOwnContext({ runId: initialContext.runId });
-  },[initialContext?.runId]);
+  const conversationPaneRef = useRef<HTMLDivElement>(null);
+  const conversationEndRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
 
   useEffect(() => {
     onLanguageChange?.(language);
@@ -398,15 +390,22 @@ export function Assistant({
     if (conversation === null) return;
     setLanguage(conversation.language);
     if (conversation.messages.length > 0) setMessages(conversation.messages);
-    if (initialContext === undefined) setOwnContext(conversation.ownContext);
-  },[identityAvailable,identityResolved,initialContext,persistent,restored]);
+  },[identityAvailable,identityResolved,persistent,restored]);
 
   useEffect(() => {
     if (!persistent || !restored) return;
     writeStoredSupportConversation(browserSupportConversationStorage(),{
-      language,identityBound: identityAvailable,messages,ownContext
+      language,identityBound: identityAvailable,messages
     });
-  },[identityAvailable,language,messages,ownContext,persistent,restored]);
+  },[identityAvailable,language,messages,persistent,restored]);
+
+  useEffect(() => {
+    if (!fullPage || !followLatestRef.current) return;
+    const end = conversationEndRef.current;
+    if (end !== null && typeof end.scrollIntoView === "function") {
+      end.scrollIntoView({ block:"end",behavior:"smooth" });
+    }
+  },[fullPage,messages.length]);
 
   useEffect(() => {
     if (signedIn !== undefined) {
@@ -458,6 +457,8 @@ export function Assistant({
   },[fullPage,persistent]);
 
   function chooseLanguage(next: SupportAssistantLanguage): void {
+    if (next === language) return;
+    setSession(null);
     setLanguage(next);
     onLanguageChange?.(next);
     setMessages((current) => current.map((message,index) => index === 0
@@ -476,9 +477,7 @@ export function Assistant({
     // DL1-F5c: the bearer goes with the transcript it belongs to.
     setCaseBearer(null);
     setMessages([{ id: "disclosure",role: "assistant",text: DISCLOSURE[language] }]);
-    setOwnContext({ latest: true });
     setActiveTopic("reading");
-    setContextOpen(false);
     if (inputRef.current !== null) inputRef.current.value = "";
     if (persistent) clearStoredSupportConversation(browserSupportConversationStorage());
   }
@@ -495,7 +494,10 @@ export function Assistant({
       {
         id: response.messageId || `assistant-${current.length}`,
         role: "assistant",text: redactSupportText(response.text).text,
-        outcome: response.outcome,...(response.link === undefined ? {} : { link: response.link })
+        outcome: response.outcome,language,
+        sources: response.sources ?? Object.freeze([]),
+        actions: response.actions ?? Object.freeze([]),
+        ...(response.link === undefined ? {} : { link: response.link })
       },
       ...(acknowledgement === undefined ? [] : [caseOpenedMessage(current.length + 1,language)])
     ]);
@@ -531,6 +533,12 @@ export function Assistant({
    * a stale identity-bound session on a shared tab, an expiry, a lock) one
    * retry on a brand-new session. Without this the compact widget answered
    * "Support is unavailable" for the life of the tab, with no reset control.
+   *
+   * dev's snapshot restart takes the same door: the API's exact 409
+   * `SUPPORT_KB_SNAPSHOT_UNAVAILABLE` envelope retires the session the way a
+   * stale 404 does, and the turn is retried once on a fresh session held in
+   * memory — the session is never read back from, or written to, storage. A
+   * second mismatch leaves no session held and surfaces as unavailable.
    */
   async function withSupportSession<T>(
     run: (active: SupportSession) => Promise<T>
@@ -540,10 +548,17 @@ export function Assistant({
     try {
       return await run(active);
     } catch (failure) {
-      if (!isStaleSupportSession(failure)) throw failure;
+      if (!isStaleSupportSession(failure)
+        && !(failure instanceof SupportSnapshotUnavailableError)) throw failure;
       setSession(null);
       const fresh = await activeSession(true);
-      return fresh === null ? null : await run(fresh);
+      if (fresh === null) return null;
+      try {
+        return await run(fresh);
+      } catch (retryFailure) {
+        if (retryFailure instanceof SupportSnapshotUnavailableError) setSession(null);
+        throw retryFailure;
+      }
     }
   }
 
@@ -556,9 +571,7 @@ export function Assistant({
       id: `user-${current.length}`,role: "user",text: request
     }]);
     try {
-      const response = await withSupportSession((active) => isOwnContextRequest(request)
-        ? client.sendMessage(active,request,language,ownContext)
-        : client.sendMessage(active,request,language));
+      const response = await withSupportSession((active) => client.sendMessage(active,request));
       if (response !== null) appendReply(response);
     } catch {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
@@ -612,27 +625,6 @@ export function Assistant({
     }
   }
 
-  async function changeConsent(on: boolean): Promise<void> {
-    const setConsent = client.setConsent;
-    if (setConsent === undefined) throw new Error("SUPPORT_CONSENT_UNAVAILABLE");
-    try {
-      const result = await withSupportSession((active) => setConsent(active,on));
-      if (result === null || result === undefined) return;
-      if (isSupportReply(result)) {
-        appendReply(result);
-        return;
-      }
-      // DL3-F6: the server's new record replaces the one this session held, so
-      // the control shows what the API actually holds rather than a local guess.
-      setSession((current) => current === null
-        ? current
-        : { ...current,consentOwnContextAt: result.consentOwnContextAt });
-    } catch (error) {
-      appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
-      throw error;
-    }
-  }
-
   const languageControls = <div className="supportLanguage" aria-label="Language override">
     <button type="button" aria-pressed={language === "en"} onClick={() => chooseLanguage("en")}>EN</button>
     <button type="button" aria-pressed={language === "ro"} onClick={() => chooseLanguage("ro")}>RO</button>
@@ -645,7 +637,7 @@ export function Assistant({
    * token-free notice with no link, because the code is not there to render.
    */
   const liveCaseMessageId = caseBearer === null ? null : messages.reduce<string | null>(
-    (latest,message) => message.caseOpened === true ? message.id : latest,null
+    (newest,message) => message.caseOpened === true ? message.id : newest,null
   );
 
   const conversation = <div className="supportConversation" aria-label="Support conversation" aria-live="polite">
@@ -653,34 +645,30 @@ export function Assistant({
       const bearer = caseBearer !== null && message.id === liveCaseMessageId ? caseBearer : null;
       const text = bearer === null ? message.text : bearer.text;
       const link = bearer === null ? safeFirstPartyLink(message.link) : supportCaseLink(bearer.token);
+      const sources = message.sources ?? Object.freeze([]);
+      const actions = message.actions ?? Object.freeze([]);
+      const hasFooter = link !== null || sources.length > 0 || actions.length > 0;
       return <article className={`supportMessage supportMessage--${message.role}`} key={message.id} data-role={message.role}>
         {message.role === "assistant" ? <div className="supportMessageShell">
           <div className="supportMessageTab" aria-hidden />
           <div className="supportMessageCore">
             <p>{text}</p>
-            {link === null ? null : <footer className="supportCitation">
-              <span>DOCS · PRODUCT GUIDE</span>
-              <a href={link}>View source →</a>
+            {!hasFooter ? null : <footer className="supportCitation">
+              {sources.length === 0 ? null : <div role="list" aria-label={language === "en" ? "Sources" : "Surse"}>
+                {sources.map((source) => <span role="listitem" key={source.id}>{source.label}</span>)}
+              </div>}
+              {actions.length === 0 ? null : <nav aria-label={language === "en" ? "Actions" : "Acțiuni"}>
+                {actions.map((action) => <a href={action.href} key={action.id}>{action.label}</a>)}
+              </nav>}
+              {link === null ? null : <>
+                <span>DOCS · PRODUCT GUIDE</span>
+                <a href={link}>View source →</a>
+              </>}
             </footer>}
           </div>
         </div> : <p>{text}</p>}
       </article>;
     })}
-  </div>;
-
-  const contextControls = <div className="supportContextPanel" hidden={fullPage && !contextOpen}>
-    <ConsentToggle
-      signedIn={identityAvailable}
-      language={language}
-      consentedAt={session?.consentOwnContextAt ?? null}
-      onChange={changeConsent}
-    />
-    <DebatePicker
-      signedIn={identityAvailable}
-      language={language}
-      onSelect={(runId) => setOwnContext({ runId })}
-      onLatest={() => setOwnContext({ latest: true })}
-    />
   </div>;
 
   const ratingControls = canRate && last !== undefined ? (
@@ -701,13 +689,6 @@ export function Assistant({
       placeholder={language === "en" ? "Describe what happened…" : "Descrie ce s-a întâmplat…"}
     />
     {fullPage ? <div className="supportComposerBar">
-      <button
-        className="supportAttach"
-        type="button"
-        aria-expanded={contextOpen}
-        onClick={() => setContextOpen((open) => !open)}
-      >⌁ <span>Attach a debate</span></button>
-      <span className="supportComposerHint">Your session and device details are attached automatically.</span>
       <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
     </div> : <div className="supportComposerBar supportComposerBar--compact">
       <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
@@ -726,7 +707,6 @@ export function Assistant({
         {languageControls}
       </div>
       {conversation}
-      {contextControls}
       {ratingControls}
       <button
         type="button"
@@ -741,7 +721,9 @@ export function Assistant({
   const statusLabel = statusUnavailable || pageStatus?.available === false
     ? "UNAVAILABLE" : pageStatus === null ? "CHECKING" : "ONLINE";
   const reference = session === null ? "HLP—NEW" : `HLP-${session.sessionId.slice(0,4).toUpperCase()}`;
-  const debateContext = "runId" in ownContext ? `Run ${ownContext.runId.slice(0,12)}` : "Latest debate when requested";
+  const privacyShortcut = resolveSupportActions(["privacy-preferences"],{
+    signedIn: identityAvailable,language
+  }).at(0);
 
   return <div className="supportDesk" data-support-desk>
     <header className="supportHeader" data-support-header>
@@ -800,14 +782,23 @@ export function Assistant({
           <div className="supportAgentAvatar" aria-hidden>◆</div>
           <div className="supportAgentIdentity">
             <div><h1>Support agent</h1><span className={`supportOnline supportOnline--${statusLabel.toLowerCase()}`}>{statusLabel}</span></div>
-            <p>Answers from the product docs and your account — cites its source, and hands off to a person when it cannot.</p>
+            <p>Answers from public product guidance, cites its source, and hands off to a person when it cannot.</p>
           </div>
           <button className="supportNewConversation" type="button" onClick={beginNewConversation}>New conversation</button>
         </header>
 
-        <div className="supportChatScroll">
+        <div
+          className="supportChatScroll"
+          ref={conversationPaneRef}
+          onScroll={() => {
+            const pane = conversationPaneRef.current;
+            if (pane === null) return;
+            followLatestRef.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight <= 48;
+          }}
+        >
           <p className="supportTimestamp">Today · Support conversation</p>
           {conversation}
+          <div ref={conversationEndRef} data-support-conversation-end aria-hidden />
           {ratingControls}
           <div className="supportSuggestions" aria-label="Suggested questions">
             {HELP_SUGGESTIONS.map((suggestion) => <button
@@ -818,7 +809,6 @@ export function Assistant({
         </div>
 
         <div className="supportComposerDock">
-          {contextControls}
           {composer}
         </div>
       </section>
@@ -828,9 +818,8 @@ export function Assistant({
           <p className="supportEyebrow">This conversation</p>
           <dl className="supportMetadata">
             <div><dt>Reference</dt><dd>{reference}</dd></div>
-            <div><dt>Debate</dt><dd>{debateContext}</dd></div>
             <div><dt>Opened</dt><dd>This visit</dd></div>
-            <div><dt>Attached</dt><dd>{identityAvailable ? "Session · debate context" : "Device only · no account data"}</dd></div>
+            <div><dt>Data</dt><dd>Public product guidance only</dd></div>
           </dl>
           <div className="supportSideLanguage"><span>Language</span>{languageControls}</div>
         </section>
@@ -846,25 +835,20 @@ export function Assistant({
         <section className="supportSideCard" aria-label="Support shortcuts">
           <p className="supportEyebrow">Shortcuts</p>
           <ul className="supportShortcuts">
-            <li><a href="/settings#privacy">Privacy policy <span>↗</span></a></li>
-            <li><a href="/settings#cookies">Cookie preferences <span>↗</span></a></li>
+            {privacyShortcut === undefined ? null : <li>
+              <a href={privacyShortcut.href}>{privacyShortcut.label} <span>↗</span></a>
+            </li>}
+            <li><button type="button" onClick={(event) => requestPreferences(event.currentTarget)}>
+              Cookie preferences <span>↗</span>
+            </button></li>
             <li><a href="#service-status">Model fleet status <span>↗</span></a></li>
             <li><button type="button" onClick={() => primeComposer("Report a bug in this debate")}>Report a bug <span>→</span></button></li>
           </ul>
-          <p className="supportShortcutNote">Opens a conversation here with your session and selected debate context attached.</p>
+          <p className="supportShortcutNote">Opens a public product-guide conversation here.</p>
         </section>
 
         {auxiliaryContent === undefined ? null : <div className="supportAuxiliary">{auxiliaryContent}</div>}
       </aside>
     </div>
   </div>;
-}
-
-function isOwnContextRequest(message: string): boolean {
-  const subject = /\b(?:my|mine|own|mea|mele|meu)\b|propri[au]/iu.test(message);
-  const object = /\b(?:debate|debates|run|runs)\b|dezbat|rulare|rulări/iu.test(message);
-  const state = /\b(?:current|status|state|stuck|progress|visibility|failure)\b|stare|blocat|progres|vizibil|eroare|ultim/iu.test(message);
-  const list = /\b(?:list|show|enumerate)\b|listeaz|arat/iu.test(message);
-  return (subject && object && (state || list))
-    || /\b(?:this|selected|această|selectată)\s+(?:debate|run|dezbatere|rulare)\b/iu.test(message);
 }

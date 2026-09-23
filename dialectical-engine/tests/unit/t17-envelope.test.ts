@@ -7,7 +7,7 @@ import {
 import { SERVE_LEG, computeStructuralCeilingBasis } from "@debateai/register";
 import { parseCostEnvelopeBasis } from "@debateai/budget";
 import { evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
-import type { AskRequest } from "@debateai/contract";
+import { PLAN_TIER_ROSTERS, type AskRequest } from "@debateai/contract";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 
 /**
@@ -377,6 +377,7 @@ describe("T17 · the receipt may not be self-contradictory (S09B)", () => {
 describe("T17 · an over-bound input still refuses loudly at admission", () => {
   const ask: AskRequest = {
     question_line: "What follows from this evidence?",
+    plan_tier: "free",
     risk_tier: "standard",
     tier_source: "ASKER",
     tier_provenance_ref: "asker:test",
@@ -394,7 +395,9 @@ describe("T17 · an over-bound input still refuses loudly at admission", () => {
       registerVersion: 1,
       batteryVersion: "battery:test",
       settlementWatchHandle: "watch:test",
-      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
+      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2).map((member, index) => ({
+        ...member, model_id: PLAN_TIER_ROSTERS.free[index]!
+      })),
       resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
         ...ceilingInput(input.panelSize, Number(input.depthParams.depth))
       }),

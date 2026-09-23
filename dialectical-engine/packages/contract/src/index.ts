@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
+import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -140,6 +141,7 @@ export const AskRequestSchema = z.object({
   decision_scope: z.string().trim().min(1),
   as_of: z.iso.datetime(),
   steering_presets: z.array(z.string().trim().min(1)),
+  plan_tier: PlanTierSchema,
   steering_annotations: z.array(z.string().min(1))
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
@@ -723,7 +725,6 @@ export const contractInventory = Object.freeze({
     "GET /v1/public/debates/{id}",
     "POST /v1/support/sessions",
     "GET /v1/support/sessions/{id}",
-    "POST /v1/support/sessions/{id}/consent",
     "POST /v1/support/sessions/{id}/messages",
     "POST /v1/support/messages/{id}/rating",
     "POST /v1/support/sessions/{id}/escalate",

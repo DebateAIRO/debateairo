@@ -13,11 +13,25 @@ export const TEST_DEVELOPMENT_PROVIDER_DOCUMENT = Object.freeze({
       authorization_header: "Bearer test-codex"
     }),
     Object.freeze({
+      provider_ref: "development:codex-premium-cli",
+      maker: "OpenAI",
+      base_url: "http://127.0.0.1:8795/v1",
+      model: "gpt-premium-test-real",
+      authorization_header: "Bearer test-codex-premium"
+    }),
+    Object.freeze({
       provider_ref: "development:claude-cli",
       maker: "Anthropic",
       base_url: "http://127.0.0.1:8792/v1",
       model: "claude-test-real",
       authorization_header: "Bearer test-claude"
+    }),
+    Object.freeze({
+      provider_ref: "development:claude-premium-cli",
+      maker: "Anthropic",
+      base_url: "http://127.0.0.1:8796/v1",
+      model: "claude-premium-test-real",
+      authorization_header: "Bearer test-claude-premium"
     }),
     Object.freeze({
       provider_ref: "development:grok-cli",

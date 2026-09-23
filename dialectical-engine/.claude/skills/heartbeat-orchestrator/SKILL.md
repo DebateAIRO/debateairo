@@ -114,6 +114,7 @@ between attempts — processes by PID, worktrees, untracked files, locks. A CLI 
   `REQ-FIX.md` and `ARCH-FIX.md`); fill every
   `__MARKER__`; keep the contract half ≤ 40 lines. A path the seat will create carries ` (new)`; a code quote is
   `<abs path>:<LINE> — \`text\``, re-grepped at write time — never recalled from earlier tool output.
+- **A dependent cluster's base is measured AFTER its predecessors land, by the orchestrator, with the capture runner** — the frame goes into the packet (`__BASE_FRAME__`) as the START state; the PLAN's §2 row was measured before the predecessors existed and is only valid for a cluster with none (S03 C1 → C3, 2026-09-13: two suites BROKEN at module load, unseen by any review).
 - **`scripts/packet-check.sh <packet>` runs before every dispatch; exit 1 means no dispatch.**
   It runs AFTER the freeze commit (§9) and immediately before the DISPATCHED comment, which stamps
   the HEAD the check printed — one HEAD across the whole dispatch record. A

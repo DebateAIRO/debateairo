@@ -156,8 +156,16 @@ function decodeTargetRow(source: string): Readonly<Record<string,unknown>> {
 function ratifiedRelayTarget(
   row: Readonly<Record<string,unknown>>
 ): ProviderDiscoveryTarget | undefined {
-  if (Object.keys(row).sort().join("\0")
-    !== ["provider_ref","base_url","model","authorization_header"].sort().join("\0")) {
+  // dev's support-preview development stack runs the SAME ratified relay on its
+  // own loopback port (8894), flagged by one marker member. The marker is a
+  // relay-only rule: it is read nowhere else, and a hosted deployment still
+  // refuses every relay target through `assertDeploymentProviderTargets` below.
+  const supportPreview = row.development_stack_profile === "support-preview";
+  const expectedKeys = [
+    "provider_ref","base_url","model","authorization_header",
+    ...(supportPreview ? ["development_stack_profile"] : [])
+  ];
+  if (Object.keys(row).sort().join("\0") !== expectedKeys.sort().join("\0")) {
     return undefined;
   }
   if (row.provider_ref !== SUPPORT_HERMES_PROVIDER_REF
@@ -174,7 +182,7 @@ function ratifiedRelayTarget(
   }
   if (url.protocol !== "http:"
     || url.hostname !== "127.0.0.1"
-    || url.port !== "8794"
+    || url.port !== (supportPreview ? "8894" : "8794")
     || url.username !== ""
     || url.password !== ""
     || url.search !== ""

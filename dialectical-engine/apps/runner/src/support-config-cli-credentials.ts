@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import pg, { type PoolClient } from "pg";
+import pg, { type Pool, type PoolClient } from "pg";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
 
 const { Pool: PgPool } = pg;
@@ -14,8 +14,8 @@ const SUPPORT_CONFIG_OPERATOR_DATABASE_URL = "SUPPORT_CONFIG_OPERATOR_DATABASE_U
 const DEVELOPMENT_SUPPORT_CONFIG_OPERATOR_ROLE = "debateai_dev_support_config_operator";
 const PRODUCTION_SUPPORT_CONFIG_OPERATOR_ROLE = "debateai_prod_support_config_operator";
 const LOCAL_DATABASE_HOST = "127.0.0.1";
-const LOCAL_DATABASE_PORT = "55432";
 const LOCAL_DATABASE_NAME = "/debateai";
+const DEVELOPMENT_INITIALIZATION_DEADLINE_MILLISECONDS = 5_000;
 
 export type DevelopmentSupportConfigCliCredentials = Readonly<{
   databaseUrl: string;
@@ -121,7 +121,7 @@ function parseExactDevelopmentCredentials(source: string): ReadonlyMap<string, s
   return parsed;
 }
 
-function assertDevelopmentSupportConfigDatabaseUrl(raw: string): void {
+function assertDevelopmentSupportConfigDatabaseUrl(raw: string, expectedPort: string): void {
   let databaseUrl: URL;
   try {
     databaseUrl = new URL(raw);
@@ -130,7 +130,7 @@ function assertDevelopmentSupportConfigDatabaseUrl(raw: string): void {
   }
   if ((databaseUrl.protocol !== "postgres:" && databaseUrl.protocol !== "postgresql:")
     || databaseUrl.hostname !== LOCAL_DATABASE_HOST
-    || databaseUrl.port !== LOCAL_DATABASE_PORT
+    || databaseUrl.port !== expectedPort
     || databaseUrl.pathname !== LOCAL_DATABASE_NAME
     || databaseUrl.search !== ""
     || databaseUrl.hash !== ""
@@ -202,7 +202,8 @@ function parseExactProductionCredentials(
 }
 
 export async function loadDevelopmentSupportConfigCliCredentials(
-  credentialFilePath: string
+  credentialFilePath: string,
+  expectedPort = "55432"
 ): Promise<DevelopmentSupportConfigCliCredentials> {
   const resolvedPath = resolve(credentialFilePath);
   await assertPrivateDirectory(dirname(resolvedPath));
@@ -214,8 +215,27 @@ export async function loadDevelopmentSupportConfigCliCredentials(
   if (databaseUrl === undefined) {
     throw new TypeError("SUPPORT_CONFIG_CREDENTIAL_FILE_INVALID");
   }
-  assertDevelopmentSupportConfigDatabaseUrl(databaseUrl);
+  assertDevelopmentSupportConfigDatabaseUrl(databaseUrl, expectedPort);
   return Object.freeze({ databaseUrl });
+}
+
+export async function createDevelopmentSupportConfigInitializationPool(
+  credentialFilePath: string,
+  expectedPort = "55432"
+): Promise<Pool> {
+  const credentials = await loadDevelopmentSupportConfigCliCredentials(
+    credentialFilePath,
+    expectedPort
+  );
+  const pool = new PgPool({
+    connectionString: credentials.databaseUrl,
+    max: 1,
+    connectionTimeoutMillis: DEVELOPMENT_INITIALIZATION_DEADLINE_MILLISECONDS,
+    statement_timeout: DEVELOPMENT_INITIALIZATION_DEADLINE_MILLISECONDS,
+    query_timeout: DEVELOPMENT_INITIALIZATION_DEADLINE_MILLISECONDS
+  });
+  pool.on("error", () => undefined);
+  return pool;
 }
 
 async function validateProductionSupportConfigCredentialFile(

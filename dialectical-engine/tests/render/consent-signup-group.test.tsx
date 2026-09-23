@@ -19,9 +19,10 @@ import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 
 /** Copy — byte-exact from SPEC.md §Copy / turn-8a-checkbox-group.html:4,8. */
 const ROW_ONE_TEXT = "I am 18 or over.";
-const ROW_TWO_TEXT =
-  "I agree to the Privacy Policy, including that my debates may be published publicly.";
+const ROW_TWO_TEXT = "I have read the Privacy Policy.";
+const ROW_THREE_TEXT = "I have read and agree to the Terms of Service.";
 const POLICY_CONTROL_TEXT = "Privacy Policy";
+const TERMS_CONTROL_TEXT = "Terms of Service";
 
 let root: Root | null = null;
 
@@ -70,6 +71,7 @@ async function registerSuccessfully(): Promise<void> {
   field("password").value = "correct horse battery staple";
   field("adult-affirmed").checked = true;
   field("privacy-accepted").checked = true;
+  field("terms-accepted").checked = true;
   const form = document.querySelector<HTMLFormElement>("form");
   expect(form).not.toBeNull();
   await act(async () => {
@@ -95,32 +97,43 @@ describe("sign-up consent checkbox group", () => {
   });
 
   /* S02-S17 — structure. */
-  it("renders one bordered group holding exactly two rows, one input in each, adult first", async () => {
+  it("renders one bordered group holding exactly three rows, one input in each, adult first", async () => {
     await mount();
 
     const groups = document.querySelectorAll(".consentGroup");
     expect(groups).toHaveLength(1);
 
     const consentRows = rows();
-    expect(consentRows).toHaveLength(2);
+    expect(consentRows).toHaveLength(3);
 
     const adult = field("adult-affirmed");
     const privacy = field("privacy-accepted");
+    const terms = field("terms-accepted");
     expect(consentRows[0].contains(adult)).toBe(true);
     expect(consentRows[1].contains(privacy)).toBe(true);
+    expect(consentRows[2].contains(terms)).toBe(true);
     expect(consentRows[0].contains(privacy)).toBe(false);
     expect(consentRows[1].contains(adult)).toBe(false);
+    expect(consentRows[2].contains(privacy)).toBe(false);
     expect(adult.compareDocumentPosition(privacy) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(privacy.compareDocumentPosition(terms) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   /* S02-S18 — copy is byte-exact. */
-  it("carries the design's two sentences and the two-word policy control verbatim", async () => {
+  it("carries the three sentences and the two document controls verbatim", async () => {
     await mount();
 
     const consentRows = rows();
     expect(consentRows[0].textContent?.trim()).toBe(ROW_ONE_TEXT);
     expect(consentRows[1].textContent?.trim()).toBe(ROW_TWO_TEXT);
+    expect(consentRows[2].textContent?.trim()).toBe(ROW_THREE_TEXT);
+
+    const termsControl = consentRows[2].querySelector(".consentPolicyLink");
+    expect(termsControl, "missing the Terms of Service control").not.toBeNull();
+    expect(termsControl!.textContent).toBe(TERMS_CONTROL_TEXT);
+    expect(termsControl!.getAttribute("type"), "Terms of Service control type").toBe("button");
 
     const control = consentRows[1].querySelector(".consentPolicyLink");
     expect(control, "missing the Privacy Policy control").not.toBeNull();
@@ -133,10 +146,10 @@ describe("sign-up consent checkbox group", () => {
   });
 
   /* S02-S19 — form semantics. */
-  it("keeps both boxes real, required, single-form controls that disable with the card", async () => {
+  it("keeps all three boxes real, required, single-form controls that disable with the card", async () => {
     await mount();
 
-    for (const name of ["adult-affirmed", "privacy-accepted"]) {
+    for (const name of ["adult-affirmed", "privacy-accepted", "terms-accepted"]) {
       const input = field(name);
       expect(input.type, `${name} type`).toBe("checkbox");
       expect(input.required, `${name} required`).toBe(true);
@@ -148,6 +161,7 @@ describe("sign-up consent checkbox group", () => {
 
     expect(field("adult-affirmed").disabled, "adult-affirmed disabled when sent").toBe(true);
     expect(field("privacy-accepted").disabled, "privacy-accepted disabled when sent").toBe(true);
+    expect(field("terms-accepted").disabled, "terms-accepted disabled when sent").toBe(true);
     expect(document.querySelectorAll("form")).toHaveLength(1);
   });
 
@@ -164,6 +178,12 @@ describe("sign-up consent checkbox group", () => {
     const named = document.getElementById(labelledBy!);
     expect(named, `aria-labelledby="${labelledBy}" names no element`).not.toBeNull();
     expect(named!.textContent?.trim()).toBe(ROW_TWO_TEXT);
+
+    const termsLabelledBy = field("terms-accepted").getAttribute("aria-labelledby");
+    expect(termsLabelledBy, "terms-accepted has no aria-labelledby").not.toBeNull();
+    const termsNamed = document.getElementById(termsLabelledBy!);
+    expect(termsNamed, `aria-labelledby="${termsLabelledBy}" names no element`).not.toBeNull();
+    expect(termsNamed!.textContent?.trim()).toBe(ROW_THREE_TEXT);
   });
 
   /* S02-S21 — the 18+ row is a plain toggle, from all three surfaces, and opens nothing. */

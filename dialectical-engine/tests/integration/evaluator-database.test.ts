@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest, Session } from "@debateai/contract";
-import { migrate, ProviderProbeRepository } from "@debateai/db";
+import { migrate, ProviderProbeRepository, type DiscoveredPanelMember } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   DomainRegistryRepository,
@@ -1331,6 +1331,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     decision_scope: "test",
     as_of: "2026-08-14T00:00:00.000Z",
     steering_presets: [],
+    plan_tier: "free",
     steering_annotations: []
   };
   const session = {
@@ -1348,10 +1349,12 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
   async function admitAndReadPersistedRun(registerVersion: number): Promise<{
     readonly panelBytes: string;
     readonly discoveredPanel: readonly { readonly provider_ref: string; readonly maker: string }[];
+    readonly resolvedPanel: readonly DiscoveredPanelMember[];
     readonly agentCount: number;
   }> {
     const deploymentMakers = await readDeploymentMakerCapability(database.pool, registerVersion);
     const probes = new ProviderProbeRepository(database.pool);
+    let resolvedPanel: readonly DiscoveredPanelMember[] = [];
     const settings: RunCreationSettings = {
       strangerSampleRate: 0,
       registerVersion,
@@ -1362,7 +1365,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
           deploymentMakers.configuredProviders.map((provider) => provider.providerRef)
         );
         const now = Date.now();
-        return Object.freeze(latest.flatMap((record) =>
+        resolvedPanel = Object.freeze(latest.flatMap((record) =>
           record.state === "HEALTHY" && record.modelId !== null
             && now - record.probedAt.getTime() <= 60_000
             ? [Object.freeze({
@@ -1374,6 +1377,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
               })]
             : []
         ));
+        return resolvedPanel;
       },
       resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 2),
       resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
@@ -1404,6 +1408,7 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     return Object.freeze({
       panelBytes: row.panel_bytes,
       discoveredPanel: row.discovered_panel,
+      resolvedPanel,
       agentCount: row.agent_count
     });
   }
@@ -1446,8 +1451,8 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
       ) VALUES ($1, 'AVAILABLE', NULL, $2, $2, ledger.allocate_sequence())
     `, [EVALUATOR_PROVIDER_REF, probedAt]);
     for (const probe of [
-      { probeEvidenceRef: "00000000-0000-4000-8000-000000000201", providerRef: "provider:product-a", maker: "maker:product-a", modelId: "model:product-a" },
-      { probeEvidenceRef: "00000000-0000-4000-8000-000000000202", providerRef: "provider:product-b", maker: "maker:product-b", modelId: "model:product-b" },
+      { probeEvidenceRef: "00000000-0000-4000-8000-000000000201", providerRef: "provider:product-a", maker: "maker:product-a", modelId: "gpt-5.6-luna" },
+      { probeEvidenceRef: "00000000-0000-4000-8000-000000000202", providerRef: "provider:product-b", maker: "maker:product-b", modelId: "claude-sonnet-5" },
       { probeEvidenceRef: "00000000-0000-4000-8000-000000000203", providerRef: EVALUATOR_PROVIDER_REF, maker: EVALUATOR_MAKER, modelId: "model:evaluator-local" }
     ]) {
       await probes.record({ ...probe, state: "HEALTHY", failureCode: null, probedAt });
@@ -1456,6 +1461,9 @@ describe("FR-0.6 AC5 persisted panel-isolation differential", () => {
     const absent = await admitAndReadPersistedRun(absentVersion);
     const healthy = await admitAndReadPersistedRun(healthyVersion);
 
+    expect(healthy.resolvedPanel.some((member) =>
+      member.provider_ref === EVALUATOR_PROVIDER_REF || member.maker === EVALUATOR_MAKER
+    )).toBe(false);
     expect(healthy.panelBytes).toBe(absent.panelBytes);
     expect(healthy.agentCount).toBe(absent.agentCount);
     expect(healthy.discoveredPanel.some((member) =>

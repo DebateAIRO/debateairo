@@ -37,11 +37,15 @@ apps/api/src/support/incidents.ts
 apps/api/src/support/index.ts
 apps/api/src/support/keys.ts
 apps/api/src/support/limits.ts
+apps/api/src/support/model-references.ts
 apps/api/src/support/model-reservation.ts
 apps/api/src/support/model.ts
-apps/api/src/support/own-context.ts
 apps/api/src/support/prompt.ts
+apps/api/src/support/public-guide-boundary.ts
 apps/api/src/support/queue.ts
+apps/api/src/support/recovery-intent.ts
+apps/api/src/support/response-policy.ts
+apps/api/src/support/security-guidance.ts
 apps/api/src/support/session.ts
 apps/api/src/support/shred.ts
 apps/api/src/support/templates.ts
@@ -164,6 +168,7 @@ apps/runner/src/dev-api-process.ts
 apps/runner/src/dev-auth-data-plane-cli.ts
 apps/runner/src/dev-auth-data-plane.ts
 apps/runner/src/dev-auth-stack-cli.ts
+apps/runner/src/dev-auth-stack-profile.ts
 apps/runner/src/dev-auth-stack.ts
 apps/runner/src/dev-cli-provider-panel.ts
 apps/runner/src/dev-database-principals-cli.ts
@@ -173,6 +178,7 @@ apps/runner/src/dev-deployment-register.ts
 apps/runner/src/dev-hatchet-token-cli.ts
 apps/runner/src/dev-hatchet-token.ts
 apps/runner/src/dev-provider-panel.ts
+apps/runner/src/dev-provider-set-publish-cli.ts
 apps/runner/src/dev-runner-policy.ts
 apps/runner/src/dev-runner-process.ts
 apps/runner/src/dev-secret-files-cli.ts
@@ -260,7 +266,9 @@ apps/ui/components/consent/ConsentSettingsPanel.tsx
 apps/ui/components/consent/CookieBar.tsx
 apps/ui/components/consent/CookieConsent.tsx
 apps/ui/components/consent/CookiePreferencesCard.tsx
+apps/ui/components/consent/LegalDocumentModal.tsx
 apps/ui/components/consent/PrivacyPolicyModal.tsx
+apps/ui/components/consent/TermsOfServiceModal.tsx
 apps/ui/components/consent/modalSemantics.ts
 apps/ui/components/debateReferenceDesign.source-test.mjs
 apps/ui/components/landing/LandingChrome.tsx
@@ -274,13 +282,9 @@ apps/ui/components/modeTransition.test.mjs
 apps/ui/components/modeTransition.ts
 apps/ui/components/support/Assistant.tsx
 apps/ui/components/support/CaseView.tsx
-apps/ui/components/support/ConsentToggle.tsx
-apps/ui/components/support/DebatePicker.tsx
 apps/ui/components/support/SupportWidget.tsx
 apps/ui/components/support/caseLink.test.mjs
 apps/ui/components/support/caseLink.ts
-apps/ui/components/support/consent.test.mjs
-apps/ui/components/support/consent.ts
 apps/ui/components/support/conversation.ts
 apps/ui/components/support/http.ts
 apps/ui/components/support/supportConversation.test.mjs
@@ -297,6 +301,7 @@ apps/ui/lib/debatePresentation.ts
 apps/ui/lib/debateTreeUtils.ts
 apps/ui/lib/edgeUpgrade.test.mjs
 apps/ui/lib/format.ts
+apps/ui/lib/legalDocument.ts
 apps/ui/lib/makerIdentity.ts
 apps/ui/lib/mfaEnrollment.ts
 apps/ui/lib/models.ts
@@ -319,6 +324,7 @@ apps/ui/lib/scrutinyDepth.ts
 apps/ui/lib/serverApi.test.mjs
 apps/ui/lib/serverApi.ts
 apps/ui/lib/sessionProxy.test.mjs
+apps/ui/lib/termsOfService.ts
 apps/ui/lib/totpQr.ts
 apps/ui/lib/trustedClientIp.test.mjs
 apps/ui/lib/types.ts
@@ -335,6 +341,8 @@ apps/ui/middleware.ts
 apps/ui/next-env.d.ts
 apps/ui/next.config.mjs
 apps/ui/scripts/assert-production-auth-routes.mjs
+apps/ui/scripts/generate-legal-data.d.mts
+apps/ui/scripts/generate-legal-data.mjs
 apps/ui/scripts/next-config-csp.test.mjs
 apps/ui/scripts/run-node-tests.mjs
 apps/ui/server.mjs
@@ -350,6 +358,7 @@ packages/budget/src/model-spend.ts
 packages/contract/src/client.ts
 packages/contract/src/generate.ts
 packages/contract/src/index.ts
+packages/contract/src/plan-tiers.ts
 packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
 packages/crypto/src/argon2-worker.ts
@@ -380,6 +389,8 @@ packages/judgement/src/index.ts
 packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
 packages/kernel/src/index.ts
+packages/kernel/src/support-credentials.ts
+packages/kernel/src/support-text-views.ts
 packages/ledger/src/index.ts
 packages/liveness/src/index.ts
 packages/memory/src/index.ts
@@ -424,6 +435,10 @@ packages/register/src/support-config.ts
 packages/serve/src/index.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
+packages/support-kb/src/catalog.ts
+packages/support-kb/src/context.ts
 packages/support-kb/src/index.ts
+packages/support-kb/src/navigation.ts
+packages/support-kb/src/recovery.ts
 packages/valuation/src/index.ts
 web/next.config.mjs

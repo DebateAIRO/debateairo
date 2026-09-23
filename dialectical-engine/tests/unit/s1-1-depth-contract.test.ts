@@ -161,6 +161,7 @@ function buildAskApi(application: AskApplication = fixtureApplication()) {
 function askWithout(depthParams: unknown): Record<string, unknown> {
   return {
     question_line: "What follows from this evidence?",
+    plan_tier: "premium",
     risk_tier: "casual",
     tier_source: "ASKER",
     tier_provenance_ref: "asker-declaration:s1-1",
@@ -236,6 +237,7 @@ describe("S1-1 · depth enforced at the contract door", () => {
         const accepted = await createDebate(
           "What follows from this evidence?",
           {
+            plan_tier: "premium",
             risk_tier: "casual", tier_source: "ASKER", tier_provenance_ref: "asker:ui-selection",
             composition_budget_tier: "low", depth, decision_scope: "personal",
             as_of: "2026-09-01T00:00:00.000Z"
@@ -1776,7 +1778,7 @@ describe("S1-1 · the depth bound has a single source", () => {
     const sites = depthBoundSitesInShippedCode();
     if (process.env.ORACLE_AUDIT === "1") console.log("SHIPPED_SITES " + JSON.stringify(sites));
     expect(sites).toEqual([
-      `${OWNING_DECLARATION.path}:112 [DEPTH_BOUND_LITERAL] ${OWNING_DECLARATION.text}`
+      `${OWNING_DECLARATION.path}:${lineOf(readFileSync(OWNING_DECLARATION.path, "utf8"), readFileSync(OWNING_DECLARATION.path, "utf8").indexOf(OWNING_DECLARATION.text))} [DEPTH_BOUND_LITERAL] ${OWNING_DECLARATION.text}`
     ]);
   });
 

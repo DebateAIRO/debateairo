@@ -166,14 +166,32 @@ describe("S6 content-encryption architecture contract", () => {
       database.indexOf("export async function acquireRunContentLease("),
       database.indexOf("export async function withRunContentLease<T>(")
     );
+    // Users of content SHARE the lease (a reader must never wait for a running debate);
+    // only account erasure takes it exclusively. See tests/integration/run-content-lease-sharing.test.ts.
     expect(acquisition).toContain(
-      "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired"
+      "SELECT pg_try_advisory_lock_shared(hashtextextended($1,0)) AS acquired"
     );
+    expect(acquisition).toContain(
+      "SELECT pg_advisory_unlock_shared(hashtextextended($1,0)) AS unlocked"
+    );
+    expect(acquisition).not.toContain("SELECT pg_try_advisory_lock(hashtextextended($1,0))");
     expect(acquisition).not.toContain(
       "SELECT pg_advisory_lock(hashtextextended($1,0))"
     );
     expect(acquisition).toContain("await unlock()");
     expect(acquisition).toContain("setTimeout(resolve,10)");
+  });
+
+  it("keeps account erasure the only EXCLUSIVE holder of the run content lease", async () => {
+    const erasure = await read("packages/db/src/account-erasure.ts");
+    const leases = erasure.slice(
+      erasure.indexOf("async function withErasureContentLeases<T>("),
+      erasure.indexOf("async function withErasureContentLeases<T>(") + 1_600
+    );
+    expect(leases).toContain("SELECT pg_advisory_lock(hashtextextended($1,0))");
+    expect(leases).toContain("SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked");
+    expect(leases).not.toContain("_shared");
+    expect(erasure).toContain('const CONTENT_LEASE_NAMESPACE = "debateai:run-content-lease:v1:"');
   });
 
   it("keeps evaluator key preparation outside harvest transactions and add-on run locks", async () => {

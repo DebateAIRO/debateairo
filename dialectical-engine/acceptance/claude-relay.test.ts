@@ -179,6 +179,34 @@ describe("FAIR-02 Claude Code CLI relay", () => {
     expect(relay.maker).toBe("Anthropic");
   });
 
+  it("asks the CLI for the caller's model alias and selects that lineage among helper-model usage", async () => {
+    const capturedEnvelopeScript = [
+      'console.log(JSON.stringify({',
+      '  is_error: false, result: JSON.stringify({ argumentList: process.argv }), total_cost_usd: 0.01,',
+      '  modelUsage: {',
+      '    "claude-haiku-4-5-20251001": { inputTokens: 910, outputTokens: 17, canonicalModel: "claude-haiku-4-5" },',
+      '    "claude-sonnet-5": { inputTokens: 2, outputTokens: 4, canonicalModel: "claude-sonnet-5" }',
+      '  }',
+      '}));'
+    ].join("");
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      modelAlias: "sonnet",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", capturedEnvelopeScript, "--"] }
+    });
+    handles.push(relay);
+    expect(relay.model).toBe("claude-sonnet-5");
+    const response = await postCompletion(relay, "Assess this claim.");
+    expect(response.status).toBe(200);
+    const completion = await response.json() as {
+      model: string; choices: readonly { message: { content: string } }[];
+    };
+    expect(completion.model).toBe("claude-sonnet-5");
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as { argumentList: readonly string[] };
+    expect(relayed.argumentList[relayed.argumentList.indexOf("--model") + 1]).toBe("sonnet");
+  });
+
   it("maps an OpenAI request to claude -p --output-format json with closed stdin and reports true lineage", async () => {
     const environmentKeys = [
       "HOME", "PATH", "TMPDIR", "LANG", "USER", "LOGNAME",

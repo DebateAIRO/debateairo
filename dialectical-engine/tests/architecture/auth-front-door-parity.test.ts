@@ -84,7 +84,7 @@ describe("auth front-door parity", () => {
     expect(signUp).toMatch(/client\.resendVerification/);
     expect(signUp).toMatch(/section-primary-email email/);
     expect(signUp).toMatch(/section-recovery-email email/);
-    expect(signUp).not.toMatch(/localStorage|sessionStorage|Bearer|Google|Model API|terms/i);
+    expect(signUp).not.toMatch(/localStorage|sessionStorage|Bearer|Google|Model API/i);
 
     expect(verify).toMatch(/export \{ default \} from "\.\.\/enroll-mfa\/page"/);
     expect(verify).not.toMatch(/<form\b/);

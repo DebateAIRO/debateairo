@@ -1,8 +1,7 @@
 export const TOOL_REGISTRY = Object.freeze({
   answer_from_corpus: "answer_from_corpus",
   link_first_party: "link_first_party",
-  refuse: "refuse",
-  read_own_run_state: "read_own_run_state"
+  refuse: "refuse"
 } as const);
 
 export const FIRST_PARTY_ROUTES = Object.freeze([

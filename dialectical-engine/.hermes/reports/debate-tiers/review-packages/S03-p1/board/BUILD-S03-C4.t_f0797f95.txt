@@ -1,0 +1,131 @@
+Task t_f0797f95: BUILD(S03-C4) — /new reads the register row; admission fixtures move; typecheck delta (S24, S35, S36)
+  status:    done
+  assignee:  -
+  workspace: scratch @ /Users/vladmihaimiron/.hermes/kanban/boards/debate-tiers/workspaces/t_f0797f95
+  max-retries: 2 (default)
+  created:   2026-09-13 18:01 by Claude-Router
+  started:   2026-09-13 20:08
+  completed: 2026-09-13 21:31
+  parents:   t_77c0cb5f, t_843976bb
+
+Body:
+Codex Sol, lane .worktrees/tiers-s03, after BUILD(S03-C3) READY (parent) — and C1's commit. 5 paths, four-suite command.
+
+Result:
+READY: commit cc014550 — /new reads the rosters from the deployment payload, admission fixtures on the file-fed ids, S13 flipped; five suites 73/73 ×3 CLUSTER_GREEN
+
+Comments (7):
+  [2026-09-13 20:08] Claude-Router: DISPATCHED 2026-09-13 20:08:18 EEST by Claude-Router — BUILD(S03-C4) pass 1 of 3, seat BUILD-S03-C4 (Codex Sol, codex exec, danger-full-access inside the lane). Packet: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/debate-tiers/packets/BUILD-S03-C4.md (packet-check OK). Main-tree freeze HEAD 57e3060f (records only — never your base). Lane base: slice/tiers-s03 @ 43efdb1a = 9a000c37 + C2 a9179644 + C1 62a4c367 + C3 43efdb1a; lane porcelain must be empty when you arrive (you work alone — the last cluster). Your base measured by me at 43efdb1a: Test Files 3 failed | 2 passed (5) · Tests 7 failed | 63 passed (70) — 2 render + 4 admission titles on the old ids, plus S13's pinned inventory moved by C3 (charge 5 names all seven; the S13 flip's two-file set is index.ts + dev-deployment-register.ts). Six allowed paths (tiers-s02-rosters.test.ts joined for the S13 flip only). Comment cursor at dispatch: 1 (this one).
+  [2026-09-13 20:10] BUILD-S03-C4: CLAIM — seat BUILD-S03-C4 · node BUILD(S03-C4) pass 1 of 3 · start 2026-09-13 20:10:05 EEST · session id 01a09bbd-c5d2-79f3-91eb-ddd32adb3ccd · session file /Users/vladmihaimiron/.codex/sessions/2026/09/13/rollout-2026-09-13T20-08-20-01a09bbd-c5d2-79f3-91eb-ddd32adb3ccd.jsonl · lane slice/tiers-s03 HEAD 43efdb1a · dirty count 0. Re-measured C1/C3 landing at 43efdb1a via captured five-suite command: Test Files 3 failed | 2 passed (5); Tests 7 failed | 63 passed (70), matching the seven packet-named landing failures. Log: /tmp/debate-tiers-build-s03-c4-01a09bbd/base-cluster.log. comments read through: 1
+  [2026-09-13 20:14] BUILD-S03-C4: S24 Free-card RED (verbatim from /tmp/debate-tiers-build-s03-c4-01a09bbd/s24-free-card-red-attempt2.log):
+× tests/render/tier01-new-plan-tier.test.tsx > S01 /new plan tier > S03-24 R16 renders the Free card from the deployment roster row 39ms
+  → expected 'FreeEvery gauge fixed. The question i…' to contain 'glm-5.3-flash'
+FAIL  tests/render/tier01-new-plan-tier.test.tsx > S01 /new plan tier > S03-24 R16 renders the Free card from the deployment roster row
+AssertionError: expected 'FreeEvery gauge fixed. The question i…' to contain 'glm-5.3-flash'
+
+Expected: "glm-5.3-flash"
+Received: "FreeEvery gauge fixed. The question is yours.gpt-5.6-lunaclaude-sonnet-5"
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 skipped (23)
+
+Initial same-value fixture probe was invalidly GREEN because C1 already regenerated PLAN_TIER_ROSTERS to Luna/GLM; the corrected RED uses a stale compiled-roster mutant against the current deployment row. comments read through: 1
+  [2026-09-13 20:15] BUILD-S03-C4: S24 S13-flip RED (verbatim from /tmp/debate-tiers-build-s03-c4-01a09bbd/s24-s13-flip-red.log):
+× tests/architecture/tiers-s02-rosters.test.ts > S02 tier roster architecture > keeps plan-tier roster selection in server production files only 46ms
+  → expected [ 'apps/api/src/index.ts', …(2) ] to deeply equal [ 'apps/api/src/index.ts', …(1) ]
+  → expected [ 'apps/ui/app/new/page.tsx' ] to deeply equal []
+
+- Expected
++ Received
+
+  [
+    "apps/api/src/index.ts",
+    "apps/runner/src/dev-deployment-register.ts",
++   "apps/ui/app/new/page.tsx",
+  ]
+
+- Expected
++ Received
+
+- []
++ [
++   "apps/ui/app/new/page.tsx",
++ ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+comments read through: 1
+  [2026-09-13 20:21] BUILD-S03-C4: S35 both-ids refusal RED (verbatim from /tmp/debate-tiers-build-s03-c4-01a09bbd/s35-both-ids-red.log):
+FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses a Free ask missing both file-fed ids before creating a run
+AssertionError: expected { …(2) } to deeply equal { …(2) }
+
+- Expected
++ Received
+
+  {
+    "error": "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
+-   "message": "The free plan needs gpt-5.6-luna, glm-5.3-flash, and they are not available right now",
++   "message": "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now",
+  }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+comments read through: 1
+  [2026-09-13 20:30] BUILD-S03-C4: SKILLS LOADED: /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/references/codex-tools.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/writing-good-tests.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md · /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md
+2 READY · node BUILD(S03-C4), pass 1 of 3 · ticket t_f0797f95 · seat BUILD-S03-C4 · session 01a09bbd-c5d2-79f3-91eb-ddd32adb3ccd · transcript /Users/vladmihaimiron/.codex/sessions/2026/09/13/rollout-2026-09-13T20-08-20-01a09bbd-c5d2-79f3-91eb-ddd32adb3ccd.jsonl
+3 ARTIFACT · branch slice/tiers-s03 · commit cc014550 (feat(tiers S03-C4): read plan rosters from deployment) · changed only apps/ui/app/new/page.tsx, tests/render/tier01-new-plan-tier.test.tsx, tests/unit/tiers-s02-admission.test.ts, tests/architecture/tiers-s02-rosters.test.ts; allowed tests/unit/tiers-s02-wire.test.ts and tests/unit/api.test.ts were verified unchanged; lane porcelain clean after commit.
+4 VERIFICATION · measured start at 43efdb1a: Test Files 3 failed | 2 passed (5), Tests 7 failed | 63 passed (70) = render 20/22, admission 10/14, wire 2/2, api 26/26, roster architecture 5/6; all seven C1/C3 landing failures named in the CLAIM. Final per-suite delta from the PLAN base: render 22/22 → 24/24 (+ Free runtime-row case, + five-id name/dot case; the two landing-old expectations also re-fixtured); admission 14/14 → 15/15 (+ both-ids/no-run case); wire 2/2 → 2/2; api 26/26 → 26/26; roster architecture 6/6 → 6/6 (case 6 flipped).
+Three-run table, worst wins:
+attempt | Test Files | Tests | log
+1 | 5 passed (5) | 73 passed (73) | /tmp/debate-tiers-build-s03-c4-01a09bbd/final-cluster-run-1.log
+2 | 5 passed (5) | 73 passed (73) | /tmp/debate-tiers-build-s03-c4-01a09bbd/final-cluster-run-2.log
+3 | 5 passed (5) | 73 passed (73) | /tmp/debate-tiers-build-s03-c4-01a09bbd/final-cluster-run-3.log
+Primary RED frames, verbatim:
+S24 Free card:
+FAIL  tests/render/tier01-new-plan-tier.test.tsx > S01 /new plan tier > S03-24 R16 renders the Free card from the deployment roster row
+AssertionError: expected 'FreeEvery gauge fixed. The question i…' to contain 'glm-5.3-flash'
+Expected: "glm-5.3-flash"
+Received: "FreeEvery gauge fixed. The question is yours.gpt-5.6-lunaclaude-sonnet-5"
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 skipped (23)
+S24 S13 flip:
+× tests/architecture/tiers-s02-rosters.test.ts > S02 tier roster architecture > keeps plan-tier roster selection in server production files only 46ms
+  → expected [ 'apps/api/src/index.ts', …(2) ] to deeply equal [ 'apps/api/src/index.ts', …(1) ]
+  → expected [ 'apps/ui/app/new/page.tsx' ] to deeply equal []
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+S35 both-id refusal:
+FAIL  tests/unit/tiers-s02-admission.test.ts > S02 tier roster admission > refuses a Free ask missing both file-fed ids before creating a run
+-   "message": "The free plan needs gpt-5.6-luna, glm-5.3-flash, and they are not available right now",
++   "message": "The free plan needs gpt-5.6-luna, claude-sonnet-5, and they are not available right now",
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+Primary RED logs: /tmp/debate-tiers-build-s03-c4-01a09bbd/s24-free-card-red-attempt2.log · /tmp/debate-tiers-build-s03-c4-01a09bbd/s24-s13-flip-red.log · /tmp/debate-tiers-build-s03-c4-01a09bbd/s35-both-ids-red.log.
+Refutation matrix:
+PROPERTY file-fed lists, not healthy panel | MUTANT page reads discovered_panel | RED Free-card 1 failed/24, /tmp/debate-tiers-build-s03-c4-01a09bbd/s24-discovered-panel-mutant-red.log | RESTORE GREEN 1/1, error-fallback neighboring mutant stayed GREEN 1/1; snapshot diff exact and porcelain printed.
+PROPERTY no UI compiled-roster selection | MUTANT retain PLAN_TIER_ROSTERS import | RED roster case 1 failed/6, /tmp/debate-tiers-build-s03-c4-01a09bbd/s24-import-mutant-red.log | RESTORE GREEN 1/1, unrelated contract type-import neighboring mutant stayed GREEN 1/1; snapshot diff exact and porcelain printed.
+PROPERTY every current id has a dot | MUTANT blank glm-5.3-flash --dot | RED R17 1 failed/24, /tmp/debate-tiers-build-s03-c4-01a09bbd/s24-dot-mutant-red.log | RESTORE GREEN 1/1, blank retired-Sonnet dot neighboring mutant stayed GREEN 1/1; snapshot diff exact and porcelain printed.
+S36: pnpm typecheck rc=1 at base and final; validated diagnostic checker denominator 67 diagnostics / 19 files; base-to-final file/count diff rc=0; no diagnostic in a new file. Logs /tmp/debate-tiers-build-s03-c4-01a09bbd/s36-typecheck-base.log and /tmp/debate-tiers-build-s03-c4-01a09bbd/s36-typecheck-final.log. Exact-path per-suite runner: render 24/24, admission 15/15, wire 2/2, api 26/26, roster architecture 6/6; CLUSTER_GREEN in /tmp/debate-tiers-build-s03-c4-01a09bbd/final-run-suites-exact-paths.log.
+5 FINDINGS / PACKET DEFECTS · BUILD-S03-C4.md:27 requires natural Sonnet REDs while :28 states the page already renders Luna/GLM from C1; scoped stale-roster mutants were required to create discriminating REDs. BUILD-S03-C4.md:10 says 5 paths/four suites while :15 and the ruling authorize 6 code/test paths and the gate names 5 suites. BUILD-S03-C4.md:15 limits the page to old-symbol blocks, but the async requirement necessarily adds state/effect at apps/ui/app/new/page.tsx:83,114-124. run-suites.sh:15 passes labels as fuzzy Vitest filters; bare api matched seven files and produced a false cluster RED (59 passed/5 failed), while exact tests/unit/api.test.ts produced 26/26 and CLUSTER_GREEN. Runtime authorization finding: apps/ui/app/new/page.tsx:114 calls readDeployment, while tests/unit/api.test.ts:228 pins ordinary-user /v1/deployment to 403; the render fixture mocks success. VERDICT carry this mount to REV(S03) before browser acceptance / CONFIDENCE medium / STRONGEST COUNTER: V's dev session may have operator scope via infrastructure outside this packet's read surface.
+6 UNVERIFIED · no browser, :3000 stack, live database, provider, key, or desktop operation was permitted. Therefore acceptance steps 2/8 and the ordinary-user authorization mount are UNVERIFIED at runtime; steps 3/4/10b remain key-gated. pnpm typecheck is not claimed green: only its zero delta is verified. The first same-value S24 probe was GREEN and explicitly rejected as invalid evidence; only the corrected mutant RED above is claimed.
+7 SELF-REPORT · /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/debate-tiers/agent-reports/BUILD-S03-C4.md
+8 comments read through: 5
+  [2026-09-13 21:31] Claude-Router: CONSUMED by the orchestrator 2026-09-13 21:31 EEST: SKILLS LOADED 6/6 verified on the rollout; commit cc014550 = 4 files, every one inside the 6 allowed paths (wire and api verified unchanged, as you said); lane porcelain empty; my own re-run of the five-suite command at cc014550: rc=0 · Test Files 5 passed (5) · Tests 73 passed (73); S13's case is in the final form (index.ts + dev-deployment-register.ts, apps/ui negative); the page reads the planTierRosters row from readDeployment. Your five findings are accepted: F1 the packet's natural-Sonnet RED contradicted the measured base (a packet-check rule: an expected RED value must differ from the measured base output; folded), F2 run-suites.sh takes fuzzy Vitest filters — exact paths are now the runner contract (folded, TRAPS), F3 the ordinary-user 403 on /v1/deployment vs the page's readDeployment — carried to REV(S03) as a probe (the page already reads the deployment for riskTier defaults; the lens measures whether the same authorization holds for the roster row), F4 the async state/effect hunk (allowed-hunk derivation law), F5 diff review before the variance runs (template). Orchestrator confession: your READY landed 20:30; my Monitor filter expected the line to begin 'READY —' and yours began '2 READY ·' — an hour lost, recorded. comments read through: 6
+
+Events (12):
+  [2026-09-13 18:01] created {'assignee': None, 'status': 'todo', 'parents': ['t_843976bb'], 'tenant': None, 'branch_name': None, 'skills': None, 'goal_mode': None}
+  [2026-09-13 18:01] linked {'parent': 't_77c0cb5f', 'child': 't_f0797f95'}
+  [2026-09-13 20:05] promoted
+  [2026-09-13 20:08] commented {'author': 'Claude-Router', 'len': 953}
+  [2026-09-13 20:08] [run 269] claimed {'lock': 'Vlads-MacBook-Pro.local:1146', 'expires': 1789340899, 'run_id': 269}
+  [2026-09-13 20:10] commented {'author': 'BUILD-S03-C4', 'len': 608}
+  [2026-09-13 20:14] commented {'author': 'BUILD-S03-C4', 'len': 962}
+  [2026-09-13 20:15] commented {'author': 'BUILD-S03-C4', 'len': 706}
+  [2026-09-13 20:21] commented {'author': 'BUILD-S03-C4', 'len': 685}
+  [2026-09-13 20:30] commented {'author': 'BUILD-S03-C4', 'len': 7207}
+  [2026-09-13 21:31] commented {'author': 'Claude-Router', 'len': 1326}
+  [2026-09-13 21:31] [run 269] completed {'result_len': 164, 'summary': 'READY: commit cc014550 — /new reads the rosters from the deployment payload, admission fixtures on the file-fed ids, S13 flipped; five suites 73/73 ×3 CLUSTER_GREEN'}
+
+Runs (1):
+  #269 completed    @-  4984s  2026-09-13 20:08
+        → READY: commit cc014550 — /new reads the rosters from the deployment payload, admission fixtures on the file-fed ids, S13 flipped; five suites 73/73 ×3 CLUSTER_G

@@ -161,6 +161,24 @@ describe("GROK-01 Grok Build CLI relay", () => {
     expect(relay.model).toBe("grok-fake-cli-model");
   });
 
+  it("drops the CLI sandbox only when the caller asks for the none profile", async () => {
+    // Docker Desktop makes /var/run/docker.sock a symlink; grok 1.0.30 then refuses to apply
+    // its read-only profile and exits before the handshake. The dev panel opts out explicitly.
+    const relay = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      sandboxProfile: "none",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+    handles.push(relay);
+    const response = await postCompletion(relay, "Assess this claim.");
+    expect(response.status).toBe(200);
+    const completion = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as { argumentList: readonly string[] };
+    expect(relayed.argumentList[relayed.argumentList.indexOf("--sandbox") + 1]).toBe("none");
+    expect(relayed.argumentList).not.toContain("read-only");
+  });
+
   it("maps the OpenAI-compatible transcript to a single, verbatim, tool-less Grok call", async () => {
     const environmentKeys = [
       "HOME", "PATH", "TMPDIR", "LANG", "XAI_API_KEY",

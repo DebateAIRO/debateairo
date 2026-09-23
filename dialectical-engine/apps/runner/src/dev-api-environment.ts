@@ -22,11 +22,14 @@ import {
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
 import { parseDevelopmentSupportModelTargetJson } from "./dev-support-model.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const MAX_CREDENTIAL_FILE_BYTES = 64 * 1024;
 const LOCAL_DATABASE_HOST = "127.0.0.1";
-const LOCAL_DATABASE_PORT = "55432";
 const LOCAL_DATABASE_NAME = "/debateai";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -84,6 +87,7 @@ type AssembleDevelopmentApiEnvironmentInput = Readonly<{
   providerPanel: DevelopmentProviderPanel;
   registerReceipt: DevelopmentDeploymentRegisterMachineReceiptV1;
   supportModelTarget: string;
+  profile?: DevelopmentAuthStackProfile;
 }>;
 
 function currentUid(): number {
@@ -183,7 +187,7 @@ function parseExactEnvironment(source: string, expectedKeys: readonly string[]):
   return parsed;
 }
 
-function readDatabaseCredentials(source: string): Map<string, string> {
+function readDatabaseCredentials(source: string, expectedPort: string): Map<string, string> {
   const expectedKeys = DEVELOPMENT_DATABASE_PRINCIPALS.map(({ environmentKey }) => environmentKey);
   const parsed = parseExactEnvironment(source, expectedKeys);
   const identities = new Set<string>();
@@ -198,7 +202,7 @@ function readDatabaseCredentials(source: string): Map<string, string> {
     }
     if ((url.protocol !== "postgres:" && url.protocol !== "postgresql:")
       || url.hostname !== LOCAL_DATABASE_HOST
-      || url.port !== LOCAL_DATABASE_PORT
+      || url.port !== expectedPort
       || url.pathname !== LOCAL_DATABASE_NAME
       || url.search !== ""
       || url.hash !== ""
@@ -216,7 +220,7 @@ function readDatabaseCredentials(source: string): Map<string, string> {
   return apiCredentials;
 }
 
-function tenantIdFromToken(token: string): string {
+function tenantIdFromToken(token: string, profile: DevelopmentAuthStackProfile): string {
   if (token.length > 8_192 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(token)) {
     throw new TypeError("DEV_API_ENVIRONMENT_HATCHET_TOKEN_INVALID");
   }
@@ -228,8 +232,8 @@ function tenantIdFromToken(token: string): string {
     };
     if (typeof payload.sub !== "string"
       || !UUID_PATTERN.test(payload.sub)
-      || payload.server_url !== "http://localhost:8888"
-      || payload.grpc_broadcast_address !== "localhost:7077") {
+      || payload.server_url !== `http://localhost:${profile.hatchetApiPort}`
+      || payload.grpc_broadcast_address !== `localhost:${profile.hatchetGrpcPort}`) {
       throw new TypeError("DEV_API_ENVIRONMENT_HATCHET_TOKEN_INVALID");
     }
     return payload.sub;
@@ -318,7 +322,11 @@ async function publishExactFile(
   }
 }
 
-function isExactProviderRuntimeRefresh(existing: string, expected: string): boolean {
+function isExactProviderRuntimeRefresh(
+  existing: string,
+  expected: string,
+  profile: DevelopmentAuthStackProfile
+): boolean {
   try {
     const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
     const expectedValues = parseExactEnvironment(expected, DEVELOPMENT_API_ENVIRONMENT_KEYS);
@@ -326,8 +334,72 @@ function isExactProviderRuntimeRefresh(existing: string, expected: string): bool
       if (key === "PROVIDER_DISCOVERY_TARGETS_JSON" || key === "SUPPORT_MODEL_TARGET_JSON") continue;
       if (existingValues.get(key) !== expectedValues.get(key)) return false;
     }
-    parseDevelopmentProviderPanelTargets(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
-    parseDevelopmentSupportModelTargetJson(existingValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+    parseDevelopmentProviderPanelTargets(
+      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+      profile
+    );
+    parseDevelopmentSupportModelTargetJson(
+      existingValues.get("SUPPORT_MODEL_TARGET_JSON")!,
+      profile
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Accepts an environment that differs only in the provider targets AND the three keys that
+ * move with the deployment register receipt. A register version is never edited in place
+ * (`register.register_row` rejects UPDATE and DELETE), so a deployment that grows its
+ * configured provider set publishes a NEW version and the custody receipt follows it; the
+ * assembler has already asserted that the receipt it was handed is the one on disk, so the
+ * only environment this admits is the one this stack just produced. Everything else -
+ * credentials, database URLs, ports - must still match exactly, which is what keeps the
+ * drift guard meaningful.
+ */
+function isExactPublishedRegisterRefresh(
+  existing: string,
+  expected: string,
+  profile: DevelopmentAuthStackProfile
+): boolean {
+  const receiptKeys = new Set([
+    "REGISTER_VERSION",
+    "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
+    "REGISTER_DEPLOYMENT_RECEIPT_FILE"
+  ]);
+  try {
+    const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    const expectedValues = parseExactEnvironment(expected, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    // A publication only ever moves the version FORWARD; a file naming an older version is
+    // a reconstruction, not this stack's output.
+    if (BigInt(expectedValues.get("REGISTER_VERSION")!)
+      <= BigInt(existingValues.get("REGISTER_VERSION")!)) return false;
+    for (const key of DEVELOPMENT_API_ENVIRONMENT_KEYS) {
+      if (key === "PROVIDER_DISCOVERY_TARGETS_JSON" || key === "SUPPORT_MODEL_TARGET_JSON"
+        || receiptKeys.has(key)) continue;
+      if (existingValues.get(key) !== expectedValues.get(key)) return false;
+    }
+    // The OUTGOING targets cannot be re-parsed against the new configured set - that set is
+    // precisely what changed - so they are held to the rule a publication actually obeys:
+    // slots are ADDED, never removed or renamed. An environment naming a provider the
+    // deployment does not configure (the retired local-vllm scaffold, say) stays drift.
+    const incoming = parseDevelopmentProviderPanelTargets(
+      expectedValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+      profile
+    );
+    const configuredRefs = new Set(incoming.targets.map((target) => target.providerRef));
+    const outgoing: unknown = JSON.parse(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
+    if (!Array.isArray(outgoing) || outgoing.length < 1) return false;
+    for (const row of outgoing) {
+      if (typeof row !== "object" || row === null) return false;
+      const providerRef = (row as Readonly<Record<string, unknown>>).provider_ref;
+      if (typeof providerRef !== "string" || !configuredRefs.has(providerRef)) return false;
+    }
+    parseDevelopmentSupportModelTargetJson(
+      existingValues.get("SUPPORT_MODEL_TARGET_JSON")!,
+      profile
+    );
     return true;
   } catch {
     return false;
@@ -336,18 +408,20 @@ function isExactProviderRuntimeRefresh(existing: string, expected: string): bool
 
 function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
   existing: string,
-  expected: string
+  expected: string,
+  profile: DevelopmentAuthStackProfile
 ): boolean {
   const upgraded = existing.replace(
     "PROVIDER_PROBE_TIMEOUT_MS=5000\n",
     `PROVIDER_PROBE_TIMEOUT_MS=${DEVELOPMENT_CLI_CALL_TIMEOUT_MS}\n`
   );
-  return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected);
+  return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected, profile);
 }
 
 function isExactLegacyEnvironmentWithoutSupportModelTarget(
   existing: string,
-  expected: string
+  expected: string,
+  profile: DevelopmentAuthStackProfile
 ): boolean {
   try {
     const legacyKeys = DEVELOPMENT_API_ENVIRONMENT_KEYS.filter((key) =>
@@ -359,8 +433,14 @@ function isExactLegacyEnvironmentWithoutSupportModelTarget(
       if (key === "PROVIDER_DISCOVERY_TARGETS_JSON") continue;
       if (existingValues.get(key) !== expectedValues.get(key)) return false;
     }
-    parseDevelopmentProviderPanelTargets(existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!);
-    parseDevelopmentSupportModelTargetJson(expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!);
+    parseDevelopmentProviderPanelTargets(
+      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+      profile
+    );
+    parseDevelopmentSupportModelTargetJson(
+      expectedValues.get("SUPPORT_MODEL_TARGET_JSON")!,
+      profile
+    );
     return true;
   } catch {
     return false;
@@ -370,6 +450,7 @@ function isExactLegacyEnvironmentWithoutSupportModelTarget(
 export async function assembleDevelopmentApiEnvironment(
   input: AssembleDevelopmentApiEnvironmentInput
 ): Promise<DevelopmentApiEnvironmentReceipt> {
+  const profile = input.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   const repositoryRoot = resolve(input.repositoryRoot);
   const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
   await assertPrivateCustodyRoot(custodyRoot);
@@ -390,12 +471,15 @@ export async function assembleDevelopmentApiEnvironment(
   if (databaseSource === undefined || hatchetSource === undefined) {
     throw new TypeError("DEV_API_ENVIRONMENT_CREDENTIAL_REQUIRED");
   }
-  const databases = readDatabaseCredentials(databaseSource);
+  const databases = readDatabaseCredentials(databaseSource, String(profile.postgresPort));
   const hatchet = parseExactEnvironment(hatchetSource, ["HATCHET_CLIENT_TOKEN"]);
   const token = hatchet.get("HATCHET_CLIENT_TOKEN")!;
-  const tenantId = tenantIdFromToken(token);
+  const tenantId = tenantIdFromToken(token, profile);
   const providerPanel = input.providerPanel;
-  const supportModelTarget = parseDevelopmentSupportModelTargetJson(input.supportModelTarget);
+  const supportModelTarget = parseDevelopmentSupportModelTargetJson(
+    input.supportModelTarget,
+    profile
+  );
   const custodyRegisterReceipt = await readDevelopmentDeploymentRegisterReceipt(repositoryRoot);
   if (serializeDevelopmentDeploymentRegisterReceipt(custodyRegisterReceipt)
     !== serializeDevelopmentDeploymentRegisterReceipt(input.registerReceipt)) {
@@ -419,11 +503,11 @@ export async function assembleDevelopmentApiEnvironment(
     ["ACCOUNT_ERASURE_GRACE_MS", "604800000"],
     ["MAIL_SENDMAIL_PATH", join(repositoryRoot, "deploy", "dev-auth", "sendmail-capture.mjs")],
     ["MAIL_FROM", "noreply@localhost.test"],
-    ["PUBLIC_APP_URL", "https://localhost:3000"],
+    ["PUBLIC_APP_URL", profile.publicOrigin],
     ["DATABASE_URL", databases.get("DATABASE_URL")!],
     ["SUPPORT_DATABASE_URL", databases.get("SUPPORT_DATABASE_URL")!],
     ["API_HOST", "127.0.0.1"],
-    ["API_PORT", "8790"],
+    ["API_PORT", String(profile.apiPort)],
     ["STRANGER_SAMPLE_RATE", "0"],
     ["REGISTER_VERSION", custodyRegisterReceipt.registerVersion],
     ["REGISTER_DEPLOYMENT_RECEIPT_SHA256", custodyRegisterReceipt.receiptSha256],
@@ -437,8 +521,8 @@ export async function assembleDevelopmentApiEnvironment(
     ["EVALUATOR_DEV_MENU_ENABLED", "false"],
     ["EVALUATOR_DEV_MENU_DATABASE_URL", databases.get("EVALUATOR_DEV_MENU_DATABASE_URL")!],
     ["HATCHET_CLIENT_TOKEN", token],
-    ["HATCHET_HOST_PORT", "127.0.0.1:7077"],
-    ["HATCHET_API_URL", "http://127.0.0.1:8888"],
+    ["HATCHET_HOST_PORT", `127.0.0.1:${profile.hatchetGrpcPort}`],
+    ["HATCHET_API_URL", `http://127.0.0.1:${profile.hatchetApiPort}`],
     ["HATCHET_TENANT_ID", tenantId],
     ["HATCHET_WORKFLOW_NAME", "debateai-dev"],
     ["HATCHET_TLS_STRATEGY", "none"],
@@ -449,9 +533,10 @@ export async function assembleDevelopmentApiEnvironment(
     join(custodyRoot, "api.env"),
     source,
     [],
-    (existing) => isExactProviderRuntimeRefresh(existing, source)
-      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source)
-      || isExactLegacyEnvironmentWithoutSupportModelTarget(existing,source)
+    (existing) => isExactProviderRuntimeRefresh(existing, source, profile)
+      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source, profile)
+      || isExactPublishedRegisterRefresh(existing, source, profile)
+      || isExactLegacyEnvironmentWithoutSupportModelTarget(existing, source, profile)
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
 }

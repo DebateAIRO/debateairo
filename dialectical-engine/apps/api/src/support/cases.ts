@@ -4,6 +4,9 @@ import type { PromptPacket } from "@debateai/providers";
 import type { SupportKeyPort } from "./keys.js";
 import { buildSupportSummaryPrompt } from "./prompt.js";
 import { redactSupportMessage } from "./session.js";
+import {
+  parseSupportCaseSummaryDraft,screenSupportModelText
+} from "./response-policy.js";
 import { SHREDDED_NOTICE,type SupportLanguage } from "./templates.js";
 
 export type SupportCasePredicate = "E1" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8";
@@ -42,9 +45,16 @@ export type SupportCaseRecord = Readonly<{
 }>;
 
 export const SUPPORT_SUMMARY_PROMPT =
-  "Summarize the user's problem in one paragraph of at most 80 words. "
+  "Return only JSON with exactly kind, text, sourceIds, and actionIds. "
+  + "kind must be case_summary; sourceIds and actionIds must both be empty arrays. "
+  + "Summarize the user's problem in one paragraph of at most 80 words. "
   + "Do not state or guess who the user is, whether they are the account owner, "
   + "or whether their request is legitimate.";
+
+const SUPPORT_SUMMARY_REPLACEMENT: Readonly<Record<SupportLanguage,string>> = Object.freeze({
+  en: "The advisory summary was omitted because it did not pass Support safety checks.",
+  ro: "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."
+});
 
 export type SupportCaseSummaryRecord = Readonly<{
   caseId: string;
@@ -121,7 +131,11 @@ export function createAdvisorySummaryService(input: Readonly<{
       }
       const timedOut = result.kind === "TIMED_OUT"
         || signal.aborted || observedAt.getTime() > deadlineAt.getTime();
-      const summary = result.kind === "DONE" && !timedOut ? boundedSummary(result.text) : null;
+      const draft = result.kind === "DONE" && !timedOut
+        ? parseSupportCaseSummaryDraft(result.text) : null;
+      const candidate = draft === null ? null : boundedSummary(draft.text);
+      const summary = timedOut ? null
+        : candidate ?? SUPPORT_SUMMARY_REPLACEMENT[request.language];
       if (timedOut) {
         try {
           await input.persist({
@@ -372,9 +386,10 @@ export function createSupportCaseAccessService(input: Readonly<{
           const message = entry as Readonly<Record<string,unknown>>;
           if ((message.role === "user" || message.role === "assistant")
             && typeof message.text === "string") {
+            const prepared = redactSupportMessage(message.text);
             messages.push(Object.freeze({
               id: typeof message.messageId === "string" ? message.messageId : `snapshot-${index}`,
-              role: message.role,text: message.text
+              role: message.role,text: prepared.text
             }));
           }
         }
@@ -391,8 +406,9 @@ export function createSupportCaseAccessService(input: Readonly<{
               kind: "case-message",caseId,messageId: String(message.id),
               role: message.role,purpose: "content"
             },dataKey,ciphertext);
+            const prepared = redactSupportMessage(plaintext.toString("utf8"));
             messages.push(Object.freeze({
-              id: String(message.id),role: message.role,text: plaintext.toString("utf8")
+              id: String(message.id),role: message.role,text: prepared.text
             }));
           } finally { ciphertext.fill(0);plaintext?.fill(0); }
         }
@@ -405,7 +421,12 @@ export function createSupportCaseAccessService(input: Readonly<{
               { kind: "case-summary",caseId,purpose: "summary" },
               dataKey,summaryCiphertext
             );
-            summary = summaryPlaintext.toString("utf8");
+            const opened = summaryPlaintext.toString("utf8");
+            const bounded = boundedSummary(opened);
+            summary = bounded !== null && screenSupportModelText(bounded)
+              ? bounded : SUPPORT_SUMMARY_REPLACEMENT[
+                row.language === "ro" ? "ro" : "en"
+              ];
           }
         } finally { summaryCiphertext?.fill(0); }
         return Object.freeze({

@@ -30,15 +30,16 @@ import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   type DevelopmentProviderPanel
 } from "./dev-provider-panel.js";
-import {
-  HERMES_SUPPORT_PORT,
-  startHermesSupportRelay
-} from "../../../acceptance/hermes-relay.js";
+import { startHermesSupportRelay } from "../../../acceptance/hermes-relay.js";
 import type { DevelopmentDeploymentRegisterMachineReceiptV1 } from "./dev-deployment-register.js";
 import {
   createDevTlsReadinessOperations,
   startAttestedDevTlsFrontDoor
 } from "../../../deploy/dev-auth/tls-front-door.mjs";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 type Stoppable = Readonly<{ stop(): Promise<void> }>;
 type DataPlaneHandle = Stoppable & Readonly<{
@@ -56,6 +57,7 @@ type SupportModelRelayHandle = Stoppable & Readonly<{
 }>;
 
 export type DevelopmentAuthStackOperations = Readonly<{
+  profile?: DevelopmentAuthStackProfile;
   isPublicPortOccupied(): Promise<boolean>;
   startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
   startSupportModelRelay(): Promise<SupportModelRelayHandle>;
@@ -79,7 +81,7 @@ export type DevelopmentAuthStackExit =
 
 export type DevelopmentAuthStack = Readonly<{
   receipt: Readonly<{
-    origin: "https://localhost:3000";
+    origin: string;
     dataPlane: "ATTESTED";
     mail: "CAPTURED";
     api: "DENY_DEFAULT";
@@ -400,6 +402,7 @@ export async function startDevelopmentAuthStack(
   operations: DevelopmentAuthStackOperations,
   stopTimeoutMs: number = DEV_AUTH_STACK_STOP_TIMEOUT_MS
 ): Promise<DevelopmentAuthStack> {
+  const profile = operations.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   const occupied = await fixedStage(
     "DEV_AUTH_STACK_PREFLIGHT_FAILED",
     () => operations.isPublicPortOccupied()
@@ -452,7 +455,7 @@ export async function startDevelopmentAuthStack(
     let stopPromise: Promise<void> | undefined;
     return Object.freeze({
       receipt: Object.freeze({
-        origin: "https://localhost:3000",
+        origin: profile.publicOrigin,
         dataPlane: "ATTESTED",
         mail: "CAPTURED",
         api: "DENY_DEFAULT",
@@ -498,20 +501,29 @@ export async function superviseDevelopmentAuthStack(
 
 export function createDevelopmentAuthStackOperations(
   repositoryRoot: string,
-  commandEnvironment: Readonly<Record<string, string>>
+  commandEnvironment: Readonly<Record<string, string>>,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentAuthStackOperations {
   const hatchetOperations = createDevelopmentHatchetTokenOperations(
     repositoryRoot,
-    commandEnvironment
+    commandEnvironment,
+    profile
   );
-  const tlsOperations = createDevTlsReadinessOperations(repositoryRoot);
+  const tlsOperations = createDevTlsReadinessOperations(repositoryRoot, {
+    publicPort: profile.publicPort,
+    uiPort: profile.uiPort
+  });
   return Object.freeze({
+    profile,
     isPublicPortOccupied: () => tlsOperations.isPublicPortOccupied(),
-    startProviderPanel: () => startDevelopmentCliProviderPanel(),
+    startProviderPanel: () => startDevelopmentCliProviderPanel(undefined, profile),
     async startSupportModelRelay() {
       const relay = await startHermesSupportRelay({
-        port: HERMES_SUPPORT_PORT,
-        timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS
+        port: profile.supportModelPort,
+        timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
+        ...(profile.name === "support-preview"
+          ? { developmentStackProfile: "support-preview" as const }
+          : {})
       });
       return Object.freeze({
         targetJson: relay.targetJson,
@@ -523,34 +535,39 @@ export function createDevelopmentAuthStackOperations(
       createDevelopmentAuthDataPlaneOperations(
         repositoryRoot,
         commandEnvironment,
-        providerPanel
+        providerPanel,
+        profile
       )
     ),
     async provisionHatchetToken() {
       await provisionDevelopmentHatchetToken({
         repositoryRoot,
-        operations: hatchetOperations
+        operations: hatchetOperations,
+        profile
       });
     },
     async assembleApiEnvironment(providerPanel, registerReceipt, supportModelTarget) {
       await assembleDevelopmentApiEnvironment({
-        repositoryRoot,providerPanel,registerReceipt,supportModelTarget
+        repositoryRoot,providerPanel,registerReceipt,supportModelTarget,profile
       });
     },
     startApi: () => startDevelopmentApiProcess({
       repositoryRoot,
       commandEnvironment,
-      operations: createDevelopmentApiProcessOperations(repositoryRoot)
+      operations: createDevelopmentApiProcessOperations(repositoryRoot, profile),
+      profile
     }),
     startRunner: () => startDevelopmentRunnerProcess({
       repositoryRoot,
       commandEnvironment,
-      operations: createDevelopmentRunnerProcessOperations(repositoryRoot)
+      operations: createDevelopmentRunnerProcessOperations(repositoryRoot, profile),
+      profile
     }),
     startUi: () => startDevelopmentUiProcess({
       repositoryRoot,
       commandEnvironment,
-      operations: createDevelopmentUiProcessOperations(repositoryRoot)
+      operations: createDevelopmentUiProcessOperations(repositoryRoot, profile),
+      profile
     }),
     startTls: () => startAttestedDevTlsFrontDoor({ operations: tlsOperations })
   });

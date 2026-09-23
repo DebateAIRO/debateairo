@@ -1,11 +1,16 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadHelpCorpus } from "../../packages/support-kb/src/index.js";
+import { SUPPORT_CATALOG_CANONICAL } from "../../packages/support-kb/src/catalog.js";
+import {
+  createHelpCorpusSnapshotLookup,
+  loadHelpCorpus,
+  type SupportReviewManifest,
+} from "../../packages/support-kb/src/index.js";
 
 type EntryFixture = {
   id: string;
@@ -66,6 +71,32 @@ function sha256(bytes: string | Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function reviewedManifest(
+  articles: readonly Readonly<{ id: string; lang: "en" | "ro"; bytes: string | Buffer }>[],
+  overrides: Partial<SupportReviewManifest["catalog"]> = {},
+): SupportReviewManifest {
+  const review = {
+    reviewedBy: "SOL" as const,
+    reviewerSession: "/root/editorial-review",
+    reviewedOn: "2026-09-14",
+    evidence: ".hermes/reports/support-conversation-20260914/evidence/EDITORIAL.md",
+  };
+  return {
+    schemaVersion: 1,
+    catalog: {
+      sha256: sha256(SUPPORT_CATALOG_CANONICAL),
+      ...review,
+      ...overrides,
+    },
+    articles: articles.map(({ id, lang, bytes }) => ({
+      id,
+      lang,
+      sha256: sha256(bytes),
+      ...review,
+    })),
+  };
+}
+
 afterEach(() => {
   for (const directory of fixtureDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -73,18 +104,83 @@ afterEach(() => {
 });
 
 describe("Help Corpus loader", () => {
-  it("loads the complete real V-ratified bilingual corpus into its byte-derived version", () => {
+  it("keeps paired public scoring and human-case draft facts aligned", () => {
+    const content = fileURLToPath(
+      new URL("../../packages/support-kb/content/", import.meta.url),
+    );
+    const enScoring = readFileSync(join(content,"debate-workspace-menus.en.md"),"utf8");
+    const roScoring = readFileSync(join(content,"debate-workspace-menus.ro.md"),"utf8");
+    const enCases = readFileSync(join(content,"support-cases.en.md"),"utf8");
+    const roCases = readFileSync(join(content,"support-cases.ro.md"),"utf8");
+
+    for (const [document,terms] of [
+      [enScoring,["provider and model","cache or staleness","unresolved holes and fatal flags"]],
+      [roScoring,["furnizorul și modelul","cache sau învechire","golurile nerezolvate și marcajele fatale"]],
+      [enCases,["email support does not create this case","receipt, response target, or private case link"]],
+      [roCases,["emailul de asistență nu creează acest caz","confirmarea, termenul de răspuns sau legătura privată"]]
+    ] as const) for (const term of terms) expect(document).toContain(term);
+  });
+
+  it("binds the separately reviewed public-guide corpus in the editorial manifest", () => {
+    const directory = fileURLToPath(
+      new URL("../../packages/support-kb/content/", import.meta.url),
+    );
+    const manifestPath = fileURLToPath(
+      new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
+    );
+    const componentPath = fileURLToPath(
+      new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
+    );
+    const manifest = JSON.parse(readFileSync(manifestPath,"utf8")) as {
+      articles: unknown[];recovery:{ componentFileSha256:string };
+    };
+    const componentBytes = readFileSync(componentPath);
+
+    expect(manifest.articles).toHaveLength(32);
+    expect(manifest.recovery.componentFileSha256).toBe(sha256(componentBytes));
+    const corpus = loadHelpCorpus(directory,{
+      reviewManifest:manifest,recoveryComponents:componentBytes,requireReviewedRecovery:true
+    } as never);
+    expect(corpus.recoveryReviewedCount).toBe(22);
+  });
+
+  it("keeps changed and new real corpus drafts excluded until separate editorial review", () => {
     const directory = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
     );
 
     const corpus = loadHelpCorpus(directory);
 
-    expect(corpus.entries).toHaveLength(24);
-    expect(corpus.shippedCount).toBe(12);
-    expect(corpus.ignoredCount).toBe(0);
-    expect(corpus.manifest.split("\n")).toHaveLength(24);
-    expect(corpus.kbVersion).toBe("9016371b38ca10c594e7209c34e51ffd6c4a9b883c47f7b87e70c9881b2b1eec");
+    expect(corpus.entries).toHaveLength(12);
+    expect(corpus.shippedCount).toBe(6);
+    expect(corpus.ignoredCount).toBe(16);
+    expect(corpus.entries.some(({ id }) => id === "product-identity")).toBe(false);
+    for (const id of [
+      "app-navigation","debate-workspace-menus","settings-help-menus","support-status-limits"
+    ]) expect(corpus.entries.some((entry) => entry.id === id)).toBe(false);
+    expect(corpus.previewReviewedCount).toBe(0);
+    expect(corpus.ownerRatifiedCount).toBe(6);
+    expect(corpus.manifest.split("\n")).toHaveLength(25);
+    expect(corpus.kbVersion).toMatch(/^[0-9a-f]{64}$/u);
+  });
+
+  it("admits the changed component set after its separate review manifest lands", () => {
+    const directory = fileURLToPath(
+      new URL("../../packages/support-kb/content/", import.meta.url),
+    );
+    const manifestPath = fileURLToPath(
+      new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
+    );
+    const componentPath = fileURLToPath(
+      new URL("../../packages/support-kb/recovery/components.json", import.meta.url),
+    );
+
+    const corpus = loadHelpCorpus(directory,{
+      reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
+      recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
+    });
+    expect(corpus.entries).toHaveLength(44);
+    expect(corpus.recoveryReviewedCount).toBe(22);
   });
 
   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {
@@ -148,12 +244,19 @@ describe("Help Corpus loader", () => {
     writeEntry(directory, { id: "crlf", lang: "en" }, crlfEn);
     writeEntry(directory, { id: "crlf", lang: "ro" }, crlfRo);
     const expectedManifest = [
+      `catalog:${sha256(SUPPORT_CATALOG_CANONICAL)}`,
       `alpha.en.md:${sha256(alphaEn)}`,
       `alpha.ro.md:${sha256(alphaRo)}`,
       `crlf.en.md:${sha256(crlfEn)}`,
       `crlf.ro.md:${sha256(crlfRo)}`,
       `zeta.en.md:${sha256(zetaEn)}`,
       `zeta.ro.md:${sha256(zetaRo)}`,
+      "ratification:alpha.en:V:2026-09-03",
+      "ratification:alpha.ro:V:2026-09-03",
+      "ratification:crlf.en:V:2026-09-03",
+      "ratification:crlf.ro:V:2026-09-03",
+      "ratification:zeta.en:V:2026-09-03",
+      "ratification:zeta.ro:V:2026-09-03",
     ].join("\n");
 
     const corpus = loadHelpCorpus(directory);
@@ -232,6 +335,19 @@ describe("Help Corpus loader", () => {
         name: "TypedDomainError",
         code: "SUPPORT_KB_UTF8_INVALID",
       }),
+    );
+  });
+
+  it.each([
+    { ratifiedBy: "V" as const, ratifiedOn: "" },
+    { ratifiedBy: "" as const, ratifiedOn: "2026-09-03" },
+  ])("rejects owner ratification fields unless both are populated or both blank", ({ ratifiedBy, ratifiedOn }) => {
+    // Catches partial owner provenance being mistaken for a completed ratification event.
+    const directory = fixtureDirectory();
+    writeEntry(directory, { id: "partial", lang: "en", ratifiedBy, ratifiedOn });
+
+    expect(() => loadHelpCorpus(directory)).toThrowError(
+      expect.objectContaining({ code: "SUPPORT_KB_FRONT_MATTER_INVALID" }),
     );
   });
 
@@ -319,6 +435,130 @@ describe("Help Corpus loader", () => {
         code: "SUPPORT_KB_DUPLICATE_ENTRY",
       }),
     );
+  });
+
+  it("admits an unratified shipped pair only with separate exact-byte Sol attestations", () => {
+    // Catches conflating actual peer review with owner ratification or accepting a self-referential digest.
+    const directory = fixtureDirectory();
+    const en = writeEntry(directory, { id: "peer-reviewed", lang: "en", ratifiedBy: "", ratifiedOn: "" });
+    const ro = writeEntry(directory, { id: "peer-reviewed", lang: "ro", ratifiedBy: "", ratifiedOn: "" });
+
+    const withoutReview = loadHelpCorpus(directory);
+    const withReview = loadHelpCorpus(directory, {
+      reviewManifest: reviewedManifest([
+        { id: "peer-reviewed", lang: "en", bytes: en },
+        { id: "peer-reviewed", lang: "ro", bytes: ro },
+      ]),
+    });
+
+    expect(withoutReview.entries).toEqual([]);
+    expect(withoutReview.previewReviewedCount).toBe(0);
+    expect(withReview.entries.map(({ id, lang }) => `${id}.${lang}`)).toEqual([
+      "peer-reviewed.en",
+      "peer-reviewed.ro",
+    ]);
+    expect(withReview.previewReviewedCount).toBe(1);
+    expect(withReview.ownerRatifiedCount).toBe(0);
+    expect(withReview.reviewManifest.articles).toHaveLength(2);
+  });
+
+  it("excludes a changed article whose current bytes no longer match its attestation", () => {
+    // Catches continuing to serve an edited article under an earlier editorial review.
+    const directory = fixtureDirectory();
+    const en = writeEntry(directory, { id: "changed", lang: "en", ratifiedBy: "", ratifiedOn: "" });
+    const ro = writeEntry(directory, { id: "changed", lang: "ro", ratifiedBy: "", ratifiedOn: "" });
+    const reviewManifest = reviewedManifest([
+      { id: "changed", lang: "en", bytes: en },
+      { id: "changed", lang: "ro", bytes: ro },
+    ]);
+    writeEntry(directory, {
+      id: "changed",
+      lang: "ro",
+      ratifiedBy: "",
+      ratifiedOn: "",
+      body: "Text changed after review.",
+    });
+
+    const corpus = loadHelpCorpus(directory, { reviewManifest });
+
+    expect(corpus.entries).toEqual([]);
+    expect(corpus.previewReviewedCount).toBe(0);
+    expect(corpus.ignoredCount).toBe(1);
+  });
+
+  it("excludes peer-reviewed articles when the catalog digest does not match its attestation", () => {
+    // Catches serving reviewed prose beside navigation or capability bytes the editor did not inspect.
+    const directory = fixtureDirectory();
+    const en = writeEntry(directory, { id: "catalog-bound", lang: "en", ratifiedBy: "", ratifiedOn: "" });
+    const ro = writeEntry(directory, { id: "catalog-bound", lang: "ro", ratifiedBy: "", ratifiedOn: "" });
+    const manifest = reviewedManifest([
+      { id: "catalog-bound", lang: "en", bytes: en },
+      { id: "catalog-bound", lang: "ro", bytes: ro },
+    ], { sha256: "0".repeat(64) });
+
+    const corpus = loadHelpCorpus(directory, { reviewManifest: manifest });
+
+    expect(corpus.entries).toEqual([]);
+    expect(corpus.previewReviewedCount).toBe(0);
+  });
+
+  it.each([
+    { reviewedBy: "V" },
+    { reviewerSession: "" },
+    { reviewedOn: "2026-99-99" },
+    { evidence: "" },
+  ])("rejects malformed or invented catalog review identity: $reviewedBy$reviewerSession", (override) => {
+    // Catches treating arbitrary metadata as proof that a separate Sol session reviewed exact bytes.
+    const directory = fixtureDirectory();
+    writeEntry(directory, { id: "accepted", lang: "en" });
+    writeEntry(directory, { id: "accepted", lang: "ro" });
+
+    expect(() => loadHelpCorpus(directory, {
+      reviewManifest: reviewedManifest([], override as Partial<SupportReviewManifest["catalog"]>),
+    })).toThrowError(expect.objectContaining({ code: "SUPPORT_KB_REVIEW_MANIFEST_INVALID" }));
+  });
+
+  it("hashes the catalog and selected review metadata into kbVersion", () => {
+    // Catches versions that identify article bytes while silently changing navigation truth or review selection.
+    const directory = fixtureDirectory();
+    const en = writeEntry(directory, { id: "reviewed", lang: "en", ratifiedBy: "", ratifiedOn: "" });
+    const ro = writeEntry(directory, { id: "reviewed", lang: "ro", ratifiedBy: "", ratifiedOn: "" });
+    const first = reviewedManifest([
+      { id: "reviewed", lang: "en", bytes: en },
+      { id: "reviewed", lang: "ro", bytes: ro },
+    ]);
+    const second: SupportReviewManifest = {
+      ...first,
+      articles: first.articles.map((article) => ({ ...article, reviewerSession: "/root/second-editor" })),
+    };
+
+    const firstCorpus = loadHelpCorpus(directory, { reviewManifest: first });
+    const secondCorpus = loadHelpCorpus(directory, { reviewManifest: second });
+
+    expect(firstCorpus.catalogDigest).toBe(sha256(SUPPORT_CATALOG_CANONICAL));
+    expect(firstCorpus.manifest).toContain(`catalog:${firstCorpus.catalogDigest}`);
+    expect(firstCorpus.kbVersion).not.toBe(secondCorpus.kbVersion);
+  });
+
+  it("provides immutable exact-version lookup without rereading live documents", () => {
+    // Catches an A-labeled session observing B bytes after the corpus changes or the process restarts.
+    const directory = fixtureDirectory();
+    writeEntry(directory, { id: "snapshot", lang: "en", body: "Snapshot A English." });
+    writeEntry(directory, { id: "snapshot", lang: "ro", body: "Snapshot A Romanian." });
+    const snapshotA = loadHelpCorpus(directory);
+    const lookupA = createHelpCorpusSnapshotLookup(snapshotA);
+
+    writeEntry(directory, { id: "snapshot", lang: "en", body: "Snapshot B English." });
+    const snapshotB = loadHelpCorpus(directory);
+
+    expect(lookupA.get(snapshotA.kbVersion)?.entries[0]?.body).toBe("Snapshot A English.");
+    expect(lookupA.get(snapshotB.kbVersion)).toBeUndefined();
+    expect(lookupA.currentVersion).toBe(snapshotA.kbVersion);
+    expect(Object.isFrozen(lookupA)).toBe(true);
+
+    const restarted = createHelpCorpusSnapshotLookup(snapshotB);
+    expect(restarted.get(snapshotA.kbVersion)).toBeUndefined();
+    expect(restarted.get(snapshotB.kbVersion)?.entries[0]?.body).toBe("Snapshot B English.");
   });
 
   it.each([

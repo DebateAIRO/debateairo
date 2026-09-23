@@ -406,6 +406,72 @@ export function v3NodeScoreDetails(node: ContractNode): V3NodeScoreDetails {
   ];
 }
 
+export type V3NodeHonestyRow = Readonly<{
+  key: "BASE SCORE" | "FINAL STRENGTH" | "REPLAY" | "RESTATEMENT" | "DEFEATERS" | "JUDGE DISAGREEMENT";
+  value: string;
+  title?: string;
+}>;
+
+function scoreSourceLabel(detail: V3NodeScoreDetail): string {
+  const producer = detail.producer.toLowerCase();
+  if (detail.id === "base_score") {
+    return producer.includes("judg") ? "judge-panel" : "recorded assessment";
+  }
+  return producer.includes("propagat") ? "replayed" : "recorded result";
+}
+
+function restatementStatusLabel(status: ContractNode["stranger_restatement"]["check_status"]): string {
+  switch (status) {
+    case "PASS": return "passed";
+    case "FAIL": return "failed";
+    case "NOT_SAMPLED": return "not sampled";
+  }
+}
+
+function disagreementLabel(disagreement: ContractNode["disagreement"]): string {
+  if (disagreement === null) return "No disagreement record";
+  if (disagreement.kind === "NOT_MEASURED") {
+    return disagreement.reason === "SINGLE_JUDGE_WALKING_SKELETON"
+      ? "Not measured · single-judge run"
+      : "Not measured";
+  }
+  return "Disagreement recorded";
+}
+
+/**
+ * Drawer-ready honesty copy. Storage references remain in the contract for
+ * traceability, but this visual surface follows the design's semantic labels
+ * and never exposes UUIDs or raw JSON as prose.
+ */
+export function v3NodeHonestyRows(node: ContractNode): readonly V3NodeHonestyRow[] {
+  const [baseScore, finalStrength] = v3NodeScoreDetails(node);
+  const defeaters = node.defeater_refs.length === 0
+    ? node.defeater_exhaustion_marked
+      ? "Rotation exhausted and marked"
+      : "Obligation remains open"
+    : `${node.defeater_refs.length} recorded defeater${node.defeater_refs.length === 1 ? "" : "s"}`;
+
+  return [
+    {
+      key: "BASE SCORE",
+      value: `${baseScore.percentage.text} · ${scoreSourceLabel(baseScore)}`,
+      title: baseScore.percentage.detail
+    },
+    {
+      key: "FINAL STRENGTH",
+      value: `${finalStrength.percentage.text} · ${scoreSourceLabel(finalStrength)}`,
+      title: finalStrength.percentage.detail
+    },
+    { key: "REPLAY", value: "Recorded replay available" },
+    {
+      key: "RESTATEMENT",
+      value: `Stranger restatement check ${restatementStatusLabel(node.stranger_restatement.check_status)}`
+    },
+    { key: "DEFEATERS", value: defeaters },
+    { key: "JUDGE DISAGREEMENT", value: disagreementLabel(node.disagreement) }
+  ];
+}
+
 function labeledNumberBadge(
   id: V3ScoreBadge["id"],
   name: string,

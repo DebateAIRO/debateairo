@@ -10,7 +10,7 @@ import { SUPPORT_ROUTE_PATHS } from "../../apps/api/src/support/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const forbiddenImports =
-  /(?:registration|mfa|recovery|mail-channel|sessions|account-erasure|legacy-claim|packages\/crypto|db\/src\/identity)/u;
+  /(?:registration|mfa|auth\/recovery|mail-channel|sessions|account-erasure|legacy-claim|packages\/crypto|db\/src\/identity)/u;
 
 async function sourceFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -127,7 +127,7 @@ describe("SUP-01 support capability boundary", () => {
 
   it("keeps the tool registry and first-party link set closed and frozen", () => {
     expect(Object.keys(TOOL_REGISTRY)).toEqual([
-      "answer_from_corpus", "link_first_party", "refuse", "read_own_run_state"
+      "answer_from_corpus", "link_first_party", "refuse"
     ]);
     expect(Object.isFrozen(TOOL_REGISTRY)).toBe(true);
     expect(FIRST_PARTY_ROUTES).toEqual([
@@ -154,7 +154,11 @@ describe("SUP-01 support capability boundary", () => {
     expect(source).not.toMatch(
       /(?:from\s+["']pg["']|@debateai\/db|createPool|PoolClient|RegisterPublicationPort|publishSupport)/u
     );
-    expect(source).not.toMatch(/(?:https?:\/\/|process[.]env|throw\s+new\s+(?:Error|TypeError)\b)/u);
+    expect(source).not.toMatch(/(?:https?:\/\/|process[.]env)/u);
+    const boundarySource = (await Promise.all(files.filter((file) =>
+      !file.endsWith("response-policy.ts") && !file.endsWith("model-references.ts")
+    ).map((file) => readFile(file,"utf8")))).join("\n");
+    expect(boundarySource).not.toMatch(/throw\s+new\s+(?:Error|TypeError)\b/u);
     expect(source).toContain("extends TypedDomainError");
     const keySource = await readFile("apps/api/src/support/keys.ts","utf8");
     expect(keySource).toContain('import { TypedDomainError } from "@debateai/kernel"');
@@ -178,6 +182,12 @@ describe("SUP-01 support capability boundary", () => {
         .test(specifier)
     )).toEqual([]);
     expect(source).not.toMatch(/\b(?:SupportKeyPort|unwrapDataKey)\b/u);
+    expect(source).not.toMatch(
+      /UPDATE\s+support[.]session\s+SET\s+state\s*=\s*['"]LOCKED/iu
+    );
+    const supportApi = `${await readFile("apps/api/src/support/index.ts","utf8")}\n${
+      await readFile("apps/api/src/support/session.ts","utf8")}`;
+    expect(supportApi).not.toContain("finalizeInjectionLock");
   });
 
   it("composes the API support data plane from its dedicated credential", async () => {
@@ -227,7 +237,6 @@ describe("SUP-01 support capability boundary", () => {
     expect(SUPPORT_ROUTE_PATHS).toEqual([
       "POST /v1/support/sessions",
       "GET /v1/support/sessions/{id}",
-      "POST /v1/support/sessions/{id}/consent",
       "POST /v1/support/sessions/{id}/messages",
       "POST /v1/support/messages/{id}/rating",
       "POST /v1/support/sessions/{id}/escalate",

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   AskRefusal,
   buildApi as buildApiBase,
@@ -8,9 +8,14 @@ import {
   type AskApplication,
   type RunCreationSettings
 } from "@debateai/api";
-import { createContractClient, type AskRequest, type Session } from "@debateai/contract";
+import {
+  PLAN_TIER_ROSTERS,
+  createContractClient,
+  type AskRequest,
+  type Session
+} from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
-import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import { configureContentEncryption, RunRepository } from "@debateai/db";
 import {
   RETIRED_DEV_HEADER,
   TEST_APP_ORIGIN,
@@ -27,6 +32,19 @@ const ANSWER_ID = "44444444-4444-4444-8444-444444444444";
 const USER_IDENTITY = testHttpIdentity("api-user");
 const USER_HEADERS = testSessionHeaders(USER_IDENTITY);
 const USER_MUTATION_HEADERS = testSessionHeaders(USER_IDENTITY, true);
+
+function rosterPanel(
+  tier: AskRequest["plan_tier"],
+  makers: readonly string[] = []
+) {
+  return PLAN_TIER_ROSTERS[tier].map((modelId, index) => Object.freeze({
+    provider_ref: `provider:${tier}:${index + 1}`,
+    maker: makers[index] ?? `maker:${tier}:${index + 1}`,
+    model_id: modelId,
+    probe_evidence_ref: `probe:${tier}:${index + 1}`,
+    probed_at: "2026-09-12T00:00:00.000Z"
+  }));
+}
 
 function buildApi(options: Parameters<typeof buildApiBase>[0]) {
   return buildApiBase({
@@ -81,7 +99,7 @@ function admissionSettings(
     registerVersion: 1,
     batteryVersion: "battery:test",
     settlementWatchHandle: "watch:test",
-    resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(2),
+    resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:2"]),
     resolveEnvelopeBasis: async () => ({ max_model_attempts: 1 }),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
       effectiveRiskTier,
@@ -132,6 +150,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       decision_scope: "test-layer scope",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     };
     await expect(evaluateAskAdmission(admissionSettings(), ask)).resolves.toMatchObject({
@@ -154,10 +173,11 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       decision_scope: "test-layer scope",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     };
     await expect(evaluateAskAdmission(admissionSettings({
-      resolveDiscoveredPanel: async () => fixtureDiscoveredPanel(1)
+      resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:1"])
     }), ask)).resolves.toMatchObject({
       criticUnavailableCap: {
         serves: true,
@@ -167,6 +187,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     });
 
     await expect(evaluateAskAdmission(admissionSettings({
+      resolveDiscoveredPanel: async () => rosterPanel("free"),
       resolveEnvelopeBasis: async () => {
         throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "No computed structural ceiling");
       }
@@ -236,6 +257,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         decision_scope: "test-layer scope",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: "free",
         steering_annotations: []
       }
     });
@@ -243,6 +265,115 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     expect(response.json()).toEqual({ run_ref: RUN_ID, status: "QUEUED" });
     expect(observedAsker).toBe(USER_IDENTITY.authenticated.session.asker_id);
     await api.close();
+  });
+
+  it("R14 answers 202 for each plan tier and 400 MALFORMED_REQUEST for a bad or absent one", async () => {
+    const api = buildApi({ application: fixtureApplication() });
+    const validPayload = {
+      question_line: "What follows from this evidence?",
+      risk_tier: "casual",
+      tier_source: "ASKER",
+      tier_provenance_ref: "asker-declaration:test",
+      composition_budget_tier: "low",
+      depth_params: { depth: 1 },
+      decision_scope: "test-layer scope",
+      as_of: "2026-08-07T00:00:00.000Z",
+      steering_presets: [],
+      steering_annotations: []
+    };
+
+    const injectAsk = (payload: Record<string, unknown>) => api.inject({
+      method: "POST",
+      url: "/v1/asks",
+      headers: USER_MUTATION_HEADERS,
+      payload
+    });
+    const free = await injectAsk({ ...validPayload, plan_tier: "free" });
+    const premium = await injectAsk({ ...validPayload, plan_tier: "premium" });
+    const bad = await injectAsk({ ...validPayload, plan_tier: "gold" });
+    const absent = await injectAsk(validPayload);
+
+    expect(free.statusCode).toBe(202);
+    expect(premium.statusCode).toBe(202);
+    expect({ statusCode: bad.statusCode, body: bad.json() }).toMatchObject({
+      statusCode: 400,
+      body: { error: "MALFORMED_REQUEST" }
+    });
+    expect({ statusCode: absent.statusCode, body: absent.json() }).toMatchObject({
+      statusCode: 400,
+      body: { error: "MALFORMED_REQUEST" }
+    });
+    await api.close();
+  });
+
+  it("warns when a pre-0061 encrypted writer strips the run plan tier", async () => {
+    const dataPool = {
+      query: async () => {
+        throw new Error("UNEXPECTED_DATA_POOL_QUERY");
+      }
+    };
+    const provisionPool = {
+      query: async (statement: string) => {
+        if (statement.includes("prepare_run_key_provision")) {
+          return { rows: [{ execution_ref: "55555555-5555-4555-8555-555555555555" }] };
+        }
+        if (statement.includes("create_encrypted_run")) {
+          return { rows: [{ created: true, plan_tier_supported: false }] };
+        }
+        throw new Error(`UNEXPECTED_PROVISION_QUERY:${statement}`);
+      }
+    };
+    configureContentEncryption(dataPool as never, {
+      provisionRun: async () => undefined,
+      destroyRunKey: async () => undefined,
+      prepareRun: async () => ({
+        encrypt: () => ({
+          v: 1,
+          alg: "A256GCM",
+          nonce: "AA==",
+          ct: "AA==",
+          tag: "AA=="
+        }),
+        attestEnvelope: () => Buffer.alloc(32),
+        databaseAttestationSecret: () => Buffer.alloc(32),
+        close: () => undefined
+      })
+    } as never);
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      await new RunRepository(dataPool as never, provisionPool as never).startRun({
+        questionLine: "Does the deploy gap remain visible?",
+        principal: {
+          kind: "server",
+          userId: "66666666-6666-4666-8666-666666666666",
+          ownerRef: "77777777-7777-4777-8777-777777777777"
+        },
+        sessionId: "88888888-8888-4888-8888-888888888888",
+        callerScope: "ASKER",
+        asOf: new Date("2026-09-12T00:00:00.000Z"),
+        askerRiskTier: "casual",
+        effectiveRiskTier: "casual",
+        tierSource: "ASKER",
+        tierProvenanceRef: "test:pre-0061-warning",
+        compositionBudgetTier: "low",
+        planTier: "free",
+        depthParams: { depth: 1 },
+        discoveredPanel: rosterPanel("free"),
+        strangerSampleRate: 0,
+        envelopeBasis: { max_model_attempts: 1 },
+        registerVersion: 1,
+        batteryVersion: "battery:test",
+        batteryRows: []
+      });
+
+      expect(warning).toHaveBeenCalledOnce();
+      expect(warning).toHaveBeenCalledWith(
+        "[RUN_PLAN_TIER_DROPPED] core.create_encrypted_run does not accept planTier; run created without plan tier"
+      );
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it("maps ask-boundary domain refusals to 422 with their real code and message", async () => {
@@ -268,6 +399,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         decision_scope: "test-layer scope",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: "free",
         steering_annotations: []
       }
     });
@@ -334,6 +466,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
       decision_scope: "bounded-history",
       as_of: "2026-08-25T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     };
     const session: Session = {
@@ -426,6 +559,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         decision_scope: "test-layer scope",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: "free",
         steering_annotations: []
       }
     });
@@ -498,6 +632,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
         decision_scope: "test-layer scope",
         as_of: "2026-08-07T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: "free",
         steering_annotations: []
       }
     });

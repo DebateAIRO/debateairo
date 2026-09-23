@@ -120,7 +120,7 @@ async function mountBoth(): Promise<void> {
 describe("cross-slice integration — both consent surfaces in one document", () => {
   it("P1 · both slices' surfaces coexist in one document", async () => {
     await mountBoth();
-    expect(document.querySelectorAll(".consentGroup .consentRow").length, "S02 rows").toBe(2);
+    expect(document.querySelectorAll(".consentGroup .consentRow").length, "S02 rows").toBe(3);
     expect(bar(), "S01 cookie bar").not.toBeNull();
     expect(dialogs().length, "no dialog open at rest").toBe(0);
   });

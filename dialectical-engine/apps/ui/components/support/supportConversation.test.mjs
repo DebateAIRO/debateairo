@@ -35,7 +35,6 @@ test("DL3-F3: a persisted conversation carries no session capability token", asy
     language: "en",
     identityBound: true,
     messages: MESSAGES,
-    ownContext: { latest: true },
     // A caller that still holds a session must not be able to smuggle it in.
     session: { sessionId: "session-1", token: "K".repeat(43), identityBound: true }
   });
@@ -47,8 +46,7 @@ test("DL3-F3: a persisted conversation carries no session capability token", asy
   assert.deepEqual(JSON.parse(raw), {
     language: "en",
     identityBound: true,
-    messages: MESSAGES,
-    ownContext: { latest: true }
+    messages: MESSAGES
   });
 });
 
@@ -58,8 +56,7 @@ test("DL3-F3: a conversation left by the pre-fix build is dropped, capability an
     [KEY]: JSON.stringify({
       language: "en",
       session: { sessionId: "session-1", token: "K".repeat(43), identityBound: true },
-      messages: MESSAGES,
-      ownContext: { latest: true }
+      messages: MESSAGES
     })
   });
   assert.equal(readStoredSupportConversation(storage), null);
@@ -72,14 +69,12 @@ test("DL3-F3: a restored conversation round-trips without a session", async () =
   writeStoredSupportConversation(storage, {
     language: "ro",
     identityBound: false,
-    messages: MESSAGES,
-    ownContext: { runId: "run-7" }
+    messages: MESSAGES
   });
   assert.deepEqual(readStoredSupportConversation(storage), {
     language: "ro",
     identityBound: false,
-    messages: MESSAGES,
-    ownContext: { runId: "run-7" }
+    messages: MESSAGES
   });
 });
 
@@ -90,7 +85,7 @@ test("DL3-F3: a transcript from another identity is erased, never shown to the n
   for (const [wrote, reads] of [[true, false], [false, true]]) {
     const storage = memoryStorage();
     writeStoredSupportConversation(storage, {
-      language: "en", identityBound: wrote, messages: MESSAGES, ownContext: { latest: true }
+      language: "en", identityBound: wrote, messages: MESSAGES
     });
     assert.equal(restoreSupportConversation(storage, reads), null);
     assert.equal(storage.getItem(KEY), null, "an identity change erases the previous conversation");
@@ -101,7 +96,7 @@ test("DL3-F3: the same identity keeps its own conversation across a reload", asy
   const { restoreSupportConversation, writeStoredSupportConversation } = await loadConversation();
   const storage = memoryStorage();
   writeStoredSupportConversation(storage, {
-    language: "en", identityBound: true, messages: MESSAGES, ownContext: { latest: true }
+    language: "en", identityBound: true, messages: MESSAGES
   });
   assert.deepEqual(restoreSupportConversation(storage, true)?.messages, MESSAGES);
 });
@@ -110,7 +105,7 @@ test("DL3-F3: clearing is what logout calls, and it survives an absent storage",
   const { clearStoredSupportConversation, writeStoredSupportConversation } = await loadConversation();
   const storage = memoryStorage();
   writeStoredSupportConversation(storage, {
-    language: "en", identityBound: true, messages: MESSAGES, ownContext: { latest: true }
+    language: "en", identityBound: true, messages: MESSAGES
   });
   clearStoredSupportConversation(storage);
   assert.equal(storage.getItem(KEY), null);
@@ -129,8 +124,65 @@ test("DL3-F3: a malformed or throwing store never breaks the widget", async () =
   };
   assert.equal(readStoredSupportConversation(hostile), null);
   assert.doesNotThrow(() => writeStoredSupportConversation(hostile, {
-    language: "en", identityBound: false, messages: [], ownContext: { latest: true }
+    language: "en", identityBound: false, messages: []
   }));
+});
+
+// ---------------------------------------------- SYNC3: dev's reviewed decorations, both doors
+
+/**
+ * dev's reviewed-response rework gives an assistant answer its reviewed
+ * `sources` and canonical `actions`. They rest in the browser only through the
+ * same validators the response boundary uses: a stored action whose href is
+ * not the canonical one for its identity and language would otherwise be a
+ * link of the payload's own choosing, restored straight onto the page.
+ */
+const DECORATED = Object.freeze({
+  id: "answer-1",
+  role: "assistant",
+  text: "Current product guidance.",
+  outcome: "ANSWER_GROUNDED",
+  language: "en",
+  sources: [{ id: "getting-started-debate", label: "Create a debate" }],
+  actions: [{ id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" }]
+});
+
+test("SYNC3: reviewed sources and canonical actions round-trip through the whitelist", async () => {
+  const { readStoredSupportConversation, writeStoredSupportConversation } = await loadConversation();
+  const storage = memoryStorage();
+  writeStoredSupportConversation(storage, {
+    language: "en", identityBound: false, messages: [...MESSAGES, DECORATED]
+  });
+  assert.deepEqual(readStoredSupportConversation(storage)?.messages, [...MESSAGES, DECORATED]);
+});
+
+test("SYNC3: a stored forged action or source refuses the whole payload, and erases it", async () => {
+  const { readStoredSupportConversation } = await loadConversation();
+  for (const forged of [
+    { ...DECORATED, actions: [{ id: "home", label: "Reset account", href: "/settings" }] },
+    { ...DECORATED, actions: [{ id: "start-debate", label: "Start a debate", href: "/new" }] },
+    { ...DECORATED, sources: [{ id: "not-a-reviewed-article", label: "Anything" }] },
+    { ...DECORATED, sources: [{ id: "getting-started-debate", label: "x", path: "/internal" }] }
+  ]) {
+    const storage = memoryStorage({
+      [KEY]: JSON.stringify({ language: "en", identityBound: false, messages: [...MESSAGES, forged] })
+    });
+    assert.equal(readStoredSupportConversation(storage), null);
+    assert.equal(storage.getItem(KEY), null, "a forged decoration is erased, not merely ignored");
+  }
+});
+
+test("SYNC3: the writer never stores a decoration the response boundary would refuse", async () => {
+  const { writeStoredSupportConversation } = await loadConversation();
+  const storage = memoryStorage();
+  writeStoredSupportConversation(storage, {
+    language: "en",
+    identityBound: false,
+    messages: [...MESSAGES, { ...DECORATED, actions: [{ id: "home", label: "Home", href: "/elsewhere" }] }]
+  });
+  const raw = storage.entries()[KEY];
+  assert.doesNotMatch(raw, /elsewhere/u);
+  assert.deepEqual(JSON.parse(raw).messages, MESSAGES);
 });
 
 // ---------------------------------------------- DL1-F5c: the case bearer never rests on disk
@@ -160,8 +212,7 @@ test("DL1-F5c: a persisted acknowledgement carries no case bearer in its id, tex
   writeStoredSupportConversation(storage, {
     language: "en",
     identityBound: false,
-    messages: [...MESSAGES, { ...CASE_ACKNOWLEDGEMENT, caseOpened: true }],
-    ownContext: { latest: true }
+    messages: [...MESSAGES, { ...CASE_ACKNOWLEDGEMENT, caseOpened: true }]
   });
   const raw = storage.entries()[KEY];
   assert.equal(typeof raw, "string");
@@ -179,8 +230,7 @@ test("DL1-F5c: a bearer left by the pre-fix build is never read back into the pa
     [KEY]: JSON.stringify({
       language: "en",
       identityBound: false,
-      messages: [...MESSAGES, CASE_ACKNOWLEDGEMENT],
-      ownContext: { latest: true }
+      messages: [...MESSAGES, CASE_ACKNOWLEDGEMENT]
     })
   });
   const restored = readStoredSupportConversation(storage);
@@ -206,8 +256,7 @@ test("DL1-F5c: the retired key and any payload the reader refuses are erased, no
   const legacy = JSON.stringify({
     language: "en",
     identityBound: false,
-    messages: [...MESSAGES, CASE_ACKNOWLEDGEMENT],
-    ownContext: { latest: true }
+    messages: [...MESSAGES, CASE_ACKNOWLEDGEMENT]
   });
   // (a) A tab open across the deploy: the old key, written by the old build.
   const carried = memoryStorage({ [RETIRED_KEY]: legacy });
