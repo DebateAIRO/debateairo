@@ -2574,3 +2574,51 @@ describe("T1 rework3 RED 1 — a bounded observation never disables a later deat
     });
   }, 30_000);
 });
+
+/**
+ * CI-1b — CodeQL js/polynomial-redos on PR #8 (alert 6, `encodeSalt`). The
+ * input is always Node's own base64 of the salt, which ends in at most two
+ * "=", so `/=+$/` never met a long run here and the finding was not reachable.
+ * The pattern was replaced anyway because the change is one line. The rows
+ * pin the request binding for every padding class — each answer is built from
+ * a literal, so it is accepted only if the pool's own binding equals it — and
+ * the last test keeps the unbounded pattern from returning.
+ */
+describe("CI-1b — the salt binding is unpadded base64, stripped without backtracking", () => {
+  const PASSWORD_KDF = { memoryCostKiB: 65_536, timeCost: 3, parallelism: 1, hashLength: 32 };
+  const saltOf = (length: number): Uint8Array =>
+    Uint8Array.from({ length }, (_unused, index) => (index * 37 + 11) % 256);
+
+  it.each([
+    [16, "==", "CzBVep/E6Q4zWH2ix+wRNg"],
+    [17, "=", "CzBVep/E6Q4zWH2ix+wRNls"],
+    [18, "", "CzBVep/E6Q4zWH2ix+wRNluA"],
+    [32, "=", "CzBVep/E6Q4zWH2ix+wRNluApcrvFDleg6jN8hc8YYY"],
+    [63, "", "CzBVep/E6Q4zWH2ix+wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW+yBFao+02f4jSG2St9wB"],
+    [64, "==", "CzBVep/E6Q4zWH2ix+wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW+yBFao+02f4jSG2St9wBJg"]
+  ])("binds a %i-byte salt (padding %j) to %s", async (length, padding, unpadded) => {
+    const salt = saltOf(length);
+    expect(Buffer.from(salt).toString("base64")).toBe(`${unpadded}${padding}`);
+    const { pool, workers } = makePool({ workers: 1 });
+    await pool.ready();
+    const hash = pool.hashPassword(bytes(8), salt, PASSWORD_KDF);
+    await flush();
+    const answer = `$argon2id$v=19$m=65536,t=3,p=1$${unpadded}$${"A".repeat(43)}`;
+    workers[0]!.raw({ kind: "result", id: workers[0]!.received[0]!.id, digest: answer });
+    await expect(hash).resolves.toBe(answer);
+    await pool.close();
+  });
+
+  it("strips the padding without an unbounded quantifier before the end anchor", async () => {
+    const source = await readFile(
+      new URL("../../packages/crypto/src/argon2-worker-pool.ts", import.meta.url), "utf8"
+    );
+    const start = source.indexOf("function encodeSalt(");
+    expect(start).toBeGreaterThan(-1);
+    const end = source.indexOf("\n}\n", start);
+    expect(end).toBeGreaterThan(start);
+    // `/=+$/` or `/=*$/`: a backtracking engine restarts at every "=" of a run
+    // it cannot end — exactly the shape CodeQL reports.
+    expect(source.slice(start, end)).not.toMatch(/\/[^/\n]*[+*]\$\/[a-z]*/u);
+  });
+});
