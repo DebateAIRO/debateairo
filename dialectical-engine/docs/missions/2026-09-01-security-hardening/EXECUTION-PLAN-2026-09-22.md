@@ -221,3 +221,9 @@ Today the run-wide bound counts ATTEMPTS only (`packages/budget`, `assertModelAt
 ## Task 15: V-21 — three development-only leftovers (low priority, last)
 
 (a) The development superuser literal `debateai:debateai-dev-only` in `compose.dev.yaml` and the local migrator URL; (c) the custody-mode policy duplicated in three development launchers (`dev-api-environment`, `dev-api-process`, `dev-secret-files`) — centralise it on the helper the token and principals commands already use. (b) — two assumptions about the hatchet-lite image — can only be verified with the development stack running: write down exactly what to check on the next `pnpm dev:auth:up`, and stop there. RED first where behaviour changes.
+
+---
+
+## Task 16: plan tiers by deployment (queued 2026-09-23 at the third dev sync; starts after Task 13 names a vendor)
+
+`dev`'s plan-tier feature (merged 2026-09-23) makes `plan_tier` mandatory on every ask and filters the maker panel by a FIXED roster of local CLI model names. That is right for local mode and fails closed in hosted mode (an ask whose tier names an unpriced or unconfigured target is refused — V-9c's rule), but it means no hosted ask can succeed until the tiers name priced vendor targets. Build: a per-deployment mapping from tier to configured provider targets (the register's configured provider set), read at ask admission, so that local keeps today's roster and hosted maps each tier to vetted, priced vendors; a typed refusal when a tier has no target in the deployment; tests for both modes; the UI copy for the refusal already exists. Sealed values are superseded, never edited. No migration expected.
