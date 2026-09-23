@@ -46,9 +46,32 @@ jobs:
           echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check --strict
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
           "$RUNNER_TEMP/gitleaks" version
-      - name: Scan every ref for secrets
+      # The BLOCKING scan covers the change under review: a pull request's commits (base..head) or the
+      # commits of a push (before..after). The weekly schedule scans EVERY ref (--all) as the history
+      # audit; it fails loudly on its own run and blocks no pull request. Reason (2026-09-23): with
+      # --all on every run, 253 findings in other branches' histories (translation files where "zapis"
+      # contains "api", recorded transcripts, test corpora) blocked a pull request that added none of
+      # them; GitHub's own secret scanning (on since 2026-09-23) watches the whole history for real
+      # provider tokens continuously. Findings are printed redacted: file, commit, rule — never the value.
+      - name: Scan the change under review for secrets (every ref on the weekly schedule)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          "$RUNNER_TEMP/gitleaks" git --redact --verbose --no-banner --config .gitleaks.toml --log-opts="--all" .
+          case "$EVENT_NAME" in
+            pull_request) LOG_OPTS="$PR_BASE_SHA..$HEAD_SHA" ;;
+            push)
+              if [ -n "$PUSH_BEFORE_SHA" ] && [ "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+                LOG_OPTS="$PUSH_BEFORE_SHA..$HEAD_SHA"
+              else
+                LOG_OPTS="--all"
+              fi ;;
+            *) LOG_OPTS="--all" ;;
+          esac
+          echo "gitleaks scope: $LOG_OPTS"
+          "$RUNNER_TEMP/gitleaks" git --redact --verbose --no-banner --config .gitleaks.toml --log-opts="$LOG_OPTS" .
   codeql:
     runs-on: ubuntu-latest
     permissions: { contents: read, security-events: write }
