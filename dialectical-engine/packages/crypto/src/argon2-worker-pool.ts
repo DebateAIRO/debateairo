@@ -446,9 +446,18 @@ const HEX_DIGEST = /^[0-9a-f]+$/;
  */
 export const ARGON2_LAWFUL_WORKER_FAILURE_CODE = "ARGON2_WORKER_JOB_FAILED";
 
-/** Unpadded standard base64 of a salt, exactly as an Argon2 encoding carries it. */
+/**
+ * Unpadded standard base64 of a salt, exactly as an Argon2 encoding carries it.
+ *
+ * CI-1b (CodeQL js/polynomial-redos, PR #8): this used `.replace(/=+$/, "")`.
+ * Node's base64 ends in at most two "=", so the pattern never met a long run
+ * here; a backwards scan removes the same characters with no pattern at all.
+ */
 function encodeSalt(salt: Uint8Array): string {
-  return Buffer.from(salt).toString("base64").replace(/=+$/, "");
+  const padded = Buffer.from(salt).toString("base64");
+  let end = padded.length;
+  while (end > 0 && padded.charCodeAt(end - 1) === 0x3d) end -= 1;
+  return padded.slice(0, end);
 }
 
 /**
