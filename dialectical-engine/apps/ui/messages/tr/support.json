@@ -53,6 +53,7 @@
   "support.escalateBody": "Aktardığınızda bir yetkili tüm yazışmayı okur. Hafta içi bir iş günü içinde yanıt verilir.",
   "support.escalate": "Bir yetkiliye aktar",
   "support.shortcuts": "Kısayollar",
+  "support.summaryAdvisory": "Model tarafından yazılan özet — yalnızca yol gösterme amaçlıdır",
   "support.case.reply": "Bu talebi yanıtla",
   "support.case.state": "Durum",
   "support.case.yours": "Destek talepleriniz",

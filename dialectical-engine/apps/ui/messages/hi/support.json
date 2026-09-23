@@ -53,6 +53,7 @@
   "support.escalateBody": "इसे आगे भेजने पर कोई व्यक्ति पूरा संवाद पढ़ेगा। कार्यदिवसों में एक कार्यदिवस के भीतर उत्तर मिलेगा।",
   "support.escalate": "किसी व्यक्ति को भेजें",
   "support.shortcuts": "शॉर्टकट",
+  "support.summaryAdvisory": "मॉडल द्वारा लिखा सारांश — केवल मार्गदर्शन के लिए",
   "support.case.reply": "इस मामले का उत्तर दें",
   "support.case.state": "स्थिति",
   "support.case.yours": "आपके सहायता मामले",

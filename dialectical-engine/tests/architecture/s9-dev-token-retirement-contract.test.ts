@@ -57,7 +57,7 @@ describe("S9 dev-token retirement architecture contract", () => {
     const [uiControl, uiSettings, acceptance, packageJson,
       vitestConfig] = await Promise.all([
       read("apps/ui/components/LegacyRunClaimControls.tsx"),
-      read("apps/ui/app/settings/page.tsx"),
+      read("apps/ui/components/EvaluatorDevMenu.tsx"),
       read("acceptance/main.ts"),
       read("package.json"),
       read("vitest.config.ts")

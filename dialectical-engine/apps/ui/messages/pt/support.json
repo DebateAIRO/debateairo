@@ -53,6 +53,7 @@
   "support.escalateBody": "Encaminhe o caso para uma pessoa, que lerá toda a conversa. Nos dias úteis, a resposta é dada no prazo de um dia útil.",
   "support.escalate": "Encaminhar para uma pessoa",
   "support.shortcuts": "Atalhos",
+  "support.summaryAdvisory": "Resumo elaborado pelo modelo — indicativo",
   "support.case.reply": "Responder a este caso",
   "support.case.state": "Estado",
   "support.case.yours": "Os seus casos de apoio",

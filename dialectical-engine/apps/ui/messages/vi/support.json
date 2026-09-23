@@ -53,6 +53,7 @@
   "support.escalateBody": "Chuyển tiếp để nhân viên hỗ trợ đọc toàn bộ cuộc trò chuyện. Vào ngày làm việc, phản hồi sẽ được gửi trong vòng một ngày làm việc.",
   "support.escalate": "Chuyển cho nhân viên hỗ trợ",
   "support.shortcuts": "Lối tắt",
+  "support.summaryAdvisory": "Bản tóm tắt do mô hình viết — chỉ để tham khảo",
   "support.case.reply": "Trả lời yêu cầu này",
   "support.case.state": "Trạng thái",
   "support.case.yours": "Yêu cầu hỗ trợ của bạn",

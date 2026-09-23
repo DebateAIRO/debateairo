@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
@@ -24,6 +25,20 @@ import {
 function source(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(`../../apps/ui/${relativePath}`, import.meta.url)), "utf8");
 }
+
+function englishCatalog(namespace: string): Readonly<Record<string, string>> {
+  return JSON.parse(
+    readFileSync(resolve(process.cwd(), `apps/ui/messages/en/${namespace}.json`), "utf8")
+  ) as Readonly<Record<string, string>>;
+}
+
+const english = {
+  debateChrome: englishCatalog("debateChrome"),
+  debateViews: englishCatalog("debateViews"),
+  debateDrawers: englishCatalog("debateDrawers"),
+  misc: englishCatalog("misc"),
+  settings: englishCatalog("settings")
+} as const;
 
 function region(text: string, start: string, end: string): string {
   const startIndex = text.indexOf(start);
@@ -162,9 +177,11 @@ describe("v2-ui scoring copy consults the V3 absence rule before crying failure"
       copy.indexOf('if (isStaleInputHashMismatch(input))')
     );
     expect(unavailableBranch).toContain("v3ScoringStatusLabel(input.reason)");
+    const failureCopy = 't(catalog, "debateChrome.scoring.checkFailed")';
+    expect(english.debateChrome["debateChrome.scoring.checkFailed"]).toBe("Scoring check failed");
     // The V3 branch must come BEFORE the failure branch, or the label never wins.
     expect(unavailableBranch.indexOf("v3ScoringStatusLabel")).toBeLessThan(
-      unavailableBranch.indexOf("Scoring check failed")
+      unavailableBranch.indexOf(failureCopy)
     );
   });
 
@@ -256,7 +273,8 @@ describe("v2-ui /admin/workers does not probe operator deployment state", () => 
   const homePage = source("app/page.tsx");
 
   it("keeps the ordinary route honest without invoking operator APIs", () => {
-    expect(workersPage).toContain("Operator-only view");
+    expect(workersPage).toContain('t(catalog, "settings.workers.operatorOnly")');
+    expect(english.settings["settings.workers.operatorOnly"]).toBe("Operator-only view");
     expect(workersPage).not.toMatch(/backendStatus|readDeployment|contractClient|setInterval/);
     expect(homePage).not.toContain('href="/admin/workers"');
   });
@@ -264,10 +282,11 @@ describe("v2-ui /admin/workers does not probe operator deployment state", () => 
 
 describe("v2-ui /settings reports the deployment without inventing money", () => {
   const settingsPage = source("app/settings/page.tsx");
+  const settingsClient = source("components/EvaluatorDevMenu.tsx");
 
   it("reads the deployment projection instead of a V2 settings resource", () => {
-    expect(settingsPage).toContain("getSettingsView");
-    expect(settingsPage).not.toContain("apiFetch");
+    expect(settingsClient).toContain("getSettingsView");
+    expect(settingsClient).not.toContain("apiFetch");
   });
 
   it("renders no fabricated spend or cap number (DR-115)", () => {
@@ -288,7 +307,7 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
   const drawer = source("components/NodeDetailDrawer.tsx");
   const thread = source("components/DebateThread.tsx");
   const tree = source("components/DebateTree.tsx");
-  const settings = source("app/settings/page.tsx");
+  const settings = source("components/EvaluatorDevMenu.tsx");
 
   it("ports CanvasViewport without dropping the approved V3 score and maker inputs", () => {
     expect(canvas).toContain('import { CanvasViewport } from "@/components/CanvasViewport"');
@@ -498,13 +517,43 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
   });
 
   it("kills MUT-B: re-enabling Regenerate while retaining its truthful tooltip", () => {
-    for (const [name, text] of [["canvas", canvas], ["thread", thread], ["tree", tree], ["drawer", drawer]] as const) {
-      const buttons = buttonBlocksContaining(text, "Regenerate");
+    expect(english.debateViews["debateViews.regenerate"]).toBe("Regenerate");
+    expect(english.debateViews["debateViews.nodeRegenerationUnavailable"]).toBe(
+      "V3 exposes no node-regeneration resource."
+    );
+    expect(english.debateDrawers["debateDrawers.node.regenerate"]).toBe("Regenerate");
+    for (const [name, text, label, capability] of [
+      [
+        "canvas",
+        canvas,
+        't(catalog, "debateViews.regenerate")',
+        't(catalog, "debateViews.nodeRegenerationUnavailable")'
+      ],
+      [
+        "thread",
+        thread,
+        't(catalog, "debateViews.regenerate")',
+        't(catalog, "debateViews.nodeRegenerationUnavailable")'
+      ],
+      [
+        "tree",
+        tree,
+        't(catalog, "debateViews.regenerate")',
+        't(catalog, "debateViews.nodeRegenerationUnavailable")'
+      ],
+      [
+        "drawer",
+        drawer,
+        't(catalog, "debateDrawers.node.regenerate")',
+        "V3_MISSING_CAPABILITIES.nodeRegeneration"
+      ]
+    ] as const) {
+      const buttons = buttonBlocksContaining(text, label);
       expect(buttons.length, `${name} regenerate button count`).toBeGreaterThan(0);
       for (const button of buttons) {
         expect(button, `${name} regenerate disabled`).toMatch(/\bdisabled\b/);
         expect(button, `${name} regenerate aria-disabled`).toContain('aria-disabled="true"');
-        expect(button, `${name} regenerate capability`).toContain("V3_MISSING_CAPABILITIES.nodeRegeneration");
+        expect(button, `${name} regenerate capability`).toContain(capability);
         expect(button, `${name} regenerate has no click path`).not.toContain("onClick=");
       }
       expect(text, name).not.toContain("await regenerateNode(");
@@ -523,17 +572,28 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
     }
     expect(drawer).not.toContain('onClick={() => onSubmit("up")}');
     expect(drawer).not.toContain('onClick={() => onSubmit("down")}');
-    expect(client).toContain("V3_MISSING_CAPABILITIES.adaptiveDepthApproval");
+    expect(client).toContain('t(catalog, "debateChrome.adaptiveDepth.approvalUnavailable")');
+    expect(english.debateChrome["debateChrome.adaptiveDepth.approvalUnavailable"]).toBe(
+      "V3 exposes no adaptive-depth approval resource."
+    );
+    expect(english.debateChrome["debateChrome.adaptiveDepth.approveSelected"]).toBe(
+      "Approve selected expansions"
+    );
     const compactScoring = region(client, 'data-scoring-insights-compact="true"', "</ScoringErrorBoundary>");
     expect(compactScoring).toContain("<AdaptiveDepthDryRunPanel");
     expect(compactScoring).toContain("enabled={true}");
     const adaptivePanel = region(client, "function AdaptiveDepthDryRunPanel", "function AdaptiveDepthDryRunChip");
     const unavailablePanel = region(adaptivePanel, 'if (state.status === "error" || state.status === "unavailable")', "  if (!state.data) return null;");
-    const approveButtons = buttonBlocksContaining(unavailablePanel, "Approve selected expansions");
+    const approveButtons = buttonBlocksContaining(
+      unavailablePanel,
+      't(catalog, "debateChrome.adaptiveDepth.approveSelected")'
+    );
     expect(approveButtons).toHaveLength(1);
     expect(approveButtons[0]).toMatch(/\bdisabled\b/);
     expect(approveButtons[0]).toContain('aria-disabled="true"');
-    expect(approveButtons[0]).toContain("V3_MISSING_CAPABILITIES.adaptiveDepthApproval");
+    expect(approveButtons[0]).toContain(
+      't(catalog, "debateChrome.adaptiveDepth.approvalUnavailable")'
+    );
     expect(unavailablePanel).toContain("adaptiveDepthActionMessage");
     expect(client).not.toContain("await approveDebateAdaptiveDepthExpansion(");
     expect(client).not.toContain("await submitScoringFeedback(");
@@ -541,11 +601,15 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
   });
 
   it("restores the V2 settings write affordance as disabled-not-hidden", () => {
-    const saveButtons = buttonBlocksContaining(settings, "Save changes");
+    expect(english.settings["settings.operator.saveChanges"]).toBe("Save changes");
+    expect(english.settings["settings.operator.writeUnavailable"]).toBe(
+      "V3 exposes no settings-write resource; deployment configuration is register-governed."
+    );
+    const saveButtons = buttonBlocksContaining(settings, 't(catalog, "settings.operator.saveChanges")');
     expect(saveButtons).toHaveLength(1);
     expect(saveButtons[0]).toMatch(/\bdisabled\b/);
     expect(saveButtons[0]).toContain('aria-disabled="true"');
-    expect(saveButtons[0]).toContain("V3_MISSING_CAPABILITIES.settingsWrite");
+    expect(saveButtons[0]).toContain('t(catalog, "settings.operator.writeUnavailable")');
     expect(saveButtons[0]).not.toContain("onClick=");
     expect(settings).not.toContain("saveSettings(");
   });
@@ -558,17 +622,32 @@ describe("UI-02c B1 — both shared model renderers consume the tested house lab
   it("routes ModelMetaLine and ModelBadge through makerIdentityLabel", () => {
     expect(presentation).toContain('import { makerIdentityLabel } from "@/lib/makerIdentity"');
     expect(presentation.match(/makerIdentityLabel\(\{ maker, modelId \}\)/g)).toHaveLength(2);
+    expect(english.misc["misc.model.houseUnavailable"]).toBe("House unavailable");
     const metaLine = region(presentation, "export function ModelMetaLine", "export function ModelBadge");
     const badge = presentation.slice(presentation.indexOf("export function ModelBadge"));
     for (const [name, renderer] of [["ModelMetaLine", metaLine], ["ModelBadge", badge]] as const) {
       expect(renderer.match(/makerIdentityLabel\(\{ maker, modelId \}\)/g), name).toHaveLength(1);
-      expect(renderer.match(/\{label\.text\}/g), name).toHaveLength(1);
+      expect(
+        renderer.match(/const visibleLabel = label\.absence \? t\(catalog, "misc\.model\.houseUnavailable"\) : label\.text;/g),
+        name
+      ).toHaveLength(1);
+      expect(renderer.match(/\{visibleLabel\}/g), name).toHaveLength(1);
     }
   });
 
   it("styles typed absence like an unavailable pill and suppresses its identity dot", () => {
-    expect(presentation).toContain('title={label.absence ? "No recorded house is available for this argument." : undefined}');
-    expect(presentation).toContain('aria-label={label.absence ? "No recorded house is available for this argument." : undefined}');
+    expect(english.misc["misc.model.noRecordedHouse"]).toBe(
+      "No recorded house is available for this argument."
+    );
+    expect(presentation.match(
+      /const absenceExplanation = t\(catalog, "misc\.model\.noRecordedHouse"\);/g
+    )).toHaveLength(2);
+    expect(presentation.match(
+      /title=\{label\.absence \? absenceExplanation : undefined\}/g
+    )).toHaveLength(2);
+    expect(presentation.match(
+      /aria-label=\{label\.absence \? absenceExplanation : undefined\}/g
+    )).toHaveLength(2);
     expect(presentation).toMatch(/\{label\.absence \? null : <span className="modelDot"/);
     expect(globals).toMatch(/\[data-maker-absence="true"\]\s*\{[\s\S]*?border:\s*1px solid var\(--line-strong\);[\s\S]*?background:\s*var\(--surface-sunken\);[\s\S]*?color:\s*var\(--muted\);/);
   });
@@ -617,7 +696,10 @@ describe("XREV-01 — node review uses the existing V2 card and drawer vocabular
   it("shows reviewer lineage, reasons, and typed absence in the existing drawer", () => {
     expect(drawer).toContain('data-node-review={v3.review?.outcome ?? "absent"}');
     expect(drawer).toContain("v3.review?.reviewer_lineage.maker ?? null");
-    expect(drawer).toContain("No completed second-maker review is recorded for this node.");
+    expect(drawer).toContain('t(catalog, "debateDrawers.node.noCompletedReview")');
+    expect(english.debateDrawers["debateDrawers.node.noCompletedReview"]).toBe(
+      "No completed second-maker review is recorded for this node."
+    );
     expect(drawer).toContain('v3.review.reasons.join(" ")');
   });
 });

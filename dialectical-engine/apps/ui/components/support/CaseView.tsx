@@ -32,9 +32,11 @@ export function CaseView({ state,messages,summary = null,text = null,onReply }: 
   if (state === "NOT_FOUND" || state === "SHREDDED") {
     return text === null ? null : <p>{text}</p>;
   }
+  const summaryAdvisory = t(catalog,"support.summaryAdvisory");
   return <section aria-label={t(catalog,"support.case.region")}>
     <p>{t(catalog,"support.case.state")}: {state}</p>
-    {summary === null ? null : <aside>
+    {summary === null ? null : <aside aria-label={summaryAdvisory}>
+      <h2>{summaryAdvisory}</h2>
       <p>{summary}</p>
     </aside>}
     {messages.map((message) => <article key={message.id} data-role={message.role}>

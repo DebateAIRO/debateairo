@@ -158,7 +158,15 @@ describe("SUP-01 support capability boundary", () => {
     const boundarySource = (await Promise.all(files.filter((file) =>
       !file.endsWith("response-policy.ts") && !file.endsWith("model-references.ts")
     ).map((file) => readFile(file,"utf8")))).join("\n");
-    expect(boundarySource).not.toMatch(/throw\s+new\s+(?:Error|TypeError)\b/u);
+    // Persisted locale validation is the same narrow programmer/data-shape
+    // boundary as model-references.ts. Pin that one exact loud TypeError while
+    // continuing to reject every other generic Error/TypeError in support code.
+    expect(boundarySource.match(/throw\s+new\s+(?:Error|TypeError)\b[^;]*;/gu) ?? []).toEqual([
+      'throw new TypeError("SUPPORT_LANGUAGE_INVALID");'
+    ]);
+    expect(boundarySource).toContain(
+      'if (!isSupportLanguage(value)) throw new TypeError("SUPPORT_LANGUAGE_INVALID");'
+    );
     expect(source).toContain("extends TypedDomainError");
     const keySource = await readFile("apps/api/src/support/keys.ts","utf8");
     expect(keySource).toContain('import { TypedDomainError } from "@debateai/kernel"');

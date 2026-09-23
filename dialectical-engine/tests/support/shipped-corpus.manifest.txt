@@ -31,6 +31,7 @@ apps/api/src/support/c3-admission.ts
 apps/api/src/support/cases.ts
 apps/api/src/support/classify.ts
 apps/api/src/support/degraded.ts
+apps/api/src/support/draft-screens.ts
 apps/api/src/support/escalation.ts
 apps/api/src/support/incidents.ts
 apps/api/src/support/index.ts
@@ -268,6 +269,7 @@ apps/ui/components/consent/CookieConsent.tsx
 apps/ui/components/consent/CookiePreferencesCard.tsx
 apps/ui/components/consent/PrivacyPolicyModal.tsx
 apps/ui/components/consent/modalSemantics.ts
+apps/ui/components/consent/useConsentCatalog.ts
 apps/ui/components/debateReferenceDesign.chrome.source-test.mjs
 apps/ui/components/debateReferenceDesign.drawers.source-test.mjs
 apps/ui/components/debateReferenceDesign.public.source-test.mjs
@@ -301,12 +303,14 @@ apps/ui/lib/format.ts
 apps/ui/lib/i18n/I18nProvider.tsx
 apps/ui/lib/i18n/auth.test.mjs
 apps/ui/lib/i18n/catalog.test.mjs
+apps/ui/lib/i18n/catalogContractAssertions.mjs
 apps/ui/lib/i18n/compose.test.mjs
 apps/ui/lib/i18n/consent.test.mjs
 apps/ui/lib/i18n/debateChrome.test.mjs
 apps/ui/lib/i18n/debateDrawers.test.mjs
 apps/ui/lib/i18n/debateViews.test.mjs
 apps/ui/lib/i18n/locales.ts
+apps/ui/lib/i18n/misc.test.mjs
 apps/ui/lib/i18n/public.test.mjs
 apps/ui/lib/i18n/server.ts
 apps/ui/lib/i18n/settings.test.mjs
@@ -464,10 +468,14 @@ packages/register/src/support-config.ts
 packages/serve/src/index.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
+packages/support-kb/scripts/generate-ui-labels.mjs
 packages/support-kb/src/catalog.ts
 packages/support-kb/src/context.ts
 packages/support-kb/src/index.ts
+packages/support-kb/src/locale.ts
 packages/support-kb/src/navigation.ts
 packages/support-kb/src/recovery.ts
+packages/support-kb/src/templates.ts
+packages/support-kb/src/ui-labels.ts
 packages/valuation/src/index.ts
 web/next.config.mjs

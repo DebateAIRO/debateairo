@@ -13,6 +13,9 @@ const ownerHonesty = readFileSync(
 const chromeEnglish = JSON.parse(
   readFileSync(resolve(process.cwd(), "apps/ui/messages/en/chrome.json"), "utf8")
 ) as Readonly<Record<string, string>>;
+const miscEnglish = JSON.parse(
+  readFileSync(resolve(process.cwd(), "apps/ui/messages/en/misc.json"), "utf8")
+) as Readonly<Record<string, string>>;
 
 function between(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
@@ -99,52 +102,57 @@ describe("S02 owner/public affordance drift pins", () => {
   });
 
   it("pins and classifies every owner honesty section", () => {
-    const sections = [...ownerHonesty.matchAll(/<section className="wsSection" aria-label="([^"]+)"/g)]
+    const sections = [...ownerHonesty.matchAll(
+      /<section className="wsSection" aria-label=\{t\(catalog, "([^"]+)"\)\}/g
+    )]
       .map((match) => match[1]);
     const expectedSections = [
       // PUBLIC DRAWER — rendered from the public answer state.
-      "Answer state",
+      ["misc.answerHonesty.answerState", "Answer state"],
       // PUBLIC DRAWER — rendered from verdict/confidence fields.
-      "Verdict",
+      ["misc.answerHonesty.verdict", "Verdict"],
       // NODE DRAWER — public contract nodes retain condition marks.
-      "Condition marks",
+      ["misc.answerHonesty.conditionMarks", "Condition marks"],
       // NODE DRAWER — public contract nodes retain redacted abstention records.
-      "Abstention",
+      ["misc.answerHonesty.abstention", "Abstention"],
       // NODE DRAWER — public contract nodes retain relevant-as-of state.
-      "Per-item freshness",
+      ["misc.answerHonesty.perItemFreshness", "Per-item freshness"],
       // TYPED ABSENCE — named explicitly as not included in the public snapshot.
-      "Cost envelope",
+      ["misc.answerHonesty.costEnvelope", "Cost envelope"],
       // TREE SURFACE — public edges are projected into the shared reading views.
-      "Graph edges",
+      ["misc.answerHonesty.graphEdges", "Graph edges"],
       // NODE DRAWER — public nodes retain labeled numbers with owner pointers redacted.
-      "Numbers and replay",
+      ["misc.answerHonesty.numbersAndReplay", "Numbers and replay"],
       // PUBLIC DRAWER — rendered when present.
-      "Badges",
+      ["misc.answerHonesty.badges", "Badges"],
       // PUBLIC DRAWER — rendered when present.
-      "Residual objections",
+      ["misc.answerHonesty.residualObjections", "Residual objections"],
       // PUBLIC DRAWER — rendered directly.
-      "What would reverse this",
+      ["misc.answerHonesty.whatWouldReverseThis", "What would reverse this"],
       // N/A — value hinges are not in the public envelope.
-      "Value hinges",
+      ["misc.answerHonesty.valueHinges", "Value hinges"],
       // N/A — shadow suppressions are not in the public envelope.
-      "Shadow suppressions",
+      ["misc.answerHonesty.shadowSuppressions", "Shadow suppressions"],
       // N/A — answer lineage is not in the public envelope.
-      "Builds on a previous answer",
+      ["misc.answerHonesty.buildsOnPreviousAnswer", "Builds on a previous answer"],
       // TYPED ABSENCE — owner-only and named explicitly.
-      "Authorized inspection",
+      ["misc.answerHonesty.authorizedInspection", "Authorized inspection"],
       // TYPED ABSENCE — named explicitly as not included.
-      "Execution ledger digest",
+      ["misc.answerHonesty.executionLedgerDigest", "Execution ledger digest"],
       // N/A — live cycle refusal records are not publication fields.
-      "Cycle refusals",
+      ["misc.answerHonesty.cycleRefusals", "Cycle refusals"],
       // N/A — investigation recording is a mutation and stays owner-only.
-      "Investigate deeper",
+      ["misc.answerHonesty.investigateDeeper", "Investigate deeper"],
       // N/A — immutable public snapshots have no live event stream.
-      "Live honesty events",
+      ["misc.answerHonesty.liveHonestyEvents", "Live honesty events"],
       // PUBLIC PAGE — represented by the public-envelope export affordance.
-      "Export"
-    ];
+      ["misc.answerHonesty.export", "Export"]
+    ] as const;
 
-    expect(sections).toEqual(expectedSections);
+    expect(sections).toEqual(expectedSections.map(([key]) => key));
+    for (const [key, english] of expectedSections) {
+      expect(miscEnglish[key], `${key} English catalogue value`).toBe(english);
+    }
     expect(sections).toHaveLength(20);
   });
 });

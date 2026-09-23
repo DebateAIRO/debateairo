@@ -53,6 +53,7 @@
   "support.escalateBody": "Siirrä asia henkilölle, joka lukee koko keskusteluketjun. Arkisin vastaus saapuu yhden työpäivän kuluessa.",
   "support.escalate": "Siirrä henkilölle",
   "support.shortcuts": "Pikavalinnat",
+  "support.summaryAdvisory": "Mallin laatima yhteenveto — ohjeellinen",
   "support.case.reply": "Vastaa tähän tukipyyntöön",
   "support.case.state": "Tila",
   "support.case.yours": "Tukipyyntösi",

@@ -53,6 +53,7 @@
   "support.escalateBody": "Továbbítás esetén egy munkatárs elolvassa a teljes beszélgetést. Munkanapokon egy munkanapon belül válaszol.",
   "support.escalate": "Továbbítás munkatárshoz",
   "support.shortcuts": "Gyorsbillentyűk",
+  "support.summaryAdvisory": "A modell által írt összefoglaló — tájékoztató jellegű",
   "support.case.reply": "Válasz erre az ügyre",
   "support.case.state": "Állapot",
   "support.case.yours": "Az Ön ügyfélszolgálati ügyei",

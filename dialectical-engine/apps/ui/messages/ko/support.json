@@ -53,6 +53,7 @@
   "support.escalateBody": "상담원에게 전달하면 전체 대화를 읽습니다. 평일에는 영업일 기준 하루 이내에 답변합니다.",
   "support.escalate": "상담원에게 전달",
   "support.shortcuts": "바로 가기",
+  "support.summaryAdvisory": "모델이 작성한 요약 — 참고용",
   "support.case.reply": "이 지원 건에 답변",
   "support.case.state": "상태",
   "support.case.yours": "내 지원 건",

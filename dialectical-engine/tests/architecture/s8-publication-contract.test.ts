@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = new URL("../../", import.meta.url);
@@ -138,20 +139,31 @@ describe("Accounts S8 publication architecture", () => {
   });
 
   it("ships the deliberate controls and public-only reader in the UI composition", async () => {
-    const [applicationControl, applicationHome, applicationPublic, englishHome] = await Promise.all([
+    const [applicationControl, applicationHome, applicationPublic, englishHome, englishPublic] = await Promise.all([
       read("apps/ui/components/PublicationControl.tsx"),
       read("apps/ui/app/page.tsx"),
       read("apps/ui/app/public/debate/[id]/page.tsx"),
-      read("apps/ui/messages/en/home.json")
+      readFile(join(process.cwd(), "apps/ui/messages/en/home.json"), "utf8"),
+      readFile(join(process.cwd(), "apps/ui/messages/en/public.json"), "utf8")
     ]);
     const englishHomeCatalog = JSON.parse(englishHome) as Readonly<Record<string, string>>;
+    const englishPublicCatalog = JSON.parse(englishPublic) as Readonly<Record<string, string>>;
     for (const control of [applicationControl]) {
       expect(control).toContain("stepUp(password, code");
       expect(control).toContain("publishRun(runId, grant.token)");
       expect(control).toContain("unpublishRun(runId, grant.token)");
       expect(control).toContain('type="checkbox"');
-      expect(control).toContain("search engines to index it");
-      expect(control.toLowerCase()).toContain("copies already");
+      expect(control).toContain('t(catalog, "public.publication.publishWarning")');
+      expect(englishPublicCatalog["public.publication.publishWarning"]).toBe(
+        "Publishing makes this debate readable by anyone and may allow search engines to index it. " +
+        "It leaves your private deletion envelope, and public copies may persist even if you later " +
+        "unpublish or delete your account."
+      );
+      expect(control).toContain('t(catalog, "public.publication.unpublishWarning")');
+      expect(englishPublicCatalog["public.publication.unpublishWarning"]).toBe(
+        "Unpublishing stops future anonymous reads from DebateAI, but copies already downloaded, " +
+        "quoted, cached, or indexed may persist."
+      );
     }
     // The home surface fetches the published list and states the indexing
     // warning; the row component owns the per-debate public link.

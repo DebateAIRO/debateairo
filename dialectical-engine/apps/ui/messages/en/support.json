@@ -53,6 +53,7 @@
   "support.escalateBody": "Escalate and a human reads the whole thread. Weekdays, replies within one working day.",
   "support.escalate": "Escalate to a human",
   "support.shortcuts": "Shortcuts",
+  "support.summaryAdvisory": "Model-written summary — advisory",
   "support.case.reply": "Reply to this case",
   "support.case.state": "State",
   "support.case.yours": "Your support cases",

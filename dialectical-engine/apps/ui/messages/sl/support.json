@@ -53,6 +53,7 @@
   "support.escalateBody": "Predajte pogovor osebi, ki bo prebrala celotno nit. Ob delavnikih odgovorimo v enem delovnem dnevu.",
   "support.escalate": "Predaj osebi",
   "support.shortcuts": "Bližnjice",
+  "support.summaryAdvisory": "Povzetek, ki ga je napisal model — informativno",
   "support.case.reply": "Odgovori na ta primer",
   "support.case.state": "Stanje",
   "support.case.yours": "Vaši primeri za podporo",

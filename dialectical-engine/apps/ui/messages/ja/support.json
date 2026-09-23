@@ -53,6 +53,7 @@
   "support.escalateBody": "担当者に引き継ぐと、会話全体が読まれます。平日は1営業日以内に返信します。",
   "support.escalate": "担当者に引き継ぐ",
   "support.shortcuts": "ショートカット",
+  "support.summaryAdvisory": "モデルが作成した要約 — 参考情報",
   "support.case.reply": "このケースに返信",
   "support.case.state": "状態",
   "support.case.yours": "サポートケース",

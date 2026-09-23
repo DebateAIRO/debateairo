@@ -53,6 +53,7 @@
   "support.escalateBody": "转交后，人工客服将阅读完整对话。工作日内会在一个工作日内回复。",
   "support.escalate": "转交人工客服",
   "support.shortcuts": "快捷方式",
+  "support.summaryAdvisory": "模型生成的摘要——仅供参考",
   "support.case.reply": "回复此支持工单",
   "support.case.state": "状态",
   "support.case.yours": "您的支持工单",

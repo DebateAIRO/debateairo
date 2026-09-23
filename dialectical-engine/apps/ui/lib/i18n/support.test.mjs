@@ -64,6 +64,7 @@ const expectedKeys = [
   "support.escalateBody",
   "support.escalate",
   "support.shortcuts",
+  "support.summaryAdvisory",
   "support.case.reply",
   "support.case.state",
   "support.case.yours",
@@ -74,7 +75,7 @@ const expectedKeys = [
   "support.action.openPublicDebate"
 ].sort();
 
-test("all 35 locales expose the exact 62-key support chrome contract", () => {
+test("all 35 locales expose the exact 63-key support chrome contract", () => {
   assert.deepEqual(Object.keys(english).sort(), expectedKeys);
   const locales = readdirSync(join(root, "messages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())

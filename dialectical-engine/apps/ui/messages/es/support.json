@@ -53,6 +53,7 @@
   "support.escalateBody": "Eleve el caso y una persona leerá todo el hilo. En días laborables, responderá en el plazo de un día laborable.",
   "support.escalate": "Elevar a una persona",
   "support.shortcuts": "Accesos directos",
+  "support.summaryAdvisory": "Resumen redactado por el modelo — orientativo",
   "support.case.reply": "Responder a este caso",
   "support.case.state": "Estado",
   "support.case.yours": "Sus casos de soporte",

@@ -53,6 +53,7 @@
   "support.escalateBody": "صعّد الطلب ليقرأ شخص سلسلة المحادثة كاملة. في أيام العمل، يصل الرد خلال يوم عمل واحد.",
   "support.escalate": "التصعيد إلى شخص",
   "support.shortcuts": "الاختصارات",
+  "support.summaryAdvisory": "ملخص كتبه النموذج — للاسترشاد",
   "support.case.reply": "الرد على هذا الطلب",
   "support.case.state": "الحالة",
   "support.case.yours": "طلبات الدعم الخاصة بك",

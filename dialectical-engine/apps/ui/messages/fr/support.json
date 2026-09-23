@@ -53,6 +53,7 @@
   "support.escalateBody": "Transmettez la conversation à une personne, qui lira l’ensemble du fil. En semaine, elle répond sous un jour ouvré.",
   "support.escalate": "Transmettre à une personne",
   "support.shortcuts": "Raccourcis",
+  "support.summaryAdvisory": "Résumé rédigé par le modèle — à titre indicatif",
   "support.case.reply": "Répondre à ce dossier",
   "support.case.state": "État",
   "support.case.yours": "Vos dossiers d’assistance",

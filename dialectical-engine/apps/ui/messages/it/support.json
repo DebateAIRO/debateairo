@@ -53,6 +53,7 @@
   "support.escalateBody": "Richieda l'intervento di una persona, che leggerà l'intera conversazione. Nei giorni feriali, risponde entro un giorno lavorativo.",
   "support.escalate": "Richiedi l'intervento di una persona",
   "support.shortcuts": "Scorciatoie",
+  "support.summaryAdvisory": "Riepilogo redatto dal modello — indicativo",
   "support.case.reply": "Rispondi a questo caso",
   "support.case.state": "Stato",
   "support.case.yours": "I suoi casi di supporto",

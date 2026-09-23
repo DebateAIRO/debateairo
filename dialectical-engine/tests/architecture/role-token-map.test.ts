@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * DESIGN provenance, never derived from the shipped bindings:
@@ -31,9 +31,67 @@ type RoleExpectation = {
   family: RegExp;
 };
 
+type LocalizedAnchor = Readonly<{
+  catalog: "debateViews" | "debateDrawers";
+  key: string;
+  english: string;
+}>;
+
 const sources = Object.fromEntries(
   Object.entries(paths).map(([name, path]) => [name, readFileSync(resolve(process.cwd(), path), "utf8")])
 ) as Record<SourceName, string>;
+
+const englishCatalogs = {
+  debateViews: JSON.parse(
+    readFileSync(resolve(process.cwd(), "apps/ui/messages/en/debateViews.json"), "utf8")
+  ) as Readonly<Record<string, string>>,
+  debateDrawers: JSON.parse(
+    readFileSync(resolve(process.cwd(), "apps/ui/messages/en/debateDrawers.json"), "utf8")
+  ) as Readonly<Record<string, string>>
+} as const;
+
+const localizedAnchors: Readonly<Record<string, LocalizedAnchor>> = {
+  "DebateMap Supports legend": {
+    catalog: "debateViews",
+    key: "debateViews.supports",
+    english: "Supports"
+  },
+  "DebateMap Opposes legend": {
+    catalog: "debateViews",
+    key: "debateViews.opposes",
+    english: "Opposes"
+  },
+  "Guide live-generation icon": {
+    catalog: "debateDrawers",
+    key: "debateDrawers.guide.liveGenerationTitle",
+    english: "Live generation"
+  },
+  "Guide stance icon fill": {
+    catalog: "debateDrawers",
+    key: "debateDrawers.guide.attributionTitle",
+    english: "Who said what, and which side"
+  },
+  "Guide reasoning icon": {
+    catalog: "debateDrawers",
+    key: "debateDrawers.guide.attributionTitle",
+    english: "Who said what, and which side"
+  },
+  "Guide challenge icon fill": {
+    catalog: "debateDrawers",
+    key: "debateDrawers.guide.challengeTitle",
+    english: "Challenge a flaw anywhere"
+  },
+  "Guide challenge icon text": {
+    catalog: "debateDrawers",
+    key: "debateDrawers.guide.challengeTitle",
+    english: "Challenge a flaw anywhere"
+  },
+  "Guide compare/switch/export icon": {
+    catalog: "debateDrawers",
+    key: "debateDrawers.guide.compareTitle",
+    english: "Compare, switch, export"
+  }
+};
 
 function capturedToken(source: SourceName, pattern: RegExp): string {
   return sources[source].match(pattern)?.[1] ?? "<unbound>";
@@ -54,6 +112,13 @@ function objectToken(source: SourceName, anchor: string, property: string): stri
 }
 
 function expectRole({ surface, role, actual, family }: RoleExpectation): void {
+  const localizedAnchor = localizedAnchors[surface];
+  if (localizedAnchor !== undefined) {
+    expect(
+      englishCatalogs[localizedAnchor.catalog][localizedAnchor.key],
+      `${localizedAnchor.key} English catalogue value`
+    ).toBe(localizedAnchor.english);
+  }
   if (!family.test(actual)) {
     throw new Error(`${surface}: expected role ${role}, but actually binds ${actual}`);
   }
@@ -100,13 +165,13 @@ const expected: RoleExpectation[] = [
   {
     surface: "DebateMap Supports legend",
     role: "pro stance",
-    actual: capturedToken("map", /mapLegendSwatch" style=\{\{ background: "var\((--[\w-]+)\)" \}\} \/>\n\s*Supports/),
+    actual: capturedToken("map", /mapLegendSwatch" style=\{\{ background: "var\((--[\w-]+)\)" \}\} \/>\n\s*\{t\(catalog, "debateViews\.supports"\)\}/),
     family: roles.pro
   },
   {
     surface: "DebateMap Opposes legend",
     role: "con stance",
-    actual: capturedToken("map", /mapLegendSwatch" style=\{\{ background: "var\((--[\w-]+)\)" \}\} \/>\n\s*Opposes/),
+    actual: capturedToken("map", /mapLegendSwatch" style=\{\{ background: "var\((--[\w-]+)\)" \}\} \/>\n\s*\{t\(catalog, "debateViews\.opposes"\)\}/),
     family: roles.con
   },
   {
@@ -154,37 +219,37 @@ const expected: RoleExpectation[] = [
   {
     surface: "Guide live-generation icon",
     role: "generation state",
-    actual: objectToken("guide", 'title: "Live generation"', "iconBg"),
+    actual: objectToken("guide", 'titleKey: "debateDrawers.guide.liveGenerationTitle"', "iconBg"),
     family: roles.generation
   },
   {
     surface: "Guide stance icon fill",
     role: "pro stance",
-    actual: objectToken("guide", 'title: "Who said what, and which side"', "iconBg"),
+    actual: objectToken("guide", 'titleKey: "debateDrawers.guide.attributionTitle"', "iconBg"),
     family: roles.pro
   },
   {
     surface: "Guide reasoning icon",
     role: "reasoning accent (not Terracotta gold)",
-    actual: objectToken("guide", 'title: "Who said what, and which side"', "iconColor"),
+    actual: objectToken("guide", 'titleKey: "debateDrawers.guide.attributionTitle"', "iconColor"),
     family: roles.reasoning
   },
   {
     surface: "Guide challenge icon fill",
     role: "score uncertainty chrome",
-    actual: objectToken("guide", 'title: "Challenge a flaw anywhere"', "iconBg"),
+    actual: objectToken("guide", 'titleKey: "debateDrawers.guide.challengeTitle"', "iconBg"),
     family: roles.uncertainty
   },
   {
     surface: "Guide challenge icon text",
     role: "score uncertainty chrome",
-    actual: objectToken("guide", 'title: "Challenge a flaw anywhere"', "iconColor"),
+    actual: objectToken("guide", 'titleKey: "debateDrawers.guide.challengeTitle"', "iconColor"),
     family: roles.uncertainty
   },
   {
     surface: "Guide compare/switch/export icon",
     role: "state surface",
-    actual: objectToken("guide", 'title: "Compare, switch, export"', "iconBg"),
+    actual: objectToken("guide", 'titleKey: "debateDrawers.guide.compareTitle"', "iconBg"),
     family: roles.stateSurface
   },
   {
