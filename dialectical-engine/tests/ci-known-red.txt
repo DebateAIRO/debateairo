@@ -63,6 +63,27 @@
 #     the defect it was written for hides the next one.
 # Gate after the reconciliation → new=0 known=5 stale=0.
 #
+# RE-BASELINED at SYNC3, 2026-09-23 (origin/dev@25a0069f merged at 9a2675a4; record:
+# docs/missions/2026-09-01-security-hardening/DEV-SYNC-2026-09-23.md). The union of the two
+# sides: dev keeps no list, so the five entries above are carried; each was re-run on the
+# merged tree and still fails for exactly its recorded reason (scaffold: the same three
+# obs-capture edges and no fourth). The gate on the merged tree reported `new=14`. None
+# was listed on sight:
+#   - 7 were this line's own tests meeting dev's changes (a merge defect, never listed) and
+#     were fixed in the commits that found them: security-migration-0065 (R2, 0067),
+#     no-machine-paths (dev's review manifest named a home directory), dl1-f7 x3 (dev's
+#     retired consent route, dev's KB-snapshot binding), v9-provider-credential-files x2
+#     (dev's five-slot dev panel).
+#   - 7 were RED ON dev ITSELF, measured on a pristine extract of origin/dev@25a0069f
+#     installed offline, each with the identical message. Four were FIXED rather than
+#     listed, because an entry would blind a guard for everything after the failing
+#     assertion: p3-production-database-principals (the principal inventory),
+#     t09-synthesis-entrypoint (sealed-role resolution), v2ui-data-layer (the ask), and
+#     v2ui-node-runner (it runs the WHOLE UI node suite, so listing it would hide every
+#     UI node test). The three below are listed: each needs dev's product change or a
+#     ruling on a sealed value, not a sync.
+# Gate after this re-baseline -> new=0 known=8 stale=0.
+#
 # Deliberately NOT listed:
 #   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
 #     tripwire"): they pass solo; listing them would hide a real regression. Integration
@@ -95,3 +116,18 @@ tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and ho
 #   source: dev's closing four-count at a61206dc, row 11. UI source pin owned by the apps/ui lane.
 tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary > shows typed review outcome and reviewer house on cards, including honest absence
 #   source: dev's closing four-count at a61206dc, row 12. UI source pin owned by the apps/ui lane.
+tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > keeps all twelve fixed wrappers least-privileged and file-backed
+#   source: dev, b7ca2c41 (SYNC3, 2026-09-23). Red on origin/dev@25a0069f with the same
+#   message: dev's test demands twelve principals including debateai_dev_evaluator_worker;
+#   dev's apps/runner/src/dev-database-principals.ts declares eleven. Adding a database role
+#   is dev's product change, not a sync's.
+tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > preserves the exact legacy hashes while the actual port input owns all 248 policy decimals
+#   source: dev, 6a05a0d0 (SYNC3, 2026-09-23). Red on origin/dev@25a0069f with the same
+#   message: dev moved DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 (120bdfea… -> 42b90bca…)
+#   but not the sealed fixture tests/support/fixtures/register-development-v4.json, which
+#   still hashes to 120bdfea…. Which side is right is a ruling on a sealed value; the
+#   LEGACY v1 hash check above the failing line still runs and passes.
+tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded numbers, in V2's own vocabulary > keeps the fuller record on the executable drawer projection and forbids raw-value JSX
+#   source: dev, b7ca2c41 (SYNC3, 2026-09-23). Red on origin/dev@25a0069f with the same
+#   message. UI source pin owned by the apps/ui lane: `v3NodeScoreDetails(v3)` moved from the
+#   drawer into apps/ui/lib/v3/adapter.ts.
