@@ -76,12 +76,24 @@ export function registerVersionToSafeLegacyNumber(value: RegisterVersionText): n
   return Number(parsed);
 }
 
+/**
+ * CI-1b (CodeQL js/polynomial-redos, PR #8): `.replace(/0+$/u, "")` restarted
+ * at every "0" and rescanned the run when a non-zero digit followed it — about
+ * 2.8 s for a 100 000-zero fraction ending in "1", and the register JSON parser
+ * admits 1 MiB. One backwards scan removes exactly the same characters.
+ */
+function withoutTrailingZeros(digits: string): string {
+  let end = digits.length;
+  while (end > 0 && digits.charCodeAt(end - 1) === 0x30) end -= 1;
+  return digits.slice(0, end);
+}
+
 function normalizeDecimal(raw: string): string {
   const match = /^(-?)([0-9]+)(?:[.]([0-9]+))?$/u.exec(raw);
   if (match === null) return fail("CANONICAL_DECIMAL_INVALID");
   const sign = match[1] ?? "";
   const integer = (match[2] ?? "").replace(/^0+(?=[0-9])/u, "");
-  const fraction = (match[3] ?? "").replace(/0+$/u, "");
+  const fraction = withoutTrailingZeros(match[3] ?? "");
   const isZero = integer === "0" && fraction === "";
   return `${isZero ? "" : sign}${integer}${fraction === "" ? "" : `.${fraction}`}`;
 }
