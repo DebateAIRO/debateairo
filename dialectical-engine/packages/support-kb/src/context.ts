@@ -330,7 +330,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const directWords = product.branded ? product.substantiveWords : evidenceWords(input.query);
   const topicBinding = SUPPORT_TOPIC_PROMPTS[input.language]
     .find(({ prompt }) => prompt === input.query);
-  const topicSourceIds = topicBinding?.sourceIds ?? [];
+  const topicSourceIds: readonly string[] = topicBinding?.sourceIds ?? [];
   const guideMatches = SUPPORT_GUIDE_LABELS.map((item) => {
     if (item.requiresNavigationIntent && !hasActionIntent) return Object.freeze({ item,score:0 });
     const uiAliases = item.actionId === null || item.actionId === "forgot-password"

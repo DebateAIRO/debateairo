@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import enConsent from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+import { t } from "../../apps/ui/lib/i18n/translate.js";
 import {
   POLICY_JUMP,
-  POLICY_SECTIONS
+  POLICY_SECTIONS,
+  type PolicyMessage
 } from "../../apps/ui/lib/privacyPolicy.js";
 
 // Literals below are the DECODED text of `slices/S02/SPEC.md` §Copy — the reader's text.
@@ -37,9 +40,14 @@ const SPEC_BULLETS: readonly string[] = [
   "Withdraw consent (Art. 7(3)) — for analytics, telemetry, or a published debate."
 ];
 
+const resolvePolicyMessage = ({ key, vars }: PolicyMessage): string => t(enConsent, key, vars);
+
 describe("privacy policy content module", () => {
   it("carries the eight jump pills in the design's own order, not document order", () => {
-    expect(POLICY_JUMP).toEqual([
+    expect(POLICY_JUMP.map(({ labelKey, target }) => ({
+      label: t(enConsent, labelKey),
+      target
+    }))).toEqual([
       { label: "CONTROLLER", target: "policy-section-05" },
       { label: "WHAT WE COLLECT", target: "policy-section-01" },
       { label: "LAWFUL BASIS", target: "policy-section-06" },
@@ -50,7 +58,7 @@ describe("privacy policy content module", () => {
       { label: "COMPLAINTS", target: "policy-section-11" }
     ]);
 
-    const labels = POLICY_JUMP.map((pill) => pill.label);
+    const labels = POLICY_JUMP.map((pill) => t(enConsent, pill.labelKey));
     expect(labels).not.toEqual([...labels].sort());
   });
 
@@ -59,7 +67,7 @@ describe("privacy policy content module", () => {
     expect(POLICY_SECTIONS.map((section) => section.no)).toEqual([
       "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11"
     ]);
-    expect(POLICY_SECTIONS.map((section) => section.title)).toEqual([
+    expect(POLICY_SECTIONS.map((section) => t(enConsent, section.titleKey))).toEqual([
       "What we collect",
       "Why we hold it",
       "Publishing and visibility",
@@ -85,7 +93,7 @@ describe("privacy policy content module", () => {
       const matches = POLICY_SECTIONS.filter(
         (section) => `policy-section-${section.no}` === pill.target
       );
-      expect(matches, `pill ${pill.label} resolves to ${matches.length} sections`)
+      expect(matches, `pill ${t(enConsent, pill.labelKey)} resolves to ${matches.length} sections`)
         .toHaveLength(1);
       return matches[0]!.no;
     });
@@ -109,17 +117,19 @@ describe("privacy policy content module", () => {
   });
 
   it("ships decoded characters, with bodies and bullets byte-exact against the SPEC", () => {
-    expect(POLICY_SECTIONS.map((section) => section.body)).toEqual(SPEC_BODIES);
-    expect(POLICY_SECTIONS.flatMap((section) => [...section.items])).toEqual(SPEC_BULLETS);
+    expect(POLICY_SECTIONS.map((section) => resolvePolicyMessage(section.body)))
+      .toEqual(SPEC_BODIES);
+    expect(POLICY_SECTIONS.flatMap((section) => section.items.map(resolvePolicyMessage)))
+      .toEqual(SPEC_BULLETS);
 
     const everyString = [
-      ...POLICY_JUMP.flatMap((pill) => [pill.label, pill.target]),
+      ...POLICY_JUMP.flatMap((pill) => [t(enConsent, pill.labelKey), pill.target]),
       ...POLICY_SECTIONS.flatMap((section) => [
         section.no,
-        section.title,
+        t(enConsent, section.titleKey),
         section.accent,
-        section.body,
-        ...section.items
+        resolvePolicyMessage(section.body),
+        ...section.items.map(resolvePolicyMessage)
       ])
     ];
     for (const value of everyString) {

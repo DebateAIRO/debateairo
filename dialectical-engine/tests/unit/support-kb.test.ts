@@ -125,7 +125,15 @@ describe("Help Corpus loader", () => {
         join(directory,`${locale}.json`),"utf8"
       )) as Record<string,string>;
       expect(Object.keys(values)).toEqual(SUPPORT_TEMPLATE_IDS);
-      if (locale !== "en" && locale !== "ro") expect(values).toEqual(en);
+      if (locale === "en" || locale === "ro") continue;
+      // Translated locales: same ids, non-empty prose, the same {placeholders} as English,
+      // and NOT the English copy the build wave left behind before translation.
+      const placeholders = (text: string) => (text.match(/\{[a-zA-Z0-9_]+\}/g) ?? []).sort();
+      for (const id of SUPPORT_TEMPLATE_IDS) {
+        expect(values[id]!.trim().length,`${locale}/${id} is empty`).toBeGreaterThan(0);
+        expect(placeholders(values[id]!),`${locale}/${id} placeholders`).toEqual(placeholders(en[id]!));
+      }
+      expect(values,`${locale} templates are still the English copy`).not.toEqual(en);
     }
   });
 

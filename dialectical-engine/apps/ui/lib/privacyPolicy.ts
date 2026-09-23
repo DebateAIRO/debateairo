@@ -10,7 +10,7 @@
  * `var(${accent})` and this file stays free of markup.
  */
 
-import type { TranslationVariables } from "./i18n/translate";
+import type { TranslationVariables } from "./i18n/translate.js";
 
 export type PolicyMessage = Readonly<{ key: string; vars?: TranslationVariables }>;
 export type PolicyJump = Readonly<{ labelKey: string; target: string }>;
