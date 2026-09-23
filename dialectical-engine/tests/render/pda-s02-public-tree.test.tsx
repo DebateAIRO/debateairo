@@ -10,6 +10,19 @@ import { DebateSplit } from "../../apps/ui/components/DebateSplit.js";
 import { DebateCanvas } from "../../apps/ui/components/DebateCanvas.js";
 import { NodeDetailDrawer } from "../../apps/ui/components/NodeDetailDrawer.js";
 import { PublicDebatePageClient } from "../../apps/ui/app/public/debate/[id]/PublicDebatePageClient.js";
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
+import timeEnglish from "../../apps/ui/messages/en/time.json" with { type: "json" };
+import debateChromeEnglish from "../../apps/ui/messages/en/debateChrome.json" with { type: "json" };
+import debateViewsEnglish from "../../apps/ui/messages/en/debateViews.json" with { type: "json" };
+import debateDrawersEnglish from "../../apps/ui/messages/en/debateDrawers.json" with { type: "json" };
+import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+
+const PUBLIC_PAGE_I18N = {
+  locale: "en" as const,
+  publicCatalog: publicEnglish,
+  timeCatalog: timeEnglish,
+  debateChromeCatalog: debateChromeEnglish
+};
 
 function labeledNumber(value: number) {
   return {
@@ -228,8 +241,8 @@ describe("S02 shared tree leaves in public read-only mode", () => {
         onToggleExpand={() => undefined}
       />
     );
-    expect(split.textContent).toContain("⚐ Challenge");
-    expect(split.textContent).toContain("challenge it to spawn a rebuttal");
+    expect(split.textContent).toContain(`⚐ ${debateViewsEnglish["debateViews.challenge"]}`);
+    expect(split.textContent).toContain(debateViewsEnglish["debateViews.leafWithChallenge"]);
 
     const drawer = await render(
       <NodeDetailDrawer
@@ -244,16 +257,28 @@ describe("S02 shared tree leaves in public read-only mode", () => {
         onAuthRejected={() => undefined}
       />
     );
-    expect(drawer.textContent).toContain("⚐ Challenge");
+    expect(drawer.textContent).toContain(
+      `⚐ ${debateDrawersEnglish["debateDrawers.node.challenge"]}`
+    );
   });
 });
 
 describe("S02 public argument-tree projection", () => {
   it("renders every reading mode, real projected claims, and a read-only node drawer", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    const container = await render(<PublicDebatePageClient debate={publicTreeDebate} />);
-    const viewButtons = [...container.querySelectorAll<HTMLButtonElement>('[role="group"][aria-label="View"] > button')];
-    expect(viewButtons.map((button) => button.textContent)).toEqual(["Overview", "Thread", "Split", "Tree", "Map"]);
+    const container = await render(
+      <PublicDebatePageClient debate={publicTreeDebate} {...PUBLIC_PAGE_I18N} />
+    );
+    const viewButtons = [...container.querySelectorAll<HTMLButtonElement>(
+      `[role="group"][aria-label="${chromeEnglish["chrome.view"]}"] > button`
+    )];
+    expect(viewButtons.map((button) => button.textContent)).toEqual([
+      chromeEnglish["chrome.overview"],
+      chromeEnglish["chrome.thread"],
+      chromeEnglish["chrome.split"],
+      chromeEnglish["chrome.tree"],
+      chromeEnglish["chrome.map"]
+    ]);
 
     const clickView = async (label: string) => {
       const button = viewButtons.find((candidate) => candidate.textContent === label);
@@ -314,9 +339,13 @@ describe("S02 public argument-tree projection", () => {
         as_of: publicTreeDebate.answer.as_of
       }
     });
-    const container = await render(<PublicDebatePageClient debate={legacyDebate} />);
-    expect(container.querySelectorAll('[role="group"][aria-label="View"] > button')).toHaveLength(0);
+    const container = await render(
+      <PublicDebatePageClient debate={legacyDebate} {...PUBLIC_PAGE_I18N} />
+    );
+    expect(container.querySelectorAll(
+      `[role="group"][aria-label="${chromeEnglish["chrome.view"]}"] > button`
+    )).toHaveLength(0);
     expect(container.querySelector(".canvasViewport, .thread, .split, .map")).toBeNull();
-    expect(container.textContent).toContain("predates argument-tree publishing");
+    expect(container.textContent).toContain(publicEnglish["public.disclosure.legacySummaryOnly"]);
   });
 });

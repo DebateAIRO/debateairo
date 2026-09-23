@@ -12,11 +12,12 @@ import AiTransparencyPage from "../../apps/ui/app/ai-transparency/page.js";
 import { Assistant, type SupportAssistantClient } from "../../apps/ui/components/support/Assistant.js";
 import { debateDetailFromAnswer } from "../../apps/ui/lib/v3/adapter.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { type: "json" };
 
 describe("AI disclosure at the point of use", () => {
-  it("makes the linked explanation available without signing in", () => {
-    const html = renderToStaticMarkup(<AiTransparencyPage />);
-    expect(html).toContain("How we label AI content");
+  it("makes the linked explanation available without signing in", async () => {
+    const html = renderToStaticMarkup(await AiTransparencyPage());
+    expect(html).toContain(settingsEnglish["settings.transparency.title"]);
     expect(html).toContain("ai_disclosure");
     expect(html).toContain('href="/help"');
   });

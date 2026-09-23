@@ -243,7 +243,7 @@ export function PrivacyPolicyModal({
           </div>
           <div className="policyFoot">
             <span className="policyContact">
-              {t(catalog, "consent.policy.questions")} {" "}
+              {t(catalog, "consent.policy.questions")}{" "}
               <span className="policyMail">{PRIVACY_EMAIL}</span>
             </span>
             <span className="policyFootSpacer" />

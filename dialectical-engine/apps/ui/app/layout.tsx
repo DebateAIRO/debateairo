@@ -39,7 +39,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(cookieLocale) ? cookieLocale : "en";
   const localeDefinition = getLocale(locale);
-  const chrome = await loadNamespace(locale, "chrome");
+  const [chrome, debateViews] = await Promise.all([
+    loadNamespace(locale, "chrome"),
+    loadNamespace(locale, "debateViews")
+  ]);
+  const sharedCatalog = Object.freeze({ ...chrome, ...debateViews });
 
   return (
     <html
@@ -64,7 +68,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             'var(--font-sans), "Noto Sans", "Noto Sans Arabic", "Noto Sans Hebrew", "Noto Sans Devanagari", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR", sans-serif'
         }}
       >
-        <I18nProvider locale={locale} catalog={chrome}>
+        <I18nProvider locale={locale} catalog={sharedCatalog}>
           <div className="appShell">
             <TopBar />
             {children}

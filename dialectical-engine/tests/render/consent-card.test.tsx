@@ -7,6 +7,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY, COOKIE_CATEGORIES } from "../../apps/ui/lib/consent.js";
 import { CookiePreferencesCard } from "../../apps/ui/components/consent/CookiePreferencesCard.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+import { t } from "../../apps/ui/lib/i18n/translate.js";
 
 // The acceptance command is pinned to the lane root, so source fixtures resolve
 // from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
@@ -21,10 +23,14 @@ const globalsSource = (): string =>
 
 // SPEC §Copy, extracted with a codepoint dump rather than retyped: the lede
 // carries U+2192 RIGHT ARROW (TOOLING-TRAPS, CODE-S01-C1C2).
-const EYEBROW = "CHOOSE WHAT TO STORE";
-const TITLE = "Cookie preferences";
-const LEDE = "Asked once. Revisit any time from Settings → Privacy.";
-const FOOTER = ["Privacy notice", "Essential only", "Save choices"];
+const EYEBROW = consentEnglish["consent.preferences.eyebrow"];
+const TITLE = consentEnglish["consent.preferences.title"];
+const LEDE = consentEnglish["consent.preferences.lede"];
+const FOOTER = [
+  consentEnglish["consent.preferences.privacyNotice"],
+  consentEnglish["consent.action.essentialOnly"],
+  consentEnglish["consent.preferences.saveChoices"]
+];
 /** Every string the card renders that is NOT one of the twelve category strings. */
 const CARD_CHROME = [EYEBROW, TITLE, LEDE, ...FOOTER];
 
@@ -126,6 +132,7 @@ function mountCard(handlers: CardHandlers = {}): HTMLElement {
   act(() => {
     root!.render(
       <CookiePreferencesCard
+        catalog={consentEnglish}
         initial={handlers.initial ?? DEFAULTS}
         onSave={handlers.onSave ?? ((): void => {})}
         onEssentialOnly={handlers.onEssentialOnly ?? ((): void => {})}
@@ -180,10 +187,10 @@ describe("S01-C4 the cookie preferences card (10b)", () => {
       "the twelve strings, by row, in the design's order"
     ).toEqual(
       COOKIE_CATEGORIES.map((category) => [
-        category.name,
-        category.tag,
-        category.description,
-        category.detail
+        t(consentEnglish, category.nameKey),
+        t(consentEnglish, category.tagKey),
+        t(consentEnglish, category.descriptionKey),
+        t(consentEnglish, category.detailKey, category.detailVars)
       ])
     );
 
@@ -194,10 +201,10 @@ describe("S01-C4 the cookie preferences card (10b)", () => {
     // which is a category string.
     const source = cardSource();
     for (const value of COOKIE_CATEGORIES.flatMap((category) => [
-      category.name,
-      category.tag,
-      category.description,
-      category.detail
+      t(consentEnglish, category.nameKey),
+      t(consentEnglish, category.tagKey),
+      t(consentEnglish, category.descriptionKey),
+      t(consentEnglish, category.detailKey, category.detailVars)
     ])) {
       const inlined = new RegExp(`["'>]\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*["'<]`);
       expect(inlined.test(source), `"${value}" is inlined in CookiePreferencesCard.tsx`).toBe(false);

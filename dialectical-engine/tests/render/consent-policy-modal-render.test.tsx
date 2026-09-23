@@ -8,6 +8,8 @@ import {
   type PrivacyPolicyModalProps
 } from "../../apps/ui/components/consent/PrivacyPolicyModal.js";
 import { POLICY_JUMP, POLICY_SECTIONS } from "../../apps/ui/lib/privacyPolicy.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+import { t } from "../../apps/ui/lib/i18n/translate.js";
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -75,7 +77,7 @@ describe("privacy policy modal — rendered", () => {
     expect(labelledBy).not.toBeNull();
     const title = document.getElementById(labelledBy!);
     expect(title, `aria-labelledby="${labelledBy}" resolves to nothing`).not.toBeNull();
-    expect(title!.textContent).toBe("What we store, and why");
+    expect(title!.textContent).toBe(consentEnglish["consent.policy.title"]);
 
     expect(dialog.querySelectorAll(".policyCore .policyTab").length).toBe(1);
   });
@@ -86,15 +88,17 @@ describe("privacy policy modal — rendered", () => {
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
-      "PRIVACY POLICY · v2.1 · EFFECTIVE 12 AUG 2026"
+      consentEnglish["consent.policy.eyebrow"]
     );
-    expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
+    expect(dialog.querySelector(".policyTitle")!.textContent).toBe(
+      consentEnglish["consent.policy.title"]
+    );
     expect(dialog.querySelector(".policyLede")!.textContent).toBe(
-      "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Eleven sections — scroll to the end."
+      t(consentEnglish, "consent.policy.lede", { regulation: "GDPR (EU) 2016/679" })
     );
 
     const closers = [...dialog.querySelectorAll("*")].filter(
-      (element) => element.getAttribute("aria-label") === "Close"
+      (element) => element.getAttribute("aria-label") === consentEnglish["consent.policy.close"]
     );
     expect(closers.length).toBe(1);
     expect(closers[0]!.textContent).toBe("×");
@@ -107,7 +111,9 @@ describe("privacy policy modal — rendered", () => {
 
     const pills = [...dialog.querySelectorAll<HTMLButtonElement>("button[data-jump]")];
     expect(pills.length).toBe(8);
-    expect(pills.map((pill) => pill.textContent)).toEqual(POLICY_JUMP.map((jump) => jump.label));
+    expect(pills.map((pill) => pill.textContent)).toEqual(
+      POLICY_JUMP.map((jump) => t(consentEnglish, jump.labelKey))
+    );
 
     for (const pill of pills) {
       expect(pill.getAttribute("type")).toBe("button");
@@ -143,13 +149,13 @@ describe("privacy policy modal — rendered", () => {
     ]);
 
     expect(sections.map((section) => section.querySelector(".policySectionTitle")!.textContent)).toEqual(
-      POLICY_SECTIONS.map((section) => section.title)
+      POLICY_SECTIONS.map((section) => t(consentEnglish, section.titleKey))
     );
     expect(sections.map((section) => section.querySelector(".policyNo")!.textContent)).toEqual(
       POLICY_SECTIONS.map((section) => section.no)
     );
     expect(sections.map((section) => section.querySelector(".policyText")!.textContent)).toEqual(
-      POLICY_SECTIONS.map((section) => section.body)
+      POLICY_SECTIONS.map((section) => t(consentEnglish, section.body.key, section.body.vars))
     );
 
     // The expected bullet total is DERIVED from the data (3 + 4 + 5), and the data's own total is
@@ -172,13 +178,15 @@ describe("privacy policy modal — rendered", () => {
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     const contacts = [...dialog.querySelectorAll("*")].filter(
-      (element) => element.textContent === "Questions: privacy@dezbatere.ro"
+      (element) => element.textContent === `${consentEnglish["consent.policy.questions"]} privacy@dezbatere.ro`
     );
     expect(contacts.length).toBeGreaterThanOrEqual(1);
 
     const scrollRegion = dialog.querySelector(".policyBody")!;
     const last = scrollRegion.lastElementChild!;
-    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v2.1");
+    expect(last.textContent).toBe(
+      t(consentEnglish, "consent.policy.endMarker", { regulation: "GDPR (EU) 2016/679" })
+    );
 
     // The honesty rule: this repository generates no policy PDF, so no control claims one.
     const pdf = [...dialog.querySelectorAll("*")].filter(
@@ -195,11 +203,11 @@ describe("privacy policy modal — rendered", () => {
     );
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
-    expect(textControls(dialog, "I have read it").length).toBe(0);
-    expect(textControls(dialog, "Close").length).toBe(1);
+    expect(textControls(dialog, consentEnglish["consent.policy.acknowledge"]).length).toBe(0);
+    expect(textControls(dialog, consentEnglish["consent.policy.close"]).length).toBe(1);
     expect(
       [...dialog.querySelectorAll("*")].filter(
-        (element) => element.textContent === "Questions: privacy@dezbatere.ro"
+        (element) => element.textContent === `${consentEnglish["consent.policy.questions"]} privacy@dezbatere.ro`
       ).length
     ).toBeGreaterThanOrEqual(1);
 
@@ -218,8 +226,8 @@ describe("privacy policy modal — rendered", () => {
     await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
-    expect(textControls(dialog, "I have read it").length).toBe(1);
-    expect(textControls(dialog, "Close").length).toBe(0);
+    expect(textControls(dialog, consentEnglish["consent.policy.acknowledge"]).length).toBe(1);
+    expect(textControls(dialog, consentEnglish["consent.policy.close"]).length).toBe(0);
   });
 });
 

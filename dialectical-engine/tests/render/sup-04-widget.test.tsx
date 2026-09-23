@@ -116,7 +116,9 @@ describe("SUP-04 product-route support widget", () => {
     ]);
     expect(home).toMatch(/<section[^>]*data-support-primary-control[^>]*id="start-a-debate"/u);
     expect(create).toMatch(/<button[^>]*data-support-primary-control[^>]*type="submit"/su);
-    expect(publication).toMatch(/<section[^>]*data-support-primary-control[^>]*aria-label="Publication controls"/u);
+    expect(publication).toMatch(
+      /<section[^>]*data-support-primary-control[^>]*aria-label=\{t\(catalog, "public\.publication\.controlsAria"\)\}/u
+    );
   });
 
   it("continues one session and its messages across widget and full-page remounts in the tab", async () => {
