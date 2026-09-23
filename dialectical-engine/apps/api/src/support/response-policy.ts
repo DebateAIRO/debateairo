@@ -7,6 +7,10 @@ import {
   SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,SUPPORT_GUIDE_LABELS,
   type SupportActionId
 } from "@debateai/support-kb/catalog";
+import type { SupportLanguage } from "@debateai/support-kb/catalog";
+import {
+  conflatesLocalizedCaseAndEmail,hasLocalizedFinancialCapabilityClaim
+} from "./draft-screens.js";
 
 const MAX_RAW_CODE_POINTS = 8_192;
 const MAX_TEXT_CODE_POINTS = 4_000;
@@ -39,11 +43,6 @@ export type SupportCaseSummaryDraft = Readonly<{
 
 const ACCOUNT_DETAIL_CLAIM = /\b(?:active sessions?|privacy preferences?|cookie preferences?|claim legacy debates?|delete account|deletion schedule|sesiuni active|preferin(?:te|tele) (?:cookie|de confidentialitate)|revendic(?:a|area) dezbaterilor vechi|sterger(?:ea|ii) contului|programarea stergerii)\b/u;
 const NAVIGATION_COMMITMENT = /\b(?:support|asistenta)\b[^.!?;\n]{0,80}\b(?:can\s+(?:guide|navigate|direct)|poate\s+(?:ghida|naviga|indrepta|deschide))\b/u;
-const EMAIL = /\b(?:e-?mail(?:ul)?|mail)\b/u;
-const CASE = /\b(?:human\s+case|support\s+case|case|caz(?:ul)?)\b/u;
-const CASE_CREATION = /\b(?:create[ds]?|open(?:s|ed)?|cre(?:eaza|at|are)|deschide)\b/u;
-const CASE_CREATION_NEGATION = /\b(?:does\s+not|doesn['’]?t|did\s+not|never|cannot|can['’]?t|nu)\b[^.!?;\n]{0,40}\b(?:create|open|cre(?:eaza|a)|deschide)\b/u;
-const FINANCIAL_CAPABILITY = /\b(?:pay(?:ing|ment|ments|ed|s)?|paid|purchas\p{L}*|buy(?:ing|s)?|bought|bill(?:ing|ed|s)?|charg\p{L}*|transaction\p{L}*|checkout\p{L}*|plat(?!form)\p{L}*|achit\p{L}*|cump\p{L}*|achiz\p{L}*|factur\p{L}*|tranzact\p{L}*|debit(?:are\p{L}*|at\p{L}*)|tax(?:are\p{L}*|at\p{L}*))\b/gu;
 
 function authorityText(value: string): string {
   return value.normalize("NFKD").replace(/\p{M}/gu,"").toLocaleLowerCase("en-US");
@@ -51,18 +50,6 @@ function authorityText(value: string): string {
 
 function authorityWords(value: string): string {
   return authorityText(value).replace(/[^\p{L}\p{N}]+/gu," ").trim();
-}
-
-function conflatesCaseAndEmail(value: string): boolean {
-  return authorityText(value).split(/[.!?;\n]+|\b(?:while|whereas|iar|in timp ce)\b/u).some((clause) =>
-    EMAIL.test(clause) && CASE.test(clause) && CASE_CREATION.test(clause)
-      && !CASE_CREATION_NEGATION.test(clause)
-  );
-}
-
-function hasFinancialCapabilityClaim(value: string): boolean {
-  FINANCIAL_CAPABILITY.lastIndex = 0;
-  return FINANCIAL_CAPABILITY.test(authorityText(value));
 }
 
 type NavigationMatch = Readonly<{
@@ -113,10 +100,12 @@ function actionHasRequestAuthority(
 export function bindSupportDraftAuthority(
   draft: SupportDraft,
   allowedSourceIds: readonly string[],
-  requestedActionIds: readonly (SupportActionId | string)[]
+  requestedActionIds: readonly (SupportActionId | string)[],
+  language: SupportLanguage
 ): SupportDraft | null {
   const text = authorityText(draft.text);
-  if (conflatesCaseAndEmail(text) || hasFinancialCapabilityClaim(text)) return null;
+  if (conflatesLocalizedCaseAndEmail(text,language)
+    || hasLocalizedFinancialCapabilityClaim(text,language)) return null;
 
   const sourceIds = [...draft.sourceIds];
   if (ACCOUNT_DETAIL_CLAIM.test(text) && !sourceIds.includes("settings-help-menus")) {

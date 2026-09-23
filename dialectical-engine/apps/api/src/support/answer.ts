@@ -341,7 +341,7 @@ export function createSupportAnswerService(input: Readonly<{
         const authorityDraft = !structured ? undefined
           : translatedDraft === null || translatedDraft === undefined ? null
           : bindSupportDraftAuthority(
-            translatedDraft,context!.sourceIds,context!.requestedActionIds
+            translatedDraft,context!.sourceIds,context!.requestedActionIds,request.language
           );
         const draft = !structured ? undefined
           : authorityDraft === null || authorityDraft === undefined

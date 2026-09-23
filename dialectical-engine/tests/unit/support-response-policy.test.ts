@@ -1,6 +1,6 @@
 import { describe,expect,it } from "vitest";
 import {
-  bindSupportDraftAuthority,
+  bindSupportDraftAuthority as bindSupportDraftAuthorityForLocale,
   diagnoseSupportDraft,
   parseSupportCaseSummaryDraft,
   parseSupportDraft,
@@ -10,6 +10,18 @@ import {
 import {
   SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,SUPPORT_GUIDE_LABELS
 } from "../../packages/support-kb/src/catalog.js";
+import type { SupportLanguage } from "../../packages/support-kb/src/locale.js";
+
+function bindSupportDraftAuthority(
+  draft: Parameters<typeof bindSupportDraftAuthorityForLocale>[0],
+  allowedSourceIds: Parameters<typeof bindSupportDraftAuthorityForLocale>[1],
+  requestedActionIds: Parameters<typeof bindSupportDraftAuthorityForLocale>[2],
+  language: SupportLanguage = "en"
+) {
+  return bindSupportDraftAuthorityForLocale(
+    draft,allowedSourceIds,requestedActionIds,language
+  );
+}
 
 function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): string {
   return JSON.stringify({
