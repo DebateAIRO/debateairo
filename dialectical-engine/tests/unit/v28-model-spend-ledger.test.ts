@@ -21,8 +21,9 @@ import {
  * processes. So the running totals live in the database (migration 0066,
  * `ledger.model_spend`) and every rule that reads them is expressed against the
  * SEAM below. The database-backed half is written in
- * `tests/integration/v28-model-spend.test.ts` and is NOT RUN here — Docker is
- * down on this host by the mission's own quiet rule.
+ * `tests/integration/v28-model-spend.test.ts`, which runs on the embedded test
+ * Postgres in `test:s00` (no Docker — it first ran, and passed, on 2026-09-23 at
+ * the third dev sync).
  *
  * What is exercised here is the whole decision surface: what is charged, when a
  * call is refused, when a new run is refused, and what a restart sees.

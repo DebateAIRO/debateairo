@@ -1,49 +1,35 @@
-# The Docker window — what has to run once Docker is up, and what each run proves
+# The database-backed suites — run on 2026-09-23 (no Docker needed after all)
 
-*Written 2026-09-22 by the coordinator. Docker Desktop was not running on this Mac during the whole execution, so every database-backed suite in this branch is written but has never executed here. This file is the checklist for the one window in which they all run, before anything reaches `dev`. Plain-language mirror: [PLAIN-STATUS.md](PLAIN-STATUS.md); checklist line 6 of [GO-LIVE-CHECKLIST.md](GO-LIVE-CHECKLIST.md).*
+*Written 2026-09-22 as "the Docker window", rewritten 2026-09-23 by the coordinator after the measurement. The premise was wrong: every database-backed suite in this repository starts its own embedded PostgreSQL (`tests/support/testDatabase.ts` → `startWithEmbedded`; the testcontainers path is "DEFERRED BY DR-121" and the only two mentions of it in the tests pin that fact). The packages' "NOT RUN (Docker)" notes were assumptions. Docker Desktop is needed for the development stack and the server rehearsals, not for any test. Plain-language mirror: [PLAIN-STATUS.md](PLAIN-STATUS.md); checklist line 6 of [GO-LIVE-CHECKLIST.md](GO-LIVE-CHECKLIST.md).*
 
-## 1. The runs
+## 1. The run
 
-All from `dialectical-engine/`, on the release-candidate commit, with Docker Desktop running (the suites start their own PostgreSQL through testcontainers — nothing to provision by hand).
-
-The whole gate, including the integration directory CI never runs:
+From `dialectical-engine/`, on the release-candidate commit, on a QUIET machine (three timing rows in `registration-database` go red under load):
 
 ```bash
 pnpm run test:s00
 ```
 
-The `acceptance/` directory is NOT part of this window: it is the ceremony harness that drives real model relays (the local CLIs in local mode, paid vendors in hosted) — it runs as part of the owner's confirmation run, not against testcontainers. The only acceptance check that belongs here is that it still compiles, which the integration branch already proves on every merge (acceptance tsc 0).
+`acceptance/` is not part of it: that is the ceremony harness that drives real model relays and belongs to the owner's confirmation run. A failure is a finding, not a reason to edit the test.
 
-Record the commit, the date, the totals and every failure verbatim in §4 below. A failure is a finding, not a reason to edit the test.
+## 2. What was measured on 2026-09-23
 
-## 2. What the window proves, by area (the properties with NO unit-level proof today)
+First full run, on the third-sync tip `3030ac20`, 46 minutes: **471 files, 7414 tests — 7353 passed, 60 failed, 1 skipped.** The 60:
 
-| Area | Property proven only by a database-backed suite | Where |
-|---|---|---|
-| Keys (A) | The support KEK rotation's `UPDATE (wrapped_key, destroyed_at)` is accepted by the 0054 CHECK constraint; the `destroyed_at IS NULL AND wrapped_key = $3` bytea comparison through node-pg; `support.assert_shred_integrity()` accepting each commit; `listWrappedKeys`' UNION shape; `assertSupportPrincipalRole`'s SQL witness | `tests/integration/support-kek-rotation-database.test.ts` — NOTE: it runs as the test superuser, so it does NOT prove the rotation under the real `debateai_support` column grant (a follow-up: run it as that role) |
-| Keys (A) | The custody group with real group ids (the unit rows skip on a host with fewer than two supplementary groups) | `tests/unit/custody-group.test.ts` (`it.skipIf`) — run on a host with ≥ 2 groups |
-| Money (C) | Migration 0066 applies and replays (both tables, every CHECK, the FK to `core.run`, both indexes, `reject_mutation`/`reject_truncate`, the DO contract count of 4, the GRANTs) | migration replay in `test:s00` |
-| Money (C) | `PostgresModelSpendStore` SQL text (the `$5::date` insert, the two `coalesce(sum(...))::text` reads, the numeric-text narrowing) | `tests/integration/v28-model-spend.test.ts` |
-| Money (C) | `admitNewRun` end to end: `pg_advisory_xact_lock(hashtextextended(...))`, the combined charge + reservation sum with `expires_at > $2`, rollback and lock release, TWO backends serialising | same |
-| Money (C) | The seam over a real pool: `readRunSpentMicros` on a second connection while the run's lease holds a client; `recordSpend` failing after a billed call (the never-charge path); two concurrent calls of one run racing the per-run gate | same |
-| Money (C) | Whole-run cases 1–12: spend stop during root authoring / expansion / first review; `SINGLE-LINEAGE` with the stop code (never `MONO_MAKER_RUN`); `UNSERVED-MAKER-POSITION` at M=3; `HIDDEN-UNJUDGEABLE` kept; the ledger holds root 0's charges and nothing for the refused call; `PROVIDER_USAGE_UNREPORTED` ends in the envelope terminal | `tests/integration/v28-model-spend.test.ts:172-230` (a numbered `describe.skip` — un-skip it in the window and record the result) |
-| Money (C) | Role privileges in practice (`debateai_runtime` inserts into both tables and takes the advisory lock); the 429 + `Retry-After` path through Fastify and the `api.ask.refused` log line | same + `tests/integration/database.test.ts` |
-| Money (C) | The register version a fresh database allocates is 5 (the constant was corrected from 6 in the fix wave; the three cases that pin it are expected GREEN now) | `tests/integration/dev-deployment-register.test.ts`, `dev-api-environment.test.ts`, `t16-algorithm-register.test.ts` |
-| Money (C) | The reservation TTL (30 min, provisional) against real first-charge latency — unproven at every level; measure it in the owner's paid run | (owner's confirmation run) |
-| Support (D) | The owner-bound case token; the 30-day TTL; case-reply redaction and limits; the injection lock; the anonymous IP window/cooldown and cross-instance counters; SHREDDED read/reply; the rotation repository's conditional UPDATE; the real-role witness; `sessionOwnerMatches` | `tests/integration/support-*.test.ts` |
-| Support (D) | The evaluator consumer treats pre-change outputs as stale after the prompt version bump (the unit suite's fake repository decides `ALREADY_CURRENT` itself) | `tests/integration/evaluator-consumer-database.test.ts` |
-| Runner (F) | A real run body against a real pool reaches the five money-stop catches and the envelope terminal (the CI pin is a source pin: deletion, guard inversion and comment-out, not execution) | `tests/integration/database.test.ts` + the v28 whole-run cases |
-| Prompt containment (B) | The database-backed suites repaired by package 9 that live under `tests/integration` | `test:s00` (the ceremony under `acceptance/` belongs to the owner's confirmation run) |
-| Benchmark | `pnpm run support:eval` scores something other than 0/60 once the harness's pseudonym matches the 0054 CHECK (fix package FW-E) — needs a database and a model; record the score | `tests/support-eval/run.ts` |
+| Group | Count | Cause | What happened |
+|---|---|---|---|
+| The known-red list | 8 | recorded entries (5 inherited from `dev`, 3 `dev`-owned rows split so nothing of ours hides behind them) | unchanged |
+| `tests/integration/database.test.ts` | 28 | the suite's fake vendor answered a placeholder model id; Task 9's model-identity check refuses it (never seen: the suite had never run) | fixed in the fixture — SYNC3-B (`492fb87c`), 95/95 |
+| Eight rows only on our branch, four files | 8 | KEK-rotation suite never ran `migrate`; the V-28 spend helper's cast hid three values `core.run` refuses; T17's fake vendor keyed failures on the exact request text (our per-call fence markers reset it) plus the placeholder model id; OBS-07 expected pre-DL7-F3 notify addresses; **and one real product defect: the observation agent's zsh launcher declared a local named `path` (bound to PATH in zsh) in our DL7-F5 change, so the agent could never start** | fixed — SYNC3-C (`267c3329`…`2ba24ce0`); the launcher fix is test-first with a new gate check |
+| `dev`'s own | 2 | `dev` moved the sealed development-v4 snapshot constant (`6a05a0d0`) without the fixture it describes — `production-database-principals` "emergency off" and `register-support-publication`'s database row | recorded for `dev`'s author; needs a ruling on a sealed value |
+| This machine's environment | 10 | the development-stack suites expect the local CLIs and a dev environment (`dev-api-process` ×5 `DEV_API_PROCESS_ENVIRONMENT_INVALID`, `dev-api-environment`, `dev-provider-panel` exit 2, `dev-ui-process`), `evaluator-addon-database` "twelve same-run invocations above pool max", `t16-algorithm-register` seeding — all fail identically on pristine `dev@25a0069f` | recorded; not ours |
+| Load-sensitive | 4 | `registration-database` rework rows (pass alone in 98–315 s; red only under concurrent runs) and `dev`'s memory tripwire (3.45 MiB against a 2 MiB limit even on a quiet machine) | recorded; the tripwire is `dev`'s test |
 
-## 3. Then, in the same window (the two packages that were held for Docker)
+## 3. Results table
 
-- **Task 5** — V-17, V-29 (a new migration, number 0067 or later, assigned by the coordinator), B28's tamper check.
-- **Task 7** — V-6 (encrypt the remaining readable debate text) and V-26 (account deletion erases the support conversations and revokes the case bearers). The owner asked to be told before V-6 passes one day.
-
-## 4. Results
-
-*(empty until the window runs)*
-
-| Commit | Date | Command | Totals | Failures (verbatim) |
+| Commit | Date | Command | Totals | Failures |
 |---|---|---|---|---|
+| `3030ac20` (sync tip before the fixes) | 2026-09-23 | `pnpm run test:s00` | 471 files; 7353 passed / 60 failed / 1 skipped | the table above |
+| `492fb87c` | 2026-09-23 | `vitest run tests/integration/database.test.ts` ×3 | 95 passed each | none |
+| `2ba24ce0` | 2026-09-23 | the five SYNC3-C files together | 27 passed / 1 skipped (pre-existing placeholder) | none |
+| `8692c4dc` (integration tip, pushed) | 2026-09-23 | clean checkout: typecheck, acceptance tsc, gate, audit, UI typecheck/tests/build, s5, S06, the six fixed integration files | gate new=0 known=8 stale=0; UI 134/134; six files 122 passed / 1 skipped | none of ours; the `dev`-owned and environment rows of §2 stand |

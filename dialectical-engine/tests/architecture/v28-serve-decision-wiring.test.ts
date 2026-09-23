@@ -20,8 +20,8 @@ import { describe, expect, it } from "vitest";
  * in `tests/integration/v28-model-spend.test.ts`". That file's whole-run block
  * (:279-282) is a `describe.skip` whose single body is `expect.unreachable` — a
  * NUMBERED CONTRACT for a harness nobody has wired, not a confirmation waiting
- * on Docker. (Its two other blocks are real Docker specs; this one is not a
- * spec at all.) So nothing anywhere confirms the whole run, and the source pins
+ * on anything. (Its two other blocks are real specs on the embedded test Postgres —
+ * no Docker — and passed on 2026-09-23; this one is not a spec at all.) So nothing anywhere confirms the whole run, and the source pins
  * in this file are the only thing standing between the run-body money stop and
  * a silent deletion. They are written to say so.
  */
@@ -119,8 +119,8 @@ describe("V-28 round 4 — the post-authoring serve decision is one function, ca
  * A DRIVEN pin is not available: the run body is the middle of
  * `WalkingSkeletonRunner.execute`, which is built from a `Pool` and eleven
  * repositories over it, and no pool-free harness for it exists anywhere in the
- * repository (the one whole-run spec is Docker-bound, and its spend-stop block
- * is an unwired `describe.skip`). So this is a SOURCE pin, of the same kind and
+ * repository (the one whole-run spec runs on the embedded Postgres, and its
+ * spend-stop block is an unwired `describe.skip`). So this is a SOURCE pin, of the same kind and
  * with the same honest limits as the DL4-F3 and V-28 pins in
  * `tests/unit/provider-gateway-backoff.test.ts`.
  *
@@ -141,8 +141,8 @@ describe("V-28 round 4 — the post-authoring serve decision is one function, ca
  * carrying the same statement text on its own line would satisfy it, a rewrite
  * that expresses the same guard differently would fail it while being correct,
  * and NOTHING here proves that a real run body, against a real Pool, ever
- * reaches these catches — that stays for the Docker window and the numbered
- * contract in `tests/integration/v28-model-spend.test.ts`. What this block buys
+ * reaches these catches — that stays for the numbered contract in
+ * `tests/integration/v28-model-spend.test.ts` once its harness is wired. What this block buys
  * is that the wiring cannot be deleted, inverted or commented out in silence,
  * which is the failure mode three review rounds did not catch.
  */

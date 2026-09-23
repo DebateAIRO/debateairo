@@ -20,10 +20,24 @@ PENDING is the best result this bench can give on its own, on purpose: it will o
 
 | Checked | Result |
 |---|---|
-| The work branch | `security/dev-sync-2026-09-18` — **pushed to GitHub on 23 September** (your "push to dev"); GitHub's secret check found nothing. Pull request #8 now points at it — but it **cannot merge yet**: `dev` gained 127 commits (the support-agent work and the sign-up terms gate) since this branch last absorbed it, and 20 files collide, mostly the support chat where both sides changed the same code. A third bringing-up-to-date is needed first |
+| The work branch | `security/dev-sync-2026-09-18` — **pushed to GitHub on 23 September, twice**: first as it was (your "push to dev"), then again after the third bringing-up-to-date with `dev` (your "push again when it's green"); GitHub's secret check found nothing either time. Pull request #8 points at the latest tip |
 | GitHub switches | **23 September: secret scanning + push protection are ON** (your "go 1"). That was the one switch that had to precede the first push. The others wait for their own "go" |
 | This Mac's Node version (Node is the program that runs the code) | 26.8.2 — exactly what `dev` now requires |
 | `dev`, the main V3 line | has moved on by 36 commits since this branch last absorbed it |
+
+### The third bringing-up-to-date with `dev`, and the first run of the database-backed tests (23 September)
+
+`dev` had moved by 127 commits (your support-agent work, the sign-up terms gate, plan tiers) since this branch last absorbed it. Twenty-five files collided; an agent resolved them, an independent reviewer approved the result, and two rulings you ratified landed: the support chat's safety frame now asks for the JSON answer your support-agent code expects (a new sealed version of the contract), and your new migration was renumbered `0061` → `0067`.
+
+Then a surprise: **the database-backed tests never needed Docker** — they start their own embedded Postgres. Every package had assumed otherwise, so those suites had never run. They ran now (7,414 tests in 46 minutes). What they found:
+
+| Found | Count | Outcome |
+|---|---|---|
+| A test fixture answering with a placeholder model name, refused by the new identity check | 28 | fixed (the fixture; the check is unchanged) |
+| Eight rows failing only on our branch | 8 | fixed — **including one real defect: the observation agent's launcher could not start at all** (a variable named `path` in a zsh script is the PATH itself; our own earlier change introduced it). Test-first fix plus a new automatic check |
+| Rows that fail on `dev` too — a sealed value `dev` moved without its fixture, the development-stack suites that expect the local CLIs on this machine, and timing checks that fail under load | 16 | recorded, not touched; two of them are for your side to rule on |
+
+Verified on the pushed tip in a clean copy: type check 0 · automatic check **0 new failures** (8 known, 0 stale) · no vulnerable packages · website builds, 134/134 tests, security smoke PASS · the six repaired database suites 122/122. Detail: [DEV-SYNC-2026-09-23.md](DEV-SYNC-2026-09-23.md) and [DOCKER-WINDOW-2026-09-22.md](DOCKER-WINDOW-2026-09-22.md).
 
 ### The final review and its fix wave — done (22 September, evening)
 
