@@ -49,6 +49,10 @@ const ASK = Object.freeze({
   tier_source: "ASKER",
   tier_provenance_ref: "asker:test",
   composition_budget_tier: "standard",
+  // dev's debate tiers (SYNC3): without a valid plan tier the ask is refused
+  // ASK_PLAN_TIER_INVALID after the daily gate and BEFORE panel discovery, so
+  // neither the order nor the local-mode row could observe the panel at all.
+  plan_tier: "free",
   depth_params: {},
   decision_scope: {},
   steering_presets: [],

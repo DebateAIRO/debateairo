@@ -71,6 +71,8 @@ const ASK_BODY = Object.freeze({
   tier_source: "ASKER",
   tier_provenance_ref: "asker-declaration:test",
   composition_budget_tier: "low",
+  // dev's debate tiers: the ask contract requires the plan tier (SYNC3).
+  plan_tier: "free",
   depth_params: { depth: 1 },
   decision_scope: "test-layer scope",
   as_of: "2026-08-07T00:00:00.000Z",
