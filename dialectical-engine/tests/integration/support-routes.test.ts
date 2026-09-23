@@ -1767,7 +1767,10 @@ describe("SUP-01 support routes", () => {
     expect(stored.rows[0]).toMatchObject({
       class: "INJECTION",
       message_sha256: createHash("sha256").update(text, "utf8").digest("hex"),
-      ip_sha256: createHash("sha256").update("203.0.113.41", "utf8").digest("hex")
+      // DL5-F3: the stored source is the KEYED pseudonym production derives
+      // (the fixture composes the real `supportKeys.sourcePseudonym`), never a
+      // bare sha256 of the address — which an attacker can enumerate.
+      ip_sha256: supportKeys.sourcePseudonym("203.0.113.41")
     });
     expect(stored.rows[0]?.message_sha256).toMatch(/^[0-9a-f]{64}$/u);
     expect(stored.rows[0]?.ip_sha256).toMatch(/^[0-9a-f]{64}$/u);
@@ -2077,7 +2080,8 @@ describe("SUP-01 support routes", () => {
       SELECT * FROM support.abuse_event
       WHERE ip_sha256=$1 AND class IN ('LOCK','IP_COOLDOWN')
       ORDER BY at,abuse_event_id
-    `,[createHash("sha256").update(ip,"utf8").digest("hex")]);
+    `,[supportKeys.sourcePseudonym(ip)]);
+    // dev's append-only LOCK rows, under the DL5-F3 keyed source pseudonym.
     expect(events.rows.filter((row) => row.class === "LOCK")).toHaveLength(3);
     expect(events.rows.filter((row) => row.class === "IP_COOLDOWN")).toHaveLength(1);
     expect(events.rows.every((row) => row.message_sha256 === null)).toBe(true);
@@ -2293,7 +2297,8 @@ describe("SUP-01 support routes", () => {
     `, [opened.body.session_id]);
     expect(events.rows).toEqual([{
       message_sha256: createHash("sha256").update(firstText, "utf8").digest("hex"),
-      ip_sha256: createHash("sha256").update(ip, "utf8").digest("hex"),
+      // DL5-F3: the keyed pseudonym production stores, not a bare sha256.
+      ip_sha256: supportKeys.sourcePseudonym(ip),
       at
     }]);
 

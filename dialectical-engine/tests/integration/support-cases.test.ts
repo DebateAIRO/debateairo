@@ -606,6 +606,11 @@ describe("SUP-02 cases", () => {
         listOwnCases: vi.fn(async () => []),
         readCaseEncrypted: vi.fn(async () => ({
           case_id: caseId,language: "en",state: "NEW",sla_hours: 48,
+          // DL1-F5(a)/(b): a case row carries its creation instant and its
+          // owner binding, and a read without them is refused (fail-closed).
+          // dev's fixture predates that; it states them instead of the read
+          // being loosened.
+          created_at: new Date(),identity_owner_ref: null,
           shredded_at: null,destroyed_at: null,wrapped_key: Buffer.from("wrapped"),
           transcript_snapshot_ciphertext: Buffer.from("transcript"),
           summary_ciphertext: Buffer.from("summary"),case_message_next_cursor: null,
