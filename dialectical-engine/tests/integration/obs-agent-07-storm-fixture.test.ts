@@ -20,12 +20,16 @@ describe("OBS-07 stimulus-only storm fixture", () => {
       moduleName: "routing", targetFragmentBasename: "OBS-07.json"
     });
     const targets = await loadObservationTargetCatalog(resolve("deploy/observation-agent/targets.dev.d"));
+    // DL7-F3 (31f91360c) moved both addresses to the reserved `localhost.test`:
+    // the capture sink's RECIPIENT_GRAMMAR requires a dotted domain, so
+    // `ops@localhost` is refused DEV_MAIL_CAPTURE_RECIPIENT_INVALID. The unit
+    // pin `obs-agent-07-sendmail.test.ts` reads that grammar out of the script.
     expect(targets.fragments.find(({ basename }) => basename === "OBS-07.json"))
       .toMatchObject({ configuration: { notify: {
         sendmail_path: "deploy/dev-auth/sendmail-capture.mjs",
         dev_capture_dir: "dev-mail-capture",
-        from: "observation-agent@localhost",
-        to: "ops@localhost"
+        from: "observation-agent@localhost.test",
+        to: "ops@localhost.test"
       } } });
     const policy = await loadMergedThresholdPolicy({
       defaultsDirectory: resolve("deploy/observation-agent/thresholds/defaults")
