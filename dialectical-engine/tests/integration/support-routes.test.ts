@@ -43,7 +43,7 @@ import {
 } from "../../apps/api/src/support/keys.js";
 import { SUPPORT_VISITOR_MESSAGE_FIELD } from "../../apps/api/src/support/prompt.js";
 import { supportTemplate } from "../../apps/api/src/support/templates.js";
-import { framedField, readFramedMaterial } from "../support/framed-packet.js";
+import { framedField, framedInstruction, readFramedMaterial } from "../support/framed-packet.js";
 import { recoverySecurityGuidance } from "../../apps/api/src/support/security-guidance.js";
 import {
   migrate,
@@ -2984,7 +2984,7 @@ describe("SUP-01 support routes", () => {
       entries: [article],snapshots,messages: messageCipher,
       modelFor: () => Object.freeze({
         complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
-          system = input.system;
+          system = framedInstruction(input.packet);
           return Object.freeze({ text: JSON.stringify({
             kind: "answer",
             text: "JSON export requires a served answer and readable ledger digest.",

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe,expect,it } from "vitest";
+import { buildSupportAnswerPrompt } from "../../apps/api/src/support/prompt.js";
 import {
   discoverSupportEvalCases,
   createInProcessSupportEvalExecutor,
@@ -68,13 +69,18 @@ describe("SUP-01 support eval release gate", () => {
       "s-10000000000040008000000000000001-2"
     ];
     const actionReferences = ["a-10000000000040008000000000000001-1"];
+    // FW-B: the stand-in model receives what a vendor receives — one framed
+    // packet, the OUTPUT CONTRACT in its instruction slot — never a system string.
     const completion = createDeterministicStructuralCompletion({
       language:"en",
-      system:[
-        "SUPPORT POLICY","OUTPUT CONTRACT",
-        `sourceIds=${sourceReferences.join(",")}`,
-        `actionIds=${actionReferences.join(",")}`
-      ].join("\n")
+      packet:buildSupportAnswerPrompt({
+        instruction:[
+          "SUPPORT POLICY","OUTPUT CONTRACT",
+          `sourceIds=${sourceReferences.join(",")}`,
+          `actionIds=${actionReferences.join(",")}`
+        ].join("\n"),
+        visitorMessage:"question"
+      }).packet
     });
     const draft = JSON.parse(completion.text) as Record<string,unknown>;
     expect(Object.keys(draft).sort()).toEqual(["actionIds","kind","sourceIds","text"]);

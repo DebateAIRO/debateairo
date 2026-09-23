@@ -88,6 +88,25 @@ export function readFramedMaterial(packet: PromptPacket | WirePacket): FramedMat
 }
 
 /**
+ * SYNC3 — THE OWNERS' INSTRUCTION SLOT of a packet the door accepted.
+ *
+ * dev's support tests read what the model was TOLD — the reviewed context and
+ * its OUTPUT CONTRACT — off a `system` string the hardened port no longer has.
+ * That text is the instruction slot of the framed system message now, so a
+ * double reads it here, after `readPromptFrame` (the door) has accepted the
+ * packet, and without the code-owned frame that follows it. The builder
+ * refuses an instruction carrying the frame banner (a reserved token), so the
+ * FIRST banner is the frame's own, and everything before it is the owners'.
+ */
+export function framedInstruction(packet: PromptPacket | WirePacket): string {
+  readPromptFrame(packet as PromptPacket);
+  const system = packet.messages[0]!.content;
+  const frameAt = system.indexOf("\n\n--- SAFETY FRAME");
+  if (frameAt < 0) throw new TypeError("FRAMED_INSTRUCTION_ABSENT");
+  return system.slice(0, frameAt);
+}
+
+/**
  * The content of ONE named field. A field that is not there is a loud failure,
  * never an empty default — the empty default is exactly what let ~40 review
  * fixtures emit `edge_bearings: []` without a test going red.

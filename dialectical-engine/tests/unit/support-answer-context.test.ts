@@ -12,6 +12,7 @@ import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/cont
 import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
 import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
+import { framedInstruction } from "../support/framed-packet.js";
 
 const REFERENCE_REQUEST_ID = "10000000-0000-4000-8000-000000000001";
 const SOURCE_REFERENCE = "s-10000000000040008000000000000001-1";
@@ -498,7 +499,9 @@ describe("CP1 composed answer context", () => {
     expect(result).toMatchObject({
       outcome:"ANSWER_GROUNDED",sources:[{ id:"app-navigation" }],actions:[]
     });
-    const system = complete.mock.calls[0]?.[0].system;
+    // FW-B: the port carries a framed packet; the model's instructions are its
+    // instruction slot, read after the door accepted it.
+    const system = framedInstruction(complete.mock.calls[0]![0].packet);
     expect(system).toContain("actionIds=none");
   });
 
@@ -597,7 +600,7 @@ describe("CP1 composed answer context", () => {
     const snapshot = authorDraftCorpus();
     let system = "";
     const complete = vi.fn<SupportModelPort["complete"]>(async (input) => {
-      system = input.system;
+      system = framedInstruction(input.packet);
       return Object.freeze({ text:JSON.stringify({
         kind:"answer",text:"Use the reviewed Privacy section.",
         sourceIds:[SOURCE_REFERENCE],actionIds:[ACTION_REFERENCE]
@@ -712,8 +715,8 @@ describe("CP1 composed answer context", () => {
           kind === "source" ? sourceReference : actionReference
       }),
       modelFor: () => Object.freeze({
-        complete: async (input: Readonly<{ system: string }>) => {
-          system = input.system;
+        complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
+          system = framedInstruction(input.packet);
           return Object.freeze({ text: JSON.stringify({
             kind: "answer",text: "Choose Start a debate to continue.",
             sourceIds: [sourceReference],actionIds: [actionReference]
@@ -747,8 +750,8 @@ describe("CP1 composed answer context", () => {
     ];
     const snapshot = corpus(entries,"a".repeat(64));
     let system = "";
-    const complete = vi.fn(async (input: Readonly<{ system: string }>) => {
-      system = input.system;
+    const complete = vi.fn(async (input: Parameters<SupportModelPort["complete"]>[0]) => {
+      system = framedInstruction(input.packet);
       return Object.freeze({ text: JSON.stringify({
         kind: "answer",text: "The reviewed sections describe the requested feature.",
         sourceIds: [SOURCE_REFERENCE],actionIds: []
@@ -779,8 +782,8 @@ describe("CP1 composed answer context", () => {
     const service = createSupportAnswerService({
       entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
       modelFor: () => Object.freeze({
-        complete: async (input: Readonly<{ system: string }>) => {
-          system = input.system;
+        complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
+          system = framedInstruction(input.packet);
           return Object.freeze({ text: JSON.stringify({
             kind: "answer",text: "JSON export requires a served answer and readable ledger.",
             sourceIds: [SOURCE_REFERENCE],actionIds: []
@@ -809,8 +812,8 @@ describe("CP1 composed answer context", () => {
     const snapshotA = corpus([selected],"a".repeat(64));
     const snapshotB = corpus([stale],"b".repeat(64));
     let system = "";
-    const complete = vi.fn(async (input: Readonly<{ system: string }>) => {
-      system = input.system;
+    const complete = vi.fn(async (input: Parameters<SupportModelPort["complete"]>[0]) => {
+      system = framedInstruction(input.packet);
       return Object.freeze({ text: JSON.stringify({
         kind: "answer",text: "Selected snapshot answer.",
         sourceIds: [SOURCE_REFERENCE],actionIds: []
