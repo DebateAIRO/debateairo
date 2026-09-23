@@ -14,6 +14,7 @@ import {
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { withRequestDerivedBearings } from "../support/reviewBearings.js";
+import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 
 /**
  * T17 · the DoD's maximum-path LEDGER-COUNT test (codex r1 B1).
@@ -217,6 +218,42 @@ function classify(body: string): RequestKind {
 }
 
 /**
+ * SYNC3-C — WHICH SITE a request belongs to: the packet's framed material (its
+ * prompt contract and every field, a repair turn's included), read through the
+ * door's own reader, and NOT the raw body.
+ *
+ * The raw body stopped being a site identity when V-11's frame landed:
+ * `buildFramedPrompt` mints a fresh random fence and canary on every build, by
+ * design, and a cooldown-wrapped judge site builds its packet again for the
+ * final-retry sequence. Keyed by the body, the site's fourth attempt arrived as
+ * a NEW packet with a zero failure count, so the double never answered it: the
+ * primary author site failed 4 of 4 (packet attempts [1,3], never [4]) and the
+ * run died MAKER_POSITION_UNAVAILABLE before a panel or review call was made.
+ * The material is what the old body key meant. Only the per-build tokens drop out.
+ */
+function siteIdentity(body: string): string {
+  return JSON.stringify(readFramedMaterial(wirePacket(body)));
+}
+
+/**
+ * L4-F10 (SYNC3-C, as SYNC3-B did in database.test.ts): the model the request
+ * asks for. The gateway sends its target's PIN as `model` and refuses, as
+ * PROVIDER_MODEL_IDENTITY_CHANGED, an answer asserting any other model. This
+ * double asserted "test-layer/model" to targets pinned to
+ * test-layer/primary-model and test-layer/secondary-model, which only a gateway
+ * without the check accepted. A body naming no model is answered without one,
+ * which the gateway refuses as malformed: the double never guesses a model.
+ */
+function requestedModel(body: string): string | undefined {
+  try {
+    const model = (JSON.parse(body) as { readonly model?: unknown }).model;
+    return typeof model === "string" ? model : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * A provider double that drives EVERY reachable namespace to its maximum.
  *
  * Each site fails to its last allowed attempt and succeeds there: cooldown-
@@ -238,10 +275,11 @@ async function startMaximumPathProvider(label: string): Promise<{
     PANEL: 0, REVIEW: 0, JUDGE: 0, CONFORMANCE: 0, R9: 0, COMPOSE: 0, EVALUATOR: 0
   };
   /**
-   * Failures are counted PER SITE, keyed by the request packet itself, and the
-   * count RESETS on that site's success. A single global counter cannot survive
-   * the interleaving: panel and serve legs land between a judge site's two
-   * sequences, and two sites can legitimately send identical packets.
+   * Failures are counted PER SITE, keyed by the request packet's framed material
+   * (`siteIdentity`), and the count RESETS on that site's success. A single
+   * global counter cannot survive the interleaving: panel and serve legs land
+   * between a judge site's two sequences, and two sites can legitimately send
+   * identical packets.
    */
   const failuresByPacket = new Map<string, number>();
   const attemptsByPacket = new Map<string, number>();
@@ -275,7 +313,7 @@ async function startMaximumPathProvider(label: string): Promise<{
         : kind === "COMPOSE" || kind === "CONFORMANCE" || kind === "R9" || kind === "EVALUATOR"
           ? ATTEMPTS_PER_SERVE_SITE - 1
           : ATTEMPTS_PER_COOLDOWN_SITE - 1;
-      const packetKey = `${kind}:${createHash("sha256").update(body).digest("hex")}`;
+      const packetKey = `${kind}:${createHash("sha256").update(siteIdentity(body)).digest("hex")}`;
       attemptsByPacket.set(packetKey, (attemptsByPacket.get(packetKey) ?? 0) + 1);
       if (failureBudget > 0) {
         const failures = failuresByPacket.get(packetKey) ?? 0;
@@ -310,7 +348,7 @@ async function startMaximumPathProvider(label: string): Promise<{
                 : judgementDouble(`${label} position ${served}`);
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
         id: `t17-${label}-${served}`,
-        model: "test-layer/model",
+        model: requestedModel(body),
         choices: [{ message: { content } }]
       }));
     });
