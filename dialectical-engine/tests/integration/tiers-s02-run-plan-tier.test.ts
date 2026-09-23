@@ -65,7 +65,9 @@ function runInput(
 async function migrateBeforePlanTier(target: TestDatabase): Promise<void> {
   const directory = new URL("../../migrations/", import.meta.url);
   const migrations = (await readdir(directory))
-    .filter((name) => /^\d+.*\.sql$/.test(name) && name < "0061_plan_tier_on_run.sql")
+    // SYNC3 / R2: dev's plan-tier migration is 0067 now; "before plan tier" is
+    // every migration that sorts before it.
+    .filter((name) => /^\d+.*\.sql$/.test(name) && name < "0067_plan_tier_on_run.sql")
     .sort();
   const client = await target.pool.connect();
   try {
