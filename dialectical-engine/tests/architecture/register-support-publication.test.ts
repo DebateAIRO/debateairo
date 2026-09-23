@@ -362,7 +362,15 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
       .toBe("42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb");
   });
 
-  it("preserves the exact legacy hashes while the actual port input owns all 248 policy decimals", async () => {
+  /**
+   * SYNC3 fix round 1. This row and the one after it were ONE row, and dev's
+   * moved snapshot constant failed in the middle of it (red on dev itself), so
+   * the gate matched it by name as "known red" and the 248-decimal census, the
+   * AST census and the canonical-serializer refusal below never ran. Every
+   * assertion of this line lives in THIS row, which runs; dev's own
+   * expectation is alone in the next row.
+   */
+  it("preserves the exact legacy v1 hash while the actual port input owns all 248 policy decimals", async () => {
     const bootstrap = await loadBootstrapRegister();
     const historicalRows = buildBootstrapRegisterPublicationRows(bootstrap);
     const developmentRows = await buildDevelopmentDeploymentRegisterPublicationRows(
@@ -400,8 +408,6 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(50);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
-    expect(computeRegisterSnapshotSha256(await readLegacyDevelopmentV4Rows()))
-      .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
 
     const policyKeys = new Set([
       ...AUTH_POLICY_ROW_KEYS,
@@ -455,6 +461,18 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     const readerObject = JSON.parse(policyRows[0]!.valueJsonText) as Record<string, unknown>;
     expect(() => canonicalRegisterJson(readerObject as never))
       .toThrowError("CANONICAL_REGISTER_JSON_AST_INVALID");
+  });
+
+  /**
+   * dev's own expectation, alone in its row (6a05a0d0): dev moved
+   * DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 from 120bdfea… to 42b90bca…
+   * but not the sealed fixture it describes, which still hashes to 120bdfea….
+   * Red on dev itself and listed in tests/ci-known-red.txt; which side is right
+   * is a ruling on a sealed value. Listing it blinds nothing of this line's.
+   */
+  it("dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant", async () => {
+    expect(computeRegisterSnapshotSha256(await readLegacyDevelopmentV4Rows()))
+      .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
   });
 
   it("recognizes hostile static SQL concatenation, interpolation, and tagged builders", () => {

@@ -84,6 +84,18 @@
 #     ruling on a sealed value, not a sync.
 # Gate after this re-baseline -> new=0 known=8 stale=0.
 #
+# SPLIT at SYNC3 fix round 1 (the review's IMPORTANT 1). The gate matches by test NAME, so a
+# listed row blinds every assertion that sits after its failing one: a later regression there
+# would read as "known". Four listed rows had assertions after the failing one —
+# dev-database-principals (our L7-F10 custody line, least privilege, file custody),
+# register-support-publication (the 248-decimal census, the AST census, the canonical
+# serializer's refusal), scaffold (every other edge row, cycles and structural rules 1–5) and
+# v2ui-pages UI-02a (the drawer's two raw-value bans). Each was split: dev's failing
+# assertion(s) alone in a row named for dev's change, everything else in a row that RUNS.
+# Proved each time with a temporary product breakage that turned the RUNNING row red (a new
+# failure, not "known"), then restored; the entries below carry the new exact names.
+# Every entry now says what it blinds.
+#
 # Deliberately NOT listed:
 #   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
 #     tripwire"): they pass solo; listing them would hide a real regression. Integration
@@ -107,27 +119,48 @@ tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-f
 #   source: dev's closing four-count at a61206dc, row 1. Deferred by V, not broken: D79 (c)(1)
 #   ruled the card review marks out of scope for that round and into V's UI programme, and
 #   D79 (d) ruled the positive tests stay RED as an honest "ruled, not yet built".
+#   blinds: nothing — the row is one role binding (`expectRole(row)`).
 tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
 #   source: dev's closing four-count at a61206dc, row 2. Same ruling as the row above.
-tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > matches all 27 dependency-edge rows and structural rules 1–5
-#   source: dev's closing four-count at a61206dc, row 3. Exactly three rows, all dev's:
-#   apps/{api,runner,scheduler} -> obs-capture undeclared. V's ticketed debt F31 (D79 (j)4).
+#   blinds: nothing — the row is one role binding (`expectRole(row)`).
+tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+#   source: dev's closing four-count at a61206dc, row 3; split out at SYNC3 fix round 1 from
+#   "matches all 27 dependency-edge rows and structural rules 1–5". Exactly three
+#   violations, all dev's: apps/{api,runner,scheduler} -> obs-capture undeclared. V's
+#   ticketed debt F31 (D79 (j)4).
+#   blinds: nothing of ours — the row filters to those three exact strings; every other edge
+#   row, cycle and structural rule 1–5 runs in "…, dev's three F31 edges apart".
 tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
 #   source: dev's closing four-count at a61206dc, row 11. UI source pin owned by the apps/ui lane.
+#   blinds: the rest of dev's own DR-160 source pins in the same row (the B6-W1/B6-W2
+#   mutation kills) — one feature, all the apps/ui lane's; nothing of this line's.
 tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary > shows typed review outcome and reviewer house on cards, including honest absence
 #   source: dev's closing four-count at a61206dc, row 12. UI source pin owned by the apps/ui lane.
-tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > keeps all twelve fixed wrappers least-privileged and file-backed
-#   source: dev, b7ca2c41 (SYNC3, 2026-09-23). Red on origin/dev@25a0069f with the same
-#   message: dev's test demands twelve principals including debateai_dev_evaluator_worker;
-#   dev's apps/runner/src/dev-database-principals.ts declares eleven. Adding a database role
-#   is dev's product change, not a sync's.
-tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > preserves the exact legacy hashes while the actual port input owns all 248 policy decimals
-#   source: dev, 6a05a0d0 (SYNC3, 2026-09-23). Red on origin/dev@25a0069f with the same
-#   message: dev moved DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 (120bdfea… -> 42b90bca…)
-#   but not the sealed fixture tests/support/fixtures/register-development-v4.json, which
-#   still hashes to 120bdfea…. Which side is right is a ruling on a sealed value; the
-#   LEGACY v1 hash check above the failing line still runs and passes.
-tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded numbers, in V2's own vocabulary > keeps the fuller record on the executable drawer projection and forbids raw-value JSX
-#   source: dev, b7ca2c41 (SYNC3, 2026-09-23). Red on origin/dev@25a0069f with the same
-#   message. UI source pin owned by the apps/ui lane: `v3NodeScoreDetails(v3)` moved from the
-#   drawer into apps/ui/lib/v3/adapter.ts.
+#   blinds: the three other card-review pins of the same deferred feature (D79 (c)(1)); the
+#   drawer's review pins run in their own row. Nothing of this line's.
+tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+#   source: dev, b7ca2c41 (SYNC3, 2026-09-23; split out at fix round 1 from "keeps all twelve
+#   fixed wrappers least-privileged and file-backed"). Red on origin/dev@25a0069f with the
+#   same message: dev's test demands twelve principals including
+#   debateai_dev_evaluator_worker; dev's apps/runner/src/dev-database-principals.ts declares
+#   eleven. Adding a database role is dev's product change, not a sync's.
+#   blinds: nothing of ours — the row holds only dev's count and dev's evaluator-worker pin;
+#   the least-privilege, file-custody and L7-F10 assertions run in "keeps every fixed
+#   wrapper least-privileged and file-backed".
+tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+#   source: dev, 6a05a0d0 (SYNC3, 2026-09-23; split out at fix round 1 from "preserves the
+#   exact legacy hashes while the actual port input owns all 248 policy decimals"). Red on
+#   origin/dev@25a0069f with the same message: dev moved
+#   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 (120bdfea… -> 42b90bca…) but not the sealed
+#   fixture tests/support/fixtures/register-development-v4.json, which still hashes to
+#   120bdfea…. Which side is right is a ruling on a sealed value.
+#   blinds: nothing of ours — the row is that one hash assertion; the row counts, the legacy
+#   v1 hash, both 248-decimal censuses and the canonical refusal run in "preserves the exact
+#   legacy v1 hash while the actual port input owns all 248 policy decimals".
+tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded numbers, in V2's own vocabulary > dev's b7ca2c41 pin: the drawer projects the fuller record through v3NodeScoreDetails(v3)
+#   source: dev, b7ca2c41 (SYNC3, 2026-09-23; split out at fix round 1 from "keeps the fuller
+#   record on the executable drawer projection and forbids raw-value JSX"). Red on
+#   origin/dev@25a0069f with the same message. UI source pin owned by the apps/ui lane:
+#   `v3NodeScoreDetails(v3)` moved from the drawer into apps/ui/lib/v3/adapter.ts.
+#   blinds: nothing — the row is that one pin; the drawer's raw-value bans run in "forbids
+#   raw-value JSX on the executable drawer projection".
