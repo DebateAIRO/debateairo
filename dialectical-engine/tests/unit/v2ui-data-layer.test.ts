@@ -832,6 +832,9 @@ describe("v2-ui data access over the V3 contract client", () => {
         tier_source: "MACHINE_DEFAULT",
         tier_provenance_ref: "machine:deployment-floor",
         composition_budget_tier: "low",
+        // SYNC3: dev's debate tiers (b866191f) made the plan tier a required,
+        // user-supplied ask field; the UI invents no ask values.
+        plan_tier: "free",
         depth: 1,
         decision_scope: "scope",
         as_of: "2026-08-10T00:00:00.000Z"
@@ -845,6 +848,7 @@ describe("v2-ui data access over the V3 contract client", () => {
       risk_tier: "casual",
       tier_source: "MACHINE_DEFAULT",
       tier_provenance_ref: "machine:deployment-floor",
+      plan_tier: "free",
       depth_params: { depth: 1 }
     });
   });

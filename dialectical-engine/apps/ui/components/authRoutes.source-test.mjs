@@ -16,6 +16,7 @@ const signUp = read("./SignUpFlow.tsx");
 const shell = read("./AuthShell.tsx");
 const gate = read("./AuthGate.tsx");
 const topBar = read("./TopBar.tsx");
+const settingsPage = read("../app/settings/page.tsx");
 const styles = read("../app/globals.css");
 const home = read("../app/page.tsx");
 const verifyEmail = read("../app/verify-email/page.tsx");
@@ -66,7 +67,11 @@ test("auth screens share the reference hierarchy and replace the inline gate", (
 });
 
 test("every public and protected entry point reaches the dedicated auth routes", () => {
-  assert.match(topBar, /href="\/login"/);
+  // SYNC3: dev's 163f15c5 routes the top bar's Account entry to /settings (pinned by
+  // dev's tests/render/support-topbar.test.tsx); /settings is behind the AuthGate,
+  // which sends a signed-out visitor to /login (the `gate` line below).
+  assert.match(topBar, /href="\/settings"[\s\S]*?>\s*Account\s*</);
+  assert.match(settingsPage, /<AuthGate>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
   assert.match(login, /useState\("\/sign-up"\)/);
@@ -158,7 +163,8 @@ test("primary and recovery emails occupy distinct autocomplete sections", () => 
 });
 
 test("ordinary top bar exposes a neutral account entry without inventing session state", () => {
-  assert.match(topBar, /href="\/login"[\s\S]*?>\s*Account\s*</);
+  // SYNC3: the entry is dev's /settings (163f15c5); still neutral, still no session guess.
+  assert.match(topBar, /href="\/settings"[\s\S]*?>\s*Account\s*</);
   assert.doesNotMatch(topBar, />\s*Log in\s*</);
   assert.doesNotMatch(topBar, /Signed in|Signed out|authenticated|useSession/);
 });
