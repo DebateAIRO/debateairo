@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
   CliRelayFailure,
   invokeCli,
+  resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
+  type CliCompletion,
   type CliRelayAdapter,
   type CliRelayHandle,
   type CommandSpec
@@ -13,8 +15,10 @@ import {
  * FAIR-02 (DR-140): the SECOND real maker — an OpenAI-compatible relay to the
  * local Claude Code CLI, maker Anthropic.
  *
- * Empirically verified on this machine (2026-08-10, claude 2.1.221 at
- * CLAUDE_BINARY): `claude -p <prompt> --output-format json` prints exactly one
+ * Empirically verified on this machine (2026-08-10, claude 2.1.221 — at the
+ * compiled-in absolute path this module carried until 2026-09-17; discovery by
+ * name did not exist on that date and this record makes no claim about it):
+ * `claude -p <prompt> --output-format json` prints exactly one
  * JSON envelope on stdout with `is_error`, `result` (the reply text) and
  * `modelUsage` keyed by the model id the CLI actually used, and exits nonzero
  * on failure (observed: expired OAuth => exit 1, is_error true). The prompt
@@ -24,7 +28,24 @@ import {
  * can report helper-model usage alongside the requested model; in that case
  * exactly one reported lineage must match the requested model family.
  */
-export const CLAUDE_BINARY = "/Users/vladmihaimiron/.local/bin/claude" as const;
+/** The NAME this maker's CLI is looked up by; never a path (D10, 2026-09-17). */
+export const CLAUDE_BINARY_NAME = "claude" as const;
+/**
+ * D10 host override for {@link CLAUDE_BINARY_NAME}. Unset ⇒ this host's own
+ * `claude`, deduced from PATH. See `relay-core.ts` for the order and for the
+ * refusal vocabulary a resolved file is held to.
+ */
+const CLAUDE_BINARY_ENV_KEY = "ACCEPTANCE_CLAUDE_BINARY" as const;
+const CLAUDE_BINARY_UNRESOLVED = "CLAUDE_CLI_BINARY_UNRESOLVED" as const;
+
+export function resolveClaudeBinary(source: NodeJS.ProcessEnv = process.env): string {
+  return resolveConfiguredBinary(
+    CLAUDE_BINARY_NAME,
+    CLAUDE_BINARY_ENV_KEY,
+    CLAUDE_BINARY_UNRESOLVED,
+    source
+  );
+}
 export const ANTHROPIC_MAKER = "Anthropic" as const;
 /**
  * The model ALIAS asked of the CLI. Passing none inherits the CLI's default,
@@ -41,6 +62,12 @@ export const ANTHROPIC_MAKER = "Anthropic" as const;
 export const CLAUDE_MODEL_ALIAS = "opus" as const;
 export const CLAUDE_HANDSHAKE_PROMPT =
   "FAIR-02 acceptance transport handshake. Reply with the single word: OK" as const;
+/**
+ * D18: the ONLY setting source the relay loads. The CLI cannot see its own
+ * keychain login without it (measured; see buildArguments). Deliberately not
+ * "user,project,local" — project and local remain excluded.
+ */
+export const CLAUDE_SETTING_SOURCES = "user" as const;
 
 const envelopeSchema = z.object({
   is_error: z.boolean(),
@@ -132,10 +159,33 @@ function createClaudeAdapter(alias: string): CliRelayAdapter {
   timeoutCode: "CLAUDE_CLI_TIMEOUT",
   // --no-session-persistence: relay calls must not accrete resumable sessions;
   // --tools "": the relay is a pure completion transport, no agentic tools.
+  //
+  // D18: --setting-sources is "user", NOT "". Measured on claude 2.1.247
+  // (logs/trel2/probe-02..04, full production argument vector, sanitized env):
+  //   ""              -> `Not logged in · Please run /login`, is_error true, $0
+  //   "user"          -> normal answer, exactly one reported model, $0.032
+  //   "project,local" -> `Not logged in` again
+  // The CLI's login is carried by the USER source and by nothing else, so
+  // "user" is the narrowest SOURCE LIST that lets an authenticated CLI see its
+  // own keychain login. Project and local settings stay excluded.
+  //
+  // --safe-mode carries the isolation that "" used to provide, without the
+  // auth cost. Loading the user source alone would also load user MEMORY: with
+  // `--setting-sources user` the model answered YES to "do your instructions
+  // include user-level memory loaded from a CLAUDE.md file?" (probe-05, 5423
+  // context tokens); adding --safe-mode it answered NO (probe-06, 2717 tokens)
+  // and still authenticated with exactly one reported model. The installed
+  // binary sets CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 for this flag and its
+  // customization-disable map carries `claudeMd:true, hooks:true, plugins:true`.
+  //
+  // Both are needed: --setting-sources user narrows WHICH SCOPES load,
+  // --safe-mode disables the CUSTOMIZATIONS within them. Neither alone is
+  // sufficient — dropping either is caught by a test.
   buildArguments: (prompt) => [
     "-p", prompt,
     "--output-format", "json",
-    "--setting-sources", "",
+    "--setting-sources", CLAUDE_SETTING_SOURCES,
+    "--safe-mode",
     "--strict-mcp-config",
     "--no-session-persistence",
     "--tools", "",
@@ -160,6 +210,52 @@ export interface ClaudeRelayHandle extends CliRelayHandle {
   readonly maker: typeof ANTHROPIC_MAKER;
 }
 
+export interface ClaudePreflightOptions {
+  readonly timeoutMs: number;
+  /** Test-only process seam. Rejected outside NODE_ENV=test (DR-115). */
+  readonly testOnlyCommand?: CommandSpec;
+  /** Use the same requested model for the handshake and served calls. */
+  readonly modelAlias?: string;
+}
+
+export interface ClaudePreflightResult {
+  /** The exact command a relayed call would spawn. */
+  readonly command: CommandSpec;
+  /** The CLI's own handshake completion, parsed by the relay's own adapter. */
+  readonly handshake: CliCompletion;
+}
+
+/**
+ * F26: the ceremony preflight IS the relay's own first call, not a
+ * hand-written imitation of it. The preflight resolves the same binary
+ * (TREL's ACCEPTANCE_CLAUDE_BINARY override included), builds the same
+ * arguments through the same adapter, and gets the same allowlisted child
+ * environment, because it goes through invokeCli exactly as a relayed call
+ * does. startClaudeRelay calls this function for its own handshake, so the
+ * two cannot drift.
+ *
+ * This exists because they drifted three times: PATH vs a hardcoded absolute
+ * path, the parent environment vs the child allowlist, and bare arguments vs
+ * `--setting-sources ""`. Each time an operator preflight passed minutes
+ * before the relay failed on the same binary.
+ */
+export async function preflightClaudeCli(
+  options: ClaudePreflightOptions
+): Promise<ClaudePreflightResult> {
+  const command = resolveTestGuardedCommand(
+    () => ({ binary: resolveClaudeBinary(), prefixArguments: [] }),
+    options.testOnlyCommand,
+    "TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN"
+  );
+  const handshake = await invokeCli(
+    command,
+    createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS),
+    CLAUDE_HANDSHAKE_PROMPT,
+    options.timeoutMs
+  );
+  return Object.freeze({ command, handshake });
+}
+
 /**
  * Starts the Anthropic relay AFTER a real CLI handshake call. The handshake
  * proves the CLI is alive and captures the CLI-reported model id for lineage
@@ -168,13 +264,12 @@ export interface ClaudeRelayHandle extends CliRelayHandle {
  * silently serving (DR-115).
  */
 export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<ClaudeRelayHandle> {
-  const command = resolveTestGuardedCommand(
-    { binary: CLAUDE_BINARY, prefixArguments: [] },
-    options.testOnlyCommand,
-    "TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN"
-  );
   const claudeAdapter = createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS);
-  const handshake = await invokeCli(command, claudeAdapter, CLAUDE_HANDSHAKE_PROMPT, options.timeoutMs);
+  const { command, handshake } = await preflightClaudeCli({
+    timeoutMs: options.timeoutMs,
+    ...(options.modelAlias === undefined ? {} : { modelAlias: options.modelAlias }),
+    ...(options.testOnlyCommand === undefined ? {} : { testOnlyCommand: options.testOnlyCommand })
+  });
   const server = await startCliRelayServer({
     port: options.port,
     timeoutMs: options.timeoutMs,

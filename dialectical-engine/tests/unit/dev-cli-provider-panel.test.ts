@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
-import { computeRegisterSnapshotSha256 } from "@debateai/register";
+import { canonicalRegisterJson, computeRegisterSnapshotSha256, parseRegisterVersionText } from "@debateai/register";
 import { describe, expect, it, vi } from "vitest";
 import {
   DEVELOPMENT_CLI_MODEL_PINS,
@@ -148,7 +148,7 @@ describe("development CLI model pins", () => {
 });
 
 describe("development provider-set publication", () => {
-  it("publishes the roster's configured set as a new version on the sealed base and moves the receipt", async () => {
+  it.each([false, true])("publishes the provider set and preserves sealed roles when present: %s", async (hasRoles) => {
     // The bootstrap register (v1-4) is append-only and capped at 4, so a deployment that
     // grows a provider slot supersedes the old set by publication, never by edit.
     const { developmentConfiguredProviderPanel } = await import("../../apps/runner/src/dev-provider-panel.js");
@@ -164,16 +164,21 @@ describe("development provider-set publication", () => {
       .toEqual(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ providerRef }) => providerRef));
 
     const seen: unknown[] = [];
+    const roleRows = hasRoles ? [
+      { rowKey: "synthesizerRoleRef", valueJsonText: canonicalRegisterJson({kind: "SYNTHESIZER_ROLE_REF", providerRef: "development:codex-premium-cli", provisional: false}), sourceRef: "operator:selected-synthesizer" },
+      { rowKey: "evaluatorRoleRef", valueJsonText: canonicalRegisterJson({kind: "EVALUATOR_ROLE_REF", providerRef: "development:claude-premium-cli", provisional: false}), sourceRef: "operator:selected-evaluator" }
+    ] : [];
     const receipt = await publishDevelopmentDeploymentRegisterProviderSet({
       adminPool: undefined as never,
       providerPanel: panel,
       repositoryRoot,
-      baseRegisterVersion: "4",
+      baseRegisterVersion: parseRegisterVersionText("4"),
       operations: {
+        readBaseAlgorithmRows: async () => roleRows,
         publishGeneral: async (input) => {
           seen.push(input);
           return Object.freeze({
-            registerVersion: "9" as const,
+            registerVersion: parseRegisterVersionText("9"),
             baseRegisterVersion: input.baseRegisterVersion,
             publicationId: input.publicationId,
             publicationKind: "GENERAL" as const,
@@ -188,12 +193,13 @@ describe("development provider-set publication", () => {
 
     const published = seen[0] as { publicationId: string; baseRegisterVersion: string; rows: readonly { rowKey: string; valueJsonText: string }[] };
     expect(published.baseRegisterVersion).toBe("4");
+    for (const row of roleRows) expect(published.rows).toContainEqual(row);
     const providerRow = published.rows.find(({ rowKey }) => rowKey === "configuredProviderSet");
     expect(JSON.parse(providerRow!.valueJsonText).providers.map((p: { providerRef: string }) => p.providerRef))
       .toEqual(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ providerRef }) => providerRef));
     // deterministic id: republishing the same set on the same base replays, never forks
     expect(published.publicationId).toBe(
-      developmentProviderSetPublicationId("4", computeRegisterSnapshotSha256(published.rows as never))
+      developmentProviderSetPublicationId(parseRegisterVersionText("4"), computeRegisterSnapshotSha256(published.rows as never))
     );
     expect(published.publicationId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
     expect(receipt.registerVersion).toBe("9");

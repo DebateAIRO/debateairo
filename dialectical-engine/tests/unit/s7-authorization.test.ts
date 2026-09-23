@@ -48,7 +48,6 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
-  { route: "GET /v1/evaluator/rankings", auth: "user", resource: "evaluator", action: "read-rankings" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
   { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
@@ -155,7 +154,6 @@ describe("S7 deny-by-default authorization", () => {
       recovery: {} as never,
       mfa: {} as never,
       sessions: {} as never,
-      evaluatorRankings: {} as never,
       evaluatorDevMenu: {} as never,
       evaluatorDevMenuRegisterVersion: 1,
       support: {} as never

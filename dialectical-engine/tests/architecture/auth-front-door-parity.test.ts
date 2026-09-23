@@ -35,17 +35,19 @@ async function fakeBuild(routes: readonly string[] = REQUIRED_AUTH_ROUTES): Prom
 }
 
 describe("auth front-door parity", () => {
-  it("uses one exact four-route production-manifest gate from both Next builds", async () => {
+  // `web/` was the second Next build this gate compared against. It is retired
+  // in favour of apps/ui (.hermes/reports/2026-09-01-algorithm-live-loop/
+  // PROGRESS.md:32, DECISIONS.md:810), so the manifest gate is asserted over the
+  // one surviving build. Nothing else about the gate changes.
+  it("uses one exact four-route production-manifest gate from the surviving Next build", async () => {
     expect(REQUIRED_AUTH_ROUTES).toEqual([
       "/login",
       "/sign-up",
       "/verify-email",
       "/enroll-mfa"
     ]);
-    for (const packagePath of ["apps/ui/package.json", "web/package.json"]) {
-      const packageJson = JSON.parse(await read(packagePath)) as { scripts: { build: string } };
-      expect(packageJson.scripts.build).toContain("assert-auth-front-door-routes.mjs");
-    }
+    const packageJson = JSON.parse(await read("apps/ui/package.json")) as { scripts: { build: string } };
+    expect(packageJson.scripts.build).toContain("assert-auth-front-door-routes.mjs");
 
     await expect(assertProductionAuthRoutes(await fakeBuild(), "fixture"))
       .resolves.toEqual(REQUIRED_AUTH_ROUTES);
@@ -55,44 +57,40 @@ describe("auth front-door parity", () => {
     )).rejects.toThrow("/enroll-mfa is absent");
   });
 
-  it("pins the same supported auth state machines and excludes invented affordances", async () => {
-    const [uiLogin, webLogin, uiSignUp, webSignUp, uiVerify, webVerify, uiEnroll, webEnroll] =
-      await Promise.all([
-        read("apps/ui/components/LoginFlow.tsx"),
-        read("web/components/LoginFlow.tsx"),
-        read("apps/ui/components/SignUpFlow.tsx"),
-        read("web/components/SignUpFlow.tsx"),
-        read("apps/ui/app/verify-email/page.tsx"),
-        read("web/app/verify-email/page.tsx"),
-        read("apps/ui/app/enroll-mfa/page.tsx"),
-        read("web/app/enroll-mfa/page.tsx")
-      ]);
+  // Same retirement: the four `web/` halves of this parity pair are gone
+  // (PROGRESS.md:32, DECISIONS.md:810). Each assertion's PURPOSE — the shipped
+  // auth flows carry exactly the supported state machines and no invented
+  // affordance — survives on apps/ui, where every one of the four artifacts
+  // exists, so the arm is re-pointed rather than retired. The assertion texts
+  // below are unchanged.
+  it("pins the supported auth state machines and excludes invented affordances", async () => {
+    const [login, signUp, verify, enroll] = await Promise.all([
+      read("apps/ui/components/LoginFlow.tsx"),
+      read("apps/ui/components/SignUpFlow.tsx"),
+      read("apps/ui/app/verify-email/page.tsx"),
+      read("apps/ui/app/enroll-mfa/page.tsx")
+    ]);
 
-    for (const login of [uiLogin, webLogin]) {
-      expect(login).toMatch(/client\.beginLogin/);
-      expect(login).toMatch(/client\.completeLogin/);
-      expect(login).toMatch(/replacement_recovery_code/);
-      expect(login).toMatch(/Enter your authentication code\./);
-      expect(login).toMatch(/Use a recovery code/);
-      expect(login).toMatch(/Enter a recovery code\./);
-      expect(login).toMatch(/Back to sign in/);
-      expect(login).not.toMatch(/localStorage|sessionStorage|Bearer|OAuth|forgot|remember/i);
-    }
-    for (const signUp of [uiSignUp, webSignUp]) {
-      expect(signUp).toMatch(/client\.register/);
-      expect(signUp).toMatch(/client\.resendVerification/);
-      expect(signUp).toMatch(/section-primary-email email/);
-      expect(signUp).toMatch(/section-recovery-email email/);
-      expect(signUp).not.toMatch(/localStorage|sessionStorage|Bearer|Google|Model API|terms/i);
-    }
-    for (const verify of [uiVerify, webVerify]) {
-      expect(verify).toMatch(/export \{ default \} from "\.\.\/enroll-mfa\/page"/);
-      expect(verify).not.toMatch(/<form\b/);
-    }
-    for (const enroll of [uiEnroll, webEnroll]) {
-      expect(enroll).toContain('id="totp-code"');
-      expect(enroll).toContain('id="recovery-typeback"');
-      expect(enroll).not.toMatch(/<form\b/);
-    }
+    expect(login).toMatch(/client\.beginLogin/);
+    expect(login).toMatch(/client\.completeLogin/);
+    expect(login).toMatch(/replacement_recovery_code/);
+    expect(login).toMatch(/Enter your authentication code\./);
+    expect(login).toMatch(/Use a recovery code/);
+    expect(login).toMatch(/Enter a recovery code\./);
+    expect(login).toMatch(/Back to sign in/);
+    expect(login).not.toMatch(/localStorage|sessionStorage|Bearer|OAuth|forgot|remember/i);
+
+    expect(signUp).toMatch(/client\.register/);
+    expect(signUp).toMatch(/client\.resendVerification/);
+    expect(signUp).toMatch(/section-primary-email email/);
+    expect(signUp).toMatch(/section-recovery-email email/);
+    expect(signUp).not.toMatch(/localStorage|sessionStorage|Bearer|Google|Model API|terms/i);
+
+    expect(verify).toMatch(/export \{ default \} from "\.\.\/enroll-mfa\/page"/);
+    expect(verify).not.toMatch(/<form\b/);
+
+    expect(enroll).toContain('id="totp-code"');
+    expect(enroll).toContain('id="recovery-typeback"');
+    expect(enroll).not.toMatch(/<form\b/);
   });
 });

@@ -1,0 +1,42 @@
+# DISPATCH t17t9-3-4 · 2026-09-05 20:46 · F-T17T9-3 V-AUTHORISED EVIDENCE ROUND (B1) · same seat resumed · not a rework round
+
+# ---- AMENDMENT 3 (20:46 2026-09-05) — V-AUTHORISED EVIDENCE ROUND for B1 (not a rework round; V's decision of 20:46) · everything above preserved ----
+
+V's ruling (V-DECISIONS-PACKET, row "F-T17T9-3 · B1"): **bounded evidence work** — one extra round, test harness only, no
+production change, whose ONLY output is evidence about the 19 unhandled AUTH_MAIL_BUSY rejections. The 106 fix itself is
+approved on its merits (codex r2: B2 cleared, derivation stands, transfer clean) and is NOT touched in this round.
+
+codex r2 (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/codex-r2-verdict.final-snapshot.md — its "## B1" section IS the evidence bar; read it whole.
+
+## OUTCOME (D58)
+A record V can read that says, with data, whether the 19 unhandled rejections in b14 (5e837ba7) are an inherited
+harness/load behaviour or a tip-only difference — or that the question is inconclusive after the specified experiment.
+No guess is renamed proof.
+
+## The bar, in the reviewer's words (verbatim requirements)
+- Preserve the exact test-only probe SOURCE and its full hash (round 3 kept only a 16-char prefix and no diff — that is
+  why parity could not be certified).
+- Retain BOTH effective deadlines: 28 s for registration, 18 s for default reservations (round 3 said "18 s registration" —
+  wrong). Do not shorten them for the discriminating run.
+- Record, per reservation: identity, role (dummy / target / marker), the actual deadline, enqueue / grant / release /
+  settlement times (wall clock), and occupancy.
+- Compare parent 2af816f1 and tip under the SAME documented concurrency or controlled contention, WITH an uninduced control.
+- The paired failing episode must REACH the relevant release / marker-grant phase, not prevent entry to it (round 3's
+  1500 ms deadline lost queued work before the initial release gate — that is why it did not clear).
+- Account for EVERY unhandled event; preserve observation/cleanup behaviour explicitly.
+
+Decision rule (the reviewer's): the same correlated post-release failure on the parent → B1 clears as an inherited
+harness/load issue with residual uncertainty stated; a repeatable tip-only difference → a finding for investigation;
+neither run produces the episode → INCONCLUSIVE, stated as such. b14 stays the 5e837ba7 measurement 80/1/0/20.
+
+## Contract (D61)
+allowed : tests/integration/registration-database.test.ts (instrumentation only, reverted at the end, byte-identical proven) ·
+          tests/support/* mail-queue fixtures (instrumentation only, same) · a scratch checkout of 2af816f1 outside the
+          mission worktrees, removed afterwards · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/* (probe source + full hash + every run's log) ·
+          /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t17t9-3.md (append: "§6f B1 evidence round") · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/t17t9-3-self.md (append) ·
+          the lane's .hermes/TOOLING-TRAPS.md (append-only)
+readonly: apps/api/src/registration.ts · apps/api/src/auth-policy.ts · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/27-suite-run2.log · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/31-fourcount-run2.log ·
+          /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/14-b14-full-suite.log · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/codex-r2-verdict.final-snapshot.md
+forbidden: all_others · NO change to the 106 fix or any file it touched · never push, never merge · no edits to the board or the DECISIONS file · no credential values (D18)
+Time box: if after ~3 h of wall clock the episode has not been reached on either tree, STOP and file INCONCLUSIVE with what was observed.
+Markers: `comments read through: t17t9-3-codex-r2-2026-09-05`. End with `EVIDENCE FILED — <cleared|tip-only difference|inconclusive>`.

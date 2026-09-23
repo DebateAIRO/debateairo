@@ -11,7 +11,11 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(packageJson.scripts?.["dev:auth:seed-register"])
       .toBe("tsx apps/runner/src/dev-deployment-register-cli.ts");
     expect(cli).toContain("loadMigrationEnvironment()");
-    expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(loadDevelopmentCommandEnvironment())");
+    // The panel and the T16 role identities both come from the ONE development
+    // command environment the CLI loads (T16 ruling J7 added the role refs).
+    expect(cli).toContain("loadDevelopmentCommandEnvironment()");
+    expect(cli).toContain("loadDevelopmentProviderPanelFromEnvironment(commandEnvironment)");
+    expect(cli).toContain("resolveDevelopmentSynthesisRoleRefs(providerPanel, commandEnvironment)");
     expect(cli).toContain("seedDevelopmentDeploymentRegister({");
     expect(cli).toContain("repositoryRoot: process.cwd()");
     expect(cli).toContain("DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX");
@@ -34,7 +38,7 @@ describe("DEV-05 development deployment register source contract", () => {
     expect(source).toContain("SESSION_POLICY_REGISTER_ROW");
     expect(source).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(source).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
-    expect(source).toContain("createPostgresRegisterPublicationPort(input.adminPool).importHistorical");
+    expect(source).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
     expect(source).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
     expect(source).not.toMatch(/INSERT\s+INTO\s+register[.]register_(?:row|version)/iu);
     expect(source).not.toContain('await client.query("BEGIN")');
@@ -42,7 +46,7 @@ describe("DEV-05 development deployment register source contract", () => {
 
   it("publishes one canonical receipt only after the closed port resolves and verifies custody", async () => {
     const source = await readFile("apps/runner/src/dev-deployment-register.ts", "utf8");
-    const port = source.indexOf("await createPostgresRegisterPublicationPort(input.adminPool).importHistorical");
+    const port = source.indexOf("await createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
     const receipt = source.indexOf("createDevelopmentDeploymentRegisterMachineReceipt", port);
     const custody = source.indexOf("await writeDevelopmentDeploymentRegisterReceipt", receipt);
     expect(port).toBeGreaterThan(-1);

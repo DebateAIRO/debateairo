@@ -1,0 +1,41 @@
+# DISPATCH t1-oracle-evaluator-worker-r2-2 · 2026-09-07 02:43 · round-2 REWORK (AMENDMENT 1) — the ticket's last authorised rework · same seat resumed
+
+# ---- AMENDMENT 1 (02:43 2026-09-07) — ROUND-2 REWORK · THE TICKET'S THIRD AND LAST AUTHORISED REWORK (r1, r1b, r2 were CHANGES) · original preserved above ----
+verdict (final snapshot): /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t1-oracle-evaluator/codex-r2-verdict.final-snapshot.md — read B1–B11, F1, F2 WHOLE, with their Required fixes; the cleared
+sections (stub RED, controls-first, K28/K38 custody, the gate reconciliation) stay. A further CHANGES on this ticket goes to V, not to you.
+The eleven, in the reviewer's terms:
+- B1 parameter checking admits default/rest params → reject initialisers/rest and other unsupported parameter syntax under clause 1 in EVERY callback
+  operation; whole-operation UNKNOWN with an attributable reason; add both discriminators, K7's parameter-count mutation kept independent.
+- B2 flatMap bypasses the purity contract and rejects an admitted block form → the same parameter / exact-body / whole-expression purity and
+  async/generator checks as map/filter, with its narrowly declared array-shape exception; admission examines the whole syntax, evaluation visits only
+  the selected branch; parentheses and the return-only block preserved.
+- B3 the "closed grammar" is a partial blacklist → POSITIVE admission of the declared expression forms/operators incl. the explicit atomic JSX treatment
+  and the flatMap exceptions; unsupported syntax → UNKNOWN for the whole operation even in an untaken branch (no evaluation of both branches).
+- B4 the work limits are not enforced on the recorded body → count from the original callback body node (body = 0, forEachChild semantics) before
+  interpreting the extracted expression; both limits on flatMap too; assert the admitted 64/32 boundaries and independently exhausted node/depth cases
+  incl. return-only blocks (K31 alone cannot).
+- B5 two explicit Prim transfer cases missing → JSX truthiness; null/undefined string rendering; conservative on unknown/unavailable object coercions;
+  pin the actual primitive payloads, not their tags.
+- B6 zero-argument splice returns the wrong cells → distinguish zero, one and two arguments; keep the removed-elements rule for splice(start); test the
+  zero-argument case after a ruled derivation so the error changes the verdict.
+- B7 binding syntax silently ignored → conservatively reject unsupported nested/default binding forms (→ UNKNOWN) before classifying outputs, or model
+  them explicitly; keep the working elision offsets, nested array payload extraction into a plain name, any-RULED aggregation.
+- B8 consumedStart never moves to the consumed owner → carry BOTH consumed boundaries through ownership transitions (the actual consumed node's
+  start/end incl. the whole rejected call); literal start/end unchanged for occurrence identity; rule-1's early stop preserved; both boundaries asserted
+  on both K45 forms and representative wrappers.
+- B9 an exact sibling spread always rejected → fold sibling spreads whose values are exact under the admitted grammar, in order, with collection
+  conversion as declared; UNKNOWN for an unmodelled sibling; a decided negative and a ruled sibling-spread case.
+- B10 Object.freeze bypasses NOT_ARRAY continuation → the receiver-state continuation rule BEFORE freeze identity; identity applies to exact values (a
+  narrower freeze exception would need an explicit contract amendment).
+- B11 the committed assertions do not cover the required round-2 rows → the table-driven candidate assertions with complete source, discovery identity,
+  full Cell payloads, whole Value kind, both consumed boundaries and reasons; an observable known-receiver check for K43; all seven controls and O1
+  cases first; no deferral to round 3.
+F1 (round-3 PREREQUISITE): the shipped population is NOT the predicted one — a fresh scan evaluates 33 candidates: 32 OTHER, 1 UNDETERMINED
+(`tokenUnlock.ts:36`, `[502, 503, 504].includes(error.status)` inside an `||` inside an `if`: includes → NOT_ARRAY, then the enclosing binary OR hits the
+fallback "unmodelled owner"). Reconcile the plan's terminal/ownership contract with its shipped prediction (total 1 / K4) BEFORE round 3: a narrowly
+defined consumption/context rule with positive AND conservative counter-controls; do NOT restore a blanket NOT_ARRAY exemption; record the
+reconciliation in the manifest and the report as a contract amendment, not a deviation.
+F2: POL-03 — state the direct-import/diff facts as entailed; keep "consistent-with context sensitivity / exact cause undetermined / may recur"; remove the
+general zero-grep causal rule; name the failed exit-code assertion precisely (the isolation record 20-pol03-attribution.log already suffices).
+Same grants; the old emitter and WHOLE_DOMAIN fallback still ACTIVE; no shipped-emitter change. Gates as before, then ONE full suite (fourcount5).
+Markers: `comments read through: t1-oracle-evaluator-r2-2026-09-07`; end with `REWORK READY FOR REVIEW` or `BLOCKED <which item, why>`; return only there.

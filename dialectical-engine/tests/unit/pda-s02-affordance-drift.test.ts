@@ -27,9 +27,23 @@ describe("S02 owner/public affordance drift pins", () => {
   it("pins and classifies the owner top-bar affordance inventory", () => {
     const topBar = between(ownerPage, "{/* ---- top bar ---- */}", "{/* ---- verdict-first banner");
 
-    // READ — public page has the same four reading-mode controls.
+    // READ + PUBLIC-ONLY ADDITION — four reading-mode controls are shared with
+    // the public page (Thread, Split, Tree, Map). V's ruling of 2026-09-20
+    // added a FIFTH, Overview, which the public surface has and the owner does
+    // not: a shared link opens on the published summary with the argument tree
+    // one click away, and the owner has no published summary to open.
+    //
+    // This is the first affordance in this inventory that runs PUBLIC-only —
+    // every other divergence pinned below is owner-only — so the bare count can
+    // no longer state the relationship, and "5" on its own would not say who
+    // gets the fifth. The gate is therefore pinned beside the count: drop the
+    // `publicMode &&` and the owner gets an Overview tab with no publicOverview
+    // behind it, which falls through every view branch and renders blank. That
+    // is exactly the kind of silent divergence this file exists to catch.
     expect(occurrences(topBar, 'role="group" aria-label="View"')).toBe(1);
-    expect(occurrences(topBar, "aria-pressed={view ===")).toBe(4);
+    expect(occurrences(topBar, "aria-pressed={view ===")).toBe(5);
+    expect(occurrences(topBar, 'aria-pressed={view === "overview"}')).toBe(1);
+    expect(occurrences(topBar, "{publicMode && publicOverview ? (")).toBe(1);
     // READ — public page reuses the same typed-absence scoring diagnostics drawer.
     expect(occurrences(topBar, 'aria-label="Open scoring diagnostics"')).toBe(1);
     // READ — library navigation remains available on the public page.
@@ -62,8 +76,12 @@ describe("S02 owner/public affordance drift pins", () => {
     // MUTATION — publication, unpublish and private-delete controls stay owner-only.
     expect(occurrences(ownerPage, "<PublicationControl")).toBe(1);
 
+    // 20 before V's ruling of 2026-09-20; the public-only Overview control
+    // above is the twenty-first. This total is the backstop for the named pins:
+    // it catches an interactive element ADDED to the top bar that none of the
+    // aria-label counts above happens to name.
     const interactiveElementCount = (topBar.match(/<(?:button|a|Link|summary)\b/g) ?? []).length;
-    expect(interactiveElementCount).toBe(20);
+    expect(interactiveElementCount).toBe(21);
   });
 
   it("pins and classifies every owner honesty section", () => {

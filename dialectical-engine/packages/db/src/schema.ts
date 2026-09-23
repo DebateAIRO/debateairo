@@ -334,6 +334,9 @@ export const propagationRun = ledger.table("propagation_run", {
   judgementSelectionRuleKey: text("judgement_selection_rule_key"),
   judgementSelectionRuleRegisterVersion: bigint("judgement_selection_rule_register_version", { mode: "number" }),
   judgementSelectionRuleSourceRef: text("judgement_selection_rule_source_ref"),
+  // T10: the served-root decision and its margin to the runner-up. NULL on the
+  // DR-184 catch-up path, which re-propagates without re-selecting a root.
+  servedRootSelection: jsonb("served_root_selection"),
   atSeq: bigint("at_seq", { mode: "number" }).notNull()
 });
 
@@ -381,8 +384,6 @@ export const nodeStrengthRecord = ledger.table("node_strength_record", {
   operatorLevel: text("operator_level"),
   positionLabel: text("position_label"),
   liftMarker: jsonb("lift_marker").notNull(),
-  rivalOperator: text("rival_operator"),
-  rivalStrength: doublePrecision("rival_strength"),
   reducedJudgementRef: uuid("reduced_judgement_ref")
     .references(() => reducedJudgement.reducedJudgementId)
 });
@@ -513,7 +514,9 @@ export const answer = serve.table("answer", {
   composedTextId: uuid("composed_text_id"),
   conformanceRecordId: uuid("conformance_record_id"),
   sealedAtSeq: bigint("sealed_at_seq", { mode: "number" }).notNull(),
-  relevantAsOf: timestamp("relevant_as_of", { withTimezone: true }).notNull()
+  relevantAsOf: timestamp("relevant_as_of", { withTimezone: true }).notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const segmentSuppression = serve.table("segment_suppression", {

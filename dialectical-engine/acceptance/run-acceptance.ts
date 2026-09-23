@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { AskAcceptedSchema, AskRequestSchema, AnswerSchema, type AskRequest } from "@debateai/contract";
 import { ProviderProbeRepository } from "@debateai/db";
+import { announceAbsentMakers } from "./absent-makers.js";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
+import {
+  readDefinitionOfDoneFacts,
+  renderDefinitionOfDoneLines,
+  type DefinitionOfDoneFacts
+} from "./dod-facts.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import { assertFairDebate, type FairDebateReport } from "./fair-debate.js";
 import {
@@ -24,8 +30,20 @@ export interface AcceptanceArguments {
   readonly serve: boolean;
 }
 
+/**
+ * F-CREDENTIAL-ON-ARGV. The argument name that carries the service credential is
+ * deliberately ABSENT from this set and must never return to it: the credential
+ * is read from the environment and from nowhere else. The name is refused by
+ * `parseAcceptanceArguments` before any other check, so an operator who still
+ * types the old shape reads the specific reason rather than a generic
+ * unknown-argument line.
+ */
+const credentialArgument = "--service-credential";
+
+/** The environment key the operator exports in their own shell before the run. */
+const credentialEnvironmentKey = "ACCEPTANCE_SERVICE_CREDENTIAL";
+
 const supportedArguments = new Set([
-  "--service-credential",
   "--question",
   "--risk-tier",
   "--tier-provenance-ref",
@@ -37,16 +55,55 @@ const supportedArguments = new Set([
   "--steering-annotations"
 ]);
 
+/** The shape of a service credential: 43 characters of `[A-Za-z0-9_-]`. */
+const credentialPattern = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * The length past which a token stops being quoted: the longest name this parser
+ * actually supports, DEDUCED from the set above rather than written down (V's
+ * rule, 2026-09-17 — "if it needs to be set to something local, it needs to be
+ * deduced first, never set in stone"). A literal drifts in both directions: above
+ * the longest name it quotes tokens it should redact, and the day a longer flag is
+ * added it redacts the operator's own flag instead of naming it. A token longer
+ * than every supported name is either a typo or a value in a name's place, and a
+ * value is the thing that must never be quoted.
+ */
+const longestSupportedArgumentLength = Math.max(
+  ...[...supportedArguments].map((argument) => argument.length)
+);
+
+/**
+ * F-CREDENTIAL-ON-ARGV, the second mouth of the leak. A refusal has to name the
+ * argument it refused to be any use, but `main()` has no catch, so whatever it
+ * names reaches stderr — which `closing-run.sh` redirects into the persisted
+ * ceremony log. An operator can put the credential where a NAME is expected: bare
+ * (`tsx run-acceptance.ts <credential>` puts it at an even index) or joined to
+ * another flag (`--unknown=<credential>`). So a token that looks like a credential
+ * is described rather than quoted, and one too long to be any supported name is
+ * reported by its length alone — never by a prefix of itself, since the first
+ * characters are exactly what the process listing gave away in the first place.
+ */
+function describeToken(token: string): string {
+  if (credentialPattern.test(token)) return "[redacted: looks like a credential]";
+  if (token.length > longestSupportedArgumentLength) {
+    return `[redacted: ${String(token.length)}-character token]`;
+  }
+  return token;
+}
+
 function argumentMap(arguments_: readonly string[]): ReadonlyMap<string, string> {
   const output = new Map<string, string>();
   for (let index = 0; index < arguments_.length; index += 2) {
     const name = arguments_[index];
     if (name === undefined || !supportedArguments.has(name)) {
-      throw new Error(`UNKNOWN_ACCEPTANCE_ARGUMENT:${String(name)}`);
+      throw new Error(`UNKNOWN_ACCEPTANCE_ARGUMENT:${name === undefined ? "undefined" : describeToken(name)}`);
     }
+    // Every refusal that names a token names it through the same gate, so the
+    // derived bound is what guarantees a SUPPORTED name is always reported in
+    // full — rather than that guarantee resting on which throw happens to redact.
     const value = arguments_[index + 1];
-    if (value === undefined) throw new Error(`ACCEPTANCE_ARGUMENT_VALUE_REQUIRED:${name}`);
-    if (output.has(name)) throw new Error(`DUPLICATE_ACCEPTANCE_ARGUMENT:${name}`);
+    if (value === undefined) throw new Error(`ACCEPTANCE_ARGUMENT_VALUE_REQUIRED:${describeToken(name)}`);
+    if (output.has(name)) throw new Error(`DUPLICATE_ACCEPTANCE_ARGUMENT:${describeToken(name)}`);
     output.set(name, value);
   }
   return output;
@@ -62,17 +119,38 @@ function parseJson(value: string, label: string): unknown {
 
 export function parseAcceptanceArguments(
   arguments_: readonly string[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  environment: NodeJS.ProcessEnv = process.env
 ): AcceptanceArguments {
+  /**
+   * F-CREDENTIAL-ON-ARGV, decided FIRST — before the unknown-argument check and
+   * before the missing-value check — so the operator reads this reason and not a
+   * generic one. A process's arguments are readable by every user of the machine
+   * through the process list for the whole of the run; its environment is not.
+   * The offered value is never repeated in the message, in any form.
+   *
+   * BOTH spellings. `--service-credential=<value>` is the one an operator is
+   * likeliest to reach for, and it is the dangerous one: an exact-token test lets
+   * it through to the unknown-argument throw, which would quote the whole token —
+   * credential and all — onto the stream `closing-run.sh` writes to the ceremony
+   * log. Matching the `=`-joined prefix here is what keeps the value off that log.
+   */
+  if (arguments_.some((argument) =>
+    argument === credentialArgument || argument.startsWith(`${credentialArgument}=`))) {
+    throw new Error(
+      `ACCEPTANCE_SERVICE_CREDENTIAL_ON_ARGV_REFUSED:${credentialArgument} is no longer read from the ` +
+      `command line; export ${credentialEnvironmentKey} in your own shell instead`
+    );
+  }
   // "--serve" is the one value-less flag; extract it before pair parsing.
   const serveCount = arguments_.filter((argument) => argument === "--serve").length;
   if (serveCount > 1) throw new Error("DUPLICATE_ACCEPTANCE_ARGUMENT:--serve");
   const values = argumentMap(arguments_.filter((argument) => argument !== "--serve"));
-  const serviceCredential = values.get("--service-credential");
+  const serviceCredential = environment[credentialEnvironmentKey];
   if (serviceCredential === undefined || serviceCredential.trim().length === 0) {
     throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_REQUIRED");
   }
-  if (!/^[A-Za-z0-9_-]{43}$/.test(serviceCredential)) {
+  if (!credentialPattern.test(serviceCredential)) {
     throw new Error("ACCEPTANCE_SERVICE_CREDENTIAL_INVALID");
   }
   const ask = AskRequestSchema.parse({
@@ -103,6 +181,25 @@ export interface LiveAcceptanceCeremony {
   readonly modelCallCount: number;
   readonly discoveredPanelSize: number;
   readonly structuralCeilingMaxModelAttempts: number;
+  /**
+   * T17: the ENVELOPE_STATE standing at the terminal, read from the same run's
+   * progress stream. The Global DoD requires WITHIN; EXHAUSTED is the only
+   * other value the runner can leave behind, and the live proofs refuse it.
+   */
+  readonly terminalEnvelopeState: "WITHIN" | "EXHAUSTED";
+  /**
+   * The Global definition of done's remaining sub-clauses, read off this same
+   * settled run: the panel-reduced taus and their voice counts, the measured
+   * attack edges, each root's final strength against its tau, the strongest
+   * surviving objection, the evaluator loop record against its sealed bound,
+   * the code-derived label, and the band with its basis. Sub-clauses 4 and 9
+   * are `structuralCeilingMaxModelAttempts` and `terminalEnvelopeState` above.
+   *
+   * A DoD OUTCOME (no root differs, an objection standing, a single-voice
+   * panel, an UNKNOWN magnitude, no surviving objection) rides this block and
+   * the printed report; only a SHAPE violation refuses the ceremony.
+   */
+  readonly definitionOfDone: DefinitionOfDoneFacts;
   /** Append-only probe evidence rows for this isolated ceremony (boot/admission/claim). */
   readonly providerProbeEvidenceCount: number;
   readonly nodeMakerLineage: readonly {
@@ -179,19 +276,25 @@ export async function runAcceptanceCeremony(
     claudeRelay = relayStarts[1]?.status === "fulfilled" ? relayStarts[1].value : null;
     grokRelay = relayStarts[2]?.status === "fulfilled" ? relayStarts[2].value : null;
     const probes = new ProviderProbeRepository(database.pool);
-    for (const [index, result] of relayStarts.entries()) {
-      if (result.status === "fulfilled") continue;
-      const configured = policy.providers[index];
-      if (configured === undefined) continue;
+    // F-GROK-SANDBOX-PROFILE outcome (1). The announcement and the ABSENT
+    // provider probe come from ONE call, so the ceremony cannot keep the
+    // database record while losing the line its own log is read from. The
+    // provider refs are named here rather than indexed out of `policy.providers`
+    // — only this call site knows which relay sits at which position, and the
+    // refs below are the same ones `makerRelays` is built from.
+    const namedStarts = (["acceptance:codex-cli", "acceptance:claude-cli", "acceptance:grok-cli"] as const)
+      .flatMap((providerRef, index) => {
+        const start = relayStarts[index];
+        return start === undefined ? [] : [{ providerRef, start }];
+      });
+    for (const absent of announceAbsentMakers(namedStarts, policy.providers)) {
       await probes.record({
         probeEvidenceRef: randomUUID(),
-        providerRef: configured.providerRef,
-        maker: configured.maker,
+        providerRef: absent.providerRef,
+        maker: absent.maker,
         state: "ABSENT",
         modelId: null,
-        failureCode: result.reason instanceof Error && result.reason.message.trim() !== ""
-          ? result.reason.message
-          : "PROVIDER_RELAY_START_FAILED",
+        failureCode: absent.failureCode,
         probedAt: new Date()
       });
     }
@@ -262,7 +365,7 @@ export async function runAcceptanceCeremony(
     // more than one node, more than one persisted maker, a real attack edge,
     // and a proven independence receipt, all read from the recorded run.
     const fairDebate = await assertFairDebate(database.pool, accepted.run_ref);
-    const [modelCalls, lineage, reviewLineage, runFacts, probeEvidence] = await Promise.all([
+    const [modelCalls, lineage, reviewLineage, runFacts, probeEvidence, envelopeState] = await Promise.all([
       database.pool.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM ledger.ledger_entry
          WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
@@ -312,12 +415,30 @@ export async function runAcceptanceCeremony(
       ),
       database.pool.query<{ count: string }>(
         "SELECT count(*)::text AS count FROM core.provider_probe"
+      ),
+      /**
+       * T17 (goal 285-295 DoD, Global DoD "envelope WITHIN at terminal"): the
+       * envelope state as it stands at the TERMINAL, read from the same run's
+       * progress stream that `readCurrentState` reads. `DISTINCT ON (kind)
+       * ... ORDER BY at_seq DESC` is the last value written, so this is the
+       * terminal value and not the WITHIN the run head was seeded with.
+       */
+      database.pool.query<{ envelope_state: string }>(
+        `SELECT DISTINCT ON (kind) value_json #>> '{}' AS envelope_state
+         FROM core.run_progress_event
+         WHERE run_id=$1 AND kind='ENVELOPE_STATE'
+         ORDER BY kind, at_seq DESC`,
+        [accepted.run_ref]
       )
     ]);
     const modelCallCount = Number(modelCalls.rows[0]?.count ?? 0);
     const discoveredPanelSize = Number(runFacts.rows[0]?.panel_size);
     const structuralCeilingMaxModelAttempts = Number(runFacts.rows[0]?.structural_ceiling);
     const providerProbeEvidenceCount = Number(probeEvidence.rows[0]?.count ?? 0);
+    const terminalEnvelopeState = envelopeState.rows[0]?.envelope_state;
+    if (terminalEnvelopeState !== "WITHIN" && terminalEnvelopeState !== "EXHAUSTED") {
+      throw new Error(`ACCEPTANCE_TERMINAL_ENVELOPE_STATE_INVALID:${String(terminalEnvelopeState)}`);
+    }
     if (!Number.isInteger(discoveredPanelSize) || discoveredPanelSize < 1
       || !Number.isInteger(structuralCeilingMaxModelAttempts) || structuralCeilingMaxModelAttempts < 1) {
       throw new Error("ACCEPTANCE_RUN_DISCOVERY_FACTS_INVALID");
@@ -352,9 +473,37 @@ export async function runAcceptanceCeremony(
       `DISC-01 panel/ceiling/probe evidence: ${discoveredPanelSize} / ` +
       `${structuralCeilingMaxModelAttempts} / ${providerProbeEvidenceCount}`
     );
+    console.info(
+      `T17 envelope at terminal: ${terminalEnvelopeState} · ` +
+      `${modelCallCount}/${structuralCeilingMaxModelAttempts} model attempts (panel included)`
+    );
     console.info(`PRO-01 per-node maker lineage: ${JSON.stringify(nodeMakerLineage)}`);
     console.info(`XREV-01 per-node review lineage: ${JSON.stringify(nodeReviewLineage)}`);
     console.info(`ACC-01 UI: ${uiUrl}`);
+    /**
+     * The definition-of-done facts, from the run's own relations plus the answer
+     * just read through the API. The loop bound is the register row this
+     * deployment already resolved — never a literal restated here.
+     *
+     * READ LAST, AND DELIBERATELY SO. This is the only work the ceremony does
+     * after its report could have been printed: three more queries, plus four
+     * typed refusals of its own. A throw here reaches the `catch` below, which
+     * closes the stack and rethrows — so if this ran first, one transient `pg`
+     * error on a closing run that had already settled WITHIN would leave
+     * `logs/closing-run/ceremony-*.log` with not one line in it, and the W12
+     * judge with less evidence than before this block existed. Every
+     * established line is above; the new ones follow. O3's refusals are
+     * unchanged — they now cost their own lines and nothing else.
+     */
+    const definitionOfDone = await readDefinitionOfDoneFacts(database.pool, {
+      runId: accepted.run_ref,
+      answer,
+      sealedEvaluatorLoopMaxRounds: policy.synthesisRolePolicy.evaluatorLoopMaxRounds
+    });
+    // The remaining Global-DoD sub-clauses, one line each, on the same stream
+    // `.hermes/reports/2026-09-01-algorithm-live-loop/tools/closing-run.sh`
+    // captures verbatim.
+    for (const line of renderDefinitionOfDoneLines(definitionOfDone)) console.info(line);
     const liveDatabase = database;
     const liveShim = shim;
     const liveClaudeRelay = claudeRelay;
@@ -368,6 +517,8 @@ export async function runAcceptanceCeremony(
       modelCallCount,
       discoveredPanelSize,
       structuralCeilingMaxModelAttempts,
+      terminalEnvelopeState,
+      definitionOfDone,
       providerProbeEvidenceCount,
       nodeMakerLineage,
       nodeReviewLineage,

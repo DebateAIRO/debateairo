@@ -1,0 +1,9 @@
+[filed before sending — D64]  lane/w3 · dispatch 2 · 2026-09-05
+
+Integration is at 3d137d643caeba7594256865272431533842042e (h-fix merged). Branch lane/w3 anew from d4a3eae9, merge 3d137d64 in. GO.
+
+One change from the hold instruction: I said I would wait for BOTH pending merges. The t17t9 review returned CHANGES, so its merge is delayed by at least a rework round. Its diff touches acceptance/*, tests/integration/t17-envelope-ledger.test.ts and tests/unit/ — NONE of your two conflict files (apps/runner/src/index.ts, packages/budget/src/index.ts) and none of the register or audit files. So when t17t9 later merges, your branch takes a second, trivial catch-up with no conflicts. Starting now costs you nothing and saves the hour.
+
+Sequence as ruled in AMENDMENT 1: (1) fresh lane/w3 from d4a3eae9 — the existing lane-w3 worktree at d08ee928 is abandoned; create a new worktree (e.g. lane-w3b) or reset the branch, and say which; provision per D9 (install + generate:contract; compare the contract hash to integration's, which is 59a57922dd1ab796 at 3d137d64). (2) merge 3d137d64 in; resolve the two conflicts preserving BOTH T1's site fixes and integration's behaviour; per hunk, say which side won and why. (3) T1's oracle RED on your tree on exactly the register's sites — capture it. (4) derivation + row 17. (5) oracle GREEN; admission unchanged; typecheck 0; the audit's numeric-literal rule satisfied by T1's GOAL_RULED_LAW_CARRIERS (confirm).
+
+Contract is as widened in AMENDMENT 1. The runner index is conflict-resolution-only. Log under logs/w3/ with an r2- prefix. Stall guard stands.

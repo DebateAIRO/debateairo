@@ -42,8 +42,8 @@ describe("S02 graph law in the pure core", () => {
     expect(() => evaluate({
       nodes,
       arrows: [
-        { arrowId: "edge:a-b", sourceNodeId: "node:a", targetKind: "NODE", targetNodeId: "node:b", targetEdgeId: null, polarity: "support", kind: null, strength: 0.4, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" },
-        { arrowId: "edge:b-a", sourceNodeId: "node:b", targetKind: "NODE", targetNodeId: "node:a", targetEdgeId: null, polarity: "attack", kind: "rebutting", strength: 0.2, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" }
+        { arrowId: "edge:a-b", sourceNodeId: "node:a", targetKind: "NODE", targetNodeId: "node:b", targetEdgeId: null, polarity: "support", kind: null, strength: 0.4, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" },
+        { arrowId: "edge:b-a", sourceNodeId: "node:b", targetKind: "NODE", targetNodeId: "node:a", targetEdgeId: null, polarity: "attack", kind: "rebutting", strength: 0.2, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" }
       ],
       arrowOrder: ["edge:a-b", "edge:b-a"],
       operatorResolutions: [],
@@ -55,7 +55,7 @@ describe("S02 graph law in the pure core", () => {
     const transmissionReductions = deriveTransmissionReductions({
       nodes,
       arrows: [
-        { arrowId: "edge:support", sourceNodeId: "node:a", targetKind: "NODE", targetNodeId: "node:b", targetEdgeId: null, polarity: "support", kind: null, strength: 0.6, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" },
+        { arrowId: "edge:support", sourceNodeId: "node:a", targetKind: "NODE", targetNodeId: "node:b", targetEdgeId: null, polarity: "support", kind: null, strength: 0.6, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" },
         { arrowId: "edge:undercut", sourceNodeId: "node:b", targetKind: "EDGE", targetNodeId: null, targetEdgeId: "edge:support", polarity: "attack", kind: "undercutting", strength: 0.25, magnitudeStatus: "MEASURED", strengthSource: "UNDERCUT_TRANSMISSION" }
       ],
       arrowOrder: ["edge:support", "edge:undercut"],

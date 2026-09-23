@@ -65,7 +65,7 @@ async function rawEdge(input: {
   kind: null | "rebutting" | "undercutting";
   strength: number | null;
   magnitudeStatus: "MEASURED" | "UNKNOWN";
-  strengthSource: "EVIDENCE_VERIFIER" | "CLUSTER_COLLAPSE" | "UNDERCUT_TRANSMISSION";
+  strengthSource: "REVIEWER" | "CLUSTER_COLLAPSE" | "UNDERCUT_TRANSMISSION";
 }): Promise<string> {
   const result = await database.pool.query<{ edge_id: string }>(`
     INSERT INTO core.edge (
@@ -123,8 +123,8 @@ describe("S02 migrated graph invariants", () => {
     const runId = await createRun("undercut-target");
     const source = await rawNode({ runId, claimText: "Source" });
     const target = await rawNode({ runId, claimText: "Target" });
-    const supportId = await rawEdge({ runId, sourceNodeId: source, targetKind: "NODE", targetNodeId: target, polarity: "support", kind: null, strength: 0.7, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" });
-    const attackId = await rawEdge({ runId, sourceNodeId: source, targetKind: "NODE", targetNodeId: target, polarity: "attack", kind: "rebutting", strength: 0.3, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" });
+    const supportId = await rawEdge({ runId, sourceNodeId: source, targetKind: "NODE", targetNodeId: target, polarity: "support", kind: null, strength: 0.7, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" });
+    const attackId = await rawEdge({ runId, sourceNodeId: source, targetKind: "NODE", targetNodeId: target, polarity: "attack", kind: "rebutting", strength: 0.3, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" });
     await expect(rawEdge({ runId, sourceNodeId: target, targetKind: "EDGE", targetEdgeId: supportId, targetEdgePolarity: "support", polarity: "attack", kind: "undercutting", strength: 0.2, magnitudeStatus: "MEASURED", strengthSource: "UNDERCUT_TRANSMISSION" })).resolves.toMatch(/[0-9a-f-]{36}/);
     await expect(rawEdge({ runId, sourceNodeId: target, targetKind: "EDGE", targetEdgeId: attackId, targetEdgePolarity: "attack", polarity: "attack", kind: "undercutting", strength: 0.2, magnitudeStatus: "MEASURED", strengthSource: "UNDERCUT_TRANSMISSION" })).rejects.toThrow();
   });
@@ -136,7 +136,7 @@ describe("S02 migrated graph invariants", () => {
       await writer.addNode({ runId, statementText: "Source", claimType: "unknown", parentNodeId: null, childKind: null, siblingOrdinal: 0, generationStatus: "complete", pathStatus: "active", explorationDecision: "continue", provenanceRef: null, wayOfKnowing: "REASONING", locator: null, valueLaden: false }),
       await writer.addNode({ runId, statementText: "Target", claimType: "unknown", parentNodeId: null, childKind: null, siblingOrdinal: 0, generationStatus: "complete", pathStatus: "active", explorationDecision: "continue", provenanceRef: null, wayOfKnowing: "REASONING", locator: null, valueLaden: false })
     ] as const);
-    const edge = { runId, sourceNodeId, targetKind: "NODE" as const, targetNodeId, targetEdgeId: null, targetEdgePolarity: null, polarity: "support" as const, kind: null, strength: 0.5, magnitudeStatus: "MEASURED" as const, strengthSource: "EVIDENCE_VERIFIER" as const, provenanceRef: "fixture:S02" };
+    const edge = { runId, sourceNodeId, targetKind: "NODE" as const, targetNodeId, targetEdgeId: null, targetEdgePolarity: null, polarity: "support" as const, kind: null, strength: 0.5, magnitudeStatus: "MEASURED" as const, strengthSource: "REVIEWER" as const, provenanceRef: "fixture:S02" };
     const first = await graph.withGraphWrite(runId, (writer) => writer.addEdge(edge));
     const duplicate = await graph.withGraphWrite(runId, (writer) => writer.addEdge(edge));
     expect(duplicate).toBe(first);
@@ -150,10 +150,10 @@ describe("S02 migrated graph invariants", () => {
     const a2 = await rawNode({ runId: runA, claimText: "A2" });
     const b1 = await rawNode({ runId: runB, claimText: "B1" });
     const b2 = await rawNode({ runId: runB, claimText: "B2" });
-    const supportA = await rawEdge({ runId: runA, sourceNodeId: a1, targetKind: "NODE", targetNodeId: a2, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" });
-    const supportB = await rawEdge({ runId: runB, sourceNodeId: b1, targetKind: "NODE", targetNodeId: b2, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" });
-    await expect(rawEdge({ runId: runA, sourceNodeId: b1, targetKind: "NODE", targetNodeId: a2, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" })).rejects.toThrow();
-    await expect(rawEdge({ runId: runA, sourceNodeId: a1, targetKind: "NODE", targetNodeId: b2, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" })).rejects.toThrow();
+    const supportA = await rawEdge({ runId: runA, sourceNodeId: a1, targetKind: "NODE", targetNodeId: a2, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" });
+    const supportB = await rawEdge({ runId: runB, sourceNodeId: b1, targetKind: "NODE", targetNodeId: b2, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" });
+    await expect(rawEdge({ runId: runA, sourceNodeId: b1, targetKind: "NODE", targetNodeId: a2, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" })).rejects.toThrow();
+    await expect(rawEdge({ runId: runA, sourceNodeId: a1, targetKind: "NODE", targetNodeId: b2, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" })).rejects.toThrow();
     await expect(rawEdge({ runId: runA, sourceNodeId: a2, targetKind: "EDGE", targetEdgeId: supportB, targetEdgePolarity: "support", polarity: "attack", kind: "undercutting", strength: 0.2, magnitudeStatus: "MEASURED", strengthSource: "UNDERCUT_TRANSMISSION" })).rejects.toThrow();
     await expect(rawEdge({ runId: runA, sourceNodeId: a2, targetKind: "EDGE", targetEdgeId: supportA, targetEdgePolarity: "support", polarity: "attack", kind: "undercutting", strength: 0.2, magnitudeStatus: "MEASURED", strengthSource: "UNDERCUT_TRANSMISSION" })).resolves.toMatch(/[0-9a-f-]{36}/);
   });
@@ -162,7 +162,7 @@ describe("S02 migrated graph invariants", () => {
     const runId = await createRun("remaining-invariants");
     const source = await rawNode({ runId, claimText: "Source" });
     const target = await rawNode({ runId, claimText: "Target" });
-    const base = { runId, sourceNodeId: source, targetKind: "NODE" as const, targetNodeId: target, polarity: "support" as const, kind: null, strength: 0.4, magnitudeStatus: "MEASURED" as const, strengthSource: "EVIDENCE_VERIFIER" as const };
+    const base = { runId, sourceNodeId: source, targetKind: "NODE" as const, targetNodeId: target, polarity: "support" as const, kind: null, strength: 0.4, magnitudeStatus: "MEASURED" as const, strengthSource: "REVIEWER" as const };
     await expect(rawEdge({ ...base, targetEdgeId: "00000000-0000-4000-8000-000000000000" })).rejects.toThrow();
     await expect(rawEdge({ ...base, strength: null })).rejects.toThrow();
     await expect(rawEdge({ ...base, targetNodeId: source })).rejects.toThrow();
@@ -175,7 +175,7 @@ describe("S02 migrated graph invariants", () => {
     const graph = new GraphRepository(database.pool);
     const a = await rawNode({ runId, claimText: "A" });
     const b = await rawNode({ runId, claimText: "B" });
-    const edge = (sourceNodeId: string, targetNodeId: string) => ({ runId, sourceNodeId, targetKind: "NODE" as const, targetNodeId, targetEdgeId: null, targetEdgePolarity: null, polarity: "support" as const, kind: null, strength: 0.5, magnitudeStatus: "MEASURED" as const, strengthSource: "EVIDENCE_VERIFIER" as const, provenanceRef: "fixture:S02" });
+    const edge = (sourceNodeId: string, targetNodeId: string) => ({ runId, sourceNodeId, targetKind: "NODE" as const, targetNodeId, targetEdgeId: null, targetEdgePolarity: null, polarity: "support" as const, kind: null, strength: 0.5, magnitudeStatus: "MEASURED" as const, strengthSource: "REVIEWER" as const, provenanceRef: "fixture:S02" });
     await graph.withGraphWrite(runId, (writer) => writer.addEdge(edge(a, b)));
     await expect(graph.withGraphWrite(runId, (writer) => writer.addEdge(edge(b, a)))).rejects.toMatchObject({ code: "GRAPH_CYCLE_WRITE_REJECTED" });
   });
@@ -184,7 +184,7 @@ describe("S02 migrated graph invariants", () => {
     const runId = await createRun("stable-order");
     const source = await rawNode({ runId, claimText: "Source" });
     const target = await rawNode({ runId, claimText: "Target" });
-    const support = await rawEdge({ runId, sourceNodeId: source, targetKind: "NODE", targetNodeId: target, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" });
+    const support = await rawEdge({ runId, sourceNodeId: source, targetKind: "NODE", targetNodeId: target, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" });
     await rawEdge({ runId, sourceNodeId: target, targetKind: "EDGE", targetEdgeId: support, targetEdgePolarity: "support", polarity: "attack", kind: "undercutting", strength: 0.2, magnitudeStatus: "MEASURED", strengthSource: "UNDERCUT_TRANSMISSION" });
     const graph = new GraphRepository(database.pool);
     const first = await graph.materialiseSnapshot(runId);
@@ -206,7 +206,7 @@ describe("S02 migrated graph invariants", () => {
       kind: null,
       strength: 0.5,
       magnitudeStatus: "MEASURED",
-      strengthSource: "EVIDENCE_VERIFIER"
+      strengthSource: "REVIEWER"
     });
     const materialised = await new GraphRepository(database.pool).materialiseSnapshot(runId);
     expect(materialised.nodes).toEqual(expect.arrayContaining([
@@ -216,7 +216,7 @@ describe("S02 migrated graph invariants", () => {
     expect(materialised.arrows).toHaveLength(1);
   });
 
-  it("S03 records operator, cluster, lift, rival, and removal-sensitivity receipts", async () => {
+  it("S03 records operator, cluster, lift, and removal-sensitivity receipts", async () => {
     const runId = await createRun("s03-receipts");
     const root = await rawNode({ runId, claimText: "Receipt root" });
     const supporter = await rawNode({ runId, claimText: "Receipt supporter" });
@@ -229,7 +229,7 @@ describe("S02 migrated graph invariants", () => {
       kind: null,
       strength: 1,
       magnitudeStatus: "MEASURED",
-      strengthSource: "EVIDENCE_VERIFIER"
+      strengthSource: "REVIEWER"
     });
     const outcome = evaluate({
       nodes: [
@@ -246,7 +246,7 @@ describe("S02 migrated graph invariants", () => {
         kind: null,
         strength: 1,
         magnitudeStatus: "MEASURED",
-        strengthSource: "EVIDENCE_VERIFIER"
+        strengthSource: "REVIEWER"
       }],
       arrowOrder: [support],
       operatorResolutions: [{ parentNodeId: root, operator: "accumulate", suppliedBy: "deployment" }],
@@ -274,8 +274,8 @@ describe("S02 migrated graph invariants", () => {
       }))
     });
     const receipt = await database.pool.query(
-      `SELECT strength.operator_used, strength.operator_level, strength.rival_operator,
-              strength.rival_strength, strength.supported_by, strength.position_label,
+      `SELECT strength.operator_used, strength.operator_level,
+              strength.supported_by, strength.position_label,
               propagation.cluster_records, propagation.operator_by_parent,
               count(sensitivity.removed_node_id)::int AS sensitivity_count
        FROM ledger.propagation_run AS propagation
@@ -284,27 +284,33 @@ describe("S02 migrated graph invariants", () => {
        JOIN ledger.sensitivity_record AS sensitivity
          ON sensitivity.propagation_run_id=propagation.propagation_run_id
        WHERE propagation.propagation_run_id=$1
-       GROUP BY strength.operator_used, strength.operator_level, strength.rival_operator,
-                strength.rival_strength, strength.supported_by, strength.position_label,
+       GROUP BY strength.operator_used, strength.operator_level,
+                strength.supported_by, strength.position_label,
                 propagation.cluster_records, propagation.operator_by_parent`,
       [propagationRunId, root]
     );
     expect(receipt.rows[0]).toMatchObject({
       operator_used: "accumulate",
       operator_level: "deployment",
-      rival_operator: "strict-and",
-      rival_strength: 0.75,
       supported_by: [support],
       position_label: "supports",
       sensitivity_count: 2
     });
+    // T8 / S5-2: the retired receipt pair is gone from the table, not merely null.
+    const columns = await database.pool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema='ledger' AND table_name='node_strength_record'`
+    );
+    const columnNames = columns.rows.map((row) => row.column_name);
+    expect(columnNames).not.toContain("rival_operator");
+    expect(columnNames).not.toContain("rival_strength");
   });
 
   it("DR-071 records a real undercut's pure-core reduction and the derived order end to end", async () => {
     const runId = await createRun("recorded-undercut");
     const source = await rawNode({ runId, claimText: "Source" });
     const target = await rawNode({ runId, claimText: "Target" });
-    const support = await rawEdge({ runId, sourceNodeId: source, targetKind: "NODE", targetNodeId: target, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "EVIDENCE_VERIFIER" });
+    const support = await rawEdge({ runId, sourceNodeId: source, targetKind: "NODE", targetNodeId: target, polarity: "support", kind: null, strength: 0.5, magnitudeStatus: "MEASURED", strengthSource: "REVIEWER" });
     const undercut = await rawEdge({ runId, sourceNodeId: target, targetKind: "EDGE", targetEdgeId: support, targetEdgePolarity: "support", polarity: "attack", kind: "undercutting", strength: 0.2, magnitudeStatus: "MEASURED", strengthSource: "UNDERCUT_TRANSMISSION" });
     const snapshot = await new GraphRepository(database.pool).materialiseSnapshot(runId);
     const reductions = deriveTransmissionReductions(snapshot);

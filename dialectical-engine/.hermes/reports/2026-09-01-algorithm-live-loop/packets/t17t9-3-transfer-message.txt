@@ -1,0 +1,14 @@
+transfer(F-T17T9-3): the sealed envelope row re-derived from the shipped serve leg — ceiling 109 → 106
+
+Explicit transfer of lane/t17t9-3's nine-file code delta (5e837ba7 vs 2af816f1) onto
+integration, per codex T17T9-3 r1 (verdict file agent-reports/t17t9-3-codex-r1.md) and V's
+rulings of 2026-09-05 (re-derive the row; seal the true number, 106). The lane is
+dev-reconciled-based (D66) and is merged into dev by V; integration carries the same change by
+this transfer. All nine files were identical between the lane's base and integration, and the
+delta applies cleanly.
+
+Serve leg: one site per role per round (2 roles x 3 rounds = 6), selected SYNTHESIS_LOOP,
+formula_version DR-184-v4; the budget parser reads the rule from @debateai/register instead
+of restating it. The seeder's row values were already right; the derivation was wrong.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

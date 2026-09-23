@@ -30,6 +30,7 @@ import {
   type LoginIdentityRecord
 } from "@debateai/db";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import { createPublicEvaluatorConsumerWorker } from "../../apps/evaluator-worker/src/index.js";
@@ -1697,18 +1698,56 @@ describe("S8 publication on real PostgreSQL", () => {
     const asOf = new Date().toISOString();
     await expect(application.publish({
       runId,
+      // The second `as never` sat here. `publish` reads exactly three fields of
+      // this object — `userId`, `ownerRef` and `session.session_id`
+      // (apps/api/src/publications.ts:226-228, :256) — but its declared type is
+      // `AuthenticatedSession`, which also requires `tokenHash`, `csrfTokenHash`
+      // and `authKind`, and whose `session` requires `asker_id`, `caller_scope`,
+      // `ownership_provenance` and `provisional_identity_model`. Removing the cast
+      // means stating all of them: the compiler pins four to literals,
+      // `tokenHash` is the fixture's own session hash, and the remaining two are
+      // inert on this path (same idiom as
+      // tests/integration/s7-authorization-database.test.ts:124).
       authenticated: {
         userId: identity.userId,ownerRef: identity.ownerRef,
-        session: { session_id: identity.sessionId }
-      } as never,
+        tokenHash: identity.sessionTokenHash,
+        csrfTokenHash: `hash:csrf:${identity.sessionId}`,
+        authKind: "cookie" as const,
+        session: {
+          session_id: identity.sessionId,asker_id: identity.ownerRef,
+          caller_scope: "ASKER",ownership_provenance: "server_session",
+          provisional_identity_model: false
+        }
+      },
       grantToken: publishToken,
       source,
-      answer: {
+      // F-S8-FIXTURE-CONTRACT-PARSED. This fixture used to be an inline literal
+      // under `as never`, and that cast is what hid its missing required fields
+      // from the compiler for twelve days: the omission surfaced at runtime, in
+      // the projection, instead of at typecheck. `buildFairShapedAnswer`
+      // (tests/support/v2uiFixtures.ts:9) runs `AnswerSchema.parse`, so the next
+      // field the contract makes required fails the COMPILER here, and the
+      // overrides below are the only thing this row actually varies.
+      // `publish` maps `nodes` and `edges` into the public projection before it
+      // calls the repository, so the builder's parsed two-node/one-edge graph is
+      // what the projection, its PublicDebate parse and the readback at the end
+      // run against; nothing in this row asserts node or edge content.
+      // `confidence_band: "moderate"` is NOT carried over. The literal set it with no
+      // `band_ceiling`, and AnswerSchema refuses that pair
+      // (packages/contract/src/index.ts:647-648, "confidence_band and band_ceiling must be
+      // present together") — so the row's authored answer had been contract-INVALID the whole
+      // time, and the cast is precisely why no one knew. Nothing here asserts the band, and a
+      // real `band_ceiling` would mean inventing a register_row_key/register_version/source_ref
+      // triple for a row about transport ambiguity, so the builder's null pair stands.
+      answer: buildFairShapedAnswer({
         run_ref: runId,terminal: "SERVED",question_line: "ambiguous public question",
-        verdict_state: "SUPPORTED",confidence_band: "moderate",
-        composed_text: [{ text: "ambiguous public answer" }],badges: [],
-        residual_objections: [],reversal_point: "new evidence",as_of: asOf
-      } as never
+        verdict_state: "SUPPORTED",
+        composed_text: [{
+          segment_id: "seg:ambiguous-1",text: "ambiguous public answer",
+          load_bearing: true,served_number_refs: []
+        }],
+        badges: [],residual_objections: [],reversal_point: "new evidence",as_of: asOf
+      })
     })).rejects.toThrow("SIMULATED_AMBIGUOUS_COMMIT");
     const committed = await database.pool.query<{ publication_ref: string }>(`
       SELECT snapshot.publication_ref FROM serve.publication_snapshot AS snapshot

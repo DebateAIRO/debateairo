@@ -117,7 +117,7 @@ describe("P2-02 sealed recovery-policy register", () => {
     expect(registerSource).toContain("createPostgresRegisterPublicationPort(pool).importHistorical");
     expect(devSeed).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
-    expect(devSeed).toContain("createPostgresRegisterPublicationPort(input.adminPool).importHistorical");
+    expect(devSeed).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
     const readIndex = apiMain.indexOf("await readRecoveryPolicy(pool, environment.REGISTER_VERSION)");
     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
     expect(readIndex).toBeGreaterThan(-1);

@@ -1,0 +1,199 @@
+# Where things stand, in plain language
+
+*Written 2026-09-17 and updated through 2026-09-21 for the project owner. This page explains the state of the V3 debate engine work without the code names the other files in this folder use. Every claim links to the file that holds the details. When the detailed records change, this page is updated in the same commit.*
+
+## 2026-09-21: you asked whether anything was left, and to merge with dev and push
+
+**Nothing was left to merge.** GitHub's `dev` already held every piece of this work: I fetched it fresh and compared, and the two were identical. The code on `dev` is exactly the code the last full test run checked, because everything added since that run is notes, not code.
+
+**One small correction went to `dev`.** While checking, I found three slips in the project's own records, all made by the tool that writes them: one row named the wrong commit for the final test run, and two sentences had a leftover placeholder where the actual count belonged. They are fixed, and the next section gained one sentence: the failing-test count can move by one or two between runs without anything changing.
+
+**Left alone on purpose:** a security branch from a different session exists only on this Mac and is not on `dev`. It is a separate job, so it was not merged.
+
+## 2026-09-19 → 20: "please fix the tests" — and what the failures turned out to be
+
+**What you asked.** You said you still did not understand what needed doing, asked me to fix the tests, and said to ask if I needed anything. Three workers took the 45 failures in three groups, under one rule I did not let them bend: **never make a test pass by lowering the bar.** If a test is right about something the product lacks, that is a finding, not a fix.
+
+**The headline: most of those failures were not "features nobody built". They were features that were built, and then deleted by accident.** Two tidy-up commits on 1–2 September — "consolidate local UI and workspace changes" and "checkpoint local development state" — removed large parts of your designed website work and left behind every test that described it. A third loss came from a merge that kept a test and threw away the code it was testing. Real consequences, all now fixed: published debates went out **without their search-indexing notice**, a stalled run stopped saying why it was waiting, a failed run stopped saying "Failed", and a stranger following a shared link could not open the argument tree.
+
+**Where the count landed.** Failing tests went from 45 to **12**, out of 5367. 33 closed this round and nothing new appeared. Nothing failed that is not accounted for, and here is every one of the twelve:
+
+| how many | what it is | whose call |
+|---|---|---|
+| 6 | the review marks on debate cards | yours — ruled YES, deferred to your website work |
+| 1 | the library rows' card frame | yours — deferred with the same ruling |
+| 1 | where the debate toolbar belongs | **waiting on you**, one minute, card linked below |
+| 1 | a structural check you already have a card for (F31) | already tracked |
+| 3 | three measurements in the sign-up tests whose instruments are unreliable, not the code they measure | already tracked, each with its own card |
+
+The three measurement ones are worth one sentence, because they are not bugs in your product: one compares a number against a threshold it recalculates from its own data every run, which makes it fail roughly six times in a hundred for no reason; one watches for memory growth using a calculation that also trips when memory is *released*; and one is a test being cut off after a minute when the work it does takes under two. All three have cards saying what to fix, and in every case what to fix is the measurement, not the thing measured. A fourth sign-up measurement of the same kind happened to pass on the run that counted; in the run just before it, that one failed and the six-in-a-hundred one passed. So the next count can move by one or two without anything in your product changing. The fourth one has its own card too: [F-ENUMERATION-TIMING-GATES-SPIKE](board/F-ENUMERATION-TIMING-GATES-SPIKE.md).
+
+**What you decided, and what it produced.** You chose to restore only what a visitor would notice, and separately ruled that the review marks belong on the debate card, that a shared link should open on the summary with the tree one click away, and that the library counter should count the rows on screen. All three of those are built. The review marks are recorded as your decision and left for your website work — the tests for them stay red on purpose, which is an honest "agreed, not yet built" rather than a hidden disagreement.
+
+**One decision still waiting for you, and it takes a minute.** Your debate header's buttons work again. But two of your own designs disagree about whether that toolbar belongs inside the compact header. It is inside today, under a different class name, so the stricter design's check passes on a spelling rather than on the arrangement it meant to protect. Outside satisfies both designs at once. Inside means retiring two checks and saying why. Either is fine; leaving it unexamined is the only bad option. Details: [F-DR160-TOOLBAR-NAME-OF-RECORD](board/F-DR160-TOOLBAR-NAME-OF-RECORD.md).
+
+**Five ways a test can look like it is working when it is not.** This is the part worth keeping, because it changes how much any green result is worth:
+
+1. **A safeguard moves and its test stays behind.** Three safeguards moved into the database in August, correctly; four tests kept looking for them in the old place.
+2. **A check that cannot fail.** A test looked for text that no longer existed, got "not found", and treated that as success. Swept the whole project: 149 candidates examined, 10 were incapable of failing, all repaired. One had been passing since August while checking nothing.
+3. **A check that never runs.** When a test fails, every line after the failing one is skipped. One test died on its first line, so its second line — which would have caught a real problem — had never run once.
+4. **A check that was deleted.** A merge discarded part of a test file, removing the rules that your public disclosure appears exactly once and in the right place. A deleted test cannot report its own absence: the file still existed, still passed, still looked maintained.
+5. **A check that tests less than it claims.** A worker wrote a new test, it passed, and it was wrong: the example it used never reached the code it claimed to check. It was caught only because the deliberate sabotage written to prove the test worked failed to break it.
+
+**The honest limit, which I want you to have in plain words.** A count of failing tests counts *failures*. If a piece of your product was deleted **together with the test that guarded it**, nothing fails and nothing appears in any number I give you. Two of the losses recovered tonight were exactly that: they broke no test and appeared in no report, and were found only by reading what old merges threw away. That sweep has been run once, for one shape of loss, and it found sixteen discards of which five are still live. **So a clean test run means the code the tests reach is behaving — not that nothing is missing.**
+
+## 2026-09-18, later: Node upgraded, and the hundred "failing" tests were never broken code
+
+**What you asked for.** "Upgrade to the latest stable Node version available and adapt the code in case there are problems." Node is the engine the code runs on, like the version of Windows a program needs.
+
+**What was installed.** This Mac went from Node 26.5.0 to **26.8.2**, the newest version Homebrew offers. Node's own website has 26.9.0, released two days ago and not yet packaged for Homebrew, so it was not used. The 26 line becomes the long-term-support line next month, so this is the right line to be on.
+
+**The interesting part: the 100 failing tests were not broken code.** For weeks every report has carried the same caveat — about 100 of the 140 failing tests fail "because of the Node version". Now we know exactly why, and it was one small thing:
+
+- Newer versions of Node invented their own version of the browser's "remember this in the page" storage. It exists, but it is empty and switched off unless you start Node a special way.
+- The testing tool pretends to be a browser so that website tests can run without a browser. When it sets up that fake browser, it skips anything Node has already defined — and Node had now defined that storage. So the tests got Node's empty switched-off version instead of the working fake-browser one.
+- Every one of those tests starts by emptying the storage. With nothing there to empty, they all died on their very first line, before testing anything at all.
+
+**The fix was the testing tool, not our code.** Version 5.0.1 of that tool, released two weeks ago, adds exactly those two storage items to the list it hands over, and declares Node 26 supported. Upgrading it fixed the whole class at once. The alternative would have been to start Node with a special flag, which would have given every test one shared storage file on disk and quietly broken the isolation the tests depend on.
+
+**The result.** Failing tests went from 140 to 45. That is 99 tests that now pass and were only ever failing because of the environment. Of the 45 left, 41 are the same failures this project already owned and tracks on cards, 3 are those same tests under slightly different names because the new testing tool prints titles differently, and 1 is the occasionally-failing test described below.
+
+**Four real defects were hiding behind the noise.** The September 16 audit predicted "about four" real failures masked by the storage problem. Exactly four appeared, all in the debate canvas and map: a corner radius written as a raw number instead of the design's token, the review marks that are styled but never actually drawn on a card (twice), and the map's hub ring geometry. These are unbuilt pieces of the design, not one-line bugs, so they were written up rather than patched: [F-UI-DEFECTS-UNMASKED-BY-NODE26](board/F-UI-DEFECTS-UNMASKED-BY-NODE26.md), for your UI work. Worth knowing: because these tests kept their names, a simple before-and-after count would not show them. They only surface if someone reads why each remaining test fails.
+
+**One thing I stopped and reversed.** The worker also updated the Node version inside the project's "machine pins" file — a record of what this machine had on 2026-08-07. That sounds harmless, but that file is a sealed record: the production setup instructions tell an operator to confirm its exact fingerprint in the live database, and the code refuses to start against a database whose sealed copy differs. Editing it would have rewritten history an operator is told to verify. It is reverted. The record still says the true thing about its own date, the project's actual requirement now says 26.8.2, and recording today's machine pins properly needs a new sealed version, which is now a to-do card. This is the second time in one day the same rule decided a question: **a sealed value is never edited, only superseded.**
+
+**Two things the final checks turned up.** First, the test pass had to be run twice. The first run shared the Mac with another AI agent I had working, and two timing tests failed — including the one that proves an attacker cannot tell a registered email from an unregistered one by how long the site takes to answer. On a quiet machine those tests pass comfortably, and the numbers show why: only the half of the measurement that does real work slowed down, which is what happens when something else is competing for the processor. The rule now recorded: a test run that measures timing is done on a quiet machine, and my own agents count as noise.
+
+Second, and more useful: one remaining failure is a test that is designed to fail occasionally. It compares a measurement against a threshold it calculates from its own data, in a way that flags roughly one run in a hundred even when nothing is wrong, and the run makes about a dozen such comparisons. It has a card, with the arithmetic and an explicit warning not to "fix" it by raising the threshold, because the threshold is the security property.
+
+**One more thing I checked myself, and it was worth it.** The website's own type check was outside every automated check. When I ran it properly it failed, and the reason is that it had been reporting success from a cache: it reuses previous results, and reusing them skipped the work entirely. The failure itself is old and not caused by this upgrade. The lesson is the one worth keeping: a cached check can report success for something that does not actually pass. Card: [F-UI-TYPECHECK-NEEDS-A-BUILD](board/F-UI-TYPECHECK-NEEDS-A-BUILD.md).
+
+**Still not re-measured.** Two memory limits for the sign-in service were measured on the old Node and have not been checked on the new one. They are not wrong, just unverified. That has a card too: [F-AUTH-MEMORY-BOUNDS-MEASURED-ON-NODE-22](board/F-AUTH-MEMORY-BOUNDS-MEASURED-ON-NODE-22.md).
+
+## 2026-09-18, early morning: you decided the open questions, three changes followed, and the mission is signed off
+
+**What you decided.** I put ten questions to you, each with a recommendation and the alternatives. Your answers:
+
+| Question | Your answer | What it means |
+|---|---|---|
+| When should a debate stop going deeper? (the "stop threshold") | Lower it from 0.02 to 0.01 | After each round the engine checks whether any position's score still moved. Below the threshold it stops. In the real run the winner led by about 0.011, so the old 0.02 would have called a debate "settled" while scores were still moving by more than the lead. |
+| When should one argument stop getting replies? (the "freeze threshold") | Lower it from 0.01 to 0.005 | An argument that cannot move any position's score by at least this much gets no further replies. The old value would have frozen four of the six main arguments of the real run, two of them close enough to matter. |
+| Your secret key was visible in the Mac's process list during a run | Fix it before pushing | Done, see below. |
+| 1. The verdict label comes from code, the verdict text from an AI, and a second AI checks they agree | Yes | This is how the real run worked. |
+| 2. If the checking AI still objects after three rewrites, serve the answer with a visible warning | Yes | The reader gets the answer and sees the disagreement. |
+| 3. Should that objection also force the label down to "contested"? | No | The label comes from the numbers only. |
+| 4. The website's words for the three labels | Rename now | Done, see below. |
+| 5. If some of the AI judges fail, carry on with the rest and mark it visibly | Yes | Never a silent self-grade. |
+| 6. A single AI on its own can never print "supported" | Yes | |
+| 7. "One debate, one frame" | Park it | Revisit with live data. |
+
+You also said you do not need the single-model run ("I trust that it will work"). The sign-off says so openly: that one item of the finish-line checklist was never demonstrated by a run, by your decision.
+
+**What was built from your answers.** Three small changes, each written by one AI worker and then checked by a second AI that had never seen it (the "second doctor's opinion"):
+
+1. **The two thresholds.** The new numbers are in. One thing surfaced that matters: the real-run setup keeps a sealed copy of these numbers, and a sealed copy can never be edited. So the new numbers were added as a new sealed version next to the old one. Your run of September 17 and its data stay untouched, and nothing has to be reset before the next run. One honest limit: with the debate set to two levels deep, the stop threshold cannot trigger at all (there is no earlier round to compare with until the last one), so it only starts to matter for deeper debates.
+2. **Your key is off the command line.** The program now reads the key only from the environment variable you already export, and refuses it if it is typed on the command line. The reviewer found two ways the key could still have ended up in the saved run log (writing the flag with an `=` sign, and the run tool copying its own command line into the log before the program could refuse). Both are closed. The guide's copy-paste commands were also cleaned: no command block contains a `<` or `>` any more, because that is exactly the character that emptied your three tools on the 17th when a line was pasted into the terminal.
+3. **The website's words.** The three labels now use the engine's own words: supported, contested, unsupported. A sentence that was false went away: for "unsupported" the banner used to say that no evidence was available, which is not what the label means. Two new sentences, which you can change or veto:
+   - contested: "The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing."
+   - unsupported: "Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one."
+   One honest limit: **none of this is visible on the site today.** The label reaches a reader only as a raw word in a side drawer, and nothing feeds the banner yet. That is a separate item for your UI work, with its own ticket.
+
+**The tests.** Every test file the three changes touched was run three times at the final commit: all green except the same two known failures as before (one safeguard test from before this work, and five cases of one website test that fail only on this Mac's Node version). Then the full automated pass ran at the final commit: **140 failing tests out of 5363** — exactly the same known failures as before tonight, name for name, nothing new. All the tests added or changed tonight pass.
+
+**The sign-off.** The reviewer role has now written the final verdict on the whole mission: **the goal is met**, with two things said openly. First, the single-model run was skipped at your word, so that checklist item was never demonstrated. Second, every test number here comes from this Mac's newer Node version, and one run on the project's pinned version is still owed. The verdict is in [agent-reports/w12-whole-goal-verdict-2026-09-18.md](agent-reports/w12-whole-goal-verdict-2026-09-18.md); it also lists what it does not claim.
+
+**What is left, none of it blocking.** One test run on the pinned Node version (item 2 below). Seven small to-do cards written during the night, in the [board](board/) folder; the two worth your attention are that the verdict label is not yet visible on the site (`F-UI-VERDICT-LABEL-DRAWER-ONLY`), and that the sealed numbers can be re-tuned only one more time before the sealing mechanism needs a design decision (`F-REGISTER-HISTORICAL-IMPORT-CAP`). Everything you decided, with the measurements behind the two thresholds, is entry D77 at the end of [DECISIONS.md](DECISIONS.md).
+
+## The big news of 2026-09-17, late evening: the real run happened, and it passed
+
+At 22:28 you started the full real debate with all three AI services, and at 23:47 it finished cleanly. Three positions, 27 arguments, 15 independent attacks between them, 114 model calls of a 396 ceiling, and every one of the nine facts on the finish-line checklist is in the log: every argument scored by a panel that never included its own author, every link carrying a measured weight, all three top-level scores moved by the counter-arguments, the final statement accepted by its evaluator on the second attempt after a first rejection, a code-derived verdict of CONTESTED, and a confidence band capped because all five cited arguments rest on reasoning alone (no looked-up evidence, which is honest for a four-day-workweek question). The judge's finding: the flagship item of the checklist is witnessed in full. The log is kept in the project under `closing-runs/`. What still separates this from "mission complete" is in item 4 below; the biggest blocker is gone.
+
+## The picture in one paragraph
+
+DebateAI has two generations. **V2** is the older Python system that runs the live site (dezbatere.ro) from the `main` branch. **V3** is the rewrite on the `dev` branch: several AI models argue a question against each other, a panel of AI judges scores every argument, the scores are propagated through the argument tree, and a final written answer comes out with a label (supported / contested / unsupported) and a confidence band. The work of the last weeks was about proving that this V3 machinery really works end to end with real AI services, and about fixing what that proof turned up. As of this evening, **all of that work is on `dev` on GitHub**, and the one thing that still has to happen is a **full real run**, which only you can start because it needs your paid API credential.
+
+## What happened today (2026-09-17)
+
+1. **Everything was pushed to `dev`.** Your local copy of `dev` on this Mac was still pointing at the old V2 line; it now points at the V3 line, and GitHub's `dev` carries all the work. The two `claude/…` branches you asked about are old V2 work and were left alone. The three temporary working folders from earlier tasks were deleted, after checking that nothing in them was unsaved.
+2. **The run's report was fixed.** The full run of September 8 finished, but its printed report skipped six of the nine facts the project's finish-line checklist demands. The code now prints all of them (details in the next section). This was built by one AI worker, checked by a second AI that had never seen it, corrected once, and re-checked; the tests pass.
+3. **A wrong default in the run instructions was corrected.** The checklist requires the debate to go at least two levels deep (argument → counter-argument → reply to the counter-argument). The instructions for the next run did not say so, and the program's default is one level. The instructions now set two.
+
+## What is still needed, and why
+
+### 1. The full real run — the only thing that proves the machine works (you)
+
+**What it is.** A complete debate, start to finish, using the real AI services (OpenAI's Codex, Anthropic's Claude, and xAI's Grok if it can start), with everything recorded in one log file. Think of it as a test flight before an airline accepts a plane: the plane can pass every ground check, but the acceptance is the flight.
+
+**Why you.** It needs your API credential, the secret that lets the program spend money with the AI providers. By the rules of this project no AI agent ever reads, stores or prints that secret; you type it into your own terminal, run one command, and the program uses it for about 25 minutes.
+
+**What you do.** Follow [packets/readiness-ask-2026-09-16.md](packets/readiness-ask-2026-09-16.md). It lists the exact command, the ports it uses, where the log lands, and what to check first. The short form is one line that runs [tools/closing-run.sh](tools/closing-run.sh) with the depth-2 setting. Since the evening of 2026-09-17 the tool first runs a **pre-flight**: it finds the three AI command-line tools, checks that each one is a real, complete program (not an empty file, not a text file), and refuses to start unless at least two of them work. You can run only that check, with no cost, by putting `PREFLIGHT_ONLY=1` in front of the command. Since the first real attempt on 2026-09-17 at 22:22, which died in ten seconds because the Claude command line's sign-in had expired, the check also confirms that Claude and Codex are signed in, and tells you the sign-in command if not (`claude auth login`, `codex login`). Grok has no such check; the run's own first contact with it decides. All three tools were complete programs again by 22:19 that evening.
+
+**What you get.** A log with the nine facts the checklist wants. Two of them can only be proven by a real run, never by the automated tests: whether the argument links carry measured weights, and whether propagation actually moved at least one top-level score. The seven new report lines and what each one means are described in the code's own guide, [acceptance/README.md](../../../acceptance/README.md), under "The definition-of-done report".
+
+### 2. Run the automated tests on the right Node version — DONE on 2026-09-18, the other way round
+
+This item said the project was pinned to Node 22.23.1 while this Mac ran Node 26, and that running the tests on 22.23.1 would clear about 100 failures. It was resolved by moving forward instead of back: the Mac is on Node 26.8.2, the project now declares that version, and the testing tool was upgraded to the release that works with it. The 100 failures are gone, and the four real ones they were hiding are written up. The top section of this page has the detail.
+
+### 3. Look at the small choices made on your behalf (you, five minutes)
+
+While building, I sometimes had to choose between two reasonable options without you. Each choice is written down as a default that stands unless you say no. The newest ones are in the "2026-09-17" section at the bottom of [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md); each row says what was chosen and what saying "no" would mean. Example: the run's log now never contains the text of any argument, only ids and numbers, because the same texts are encrypted in the database and a log file is not a safe place for them. If you want the texts in the log anyway, that is a one-line veto.
+
+### 4. After the run: the last steps to declare the mission finished — DONE on 2026-09-18
+
+The steps this section listed on 2026-09-17 are done, except the single-model run, which you chose to skip: the two tuning numbers were fitted from the real run and you ruled on them, the seven questions were put to you and answered, and the reviewer role has written the final verdict. The section at the top of this page has the details. A full automated test pass ran after the real run (00:34: 140 failing tests out of 5,341, the same 140 known ones as before, nothing new) and again after tonight's three changes (see the top section).
+
+### 5. Two loose ends that are not part of this mission (for your awareness)
+
+- One automated test has been failing since before this work: a safeguard that makes the code lock database rows in a fixed order (so two processes cannot deadlock) is no longer present where the test looks for it ([tests/architecture/s7-authorization-contract.test.ts](../../../tests/architecture/s7-authorization-contract.test.ts), line 98). Nothing here caused it; someone should look at it separately.
+- GitHub reported 12 vulnerable dependencies on the `main` branch, which is the V2 production site. Nothing in this mission touches `main`.
+
+## The incident of 2026-09-17 evening, in plain language
+
+Around 20:15 the Mac froze for everyone: your terminal, my commands, even the Claude updater. The cause was one file. The launcher of the Codex command-line tool (`/opt/homebrew/bin/codex`, which points to a file inside the npm package) had been overwritten with four lines of plain text instead of a program. When a shell is asked to run a file that isn't a program, it falls back to reading it as a script, and the first line of that text was the launcher's own path, so it started itself again, and again, about once a second. Within four minutes there were about 2,400 copies, the Mac's limit of 2,666 processes per user was reached, and nothing new could start. Think of a photocopier told to copy its own output tray.
+
+**How it was resolved.** My safety layer does not let me kill processes or write files outside the project, so you did it: one line in your terminal replaced the broken file with a two-line program that simply exits, which let every copy in the chain finish by itself, and then `npm install -g @openai/codex@0.154.0` put the real launcher back. Nothing else on the machine was harmed.
+
+**The cause, finally (third and last correction, 22:15).** It was my own instructions file. The run instructions showed the measured tool locations in a code box, as lines like "command -v claude", an arrow, the launcher path, an arrow, the target. Those lines were never meant to be run, but they look like commands, and you pasted them into your terminal, three times over the evening. To a shell, an arrow made of a dash and a greater-than sign means "write the output into the following file". So each paste opened the Claude launcher for writing, which empties the real program behind it, then failed on the shortened path and stopped. Same for Grok; and for Codex the command's own output landed in the launcher file, which is exactly the four lines of text we found. Earlier tonight I blamed an unknown actor, then the Claude updater. Both were wrong. The Claude updater is innocent. The old engine did play one role: its watchdog and its Codex worker call `codex` every minute or two, so once that launcher was broken, they kept starting new chains. Nothing there was changed; it is noted for the old engine's own to-do list. The instructions now show those measurements as a table with a warning, and the rule for every file written for you from now on is simple: a code box contains a real command you can paste, or it is not a code box.
+
+**What changed so it cannot repeat here.** The run tool now checks every launcher before running it: non-empty, executable, and starting with a real program header. A text file is refused by name and never executed. The same check is now built into the relays the debate uses (finished and reviewed the same evening), together with your rule that no path specific to one computer may be written into code: each tool is found by its name on the machine's search path, or through a setting you provide, never from a baked-in path, and the file that was checked is exactly the file that gets started. A broken launcher that comes first on the search path is reported by name, never silently skipped for another copy. Details for the curious: the section "Which CLI a maker relay runs" in [acceptance/README.md](../../../acceptance/README.md).
+
+## The words you will meet in the other files
+
+| Word in the records | What it means |
+|---|---|
+| **V** | You. The one who decides and vetoes. |
+| **Mission** | This whole effort: prove the V3 algorithm works end to end. Everything about it lives in this folder. |
+| **Ceremony / closing run / acceptance run / re-run** | The full real debate described in item 1 above. |
+| **Definition of done (DoD)** | The finish-line checklist for the mission. The nine-item bullet is quoted in [slices/S12-closure/SPEC.md](slices/S12-closure/SPEC.md), lines 37–41. |
+| **The six absent facts / the DOD lines** | Six of the nine checklist items the September 8 report did not print. The program now prints seven lines named `DOD-1` … `DOD-8` (no 4 and 9, which were already printed). |
+| **Depth** | How many rounds of argument and counter-argument the debate goes. The checklist needs two. |
+| **Panel, τ (tau)** | The AI judges that score an argument, and the score they agree on (a number from 0 to 1). "Non-self-graded" means an argument's score never comes only from the model that wrote it. |
+| **Final strength** | An argument's score after the counter-arguments against it have been taken into account. The checklist wants proof that this differs from the raw score for at least one top-level argument, i.e. that the debate changed something. |
+| **Label and band** | The final answer's verdict (supported / contested / unsupported) and its confidence level, computed by code from the numbers, not written by an AI. |
+| **D-number (D74, D73 …), addendum** | Numbered entries in the decision logbook, [DECISIONS.md](DECISIONS.md). An addendum is a dated follow-up note under an entry; letters (a), (b) … are its paragraphs. |
+| **Ticket, board** | A to-do card with a status, in the [board](board/) folder. |
+| **Packet** | Written instructions handed to an AI worker before it starts a task; in the [packets](packets/) folder. |
+| **Seat** | An AI worker: an implementer, a reviewer, or a records writer. |
+| **Blind review** | A second AI that did not write the code reads it fresh and tries to break it, like a second doctor's opinion. |
+| **Mutant** | A deliberately broken copy of the code, used to check that a test really notices the breakage, like testing a smoke detector with actual smoke. |
+| **Gate** | Running the automated tests and type checks at a given commit and recording the counts. "140 / 0 / 0 / 1" means 140 failing tests, 0 test files that failed to load, 0 skipped, 1 unhandled error; every one of those is known and explained. |
+| **Credential** | Your secret API key. No AI agent here ever sees it. |
+| **Node** | The engine the code runs on, like the version of Windows a program needs. This Mac and the project are now both on Node 26.8.2. |
+| **jsdom, the testing tool** | Website tests need a browser. Rather than open one, the tests use a pretend browser (jsdom) driven by a test runner (vitest). When the pretend browser is missing a piece, tests fail for reasons that have nothing to do with the website. |
+| **Stop threshold, freeze threshold (δ, ε)** | The two tuning numbers you set on 2026-09-18. Stop: how much a position's score must still move between rounds for the debate to keep going deeper (now 0.01). Freeze: the least an argument must be able to move a score to earn further replies (now 0.005). |
+| **Sealed register, register version** | The engine reads its policy numbers from a database table whose rows, once written, are never edited ("sealed"). Changing a number means writing a new numbered version next to the old one. The real-run setup is now on version 3. |
+| **Confirm-items** | The seven questions the mission's goal asked you to confirm at the end. Answered on 2026-09-18. |
+| **Verdict, sign-off** | The reviewer role's written judgement of whether the mission met its goal, item by item, saying what it does not claim. |
+| **`dev`, `main`, V2, V3** | `main` is the V2 production site, never touched by this mission; `dev` is V3 and is where all of this lives. |
+
+## Where to look for details
+
+- **What to do next, for the next AI session:** the newest entry at the bottom of [RESUME.md](RESUME.md).
+- **What happened, day by day:** [PROGRESS.md](PROGRESS.md), newest section at the bottom.
+- **Every decision and why:** [DECISIONS.md](DECISIONS.md); the entries of 2026-09-17 are D74–D76, and everything you decided on 2026-09-18 is D77 with its first addendum, at the end.
+- **The final verdict on the whole mission:** [agent-reports/w12-whole-goal-verdict-2026-09-18.md](agent-reports/w12-whole-goal-verdict-2026-09-18.md).
+- **The Node upgrade, in detail:** entry D78 at the end of [DECISIONS.md](DECISIONS.md); the worker's and reviewer's reports are the two files named `d78-…-2026-09-18.md` in [agent-reports](agent-reports/).
+- **Tonight's three changes, plainly:** the plan [docs/superpowers/plans/2026-09-18-owner-rulings-d77.md](../../../docs/superpowers/plans/2026-09-18-owner-rulings-d77.md); the workers' and reviewers' reports are the six files named `d77-…-2026-09-18.md` in [agent-reports](agent-reports/).
+- **Every worker's and reviewer's report:** the [agent-reports](agent-reports/) folder; today's are `dod-facts-seat-2026-09-17.md` (the worker) and `dod-facts-review-2026-09-17.md` (the reviewer).
+- **The plan for today's fix, in ordinary sentences:** [docs/superpowers/plans/2026-09-17-ceremony-report-six-facts.md](../../../docs/superpowers/plans/2026-09-17-ceremony-report-six-facts.md).
+- **The code that prints the new report lines:** [acceptance/dod-facts.ts](../../../acceptance/dod-facts.ts), called from [acceptance/run-acceptance.ts](../../../acceptance/run-acceptance.ts).

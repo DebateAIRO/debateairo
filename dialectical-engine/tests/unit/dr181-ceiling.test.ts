@@ -19,8 +19,19 @@ describe("DR-181 computed structural tripwire", () => {
         const exchange = buildCrossRootExchangePlan(panelSize);
         const authored = panelSize + expansion.length + exchange.length;
         const reviews = panelSize === 1 ? 0 : authored;
-        const fixedSites = 2 * RUNNER_FIXED_ORGANS_PER_COMPOSITION;
-        const independentWorstCase = (authored + reviews) * (3 + 1) + fixedSites * 3;
+        // T17: the panel leg — (M-1) non-author assessments at EVERY authored
+        // node — and the cooldown site's two provider sequences.
+        const panelCalls = panelSize === 1 ? 0 : (panelSize - 1) * authored;
+        // Cumulative per call-site key: sequence 2 only gets the final retry.
+        const cooldownSite = 3 + 1;
+        // F-T17T9-3: the serve leg is the shipped synthesis loop alone — one
+        // site per role per round. The composition chain T9 retired used to
+        // bind this leg at `maxRecompose * (1 + segmentCap) + 1` = 7 sites;
+        // the runner wires none of those organs now, so it bills nothing.
+        const fixedSites = 3 + 3;
+        const independentWorstCase = (authored + reviews) * cooldownSite
+          + panelCalls * 3
+          + fixedSites * 3;
         const basis = computeStructuralCeilingBasis({
           panelSize,
           depth,
@@ -31,7 +42,11 @@ describe("DR-181 computed structural tripwire", () => {
           finalRetryAttempts: 1,
           branchingFactor: RUNNER_BRANCHING_FACTOR,
           compositionSegmentCap: RUNNER_COMPOSITION_SEGMENT_CAP,
-          fixedOrgansPerComposition: RUNNER_FIXED_ORGANS_PER_COMPOSITION
+          fixedOrgansPerComposition: RUNNER_FIXED_ORGANS_PER_COMPOSITION,
+          reviewerCallsPerNode: 1,
+          synthesizerMaxRounds: 3,
+          evaluatorMaxRounds: 3,
+          maxDepth: 5
         });
         expect(basis.max_model_attempts).toBeGreaterThanOrEqual(independentWorstCase);
         expect(basis.max_model_attempts).toBeGreaterThanOrEqual(2 * authored);

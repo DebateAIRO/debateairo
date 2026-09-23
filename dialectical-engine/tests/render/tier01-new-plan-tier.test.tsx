@@ -149,8 +149,8 @@ describe("S01 /new plan tier", () => {
     expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#budgetTier-low')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringAnnotations')?.value).toBe("");
+    expect(document.querySelector('#steeringPresets')).toBeNull();
+    expect(document.querySelector('#steeringAnnotations')).toBeNull();
     expect(document.querySelector('.ndIntro')?.textContent?.trim()).toBe(
       "Free runs every debate at fixed settings. Type your question and click Start, or choose Premium to set the gauges yourself."
     );
@@ -216,7 +216,8 @@ describe("S01 /new plan tier", () => {
 
   it("uses shared model metadata for the five real and six alternate roster id shapes", async () => {
     vi.resetModules();
-    vi.doMock("@debateai/contract", () => ({
+    vi.doMock("@debateai/contract", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("@debateai/contract")>()),
       PLAN_TIER_ROSTERS: {
         free: ["gpt-5.6-luna", "claude-sonnet-5", "openai-o3", "sol-gpt-5", "GPT-5.6-SOL"],
         premium: ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build", "claude_opus", "grok/4.6", "gemini-3"]
@@ -247,7 +248,7 @@ describe("S01 /new plan tier", () => {
     }
   });
 
-  it("S01-27 R4 locks all fourteen controls while Free is chosen", async () => {
+  it("S01-27 R4 locks all twelve controls while Free is chosen", async () => {
     await renderPage();
     await click('.ndOptionsToggle');
 
@@ -259,8 +260,6 @@ describe("S01 /new plan tier", () => {
       "budgetTier-medium",
       "budgetTier-high",
       "treeDepth",
-      "steeringPresets",
-      "steeringAnnotations",
       "depthMode",
       "scrutinyDepth",
       "branchingWidth",
@@ -268,12 +267,12 @@ describe("S01 /new plan tier", () => {
       "maxTokens"
     ];
     const locked = lockedIds.map((id) => document.querySelector<HTMLElement>(`#${id}`)!);
-    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(14);
+    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(12);
     expect(locked.filter((control) => control.hasAttribute("aria-disabled"))).toEqual([]);
     expect(locked.map((control) => {
       const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
       return [visualLock.style.opacity, visualLock.style.cursor];
-    })).toEqual(Array.from({ length: 14 }, () => ["", ""]));
+    })).toEqual(Array.from({ length: 12 }, () => ["", ""]));
   });
 
   it("S01-28 R4 forwards the Free lock to every native control family and keeps its description", async () => {
@@ -288,7 +287,7 @@ describe("S01 /new plan tier", () => {
       document.querySelectorAll('.ndSlider:disabled').length,
       document.querySelectorAll('.ndSteerInput:disabled').length,
       document.querySelectorAll('.ndSelect select:disabled').length
-    ]).toEqual([6, 4, 2, 2]);
+    ]).toEqual([6, 4, 0, 2]);
     expect(locked.every((control) => (control as HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).disabled)).toBe(true);
     expect(locked.map((control) => control.getAttribute("aria-describedby")).every(Boolean)).toBe(true);
     expect(locked.every((control) => document.getElementById(control.getAttribute("aria-describedby")!))).toBe(true);
@@ -304,7 +303,7 @@ describe("S01 /new plan tier", () => {
     const lockedIds = [
       "riskTier-casual", "riskTier-standard", "riskTier-high-stakes",
       "budgetTier-low", "budgetTier-medium", "budgetTier-high",
-      "treeDepth", "steeringPresets", "steeringAnnotations",
+      "treeDepth",
       "depthMode", "scrutinyDepth", "branchingWidth", "concurrency", "maxTokens"
     ];
     const focusAccepted = lockedIds.filter((id) => {
@@ -372,8 +371,6 @@ describe("S01 /new plan tier", () => {
     await click('#riskTier-high-stakes');
     await click('#budgetTier-high');
     await inputValue('#treeDepth', "4");
-    await inputValue('#steeringPresets', "Prefer primary sources");
-    await inputValue('#steeringAnnotations', "Flag unsupported claims");
     await click('.ndOptionsToggle');
     await selectValue('#depthMode', "adaptive");
     await selectValue('#scrutinyDepth', "deep");
@@ -386,8 +383,8 @@ describe("S01 /new plan tier", () => {
     expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#budgetTier-low')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringAnnotations')?.value).toBe("");
+    expect(document.querySelector('#steeringPresets')).toBeNull();
+    expect(document.querySelector('#steeringAnnotations')).toBeNull();
     expect(document.querySelector('.ndIntro')?.textContent?.trim()).toBe(
       "Free runs every debate at fixed settings. Type your question and click Start, or choose Premium to set the gauges yourself."
     );
@@ -416,7 +413,7 @@ describe("S01 /new plan tier", () => {
       (Number(max) - Number(min)) % Number(step) === 0
     )).toBe(true);
     expect(document.querySelector<HTMLTextAreaElement>('#topic')?.value).toBe("a debatable claim");
-    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(14);
+    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(12);
   });
 
   it("S01-35 R8 restores nothing from a remembered pre-Free state", async () => {
@@ -425,16 +422,14 @@ describe("S01 /new plan tier", () => {
     await click('#riskTier-high-stakes');
     await click('#budgetTier-high');
     await inputValue('#treeDepth', "4");
-    await inputValue('#steeringPresets', "Prefer primary sources");
-    await inputValue('#steeringAnnotations', "Flag unsupported claims");
     await click('#planTier-free');
     await click('#planTier-premium');
 
     expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#budgetTier-low')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringAnnotations')?.value).toBe("");
+    expect(document.querySelector('#steeringPresets')).toBeNull();
+    expect(document.querySelector('#steeringAnnotations')).toBeNull();
     expect(document.querySelector('.ndIntro')?.textContent?.trim()).toBe(
       "Choose your risk tier, composition budget tier, and depth, then click Start."
     );
@@ -459,8 +454,6 @@ describe("S01 /new plan tier", () => {
       "budgetTier-medium",
       "budgetTier-high",
       "treeDepth",
-      "steeringPresets",
-      "steeringAnnotations",
       "depthMode",
       "scrutinyDepth",
       "branchingWidth",
@@ -475,14 +468,12 @@ describe("S01 /new plan tier", () => {
     await click('#riskTier-high-stakes');
     await click('#budgetTier-high');
     await inputValue('#treeDepth', "4");
-    await inputValue('#steeringPresets', "Prefer primary sources");
-    await inputValue('#steeringAnnotations', "Flag unsupported claims");
     await selectValue('#scrutinyDepth', "deep");
     expect(document.querySelector('#riskTier-high-stakes')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#budgetTier-high')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("4");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringPresets')?.value).toBe("Prefer primary sources");
-    expect(document.querySelector<HTMLTextAreaElement>('#steeringAnnotations')?.value).toBe("Flag unsupported claims");
+    expect(document.querySelector('#steeringPresets')).toBeNull();
+    expect(document.querySelector('#steeringAnnotations')).toBeNull();
     expect(document.querySelector<HTMLSelectElement>('#scrutinyDepth')?.value).toBe("deep");
   });
 

@@ -1,0 +1,33 @@
+# DISPATCH w5-records-1 · 2026-09-05 19:56 · W5-R2-F2 + W5-R2-F3 · records-only Opus 5 seat
+
+# W5-R2-F2 + W5-R2-F3 — RECORDS-ONLY WORKER PACKET (one seat, two tickets, no code)
+
+```
+mission dir : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop
+tickets     : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/W5-R2-F2.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/board/W5-R2-F3.md
+verdict     : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-codex-r2.md — sections "## F2" and "## F3" name the exact lines
+records     : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-dev-reconciliation.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-dev-reconciliation-self.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/ (the round-2 AND round-3 resolution ledgers, explicitly granted)
+no worktree : you do not need a checkout; do not open one. lane/devsync is under V's merge decision — do not touch it.
+rework rounds: max 3
+```
+
+## OUTCOME (D58)
+Every statement codex F2 and F3 named is corrected by a DATED, APPENDED annotation in each record that carries it; no
+sentence already written is deleted or rewritten; the conservative 81/1/0/1 verdict line does not change.
+
+- F2: round 3 promised to correct m2's round-2 description (an id rename `topic → steeringNotes`, dying at the /steering/i
+  substring check — NOT a dataflow mutant) in the report, the resolution ledger and the self-report; the correction exists in
+  one of the three. Apply the same dated correction to the other two, and correct the aggregate completion claim.
+- F3: correct the gate/fidelity statements codex re-derived differently (its F3 section lists them with line numbers),
+  each with a dated annotation and the reviewer's number beside the seat's; the verdict stands.
+
+## Contract (D61)
+allowed  : the three record paths above (append-only) · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-records.md (your report) · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-records-self.md
+readonly : /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-codex-r1.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/agent-reports/w5-codex-r2.md · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/31-fourcount-run2.log · /Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/w5/27-suite-run2.log
+forbidden: all_others · no code · no git · no board or DECISIONS edits · no credential values (D18)
+
+## Records you owe
+A short report listing each annotation (file, line, what was wrong, what the annotation says); the self-report answering
+the router §3 question verbatim ("treat it like a murder case…"). Markers with `comments read through: w5-codex-r2-2026-09-05`.
+End with `READY FOR PEER REVIEW`. Skills: heartbeat-worker floor (read as markdown at
+`/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md` if the Skill tool cannot load it — say which).

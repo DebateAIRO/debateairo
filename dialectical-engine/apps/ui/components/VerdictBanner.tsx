@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDialecticalSupport } from "@/lib/debatePresentation";
-import type { VerdictSummary } from "@/lib/types";
+import type { LiveVerdictState, VerdictSummary } from "@/lib/types";
 
 const BAND_LABELS: Record<VerdictSummary["verdictBand"], string> = {
   supported: "Strongly supported",
@@ -10,6 +10,36 @@ const BAND_LABELS: Record<VerdictSummary["verdictBand"], string> = {
   unavailable: "Analysis unavailable",
   insufficient_scoring: "Not enough judge scoring",
   suppressed: "Verdict withheld"
+};
+
+/**
+ * What each verdict state means, in one sentence that is true of EVERY way the
+ * engine can reach that state (V's ruling D77 of 2026-09-18, confirm-item 4).
+ *
+ * - "contested" is reached three ways: the comparison was missing a limb, the
+ *   positions were within the tie margin OR the judges disagreed at the
+ *   threshold, or the winner sat in the middle band. The sentence names all of
+ *   them as alternatives, because the summary does not carry which one fired.
+ *   Their ORDER is deliberate: the tie-adjacent case is tested before the high
+ *   cut is, so a winner far above the high cut still prints "contested" when
+ *   its margin is narrow -- the run of 2026-09-17 is exactly that. "Not strong
+ *   enough" would be false for that reader, so it does not lead.
+ * - "unsupported" is reached exactly one way: the winning position's propagated
+ *   strength fell below the low cut. It is a weak case, NOT a refuted one, and
+ *   NOT a statement about whether evidence was looked up -- the sentence this
+ *   replaced said exactly that, and it was false.
+ * - "supported" needs no sentence: the band label already says it.
+ *
+ * The record is total over the union, so every state the mapping can produce
+ * has an entry. A value from OUTSIDE the union -- a retired word arriving in an
+ * older stored payload -- renders no sentence rather than a fabricated one.
+ */
+const STATE_SENTENCES: Record<LiveVerdictState, string | null> = {
+  supported: null,
+  contested:
+    "The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing.",
+  unsupported:
+    "Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one."
 };
 
 const EVIDENCE_UNVERIFIED_CAVEAT =
@@ -32,32 +62,23 @@ export function VerdictBanner({ verdict }: { verdict: VerdictSummary | undefined
   // Unknown/future bands must never crash the banner: fall back to rendering
   // the raw band value verbatim (honest, never a fabricated label).
   const bandLabel = BAND_LABELS[verdict.verdictBand] ?? verdict.verdictBand;
-  const suppressed = verdict.verdictState === "suppressed_no_evidence";
+  const stateSentence = verdict.verdictState ? STATE_SENTENCES[verdict.verdictState] : null;
 
   return (
-    <section className="verdictBanner" aria-label="Verdict" data-verdict-band={verdict.verdictBand}>
+    <section
+      className="verdictBanner"
+      aria-label="Verdict"
+      data-verdict-band={verdict.verdictBand}
+      data-verdict-state={verdict.verdictState}
+    >
       <div className="verdictBannerHead">
         <span className="verdictBadge" data-verdict-band={verdict.verdictBand}>
           {bandLabel}
         </span>
         <span className="verdictThresholdsVersion">{verdict.verdictThresholdsVersion}</span>
       </div>
-      <p className="verdictClaimLanguage">
-        {suppressed ? (
-          <>
-            No evidence was available in this run, so no endorsed verdict is shown for this empirical claim (claim type: {
-              verdict.suppressionReason?.claimType ?? "not available"
-            }). The analysis map below remains available.
-          </>
-        ) : (
-          verdict.claimLanguage
-        )}
-      </p>
-      {suppressed ? (
-        <p className="verdictUnlockHint">
-          To unlock an endorsed verdict: {verdict.suppressionReason?.unlock?.[0] ?? "not available"}.
-        </p>
-      ) : null}
+      <p className="verdictClaimLanguage">{verdict.claimLanguage}</p>
+      {stateSentence ? <p className="verdictCaveat">{stateSentence}</p> : null}
       {verdict.caveats?.map((caveat) => {
         if (caveat.code === "evidence_unverified") {
           return (

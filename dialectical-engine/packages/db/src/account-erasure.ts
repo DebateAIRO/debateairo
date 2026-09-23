@@ -580,6 +580,23 @@ export class PostgresAccountErasureRepository {
   }
 }
 
+/**
+ * WHICH reconcile stage swallowed a throw. Bounded by construction: three
+ * constants of this module, one per catch, carrying no cause — not its message,
+ * not its name, not a stringification, and no key material.
+ *
+ * This is a DIAGNOSTIC label BESIDE the typed outcome, never a member of the
+ * outcome vocabulary above and never a substitute for one. Its whole job is to
+ * make two `INVALID_EVIDENCE` items distinguishable: one the code returned on
+ * purpose after checking evidence, and one that is a swallowed throw wearing
+ * the same word. It rides ONLY on the swallow path, so the success path's item
+ * keeps the key set its callers already match on.
+ */
+export const ACCOUNT_ERASURE_RECONCILE_STAGES = Object.freeze([
+  "run-key-provision-cleanup", "account-erasure-execute", "private-run-cleanup-complete"
+] as const);
+export type AccountErasureReconcileStage = typeof ACCOUNT_ERASURE_RECONCILE_STAGES[number];
+
 export class AccountErasureCoordinator {
   constructor(
     private readonly repository: PostgresAccountErasureRepository,
@@ -722,8 +739,13 @@ export class AccountErasureCoordinator {
   async reconcileRunKeyProvisionIntents(limit = 100): Promise<readonly Readonly<{
     runId: string;
     outcome: "CLEANED" | "INVALID_EVIDENCE" | "CONTENDED";
+    diagnosticStage?: AccountErasureReconcileStage;
   }>[]> {
-    const outcomes: { runId: string; outcome: "CLEANED" | "INVALID_EVIDENCE" | "CONTENDED" }[] = [];
+    const outcomes: {
+      runId: string;
+      outcome: "CLEANED" | "INVALID_EVIDENCE" | "CONTENDED";
+      diagnosticStage?: AccountErasureReconcileStage;
+    }[] = [];
     for (const intent of await this.repository.claimRunKeyProvisionCleanup(limit)) {
       try {
         if (await this.runs.exists(intent.runId)
@@ -744,7 +766,15 @@ export class AccountErasureCoordinator {
             ? "CLEANED" : "CONTENDED"
         });
       } catch {
-        outcomes.push({ runId: intent.runId, outcome: "INVALID_EVIDENCE" });
+        // The cause is discarded on purpose — it can carry a driver message or
+        // a key identity. The STAGE is not the cause: it is this catch's own
+        // name, so a reader can tell this swallowed throw from the two
+        // INVALID_EVIDENCE items the ownership and readback checks return above.
+        outcomes.push({
+          runId: intent.runId,
+          outcome: "INVALID_EVIDENCE",
+          diagnosticStage: "run-key-provision-cleanup"
+        });
       }
     }
     return Object.freeze(outcomes.map((outcome) => Object.freeze(outcome)));
@@ -753,15 +783,25 @@ export class AccountErasureCoordinator {
   async reconcile(source: AuthSourceContext, limit = 100): Promise<readonly Readonly<{
     erasureId: string;
     outcome: AccountErasureTransitionOutcome;
+    diagnosticStage?: AccountErasureReconcileStage;
   }>[]> {
-    const outcomes: { erasureId: string; outcome: AccountErasureTransitionOutcome }[] = [];
+    const outcomes: {
+      erasureId: string;
+      outcome: AccountErasureTransitionOutcome;
+      diagnosticStage?: AccountErasureReconcileStage;
+    }[] = [];
     for (const erasureId of await this.repository.pendingWork(limit)) {
       try {
         outcomes.push({ erasureId, outcome: await this.execute(erasureId, source) });
       } catch {
         // A poisoned intent remains visible for retry without starving later
-        // prepared accounts in the ordered cleanup batch.
-        outcomes.push({ erasureId, outcome: "INVALID_EVIDENCE" });
+        // prepared accounts in the ordered cleanup batch. The stage says which
+        // catch produced this item; the cause itself is still discarded.
+        outcomes.push({
+          erasureId,
+          outcome: "INVALID_EVIDENCE",
+          diagnosticStage: "account-erasure-execute"
+        });
       }
     }
     return Object.freeze(outcomes.map((outcome) => Object.freeze(outcome)));
@@ -958,13 +998,24 @@ export class PrivateRunErasureCoordinator {
   async reconcile(source: AuthSourceContext, limit = 100): Promise<readonly Readonly<{
     erasureId: string;
     outcome: PrivateRunErasureOutcome;
+    diagnosticStage?: AccountErasureReconcileStage;
   }>[]> {
-    const outcomes: { erasureId: string; outcome: PrivateRunErasureOutcome }[] = [];
+    const outcomes: {
+      erasureId: string;
+      outcome: PrivateRunErasureOutcome;
+      diagnosticStage?: AccountErasureReconcileStage;
+    }[] = [];
     for (const erasureId of await this.repository.pendingCleanup(limit)) {
       try {
         outcomes.push({ erasureId, outcome: await this.completePrepared(erasureId, source) });
       } catch {
-        outcomes.push({ erasureId, outcome: "INVALID_EVIDENCE" });
+        // Same shape as the two catches above: the cause stays discarded, the
+        // stage names which catch produced the item.
+        outcomes.push({
+          erasureId,
+          outcome: "INVALID_EVIDENCE",
+          diagnosticStage: "private-run-cleanup-complete"
+        });
       }
     }
     return Object.freeze(outcomes.map((outcome) => Object.freeze(outcome)));

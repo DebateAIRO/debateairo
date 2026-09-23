@@ -135,7 +135,7 @@ describe("P2-14 sealed product-role catalog", () => {
     expect(registerSource).toContain("createPostgresRegisterPublicationPort(pool).importHistorical");
     expect(devSeed).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
-    expect(devSeed).toContain("createPostgresRegisterPublicationPort(input.adminPool).importHistorical");
+    expect(devSeed).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
     const readIndex = apiMain.indexOf("await readProductRolePolicy(pool, environment.REGISTER_VERSION)");
     const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
     expect(readIndex).toBeGreaterThan(-1);

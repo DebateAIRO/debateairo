@@ -92,6 +92,11 @@ export function SupportWidget() {
         aria-label={label}
         aria-expanded={expanded}
         onClick={() => expanded ? close() : open()}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          if (expanded) close(); else open();
+        }}
       >{label}</button>
       {expanded || closing ? (
         <section className="supportWidgetPanel scroll" data-support-widget-panel>

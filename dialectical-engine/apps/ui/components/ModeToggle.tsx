@@ -38,7 +38,7 @@ export function ModeToggle({ compact = false }: { compact?: boolean } = {}): JSX
       aria-label={chamber ? "Switch to Terracotta mode" : "Switch to Chamber mode"}
       onClick={toggleMode}
     >
-      {compact ? (chamber ? "☀" : "☾") : chamber ? "☀" : "☾"}
+      {compact ? (chamber ? "☀" : "☾") : chamber ? "☀ Terracotta" : "☾ Chamber"}
     </button>
   );
 }

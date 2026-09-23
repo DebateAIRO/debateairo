@@ -1,0 +1,31 @@
+# DISPATCH t17t9-3-2 · 2026-09-05 16:24 · F-T17T9-3 round 2 (AMENDMENT 1) · same seat resumed (conversation-mode recovery) · V: seal 106
+
+# ---- AMENDMENT 1 (2026-09-05, after the seat's BLOCK at a44c905f; original above preserved) ----
+
+**Orchestrator defect (#24):** the grant enumerated files by the row's NAME and never asked what CONSUMES the
+basis. The seat proved the gap (/Users/stefan.nour/Library/CloudStorage/OneDrive-adessoGroup/Debate/V5/dialectical-engine/.hermes/reports/2026-09-01-algorithm-live-loop/logs/t17t9-3/04: the real parser REJECTS the re-derived basis). Corrected here.
+
+**V's ruling on the number:** **Seal the true number, 106** (V, 2026-09-05 16:24, against the choice of keeping 109 as padding). The row, `parseCostEnvelopeBasis`, `fixtureStructuralCeiling`, and every test that pins 109 / serve 7 / `selected: COMPOSITION` move to 106 / 6 / `SYNTHESIS_LOOP` together, in this lane. No padding remains. My register sentence '109 stays as a bound' is withdrawn.
+
+**Grant extended (D61):** `packages/budget/src/index.ts` (parseCostEnvelopeBasis — restate the serve rule
+ONCE, or make the parser read the rule from the constructor; either way the two cannot disagree again) ·
+`tests/support/discoveredPanel.ts` (fixtureStructuralCeiling) · every test whose ONLY change is the pinned
+site count / selected arm / ceiling (list each in your report with its old→new pin) · `packages/budget`'s
+own tests. The consumers of the basis on this tree, so you do not have to find them: `packages/budget/src/index.ts`,
+`packages/register/src/index.ts`, `apps/runner/src/index.ts` (read-only — the serve leg you describe), `apps/api/src/main.ts`
+(read-only unless a pin lives there), `acceptance/runtime-policy.ts` + `.test.ts`, `tests/support/discoveredPanel.ts`, and the
+tests `budget-s09`, `dr181-ceiling`, `dr184-review-resilience`, `pro01-runner-tree`, `register-s09`, `xrev01-node-review`,
+`t17-envelope`, `t17-envelope-ledger`, `architecture/scaffold`, `integration/database`, `dev-deployment-register`,
+`evaluator-database`, and `tools/orphan-audit/src/index.ts`. Change only the pins that follow from 106/6/SYNTHESIS_LOOP;
+list every one with old→new. `migrations/` grant withdrawn (P2: the value is minted by the seeder, not the migration).
+
+**Scope added (P5):** `t17-envelope-ledger.test.ts:658` and the ":660 ceiling is TIGHT" comment.
+**Ticket corrected (P6):** `compositionSegmentCap` is live; do not touch it.
+**Typecheck (P3):** report the DIFFERENTIAL — exactly W5's 8 inherited `s14-ui` errors and no others.
+**TOOLING-TRAPS (P8):** the LANE's copy, at `<lane>/dialectical-engine/.hermes/TOOLING-TRAPS.md`, append-only.
+**Skills (P7):** if the Skill tool cannot load a role contract, read it at
+`<lane>/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md` and say so in SKILLS LOADED.
+
+Everything else in the original stands: RED reproduced (done), re-derivation by import (done), then GREEN,
+mutation custody (tools/mutate.sh v2 now accepts `/`), the four-count b14 on your tip, records, marker.
+Round 2 of max 3. `comments read through: t17t9-3-amendment1-2026-09-05`.

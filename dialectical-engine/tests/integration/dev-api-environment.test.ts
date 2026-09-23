@@ -1,3 +1,4 @@
+import { DEVELOPMENT_REGISTER_VERSION } from "../../apps/runner/src/dev-deployment-register.js";
 import { Buffer } from "node:buffer";
 import {
   chmod,
@@ -446,7 +447,7 @@ describe("DEV-09 private local API environment", () => {
     expect(cliSource).not.toMatch(/HATCHET_CLIENT_TOKEN|readFile|console\.log\([^)]*path/i);
     expect(topology.apiEnvironment).toMatchObject({
       STRANGER_SAMPLE_RATE: "0",
-      REGISTER_VERSION: "4",
+      REGISTER_VERSION: String(DEVELOPMENT_REGISTER_VERSION),
       BATTERY_VERSION: "dev-auth-v1",
       SETTLEMENT_WATCH_HANDLE: "dev-auth:settlement-watch",
       HATCHET_WORKFLOW_NAME: "debateai-dev"

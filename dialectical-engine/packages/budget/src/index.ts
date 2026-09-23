@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
+import { ExpansionDepthSchema } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
+import { SERVE_LEG } from "@debateai/register";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
@@ -33,37 +35,128 @@ export const BATTERY_BUDGET_CONTRACTS = Object.freeze(
   }))
 );
 
+/**
+ * T17 (DR-184-v4): the run head's basis carries the four call-site legs and the
+ * serve chain it was minted against, so an audit of a stored receipt can see
+ * WHICH topology the run was admitted under. The schema is strict on purpose —
+ * a DR-184-v2 basis, which counted no panel leg, is REFUSED loudly here rather
+ * than enforced as an undercount against a live panel.
+ */
 const costEnvelopeBasisSchema = z.object({
   kind: z.literal("COMPUTED_STRUCTURAL_CEILING"),
   max_model_attempts: z.number().int().positive(),
   panel_size: z.number().int().positive(),
-  depth: z.number().int().min(1).max(5),
-  per_site_attempts: z.object({ judge: z.number().int().positive(), organ: z.number().int().positive() }).strict(),
+  depth: ExpansionDepthSchema,
+  per_site_attempts: z.object({
+    judge: z.number().int().positive(),
+    organ: z.number().int().positive(),
+    panel_member: z.number().int().positive(),
+    cooldown_site: z.number().int().positive()
+  }).strict(),
+  call_sites: z.object({
+    author: z.number().int().positive(),
+    panel: z.number().int().min(0),
+    reviewer: z.number().int().min(0),
+    serve: z.number().int().positive()
+  }).strict(),
+  /**
+   * F-T17T9-3: the leg has ONE arm. The composition chain is retired, so its
+   * three fields are gone from the receipt rather than carried unbilled, and
+   * `.strict()` makes a receipt that re-introduces them fail loudly. `selected`
+   * survives as the discriminator: it is `SERVE_LEG.chain`, READ from the
+   * constructor's package, so a pre-T9 basis naming COMPOSITION is refused.
+   */
+  serve_leg: z.object({
+    synthesis_loop_sites: z.number().int().positive(),
+    selected: z.literal(SERVE_LEG.chain)
+  }).strict(),
   hold_cap: z.number().int().positive(),
   final_retry_attempts: z.number().int().positive(),
   formula_version: z.string().trim().min(1),
   bounds_source_ref: z.string().trim().min(1)
-}).strict();
+}).strict().superRefine((basis, ctx) => {
+  /**
+   * S09B: the serve leg is disclosed TWICE — once as the billed site count
+   * (`call_sites.serve`) and once as the arm it was read from (`serve_leg`) —
+   * and nothing made them agree, so a basis could bill a count its own
+   * disclosed leg did not support.
+   *
+   * The check is KEPT and its RULE is no longer restated here. Before
+   * F-T17T9-3 this block re-typed the constructor's two decisions
+   * (`max(composition, synthesis)` and the `>=` tie policy) as independent
+   * guards; they were faithful, and they made the rule unchangeable one file
+   * at a time — correcting the constructor produced bases this parser refused
+   * at the run head. It now READS the rule from `SERVE_LEG`, so the receipt is
+   * still checked against the constructor's rule and the two cannot drift.
+   *
+   * The tie policy and the larger-arm guard are GONE rather than relaxed:
+   * with one arm there is nothing to select between, and the retired arm can no
+   * longer appear on a receipt at all (the schema above is strict).
+   *
+   * WHAT THIS CHECKS, EXACTLY (codex r1 F4). Three things: the receipt's SHAPE
+   * (the strict schema above), the CHAIN IDENTITY (`selected` must be
+   * `SERVE_LEG.chain`), and the internal CONSISTENCY of the two disclosures
+   * (`call_sites.serve` must equal the leg it discloses). It does NOT prove that
+   * an accepted receipt is one the constructor would have minted: the other
+   * legs — author, panel, reviewer — and `max_model_attempts` are read as
+   * disclosed, and nothing here recomputes them from panel size and depth. A
+   * receipt with a self-consistent serve leg and a wrong author count parses.
+   */
+  const billed = SERVE_LEG.billed(basis.serve_leg);
+  if (basis.call_sites.serve !== billed) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["call_sites", "serve"],
+      message: `serve call sites ${basis.call_sites.serve} disagree with the `
+        + `${basis.serve_leg.selected} arm ${billed}`
+    });
+  }
+});
 
 export interface CostEnvelopeBasis {
   readonly maxModelAttempts: number;
   readonly panelSize: number;
   readonly depth: number;
+  /** The serve leg the receipt discloses, so a reader need not re-parse it. */
+  readonly serveLeg: {
+    readonly synthesisLoopSites: number;
+    readonly selected: typeof SERVE_LEG.chain;
+  };
   readonly wire: Readonly<Record<string, unknown>>;
 }
 
 export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
   const parsed = costEnvelopeBasisSchema.safeParse(value);
   if (!parsed.success) {
+    /**
+     * T17B/B2 — the refusal names WHICH check refused.
+     *
+     * Every basis defect used to produce one identical sentence, so no caller
+     * and no test could tell the cross-field guards apart. That is the shape
+     * D56 rules out: a guard whose firing cannot be observed cannot be shown to
+     * fire for the reason it exists, and two guards that are indistinguishable
+     * at the surface are indistinguishable to a mutant too — one of them can be
+     * deleted with every test still green.
+     *
+     * The CODE is unchanged, and the original sentence is kept as the prefix,
+     * so the existing consumers and the assertion that matches that sentence
+     * are unaffected. Only the numbers and enum names already present in the
+     * rejected receipt are appended.
+     */
     throw new TypedDomainError(
       "RUN_COST_ENVELOPE_UNRESOLVED",
-      "The run head has no valid register-supplied cost-envelope basis"
+      "The run head has no valid register-supplied cost-envelope basis: "
+        + parsed.error.issues.map((issue) => issue.message).join("; ")
     );
   }
   return Object.freeze({
     maxModelAttempts: parsed.data.max_model_attempts,
     panelSize: parsed.data.panel_size,
     depth: parsed.data.depth,
+    serveLeg: Object.freeze({
+      synthesisLoopSites: parsed.data.serve_leg.synthesis_loop_sites,
+      selected: parsed.data.serve_leg.selected
+    }),
     wire: Object.freeze(parsed.data)
   });
 }
@@ -131,13 +224,55 @@ export type BudgetPressureDecision =
 export function decideBudgetPressure(input: {
   readonly basis: CostEnvelopeBasis;
   readonly consumedModelAttempts: number;
+  /**
+   * T17B/B1 — how many FURTHER attempts the caller is asking about, default 0.
+   *
+   * THE TWO EQUALITY CONTEXTS. This function was being asked two different
+   * questions through one branch whose only input was the post-consumption
+   * count, and at `consumed == max` those questions have OPPOSITE answers:
+   *
+   *   pending 0 — "has this run spent MORE than it was allowed?"  no  -> WITHIN
+   *   pending 1 — "may this run spend ANOTHER attempt?"           no  -> HARD_STOP
+   *
+   * J28 ruled the first one, and it stays exactly as it was: a run that
+   * completes having spent its whole envelope is WITHIN and keeps its answer.
+   * The second is what `assertModelAttemptAllowed` has always decided when it
+   * refuses at `consumed >= max`; before this parameter existed the runner's
+   * catch re-derived that refusal from the count alone, got J28's WITHIN back,
+   * and rethrew — so a refused attempt reached neither the components-only
+   * envelope terminal nor an ENVELOPE_EXHAUSTED record.
+   *
+   * The caller now says WHICH question it is asking instead of the branch
+   * guessing from a number that cannot distinguish them.
+   */
+  readonly pendingModelAttempts?: number;
   readonly pendingRows: readonly PendingBudgetRow[];
   readonly verifiedNodeIds: readonly string[];
 }): BudgetPressureDecision {
   if (!Number.isInteger(input.consumedModelAttempts) || input.consumedModelAttempts < 0) {
     throw new TypeError("ATTEMPT_LEDGER_CONSUMPTION_INVALID");
   }
-  if (input.consumedModelAttempts < input.basis.maxModelAttempts) {
+  const pendingModelAttempts = input.pendingModelAttempts ?? 0;
+  if (!Number.isInteger(pendingModelAttempts) || pendingModelAttempts < 0) {
+    throw new TypeError("ATTEMPT_LEDGER_PENDING_INVALID");
+  }
+  /**
+   * J28 — the REPORTING comparison follows the PERMISSION comparison.
+   * `assertModelAttemptAllowed` PERMITS exactly `maxModelAttempts` attempts
+   * (it refuses at `consumed >= max`), so a run that spends exactly what the
+   * structure permits has not exceeded anything and is WITHIN. Reporting that
+   * state as EXHAUSTED made a lawful maximum-path run complete and then say it
+   * had run out — and, worse, fired the envelope terminal that REPLACED the
+   * answer it had just served (`makeEnvelopeTerminal`, in the runner's serve
+   * section). Nothing about what is ALLOWED changes here; only what the run
+   * says about itself. V-S09-8 records the alternative reading, which is V's.
+   *
+   * The `+ pendingModelAttempts` term is what keeps that ruling intact while
+   * still telling the truth about a REFUSED attempt: at the default 0 this is
+   * character-for-character J28's comparison, and the refusal context supplies
+   * the 1 that makes its own question the one being answered.
+   */
+  if (input.consumedModelAttempts + pendingModelAttempts <= input.basis.maxModelAttempts) {
     return Object.freeze({
       kind: "WITHIN_ENVELOPE",
       state: "WITHIN",
@@ -267,12 +402,17 @@ export class BudgetRepository {
   async evaluateRunPressure(input: {
     readonly runId: string;
     readonly basis: CostEnvelopeBasis;
+    /** T17B/B1 — see `decideBudgetPressure`: which question the caller is asking. */
+    readonly pendingModelAttempts?: number;
     readonly pendingRows: readonly PendingBudgetRow[];
     readonly verifiedNodeIds: readonly string[];
   }): Promise<BudgetPressureDecision> {
     return decideBudgetPressure({
       basis: input.basis,
       consumedModelAttempts: await this.countRunModelAttempts(input.runId),
+      // Resolved here rather than forwarded as `undefined`: the repo builds under
+      // `exactOptionalPropertyTypes`, so an absent caller means 0, explicitly.
+      pendingModelAttempts: input.pendingModelAttempts ?? 0,
       pendingRows: input.pendingRows,
       verifiedNodeIds: input.verifiedNodeIds
     });

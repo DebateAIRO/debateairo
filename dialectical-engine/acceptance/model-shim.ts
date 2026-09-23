@@ -5,6 +5,7 @@ import {
   CliRelayFailure,
   invokeCli,
   renderPromptTranscript,
+  resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
   type CliRelayAdapter,
@@ -12,7 +13,26 @@ import {
   type CommandSpec
 } from "./relay-core.js";
 
-export const CODEX_BINARY = "/Applications/ChatGPT.app/Contents/Resources/codex" as const;
+/** The NAME this maker's CLI is looked up by; never a path (D10, 2026-09-17). */
+export const CODEX_BINARY_NAME = "codex" as const;
+/**
+ * D10 host override for {@link CODEX_BINARY_NAME}. Unset ⇒ this host's own
+ * `codex`, deduced from PATH. See `relay-core.ts` for the order and for the
+ * refusal vocabulary a resolved file is held to. On a developer machine this
+ * resolves to a real, logged-in CLI, so it stays the one default no test may
+ * reach: a test that did would make a LIVE provider call.
+ */
+const CODEX_BINARY_ENV_KEY = "ACCEPTANCE_CODEX_BINARY" as const;
+const CODEX_BINARY_UNRESOLVED = "CODEX_CLI_BINARY_UNRESOLVED" as const;
+
+export function resolveCodexBinary(source: NodeJS.ProcessEnv = process.env): string {
+  return resolveConfiguredBinary(
+    CODEX_BINARY_NAME,
+    CODEX_BINARY_ENV_KEY,
+    CODEX_BINARY_UNRESOLVED,
+    source
+  );
+}
 export const ACCEPTANCE_MAKER = "OpenAI" as const;
 export const CODEX_HANDSHAKE_PROMPT =
   "DR-181 acceptance transport handshake. Reply with the single word: OK" as const;
@@ -174,14 +194,26 @@ function createCodexAdapter(sessionsRoot: string, model?: string): CliRelayAdapt
 export const codexAdapter: CliRelayAdapter = createCodexAdapter(defaultCodexSessionsRoot());
 
 export async function startModelShim(options: ModelShimOptions): Promise<ModelShimHandle> {
+  // Codex is the only maker with a SECOND test-only seam, so it is the only
+  // one where baseline ordering has to be made explicit. At base the default
+  // command was a constant that could not throw, so "command seam, then
+  // sessions-root seam, then default" held implicitly; with an env-backed
+  // default, a blank ACCEPTANCE_CODEX_BINARY would pre-empt this pre-existing
+  // typed-loud code whenever no command seam is supplied. The command seam
+  // keeps its baseline precedence: when it is present resolveTestGuardedCommand
+  // decides first and never forces the thunk, so this guard defers to it — and
+  // that is also why the check no longer sits below the resolution, where it
+  // would now be unreachable in every combination.
+  if (options.testOnlyCommand === undefined
+    && options.testOnlySessionsRoot !== undefined
+    && process.env.NODE_ENV !== "test") {
+    throw new Error("TEST_ONLY_CODEX_SESSIONS_ROOT_FORBIDDEN");
+  }
   const command = resolveTestGuardedCommand(
-    { binary: CODEX_BINARY, prefixArguments: [] },
+    () => ({ binary: resolveCodexBinary(), prefixArguments: [] }),
     options.testOnlyCommand,
     "TEST_ONLY_CODEX_COMMAND_FORBIDDEN"
   );
-  if (options.testOnlySessionsRoot !== undefined && process.env.NODE_ENV !== "test") {
-    throw new Error("TEST_ONLY_CODEX_SESSIONS_ROOT_FORBIDDEN");
-  }
   const adapter = createCodexAdapter(options.testOnlySessionsRoot ?? defaultCodexSessionsRoot(), options.model);
   const handshake = await invokeCli(command, adapter, CODEX_HANDSHAKE_PROMPT, options.timeoutMs);
   if (options.model !== undefined && handshake.model !== options.model) {

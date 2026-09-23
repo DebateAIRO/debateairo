@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
 import { randomUUID } from "node:crypto";
 import {
@@ -99,4 +100,10 @@ export async function publishRegisterFixture(
   input: GeneralRegisterPublication
 ): Promise<RegisterPublicationReceipt> {
   return createPostgresRegisterPublicationPort(pool).publishGeneral(input);
+}
+
+/** Frozen bytes from remote dev f19c706f; current development builders may evolve. */
+export async function readLegacyDevelopmentV4Rows(): Promise<readonly RegisterPublicationRow[]> {
+  const rows = JSON.parse(await readFile(new URL("./fixtures/register-development-v4.json", import.meta.url), "utf8")) as Array<{ rowKey: string; valueJsonText: string; sourceRef: string }>;
+  return rows.map(row => ({ ...row, valueJsonText: parseCanonicalRegisterJson(Buffer.from(row.valueJsonText)) }));
 }

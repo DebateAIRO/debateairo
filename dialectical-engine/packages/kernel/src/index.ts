@@ -66,6 +66,51 @@ export const ABSTENTION_KINDS = [
 ] as const;
 export type AbstentionKind = typeof ABSTENTION_KINDS[number];
 
+/**
+ * T10 (goal 188-195, rulings S6-1 / S6-3) — the rule that picks the served root.
+ *
+ * DR-161's configuration-order rule is RETIRED — its retired string is named
+ * once, in migrations/0055_t10_served_root_selection.sql, and nowhere else in
+ * shipped source. Configuration order no longer decides the answer;
+ * propagation does. The served root is the one carrying the
+ * maximum propagated strength among the servable maker roots, and an exact tie
+ * is broken by lexicographic node id — deterministic, order-independent, and
+ * CONTESTED under T11's ladder anyway because a tie's margin is zero.
+ *
+ * Minted here, beside the other closed vocabularies, because the same string is
+ * a typed record field (serve), a wire literal (contract) and a DDL CHECK member
+ * (migrations). One declaration; every representation imports it.
+ */
+export const SERVED_ROOT_SELECTION_RULE = "max-propagated-strength-lexicographic-tiebreak" as const;
+/** The rule a NEW selection may record. The write vocabulary. */
+export type ServedRootRule = typeof SERVED_ROOT_SELECTION_RULE;
+
+/**
+ * Rules that were lawful when older answers were sealed, and are therefore
+ * still present on their records. READ-ONLY: no new selection may record one,
+ * and no shipped writer contains the literal — the values only ever arrive by
+ * reading a row that was sealed before migration 0055.
+ *
+ * This list exists because migration 0055 PRESERVES those rows rather than
+ * relabelling them. A record is evidence of how an answer was actually chosen;
+ * rewriting it to today's rule would be a falsification, so the read vocabulary
+ * is a superset of the write vocabulary and says so in the type system.
+ */
+export const RETIRED_SERVED_ROOT_RULES = ["first-configured-provider"] as const;
+export type RetiredServedRootRule = typeof RETIRED_SERVED_ROOT_RULES[number];
+
+/** Every value a sealed record may lawfully carry — the READ vocabulary. */
+export const SERVED_ROOT_RULE_HISTORY = Object.freeze([
+  SERVED_ROOT_SELECTION_RULE,
+  ...RETIRED_SERVED_ROOT_RULES
+] as const);
+export type ServedRootRuleHistory = ServedRootRule | RetiredServedRootRule;
+
+/** True for a value that may be READ but never WRITTEN by a fresh selection. */
+export function isRetiredServedRootRule(value: string | null): value is RetiredServedRootRule {
+  return value !== null && (RETIRED_SERVED_ROOT_RULES as readonly string[]).includes(value);
+}
+
 // Spec §12.3 Home 2 is the sole minting authority. Every wire, UI and DDL
 // representation imports this vocabulary; no sibling package extends it.
 export const CONDITION_MARKS = [
@@ -74,9 +119,23 @@ export const CONDITION_MARKS = [
   "SKIPPED-BY-BUDGET",
   "ENVELOPE_EXHAUSTED",
   "LEVERAGE_UNRESOLVED",
+  // S3-2/S5-1 (goal-v4 T7): adaptive stopping froze this branch — its
+  // root-scoped leverage fell strictly below ε (mission ruling J3), so nothing
+  // was expanded beneath it. Placed HERE beside the other leverage disclosure
+  // and NOT appended: the DR-176 tail of this vocabulary is read positionally
+  // by `CONDITION_MARKS.slice(-4)`.
+  "BRANCH-FROZEN-LOW-LEVERAGE",
   "DEGRADED-DIVERSITY",
   "SINGLE-LINEAGE",
   "CRITIQUE-UNAVAILABLE",
+  // S2-2 (goal-v4 T3) / confirm-item 5, ruling J13(b): the judge panel's two degradation
+  // disclosures. PANEL-PARTIAL — some non-author members failed, the node was reduced on
+  // the voices that parsed. PANEL-DEGRADED-SINGLE-VOICE — every non-author member failed,
+  // so the author's own voice is the only one left and the node's band steps down. Placed
+  // HERE, beside the other panel/lineage degradations and NOT appended: the DR-176 tail
+  // of this vocabulary is read positionally by `CONDITION_MARKS.slice(-4)`.
+  "PANEL-PARTIAL",
+  "PANEL-DEGRADED-SINGLE-VOICE",
   "AMBIGUOUS_ATTRIBUTION",
   "STALE",
   "UNDER-REVIEW",
@@ -92,12 +151,50 @@ export const CONDITION_MARKS = [
   "NON-COMPARABLE",
   "NOT_SAMPLED",
   "OFF-SUBJECT-DOWNGRADE",
+  // S2-3 (goal-v4 T4): the judge claimed a way of knowing normalization could
+  // not keep — a locator-less LOOKED_UP. The node is served as REASONING and
+  // the override is disclosed rather than absorbed. Deliberately placed here,
+  // beside the other downgrade disclosure, and NOT appended: the DR-176 tail
+  // of this vocabulary is read positionally by `CONDITION_MARKS.slice(-4)`.
+  "WAY-OF-KNOWING-DOWNGRADED",
   "AMENDED-SEARCH",
   "MISSING-NUMBER",
+  // S6-1 / T11, confirm-item 6: the three-state label was derived without a
+  // complete basis — no runner-up existed to measure a margin against, or the
+  // winning root's panel reported fewer than two parseable judgements, so no
+  // dispersion could be measured. The label is CONTESTED and says why: a solo
+  // voice can never print SUPPORTED, no matter how confident. Placed HERE,
+  // beside the other served-answer honesty disclosures, and NOT appended: the
+  // DR-176 tail of this vocabulary is read positionally by
+  // `CONDITION_MARKS.slice(-4)`.
+  "LABEL-BASIS-INCOMPLETE",
   // DR-139(4), TERM-01: a battery row ACTIVE at run completion whose owed
   // check has no recorded execution — the run settles and the served answer
   // names each such check loudly (one condition-mark record per row).
   "OWED-CHECK-UNEXECUTED",
+  // S6-2 / T9, confirm-items 2-3: the synthesis loop reached its sealed round
+  // bound with the evaluator still unsatisfied. The statement is SERVED
+  // regardless — the loop never withholds an answer — and the objection that
+  // is still standing rides it VISIBLY rather than being dropped on the floor.
+  "SYNTHESIS-OBJECTION-STANDING",
+  // T9 (goal 223-231): the digest's per-node summaries had to be tightened to
+  // fit the composition byte budget. MEMBERSHIP is untouched — every
+  // materialized node is still in the digest — so this names a loss of detail,
+  // never a loss of nodes.
+  "DIGEST-COMPRESSED",
+  // T9 (goal 226-228, 263-266): even at maximum compression the digest exceeds
+  // the byte budget, so no digest exists to synthesize from. One of the four
+  // enumerated COMPONENTS_ONLY crash classes — a death, not a quality
+  // judgement, and never a silent subset of the nodes.
+  "DIGEST-CANNOT-EXIST",
+  // F4 / T9 (goal 248-251): the envelope terminal fired while the served root's
+  // R9 restatement had FAILED. Before T9 that combination could not exist —
+  // `protectedCoreVerified` threw — because the guard was keyed on R9's
+  // GATE-HOOD. R9 is an evaluator objection criterion now, so the guard is
+  // knowingly retired and the failing status is DISCLOSED instead of deciding.
+  // Minted as a mark rather than left in the gate trace because J25 rules that
+  // a disclosure a reader of the answer cannot see is not a disclosure.
+  "PROTECTED-CORE-GUARD-RETIRED",
   // DR-176: authored material whose cross-maker review transport exhausted.
   // It remains append-only and revealable, but is excluded from the served
   // number and disclosed as unjudged when revealed.
@@ -180,14 +277,21 @@ export type EdgeKind = typeof EDGE_KINDS[number];
 export const MAGNITUDE_STATUSES = ["MEASURED", "UNKNOWN"] as const;
 export type MagnitudeStatus = typeof MAGNITUDE_STATUSES[number];
 
+/**
+ * T5 / S3-1 — the stamp names the role that actually measures. `REVIEWER`
+ * replaces the retired `EVIDENCE_VERIFIER`, which named a role that never
+ * took a measurement: every edge it stamped carried a NULL strength.
+ * Migration 0052 renames the stamp on the stored rows and narrows the column
+ * domain, so no read path can hand back a value this vocabulary refuses.
+ */
 export const STRENGTH_SOURCES = [
-  "EVIDENCE_VERIFIER",
+  "REVIEWER",
   "CLUSTER_COLLAPSE",
   "UNDERCUT_TRANSMISSION"
 ] as const;
 export type StrengthSource = typeof STRENGTH_SOURCES[number];
 
-export const SCORING_OPERATORS = ["accumulate", "strict-and"] as const;
+export const SCORING_OPERATORS = ["accumulate"] as const;
 export type ScoringOperator = typeof SCORING_OPERATORS[number];
 
 export const OPERATOR_SUPPLYING_LEVELS = ["parent", "run", "deployment"] as const;

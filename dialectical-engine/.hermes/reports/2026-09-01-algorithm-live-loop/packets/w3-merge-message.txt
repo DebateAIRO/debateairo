@@ -1,0 +1,23 @@
+Merge branch 'lane/w3b' into mission/2026-09-01-algorithm-live-loop
+
+W3 (V-T1B3-1 option a) — one literal depth ceiling. The register's sealed
+maxDepth is now derived from the contract owner (EXPANSION_DEPTH_MAX) instead
+of restating 5; the register declares @debateai/contract in package.json and
+row 17 of the 28-row architecture edge table admits register -> contract, as a
+pair, because the audit builds its graph from package.json dependencies and an
+undeclared import is invisible to it. Admission behaviour measured unchanged
+(seeded maxDepth = 5). T1's single-source oracle, in-tree and byte-identical to
+lane/t1's: RED on exactly the register's two sites before, GREEN 46/46 after.
+
+This merge also lands lane/t1 (T01 depth contract, T1B layout-independent
+oracle, eleven commits) by way of W3's catch-up merge from d4a3eae9 onto
+3d137d64 — F-T1B-6's owed merge-in, done by the lane that owns the register
+change. Catch-up conflicts in apps/runner/src/index.ts and
+packages/budget/src/index.ts were resolved per hunk with the winner and reason
+recorded; the oracle independently checks the budget half.
+
+W3 round 1 was blocked on an orchestrator packet defect (the cited owner existed
+only on lane/t1); round 2 ran on T1's base by ruling. Reviewed by codex on
+gpt-6-astra (D65).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>

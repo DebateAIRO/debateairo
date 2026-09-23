@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { observationRepoRoot } from "../../apps/observation-agent/src/core/paths.js";
 import { readHostCapacity } from "../../apps/observation-agent/src/modules/host-capacity/commands.js";
 import { createHostCapacityModule } from "../../apps/observation-agent/src/modules/host-capacity/module.js";
 
@@ -45,6 +46,7 @@ describe("OBS-05 Docker and host collection", () => {
     const module = createHostCapacityModule({ readSnapshot: async () => snapshot });
     const observations = await module.probe({
       now: observedAt, timeoutMs: 2_000, database, stateDir: "unused",
+      repoRoot: observationRepoRoot(),
       targets: [], targetFragment: null, configuration: {}, thresholds: {}
     });
     const samples = module.samples(observations, { now: observedAt });

@@ -939,10 +939,23 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       const liveness = new LivenessRepository(database.pool).recordQuery(question, access);
       let lockWaiters = 0;
       for (let attempt = 0; attempt < 20 && lockWaiters < 2; attempt += 1) {
+        // pg_stat_activity.query reports the TOP-LEVEL statement, never a
+        // function body. 2d1f86b8 (DEV-11E item 4) moved the ordered run lock
+        // out of inline `ORDER BY run_id FOR UPDATE` and into the SECURITY
+        // DEFINER capability core.lock_owned_live_runs, because the
+        // debateai_runtime principal is deliberately denied UPDATE on
+        // core.run. The liveness writer's visible statement is therefore
+        // `SELECT run_id FROM core.lock_owned_live_runs(...)`
+        // (packages/liveness/src/index.ts:196) and matches neither old branch.
+        // The lock itself is unchanged: migrations/0040_account_erasure.sql
+        // still ends `ORDER BY run.run_id FOR UPDATE` over every requested id.
+        // Both spellings stay listed so the inline form is still counted if it
+        // ever returns.
         lockWaiters = Number((await database.pool.query<{ count: string }>(
           `SELECT count(*) FROM pg_stat_activity
            WHERE wait_event_type='Lock'
              AND (query LIKE '%append_run_ownership_event%'
+               OR query LIKE '%lock_owned_live_runs%'
                OR (query LIKE '%core.run%' AND query LIKE '%FOR UPDATE%'))`
         )).rows[0]!.count);
         if (lockWaiters < 2) await new Promise((resolve) => setTimeout(resolve, 5));

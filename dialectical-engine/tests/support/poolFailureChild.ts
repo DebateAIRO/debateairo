@@ -44,10 +44,16 @@ async function reproduceRealBackendFailure(connectionString: string): Promise<{
   try {
     const activeClient = await pool.connect();
     const activePid = await activeClient.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-    const inFlight = activeClient.query("SELECT pg_sleep(30)");
+    // The rejection handler is attached in the SAME synchronous turn that creates
+    // the query promise. Holding the raw promise across the two awaits below left
+    // it unhandled for exactly the window in which pg_terminate_backend makes it
+    // reject: whenever the victim connection's FATAL was processed in an earlier
+    // tick than the killer query's reply, Node reported an unhandled rejection and
+    // killed this child before it could write its receipt.
+    const inFlight = expectFailure(activeClient.query("SELECT pg_sleep(30)"));
     await delay(50);
     await terminateBackend(killer, activePid.rows[0]!.pid);
-    const inFlightError = await expectFailure(inFlight);
+    const inFlightError = await inFlight;
     activeClient.release(true);
 
     const idleClient = await pool.connect();
