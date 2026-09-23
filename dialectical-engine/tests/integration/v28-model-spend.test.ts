@@ -3,25 +3,24 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
 import { CostEnvelopeGuard, PostgresModelSpendStore, costEnvelopeDay } from "@debateai/budget";
 import { RunRepository } from "../../packages/db/src/index.js";
-import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
  * V-28 (DL4-F2) — THE DATABASE HALF OF THE SPENDING CEILING.
  *
- * NOT RUN — Docker. This suite was written with the rest of task 11 and has
- * never been executed: the mission's quiet rule (constraint 11) forbids
- * starting, stopping or reconfiguring Docker on this host, and the engine was
- * down for the whole package. The decision surface it covers IS exercised, in
+ * It needs no Docker: `startTestDatabase` starts the embedded PostgreSQL every
+ * integration suite uses. Written with the rest of task 11, it first ran on
+ * 2026-09-23 (SYNC3-C). Its one repair was the run helper below, whose cast
+ * had hidden three values `core.run` refuses. The surface is also exercised in
  * `tests/unit/v28-model-spend-ledger.test.ts`, against the same
- * `CostEnvelopeGuard` over an in-memory `ModelSpendStore`; what is unproven here
- * and nowhere else is the SQL: that migration 0066 applies, that its CHECKs and
- * its append-only guards hold, and that `PostgresModelSpendStore`'s two sums
- * return what the unit fake returns.
+ * `CostEnvelopeGuard` over an in-memory `ModelSpendStore`; what only this file
+ * proves is the SQL: that migration 0066 applies, that its CHECKs and its
+ * append-only guards hold, and that `PostgresModelSpendStore`'s two sums return
+ * what the unit fake returns.
  *
- * The coordinator should run it on the first host with the engine up. Nothing
- * else in this package depends on it passing; everything above the seam does not
- * touch a database.
+ * Nothing else in this package depends on it passing; everything above the seam
+ * does not touch a database.
  *
  * RE-REVIEW: it also carries the two whole-run properties nothing else can
  * prove, both marked below — that a money refusal raised DURING EXPANSION (and
@@ -66,22 +65,23 @@ async function createLegacyRun(): Promise<string> {
     questionLine: "Is this spend row attributable?",
     principal: { kind: "legacy", legacyAskerId: `test:${randomUUID()}` },
     sessionId: randomUUID(),
-    callerScope: "test",
+    callerScope: "ASKER",
     asOf: new Date(),
     askerRiskTier: "casual",
     effectiveRiskTier: "casual",
     tierSource: "ASKER",
     tierProvenanceRef: "asker:test",
-    compositionBudgetTier: "standard",
+    compositionBudgetTier: "low",
     depthParams: { depth: 1 },
-    discoveredPanel: [],
+    // Typed, not cast: an empty panel, scope "test" and tier "standard" all broke 0000 CHECKs.
+    discoveredPanel: fixtureDiscoveredPanel(1),
     strangerSampleRate: 0,
     envelopeBasis: fixtureStructuralCeiling(4),
     registerVersion: 1,
     batteryVersion: "test",
     askContract: {},
     batteryRows: []
-  } as never);
+  });
 }
 
 async function insertRunCharge(
@@ -222,7 +222,7 @@ describe("V-28 the persisted totals answer the two envelope questions", () => {
 });
 
 /**
- * RE-REVIEW C1/C2(a) — THE WHOLE-RUN PROPERTY. **NOT RUN — Docker.**
+ * RE-REVIEW C1/C2(a) — THE WHOLE-RUN PROPERTY. **NOT RUN — an unwired sketch.**
  *
  * Sketched rather than finished on purpose: standing a run up to the point where
  * a second root is authored needs the runner's full settings object, a fake
@@ -276,7 +276,7 @@ describe("V-28 the persisted totals answer the two envelope questions", () => {
  *     keeps its `HIDDEN-UNJUDGEABLE` record; a child the stop denied a review
  *     is not hidden.
  */
-describe.skip("V-28 a spend stop mid-run ends in the envelope terminal (NOT RUN — Docker)", () => {
+describe.skip("V-28 a spend stop mid-run ends in the envelope terminal (NOT RUN — unwired sketch)", () => {
   it("keeps root 0 when root 1 is refused on money at M=2, and says it rests on one lineage", () => {
     expect.unreachable("wire to the acceptance harness; see the numbered contract above");
   });
