@@ -1,14 +1,24 @@
 import type { SupportLanguage, SupportOutcome } from "./templates.js";
+import { analyzePreparedRecoverySemanticsViews } from "./recovery-intent.js";
+import { classifySecurityRecoveryViews } from "./security-guidance.js";
+import { isPreparedPublicAccountLocationGuide } from "./public-guide-boundary.js";
 
 export type SupportClassification = Readonly<{
   outcome: Extract<SupportOutcome,
     "REFUSE_ZONE" | "REFUSE_INJECTION" | "REFUSE_SAFETY"> | "INCIDENT" | null;
   language: SupportLanguage;
   link: "/login" | "/sign-up" | "/settings" | null;
+  securityNavigation?: "FORGOT_PASSWORD";
+  securityOperation?: "CREDENTIAL_OPERATION";
 }>;
 
 type ZoneLink = Exclude<SupportClassification["link"], null>;
-type ZoneRule = Readonly<{ pattern: RegExp; link: ZoneLink }>;
+type ZoneRule = Readonly<{
+  pattern: RegExp;
+  link: ZoneLink;
+  recoveryPassword?: true;
+  publicLocationGuide?: true;
+}>;
 
 export type SupportSensitiveIntentFamily =
   | "account-erasure"
@@ -18,7 +28,7 @@ export type SupportSensitiveIntentFamily =
   | "minor"
   | "legal-data";
 
-const ACCOUNT_ERASURE_PATTERN = /(?:(?:\bdelete|\berase|\bremove)\b.{0,40}\b(?:(?:my|this|the)\s+)?account\b|(?<!\p{L})(?:șterg|sterg)\p{L}*(?:-[\p{L}]+)?.{0,40}(?<!\p{L})cont\p{L}*(?!\p{L}))/u;
+const ACCOUNT_ERASURE_PATTERN = /(?:(?:\bdelete|\berase|\bremove)\b.{0,40}\b(?:(?:my|this|the)\s+)?account\b|(?<!\p{L})(?:șterg|sterg|ștearg|stearg|elimin)\p{L}*(?:-[\p{L}]+)?.{0,40}(?<!\p{L})cont\p{L}*(?!\p{L}))/u;
 
 const ZONE_RULES: readonly ZoneRule[] = Object.freeze([
   Object.freeze({
@@ -31,7 +41,8 @@ const ZONE_RULES: readonly ZoneRule[] = Object.freeze([
   }),
   Object.freeze({
     pattern: /(?:\bpasswords?\b|(?<!\p{L})parol(?:a|ă|e|ei|ele|elor)(?!\p{L}))/u,
-    link: "/settings"
+    link: "/settings",
+    recoveryPassword: true
   }),
   Object.freeze({
     pattern: /(?:\bverification (?:codes?|links?)\b|\bverify (?:my )?(?:email|account)\b|\bcod(?:ul|uri)? de verificare\b|\blink(?:ul|uri)? de verificare\b)/u,
@@ -47,11 +58,13 @@ const ZONE_RULES: readonly ZoneRule[] = Object.freeze([
   }),
   Object.freeze({
     pattern: /(?:\bsign[ -]?out\b|\blog[ -]?out\b|\b(?:active |other |account )?sessions?\b|\bdeconect\w*\b|\bsesiun\w*\b)/u,
-    link: "/settings"
+    link: "/settings",
+    publicLocationGuide: true
   }),
   Object.freeze({
     pattern: ACCOUNT_ERASURE_PATTERN,
-    link: "/settings"
+    link: "/settings",
+    publicLocationGuide: true
   }),
   Object.freeze({
     pattern: /(?:\bdoes (?:an |the )?account\b.{0,32}\bexist\b|\baccount\b.{0,32}\bexist\b|(?<!\p{L})(?:există|exista)(?!\p{L}).{0,32}(?<!\p{L})cont\p{L}*(?!\p{L}))/u,
@@ -63,7 +76,8 @@ const ZONE_RULES: readonly ZoneRule[] = Object.freeze([
   }),
   Object.freeze({
     pattern: /(?:\bsign[ -]?in\b|\blog[ -]?in\b|\blogin\b|\bautentific\w*\b)/u,
-    link: "/login"
+    link: "/login",
+    publicLocationGuide: true
   })
 ]);
 
@@ -287,7 +301,8 @@ const ROMANIAN_WORDS = new Set([
   "cineva", "cont", "cum", "dezbatere", "dezbaterii", "dezbaterile", "disponibile",
   "este", "funcționează", "ghidul", "îmi", "început", "întâmplă", "nivelurile", "opțiuni",
   "persoană", "pot", "proprietarul", "publicarea", "răspunsul", "retrag", "să",
-  "scriu", "sunt", "sursa", "telefon", "unde", "vizitatorii", "stricat", "merge", "nu"
+  "scriu", "sunt", "sursa", "telefon", "unde", "vizitatorii", "stricat", "merge", "nu",
+  "codul", "recuperare", "trimite"
 ]);
 
 function boundedUnicodeSlice(message: string): string {
@@ -354,16 +369,35 @@ export function classifySupportMessage(message: string): SupportClassification {
   const prepared = prepareMessage(message);
   const views = prepared.ordinaryViews;
   const language = detectPreparedLanguage(prepared);
-  const zone = ZONE_RULES.find((rule) => views.some((text) => rule.pattern.test(text)));
+  const recoverySemantics = analyzePreparedRecoverySemanticsViews(views,language);
+  const securityRecovery = classifySecurityRecoveryViews(views,language);
+  if (securityRecovery !== null) {
+    return Object.freeze({
+      outcome: "REFUSE_ZONE",
+      language: securityRecovery.language,
+      link: null,
+      ...(securityRecovery.kind === "CREDENTIAL_OPERATION"
+        ? {} : { securityNavigation:"FORGOT_PASSWORD" as const }),
+      ...(securityRecovery.kind === "FORGOT_PASSWORD"
+        ? {} : { securityOperation:"CREDENTIAL_OPERATION" as const })
+    });
+  }
+  if (INJECTION_PATTERNS.some((pattern) => pattern.test(prepared.injectionText))) {
+    return Object.freeze({ outcome: "REFUSE_INJECTION", language, link: null });
+  }
+  const solelyNegatedRecovery = recoverySemantics.navigation !== "AFFIRMATIVE"
+    && recoverySemantics.credentialOperation === "NEGATED";
+  const publicAccountLocation = isPreparedPublicAccountLocationGuide(views);
+  const zone = ZONE_RULES.find((rule) =>
+    !(solelyNegatedRecovery && rule.recoveryPassword === true)
+    && !(publicAccountLocation && rule.publicLocationGuide === true)
+    && views.some((text) => rule.pattern.test(text)));
   if (zone !== undefined) {
     return Object.freeze({ outcome: "REFUSE_ZONE", language, link: zone.link });
   }
   const sensitiveFamily = sensitiveIntentFamilyFromViews(views);
   if (sensitiveFamily !== null && sensitiveFamily !== "account-erasure") {
     return Object.freeze({ outcome: "REFUSE_SAFETY",language,link: null });
-  }
-  if (INJECTION_PATTERNS.some((pattern) => pattern.test(prepared.injectionText))) {
-    return Object.freeze({ outcome: "REFUSE_INJECTION", language, link: null });
   }
   if (INCIDENT_PATTERNS.some((pattern) => views.some((view) => pattern.test(view)))) {
     return Object.freeze({ outcome: "INCIDENT", language, link: null });

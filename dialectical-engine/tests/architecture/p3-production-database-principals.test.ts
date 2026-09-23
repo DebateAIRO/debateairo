@@ -310,6 +310,16 @@ describe("P3-01 production database-principal manifest", () => {
             binding: "DEVELOPMENT_ONLY",
             condition: "package script dev:auth:seed-register"
           },
+          // SYNC3: dev's `dev:auth:publish-provider-set` (debate tiers) is a new
+          // migrator-principal seam, development only, like the seeder above.
+          {
+            component: "apps/runner:dev-provider-set-publish-cli",
+            sourceFile: "apps/runner/src/dev-provider-set-publish-cli.ts",
+            environmentKey: "MIGRATION_DATABASE_URL",
+            purpose: "DEVELOPMENT_PROVIDER_SET_PUBLICATION",
+            binding: "DEVELOPMENT_ONLY",
+            condition: "package script dev:auth:publish-provider-set"
+          },
           {
             component: "apps/runner:production-database-principals-cli",
             sourceFile: "apps/runner/src/production-database-principals-cli.ts",
@@ -347,6 +357,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/runner:migrate-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "MIGRATIONS_AND_ROLE_BOOTSTRAP", binding: "WIRED" },
         { component: "apps/runner:dev-database-principals-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_PRINCIPAL_PROVISIONING", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:provision-principals" },
         { component: "apps/runner:dev-deployment-register-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_REGISTER_SEED", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:seed-register" },
+        { component: "apps/runner:dev-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_PROVIDER_SET_PUBLICATION", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:publish-provider-set" },
         { component: "apps/runner:production-database-principals-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_PRINCIPAL_PROVISIONING", binding: "WIRED", condition: "package script db:provision-principals" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },

@@ -323,6 +323,7 @@ describe("rendered auth flow integration", () => {
     field("password").value = "correct horse battery staple";
     field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
+    field("terms-accepted").checked = true;
     await submit();
 
     expect(register).toHaveBeenCalledWith(
@@ -448,6 +449,7 @@ describe("rendered auth flow integration", () => {
     field("password").value = "password";
     field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
+    field("terms-accepted").checked = true;
     await submit();
 
     expect(document.querySelector('[role="alert"]')?.textContent)
@@ -467,6 +469,7 @@ describe("rendered auth flow integration", () => {
     field("password").value = "password";
     field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
+    field("terms-accepted").checked = true;
     await submit();
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
 
@@ -480,7 +483,7 @@ describe("rendered auth flow integration", () => {
   // validation, so `required` gates nothing against a scripted submit. The handler
   // refuses from the two FormData reads — never from R17's React mirror, which an
   // assignment never updates.
-  it("refuses to register when either consent box is left unticked", async () => {
+  it("refuses to register when any consent box is left unticked", async () => {
     const registerWithoutPrivacy = vi.fn();
     await act(async () =>
       root!.render(
@@ -513,6 +516,7 @@ describe("rendered auth flow integration", () => {
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "correct horse battery staple";
     field("privacy-accepted").checked = true;
+    field("terms-accepted").checked = true;
     await submit();
 
     expect(registerWithoutAdult).not.toHaveBeenCalled();

@@ -1,16 +1,17 @@
 ---
 id: unsupported-capabilities
 lang: ro
-title: "Acțiuni indisponibile"
+title: "Acțiuni indisponibile sau doar locale"
 status: shipped
 sources:
-  - apps/ui/lib/v3/missingCapabilities.ts:8
-  - apps/ui/lib/v3/missingCapabilities.ts:9
-  - apps/ui/lib/v3/missingCapabilities.ts:10
-  - apps/ui/lib/v3/missingCapabilities.ts:11
-verified_against: "2b670d30"
-ratified_by: V
-ratified_on: "2026-09-04"
+  - apps/ui/lib/v3/missingCapabilities.ts:7
+  - apps/ui/lib/v3/adapter.ts:686
+  - apps/ui/app/new/page.tsx:335
+  - apps/ui/app/debate/[id]/DebatePageClient.tsx:1444
+  - apps/ui/components/NodeDetailDrawer.tsx:121
+verified_against: "b7ca2c41"
+ratified_by: ""
+ratified_on: ""
 ---
 
-Produsul actual nu poate regenera un nod, primi feedback despre evaluare, modifica setările de implementare sau aproba adâncimea adaptivă. Controalele pentru aceste acțiuni nu le pot finaliza.
+Produsul V3 curent nu are resurse pentru regenerarea nodului, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Controalele pentru modul adâncimii, profunzimea examinării, lățimea ramificării, concurență și numărul maxim de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul rulării V3. Challenge schimbă acum starea locală a paginii, fără să pornească un răspuns durabil. Încărcarea istoricului generărilor poate eșua și poate afișa un panou gol. Asistența nu poate transforma aceste limitări în acțiuni funcționale.

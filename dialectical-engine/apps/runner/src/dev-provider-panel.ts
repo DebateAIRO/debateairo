@@ -2,6 +2,11 @@ import {
   parseProviderDiscoveryTargets,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  loadDevelopmentAuthStackProfile,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const REMOVED_SCAFFOLD_PROVIDER_REF = "development:local-vllm";
 const REMOVED_SCAFFOLD_MODEL = "qa-deterministic-v1";
@@ -15,6 +20,13 @@ export const REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON = JSON.stringify([{
   model: REMOVED_SCAFFOLD_MODEL
 }]);
 
+/**
+ * One slot per plan-tier roster member (V, 2026-09-12: "Both free and premium need to be
+ * accessible at the same time"). Discovery is 1:1 with the configured provider set — one
+ * target per provider_ref, checked in parseProviderDiscoveryTargets — so a maker that
+ * serves two tiers needs two slots. The order is the order of the discovery targets and
+ * of the sealed configuredProviderSet row; appending is safe, reordering is not.
+ */
 export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
   Object.freeze({
     providerRef: "development:codex-cli",
@@ -23,10 +35,22 @@ export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
     port: 8_791
   }),
   Object.freeze({
+    providerRef: "development:codex-premium-cli",
+    adapterKind: "openai-compatible-http" as const,
+    maker: "OpenAI",
+    port: 8_795
+  }),
+  Object.freeze({
     providerRef: "development:claude-cli",
     adapterKind: "openai-compatible-http" as const,
     maker: "Anthropic",
     port: 8_792
+  }),
+  Object.freeze({
+    providerRef: "development:claude-premium-cli",
+    adapterKind: "openai-compatible-http" as const,
+    maker: "Anthropic",
+    port: 8_796
   }),
   Object.freeze({
     providerRef: "development:grok-cli",
@@ -35,6 +59,20 @@ export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
     port: 8_793
   })
 ] as const);
+
+type DevelopmentCliProvider = Omit<(typeof DEVELOPMENT_CLI_PROVIDER_ROSTER)[number], "port"> &
+  Readonly<{ port: number }>;
+
+export function developmentCliProviderRoster(
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): readonly DevelopmentCliProvider[] {
+  return Object.freeze(DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider, index) => Object.freeze({
+    providerRef: provider.providerRef,
+    adapterKind: provider.adapterKind,
+    maker: provider.maker,
+    port: profile.providerPorts[index]!
+  })));
+}
 
 export type DevelopmentConfiguredProvider = Readonly<{
   providerRef: string;
@@ -57,26 +95,33 @@ type DevelopmentCliTargetObservation = Readonly<{
   authorizationHeader?: string;
 }>;
 
-const configuredProviders = Object.freeze(DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider) =>
+function configuredProvidersFor(
+  roster: readonly DevelopmentCliProvider[]
+): readonly DevelopmentConfiguredProvider[] {
+  return Object.freeze(roster.map((provider) =>
   Object.freeze({
     providerRef: provider.providerRef,
     adapterKind: provider.adapterKind,
     maker: provider.maker
   })
-));
+  ));
+}
 
 function expectedBaseUrl(port: number): string {
   return `http://127.0.0.1:${port}/v1`;
 }
 
 export function buildDevelopmentProviderPanel(
-  observations: readonly DevelopmentCliTargetObservation[]
+  observations: readonly DevelopmentCliTargetObservation[],
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentProviderPanel {
+  const roster = developmentCliProviderRoster(profile);
+  const configuredProviders = configuredProvidersFor(roster);
   const byRef = new Map(observations.map((observation) => [observation.providerRef, observation] as const));
-  if (byRef.size !== DEVELOPMENT_CLI_PROVIDER_ROSTER.length) {
+  if (byRef.size !== roster.length) {
     throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
   }
-  const rows = DEVELOPMENT_CLI_PROVIDER_ROSTER.map((provider) => {
+  const rows = roster.map((provider) => {
     const observation = byRef.get(provider.providerRef);
     if (observation === undefined || observation.baseUrl !== expectedBaseUrl(provider.port)) {
       throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_SET_INVALID");
@@ -110,7 +155,30 @@ export function buildDevelopmentProviderPanel(
   });
 }
 
-export function parseDevelopmentProviderPanelTargets(source: string): DevelopmentProviderPanel {
+/**
+ * The deployment's CONFIGURED provider set, straight from the roster: refs, makers and
+ * adapter kinds, with every slot marked unavailable. Health is not part of the register
+ * row - only which providers the deployment is allowed to discover - so this is the
+ * honest input when publishing the set without standing the CLIs up first.
+ */
+export function developmentConfiguredProviderPanel(
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): DevelopmentProviderPanel {
+  const roster = developmentCliProviderRoster(profile);
+  return buildDevelopmentProviderPanel(roster.map((provider) =>
+    Object.freeze({
+      providerRef: provider.providerRef,
+      baseUrl: expectedBaseUrl(provider.port),
+      model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+    })
+  ), profile);
+}
+
+export function parseDevelopmentProviderPanelTargets(
+  source: string,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): DevelopmentProviderPanel {
+  const configuredProviders = configuredProvidersFor(developmentCliProviderRoster(profile));
   const targets = parseProviderDiscoveryTargets(source, configuredProviders);
   // V-9(2): the shared parser understands `authorization_file`, but this stack
   // does not resolve it — only the two shipped composition roots do. Carrying on
@@ -125,7 +193,7 @@ export function parseDevelopmentProviderPanelTargets(source: string): Developmen
     model: target.model,
     ...(target.authorizationHeader === undefined
       ? {} : { authorizationHeader: target.authorizationHeader })
-  })));
+  })), profile);
 }
 
 export function loadDevelopmentProviderPanelFromEnvironment(
@@ -135,5 +203,8 @@ export function loadDevelopmentProviderPanelFromEnvironment(
   if (targetsJson === undefined || targetsJson.trim() === "") {
     throw new TypeError("DEV_CLI_PROVIDER_PANEL_REQUIRED");
   }
-  return parseDevelopmentProviderPanelTargets(targetsJson);
+  return parseDevelopmentProviderPanelTargets(
+    targetsJson,
+    loadDevelopmentAuthStackProfile(source)
+  );
 }

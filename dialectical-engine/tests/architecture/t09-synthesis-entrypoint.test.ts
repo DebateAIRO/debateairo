@@ -74,8 +74,13 @@ describe("T9 production entry point wiring", () => {
       new URL("../../apps/runner/src/index.ts", import.meta.url),
       "utf8"
     );
-    // The resolver closes over the probed, claim-eligible list.
-    expect(source).toContain("const configured = configuredMakers.find((maker) => maker.providerRef === roleRef);");
+    // The resolver closes over the probed, claim-eligible list. SYNC3: dev's
+    // debate tiers named that list `synthesisMakers` — the claim-eligible panel
+    // plus the out-of-panel role providers the claim-time probe found HEALTHY —
+    // so the pin follows the name; the property it guards is unchanged.
+    expect(source).toContain("const configured = synthesisMakers.find((maker) => maker.providerRef === roleRef);");
+    expect(source).toContain("const synthesisMakers = [...configuredMakers];");
+    expect(source).toContain("if (healthy) synthesisMakers.push(configured);");
     // ...and never over the unfiltered membership, which is what let an
     // already-absent role provider be called.
     expect(source).not.toContain("this.#configuredMakers.find((maker) => maker.providerRef === roleRef)");

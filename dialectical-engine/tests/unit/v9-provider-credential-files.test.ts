@@ -330,6 +330,10 @@ describe("V-9 the local dev stack refuses a credential file it cannot honour", (
   // A healthy relay must carry an inline credential in this stack, so the whole
   // roster is healthy and credentialled and only the FIRST entry differs. The
   // refusal under test is then the credential file, not the panel's set guards.
+  //
+  // SYNC3: dev's debate tiers grew the roster from three slots to five — one per
+  // plan-tier roster member (DEVELOPMENT_CLI_PROVIDER_ROSTER) — so the fixture
+  // names all five, or the set-mismatch guard answers before the credential rule.
   const roster = (first: Readonly<Record<string, unknown>>) => JSON.stringify([
     {
       provider_ref: "development:codex-cli",
@@ -338,10 +342,22 @@ describe("V-9 the local dev stack refuses a credential file it cannot honour", (
       ...first
     },
     {
+      provider_ref: "development:codex-premium-cli",
+      base_url: "http://127.0.0.1:8795/v1",
+      model: "gpt-5-codex-premium",
+      authorization_header: "Bearer local-relay-codex-premium"
+    },
+    {
       provider_ref: "development:claude-cli",
       base_url: "http://127.0.0.1:8792/v1",
       model: "claude-opus",
       authorization_header: "Bearer local-relay-claude"
+    },
+    {
+      provider_ref: "development:claude-premium-cli",
+      base_url: "http://127.0.0.1:8796/v1",
+      model: "claude-opus-premium",
+      authorization_header: "Bearer local-relay-claude-premium"
     },
     {
       provider_ref: "development:grok-cli",

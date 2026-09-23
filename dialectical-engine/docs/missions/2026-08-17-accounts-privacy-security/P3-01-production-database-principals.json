@@ -297,6 +297,14 @@
           "condition": "package script dev:auth:seed-register"
         },
         {
+          "component": "apps/runner:dev-provider-set-publish-cli",
+          "sourceFile": "apps/runner/src/dev-provider-set-publish-cli.ts",
+          "environmentKey": "MIGRATION_DATABASE_URL",
+          "purpose": "DEVELOPMENT_PROVIDER_SET_PUBLICATION",
+          "binding": "DEVELOPMENT_ONLY",
+          "condition": "package script dev:auth:publish-provider-set"
+        },
+        {
           "component": "apps/runner:production-database-principals-cli",
           "sourceFile": "apps/runner/src/production-database-principals-cli.ts",
           "environmentKey": "MIGRATION_DATABASE_URL",

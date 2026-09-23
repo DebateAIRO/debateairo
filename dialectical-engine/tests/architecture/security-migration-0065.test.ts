@@ -384,7 +384,14 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0065_security_delta_guards.sql",
         // V-28 (task 11): the persisted model-spend ledger the per-run and daily
         // cost envelopes read. A new prefix, no pair.
-        "0066_model_spend_ledger.sql"
+        "0066_model_spend_ledger.sql",
+        // SYNC3 / R2 (coordinator ruling): dev's plan-tier column, which dev had
+        // numbered 0061 beside 0061_algorithm_publication_profiles.sql. Renamed to
+        // the next free prefix instead of adding "0061" to DUPLICATED_PREFIXES. It
+        // is idempotent statement by statement, so a database that applied it
+        // under the old name re-applies it harmlessly under this one (the runner
+        // tracks migrations by full file name).
+        "0067_plan_tier_on_run.sql"
       ]);
   });
 });

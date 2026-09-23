@@ -1,5 +1,6 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   Argon2WorkerPool,
@@ -15,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportOwnContextRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -41,7 +42,7 @@ import {
 // V-28 (DL4-F2): the application-wide daily spending ceiling, over the persisted
 // model-spend ledger migration 0066 created.
 import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
-import { loadHelpCorpus } from "@debateai/support-kb";
+import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
   HatchetDispatcher,
@@ -75,6 +76,7 @@ import {
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
+import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
 import {
   createSupportModelAdapter,parseSupportModelTargetJson,type SupportModelPort
 } from "./support/model.js";
@@ -82,7 +84,6 @@ import {
   SupportModelReservationLedger,createReservedSupportModelPort
 } from "./support/model-reservation.js";
 import { createAdvisorySummaryService,createSupportCaseAccessService,createSupportSummarySealer } from "./support/cases.js";
-import { createSupportOwnContextService } from "./support/own-context.js";
 import { PostgresSupportIncidentRepository } from "./support/incidents.js";
 import { readLimits } from "./support/limits.js";
 import { SupportRelayQueue } from "./support/queue.js";
@@ -94,7 +95,21 @@ const environment = loadApiEnvironment();
 // envelopes are sealed. The seam is `readSealedCostEnvelopeStatus` in
 // @debateai/register, which task 11 replaces. Local mode is untouched.
 assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
-const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"));
+/**
+ * The reviewed support knowledge base, its review manifest and its recovery
+ * components (dev's SUP rework). Loading can refuse (SUPPORT_KB_*), and it is
+ * SYNCHRONOUS: it stays here, before `installBootCustody()`, where no key or
+ * secret has been loaded yet — a refusal at this line leaves nothing live to
+ * zero, which is why it needs no ledger stage (DL7-F7).
+ */
+const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"),{
+  reviewManifest: JSON.parse(readFileSync(
+    resolve("packages/support-kb/reviews/manifest.json"),"utf8"
+  )) as unknown,
+  recoveryComponents: readFileSync(resolve("packages/support-kb/recovery/components.json")),
+  requireReviewedRecovery: true
+});
+const supportKnowledgeSnapshots = createHelpCorpusSnapshotLookup(supportKnowledge);
 // V-19: before the first key file is opened, so a group this host cannot
 // resolve refuses at boot instead of at the first private debate.
 configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
@@ -551,6 +566,9 @@ const supportConfiguration = createSupportConfigurationPort(
 const reportSupportDiagnostic = (diagnostic: Readonly<{ code: string }> | string): void => {
   console.error({ code: typeof diagnostic === "string" ? diagnostic : diagnostic.code });
 };
+const reportSupportDraftDiagnostic = (diagnostic: SupportDraftReport): void => {
+  console.error(projectSupportDraftReport(diagnostic));
+};
 const supportRelayReservations = new PostgresSupportRelayReservationRepository(supportRelayLeasePool);
 const supportRelayCallRecords = new PostgresSupportRelayReservationRepository(supportPool);
 const supportRelayQueue = new SupportRelayQueue({
@@ -656,16 +674,15 @@ const supportCases = createSupportCaseService({
 const supportIncidents = new PostgresSupportIncidentRepository(supportPool as never);
 const supportAnswers = createSupportAnswerService({
   entries: supportKnowledge.entries,
+  requireStructuredDraft: true,
   messages: supportMessages,
   incidents: supportIncidents,
+  reportDraftDiagnostic: reportSupportDraftDiagnostic,
   queue: supportRelayQueue,
   degraded: supportDegraded,
   modelFor: () => supportAdmittedModel
 });
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
-const supportOwnContext = createSupportOwnContextService(
-  new PostgresSupportOwnContextRepository(pool,supportPool)
-);
 const api = buildApi({
   application,
   accountErasure:erasureApplication,
@@ -684,10 +701,8 @@ const api = buildApi({
     sessions: Object.freeze({
       create: supportSessions.create.bind(supportSessions),
       read: supportSessions.read.bind(supportSessions),
-      setConsent: supportSessions.setConsent.bind(supportSessions),
       admitMessage: supportSessions.admitMessage.bind(supportSessions),
       admitIpSession: supportSessions.admitIpSession.bind(supportSessions),
-      finalizeInjectionLock: supportSessions.finalizeInjectionLock.bind(supportSessions),
       recordRateLimit: supportSessions.recordRateLimit.bind(supportSessions),
       rateMessage: supportSessions.rateMessage.bind(supportSessions),
       status: supportStatus.status.bind(supportStatus)
@@ -698,10 +713,10 @@ const api = buildApi({
       repository: supportCaseSummaries,keys: supportKeys
     }),
     answer: supportAnswers,
-    ownContext: supportOwnContext,
     incidents: supportIncidents,
     reportDiagnostic: reportSupportDiagnostic,
     knowledge: {
+      snapshot: (version) => supportKnowledgeSnapshots.get(version),
       status: async () => Object.freeze({
         kbVersion: supportKnowledge.kbVersion,
         shipped: supportKnowledge.shippedCount,

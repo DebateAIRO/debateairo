@@ -2,10 +2,12 @@ import { spawn } from "node:child_process";
 import { get } from "node:http";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const LOCAL_HOST = "127.0.0.1";
-const LOCAL_UI_PORT = 3_001;
-const LOCAL_API_PORT = 8_790;
 const MAX_HTML_BYTES = 512 * 1024;
 const MAX_JSON_BYTES = 1_024;
 const TRANSIENT_PROBE_ERRORS = new Set(["ECONNREFUSED", "ECONNRESET", "EPIPE", "ETIMEDOUT"]);
@@ -39,7 +41,7 @@ export type DevelopmentUiProcessOperations = Readonly<{
 }>;
 
 export type DevelopmentUiProcess = Readonly<{
-  receipt: Readonly<{ host: "127.0.0.1"; port: 3001; proxy: "DENY_DEFAULT" }>;
+  receipt: Readonly<{ host: "127.0.0.1"; port: number; proxy: "DENY_DEFAULT" }>;
   exited: Promise<DevelopmentUiChildExit>;
   stop(): Promise<void>;
 }>;
@@ -76,8 +78,10 @@ export async function startDevelopmentUiProcess(input: Readonly<{
   repositoryRoot: string;
   commandEnvironment: Readonly<Record<string, string>>;
   operations: DevelopmentUiProcessOperations;
+  profile?: DevelopmentAuthStackProfile;
   maximumProbeAttempts?: number;
 }>): Promise<DevelopmentUiProcess> {
+  const profile = input.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   const api = await input.operations.probeApi();
   if (api === null || !isExactSessionDenial(api)) {
     throw new DevelopmentUiProcessError("DEV_UI_PROCESS_API_UNAVAILABLE");
@@ -90,8 +94,8 @@ export async function startDevelopmentUiProcess(input: Readonly<{
     child = input.operations.startUi(Object.freeze({
       ...input.commandEnvironment,
       DIALECTICAL_UI_HOST: LOCAL_HOST,
-      PORT: String(LOCAL_UI_PORT),
-      DIALECTICAL_API_BASE: `http://${LOCAL_HOST}:${LOCAL_API_PORT}`,
+      PORT: String(profile.uiPort),
+      DIALECTICAL_API_BASE: `http://${LOCAL_HOST}:${profile.apiPort}`,
       NEXT_PUBLIC_API_BASE: "/api"
     }));
   } catch (error) {
@@ -118,7 +122,7 @@ export async function startDevelopmentUiProcess(input: Readonly<{
         }
         let stopped = false;
         return Object.freeze({
-          receipt: Object.freeze({ host: LOCAL_HOST, port: LOCAL_UI_PORT, proxy: "DENY_DEFAULT" }),
+          receipt: Object.freeze({ host: LOCAL_HOST, port: profile.uiPort, proxy: "DENY_DEFAULT" }),
           exited: child.exited,
           async stop() {
             if (stopped) return;
@@ -169,16 +173,17 @@ function probeHttp(port: number, path: string, maximumBytes: number): Promise<Ht
 }
 
 export function createDevelopmentUiProcessOperations(
-  repositoryRoot: string
+  repositoryRoot: string,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentUiProcessOperations {
   const cwd = resolve(repositoryRoot);
   const uiCwd = resolve(repositoryRoot, "apps", "ui");
   return Object.freeze({
-    probeApi: () => probeHttp(LOCAL_API_PORT, "/v1/session", MAX_JSON_BYTES),
+    probeApi: () => probeHttp(profile.apiPort, "/v1/session", MAX_JSON_BYTES),
     async probeUi() {
-      const login = await probeHttp(LOCAL_UI_PORT, "/login", MAX_HTML_BYTES);
+      const login = await probeHttp(profile.uiPort, "/login", MAX_HTML_BYTES);
       if (login === null) return null;
-      const session = await probeHttp(LOCAL_UI_PORT, "/api/v1/session", MAX_JSON_BYTES);
+      const session = await probeHttp(profile.uiPort, "/api/v1/session", MAX_JSON_BYTES);
       if (session === null) return null;
       return Object.freeze({ login, session });
     },

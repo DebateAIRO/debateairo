@@ -1,0 +1,22 @@
+=== is isExactProviderRuntimeRefresh actually CALLED? (the tie-break rests on it) ===
+310:function isExactProviderRuntimeRefresh(existing: string, expected: string): boolean {
+336:function isExactPublishedRegisterRefresh(existing: string, expected: string): boolean {
+376:function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
+384:  return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected);
+493:    (existing) => isExactProviderRuntimeRefresh(existing, source)
+494:      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source)
+495:      || isExactPublishedRegisterRefresh(existing, source)
+
+=== its call context 488,500 ===
+  const source = environmentSource(values);
+  const reused = await publishExactFile(
+    join(custodyRoot, "api.env"),
+    source,
+    [],
+    (existing) => isExactProviderRuntimeRefresh(existing, source)
+      || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source)
+      || isExactPublishedRegisterRefresh(existing, source)
+      || isExactLegacyEnvironmentWithoutSupportModelTarget(existing,source)
+  );
+  return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
+}

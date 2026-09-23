@@ -49,6 +49,37 @@ describe("support relay response boundary", () => {
     ]) expect(() => parseSupportModelTargetJson(invalid,local)).toThrow("SUPPORT_MODEL_PATH_NOT_RATIFIED");
   });
 
+  it("ratifies only the marked support-preview target on its fixed loopback port",() => {
+    // V-30: the deployment is always named — the preview marker is a LOCAL relay
+    // rule and there is no default mode that could let it through hosted.
+    const local = { mode: "local",nodeEnv: undefined } as const;
+    const source = JSON.stringify({
+      provider_ref: "development:hermes-glm-5.3-flash",
+      base_url: "http://127.0.0.1:8894/v1",
+      model: "z-ai/glm-5.3-flash",
+      authorization_header: "Bearer support-only",
+      development_stack_profile: "support-preview"
+    });
+    expect(parseSupportModelTargetJson(source,local)).toEqual({
+      providerRef: "development:hermes-glm-5.3-flash",
+      baseUrl: "http://127.0.0.1:8894/v1",
+      model: "z-ai/glm-5.3-flash",
+      authorizationHeader: "Bearer support-only"
+    });
+    for (const invalid of [
+      source.replace("8894","8794"),
+      source.replace("8894","8994"),
+      source.replace("support-preview","default"),
+      source.replace(',"development_stack_profile":"support-preview"',""),
+      source.replace("development:hermes-glm-5.3-flash","development:codex-cli"),
+      source.replace("z-ai/glm-5.3-flash","other-model"),
+      source.replace("Bearer support-only","")
+    ]) expect(() => parseSupportModelTargetJson(invalid,local)).toThrow("SUPPORT_MODEL_PATH_NOT_RATIFIED");
+    // Hosted refuses the preview relay exactly as it refuses the default one.
+    expect(() => parseSupportModelTargetJson(source,{ mode: "hosted",nodeEnv: "production" }))
+      .toThrowError(new TypeError("PROVIDER_BASE_URL_TLS_REQUIRED:development:hermes-glm-5.3-flash"));
+  });
+
   it("propagates the caller abort signal into fetch", async () => {
     let seen: AbortSignal | undefined;
     const fetchImplementation = vi.fn(async (_url: string | URL | Request,init?: RequestInit) => {

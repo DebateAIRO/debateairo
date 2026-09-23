@@ -92,6 +92,7 @@ function parseGrokEnvelope(stdout: string): {
 
 /** The isolation profile the relay asks for whenever this host can apply it. */
 export const GROK_SANDBOX_PROFILE = "read-only" as const;
+export type GrokSandboxProfile = typeof GROK_SANDBOX_PROFILE | "none";
 const GROK_SANDBOX_FLAG = "--sandbox" as const;
 
 /**
@@ -146,6 +147,8 @@ export interface GrokRelayOptions {
   readonly timeoutMs: number;
   /** Test-only process seam. Rejected outside NODE_ENV=test (DR-115). */
   readonly testOnlyCommand?: CommandSpec;
+  /** CLI sandbox profile; defaults to `read-only`. See GrokSandboxProfile. */
+  readonly sandboxProfile?: GrokSandboxProfile;
 }
 
 export interface GrokRelayHandle extends CliRelayHandle {
@@ -247,7 +250,9 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     options.testOnlyCommand,
     "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
   );
-  const probed = await handshakeWithProbedSandbox(command, options.timeoutMs);
+  const probed = options.sandboxProfile === "none"
+    ? await handshakeWithoutSandbox(command, options.timeoutMs)
+    : await handshakeWithProbedSandbox(command, options.timeoutMs);
   const server = await startCliRelayServer({
     port: options.port,
     timeoutMs: options.timeoutMs,
@@ -267,4 +272,14 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     degradation: probed.degradation,
     close: () => server.close()
   });
+}
+
+/** Preserve the development panel's explicit profile while reporting the degraded protection. */
+async function handshakeWithoutSandbox(command: CommandSpec, timeoutMs: number) {
+  const adapter = grokAdapterFor("none");
+  const handshake = await invokeCli(
+    command, adapter, GROK_HANDSHAKE_PROMPT, timeoutMs
+  ) as ReturnType<typeof parseGrokEnvelope>;
+  process.stdout.write(`RELAY DEGRADED ${XAI_MAKER} ${SANDBOX_PROFILE_UNAVAILABLE} EXPLICIT_NONE_PROFILE\n`);
+  return { handshake, adapter, sandboxProfile: null, degradation: SANDBOX_PROFILE_UNAVAILABLE };
 }

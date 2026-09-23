@@ -80,7 +80,7 @@ describe("v2-ui /new collects every value the V3 ask requires", () => {
     // V2's branching / concurrency / max-token / role-override knobs have no
     // slot in the V3 ask. They may stay on screen (design authority) but must
     // not be packed into a config the ask builder will drop on the floor.
-    const submitBlock = newPage.slice(newPage.indexOf("async function submit"), newPage.indexOf("return ("));
+    const submitBlock = region(newPage, "async function submit", "return (");
     for (const dropped of ["branching", "concurrency", "maxTokens", "role_overrides", "adaptive_expansion"]) {
       expect(submitBlock).not.toContain(dropped);
     }
@@ -239,10 +239,17 @@ describe("UI-02a: the node card shows V3's recorded numbers, in V2's own vocabul
     expect(badges).toContain("{badge.pillText}");
   });
 
-  it("keeps the fuller record on the executable drawer projection and forbids raw-value JSX", () => {
-    expect(drawer).toContain("v3NodeScoreDetails(v3)");
+  // SYNC3 fix round 1: this was ONE row whose first assertion fails on dev itself
+  // (dev's b7ca2c41 moved the helper into lib/v3/adapter.ts), which kept the two
+  // raw-value bans below from ever running while the row was listed as known red.
+  // The bans run in their own row; dev's pin is alone in the next.
+  it("forbids raw-value JSX on the executable drawer projection", () => {
     expect(drawer).not.toContain("base_score");
     expect(drawer).not.toContain("final_strength");
+  });
+
+  it("dev's b7ca2c41 pin: the drawer projects the fuller record through v3NodeScoreDetails(v3)", () => {
+    expect(drawer).toContain("v3NodeScoreDetails(v3)");
   });
 
   it("keeps adapter source text-searchable while preserving escaped NUL delimiters", () => {

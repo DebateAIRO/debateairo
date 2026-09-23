@@ -38,6 +38,7 @@ import {
   developmentDeploymentRegisterReceiptPath,
   parseDevelopmentDeploymentRegisterCliOutput,
   readDevelopmentDeploymentRegisterReceipt,
+  publishDevelopmentDeploymentRegisterProviderSet,
   seedDevelopmentDeploymentRegister,
   serializeDevelopmentDeploymentRegisterReceipt,
   writeDevelopmentDeploymentRegisterReceipt
@@ -144,6 +145,32 @@ afterEach(async () => {
 });
 
 describe("DEV-05 complete development deployment register", () => {
+  it("preserves selected synthesis roles through a real provider-set publication", async () => {
+    const configured = TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders;
+    const roleRefs = {
+      synthesizerRoleRef: configured[configured.length - 1]!.providerRef,
+      evaluatorRoleRef: configured[0]!.providerRef
+    };
+    const first = await seedDevelopmentDeploymentRegister({
+      adminPool: database.pool, providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot, roleRefs
+    });
+    const before = await database.pool.query(
+      "SELECT row_key, value_json, source_ref FROM register.register_row WHERE register_version=$1 AND row_key IN ('synthesizerRoleRef','evaluatorRoleRef') ORDER BY row_key",
+      [first.registerVersion]
+    );
+    const published = await publishDevelopmentDeploymentRegisterProviderSet({
+      adminPool: database.pool, providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot, baseRegisterVersion: parseRegisterVersionText(first.registerVersion)
+    });
+    const after = await database.pool.query(
+      "SELECT row_key, value_json, source_ref FROM register.register_row WHERE register_version=$1 AND row_key IN ('synthesizerRoleRef','evaluatorRoleRef') ORDER BY row_key",
+      [published.registerVersion]
+    );
+    expect(before.rows).toHaveLength(2);
+    expect(after.rows).toEqual(before.rows);
+  });
+
   it("initializes the complete 16-key development support snapshot enabled from the explicit deployed receipt", async () => {
     const deployed = await seedDevelopmentDeploymentRegister({
       adminPool: database.pool,
@@ -423,7 +450,9 @@ describe("DEV-05 complete development deployment register", () => {
       configuredMakers: ["Anthropic", "OpenAI", "xAI"],
       configuredProviders: [
         { providerRef: "development:codex-cli", maker: "OpenAI" },
+        { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
         { providerRef: "development:claude-cli", maker: "Anthropic" },
+        { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
         { providerRef: "development:grok-cli", maker: "xAI" }
       ]
     });

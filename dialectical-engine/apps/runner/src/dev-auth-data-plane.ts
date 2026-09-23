@@ -14,10 +14,15 @@ import {
   parseDevelopmentDeploymentRegisterCliOutput,
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
-import { createSupportControlPlanePool } from "@debateai/db";
 import { createPostgresRegisterPublicationPort } from "@debateai/register";
-import { loadDevelopmentSupportConfigCliCredentials } from "./support-config-cli-credentials.js";
+import {
+  createDevelopmentSupportConfigInitializationPool
+} from "./support-config-cli-credentials.js";
 import { initializeDevelopmentSupportConfiguration } from "./dev-support-config.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "./dev-auth-stack-profile.js";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
 const LOCAL_MIGRATOR_ORIGIN = "postgresql://127.0.0.1:55432/debateai";
@@ -33,11 +38,20 @@ const MAX_CHILD_OUTPUT_BYTES = 128 * 1024;
  * back here. The password is opaque material, so it is assigned through URL, never pasted:
  * a reserved character must not be able to re-point the connection at another host.
  */
-export function developmentMigratorDatabaseUrl(password: string): string {
-  if (password.length === 0) {
+export function developmentMigratorDatabaseUrl(
+  password: string,
+  postgresPort: number = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE.postgresPort
+): string {
+  if (password.length === 0
+    || !Number.isInteger(postgresPort)
+    || postgresPort < 1
+    || postgresPort > 65_535) {
     throw new DevelopmentAuthDataPlaneError("DEV_AUTH_DATA_PLANE_SECRET_FAILED");
   }
   const url = new URL(LOCAL_MIGRATOR_ORIGIN);
+  // The stack profile selects the published port (dev's support-preview stack is not on
+  // 55432); host, database and role stay fixed.
+  url.port = String(postgresPort);
   url.username = LOCAL_MIGRATOR_ROLE;
   url.password = password;
   return url.toString();
@@ -296,17 +310,25 @@ function composeArguments(
 export function createDevelopmentAuthDataPlaneOperations(
   repositoryRoot: string,
   commandEnvironment: Readonly<Record<string, string>>,
-  providerPanel: DevelopmentProviderPanel
+  providerPanel: DevelopmentProviderPanel,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentAuthDataPlaneOperations {
   const cwd = resolve(repositoryRoot);
   const custodyRoot = resolveDevCustodyRoot(cwd, commandEnvironment);
   const secretsEnvFile = developmentComposeSecretsPath(custodyRoot);
-  const composeEnvironment = Object.freeze({ VLLM_MODEL: "dev-auth-not-started" });
+  const composeEnvironment = Object.freeze({
+    VLLM_MODEL: "dev-auth-not-started",
+    DEBATEAI_DEV_COMPOSE_PROJECT_NAME: profile.composeProjectName,
+    DEBATEAI_DEV_POSTGRES_PORT: String(profile.postgresPort),
+    DEBATEAI_DEV_HATCHET_GRPC_PORT: String(profile.hatchetGrpcPort),
+    DEBATEAI_DEV_HATCHET_API_PORT: String(profile.hatchetApiPort)
+  });
   // Read per step, not once at construction: prepareComposeEnvironment generates the custody
   // file, so nothing may capture the password before that step has run.
   const migrationEnvironment = async () => Object.freeze({
     MIGRATION_DATABASE_URL: developmentMigratorDatabaseUrl(
-      await readDevelopmentComposeSecret(custodyRoot, "POSTGRES_SUPERUSER_PASSWORD")
+      await readDevelopmentComposeSecret(custodyRoot, "POSTGRES_SUPERUSER_PASSWORD"),
+      profile.postgresPort
     )
   });
   const pnpm = commandEnvironment.PNPM_EXECUTABLE?.trim() || "pnpm";
@@ -427,10 +449,10 @@ export function createDevelopmentAuthDataPlaneOperations(
       return parseDevelopmentDeploymentRegisterCliOutput(output, cwd);
     },
     async initializeSupportConfiguration(registerReceipt) {
-      const credentials = await loadDevelopmentSupportConfigCliCredentials(
-        join(custodyRoot, "database-principals.env")
+      const pool = await createDevelopmentSupportConfigInitializationPool(
+        join(custodyRoot, "database-principals.env"),
+        String(profile.postgresPort)
       );
-      const pool = createSupportControlPlanePool(credentials.databaseUrl);
       try {
         await initializeDevelopmentSupportConfiguration({
           publication: createPostgresRegisterPublicationPort(pool),

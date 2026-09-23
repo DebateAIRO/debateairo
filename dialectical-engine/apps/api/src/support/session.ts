@@ -23,7 +23,6 @@ export type SupportSessionRecord = Readonly<{
   state: "OPEN" | "LOCKED" | "CLOSED";
   kbVersion: string;
   createdAt: Date;
-  consentOwnContextAt: Date | null;
   shreddedAt?: Date | null;
 }>;
 
@@ -60,13 +59,6 @@ export interface SupportSessionPort {
     tokenSha256: string;
     lockAfterInjections?: number;
   }>): Promise<SupportSessionRecord | null>;
-  setConsent?(input: Readonly<{
-    sessionId: string;
-    tokenSha256: string;
-    identityOwnerRef: string;
-    on: boolean;
-    at: Date;
-  }>): Promise<SupportSessionRecord | null>;
   admitMessage(input: Readonly<{
     sessionId: string;
     tokenSha256: string;
@@ -88,10 +80,6 @@ export interface SupportSessionPort {
     cooldownMinutes: number;
     sessionLimit: number;
   }>): Promise<"ADMITTED" | "COOLDOWN" | "RATE_LIMITED">;
-  finalizeInjectionLock?(input: Readonly<{
-    sessionId: string;
-    lockAfterInjections: number;
-  }>): Promise<void>;
   recordRateLimit(input: Readonly<{
     sessionId: string;
     messageSha256: string;
@@ -206,7 +194,10 @@ export function createSupportMessageCipher(
         ciphertext
       );
       const { contentCiphertext: _ciphertext,wrappedKey: _wrapped,...metadata } = encrypted;
-      return Object.freeze({ ...metadata,text: plaintext.toString("utf8") });
+      const prepared = redactSupportMessage(plaintext.toString("utf8"));
+      return Object.freeze({
+        ...metadata,text: prepared.text,redacted: metadata.redacted || prepared.redacted
+      });
     } catch (error) {
       if (error instanceof TypedDomainError) throw error;
       throw new SupportSessionError(

@@ -15,6 +15,7 @@ import {
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 import { createDevelopmentDeploymentRegisterMachineReceipt } from "../../apps/runner/src/dev-deployment-register.js";
 import { parseRegisterVersionText } from "../../packages/register/src/index.js";
+import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
 
 const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
   registerVersion: parseRegisterVersionText("424242"),
@@ -38,6 +39,7 @@ function deferredExit() {
 
 function operations(input: Readonly<{
   occupied?: boolean;
+  preview?: boolean;
   failAt?: "provider_panel" | "support_model" | "data" | "token" | "environment" | "api" | "runner" | "ui" | "tls";
 }> = {}): DevelopmentAuthStackOperations & Readonly<{
   calls: string[];
@@ -53,6 +55,7 @@ function operations(input: Readonly<{
     if (input.failAt === stage) throw new Error(`sensitive ${stage} failure`);
   };
   return {
+    ...(input.preview ? { profile: SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } : {}),
     calls,
     apiExit,
     uiExit,
@@ -280,7 +283,12 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
       tls: "SYSTEM_TRUST",
       providers: "CLI_HANDSHAKE",
       supportModel: "HERMES_GLM_5_3_FLASH",
-      healthyProviderRefs: ["development:codex-cli", "development:claude-cli"],
+      healthyProviderRefs: [
+        "development:codex-cli",
+        "development:codex-premium-cli",
+        "development:claude-cli",
+        "development:claude-premium-cli"
+      ],
       runner: "REGISTERED"
     });
     expect(runtime.calls).toEqual([
@@ -305,6 +313,13 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     await expect(startDevelopmentAuthStack(runtime))
       .rejects.toThrow("DEV_AUTH_STACK_PUBLIC_PORT_OCCUPIED");
     expect(runtime.calls).toEqual(["preflight"]);
+  });
+
+  it("reports the selected support-preview origin without changing lifecycle ownership", async () => {
+    const runtime = operations({ preview: true });
+    const stack = await startDevelopmentAuthStack(runtime);
+    expect(stack.receipt.origin).toBe("https://localhost:3100");
+    await stack.stop();
   });
 
   it.each([
@@ -414,7 +429,7 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     expect(source).not.toMatch(/dev-local-provider|qa-deterministic/iu);
     expect(source).not.toMatch(/mkcert\s+-install|seedAccount/iu);
     expect(source).not.toContain("process.env");
-    expect(cli).toContain("DEV_AUTH_STACK_READY=https://localhost:3000:RUNNER_REGISTERED");
+    expect(cli).toContain("DEV_AUTH_STACK_READY=${stack.receipt.origin}:RUNNER_REGISTERED");
     expect(cli).toContain("process.on(\"uncaughtException\"");
     expect(cli).toContain("process.on(\"unhandledRejection\"");
     expect(cli).not.toContain("process.once(\"SIGINT\"");

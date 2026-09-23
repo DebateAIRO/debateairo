@@ -8,6 +8,7 @@ import {
 import { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { SUPPORT_ROUTE_PATHS } from "../../apps/api/src/support/index.js";
 import type { SupportAnswerPort } from "../../apps/api/src/support/answer.js";
+import type { LoadedHelpCorpus } from "../../packages/support-kb/src/index.js";
 import { createSupportCaseService } from "../../apps/api/src/support/session.js";
 import { supportHarness } from "../support/supportHarness.js";
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
@@ -81,6 +82,15 @@ function harness(policy: AdmissionPolicy = PUBLISHED) {
     application: fixtureAskApplication(),
     support: {
       ...support.application,
+      // SYNC3: dev's route binds a model answer to the session's reviewed KB
+      // snapshot and answers 409 SUPPORT_KB_SNAPSHOT_UNAVAILABLE without one.
+      // The answer port here is a stub, so any snapshot of the right version will do.
+      knowledge: Object.freeze({
+        ...support.application.knowledge,
+        snapshot: (version: string) => Object.freeze({
+          kbVersion: version, entries: Object.freeze([])
+        }) as unknown as LoadedHelpCorpus
+      }),
       answer: Object.freeze({ respond }) as unknown as SupportAnswerPort
     },
     allowedOrigin: TEST_APP_ORIGIN,
@@ -119,8 +129,7 @@ function harness(policy: AdmissionPolicy = PUBLISHED) {
 /** Every mutating support route, with a body the handler will accept far enough. */
 const MUTATING_SUPPORT_ROUTES = Object.freeze([
   ["POST /v1/support/sessions", "/v1/support/sessions", { language: "en" }],
-  ["POST /v1/support/sessions/{id}/consent",
-    "/v1/support/sessions/11111111-1111-4111-8111-111111111111/consent", { on: true }],
+  // SYNC3: the consent route retired with dev's private-context removal.
   ["POST /v1/support/sessions/{id}/messages",
     "/v1/support/sessions/11111111-1111-4111-8111-111111111111/messages", { text: "hello" }],
   ["POST /v1/support/messages/{id}/rating",

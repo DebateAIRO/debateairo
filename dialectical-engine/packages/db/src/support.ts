@@ -9,7 +9,6 @@ export type SupportRepositoryRecord = Readonly<{
   state: "OPEN" | "LOCKED" | "CLOSED";
   kbVersion: string;
   createdAt: Date;
-  consentOwnContextAt: Date | null;
   shreddedAt?: Date | null;
 }>;
 
@@ -75,143 +74,6 @@ export type SupportRelayQueueEntryResult =
   | Readonly<{ kind: "DAILY_CAP" }>
   | Readonly<{ kind: "WAITING";waiterId: string;ticket: number;position: number }>
   | Extract<SupportRelayReservationResult,{ kind: "ACQUIRED" }>;
-
-export type SupportOwnRunStateRow = Readonly<{
-  run_id: string;
-  created_at: Date;
-  run_state: "generating" | "failed" | "served";
-  terminal_state: string | null;
-  staleness_state: string | null;
-  visibility: "PRIVATE" | "PUBLISHED";
-  public_ref: string | null;
-  progress_stage: string | null;
-  last_event_at: Date;
-  failure_code: string | null;
-}>;
-
-export class PostgresSupportOwnContextRepository {
-  constructor(readonly corePool: Pool,readonly supportPool: Pool) {}
-
-  async read(input: Readonly<{
-    ownerRef: string;
-    legacyAskerId: null;
-    runId: string;
-    latest: boolean;
-  }>): Promise<SupportOwnRunStateRow | null> {
-    const result = await this.corePool.query<SupportOwnRunStateRow>(`
-      WITH candidate AS (
-        SELECT run.run_id,run.as_of,run.created_at_seq
-        FROM core.run AS run
-        WHERE (($4::boolean AND $1::uuid='00000000-0000-4000-8000-000000000000'::uuid)
-            OR (NOT $4::boolean AND run.run_id=$1::uuid))
-          AND core.run_is_owned_by(run.run_id,$2,$3)
-        ORDER BY run.created_at_seq DESC
-        LIMIT 1
-      ), projected AS (
-        SELECT run.run_id,
-          COALESCE((SELECT event.occurred_at FROM core.question_liveness_event AS event
-            WHERE event.run_id=run.run_id ORDER BY event.at_seq LIMIT 1),run.as_of) AS created_at,
-          CASE
-            WHEN EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id=run.run_id)
-              THEN 'served'
-            WHEN EXISTS (SELECT 1 FROM core.work_item AS work
-              WHERE work.run_id=run.run_id AND work.state='FAILED') THEN 'failed'
-            ELSE 'generating'
-          END AS run_state,
-          (SELECT COALESCE(event.value_json->>'state',event.value_json#>>'{}')
-            FROM core.run_progress_event AS event
-            WHERE event.run_id=run.run_id AND event.kind='TERMINAL'
-            ORDER BY event.at_seq DESC LIMIT 1) AS terminal_state,
-          (SELECT stale.state FROM core.staleness_state AS stale
-            WHERE stale.run_id=run.run_id ORDER BY stale.at_seq DESC LIMIT 1) AS staleness_state,
-          COALESCE((SELECT visibility.state FROM core.run_visibility_event AS visibility
-            WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1),'PRIVATE')
-            AS visibility,
-          (SELECT CASE WHEN visibility.state='PUBLISHED' THEN visibility.publication_ref END
-            FROM core.run_visibility_event AS visibility
-            WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1) AS public_ref,
-          (SELECT COALESCE(event.value_json->>'stage',event.value_json#>>'{}')
-            FROM core.run_progress_event AS event
-            WHERE event.run_id=run.run_id AND event.kind='PHASE'
-            ORDER BY event.at_seq DESC LIMIT 1) AS progress_stage,
-          GREATEST(run.as_of,
-            (SELECT event.occurred_at FROM core.question_liveness_event AS event
-              WHERE event.run_id=run.run_id ORDER BY event.at_seq DESC LIMIT 1),
-            (SELECT visibility.occurred_at FROM core.run_visibility_event AS visibility
-              WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1))
-            AS last_event_at,
-          (SELECT work.terminal_reason FROM core.work_item AS work
-            WHERE work.run_id=run.run_id AND work.state='FAILED'
-            ORDER BY work.created_at_seq DESC LIMIT 1) AS failure_code
-        FROM candidate AS selected
-        JOIN core.run AS run ON run.run_id=selected.run_id
-      )
-      SELECT run_id,created_at,run_state,terminal_state,staleness_state,visibility,
-        public_ref,progress_stage,last_event_at,failure_code
-      FROM projected
-    `,[input.runId,input.ownerRef,input.legacyAskerId,input.latest]);
-    return result.rows[0] ?? null;
-  }
-
-  async list(input: Readonly<{
-    ownerRef: string;
-    legacyAskerId: null;
-  }>): Promise<readonly SupportOwnRunStateRow[]> {
-    const result = await this.corePool.query<SupportOwnRunStateRow>(`
-      SELECT run.run_id,run.as_of AS created_at,
-        CASE WHEN EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id=run.run_id)
-          THEN 'served'
-          WHEN EXISTS (SELECT 1 FROM core.work_item AS work
-            WHERE work.run_id=run.run_id AND work.state='FAILED') THEN 'failed'
-          ELSE 'generating' END AS run_state,
-        NULL::text AS terminal_state,NULL::text AS staleness_state,
-        COALESCE((SELECT visibility.state FROM core.run_visibility_event AS visibility
-          WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1),'PRIVATE')
-          AS visibility,
-        (SELECT CASE WHEN visibility.state='PUBLISHED' THEN visibility.publication_ref END
-          FROM core.run_visibility_event AS visibility
-          WHERE visibility.run_id=run.run_id ORDER BY visibility.at_seq DESC LIMIT 1) AS public_ref,
-        (SELECT COALESCE(event.value_json->>'stage',event.value_json#>>'{}')
-          FROM core.run_progress_event AS event WHERE event.run_id=run.run_id AND event.kind='PHASE'
-          ORDER BY event.at_seq DESC LIMIT 1) AS progress_stage,
-        run.as_of AS last_event_at,
-        (SELECT work.terminal_reason FROM core.work_item AS work
-          WHERE work.run_id=run.run_id AND work.state='FAILED'
-          ORDER BY work.created_at_seq DESC LIMIT 1) AS failure_code
-      FROM core.run AS run
-      WHERE core.run_is_owned_by(run.run_id,$1,$2)
-      ORDER BY run.created_at_seq DESC
-      LIMIT 20
-    `,[input.ownerRef,input.legacyAskerId]);
-    return Object.freeze(result.rows);
-  }
-
-  async recordToolCall(input: Readonly<{
-    sessionId: string;
-    argsSha256: string;
-    result: Readonly<Record<string,unknown>> | "NOT_OWNED";
-    at: Date;
-  }>): Promise<void> {
-    await this.supportPool.query(`
-      INSERT INTO support.tool_call(tool_call_id,session_id,name,args_sha256,result,at)
-      VALUES($1,$2,'read_own_run_state',$3,$4::jsonb,$5)
-    `,[randomUUID(),input.sessionId,input.argsSha256,JSON.stringify(input.result),input.at]);
-  }
-
-  async listToolCalls(sessionId: string): Promise<readonly Readonly<{
-    name: string;at: Date;result: SupportOwnRunStateRow | "NOT_OWNED";
-  }>[]> {
-    const rows = await this.supportPool.query<{
-      name: string;at: Date;result: SupportOwnRunStateRow | "NOT_OWNED";
-    }>(`
-      SELECT name,at,result
-      FROM support.tool_call
-      WHERE session_id=$1
-      ORDER BY at,tool_call_id
-    `,[sessionId]);
-    return Object.freeze(rows.rows.map((row) => Object.freeze(row)));
-  }
-}
 
 export type SupportMessageRole = "user" | "assistant";
 export type SupportMessageOutcome =
@@ -304,7 +166,6 @@ type SupportSessionRow = Readonly<{
   state: "OPEN" | "LOCKED" | "CLOSED";
   kb_version: string;
   created_at: Date;
-  consent_own_context_at: Date | null;
   shredded_at?: Date | null;
 }>;
 
@@ -316,7 +177,6 @@ function record(row: SupportSessionRow): SupportRepositoryRecord {
     state: row.state,
     kbVersion: row.kb_version,
     createdAt: row.created_at,
-    consentOwnContextAt: row.consent_own_context_at,
     ...(row.shredded_at === undefined ? {} : { shreddedAt: row.shredded_at })
   });
 }
@@ -402,8 +262,7 @@ export class PostgresSupportSessionRepository {
           INSERT INTO support.session(
             session_id,session_token_sha256,identity_owner_ref,language,state,kb_version,created_at
           ) VALUES($1,$2,$3,$4,'OPEN',$5,$6)
-          RETURNING session_id,identity_owner_ref,language,state,kb_version,created_at,
-            consent_own_context_at
+          RETURNING session_id,identity_owner_ref,language,state,kb_version,created_at
         `, [
           input.sessionId,input.tokenSha256,input.identityOwnerRef,input.language,
           input.kbVersion,input.createdAt
@@ -430,6 +289,11 @@ export class PostgresSupportSessionRepository {
     const result = await this.pool.query<SupportSessionRow>(`
       SELECT session_id,identity_owner_ref,language,
         CASE
+          WHEN state='OPEN' AND EXISTS (
+            SELECT 1
+            FROM support.abuse_event AS event
+            WHERE event.session_id=support.session.session_id AND event.class='LOCK'
+          ) THEN 'LOCKED'
           WHEN state='OPEN' AND $3::integer IS NOT NULL AND (
             SELECT count(*)
             FROM support.abuse_event AS event
@@ -437,29 +301,10 @@ export class PostgresSupportSessionRepository {
           ) >= $3::integer THEN 'LOCKED'
           ELSE state
         END AS state,
-        kb_version,created_at,
-        consent_own_context_at,shredded_at
+        kb_version,created_at,shredded_at
       FROM support.session
       WHERE session_id=$1 AND session_token_sha256=$2
     `, [input.sessionId, input.tokenSha256, input.lockAfterInjections ?? null]);
-    return result.rows[0] === undefined ? null : record(result.rows[0]);
-  }
-
-  async setConsent(input: Readonly<{
-    sessionId: string;
-    tokenSha256: string;
-    identityOwnerRef: string;
-    on: boolean;
-    at: Date;
-  }>): Promise<SupportRepositoryRecord | null> {
-    const result = await this.pool.query<SupportSessionRow>(`
-      UPDATE support.session
-      SET consent_own_context_at=CASE WHEN $4::boolean THEN $5::timestamptz ELSE NULL END
-      WHERE session_id=$1 AND session_token_sha256=$2 AND identity_owner_ref=$3
-        AND shredded_at IS NULL
-      RETURNING session_id,identity_owner_ref,language,state,kb_version,created_at,
-        consent_own_context_at,shredded_at
-    `,[input.sessionId,input.tokenSha256,input.identityOwnerRef,input.on,input.at]);
     return result.rows[0] === undefined ? null : record(result.rows[0]);
   }
 
@@ -497,12 +342,17 @@ export class PostgresSupportSessionRepository {
         created_at: Date;
         shredded_at: Date | null;
         injections: string;
+        locked: boolean;
       }>(`
         SELECT state,identity_owner_ref,created_at,shredded_at,(
           SELECT count(*)::text
           FROM support.abuse_event AS event
           WHERE event.session_id=support.session.session_id AND event.class='INJECTION'
-        ) AS injections
+        ) AS injections,EXISTS(
+          SELECT 1
+          FROM support.abuse_event AS event
+          WHERE event.session_id=support.session.session_id AND event.class='LOCK'
+        ) AS locked
         FROM support.session
         WHERE session_id=$1 AND session_token_sha256=$2
       `, [input.sessionId, input.tokenSha256]);
@@ -510,7 +360,7 @@ export class PostgresSupportSessionRepository {
       if (row === undefined) return "NOT_FOUND";
       if (row.identity_owner_ref !== input.identityOwnerRef) return "NOT_FOUND";
       if (row.shredded_at !== null) return "SHREDDED";
-      if (row.state !== "OPEN") {
+      if (row.state !== "OPEN" || row.locked) {
         return "LOCKED";
       }
       if (Number(row.injections) >= input.lockAfterInjections) {
@@ -625,23 +475,6 @@ export class PostgresSupportSessionRepository {
     });
   }
 
-  async finalizeInjectionLock(input: Readonly<{
-    sessionId: string;
-    lockAfterInjections: number;
-  }>): Promise<void> {
-    await withSupportTransaction(this.pool,async (client) => {
-      await lockSupportSessions(client,[input.sessionId]);
-      await client.query(`
-        UPDATE support.session
-        SET state='LOCKED'
-        WHERE session_id=$1 AND state='OPEN' AND (
-          SELECT count(*) FROM support.abuse_event AS event
-          WHERE event.session_id=support.session.session_id AND event.class='INJECTION'
-        ) >= $2::integer
-      `,[input.sessionId,input.lockAfterInjections]);
-    });
-  }
-
   async recordRateLimit(input: Readonly<{
     sessionId: string;
     messageSha256: string;
@@ -684,6 +517,11 @@ export class PostgresSupportSessionRepository {
           AND message.session_id=$1
           AND session.session_token_sha256=$2
           AND session.shredded_at IS NULL
+          AND session.state='OPEN'
+          AND NOT EXISTS (
+            SELECT 1 FROM support.abuse_event AS event
+            WHERE event.session_id=session.session_id AND event.class='LOCK'
+          )
           AND message.role='assistant'
           AND message.outcome IN ('ANSWER_GROUNDED','NO_SOURCE')
         ON CONFLICT (message_id) DO NOTHING
@@ -835,14 +673,18 @@ export class PostgresSupportCaseRepository {
         await lockSupportSessions(client,[input.sessionId]);
         const parent = (await client.query<{
           state: string;shredded_at: Date | null;destroyed_at: Date | null;wrapped_key: Buffer;
+          locked: boolean;
         }>(`
-          SELECT parent.state,parent.shredded_at,key.destroyed_at,key.wrapped_key
+          SELECT parent.state,parent.shredded_at,key.destroyed_at,key.wrapped_key,EXISTS(
+            SELECT 1 FROM support.abuse_event AS event
+            WHERE event.session_id=parent.session_id AND event.class='LOCK'
+          ) AS locked
           FROM support.session AS parent
           JOIN support.session_key AS key ON key.session_id=parent.session_id
           WHERE parent.session_id=$1
           FOR UPDATE OF parent,key
         `,[input.sessionId])).rows[0];
-        if (parent === undefined || parent.state !== "OPEN"
+        if (parent === undefined || parent.state !== "OPEN" || parent.locked
           || parent.shredded_at !== null || parent.destroyed_at !== null
           || parent.wrapped_key.byteLength !== 61 || parent.wrapped_key[0] !== 1) {
           throw new TypeError("SUPPORT_CASE_PARENT_INVALID");
@@ -930,14 +772,18 @@ export class PostgresSupportCaseRepository {
           shredded_at: Date | null;
           destroyed_at: Date | null;
           wrapped_key: Buffer;
+          locked: boolean;
         }>(`
-          SELECT parent.state,parent.shredded_at,key.destroyed_at,key.wrapped_key
+          SELECT parent.state,parent.shredded_at,key.destroyed_at,key.wrapped_key,EXISTS(
+            SELECT 1 FROM support.abuse_event AS event
+            WHERE event.session_id=parent.session_id AND event.class='LOCK'
+          ) AS locked
           FROM support.session AS parent
           JOIN support.session_key AS key ON key.session_id=parent.session_id
           WHERE parent.session_id=$1
           FOR UPDATE OF parent,key
         `, [input.sessionId])).rows[0];
-        if (parent === undefined || parent.state !== "OPEN"
+        if (parent === undefined || parent.state !== "OPEN" || parent.locked
           || parent.shredded_at !== null || parent.destroyed_at !== null
           || parent.wrapped_key.byteLength !== 61 || parent.wrapped_key[0] !== 1) {
           throw new TypeError("SUPPORT_CASE_PARENT_INVALID");
@@ -2161,7 +2007,7 @@ export class PostgresSupportStatusRepository {
       input_tokens_last_7_days: string | null;
       output_tokens_last_7_days: string | null;
       cost_usd_last_7_days: string | null;
-      relay_outcome: "ANSWER_GROUNDED" | "DEGRADED" | null;
+      relay_outcome: "ANSWER_GROUNDED" | "REFUSE_SAFETY" | "DEGRADED" | null;
       relay_at: Date | null;
       deflection_7_days: string | null;
       deflection_30_days: string | null;
@@ -2180,7 +2026,9 @@ export class PostgresSupportStatusRepository {
         SELECT message.outcome,message.completed_at
         FROM support.message AS message,bounds
         WHERE role='assistant' AND (
-          outcome='ANSWER_GROUNDED' OR (outcome='DEGRADED' AND degraded_reason='relay')
+          outcome='ANSWER_GROUNDED'
+          OR (outcome='REFUSE_SAFETY' AND model_called)
+          OR (outcome='DEGRADED' AND degraded_reason='relay')
         ) AND message.completed_at<=bounds.observed_at
         ORDER BY completed_at DESC NULLS LAST,message_id DESC
         LIMIT 1
@@ -2249,7 +2097,11 @@ export class PostgresSupportStatusRepository {
         (SELECT (count(*) FILTER (WHERE rating='yes'))::numeric/NULLIF(count(*),0)
           FROM rating_metrics,bounds
           WHERE at>=bounds.observed_at-interval '30 days')::text AS rating_resolution_30_days,
-        (SELECT count(*) FROM support.session WHERE state='OPEN')::text AS open_sessions,
+        (SELECT count(*) FROM support.session AS session
+          WHERE session.state='OPEN' AND NOT EXISTS (
+            SELECT 1 FROM support.abuse_event AS event
+            WHERE event.session_id=session.session_id AND event.class='LOCK'
+          ))::text AS open_sessions,
         (SELECT count(*) FROM support."case" WHERE state='NEW')::text AS new_cases
     `,[this.clock()]);
     const row = result.rows[0];

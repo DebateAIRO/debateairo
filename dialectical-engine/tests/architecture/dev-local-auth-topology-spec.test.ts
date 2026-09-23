@@ -228,8 +228,8 @@ describe("DEV-01 local-auth topology specification", () => {
     expect(apiMain).toContain("assertAccountErasureDatabaseRole(pool,erasurePool)");
     expect(apiMain).toContain("environment.MAIL_SENDMAIL_PATH");
     expect(uiServer).toContain('process.env.PORT?.trim() || "3000"');
-    expect(compose).toContain('"127.0.0.1:8888:8888"');
-    expect(compose).toContain('"127.0.0.1:7077:7077"');
+    expect(compose).toContain('"127.0.0.1:${DEBATEAI_DEV_HATCHET_API_PORT:-8888}:8888"');
+    expect(compose).toContain('"127.0.0.1:${DEBATEAI_DEV_HATCHET_GRPC_PORT:-7077}:7077"');
     // DEV-01 promised a dedicated hatchet owner; compose now uses it (L7-F2).
     expect(compose).toContain("postgresql://debateai_dev_hatchet:");
     expect(compose).not.toContain("postgresql://debateai:");

@@ -6,6 +6,7 @@ import {
   type DevelopmentUiProcessOperations,
   type DevelopmentUiProbe
 } from "../../apps/runner/src/dev-ui-process.js";
+import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
 
 const API_READY = Object.freeze({
   statusCode: 401,
@@ -69,7 +70,8 @@ describe("DEV-10C private local UI process", () => {
       DIALECTICAL_UI_HOST: "127.0.0.1",
       PORT: "3001",
       DIALECTICAL_API_BASE: "http://127.0.0.1:8790",
-      NEXT_PUBLIC_API_BASE: "/api"
+      NEXT_PUBLIC_API_BASE: "/api",
+      NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED: "true"
     });
     await uiProcess.stop();
     expect(runtime.uiChild.terminate).toHaveBeenCalledTimes(1);
@@ -89,6 +91,22 @@ describe("DEV-10C private local UI process", () => {
       })).rejects.toThrow("DEV_UI_PROCESS_API_UNAVAILABLE");
       expect(runtime.startUi).not.toHaveBeenCalled();
     }
+  });
+
+  it("starts the selected support-preview UI against its isolated API", async () => {
+    const runtime = operations();
+    const uiProcess = await startDevelopmentUiProcess({
+      repositoryRoot: process.cwd(),
+      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
+      operations: runtime,
+      profile: SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE
+    });
+    expect(uiProcess.receipt.port).toBe(3101);
+    expect(runtime.startUi).toHaveBeenCalledWith(expect.objectContaining({
+      PORT: "3101",
+      DIALECTICAL_API_BASE: "http://127.0.0.1:8890"
+    }));
+    await uiProcess.stop();
   });
 
   it("refuses any pre-existing port-3001 listener without adopting it", async () => {
@@ -156,9 +174,7 @@ describe("DEV-10C private local UI process", () => {
     );
     expect(implementation).toContain("if (session === null) return null");
     expect(implementation).not.toContain("DEV_UI_PROCESS_PROXY_DISAPPEARED");
-    expect(implementation).toContain("const LOCAL_UI_PORT = 3_001");
-    expect(implementation).toContain("PORT: String(LOCAL_UI_PORT)");
-    expect(implementation).not.toContain("LOCAL_UI_PORT = 3_000");
+    expect(implementation).toContain("PORT: String(profile.uiPort)");
     expect(implementation).not.toContain("process.env");
     expect(cli).toContain("DEV_AUTH_UI_READY=127.0.0.1:3001:DENY_DEFAULT_PROXY");
     expect(cli).not.toMatch(/DATABASE_URL|HATCHET_CLIENT_TOKEN|password/iu);

@@ -418,6 +418,8 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
     const operatorPort = createPostgresRegisterPublicationPort(operatorPool);
     const adminPort = createPostgresRegisterPublicationPort(database.pool);
     try {
+      await expect(operatorPort.readSupportStatus()).resolves.toBeNull();
+
       const incomplete = completeSupportPatch(false)
         .filter(({ key }) => key !== "support_enabled");
       await expect(operatorPort.publishSupport({

@@ -39,7 +39,6 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   // DL1-F7: every mutating support route, anonymous callers included.
   { route: "POST /v1/support/sessions", auth: "public", origin: "trusted", session: "optional", resource: "support-session", action: "create" },
   { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
-  { route: "POST /v1/support/sessions/{id}/consent", auth: "public", origin: "trusted", session: "optional", resource: "support-session", action: "consent" },
   { route: "POST /v1/support/sessions/{id}/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
   { route: "POST /v1/support/messages/{id}/rating", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "rate" },
   { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "create" },
@@ -78,6 +77,7 @@ const validAskPayload = () => ({
   decision_scope: "test",
   as_of: "2026-08-07T00:00:00.000Z",
   steering_presets: [],
+  plan_tier: "free",
   steering_annotations: []
 });
 

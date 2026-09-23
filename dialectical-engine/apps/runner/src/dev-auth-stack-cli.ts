@@ -6,6 +6,7 @@ import {
   superviseDevelopmentAuthStack,
   startDevelopmentAuthStack
 } from "./dev-auth-stack.js";
+import { loadDevelopmentAuthStackProfile } from "./dev-auth-stack-profile.js";
 
 function terminationSignal(): Promise<NodeJS.Signals> {
   return new Promise((resolveSignal) => {
@@ -49,13 +50,16 @@ function runtimeFaultSignal(): Readonly<{ promise: Promise<never>; dispose(): vo
 
 const runtimeFault = runtimeFaultSignal();
 try {
+  const commandEnvironment = loadDevelopmentCommandEnvironment();
+  const profile = loadDevelopmentAuthStackProfile(commandEnvironment);
   const stack = await startDevelopmentAuthStack(
     createDevelopmentAuthStackOperations(
       process.cwd(),
-      loadDevelopmentCommandEnvironment()
+      commandEnvironment,
+      profile
     )
   );
-  console.log("DEV_AUTH_STACK_READY=https://localhost:3000:RUNNER_REGISTERED");
+  console.log(`DEV_AUTH_STACK_READY=${stack.receipt.origin}:RUNNER_REGISTERED`);
   await superviseDevelopmentAuthStack(
     stack,
     Promise.race([terminationSignal(), runtimeFault.promise])

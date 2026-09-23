@@ -408,6 +408,26 @@ function panelAssessmentDouble(fidelity: number): string {
   });
 }
 
+/**
+ * L4-F10 (SYNC3-B): the model an OpenAI-compatible request asks for. The gateway
+ * sends its target's PIN as `model` and refuses, as PROVIDER_MODEL_IDENTITY_CHANGED,
+ * an answer asserting any other model, so the double below — an HONEST vendor —
+ * answers with the model it was asked for. It used to assert a placeholder
+ * ("test-layer/model", "model:test-layer") whatever the target was pinned to,
+ * which only a gateway without the check could accept. A body naming no model is
+ * answered without one, which the gateway refuses as malformed: the double never
+ * guesses a model. The refusal of a relabelled answer is proved where the check
+ * lives, `tests/unit/provider-gateway-model-identity.test.ts`.
+ */
+function requestedModel(body: string): string | undefined {
+  try {
+    const model = (JSON.parse(body) as { readonly model?: unknown }).model;
+    return typeof model === "string" ? model : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function startProviderDouble(
   contents: readonly ProviderDoubleResponse[],
   panelAssessment: string = DEFAULT_PANEL_ASSESSMENT
@@ -456,6 +476,7 @@ async function startProviderDouble(
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
       bodies.push(body);
+      const askedModel = requestedModel(body);
       // J12 coherence (T3/S2-2): every M>=2 fixture below now runs a judge panel, so
       // each authored node draws one assess call per non-author maker. Those legs are
       // answered FROM THE CONTRACT and never consume `pending`, so every fixture's
@@ -475,7 +496,7 @@ async function startProviderDouble(
         calls += 1;
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `panel-assess-${calls}`,
-          model: "model:test-layer",
+          model: askedModel,
           choices: [{ message: { content: panelAssessment } }]
         }));
         return;
@@ -512,7 +533,7 @@ async function startProviderDouble(
         return;
       }
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
-        id: `completion-test-${calls}`, model: "test-layer/model",
+        id: `completion-test-${calls}`, model: askedModel,
         choices: [{ message: { content } }]
       }));
     });
@@ -5437,6 +5458,62 @@ describe("T10/T11 · the served root and its label, through the production runne
       await absentRolePrimary.stop();
     }
   });
+
+  it.each(["HEALTHY", "ABSENT", "MISSING_PROBE"] as const)(
+    "keeps a sealed synthesis provider outside the debate panel separate: %s",
+    async (state) => {
+      const work = await createRunnerWork(`separate-synthesis-${state}-${randomUUID()}`);
+      const author = await startProviderDouble([judgementDouble("A single panel author's position", 0.4)]);
+      const synthesis = await startProviderDouble([resil01Composition, evaluatorSatisfied()]);
+      const roleRef = "provider:test-layer:secondary";
+      const probes: string[] = [];
+      try {
+        const settings = runnerSettings();
+        const runner = runnerWithEndpoint(author.endpoint, {
+          ...settings,
+          scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+          additionalMakers: [{
+            provider: createPostgresProviderGateway(database.pool, {
+              endpoint: synthesis.endpoint, model: "test-layer/synthesis-model", maker: "synthesis-only"
+            }),
+            providerRef: roleRef, maker: "synthesis-only"
+          }],
+          synthesisRolePolicy: {
+            ...settings.synthesisRolePolicy,
+            synthesizerRoleRef: roleRef, evaluatorRoleRef: roleRef
+          },
+          ...(state === "MISSING_PROBE" ? {} : {
+            claimTimeSynthesisRoleProbe: async (providerRef: string) => {
+              probes.push(providerRef);
+              return state === "HEALTHY"
+                ? { state: "HEALTHY" as const, modelId: "test-layer/synthesis-model", failureCode: null }
+                : { state: "ABSENT" as const, modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" };
+            }
+          })
+        });
+        if (state === "HEALTHY") {
+          await expect(runner.executeWorkItem(work.workItemId)).resolves.toMatchObject({ kind: "COMPLETED" });
+          expect(author.calls()).toBe(1);
+          expect(synthesis.calls()).toBe(2);
+          // The shared synthesis/evaluator identity is probed once; it authors no panel roots.
+          expect(probes).toEqual([roleRef]);
+          const frozen = await new RunRepository(database.pool).readFrozenHead(work.runId);
+          expect(frozen.discoveredPanel.map((member) => member.provider_ref)).toEqual([settings.providerRef]);
+        } else {
+          await expect(runner.executeWorkItem(work.workItemId))
+            .rejects.toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+          expect(author.calls()).toBe(0);
+          expect(synthesis.calls()).toBe(0);
+          expect(probes).toEqual(state === "MISSING_PROBE" ? [] : [roleRef]);
+          const item = await database.pool.query("SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [work.workItemId]);
+          expect(item.rows[0]).toEqual({ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER" });
+        }
+      } finally {
+        await author.stop();
+        await synthesis.stop();
+      }
+    }
+  );
 
   /**
    * codex r2 B2 / J29 — a round reference must RESOLVE, and resolve INSIDE THIS

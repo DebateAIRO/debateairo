@@ -1,4 +1,4 @@
-import type { Deployment, Session } from "@debateai/contract";
+import type { Deployment, PlanTier, Session } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 
 export type RiskTier = "casual" | "standard" | "high-stakes";
@@ -49,6 +49,7 @@ export type NewDebateAskDefaults = {
   readonly asOf: string;
   readonly depth: number;
   readonly asOfWasEdited: boolean;
+  readonly planTier?: PlanTier;
   readonly riskTierWasEdited?: boolean;
 };
 
@@ -58,9 +59,10 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
     throw new TypedDomainError("ASK_AS_OF_INVALID", "As of must be a valid date and time.");
   }
   return {
+    plan_tier: defaults.planTier,
     risk_tier: defaults.riskTier,
     tier_source: defaults.riskTierWasEdited ? "ASKER" : "MACHINE_DEFAULT",
-    tier_provenance_ref: defaults.riskTierWasEdited ? "asker:ui-selection" : "machine:deployment-floor",
+    tier_provenance_ref: defaults.riskTierWasEdited ? "asker:ui-selection" : "machine:plan-tier-free",
     composition_budget_tier: defaults.budgetTier,
     depth: defaults.depth,
     decision_scope: defaults.decisionScope.trim(),

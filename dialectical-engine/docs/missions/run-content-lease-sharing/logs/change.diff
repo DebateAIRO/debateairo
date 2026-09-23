@@ -1,0 +1,81 @@
+diff --git a/dialectical-engine/packages/db/src/index.ts b/dialectical-engine/packages/db/src/index.ts
+index e59f1af9..b17afe8f 100644
+--- a/dialectical-engine/packages/db/src/index.ts
++++ b/dialectical-engine/packages/db/src/index.ts
+@@ -292,6 +292,16 @@ export interface RunContentLease {
+   release(): Promise<void>;
+ }
+ 
++/**
++ * Takes the run content lease in SHARED mode. The lease keeps account erasure - the only
++ * exclusive holder (withErasureContentLeases in account-erasure.ts) - from shredding a run's
++ * keys while anything still uses that run's content; it is not a mutex between users. When
++ * users took it exclusively, the runner held a run's lease for the whole debate and every
++ * reader of that run spun below until the debate ended (2026-09-13: a slow Premium debate
++ * froze the debate page, its event stream and the home list for half an hour). Postgres
++ * queues a new shared request behind a waiting exclusive one, so readers cannot starve an
++ * erasure that is already waiting; the retry below is only ever contended by erasure.
++ */
+ export async function acquireRunContentLease(
+   pool: Pool,
+   requestedRunIds: readonly string[]
+@@ -309,8 +319,9 @@ export async function acquireRunContentLease(
+       let failure: unknown = invalidated;
+       for (const runId of [...acquired].reverse()) {
+         try {
++          // A shared hold is released only by the shared unlock; the exclusive one returns false.
+           const result = await client.query<{ unlocked: boolean }>(
+-            "SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked",
++            "SELECT pg_advisory_unlock_shared(hashtextextended($1,0)) AS unlocked",
+             [`${CONTENT_LEASE_NAMESPACE}${runId}`]
+           );
+           if (result.rows[0]?.unlocked !== true) {
+@@ -328,7 +339,7 @@ export async function acquireRunContentLease(
+       let contended = false;
+       for (const runId of runIds) {
+         const result = await client.query<{ acquired: boolean }>(
+-          "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired",
++          "SELECT pg_try_advisory_lock_shared(hashtextextended($1,0)) AS acquired",
+           [`${CONTENT_LEASE_NAMESPACE}${runId}`]
+         );
+         if (result.rows[0]?.acquired !== true) {
+diff --git a/dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts b/dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts
+index e61fac29..f6c8e8c0 100644
+--- a/dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts
++++ b/dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts
+@@ -49,9 +49,15 @@ describe("S6 content-encryption architecture contract", () => {
+       database.indexOf("export async function acquireRunContentLease("),
+       database.indexOf("export async function withRunContentLease<T>(")
+     );
++    // Users of content SHARE the lease (a reader must never wait for a running debate);
++    // only account erasure takes it exclusively. See tests/integration/run-content-lease-sharing.test.ts.
+     expect(acquisition).toContain(
+-      "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired"
++      "SELECT pg_try_advisory_lock_shared(hashtextextended($1,0)) AS acquired"
+     );
++    expect(acquisition).toContain(
++      "SELECT pg_advisory_unlock_shared(hashtextextended($1,0)) AS unlocked"
++    );
++    expect(acquisition).not.toContain("SELECT pg_try_advisory_lock(hashtextextended($1,0))");
+     expect(acquisition).not.toContain(
+       "SELECT pg_advisory_lock(hashtextextended($1,0))"
+     );
+@@ -59,6 +65,18 @@ describe("S6 content-encryption architecture contract", () => {
+     expect(acquisition).toContain("setTimeout(resolve,10)");
+   });
+ 
++  it("keeps account erasure the only EXCLUSIVE holder of the run content lease", async () => {
++    const erasure = await read("packages/db/src/account-erasure.ts");
++    const leases = erasure.slice(
++      erasure.indexOf("async function withErasureContentLeases<T>("),
++      erasure.indexOf("async function withErasureContentLeases<T>(") + 1_600
++    );
++    expect(leases).toContain("SELECT pg_advisory_lock(hashtextextended($1,0))");
++    expect(leases).toContain("SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked");
++    expect(leases).not.toContain("_shared");
++    expect(erasure).toContain('const CONTENT_LEASE_NAMESPACE = "debateai:run-content-lease:v1:"');
++  });
++
+   it("keeps evaluator key preparation outside harvest transactions and add-on run locks", async () => {
+     const evaluator = await read("packages/evaluator/src/index.ts");
+     const harvest = evaluator.slice(

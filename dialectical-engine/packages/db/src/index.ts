@@ -33,7 +33,6 @@ export {
   PostgresSupportCaseRepository,
   PostgresSupportCaseSummaryRepository,
   PostgresSupportMessageRepository,
-  PostgresSupportOwnContextRepository,
   PostgresSupportKeyRotationRepository,
   PostgresSupportRelayReservationRepository,
   PostgresSupportShredRepository,
@@ -47,7 +46,6 @@ export {
   type SupportMessageRead,
   type SupportMessageRole,
   type SupportMessageWrite,
-  type SupportOwnRunStateRow,
   type SupportKeyReplacement,
   type SupportRepositoryRecord,
   type SupportRepositoryStatus,
@@ -296,6 +294,16 @@ export interface RunContentLease {
   release(): Promise<void>;
 }
 
+/**
+ * Takes the run content lease in SHARED mode. The lease keeps account erasure - the only
+ * exclusive holder (withErasureContentLeases in account-erasure.ts) - from shredding a run's
+ * keys while anything still uses that run's content; it is not a mutex between users. When
+ * users took it exclusively, the runner held a run's lease for the whole debate and every
+ * reader of that run spun below until the debate ended (2026-09-13: a slow Premium debate
+ * froze the debate page, its event stream and the home list for half an hour). Postgres
+ * queues a new shared request behind a waiting exclusive one, so readers cannot starve an
+ * erasure that is already waiting; the retry below is only ever contended by erasure.
+ */
 export async function acquireRunContentLease(
   pool: Pool,
   requestedRunIds: readonly string[]
@@ -313,8 +321,9 @@ export async function acquireRunContentLease(
       let failure: unknown = invalidated;
       for (const runId of [...acquired].reverse()) {
         try {
+          // A shared hold is released only by the shared unlock; the exclusive one returns false.
           const result = await client.query<{ unlocked: boolean }>(
-            "SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked",
+            "SELECT pg_advisory_unlock_shared(hashtextextended($1,0)) AS unlocked",
             [`${CONTENT_LEASE_NAMESPACE}${runId}`]
           );
           if (result.rows[0]?.unlocked !== true) {
@@ -332,7 +341,7 @@ export async function acquireRunContentLease(
       let contended = false;
       for (const runId of runIds) {
         const result = await client.query<{ acquired: boolean }>(
-          "SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired",
+          "SELECT pg_try_advisory_lock_shared(hashtextextended($1,0)) AS acquired",
           [`${CONTENT_LEASE_NAMESPACE}${runId}`]
         );
         if (result.rows[0]?.acquired !== true) {
@@ -636,6 +645,19 @@ async function contentEncryptionSchemaIsApplied(pool: Pool): Promise<boolean> {
   return result.rows[0]?.applied === true;
 }
 
+async function planTierColumnIsApplied(
+  executor: Pick<Pool, "query"> | PoolClient
+): Promise<boolean> {
+  const result = await executor.query<{ applied: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema='core' AND table_name='run'
+         AND column_name='plan_tier'
+     ) AS applied`
+  );
+  return result.rows[0]?.applied === true;
+}
+
 type UntypedMethod = (...args: unknown[]) => unknown;
 
 function typedPoolFailure(error: unknown): TypedDomainError {
@@ -849,6 +871,7 @@ export interface StartRunInput {
   readonly tierSource: TierSource;
   readonly tierProvenanceRef: string;
   readonly compositionBudgetTier: CompositionBudgetTier;
+  readonly planTier?: "free" | "premium";
   readonly depthParams: Readonly<Record<string, unknown>>;
   readonly discoveredPanel: readonly DiscoveredPanelMember[];
   readonly strangerSampleRate: number;
@@ -1152,6 +1175,8 @@ export class RunRepository {
     } else if (!UUID_V4.test(input.principal.ownerRef)) {
       throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
     }
+    const planTierColumnApplied = input.principal.kind === "legacy"
+      && await planTierColumnIsApplied(this.pool);
     const askContract = input.askContract ?? {};
     let storedQuestionLine = input.questionLine;
     let storedAskContract: Readonly<Record<string, unknown>> = askContract;
@@ -1209,8 +1234,25 @@ export class RunRepository {
         }
         commitAttempted = true;
         const provisionExecutor=admissionClient ?? this.provisionPool;
-        const created = await provisionExecutor.query<{ created: boolean }>(
-          "SELECT core.create_encrypted_run($1::jsonb,$2,$3,$4::jsonb) AS created",
+        const created = await provisionExecutor.query<{
+          created: boolean;
+          plan_tier_supported: boolean;
+        }>(
+          `WITH capability AS (
+             SELECT COALESCE(
+               pg_get_functiondef(
+                 to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
+               ) LIKE '%''planTier''%',
+               false
+             ) AS plan_tier_supported
+           )
+           SELECT core.create_encrypted_run(
+             CASE WHEN capability.plan_tier_supported
+               THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
+             $2,$3,$4::jsonb
+           ) AS created,
+           capability.plan_tier_supported
+           FROM capability`,
           [JSON.stringify({
             runId,
             questionLine: storedQuestionLine,
@@ -1223,6 +1265,7 @@ export class RunRepository {
             tierSource: input.tierSource,
             tierProvenanceRef: input.tierProvenanceRef,
             compositionBudgetTier: input.compositionBudgetTier,
+            planTier: input.planTier ?? null,
             depthParams: input.depthParams,
             discoveredPanel: input.discoveredPanel,
             strangerSampleRate: input.strangerSampleRate,
@@ -1242,6 +1285,13 @@ export class RunRepository {
             skipEvidence:row.skipEvidence
           })))]
         );
+        if (created.rows[0]?.created === true
+          && created.rows[0].plan_tier_supported === false
+          && input.planTier !== undefined) {
+          console.warn(
+            "[RUN_PLAN_TIER_DROPPED] core.create_encrypted_run does not accept planTier; run created without plan tier"
+          );
+        }
         if (created.rows[0]?.created !== true) {
           commitAttempted = false;
           throw new TypedDomainError(
@@ -1265,21 +1315,30 @@ export class RunRepository {
       const baseRunValues = [
         runId, storedQuestionLine, askerId, runExecutionRef, input.callerScope, input.asOf,
         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
-        input.compositionBudgetTier, JSON.stringify(input.depthParams), JSON.stringify(input.discoveredPanel),
-        input.strangerSampleRate, JSON.stringify(input.envelopeBasis), input.registerVersion,
+        input.compositionBudgetTier,
+        ...(planTierColumnApplied ? [input.planTier ?? null] : []),
+        JSON.stringify(input.depthParams),
+        JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
+        JSON.stringify(input.envelopeBasis), input.registerVersion,
         input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
       ];
+      const bindOffset = planTierColumnApplied ? 1 : 0;
       await client.query(
         `INSERT INTO core.run (
           run_id, question_line, asker_id, session_id, caller_scope, as_of,
           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-          composition_budget_tier, depth_params, agent_count, discovered_panel,
+          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""},
+          depth_params, agent_count, discovered_panel,
           stranger_sample_rate, envelope_basis, register_version,
           battery_version, ask_contract, created_at_seq
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12::jsonb, jsonb_array_length($13::jsonb), $13::jsonb, $14,
-          $15::jsonb, $16, $17, $18::jsonb, $19
+          $11${planTierColumnApplied ? ", $12" : ""},
+          $${12 + bindOffset}::jsonb,
+          jsonb_array_length($${13 + bindOffset}::jsonb),
+          $${13 + bindOffset}::jsonb, $${14 + bindOffset},
+          $${15 + bindOffset}::jsonb, $${16 + bindOffset},
+          $${17 + bindOffset}, $${18 + bindOffset}::jsonb, $${19 + bindOffset}
         )`,
         baseRunValues
       );

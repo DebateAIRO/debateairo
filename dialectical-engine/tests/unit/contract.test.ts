@@ -68,6 +68,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       decision_scope: "test-layer scope",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     }).question_line).toContain("evidence");
     expect(AskRequestSchema.parse({
@@ -80,6 +81,7 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       decision_scope: "test-layer scope",
       as_of: "2026-08-07T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     }).tier_source).toBe("MACHINE_DEFAULT");
     expect(TierSourceSchema.options).toEqual(["ASKER", "MACHINE_DEFAULT", "DEPLOYMENT_POLICY"]);
@@ -87,9 +89,36 @@ describe("P3 / AC-59 / AC-60 — one declared wire contract", () => {
       question_line: "Forged scope", risk_tier: "casual", tier_source: "ASKER",
       tier_provenance_ref: "test", composition_budget_tier: "low", depth_params: { depth: 1 },
       decision_scope: "test", as_of: "2026-08-07T00:00:00.000Z",
-      steering_presets: [], steering_annotations: [], caller_scope: "OPERATOR"
+      steering_presets: [],
+      plan_tier: "free",
+      steering_annotations: [], caller_scope: "OPERATOR"
     })).toThrow();
     expect(() => AskRequestSchema.parse({ question_line: "missing ruled fields" })).toThrow();
+  });
+
+  it("R12 admits plan_tier free and premium and refuses anything else", () => {
+    const validAsk = {
+      question_line: "What follows from this evidence?",
+      risk_tier: "casual",
+      tier_source: "ASKER",
+      tier_provenance_ref: "asker-declaration:test",
+      composition_budget_tier: "low",
+      depth_params: { depth: 1 },
+      decision_scope: "test-layer scope",
+      as_of: "2026-08-07T00:00:00.000Z",
+      steering_presets: [],
+      steering_annotations: []
+    };
+
+    expect(AskRequestSchema.parse({ ...validAsk, plan_tier: "free" }).plan_tier).toBe("free");
+    expect(AskRequestSchema.parse({ ...validAsk, plan_tier: "premium" }).plan_tier).toBe("premium");
+    expect(() => AskRequestSchema.parse({ ...validAsk, plan_tier: "gold" })).toThrow();
+    expect(() => AskRequestSchema.parse(validAsk)).toThrow();
+    expect(() => AskRequestSchema.parse({
+      ...validAsk,
+      plan_tier: "free",
+      caller_scope: "OPERATOR"
+    })).toThrow();
   });
 
   it("generates runtime-validatable accepted/session/answer/node resources", () => {

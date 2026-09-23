@@ -32,6 +32,7 @@ function operations(input: Readonly<{
   occupied?: boolean;
   privateUi?: DevTlsUiProbe | null;
   publicUi?: readonly (DevTlsUiProbe | null)[];
+  port?: number;
 }> = {}): DevTlsReadinessOperations & Readonly<{
   close: ReturnType<typeof vi.fn>;
   startFrontDoor: ReturnType<typeof vi.fn>;
@@ -42,7 +43,7 @@ function operations(input: Readonly<{
   return {
     isPublicPortOccupied: vi.fn(async () => input.occupied ?? false),
     probePrivateUi: vi.fn(async () => input.privateUi === undefined ? READY_UI : input.privateUi),
-    startFrontDoor: vi.fn(async () => Object.freeze({ port: 3000, close })),
+    startFrontDoor: vi.fn(async () => Object.freeze({ port: input.port ?? 3000, close })),
     probePublicUi: vi.fn(async () => (
       publicProbes[Math.min(publicProbeIndex++, publicProbes.length - 1)] ?? null
     )),
@@ -64,6 +65,14 @@ describe("DEV-10D attested trusted local HTTPS front door", () => {
     await frontDoor.stop();
     await frontDoor.stop();
     expect(runtime.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the actual attested support-preview listener", async () => {
+    const frontDoor = await startAttestedDevTlsFrontDoor({
+      operations: operations({ port: 3100 })
+    });
+    expect(frontDoor.receipt.origin).toBe("https://localhost:3100");
+    await frontDoor.stop();
   });
 
   it("refuses an occupied public port or wrong private identity without starting or adopting anything", async () => {

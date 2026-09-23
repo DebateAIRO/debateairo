@@ -78,4 +78,15 @@ describe("development compose credentials (L7-F2, V-21a)", () => {
       .toBe("postgresql://debateai:a%40b%2Fc%3Fd%23e@127.0.0.1:55432/debateai");
     expect(() => developmentMigratorDatabaseUrl("")).toThrow("DEV_AUTH_DATA_PLANE_SECRET_FAILED");
   });
+
+  it("points the migrator at the selected profile's published port, never a fixed one", () => {
+    // dev's support-preview stack publishes Postgres on its own port; the custody password
+    // must reach THAT database, not the default stack's (SYNC3: V-21a with dev's profiles).
+    expect(developmentMigratorDatabaseUrl("s3cret-value_A", 55433))
+      .toBe("postgresql://debateai:s3cret-value_A@127.0.0.1:55433/debateai");
+    expect(() => developmentMigratorDatabaseUrl("s3cret-value_A", 0))
+      .toThrow("DEV_AUTH_DATA_PLANE_SECRET_FAILED");
+    expect(() => developmentMigratorDatabaseUrl("s3cret-value_A", 65_536))
+      .toThrow("DEV_AUTH_DATA_PLANE_SECRET_FAILED");
+  });
 });

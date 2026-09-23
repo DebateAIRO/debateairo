@@ -101,7 +101,7 @@ function createAccountButton(): HTMLButtonElement {
 
 function privacyRow(): HTMLElement {
   const rows = [...document.querySelectorAll<HTMLElement>(".consentGroup .consentRow")];
-  expect(rows.length, "expected two consent rows").toBe(2);
+  expect(rows.length, "expected three consent rows").toBe(3);
   return rows[1]!;
 }
 
@@ -223,11 +223,42 @@ async function acknowledgePolicy(): Promise<void> {
 }
 
 /**
- * THE MIRROR ARM. Ticking `adult-affirmed` makes the privacy mirror the only remaining term
- * in the button's `disabled`, so a mirror left `true` by an open-or-dismiss route shows up
- * here as an ENABLED button. Uses the one button idiom, never an assignment.
+ * THE TERMS ROUTE — the third row's own acknowledgement, the same shape as the privacy one.
+ * It is what makes the terms mirror `true`, so the mirror arm below still discriminates a
+ * desynced privacy mirror now that a third term sits in the button's `disabled`.
+ */
+async function acknowledgeTerms(): Promise<void> {
+  metrics.scrollTop = TOP.scrollTop;
+  await clickElement(field("terms-accepted"));
+  expect(dialog(), "the terms route needs the Terms open").not.toBeNull();
+  expect(dialog()!.getAttribute("aria-labelledby"), "the Terms, not the policy").toBe(
+    "terms-modal-title"
+  );
+  expect(policyButton("I have read it").disabled, "disabled before the end is reached").toBe(true);
+  await driveScrollToEnd();
+  await clickElement(policyButton("I have read it"));
+  expect(field("terms-accepted").checked, "acknowledging must tick the terms box").toBe(true);
+  expect(dialog(), "acknowledging must close the Terms").toBeNull();
+  // Back to the top for whichever document opens next: `acknowledgePolicy` asserts the
+  // gate is closed at mount, and the metrics are shared.
+  metrics.scrollTop = TOP.scrollTop;
+}
+
+/**
+ * THE MIRROR ARM. With `terms-accepted` already ticked (through its own acknowledgement,
+ * BEFORE the route under test — the arm may run while the policy is open and may be followed
+ * by a dismissal of that policy, so it must open nothing itself), ticking `adult-affirmed`
+ * makes the privacy mirror the only remaining term in the button's `disabled`, so a mirror
+ * left `true` by an open-or-dismiss route shows up here as an ENABLED button. The
+ * precondition is asserted, so a case that forgot the terms route fails loudly instead of
+ * passing on a button that is disabled for the wrong reason. Uses the one button idiom, never
+ * an assignment.
  */
 async function mirrorArm(): Promise<void> {
+  expect(
+    field("terms-accepted").checked,
+    "the mirror arm needs the terms box ticked first — call acknowledgeTerms() before the route"
+  ).toBe(true);
   await clickElement(field("adult-affirmed"));
   expect(field("adult-affirmed").checked, "the mirror arm's own click must land").toBe(true);
   expect(createAccountButton().disabled, "Create account after the mirror arm").toBe(true);
@@ -291,6 +322,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
   /* S02-S49 — R05, and R17's mirror invariant. */
   it("opens the policy from the unchecked check square, leaving box and mirror false", async () => {
     await mount();
+    await acknowledgeTerms();
 
     await clickElement(field("privacy-accepted"));
 
@@ -303,6 +335,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
      a separate case because a preventDefault covering only one of them fails exactly one. */
   it("opens the policy from the row's text, leaving box and mirror false", async () => {
     await mount();
+    await acknowledgeTerms();
 
     await clickElement(privacyText());
 
@@ -317,6 +350,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
      likely implementation slip in the slice. */
   it("opens the policy from the Privacy Policy control, leaving box and mirror false", async () => {
     await mount();
+    await acknowledgeTerms();
 
     await clickElement(policyControl());
 
@@ -403,6 +437,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
      comes back enabled with nothing ticked. */
   it("unchecks the checked privacy row directly, with no modal and no stale mirror", async () => {
     await mount();
+    await acknowledgeTerms();
     await acknowledgePolicy();
 
     await clickElement(privacyText());
@@ -428,7 +463,9 @@ describe("sign-up card ↔ privacy policy modal", () => {
     );
 
     await clickElement(field("adult-affirmed"));
-    expect(createAccountButton().disabled, "Create account with both boxes ticked").toBe(false);
+    expect(createAccountButton().disabled, "still disabled with the Terms box empty").toBe(true);
+    await acknowledgeTerms();
+    expect(createAccountButton().disabled, "Create account with all three boxes ticked").toBe(false);
   });
 
   /* S02-S54 — R08, R17. Against the pre-B1 rule this step's mirror arm is the one that fails
@@ -436,6 +473,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
      forbids. */
   it("closes on the close control, leaving the box unchecked and the mirror false", async () => {
     await mount();
+    await acknowledgeTerms();
     await clickElement(field("privacy-accepted"));
     expect(dialog(), "the policy modal must be open").not.toBeNull();
 
@@ -452,6 +490,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
   /* S02-S55 — R08, R17. A click on the scrim ITSELF, never on a descendant of it. */
   it("closes on a backdrop click, leaving the box unchecked and the mirror false", async () => {
     await mount();
+    await acknowledgeTerms();
     await clickElement(field("privacy-accepted"));
     const scrim = document.querySelector<HTMLElement>(".policyScrim");
     expect(scrim, "missing the policy scrim").not.toBeNull();
@@ -470,14 +509,16 @@ describe("sign-up card ↔ privacy policy modal", () => {
      consumer half of the Esc stack (the mechanism half is S02-S01): the topmost open surface
      consumes Escape and NO other surface acts on the same event. The sign-up card is what a
      second listener would damage, so the case asserts the card is untouched rather than
-     counting listeners. The mirror arm needs no extra click here — `adult-affirmed` is
-     already ticked, so the privacy mirror is the only remaining term in `disabled`. */
+     counting listeners. The mirror arm needs no extra click here — `adult-affirmed` and
+     `terms-accepted` are already ticked, so the privacy mirror is the only remaining term in
+     `disabled`. */
   it("closes on one Escape and nothing else acts on that event", async () => {
     await mount();
     await type("email", "person@example.test");
     await type("recovery-email", "recovery@example.test");
     await type("password", "correct horse battery staple");
     await clickElement(field("adult-affirmed"));
+    await acknowledgeTerms();
     await clickElement(field("privacy-accepted"));
     expect(dialog(), "the policy modal must be open").not.toBeNull();
 
@@ -494,6 +535,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
     expect(document.querySelectorAll("form"), "the sign-up form survives").toHaveLength(1);
     expect(document.body.contains(field("adult-affirmed"))).toBe(true);
     expect(document.body.contains(field("privacy-accepted"))).toBe(true);
+    expect(document.body.contains(field("terms-accepted"))).toBe(true);
     // (c) the three text fields still hold what was typed
     expect(field("email").value).toBe("person@example.test");
     expect(field("recovery-email").value).toBe("recovery@example.test");
@@ -501,6 +543,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
     // (d) the boxes are untouched
     expect(field("adult-affirmed").checked, "the 18+ box stays ticked").toBe(true);
     expect(field("privacy-accepted").checked, "the privacy box stays empty").toBe(false);
+    expect(field("terms-accepted").checked, "the terms box stays ticked").toBe(true);
     // (e) focus is back on the privacy input
     expect(document.activeElement, "focus returns to the privacy input").toBe(
       field("privacy-accepted")
@@ -560,6 +603,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
      reader started from — strictly more than the original wording, and true. */
   it("opens the policy from an activation of the focused empty box, and returns focus", async () => {
     await mount();
+    await acknowledgeTerms();
     field("privacy-accepted").focus();
     expect(document.activeElement, "the box must be focusable").toBe(field("privacy-accepted"));
 
@@ -596,10 +640,12 @@ describe("sign-up card ↔ privacy policy modal", () => {
 
     await acknowledgePolicy();
     await clickElement(field("adult-affirmed"));
+    await acknowledgeTerms();
 
     expect(field("privacy-accepted").checked, "the privacy box is genuinely ticked").toBe(true);
     expect(field("adult-affirmed").checked, "the 18+ box is genuinely ticked").toBe(true);
-    expect(createAccountButton().disabled, "Create account with both boxes ticked").toBe(false);
+    expect(field("terms-accepted").checked, "the terms box is genuinely ticked").toBe(true);
+    expect(createAccountButton().disabled, "Create account with all three boxes ticked").toBe(false);
   });
 
   /* S02-S29 — R17 case 5 (REQ-REV-01 B5), in R17's order with only the last movement
@@ -613,15 +659,18 @@ describe("sign-up card ↔ privacy policy modal", () => {
 
     field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
+    field("terms-accepted").checked = true;
     expect(createAccountButton().disabled, "assignment announces nothing to React").toBe(true);
 
     field("adult-affirmed").checked = false;
     field("privacy-accepted").checked = false;
+    field("terms-accepted").checked = false;
 
     await clickElement(field("adult-affirmed"));
     await acknowledgePolicy();
+    await acknowledgeTerms();
 
-    expect(createAccountButton().disabled, "Create account after two real activations")
+    expect(createAccountButton().disabled, "Create account after three real activations")
       .toBe(false);
   });
 

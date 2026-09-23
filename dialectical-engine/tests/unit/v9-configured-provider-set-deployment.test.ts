@@ -373,4 +373,32 @@ describe("C-I5 a hosted publication carries the vetted row or none at all", () =
     expect(source).toContain("publishGeneral({");
     expect(source).toMatch(/deployment: "local"/u);
   });
+
+  /**
+   * SYNC3. dev added a second publisher to the same file (the running panel's
+   * provider set, `dev:auth:publish-provider-set`), and the row above was
+   * satisfied by the FIRST call alone. Every publication literal in the file is
+   * judged now, so a new publisher that forgets to declare itself is named here
+   * as well as refused by the compiler.
+   */
+  it("declares the deployment on EVERY general publication the dev register makes", async () => {
+    const source = await readFile(
+      new URL("../../apps/runner/src/dev-deployment-register.ts", import.meta.url), "utf8"
+    );
+    const literals: string[] = [];
+    for (let at = source.indexOf("publishGeneral({"); at !== -1;
+      at = source.indexOf("publishGeneral({", at + 1)) {
+      const open = source.indexOf("{", at);
+      let depth = 0;
+      let end = open;
+      for (; end < source.length; end += 1) {
+        if (source[end] === "{") depth += 1;
+        if (source[end] === "}") depth -= 1;
+        if (depth === 0) break;
+      }
+      literals.push(source.slice(open, end + 1));
+    }
+    expect(literals.length).toBeGreaterThanOrEqual(2);
+    for (const literal of literals) expect(literal).toMatch(/\bdeployment: "local"/u);
+  });
 });

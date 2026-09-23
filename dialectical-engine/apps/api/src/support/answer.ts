@@ -1,9 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
-import type { HelpCorpusEntry } from "@debateai/support-kb";
+import type {
+  HelpCorpusEntry,HelpCorpusSnapshotLookup,LoadedHelpCorpus
+} from "@debateai/support-kb";
+import {
+  selectSupportRecoveryEntry,supportSourceIdsSatisfyPolicy
+} from "@debateai/support-kb";
+import {
+  SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,type SupportAction
+} from "@debateai/support-kb/catalog";
+import { buildSupportKnowledgeContext } from "@debateai/support-kb/context";
+import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { redactSupportMessage, type SupportMessageCipherPort } from "./session.js";
 import { SupportModelError, type SupportModelPort, type SupportModelUsage } from "./model.js";
-import { buildSupportAnswerPrompt } from "./prompt.js";
+import { buildSupportAnswerPrompt,buildSupportDraftAnswerPrompt } from "./prompt.js";
 import { supportTemplate, type SupportLanguage } from "./templates.js";
 import { supportIntentSurface } from "./classify.js";
 import {
@@ -11,9 +21,17 @@ import {
 } from "./incidents.js";
 import { SupportQueueError,type SupportRelayQueue } from "./queue.js";
 import type { SupportDegradedPort } from "./degraded.js";
+import {
+  bindSupportDraftAuthority,diagnoseSupportDraft,parseSupportDraft,screenSupportModelText,
+  type SupportDraftReport,validateSupportDraft
+} from "./response-policy.js";
+import {
+  createSupportModelReferenceFactory,translateSupportDraftReferences,
+  type SupportModelReferenceFactory
+} from "./model-references.js";
 
 const MAX_RETRIEVED_ENTRIES = 3;
-const MAX_SYSTEM_CODE_POINTS = 12_000;
+const MAX_SYSTEM_CODE_POINTS = 24_000;
 // Leave explicit time for queue/durable cleanup inside the frozen one-second
 // caller-visible half-open budget.
 const HALF_OPEN_PROBE_TIMEOUT_MS = 850;
@@ -40,9 +58,11 @@ const INTENT_SIGNALS: Readonly<Record<string,readonly RegExp[]>> = Object.freeze
 
 export type SupportAnswerResult = Readonly<{
   messageId: string;
-  outcome: "ANSWER_GROUNDED" | "NO_SOURCE" | "DEGRADED" | "DISABLED";
+  outcome: "ANSWER_GROUNDED" | "NO_SOURCE" | "REFUSE_SAFETY" | "DEGRADED" | "DISABLED";
   text: string;
   canEscalate: true;
+  sources?: readonly Readonly<{ id: string;label: string }>[];
+  actions?: readonly SupportAction[];
   usage?: SupportModelUsage;
 }>;
 
@@ -54,6 +74,9 @@ export interface SupportAnswerPort {
     detectedLanguage: SupportLanguage;
     overrideLanguage: SupportLanguage | null;
     modelRef: string;
+    kbVersion?: string;
+    snapshot?: LoadedHelpCorpus;
+    signedIn?: boolean;
     receivedAt: Date;
     onQueueProgress?: (notice: string) => void;
   }>): Promise<SupportAnswerResult>;
@@ -131,6 +154,32 @@ export function supportAnswerInstruction(
   return [...`${preamble}\n\n${joined}`].slice(0,MAX_SYSTEM_CODE_POINTS).join("");
 }
 
+/**
+ * dev's reviewed structured-draft preamble — the OWNERS' instruction slot of
+ * `support.chat-answer.v2` (SYNC3, R1), ahead of the reviewed context and its
+ * OUTPUT CONTRACT. It restates the JSON shape the code-owned form states; the
+ * form, not this text, is what an edit can never remove.
+ */
+function structuredInstruction(language: SupportLanguage): string {
+  const shape = '{"kind":"answer","text":"<grounded answer>","sourceIds":["<allowed source reference>"],"actionIds":[]}';
+  return language === "ro"
+    ? `Returnează numai un singur obiect JSON, fără alte chei și fără text înainte sau după: ${shape}. kind trebuie să fie answer. Secțiunea finală OUTPUT CONTRACT enumeră singurele sourceIds și actionIds permise; înlocuiește exemplele și copiază identificatorii exact, citând cel puțin un sourceId. Nu scrie niciodată identificatori de surse, acțiuni sau capabilități, rute ori căi în text; exprimă navigarea numai prin actionIds. Poți explica limite și condiții despre setările de securitate, dar nu solicita, primi, transforma, verifica sau repeta niciodată parole, coduri ori alte date de autentificare și nu afirma că ai efectuat o schimbare de securitate.`
+    : `Return only one JSON object, with no other keys and no text before or after it: ${shape}. kind must be answer. The final OUTPUT CONTRACT lists the only allowed sourceIds and actionIds; replace the examples and copy identifiers exactly, citing at least one sourceId. Never write source IDs, action IDs, capability IDs, routes, or paths inside text; express navigation only through actionIds. You may explain limitations and prerequisites for security settings, but never request, receive, transform, validate, or repeat passwords, codes, or other credentials, and never claim that you performed a security change.`;
+}
+
+/**
+ * The v2 instruction slot exactly as `respond` sends it, exported so the byte
+ * pins and the injection corpus drive the text the engine really sends. Bounded
+ * at `MAX_SYSTEM_CODE_POINTS`; the code-owned frame follows it in the packet.
+ */
+export function supportDraftAnswerInstruction(context: string,language: SupportLanguage): string {
+  const system = `${structuredInstruction(language)}\n\n${context}`;
+  if ([...system].length > MAX_SYSTEM_CODE_POINTS) {
+    throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
+  }
+  return system;
+}
+
 function withoutModelSources(text: string): string {
   return text.replace(SERVER_SOURCE_LINE,"").replace(/\n{3,}/gu,"\n\n").trim();
 }
@@ -168,18 +217,52 @@ async function completeWithoutQueue<T>(
 
 export function createSupportAnswerService(input: Readonly<{
   entries: readonly HelpCorpusEntry[];
+  snapshots?: HelpCorpusSnapshotLookup;
+  requireStructuredDraft?: true;
   messages: SupportMessageCipherPort;
   modelFor: (modelRef: string) => SupportModelPort;
   queue?: Pick<SupportRelayQueue,"execute">;
   degraded?: SupportDegradedPort;
   incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
+  reportDraftDiagnostic?: (diagnostic: SupportDraftReport) => void;
+  modelReferenceFactory?: () => SupportModelReferenceFactory;
   clock?: () => Date;
 }>): SupportAnswerPort {
   const clock = input.clock ?? (() => new Date());
   return Object.freeze({
     respond: async (request: Parameters<SupportAnswerPort["respond"]>[0]) => {
       const prepared = redactSupportMessage(request.text);
-      const entries = retrieve(input.entries,prepared.text,request.language);
+      const routeSnapshot = request.snapshot !== undefined
+        && typeof request.snapshot.kbVersion === "string"
+        && Array.isArray(request.snapshot.entries) ? request.snapshot : undefined;
+      const snapshot = routeSnapshot ?? (request.kbVersion === undefined
+        ? undefined : input.snapshots?.get(request.kbVersion));
+      const structured = input.requireStructuredDraft === true || input.snapshots !== undefined;
+      const eligibleEntries = structured ? snapshot?.entries ?? [] : input.entries;
+      const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{
+        signedIn: request.signedIn === true,language: request.language
+      }).map(({ id }) => id);
+      const modelReferenceFactory = structured
+        ? (input.modelReferenceFactory ?? createSupportModelReferenceFactory)() : undefined;
+      const context = structured ? buildSupportKnowledgeContext({
+        entries: eligibleEntries,
+        capabilities: SUPPORT_CAPABILITIES,
+        language: request.language,
+        query: prepared.text,
+        historyText: "",
+        availableActionIds,
+        referenceFor: modelReferenceFactory!.referenceFor,
+        maxCodePoints: MAX_SYSTEM_CODE_POINTS
+          - [...`${structuredInstruction(request.language)}\n\n`].length
+      }) : undefined;
+      const entries = structured
+        ? context!.sourceIds.flatMap((id) => {
+          const entry = eligibleEntries.find((candidate) =>
+            candidate.lang === request.language && candidate.id === id
+          );
+          return entry === undefined ? [] : [entry];
+        })
+        : retrieve(eligibleEntries,prepared.text,request.language);
       if (entries.length === 0) {
         const completedAt = strictAfter(request.receivedAt,clock);
         const text = supportTemplate("NO_SOURCE",request.language);
@@ -190,14 +273,26 @@ export function createSupportAnswerService(input: Readonly<{
           detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
           receivedAt: request.receivedAt,firstTokenAt: null,completedAt
         });
-        await input.messages.write({
+        const stored = await input.messages.write({
           messageId,sessionId: request.sessionId,role: "assistant",
           text,outcome: "NO_SOURCE",language: request.language,
           detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
           receivedAt: request.receivedAt,firstTokenAt: null,completedAt
         });
-        return Object.freeze({ messageId,outcome: "NO_SOURCE",text,canEscalate: true as const });
+        return Object.freeze({
+          messageId,outcome: "NO_SOURCE",text: stored.text,canEscalate: true as const,
+          sources: Object.freeze([]),actions: Object.freeze([])
+        });
       }
+      const recoveryEntry = structured
+        ? selectSupportRecoveryEntry(
+          entries,context!.sourcePolicy,context!.recoverySourceIds
+        ) : undefined;
+      const sourceActionIds = recoveryEntry === undefined ? Object.freeze([]) : Object.freeze(
+        context!.requestedActionIds.filter((id) => SUPPORT_CAPABILITIES.some(({ articleIds,actionIds }) =>
+          articleIds.includes(recoveryEntry.id) && actionIds.includes(id)
+        ))
+      );
 
       let completion: Awaited<ReturnType<SupportModelPort["complete"]>> | undefined;
       let firstTokenAt: Date | undefined;
@@ -205,6 +300,7 @@ export function createSupportAnswerService(input: Readonly<{
       let modelCalled = false;
       let circuitShortCircuited = false;
       let halfOpenProbe = false;
+      const attemptId = randomUUID();
       try {
         await input.messages.writeAndTransit({
           messageId: randomUUID(),sessionId: request.sessionId,role: "user",
@@ -228,11 +324,20 @@ export function createSupportAnswerService(input: Readonly<{
            * `safeText` is the redacted visitor message — untrusted, and now
            * inside the fenced `visitor_message` field instead of beside the
            * instruction as a bare `user` turn.
+           *
+           * SYNC3 / R1: the structured path — the one the API root composes —
+           * is framed under `support.chat-answer.v2`, whose locked form states
+           * the JSON shape the parse below enforces; the prose path keeps v1.
            */
-          const framed = buildSupportAnswerPrompt({
-            instruction: supportAnswerInstruction(entries,request.language),
-            visitorMessage: safeText
-          });
+          const framed = structured
+            ? buildSupportDraftAnswerPrompt({
+              instruction: supportDraftAnswerInstruction(context!.text,request.language),
+              visitorMessage: safeText
+            })
+            : buildSupportAnswerPrompt({
+              instruction: supportAnswerInstruction(entries,request.language),
+              visitorMessage: safeText
+            });
           const complete = (signal?: AbortSignal) => {
             modelCalled = true;
             return input.modelFor(request.modelRef).complete({
@@ -254,18 +359,75 @@ export function createSupportAnswerService(input: Readonly<{
         if (completion === undefined || firstTokenAt === undefined || completedAt === undefined) {
           throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
         }
-        const modelText = withoutModelSources(completion.text);
+        const diagnostic = structured ? diagnoseSupportDraft(
+          completion.text,
+          context!.sourceReferences.map(({ reference }) => reference),
+          context!.actionReferences.map(({ reference }) => reference),
+          [
+            ...context!.sourceIds,...context!.requestedActionIds,
+            ...context!.sourceReferences.map(({ reference }) => reference),
+            ...context!.actionReferences.map(({ reference }) => reference)
+          ]
+        ) : undefined;
+        if (diagnostic !== undefined && diagnostic.code !== "ACCEPTED") {
+          input.reportDraftDiagnostic?.(Object.freeze({ attemptId,...diagnostic }));
+        }
+        const parsed = structured
+          ? parseSupportDraft(completion.text,[
+            ...context!.sourceIds,...context!.requestedActionIds,
+            ...context!.sourceReferences.map(({ reference }) => reference),
+            ...context!.actionReferences.map(({ reference }) => reference)
+          ]) : undefined;
+        const referenceDraft = !structured ? undefined
+          : parsed === null || parsed === undefined ? null
+          : validateSupportDraft(
+            parsed,
+            context!.sourceReferences.map(({ reference }) => reference),
+            context!.actionReferences.map(({ reference }) => reference)
+          );
+        const translatedDraft = !structured ? undefined
+          : referenceDraft === null || referenceDraft === undefined ? null
+          : translateSupportDraftReferences(referenceDraft,{
+            sources:context!.sourceReferences,actions:context!.actionReferences
+          });
+        const authorityDraft = !structured ? undefined
+          : translatedDraft === null || translatedDraft === undefined ? null
+          : bindSupportDraftAuthority(
+            translatedDraft,context!.sourceIds,context!.requestedActionIds
+          );
+        const draft = !structured ? undefined
+          : authorityDraft === null || authorityDraft === undefined
+            || !supportSourceIdsSatisfyPolicy(
+              authorityDraft.sourceIds,context!.sourcePolicy
+            ) ? null : authorityDraft;
+        const rejected = structured && draft === null;
+        const recovered = rejected
+          && recoveryEntry?.fallback !== undefined
+          && screenSupportModelText(recoveryEntry.fallback);
+        const modelText = structured
+          ? recovered ? recoveryEntry.fallback
+          : rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text
+          : withoutModelSources(completion.text);
         if (modelText === "") throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
         input.degraded?.markAvailable();
-        const groundedText = `${modelText}\n${sourceLines(entries,request.language)}`;
-        const text = input.incidents === undefined ? groundedText : applyIncidentNotice(
+        const groundedText = structured ? modelText
+          : `${modelText}\n${sourceLines(entries,request.language)}`;
+        const text = rejected || input.incidents === undefined ? groundedText : applyIncidentNotice(
           groundedText,supportIntentSurface(request.text),
           await input.incidents.readActiveIncidents(),request.language
         );
+        const outcome = rejected && !recovered ? "REFUSE_SAFETY" as const : "ANSWER_GROUNDED" as const;
+        const sources = rejected && !recovered ? Object.freeze([]) : Object.freeze((recovered
+          ? [recoveryEntry!] : entries.filter((entry) => structured ? draft!.sourceIds.includes(entry.id) : true))
+          .map((entry) => Object.freeze({ id: entry.id,label: entry.title })));
+        const actions = rejected && !recovered || !structured ? Object.freeze([]) : resolveSupportActions(
+          recovered ? sourceActionIds : draft!.actionIds,
+          { signedIn: request.signedIn === true,language: request.language }
+        );
         const messageId = randomUUID();
-        await input.messages.write({
+        const stored = await input.messages.write({
           messageId,sessionId: request.sessionId,role: "assistant",
-          text,outcome: "ANSWER_GROUNDED",language: request.language,
+          text,outcome,language: request.language,
           detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
           receivedAt: request.receivedAt,firstTokenAt,completedAt,modelCalled: true,
           ...(completion.usage?.input_tokens === undefined
@@ -276,7 +438,7 @@ export function createSupportAnswerService(input: Readonly<{
             ? {} : { costUsd: completion.usage.cost_usd })
         });
         return Object.freeze({
-          messageId,outcome: "ANSWER_GROUNDED",text,canEscalate: true as const,
+          messageId,outcome,text: stored.text,canEscalate: true as const,sources,actions,
           ...(completion.usage === undefined ? {} : { usage: completion.usage })
         });
       } catch (error) {
@@ -290,14 +452,17 @@ export function createSupportAnswerService(input: Readonly<{
           const disabledAt = strictAfter(request.receivedAt,clock);
           const text = supportTemplate("DISABLED",request.language);
           const messageId = randomUUID();
-          await input.messages.write({
+          const stored = await input.messages.write({
             messageId,sessionId: request.sessionId,role: "assistant",
             text,outcome: "DISABLED",language: request.language,
             detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
             receivedAt: request.receivedAt,firstTokenAt: null,completedAt: disabledAt,
             modelCalled: false
           });
-          return Object.freeze({ messageId,outcome: "DISABLED",text,canEscalate: true as const });
+          return Object.freeze({
+            messageId,outcome: "DISABLED",text: stored.text,canEscalate: true as const,
+            sources: Object.freeze([]),actions: Object.freeze([])
+          });
         }
         const degradedAt = strictAfter(request.receivedAt,clock);
         if (error instanceof SupportModelError && !circuitShortCircuited) {
@@ -313,7 +478,7 @@ export function createSupportAnswerService(input: Readonly<{
           : error.code === "SUPPORT_DAILY_CAP" ? "cap" as const : undefined;
         const text = supportTemplate("DEGRADED",request.language);
         const messageId = randomUUID();
-        await input.messages.write({
+        const stored = await input.messages.write({
           messageId,sessionId: request.sessionId,role: "assistant",
           text,outcome: "DEGRADED",language: request.language,
           detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
@@ -321,7 +486,10 @@ export function createSupportAnswerService(input: Readonly<{
           modelCalled,
           ...(degradedReason === undefined ? {} : { degradedReason })
         });
-        return Object.freeze({ messageId,outcome: "DEGRADED",text,canEscalate: true as const });
+        return Object.freeze({
+          messageId,outcome: "DEGRADED",text: stored.text,canEscalate: true as const,
+          sources: Object.freeze([]),actions: Object.freeze([])
+        });
       }
     }
   });

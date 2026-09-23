@@ -1,18 +1,22 @@
 /**
  * V-3 — the Postgres half of the support-KEK rotation.
  *
- * NOT YET RUN. The Docker engine was down for the whole of task 6, so this file
- * has never executed; `tests/unit/rotate-kek.test.ts` proves the same behaviour
- * against an in-memory stand-in for the seam, and this one proves that
- * `PostgresSupportKeyRotationRepository` really is that seam. It must be run in
- * a Docker window before anything here reaches `dev`.
+ * `tests/unit/rotate-kek.test.ts` proves the same behaviour against an in-memory
+ * stand-in for the seam, and this one proves that
+ * `PostgresSupportKeyRotationRepository` really is that seam. It needs no
+ * Docker: `startTestDatabase` starts the embedded PostgreSQL every integration
+ * suite uses. It first ran on 2026-09-23 (SYNC3-C). Until then it had never
+ * executed, and when it did, all three rows failed for one reason: it never
+ * migrated the empty database it starts, so neither `support.session` nor the
+ * `debateai_support` role existed.
  *
  * What it pins that the unit tests cannot:
  *   - the two `bytea` columns survive a re-wrap under their own CHECK
  *     constraint — `octet_length(wrapped_key) = 61 AND get_byte(wrapped_key,0) = 1`
  *     (migration 0054) — so no migration is needed;
  *   - a destroyed row's 61 zero bytes are still exactly that afterwards, and
- *     `support.assert_shred_integrity()` accepts every commit the rotation makes;
+ *     `support.assert_shred_integrity()` accepts every commit the rotation makes
+ *     with that tombstone in the table;
  *   - the optimistic condition really protects a row that changed underneath.
  */
 import { randomUUID } from "node:crypto";
@@ -22,8 +26,10 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertSupportPrincipalRole,
+  migrate,
   PostgresSupportKeyRotationRepository,
-  PostgresSupportSessionRepository
+  PostgresSupportSessionRepository,
+  PostgresSupportShredRepository
 } from "../../packages/db/src/index.js";
 import { generateDek } from "../../packages/crypto/src/index.js";
 import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
@@ -48,6 +54,11 @@ async function supportKekPath(name: string): Promise<string> {
 
 beforeAll(async () => {
   database = await startTestDatabase();
+  // The embedded database starts EMPTY. Every sibling support suite migrates it
+  // (support-shred, support-cases, support-routes …); without this, the first
+  // row died on `relation "support.session" does not exist` and the principal
+  // row on `role "debateai_support" does not exist`, before any rotation ran.
+  await migrate(database.pool);
 }, 600_000);
 
 afterAll(async () => {
@@ -76,6 +87,18 @@ describe("V-3 support-KEK rotation against the real columns", () => {
         kbVersion: "2".repeat(64),
         createdAt: new Date()
       });
+      // A destroyed row beside it, shredded through the real SUP-07 path, so the
+      // tombstone is exactly what the shred writes: 61 zero bytes, destroyed_at set.
+      const shreddedId = randomUUID();
+      await sessions.create({
+        sessionId: shreddedId,
+        tokenSha256: "5".repeat(64),
+        identityOwnerRef: null,
+        language: "en",
+        kbVersion: "2".repeat(64),
+        createdAt: new Date()
+      });
+      await new PostgresSupportShredRepository(pool).shredSession(shreddedId, "vitest", new Date());
       await before.close();
 
       const repository = new PostgresSupportKeyRotationRepository(pool);
@@ -84,6 +107,9 @@ describe("V-3 support-KEK rotation against the real columns", () => {
       expect(row).toBeDefined();
       expect(row?.wrappedKey).toHaveLength(61);
       expect(row?.destroyed).toBe(false);
+      const tombstone = listed.find((candidate) => candidate.ref === shreddedId);
+      expect(tombstone?.destroyed).toBe(true);
+      expect(tombstone?.wrappedKey.equals(Buffer.alloc(61))).toBe(true);
 
       const during = await createSupportKeyPort({
         supportKekPath: newPath, previousSupportKekPath: oldPath
@@ -92,13 +118,19 @@ describe("V-3 support-KEK rotation against the real columns", () => {
       await during.close();
       expect(rotationFailed([report])).toBe(false);
       expect(report.counts.rewrapped).toBeGreaterThanOrEqual(1);
+      expect(report.counts.tombstonesSkipped).toBeGreaterThanOrEqual(1);
 
       // The row is still exactly what the CHECK constraint demands. If it were
       // not, the UPDATE would have raised rather than reaching here.
-      const after = (await repository.listWrappedKeys())
-        .find((candidate) => candidate.ref === sessionId);
+      const afterRows = await repository.listWrappedKeys();
+      const after = afterRows.find((candidate) => candidate.ref === sessionId);
       expect(after?.wrappedKey).toHaveLength(61);
       expect(after?.wrappedKey[0]).toBe(1);
+      // The tombstone is untouched: still destroyed, still 61 zero bytes. A key
+      // re-made where the shred removed one would be a resurrection.
+      const tombstoneAfter = afterRows.find((candidate) => candidate.ref === shreddedId);
+      expect(tombstoneAfter?.destroyed).toBe(true);
+      expect(tombstoneAfter?.wrappedKey.equals(Buffer.alloc(61))).toBe(true);
 
       // And it opens under the new KEK alone.
       const alone = await createSupportKeyPort({ supportKekPath: newPath });

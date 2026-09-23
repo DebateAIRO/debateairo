@@ -1,8 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { describe,expect,it } from "vitest";
+import { buildSupportDraftAnswerPrompt } from "../../apps/api/src/support/prompt.js";
 import {
   discoverSupportEvalCases,
   createInProcessSupportEvalExecutor,
+  createDeterministicStructuralCompletion,
   evaluateSupportObservation,
   formatSupportEvalReport,
   runSupportEval,
@@ -59,6 +61,36 @@ describe("SUP-01 support eval release gate", () => {
     expect(evaluateSupportObservation(testCase,{
       ...observation(testCase),toolCalls: ["delete_debate"]
     })).toContain("forbidden_tools");
+  });
+
+  it("emits a strict four-key draft using only the opaque references in the output contract", () => {
+    const sourceReferences = [
+      "s-10000000000040008000000000000001-1",
+      "s-10000000000040008000000000000001-2"
+    ];
+    const actionReferences = ["a-10000000000040008000000000000001-1"];
+    // FW-B: the stand-in model receives what a vendor receives — one framed
+    // packet, the OUTPUT CONTRACT in its instruction slot — never a system string.
+    const completion = createDeterministicStructuralCompletion({
+      language:"en",
+      packet:buildSupportDraftAnswerPrompt({
+        instruction:[
+          "SUPPORT POLICY","OUTPUT CONTRACT",
+          `sourceIds=${sourceReferences.join(",")}`,
+          `actionIds=${actionReferences.join(",")}`
+        ].join("\n"),
+        visitorMessage:"question"
+      }).packet
+    });
+    const draft = JSON.parse(completion.text) as Record<string,unknown>;
+    expect(Object.keys(draft).sort()).toEqual(["actionIds","kind","sourceIds","text"]);
+    expect(draft).toEqual({
+      kind:"answer",text:"Answer based only on the reviewed public help.",
+      sourceIds:sourceReferences,actionIds:actionReferences
+    });
+    for (const canonical of ["getting-started-debate","start-debate","owner-debate"]) {
+      expect(completion.text).not.toContain(canonical);
+    }
   });
 
   it("prints honest structural, latency, and independent-rubric evidence without claiming PASS", async () => {
@@ -134,6 +166,9 @@ describe("SUP-01 support eval release gate", () => {
   it("drives the in-process API and disposable PostgreSQL through all applicable cases", async () => {
     const executor = await createInProcessSupportEvalExecutor();
     try {
+      expect(executor.kbVersion).toBe(
+        "fd3c63e417a280493d61b6dd86de617957a5c1052f348dbfbb1c0acb24a48278"
+      );
       const report = await runSupportEval({
         caseDirectory: CASE_DIRECTORY,runs: 1,mode: "deterministic-structural",
         executeCase: executor.executeCase

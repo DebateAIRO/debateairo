@@ -17,7 +17,8 @@ export function validateDevPostgresCompose(source) {
 
   const ports = postgres.match(/\n    ports:\n((?:      - [^\n]+\n?)+)/)?.[1]
     ?.trim().split("\n").map((line) => line.trim().replace(/^- /, "")) ?? [];
-  if (ports.length !== 1 || ports[0] !== '"127.0.0.1:55432:5432"'
+  if (ports.length !== 1
+    || ports[0] !== '"127.0.0.1:${DEBATEAI_DEV_POSTGRES_PORT:-55432}:5432"'
     || /^\s*network_mode:\s*(?:"host"|'host'|host)\s*(?:#.*)?$/m.test(postgres)) {
     throw new Error("DEV_POSTGRES_LOOPBACK_PORT_REQUIRED");
   }

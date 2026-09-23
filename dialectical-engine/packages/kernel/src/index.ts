@@ -1,3 +1,5 @@
+import { analyzeSupportCredentialText } from "./support-credentials.js";
+
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 
 export type RunId = Brand<string, "RunId">;
@@ -418,6 +420,9 @@ export function isRunLevelSpendStop(error: unknown): boolean {
     && (RUN_LEVEL_SPEND_STOP_CODES as readonly string[]).includes(code);
 }
 
+export * from "./support-credentials.js";
+export * from "./support-text-views.js";
+
 export class TypedDomainError extends Error {
   constructor(readonly code: string, message: string) {
     super(message);
@@ -427,9 +432,16 @@ export class TypedDomainError extends Error {
 
 const SUPPORT_SECRET_LIKE_PATTERN =
   /(?:\b(?:sk|key)-[A-Za-z0-9_-]+\b|\b(?:code|cod(?:ul)?)\s+\d{6}\b|\b\d{6}\b|\b[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+[.][A-Za-z0-9_-]+\b|\b[A-Za-z0-9_-]{32,}\b)/giu;
-
 /** Browser-safe and server-safe canonical support-message redaction. */
 export function redactSupportText(text: string): Readonly<{ text: string;redacted: boolean }> {
-  const redactedText = text.replace(SUPPORT_SECRET_LIKE_PATTERN,"[REDACTED_SECRET_LIKE]");
+  const spans = analyzeSupportCredentialText(text).credentialValueSpans;
+  let labelled = "";
+  let cursor = 0;
+  for (const { start,end } of spans) {
+    labelled += `${text.slice(cursor,start)}[REDACTED_SECRET_LIKE]`;
+    cursor = end;
+  }
+  labelled += text.slice(cursor);
+  const redactedText = labelled.replace(SUPPORT_SECRET_LIKE_PATTERN,"[REDACTED_SECRET_LIKE]");
   return Object.freeze({ text: redactedText,redacted: redactedText !== text });
 }

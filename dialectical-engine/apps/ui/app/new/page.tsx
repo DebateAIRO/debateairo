@@ -4,10 +4,12 @@ import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState 
 import { useRouter, useSearchParams } from "next/navigation";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
+import { modelMeta } from "@/lib/models";
 import { SCRUTINY_DEPTH_OPTIONS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { requestFailureMessage } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
+import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import {
   buildNewDebateAskConfig,
   DECISION_SCOPE_DEFAULT,
@@ -39,6 +41,13 @@ const BUDGET_TIER_OPTIONS: ReadonlyArray<{ value: CompositionBudgetTier; label: 
   { value: "high", label: "High" }
 ];
 
+const PLAN_TIER_OPTIONS = [
+  { value: "free", name: "Free", promise: "Every gauge fixed. The question is yours." },
+  { value: "premium", name: "Premium", promise: "Every gauge yours to set." }
+] as const;
+
+type PlanTier = (typeof PLAN_TIER_OPTIONS)[number]["value"];
+
 /* The document draws every text field at its resting height — one line for the
    question — so the field grows with its content instead of scrolling inside a
    fixed frame. A ref callback rather than a hook, because it also has to run for
@@ -64,14 +73,15 @@ function NewDebateForm({ token }: { token: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
+  const [planTier, setPlanTier] = useState<PlanTier>("free");
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [depthMode, setDepthMode] = useState<AdaptiveDepthMode>("fixed");
   const [scrutiny, setScrutiny] = useState<ScrutinyDepth>("standard");
-  const [depth, setDepth] = useState(1);
+  const [depth, setDepth] = useState(2);
   const [branching, setBranching] = useState(2);
   const [concurrency, setConcurrency] = useState(3);
   const [maxTokens, setMaxTokens] = useState(800);
-  const [riskTier, setRiskTier] = useState("");
+  const [riskTier, setRiskTier] = useState("standard");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
@@ -96,6 +106,20 @@ function NewDebateForm({ token }: { token: string }) {
     return () => { active = false; };
   }, [token]);
 
+  function choosePlanTier(value: PlanTier): void {
+    setPlanTier(value);
+    if (value !== "free") return;
+    setRiskTier("standard");
+    setRiskTierWasEdited(false);
+    setBudgetTier(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
+    setDepth(2);
+    setDepthMode("fixed");
+    setScrutiny("standard");
+    setBranching(2);
+    setConcurrency(3);
+    setMaxTokens(800);
+  }
+
   const askAsOf = new Date(asOf);
   // The button becomes ready only for the complete ask that will be submitted.
   // UX-01 makes machine-derived values visible and editable rather than hidden.
@@ -117,6 +141,7 @@ function NewDebateForm({ token }: { token: string }) {
       const submitTime = new Date();
       setAsOf(dateTimeLocalValue(submitTime));
       const config = buildNewDebateAskConfig({
+        planTier,
         riskTier: riskTier as RiskTier,
         budgetTier: budgetTier as CompositionBudgetTier,
         decisionScope,
@@ -152,6 +177,37 @@ function NewDebateForm({ token }: { token: string }) {
         <form onSubmit={submit} onKeyDown={onKeyDown}>
           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
 
+          <div className="ndTier" role="radiogroup" aria-label="Plan tier">
+            {PLAN_TIER_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                id={`planTier-${option.value}`}
+                data-field="planTier"
+                data-value={option.value}
+                aria-checked={planTier === option.value}
+                className="ndTierOption"
+                onClick={() => choosePlanTier(option.value)}
+              >
+                <span className="ndTierName">{option.name}</span>
+                <span className="ndTierPromise">{option.promise}</span>
+                <span className="ndTierModels">
+                  {PLAN_TIER_ROSTERS[option.value].map((modelId) => (
+                    <span key={modelId} className="ndTierModel">
+                      <span
+                        className="modelDot"
+                        style={{ "--dot": modelMeta(modelId).dot } as CSSProperties}
+                        aria-hidden
+                      />
+                      {modelId}
+                    </span>
+                  ))}
+                </span>
+              </button>
+            ))}
+          </div>
+
           <label className="srOnly" htmlFor="topic">
             Topic
           </label>
@@ -176,14 +232,19 @@ function NewDebateForm({ token }: { token: string }) {
 
           <div className="ndCard">
             <p className="ndIntro">
-              Choose your risk tier, composition budget tier, and depth, then click Start.
+              {planTier === "free"
+                ? "Free runs every debate at fixed settings. Type your question and click Start, or choose Premium to set the gauges yourself."
+                : "Choose your risk tier, composition budget tier, and depth, then click Start."}
             </p>
             <SegmentedRow
               field="riskTier"
               label="Risk tier"
-              hint="How much is riding on the answer · explicit asker selection"
+              hint={planTier === "free"
+                ? "How much is riding on the answer · fixed by the Free plan"
+                : "How much is riding on the answer · explicit asker selection"}
               options={RISK_TIER_OPTIONS}
               value={riskTier}
+              disabled={planTier === "free"}
               onChange={(value) => {
                 setRiskTier(value);
                 setRiskTierWasEdited(true);
@@ -192,9 +253,12 @@ function NewDebateForm({ token }: { token: string }) {
             <SegmentedRow
               field="budgetTier"
               label="Composition budget tier"
-              hint="How much work the composition may spend · provisional default, editable"
+              hint={planTier === "free"
+                ? "How much work the composition may spend · fixed by the Free plan"
+                : "How much work the composition may spend · provisional default, editable"}
               options={BUDGET_TIER_OPTIONS}
               value={budgetTier}
+              disabled={planTier === "free"}
               onChange={(value) => setBudgetTier(value as CompositionBudgetTier)}
             />
             <SliderRow
@@ -204,6 +268,7 @@ function NewDebateForm({ token }: { token: string }) {
               min={EXPANSION_DEPTH_MIN}
               max={EXPANSION_DEPTH_MAX}
               value={depth}
+              disabled={planTier === "free"}
               onChange={setDepth}
             />
             {/* S1-2 · V ruling 2026-09-03: the two steering textareas that stood
@@ -246,6 +311,7 @@ function NewDebateForm({ token }: { token: string }) {
                 label="Depth mode"
                 hint="Selection strategy"
                 value={depthMode}
+                disabled={planTier === "free"}
                 onChange={(value) => setDepthMode(value as AdaptiveDepthMode)}
                 options={depthModeOptions}
               />
@@ -254,6 +320,7 @@ function NewDebateForm({ token }: { token: string }) {
                 label="Depth of scrutiny"
                 hint={SCRUTINY_DEPTH_OPTIONS.find((option) => option.value === scrutiny)?.hint ?? ""}
                 value={scrutiny}
+                disabled={planTier === "free"}
                 onChange={(value) => setScrutiny(value as ScrutinyDepth)}
                 options={SCRUTINY_DEPTH_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
               />
@@ -264,6 +331,7 @@ function NewDebateForm({ token }: { token: string }) {
                 min={1}
                 max={4}
                 value={branching}
+                disabled={planTier === "free"}
                 onChange={setBranching}
               />
               <SliderRow
@@ -273,6 +341,7 @@ function NewDebateForm({ token }: { token: string }) {
                 min={1}
                 max={6}
                 value={concurrency}
+                disabled={planTier === "free"}
                 onChange={setConcurrency}
               />
               <SliderRow
@@ -281,8 +350,9 @@ function NewDebateForm({ token }: { token: string }) {
                 hint="Per generated argument"
                 min={128}
                 max={4000}
-                step={128}
+                step={32}
                 value={maxTokens}
+                disabled={planTier === "free"}
                 onChange={setMaxTokens}
               />
               <p className="ndProvenance">
@@ -319,6 +389,7 @@ function SegmentedRow({
   hint,
   options,
   value,
+  disabled = false,
   onChange
 }: {
   field: string;
@@ -326,15 +397,16 @@ function SegmentedRow({
   hint: string;
   options: ReadonlyArray<{ value: string; label: string }>;
   value: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
     <div className="ndRow">
       <div className="ndRowText">
         <div className="ndLabel" id={`${field}-label`}>{label}</div>
-        <div className="ndHint">{hint}</div>
+        <div className="ndHint" id={`${field}-hint`}>{hint}</div>
       </div>
-      <div className="ndSeg" role="radiogroup" aria-labelledby={`${field}-label`}>
+      <div className="ndSeg" role="radiogroup" aria-labelledby={`${field}-label`} aria-describedby={`${field}-hint`}>
         {options.map((option) => (
           <button
             key={option.value}
@@ -344,7 +416,9 @@ function SegmentedRow({
             data-field={field}
             data-value={option.value}
             aria-checked={value === option.value}
+            aria-describedby={`${field}-hint`}
             className="ndSegItem"
+            disabled={disabled}
             onClick={() => onChange(option.value)}
           >
             {option.label}
@@ -360,6 +434,7 @@ function SelectRow({
   label,
   hint,
   value,
+  disabled = false,
   onChange,
   options
 }: {
@@ -367,6 +442,7 @@ function SelectRow({
   label: string;
   hint: string;
   value: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
   options: ReadonlyArray<{ value: string; label: string }>;
 }) {
@@ -374,12 +450,19 @@ function SelectRow({
     <div className="ndRow">
       <div className="ndRowText">
         <label className="ndLabel" htmlFor={id}>{label}</label>
-        <div className="ndHint">{hint}</div>
+        <div className="ndHint" id={`${id}-hint`}>{hint}</div>
       </div>
       <span className="ndSelect">
         <span aria-hidden>{options.find((option) => option.value === value)?.label ?? value}</span>
         <span className="ndSelectCaret" aria-hidden>▼</span>
-        <select id={id} value={value} onChange={(event) => onChange(event.target.value)} aria-label={label}>
+        <select
+          id={id}
+          value={value}
+          disabled={disabled}
+          aria-describedby={`${id}-hint`}
+          onChange={(event) => onChange(event.target.value)}
+          aria-label={label}
+        >
           {options.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
@@ -397,6 +480,7 @@ function SliderRow({
   max,
   step = 1,
   value,
+  disabled = false,
   onChange
 }: {
   id: string;
@@ -406,6 +490,7 @@ function SliderRow({
   max: number;
   step?: number;
   value: number;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
@@ -413,7 +498,7 @@ function SliderRow({
     <div className="ndRow ndRowSlider">
       <div className="ndRowText">
         <label className="ndLabel" htmlFor={id}>{label}</label>
-        <div className="ndHint">{hint}</div>
+        <div className="ndHint" id={`${id}-hint`}>{hint}</div>
       </div>
       <span className="ndSliderWrap">
         <input
@@ -424,6 +509,8 @@ function SliderRow({
           max={max}
           step={step}
           value={value}
+          disabled={disabled}
+          aria-describedby={`${id}-hint`}
           onChange={(event) => onChange(Number(event.target.value))}
           aria-label={label}
           style={{ "--nd-pct": `${pct}%` } as CSSProperties}
