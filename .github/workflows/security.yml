@@ -13,7 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: dialectical-engine } }
     steps:
+      # Full history: tests/unit/obs-l2-s04-zone.test.ts compares apps/api/src/index.ts against a
+      # base commit with `git show`, which a depth-1 checkout cannot resolve (ZONE_BASE_UNRESOLVED).
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { fetch-depth: 0 }
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with: { version: 11.20.0 }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -45,7 +48,7 @@ jobs:
           "$RUNNER_TEMP/gitleaks" version
       - name: Scan every ref for secrets
         run: |
-          "$RUNNER_TEMP/gitleaks" git --redact --no-banner --config .gitleaks.toml --log-opts="--all" .
+          "$RUNNER_TEMP/gitleaks" git --redact --verbose --no-banner --config .gitleaks.toml --log-opts="--all" .
   codeql:
     runs-on: ubuntu-latest
     permissions: { contents: read, security-events: write }
