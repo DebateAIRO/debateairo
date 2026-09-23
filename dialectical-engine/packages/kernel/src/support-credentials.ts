@@ -145,7 +145,12 @@ function originalSpan(normalized: NormalizedText,start: number,end: number): Sup
 function scopesFor(text: string): readonly Scope[] {
   const sentenceStarts: number[] = [0];
   for (const match of text.matchAll(SENTENCE_BOUNDARY)) sentenceStarts.push(match.index + match[0].length);
-  const sentenceAt = (offset: number) => Math.max(0,sentenceStarts.findLastIndex((start) => start <= offset));
+  const sentenceAt = (offset: number) => {
+    for (let index = sentenceStarts.length - 1; index >= 0; index -= 1) {
+      if (sentenceStarts[index]! <= offset) return index;
+    }
+    return 0;
+  };
   const scopes: Scope[] = [];
   let start = 0;
   for (const match of text.matchAll(SCOPE_BOUNDARY)) {
@@ -160,7 +165,10 @@ function scopesFor(text: string): readonly Scope[] {
 function scopeAt(scopes: readonly Scope[],offset: number): number {
   const exact = scopes.findIndex(({ start,end }) => offset >= start && offset < end);
   if (exact >= 0) return exact;
-  return Math.max(0,scopes.findLastIndex(({ start }) => start <= offset));
+  for (let index = scopes.length - 1; index >= 0; index -= 1) {
+    if (scopes[index]!.start <= offset) return index;
+  }
+  return 0;
 }
 
 function uniqueSpans(spans: readonly SupportTextSpan[]): readonly SupportTextSpan[] {

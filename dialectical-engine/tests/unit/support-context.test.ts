@@ -480,6 +480,51 @@ describe("Support knowledge context", () => {
   });
 
   it.each([
+    ["en" as const,"Where can I find account deletion controls?","settings-help-menus","delete-a-private-debate"],
+    ["ro" as const,"Unde găsesc opțiunile de ștergere a contului?","settings-help-menus","delete-a-private-debate"],
+    ["ro" as const,"Unde gasesc optiunile de stergere a contului?","settings-help-menus","delete-a-private-debate"],
+    ["en" as const,"Where can I learn how a debate works?","guide-how-it-works","app-navigation"],
+    ["ro" as const,"Unde pot afla cum funcționează o dezbatere?","guide-how-it-works","app-navigation"],
+    ["ro" as const,"Unde pot afla cum functioneaza o dezbatere?","guide-how-it-works","app-navigation"],
+  ])("puts exact reviewed %s guidance ahead of a lexical fallback collision: %s",(
+    language,query,expectedPrimary,wrongPrimary
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{
+      signedIn:false,language
+    }).map(({ id }) => id);
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds,language,query,historyText:"",maxCodePoints:24_000
+    });
+
+    expect(result.sourceIds).toContain(expectedPrimary);
+    expect(result.recoverySourceIds).toEqual([expectedPrimary]);
+    expect(result.recoverySourceIds).not.toContain(wrongPrimary);
+    expect(result.requestedActionIds).toEqual([]);
+  });
+
+  it.each([
+    ["en" as const,"How do I delete a private debate?","delete-a-private-debate"],
+    ["ro" as const,"Cum șterg o dezbatere privată?","delete-a-private-debate"],
+    ["en" as const,"Where can I read the Method section?","app-navigation"],
+    ["ro" as const,"Unde pot citi secțiunea Metodă?","app-navigation"],
+  ])("keeps the neighboring %s intent distinct after guide-source prioritization: %s",(
+    language,query,expectedPrimary
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+
+    expect(result.sourceIds).toContain(expectedPrimary);
+    if (result.recoverySourceIds.length > 0) {
+      expect(result.recoverySourceIds).toEqual([expectedPrimary]);
+    }
+  });
+
+  it.each([
     ["en" as const,"Where do I find my debates and the public debate library?"],
     ["en" as const,"How can I open Your debates together with Public debates?"],
     ["ro" as const,"Unde găsesc dezbaterile mele și biblioteca publică?"],

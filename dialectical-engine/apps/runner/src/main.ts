@@ -136,6 +136,19 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // every register family the run reads. Without this line the claim-time
   // gate refuses every work item and no statement is ever synthesized.
   synthesisRolePolicy: policy.synthesisRolePolicy,
+  claimTimeSynthesisRoleProbe: async (providerRef) => {
+    const target = providerTargets.find((candidate) => candidate.providerRef === providerRef);
+    if (target === undefined) {
+      return { state: "ABSENT" as const, modelId: null, failureCode: "CLAIM_GATEWAY_UNRESOLVED" };
+    }
+    // The same target probe validates the configured model identity. The runner
+    // persists this observation separately from the selected debate panel.
+    const observation = await observeProviderTarget({
+      target, timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
+      fetchImplementation: fetch, clock: () => new Date()
+    });
+    return { state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode };
+  },
   holdRecorder: {
     countCooldownHolds: (runId) => runRepository.countCooldownHolds(runId),
     record: (event) => runRepository.recordRunLifecycleEvent({

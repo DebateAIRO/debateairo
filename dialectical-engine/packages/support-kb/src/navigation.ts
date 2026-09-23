@@ -1,3 +1,4 @@
+import { exhaustive } from "@debateai/kernel";
 import {
   SUPPORT_ACTION_CATALOG,
   type SupportAction,
@@ -73,6 +74,7 @@ function isApplicable(definition: SupportActionDefinition, context: SupportNavig
     case "public-reference": return UUID.test(context.publicDebateRef ?? "");
     case "unresolved":
     case "excluded": return false;
+    default: return exhaustive(definition.availability);
   }
 }
 
