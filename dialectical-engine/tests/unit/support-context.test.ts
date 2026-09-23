@@ -87,7 +87,10 @@ describe("Support knowledge context", () => {
 
   it("meets the exact public answerable and unsupported case matrix from the immutable production corpus", () => {
     const corpus = productionReviewedCorpus();
-    expect(corpus.kbVersion).toBe("7ef4244d30507e162cebf544eeb6b9578f17ed91711f2d164f2a4d75dd72c7af");
+    // SYNC3: the review manifest's evidence locators became repository-relative
+    // (DL6-F4); the version folds them in, so it moved from 7ef4244d… with no
+    // article, projection or fallback byte changed.
+    expect(corpus.kbVersion).toBe("b9f70c86d54b97fb8a837c4d86260233217cdc64cdf5691d045355fedecd2aa8");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 
