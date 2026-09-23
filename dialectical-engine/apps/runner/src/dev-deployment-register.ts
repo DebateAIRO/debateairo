@@ -866,7 +866,11 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
     publicationId: developmentProviderSetPublicationId(input.baseRegisterVersion, snapshotSha256),
     baseRegisterVersion: input.baseRegisterVersion,
     rows,
-    sourceRef: DEVELOPMENT_PROVIDER_SET_SOURCE_REF
+    sourceRef: DEVELOPMENT_PROVIDER_SET_SOURCE_REF,
+    // C-I5: this publisher republishes the LOCAL dev panel's provider set (CLI
+    // relays on loopback, the local product path V-9(c) ruled), exactly as the
+    // seeder below does; a hosted publication is held to V-9(4) at this door.
+    deployment: "local"
   });
   if (published.snapshotSha256 !== snapshotSha256 || published.rowCount !== rows.length) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
