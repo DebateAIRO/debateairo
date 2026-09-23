@@ -2,8 +2,10 @@
 
 import * as React from "react";
 
-import { POLICY_JUMP, POLICY_SECTIONS } from "../../lib/privacyPolicy";
+import { POLICY_JUMP, POLICY_SECTIONS, PRIVACY_EMAIL } from "../../lib/privacyPolicy";
 import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
+import { t } from "@/lib/i18n/translate";
+import { useConsentCatalog } from "./useConsentCatalog";
 
 /**
  * The privacy policy modal (design 10c). Standalone and prop-driven: it owns no consent state,
@@ -62,19 +64,9 @@ const GATE_HINT_ID = "policy-modal-gate-hint";
 const ACCENT_PROPERTY = "--accent";
 
 /**
- * The header copy, `slices/S02/SPEC.md` §Copy, transcribed as DECODED characters (U+00B7 MIDDLE
- * DOT twice in the eyebrow, U+2014 EM DASH once in the lede). Written as string expressions
- * rather than as JSX text so no whitespace folding can alter a `textContent` comparison.
- * `privacyPolicy.ts` holds the pills and the sections; the header, the end marker and the
- * footer contact line are the modal's own chrome and live here.
+ * The catalogue holds the header, end marker and footer chrome. `privacyPolicy.ts` holds the
+ * semantic keys and protected interpolation values for the pills and sections.
  */
-const EYEBROW = "PRIVACY POLICY · v2.1 · EFFECTIVE 12 AUG 2026";
-const TITLE = "What we store, and why";
-const LEDE =
-  "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Eleven sections — scroll to the end.";
-const END_MARKER = "END OF POLICY · GDPR (EU) 2016/679 · v2.1";
-const GATE_HINT = "Scroll to the end of the policy to continue.";
-
 /**
  * The scroll-to-end criterion's slack, in pixels (`SPEC.md` R15). DERIVED, not conventional: the
  * body text is 11.5px at `line-height: 1.65` ≈ 19px per line, so 8px is under half a line — the
@@ -89,6 +81,7 @@ export function PrivacyPolicyModal({
   onClose,
   onAcknowledge
 }: PrivacyPolicyModalProps): React.ReactElement | null {
+  const catalog = useConsentCatalog();
   const scrimRef = React.useRef<HTMLDivElement | null>(null);
   const dialogRef = React.useRef<HTMLElement | null>(null);
   const closeRef = React.useRef<HTMLElement | null>(null);
@@ -171,16 +164,18 @@ export function PrivacyPolicyModal({
           <span className="policyTab" aria-hidden="true" />
           <div className="policyHead">
             <div className="policyHeadText">
-              <div className="policyEyebrow">{EYEBROW}</div>
+              <div className="policyEyebrow">{t(catalog, "consent.policy.eyebrow")}</div>
               <div id={TITLE_ID} className="policyTitle">
-                {TITLE}
+                {t(catalog, "consent.policy.title")}
               </div>
-              <div className="policyLede">{LEDE}</div>
+              <div className="policyLede">
+                {t(catalog, "consent.policy.lede", { regulation: "GDPR (EU) 2016/679" })}
+              </div>
             </div>
             <button
               type="button"
               className="policyClose"
-              aria-label="Close"
+              aria-label={t(catalog, "consent.policy.close")}
               onClick={onClose}
               ref={(node) => {
                 closeRef.current = node;
@@ -192,7 +187,12 @@ export function PrivacyPolicyModal({
           {/* `tabindex="0"` plus a name of its own: paging this region is the ONLY way a
               keyboard-only reader can satisfy the scroll gate, and the name says what is inside
               it rather than repeating the dialog's title. */}
-          <div className="policyBody" tabIndex={0} aria-label="Privacy Policy text" ref={bodyRef}>
+          <div
+            className="policyBody"
+            tabIndex={0}
+            aria-label={t(catalog, "consent.policy.textLabel")}
+            ref={bodyRef}
+          >
             <div className="policyJumps">
               {POLICY_JUMP.map((jump) => (
                 <button
@@ -202,7 +202,7 @@ export function PrivacyPolicyModal({
                   data-jump={jump.target}
                   onClick={() => jumpTo(jump.target)}
                 >
-                  {jump.label}
+                  {t(catalog, jump.labelKey)}
                 </button>
               ))}
             </div>
@@ -216,13 +216,13 @@ export function PrivacyPolicyModal({
                   >
                     {section.no}
                   </span>
-                  <span className="policySectionTitle">{section.title}</span>
+                  <span className="policySectionTitle">{t(catalog, section.titleKey)}</span>
                 </div>
-                <p className="policyText">{section.body}</p>
+                <p className="policyText">{t(catalog, section.body.key, section.body.vars)}</p>
                 {section.items.length > 0 ? (
                   <div className="policyItems">
                     {section.items.map((item) => (
-                      <div key={item} className="policyItem">
+                      <div key={item.key} className="policyItem">
                         <span
                           className="policyDot"
                           aria-hidden="true"
@@ -230,19 +230,21 @@ export function PrivacyPolicyModal({
                             { [ACCENT_PROPERTY]: `var(${section.accent})` } as React.CSSProperties
                           }
                         />
-                        <span className="policyItemText">{item}</span>
+                        <span className="policyItemText">{t(catalog, item.key, item.vars)}</span>
                       </div>
                     ))}
                   </div>
                 ) : null}
               </div>
             ))}
-            <div className="policyEnd">{END_MARKER}</div>
+            <div className="policyEnd">
+              {t(catalog, "consent.policy.endMarker", { regulation: "GDPR (EU) 2016/679" })}
+            </div>
           </div>
           <div className="policyFoot">
             <span className="policyContact">
-              {"Questions: "}
-              <span className="policyMail">{"privacy@dezbatere.ro"}</span>
+              {t(catalog, "consent.policy.questions")} {" "}
+              <span className="policyMail">{PRIVACY_EMAIL}</span>
             </span>
             <span className="policyFootSpacer" />
             {mode === "consent" ? (
@@ -253,7 +255,7 @@ export function PrivacyPolicyModal({
                     the repo's visually-hidden treatment. */}
                 {!gateOpen ? (
                   <span id={GATE_HINT_ID} className="policyGateHint">
-                    {GATE_HINT}
+                    {t(catalog, "consent.policy.gateHint")}
                   </span>
                 ) : null}
                 <button
@@ -264,12 +266,12 @@ export function PrivacyPolicyModal({
                   aria-describedby={!gateOpen ? GATE_HINT_ID : undefined}
                   onClick={acknowledge}
                 >
-                  {"I have read it"}
+                  {t(catalog, "consent.policy.acknowledge")}
                 </button>
               </>
             ) : (
               <button type="button" className="policyPrimary" onClick={onClose}>
-                {"Close"}
+                {t(catalog, "consent.policy.close")}
               </button>
             )}
           </div>

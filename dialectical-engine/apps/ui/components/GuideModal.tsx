@@ -1,64 +1,73 @@
 "use client";
 
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
+
 const GUIDE_ITEMS = [
   {
     icon: "⚡",
     iconBg: "var(--gen-bg)",
-    title: "Live generation",
-    body: "The skeleton appears first, then each model writes its claim in with a cursor while the bar tracks progress."
+    titleKey: "debateDrawers.guide.liveGenerationTitle",
+    bodyKey: "debateDrawers.guide.liveGenerationBody"
   },
   {
     icon: "●",
     iconBg: "var(--pro-bg)",
     iconColor: "var(--reasoning)",
-    title: "Who said what, and which side",
-    body: "Every claim names the model that wrote it (colored dot). Pro supports its parent claim; Con opposes it."
+    titleKey: "debateDrawers.guide.attributionTitle",
+    bodyKey: "debateDrawers.guide.attributionBody"
   },
   {
     icon: "⚐",
     iconBg: "var(--score-uncertainty-bg)",
     iconColor: "var(--score-uncertainty-text)",
-    title: "Challenge a flaw anywhere",
-    body: "Click Challenge on a claim — or select any sentence inside an argument — to send focused scrutiny at that exact spot."
+    titleKey: "debateDrawers.guide.challengeTitle",
+    bodyKey: "debateDrawers.guide.challengeBody"
   },
   {
     icon: "↻",
     iconBg: "var(--surface-sunken)",
-    title: "Compare, switch, export",
-    body: "Open any claim for its generation history and compare versions. Toggle Tree / Outline, and Export for Markdown."
+    titleKey: "debateDrawers.guide.compareTitle",
+    bodyKey: "debateDrawers.guide.compareBody"
   }
 ];
 
-export function GuideModal({ onClose }: { onClose: () => void }) {
+export function GuideModal({
+  onClose,
+  catalog = debateDrawersEnglish
+}: {
+  onClose: () => void;
+  catalog?: MessageCatalog;
+}) {
   return (
     <div className="modalScrim" onClick={onClose}>
       <div className="modalCard scroll" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal>
         <div className="modalHead">
           <div>
             <div className="nodeEyebrow" style={{ marginBottom: 6 }}>
-              How to read this
+              {t(catalog, "debateDrawers.guide.eyebrow")}
             </div>
-            <div className="modalTitle">A debate is an argument tree several models build together.</div>
+            <div className="modalTitle">{t(catalog, "debateDrawers.guide.title")}</div>
           </div>
-          <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
+          <button type="button" className="iconBtn" onClick={onClose} aria-label={t(catalog, "debateDrawers.common.close")}>
             ×
           </button>
         </div>
         <div className="guideList">
           {GUIDE_ITEMS.map((item) => (
-            <div key={item.title} className="guideRow">
+            <div key={item.titleKey} className="guideRow">
               <span className="guideIcon" style={{ background: item.iconBg, color: item.iconColor }}>
                 {item.icon}
               </span>
               <div>
-                <div className="guideRowTitle">{item.title}</div>
-                <div className="guideRowBody">{item.body}</div>
+                <div className="guideRowTitle">{t(catalog, item.titleKey)}</div>
+                <div className="guideRowBody">{t(catalog, item.bodyKey)}</div>
               </div>
             </div>
           ))}
         </div>
         <button type="button" className="btn btnDark guideDone" onClick={onClose}>
-          Got it
+          {t(catalog, "debateDrawers.guide.gotIt")}
         </button>
       </div>
     </div>

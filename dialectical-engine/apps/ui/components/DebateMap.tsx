@@ -3,7 +3,17 @@
 import { useState } from "react";
 import type { DebateNode } from "@/lib/types";
 import { ModelMetaLine } from "@/components/ModelPresentation";
-import { ROLE_PALETTES, renderStateOf, roleOf } from "@/lib/debatePresentation";
+import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+
+function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog): string {
+  const role = roleOf(node);
+  if (role === "root") return t(catalog, "debateViews.rootClaim");
+  if (role === "pro") return t(catalog, "debateViews.pro");
+  if (role === "con") return t(catalog, "debateViews.con");
+  return roleLabel(node);
+}
 
 type DebateMapProps = {
   root: DebateNode;
@@ -61,6 +71,7 @@ function fillFor(node: DebateNode): string {
 }
 
 export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
+  const { catalog } = useChromeI18n();
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const maxDepth = Math.max(1, treeDepth(root));
@@ -103,17 +114,17 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
         <div className="mapLegend">
           <span className="mapLegendItem">
             <span className="mapLegendSwatch" style={{ background: "var(--pro-line)" }} />
-            Supports
+            {t(catalog, "debateViews.supports")}
           </span>
           <span className="mapLegendItem">
             <span className="mapLegendSwatch" style={{ background: "var(--con-line)" }} />
-            Opposes
+            {t(catalog, "debateViews.opposes")}
           </span>
           <span className="mapLegendItem">
             <span className="mapLegendSwatch" style={{ background: "var(--reasoning-line)" }} />
-            Reasoning
+            {t(catalog, "debateViews.mapReasoning")}
           </span>
-          <span className="mapLegendHint">Ring = depth · width = the amount of debate below it</span>
+          <span className="mapLegendHint">{t(catalog, "debateViews.mapLegendHint")}</span>
         </div>
 
         <div className="mapStage" onMouseLeave={() => setHoverId(null)}>
@@ -156,7 +167,7 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
         <div className="mapReadoutShell">
           <div className="mapReadout" data-reference-map-readout>
             <span className="referenceStanceTab" style={{ background: readoutRole === "root" ? "var(--ink)" : readoutPal.line }} aria-hidden />
-            <div className="nodeEyebrow">{readoutRole === "root" ? "Root claim" : readoutRole}</div>
+            <div className="nodeEyebrow">{localizedRoleLabel(readoutNode, catalog)}</div>
             {readoutNode.active_generation || readoutNode.maker !== undefined ? (
               <ModelMetaLine
                 modelId={readoutNode.active_generation?.model_id ?? null}
@@ -165,10 +176,10 @@ export function DebateMap({ root, onOpenSplit }: DebateMapProps) {
             ) : null}
             <div className="mapReadoutClaim" data-ai-generated={readoutRole === "root" ? undefined : "true"}>{readoutNode.claim}</div>
             <div className="mapReadoutFooter">
-              <span>Hover a wedge to inspect · click to focus</span>
+              <span>{t(catalog, "debateViews.mapInteractionHint")}</span>
               <span style={{ flex: 1 }} />
               <button type="button" className="nodeCtrl link" onClick={() => onOpenSplit(readoutNode.id)}>
-                Open in Split ▸
+                {t(catalog, "debateViews.openInSplit")} ▸
               </button>
             </div>
           </div>

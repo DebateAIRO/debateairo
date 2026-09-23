@@ -1,3 +1,6 @@
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import { t, type MessageCatalog } from "./i18n/translate.js";
+
 export type PopoverState = {
   nodeId: string;
   x: number;
@@ -12,32 +15,36 @@ export type ScrutinyStatus = {
   text: string;
 };
 
-export const SCRUTINY_STATUS: Record<string, ScrutinyStatus> = {
-  working: {
-    label: "Investigating",
-    color: "var(--reasoning-line)",
-    bg: "var(--reasoning-bg)",
-    text: "var(--reasoning-text)"
-  },
-  contested: {
-    label: "Contested",
-    color: "var(--dispute)",
-    bg: "var(--dispute-bg)",
-    text: "var(--dispute-text)"
-  },
-  strengthened: {
-    label: "Strengthened",
-    color: "var(--agree-border)",
-    bg: "var(--agree-bg)",
-    text: "var(--agree-text)"
-  },
-  refuted: {
-    label: "Refuted",
-    color: "var(--dispute-border)",
-    bg: "var(--dispute-bg)",
-    text: "var(--dispute-text)"
-  }
-};
+export function scrutinyStatus(catalog: MessageCatalog = composeEnglish): Record<string, ScrutinyStatus> {
+  return {
+    working: {
+      label: t(catalog, "compose.scrutiny.status.investigating"),
+      color: "var(--reasoning-line)",
+      bg: "var(--reasoning-bg)",
+      text: "var(--reasoning-text)"
+    },
+    contested: {
+      label: t(catalog, "compose.scrutiny.status.contested"),
+      color: "var(--dispute)",
+      bg: "var(--dispute-bg)",
+      text: "var(--dispute-text)"
+    },
+    strengthened: {
+      label: t(catalog, "compose.scrutiny.status.strengthened"),
+      color: "var(--agree-border)",
+      bg: "var(--agree-bg)",
+      text: "var(--agree-text)"
+    },
+    refuted: {
+      label: t(catalog, "compose.scrutiny.status.refuted"),
+      color: "var(--dispute-border)",
+      bg: "var(--dispute-bg)",
+      text: "var(--dispute-text)"
+    }
+  };
+}
+
+export const SCRUTINY_STATUS: Record<string, ScrutinyStatus> = scrutinyStatus();
 
 export type ChallengeAction = {
   key: string;
@@ -46,9 +53,33 @@ export type ChallengeAction = {
   icon: string;
 };
 
-export const CHALLENGE_ACTIONS: ChallengeAction[] = [
-  { key: "counter", label: "Counter it", sub: "Spawn a focused opposing argument", icon: "⚔" },
-  { key: "factcheck", label: "Fact-check", sub: "Ask for sources, then verify", icon: "◉" },
-  { key: "weak", label: "Mark as weak", sub: "Flag as unsupported", icon: "⚠" },
-  { key: "reinterpret", label: "Reinterpret", sub: "The claim was misread", icon: "↻" }
-];
+export function challengeActions(catalog: MessageCatalog = composeEnglish): ChallengeAction[] {
+  return [
+    {
+      key: "counter",
+      label: t(catalog, "compose.challenge.counter.label"),
+      sub: t(catalog, "compose.challenge.counter.hint"),
+      icon: "⚔"
+    },
+    {
+      key: "factcheck",
+      label: t(catalog, "compose.challenge.factCheck.label"),
+      sub: t(catalog, "compose.challenge.factCheck.hint"),
+      icon: "◉"
+    },
+    {
+      key: "weak",
+      label: t(catalog, "compose.challenge.markWeak.label"),
+      sub: t(catalog, "compose.challenge.markWeak.hint"),
+      icon: "⚠"
+    },
+    {
+      key: "reinterpret",
+      label: t(catalog, "compose.challenge.reinterpret.label"),
+      sub: t(catalog, "compose.challenge.reinterpret.hint"),
+      icon: "↻"
+    }
+  ];
+}
+
+export const CHALLENGE_ACTIONS: ChallengeAction[] = challengeActions();

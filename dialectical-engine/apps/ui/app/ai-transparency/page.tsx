@@ -1,37 +1,64 @@
-import { AI_NOTICE } from "@/lib/aiDisclosure";
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
+import { loadNamespace } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/translate";
 
-export const metadata = {
-  title: "AI transparency · Dialectical Engine",
-  description: "How DebateAI identifies generated arguments, reviews, scores, verdicts and support replies."
-};
+const AI_GENERATED_MARKING = 'data-ai-generated="true"';
+const AUTOMATED_ORIGIN_MARKING = 'data-content-origin="automated"';
+const AI_DISCLOSURE_FIELD = "ai_disclosure";
+const DEBATEAI_BRAND = "DebateAI";
+const PRODUCT_NAME = "Dialectical Engine";
 
-export default function AiTransparencyPage() {
+async function settingsCatalog() {
+  const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
+  const locale = isLocale(requestedLocale) ? requestedLocale : "en";
+  return loadNamespace(locale, "settings");
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const catalog = await settingsCatalog();
+  return {
+    title: t(catalog, "settings.transparency.metadataTitle", { product: PRODUCT_NAME }),
+    description: t(catalog, "settings.transparency.metadataDescription", { brand: DEBATEAI_BRAND })
+  };
+}
+
+export default async function AiTransparencyPage() {
+  const catalog = await settingsCatalog();
   return (
     <main className="screen scroll aiTransparencyPage">
       <article>
-        <p className="libEyebrow">AI TRANSPARENCY</p>
-        <h1>How we label AI content</h1>
-        <p>{AI_NOTICE.block}</p>
-        <h2>Read critically</h2>
-        <p>Generated content may be inaccurate or incomplete — treat it as material to judge, not as fact.
-          Scores and verdicts evaluate arguments; they are not a guarantee of truth. Check claims and their sources before relying on them.</p>
-        <h2>Visible labels</h2>
-        <p>AI notices appear before starting a debate, in the library, on private and published debates,
-          and in support conversations. Recorded model attribution accompanies arguments where available.</p>
-        <h2>Machine-readable markings</h2>
-        <p>Generated content in the rendered page carries <code>data-ai-generated="true"</code>.
-          This identifies the marked content, including its generated text and evaluations.
-          Your question and your support messages are not labelled as AI-generated.
-          Fixed support notices use <code>data-content-origin="automated"</code> instead.</p>
-        <p>Debate JSON downloads include an <code>ai_disclosure</code> object describing the generated
-          content and the absence of human editorial review. Recorded answer data, model provenance,
-          and operational records retain their original values.</p>
-        <p>These markings describe content in our UI and downloads. They are not a watermark or
-          authenticity certificate; copying plain text may remove them.</p>
-        <h2>Support and human help</h2>
-        <p>The support assistant is an AI system. Use “Talk to a human” or “Escalate to a human”
-          in <a href="/help">Help</a> to request human assistance.</p>
-        <a className="btn" href="/">Back to DebateAI</a>
+        <p className="libEyebrow">{t(catalog, "settings.transparency.eyebrow")}</p>
+        <h1>{t(catalog, "settings.transparency.title")}</h1>
+        <p>{t(catalog, "settings.transparency.notice", { brand: DEBATEAI_BRAND })}</p>
+        <h2>{t(catalog, "settings.transparency.readCriticallyTitle")}</h2>
+        <p>{t(catalog, "settings.transparency.readCriticallyBody")}</p>
+        <h2>{t(catalog, "settings.transparency.visibleLabelsTitle")}</h2>
+        <p>{t(catalog, "settings.transparency.visibleLabelsBody")}</p>
+        <h2>{t(catalog, "settings.transparency.machineReadableTitle")}</h2>
+        <p>
+          {t(catalog, "settings.transparency.machineReadableLead")}{" "}
+          <code>{AI_GENERATED_MARKING}</code>.
+          {" "}{t(catalog, "settings.transparency.machineReadableMiddle")}{" "}
+          <code>{AUTOMATED_ORIGIN_MARKING}</code>{" "}
+          {t(catalog, "settings.transparency.machineReadableTail")}
+        </p>
+        <p>
+          {t(catalog, "settings.transparency.downloadsLead")}{" "}
+          <code>{AI_DISCLOSURE_FIELD}</code>{" "}
+          {t(catalog, "settings.transparency.downloadsTail")}
+        </p>
+        <p>{t(catalog, "settings.transparency.markingsLimit")}</p>
+        <h2>{t(catalog, "settings.transparency.supportTitle")}</h2>
+        <p>
+          {t(catalog, "settings.transparency.supportLead")}{" "}
+          <a href="/help">{t(catalog, "settings.transparency.help")}</a>{" "}
+          {t(catalog, "settings.transparency.supportTail")}
+        </p>
+        <a className="btn" href="/">
+          {t(catalog, "settings.transparency.back", { brand: DEBATEAI_BRAND })}
+        </a>
       </article>
     </main>
   );

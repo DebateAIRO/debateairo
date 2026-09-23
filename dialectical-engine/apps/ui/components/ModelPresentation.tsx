@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 import { makerIdentityLabel } from "@/lib/makerIdentity";
 import { modelMeta } from "@/lib/models";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import miscEnglish from "@/messages/en/misc.json";
 
 export function modelColor(identity: string): string {
   switch (identity.trim().toLowerCase()) {
@@ -24,10 +26,22 @@ export function modelColorStyle(identity: string): CSSProperties {
   return { "--model-color": color, "--node-model-color": color } as CSSProperties;
 }
 
-type ModelIdentityProps = { modelId: string | null; maker?: string | null; className?: string };
+type ModelIdentityProps = {
+  modelId: string | null;
+  maker?: string | null;
+  className?: string;
+  catalog?: MessageCatalog;
+};
 
-export function ModelMetaLine({ modelId, maker, className = "metaLine" }: ModelIdentityProps) {
+export function ModelMetaLine({
+  modelId,
+  maker,
+  className = "metaLine",
+  catalog = miscEnglish
+}: ModelIdentityProps) {
   const label = makerIdentityLabel({ maker, modelId });
+  const visibleLabel = label.absence ? t(catalog, "misc.model.houseUnavailable") : label.text;
+  const absenceExplanation = t(catalog, "misc.model.noRecordedHouse");
   const model = modelId === null ? null : modelMeta(modelId);
   const identity = maker ?? modelId ?? "maker-absent";
   const dot = maker === undefined && model !== null ? model.dot : modelColor(identity);
@@ -37,17 +51,19 @@ export function ModelMetaLine({ modelId, maker, className = "metaLine" }: ModelI
       style={label.absence ? undefined : ({ "--model-color": dot } as CSSProperties)}
       data-maker={maker ?? undefined}
       data-maker-absence={label.absence ? "true" : undefined}
-      title={label.absence ? "No recorded house is available for this argument." : undefined}
-      aria-label={label.absence ? "No recorded house is available for this argument." : undefined}
+      title={label.absence ? absenceExplanation : undefined}
+      aria-label={label.absence ? absenceExplanation : undefined}
     >
       {label.absence ? null : <span className="modelDot" style={{ ["--dot" as string]: dot }} />}
-      {label.text}
+      {visibleLabel}
     </span>
   );
 }
 
-export function ModelBadge({ modelId, maker }: ModelIdentityProps) {
+export function ModelBadge({ modelId, maker, catalog = miscEnglish }: ModelIdentityProps) {
   const label = makerIdentityLabel({ maker, modelId });
+  const visibleLabel = label.absence ? t(catalog, "misc.model.houseUnavailable") : label.text;
+  const absenceExplanation = t(catalog, "misc.model.noRecordedHouse");
   const identity = maker ?? modelId ?? "maker-absent";
   const color = modelColor(identity);
   return (
@@ -58,10 +74,10 @@ export function ModelBadge({ modelId, maker }: ModelIdentityProps) {
       data-maker={maker ?? undefined}
       data-maker-absence={label.absence ? "true" : undefined}
       data-model-color={label.absence ? undefined : color}
-      title={label.absence ? "No recorded house is available for this argument." : undefined}
-      aria-label={label.absence ? "No recorded house is available for this argument." : undefined}
+      title={label.absence ? absenceExplanation : undefined}
+      aria-label={label.absence ? absenceExplanation : undefined}
     >
-      {label.text}
+      {visibleLabel}
     </span>
   );
 }

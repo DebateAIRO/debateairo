@@ -2,14 +2,16 @@
 
 import { formatDialecticalSupport } from "@/lib/debatePresentation";
 import type { LiveVerdictState, VerdictSummary } from "@/lib/types";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 
-const BAND_LABELS: Record<VerdictSummary["verdictBand"], string> = {
-  supported: "Strongly supported",
-  contested: "Contested",
-  unsupported: "Weakly supported",
-  unavailable: "Analysis unavailable",
-  insufficient_scoring: "Not enough judge scoring",
-  suppressed: "Verdict withheld"
+const BAND_LABEL_KEYS: Record<VerdictSummary["verdictBand"], string> = {
+  supported: "debateDrawers.verdict.stronglySupported",
+  contested: "debateDrawers.verdict.contested",
+  unsupported: "debateDrawers.verdict.weaklySupported",
+  unavailable: "debateDrawers.verdict.analysisUnavailable",
+  insufficient_scoring: "debateDrawers.verdict.insufficientScoring",
+  suppressed: "debateDrawers.verdict.withheld"
 };
 
 /**
@@ -34,40 +36,53 @@ const BAND_LABELS: Record<VerdictSummary["verdictBand"], string> = {
  * has an entry. A value from OUTSIDE the union -- a retired word arriving in an
  * older stored payload -- renders no sentence rather than a fabricated one.
  */
-const STATE_SENTENCES: Record<LiveVerdictState, string | null> = {
+const STATE_SENTENCE_KEYS: Record<LiveVerdictState, string | null> = {
   supported: null,
-  contested:
-    "The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing.",
-  unsupported:
-    "Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one."
+  contested: "debateDrawers.verdict.contestedExplanation",
+  unsupported: "debateDrawers.verdict.unsupportedExplanation"
 };
 
-const EVIDENCE_UNVERIFIED_CAVEAT =
-  "Caveat — evidence unverified: extracted evidence has no resolved external source.";
-const CLAIM_TYPE_UNKNOWN_CAVEAT =
-  "Caveat — claim type unestablished: this claim's type could not be determined from stored analysis, so the evidence gate was not applied.";
-
-function formatConvergence(convergence: VerdictSummary["basis"]["convergence"]): string {
-  if (!convergence) return "not available";
+function formatConvergence(
+  catalog: MessageCatalog,
+  convergence: VerdictSummary["basis"]["convergence"]
+): string {
+  if (!convergence) return t(catalog, "debateDrawers.common.notAvailable");
   const converged = convergence["converged"];
   const reason = convergence["reason"];
-  const convergedLabel = converged === true ? "true" : converged === false ? "false" : "not available";
-  const reasonLabel = typeof reason === "string" && reason.trim().length > 0 ? reason : "not available";
-  return `converged: ${convergedLabel}, reason: ${reasonLabel}`;
+  const convergedLabel = converged === true
+    ? t(catalog, "debateDrawers.common.true")
+    : converged === false
+      ? t(catalog, "debateDrawers.common.false")
+      : t(catalog, "debateDrawers.common.notAvailable");
+  const reasonLabel = typeof reason === "string" && reason.trim().length > 0
+    ? reason
+    : t(catalog, "debateDrawers.common.notAvailable");
+  return t(catalog, "debateDrawers.verdict.convergenceSummary", {
+    converged: convergedLabel,
+    reason: reasonLabel
+  });
 }
 
-export function VerdictBanner({ verdict }: { verdict: VerdictSummary | undefined }) {
+export function VerdictBanner({
+  verdict,
+  catalog = debateDrawersEnglish
+}: {
+  verdict: VerdictSummary | undefined;
+  catalog?: MessageCatalog;
+}) {
   if (!verdict) return null;
 
   // Unknown/future bands must never crash the banner: fall back to rendering
   // the raw band value verbatim (honest, never a fabricated label).
-  const bandLabel = BAND_LABELS[verdict.verdictBand] ?? verdict.verdictBand;
-  const stateSentence = verdict.verdictState ? STATE_SENTENCES[verdict.verdictState] : null;
+  const bandLabelKey = BAND_LABEL_KEYS[verdict.verdictBand];
+  const bandLabel = bandLabelKey ? t(catalog, bandLabelKey) : verdict.verdictBand;
+  const stateSentenceKey = verdict.verdictState ? STATE_SENTENCE_KEYS[verdict.verdictState] : null;
+  const stateSentence = stateSentenceKey ? t(catalog, stateSentenceKey) : null;
 
   return (
     <section
       className="verdictBanner"
-      aria-label="Verdict"
+      aria-label={t(catalog, "debateDrawers.verdict.title")}
       data-verdict-band={verdict.verdictBand}
       data-verdict-state={verdict.verdictState}
       data-ai-generated="true"
@@ -84,36 +99,43 @@ export function VerdictBanner({ verdict }: { verdict: VerdictSummary | undefined
         if (caveat.code === "evidence_unverified") {
           return (
             <p key={caveat.code} className="verdictCaveat">
-              {EVIDENCE_UNVERIFIED_CAVEAT}
+              {t(catalog, "debateDrawers.verdict.evidenceUnverifiedCaveat")}
             </p>
           );
         }
         if (caveat.code === "claim_type_unknown") {
           return (
             <p key={caveat.code} className="verdictCaveat">
-              {CLAIM_TYPE_UNKNOWN_CAVEAT}
+              {t(catalog, "debateDrawers.verdict.claimTypeUnknownCaveat")}
             </p>
           );
         }
         return null;
       })}
       <details className="verdictDetails">
-        <summary>Details</summary>
+        <summary>{t(catalog, "debateDrawers.verdict.details")}</summary>
         <span className="verdictDetailRow">
           {typeof verdict.basis.dialecticalStrength === "number" && verdict.basis.semanticsVersion
             ? formatDialecticalSupport(verdict.basis.dialecticalStrength, verdict.basis.semanticsVersion)
-            : "not available"}
+            : t(catalog, "debateDrawers.common.notAvailable")}
         </span>
         <span className="verdictDetailRow">
-          verification status: {verdict.basis.verificationStatus ?? "not available"}
+          {t(catalog, "debateDrawers.verdict.verificationStatus", {
+            status: verdict.basis.verificationStatus ?? t(catalog, "debateDrawers.common.notAvailable")
+          })}
         </span>
         <span className="verdictDetailRow">
-          judge-score coverage:{" "}
-          {typeof verdict.basis.tauCoverage === "number" ? verdict.basis.tauCoverage : "not available"}
+          {t(catalog, "debateDrawers.verdict.judgeScoreCoverage", {
+            coverage: typeof verdict.basis.tauCoverage === "number"
+              ? verdict.basis.tauCoverage
+              : t(catalog, "debateDrawers.common.notAvailable")
+          })}
         </span>
         <span className="verdictDetailRow">
-          convergence (dialectical, semantics version {verdict.basis.semanticsVersion ?? "not available"}):{" "}
-          {formatConvergence(verdict.basis.convergence)}
+          {t(catalog, "debateDrawers.verdict.convergence", {
+            version: verdict.basis.semanticsVersion ?? t(catalog, "debateDrawers.common.notAvailable"),
+            convergence: formatConvergence(catalog, verdict.basis.convergence)
+          })}
         </span>
       </details>
     </section>

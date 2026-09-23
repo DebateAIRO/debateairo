@@ -4,7 +4,21 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { LocaleCode } from "./locales";
 import type { MessageCatalog } from "./translate";
 
-export type I18nNamespace = "chrome" | "home" | "newDebate" | "time";
+export type I18nNamespace =
+  | "chrome"
+  | "home"
+  | "newDebate"
+  | "time"
+  | "auth"
+  | "public"
+  | "debateViews"
+  | "debateDrawers"
+  | "debateChrome"
+  | "settings"
+  | "consent"
+  | "support"
+  | "compose"
+  | "misc";
 
 type I18nContextValue = Readonly<{
   locale: LocaleCode;

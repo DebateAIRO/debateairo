@@ -21,16 +21,23 @@ const home = read("../app/page.tsx");
 const verifyEmail = read("../app/verify-email/page.tsx");
 const enrollMfa = read("../app/enroll-mfa/page.tsx");
 const packageJson = read("../package.json");
+const authMessages = JSON.parse(read("../messages/en/auth.json"));
 
 test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
   assert.match(login, /client\.beginLogin/);
   assert.match(login, /client\.completeLogin/);
-  assert.match(login, /authenticator or a recovery code/);
-  assert.match(login, /Enter your authentication code\./);
-  assert.match(login, /6-digit authentication code/);
-  assert.match(login, /Use a recovery code/);
-  assert.match(login, /Enter a recovery code\./);
-  assert.match(login, /Back to sign in/);
+  assert.match(login, /t\(catalog, "auth\.login\.securityPolicy"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.authenticatorTitle"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.authenticationCodeLabel"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.useRecoveryCode"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.recoveryTitle"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.backToSignIn"\)/);
+  assert.match(authMessages["auth.login.securityPolicy"], /authenticator or a recovery code/);
+  assert.equal(authMessages["auth.login.authenticatorTitle"], "Enter your authentication code.");
+  assert.equal(authMessages["auth.login.authenticationCodeLabel"], "6-digit authentication code");
+  assert.equal(authMessages["auth.login.useRecoveryCode"], "Use a recovery code");
+  assert.equal(authMessages["auth.login.recoveryTitle"], "Enter a recovery code.");
+  assert.equal(authMessages["auth.login.backToSignIn"], "Back to sign in");
   assert.match(login, /replacement_recovery_code/);
   assert.match(login, /role="alert"/);
   assert.match(login, /window\.location\.assign\(safeReturnPath\(next\)\)/);
@@ -43,7 +50,17 @@ test("sign-up exposes only fields backed by the registration contract", () => {
   assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
   assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
   assert.match(signUp, /name="adult-affirmed"[\s\S]*?required/);
-  assert.match(signUp, /result\.message/);
+  assert.match(signUp, /await client\.register/);
+  assert.match(signUp, /await client\.resendVerification/);
+  assert.match(signUp, /successMessage\(catalog, messageKey\)/);
+  assert.equal(
+    authMessages["auth.signUp.registrationSent"],
+    "If this address can be registered, verification instructions will arrive. Check your spam folder."
+  );
+  assert.equal(
+    authMessages["auth.signUp.resendSent"],
+    "If this address is awaiting verification, new instructions will arrive. Check your spam folder."
+  );
   assert.match(signUp, /role="status"/);
   assert.doesNotMatch(signUp, /localStorage|sessionStorage|Bearer|Google|Model API|terms|privacy notice/i);
 });
@@ -88,7 +105,7 @@ test("the login route sends an already-authenticated browser back to its debate 
   assert.match(loginPage, /\.readSession\(\)/);
   assert.match(loginPage, /redirect\("\/#start-a-debate"\)/);
   assert.match(loginPage, /catch \{/);
-  assert.match(loginPage, /return <LoginFlow \/>/);
+  assert.match(loginPage, /return <LoginFlow catalog=\{catalog\} \/>/);
 });
 
 test("verification remains one canonical mailed-link path and production builds gate every auth route", () => {
@@ -131,12 +148,18 @@ test("desktop auth content is the document's 540px card", () => {
 test("auth failures use stable public copy instead of exception text", () => {
   assert.doesNotMatch(login, /failure\.message/);
   assert.doesNotMatch(signUp, /failure\.message/);
-  assert.match(login, /setError\("Sign-in could not be completed\."\)/);
-  assert.match(login, /setError\("Authenticator verification could not be completed\."\)/);
-  assert.match(login, /That recovery code was not accepted/);
-  assert.match(login, /Too many verification attempts/);
-  assert.match(signUp, /setError\("Account creation could not be completed\."\)/);
-  assert.match(signUp, /setError\("Verification instructions could not be resent\."\)/);
+  assert.match(login, /setError\(t\(catalog, "auth\.login\.signInFailed"\)\)/);
+  assert.match(login, /setError\(t\(catalog, "auth\.login\.verificationFailed"\)\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.recoveryCodeRejected"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.tooManyAttempts"\)/);
+  assert.match(signUp, /setError\(t\(catalog, "auth\.signUp\.creationFailed"\)\)/);
+  assert.match(signUp, /setError\(t\(catalog, "auth\.signUp\.resendFailed"\)\)/);
+  assert.equal(authMessages["auth.login.signInFailed"], "Sign-in could not be completed.");
+  assert.equal(authMessages["auth.login.verificationFailed"], "Authenticator verification could not be completed.");
+  assert.match(authMessages["auth.login.recoveryCodeRejected"], /^That recovery code was not accepted\./);
+  assert.match(authMessages["auth.login.tooManyAttempts"], /^Too many verification attempts\./);
+  assert.equal(authMessages["auth.signUp.creationFailed"], "Account creation could not be completed.");
+  assert.equal(authMessages["auth.signUp.resendFailed"], "Verification instructions could not be resent.");
 });
 
 test("primary and recovery emails occupy distinct autocomplete sections", () => {

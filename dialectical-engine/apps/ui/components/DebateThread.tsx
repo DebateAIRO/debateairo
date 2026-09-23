@@ -6,7 +6,16 @@ import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { ReferenceAuthorPill, ReferenceReviewLine, ReferenceScoreBadges } from "@/components/ReferenceNodeMeta";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
-import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+
+function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog): string {
+  const role = roleOf(node);
+  if (role === "root") return t(catalog, "debateViews.rootClaim");
+  if (role === "pro") return t(catalog, "debateViews.pro");
+  if (role === "con") return t(catalog, "debateViews.con");
+  return roleLabel(node);
+}
 
 export type ThreadCallbacks = {
   onOpenNode: (nodeId: string) => void;
@@ -63,6 +72,7 @@ export function DebateThread({
   onToggleCollapse,
   onProseSelect
 }: DebateThreadProps) {
+  const { catalog, locale } = useChromeI18n();
   const rows = buildRows(root, collapsed);
 
   return (
@@ -71,14 +81,14 @@ export function DebateThread({
         <div className="threadRootShell">
           <div className="threadRoot">
             <span className="referenceStanceTab root" aria-hidden />
-            <div className="nodeEyebrow">Root claim</div>
+            <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
             <div className="threadRootClaim">{root.claim}</div>
             <div className="nodeRootMeta">
-              <span>{meta.nodes} claims</span>
+              <span>{tPlural(catalog, "debateViews.claimCount", meta.nodes, locale)}</span>
               <span className="sep">/</span>
-              <span>depth {meta.depth}</span>
+              <span>{t(catalog, "debateViews.depthValue", { depth: meta.depth })}</span>
               <span className="sep">/</span>
-              <span>scroll down to follow each line of argument</span>
+              <span>{t(catalog, "debateViews.followArgumentLines")}</span>
             </div>
           </div>
         </div>
@@ -99,6 +109,7 @@ export function DebateThread({
             onToggleExpand={onToggleExpand}
             onToggleCollapse={onToggleCollapse}
             onProseSelect={onProseSelect}
+            catalog={catalog}
           />
         ))}
       </div>
@@ -112,6 +123,7 @@ type ThreadRowCardProps = ThreadCallbacks & {
   collapsed: boolean;
   scrutinyStatus?: string;
   v3Node?: ContractNode;
+  catalog: MessageCatalog;
 };
 
 function ThreadRowCard({
@@ -125,7 +137,8 @@ function ThreadRowCard({
   onRegenNode,
   onToggleExpand,
   onToggleCollapse,
-  onProseSelect
+  onProseSelect,
+  catalog
 }: ThreadRowCardProps) {
   const { node, trail, childCount } = row;
   const role = roleOf(node);
@@ -185,7 +198,7 @@ function ThreadRowCard({
 
           <div className="threadMetaRow">
             <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
-              {pal.arrow} {roleLabel(node)}
+              {pal.arrow} {localizedRoleLabel(node, catalog)}
             </span>
             <ReferenceScoreBadges node={node} v3Node={v3Node} onOpenNode={onOpenNode} />
             <span style={{ flex: 1 }} />
@@ -198,7 +211,7 @@ function ThreadRowCard({
               <span className="nodeEmptyMark" aria-hidden>
                 ∅
               </span>
-              <div className="nodeEmptyText">No strong argument found.</div>
+              <div className="nodeEmptyText">{t(catalog, "debateViews.noStrongArgument")}</div>
             </div>
           ) : state === "pending" ? (
             <div className="nodePending">
@@ -227,9 +240,9 @@ function ThreadRowCard({
                   className="nodeCtrl"
                   disabled
                   aria-disabled="true"
-                  title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+                  title={t(catalog, "debateViews.nodeRegenerationUnavailable")}
                 >
-                  ↻ Regenerate
+                  ↻ {t(catalog, "debateViews.regenerate")}
                 </button>
                 <span style={{ flex: 1 }} />
                 <button
@@ -241,7 +254,7 @@ function ThreadRowCard({
                     else onOpenNode(node.id);
                   }}
                 >
-                  {expanded ? "Show less" : "Read"} <span aria-hidden>{expanded ? "▴" : "▾"}</span>
+                  {t(catalog, expanded ? "debateViews.showLess" : "debateViews.read")} <span aria-hidden>{expanded ? "▴" : "▾"}</span>
                 </button>
               </div>
             </>

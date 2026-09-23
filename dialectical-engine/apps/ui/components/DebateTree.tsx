@@ -7,7 +7,8 @@ import type { DebateNode, Generation, NodeScoringPayload } from "@/lib/types";
 import { isAbandonedArgumentStatus, isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { branchLabelOf } from "@/lib/debatePresentation";
 import { ModelBadge, modelColorStyle } from "@/components/ModelPresentation";
-import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 
 function isAbandonedNode(node: DebateNode): boolean {
   return isAbandonedArgumentStatus(node.status)
@@ -31,10 +32,10 @@ function nodeClass(node: DebateNode, lowStrength: boolean): string {
   return `nodeCard ${roleClass}${ab}${ls}`;
 }
 
-function nodeLabel(node: DebateNode): string {
-  if (node.node_type === "ROOT_CLAIM") return "Root";
-  if (node.node_type === "PRO") return "Pro";
-  if (node.node_type === "CON") return "Con";
+function nodeLabel(node: DebateNode, catalog: MessageCatalog): string {
+  if (node.node_type === "ROOT_CLAIM") return t(catalog, "debateViews.root");
+  if (node.node_type === "PRO") return t(catalog, "debateViews.pro");
+  if (node.node_type === "CON") return t(catalog, "debateViews.con");
   // Data-driven: backend-provided label/lens wins, else derive from node_type.
   return branchLabelOf(node);
 }
@@ -80,6 +81,7 @@ export function ArgumentNodeCard({
   scoring,
   lowStrengthThreshold,
 }: ArgumentNodeCardProps) {
+  const { catalog } = useChromeI18n();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Generation[]>([]);
 
@@ -91,7 +93,7 @@ export function ArgumentNodeCard({
       }
       setHistoryOpen(!historyOpen);
     } catch (exc) {
-      const message = errorMessage(exc, "Unable to load generation history");
+      const message = errorMessage(exc, t(catalog, "debateViews.unableToLoadGenerationHistory"));
       onError(message);
     }
   }
@@ -114,10 +116,10 @@ export function ArgumentNodeCard({
   }
 
   const generation = node.active_generation;
-  const argument = generation?.argument || (node.status === "pending" ? "Queued" : "");
+  const argument = generation?.argument || (node.status === "pending" ? t(catalog, "debateViews.queued") : "");
   const workerName = generation?.worker_name || generation?.worker_id;
   const isCardInteractive = Boolean(onSelectNode);
-  const cardLabel = selectionLabel ?? (isCardInteractive ? `Select argument: ${node.claim}` : undefined);
+  const cardLabel = selectionLabel ?? (isCardInteractive ? t(catalog, "debateViews.selectArgument", { claim: node.claim }) : undefined);
   const modelStyle = generation ? modelColorStyle(generation.maker ?? generation.model_id) : undefined;
   // Additive, flag-gated low-strength dimming (Phase 9 Task 3). Never replaces
   // the existing abandoned/selection classes -- a node can be both abandoned
@@ -151,9 +153,9 @@ export function ArgumentNodeCard({
           onKeyDown={isCardInteractive ? selectOrToggleFromKeyboard : undefined}
         >
           <div className="toolbar">
-            <span className="badge">{nodeLabel(node)}</span>
+            <span className="badge">{nodeLabel(node, catalog)}</span>
             <span className={`badge${isAbandonedNode(node) ? " abandonedBadge" : ""}`}>
-              {isAbandonedNode(node) ? "Stopped" : node.status}
+              {isAbandonedNode(node) ? t(catalog, "debateViews.stopped") : node.status}
             </span>
             {generation || node.maker !== undefined ? (
               <ModelBadge modelId={generation?.model_id ?? null} maker={node.maker} />
@@ -179,10 +181,12 @@ export function ArgumentNodeCard({
               className="secondary"
               type="button"
               aria-expanded={childrenOpen}
-              aria-label={`${childrenOpen ? "Collapse" : "Expand"} child arguments for: ${node.claim}`}
+              aria-label={childrenOpen
+                ? t(catalog, "debateViews.collapseChildArgumentsFor", { claim: node.claim })
+                : t(catalog, "debateViews.expandChildArgumentsFor", { claim: node.claim })}
               onClick={onToggleChildren}
             >
-              {childrenOpen ? "Collapse" : "Expand"}
+              {childrenOpen ? t(catalog, "debateViews.collapse") : t(catalog, "debateViews.expand")}
             </button>
           ) : null}
           {token && !isAbandonedNode(node) ? (
@@ -191,21 +195,23 @@ export function ArgumentNodeCard({
               type="button"
               disabled
               aria-disabled="true"
-              aria-label={`Regenerate argument: ${node.claim}`}
-              title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+              aria-label={t(catalog, "debateViews.regenerateArgument", { claim: node.claim })}
+              title={t(catalog, "debateViews.nodeRegenerationUnavailable")}
             >
-              Regenerate
+              {t(catalog, "debateViews.regenerate")}
             </button>
           ) : null}
           {token && !isAbandonedNode(node) ? (
             <button
               className="secondary"
               type="button"
-              aria-label={`${historyOpen ? "Hide" : "Show"} generation history for argument: ${node.claim}`}
+              aria-label={historyOpen
+                ? t(catalog, "debateViews.hideGenerationHistory", { claim: node.claim })
+                : t(catalog, "debateViews.showGenerationHistory", { claim: node.claim })}
               aria-expanded={historyOpen}
               onClick={toggleHistory}
             >
-              History
+              {t(catalog, "debateViews.history")}
             </button>
           ) : null}
         </div>
@@ -213,12 +219,12 @@ export function ArgumentNodeCard({
       {historyOpen ? (
         <div className="historyPanel">
           {history.length === 0 ? (
-            <p className="muted">No generations yet.</p>
+            <p className="muted">{t(catalog, "debateViews.noGenerationsYet")}</p>
           ) : (
             history.map((item) => (
               <section key={item.id}>
                 <div className="toolbar">
-                  <span className="badge">{item.is_active ? "Active" : "Archived"}</span>
+                  <span className="badge">{item.is_active ? t(catalog, "debateViews.active") : t(catalog, "debateViews.archived")}</span>
                   <ModelBadge modelId={item.model_id} />
                   <span className="badge">{item.worker_name || item.worker_id}</span>
                   <span className="badge">{item.role}</span>
@@ -242,6 +248,7 @@ export function DebateTree({
   scoringByNodeId,
   lowStrengthThreshold,
 }: DebateTreeProps) {
+  const { catalog, locale } = useChromeI18n();
   const [childrenOpen, setChildrenOpen] = useState(node.node_type === "ROOT_CLAIM");
 
   const activeChildren = node.children.filter((c) => !isAbandonedNode(c));
@@ -284,9 +291,9 @@ export function DebateTree({
         </div>
       ) : null}
       {abandonedChildren.length > 0 ? (
-        <div className="abandonedPaths" aria-label={`${abandonedChildren.length} stopped path${abandonedChildren.length === 1 ? "" : "s"}`}>
+        <div className="abandonedPaths" aria-label={tPlural(catalog, "debateViews.stoppedPathCount", abandonedChildren.length, locale)}>
           <div className="abandonedPathsSummary">
-            ⊗ {abandonedChildren.length} stopped path{abandonedChildren.length === 1 ? "" : "s"}
+            ⊗ {tPlural(catalog, "debateViews.stoppedPathCount", abandonedChildren.length, locale)}
           </div>
           <div className="children vertical" data-child-layout="vertical">
             {abandonedChildren.map((child) => (

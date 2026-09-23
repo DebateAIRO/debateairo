@@ -7,6 +7,16 @@ import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePre
 import { findNodePathById, partitionArgumentChildren, perspectiveChildren } from "@/lib/debateTreeUtils";
 import { ReferenceAuthorPill, ReferenceReviewLine, ReferenceScoreBadges } from "@/components/ReferenceNodeMeta";
 import { SCRUTINY_STATUS } from "@/lib/scrutiny";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+
+function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog): string {
+  const role = roleOf(node);
+  if (role === "root") return t(catalog, "debateViews.rootClaim");
+  if (role === "pro") return t(catalog, "debateViews.pro");
+  if (role === "con") return t(catalog, "debateViews.con");
+  return roleLabel(node);
+}
 
 export type SplitCallbacks = {
   onFocus: (nodeId: string) => void;
@@ -53,6 +63,7 @@ export function DebateSplit({
   onToggleExpand,
   onProseSelect
 }: DebateSplitProps) {
+  const { catalog, locale } = useChromeI18n();
   const path = focusNodeId ? findNodePathById(root, focusNodeId) : [root];
   const focus = path.length ? path[path.length - 1] : root;
   const isRootFocus = focus.node_type === "ROOT_CLAIM";
@@ -63,7 +74,11 @@ export function DebateSplit({
   const { pro, con } = subtreeLean(focus);
   const total = pro + con;
   const leanPct = total ? Math.round((pro / total) * 100) : 50;
-  const leanLabel = leanPct >= 55 ? "Pro" : leanPct <= 45 ? "Con" : "Even";
+  const leanLabel = leanPct >= 55
+    ? t(catalog, "debateViews.pro")
+    : leanPct <= 45
+      ? t(catalog, "debateViews.con")
+      : t(catalog, "debateViews.even");
 
   const focusRole = roleOf(focus);
   const focusPal = focusRole === "root" ? null : ROLE_PALETTES[focusRole];
@@ -73,7 +88,7 @@ export function DebateSplit({
       <div className="splitInner">
         <div className="splitPath">
           <div className="splitPathHead">
-            <span>Path from root</span>
+            <span>{t(catalog, "debateViews.pathFromRoot")}</span>
             <div className="splitPathChips">
             {(ancestors.length > 0 ? path.slice(0, -1) : [root]).map((node, index) => {
               const role = roleOf(node);
@@ -90,7 +105,7 @@ export function DebateSplit({
                       className="splitChipRole"
                       style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}
                     >
-                      {role === "root" ? "● Root" : `${pal.arrow} ${roleLabel(node)}`}
+                      {role === "root" ? `● ${t(catalog, "debateViews.root")}` : `${pal.arrow} ${localizedRoleLabel(node, catalog)}`}
                     </span>
                     <span className="splitChipClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
                   </button>
@@ -98,7 +113,7 @@ export function DebateSplit({
               );
             })}
             </div>
-            <span className="splitPathHint">click a level to step back up</span>
+            <span className="splitPathHint">{t(catalog, "debateViews.clickLevelToStepBack")}</span>
           </div>
         </div>
 
@@ -106,7 +121,7 @@ export function DebateSplit({
           <div className="splitFocusShell">
             <div className="splitFocusRoot">
               <span className="referenceStanceTab root" aria-hidden />
-              <div className="nodeEyebrow">Root claim</div>
+              <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
               <div className="splitFocusRootClaim">{root.claim}</div>
             </div>
           </div>
@@ -119,7 +134,7 @@ export function DebateSplit({
                 className="roleBadge"
                 style={{ color: focusPal?.text, background: focusPal?.bg, borderColor: focusPal?.border }}
               >
-                {focusPal?.arrow} {roleLabel(focus)}
+                {focusPal?.arrow} {localizedRoleLabel(focus, catalog)}
               </span>
               <ReferenceScoreBadges node={focus} v3Node={v3NodesById?.get(focus.id)} onOpenNode={onOpenNode} />
               <span style={{ flex: 1 }} />
@@ -142,15 +157,15 @@ export function DebateSplit({
                     onChallengeNode(focus, event.currentTarget);
                   }}
                 >
-                  ⚐ Challenge
+                  ⚐ {t(catalog, "debateViews.challenge")}
                 </button>
               ) : null}
               <button type="button" className="nodeCtrl" disabled aria-disabled="true">
-                ↻ Regenerate
+                ↻ {t(catalog, "debateViews.regenerate")}
               </button>
               <span style={{ flex: 1 }} />
               <button type="button" className="nodeCtrl link" onClick={() => onOpenNode(focus.id)}>
-                Open full analysis ▸
+                {t(catalog, "debateViews.openFullAnalysis")} ▸
               </button>
             </div>
             </div>
@@ -161,8 +176,8 @@ export function DebateSplit({
           <>
             <div className="splitMeter">
               <div className="splitMeterSide right">
-                <div className="splitMeterLabel pro">↑ The case for</div>
-                <div className="splitMeterCount">{pro} arguments</div>
+                <div className="splitMeterLabel pro">↑ {t(catalog, "debateViews.caseFor")}</div>
+                <div className="splitMeterCount">{tPlural(catalog, "debateViews.argumentCount", pro, locale)}</div>
               </div>
               <div
                 className="splitMeterBar"
@@ -171,11 +186,11 @@ export function DebateSplit({
                 }}
               />
               <div className="splitMeterSide left">
-                <div className="splitMeterLabel con">The case against ↓</div>
-                <div className="splitMeterCount">{con} arguments</div>
+                <div className="splitMeterLabel con">{t(catalog, "debateViews.caseAgainst")} ↓</div>
+                <div className="splitMeterCount">{tPlural(catalog, "debateViews.argumentCount", con, locale)}</div>
               </div>
             </div>
-            <div className="splitMeterNote">Leans {leanLabel} · click any argument to make it the focus</div>
+            <div className="splitMeterNote">{t(catalog, "debateViews.leanAndFocusHint", { lean: leanLabel })}</div>
           </>
         ) : null}
 
@@ -193,7 +208,7 @@ export function DebateSplit({
             <div className="splitColumn pro">
               <div className="splitColumnHead pro">
                 <span className="splitColumnIcon pro">↑</span>
-                <span>The case for</span>
+                <span>{t(catalog, "debateViews.caseFor")}</span>
               </div>
               {proChildren.length > 0 ? (
                 proChildren.map((node) => (
@@ -211,13 +226,13 @@ export function DebateSplit({
                   />
                 ))
               ) : (
-                <p className="splitColumnEmpty">No supporting arguments at this level.</p>
+                <p className="splitColumnEmpty">{t(catalog, "debateViews.noSupportingArguments")}</p>
               )}
             </div>
             <div className="splitColumn con">
               <div className="splitColumnHead con">
                 <span className="splitColumnIcon con">↓</span>
-                <span>The case against</span>
+                <span>{t(catalog, "debateViews.caseAgainst")}</span>
               </div>
               {conChildren.length > 0 ? (
                 conChildren.map((node) => (
@@ -235,14 +250,15 @@ export function DebateSplit({
                   />
                 ))
               ) : (
-                <p className="splitColumnEmpty">No opposing arguments at this level.</p>
+                <p className="splitColumnEmpty">{t(catalog, "debateViews.noOpposingArguments")}</p>
               )}
             </div>
           </div>
         ) : perspectives.length === 0 ? (
           <div className="splitLeaf">
-            No further arguments branch from here — this is a leaf of the debate. Use the path above to step back up
-            {onChallengeNode ? ", or challenge it to spawn a rebuttal." : "."}
+            {onChallengeNode
+              ? t(catalog, "debateViews.leafWithChallenge")
+              : t(catalog, "debateViews.leafWithoutChallenge")}
           </div>
         ) : null}
       </div>
@@ -251,13 +267,14 @@ export function DebateSplit({
 }
 
 function PerspectiveCard({ node, onFocus }: { node: DebateNode; onFocus: (id: string) => void }) {
+  const { catalog } = useChromeI18n();
   const { pro, con } = subtreeLean(node);
   return (
     <button type="button" className="splitPerspective" onClick={() => onFocus(node.id)}>
-      <span className="splitPerspectiveBadge">◆ {roleLabel(node)}</span>
+      <span className="splitPerspectiveBadge">◆ {localizedRoleLabel(node, catalog)}</span>
       <span className="splitPerspectiveClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</span>
       <span className="splitPerspectiveMeta">
-        {pro} for · {con} against ▸
+        {t(catalog, "debateViews.perspectiveBalance", { pro, con })} ▸
       </span>
     </button>
   );
@@ -286,6 +303,7 @@ function SplitCard({
   onToggleExpand,
   onProseSelect
 }: SplitCardProps) {
+  const { catalog } = useChromeI18n();
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const state = renderStateOf(node);
@@ -312,7 +330,7 @@ function SplitCard({
         ) : null}
         <div className="splitCardMeta referenceMetaRow">
           <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
-            {pal.arrow} {roleLabel(node)}
+            {pal.arrow} {localizedRoleLabel(node, catalog)}
           </span>
           <ReferenceScoreBadges node={node} v3Node={v3Node} onOpenNode={onOpenNode} condensed />
           <span style={{ flex: 1 }} />
@@ -323,7 +341,7 @@ function SplitCard({
             <span className="nodeEmptyMark" aria-hidden>
               ∅
             </span>
-            <div className="nodeEmptyText">No strong argument found.</div>
+            <div className="nodeEmptyText">{t(catalog, "debateViews.noStrongArgument")}</div>
           </div>
         ) : (
           <>
@@ -340,12 +358,12 @@ function SplitCard({
             ) : null}
             <div className="nodeControls nodeReferenceFooter">
               <button type="button" className="nodeCtrl focus" onClick={() => onFocus(node.id)}>
-                Focus ▸
+                {t(catalog, "debateViews.focus")} ▸
               </button>
               <span style={{ flex: 1 }} />
               {node.active_generation?.argument ? (
                 <button type="button" className="nodeCtrl" onClick={() => onToggleExpand(node.id)}>
-                  {expanded ? "Show less" : "Read"}
+                  {expanded ? t(catalog, "debateViews.showLess") : t(catalog, "debateViews.read")}
                 </button>
               ) : null}
             </div>
@@ -358,7 +376,11 @@ function SplitCard({
           {rebuttals.map((child) => {
             const cr = roleOf(child);
             const cpal = cr === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[cr];
-            const rel = cr === "pro" ? "Supports" : cr === "con" ? "Rebuts" : "Branches";
+            const rel = cr === "pro"
+              ? t(catalog, "debateViews.supports")
+              : cr === "con"
+                ? t(catalog, "debateViews.rebuts")
+                : t(catalog, "debateViews.branches");
             return (
               <button
                 key={child.id}
@@ -371,7 +393,7 @@ function SplitCard({
                   ↳ {rel}
                 </span>
                 <span className="splitRebuttalClaim">
-                  {renderStateOf(child) === "empty" ? "No strong argument found." : child.claim}
+                  {renderStateOf(child) === "empty" ? t(catalog, "debateViews.noStrongArgument") : child.claim}
                 </span>
               </button>
             );

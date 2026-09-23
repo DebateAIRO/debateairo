@@ -3,10 +3,13 @@
 import React from "react";
 import type { ReactNode } from "react";
 import { CLIENT_REPORTS, reportClientFault } from "../lib/obs/reporter.js";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import miscEnglish from "@/messages/en/misc.json";
 
 type ScoringErrorBoundaryProps = {
   children: ReactNode;
   fallback?: ReactNode;
+  catalog?: MessageCatalog;
 };
 
 type ScoringErrorBoundaryState = {
@@ -32,7 +35,7 @@ export class ScoringErrorBoundary extends React.Component<
       return (
         this.props.fallback ?? (
           <span className="scoreBadge unavailable" role="status" aria-live="polite">
-            Scoring UI unavailable.
+            {t(this.props.catalog ?? miscEnglish, "misc.scoring.unavailable")}
           </span>
         )
       );

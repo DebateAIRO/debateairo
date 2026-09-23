@@ -3,6 +3,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { ContractClient, SessionSummary } from "@debateai/contract";
 import { contractClient } from "../lib/api.js";
+import type { LocaleCode } from "../lib/i18n/locales.js";
+import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
+import settingsEnglish from "../messages/en/settings.json";
 
 export type SessionControlClient = Pick<ContractClient,
   "listSessions" | "logout" | "revokeSession" | "revokeAllSessions" | "stepUp"
@@ -11,6 +14,8 @@ export type SessionControlClient = Pick<ContractClient,
 export interface SessionControlsProps {
   readonly client?: SessionControlClient;
   readonly onSessionEnded?: () => void;
+  readonly catalog?: MessageCatalog;
+  readonly locale?: LocaleCode;
 }
 
 /* The server stores only a hash of the user agent (binding_context.user_agent_hash),
@@ -52,13 +57,15 @@ function currentDeviceLabel(): string | null {
   return parts.length === 0 ? null : parts.join(" · ");
 }
 
-function describeFailure(failure: unknown): string {
-  return failure instanceof Error ? failure.message : "Session operation failed";
+function describeFailure(failure: unknown, catalog: MessageCatalog): string {
+  return failure instanceof Error ? failure.message : t(catalog, "settings.sessions.operationFailed");
 }
 
 export function SessionControls({
   client = contractClient,
-  onSessionEnded
+  onSessionEnded,
+  catalog = settingsEnglish,
+  locale = "en"
 }: SessionControlsProps) {
   const [sessions, setSessions] = useState<readonly SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,10 +90,10 @@ export function SessionControls({
     let active = true;
     void client.listSessions().then(
       (result) => { if (active) { setSessions(result.sessions); setError(null); } },
-      (failure) => { if (active) setError(describeFailure(failure)); }
+      (failure) => { if (active) setError(describeFailure(failure, catalog)); }
     ).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [client]);
+  }, [catalog, client]);
 
   async function revoke(session: SessionSummary): Promise<void> {
     setBusy(session.session_id);
@@ -96,7 +103,7 @@ export function SessionControls({
       if (session.current) finishSession();
       else await refresh();
     } catch (failure) {
-      setError(describeFailure(failure));
+      setError(describeFailure(failure, catalog));
     } finally {
       setBusy(null);
     }
@@ -110,7 +117,7 @@ export function SessionControls({
       setSessions([]);
       finishSession();
     } catch (failure) {
-      setError(describeFailure(failure));
+      setError(describeFailure(failure, catalog));
     } finally {
       setBusy(null);
     }
@@ -124,7 +131,7 @@ export function SessionControls({
       setSessions([]);
       finishSession();
     } catch (failure) {
-      setError(describeFailure(failure));
+      setError(describeFailure(failure, catalog));
     } finally {
       setBusy(null);
     }
@@ -146,7 +153,7 @@ export function SessionControls({
       form.reset();
       await refresh();
     } catch (failure) {
-      setError(describeFailure(failure));
+      setError(describeFailure(failure, catalog));
     } finally {
       setBusy(null);
     }
@@ -158,20 +165,24 @@ export function SessionControls({
      they were signed in. The id stays on the revoke control's accessible name
      so the action is still unambiguous to assistive tech and to tests. */
   const signedInOn = (iso: string): string =>
-    new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+    t(catalog, "settings.sessions.signedIn", {
+      date: formatDate(locale, iso, { day: "numeric", month: "long", year: "numeric" })
+    });
 
   return (
     <>
       <section aria-labelledby="active-sessions-heading">
         <div className="setSectionHead">
-          <h2 className="setSectionTitle" id="active-sessions-heading">Active sessions</h2>
-          <p className="setSectionHint">Review devices, revoke a single session, or sign out everywhere.</p>
+          <h2 className="setSectionTitle" id="active-sessions-heading">
+            {t(catalog, "settings.sessions.title")}
+          </h2>
+          <p className="setSectionHint">{t(catalog, "settings.sessions.hint")}</p>
         </div>
         <div className="setList">
-          {loading ? <p className="setStatus">Loading sessions…</p> : null}
+          {loading ? <p className="setStatus">{t(catalog, "settings.sessions.loading")}</p> : null}
           {error ? <div className="setError" role="alert">{error}</div> : null}
           {!loading && sessions.length === 0 ? (
-            <p className="setStatus">No active sessions were returned.</p>
+            <p className="setStatus">{t(catalog, "settings.sessions.none")}</p>
           ) : null}
           {sessions.map((session) => (
             <div className="setSessionRow" key={session.session_id}>
@@ -180,25 +191,34 @@ export function SessionControls({
                 <div className="setSessionLine">
                   <span className="setSessionDevice">
                     {session.current
-                      ? deviceLabel ?? "Current session"
-                      : `Signed in ${signedInOn(session.created_at)}`}
+                      ? deviceLabel ?? t(catalog, "settings.sessions.current")
+                      : signedInOn(session.created_at)}
                   </span>
                   <span className="setSessionName">
-                    {session.current ? "Current session" : "Other session"}
+                    {session.current
+                      ? t(catalog, "settings.sessions.current")
+                      : t(catalog, "settings.sessions.other")}
                   </span>
                 </div>
                 <p className="setSessionSeen">
-                  Last seen {new Date(session.last_seen_at).toLocaleString()}
+                  {t(catalog, "settings.sessions.lastSeen", {
+                    date: formatDate(locale, session.last_seen_at, {
+                      dateStyle: "medium",
+                      timeStyle: "short"
+                    })
+                  })}
                 </p>
               </div>
               <button
                 type="button"
                 className="setBtn setBtnRevoke"
                 disabled={busy !== null}
-                aria-label={`Revoke session ${session.session_id}`}
+                aria-label={t(catalog, "settings.sessions.revokeLabel", {
+                  sessionId: session.session_id
+                })}
                 onClick={() => { void revoke(session); }}
               >
-                Revoke
+                {t(catalog, "settings.sessions.revoke")}
               </button>
             </div>
           ))}
@@ -209,7 +229,7 @@ export function SessionControls({
               disabled={busy !== null}
               onClick={() => { void revokeAll(); }}
             >
-              Revoke all sessions
+              {t(catalog, "settings.sessions.revokeAll")}
             </button>
             <button
               type="button"
@@ -217,44 +237,46 @@ export function SessionControls({
               disabled={busy !== null}
               onClick={() => { void logout(); }}
             >
-              Sign out
+              {t(catalog, "settings.sessions.signOut")}
             </button>
           </div>
         </div>
       </section>
 
       <form className="setCard" data-session-step-up="true" onSubmit={stepUp}>
-        <h3 className="setCardTitle">Fresh authentication</h3>
-        <p className="setCardHint">
-          Sensitive actions require re-entering your password and an authenticator code.
-        </p>
+        <h3 className="setCardTitle">{t(catalog, "settings.sessions.freshAuthentication")}</h3>
+        <p className="setCardHint">{t(catalog, "settings.sessions.freshAuthenticationHint")}</p>
         <div className="setCardRow">
           <div className="setField">
-            <label htmlFor="step-up-password">Password</label>
+            <label htmlFor="step-up-password">{t(catalog, "settings.password")}</label>
             <input
               id="step-up-password"
               name="step-up-password"
               type="password"
               autoComplete="current-password"
-              placeholder="Password"
+              placeholder={t(catalog, "settings.password")}
               required
             />
           </div>
           <div className="setField">
-            <label htmlFor="step-up-code">Authenticator code</label>
+            <label htmlFor="step-up-code">{t(catalog, "settings.authenticatorCode")}</label>
             <input
               id="step-up-code"
               name="step-up-code"
               autoComplete="one-time-code"
-              placeholder="Authenticator code"
+              placeholder={t(catalog, "settings.authenticatorCode")}
               required
             />
           </div>
           <button type="submit" className="setBtn setBtnPrimary" disabled={busy !== null}>
-            Verify
+            {t(catalog, "settings.sessions.verify")}
           </button>
         </div>
-        {stepUpComplete ? <p className="setStatus" role="status">Fresh authentication complete</p> : null}
+        {stepUpComplete ? (
+          <p className="setStatus" role="status">
+            {t(catalog, "settings.sessions.freshAuthenticationComplete")}
+          </p>
+        ) : null}
       </form>
     </>
   );

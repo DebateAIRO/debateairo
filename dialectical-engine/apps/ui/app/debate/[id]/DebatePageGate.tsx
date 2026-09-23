@@ -18,7 +18,8 @@ export default function DebatePageGate({
   initialAnswer,
   initialError,
   initialPending,
-  timeCatalog
+  timeCatalog,
+  debateChromeCatalog
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -26,6 +27,7 @@ export default function DebatePageGate({
   initialError: string | null;
   initialPending: boolean;
   timeCatalog: MessageCatalog;
+  debateChromeCatalog: MessageCatalog;
 }) {
   return (
     <>
@@ -38,6 +40,7 @@ export default function DebatePageGate({
           initialError={initialError}
           initialPending={initialPending}
           timeCatalog={timeCatalog}
+          debateChromeCatalog={debateChromeCatalog}
         />
       )}
       </AuthGate>

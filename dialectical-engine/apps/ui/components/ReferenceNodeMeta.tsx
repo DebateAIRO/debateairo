@@ -1,7 +1,11 @@
+"use client";
+
 import type { Node as ContractNode } from "@debateai/contract";
 import type { DebateNode } from "@/lib/types";
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { v3NodeScoreState, v3ScorePresentation } from "@/lib/v3/adapter";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/translate";
 
 export function ReferenceAuthorPill({ node }: { node: DebateNode }) {
   const generation = node.active_generation;
@@ -26,6 +30,7 @@ export function ReferenceScoreBadges({
   onOpenNode: (nodeId: string) => void;
   condensed?: boolean;
 }) {
+  const { catalog } = useChromeI18n();
   if (!v3Node) return null;
   const presentation = v3ScorePresentation(v3NodeScoreState(node, new Map([[node.id, v3Node]])));
   if (presentation.status === "ABSENT") {
@@ -41,7 +46,7 @@ export function ReferenceScoreBadges({
         type="button"
         className="scoreBadgeButton scoreTransition"
         data-ai-generated="true"
-        aria-label={`Open the recorded V3 scores for ${node.claim}`}
+        aria-label={t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}
         onClick={(event) => {
           event.stopPropagation();
           onOpenNode(node.id);
@@ -59,7 +64,7 @@ export function ReferenceScoreBadges({
     <button
       type="button"
       className="scoreBadgeButton"
-      aria-label={`Open the recorded V3 scores for ${node.claim}`}
+      aria-label={t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}
       onClick={(event) => {
         event.stopPropagation();
         onOpenNode(node.id);
@@ -81,13 +86,14 @@ export function ReferenceScoreBadges({
 }
 
 export function ReferenceReviewLine({ review }: { review?: ContractNode["review"] }) {
+  const { catalog } = useChromeI18n();
   if (!review) return null;
   const disputed = review.outcome === "dispute";
   const label = review.outcome === "agree"
-    ? "REVIEW AGREED BY:"
+    ? t(catalog, "debateViews.reviewAgreedBy")
     : disputed
-      ? "REVIEW DISPUTED BY:"
-      : "REVIEW COULD NOT ASSESS:";
+      ? t(catalog, "debateViews.reviewDisputedBy")
+      : t(catalog, "debateViews.reviewCouldNotAssess");
   return (
     <div className="nodeReviewLine" data-node-review={review.outcome} data-ai-generated="true">
       <span className={`drawerReviewLabel ${disputed ? "dispute" : "agree"}`}>{label}</span>

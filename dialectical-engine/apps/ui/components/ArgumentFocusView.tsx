@@ -3,6 +3,8 @@
 import type { DebateNode } from "@/lib/types";
 import { partitionArgumentChildren, perspectiveChildren } from "@/lib/debateTreeUtils";
 import { ArgumentNodeCard } from "@/components/DebateTree";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural } from "@/lib/i18n/translate";
 
 type ArgumentFocusViewProps = {
   rootNode: DebateNode;
@@ -21,6 +23,7 @@ export function ArgumentFocusView({
   onError,
   onSelectNode,
 }: ArgumentFocusViewProps) {
+  const { catalog, locale } = useChromeI18n();
   const parentNode = selectedPath.length > 1 ? selectedPath[selectedPath.length - 2] : null;
   const contextNode = parentNode ?? rootNode;
   const isRootFocused = selectedNode.node_type === "ROOT_CLAIM";
@@ -42,7 +45,7 @@ export function ArgumentFocusView({
             onError={onError}
             onSelectNode={onSelectNode}
             isSelected={child.id === selectedNode.id}
-            selectionLabel={`Focus child argument: ${child.claim}`}
+            selectionLabel={t(catalog, "debateViews.focusChildArgument", { claim: child.claim })}
           />
         ))}
       </div>
@@ -50,14 +53,14 @@ export function ArgumentFocusView({
   }
 
   return (
-    <section className="argumentFocusView" aria-label="Focused argument">
+    <section className="argumentFocusView" aria-label={t(catalog, "debateViews.focusedArgument")}>
       <header className="argumentFocusHeader">
         <div>
-          <span className="argumentFocusEyebrow">Debate topic</span>
+          <span className="argumentFocusEyebrow">{t(catalog, "debateViews.debateTopic")}</span>
           <h2>{rootNode.claim}</h2>
         </div>
       </header>
-      <nav className="argumentFocusRail" aria-label="Argument path">
+      <nav className="argumentFocusRail" aria-label={t(catalog, "debateViews.argumentPath")}>
         <div className="argumentPath">
           {selectedPath.map((node, index) => (
             <button
@@ -65,7 +68,7 @@ export function ArgumentFocusView({
               className="argumentPathButton secondary"
               type="button"
               aria-current={node.id === selectedNode.id ? "page" : undefined}
-              aria-label={`Select path argument ${index + 1}: ${node.claim}`}
+              aria-label={t(catalog, "debateViews.selectPathArgument", { index: index + 1, claim: node.claim })}
               onClick={() => onSelectNode(node.id)}
             >
               <span className="argumentPathIndex">{index + 1}</span>
@@ -74,24 +77,24 @@ export function ArgumentFocusView({
           ))}
         </div>
         {parentNode ? (
-          <button className="secondary" type="button" aria-label={`Move up to parent argument: ${parentNode.claim}`} onClick={() => onSelectNode(parentNode.id)}>
-            Up
+          <button className="secondary" type="button" aria-label={t(catalog, "debateViews.moveToParentArgument", { claim: parentNode.claim })} onClick={() => onSelectNode(parentNode.id)}>
+            {t(catalog, "debateViews.up")}
           </button>
         ) : null}
       </nav>
       <section
         key={`context-${contextNode.id}`}
         className="argumentContextPanel argumentFocusTransition"
-        aria-label={parentNode ? "Parent argument context" : "Root claim context"}
+        aria-label={parentNode ? t(catalog, "debateViews.parentArgumentContext") : t(catalog, "debateViews.rootClaimContext")}
       >
-        <div className="argumentContextLabel">{parentNode ? "Parent context" : "Root context"}</div>
+        <div className="argumentContextLabel">{parentNode ? t(catalog, "debateViews.parentContext") : t(catalog, "debateViews.rootContext")}</div>
         <button
           className="argumentContextCard"
           type="button"
-          aria-label={`Focus context argument: ${contextNode.claim}`}
+          aria-label={t(catalog, "debateViews.focusContextArgument", { claim: contextNode.claim })}
           onClick={() => onSelectNode(contextNode.id)}
         >
-          <span className="badge">{parentNode ? "Parent" : "Root"}</span>
+          <span className="badge">{parentNode ? t(catalog, "debateViews.parent") : t(catalog, "debateViews.root")}</span>
           <span>{contextNode.claim}</span>
         </button>
       </section>
@@ -102,7 +105,7 @@ export function ArgumentFocusView({
           onError={onError}
           onSelectNode={onSelectNode}
           isSelected
-          selectionLabel={`Selected argument: ${selectedNode.claim}`}
+          selectionLabel={t(catalog, "debateViews.selectedArgument", { claim: selectedNode.claim })}
         />
       </div>
       {isRootFocused ? (
@@ -112,8 +115,8 @@ export function ArgumentFocusView({
           aria-labelledby="focused-perspectives-heading"
         >
           <div className="argumentColumnHeading">
-            <h3 id="focused-perspectives-heading">Perspectives</h3>
-            <span aria-label={`${perspectives.length} ${perspectives.length === 1 ? "perspective" : "perspectives"}`}>
+            <h3 id="focused-perspectives-heading">{t(catalog, "debateViews.perspectives")}</h3>
+            <span aria-label={tPlural(catalog, "debateViews.perspectiveCount", perspectives.length, locale)}>
               {perspectives.length}
             </span>
           </div>
@@ -126,33 +129,33 @@ export function ArgumentFocusView({
                   token={token}
                   onError={onError}
                   onSelectNode={onSelectNode}
-                  selectionLabel={`Focus perspective: ${child.claim}`}
+                  selectionLabel={t(catalog, "debateViews.focusPerspective", { claim: child.claim })}
                 />
               ))}
             </div>
           ) : (
-            <p className="argumentColumnEmpty">No perspectives yet.</p>
+            <p className="argumentColumnEmpty">{t(catalog, "debateViews.noPerspectivesYet")}</p>
           )}
         </section>
       ) : (
-        <div key={`columns-${selectedNode.id}`} className="argumentColumnsFocus argumentFocusTransition" aria-label="Direct child arguments">
+        <div key={`columns-${selectedNode.id}`} className="argumentColumnsFocus argumentFocusTransition" aria-label={t(catalog, "debateViews.directChildArguments")}>
           <section className="argumentColumn" aria-labelledby="focused-pros-heading">
             <div className="argumentColumnHeading">
-              <h3 id="focused-pros-heading">Pros</h3>
-              <span aria-label={`${proChildren.length} pro ${proChildren.length === 1 ? "argument" : "arguments"}`}>
+              <h3 id="focused-pros-heading">{t(catalog, "debateViews.pros")}</h3>
+              <span aria-label={tPlural(catalog, "debateViews.proArgumentCount", proChildren.length, locale)}>
                 {proChildren.length}
               </span>
             </div>
-            {renderChildCards(proChildren, "No pros yet.")}
+            {renderChildCards(proChildren, t(catalog, "debateViews.noProsYet"))}
           </section>
           <section className="argumentColumn" aria-labelledby="focused-cons-heading">
             <div className="argumentColumnHeading">
-              <h3 id="focused-cons-heading">Cons</h3>
-              <span aria-label={`${conChildren.length} con ${conChildren.length === 1 ? "argument" : "arguments"}`}>
+              <h3 id="focused-cons-heading">{t(catalog, "debateViews.cons")}</h3>
+              <span aria-label={tPlural(catalog, "debateViews.conArgumentCount", conChildren.length, locale)}>
                 {conChildren.length}
               </span>
             </div>
-            {renderChildCards(conChildren, "No cons yet.")}
+            {renderChildCards(conChildren, t(catalog, "debateViews.noConsYet"))}
           </section>
         </div>
       )}

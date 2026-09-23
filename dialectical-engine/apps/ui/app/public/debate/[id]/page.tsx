@@ -11,12 +11,24 @@ export default async function PublicDebatePage({ params }: { params: Promise<{ i
   const { id } = await params;
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
-  const timeCatalog = await loadNamespace(locale, "time");
+  const [publicCatalog, timeCatalog, debateChromeCatalog] = await Promise.all([
+    loadNamespace(locale, "public"),
+    loadNamespace(locale, "time"),
+    loadNamespace(locale, "debateChrome")
+  ]);
   let debate;
   try {
     debate = await createServerContractClient().readPublicDebate(id);
   } catch {
     notFound();
   }
-  return <PublicDebatePageClient debate={debate} timeCatalog={timeCatalog} />;
+  return (
+    <PublicDebatePageClient
+      debate={debate}
+      locale={locale}
+      publicCatalog={publicCatalog}
+      timeCatalog={timeCatalog}
+      debateChromeCatalog={debateChromeCatalog}
+    />
+  );
 }

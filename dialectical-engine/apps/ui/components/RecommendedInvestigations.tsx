@@ -7,6 +7,9 @@ import {
   selectAdditionalRecommendations,
   selectTopRecommendation,
 } from "@/lib/recommendation";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 
 export type RecommendedInvestigationsProps = {
   recommendations: RecommendedInvestigation[];
@@ -14,6 +17,7 @@ export type RecommendedInvestigationsProps = {
   onOpenTarget?: (targetClaimId: string) => void;
   onStartInvestigation?: (recommendation: RecommendedInvestigation) => void;
   emptyMessage?: string;
+  catalog?: MessageCatalog;
 };
 
 export function RecommendedInvestigations({
@@ -21,8 +25,10 @@ export function RecommendedInvestigations({
   canOpenTarget,
   onOpenTarget,
   onStartInvestigation,
-  emptyMessage = "No recommended investigations are available from the current scoring data."
+  emptyMessage,
+  catalog = debateDrawersEnglish
 }: RecommendedInvestigationsProps) {
+  const { locale } = useChromeI18n();
   const topRecommendation = selectTopRecommendation(recommendations);
   const additionalRecommendations = selectAdditionalRecommendations(recommendations);
   const rankedRecommendations = topRecommendation ? [topRecommendation, ...additionalRecommendations] : [];
@@ -36,10 +42,10 @@ export function RecommendedInvestigations({
         className="recommendationItem"
       >
         <div className="recommendationMeta">
-          <span>Recommendation #{index + 1}</span>
+          <span>{t(catalog, "debateDrawers.recommendations.rank", { rank: index + 1 })}</span>
           <span>{formatRecommendationAction(recommendation.action)}</span>
-          <span>priority {recommendation.priority}</span>
-          <span>{targetAvailable ? "Target available" : "Target unavailable"}</span>
+          <span>{t(catalog, "debateDrawers.recommendations.priority", { priority: recommendation.priority })}</span>
+          <span>{t(catalog, targetAvailable ? "debateDrawers.recommendations.targetAvailable" : "debateDrawers.recommendations.targetUnavailable")}</span>
         </div>
         <div className="recommendationReason">{recommendation.reason}</div>
         <div className="recommendationActions">
@@ -52,7 +58,7 @@ export function RecommendedInvestigations({
               onOpenTarget(targetClaimId);
             }}
           >
-            Open target
+            {t(catalog, "debateDrawers.recommendations.openTarget")}
           </button>
           <button
             type="button"
@@ -60,7 +66,7 @@ export function RecommendedInvestigations({
             disabled={!onStartInvestigation}
             onClick={() => onStartInvestigation?.(recommendation)}
           >
-            Start investigation
+            {t(catalog, "debateDrawers.recommendations.startInvestigation")}
           </button>
         </div>
       </li>
@@ -68,11 +74,11 @@ export function RecommendedInvestigations({
   }
 
   return (
-    <section className="recommendationsPanel" aria-label="Recommended investigations">
+    <section className="recommendationsPanel" aria-label={t(catalog, "debateDrawers.recommendations.title")}>
       <div className="recommendationsHeader">
         <div>
-          <div className="recommendationsEyebrow">Recommended investigations</div>
-          <div className="recommendationsCount">{rankedRecommendations.length} from current scoring data</div>
+          <div className="recommendationsEyebrow">{t(catalog, "debateDrawers.recommendations.title")}</div>
+          <div className="recommendationsCount">{t(catalog, "debateDrawers.recommendations.fromScoringData", { count: rankedRecommendations.length })}</div>
         </div>
       </div>
       {rankedRecommendations.length > 0 ? (
@@ -83,8 +89,7 @@ export function RecommendedInvestigations({
           {additionalRecommendations.length > 0 ? (
             <details className="recommendationsDetails">
               <summary className="recommendationsSummary">
-                {additionalRecommendations.length} more recommendation
-                {additionalRecommendations.length === 1 ? "" : "s"}
+                {tPlural(catalog, "debateDrawers.recommendations.more", additionalRecommendations.length, locale)}
               </summary>
               <ol className="recommendationsList">
                 {additionalRecommendations.map((recommendation, index) => renderRecommendationItem(recommendation, index + 1))}
@@ -93,7 +98,7 @@ export function RecommendedInvestigations({
           ) : null}
         </>
       ) : (
-        <p>{emptyMessage}</p>
+        <p>{emptyMessage ?? t(catalog, "debateDrawers.recommendations.empty")}</p>
       )}
     </section>
   );

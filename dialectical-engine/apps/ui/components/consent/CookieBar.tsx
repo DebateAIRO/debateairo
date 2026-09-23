@@ -18,8 +18,10 @@
  * (S01-R09, S01-R10) and every colour there is a `var(--token)` reference.
  */
 import type { RefObject } from "react";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 export type CookieBarProps = {
+  catalog: MessageCatalog;
   /** Writes R04 row 2 and closes the bar. */
   onEssentialOnly: () => void;
   /**
@@ -42,26 +44,24 @@ export type CookieBarProps = {
   chooseRef?: RefObject<HTMLButtonElement | null>;
 };
 
-export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll, chooseRef }: CookieBarProps) {
+export function CookieBar({ catalog, onEssentialOnly, onChoose, onAcceptAll, chooseRef }: CookieBarProps) {
   return (
-    <div className="consentBar" role="region" aria-label="Cookie consent">
+    <div className="consentBar" role="region" aria-label={t(catalog, "consent.bar.label")}>
       <div className="consentBarBezel">
         <div className="consentBarCore">
           <span className="consentTab" aria-hidden="true" />
           <div className="consentCopy">
-            <div className="consentEyebrow">YOUR DATA, ON THE RECORD</div>
+            <div className="consentEyebrow">{t(catalog, "consent.bar.eyebrow")}</div>
             <div className="consentTitle">
-              We store only what keeps the bench running — unless you say otherwise.
+              {t(catalog, "consent.bar.title")}
             </div>
             <p className="consentBody">
-              Essential cookies hold your session, MFA state and device record. Analytics and
-              model-quality telemetry are optional and never sold. You can change this any time in
-              Settings.
+              {t(catalog, "consent.bar.body")}
             </p>
           </div>
           <div className="consentActions">
             <button type="button" className="consentGhost" onClick={onEssentialOnly}>
-              Essential only
+              {t(catalog, "consent.action.essentialOnly")}
             </button>
             <button
               type="button"
@@ -69,10 +69,10 @@ export function CookieBar({ onEssentialOnly, onChoose, onAcceptAll, chooseRef }:
               ref={chooseRef}
               onClick={(event) => onChoose(event.currentTarget)}
             >
-              Choose what to store
+              {t(catalog, "consent.bar.choose")}
             </button>
             <button type="button" className="consentPrimary" onClick={onAcceptAll}>
-              Accept all
+              {t(catalog, "consent.bar.acceptAll")}
             </button>
           </div>
         </div>

@@ -5,6 +5,9 @@ import type { LiveRunState } from "@/lib/v3/liveEvents";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { unrepresentedEdges } from "@/lib/v3/adapter";
 import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel, summarizeFreshness } from "@/lib/v3/labels";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import miscEnglish from "@/messages/en/misc.json";
 
 /**
  * UI-01 honesty surface (additive, V2 drawer vocabulary). V2's workspace has
@@ -15,8 +18,15 @@ import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel, summarize
  * only values the contract actually served, and typed absence otherwise.
  */
 
-function labeledNumberLine(number: { value: number; source: string; replay_handle: string }): string {
-  return `${number.value} · ${number.source} · replay ${number.replay_handle}`;
+function labeledNumberLine(
+  catalog: MessageCatalog,
+  number: { value: number; source: string; replay_handle: string }
+): string {
+  return t(catalog, "misc.answerHonesty.numberLine", {
+    value: number.value,
+    source: number.source,
+    replayHandle: number.replay_handle
+  });
 }
 
 export function AnswerHonestyDrawer({
@@ -34,7 +44,8 @@ export function AnswerHonestyDrawer({
   onRecordInvestigation,
   answerExport,
   token,
-  onClose
+  onClose,
+  catalog = miscEnglish
 }: {
   answer: Answer;
   live: LiveRunState;
@@ -51,7 +62,9 @@ export function AnswerHonestyDrawer({
   answerExport: AnswerExport;
   token: string | null;
   onClose: () => void;
+  catalog?: MessageCatalog;
 }) {
+  const { locale } = useChromeI18n();
   const freshness = summarizeFreshness(
     answer.nodes.map((node) => ({ subjectRef: node.node_id, state: node.staleness_state }))
   );
@@ -61,70 +74,89 @@ export function AnswerHonestyDrawer({
   return (
     <>
       <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label="Honesty and provenance">
+      <aside className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "misc.answerHonesty.honestyAndProvenance")}>
         <div className="drawerHead">
           <div className="drawerHeadMeta">
-            <div className="nodeEyebrow">How to read this</div>
-            <h2>Honesty &amp; provenance</h2>
+            <div className="nodeEyebrow">{t(catalog, "misc.answerHonesty.howToReadThis")}</div>
+            <h2>{t(catalog, "misc.answerHonesty.honestyAndProvenance")}</h2>
           </div>
-          <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
+          <button type="button" className="iconBtn" onClick={onClose} aria-label={t(catalog, "misc.answerHonesty.close")}>
             ×
           </button>
         </div>
 
         <div className="drawerBody">
-          <section className="wsSection" aria-label="Answer state">
-            <div className="drawerSectionTitle">Answer state</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.answerState")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.answerState")}</div>
             <ul className="drawerFindingList">
               <li className="drawerFindingItem">
                 <div className="drawerFindingMeta">
-                  <span>terminal {answer.terminal}</span>
-                  <span>serve {answer.serve_state}</span>
-                  <span>conformance {answer.conformance_outcome}</span>
+                  <span>{t(catalog, "misc.answerHonesty.terminalValue", { terminal: answer.terminal })}</span>
+                  <span>{t(catalog, "misc.answerHonesty.serveValue", { serve: answer.serve_state })}</span>
+                  <span>{t(catalog, "misc.answerHonesty.conformanceValue", { conformance: answer.conformance_outcome })}</span>
                 </div>
                 <div className="drawerFindingText">
-                  Risk tier {answer.risk_tier} · {riskTierSourceLabel(answer.tier_source)} · {answer.tier_provenance_ref}
+                  {t(catalog, "misc.answerHonesty.riskTierLine", {
+                    riskTier: answer.risk_tier,
+                    source: riskTierSourceLabel(answer.tier_source),
+                    provenanceRef: answer.tier_provenance_ref
+                  })}
                 </div>
                 <div className="drawerFindingText">
-                  As of {answer.as_of} · freshness {answer.staleness_state} · relevant as of {answer.relevant_as_of}
+                  {t(catalog, "misc.answerHonesty.freshnessLine", {
+                    asOf: answer.as_of,
+                    freshness: answer.staleness_state,
+                    relevantAsOf: answer.relevant_as_of
+                  })}
                 </div>
                 <div className="drawerFindingText">
-                  Live stream: run {live.runPhase} · serve {live.servePhase}
+                  {t(catalog, "misc.answerHonesty.liveStreamLine", {
+                    runPhase: live.runPhase,
+                    servePhase: live.servePhase
+                  })}
                 </div>
               </li>
             </ul>
             {componentsOnly ? (
               <div className="error" role="alert" style={{ marginTop: 10 }}>
-                Components only: composed prose was not cleared to serve. The verified projections below remain readable.
+                {t(catalog, "misc.answerHonesty.componentsOnlyNotice")}
               </div>
             ) : null}
           </section>
 
-          <section className="wsSection" aria-label="Verdict">
-            <div className="drawerSectionTitle">Verdict</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.verdict")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.verdict")}</div>
             {answer.verdict_state !== null ? (
               <div className="drawerFindingText" data-ai-generated="true">{answer.verdict_state}</div>
             ) : (
               <div className="drawerFindingText">
-                Verdict unavailable · {answer.verdict_unavailable?.reason_ref ?? "no reason recorded"}
+                {t(catalog, "misc.answerHonesty.verdictUnavailable", {
+                  reason: answer.verdict_unavailable?.reason_ref ?? t(catalog, "misc.answerHonesty.noReasonRecorded")
+                })}
               </div>
             )}
             {answer.confidence_band !== null ? (
-              <div className="drawerFindingText" data-ai-generated="true">Confidence band: {answer.confidence_band}</div>
+              <div className="drawerFindingText" data-ai-generated="true">
+                {t(catalog, "misc.answerHonesty.confidenceBand", { band: answer.confidence_band })}
+              </div>
             ) : null}
             {answer.band_ceiling !== null ? (
               <div className="drawerFindingText">
-                Band ceiling {answer.band_ceiling.label} · basis LOOKED_UP {answer.band_ceiling.basis.LOOKED_UP} / RAN{" "}
-                {answer.band_ceiling.basis.RAN} / REASONING {answer.band_ceiling.basis.REASONING} · lift:{" "}
-                {answer.band_ceiling.lift_path}
+                {t(catalog, "misc.answerHonesty.bandCeiling", {
+                  label: answer.band_ceiling.label,
+                  lookedUp: answer.band_ceiling.basis.LOOKED_UP,
+                  ran: answer.band_ceiling.basis.RAN,
+                  reasoning: answer.band_ceiling.basis.REASONING,
+                  liftPath: answer.band_ceiling.lift_path
+                })}
               </div>
             ) : null}
           </section>
 
-          <section className="wsSection" aria-label="Condition marks">
-            <div className="drawerSectionTitle">Condition marks</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.conditionMarks")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.conditionMarks")}</div>
             {answer.condition_marks.length === 0 ? (
-              <div className="drawerHintMuted">No condition marks on this answer.</div>
+              <div className="drawerHintMuted">{t(catalog, "misc.answerHonesty.noConditionMarks")}</div>
             ) : (
               <div className="roleChips">
                 {answer.condition_marks.map((mark) => (
@@ -135,7 +167,7 @@ export function AnswerHonestyDrawer({
               </div>
             )}
             {answer.condition_mark_records.length > 0 ? (
-              <ul className="drawerFindingList" aria-label="Named condition marks">
+              <ul className="drawerFindingList" aria-label={t(catalog, "misc.answerHonesty.namedConditionMarks")}>
                 {answer.condition_mark_records.map((record) => (
                   <li key={`${record.mark}:${record.subject_ref}`} className="drawerFindingItem">
                     <div className="drawerFindingMeta">
@@ -145,7 +177,7 @@ export function AnswerHonestyDrawer({
                     </div>
                     <div className="drawerFindingText">{record.reason}</div>
                     {record.lift_path !== null ? (
-                      <div className="drawerFindingText">Lift path: {record.lift_path}</div>
+                      <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.liftPath", { liftPath: record.lift_path })}</div>
                     ) : null}
                   </li>
                 ))}
@@ -154,30 +186,38 @@ export function AnswerHonestyDrawer({
           </section>
 
           {answer.abstention !== null ? (
-            <section className="wsSection" aria-label="Abstention">
-              <div className="drawerSectionTitle">Abstention</div>
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.abstention")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.abstention")}</div>
               <div className="drawerFindingMeta">
                 <span>{abstentionKindLabel(answer.abstention.kind)}</span>
                 <span>
-                  cell {answer.abstention.question_class}/{answer.abstention.risk_tier}
+                  {t(catalog, "misc.answerHonesty.cell", {
+                    questionClass: answer.abstention.question_class,
+                    riskTier: answer.abstention.risk_tier
+                  })}
                 </span>
-                <span>price {answer.abstention.price}</span>
+                <span>{t(catalog, "misc.answerHonesty.price", { price: answer.abstention.price })}</span>
               </div>
-              <div className="drawerFindingText">Unlock: {answer.abstention.unlock_condition}</div>
+              <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.unlock", { condition: answer.abstention.unlock_condition })}</div>
               <div className="drawerFindingText">
-                Register {answer.abstention.register_row_key} v{answer.abstention.register_version} ·{" "}
-                {answer.abstention.ledger_unknown_ref}
+                {t(catalog, "misc.answerHonesty.registerLine", {
+                  rowKey: answer.abstention.register_row_key,
+                  version: answer.abstention.register_version,
+                  unknownRef: answer.abstention.ledger_unknown_ref
+                })}
               </div>
             </section>
           ) : null}
 
-          <section className="wsSection" aria-label="Per-item freshness">
-            <div className="drawerSectionTitle">Per-item freshness</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.perItemFreshness")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.perItemFreshness")}</div>
             {freshness.kind === "EMPTY" ? (
-              <div className="drawerHintMuted">No graph items carry freshness yet.</div>
+              <div className="drawerHintMuted">{t(catalog, "misc.answerHonesty.noGraphFreshness")}</div>
             ) : freshness.kind === "UNIFORM" ? (
               <div className="drawerFindingText">
-                All {freshness.items.length} graph items: {freshness.state}
+                {tPlural(catalog, "misc.answerHonesty.allGraphItems", freshness.items.length, locale, {
+                  state: freshness.state
+                })}
               </div>
             ) : (
               <ul className="drawerFindingList">
@@ -193,21 +233,26 @@ export function AnswerHonestyDrawer({
             )}
           </section>
 
-          <section className="wsSection" aria-label="Cost envelope">
-            <div className="drawerSectionTitle">Cost envelope</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.costEnvelope")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.costEnvelope")}</div>
             <div className="drawerFindingMeta">
               <span>{answer.cost_envelope.state}</span>
-              <span>{answer.cost_envelope.consumed_model_attempts} model attempts consumed</span>
-              <span>budget tier {answer.composition_budget_tier}</span>
+              <span>{tPlural(
+                catalog,
+                "misc.answerHonesty.modelAttemptsConsumed",
+                answer.cost_envelope.consumed_model_attempts,
+                locale
+              )}</span>
+              <span>{t(catalog, "misc.answerHonesty.budgetTier", { tier: answer.composition_budget_tier })}</span>
             </div>
-            <div className="drawerFindingText">Protected core: {answer.cost_envelope.protected_core}</div>
-            <div className="drawerFindingText">Basis: {JSON.stringify(answer.cost_envelope.basis)}</div>
+            <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.protectedCore", { core: answer.cost_envelope.protected_core })}</div>
+            <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.basis", { basis: JSON.stringify(answer.cost_envelope.basis) })}</div>
           </section>
 
-          <section className="wsSection" aria-label="Graph edges">
-            <div className="drawerSectionTitle">Graph edges</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.graphEdges")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.graphEdges")}</div>
             {answer.edges.length === 0 ? (
-              <div className="drawerHintMuted">No edges on this answer graph.</div>
+              <div className="drawerHintMuted">{t(catalog, "misc.answerHonesty.noEdges")}</div>
             ) : (
               <ul className="drawerFindingList">
                 {answer.edges.map((edge) => (
@@ -218,13 +263,13 @@ export function AnswerHonestyDrawer({
                         {edge.from_node_ref} → {edge.target_ref}
                       </span>
                       <span>{edge.target_kind}</span>
-                      {edge.placeholder ? <span>placeholder</span> : null}
-                      {leftoverEdgeIds.has(edge.edge_id) ? <span>not drawn in tree</span> : null}
+                      {edge.placeholder ? <span>{t(catalog, "misc.answerHonesty.placeholder")}</span> : null}
+                      {leftoverEdgeIds.has(edge.edge_id) ? <span>{t(catalog, "misc.answerHonesty.notDrawnInTree")}</span> : null}
                     </div>
                     <div className="drawerFindingText">
                       {edge.strength.status === "PRESENT"
-                        ? labeledNumberLine(edge.strength.number)
-                        : `strength unknown · ${edge.strength.reason}`}
+                        ? labeledNumberLine(catalog, edge.strength.number)
+                        : t(catalog, "misc.answerHonesty.strengthUnknown", { reason: edge.strength.reason })}
                     </div>
                   </li>
                 ))}
@@ -232,16 +277,16 @@ export function AnswerHonestyDrawer({
             )}
           </section>
 
-          <section className="wsSection" aria-label="Numbers and replay">
-            <div className="drawerSectionTitle">Numbers and replay</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.numbersAndReplay")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.numbersAndReplay")}</div>
             {answer.number_slots.length === 0 ? (
-              <div className="drawerHintMuted">No served number slots.</div>
+              <div className="drawerHintMuted">{t(catalog, "misc.answerHonesty.noServedNumberSlots")}</div>
             ) : (
               <ul className="drawerFindingList">
                 {answer.number_slots.map((slot, index) => (
                   <li key={index} className="drawerFindingItem">
                     {slot.status === "PRESENT" ? (
-                      <div className="drawerFindingText">{labeledNumberLine(slot.number)}</div>
+                      <div className="drawerFindingText">{labeledNumberLine(catalog, slot.number)}</div>
                     ) : (
                       <div className="drawerFindingText">{conditionMarkLabel(slot.mark)}</div>
                     )}
@@ -252,8 +297,8 @@ export function AnswerHonestyDrawer({
           </section>
 
           {answer.badges.length > 0 ? (
-            <section className="wsSection" aria-label="Badges">
-              <div className="drawerSectionTitle">Badges</div>
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.badges")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.badges")}</div>
               <div className="roleChips">
                 {answer.badges.map((badge) => (
                   <span key={badge} className="roleChip">
@@ -265,8 +310,8 @@ export function AnswerHonestyDrawer({
           ) : null}
 
           {answer.residual_objections.length > 0 ? (
-            <section className="wsSection" aria-label="Residual objections">
-              <div className="drawerSectionTitle">Residual objections</div>
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.residualObjections")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.residualObjections")}</div>
               <ul className="drawerFindingList">
                 {answer.residual_objections.map((objection) => (
                   <li key={objection} className="drawerFindingItem">
@@ -277,14 +322,14 @@ export function AnswerHonestyDrawer({
             </section>
           ) : null}
 
-          <section className="wsSection" aria-label="What would reverse this">
-            <div className="drawerSectionTitle">What would reverse this</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.whatWouldReverseThis")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.whatWouldReverseThis")}</div>
             <div className="drawerFindingText" data-ai-generated="true">{answer.reversal_point}</div>
           </section>
 
           {answer.value_hinges.length > 0 ? (
-            <section className="wsSection" aria-label="Value hinges">
-              <div className="drawerSectionTitle">Value hinges</div>
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.valueHinges")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.valueHinges")}</div>
               <ul className="drawerFindingList">
                 {answer.value_hinges.map((hinge) => (
                   <li key={hinge.value_hinge_ref} className="drawerFindingItem">
@@ -293,12 +338,20 @@ export function AnswerHonestyDrawer({
                         {hinge.left_option_ref} ↔ {hinge.right_option_ref}
                       </span>
                       <span>
-                        weights {hinge.weight_source}
-                        {hinge.weight_owner !== null ? ` by ${hinge.weight_owner}` : ""}
+                        {hinge.weight_owner !== null
+                          ? t(catalog, "misc.answerHonesty.weightsBy", {
+                              source: hinge.weight_source,
+                              owner: hinge.weight_owner
+                            })
+                          : t(catalog, "misc.answerHonesty.weights", { source: hinge.weight_source })}
                       </span>
                     </div>
                     <div className="drawerFindingText">
-                      Rejected criteria: {hinge.rejected_criteria.length === 0 ? "None recorded" : hinge.rejected_criteria.join(", ")}
+                      {t(catalog, "misc.answerHonesty.rejectedCriteria", {
+                        criteria: hinge.rejected_criteria.length === 0
+                          ? t(catalog, "misc.answerHonesty.noneRecorded")
+                          : hinge.rejected_criteria.join(", ")
+                      })}
                     </div>
                   </li>
                 ))}
@@ -307,8 +360,8 @@ export function AnswerHonestyDrawer({
           ) : null}
 
           {answer.shadow_suppressions.length > 0 ? (
-            <section className="wsSection" aria-label="Shadow suppressions">
-              <div className="drawerSectionTitle">Shadow suppressions</div>
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.shadowSuppressions")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.shadowSuppressions")}</div>
               <ul className="drawerFindingList">
                 {answer.shadow_suppressions.map((suppression, index) => (
                   <li key={index} className="drawerFindingItem">
@@ -316,40 +369,43 @@ export function AnswerHonestyDrawer({
                       <span>{suppression.gate}</span>
                       <span>{suppression.subject_ref}</span>
                     </div>
-                    <div className="drawerFindingText">Unlock: {suppression.unlock_condition}</div>
+                    <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.unlock", { condition: suppression.unlock_condition })}</div>
                   </li>
                 ))}
               </ul>
             </section>
           ) : null}
 
-          <section className="wsSection" aria-label="Builds on a previous answer">
-            <div className="drawerSectionTitle">Builds on a previous answer</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.buildsOnPreviousAnswer")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.buildsOnPreviousAnswer")}</div>
             {answer.memory_disclosure !== null && answer.memory_disclosure.matched ? (
               <>
                 <div className="drawerFindingMeta">
-                  <span>{answer.memory_disclosure.tier ?? "tier unrecorded"}</span>
-                  <span>{answer.memory_disclosure.relation ?? "relation unrecorded"}</span>
+                  <span>{answer.memory_disclosure.tier ?? t(catalog, "misc.answerHonesty.tierUnrecorded")}</span>
+                  <span>{answer.memory_disclosure.relation ?? t(catalog, "misc.answerHonesty.relationUnrecorded")}</span>
                 </div>
                 <div className="drawerFindingText">
-                  Prior freshness: {answer.memory_disclosure.prior?.staleness_state ?? "No linked prior answer"}
+                  {t(catalog, "misc.answerHonesty.priorFreshness", {
+                    freshness: answer.memory_disclosure.prior?.staleness_state
+                      ?? t(catalog, "misc.answerHonesty.noLinkedPriorAnswer")
+                  })}
                 </div>
                 {answer.memory_disclosure.unlink.available ? (
                   <button type="button" className="btn" onClick={onUnlinkMemory}>
-                    Unlink prior answer
+                    {t(catalog, "misc.answerHonesty.unlinkPriorAnswer")}
                   </button>
                 ) : null}
               </>
             ) : (
-              <div className="drawerHintMuted">No matched prior answer.</div>
+              <div className="drawerHintMuted">{t(catalog, "misc.answerHonesty.noMatchedPriorAnswer")}</div>
             )}
           </section>
 
-          <section className="wsSection" aria-label="Authorized inspection">
-            <div className="drawerSectionTitle">Authorized inspection</div>
-            <div className="drawerFindingText">Handle: {answer.inspection_handle}</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.authorizedInspection")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.authorizedInspection")}</div>
+            <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.handle", { handle: answer.inspection_handle })}</div>
             <button type="button" className="btn" onClick={onShowInspection}>
-              Show me why
+              {t(catalog, "misc.answerHonesty.showMeWhy")}
             </button>
             {inspectionError !== null ? (
               <div className="drawerHintMuted" role="alert">
@@ -363,18 +419,25 @@ export function AnswerHonestyDrawer({
             ) : null}
           </section>
 
-          <section className="wsSection" aria-label="Execution ledger digest">
-            <div className="drawerSectionTitle">Execution ledger digest</div>
-            <div className="drawerFindingText">Handle: {answer.ledger_digest_handle}</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.executionLedgerDigest")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.executionLedgerDigest")}</div>
+            <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.handle", { handle: answer.ledger_digest_handle })}</div>
             {ledgerError !== null ? (
               <div className="drawerHintMuted" role="alert">
                 {ledgerError}
               </div>
             ) : ledgerDigest === null ? (
-              <div className="drawerHintMuted">Ledger digest loading…</div>
+              <div className="drawerHintMuted">{t(catalog, "misc.answerHonesty.ledgerDigestLoading")}</div>
             ) : (
               <>
-                <div className="drawerFindingText">{ledgerDigest.entries.length} executed ledger entries.</div>
+                <div className="drawerFindingText">
+                  {tPlural(
+                    catalog,
+                    "misc.answerHonesty.executedLedgerEntries",
+                    ledgerDigest.entries.length,
+                    locale
+                  )}
+                </div>
                 <ul className="drawerFindingList">
                   {ledgerDigest.work_items.map((item) => (
                     <li key={item.node_ref} className="drawerFindingItem">
@@ -404,32 +467,37 @@ export function AnswerHonestyDrawer({
           </section>
 
           {live.cycleRefusals.length > 0 ? (
-            <section className="wsSection" aria-label="Cycle refusals">
-              <div className="drawerSectionTitle">Cycle refusals</div>
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.cycleRefusals")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.cycleRefusals")}</div>
               {live.cycleRefusals.map((code, index) => (
                 <div key={`${code}:${index}`} className="error">
-                  {code}: redirected to a shared crux.
+                  {t(catalog, "misc.answerHonesty.redirectedToSharedCrux", { code })}
                 </div>
               ))}
             </section>
           ) : null}
 
           {live.investigationGaps.length > 0 ? (
-            <section className="wsSection" aria-label="Investigate deeper">
-              <div className="drawerSectionTitle">Investigate deeper</div>
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.investigateDeeper")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.investigateDeeper")}</div>
               {live.investigationGaps.map((gap) => (
                 <article key={gap.gap_ref} className="wsCard">
                   <div className="wsCardHead">
                     <h3>{gap.gap}</h3>
-                    <span className="pill">Model-authored · {conditionMarkLabel(gap.verdict)}</span>
+                    <span className="pill">
+                      {t(catalog, "misc.answerHonesty.modelAuthored", { verdict: conditionMarkLabel(gap.verdict) })}
+                    </span>
                   </div>
                   <p>
-                    {gap.why} · effort {gap.effort_grade}
+                    {t(catalog, "misc.answerHonesty.investigationEffort", {
+                      reason: gap.why,
+                      effort: gap.effort_grade
+                    })}
                   </p>
                   <pre className="drawerFindingText" style={{ whiteSpace: "pre-wrap" }}>{gap.constructed_prompt}</pre>
                   {gap.accepts_user_input ? (
                     <label style={{ display: "grid", gap: 6 }}>
-                      Optional verbatim input
+                      {t(catalog, "misc.answerHonesty.optionalVerbatimInput")}
                       <textarea
                         value={investigationInput[gap.gap_ref] ?? ""}
                         onChange={(event) => onInvestigationInput(gap.gap_ref, event.target.value)}
@@ -437,25 +505,30 @@ export function AnswerHonestyDrawer({
                     </label>
                   ) : null}
                   <button type="button" className="btn" disabled={!token} onClick={() => onRecordInvestigation(gap)}>
-                    Record investigate-deeper request
+                    {t(catalog, "misc.answerHonesty.recordInvestigateDeeperRequest")}
                   </button>
-                  {!token ? <div className="drawerHintMuted">Unlock actions to record a request.</div> : null}
+                  {!token ? (
+                    <div className="drawerHintMuted">{t(catalog, "misc.answerHonesty.unlockActionsToRecord")}</div>
+                  ) : null}
                 </article>
               ))}
             </section>
           ) : null}
 
           {live.honestyEvents.length > 0 || live.ledgerEvents.length > 0 ? (
-            <section className="wsSection" aria-label="Live honesty events">
-              <div className="drawerSectionTitle">Live honesty events</div>
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.liveHonestyEvents")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.liveHonestyEvents")}</div>
               <div className="drawerFindingText">
-                {live.honestyEvents.length} honesty · {live.ledgerEvents.length} ledger events observed on the stream.
+                {t(catalog, "misc.answerHonesty.eventsObserved", {
+                  honestyCount: live.honestyEvents.length,
+                  ledgerCount: live.ledgerEvents.length
+                })}
               </div>
             </section>
           ) : null}
 
-          <section className="wsSection" aria-label="Export">
-            <div className="drawerSectionTitle">Export</div>
+          <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.export")}>
+            <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.export")}</div>
             {answerExport.available ? (
               <a className="btn" href={answerExport.href} download={answerExport.filename}>
                 ↓ {answerExport.label}

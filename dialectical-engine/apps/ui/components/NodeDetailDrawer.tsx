@@ -27,6 +27,9 @@ import type { Node as ContractNode } from "@debateai/contract";
 import { v3NodeHonestyRows, wayOfKnowingLabel } from "@/lib/v3/adapter";
 import { abstentionKindLabel, conditionMarkLabel } from "@/lib/v3/labels";
 import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 
 function isSetAsidePath(node: DebateNode): boolean {
   const pathStatus = node.path_status?.trim().toLowerCase();
@@ -38,17 +41,18 @@ function isSetAsidePath(node: DebateNode): boolean {
   );
 }
 
-const DECISION_KIND_LABELS: Record<string, string> = {
-  continue: "continue",
-  deepen: "deepen this path",
-  seek_evidence: "seek evidence",
-  challenge: "challenge",
-  abandon: "abandon",
-  reopen: "reopen"
+const DECISION_KIND_LABEL_KEYS: Record<string, string> = {
+  continue: "debateDrawers.node.decisionContinue",
+  deepen: "debateDrawers.node.decisionDeepen",
+  seek_evidence: "debateDrawers.node.decisionSeekEvidence",
+  challenge: "debateDrawers.node.decisionChallenge",
+  abandon: "debateDrawers.node.decisionAbandon",
+  reopen: "debateDrawers.node.decisionReopen"
 };
 
-function decisionKindLabel(decision: string): string {
-  return DECISION_KIND_LABELS[decision] ?? decision;
+function decisionKindLabel(catalog: MessageCatalog, decision: string): string {
+  const key = DECISION_KIND_LABEL_KEYS[decision];
+  return key ? t(catalog, key) : decision;
 }
 
 /**
@@ -59,17 +63,17 @@ function decisionKindLabel(decision: string): string {
  * decision (annotate-only, scalar-grounded, budget/capacity refused) steered
  * nothing, so the copy stays in "noted" register, never implying causation.
  */
-function pathDecisionCopy(decision: LifecycleDecision): string {
+function pathDecisionCopy(catalog: MessageCatalog, decision: LifecycleDecision): string {
   const reason = decision.reason?.trim();
-  const kind = decisionKindLabel(decision.decision);
+  const kind = decisionKindLabel(catalog, decision.decision);
   if (decision.childSpawnCount > 0) {
     return reason
-      ? `This path expanded because ${reason} (decision: ${kind}).`
-      : `This path expanded because of a ${kind} decision.`;
+      ? t(catalog, "debateDrawers.node.pathExpandedWithReason", { reason, kind })
+      : t(catalog, "debateDrawers.node.pathExpanded", { kind });
   }
   return reason
-    ? `Noted (decision: ${kind}): ${reason}. This did not change the tree.`
-    : `Noted: a ${kind} decision was recorded. This did not change the tree.`;
+    ? t(catalog, "debateDrawers.node.pathNotedWithReason", { kind, reason })
+    : t(catalog, "debateDrawers.node.pathNoted", { kind });
 }
 
 export function NodeDetailDrawer({
@@ -87,7 +91,8 @@ export function NodeDetailDrawer({
   canFocusRecommendationNode,
   onQueued,
   onError,
-  onAuthRejected
+  onAuthRejected,
+  catalog = debateDrawersEnglish
 }: {
   node: DebateNode;
   /**
@@ -111,7 +116,9 @@ export function NodeDetailDrawer({
   onQueued: () => void;
   onError: (message: string) => void;
   onAuthRejected: () => void;
+  catalog?: MessageCatalog;
 }) {
+  const { locale } = useChromeI18n();
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const generation = node.active_generation;
@@ -162,7 +169,9 @@ export function NodeDetailDrawer({
           type="button"
           className="linkBtn"
           disabled={!targetClaimId || !canFocusTarget}
-          aria-label={canFocusTarget ? "Open recommended target claim" : "Recommended target claim unavailable"}
+          aria-label={t(catalog, canFocusTarget
+            ? "debateDrawers.node.openRecommendedTargetClaim"
+            : "debateDrawers.node.recommendedTargetUnavailable")}
           onClick={() => {
             if (!targetClaimId || !canFocusTarget) return;
             if (onFocusRecommendationNode(targetClaimId) === false) {
@@ -172,16 +181,18 @@ export function NodeDetailDrawer({
             }
           }}
         >
-          {canFocusTarget ? "Open target" : "Target unavailable"}
+          {t(catalog, canFocusTarget
+            ? "debateDrawers.recommendations.openTarget"
+            : "debateDrawers.recommendations.targetUnavailable")}
         </button>
         {targetClaimId && !canFocusTarget ? (
           <span className="muted" role="status">
-            This recommendation references a claim that is not visible in the current debate tree.
+            {t(catalog, "debateDrawers.node.targetNotVisible")}
           </span>
         ) : null}
         {targetClaimId && focusFailedTargetNodeId === targetClaimId ? (
           <span className="muted" role="status">
-            Unable to focus that recommendation target because it is no longer visible.
+            {t(catalog, "debateDrawers.node.targetFocusFailed")}
           </span>
         ) : null}
       </span>
@@ -199,7 +210,7 @@ export function NodeDetailDrawer({
         data-design-turn="5"
         role="dialog"
         aria-modal
-        aria-label="Argument detail"
+        aria-label={t(catalog, "debateDrawers.node.argumentDetail")}
         style={{ width: "min(440px, 100vw)", boxSizing: "border-box", background: "var(--core)" }}
       >
         <div className="drawerHead">
@@ -215,7 +226,7 @@ export function NodeDetailDrawer({
               />
             ) : null}
           </div>
-          <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
+          <button type="button" className="iconBtn" onClick={onClose} aria-label={t(catalog, "debateDrawers.common.close")}>
             ×
           </button>
         </div>
@@ -224,24 +235,24 @@ export function NodeDetailDrawer({
           <div className="drawerIntro">
           {v3 ? (
             <div className="nodeEyebrow drawerWayOfKnowing" data-drawer-way-of-knowing>
-              WAY OF KNOWING · {wayOfKnowingLabel(v3.way_of_knowing).toUpperCase()}
+              {t(catalog, "debateDrawers.node.wayOfKnowing", { way: wayOfKnowingLabel(v3.way_of_knowing).toUpperCase() })}
             </div>
           ) : (
-            <div className="nodeEyebrow">Argument</div>
+            <div className="nodeEyebrow">{t(catalog, "debateDrawers.node.argument")}</div>
           )}
           {isAbandoned || isSetAsidePath(node) ? (
             <div className="drawerAbandonedBanner" role="status">
-              <div className="drawerSectionTitle">Stopped path</div>
-              <p>This investigation path was paused or abandoned. It is preserved here for reference — abandoned paths are never deleted. You can resume investigation by regenerating this argument.</p>
+              <div className="drawerSectionTitle">{t(catalog, "debateDrawers.node.stoppedPath")}</div>
+              <p>{t(catalog, "debateDrawers.node.stoppedPathExplanation")}</p>
               {isSetAsidePath(node) && stoppingReason ? (
-                <p>set aside because: {stoppingReason}</p>
+                <p>{t(catalog, "debateDrawers.node.setAsideReason", { reason: stoppingReason })}</p>
               ) : null}
             </div>
           ) : null}
           {lifecycleDecision ? (
             <div className="drawerPathDecision" role="status">
-              <div className="drawerSectionTitle">Path decision</div>
-              <p>{pathDecisionCopy(lifecycleDecision)}</p>
+              <div className="drawerSectionTitle">{t(catalog, "debateDrawers.node.pathDecision")}</div>
+              <p>{pathDecisionCopy(catalog, lifecycleDecision)}</p>
             </div>
           ) : null}
           <div className="drawerClaim" data-ai-generated={node.node_type === "ROOT_CLAIM" ? undefined : "true"}>{node.claim}</div>
@@ -251,15 +262,15 @@ export function NodeDetailDrawer({
             </div>
           ) : (
             <div className="muted" style={{ marginTop: 12 }}>
-              No argument text yet.
+              {t(catalog, "debateDrawers.node.noArgumentText")}
             </div>
           )}
           {generation?.argument && onChallenge ? (
-            <div className="drawerSelectHint">▲ Select any sentence above to challenge it.</div>
+            <div className="drawerSelectHint">▲ {t(catalog, "debateDrawers.node.selectToChallenge")}</div>
           ) : null}
           </div>
 
-          {v3 ? <NodeHonestyDetails v3={v3} /> : null}
+          {v3 ? <NodeHonestyDetails v3={v3} catalog={catalog} /> : null}
 
           <div className="drawerActions drawerReferenceActions">
             {onChallenge ? (
@@ -268,7 +279,7 @@ export function NodeDetailDrawer({
                 className="btn btnChallenge"
                 onClick={(event) => onChallenge(event.currentTarget, "")}
               >
-                ⚐ Challenge
+                ⚐ {t(catalog, "debateDrawers.node.challenge")}
               </button>
             ) : null}
             <button
@@ -278,16 +289,16 @@ export function NodeDetailDrawer({
               aria-disabled="true"
               title={V3_MISSING_CAPABILITIES.nodeRegeneration}
             >
-              ↻ Regenerate
+              ↻ {t(catalog, "debateDrawers.node.regenerate")}
             </button>
           </div>
 
           <div className="drawerHistoryHead">
-            <span>Generation history</span>
+            <span>{t(catalog, "debateDrawers.node.generationHistory")}</span>
             <span className="drawerHistoryRule" aria-hidden />
             {history.length > 1 ? (
               <button type="button" className="linkBtn" onClick={() => setCompareOn((value) => !value)}>
-                {compareOn ? "Hide compare" : "Compare versions"}
+                {t(catalog, compareOn ? "debateDrawers.node.hideCompare" : "debateDrawers.node.compareVersions")}
               </button>
             ) : null}
           </div>
@@ -296,7 +307,7 @@ export function NodeDetailDrawer({
             <div className="compareRow">
               <div className="compareCell current">
                 <div className="compareCellHead">
-                  <span className="compareTag">Current</span>
+                  <span className="compareTag">{t(catalog, "debateDrawers.node.current")}</span>
                   {generation || node.maker !== undefined ? (
                     <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} className="modelPill metaLine" />
                   ) : null}
@@ -314,9 +325,9 @@ export function NodeDetailDrawer({
 
           <div className="historyList">
             {!token ? (
-              <div className="muted">Unlock actions to view generation history.</div>
+              <div className="muted">{t(catalog, "debateDrawers.node.unlockHistory")}</div>
             ) : history.length === 0 ? (
-              <div className="muted">No previous generations.</div>
+              <div className="muted">{t(catalog, "debateDrawers.node.noPreviousGenerations")}</div>
             ) : (
               history.map((item, index) => {
                 const selected = index === selectedVersion;
@@ -332,7 +343,7 @@ export function NodeDetailDrawer({
                   >
                     <div className="historyCardHead">
                       <ModelMetaLine modelId={item.model_id} className="modelPill metaLine" />
-                      <span className="historyTag">{item.is_active ? "active" : "archived"}</span>
+                      <span className="historyTag">{t(catalog, item.is_active ? "debateDrawers.node.active" : "debateDrawers.node.archived")}</span>
                     </div>
                     <div className="historyCardBody" data-ai-generated="true">{item.argument}</div>
                   </button>
@@ -349,6 +360,8 @@ export function NodeDetailDrawer({
                 feedbackSummary={feedbackSummary}
                 currentUserFeedback={currentUserFeedback}
                 recommendationTargetButton={recommendationTargetButton}
+                catalog={catalog}
+                locale={locale}
               />
             </ScoringErrorBoundary>
           ) : null}
@@ -363,26 +376,26 @@ export function NodeDetailDrawer({
  * Every line is a served contract value or a typed absence — no invented
  * numbers, no defaults.
  */
-function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
+function NodeHonestyDetails({ v3, catalog }: { v3: ContractNode; catalog: MessageCatalog }) {
   const reviewLabel = v3.review?.outcome === "agree"
-    ? "REVIEW AGREED BY:"
+    ? t(catalog, "debateDrawers.node.reviewAgreedBy")
     : v3.review?.outcome === "dispute"
-      ? "REVIEW DISPUTED BY:"
+      ? t(catalog, "debateDrawers.node.reviewDisputedBy")
       : v3.review?.outcome === "cannot-assess"
-        ? "REVIEW COULD NOT ASSESS:"
+        ? t(catalog, "debateDrawers.node.reviewCouldNotAssess")
         : null;
   const rows = v3NodeHonestyRows(v3);
 
   return (
-    <section aria-label="V3 node honesty" className="drawerHonesty">
+    <section aria-label={t(catalog, "debateDrawers.node.honestyAriaLabel")} className="drawerHonesty">
       <div className="drawerFindingText drawerFreshness">
-        Freshness {v3.staleness_state} · relevant as of {v3.relevant_as_of}
+        {t(catalog, "debateDrawers.node.freshness", { state: v3.staleness_state, date: v3.relevant_as_of })}
       </div>
 
       <div className="drawerReviewLine" data-node-review={v3.review?.outcome ?? "absent"} data-ai-generated={v3.review === null ? undefined : "true"}>
         {reviewLabel === null ? (
           <span className="drawerFindingText">
-            No completed second-maker review is recorded for this node.
+            {t(catalog, "debateDrawers.node.noCompletedReview")}
           </span>
         ) : (
           <>
@@ -433,7 +446,10 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
       ) : null}
       {v3.abstention !== null ? (
         <p style={{ marginTop: 8 }}>
-          Abstention: {abstentionKindLabel(v3.abstention.kind)} · {v3.abstention.unlock_condition}
+          {t(catalog, "debateDrawers.node.abstention", {
+            kind: abstentionKindLabel(v3.abstention.kind),
+            condition: v3.abstention.unlock_condition
+          })}
         </p>
       ) : null}
     </section>
@@ -442,25 +458,31 @@ function NodeHonestyDetails({ v3 }: { v3: ContractNode }) {
 
 function ScoringFeedbackControls({
   summary,
-  currentVote
+  currentVote,
+  catalog
 }: {
   summary?: NodeFeedbackSummary;
   currentVote?: CurrentUserFeedbackVote["vote"];
+  catalog: MessageCatalog;
 }) {
-  const upLabel = summary ? `UP ${summary.up}` : "UP";
-  const downLabel = summary ? `DOWN ${summary.down}` : "DOWN";
+  const upLabel = summary
+    ? t(catalog, "debateDrawers.node.feedbackUpCount", { count: summary.up })
+    : t(catalog, "debateDrawers.node.feedbackUp");
+  const downLabel = summary
+    ? t(catalog, "debateDrawers.node.feedbackDownCount", { count: summary.down })
+    : t(catalog, "debateDrawers.node.feedbackDown");
 
   return (
     <section
       className="drawerScoringRationale"
-      aria-label="User feedback on scoring usefulness"
+      aria-label={t(catalog, "debateDrawers.node.feedbackAriaLabel")}
       data-scoring-feedback="user-feedback"
     >
-      <div className="drawerSectionTitle">Your feedback</div>
-      <p>Was this scoring explanation useful for reviewing the claim?</p>
+      <div className="drawerSectionTitle">{t(catalog, "debateDrawers.node.yourFeedback")}</div>
+      <p>{t(catalog, "debateDrawers.node.feedbackQuestion")}</p>
       <div
         role="group"
-        aria-label="User feedback on scoring usefulness"
+        aria-label={t(catalog, "debateDrawers.node.feedbackAriaLabel")}
         style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}
       >
         <button
@@ -487,7 +509,11 @@ function ScoringFeedbackControls({
       <div className="drawerHintMuted">{V3_MISSING_CAPABILITIES.scoringFeedback}</div>
       {currentVote ? (
         <div className="drawerHintMuted" role="status">
-          Previously recorded user feedback: {currentVote === "up" ? "useful" : "not useful"}.
+          {t(catalog, "debateDrawers.node.previousFeedback", {
+            feedback: t(catalog, currentVote === "up"
+              ? "debateDrawers.node.useful"
+              : "debateDrawers.node.notUseful")
+          })}
         </div>
       ) : null}
     </section>
@@ -499,7 +525,9 @@ function NodeScoringDetails({
   scoringError,
   feedbackSummary,
   currentUserFeedback,
-  recommendationTargetButton
+  recommendationTargetButton,
+  catalog,
+  locale
 }: {
   scoring?: NodeScoringPayload;
   scoringError?: NodeScoringError;
@@ -508,6 +536,8 @@ function NodeScoringDetails({
   recommendationTargetButton: (
     recommendation: NodeScoringPayload["recommended_investigations"][number]
   ) => ReactNode;
+  catalog: MessageCatalog;
+  locale: string;
 }) {
   const rationaleShort = scoring?.rationale?.short?.trim();
   const holes = scoring?.holes.filter((hole) => hole.description.trim()) ?? [];
@@ -540,15 +570,15 @@ function NodeScoringDetails({
   return (
     <>
       {scoringError ? (
-        <section className="drawerScoringUnavailable" aria-label="Scoring unavailable">
-          <div className="drawerSectionTitle">Scoring unavailable</div>
+        <section className="drawerScoringUnavailable" aria-label={t(catalog, "debateDrawers.node.scoringUnavailable")}>
+          <div className="drawerSectionTitle">{t(catalog, "debateDrawers.node.scoringUnavailable")}</div>
           <p>{scoringError.reason}</p>
         </section>
       ) : null}
 
       {rationaleShort ? (
-        <section className="drawerScoringRationale" aria-label="Scoring rationale">
-          <div className="drawerSectionTitle">Scoring rationale</div>
+        <section className="drawerScoringRationale" aria-label={t(catalog, "debateDrawers.node.scoringRationale")}>
+          <div className="drawerSectionTitle">{t(catalog, "debateDrawers.node.scoringRationale")}</div>
           <p>{rationaleShort}</p>
         </section>
       ) : null}
@@ -556,14 +586,15 @@ function NodeScoringDetails({
       <ScoringFeedbackControls
         summary={feedbackSummary}
         currentVote={currentUserFeedback?.vote}
+        catalog={catalog}
       />
 
       {hasScoringFindings ? (
-        <section className="drawerScoringFindings" aria-label="Scoring holes and fatal flags">
-          <div className="drawerSectionTitle">Holes and fatal flags</div>
+        <section className="drawerScoringFindings" aria-label={t(catalog, "debateDrawers.node.scoringFindingsAria")}>
+          <div className="drawerSectionTitle">{t(catalog, "debateDrawers.node.scoringFindings")}</div>
           {fatalFlags.length > 0 ? (
             <div className="drawerFindingGroup">
-              <div className="drawerFindingGroupTitle">Fatal flags</div>
+              <div className="drawerFindingGroupTitle">{t(catalog, "debateDrawers.node.fatalFlags")}</div>
               <ul className="drawerFindingList">
                 {fatalFlags.map((flag, index) => (
                   <li key={`${flag.type}-${index}`} className="drawerFindingItem fatal">
@@ -579,7 +610,7 @@ function NodeScoringDetails({
           ) : null}
           {holes.length > 0 ? (
             <div className="drawerFindingGroup">
-              <div className="drawerFindingGroupTitle">Holes</div>
+              <div className="drawerFindingGroupTitle">{t(catalog, "debateDrawers.node.holes")}</div>
               <ul className="drawerFindingList">
                 {holes.map((hole, index) => (
                   <li key={`${hole.type}-${index}`} className="drawerFindingItem">
@@ -598,13 +629,13 @@ function NodeScoringDetails({
       ) : null}
 
       {scoring ? (
-        <section className="drawerScoringRecommendation" aria-label="Top recommendation">
-          <div className="drawerSectionTitle">Top recommendation</div>
+        <section className="drawerScoringRecommendation" aria-label={t(catalog, "debateDrawers.node.topRecommendation")}>
+          <div className="drawerSectionTitle">{t(catalog, "debateDrawers.node.topRecommendation")}</div>
           {topRecommendation ? (
             <>
               <div className="drawerFindingMeta">
                 <span>{formatRecommendationAction(topRecommendation.action)}</span>
-                <span>priority {topRecommendation.priority}</span>
+                <span>{t(catalog, "debateDrawers.recommendations.priority", { priority: topRecommendation.priority })}</span>
                 {recommendationTargetButton(topRecommendation)}
                 {manualInvestigationButton(topRecommendation)}
               </div>
@@ -612,8 +643,7 @@ function NodeScoringDetails({
               {additionalRecommendations.length > 0 ? (
                 <details>
                   <summary className="linkBtn">
-                    {additionalRecommendations.length} more recommendation
-                    {additionalRecommendations.length === 1 ? "" : "s"}
+                    {tPlural(catalog, "debateDrawers.recommendations.more", additionalRecommendations.length, locale)}
                   </summary>
                   <ul className="drawerFindingList">
                     {additionalRecommendations.map((recommendation, index) => (
@@ -623,7 +653,7 @@ function NodeScoringDetails({
                       >
                         <div className="drawerFindingMeta">
                           <span>{formatRecommendationAction(recommendation.action)}</span>
-                          <span>priority {recommendation.priority}</span>
+                          <span>{t(catalog, "debateDrawers.recommendations.priority", { priority: recommendation.priority })}</span>
                           {recommendationTargetButton(recommendation)}
                           {manualInvestigationButton(recommendation)}
                         </div>
@@ -635,7 +665,7 @@ function NodeScoringDetails({
               ) : null}
             </>
           ) : (
-            <p>No scoring recommendation is available for this argument.</p>
+            <p>{t(catalog, "debateDrawers.node.noScoringRecommendation")}</p>
           )}
         </section>
       ) : null}

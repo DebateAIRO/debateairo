@@ -7,6 +7,7 @@ import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/translate";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,10 @@ export default async function DebatePage({
   const cookieStore = await cookies();
   const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
-  const timeCatalog = await loadNamespace(locale, "time");
+  const [timeCatalog, debateChromeCatalog] = await Promise.all([
+    loadNamespace(locale, "time"),
+    loadNamespace(locale, "debateChrome")
+  ]);
 
   // The accepted ask already owns a durable run id. Do not make the client
   // transition wait behind the runner's private-content lease: mount the
@@ -38,6 +42,7 @@ export default async function DebatePage({
         initialError={null}
         initialPending
         timeCatalog={timeCatalog}
+        debateChromeCatalog={debateChromeCatalog}
       />
     );
   }
@@ -63,7 +68,9 @@ export default async function DebatePage({
       initialPending = true;
     } else if (result.kind === "failed") {
       initialDebate = debateDetailFromRunProjection(result.run);
-      initialError = `Debate generation failed: ${result.reason}`;
+      initialError = t(debateChromeCatalog, "debateChrome.error.debateGenerationFailed", {
+        reason: result.reason
+      });
       initialPending = false;
     } else if (result.kind === "not_found") {
       notFound();
@@ -78,6 +85,7 @@ export default async function DebatePage({
       initialError={initialError}
       initialPending={initialPending}
       timeCatalog={timeCatalog}
+      debateChromeCatalog={debateChromeCatalog}
     />
   );
 }

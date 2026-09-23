@@ -6,7 +6,9 @@ import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { contractClient } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { safeReturnPath } from "@/lib/returnPath";
+import authEnglish from "@/messages/en/auth.json";
 
 type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
 type VerificationMethod = "authenticator" | "recovery";
@@ -14,21 +16,21 @@ type VerificationMethod = "authenticator" | "recovery";
 /* The document shows live validity marks under both auth fields (7a, and 8a
    with two rules unmet). These are presentation only — the server remains the
    authority on whether any credential is accepted. */
-const PASSWORD_RULES: readonly { readonly label: string; readonly met: (value: string) => boolean }[] = [
-  { label: "Eight characters", met: (v) => v.length >= 8 },
-  { label: "One capital letter", met: (v) => /[A-Z]/.test(v) },
-  { label: "One number", met: (v) => /[0-9]/.test(v) },
-  { label: "One special character", met: (v) => /[^A-Za-z0-9]/.test(v) }
-];
+const passwordRules = (catalog: MessageCatalog) => [
+  { label: t(catalog, "auth.login.passwordRuleEight"), met: (v: string) => v.length >= 8 },
+  { label: t(catalog, "auth.passwordRuleCapital"), met: (v: string) => /[A-Z]/.test(v) },
+  { label: t(catalog, "auth.passwordRuleNumber"), met: (v: string) => /[0-9]/.test(v) },
+  { label: t(catalog, "auth.passwordRuleSpecial"), met: (v: string) => /[^A-Za-z0-9]/.test(v) }
+] as const;
 
-function emailValidity(value: string): { state: "idle" | "ok" | "bad"; text: string } {
+function emailValidity(value: string, catalog: MessageCatalog): { state: "idle" | "ok" | "bad"; text: string } {
   const trimmed = value.trim();
-  if (trimmed.length === 0) return { state: "idle", text: "Use the address this account was verified with." };
+  if (trimmed.length === 0) return { state: "idle", text: t(catalog, "auth.login.emailHint") };
   // Deliberately permissive: the address is checked for shape, not existence.
   const shaped = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(trimmed);
   return shaped
-    ? { state: "ok", text: "✓ Valid address" }
-    : { state: "bad", text: "✗ That does not look like an email address" };
+    ? { state: "ok", text: t(catalog, "auth.validAddress") }
+    : { state: "bad", text: t(catalog, "auth.invalidEmail") };
 }
 
 function navigateHome(): void {
@@ -37,9 +39,11 @@ function navigateHome(): void {
 }
 
 export function LoginFlow({
+  catalog = authEnglish,
   client = contractClient,
   onAuthenticated = navigateHome
 }: Readonly<{
+  catalog?: MessageCatalog;
   client?: LoginClient;
   onAuthenticated?: () => void;
 }>) {
@@ -72,7 +76,7 @@ export function LoginFlow({
       setVerificationMethod("authenticator");
       setChallengeToken(result.challenge_token);
     } catch {
-      setError("Sign-in could not be completed.");
+      setError(t(catalog, "auth.login.signInFailed"));
     } finally {
       setBusy(false);
     }
@@ -95,14 +99,14 @@ export function LoginFlow({
       onAuthenticated();
     } catch (failure) {
       if (failure instanceof ContractHttpError && failure.status === 429) {
-        setError("Too many verification attempts. Wait five minutes, then start sign-in again.");
+        setError(t(catalog, "auth.login.tooManyAttempts"));
       } else if (failure instanceof ContractHttpError && failure.status === 401
         && verificationMethod === "recovery") {
-        setError("That recovery code was not accepted. Start sign-in again if the challenge is more than five minutes old, or use another unused code from this account.");
+        setError(t(catalog, "auth.login.recoveryCodeRejected"));
       } else if (failure instanceof ContractHttpError && failure.status === 401) {
-        setError("That authentication code was not accepted. Enter the current 6-digit code, or use an unused recovery code.");
+        setError(t(catalog, "auth.login.authenticationCodeRejected"));
       } else {
-        setError("Authenticator verification could not be completed.");
+        setError(t(catalog, "auth.login.verificationFailed"));
       }
     } finally {
       setBusy(false);
@@ -110,29 +114,30 @@ export function LoginFlow({
   }
 
   const verificationPending = challengeToken !== null;
-  const emailState = emailValidity(email);
+  const emailState = emailValidity(email, catalog);
+  const rules = passwordRules(catalog);
   const shellCopy = replacementRecoveryCode !== null
     ? {
-        eyebrow: "Recovery access",
-        title: "Save your new recovery code.",
-        description: "Your session is ready, but this replacement code must be recorded before you continue."
+        eyebrow: t(catalog, "auth.login.recoveryAccess"),
+        title: t(catalog, "auth.login.replacementTitle"),
+        description: t(catalog, "auth.login.replacementDescription")
       }
     : verificationPending
       ? verificationMethod === "authenticator"
         ? {
-            eyebrow: "Two-step verification",
-            title: "Enter your authentication code.",
-            description: "Open Google Authenticator or another authenticator app and enter the current 6-digit code."
+            eyebrow: t(catalog, "auth.login.twoStepVerification"),
+            title: t(catalog, "auth.login.authenticatorTitle"),
+            description: t(catalog, "auth.login.authenticatorDescription")
           }
         : {
-            eyebrow: "Two-step verification",
-            title: "Enter a recovery code.",
-            description: "Use one of the recovery codes you saved when you secured this account. Each code works once."
+            eyebrow: t(catalog, "auth.login.twoStepVerification"),
+            title: t(catalog, "auth.login.recoveryTitle"),
+            description: t(catalog, "auth.login.recoveryDescription")
           }
       : {
-          eyebrow: "Welcome back",
-          title: "Back to the graph.",
-          description: "Sessions follow a fixed security policy. Every sign-in continues with your authenticator or a recovery code."
+          eyebrow: t(catalog, "auth.login.welcomeBack"),
+          title: t(catalog, "auth.login.backToGraph"),
+          description: t(catalog, "auth.login.securityPolicy")
         };
 
   return (
@@ -141,7 +146,7 @@ export function LoginFlow({
       title={shellCopy.title}
       description={shellCopy.description}
       footer={replacementRecoveryCode === null && !verificationPending ? (
-        <p>No account yet? <Link href={signUpHref}>Create one</Link></p>
+        <p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>
       ) : null}
     >
       {error ? <div className="authAlert" role="alert">{error}</div> : null}
@@ -149,9 +154,9 @@ export function LoginFlow({
       {replacementRecoveryCode !== null ? (
         <section className="authSuccessWarning" role="alert" aria-labelledby="replacement-code-title">
           <span className="authSuccessAccent" aria-hidden />
-          <p className="authNoticeKicker">Signed in securely</p>
-          <h2 id="replacement-code-title">Record your replacement recovery code</h2>
-          <p>Your used recovery code has been replaced. This is the only time this new code will be shown.</p>
+          <p className="authNoticeKicker">{t(catalog, "auth.login.signedInSecurely")}</p>
+          <h2 id="replacement-code-title">{t(catalog, "auth.login.recordReplacementCode")}</h2>
+          <p>{t(catalog, "auth.login.replacementCodeNotice")}</p>
           <code className="authRecoveryCode">{replacementRecoveryCode}</code>
           <button
             className="authPrimary"
@@ -162,19 +167,19 @@ export function LoginFlow({
               onAuthenticated();
             }}
           >
-            I saved it — continue
+            {t(catalog, "auth.login.savedContinue")}
           </button>
         </section>
       ) : challengeToken === null ? (
         <form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitCredentials}>
           <div className="authField">
-            <label htmlFor="login-email">Email</label>
+            <label htmlFor="login-email">{t(catalog, "auth.email")}</label>
             <input
               id="login-email"
               name="email"
               type="email"
               autoComplete="username"
-              placeholder="you@institution.edu"
+              placeholder={t(catalog, "auth.emailPlaceholder")}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               aria-describedby="login-email-validity"
@@ -187,7 +192,7 @@ export function LoginFlow({
             </p>
           </div>
           <div className="authField">
-            <label htmlFor="login-password">Password</label>
+            <label htmlFor="login-password">{t(catalog, "auth.password")}</label>
             <input
               id="login-password"
               name="password"
@@ -200,7 +205,7 @@ export function LoginFlow({
               disabled={busy}
             />
             <ul className="authRules" id="login-password-rules">
-              {PASSWORD_RULES.map((rule) => {
+              {rules.map((rule) => {
                 const met = rule.met(password);
                 return (
                   <li
@@ -215,15 +220,17 @@ export function LoginFlow({
             </ul>
           </div>
           <button className="authPrimary" type="submit" disabled={busy}>
-            {busy ? "Checking…" : "Continue"}
+            {busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}
           </button>
         </form>
       ) : (
         <form className="authForm authMfaForm" method="post" action="/login" aria-busy={busy} onSubmit={submitMfa}>
-          <p className="srOnly" role="status">Password accepted. Complete the required second step to open your session.</p>
+          <p className="srOnly" role="status">{t(catalog, "auth.login.passwordAcceptedStatus")}</p>
           <div className="authField">
             <label htmlFor="login-code">
-              {verificationMethod === "authenticator" ? "6-digit authentication code" : "Recovery code"}
+              {verificationMethod === "authenticator"
+                ? t(catalog, "auth.login.authenticationCodeLabel")
+                : t(catalog, "auth.login.recoveryCodeLabel")}
             </label>
             {verificationMethod === "authenticator" ? (
               /* Six boxes are the document's presentation; the real control is
@@ -242,7 +249,7 @@ export function LoginFlow({
                   value={code}
                   onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
                   aria-describedby="login-code-hint"
-                  aria-label="6-digit authentication code"
+                  aria-label={t(catalog, "auth.login.authenticationCodeLabel")}
                   spellCheck={false}
                   required
                   autoFocus
@@ -269,7 +276,7 @@ export function LoginFlow({
                 type="text"
                 autoComplete="one-time-code"
                 inputMode="text"
-                placeholder="XXXX-XXXX-XXXX-XXXX"
+                placeholder={t(catalog, "auth.login.recoveryCodePlaceholder")}
                 aria-describedby="login-code-hint"
                 spellCheck={false}
                 required
@@ -279,12 +286,12 @@ export function LoginFlow({
             )}
             <p className="authFieldHint" id="login-code-hint">
               {verificationMethod === "authenticator"
-                ? "Open Google Authenticator, 1Password, or your preferred authenticator."
-                : "Enter one unused code exactly as you saved it."}
+                ? t(catalog, "auth.login.authenticatorHint")
+                : t(catalog, "auth.login.recoveryHint")}
             </p>
           </div>
           <button className="authPrimary" type="submit" disabled={busy}>
-            {busy ? "Verifying…" : "Continue"}
+            {busy ? t(catalog, "auth.login.verifying") : t(catalog, "auth.continue")}
           </button>
           <div className="authMfaAlternatives">
             <button className="authTextButton" type="button" disabled={busy} onClick={() => {
@@ -292,7 +299,9 @@ export function LoginFlow({
               setCode("");
               setError(null);
             }}>
-              {verificationMethod === "authenticator" ? "Use a recovery code" : "Use an authenticator code"}
+              {verificationMethod === "authenticator"
+                ? t(catalog, "auth.login.useRecoveryCode")
+                : t(catalog, "auth.login.useAuthenticatorCode")}
             </button>
             <button className="authTextButton authBackButton" type="button" disabled={busy} onClick={() => {
               setChallengeToken(null);
@@ -300,7 +309,7 @@ export function LoginFlow({
               setCode("");
               setError(null);
             }}>
-              Back to sign in
+              {t(catalog, "auth.login.backToSignIn")}
             </button>
           </div>
         </form>

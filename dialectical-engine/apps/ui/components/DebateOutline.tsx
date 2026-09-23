@@ -5,6 +5,16 @@ import type { DebateNode, NodeScoringError, NodeScoringPayload } from "@/lib/typ
 import { ROLE_PALETTES, flattenOutline, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { formatScoreBadgeLabel, formatScorePercent, formatStrengthPill, formatUncertaintyPill } from "@/lib/scoringFormat";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+
+function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog): string {
+  const role = roleOf(node);
+  if (role === "root") return t(catalog, "debateViews.rootClaim");
+  if (role === "pro") return t(catalog, "debateViews.pro");
+  if (role === "con") return t(catalog, "debateViews.con");
+  return roleLabel(node);
+}
 
 type DebateOutlineProps = {
   root: DebateNode;
@@ -21,12 +31,13 @@ export function DebateOutline({
   scoringByNodeId,
   scoringErrorsByNodeId
 }: DebateOutlineProps) {
+  const { catalog, locale } = useChromeI18n();
   const rows = flattenOutline(root);
 
   return (
     <div className="outline scroll">
       <div className="outlineInner">
-        <div className="nodeEyebrow">Root claim</div>
+        <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
         <h1 className="outlineRoot">{root.claim}</h1>
         {rows.map(({ node, depth }) => {
           const role = roleOf(node);
@@ -57,14 +68,14 @@ export function DebateOutline({
             >
               <div className="outlineRowHead">
                 <span className="outlineRole" style={{ color: pal.text }}>
-                  {pal.arrow} {roleLabel(node)}
+                  {pal.arrow} {localizedRoleLabel(node, catalog)}
                 </span>
                 {generation || node.maker !== undefined ? (
                   <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
                 ) : null}
-                <OutlineScoringMetadata scoring={scoring} scoringError={scoringError} nodeClaim={node.claim} />
+                <OutlineScoringMetadata scoring={scoring} scoringError={scoringError} nodeClaim={node.claim} catalog={catalog} locale={locale} />
               </div>
-              <div className="outlineClaim">{empty ? "No strong argument found." : node.claim}</div>
+              <div className="outlineClaim">{empty ? t(catalog, "debateViews.noStrongArgument") : node.claim}</div>
               {!empty && generation?.argument ? <div className="outlineBody">{generation.argument}</div> : null}
             </div>
           );
@@ -77,11 +88,15 @@ export function DebateOutline({
 function OutlineScoringMetadata({
   scoring,
   scoringError,
-  nodeClaim
+  nodeClaim,
+  catalog,
+  locale
 }: {
   scoring?: NodeScoringPayload;
   scoringError?: NodeScoringError;
   nodeClaim: string;
+  catalog: MessageCatalog;
+  locale: string;
 }) {
   if (scoring) {
     const strength = formatScorePercent(scoring.scores.strength);
@@ -91,23 +106,23 @@ function OutlineScoringMetadata({
     const strengthPill = formatStrengthPill(scoring.strength_kind, strength);
 
     return (
-      <span className="scoreBadgeButton" aria-label={`Scoring summary for ${nodeClaim}`}>
+      <span className="scoreBadgeButton" aria-label={t(catalog, "debateViews.scoringSummaryFor", { claim: nodeClaim })}>
         <span
           className="scoreBadge strength"
-          aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}
+          aria-label={formatScoreBadgeLabel(t(catalog, "debateViews.strength"), scoring.labels.strength_label, strength)}
           title={strengthPill.title}
         >
           {strengthPill.pillText}
         </span>
         <span
           className="scoreBadge uncertainty"
-          aria-label={formatScoreBadgeLabel("Uncertainty", scoring.labels.uncertainty_label, uncertainty)}
+          aria-label={formatScoreBadgeLabel(t(catalog, "debateViews.uncertainty"), scoring.labels.uncertainty_label, uncertainty)}
           title={uncertaintyPill.title}
         >
           {uncertaintyPill.pillText}
         </span>
-        <span className="scoreBadge impact" aria-label={`${issueCount} unresolved scoring holes or fatal flags`}>
-          HOLES {issueCount}
+        <span className="scoreBadge impact" aria-label={tPlural(catalog, "debateViews.unresolvedScoringIssueCount", issueCount, locale)}>
+          {t(catalog, "debateViews.holesBadge", { count: issueCount })}
         </span>
       </span>
     );
@@ -115,8 +130,8 @@ function OutlineScoringMetadata({
 
   if (scoringError) {
     return (
-      <span className="scoreBadge unavailable" aria-label={`Scoring unavailable: ${scoringError.reason}`}>
-        Scoring unavailable
+      <span className="scoreBadge unavailable" aria-label={t(catalog, "debateViews.scoringUnavailableReason", { reason: scoringError.reason })}>
+        {t(catalog, "debateViews.scoringUnavailable")}
       </span>
     );
   }
