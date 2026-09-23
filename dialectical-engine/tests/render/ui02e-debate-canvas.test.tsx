@@ -7,6 +7,8 @@ import {
 } from "../../apps/ui/lib/v3/adapter.js";
 import type { DebateNode } from "../../apps/ui/lib/types.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import debateViewsEnglish from "../../apps/ui/messages/en/debateViews.json" with { type: "json" };
+import { tPlural } from "../../apps/ui/lib/i18n/translate.js";
 
 const noop = () => {};
 const IDENTITY = "OpenAI · GPT · gpt-5";
@@ -126,14 +128,24 @@ describe("UI-02e renders the real DebateCanvas gate surface", () => {
 
   it("DR-184 T28 renders the immutable four-term standing census in the sticky control", () => {
     const html = renderedCanvas();
-    expect(html).toContain("3 claims across 1 levels · 1 judged · 1 standing on their arguments · 1 set aside");
+    expect(html).toContain([
+      tPlural(debateViewsEnglish, "debateViews.claimCount", 3, "en", { count: 3 }),
+      debateViewsEnglish["debateViews.across"],
+      tPlural(debateViewsEnglish, "debateViews.levelCount", 1, "en", { count: 1 }),
+      "·",
+      tPlural(debateViewsEnglish, "debateViews.judgedCount", 1, "en", { count: 1 }),
+      "·",
+      tPlural(debateViewsEnglish, "debateViews.standingCount", 1, "en", { count: 1 }),
+      "·",
+      tPlural(debateViewsEnglish, "debateViews.setAsideCount", 1, "en", { count: 1 })
+    ].join(" "));
   });
   it("pins maker identity at both the empty-state and contentful-card call sites", () => {
     const html = renderedCanvas();
 
     expect(html.match(new RegExp(IDENTITY, "g"))).toHaveLength(2);
     expect(html.match(/data-maker="OpenAI"/g)).toHaveLength(2);
-    expect(html).toContain("No strong argument found.");
+    expect(html).toContain(debateViewsEnglish["debateViews.noStrongArgument"]);
     expect(html).toContain("The position claim under test.");
   });
 

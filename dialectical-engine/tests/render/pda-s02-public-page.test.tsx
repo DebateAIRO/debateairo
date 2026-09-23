@@ -5,6 +5,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublicDebateSchema } from "@debateai/contract";
 import { PublicDebatePageClient } from "../../apps/ui/app/public/debate/[id]/PublicDebatePageClient.js";
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
+import timeEnglish from "../../apps/ui/messages/en/time.json" with { type: "json" };
+import debateChromeEnglish from "../../apps/ui/messages/en/debateChrome.json" with { type: "json" };
 
 const publicDebate = PublicDebateSchema.parse({
   public_ref: "22222222-2222-4222-8222-222222222222",
@@ -40,7 +43,15 @@ describe("S02 public debate answer surface", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    await act(async () => root!.render(<PublicDebatePageClient debate={publicDebate} />));
+    await act(async () => root!.render(
+      <PublicDebatePageClient
+        debate={publicDebate}
+        locale="en"
+        publicCatalog={publicEnglish}
+        timeCatalog={timeEnglish}
+        debateChromeCatalog={debateChromeEnglish}
+      />
+    ));
 
     const text = container.textContent ?? "";
     expect.soft(text).toContain(publicDebate.question);
@@ -53,6 +64,6 @@ describe("S02 public debate answer surface", () => {
     expect.soft(text).toContain("Countercase preserved");
     expect.soft(text).toContain("A later primary source could change the result.");
     expect.soft(text).toContain("A replicated contrary result.");
-    expect(text).toContain("may be indexed by search engines");
+    expect(text).toContain(publicEnglish["public.disclosure.indexing"]);
   });
 });

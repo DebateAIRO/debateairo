@@ -82,6 +82,10 @@ function lineHits(paths: string[], pattern: RegExp): string[] {
   return hits;
 }
 
+/** Catalogue-key literals are metadata, not executable SDK or consent-state reads. */
+const withoutConsentMessageKeys = (line: string): string =>
+  line.replace(/(["'])consent\.[^"']+\1/g, '""');
+
 /** `path:line: text` for every line of every file CONTAINING `token` verbatim. */
 function literalHits(paths: string[], token: string): string[] {
   const hits: string[] = [];
@@ -237,10 +241,16 @@ describe("S01-C7 the slice-wide guards", () => {
     // so a commented-out mutant would prove nothing. The reverse of that same
     // fact is a trap this slice has already paid for once: a comment must not
     // SPELL a banned token even to DENY it (CODE-S01-C5's JSDoc `.focus()`).
-    const hits = lineHits(
-      slicesOwnFiles(),
-      /gtag|googletagmanager|analytics\.|segment|mixpanel|posthog|amplitude|plausible|datadog|sentry|<script/i
-    );
+    const sdkPattern =
+      /gtag|googletagmanager|analytics\.|segment|mixpanel|posthog|amplitude|plausible|datadog|sentry|<script/i;
+    const hits: string[] = [];
+    for (const path of slicesOwnFiles()) {
+      read(path).split("\n").forEach((line, index) => {
+        if (sdkPattern.test(withoutConsentMessageKeys(line))) {
+          hits.push(`${path}:${index + 1}: ${line.trim()}`);
+        }
+      });
+    }
 
     expect(hits, `analytics/telemetry references in this slice's files:\n${hits.join("\n")}`).toEqual(
       []
@@ -289,9 +299,10 @@ describe("S01-C7 the slice-wide guards", () => {
       read(path)
         .split("\n")
         .forEach((line, index) => {
-          for (const match of line.matchAll(stored)) {
+          const executableLine = withoutConsentMessageKeys(line);
+          for (const match of executableLine.matchAll(stored)) {
             reads += 1;
-            const before = line.slice(0, match.index);
+            const before = executableLine.slice(0, match.index);
             const key = match[1]!;
             if (dataPosition(key).test(before) || typeofOperand.test(before)) continue;
             gates.push(`${path}:${index + 1}: ${line.trim()}`);

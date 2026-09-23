@@ -11,6 +11,7 @@ import { DebateMap } from "../../apps/ui/components/DebateMap.js";
 import { ModelMetaLine } from "../../apps/ui/components/ModelPresentation.js";
 import { SynthesisPanel } from "../../apps/ui/components/SynthesisPanel.js";
 import type { DebateNode } from "../../apps/ui/lib/types.js";
+import debateViewsEnglish from "../../apps/ui/messages/en/debateViews.json" with { type: "json" };
 
 const mocks = vi.hoisted(() => ({
   getDebateBundle: vi.fn(),
@@ -517,7 +518,9 @@ describe("card anatomy", () => {
     const container = await mountDebate(answerWithProAndCon());
     const card = container.querySelector<HTMLElement>('[data-bezel="shell"][data-stance="pro"]');
     const regenerate = [...(card?.querySelectorAll<HTMLButtonElement>("button") ?? [])]
-      .find((button) => button.textContent?.includes("↻ Regenerate"));
+      .find((button) => button.textContent?.includes(
+        `↻ ${debateViewsEnglish["debateViews.regenerate"]}`
+      ));
 
     expect(regenerate).toBeDefined();
     expect(regenerate?.hidden).toBe(false);
@@ -612,7 +615,7 @@ describe("set-aside and synthesis", () => {
     );
     const controls = container.querySelector(".nodeControls");
 
-    expect(controls?.textContent).toContain("🔒 Challenge");
-    expect(controls?.textContent).not.toContain("Regenerate");
+    expect(controls?.textContent).toContain(`🔒 ${debateViewsEnglish["debateViews.challenge"]}`);
+    expect(controls?.textContent).not.toContain(debateViewsEnglish["debateViews.regenerate"]);
   });
 });

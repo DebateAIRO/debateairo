@@ -136,8 +136,16 @@ export function supportSourceIdsSatisfyPolicy(
 export function selectSupportRecoveryEntry<T extends Readonly<{
   id: string;
   fallback?: string;
-}>>(entries: readonly T[],policy: SupportSourcePolicy | null): T | undefined {
-  if (policy === null) return entries[0];
+}>>(
+  entries: readonly T[],policy: SupportSourcePolicy | null,
+  preferredSourceIds: readonly string[] = []
+): T | undefined {
+  if (policy === null) {
+    const preferred = preferredSourceIds
+      .map((id) => entries.find((entry) => entry.id === id))
+      .find((entry) => entry?.fallback !== undefined);
+    return preferred ?? entries[0];
+  }
   if (!validSourcePolicy(policy)
     || !supportSourceIdsSatisfyPolicy(entries.map(({ id }) => id),policy)) return undefined;
   const recoveryId = policy.recoverySourceIds[0]!;

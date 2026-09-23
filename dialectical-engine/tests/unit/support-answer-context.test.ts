@@ -208,6 +208,55 @@ describe("CP1 composed answer context", () => {
     ]);
   });
 
+  it.each([
+    [
+      "en" as const,"Where can I find account deletion controls?","not-json",
+      "JSON_SYNTAX","settings-help-menus","delete-a-private-debate"
+    ],
+    [
+      "ro" as const,"Unde găsesc opțiunile de ștergere a contului?","not-json",
+      "JSON_SYNTAX","settings-help-menus","delete-a-private-debate"
+    ],
+    [
+      "en" as const,"Where can I learn how a debate works?",
+      JSON.stringify({ kind:"answer",text:"Use the general navigation." }),
+      "EXACT_KEY_SET","guide-how-it-works","app-navigation"
+    ],
+    [
+      "ro" as const,"Unde pot afla cum funcționează o dezbatere?",
+      JSON.stringify({ kind:"answer",text:"Folosește navigarea generală." }),
+      "EXACT_KEY_SET","guide-how-it-works","app-navigation"
+    ],
+  ])("recovers a malformed %s full-corpus draft to the requested guidance: %s",async (
+    language,text,draft,predicate,expectedSourceId,wrongSourceId
+  ) => {
+    const snapshot = productionReviewedCorpus();
+    const reportDraftDiagnostic = vi.fn();
+    const complete = vi.fn<SupportModelPort["complete"]>(async () => Object.freeze({ text:draft }));
+    const service = createSupportAnswerService({
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      reportDraftDiagnostic,modelReferenceFactory,
+      modelFor:() => Object.freeze({ complete }) as never,
+      clock:(() => { let at=Date.parse("2026-09-22T13:00:00.000Z");return () => new Date(++at); })()
+    });
+    const expected = snapshot.entries.find((candidate) =>
+      candidate.id === expectedSourceId && candidate.lang === language)!;
+    const wrong = snapshot.entries.find((candidate) =>
+      candidate.id === wrongSourceId && candidate.lang === language)!;
+
+    const result = await service.respond({
+      ...request(snapshot),text,language,detectedLanguage:language,signedIn:false
+    });
+
+    expect(complete).toHaveBeenCalledOnce();
+    expect(reportDraftDiagnostic).toHaveBeenCalledWith(expect.objectContaining({ predicate }));
+    expect(result).toMatchObject({
+      outcome:"ANSWER_GROUNDED",text:expected.fallback,
+      sources:[{ id:expectedSourceId }],actions:[]
+    });
+    expect(result.text).not.toBe(wrong.fallback);
+  });
+
   it("rejects unsupported destination promises through the actual answer boundary",async () => {
     const snapshot = corpus([
       Object.freeze({ ...entry("support-status-limits","Starea publică a serviciului și limitele Asistenței."),lang:"ro" as const }),

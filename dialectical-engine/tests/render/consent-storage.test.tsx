@@ -14,6 +14,8 @@ import {
   writeConsent,
   type ConsentDecision
 } from "../../apps/ui/lib/consent.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+import { t } from "../../apps/ui/lib/i18n/translate.js";
 
 // The acceptance command is pinned to the lane root, so source fixtures resolve
 // from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
@@ -262,34 +264,57 @@ describe("S01-C2 consent storage contract", () => {
     expect(COOKIE_CATEGORIES, "the three records, in the design's order").toEqual([
       {
         id: "essential",
-        name: "Essential",
-        tag: "ALWAYS ON",
-        description:
-          "Session, MFA state and the device record that lets you spot a login you do not recognise.",
-        detail: "de_session · de_mfa · de_device — 30 days",
+        nameKey: "consent.category.essential.name",
+        tagKey: "consent.category.alwaysOn",
+        descriptionKey: "consent.category.essential.description",
+        detailKey: "consent.category.essential.detail",
+        detailVars: { cookies: "de_session · de_mfa · de_device" },
         locked: true,
         defaultOn: true
       },
       {
         id: "quality",
-        name: "Model quality telemetry",
-        tag: "OPTIONAL",
-        description:
-          "Which arguments you challenge or flag, used to tune judge panels. Never tied to your debates’ text.",
-        detail: "de_quality — 90 days · first-party",
+        nameKey: "consent.category.quality.name",
+        tagKey: "consent.category.optional",
+        descriptionKey: "consent.category.quality.description",
+        detailKey: "consent.category.optional.detail",
+        detailVars: { cookie: "de_quality" },
         locked: false,
         defaultOn: true
       },
       {
         id: "analytics",
-        name: "Product analytics",
-        tag: "OPTIONAL",
-        description:
-          "Aggregate page and feature usage. No cross-site tracking, no advertising, never sold.",
-        detail: "de_analytics — 90 days · first-party",
+        nameKey: "consent.category.analytics.name",
+        tagKey: "consent.category.optional",
+        descriptionKey: "consent.category.analytics.description",
+        detailKey: "consent.category.optional.detail",
+        detailVars: { cookie: "de_analytics" },
         locked: false,
         defaultOn: false
       }
+    ]);
+
+    const strings = COOKIE_CATEGORIES.flatMap((category) => [
+      t(consentEnglish, category.nameKey),
+      t(consentEnglish, category.tagKey),
+      t(consentEnglish, category.descriptionKey),
+      t(consentEnglish, category.detailKey, category.detailVars)
+    ]);
+    expect(strings, "the twelve English catalogue strings in record order").toEqual([
+      consentEnglish["consent.category.essential.name"],
+      consentEnglish["consent.category.alwaysOn"],
+      consentEnglish["consent.category.essential.description"],
+      t(consentEnglish, "consent.category.essential.detail", {
+        cookies: "de_session · de_mfa · de_device"
+      }),
+      consentEnglish["consent.category.quality.name"],
+      consentEnglish["consent.category.optional"],
+      consentEnglish["consent.category.quality.description"],
+      t(consentEnglish, "consent.category.optional.detail", { cookie: "de_quality" }),
+      consentEnglish["consent.category.analytics.name"],
+      consentEnglish["consent.category.optional"],
+      consentEnglish["consent.category.analytics.description"],
+      t(consentEnglish, "consent.category.optional.detail", { cookie: "de_analytics" })
     ]);
 
     // The extract at design-data.js:89 holds the six-character ASCII escape
@@ -297,15 +322,11 @@ describe("S01-C2 consent storage contract", () => {
     // literal is correct (the language decodes it); copying it into JSON, a raw
     // template literal or JSX text ships six visible characters. These two
     // assertions fail either way round.
-    expect(COOKIE_CATEGORIES[1]!.description, "the apostrophe is decoded").toContain(
+    expect(strings[6], "the apostrophe is decoded").toContain(
       "debates’ text"
     );
-    for (const category of COOKIE_CATEGORIES) {
-      for (const value of [category.name, category.tag, category.description, category.detail]) {
-        expect(value, `${category.id}: no undecoded escape reaches the reader`).not.toMatch(
-          /\\u[0-9a-fA-F]{4}/
-        );
-      }
+    for (const value of strings) {
+      expect(value, "no undecoded escape reaches the reader").not.toMatch(/\\u[0-9a-fA-F]{4}/);
     }
 
     // The three ids are the three decision members, so a category and the
@@ -326,16 +347,17 @@ describe("S01-C2 consent storage contract", () => {
     // two categories share. That is what makes a V ruling on the cookie names a
     // one-line data edit rather than a component change.
     const source = moduleSource();
-    const strings = COOKIE_CATEGORIES.flatMap((category) => [
-      category.name,
-      category.tag,
-      category.description,
-      category.detail
+    const keys = COOKIE_CATEGORIES.flatMap((category) => [
+      category.nameKey,
+      category.tagKey,
+      category.descriptionKey,
+      category.detailKey
     ]);
     expect(strings, "twelve strings").toHaveLength(12);
-    for (const value of new Set(strings)) {
-      const used = strings.filter((candidate) => candidate === value).length;
-      expect(source.split(value).length - 1, `"${value}" occurs ${used}x in consent.ts`).toBe(used);
+    for (const key of new Set(keys)) {
+      const used = keys.filter((candidate) => candidate === key).length;
+      const quoted = `"${key}"`;
+      expect(source.split(quoted).length - 1, `${quoted} occurs ${used}x in consent.ts`).toBe(used);
     }
   });
 

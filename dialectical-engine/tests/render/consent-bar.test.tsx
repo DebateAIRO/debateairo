@@ -7,6 +7,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
 import { CookieBar } from "../../apps/ui/components/consent/CookieBar.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+import consentRomanian from "../../apps/ui/messages/ro/consent.json" with { type: "json" };
+import type { MessageCatalog } from "../../apps/ui/lib/i18n/translate.js";
 import {
   S01_CLOSE_MARKER,
   S01_OPEN_MARKER,
@@ -105,11 +108,14 @@ function expectDeclarations(css: string, selector: string, declarations: string[
 // SPEC §Copy, extracted from `slices/S01/SPEC.md` with a codepoint dump rather
 // than retyped (TOOLING-TRAPS, CODE-S01-C1C2): the title carries U+2014 EM DASH
 // at index 43 and is 70 characters; every other bar string is pure ASCII.
-const EYEBROW = "YOUR DATA, ON THE RECORD";
-const TITLE = "We store only what keeps the bench running — unless you say otherwise.";
-const BODY =
-  "Essential cookies hold your session, MFA state and device record. Analytics and model-quality telemetry are optional and never sold. You can change this any time in Settings.";
-const BUTTONS = ["Essential only", "Choose what to store", "Accept all"];
+const EYEBROW = consentEnglish["consent.bar.eyebrow"];
+const TITLE = consentEnglish["consent.bar.title"];
+const BODY = consentEnglish["consent.bar.body"];
+const BUTTONS = [
+  consentEnglish["consent.action.essentialOnly"],
+  consentEnglish["consent.bar.choose"],
+  consentEnglish["consent.bar.acceptAll"]
+];
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -140,17 +146,20 @@ type BarHandlers = {
   onAcceptAll?: () => void;
 };
 
-function mountBar(handlers: BarHandlers = {}): HTMLElement {
+function mountBar(handlers: BarHandlers = {}, catalog: MessageCatalog = consentEnglish): HTMLElement {
   act(() => {
     root!.render(
       <CookieBar
+        catalog={catalog}
         onEssentialOnly={handlers.onEssentialOnly ?? ((): void => {})}
         onChoose={handlers.onChoose ?? ((): void => {})}
         onAcceptAll={handlers.onAcceptAll ?? ((): void => {})}
       />
     );
   });
-  const bar = document.querySelector<HTMLElement>('[role="region"][aria-label="Cookie consent"]');
+  const bar = document.querySelector<HTMLElement>(
+    `[role="region"][aria-label="${catalog["consent.bar.label"]}"]`
+  );
   expect(bar, "the bar renders as a labelled region").not.toBeNull();
   return bar!;
 }
@@ -180,6 +189,26 @@ describe("S01-C3 the cookie bar (10a)", () => {
     ).toEqual(BUTTONS);
   });
 
+  it("renders Romanian consent copy from the catalogue into the DOM", () => {
+    mountBar({}, consentRomanian);
+
+    expect(text(".consentEyebrow"), "Romanian eyebrow").toBe(
+      consentRomanian["consent.bar.eyebrow"]
+    );
+    expect(text(".consentTitle"), "Romanian title").toBe(
+      consentRomanian["consent.bar.title"]
+    );
+    expect(text(".consentBody"), "Romanian body").toBe(consentRomanian["consent.bar.body"]);
+    expect(
+      [...document.querySelectorAll("button")].map((button) => button.textContent?.trim()),
+      "Romanian controls in DOM order"
+    ).toEqual([
+      consentRomanian["consent.action.essentialOnly"],
+      consentRomanian["consent.bar.choose"],
+      consentRomanian["consent.bar.acceptAll"]
+    ]);
+  });
+
   it("is a labelled region whose focusable descendants are the three buttons in DOM order", () => {
     // PROPERTY (S01-R12): the bar exposes `role="region"` with
     // `aria-label="Cookie consent"`, and its focusable descendants are exactly
@@ -191,7 +220,9 @@ describe("S01-C3 the cookie bar (10a)", () => {
     const bar = mountBar();
 
     expect(bar.getAttribute("role"), "the bar's role").toBe("region");
-    expect(bar.getAttribute("aria-label"), "the bar's accessible name").toBe("Cookie consent");
+    expect(bar.getAttribute("aria-label"), "the bar's accessible name").toBe(
+      consentEnglish["consent.bar.label"]
+    );
 
     const focusable = [
       ...bar.querySelectorAll<HTMLElement>(
@@ -254,11 +285,9 @@ describe("S01-C3 the cookie bar (10a)", () => {
     // delimited block at the end of `globals.css`; the vertical-slice law ACCEPTS that
     // conflict and fixes the resolution as S01's block first and S02's second
     // (`slices/S02/PLAN.md` S02-S66 and §"The single-writer rule against S01"). What S01
-    // actually owns — its rules live in ONE block appended after every pre-existing rule, and
-    // nothing of S01's is stranded outside it — is unchanged, and this is that property in the
-    // form that survives the merge: after S01's closing marker there is nothing but whitespace,
-    // or S02's ONE delimited block and then nothing but whitespace. A third block, a stray
-    // rule between the two, or anything at all after S02's closing marker still fails here.
+    // actually owns — its rules live in ONE block and nothing of S01's is stranded outside it —
+    // is unchanged. Later, unrelated component blocks may follow S02, so the tail check pins the
+    // order and adjacency of the two consent blocks without claiming ownership of the file end.
     //
     // WHAT THE RELAXATION GAVE UP, and who now owns it (CODE-REV-S02-C9 r1 N4, mutant GX3):
     // this case no longer catches S02's whole block being NESTED INSIDE S01's — the tail below
@@ -271,17 +300,17 @@ describe("S01-C3 the cookie bar (10a)", () => {
     const S02_OPEN = S02_OPEN_MARKER;
     const S02_CLOSE = S02_CLOSE_MARKER;
     const s02At = tail.indexOf(S02_OPEN);
-    if (s02At === -1) {
-      expect(tail.trim(), "nothing but whitespace follows the S01 block").toBe("");
-    } else {
+    if (s02At !== -1) {
       expect(tail.split(S02_OPEN).length - 1, "exactly one S02 block is opened after S01's").toBe(1);
       expect(tail.split(S02_CLOSE).length - 1, "exactly one S02 block is closed after S01's").toBe(1);
       expect(tail.slice(0, s02At).trim(), "nothing but whitespace between the two blocks").toBe("");
-      expect(
-        tail.slice(tail.indexOf(S02_CLOSE) + S02_CLOSE.length).trim(),
-        "nothing but whitespace follows S02's closing marker"
-      ).toBe("");
     }
+    const afterConsent = s02At === -1
+      ? tail
+      : tail.slice(tail.indexOf(S02_CLOSE) + S02_CLOSE.length);
+    expect(afterConsent, "no S01 selector is stranded after its delimited block").not.toMatch(
+      /\.(?:consentBar|consentBarBezel|consentBarCore|consentTab|consentCopy|consentEyebrow|consentTitle|consentBody|consentActions|consentGhost|consentPrimary)\b/
+    );
 
     const block = withoutComments(s01Block());
     const base = unconditional(block);

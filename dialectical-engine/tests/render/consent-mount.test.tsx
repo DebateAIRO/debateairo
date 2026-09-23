@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
 import { CookieConsent } from "../../apps/ui/components/consent/CookieConsent.js";
 import { ConsentSettingsPanel } from "../../apps/ui/components/consent/ConsentSettingsPanel.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
 
 /**
  * **Why the card is wrapped rather than driven through the keyboard.**
@@ -54,7 +55,7 @@ vi.mock("../../apps/ui/components/consent/CookiePreferencesCard.js", async () =>
 const layoutSource = (): string =>
   readFileSync(resolve(process.cwd(), "apps/ui/app/layout.tsx"), "utf8");
 const settingsSource = (): string =>
-  readFileSync(resolve(process.cwd(), "apps/ui/app/settings/page.tsx"), "utf8");
+  readFileSync(resolve(process.cwd(), "apps/ui/components/EvaluatorDevMenu.tsx"), "utf8");
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -396,13 +397,17 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     seed(false, true);
     mountSettings();
 
-    expect(document.querySelector(".setSectionTitle")?.textContent, "section title").toBe("Privacy");
+    expect(document.querySelector(".setSectionTitle")?.textContent, "section title").toBe(
+      consentEnglish["consent.settings.title"]
+    );
     expect(document.querySelector(".setSectionHint")?.textContent, "section hint").toBe(
-      "Choose what this browser stores. Asked once; change it here any time."
+      consentEnglish["consent.settings.hint"]
     );
     const opener = document.querySelector<HTMLButtonElement>("button.setBtn");
     expect(opener, "one .setBtn opener").not.toBeNull();
-    expect(opener!.textContent?.trim(), "its label").toBe("Cookie preferences");
+    expect(opener!.textContent?.trim(), "its label").toBe(
+      consentEnglish["consent.settings.button"]
+    );
     expect(card(), "no card before the button is pressed").toBeNull();
 
     act(() => opener!.click());

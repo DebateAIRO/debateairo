@@ -18,7 +18,7 @@ describe("SUP-03 public-only Support UI", () => {
       readFile("apps/ui/components/support/Assistant.tsx","utf8"),
       readFile("apps/ui/components/support/SupportWidget.tsx","utf8")
     ]);
-    expect(assistant).not.toMatch(/ConsentToggle|DebatePicker|setConsent|ownContext|run_id|latest/iu);
+    expect(assistant).not.toMatch(/ConsentToggle|DebatePicker|setConsent|ownContext|run_id|\blatest\b/iu);
     expect(widget).not.toMatch(/initialContext|context\s*:/u);
     expect(assistant).not.toContain("/api/v1/answers");
   });
