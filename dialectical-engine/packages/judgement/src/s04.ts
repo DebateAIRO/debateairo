@@ -157,11 +157,38 @@ function schemaResult<T>(decoded: unknown, strategy: "RAW" | "ONE_FENCE" | "BRAC
     : Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
 }
 
+const FENCE = "```";
+
+/**
+ * CI-1b (CodeQL js/polynomial-redos, PR #8): the ONE_FENCE strategy used to be
+ * `/^\s*```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i`. Its adjacent `\s*`, `\n?`
+ * and lazy body can split one run of blanks in quadratically many ways, and
+ * `content` is model text — "```" and 100 000 newlines took about 4.6 s. This
+ * returns the same capture in one linear pass, clause for clause:
+ * - `^\s*` and `\s*$`: `trim()` strips exactly the `\s` set;
+ * - the two fences: the trimmed text starts and ends with "```" and is at least
+ *   six characters long, so no backtick belongs to both fences;
+ * - `(?:json)?`: greedy, so a case-insensitive "json" right after the opening
+ *   fence is always taken — the closing fence can never begin inside it;
+ * - `\s*\n?`: greedy, so every blank after the tag goes (`trimStart()`);
+ * - the lazy body and `\n?`: the body stops before one newline that sits
+ *   against the closing fence, when the tag's blanks did not already take it.
+ */
+function oneFenceBody(content: string): string | null {
+  const text = content.trim();
+  if (text.length < 2 * FENCE.length || !text.startsWith(FENCE) || !text.endsWith(FENCE)) return null;
+  const tagEnd = /^json$/i.test(text.slice(FENCE.length, FENCE.length + 4))
+    ? FENCE.length + 4
+    : FENCE.length;
+  const body = text.slice(tagEnd, text.length - FENCE.length).trimStart();
+  return body.endsWith("\n") ? body.slice(0, -1) : body;
+}
+
 export function parseStructuredArtifact<T>(content: string, schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
   try { return schemaResult(JSON.parse(content), "RAW", schema); } catch { /* advance only on parse failure */ }
-  const fence = content.match(/^\s*```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
-  if (fence !== null) {
-    try { return schemaResult(JSON.parse(fence[1]!), "ONE_FENCE", schema); } catch { /* next strategy */ }
+  const fenced = oneFenceBody(content);
+  if (fenced !== null) {
+    try { return schemaResult(JSON.parse(fenced), "ONE_FENCE", schema); } catch { /* next strategy */ }
   }
   const balanced = firstBalancedObject(content);
   if (balanced !== null) {
