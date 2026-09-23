@@ -793,6 +793,20 @@ select {
   letter-spacing: .08em;
 }
 
+.supportCitation > [role="list"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.supportCitation [role="listitem"] {
+  padding: 5px 8px;
+  font-size: 9px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .supportCitation a {
   color: var(--link);
   font-size: 9px;
