@@ -21,6 +21,7 @@ PENDING is the best result this bench can give on its own, on purpose: it will o
 | Checked | Result |
 |---|---|
 | The work branch | `security/dev-sync-2026-09-18`, clean, **nothing pushed anywhere** |
+| GitHub switches | **23 September: secret scanning + push protection are ON** (your "go 1"). That was the one switch that had to precede the first push. The others wait for their own "go" |
 | This Mac's Node version (Node is the program that runs the code) | 26.8.2 — exactly what `dev` now requires |
 | `dev`, the main V3 line | has moved on by 36 commits since this branch last absorbed it |
 

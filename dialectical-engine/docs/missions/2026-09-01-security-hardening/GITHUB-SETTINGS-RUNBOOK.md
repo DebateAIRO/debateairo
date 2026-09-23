@@ -17,6 +17,8 @@
 | Code scanning alerts open on the default branch | 0 (CodeQL runs only in the security workflow, on the PR) |
 | Organisation-wide two-factor requirement | off (changing it needs the web interface; the CLI token has read-only organisation scope) |
 
+**Change log.** 2026-09-23 — secret scanning + push protection turned ON (owner's "go 1"; the Step 2 call, re-read as `enabled`/`enabled`). Everything else in the table above is unchanged.
+
 ## Step 1 — V-5: make `dev` the default branch
 
 Why: GitHub's scanners, dependency graph and alerts describe the default branch; today that is the wrong product. **Never merge `main` into `dev` or `dev` into `main`** — they are separate products until V3 replaces V2 on the new server.
