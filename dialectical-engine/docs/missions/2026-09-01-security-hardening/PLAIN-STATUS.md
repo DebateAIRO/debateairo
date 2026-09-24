@@ -21,7 +21,7 @@ PENDING is the best result this bench can give on its own, on purpose: it will o
 | Checked | Result |
 |---|---|
 | The work branch | **Merged into `dev` on 24 September** (pull request #8, merge commit `9c5ffd87`, your "merge") after GitHub's own checks went green: the gate, the secret scan of the change, and CodeQL — three slow regular expressions fixed in code, five alerts dismissed with written reasons on your "go 6" (one of them, #13, on your "won't fix" ruling). Everything this mission built is now in `dev` |
-| GitHub switches | **23 September: secret scanning + push protection are ON** (your "go 1"). That was the one switch that had to precede the first push. The others wait for their own "go" |
+| GitHub switches | **All done on 23–24 September** on your "go 1/4/5/7": secret scanning + push protection; private vulnerability reporting; the default-branch label on `dev` (back to `main` on release day); Dependabot security updates; the two branch rules (nobody deletes or rewrites `main`/`dev`; every change to `dev` goes through a pull request with the gate and the secret scan green — administrators may still bypass until go-live); the pinned-Actions policy. **One switch is yours to flip in the browser:** the organisation-wide two-factor requirement — both pre-checks now print 0, so nobody would be locked out |
 | This Mac's Node version (Node is the program that runs the code) | 26.8.2 — exactly what `dev` now requires |
 | `dev`, the main V3 line | has moved on by 36 commits since this branch last absorbed it |
 
@@ -203,7 +203,7 @@ Sizes are in "agent-days" — working sessions of an AI agent, not calendar days
 
 **Three things only you can do — they can start any time, in parallel:**
 
-1. Ask your colleague to turn on two-factor login; tell me when it is done; I check that nobody would be removed; you flip "require two-factor" in the organisation's settings.
+1. ~~Ask your colleague to turn on two-factor login~~ — done: on 24 September both checks print 0 (no member and no outside collaborator without two-factor). What is left is yours: flip "require two-factor authentication" in the organisation's settings (Settings → Authentication security).
 2. Choose the first AI vendors for the hosted site, open a paid API account with each, and set a monthly spending cap on each vendor's dashboard. Keep the keys to yourself — I never see them; you place them on the server yourself, following steps I write.
 3. When you are ready: the server (which provider, which operating system, and whether I get access or you run my steps).
 
