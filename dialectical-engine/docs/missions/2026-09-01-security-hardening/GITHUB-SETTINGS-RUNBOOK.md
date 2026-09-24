@@ -17,7 +17,7 @@
 | Code scanning alerts open on the default branch | 0 (CodeQL runs only in the security workflow, on the PR) |
 | Organisation-wide two-factor requirement | off (changing it needs the web interface; the CLI token has read-only organisation scope) |
 
-**Change log.** 2026-09-23 — secret scanning + push protection turned ON (owner's "go 1"; the Step 2 call, re-read as `enabled`/`enabled`). Everything else in the table above is unchanged.
+**Change log.** 2026-09-23 — secret scanning + push protection turned ON (owner's "go 1"; the Step 2 call, re-read as `enabled`/`enabled`). 2026-09-24 — Step 6 done on the owner's "go 6": #2, #3, #4 dismissed as false positives with the reason above; two alerts that first appeared when the synced branch was pushed were dismissed too — #15 (`js/insufficient-password-hash` on an HMAC cache key: false positive) and #13 (`js/missing-rate-limiting` on the session-cookie check: **won't fix**, owner's ruling) — reasons in `CODEQL-DISMISSALS-2026-09-23.md`; three `js/polynomial-redos` alerts were FIXED in code, not dismissed. 2026-09-24 05:01 UTC — **PR #8 merged into `dev`** (merge commit `9c5ffd87`) with the verify, secrets and CodeQL checks green. Steps 1, 2 (the two remaining switches), 3, 4, 5 and 7 are still to do, each on the owner's "go".
 
 ## Step 1 — V-5: make `dev` the default branch
 
