@@ -649,4 +649,71 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(ui.get("NEXT_PUBLIC_API_BASE")).toBe("/api");
     for (const [key] of ui) expect(key).not.toMatch(/KEK|DATABASE_URL|HATCHET|SECRET$/);
   });
+
+  /**
+   * Task 14 (DEPLOY1). The kit carried a "Known-stale sections" banner listing what a first
+   * provision would trip over. Each item is pinned here as fixed, and the banner is gone.
+   */
+  it("README: the Task 14 refresh — banner removed, every item it listed fixed", () => {
+    const readme = read("deploy/vps/README.md");
+    expect(readme).not.toContain("Known-stale sections");
+    const providers = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    for (const code of [
+      "PROVIDER_TARGET_PRICE_REQUIRED", "PROVIDER_TARGET_PRICE_ZERO",
+      "PROVIDER_DISCOVERY_TARGET_PRICE_INVALID", "COST_ENVELOPE_POLICY_UNRESOLVED",
+      "COST_ENVELOPE_POLICY_INVALID", "SUPPORT_ADMISSION_SCOPES_NOT_SEALED"
+    ]) expect(providers, code).toMatch(new RegExp(`\\| \`${code}`, "u"));
+    expect(providers).toContain('"input_price_micros_per_million":3000000');
+    expect(providers).toContain('"output_price_micros_per_million":15000000');
+    expect(readme).not.toMatch(/daily\s+call\s+cap\s+is\s+the\s+only\s+ceiling\s+until/u);
+    expect(readme).not.toMatch(/KEK rotation\*\* is not implemented/u);
+    expect(readme).toContain("pnpm keys:rotate-kek");
+    const layout = readme.slice(readme.indexOf("## 3. `/etc/debateai` layout"), readme.indexOf("### The key-file contract"));
+    expect(layout).toMatch(/\| `\/etc\/debateai\/api\/` \|[^\n]*`support-kek\.bin`/u);
+    expect(layout).toMatch(/SUPPORT_DATABASE_URL[^\n]*debateai_prod_api_support/u);
+  });
+
+  it("README: cost envelopes, register publication, rehearsals, V-9(a)(b), known limitations", () => {
+    const readme = read("deploy/vps/README.md");
+    for (const needle of [
+      // V-28: the temporary values for the owner's first paid run, and how they are superseded.
+      "`250000`", "`2000000`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false",
+      // The settings register on this host, and the rows a hosted start-up refuses without.
+      "### Publishing the settings register on this host", "costEnvelopePolicy", "admissionPolicy",
+      "configuredProviderSet", "There is no hosted publish command yet",
+      // Rehearsals as runbook steps.
+      "#### Rehearsing the rotation", "tests/unit/rotate-kek.test.ts", "#### The restore rehearsal",
+      // V-9(a)(b).
+      "V-9(a) and (b)", "ssh -L 8888:127.0.0.1:8888",
+      // Honest limitations for what the owner ruled out of this round.
+      "ASK_PLAN_TIER_MODEL_UNAVAILABLE", "Task 16", "V-26", "V-17", "B28", "Task 13",
+      // The provisioner's real command line, and the six principals provisioned expired.
+      "pnpm db:provision-principals --support-config-credential-file", "VALID UNTIL '-infinity'",
+      // The observation agent's database access, consistent with V-29.
+      "a narrow statistics window (V-29)"
+    ]) expect(readme, needle).toContain(needle);
+  });
+
+  /** Constraint 10, over the whole runbook now rather than one section. */
+  it("README: every fenced block is a paste-safe sh block or an explicit text block", () => {
+    const readme = read("deploy/vps/README.md");
+    const fences = [...readme.matchAll(/^```(\S*)$/gmu)].map((match) => match[1]);
+    expect(fences.length % 2).toBe(0);
+    for (let index = 0; index < fences.length; index += 2) {
+      expect(["sh", "text"], `opening fence #${index / 2}`).toContain(fences[index]);
+      expect(fences[index + 1], `closing fence #${index / 2}`).toBe("");
+    }
+    for (const block of readme.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      expect(block[1], block[1]).not.toMatch(/<[A-Za-z][A-Za-z0-9_-]*>/u);
+      expect(block[1], block[1]).not.toContain("→");
+    }
+  });
+
+  it("deploy/ never grants the observation principal pg_monitor or pg_read_all_stats (V-29)", () => {
+    for (const file of POSTGRES_FILES) {
+      if (!file.endsWith(".sql")) continue;
+      expect(sqlStatements(read(file)), file).not.toMatch(/\bpg_(monitor|read_all_stats)\b/iu);
+    }
+  });
 });
+

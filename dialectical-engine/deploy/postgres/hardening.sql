@@ -1,12 +1,12 @@
 -- deploy/postgres/hardening.sql
 -- Phase 2 of the cluster bring-up, run as the `postgres` OS user over the socket AFTER
 -- `pnpm db:migrate` (the capability roles below are created by the migrations) and BEFORE
--- `pnpm db:provision-principals` (README §5):
+-- `pnpm db:provision-principals` (README §4):
 --   sudo -u postgres psql -v ON_ERROR_STOP=1 -f hardening.sql
 -- Re-runnable. Every setting is DATABASE-level, never per-role: the provisioner clears role
 -- settings with `ALTER ROLE ... RESET ALL` and refuses managed principals that carry any
 -- (PRODUCTION_DATABASE_PRINCIPAL_DRIFT, audit L5-F6). The JIT migrator overrides the timeout
--- per session through its connection URL (`options=-c statement_timeout=0`, README §6).
+-- per session through its connection URL (`options=-c statement_timeout=0`, README §4).
 \set ON_ERROR_STOP on
 
 -- Who may connect at all. PUBLIC keeps CONNECT by default; close it, then open it for exactly the
