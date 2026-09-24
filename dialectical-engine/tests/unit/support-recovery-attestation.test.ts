@@ -56,6 +56,19 @@ const GUIDE_REVIEW = Object.freeze({
   ratifiedOn: "",
 });
 
+// 2026-09-24: the owner read the /ai-transparency article pair (EN + RO) in chat and
+// signed it; the review manifest records it as an OWNER review (reviewedBy "OWNER",
+// ratifiedBy "V") with a committed sign-off note as evidence. The catalogue as a whole
+// carries the same signature, its only change since the Sol review being that entry.
+const OWNER_REVIEW = Object.freeze({
+  reviewedBy: "OWNER",
+  reviewerSession: "64e6601d-82f1-4fa9-b44d-7ba92d6346ae (coordinator session; the owner read the EN and RO texts in chat and answered 'signed')",
+  reviewedOn: "2026-09-24",
+  evidence: "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-ai-transparency.md",
+  ratifiedBy: "V",
+  ratifiedOn: "2026-09-24",
+});
+
 const QUALITY_REVIEW = Object.freeze({
   reviewedBy: "SOL",
   reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
@@ -83,6 +96,8 @@ const EXPECTED = [
   ["account-access", "ro", "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410", "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98", "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0"],
   ["account-settings", "en", "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628", "67f5ce1fd18952c94a981f772e32e29c8c526b5591d656c202260486826a0d62", "6d99d7eeb445525b3bf3cf55f4283ee24fec536ff4f9ccc3a3b1f928904091bf"],
   ["account-settings", "ro", "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9", "f941492f0a6bed283a0fd70aa6ffeb20304b40c5bdfdd8e01f438cf3094f08f8", "1b7be7bebd1932a4630bea3df60d016218ecedca1ef538ac14510ef66d5f2aad"],
+  ["ai-transparency", "en", "e7deab21d5d105769017fc40431c26ec94f3b8ea4385b2547d0eceac8a7f92a6", "fc313334a897d806c7c968752fb16eac7cb8ca4e5535ae18dc7b1ff89362c879", "611cf0c13e949362a3bd17c4e1c899fa291b9f6ed249b007ecc216de7601999a"],
+  ["ai-transparency", "ro", "df69c138d5166b5070ff3156e2ce205e3f9509f7accb89fd4dcbe254af1f9822", "4c7cd7c97c6a43f34083acb72adb6dbf2f2fd4ad9b363601a7fb19d0f8ae7d7f", "ef0e8df3377df3e5c2cdb37ac04c4b1f479f5ec09c2ab1ba744773d8fc04fd82"],
   ["app-navigation", "en", "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db", "3f17d7323fcd88f34b6f9f1a4da904b0da28a18a09f6fa7f814e6333f4b83b29", "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d"],
   ["app-navigation", "ro", "a6f79cd55e0856780bff01ec3134df02a068b41453f44a8847c5c58050af8a23", "04001a0ddc6b3f743946fec81d2d3d5caed672f5f14d430eb3af74dc1421e3a3", "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde"],
   ["browse-public-debates", "en", "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad", "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034", "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"],
@@ -126,7 +141,7 @@ const EXPECTED = [
 ] as const;
 
 describe("production Support recovery attestation", () => {
-  it("admits the exact separately reviewed 44-record corpus as a deterministic immutable snapshot", () => {
+  it("admits the exact separately reviewed 46-record corpus as a deterministic immutable snapshot", () => {
     const componentBytes = readFileSync(componentPath);
     const components = JSON.parse(componentBytes.toString("utf8")) as {
       components: Array<{
@@ -152,7 +167,9 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(id === "debate-workspace-menus"
+        ...(id === "ai-transparency"
+          ? OWNER_REVIEW
+          : id === "debate-workspace-menus"
           ? QUALITY_REVIEW
           : id === "support-cases"
             ? QUALITY_SUPPLEMENT_REVIEW
@@ -167,29 +184,26 @@ describe("production Support recovery attestation", () => {
       schemaVersion: 2,
       catalog: {
         sha256:
-          "fab7050104b5cab6f861c59a9e72e824ace40a27278573c09dddbe71e1b51acc",
-        reviewedBy: GUIDE_REVIEW.reviewedBy,
-        reviewerSession: GUIDE_REVIEW.reviewerSession,
-        reviewedOn: GUIDE_REVIEW.reviewedOn,
-        evidence: GUIDE_REVIEW.evidence,
+          "ebf458f1cceb6aa5681534a391f239466f92d68680e21af448bd4b7225436032",
+        ...OWNER_REVIEW,
       },
       recovery: {
         componentFileSha256:
-          "aa94ff0592d41b399f38eb9be034b5e77ec2d350677e52b1e39852196245f9d9",
+          "06703ff9df60a0c77261e0ab57a36d3180e7b6823d235f2751d57e4cfa851ee1",
         components: expectedRows,
       },
     });
-    expect(corpus.reviewManifest.articles).toHaveLength(32);
+    expect(corpus.reviewManifest.articles).toHaveLength(34);
     expect(corpus.entries.map(({ id, lang }) => `${id}.${lang}`)).toEqual(
       EXPECTED.map(([id, lang]) => `${id}.${lang}`),
     );
     expect(corpus).toMatchObject({
-      shippedCount: 22,
+      shippedCount: 23,
       ignoredCount: 0,
-      previewReviewedCount: 16,
+      previewReviewedCount: 17,
       ownerRatifiedCount: 6,
-      recoveryReviewedCount: 22,
-      recoveryOwnerRatifiedCount: 0,
+      recoveryReviewedCount: 23,
+      recoveryOwnerRatifiedCount: 1,
     });
 
     for (const [index, expected] of EXPECTED.entries()) {

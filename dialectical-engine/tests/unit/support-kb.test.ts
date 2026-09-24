@@ -198,12 +198,12 @@ describe("Help Corpus loader", () => {
     };
     const componentBytes = readFileSync(componentPath);
 
-    expect(manifest.articles).toHaveLength(32);
+    expect(manifest.articles).toHaveLength(34);
     expect(manifest.recovery.componentFileSha256).toBe(sha256(componentBytes));
     const corpus = loadHelpCorpus(directory,{
       reviewManifest:manifest,recoveryComponents:componentBytes,requireReviewedRecovery:true
     } as never);
-    expect(corpus.recoveryReviewedCount).toBe(22);
+    expect(corpus.recoveryReviewedCount).toBe(23);
   });
 
   it("keeps changed and new real corpus drafts excluded until separate editorial review", () => {
@@ -242,8 +242,8 @@ describe("Help Corpus loader", () => {
       reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
       recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
     });
-    expect(corpus.entries).toHaveLength(44);
-    expect(corpus.recoveryReviewedCount).toBe(22);
+    expect(corpus.entries).toHaveLength(46);
+    expect(corpus.recoveryReviewedCount).toBe(23);
   });
 
   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {

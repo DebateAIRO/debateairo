@@ -1,11 +1,13 @@
 {
   "schemaVersion": 2,
   "catalog": {
-    "sha256": "fab7050104b5cab6f861c59a9e72e824ace40a27278573c09dddbe71e1b51acc",
-    "reviewedBy": "SOL",
-    "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-    "reviewedOn": "2026-09-17",
-    "evidence": "docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md"
+    "sha256": "ebf458f1cceb6aa5681534a391f239466f92d68680e21af448bd4b7225436032",
+    "reviewedBy": "OWNER",
+    "reviewerSession": "64e6601d-82f1-4fa9-b44d-7ba92d6346ae (coordinator session; the owner read the EN and RO texts in chat and answered 'signed')",
+    "reviewedOn": "2026-09-24",
+    "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-ai-transparency.md",
+    "ratifiedBy": "V",
+    "ratifiedOn": "2026-09-24"
   },
   "articles": [
     {
@@ -43,6 +45,28 @@
       "reviewerSession": "/root/plan_review",
       "reviewedOn": "2026-09-14",
       "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-p2.md"
+    },
+    {
+      "id": "ai-transparency",
+      "lang": "en",
+      "sha256": "e7deab21d5d105769017fc40431c26ec94f3b8ea4385b2547d0eceac8a7f92a6",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "64e6601d-82f1-4fa9-b44d-7ba92d6346ae (coordinator session; the owner read the EN and RO texts in chat and answered 'signed')",
+      "reviewedOn": "2026-09-24",
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-ai-transparency.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-09-24"
+    },
+    {
+      "id": "ai-transparency",
+      "lang": "ro",
+      "sha256": "df69c138d5166b5070ff3156e2ce205e3f9509f7accb89fd4dcbe254af1f9822",
+      "reviewedBy": "OWNER",
+      "reviewerSession": "64e6601d-82f1-4fa9-b44d-7ba92d6346ae (coordinator session; the owner read the EN and RO texts in chat and answered 'signed')",
+      "reviewedOn": "2026-09-24",
+      "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-ai-transparency.md",
+      "ratifiedBy": "V",
+      "ratifiedOn": "2026-09-24"
     },
     {
       "id": "app-navigation",
@@ -298,7 +322,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "aa94ff0592d41b399f38eb9be034b5e77ec2d350677e52b1e39852196245f9d9",
+    "componentFileSha256": "06703ff9df60a0c77261e0ab57a36d3180e7b6823d235f2751d57e4cfa851ee1",
     "components": [
       {
         "id": "account-access",
@@ -351,6 +375,32 @@
         "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
+      },
+      {
+        "id": "ai-transparency",
+        "lang": "en",
+        "articleSha256": "e7deab21d5d105769017fc40431c26ec94f3b8ea4385b2547d0eceac8a7f92a6",
+        "modelProjectionSha256": "fc313334a897d806c7c968752fb16eac7cb8ca4e5535ae18dc7b1ff89362c879",
+        "fallbackSha256": "611cf0c13e949362a3bd17c4e1c899fa291b9f6ed249b007ecc216de7601999a",
+        "reviewedBy": "OWNER",
+        "reviewerSession": "64e6601d-82f1-4fa9-b44d-7ba92d6346ae (coordinator session; the owner read the EN and RO texts in chat and answered 'signed')",
+        "reviewedOn": "2026-09-24",
+        "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-ai-transparency.md",
+        "ratifiedBy": "V",
+        "ratifiedOn": "2026-09-24"
+      },
+      {
+        "id": "ai-transparency",
+        "lang": "ro",
+        "articleSha256": "df69c138d5166b5070ff3156e2ce205e3f9509f7accb89fd4dcbe254af1f9822",
+        "modelProjectionSha256": "4c7cd7c97c6a43f34083acb72adb6dbf2f2fd4ad9b363601a7fb19d0f8ae7d7f",
+        "fallbackSha256": "ef0e8df3377df3e5c2cdb37ac04c4b1f479f5ec09c2ab1ba744773d8fc04fd82",
+        "reviewedBy": "OWNER",
+        "reviewerSession": "64e6601d-82f1-4fa9-b44d-7ba92d6346ae (coordinator session; the owner read the EN and RO texts in chat and answered 'signed')",
+        "reviewedOn": "2026-09-24",
+        "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-ai-transparency.md",
+        "ratifiedBy": "V",
+        "ratifiedOn": "2026-09-24"
       },
       {
         "id": "app-navigation",
