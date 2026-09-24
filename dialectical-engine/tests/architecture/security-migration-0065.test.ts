@@ -391,7 +391,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // is idempotent statement by statement, so a database that applied it
         // under the old name re-applies it harmlessly under this one (the runner
         // tracks migrations by full file name).
-        "0067_plan_tier_on_run.sql"
+        "0067_plan_tier_on_run.sql",
+        // V-29 (owner ruling 2026-09-22): the observation agent's statistics window
+        // replaces its pg_monitor membership. A new prefix, no pair.
+        "0068_observation_stats_window.sql"
       ]);
   });
 });

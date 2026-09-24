@@ -32,40 +32,15 @@ type CapacityRow = Readonly<{
   hatchet_database_bytes: number;
 }>;
 
+// V-29: the probe reads one definer-owned window (migrations/0068_observation_stats_window.sql)
+// that returns only these ten aggregated numbers. The agent's principal holds no
+// predefined role, so it can see neither other sessions' statement text nor their states
+// except through this window.
 export const POSTGRES_CAPACITY_SQL = `
-WITH activity AS MATERIALIZED (
-  SELECT datname,backend_type,state,wait_event_type,state_change,xact_start,
-         query_start
-  FROM pg_catalog.pg_stat_activity
-)
-SELECT
-  count(*) FILTER (WHERE backend_type='client backend')::double precision AS used_connections,
-  current_setting('max_connections')::double precision AS max_connections,
-  count(*) FILTER (
-    WHERE wait_event_type='Lock'
-      AND state_change <= clock_timestamp() - $1::double precision * interval '1 second'
-  )::double precision AS lock_waiters,
-  coalesce(max(extract(epoch FROM clock_timestamp() - state_change)) FILTER (
-    WHERE wait_event_type='Lock'
-      AND state_change <= clock_timestamp() - $1::double precision * interval '1 second'
-  ),0)::double precision AS longest_lock_wait_seconds,
-  coalesce(max(extract(epoch FROM clock_timestamp() - xact_start)) FILTER (
-    WHERE xact_start IS NOT NULL
-  ),0)::double precision AS longest_transaction_age_seconds,
-  coalesce(max(extract(epoch FROM clock_timestamp() - query_start)) FILTER (
-    WHERE state='active'
-  ),0)::double precision AS active_query_age_seconds,
-  count(*) FILTER (
-    WHERE state='idle in transaction'
-      AND state_change <= clock_timestamp() - $2::double precision * interval '1 second'
-  )::double precision AS idle_in_transaction_count,
-  coalesce(max(extract(epoch FROM clock_timestamp() - state_change)) FILTER (
-    WHERE state='idle in transaction'
-      AND state_change <= clock_timestamp() - $2::double precision * interval '1 second'
-  ),0)::double precision AS idle_in_transaction_age_seconds,
-  coalesce(pg_database_size('debateai'),0)::double precision AS debateai_database_bytes,
-  coalesce(pg_database_size('hatchet'),0)::double precision AS hatchet_database_bytes
-FROM activity
+SELECT used_connections,max_connections,lock_waiters,longest_lock_wait_seconds,
+       longest_transaction_age_seconds,active_query_age_seconds,idle_in_transaction_count,
+       idle_in_transaction_age_seconds,debateai_database_bytes,hatchet_database_bytes
+FROM obs.postgres_capacity($1::double precision,$2::double precision)
 `;
 
 function finite(value: unknown, key: string): number {
@@ -94,7 +69,6 @@ export async function readPostgresCapacity(
   return database.withClient(async (client) => {
     await client.query("BEGIN");
     await client.query("SET LOCAL statement_timeout = 2000");
-    await client.query("SET LOCAL ROLE pg_monitor");
     const result = await client.query<CapacityRow>(POSTGRES_CAPACITY_SQL, parameters);
     await client.query("COMMIT");
     const row = result.rows[0];
