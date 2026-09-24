@@ -153,8 +153,9 @@ describe("Help Corpus loader", () => {
 
     expect(corpus.entries).toHaveLength(12);
     expect(corpus.shippedCount).toBe(6);
-    expect(corpus.ignoredCount).toBe(16);
+    expect(corpus.ignoredCount).toBe(17);
     expect(corpus.entries.some(({ id }) => id === "product-identity")).toBe(false);
+    expect(corpus.entries.some(({ id }) => id === "ai-transparency")).toBe(false);
     for (const id of [
       "app-navigation","debate-workspace-menus","settings-help-menus","support-status-limits"
     ]) expect(corpus.entries.some((entry) => entry.id === id)).toBe(false);

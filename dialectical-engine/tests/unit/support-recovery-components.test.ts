@@ -169,6 +169,23 @@ describe("reviewed Support recovery components", () => {
     }
   });
 
+  it("carries an exact bilingual AI transparency draft for separate review", () => {
+    const document = JSON.parse(readFileSync(new URL(
+      "../../packages/support-kb/recovery/components.json",import.meta.url
+    ),"utf8")) as { components: Array<Readonly<{ id:string;lang:string;articleSha256:string;
+      modelProjection:string;fallback:string }>> };
+    const drafts = document.components.filter(({ id }) => id === "ai-transparency");
+    expect(drafts.map(({ lang }) => lang)).toEqual(["en","ro"]);
+    for (const component of drafts) {
+      const article = readFileSync(new URL(
+        `../../packages/support-kb/content/ai-transparency.${component.lang}.md`,import.meta.url
+      ));
+      expect(component.articleSha256).toBe(sha256(article));
+      expect(component.modelProjection).not.toBe("");
+      expect(component.fallback).not.toBe("");
+    }
+  });
+
   it("admits a complete exact-hash bilingual component set into an immutable snapshot", () => {
     const data = fixture();
     const corpus = loadHelpCorpus(data.directory,{
