@@ -148,6 +148,49 @@ describe("DL7-F9: the daemon can no longer re-rule its own monitor", () => {
       await fixture().pool.query("REVOKE INSERT ON observation.threshold_policy FROM PUBLIC");
     }
     expect(await replayMigration()).toBe("APPLIED");
+
+    // A column-level INSERT is invisible to has_table_privilege but still lets the daemon write
+    // a row naming only the columns it holds. Granted by ANOTHER grantor, it also survives the
+    // migration's own REVOKE (which removes only the migrating grantor's grants) — 0071 must see it.
+    const columns = "version,applied_at,ratified_by,source_ref,value_json";
+    await fixture().pool.query("CREATE ROLE dl7_f9_column_grantor NOLOGIN");
+    await fixture().pool.query(
+      `GRANT INSERT (${columns}) ON observation.threshold_policy TO dl7_f9_column_grantor WITH GRANT OPTION`
+    );
+    await fixture().pool.query("GRANT USAGE ON SCHEMA observation TO dl7_f9_column_grantor");
+    const grantor = await fixture().pool.connect();
+    try {
+      await grantor.query("SET ROLE dl7_f9_column_grantor");
+      await grantor.query(`GRANT INSERT (${columns}) ON observation.threshold_policy TO ${agentRole}`);
+      await grantor.query("RESET ROLE");
+    } finally {
+      grantor.release();
+    }
+    try {
+      await expect(fixture().pool.query(`
+        SELECT has_table_privilege('${agentRole}','observation.threshold_policy','INSERT') AS table_level,
+               has_any_column_privilege('${agentRole}','observation.threshold_policy','INSERT') AS column_level
+      `)).resolves.toMatchObject({ rows: [{ table_level: false, column_level: true }] });
+      expect(await replayMigration()).toMatch(/^OBS_AGENT_THRESHOLD_INSERT_RETAINED/u);
+    } finally {
+      await fixture().pool.query(
+        `REVOKE INSERT (${columns}) ON observation.threshold_policy FROM dl7_f9_column_grantor CASCADE`
+      );
+      await fixture().pool.query("REVOKE USAGE ON SCHEMA observation FROM dl7_f9_column_grantor");
+      await fixture().pool.query("DROP ROLE dl7_f9_column_grantor");
+    }
+    expect(await replayMigration()).toBe("APPLIED");
+
+    // Any role membership is a path 0071 cannot reason about (a role the daemon can SET to or
+    // inherit from could hold the INSERT), so the migration refuses it outright.
+    await fixture().pool.query("CREATE ROLE dl7_f9_indirect_path NOLOGIN");
+    await fixture().pool.query(`GRANT dl7_f9_indirect_path TO ${agentRole}`);
+    try {
+      expect(await replayMigration()).toMatch(/^OBS_AGENT_ROLE_MEMBERSHIP/u);
+    } finally {
+      await fixture().pool.query("DROP ROLE dl7_f9_indirect_path");
+    }
+    expect(await replayMigration()).toBe("APPLIED");
     await expect(fixture().pool.query(`
       SELECT has_table_privilege('${agentRole}','observation.threshold_policy','INSERT') AS can_insert,
              has_table_privilege('${agentRole}','observation.threshold_policy','SELECT') AS can_select

@@ -73,8 +73,12 @@ GRANT SELECT, INSERT ON observation.threshold_policy TO debateai_observation_thr
 REVOKE INSERT ON observation.threshold_policy FROM debateai_observation_agent;
 
 -- Guards. They refuse, never warn.
---   * The daemon must not be able to INSERT by any path: a grant from another grantor, a grant to
---     PUBLIC, or a role it can use. has_table_privilege answers for every one of them.
+--   * The daemon must not be able to INSERT by any path: a table-level grant from another
+--     grantor or to PUBLIC (has_table_privilege), a COLUMN-level grant, which has_table_privilege
+--     does not report but which still admits a row naming only those columns
+--     (has_any_column_privilege), or a role it belongs to. The daemon is NOINHERIT, but a role it
+--     can SET to could hold the INSERT, so any membership at all is refused rather than reasoned
+--     about: the agent is created with none.
 --   * The operator must hold nothing but SELECT and INSERT on that one table: an adopted,
 --     pre-existing role of the same name could carry more.
 --   * The operator must be in no role at all, predefined or ours.
@@ -82,7 +86,16 @@ DO $$
 DECLARE
   operator_extra text;
 BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members
+    WHERE member = 'debateai_observation_agent'::regrole
+  ) THEN
+    RAISE EXCEPTION 'OBS_AGENT_ROLE_MEMBERSHIP'
+      USING ERRCODE = '55000';
+  END IF;
   IF pg_catalog.has_table_privilege(
+    'debateai_observation_agent', 'observation.threshold_policy', 'INSERT'
+  ) OR pg_catalog.has_any_column_privilege(
     'debateai_observation_agent', 'observation.threshold_policy', 'INSERT'
   ) THEN
     RAISE EXCEPTION 'OBS_AGENT_THRESHOLD_INSERT_RETAINED'
