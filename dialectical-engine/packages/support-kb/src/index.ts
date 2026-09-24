@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { lstatSync, readFileSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { TextDecoder } from "node:util";
 
 import { TypedDomainError } from "@debateai/kernel";
@@ -31,12 +31,59 @@ export type HelpCorpusEntry = Readonly<{
   recoveryReview?: SupportRecoveryReview;
 }>;
 
-export type SupportReviewDetails = Readonly<{
+/**
+ * The review manifest (`packages/support-kb/reviews/manifest.json`) records who
+ * checked the exact bytes the corpus serves. Every record names one of two roles
+ * in `reviewedBy`:
+ *
+ * - `"SOL"`: the editorial role's review. Its shape is unchanged since 2026-09.
+ *   A catalog record is `{ sha256, reviewedBy, reviewerSession, reviewedOn,
+ *   evidence }`; an article record adds `id` and `lang`; a recovery row is
+ *   `{ id, lang, articleSha256, modelProjectionSha256, fallbackSha256,
+ *   reviewedBy, reviewerSession, reviewedOn, evidence, ratifiedBy, ratifiedOn }`
+ *   with `ratifiedBy` "V" or "" paired with `ratifiedOn`. A SOL `evidence` is a
+ *   non-blank locator the loader never opens (the 2026-09 SOL locators name files
+ *   that are not in the repository).
+ * - `"OWNER"`: the owner read the exact bytes and signed them. It has the keys
+ *   of the SOL record of its kind plus `ratifiedBy` and `ratifiedOn` on every
+ *   kind (recovery rows already carry both). `ratifiedBy` must be "V", the owner;
+ *   `ratifiedOn` is the ISO date of the signature and `reviewedOn` the ISO date
+ *   of the reading; `reviewerSession` is the session in which the owner signed;
+ *   `evidence` is a relative `docs/...` path to the committed sign-off, and the
+ *   loader refuses the record unless that path is a regular file under the
+ *   evidence root (`loadHelpCorpus`'s `evidenceRoot`, by default the working
+ *   directory the services resolve `packages/support-kb/` from). CI loads a clean
+ *   checkout, where only committed files exist, and the unit suite checks that
+ *   git tracks the evidence of every OWNER record in the real manifest.
+ *
+ * An OWNER record with a missing or ill-formed field is refused with a typed
+ * error naming `<record>.<field>`: `SUPPORT_KB_REVIEW_MANIFEST_INVALID` for the
+ * catalog and article records, `SUPPORT_KB_RECOVERY_REVIEW_INVALID` for recovery
+ * rows. kbVersion binds an OWNER article review as
+ * `review:<id>.<lang>:<sha256>:OWNER:<reviewerSession>:<reviewedOn>:<evidence>:V:<ratifiedOn>`;
+ * a SOL line keeps its 2026-09 form, without the last two fields.
+ */
+export type SupportReviewRole = "SOL" | "OWNER";
+
+/** `"SOL"`: the editorial role's review. */
+export type SupportSolReviewDetails = Readonly<{
   reviewedBy: "SOL";
   reviewerSession: string;
   reviewedOn: string;
   evidence: string;
 }>;
+
+/** `"OWNER"`: the owner read the exact bytes and signed them. */
+export type SupportOwnerReviewDetails = Readonly<{
+  reviewedBy: "OWNER";
+  reviewerSession: string;
+  reviewedOn: string;
+  evidence: string;
+  ratifiedBy: "V";
+  ratifiedOn: string;
+}>;
+
+export type SupportReviewDetails = SupportSolReviewDetails | SupportOwnerReviewDetails;
 
 export type SupportArticleReview = SupportReviewDetails & Readonly<{
   id: string;
@@ -109,6 +156,17 @@ const ENTRY_FILENAME = /^([a-z0-9]+(?:-[a-z0-9]+)*)\.(en|ro)\.md$/u;
 const ENTRY_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const RATIFIED_DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
+/** The owner, as the front matter's `ratified_by` and the recovery rows' `ratifiedBy` name them. */
+const OWNER = "V";
+/**
+ * An OWNER record's evidence: a relative path under docs/, with no absolute
+ * root, no `.`, `..` or hidden segment, and no `:` (kbVersion lines are `:`-joined).
+ */
+const OWNER_EVIDENCE_PATH = /^docs(?:\/[A-Za-z0-9_-][A-Za-z0-9._-]*)+$/u;
+const RECOVERY_REVIEW_KEYS = [
+  "articleSha256","evidence","fallbackSha256","id","lang","modelProjectionSha256",
+  "ratifiedBy","ratifiedOn","reviewedBy","reviewedOn","reviewerSession"
+] as const;
 const INSTRUCTION_LIKE_PATTERNS = [
   /\bignore\s+(?:(?:all|any)\s+)?(?:(?:of\s+)?(?:your|the)\s+)?previous\b/iu,
   /\bsystem\s*:/iu,
@@ -321,17 +379,67 @@ function recoveryReviewError(detail: string): never {
   throw new SupportKbError("SUPPORT_KB_RECOVERY_REVIEW_INVALID", detail);
 }
 
-function parseReviewDetails(value: unknown, subject: string): SupportReviewDetails {
+function isRegularFile(path: string): boolean {
+  try {
+    return lstatSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * An OWNER record: the owner read the exact bytes and signed them. `keys` is the
+ * record's complete key set; every refusal names the field at fault, through
+ * `refuse` (the code of the manifest section that holds the record).
+ */
+function parseOwnerReviewDetails(
+  record: Readonly<Record<string, unknown>>,
+  keys: readonly string[],
+  subject: string,
+  evidenceRoot: string,
+  refuse: (detail: string) => never,
+): SupportOwnerReviewDetails {
+  const present = Object.keys(record);
+  const unexpected = present.filter((key) => !keys.includes(key)).sort();
+  if (unexpected.length > 0) refuse(`${subject} is an OWNER record with unexpected keys: ${unexpected.join(", ")}`);
+  const missing = keys.filter((key) => !present.includes(key));
+  if (missing.length > 0) {
+    refuse(`${subject} is an OWNER record without ${missing.map((key) => `${subject}.${key}`).join(", ")}`);
+  }
+  const { reviewerSession, reviewedOn, evidence, ratifiedBy, ratifiedOn } = record;
+  if (typeof reviewerSession !== "string" || reviewerSession.trim() === "") {
+    refuse(`${subject}.reviewerSession must identify the session in which the owner signed`);
+  }
+  if (typeof reviewedOn !== "string" || !isIsoDate(reviewedOn)) refuse(`${subject}.reviewedOn must be an ISO date`);
+  if (ratifiedBy !== OWNER) refuse(`${subject}.ratifiedBy must name the owner, "${OWNER}"`);
+  if (typeof ratifiedOn !== "string" || !isIsoDate(ratifiedOn)) refuse(`${subject}.ratifiedOn must be an ISO date`);
+  if (typeof evidence !== "string" || !OWNER_EVIDENCE_PATH.test(evidence)) {
+    refuse(`${subject}.evidence must be a relative docs/ path to the owner's committed sign-off`);
+  }
+  if (!isRegularFile(join(evidenceRoot, evidence))) {
+    refuse(`${subject}.evidence names no regular file under the evidence root: ${evidence}`);
+  }
+  return Object.freeze({ reviewedBy: "OWNER", reviewerSession, reviewedOn, evidence, ratifiedBy, ratifiedOn });
+}
+
+function parseReviewDetails(value: unknown, subject: string, evidenceRoot: string): SupportReviewDetails {
   if (typeof value !== "object" || value === null) reviewManifestError(`${subject} must be an object`);
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record).sort();
   const allowed = subject === "catalog"
     ? ["evidence", "reviewedBy", "reviewedOn", "reviewerSession", "sha256"]
     : ["evidence", "id", "lang", "reviewedBy", "reviewedOn", "reviewerSession", "sha256"];
+  if (record.reviewedBy === "OWNER") {
+    return parseOwnerReviewDetails(
+      record, [...allowed, "ratifiedBy", "ratifiedOn"], subject, evidenceRoot, reviewManifestError,
+    );
+  }
   if (keys.length !== allowed.length || keys.some((key, index) => key !== allowed[index])) {
     reviewManifestError(`${subject} has unexpected or missing keys`);
   }
-  if (record.reviewedBy !== "SOL") reviewManifestError(`${subject}.reviewedBy must identify the Sol editorial role`);
+  if (record.reviewedBy !== "SOL") {
+    reviewManifestError(`${subject}.reviewedBy must be SOL (the editorial role) or OWNER (the owner's signature)`);
+  }
   if (typeof record.reviewerSession !== "string" || record.reviewerSession.trim() === "") {
     reviewManifestError(`${subject}.reviewerSession must identify the actual review session`);
   }
@@ -349,7 +457,7 @@ function parseReviewDetails(value: unknown, subject: string): SupportReviewDetai
   });
 }
 
-function parseReviewManifest(value: unknown): SupportReviewManifest {
+function parseReviewManifest(value: unknown, evidenceRoot: string): SupportReviewManifest {
   if (value === undefined) return EMPTY_REVIEW_MANIFEST;
   if (typeof value !== "object" || value === null) reviewManifestError("manifest must be an object");
   const record = value as Record<string, unknown>;
@@ -364,14 +472,14 @@ function parseReviewManifest(value: unknown): SupportReviewManifest {
     reviewManifestError("manifest has an invalid schema or key set");
   }
   const catalogRecord = record.catalog as Record<string, unknown>;
-  const catalogDetails = parseReviewDetails(catalogRecord, "catalog");
+  const catalogDetails = parseReviewDetails(catalogRecord, "catalog", evidenceRoot);
   if (typeof catalogRecord.sha256 !== "string" || !SHA256.test(catalogRecord.sha256)) {
     reviewManifestError("catalog.sha256 must be lowercase SHA256");
   }
   const seen = new Set<string>();
   const articles = record.articles.map((value, index) => {
     const subject = `articles[${index}]`;
-    const details = parseReviewDetails(value, subject);
+    const details = parseReviewDetails(value, subject, evidenceRoot);
     const article = value as Record<string, unknown>;
     if (typeof article.id !== "string" || !ENTRY_ID.test(article.id)) {
       reviewManifestError(`${subject}.id must be a lowercase slug`);
@@ -409,21 +517,23 @@ function parseReviewManifest(value: unknown): SupportReviewManifest {
       const subject = `recovery.components[${index}]`;
       if (value === null || typeof value !== "object" || Array.isArray(value)) recoveryReviewError(`${subject} must be an object`);
       const row = value as Record<string,unknown>;
-      const allowed = [
-        "articleSha256","evidence","fallbackSha256","id","lang","modelProjectionSha256",
-        "ratifiedBy","ratifiedOn","reviewedBy","reviewedOn","reviewerSession"
-      ];
-      if (Object.keys(row).sort().join(",") !== allowed.join(",")) recoveryReviewError(`${subject} has an invalid key set`);
+      // An OWNER row is checked first, so a missing field is refused by name.
+      const ownerDetails = row.reviewedBy === "OWNER"
+        ? parseOwnerReviewDetails(row,RECOVERY_REVIEW_KEYS,subject,evidenceRoot,recoveryReviewError)
+        : undefined;
+      if (Object.keys(row).sort().join(",") !== RECOVERY_REVIEW_KEYS.join(",")) {
+        recoveryReviewError(`${subject} has an invalid key set`);
+      }
       if (typeof row.id !== "string" || !ENTRY_ID.test(row.id)) recoveryReviewError(`${subject}.id is invalid`);
       if (row.lang !== "en" && row.lang !== "ro") recoveryReviewError(`${subject}.lang is invalid`);
       for (const key of ["articleSha256","modelProjectionSha256","fallbackSha256"] as const) {
         if (typeof row[key] !== "string" || !SHA256.test(row[key])) recoveryReviewError(`${subject}.${key} is invalid`);
       }
-      const details = parseReviewDetails({
+      const details = ownerDetails ?? parseReviewDetails({
         id: row.id,lang: row.lang,sha256: row.articleSha256,
         reviewedBy: row.reviewedBy,reviewerSession: row.reviewerSession,
         reviewedOn: row.reviewedOn,evidence: row.evidence
-      },subject);
+      },subject,evidenceRoot);
       if ((row.ratifiedBy !== "" && row.ratifiedBy !== "V")
         || typeof row.ratifiedOn !== "string"
         || (row.ratifiedOn !== "" && !isIsoDate(row.ratifiedOn))
@@ -458,9 +568,16 @@ export function loadHelpCorpus(
     reviewManifest?: unknown;
     recoveryComponents?: string | Buffer;
     requireReviewedRecovery?: boolean;
+    /**
+     * The directory an OWNER record's `evidence` (`docs/...`) is relative to: the
+     * dialectical-engine root. Defaults to the working directory, the base the
+     * services already resolve `packages/support-kb/` from. SOL evidence is never
+     * opened, so it does not depend on this.
+     */
+    evidenceRoot?: string;
   }> = {},
 ): LoadedHelpCorpus {
-  const reviewManifest = parseReviewManifest(options.reviewManifest);
+  const reviewManifest = parseReviewManifest(options.reviewManifest, resolve(options.evidenceRoot ?? "."));
   const catalogDigest = sha256(SUPPORT_CATALOG_CANONICAL);
   const directoryEntries = (() => {
     try {
@@ -555,8 +672,10 @@ export function loadHelpCorpus(
       previewReviewedCount += 1;
       for (const review of [enReview, roReview] as const) {
         if (review === undefined) continue;
+        // The owner's signature is part of what admitted the pair; a SOL line keeps its 2026-09 form.
         selectedReviewLines.push(
-          `review:${review.id}.${review.lang}:${review.sha256}:${review.reviewedBy}:${review.reviewerSession}:${review.reviewedOn}:${review.evidence}`,
+          `review:${review.id}.${review.lang}:${review.sha256}:${review.reviewedBy}:${review.reviewerSession}:${review.reviewedOn}:${review.evidence}`
+          + (review.reviewedBy === "OWNER" ? `:${review.ratifiedBy}:${review.ratifiedOn}` : ""),
         );
       }
     } else {

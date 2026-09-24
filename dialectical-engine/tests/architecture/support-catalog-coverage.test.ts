@@ -33,6 +33,7 @@ describe("Support catalog route coverage", () => {
     expect(SUPPORT_PAGE_ROUTES).toEqual([
       "/",
       "/admin/workers",
+      "/ai-transparency",
       "/debate/[id]",
       "/enroll-mfa",
       "/help",
@@ -74,6 +75,13 @@ describe("Support catalog route coverage", () => {
   it("keeps product identity public, actionless, and backed by one bilingual article", () => {
     expect(SUPPORT_CAPABILITIES.find(({ id }) => id === "product-identity")).toMatchObject({
       availability: "public",actionIds: [],articleIds: ["product-identity"]
+    });
+  });
+
+  it("keeps the AI transparency page public, actionless, and backed by one bilingual article", () => {
+    expect(SUPPORT_CAPABILITIES.find(({ id }) => id === "ai-transparency")).toMatchObject({
+      route: "/ai-transparency",audience: "any",availability: "public",
+      actionIds: [],articleIds: ["ai-transparency"]
     });
   });
 

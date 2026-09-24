@@ -453,7 +453,7 @@ describe("CP1 support model response policy", () => {
       ...SUPPORT_ACTION_CATALOG.flatMap(({ labels }) => [labels.en,labels.ro]),
       ...SUPPORT_CAPABILITIES.flatMap(({ labels }) => [labels.en,labels.ro])
     ];
-    expect(labels).toHaveLength(60);
+    expect(labels).toHaveLength(62);
     for (const label of labels) {
       expect(parseSupportDraft(raw(`Available feature: ${label}.`,{ actionIds: [] })),label)
         .not.toBeNull();

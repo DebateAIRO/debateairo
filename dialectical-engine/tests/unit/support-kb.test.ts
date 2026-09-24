@@ -1,7 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -83,11 +84,12 @@ function reviewedManifest(
   };
   return {
     schemaVersion: 1,
+    // A SOL record; the overrides may deliberately break it for the refusal rows.
     catalog: {
       sha256: sha256(SUPPORT_CATALOG_CANONICAL),
       ...review,
       ...overrides,
-    },
+    } as SupportReviewManifest["catalog"],
     articles: articles.map(({ id, lang, bytes }) => ({
       id,
       lang,
@@ -95,6 +97,66 @@ function reviewedManifest(
       ...review,
     })),
   };
+}
+
+/** The dialectical-engine root: the base the real manifest's evidence paths are relative to. */
+const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const OWNER_EVIDENCE = "docs/support-kb/owner-signoff.md";
+const OWNER_SIGNATURE = Object.freeze({
+  reviewedBy: "OWNER",
+  reviewerSession: "owner-signoff-session",
+  reviewedOn: "2026-09-24",
+  evidence: OWNER_EVIDENCE,
+  ratifiedBy: "V",
+  ratifiedOn: "2026-09-24",
+});
+
+type ReviewRow = Record<string, unknown>;
+
+/** A scratch evidence root holding each relative path as a regular file. */
+function evidenceRootWith(...relativePaths: readonly string[]): string {
+  const root = fixtureDirectory();
+  for (const relativePath of relativePaths) {
+    mkdirSync(dirname(join(root, relativePath)), { recursive: true });
+    writeFileSync(join(root, relativePath), "The owner read the exact bytes and signed.\n");
+  }
+  return root;
+}
+
+/** Applies an override to a review row; an `undefined` value removes that key. */
+function amend(row: ReviewRow, override: ReviewRow): ReviewRow {
+  return Object.fromEntries(
+    Object.entries({ ...row, ...override }).filter(([, value]) => value !== undefined),
+  );
+}
+
+function ownerSignedManifest(
+  articles: readonly Readonly<{ id: string; lang: "en" | "ro"; bytes: string | Buffer }>[],
+  catalogOverride: ReviewRow = {},
+): { schemaVersion: 1; catalog: ReviewRow; articles: ReviewRow[] } {
+  return {
+    schemaVersion: 1,
+    catalog: amend({ sha256: sha256(SUPPORT_CATALOG_CANONICAL), ...OWNER_SIGNATURE }, catalogOverride),
+    articles: articles.map(({ id, lang, bytes }) => ({ id, lang, sha256: sha256(bytes), ...OWNER_SIGNATURE })),
+  };
+}
+
+/** `<subject>: <evidence>` for every OWNER record whose evidence git does not track. */
+function untrackedOwnerEvidence(manifest: unknown, tracked: ReadonlySet<string>): string[] {
+  const document = manifest as {
+    catalog?: ReviewRow;
+    articles?: ReviewRow[];
+    recovery?: { components?: ReviewRow[] };
+  };
+  const rows: [string, ReviewRow][] = [
+    ...(document.catalog === undefined ? [] : [["catalog", document.catalog] as [string, ReviewRow]]),
+    ...(document.articles ?? []).map((row, index): [string, ReviewRow] => [`articles[${index}]`, row]),
+    ...(document.recovery?.components ?? []).map((row, index): [string, ReviewRow] =>
+      [`recovery.components[${index}]`, row]),
+  ];
+  return rows
+    .filter(([, row]) => row.reviewedBy === "OWNER" && !tracked.has(String(row.evidence)))
+    .map(([subject, row]) => `${subject}: ${String(row.evidence)}`);
 }
 
 afterEach(() => {
@@ -136,12 +198,12 @@ describe("Help Corpus loader", () => {
     };
     const componentBytes = readFileSync(componentPath);
 
-    expect(manifest.articles).toHaveLength(32);
+    expect(manifest.articles).toHaveLength(34);
     expect(manifest.recovery.componentFileSha256).toBe(sha256(componentBytes));
     const corpus = loadHelpCorpus(directory,{
       reviewManifest:manifest,recoveryComponents:componentBytes,requireReviewedRecovery:true
     } as never);
-    expect(corpus.recoveryReviewedCount).toBe(22);
+    expect(corpus.recoveryReviewedCount).toBe(23);
   });
 
   it("keeps changed and new real corpus drafts excluded until separate editorial review", () => {
@@ -153,8 +215,9 @@ describe("Help Corpus loader", () => {
 
     expect(corpus.entries).toHaveLength(12);
     expect(corpus.shippedCount).toBe(6);
-    expect(corpus.ignoredCount).toBe(16);
+    expect(corpus.ignoredCount).toBe(17);
     expect(corpus.entries.some(({ id }) => id === "product-identity")).toBe(false);
+    expect(corpus.entries.some(({ id }) => id === "ai-transparency")).toBe(false);
     for (const id of [
       "app-navigation","debate-workspace-menus","settings-help-menus","support-status-limits"
     ]) expect(corpus.entries.some((entry) => entry.id === id)).toBe(false);
@@ -179,8 +242,8 @@ describe("Help Corpus loader", () => {
       reviewManifest: JSON.parse(readFileSync(manifestPath,"utf8")) as unknown,
       recoveryComponents: readFileSync(componentPath),requireReviewedRecovery: true
     });
-    expect(corpus.entries).toHaveLength(44);
-    expect(corpus.recoveryReviewedCount).toBe(22);
+    expect(corpus.entries).toHaveLength(46);
+    expect(corpus.recoveryReviewedCount).toBe(23);
   });
 
   it("serves only complete bilingual pairs that are shipped and V-ratified, counting every other id as ignored", () => {
@@ -581,5 +644,217 @@ describe("Help Corpus loader", () => {
         code: "SUPPORT_KB_FILENAME_MISMATCH",
       }),
     );
+  });
+});
+
+describe("OWNER review records: the owner read the exact bytes and signed", () => {
+  function ownerSignedPair(directory: string) {
+    const en = writeEntry(directory, { id: "owner-signed", lang: "en", ratifiedBy: "", ratifiedOn: "" });
+    const ro = writeEntry(directory, { id: "owner-signed", lang: "ro", ratifiedBy: "", ratifiedOn: "" });
+    return [
+      { id: "owner-signed", lang: "en" as const, bytes: en },
+      { id: "owner-signed", lang: "ro" as const, bytes: ro },
+    ];
+  }
+
+  it("admits an unratified pair on the owner's signed review of the catalog and both articles", () => {
+    // Catches an owner signature being refused, rewritten while parsing, or left out of kbVersion.
+    const directory = fixtureDirectory();
+    const pair = ownerSignedPair(directory);
+    const reviewManifest = ownerSignedManifest(pair);
+
+    const corpus = loadHelpCorpus(directory, { reviewManifest, evidenceRoot: evidenceRootWith(OWNER_EVIDENCE) });
+
+    expect(corpus.entries.map(({ id, lang }) => `${id}.${lang}`)).toEqual(["owner-signed.en", "owner-signed.ro"]);
+    expect(corpus.previewReviewedCount).toBe(1);
+    expect(corpus.ownerRatifiedCount).toBe(0);
+    expect(corpus.reviewManifest).toStrictEqual(reviewManifest);
+    const signature = `OWNER:owner-signoff-session:2026-09-24:${OWNER_EVIDENCE}:V:2026-09-24`;
+    const expected = [
+      `catalog:${sha256(SUPPORT_CATALOG_CANONICAL)}`,
+      ...pair.map(({ id, lang, bytes }) => `${id}.${lang}.md:${sha256(bytes)}`),
+      ...pair.map(({ id, lang, bytes }) => `review:${id}.${lang}:${sha256(bytes)}:${signature}`),
+    ].join("\n");
+    expect(corpus.manifest).toBe(expected);
+    expect(corpus.kbVersion).toBe(sha256(expected));
+  });
+
+  it("accepts an owner-signed catalog beside the editorial role's own article reviews", () => {
+    // The shape a changed catalog takes once the owner signs it: the SOL article rows stay exactly as written.
+    const directory = fixtureDirectory();
+    const en = writeEntry(directory, { id: "sol-reviewed", lang: "en", ratifiedBy: "", ratifiedOn: "" });
+    const ro = writeEntry(directory, { id: "sol-reviewed", lang: "ro", ratifiedBy: "", ratifiedOn: "" });
+    const solReviewed = reviewedManifest([
+      { id: "sol-reviewed", lang: "en", bytes: en },
+      { id: "sol-reviewed", lang: "ro", bytes: ro },
+    ]);
+    const reviewManifest = {
+      ...solReviewed,
+      catalog: { sha256: sha256(SUPPORT_CATALOG_CANONICAL), ...OWNER_SIGNATURE },
+    };
+
+    const corpus = loadHelpCorpus(directory, { reviewManifest, evidenceRoot: evidenceRootWith(OWNER_EVIDENCE) });
+
+    expect(corpus.previewReviewedCount).toBe(1);
+    expect(corpus.reviewManifest).toStrictEqual(reviewManifest);
+    expect(corpus.manifest.split("\n").filter((line) => line.startsWith("review:"))).toEqual(
+      solReviewed.articles.map((row) =>
+        `review:${row.id}.${row.lang}:${row.sha256}:SOL:/root/editorial-review:2026-09-14:${row.evidence}`),
+    );
+  });
+
+  it.each([
+    { name: "without ratifiedBy", override: { ratifiedBy: undefined }, field: "catalog.ratifiedBy" },
+    { name: "with a blank ratifiedBy", override: { ratifiedBy: "" }, field: "catalog.ratifiedBy" },
+    { name: "signed in a name other than the owner's", override: { ratifiedBy: "SOL" }, field: "catalog.ratifiedBy" },
+    { name: "without ratifiedOn", override: { ratifiedOn: undefined }, field: "catalog.ratifiedOn" },
+    { name: "with a ratifiedOn that is not a date", override: { ratifiedOn: "2026-02-30" }, field: "catalog.ratifiedOn" },
+    { name: "without reviewerSession", override: { reviewerSession: undefined }, field: "catalog.reviewerSession" },
+    { name: "with a blank reviewerSession", override: { reviewerSession: "  " }, field: "catalog.reviewerSession" },
+    { name: "with a reviewedOn that is not a date", override: { reviewedOn: "yesterday" }, field: "catalog.reviewedOn" },
+    { name: "without evidence", override: { evidence: undefined }, field: "catalog.evidence" },
+    { name: "whose evidence file is missing", override: { evidence: "docs/support-kb/never-written.md" }, field: "catalog.evidence" },
+    { name: "whose evidence lies outside docs/", override: { evidence: ".hermes/owner-signoff.md" }, field: "catalog.evidence" },
+    { name: "whose evidence climbs out of docs/", override: { evidence: "docs/../package.json" }, field: "catalog.evidence" },
+    { name: "whose evidence is a directory", override: { evidence: "docs/support-kb" }, field: "catalog.evidence" },
+    { name: "with a key the record shape does not have", override: { signedBy: "V" }, field: "signedBy" },
+  ])("refuses an OWNER catalog record $name, naming $field", ({ override, field }) => {
+    // Catches an incomplete owner signature being accepted, or refused without saying which field is wrong.
+    const directory = fixtureDirectory();
+    // Every decoy a row points at exists, so each refusal is about the record, never a missing decoy.
+    const evidenceRoot = evidenceRootWith(OWNER_EVIDENCE, ".hermes/owner-signoff.md", "package.json");
+
+    expect(() => loadHelpCorpus(directory, {
+      reviewManifest: ownerSignedManifest(ownerSignedPair(directory), override),
+      evidenceRoot,
+    })).toThrowError(expect.objectContaining({
+      name: "TypedDomainError",
+      code: "SUPPORT_KB_REVIEW_MANIFEST_INVALID",
+      message: expect.stringContaining(field),
+    }));
+  });
+
+  it("refuses an OWNER catalog record whose evidence is an absolute path, naming catalog.evidence", () => {
+    // Catches a machine-specific locator standing in for a file committed under docs/.
+    const directory = fixtureDirectory();
+    const evidenceRoot = evidenceRootWith(OWNER_EVIDENCE);
+
+    expect(() => loadHelpCorpus(directory, {
+      reviewManifest: ownerSignedManifest(ownerSignedPair(directory), {
+        evidence: join(evidenceRoot, OWNER_EVIDENCE),
+      }),
+      evidenceRoot,
+    })).toThrowError(expect.objectContaining({
+      code: "SUPPORT_KB_REVIEW_MANIFEST_INVALID",
+      message: expect.stringContaining("catalog.evidence"),
+    }));
+  });
+
+  it.each([
+    { name: "without ratifiedBy", override: { ratifiedBy: undefined }, field: "articles[1].ratifiedBy" },
+    { name: "with a ratifiedOn that is not a date", override: { ratifiedOn: "24.09.2026" }, field: "articles[1].ratifiedOn" },
+    { name: "without evidence", override: { evidence: undefined }, field: "articles[1].evidence" },
+    { name: "whose evidence file is missing", override: { evidence: "docs/support-kb/never-written.md" }, field: "articles[1].evidence" },
+  ])("refuses an OWNER article record $name, naming $field", ({ override, field }) => {
+    // Catches the owner-signature rules applying to the catalog record only.
+    const directory = fixtureDirectory();
+    const reviewManifest = ownerSignedManifest(ownerSignedPair(directory));
+    reviewManifest.articles[1] = amend(reviewManifest.articles[1] ?? {}, override);
+
+    expect(() => loadHelpCorpus(directory, {
+      reviewManifest,
+      evidenceRoot: evidenceRootWith(OWNER_EVIDENCE),
+    })).toThrowError(expect.objectContaining({
+      name: "TypedDomainError",
+      code: "SUPPORT_KB_REVIEW_MANIFEST_INVALID",
+      message: expect.stringContaining(field),
+    }));
+  });
+
+  it("keeps an editorial-role (SOL) record exactly as before: its kbVersion line, and a locator never opened", () => {
+    // The 2026-09 SOL records cite evidence files that are not in the repository; they must load as written.
+    const directory = fixtureDirectory();
+    const en = writeEntry(directory, { id: "sol-reviewed", lang: "en", ratifiedBy: "", ratifiedOn: "" });
+    const ro = writeEntry(directory, { id: "sol-reviewed", lang: "ro", ratifiedBy: "", ratifiedOn: "" });
+    const reviewManifest = reviewedManifest([
+      { id: "sol-reviewed", lang: "en", bytes: en },
+      { id: "sol-reviewed", lang: "ro", bytes: ro },
+    ]);
+
+    const corpus = loadHelpCorpus(directory, { reviewManifest, evidenceRoot: fixtureDirectory() });
+
+    const locator = ".hermes/reports/support-conversation-20260914/evidence/EDITORIAL.md";
+    const expected = [
+      `catalog:${sha256(SUPPORT_CATALOG_CANONICAL)}`,
+      `sol-reviewed.en.md:${sha256(en)}`,
+      `sol-reviewed.ro.md:${sha256(ro)}`,
+      `review:sol-reviewed.en:${sha256(en)}:SOL:/root/editorial-review:2026-09-14:${locator}`,
+      `review:sol-reviewed.ro:${sha256(ro)}:SOL:/root/editorial-review:2026-09-14:${locator}`,
+    ].join("\n");
+    expect(corpus.manifest).toBe(expected);
+    expect(corpus.kbVersion).toBe(sha256(expected));
+    expect(corpus.reviewManifest).toStrictEqual(reviewManifest);
+  });
+
+  it("refuses an editorial-role (SOL) record that carries the owner's signature fields", () => {
+    // Catches a SOL review dressed up with an owner signature instead of being recorded as OWNER.
+    const directory = fixtureDirectory();
+    writeEntry(directory, { id: "accepted", lang: "en" });
+    writeEntry(directory, { id: "accepted", lang: "ro" });
+    const solReviewed = reviewedManifest([]);
+
+    expect(() => loadHelpCorpus(directory, {
+      reviewManifest: {
+        ...solReviewed,
+        catalog: { ...solReviewed.catalog, ratifiedBy: "V", ratifiedOn: "2026-09-24" },
+      },
+      evidenceRoot: evidenceRootWith(OWNER_EVIDENCE),
+    })).toThrowError(expect.objectContaining({ code: "SUPPORT_KB_REVIEW_MANIFEST_INVALID" }));
+  });
+
+  it("loads the real review manifest's records exactly as written", () => {
+    // Pins the 2026-09 records. The catalog and article rows parse to themselves (no field added, dropped
+    // or normalised); every recovery row parses too, so the load stops only where it binds the rows to a
+    // component file this empty corpus does not have.
+    const reviewManifest = JSON.parse(readFileSync(
+      join(PRODUCT_ROOT, "packages/support-kb/reviews/manifest.json"), "utf8",
+    )) as { catalog: ReviewRow; articles: ReviewRow[]; recovery: { components: ReviewRow[] } };
+    const catalogAndArticles = {
+      schemaVersion: 1, catalog: reviewManifest.catalog, articles: reviewManifest.articles,
+    };
+
+    const corpus = loadHelpCorpus(fixtureDirectory(), {
+      reviewManifest: catalogAndArticles, evidenceRoot: PRODUCT_ROOT,
+    });
+
+    expect(corpus.reviewManifest).toStrictEqual(catalogAndArticles);
+    expect(() => loadHelpCorpus(fixtureDirectory(), { reviewManifest, evidenceRoot: PRODUCT_ROOT }))
+      .toThrowError(expect.objectContaining({
+        code: "SUPPORT_KB_RECOVERY_REVIEW_INVALID",
+        message: "recovery review does not bind the exact complete component file",
+      }));
+    expect(reviewManifest.articles.filter(({ reviewedBy }) => reviewedBy === "SOL").length).toBeGreaterThan(0);
+    expect(reviewManifest.recovery.components.filter(({ reviewedBy }) => reviewedBy === "SOL").length)
+      .toBeGreaterThan(0);
+  });
+
+  it("requires the evidence of every OWNER record in the real manifest to be tracked by git", () => {
+    // COMMITTED, not merely present: the loader proves the file exists, git proves it is in the tree.
+    const tracked = new Set(execFileSync("git", ["ls-files", "-z", "--", "docs"], {
+      cwd: PRODUCT_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024,
+    }).split("\0").filter(Boolean));
+    const reviewManifest = JSON.parse(readFileSync(
+      join(PRODUCT_ROOT, "packages/support-kb/reviews/manifest.json"), "utf8",
+    )) as unknown;
+    const aTrackedFile = [...tracked][0] ?? "";
+
+    // Control: the probe answers both ways, so the empty verdict on the real manifest is a real one.
+    expect(aTrackedFile).toMatch(/^docs\//u);
+    expect(untrackedOwnerEvidence({
+      catalog: { reviewedBy: "OWNER", evidence: aTrackedFile },
+      articles: [{ reviewedBy: "OWNER", evidence: "docs/support-kb/never-committed.md" }],
+      recovery: { components: [{ reviewedBy: "SOL", evidence: "docs/support-kb/never-committed.md" }] },
+    }, tracked)).toEqual(["articles[0]: docs/support-kb/never-committed.md"]);
+    expect(untrackedOwnerEvidence(reviewManifest, tracked)).toEqual([]);
   });
 });

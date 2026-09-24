@@ -255,6 +255,20 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
     searchTerms: terms(["help", "support", "case", "human", "status"], ["ajutor", "asistență", "caz", "persoană", "stare"]),
   }),
   capability({
+    id: "ai-transparency",
+    route: "/ai-transparency",
+    labels: labels("AI transparency", "Transparență AI"),
+    audience: "any",
+    availability: "public",
+    disposition: "action",
+    actionIds: [],
+    articleIds: ["ai-transparency"],
+    searchTerms: terms(
+      ["transparency", "label", "AI-generated", "machine-readable", "marking", "watermark", "disclosure"],
+      ["transparență", "etichetă", "generat de AI", "citibil automat", "marcaj", "filigran", "declarație"]
+    ),
+  }),
+  capability({
     id: "sign-in",
     route: "/login",
     labels: labels("Sign in and saved MFA recovery", "Autentificare și recuperare MFA salvată"),

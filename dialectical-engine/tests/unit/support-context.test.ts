@@ -90,7 +90,9 @@ describe("Support knowledge context", () => {
     // SYNC3: the review manifest's evidence locators became repository-relative
     // (DL6-F4); the version folds them in, so it moved from 7ef4244d… with no
     // article, projection or fallback byte changed.
-    expect(corpus.kbVersion).toBe("b9f70c86d54b97fb8a837c4d86260233217cdc64cdf5691d045355fedecd2aa8");
+    // 2026-09-24: the owner signed the /ai-transparency article pair and the catalogue
+    // (OWNER records in the review manifest; the version binds the session, dates and evidence).
+    expect(corpus.kbVersion).toBe("778eb63296a037e619f9e72bf887ca663d59399479ede35790f765c9604a1506");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 
