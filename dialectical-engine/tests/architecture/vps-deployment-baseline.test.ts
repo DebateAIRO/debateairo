@@ -73,7 +73,8 @@ const EDGE_FILES = [
   "deploy/vps/systemd/debateai-api.service",
   "deploy/vps/systemd/debateai-ui.service",
   "deploy/vps/systemd/debateai-runner.service",
-  "deploy/vps/systemd/debateai-hatchet.service"
+  "deploy/vps/systemd/debateai-hatchet.service",
+  "deploy/vps/systemd/debateai-observation-agent.service"
 ] as const;
 const BACKUP_FILES = [
   "deploy/vps/backup.sh",
@@ -87,7 +88,8 @@ const RUNBOOK_FILES = [
   "deploy/vps/README.md",
   "deploy/vps/env/api.env.example",
   "deploy/vps/env/runner.env.example",
-  "deploy/vps/env/ui.env.example"
+  "deploy/vps/env/ui.env.example",
+  "deploy/vps/env/observation-agent.env.example"
 ] as const;
 
 describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => {
@@ -237,6 +239,28 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     for (const needle of HARDENING) expect(unit, `${service}: ${needle}`).toContain(needle);
     expect(unit).not.toContain("MemoryDenyWriteExecute=true");
     expect(unit).not.toMatch(/^User=debateai$/m);
+  });
+
+  /**
+   * Task 14: the observation agent's unit. Same hardening floor as the three application units,
+   * its own OS user, no custody group, no writable path but its state directory — and it is NOT
+   * switched on by the runbook's enable line, because the agent has never run on Linux (§12).
+   */
+  it("debateai-observation-agent.service: own user, hardening floor, no custody, not enabled by §5", () => {
+    const unit = read("deploy/vps/systemd/debateai-observation-agent.service");
+    expect(unit).toContain("User=debateai-observer");
+    expect(unit).toContain("EnvironmentFile=/etc/debateai/observation-agent.env");
+    for (const needle of HARDENING) expect(unit, `observation-agent: ${needle}`).toContain(needle);
+    expect(unit).not.toContain("MemoryDenyWriteExecute=true");
+    expect(unit).not.toMatch(/^ReadWritePaths=/m);
+    expect(unit).not.toContain("debateai-custody");
+    expect(unit).toContain("StateDirectory=debateai-observation-agent");
+    expect(unit).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/observation-agent/src/main.ts");
+    expect(unit).toMatch(/^After=.*\bpostgresql\.service\b/m);
+    const readme = read("deploy/vps/README.md");
+    const enable = /systemctl enable --now ([^\n]*(?:\\\n[^\n]*)*)/u.exec(readme)?.[1] ?? "";
+    expect(enable).toContain("debateai-api");
+    expect(enable).not.toContain("debateai-observation-agent");
   });
 
   it("ReadWritePaths are exactly the custody trees each service writes (L2 out-of-scope, C3 amendment)", () => {

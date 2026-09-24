@@ -1,0 +1,70 @@
+# deploy/vps/systemd/debateai-observation-agent.service
+# The observation agent (apps/observation-agent) as a hardened per-service unit, under its own OS
+# user so it can read neither the API's keys nor the runner's.
+#
+# NOT ENABLED BY THE KIT. It is installed with the other units but is deliberately absent from the
+# `systemctl enable --now` line in README §5: the agent has only ever run on macOS under launchd,
+# and README §12 lists what a Linux host still lacks before it can do anything useful here — no
+# production targets catalog ships, its desktop notification channel does not exist on Linux, and
+# its operator command (`oactl`) still reads a development custody file. Enable it only after
+# those are closed; until then the unit is the definition, not a deployment.
+[Unit]
+Description=DebateAI observation agent
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=debateai-observer
+Group=debateai-observer
+# No custody group: the agent reads no key file the API or runner owns. Its only secret file is
+# its own optional Hatchet token (0600 in a 0700 directory, both its own).
+WorkingDirectory=/opt/debateai/dialectical-engine
+EnvironmentFile=/etc/debateai/observation-agent.env
+Environment=NODE_ENV=production
+Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt
+StateDirectory=debateai-observation-agent
+StateDirectoryMode=0700
+ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/observation-agent/src/main.ts
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+
+# --- filesystem ---
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+# The state directory above is the only writable path. The agent is NOT given the docker socket:
+# membership of the docker group is root on this host, which is not a trade the kit makes for a
+# monitor. A production targets catalog therefore declares no docker-backed target (README §12).
+
+# --- process and kernel ---
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# MemoryDenyWriteExecute is NOT set: it breaks the V8 JIT.
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
