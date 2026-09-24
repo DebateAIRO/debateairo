@@ -1,5 +1,13 @@
+import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  CONTENT_CIPHERTEXT_SENTINEL,
+  allocateSequence,
+  contentCipherFor,
+  encryptAttestedLeasedContentForRun,
+  prepareLeasedContentEncryptionForRun,
+  withWriteTransaction
+} from "@debateai/db";
 import {
   TypedDomainError,
   exhaustive,
@@ -511,7 +519,24 @@ export class ValuationRepository {
     readonly propagationRunId: string;
     readonly overlay: ValueOverlayResult;
   }): Promise<{ readonly overlayRunId: string; readonly valueHingeIds: readonly string[] }> {
-    return withWriteTransaction(this.pool, async (client) => {
+    // V-6 (0069): the weight owner is a content carrier on both rows. The
+    // run's cipher is PREPARED before the write transaction (no pool query may
+    // run inside it) and each envelope is sealed inside it, to the row id this
+    // method mints. With no key store configured the carrier is skipped, as
+    // encryptAttestedContentForRun does; the database refuses an encrypted
+    // run's plaintext either way.
+    const weightOwner = input.overlay.weightSource.source === "none"
+      ? null
+      : input.overlay.weightSource.owner;
+    const ownerCipher = weightOwner === null || contentCipherFor(this.pool) === undefined
+      ? null
+      : await prepareLeasedContentEncryptionForRun(this.pool, input.runId);
+    const sealOwner = (carrier: "core.value_hinge" | "ledger.overlay_run", rowId: string) =>
+      ownerCipher === null || weightOwner === null
+        ? null
+        : encryptAttestedLeasedContentForRun(ownerCipher, carrier, rowId, { weightOwner });
+    try {
+    return await withWriteTransaction(this.pool, async (client) => {
       const propagation = await client.query<{ at_seq: string }>(`
         SELECT at_seq::text FROM ledger.propagation_run
         WHERE propagation_run_id=$1 AND run_id=$2
@@ -550,22 +575,28 @@ export class ValuationRepository {
       const valueHingeIds: string[] = [];
       for (const hinge of input.overlay.valueHinges) {
         const atSequence = await allocateSequence(client);
+        const nextValueHingeId = randomUUID();
+        const hingeOwner = sealOwner("core.value_hinge", nextValueHingeId);
         const created = await client.query<{ value_hinge_id: string }>(`
           INSERT INTO core.value_hinge (
-            run_id, left_option_id, right_option_id, criterion_ids,
-            reversal_boundary, weight_source, weight_owner, weight_vector, at_seq
-          ) VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8::jsonb,$9)
+            value_hinge_id, run_id, left_option_id, right_option_id, criterion_ids,
+            reversal_boundary, weight_source, weight_owner, weight_vector, at_seq,
+            content_ciphertext, content_attestation
+          ) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9::jsonb,$10,$11::jsonb,$12)
           RETURNING value_hinge_id
         `, [
+          nextValueHingeId,
           input.runId,
           hinge.leftOptionId,
           hinge.rightOptionId,
           JSON.stringify([...hinge.leftAdvantageCriterionIds, ...hinge.rightAdvantageCriterionIds]),
           JSON.stringify(hinge.reversalBoundary),
           input.overlay.weightSource.source,
-          input.overlay.weightSource.source === "none" ? null : input.overlay.weightSource.owner,
+          hingeOwner === null ? weightOwner : CONTENT_CIPHERTEXT_SENTINEL,
           input.overlay.weightSource.source === "none" ? null : JSON.stringify(input.overlay.weightSource.vector),
-          atSequence
+          atSequence,
+          hingeOwner === null ? null : JSON.stringify(hingeOwner.envelope),
+          hingeOwner?.attestation ?? null
         ]);
         const valueHingeId = created.rows[0]!.value_hinge_id;
         valueHingeIds.push(valueHingeId);
@@ -584,21 +615,24 @@ export class ValuationRepository {
           await allocateSequence(client)
         ]);
       }
+      const nextOverlayRunId = randomUUID();
+      const overlayOwner = sealOwner("ledger.overlay_run", nextOverlayRunId);
       const overlayRun = await client.query<{ overlay_run_id: string }>(`
         INSERT INTO ledger.overlay_run (
-          run_id, propagation_run_id, weight_source, weight_owner, weight_vector,
+          overlay_run_id, run_id, propagation_run_id, weight_source, weight_owner, weight_vector,
           profile_ref, profile_version, signature_ref, accepted_criteria,
           rejected_criteria, pareto_option_ids, recorded_arrow_order,
-          recorded_strengths, detached_strengths, detachment_byte_identical, at_seq
+          recorded_strengths, detached_strengths, detachment_byte_identical, at_seq,
+          content_ciphertext, content_attestation
         ) VALUES (
-          $1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,
-          $12::jsonb,$13::jsonb,$14::jsonb,true,$15
+          $17,$1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb,
+          $12::jsonb,$13::jsonb,$14::jsonb,true,$15,$16::jsonb,$18
         ) RETURNING overlay_run_id
       `, [
         input.runId,
         input.propagationRunId,
         input.overlay.weightSource.source,
-        input.overlay.weightSource.source === "none" ? null : input.overlay.weightSource.owner,
+        overlayOwner === null ? weightOwner : CONTENT_CIPHERTEXT_SENTINEL,
         input.overlay.weightSource.source === "none" ? null : JSON.stringify(input.overlay.weightSource.vector),
         input.overlay.weightSource.source === "org_policy" ? input.overlay.weightSource.profileRef : null,
         input.overlay.weightSource.source === "org_policy" ? input.overlay.weightSource.profileVersion : null,
@@ -609,13 +643,19 @@ export class ValuationRepository {
         JSON.stringify(input.overlay.detachmentProof.recordedArrowOrder),
         JSON.stringify(input.overlay.detachmentProof.recordedStrengths),
         JSON.stringify(input.overlay.detachmentProof.detachedStrengths),
-        await allocateSequence(client)
+        await allocateSequence(client),
+        overlayOwner === null ? null : JSON.stringify(overlayOwner.envelope),
+        nextOverlayRunId,
+        overlayOwner?.attestation ?? null
       ]);
       return Object.freeze({
         overlayRunId: overlayRun.rows[0]!.overlay_run_id,
         valueHingeIds: Object.freeze(valueHingeIds)
       });
     });
+    } finally {
+      await ownerCipher?.close();
+    }
   }
 }
 

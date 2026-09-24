@@ -1149,6 +1149,40 @@ export class RunRepository {
     });
   }
 
+  /**
+   * V-6 (0069). The one prose-bearing progress kind. For an encrypted run the
+   * whole gap (gap, why, constructed_prompt, …) is sealed to the event id and
+   * the stored value keeps only `gap_ref` beside the JSON sentinel, because
+   * serve's investigation-request gate looks the gap up by that ref in SQL.
+   * A legacy run keeps the plaintext value. The database refuses anything else.
+   */
+  async recordInvestigationGapOpened(input: {
+    readonly runId: string;
+    readonly gap: Readonly<Record<string, unknown>> & { readonly gap_ref: string };
+  }): Promise<void> {
+    const eventId = randomUUID();
+    await withRunContentLease(this.pool, [input.runId], async () => {
+      const sealed = await encryptAttestedContentForRun(
+        this.pool, input.runId, "core.run_progress_event", eventId, { value: input.gap }
+      );
+      await withWriteTransaction(this.pool, async (client) => {
+        await client.query(
+          `INSERT INTO core.run_progress_event (
+             event_id, run_id, at_seq, kind, value_json, content_ciphertext, content_attestation
+           ) VALUES ($1,$2,$3,'honesty.investigation_gap_opened',$4::jsonb,$5::jsonb,$6)`,
+          [
+            eventId, input.runId, await allocateSequence(client),
+            JSON.stringify(sealed === null
+              ? input.gap
+              : { gap_ref: input.gap.gap_ref, ...CONTENT_JSON_SENTINEL }),
+            sealed === null ? null : JSON.stringify(sealed.envelope),
+            sealed?.attestation ?? null
+          ]
+        );
+      });
+    });
+  }
+
   async startRun(
     input: StartRunInput,
     admissionClient?: PoolClient

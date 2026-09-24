@@ -47,8 +47,10 @@ import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository 
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RunRepository,
+  decryptContentForRun,
   withOwnerAskAdmissionLease,
   withRunContentLease,
+  type CryptoEnvelope,
   type DiscoveredPanelMember,
   type RunOwnershipAccess
 } from "@debateai/db";
@@ -2710,8 +2712,9 @@ export class PostgresAskApplication implements AskApplication {
       kind: string;
       at_seq: string;
       value_json: unknown;
+      content_ciphertext: CryptoEnvelope | null;
     }>(
-      `SELECT event.event_id, event.kind, event.at_seq, event.value_json
+      `SELECT event.event_id, event.kind, event.at_seq, event.value_json, event.content_ciphertext
        FROM core.run_progress_event AS event
        JOIN core.run AS run ON run.run_id = event.run_id
       WHERE event.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) ORDER BY event.at_seq`,
@@ -2739,7 +2742,18 @@ export class PostgresAskApplication implements AskApplication {
       [runId, access.ownerRef, access.legacyAskerId]
     );
     if (stillOwned.rows[0]?.owned !== true) return;
-    const storedEvents = result.rows.flatMap((row) => {
+    // V-6 (0069): only an encrypted run's investigation-gap rows carry an
+    // envelope; every other row is read as stored, with no key work at all.
+    const decryptedRows = await Promise.all(result.rows.map(async (row) => (row.content_ciphertext ?? null) === null
+      ? row
+      : {
+        ...row,
+        value_json: (await decryptContentForRun<{ value: unknown }>(
+          this.pool, runId, "core.run_progress_event", row.event_id, row.content_ciphertext ?? null,
+          { value: row.value_json }
+        )).value
+      }));
+    const storedEvents = decryptedRows.flatMap((row) => {
       const direct = EventTypeSchema.safeParse(row.kind);
       const eventType = direct.success
         ? direct.data

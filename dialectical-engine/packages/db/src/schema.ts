@@ -135,6 +135,19 @@ export const run = core.table("run", {
   contentAttestation: bytea("content_attestation")
 });
 
+// V-6 (0069): the run's progress stream. Only honesty.investigation_gap_opened
+// carries an envelope, and only for an encrypted run; every other kind is
+// code-shaped (0069's core.progress_value_is_code_shaped).
+export const runProgressEvent = core.table("run_progress_event", {
+  eventId: uuid("event_id").primaryKey().defaultRandom(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  atSeq: bigint("at_seq", { mode: "number" }).notNull().unique(),
+  kind: text("kind").notNull(),
+  valueJson: jsonb("value_json").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
+});
+
 export const runContentAttestationSecret = core.table("run_content_attestation_secret", {
   runId: uuid("run_id").primaryKey().references(() => run.runId, { onDelete: "cascade" }),
   secret: bytea("secret").notNull(),
@@ -406,7 +419,9 @@ export const valueHinge = core.table("value_hinge", {
   weightSource: text("weight_source").notNull(),
   weightOwner: text("weight_owner"),
   weightVector: jsonb("weight_vector"),
-  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+  atSeq: bigint("at_seq", { mode: "number" }).notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const reversalPoint = core.table("reversal_point", {
@@ -437,7 +452,9 @@ export const overlayRun = ledger.table("overlay_run", {
   recordedStrengths: jsonb("recorded_strengths").notNull(),
   detachedStrengths: jsonb("detached_strengths").notNull(),
   detachmentByteIdentical: boolean("detachment_byte_identical").notNull(),
-  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+  atSeq: bigint("at_seq", { mode: "number" }).notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const factBundle = serve.table("fact_bundle", {
@@ -468,7 +485,9 @@ export const conformanceRecord = serve.table("conformance_record", {
   segmentResults: jsonb("segment_results").notNull(),
   coverageMode: text("coverage_mode").notNull(),
   rawArtifactRefs: jsonb("raw_artifact_refs").notNull(),
-  sealedAtSeq: bigint("sealed_at_seq", { mode: "number" }).notNull()
+  sealedAtSeq: bigint("sealed_at_seq", { mode: "number" }).notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const servedNumber = serve.table("served_number", {
@@ -854,7 +873,9 @@ export const memoryAliasRow = memory.table("alias_row", {
   sourceRunId: uuid("source_run_id").notNull(),
   priorRunId: uuid("prior_run_id").notNull(),
   keyVersion: integer("key_version").notNull(),
-  atSeq: bigint("at_seq", { mode: "number" }).notNull()
+  atSeq: bigint("at_seq", { mode: "number" }).notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
 });
 
 export const memoryAliasRevocation = memory.table("alias_revocation", {

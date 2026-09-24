@@ -2335,7 +2335,13 @@ export const CONTENT_CARRIERS = Object.freeze([
   "evidence.query_amendment",
   "evidence.evidence_item",
   "evidence.absence_row",
-  "serve.answer"
+  "serve.answer",
+  // V-6 (migration 0069): the remaining debate-text carriers.
+  "serve.conformance_record",
+  "core.value_hinge",
+  "ledger.overlay_run",
+  "core.run_progress_event",
+  "memory.alias_row"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];
