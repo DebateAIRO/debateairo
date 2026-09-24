@@ -7,8 +7,9 @@ import {
   createPostgresRegisterPublicationPort,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
-  type GeneralRegisterPublication,
+  type GeneralRegisterPublicationRequest,
   type HistoricalRegisterImportReceipt,
+  type RegisterPublicationDeployment,
   type RegisterPublicationReceipt,
   type RegisterPublicationRow
 } from "../../packages/register/src/index.js";
@@ -95,11 +96,19 @@ export async function importHistoricalRegisterFixture(
   });
 }
 
+/**
+ * C-I5: a fixture publication is a LOCAL one unless the case says otherwise —
+ * the hosted arm carries V-9(4)'s vendor vetting, which is driven on its own in
+ * `tests/unit/v9-configured-provider-set-deployment.test.ts`.
+ */
 export async function publishRegisterFixture(
   pool: Pool,
-  input: GeneralRegisterPublication
+  input: GeneralRegisterPublicationRequest & {
+    readonly deployment?: RegisterPublicationDeployment;
+  }
 ): Promise<RegisterPublicationReceipt> {
-  return createPostgresRegisterPublicationPort(pool).publishGeneral(input);
+  return createPostgresRegisterPublicationPort(pool)
+    .publishGeneral({ deployment: "local", ...input });
 }
 
 /** Frozen bytes from remote dev f19c706f; current development builders may evolve. */

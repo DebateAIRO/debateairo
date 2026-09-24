@@ -3,17 +3,38 @@ import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import pg from "pg";
 import { fixedStateDirectory } from "./state.js";
+import { readDevelopmentComposeSecret } from "../../../../../deploy/dev-auth/compose-secrets.mjs";
+import { resolveDevCustodyRoot } from "../../../../../deploy/dev-auth/custody-root.mjs";
 
-const DEV_ADMIN_DATABASE_URL =
-  "postgresql://debateai:debateai-dev-only@127.0.0.1:55432/debateai";
+const DEV_DATABASE_ORIGIN = "postgresql://127.0.0.1:55432/debateai";
+const DEV_ADMIN_ROLE = "debateai";
+const DEV_OBSERVATION_ROLE = "debateai_observation_agent";
+
+/**
+ * V-21(a): the bootstrap superuser password is generated once into the 0600 dev key-custody
+ * file that feeds compose; it is no longer a literal in this repository. This command runs
+ * after `pnpm dev:auth:up`, so the file already exists; if it does not, refusing is correct —
+ * inventing a password here would not match the database.
+ */
+async function devAdminDatabaseUrl(repoRoot: string): Promise<string> {
+  const url = new URL(DEV_DATABASE_ORIGIN);
+  url.username = DEV_ADMIN_ROLE;
+  url.password = await readDevelopmentComposeSecret(
+    resolveDevCustodyRoot(repoRoot),
+    "POSTGRES_SUPERUSER_PASSWORD"
+  );
+  return url.toString();
+}
 
 function shellValue(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
+// The admin URL is passed in, never defaulted: a credential that arrives by ambient default
+// is one nobody can see at the call site.
 export async function setObservationRolePassword(
   password: string,
-  databaseUrl: string = DEV_ADMIN_DATABASE_URL
+  databaseUrl: string
 ): Promise<void> {
   const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
   const client = await pool.connect();
@@ -39,12 +60,16 @@ export async function provisionObservationAgent(input: Readonly<{
   setRolePassword?: (password: string) => Promise<void>;
 }>): Promise<Readonly<{ output: string; environmentPath: string }>> {
   const password = (input.passwordFactory ?? (() => randomBytes(32).toString("hex")))();
-  await (input.setRolePassword ?? setObservationRolePassword)(password);
+  await (input.setRolePassword ?? (async (value: string) => {
+    await setObservationRolePassword(value, await devAdminDatabaseUrl(input.repoRoot));
+  }))(password);
 
-  const databaseUrl = new URL(DEV_ADMIN_DATABASE_URL);
-  databaseUrl.username = "debateai_observation_agent";
+  const databaseUrl = new URL(DEV_DATABASE_ORIGIN);
+  databaseUrl.username = DEV_OBSERVATION_ROLE;
   databaseUrl.password = password;
-  const authDirectory = join(input.repoRoot, ".local", "dev-auth");
+  // DL7-F4: dev custody is movable (DEBATEAI_DEV_CUSTODY_ROOT, F-05) so keys need never
+  // live inside a cloud-synced checkout; the agent's own env file and Hatchet token follow it.
+  const authDirectory = resolveDevCustodyRoot(input.repoRoot);
   const environmentPath = join(authDirectory, "observation-agent.env");
   const rows = [
     ["OBSERVATION_DATABASE_URL", databaseUrl.toString()],
@@ -60,7 +85,7 @@ export async function provisionObservationAgent(input: Readonly<{
   );
   await chmod(environmentPath, 0o600);
   return Object.freeze({
-    output: "PROVISIONED .local/dev-auth/observation-agent.env",
+    output: `PROVISIONED ${environmentPath}`,
     environmentPath
   });
 }

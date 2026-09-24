@@ -1,5 +1,21 @@
 import { spawn } from "node:child_process";
 
+// With `sendmail -t` the MTA reads every recipient out of the header block on
+// stdin, so no address reaches argv, which any local user can read with `ps`
+// (L7-F7). That moves the trust boundary onto this guard: a `,` or `;` inside
+// the address would make the MTA deliver a second copy to a mailbox nobody
+// vetted. The shape below rejects whitespace through `\s` but not those
+// separators, so each is checked explicitly and stays checked if the shape is
+// ever widened.
+const RECIPIENT_SHAPE = /^[^\s@]+@[^\s@]+$/;
+
+function isSingleDeliverableRecipient(recipient: string): boolean {
+  return RECIPIENT_SHAPE.test(recipient)
+    && !/[\r\n]/.test(recipient)
+    && !/\s/.test(recipient)
+    && !/[,;]/.test(recipient);
+}
+
 export interface VerificationMail {
   readonly attemptId: string;
   readonly recipient: string;
@@ -57,15 +73,15 @@ export class SendmailMailSender implements MailSender {
   }
 
   async sendVerification(mail: VerificationMail): Promise<void> {
-    // The shape regex currently rejects CR/LF through `\s`; keep the explicit
-    // guard as defence in depth if that broader recipient grammar is widened.
-    if (!/^[^\s@]+@[^\s@]+$/.test(mail.recipient)
-      || /[\r\n]/.test(mail.recipient)
+    if (!isSingleDeliverableRecipient(mail.recipient)
       || !/^[A-Za-z0-9_-]{43}$/.test(mail.token)) {
       throw new MailDeliveryError("MAIL_INPUT_INVALID");
     }
+    // The bearer rides in the URL fragment: browsers never send it to the
+    // server, so it cannot reach a proxy or access log (L3-F8). The token
+    // grammar above is fragment-safe verbatim; nothing is percent-encoded.
     const verificationUrl = new URL("/verify-email", this.options.publicAppUrl);
-    verificationUrl.searchParams.set("token", mail.token);
+    verificationUrl.hash = `token=${mail.token}`;
     const message = [
       `From: ${this.options.from}`,
       `To: ${mail.recipient}`,
@@ -81,7 +97,7 @@ export class SendmailMailSender implements MailSender {
       ""
     ].join("\r\n");
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(this.options.executable, ["-i", "-f", this.options.from, "--", mail.recipient], {
+      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
         stdio: ["pipe", "ignore", "ignore"]
       });
       let settled = false;
@@ -127,8 +143,7 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
   async sendSecurityNotification(mail:SecurityNotificationMail):Promise<void> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
       .test(mail.messageId)
-      || !/^[^\s@]+@[^\s@]+$/.test(mail.recipient)
-      || /[\r\n]/.test(mail.recipient)
+      || !isSingleDeliverableRecipient(mail.recipient)
       || !(mail.executeAt instanceof Date)
       || !Number.isFinite(mail.executeAt.getTime())) {
       throw new MailDeliveryError("MAIL_INPUT_INVALID");
@@ -157,7 +172,7 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
     ].join("\r\n");
     await new Promise<void>((resolve,reject)=>{
       const child=spawn(
-        this.options.executable,["-i","-f",this.options.from,"--",mail.recipient],
+        this.options.executable,["-i","-t","-f",this.options.from],
         { stdio:["pipe","ignore","ignore"] }
       );
       let settled=false;

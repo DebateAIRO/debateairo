@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies, headers } from "next/headers";
-import { createServerContractClient, USER_TOKEN_COOKIE, listDebatesPageServer } from "@/lib/serverApi";
+import { createServerContractClient, listDebatesPageServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
 import { LandingPage } from "@/components/landing/LandingPage";
@@ -18,7 +18,7 @@ export default async function HomePage({
   // UI-01 (S05): the V3 answer index is asker-scoped; without a server session
   // cookie the list honestly stays empty with a sign-in hint — never an
   // anonymous global listing.
-  const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;
+  const token = readSessionCookie(await cookies());
   if (token === null) return <><LandingPage /><SupportWidget /></>;
   const requestedTab = (await searchParams).tab;
   const tab: "yours" | "public" =
@@ -26,13 +26,14 @@ export default async function HomePage({
       ? requestedTab
       : token !== null ? "yours" : "public";
   const userAgent = (await headers()).get("user-agent") ?? undefined;
+  const clientIp = readTrustedClientIp(await headers());
   let debates: DebateSummary[] = [];
   let error: string | null = null;
   let sessionConfirmed = false;
   let published: Awaited<ReturnType<ContractClient["readPublicDebates"]>> = { items: [], total: 0 };
   let publishedError: string | null = null;
   try {
-    published = await createServerContractClient(fetch, undefined, userAgent).readPublicDebates(50, 0);
+    published = await createServerContractClient(fetch, undefined, userAgent, clientIp).readPublicDebates(50, 0);
   } catch {
     publishedError = "Published debates are temporarily unavailable.";
   }
@@ -40,7 +41,7 @@ export default async function HomePage({
     error = "Sign in to start a debate and save it to your account.";
   } else {
     try {
-      const page = await listDebatesPageServer(token, undefined, userAgent);
+      const page = await listDebatesPageServer(token, undefined, userAgent, clientIp);
       debates = page.summaries;
       sessionConfirmed = true;
     } catch {

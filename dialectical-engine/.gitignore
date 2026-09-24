@@ -8,6 +8,8 @@ packages/contract/generated/
 .test-postgres/
 .local/dev-auth/
 *.log
+.env.local
+.env.*.local
 # Per-lane gate/mutant records (the mission log directory). Ignored so writing
 # records cannot dirty the tree, which by D24 ADDENDUM-2 aborts a mutant campaign.
 logs/

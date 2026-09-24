@@ -7,6 +7,56 @@ import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
 
+/**
+ * V-28 (DL4-F2): the run-wide bound in MONEY, beside the attempt ceiling this
+ * file has always held. The arithmetic and the two decisions are pure and live
+ * in their own module so the provider gateway can be handed a seam without
+ * `@debateai/providers` taking on the ledger. See ./cost-envelope.ts.
+ */
+export {
+  COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
+  COST_ENVELOPE_CURRENCY,
+  COST_MICROS_PER_USD,
+  DAILY_COST_ENVELOPE_REACHED,
+  MAX_REPORTED_USAGE_COUNTER,
+  PROJECTED_INPUT_BYTES_PER_TOKEN,
+  PROVIDER_USAGE_UNREPORTED,
+  RUN_COST_ENVELOPE_MONEY_REACHED,
+  chargeMicrosForUsage,
+  chargeableUsage,
+  costEnvelopeDay,
+  dailyCostEnvelopeReached,
+  decideDailyCostEnvelope,
+  decideRunCostEnvelope,
+  projectedCallCeilingMicros,
+  providerUsageUnreported,
+  readReportedUsage,
+  readUsageCounters,
+  runCostEnvelopeReached,
+  type DailyCostEnvelopeDecision,
+  type ProviderTargetPrice,
+  type ReportedUsage,
+  type RunCostEnvelopeDecision,
+  type UsageCounterRead
+} from "./cost-envelope.js";
+
+/**
+ * V-28: the persisted spend (migration 0066) and the two guards built on it —
+ * the gateway's per-call seam and the daily gate a NEW run passes through.
+ */
+export {
+  CostEnvelopeGuard,
+  DEFAULT_RESERVATION_TTL_MS,
+  PostgresModelSpendStore,
+  type CostEnvelopeGuardInput,
+  type ModelSpendEntry,
+  type ModelSpendSource,
+  type ModelSpendStore,
+  type ProviderCostSeam,
+  type ProviderSeamInput
+} from "./model-spend.js";
+
+
 export const RATIFIED_BATTERY_ROW_IDS = [
   "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",
   "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18", "Q19", "Q20",
@@ -246,6 +296,27 @@ export function decideBudgetPressure(input: {
    * guessing from a number that cannot distinguish them.
    */
   readonly pendingModelAttempts?: number;
+  /**
+   * V-28 (DL4-F2) — THE HARD STOP THAT IS NOT ABOUT ATTEMPTS.
+   *
+   * The attempt ceiling and the spend bounds are independent limits on the same
+   * run: a cheap topology can exhaust its attempts with money to spare, and one
+   * expensive call can spend the money with dozens of attempts untouched. When
+   * a spend bound refuses, this flag says so, and the run takes the SAME
+   * components-only terminal the attempt ceiling has always taken — inheriting
+   * every guarantee that path carries (the verified components are served, a
+   * served statement is never retracted, DEFECT and ENVELOPE_EXHAUSTED stay
+   * independent) instead of growing a second one.
+   *
+   * NAMED `forceHardStop`, not `moneyEnvelopeReached`: ruling R2 made an
+   * unbillable vendor take this branch too, so "money" stopped being the truth
+   * about what sets it. The caller decides WHICH bound spoke; this says only
+   * that the answer is no.
+   *
+   * `consumedModelAttempts` is still reported as it stands: the run did not
+   * overspend attempts, and saying it did would be a falsehood on the record.
+   */
+  readonly forceHardStop?: boolean;
   readonly pendingRows: readonly PendingBudgetRow[];
   readonly verifiedNodeIds: readonly string[];
 }): BudgetPressureDecision {
@@ -272,7 +343,8 @@ export function decideBudgetPressure(input: {
    * character-for-character J28's comparison, and the refusal context supplies
    * the 1 that makes its own question the one being answered.
    */
-  if (input.consumedModelAttempts + pendingModelAttempts <= input.basis.maxModelAttempts) {
+  if (input.forceHardStop !== true
+    && input.consumedModelAttempts + pendingModelAttempts <= input.basis.maxModelAttempts) {
     return Object.freeze({
       kind: "WITHIN_ENVELOPE",
       state: "WITHIN",
@@ -404,6 +476,8 @@ export class BudgetRepository {
     readonly basis: CostEnvelopeBasis;
     /** T17B/B1 — see `decideBudgetPressure`: which question the caller is asking. */
     readonly pendingModelAttempts?: number;
+    /** V-28 — see `decideBudgetPressure`: a spend bound refused the next call. */
+    readonly forceHardStop?: boolean;
     readonly pendingRows: readonly PendingBudgetRow[];
     readonly verifiedNodeIds: readonly string[];
   }): Promise<BudgetPressureDecision> {
@@ -413,6 +487,7 @@ export class BudgetRepository {
       // Resolved here rather than forwarded as `undefined`: the repo builds under
       // `exactOptionalPropertyTypes`, so an absent caller means 0, explicitly.
       pendingModelAttempts: input.pendingModelAttempts ?? 0,
+      forceHardStop: input.forceHardStop ?? false,
       pendingRows: input.pendingRows,
       verifiedNodeIds: input.verifiedNodeIds
     });

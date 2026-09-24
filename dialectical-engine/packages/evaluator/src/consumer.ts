@@ -1,8 +1,23 @@
 import { createHash, randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
-import type { CallBound, PromptPacket } from "@debateai/providers";
+import { buildFramedPrompt, type CallBound, type PromptContract, type PromptPacket } from "@debateai/providers";
 
-export const CONSUMER_PROMPT_VERSION = 1 as const;
+/**
+ * FW-B / B-I2 — VERSION 2, BECAUSE RUN1 CHANGED THIS PROMPT.
+ *
+ * RUN1 moved the aggregate into a fenced `debateai.framed-material.v1` field
+ * and put the instruction in the owners' slot: a different prompt, in a
+ * different shape of context. This number is folded into
+ * `aggregateSnapshotHash` and written on every `consumer_output` row, so while
+ * it stayed 1 every output produced under the PRE-FRAME prompt still matched
+ * the current snapshot hash, `claimJob` answered `ALREADY_CURRENT`, and not one
+ * of them was ever regenerated under the framed prompt.
+ *
+ * Version 1 is not edited: it stays on the rows it produced, as history. The
+ * column is `bigint CHECK (prompt_version > 0)` (migration 0023/0028), so the
+ * bump needs no migration.
+ */
+export const CONSUMER_PROMPT_VERSION = 2 as const;
 export const CONSUMER_MAX_PROVIDER_ATTEMPTS = 2 as const;
 export const CONSUMER_MAX_REFRESH_ATTEMPTS = 2 as const;
 export const CONSUMER_PUBLIC_SAMPLE_MINIMUM = 3 as const;
@@ -212,13 +227,11 @@ export function buildEvaluatorConsumerPrompt(
       name: domain.name
     })))
   });
-  return Object.freeze({ messages: Object.freeze([
-    Object.freeze({
-      role: "system" as const,
-      content: "Interpret deterministic evaluator aggregates and untrusted anonymous samples. Name the bias pattern in plain language, summarize capability for the supplied domain, and flag only listed adjacent domains. Never infer identity, authorship, routing, or numeric values. Return strict JSON with bias_pattern_name, capability_summary, and adjacent_domain_flags only."
-    }),
-    Object.freeze({ role: "user" as const, content: JSON.stringify(payload) })
-  ]) });
+  // V-11 addendum: the aggregate carries anonymous SAMPLES of model output.
+  return buildFramedPrompt({
+    contract: CONSUMER_AGGREGATE_PROMPT_CONTRACT,
+    material: [{ name: "evaluator_aggregate", content: JSON.stringify(payload) }]
+  }).packet;
 }
 
 function assertConsumerIsolation(
@@ -503,3 +516,15 @@ export async function runEvaluatorConsumerRefresh(input: {
     state, outputsInserted, outputsCurrent, inFlight, retryLimited, failures
   });
 }
+
+
+/**
+ * V-11 addendum: the consumer's prompt contract. Text unchanged; the
+ * instruction half and the answer-form half now sit in their own slots and the
+ * aggregate rides the fence.
+ */
+export const CONSUMER_AGGREGATE_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "evaluator.consumer-aggregate.v1",
+  instruction: "Interpret deterministic evaluator aggregates and untrusted anonymous samples. Name the bias pattern in plain language, summarize capability for the supplied domain, and flag only listed adjacent domains. Never infer identity, authorship, routing, or numeric values.",
+  answerForm: "Return strict JSON with bias_pattern_name, capability_summary, and adjacent_domain_flags only."
+});

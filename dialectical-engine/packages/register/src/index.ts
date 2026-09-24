@@ -771,17 +771,50 @@ export {
 } from "./algorithm-policy.js";
 
 export {
+  CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF,
+  CONFIGURED_PROVIDER_SET_DEPLOYMENT_VERSION,
+  CONFIGURED_PROVIDER_SET_ROW_KEY,
+  CONFIGURED_PROVIDER_SET_SEALED_VERSION,
+  buildConfiguredProviderSetDeploymentRow,
+  buildConfiguredProviderSetSealedRow,
+  type ConfiguredProvider,
+  type ConfiguredProviderSetRow,
+  type ConfiguredProviderVetting,
+  type VettedConfiguredProvider
+} from "./configured-provider-set.js";
+
+export {
+  DEPLOYMENT_MODES,
+  assertHostedCostEnvelopesSealed,
+  assertHostedSupportAdmissionSealed,
+  assertProductionFloors,
+  readSealedCostEnvelopeStatus,
+  resolveDeploymentMode,
+  CostEnvelopesNotSealedError,
+  DeploymentModeInvalidError,
+  DeploymentModeUnresolvedError,
+  SupportAdmissionScopesNotSealedError,
+  type DeploymentMode,
+  type SealedCostEnvelopeStatus,
   loadApiEnvironment,
   loadDevelopmentCommandEnvironment,
+  loadKeyRotationEnvironment,
   loadLivenessEnvironment,
   loadMigrationEnvironment,
   loadReplaySelfTestEnvironment,
   loadRunnerEnvironment,
   loadSettlementEnvironment,
-  parseApiEnvironment
+  parseApiEnvironment,
+  parseKeyRotationEnvironment,
+  parseLivenessEnvironment,
+  parseMigrationEnvironment,
+  parseReplaySelfTestEnvironment,
+  parseRunnerEnvironment,
+  parseSettlementEnvironment
 } from "./runtime-environment.js";
 
 export {
+  AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   AUTH_POLICY_REGISTER_ROWS,
   AUTH_POLICY_ROW_KEYS,
   authPolicyFromRegisterRows,
@@ -790,6 +823,15 @@ export {
   type AuthPolicyRegisterRow,
   type AuthRouteLimit
 } from "./auth-policy.js";
+// V-28 (DL4-F2): the per-run and daily spending ceilings, in money.
+export {
+  COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COST_ENVELOPE_POLICY_ROW_KEY,
+  costEnvelopePolicyFromValue,
+  readCostEnvelopePolicy,
+  type CostEnvelopePolicy,
+  type CostEnvelopePolicyValue
+} from "./cost-envelope-policy.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,
@@ -799,10 +841,18 @@ export {
   type MfaPolicyValue
 } from "./mfa-policy.js";
 export {
+  ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
+  ADMISSION_POLICY_REGISTER_ROW,
+  ADMISSION_POLICY_ROW_KEY,
   SESSION_POLICY_REGISTER_ROW,
   SESSION_POLICY_ROW_KEY,
+  admissionPolicyFromValue,
+  readAdmissionPolicy,
   readSessionPolicy,
   sessionPolicyFromValue,
+  type AdmissionPolicy,
+  type AdmissionPolicyValue,
+  type AdmissionScopePolicy,
   type SessionPolicy,
   type SessionPolicyValue
 } from "./session-policy.js";
@@ -843,8 +893,10 @@ export {
   type CanonicalJsonAst,
   type CanonicalRegisterJson,
   type GeneralRegisterPublication,
+  type GeneralRegisterPublicationRequest,
   type HistoricalRegisterImport,
   type HistoricalRegisterImportReceipt,
+  type RegisterPublicationDeployment,
   type RegisterPublicationPort,
   type RegisterPublicationReceipt,
   type RegisterPublicationRow,

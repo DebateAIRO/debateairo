@@ -1,0 +1,68 @@
+# deploy/vps/systemd/debateai-ui.service
+# The UI holds no key material and no database credential at all: it proxies to the API over
+# loopback. Its only secrets-adjacent input is the edge secret file, which it reads once at boot.
+[Unit]
+Description=DebateAI UI (Next front door)
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=network-online.target debateai-api.service
+Wants=network-online.target
+Requires=debateai-api.service
+
+[Service]
+Type=simple
+User=debateai-ui
+Group=debateai-ui
+WorkingDirectory=/opt/debateai/dialectical-engine/apps/ui
+EnvironmentFile=/etc/debateai/ui.env
+Environment=NODE_ENV=production
+Environment=DIALECTICAL_UI_HOST=127.0.0.1
+Environment=PORT=3001
+# R2 / C2: only these exact peer addresses may name a client through x-forwarded-for. CIDRs and
+# hostnames are refused by parseTrustedProxies (apps/ui/trusted-client-ip.mjs).
+Environment=DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1
+# C2b: and only when they also present the shared edge secret, so that another local process
+# reaching 127.0.0.1:3001 cannot forge a client address. File is 0400 debateai-ui, 0640 root:caddy
+# on the Caddy side (README §4).
+Environment=DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret
+ExecStart=/usr/bin/node /opt/debateai/dialectical-engine/apps/ui/server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+
+# --- filesystem ---
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+# No ReadWritePaths: the UI owns no custody tree. Scratch space, if the Next server ever needs
+# any, is the state directory below and nothing else on the box is writable.
+StateDirectory=debateai-ui
+StateDirectoryMode=0700
+
+# --- process and kernel ---
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# MemoryDenyWriteExecute is NOT set: it breaks the V8 JIT.
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

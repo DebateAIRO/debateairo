@@ -1,0 +1,35 @@
+# .github/dependabot.yml
+# L6-F4: the GitHub default branch (main) is 285 commits behind dev and has no /dialectical-engine
+# tree, so every update PR targets dev, the live integration branch. Security updates and the
+# dependency graph still key on the default branch (ASK-V: make dev the default).
+#
+# V-2 item 3 (ruled 2026-09-22): each entry waits out this repository's own release-age cooldown
+# before it proposes a version. `dialectical-engine/pnpm-workspace.yaml` sets
+# `minimumReleaseAge: 10080` MINUTES; 10080 / 1440 = 7 DAYS, which is the number below. Without
+# it the bot would open pull requests for versions `pnpm install` then refuses to resolve, and a
+# version hours old is exactly what a registry hijack ships. The two numbers are compared in
+# tests/architecture/ci-security-gates.test.ts, so they cannot drift apart.
+# Syntax per docs.github.com (both pages read 2026-09-22). From "Dependabot options reference",
+# /en/code-security/reference/supply-chain-security/dependabot-options-reference: `cooldown` is a
+# mapping under an `updates` entry, `default-days` is its key, and the npm and github-actions
+# ecosystems both support it; cooldown applies to version updates, never to security updates —
+# which is what we want, since a fix for a known advisory must not wait a week. The DAY RANGE is
+# NOT on that reference page: "The number of cooldown days must be between 1 and 90" comes from
+# /en/code-security/tutorials/secure-your-dependencies/optimizing-pr-creation-version-updates,
+# under "Setting up a cooldown period for dependency updates".
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/dialectical-engine"
+    target-branch: "dev"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown:
+      default-days: 7
+    groups: { minor-and-patch: { update-types: ["minor", "patch"] } }
+    open-pull-requests-limit: 5
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "dev"
+    schedule: { interval: "weekly", day: "monday" }
+    cooldown:
+      default-days: 7

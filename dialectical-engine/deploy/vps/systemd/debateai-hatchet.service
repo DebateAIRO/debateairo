@@ -1,0 +1,22 @@
+# deploy/vps/systemd/debateai-hatchet.service
+# Wraps the single production container (deploy/vps/compose.prod.yaml) so systemd owns the boot
+# order: postgresql -> hatchet -> api -> ui. Runs as root because it drives the docker socket;
+# the container itself is the only thing here that is not a hardened per-service unit.
+[Unit]
+Description=DebateAI Hatchet engine (hatchet-lite container)
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=network-online.target postgresql.service docker.service
+Wants=network-online.target
+Requires=docker.service postgresql.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/opt/debateai/dialectical-engine/deploy/vps
+ExecStart=/usr/bin/docker compose -f /opt/debateai/dialectical-engine/deploy/vps/compose.prod.yaml up -d
+ExecStop=/usr/bin/docker compose -f /opt/debateai/dialectical-engine/deploy/vps/compose.prod.yaml down
+TimeoutStartSec=180
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

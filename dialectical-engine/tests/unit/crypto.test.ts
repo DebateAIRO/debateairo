@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -8,7 +9,13 @@ import {
   decrypt,
   encrypt,
   generateDek,
+  generateVerificationToken,
+  hashToken,
+  hashVerificationToken,
+  assertPublicationSecretDomains,
+  destroyKek,
   loadKek,
+  loadSecretKey,
   unwrapDek,
   wrapDek
 } from "../../packages/crypto/src/index.js";
@@ -93,7 +100,27 @@ describe("S1 crypto foundation", () => {
 
     await chmod(validPath, 0o644);
     expect(() => loadKek(validPath)).toThrowError(
-      expect.objectContaining({ code: "KEK_UNRESOLVED" })
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+  });
+
+  it("domain-separates token hashes per kind while keeping the sha256:<hex> column grammar", () => {
+    // L2-F12: one unkeyed SHA-256 served session, CSRF, login-challenge,
+    // step-up-grant and verification tokens with no per-purpose domain.
+    const token = generateVerificationToken();
+    const kinds = ["session", "csrf", "login-challenge", "step-up-grant", "verification"] as const;
+    const hashes = kinds.map((kind) => hashToken(kind, token));
+    for (const hash of hashes) expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(new Set(hashes).size).toBe(kinds.length);
+    expect(hashes).not.toContain(hashVerificationToken(token));
+    expect(hashToken("session", token)).toBe(`sha256:${createHash("sha256")
+      .update("debateai:token:session:v1\0", "utf8").update(token, "utf8").digest("hex")}`);
+    expect(hashToken("session", token)).toBe(hashToken("session", token));
+    expect(() => hashToken("session", "too-short")).toThrowError(
+      expect.objectContaining({ code: "CRYPTO_KEY_INVALID" })
+    );
+    expect(() => hashToken("cookie" as never, token)).toThrowError(
+      expect.objectContaining({ code: "CRYPTO_TOKEN_KIND_INVALID" })
     );
   });
 
@@ -120,6 +147,218 @@ describe("S1 crypto foundation", () => {
     );
   });
 
+  it("refuses key files that fail the custody contract instead of following them", async () => {
+    // L2-F6: the production loaders checked only isFile + 0600, so they
+    // followed symlinks, accepted a file owned by anyone, ignored extra hard
+    // links, and never looked at the parent directory. The dev launchers
+    // already enforced O_NOFOLLOW + uid + nlink + size.
+    const directory = await mkdtemp(join(tmpdir(), "debateai-custody-"));
+    temporaryDirectories.push(directory);
+    await chmod(directory, 0o700);
+    const validPath = join(directory, "kek");
+    await writeFile(validPath, generateDek(), { mode: 0o600 });
+    await chmod(validPath, 0o600);
+
+    // The contract-satisfying file still loads through both loaders.
+    expect(Object.keys(loadKek(validPath))).toEqual([]);
+    expect(loadSecretKey(validPath)).toHaveLength(32);
+
+    // A symlink pointing at a perfectly valid key is still refused: the
+    // custody decision must be made about the file the loader opened.
+    const linkPath = join(directory, "kek-symlink");
+    await symlink(validPath, linkPath);
+    expect(() => loadKek(linkPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    expect(() => loadSecretKey(linkPath)).toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
+
+    // A second hard link means a second name can outlive a custody rotation.
+    const hardPath = join(directory, "kek-hardlink");
+    await link(validPath, hardPath);
+    expect(() => loadKek(hardPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    await rm(hardPath);
+
+    // A raw key is exactly 32 bytes; 31 or 33 is a different secret.
+    const shortPath = join(directory, "kek-short");
+    await writeFile(shortPath, Buffer.alloc(31), { mode: 0o600 });
+    await chmod(shortPath, 0o600);
+    expect(() => loadKek(shortPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    expect(() => loadSecretKey(shortPath)).toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
+
+    // A group/world-readable key file.
+    await chmod(validPath, 0o640);
+    expect(() => loadKek(validPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    await chmod(validPath, 0o600);
+
+    // A 0600 key inside a 0755 directory is a key anyone can replace.
+    await chmod(directory, 0o755);
+    expect(() => loadKek(validPath)).toThrowError(
+      expect.objectContaining({ code: "KEK_CUSTODY_INVALID" })
+    );
+    expect(() => loadSecretKey(validPath)).toThrowError(
+      expect.objectContaining({ code: "SECRET_CUSTODY_INVALID" })
+    );
+    await chmod(directory, 0o700);
+    expect(Object.keys(loadKek(validPath))).toEqual([]);
+
+    // A path that is simply not there stays the unresolved-configuration code.
+    expect(() => loadKek(join(directory, "absent"))).toThrowError(
+      expect.objectContaining({ code: "KEK_UNRESOLVED" })
+    );
+    expect(() => loadSecretKey(join(directory, "absent"))).toThrowError(
+      expect.objectContaining({ code: "KEK_UNRESOLVED" })
+    );
+  });
+
+  it("destroys the KEK master copy so nothing can wrap or unwrap after shutdown", async () => {
+    // L2-F7: the WeakMap master copy was never zeroed and there was no destroy
+    // API, so the KEK stayed in process memory for a core dump or swap to find
+    // long after the pools closed.
+    const kek = loadKek(generateDek());
+    const dek = generateDek();
+    const wrapped = wrapDek(kek, dek, wrappedDekAad);
+    expect(unwrapDek(kek, wrapped, wrappedDekAad)).toEqual(dek);
+
+    destroyKek(kek);
+
+    expect(() => wrapDek(kek, dek, wrappedDekAad)).toThrowError(
+      expect.objectContaining({ code: "KEK_DESTROYED" })
+    );
+    expect(() => unwrapDek(kek, wrapped, wrappedDekAad)).toThrowError(
+      expect.objectContaining({ code: "KEK_DESTROYED" })
+    );
+    // Shutdown may run twice (signal then controller close); destroy is idempotent.
+    expect(() => destroyKek(kek)).not.toThrow();
+
+    const shutdown = await readFile(
+      new URL("../../apps/api/src/graceful-shutdown.ts", import.meta.url), "utf8"
+    );
+    expect(shutdown).toContain("destroyKek");
+  });
+
+  it("refuses aliased secret domains even when publication is disabled", async () => {
+    // L2-F8: the pairwise key-domain check ran only under PUBLICATION_ENABLED,
+    // so with publication off an operator could point KEK_PATH and
+    // BLIND_INDEX_KEY_PATH at one file and silently make the KEK the email
+    // HMAC key.
+    const directory = await mkdtemp(join(tmpdir(), "debateai-domains-"));
+    temporaryDirectories.push(directory);
+    const kekPath = join(directory, "kek");
+    const blindIndexPath = join(directory, "blind-index-key");
+    const saltPath = join(directory, "audit-source-ip-salt");
+    const storePath = join(directory, "user-dek-store");
+    const auditStorePath = join(directory, "audit-key-store");
+    const kekMaterial = generateDek();
+    const blindIndexKey = generateDek();
+    const salt = generateDek();
+    await writeFile(kekPath, kekMaterial, { mode: 0o600 });
+    await writeFile(blindIndexPath, blindIndexKey, { mode: 0o600 });
+    await writeFile(saltPath, salt, { mode: 0o600 });
+    await mkdir(storePath, { mode: 0o700 });
+    await mkdir(auditStorePath, { mode: 0o700 });
+    const kek = loadKek(kekMaterial);
+
+    const separated = Object.freeze({
+      privateKek: kek,
+      privateKekPath: kekPath,
+      privateStorePath: storePath,
+      additionalSecrets: [
+        { path: blindIndexPath, material: blindIndexKey },
+        { path: saltPath, material: salt }
+      ],
+      additionalStorePaths: [auditStorePath]
+    });
+    // A correctly provisioned private-only deployment passes with no corpus KEK.
+    expect(() => assertPublicationSecretDomains(separated)).not.toThrow();
+
+    // KEK_PATH === BLIND_INDEX_KEY_PATH.
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      additionalSecrets: [
+        { path: kekPath, material: blindIndexKey },
+        { path: saltPath, material: salt }
+      ]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // Distinct paths, identical bytes.
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      additionalSecrets: [
+        { path: blindIndexPath, material: kekMaterial },
+        { path: saltPath, material: salt }
+      ]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // The audit-key store nested inside the user DEK store.
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      additionalStorePaths: [join(storePath, "audit")]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // A symlinked alias resolves to the same inode.
+    const aliasPath = join(directory, "kek-alias");
+    await symlink(kekPath, aliasPath);
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      additionalSecrets: [
+        { path: aliasPath, material: blindIndexKey },
+        { path: saltPath, material: salt }
+      ]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    /**
+     * FIX ROUND 1, Minor 3. A changeover's PREVIOUS keys are key material this
+     * process holds, so they belong in the same pairwise check: a
+     * `KEK_PREVIOUS_PATH` aimed at the blind-index key file makes the email
+     * HMAC key a KEK for the length of the changeover, and `toKekRing` cannot
+     * see it — it only refuses a previous key EQUAL to its own current one.
+     */
+    const previousKekPath = join(directory, "kek-previous");
+    const previousMaterial = generateDek();
+    await writeFile(previousKekPath, previousMaterial, { mode: 0o600 });
+    const previousKek = loadKek(previousMaterial);
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      previousKeks: [{ handle: previousKek, path: previousKekPath }]
+    })).not.toThrow();
+
+    // The previous key IS the blind-index key, under its own name.
+    const aliasedPreviousPath = join(directory, "kek-previous-alias");
+    await writeFile(aliasedPreviousPath, blindIndexKey, { mode: 0o600 });
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      previousKeks: [{ handle: loadKek(blindIndexKey), path: aliasedPreviousPath }]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // Or names the blind-index key's own path, whatever bytes it holds.
+    expect(() => assertPublicationSecretDomains({
+      ...separated,
+      previousKeks: [{ handle: previousKek, path: blindIndexPath }]
+    })).toThrow("SECRET_DOMAIN_MUST_BE_SEPARATE");
+
+    // The API process root must run this check with no publication guard.
+    const apiMain = await readFile(
+      new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
+    );
+    // Fix round 1: the previous keys of both rings reach the check.
+    expect(apiMain).toContain("previousKeks:");
+    // DL7-F7: still at the process root and still unguarded by publication; it is
+    // a named boot stage now, so a failure zeroes the keys already loaded.
+    expect(apiMain).toMatch(
+      /^await boot[.]run\("publication-secret-domains", async \(\) => assertPublicationSecretDomains\(\{/m
+    );
+  });
+
   it("makes both process compositions refuse a missing KEK_PATH with the typed code", () => {
     vi.stubEnv("KEK_PATH", undefined);
     expect(() => loadApiEnvironment()).toThrowError(
@@ -135,12 +374,15 @@ describe("S1 crypto foundation", () => {
       readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8")
     ]);
-    expect(apiMain).toContain("loadKek(environment.KEK_PATH)");
+    // V-3 (A-C2): each root loads its KEK as a RING — the current key and, only
+    // while a changeover is configured, the previous one. `loadKekRing` is the
+    // same custody-checked `loadKek` underneath, once per path.
+    expect(apiMain).toContain("loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH");
     expect(apiMain).toContain("supportKekPath: environment.SUPPORT_KEK_PATH");
     expect(apiMain).toContain("protectedKeyPaths:");
     expect(apiMain).not.toContain(
       "createSupportKeyPort({ supportKekPath: environment.KEK_PATH })"
     );
-    expect(runnerMain).toContain("loadKek(environment.KEK_PATH)");
+    expect(runnerMain).toContain("loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH)");
   });
 });

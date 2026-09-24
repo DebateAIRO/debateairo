@@ -2,16 +2,25 @@
 
 import { useEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
 import { redactSupportText } from "@debateai/kernel";
-import {
-  SUPPORT_CAPABILITIES,
-  type SupportAction,
-  type SupportActionId
-} from "@debateai/support-kb/catalog";
+import type { SupportAction } from "@debateai/support-kb/catalog";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { requestPreferences } from "../../lib/consent.js";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
-import { supportPost } from "./http.js";
+import { supportCaseLink } from "./caseLink.js";
+import {
+  browserSupportConversationStorage,
+  clearStoredSupportConversation,
+  hasExactKeys,
+  restoreSupportConversation,
+  supportActionsFrom,
+  supportSourcesFrom,
+  writeStoredSupportConversation,
+  SUPPORT_CONVERSATION_STORAGE_KEY,
+  type SupportConversationMessage,
+  type SupportSource
+} from "./conversation.js";
+import { isStaleSupportSession, supportPost, SupportHttpError } from "./http.js";
 
 export type SupportAssistantLanguage = "en" | "ro";
 export type SupportAssistantOutcome =
@@ -44,6 +53,7 @@ type SupportSession = Readonly<{
   sessionId: string;
   token: string;
   identityBound: boolean;
+  /** The language the session was opened in; its actions resolve in it. */
   language?: SupportAssistantLanguage;
 }>;
 export type SupportCaseAcknowledgement = Readonly<{
@@ -52,7 +62,6 @@ export type SupportCaseAcknowledgement = Readonly<{
   slaHours: number;
   link: string;
 }>;
-type SupportSource = Readonly<{ id: string;label: string }>;
 type SupportReply = Readonly<{
   messageId: string;
   outcome: SupportAssistantOutcome;
@@ -135,76 +144,55 @@ const REQUEST_UNAVAILABLE = Object.freeze({
   ro: "Serviciul de suport nu este disponibil acum. Încearcă din nou sau alege „Vorbește cu o persoană”."
 });
 
-const MAX_RESPONSE_DECORATIONS = 3;
-const SUPPORT_SOURCE_IDS = new Set(
-  SUPPORT_CAPABILITIES.flatMap(({ articleIds }) => articleIds)
-);
+/**
+ * DL1-F5c: what the stored transcript says about an open case, and what the
+ * page shows once the bearer is gone — a reload, another tab, the next person
+ * at a shared browser. The API's own acknowledgement sentence carries the
+ * 30-day case capability twice (the code and the link); this one carries it
+ * nowhere, so it is what rests in `sessionStorage`.
+ */
+const CASE_OPENED_NOTICE = Object.freeze({
+  en: "A case is open for a person to read. Its code is never kept in this browser, so it is not shown here — use the case link from when it was opened, or ask for a person again.",
+  ro: "Un caz este deschis pentru ca o persoană să îl citească. Codul lui nu este păstrat în acest browser, așa că nu este afișat aici — folosește linkul cazului de la deschidere sau cere din nou o persoană."
+});
 
 const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help"]);
 const PUBLIC_DEBATE = /^\/public\/debate\/[A-Za-z0-9_-]+$/u;
-const SUPPORT_CASE = /^\/help[?]case=[A-Za-z0-9_-]{43}$/u;
+/** The API's case-capability grammar (`apps/api/src/support/session.ts`). */
+const CASE_BEARER = /^[A-Za-z0-9_-]{43}$/u;
+const SUPPORT_CASE = /^\/help(?:[?]|#)case=([A-Za-z0-9_-]{43})$/u;
 
+/**
+ * DL3-F4: the single place a case link becomes an href. The API mints the
+ * fragment form only (`apps/api/src/support/index.ts`, DL1-F5c), and the
+ * retired `/help?case=…` form is still recognised here for one release, for a
+ * link a person saved before the change — and rendered as `/help#case=…`,
+ * because a bearer in the query string reaches the address bar, browser history
+ * and any future access log, and a bearer in the fragment does not reach a
+ * server at all. Corrected in the final-review fix wave: the sentence above
+ * this function used to say the API still minted the query form.
+ */
 function safeFirstPartyLink(link: string | undefined): string | null {
   if (link === undefined) return null;
-  return STATIC_ROUTES.has(link) || PUBLIC_DEBATE.test(link) || SUPPORT_CASE.test(link) ? link : null;
+  const bearer = SUPPORT_CASE.exec(link);
+  if (bearer !== null) return supportCaseLink(bearer[1]!);
+  return STATIC_ROUTES.has(link) || PUBLIC_DEBATE.test(link) ? link : null;
 }
 
 function caseAcknowledgement(body: Readonly<Record<string,unknown>>): SupportCaseAcknowledgement | null {
   if (typeof body.case_acknowledgement !== "string"
-    || typeof body.case_token !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(body.case_token)
+    || typeof body.case_token !== "string" || !CASE_BEARER.test(body.case_token)
     || typeof body.sla_hours !== "number" || !Number.isSafeInteger(body.sla_hours)
-    || typeof body.link !== "string" || body.link !== `/help?case=${body.case_token}`) return null;
+    // DL1-F5c: the API mints the fragment form and nothing else, so the
+    // tolerance for a query-string bearer from the server is gone. The
+    // browser-side read of a `?case=` link a person saved stays for one
+    // release, in `caseLink.ts`, where it belongs.
+    || typeof body.link !== "string"
+    || body.link !== supportCaseLink(body.case_token)) return null;
   return Object.freeze({
     text: body.case_acknowledgement,token: body.case_token,
-    slaHours: body.sla_hours,link: body.link
+    slaHours: body.sla_hours,link: supportCaseLink(body.case_token)
   });
-}
-
-function hasExactKeys(value: Readonly<Record<string,unknown>>,keys: readonly string[]): boolean {
-  const actual = Object.keys(value);
-  return actual.length === keys.length && keys.every((key) => Object.hasOwn(value,key));
-}
-
-function sourcesFrom(value: unknown): readonly SupportSource[] | null {
-  if (value === undefined) return Object.freeze([]);
-  if (!Array.isArray(value) || value.length > MAX_RESPONSE_DECORATIONS) return null;
-  const seen = new Set<string>();
-  const sources: SupportSource[] = [];
-  for (const member of value) {
-    if (member === null || typeof member !== "object" || Array.isArray(member)) return null;
-    const source = member as Readonly<Record<string,unknown>>;
-    if (!hasExactKeys(source,["id","label"])
-      || typeof source.id !== "string" || !SUPPORT_SOURCE_IDS.has(source.id)
-      || typeof source.label !== "string" || source.label.length === 0
-      || seen.has(source.id)) return null;
-    seen.add(source.id);
-    sources.push(Object.freeze({ id: source.id,label: source.label }));
-  }
-  return Object.freeze(sources);
-}
-
-function actionsFrom(
-  value: unknown,
-  context: Readonly<{ signedIn: boolean;language: SupportAssistantLanguage }> | undefined
-): readonly SupportAction[] | null {
-  if (value === undefined) return Object.freeze([]);
-  if (!Array.isArray(value) || value.length > MAX_RESPONSE_DECORATIONS) return null;
-  if (value.length > 0 && context === undefined) return null;
-  const seen = new Set<string>();
-  const actions: SupportAction[] = [];
-  for (const member of value) {
-    if (member === null || typeof member !== "object" || Array.isArray(member)) return null;
-    const action = member as Readonly<Record<string,unknown>>;
-    if (!hasExactKeys(action,["id","label","href"])
-      || typeof action.id !== "string" || typeof action.label !== "string"
-      || typeof action.href !== "string" || seen.has(action.id)) return null;
-    const canonical = resolveSupportActions([action.id as SupportActionId],context!);
-    if (canonical.length !== 1 || canonical[0]!.id !== action.id
-      || canonical[0]!.label !== action.label || canonical[0]!.href !== action.href) return null;
-    seen.add(action.id);
-    actions.push(canonical[0]!);
-  }
-  return Object.freeze(actions);
 }
 
 function replyFrom(
@@ -215,8 +203,8 @@ function replyFrom(
     || !SUPPORT_ASSISTANT_OUTCOMES.has(body.outcome as SupportAssistantOutcome)
     || typeof body.text !== "string") return null;
   const acknowledgement = caseAcknowledgement(body);
-  const sources = sourcesFrom(body.sources);
-  const actions = actionsFrom(body.actions,context);
+  const sources = supportSourcesFrom(body.sources);
+  const actions = supportActionsFrom(body.actions,context);
   if (sources === null || actions === null) return null;
   const responseLink = typeof body.refusal_link === "string"
     ? body.refusal_link
@@ -250,13 +238,16 @@ async function readJson(response: Response): Promise<Record<string,unknown>> {
   const value = await response.json() as unknown;
   const body = value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string,unknown> : {};
+  // dev: the exact restart envelope, and nothing wider, asks for a new session.
   if (response.status === 409 && hasExactKeys(body,["error","restart_session"])
     && body.error === "SUPPORT_KB_SNAPSHOT_UNAVAILABLE" && body.restart_session === true) {
     throw new SupportSnapshotUnavailableError();
   }
   if (!response.ok
     && (typeof body.outcome !== "string" || typeof body.text !== "string")) {
-    throw new Error("SUPPORT_REQUEST_UNAVAILABLE");
+    // DL3-F3: the status travels with the failure so a stale session (404) can
+    // be told apart from an outage and recovered from instead of dead-ending.
+    throw new SupportHttpError(response.status);
   }
   return body;
 }
@@ -312,76 +303,36 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
   }
 });
 
-type ConversationMessage = Readonly<{
-  id: string;
-  role: "assistant" | "user";
-  text: string;
-  link?: string;
-  outcome?: SupportAssistantOutcome;
-  language?: SupportAssistantLanguage;
-  sources?: readonly SupportSource[];
-  actions?: readonly SupportAction[];
-}>;
+type ConversationMessage = SupportConversationMessage;
 
-export const SUPPORT_CONVERSATION_STORAGE_KEY = "debateai.support.conversation.v1";
+/** DL1-F5c: the case capability, for as long as this page is on screen. */
+type SupportCaseBearer = Readonly<{ token: string;text: string }>;
 
-type StoredConversation = Readonly<{
-  language: SupportAssistantLanguage;
-  session: SupportSession | null;
-  messages: readonly ConversationMessage[];
-}>;
-
-function readStoredConversation(): StoredConversation | null {
-  if (typeof sessionStorage === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY);
-    if (raw === null) return null;
-    const value = JSON.parse(raw) as Partial<StoredConversation>;
-    if ((value.language !== "en" && value.language !== "ro")
-      || !Array.isArray(value.messages)) return null;
-    const storedLanguage = value.language;
-    const session = value.session === null ? null
-      : value.session !== undefined && typeof value.session.sessionId === "string"
-        && typeof value.session.token === "string"
-        && typeof value.session.identityBound === "boolean" ? Object.freeze({
-          ...value.session,
-          language: value.session.language === "en" || value.session.language === "ro"
-            ? value.session.language : storedLanguage
-        }) : null;
-    const messages = value.messages.map((message): ConversationMessage | null => {
-      if (message === null || typeof message !== "object" || Array.isArray(message)) return null;
-      const record = message as Readonly<Record<string,unknown>>;
-      if (typeof record.id !== "string" || typeof record.text !== "string"
-        || (record.role !== "assistant" && record.role !== "user")) return null;
-      if (record.role === "user") {
-        return Object.freeze({ id: record.id,role: "user" as const,text: record.text });
-      }
-      const messageLanguage = record.language === "en" || record.language === "ro"
-        ? record.language : storedLanguage;
-      const sources = sourcesFrom(record.sources);
-      const actions = actionsFrom(record.actions,{
-        signedIn: session?.identityBound ?? false,language: messageLanguage
-      });
-      if (sources === null || actions === null
-        || (record.outcome !== undefined && (typeof record.outcome !== "string"
-          || !SUPPORT_ASSISTANT_OUTCOMES.has(record.outcome as SupportAssistantOutcome)))
-        || (record.link !== undefined && typeof record.link !== "string")) return null;
-      return Object.freeze({
-        id: record.id,role: "assistant" as const,text: record.text,language: messageLanguage,
-        sources,actions,
-        ...(record.outcome === undefined ? {} : { outcome: record.outcome as SupportAssistantOutcome }),
-        ...(record.link === undefined ? {} : { link: record.link })
-      });
-    });
-    if (messages.some((message) => message === null)) return null;
-    return Object.freeze({
-      language: storedLanguage,session,
-      messages: Object.freeze(messages as ConversationMessage[])
-    });
-  } catch {
-    return null;
-  }
+/**
+ * The only door a case bearer takes into this component's memory. The
+ * acknowledgement path has already checked the grammar; the escalate reply is a
+ * bare `{case_token,text}`, and a link is built only from a value that reads
+ * like the capability it claims to be.
+ */
+function caseBearerOf(token: string,text: string): SupportCaseBearer | null {
+  return CASE_BEARER.test(token) ? Object.freeze({ token,text }) : null;
 }
+
+/**
+ * The acknowledgement as it may rest in the browser: the fact that a case was
+ * opened, never the code that opens it. The id is the message's position, so it
+ * is a stable React key that carries nothing (it used to be `case-<token>`).
+ */
+function caseOpenedMessage(
+  index: number,language: SupportAssistantLanguage
+): ConversationMessage {
+  return Object.freeze({
+    id: `case-${index}`,role: "assistant" as const,
+    text: CASE_OPENED_NOTICE[language],caseOpened: true as const
+  });
+}
+
+export { SUPPORT_CONVERSATION_STORAGE_KEY };
 
 export function Assistant({
   client = supportAssistantClient,signedIn,onLanguageChange,
@@ -395,14 +346,27 @@ export function Assistant({
   onClose?: () => void;
 }>) {
   const persistent = client === supportAssistantClient;
-  const [stored] = useState(() => persistent ? readStoredConversation() : null);
-  const [language,setLanguage] = useState<SupportAssistantLanguage>(stored?.language ?? "en");
-  const [session,setSession] = useState<SupportSession | null>(stored?.session ?? null);
-  const [messages,setMessages] = useState<readonly ConversationMessage[]>(stored?.messages ?? [
-    { id: "disclosure",role: "assistant",text: DISCLOSURE[stored?.language ?? "en"] }
+  const [language,setLanguage] = useState<SupportAssistantLanguage>("en");
+  // DL3-F3: the capability lives here and nowhere else. It is never written to
+  // sessionStorage, so it cannot outlive the page that minted it.
+  const [session,setSession] = useState<SupportSession | null>(null);
+  /**
+   * DL1-F5c: the case capability lives here and in the URL fragment, and in
+   * neither `sessionStorage` nor the transcript: it reads a whole case and
+   * replies as the reporter for thirty days, with no cookie, for anyone holding
+   * it. The stored acknowledgement is the token-free notice; this is what puts
+   * the code and its link back on screen for the page that opened the case.
+   */
+  const [caseBearer,setCaseBearer] = useState<SupportCaseBearer | null>(null);
+  const [messages,setMessages] = useState<readonly ConversationMessage[]>([
+    { id: "disclosure",role: "assistant",text: DISCLOSURE.en }
   ]);
   const [busy,setBusy] = useState(false);
   const [identityAvailable,setIdentityAvailable] = useState(signedIn ?? false);
+  // DL3-F3: nothing stored is read back until the identity at the keyboard is
+  // known, so a signed-out first paint can never show a signed-in transcript.
+  const [identityResolved,setIdentityResolved] = useState(signedIn !== undefined);
+  const [restored,setRestored] = useState(false);
   const [activeTopic,setActiveTopic] = useState("reading");
   const [pageStatus,setPageStatus] = useState<SupportPageStatus | null>(null);
   const [statusUnavailable,setStatusUnavailable] = useState(false);
@@ -415,12 +379,25 @@ export function Assistant({
     onLanguageChange?.(language);
   },[language,onLanguageChange]);
 
+  // DL3-F3: the transcript is restored once, against the identity that produced
+  // it. A transcript belonging to anyone else is erased on the way past.
   useEffect(() => {
-    if (!persistent || typeof sessionStorage === "undefined") return;
-    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language,session,messages
-    }));
-  },[language,messages,persistent,session]);
+    if (!persistent || restored || !identityResolved) return;
+    setRestored(true);
+    const conversation = restoreSupportConversation(
+      browserSupportConversationStorage(),identityAvailable
+    );
+    if (conversation === null) return;
+    setLanguage(conversation.language);
+    if (conversation.messages.length > 0) setMessages(conversation.messages);
+  },[identityAvailable,identityResolved,persistent,restored]);
+
+  useEffect(() => {
+    if (!persistent || !restored) return;
+    writeStoredSupportConversation(browserSupportConversationStorage(),{
+      language,identityBound: identityAvailable,messages
+    });
+  },[identityAvailable,language,messages,persistent,restored]);
 
   useEffect(() => {
     if (!fullPage || !followLatestRef.current) return;
@@ -433,13 +410,22 @@ export function Assistant({
   useEffect(() => {
     if (signedIn !== undefined) {
       setIdentityAvailable(signedIn);
+      setIdentityResolved(true);
+      return;
+    }
+    if (client.isSignedIn === undefined) {
+      setIdentityResolved(true);
       return;
     }
     let active = true;
-    void client.isSignedIn?.().then((available) => {
-      if (active) setIdentityAvailable(available);
+    void client.isSignedIn().then((available) => {
+      if (!active) return;
+      setIdentityAvailable(available);
+      setIdentityResolved(true);
     }).catch(() => {
-      if (active) setIdentityAvailable(false);
+      if (!active) return;
+      setIdentityAvailable(false);
+      setIdentityResolved(true);
     });
     return () => { active = false; };
   },[client,signedIn]);
@@ -488,16 +474,21 @@ export function Assistant({
 
   function beginNewConversation(): void {
     setSession(null);
+    // DL1-F5c: the bearer goes with the transcript it belongs to.
+    setCaseBearer(null);
     setMessages([{ id: "disclosure",role: "assistant",text: DISCLOSURE[language] }]);
     setActiveTopic("reading");
     if (inputRef.current !== null) inputRef.current.value = "";
-    if (persistent && typeof sessionStorage !== "undefined") {
-      sessionStorage.removeItem(SUPPORT_CONVERSATION_STORAGE_KEY);
-    }
+    if (persistent) clearStoredSupportConversation(browserSupportConversationStorage());
   }
 
   function appendReply(response: SupportReply): void {
     if (response.outcome === "SHREDDED") setSession(null);
+    const acknowledgement = response.caseAcknowledgement;
+    // DL1-F5c: the code and the link go to memory, the fact goes to the transcript.
+    if (acknowledgement !== undefined) {
+      setCaseBearer(caseBearerOf(acknowledgement.token,acknowledgement.text));
+    }
     setMessages((current) => [
       ...current,
       {
@@ -508,14 +499,11 @@ export function Assistant({
         actions: response.actions ?? Object.freeze([]),
         ...(response.link === undefined ? {} : { link: response.link })
       },
-      ...(response.caseAcknowledgement === undefined ? [] : [{
-        id: `case-${response.caseAcknowledgement.token}`,role: "assistant" as const,
-        text: response.caseAcknowledgement.text,link: response.caseAcknowledgement.link
-      }])
+      ...(acknowledgement === undefined ? [] : [caseOpenedMessage(current.length + 1,language)])
     ]);
   }
 
-  async function activeSession(): Promise<SupportSession | null> {
+  async function activeSession(discardCurrent = false): Promise<SupportSession | null> {
     let currentIdentity = identityAvailable;
     if (signedIn !== undefined) {
       currentIdentity = signedIn;
@@ -528,7 +516,9 @@ export function Assistant({
         setIdentityAvailable(false);
       }
     }
-    if (session !== null && session.identityBound === currentIdentity) return session;
+    if (!discardCurrent && session !== null && session.identityBound === currentIdentity) {
+      return session;
+    }
     const started = await client.createSession(language);
     if (isSupportReply(started)) {
       appendReply(started);
@@ -536,6 +526,40 @@ export function Assistant({
     }
     setSession(started);
     return started;
+  }
+
+  /**
+   * DL3-F3: one attempt, and if the API says the capability is unknown (404 —
+   * a stale identity-bound session on a shared tab, an expiry, a lock) one
+   * retry on a brand-new session. Without this the compact widget answered
+   * "Support is unavailable" for the life of the tab, with no reset control.
+   *
+   * dev's snapshot restart takes the same door: the API's exact 409
+   * `SUPPORT_KB_SNAPSHOT_UNAVAILABLE` envelope retires the session the way a
+   * stale 404 does, and the turn is retried once on a fresh session held in
+   * memory — the session is never read back from, or written to, storage. A
+   * second mismatch leaves no session held and surfaces as unavailable.
+   */
+  async function withSupportSession<T>(
+    run: (active: SupportSession) => Promise<T>
+  ): Promise<T | null> {
+    const active = await activeSession();
+    if (active === null) return null;
+    try {
+      return await run(active);
+    } catch (failure) {
+      if (!isStaleSupportSession(failure)
+        && !(failure instanceof SupportSnapshotUnavailableError)) throw failure;
+      setSession(null);
+      const fresh = await activeSession(true);
+      if (fresh === null) return null;
+      try {
+        return await run(fresh);
+      } catch (retryFailure) {
+        if (retryFailure instanceof SupportSnapshotUnavailableError) setSession(null);
+        throw retryFailure;
+      }
+    }
   }
 
   async function sendRequest(rawRequest: string,clearComposer?: () => void): Promise<void> {
@@ -547,36 +571,8 @@ export function Assistant({
       id: `user-${current.length}`,role: "user",text: request
     }]);
     try {
-      const active = await activeSession();
-      if (active === null) return;
-      let response: SupportReply;
-      try {
-        response = await client.sendMessage(active,request);
-      } catch (error) {
-        if (!(error instanceof SupportSnapshotUnavailableError)) throw error;
-        setSession(null);
-        if (persistent && typeof sessionStorage !== "undefined") {
-          sessionStorage.removeItem(SUPPORT_CONVERSATION_STORAGE_KEY);
-        }
-        const restarted = await client.createSession(language);
-        if (isSupportReply(restarted)) {
-          appendReply(restarted);
-          return;
-        }
-        setSession(restarted);
-        try {
-          response = await client.sendMessage(restarted,request);
-        } catch (retryError) {
-          if (retryError instanceof SupportSnapshotUnavailableError) {
-            setSession(null);
-            if (persistent && typeof sessionStorage !== "undefined") {
-              sessionStorage.removeItem(SUPPORT_CONVERSATION_STORAGE_KEY);
-            }
-          }
-          throw retryError;
-        }
-      }
-      appendReply(response);
+      const response = await withSupportSession((active) => client.sendMessage(active,request));
+      if (response !== null) appendReply(response);
     } catch {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
     } finally {
@@ -595,15 +591,13 @@ export function Assistant({
     if (busy) return;
     setBusy(true);
     try {
-      const active = await activeSession();
-      if (active === null) return;
-      const opened = await client.escalate(active,language);
+      const opened = await withSupportSession((active) => client.escalate(active,language));
+      if (opened === null) return;
       if (isSupportReply(opened)) {
         appendReply(opened);
       } else {
-        setMessages((current) => [...current,{
-          id: `case-${opened.token}`,role: "assistant",text: opened.text
-        }]);
+        setCaseBearer(caseBearerOf(opened.token,opened.text));
+        setMessages((current) => [...current,caseOpenedMessage(current.length,language)]);
       }
     } catch {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
@@ -623,10 +617,8 @@ export function Assistant({
       if (isSupportReply(acknowledgement)) {
         appendReply(acknowledgement);
       } else {
-        setMessages((current) => [...current,{
-          id: `case-${acknowledgement.token}`,role: "assistant",
-          text: acknowledgement.text,link: acknowledgement.link
-        }]);
+        setCaseBearer(caseBearerOf(acknowledgement.token,acknowledgement.text));
+        setMessages((current) => [...current,caseOpenedMessage(current.length,language)]);
       }
     } catch {
       appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
@@ -638,9 +630,21 @@ export function Assistant({
     <button type="button" aria-pressed={language === "ro"} onClick={() => chooseLanguage("ro")}>RO</button>
   </div>;
 
+  /**
+   * DL1-F5c: the acknowledgement the in-memory bearer belongs to — the newest
+   * one, which is the case this page just opened. Every other acknowledgement,
+   * and all of them after a reload or in another tab, render the stored
+   * token-free notice with no link, because the code is not there to render.
+   */
+  const liveCaseMessageId = caseBearer === null ? null : messages.reduce<string | null>(
+    (newest,message) => message.caseOpened === true ? message.id : newest,null
+  );
+
   const conversation = <div className="supportConversation" aria-label="Support conversation" aria-live="polite">
     {messages.map((message) => {
-      const link = safeFirstPartyLink(message.link);
+      const bearer = caseBearer !== null && message.id === liveCaseMessageId ? caseBearer : null;
+      const text = bearer === null ? message.text : bearer.text;
+      const link = bearer === null ? safeFirstPartyLink(message.link) : supportCaseLink(bearer.token);
       const sources = message.sources ?? Object.freeze([]);
       const actions = message.actions ?? Object.freeze([]);
       const hasFooter = link !== null || sources.length > 0 || actions.length > 0;
@@ -648,7 +652,7 @@ export function Assistant({
         {message.role === "assistant" ? <div className="supportMessageShell">
           <div className="supportMessageTab" aria-hidden />
           <div className="supportMessageCore">
-            <p>{message.text}</p>
+            <p>{text}</p>
             {!hasFooter ? null : <footer className="supportCitation">
               {sources.length === 0 ? null : <div role="list" aria-label={language === "en" ? "Sources" : "Surse"}>
                 {sources.map((source) => <span role="listitem" key={source.id}>{source.label}</span>)}
@@ -662,7 +666,7 @@ export function Assistant({
               </>}
             </footer>}
           </div>
-        </div> : <p>{message.text}</p>}
+        </div> : <p>{text}</p>}
       </article>;
     })}
   </div>;

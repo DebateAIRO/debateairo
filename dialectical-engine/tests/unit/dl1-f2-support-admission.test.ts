@@ -1,0 +1,451 @@
+import { describe, expect, it, vi } from "vitest";
+import { buildApi, type AskApplication } from "@debateai/api";
+import {
+  ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
+  ADMISSION_POLICY_REGISTER_ROW,
+  ADMISSION_POLICY_ROW_KEY,
+  admissionPolicyFromValue,
+  loadBootstrapRegister,
+  type AdmissionPolicy
+} from "@debateai/register";
+import { buildDevelopmentDeploymentRegisterPublicationRows } from
+  "../../apps/runner/src/dev-deployment-register.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import { AdmissionLimiter } from "../../apps/api/src/admission.js";
+import { supportHarness } from "../support/supportHarness.js";
+import {
+  TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders
+} from "../support/httpSession.js";
+
+/**
+ * DL1-F2. The B10 admission limiter covered three scopes — asks, public reads,
+ * recovery starts — and none of the ten `/v1/support/*` routes. Every public
+ * support read was unmetered, and the heaviest of them, the `/status`
+ * aggregate, ran a multi-CTE join over `support.message`/`session`/`rating`/
+ * `case` on EVERY call with no cache and no limiter. Authenticated session
+ * creation skipped even the per-IP window anonymous callers get, and had no
+ * per-owner cap, so one signed-in account could loop a KEK wrap plus two
+ * inserts without bound.
+ *
+ * The two new budgets are a superseding DEPLOYMENT register row, never an edit
+ * to the sealed one (constraint 5). They are OPTIONAL in the schema, so a host
+ * still serving the current row boots and behaves exactly as it does today;
+ * the fix is live the moment the deployment register publishes the new row.
+ */
+const OWNER_A = testHttpIdentity("support-admission-owner-a");
+const OWNER_B = testHttpIdentity("support-admission-owner-b");
+const SOURCE_A = "203.0.113.5";
+const SOURCE_B = "198.51.100.7";
+const T0 = Date.parse("2026-09-22T00:00:00.000Z");
+const HOUR_MS = 60 * 60_000;
+const QUARTER_MS = 15 * 60_000;
+
+const SEALED: AdmissionPolicy = admissionPolicyFromValue(
+  ADMISSION_POLICY_REGISTER_ROW.value, ADMISSION_POLICY_REGISTER_ROW.sourceRef
+);
+const PUBLISHED: AdmissionPolicy = admissionPolicyFromValue(
+  ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value,
+  ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+);
+
+function policyWith(overrides: Readonly<Record<string, unknown>>): AdmissionPolicy {
+  const value = ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value;
+  return admissionPolicyFromValue(
+    { ...value, ...overrides }, ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+  );
+}
+
+function fixtureAskApplication(): AskApplication {
+  return {
+    withContentLease: async (_runId: string, use: () => unknown) => use(),
+    submit: async () => ({ run_ref: "00000000-0000-4000-8000-000000000000", status: "QUEUED" }),
+    readAnswer: async () => null,
+    readRunAnswer: async () => null,
+    readRun: async () => null,
+    readAnswerIndex: async (_session: unknown, limit: number, offset: number) =>
+      ({ items: [], open_runs: [], limit, offset, total: 0 }),
+    readDeployment: async () => ({
+      register: { register_version: 1, rows: [] }, scorecards: [], model_ledger: [],
+      fleet: { state: "UNAVAILABLE", reason: "NO_TYPED_FLEET_SOURCE" }
+    }),
+    readNode: async () => null,
+    recordInvestigation: async () =>
+      ({ request_ref: "request:test", status: "RECORDED", replay_handle: "replay:test" }),
+    unlinkMemoryLink: async () => ({ memory_link_id: "memory:test", state: "UNLINKED" }),
+    readInspection: async () => null,
+    readLedgerDigest: async () => null,
+    events: async function* () { return; }
+  } as unknown as AskApplication;
+}
+
+function harness(policy: AdmissionPolicy | null = PUBLISHED) {
+  let now = new Date(T0);
+  // Unknown token on both doors: the route's own work, after admission.
+  const readByToken = vi.fn(async () => null);
+  const replyByToken = vi.fn(async () => null);
+  const support = supportHarness({
+    clock: () => now,
+    // Composed so the case read reaches the admission gate instead of 503.
+    caseAccess: Object.freeze({
+      listOwn: async () => [], readByToken, replyByToken
+    }) as NonNullable<Parameters<typeof supportHarness>[0]>["caseAccess"]
+  });
+  const api = buildApi({
+    application: fixtureAskApplication(),
+    sessions: testSessionApplication([OWNER_A, OWNER_B]),
+    support: support.application,
+    allowedOrigin: TEST_APP_ORIGIN,
+    ...(policy === null ? {} : { admission: new AdmissionLimiter(policy) }),
+    admissionClock: () => now
+  });
+  const refusalLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  return Object.freeze({
+    api, support, readByToken, replyByToken,
+    advance: (ms: number) => { now = new Date(now.getTime() + ms); },
+    status: (remoteAddress: string) =>
+      api.inject({ method: "GET", url: "/v1/support/status", remoteAddress }),
+    readCase: (remoteAddress: string, token: string) => api.inject({
+      method: "GET", url: "/v1/support/case", remoteAddress,
+      headers: { "x-support-case-token": token }
+    }),
+    replyToCase: (remoteAddress: string, token: string) => api.inject({
+      method: "POST", url: "/v1/support/case/messages", remoteAddress,
+      headers: { origin: TEST_APP_ORIGIN, "x-support-case-token": token },
+      payload: { text: "any news?" }
+    }),
+    readSession: (remoteAddress: string, id: string, token: string) => api.inject({
+      method: "GET", url: `/v1/support/sessions/${id}`, remoteAddress,
+      headers: { "x-support-session-token": token }
+    }),
+    createAnonymous: (remoteAddress: string) => api.inject({
+      method: "POST", url: "/v1/support/sessions", remoteAddress,
+      // DL1-F7: a browser on the first-party page sends this; a drive-by cannot.
+      headers: { origin: TEST_APP_ORIGIN }, payload: { language: "en" }
+    }),
+    createOwned: (identity: typeof OWNER_A, remoteAddress: string) => api.inject({
+      method: "POST", url: "/v1/support/sessions", remoteAddress,
+      headers: { ...testSessionHeaders(identity, true), origin: TEST_APP_ORIGIN },
+      payload: { language: "en" }
+    }),
+    refusalLines: () => refusalLog.mock.calls.map((call) => {
+      try { return JSON.parse(String(call[0])) as unknown; } catch { return String(call[0]); }
+    }),
+    close: async () => { refusalLog.mockRestore(); await api.close(); }
+  });
+}
+
+const REFUSAL = Object.freeze({
+  error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED"
+});
+
+describe("DL1-F2 the support budgets supersede, never edit, the sealed row", () => {
+  it("leaves the sealed admission row exactly as it was, with only its three scopes", () => {
+    expect(Object.keys(ADMISSION_POLICY_REGISTER_ROW.value).sort())
+      .toEqual(["asks", "kind", "public_reads", "recovery_start"]);
+    expect(SEALED.supportReads).toBeNull();
+    expect(SEALED.supportSessions).toBeNull();
+  });
+
+  it("publishes a superseding row that adds the support scopes and nothing else", () => {
+    expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.rowKey)
+      .toBe(ADMISSION_POLICY_REGISTER_ROW.rowKey);
+    expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value).toEqual({
+      ...ADMISSION_POLICY_REGISTER_ROW.value,
+      support_reads: { key: "source", limit: 240, window_ms: QUARTER_MS, capacity: 65_536 },
+      support_sessions: { key: "owner", limit: 10, window_ms: HOUR_MS, capacity: 8_192 },
+      // DL1-F7 rides the same unpublished deployment version; see its own test.
+      support_model_calls: {
+        key: "source", limit: 40, window_ms: 24 * 60 * 60_000, capacity: 65_536
+      }
+    });
+    expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef)
+      .toContain(ADMISSION_POLICY_REGISTER_ROW.sourceRef);
+    expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef).toMatch(/DL1-F2/);
+    // The three sealed scopes are republished byte for byte.
+    for (const scope of ["asks", "public_reads", "recovery_start"] as const) {
+      expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value[scope])
+        .toEqual(ADMISSION_POLICY_REGISTER_ROW.value[scope]);
+    }
+  });
+
+  it("keeps the support scopes separate from every other budget", () => {
+    const limiter = new AdmissionLimiter(policyWith({
+      support_reads: { key: "source", limit: 1, window_ms: 1_000, capacity: 8 },
+      support_sessions: { key: "owner", limit: 1, window_ms: 1_000, capacity: 8 }
+    }));
+    expect(limiter.decide("publicReads", "same", new Date(T0))).toEqual({ allowed: true });
+    expect(limiter.decide("supportReads", "same", new Date(T0))).toEqual({ allowed: true });
+    expect(limiter.decide("supportSessions", "same", new Date(T0))).toEqual({ allowed: true });
+    expect(limiter.decide("supportReads", "same", new Date(T0)).allowed).toBe(false);
+    expect(limiter.decide("supportSessions", "same", new Date(T0)).allowed).toBe(false);
+    expect(limiter.decide("publicReads", "same", new Date(T0))).toEqual({ allowed: true });
+  });
+
+  it("reports a scope the published row does not carry as unconfigured, never as limited", () => {
+    const limiter = new AdmissionLimiter(SEALED);
+    expect(limiter.configured("supportReads")).toBe(false);
+    expect(limiter.configured("publicReads")).toBe(true);
+    expect(new AdmissionLimiter(PUBLISHED).configured("supportReads")).toBe(true);
+  });
+});
+
+describe("DL1-F2 support reads are metered per source", () => {
+  it("refuses the read past the published per-source budget and leaves other sources alone", async () => {
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 3, window_ms: QUARTER_MS, capacity: 64 }
+    }));
+    try {
+      for (let index = 0; index < 3; index += 1) {
+        expect((await h.status(SOURCE_A)).statusCode, `read ${index + 1}`).toBe(200);
+      }
+      const refused = await h.status(SOURCE_A);
+      expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toEqual(REFUSAL);
+      expect(refused.headers["retry-after"]).toBe("900");
+      // The session read shares the same per-source budget.
+      expect((await h.readSession(SOURCE_A, "11111111-1111-4111-8111-111111111111", "z".repeat(43)))
+        .statusCode).toBe(429);
+      // A second source is untouched.
+      expect((await h.status(SOURCE_B)).statusCode).toBe(200);
+      h.advance(QUARTER_MS);
+      expect((await h.status(SOURCE_A)).statusCode).toBe(200);
+      expect(h.refusalLines()).toContainEqual({
+        event: "api.admission.refused", route: "GET /v1/support/status",
+        reason: "LIMIT", windowMs: QUARTER_MS
+      });
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("refuses before the repository is asked for anything", async () => {
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 1, window_ms: QUARTER_MS, capacity: 64 }
+    }));
+    try {
+      await h.status(SOURCE_A);
+      h.support.spies.status.mockClear();
+      h.support.spies.configuration.mockClear();
+      expect((await h.status(SOURCE_A)).statusCode).toBe(429);
+      expect(h.support.spies.status).not.toHaveBeenCalled();
+      expect(h.support.spies.configuration).not.toHaveBeenCalled();
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("leaves a composition without the published budget unlimited, exactly as today", async () => {
+    const h = harness(SEALED);
+    try {
+      for (let index = 0; index < 40; index += 1) {
+        expect((await h.status(SOURCE_A)).statusCode, `read ${index + 1}`).toBe(200);
+      }
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+/**
+ * Final review, area D, Minor 3. `POST /v1/support/case/messages` charged no
+ * per-source budget while its GET twin charged `supportReads`. Both doors take
+ * the same bearer and both answer the same typed 404 to a wrong one, so a
+ * wrong-token flood simply moved to the POST: a configuration read plus an
+ * indexed unique lookup per request, unmetered and with the whole case reply
+ * path behind it. One capability, one budget.
+ */
+describe("DL1-F2 the case reply is metered like the case read", () => {
+  it("charges and refuses on the same per-source budget as its GET twin", async () => {
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 2, window_ms: QUARTER_MS, capacity: 64 }
+    }));
+    const unknown = "z".repeat(43);
+    try {
+      // The reply is admitted, does its own work, and answers the unknown token.
+      expect((await h.replyToCase(SOURCE_A, unknown)).statusCode).toBe(404);
+      // ...and it spent a unit of the SAME budget the read spends.
+      expect((await h.readCase(SOURCE_A, unknown)).statusCode).toBe(404);
+      h.support.spies.configuration.mockClear();
+      h.replyByToken.mockClear();
+
+      const refused = await h.replyToCase(SOURCE_A, unknown);
+      expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toEqual(REFUSAL);
+      expect(refused.headers["retry-after"]).toBe("900");
+      // Refused at the door: no configuration read, no repository lookup.
+      expect(h.support.spies.configuration).not.toHaveBeenCalled();
+      expect(h.replyByToken).not.toHaveBeenCalled();
+      expect(h.refusalLines()).toContainEqual({
+        event: "api.admission.refused", route: "POST /v1/support/case/messages",
+        reason: "LIMIT", windowMs: QUARTER_MS
+      });
+
+      // Another source is untouched, and the window releases this one.
+      expect((await h.replyToCase(SOURCE_B, unknown)).statusCode).toBe(404);
+      h.advance(QUARTER_MS);
+      expect((await h.replyToCase(SOURCE_A, unknown)).statusCode).toBe(404);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("leaves a composition without the published budget unlimited, exactly as today", async () => {
+    const h = harness(SEALED);
+    try {
+      for (let index = 0; index < 20; index += 1) {
+        expect((await h.replyToCase(SOURCE_A, "z".repeat(43))).statusCode, `reply ${index + 1}`)
+          .toBe(404);
+      }
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+describe("DL1-F2 the status aggregate is answered from a cache", () => {
+  it("asks the repository once per window, however many callers arrive", async () => {
+    const h = harness();
+    try {
+      for (let index = 0; index < 5; index += 1) {
+        expect((await h.status(SOURCE_A)).statusCode).toBe(200);
+      }
+      expect((await h.status(SOURCE_B)).statusCode).toBe(200);
+      // One aggregate, one configuration read, one knowledge read for all six.
+      expect(h.support.spies.status).toHaveBeenCalledTimes(1);
+      expect(h.support.spies.knowledgeStatus).toHaveBeenCalledTimes(1);
+
+      // The body is the same one the widget reads, not a stale shape.
+      const body = (await h.status(SOURCE_A)).json() as Readonly<Record<string, unknown>>;
+      expect(Object.keys(body).sort())
+        .toEqual(["configuration", "kb_loaded", "kb_version", "relay_state"]);
+
+      // Past the window the aggregate runs again.
+      h.advance(2_000);
+      expect((await h.status(SOURCE_A)).statusCode).toBe(200);
+      expect(h.support.spies.status).toHaveBeenCalledTimes(2);
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+describe("DL1-F2 authenticated session creation is capped per owner", () => {
+  it("refuses one owner past the published cap and admits another", async () => {
+    const h = harness(policyWith({
+      support_sessions: { key: "owner", limit: 2, window_ms: HOUR_MS, capacity: 64 }
+    }));
+    try {
+      expect((await h.createOwned(OWNER_A, SOURCE_A)).statusCode).toBe(201);
+      expect((await h.createOwned(OWNER_A, SOURCE_A)).statusCode).toBe(201);
+      const refused = await h.createOwned(OWNER_A, SOURCE_A);
+      expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toEqual(REFUSAL);
+      expect(refused.headers["retry-after"]).toBe("3600");
+      // Two rows written, not three: the refusal is before the KEK wrap.
+      expect(h.support.spies.create).toHaveBeenCalledTimes(2);
+
+      // A different owner has their own budget, from the same address.
+      expect((await h.createOwned(OWNER_B, SOURCE_A)).statusCode).toBe(201);
+      // An anonymous caller from that address is not charged the owner budget.
+      expect((await h.createAnonymous(SOURCE_A)).statusCode).toBe(201);
+
+      h.advance(HOUR_MS);
+      expect((await h.createOwned(OWNER_A, SOURCE_A)).statusCode).toBe(201);
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+/**
+ * Review round. The three budgets shipped INERT: the superseding row existed
+ * and every reader understood it, but no publisher carried it, so a deployment
+ * register still sealed the three-scope row and `configured(scope)` answered
+ * false for all three. A security control nothing publishes is a control
+ * nothing applies.
+ */
+describe("DL1-F2/DL1-F7 the deployment register actually publishes the budgets", () => {
+  it("seals the superseding admissionPolicy row, with all three support members", async () => {
+    const bootstrap = await loadBootstrapRegister();
+    const rows = await buildDevelopmentDeploymentRegisterPublicationRows(
+      bootstrap, TEST_DEVELOPMENT_PROVIDER_PANEL
+    );
+    const published = rows.filter((row) => row.rowKey === ADMISSION_POLICY_ROW_KEY);
+    // Exactly one admissionPolicy row per deployment version, and it is the
+    // superseding one — publishing both would make the resolved value a coin toss.
+    expect(published).toHaveLength(1);
+    const value = JSON.parse(published[0]!.valueJsonText) as Readonly<Record<string, unknown>>;
+    expect(value).toEqual(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value);
+    expect(published[0]!.sourceRef).toMatch(/DL1-F2/);
+    expect(published[0]!.sourceRef).toMatch(/DL1-F7/);
+
+    // ...and the reader a booting API uses resolves all three members from it.
+    const policy = admissionPolicyFromValue(value, published[0]!.sourceRef);
+    expect(policy.supportReads)
+      .toEqual({ key: "source", limit: 240, windowMs: QUARTER_MS, capacity: 65_536 });
+    expect(policy.supportSessions)
+      .toEqual({ key: "owner", limit: 10, windowMs: HOUR_MS, capacity: 8_192 });
+    expect(policy.supportModelCalls)
+      .toEqual({ key: "source", limit: 40, windowMs: 24 * 60 * 60_000, capacity: 65_536 });
+    // The limiter a deployment on this row builds carries all three.
+    const limiter = new AdmissionLimiter(policy);
+    for (const scope of ["supportReads", "supportSessions", "supportModelCalls"] as const) {
+      expect(limiter.configured(scope), scope).toBe(true);
+    }
+  });
+});
+
+/**
+ * Review round. The per-source read budget was keyed on the FULL address while
+ * `clientIpNetworkScope` — added in this very branch for exactly this reason —
+ * was used only for the database-side windows and the model share. One IPv6
+ * /64 is a single ordinary allocation and holds 2^64 addresses: its holder got
+ * an unlimited number of 240-read budgets AND could fill the 65 536-key table,
+ * after which the limiter answers CAPACITY to every NEW source — turning a
+ * fairness control into an outage for everyone who arrives next.
+ */
+describe("DL1-F2 the read budget is keyed on the network, not the address", () => {
+  it("gives one /64 a single budget across all three metered reads", async () => {
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 2, window_ms: QUARTER_MS, capacity: 64 }
+    }));
+    try {
+      expect((await h.status("2001:db8:1:2::1")).statusCode).toBe(200);
+      // A different address in the same /64 spends the SAME budget...
+      expect((await h.status("2001:db8:1:2:a:b:c:d")).statusCode).toBe(200);
+      const refused = await h.status("2001:db8:1:2:ffff:ffff:ffff:ffff");
+      expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toEqual(REFUSAL);
+      // ...and so does every other metered read from it.
+      expect((await h.readCase("2001:db8:1:2::9", "z".repeat(43))).statusCode).toBe(429);
+      expect((await h.readSession(
+        "2001:db8:1:2::9", "11111111-1111-4111-8111-111111111111", "z".repeat(43)
+      )).statusCode).toBe(429);
+
+      // The next /64 is its own source, and IPv4 keeps its whole address.
+      expect((await h.status("2001:db8:1:3::1")).statusCode).toBe(200);
+      expect((await h.status(SOURCE_A)).statusCode).toBe(200);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("cannot have its key table filled from inside one /64", async () => {
+    // Capacity 2: with the full address as the key, three addresses from one
+    // /64 would take both slots and refuse the third caller for CAPACITY — and
+    // every genuinely new source after it.
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 50, window_ms: QUARTER_MS, capacity: 2 }
+    }));
+    try {
+      for (const address of ["2001:db8:1:2::1", "2001:db8:1:2::2", "2001:db8:1:2::3"]) {
+        expect((await h.status(address)).statusCode, address).toBe(200);
+      }
+      // One /64 has taken exactly one slot, so two real sources still fit.
+      expect((await h.status("2001:db8:9:9::1")).statusCode).toBe(200);
+      expect((await h.status(SOURCE_A)).statusCode).toBe(429);
+    } finally {
+      await h.close();
+    }
+  });
+});

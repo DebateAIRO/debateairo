@@ -21,6 +21,8 @@ const REQUEST_HEADER_ALLOWLIST = Object.freeze([
   "user-agent",
   "x-csrf-token"
   ,"x-support-session-token"
+  // DL1-F5c/DL3-F4: the case bearer travels in a header now, never in a path.
+  ,"x-support-case-token"
 ] as const);
 const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
   "accept-ranges",
@@ -34,9 +36,28 @@ const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
   "retry-after",
   "vary"
 ] as const);
+/** L3-F1: aligned with the API's Fastify bodyLimit (B5); the proxy never buffers more. */
+const MAX_PROXY_BODY_BYTES = 1_048_576;
+/** L3-F12: ceiling for a non-stream upstream request; event streams are open-ended by design. */
+const UPSTREAM_TIMEOUT_MS = 30_000;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+/** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
+const SUPPORT_SESSION_TOKEN_HEADER = "x-support-session-token";
+/** DL1-F5c/DL3-F4: the case bearer, which used to travel in the path. */
+const SUPPORT_CASE_TOKEN_HEADER = "x-support-case-token";
+const SUPPORT_CAPABILITY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+/**
+ * L3-F6: server.mjs strips every inbound forwarded header and re-stamps the client
+ * address itself, then sets this marker before Next starts. Without the marker (a bare
+ * `next start`) the stamped header is client-controlled and is never vouched for.
+ */
+const EDGE_MARKER_ENV = "DIALECTICAL_UI_EDGE";
+
+function behindOwnEdge(): boolean {
+  return process.env[EDGE_MARKER_ENV] === "server.mjs";
+}
 
 function readApiBase(): URL {
   const configured = process.env.DIALECTICAL_API_BASE?.trim();
@@ -71,11 +92,15 @@ function createUpstreamHeaders(request: Request): Headers {
   const headers = new Headers();
   for (const name of REQUEST_HEADER_ALLOWLIST) {
     const value = request.headers.get(name);
-    if (value !== null) headers.set(name, value);
+    if (value === null) continue;
+    // DL3-F5: the support capability travels only in its exact grammar (as the cookies do).
+    if ((name === SUPPORT_SESSION_TOKEN_HEADER || name === SUPPORT_CASE_TOKEN_HEADER)
+      && !SUPPORT_CAPABILITY_PATTERN.test(value)) continue;
+    headers.set(name, value);
   }
   const cookie = filteredSessionCookies(request.headers.get("cookie"));
   if (cookie !== null) headers.set("cookie", cookie);
-  const clientIp = normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER));
+  const clientIp = behindOwnEdge() ? normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER)) : null;
   if (clientIp !== null) headers.set("x-forwarded-for", clientIp);
   return headers;
 }
@@ -124,12 +149,71 @@ function createDownstreamHeaders(upstream: Headers): Headers {
     const value = upstream.get(name);
     if (value !== null) headers.set(name, value);
   }
+  // L3-F7: fetch hands the proxy a DECODED body while content-length described the
+  // encoded one; forwarding that length would frame the response wrong.
+  if (upstream.has("content-encoding")) headers.delete("content-length");
   const setCookies = typeof upstream.getSetCookie === "function"
     ? upstream.getSetCookie() : [];
   for (const value of setCookies) {
     if (lawfulSetCookie(value)) headers.append("set-cookie", value);
   }
   return headers;
+}
+
+function payloadTooLarge(): Response {
+  return Response.json({
+    error: "PAYLOAD_TOO_LARGE",
+    message: `The request body exceeds the proxy limit of ${MAX_PROXY_BODY_BYTES} bytes.`
+  }, { status: 413 });
+}
+
+/**
+ * L3-F1: a declared content-length over the cap is refused before a byte is
+ * read; every other body is read through a counting loop that cancels the
+ * stream the moment the cap is passed, so a chunked or lying-length body can
+ * never be materialised in memory. Returns null once the cap is exceeded.
+ */
+async function readBoundedBody(request: Request): Promise<BufferSource | null> {
+  const declared = request.headers.get("content-length");
+  if (declared !== null && /^\d{1,15}$/.test(declared) && Number(declared) > MAX_PROXY_BODY_BYTES) return null;
+  if (request.body === null) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_PROXY_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+/**
+ * L3-F12: the upstream request never outlives the client's. The run event
+ * feed (accept: text/event-stream, or a path ending in /events) follows the
+ * client signal alone; everything else also gets a 30 s ceiling.
+ */
+function upstreamSignal(request: Request, path: readonly string[]): AbortSignal {
+  const streaming = (request.headers.get("accept") ?? "").includes("text/event-stream")
+    || path[path.length - 1] === "events";
+  return streaming
+    ? request.signal
+    : AbortSignal.any([request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
 }
 
 async function proxyApi(request: Request, context: ProxyContext): Promise<Response> {
@@ -139,16 +223,28 @@ async function proxyApi(request: Request, context: ProxyContext): Promise<Respon
 
   // exactOptionalPropertyTypes: a bodyless method must OMIT body, not pass
   // `undefined` for it, so the two shapes are built separately.
-  const init: RequestInit = BODYLESS_METHODS.has(request.method)
-    ? { method: request.method, headers, cache: "no-store" }
-    : { method: request.method, headers, body: await request.arrayBuffer(), cache: "no-store" };
+  const signal = upstreamSignal(request, path);
+  let init: RequestInit;
+  if (BODYLESS_METHODS.has(request.method)) {
+    init = { method: request.method, headers, cache: "no-store", signal };
+  } else {
+    const body = await readBoundedBody(request);
+    if (body === null) return payloadTooLarge();
+    init = { method: request.method, headers, body, cache: "no-store", signal };
+  }
 
   let response: Response;
   try {
     response = await fetch(target, init);
-  } catch {
-    // fetch rejected before an HTTP response existed. 502 states only the
-    // observed proxy fact; it never fabricates an API-side verdict (DR-115).
+  } catch (failure) {
+    // fetch rejected before an HTTP response existed. 502/504 state only the
+    // observed proxy fact; they never fabricate an API-side verdict (DR-115).
+    if (failure instanceof Error && failure.name === "TimeoutError") {
+      return Response.json({
+        error: "API_UPSTREAM_TIMEOUT",
+        message: "The API upstream did not answer the proxy request in time."
+      }, { status: 504 });
+    }
     return Response.json({
       error: "API_UPSTREAM_UNREACHABLE",
       message: "The API upstream did not answer the proxy request."

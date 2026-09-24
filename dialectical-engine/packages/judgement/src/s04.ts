@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ABSTENTION_KINDS, CLAIM_TYPES, type AbstentionKind, type ClaimType } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CLAIM_TYPES, isRunLevelSpendStop, type AbstentionKind, type ClaimType } from "@debateai/kernel";
 import type { CompositionMapRegisterRow } from "@debateai/register";
 
 export { CLAIM_TYPES };
@@ -132,18 +132,63 @@ function firstBalancedObject(text: string): string | null {
   return null;
 }
 
+/**
+ * DL4-F1: a schema failure names the issue CODES and PATHS only. zod's own message embeds
+ * the received values and the unrecognised keys - the model's text - and that message used
+ * to travel into ledger parse_error columns, Hatchet failure payloads and stderr, outside
+ * the AEAD boundary. Paths are the schema's names (and array indices); nothing the model
+ * wrote is copied. Bounded so a pathological issue list cannot grow the message either.
+ */
+const MAX_SCHEMA_FAILURE_MESSAGE_CHARS = 512;
+
+function schemaFailureMessage(error: z.ZodError): string {
+  const rendered = error.issues
+    .map((issue) => `${issue.code}@${issue.path.length === 0 ? "$" : issue.path.map(String).join(".")}`)
+    .join(",");
+  return rendered.length > MAX_SCHEMA_FAILURE_MESSAGE_CHARS
+    ? `${rendered.slice(0, MAX_SCHEMA_FAILURE_MESSAGE_CHARS - 1)}…`
+    : rendered;
+}
+
 function schemaResult<T>(decoded: unknown, strategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED", schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
   const parsed = schema.safeParse(decoded);
   return parsed.success
     ? Object.freeze({ kind: "PARSED", strategy, value: parsed.data })
-    : Object.freeze({ kind: "SCHEMA_FAILURE", message: parsed.error.message });
+    : Object.freeze({ kind: "SCHEMA_FAILURE", message: schemaFailureMessage(parsed.error) });
+}
+
+const FENCE = "```";
+
+/**
+ * CI-1b (CodeQL js/polynomial-redos, PR #8): the ONE_FENCE strategy used to be
+ * `/^\s*```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i`. Its adjacent `\s*`, `\n?`
+ * and lazy body can split one run of blanks in quadratically many ways, and
+ * `content` is model text — "```" and 100 000 newlines took about 4.6 s. This
+ * returns the same capture in one linear pass, clause for clause:
+ * - `^\s*` and `\s*$`: `trim()` strips exactly the `\s` set;
+ * - the two fences: the trimmed text starts and ends with "```" and is at least
+ *   six characters long, so no backtick belongs to both fences;
+ * - `(?:json)?`: greedy, so a case-insensitive "json" right after the opening
+ *   fence is always taken — the closing fence can never begin inside it;
+ * - `\s*\n?`: greedy, so every blank after the tag goes (`trimStart()`);
+ * - the lazy body and `\n?`: the body stops before one newline that sits
+ *   against the closing fence, when the tag's blanks did not already take it.
+ */
+function oneFenceBody(content: string): string | null {
+  const text = content.trim();
+  if (text.length < 2 * FENCE.length || !text.startsWith(FENCE) || !text.endsWith(FENCE)) return null;
+  const tagEnd = /^json$/i.test(text.slice(FENCE.length, FENCE.length + 4))
+    ? FENCE.length + 4
+    : FENCE.length;
+  const body = text.slice(tagEnd, text.length - FENCE.length).trimStart();
+  return body.endsWith("\n") ? body.slice(0, -1) : body;
 }
 
 export function parseStructuredArtifact<T>(content: string, schema: z.ZodType<T>): ParseStructuredArtifactResult<T> {
   try { return schemaResult(JSON.parse(content), "RAW", schema); } catch { /* advance only on parse failure */ }
-  const fence = content.match(/^\s*```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
-  if (fence !== null) {
-    try { return schemaResult(JSON.parse(fence[1]!), "ONE_FENCE", schema); } catch { /* next strategy */ }
+  const fenced = oneFenceBody(content);
+  if (fenced !== null) {
+    try { return schemaResult(JSON.parse(fenced), "ONE_FENCE", schema); } catch { /* next strategy */ }
   }
   const balanced = firstBalancedObject(content);
   if (balanced !== null) {
@@ -322,6 +367,11 @@ export async function runJudgePanel(input: {
       const judged = await member.judge();
       judgements.push({ ...judged, memberRole: member.memberRole, contractHash: member.contractHash });
     } catch (error) {
+      // V-28: a RUN-LEVEL spend stop is not this member's failure, it is the
+      // run's, and noting it would carry the panel on to the next member — one
+      // more billed call for a run that has just been told it cannot pay. It
+      // leaves untouched, keeping the code that says which control spoke.
+      if (isRunLevelSpendStop(error)) throw error;
       notes.push({
         memberRole: member.memberRole,
         contractHash: member.contractHash,

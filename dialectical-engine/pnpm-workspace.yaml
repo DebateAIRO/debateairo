@@ -5,6 +5,10 @@ packages:
   - "tools/*"
 allowBuilds:
   '@embedded-postgres/darwin-arm64': true
+  # L6-F12 (task B24a): the Linux variants ship the same postinstall (scripts/hydrate-symlinks.js,
+  # local relative symlinks only); ubuntu CI installs linux-x64, so strictDepBuilds needs them listed.
+  '@embedded-postgres/linux-arm64': true
+  '@embedded-postgres/linux-x64': true
   '@hatchet-dev/typescript-sdk': true
   cpu-features: false
   esbuild: true
@@ -12,7 +16,45 @@ allowBuilds:
   sharp: true
   ssh2: false
 
-minimumReleaseAgeExclude:
-  - '@types/node@26.2.0'
-  - '@types/pg@8.21.0'
-  - tsx@4.23.11
+# L6-F12 (task B24a): a dependency whose build script is neither allowed nor denied above fails the
+# install instead of being skipped silently.
+strictDepBuilds: true
+
+# L6-F3 (task B24a): 7-day release-age cooldown (minutes). A version published less than a week ago
+# is not resolvable unless `minimumReleaseAgeExclude` lists it as an exact name@version. Enforced by
+# tests/architecture/dependency-floors.test.ts.
+minimumReleaseAge: 10080
+
+# V-18 (ruled 2026-09-21, executed 2026-09-22): the exclusion list is EMPTY, and empty is its
+# resting state. It held 40 exact pins — the 37 that B1 needed while the next 15.5.25 and sharp
+# 0.35.4 families were young, plus @types/node@26.2.0, @types/pg@8.21.0 and tsx@4.23.11. Every one
+# of the 40 was measured against the registry on 2026-09-22, its publish time read from the `time`
+# field of `pnpm view next@15.5.25 --json` and the same call per entry: the youngest, the next
+# 15.5.25 family, was published 2026-08-31 — 22 days old — so not
+# one of them still bought anything, while each kept a hole in the cooldown open. A frozen install
+# passes with the list gone.
+#
+# If an exclusion is ever genuinely needed again it is an exact name@version (never a pattern) with
+# a `drop after YYYY-MM-DD` comment above it carrying the version's publish date plus 7 days;
+# dependency-floors.test.ts fails both when that comment is missing and on the day it expires.
+# Note that adding one at all is forbidden by the security mission's constraint 12: a version
+# younger than 7 days is reported as BLOCKED, not excluded.
+
+# F-02 (2026-09-01 security hardening, task B1): dependency floors for the advisories
+# reachable through next (postcss, sharp, nanoid) and any transitive esbuild (0.24.3 was never
+# published, so the <0.24.3 range is lifted straight to 0.28.1, the version tsx already uses).
+# pnpm 11 no longer reads package.json "pnpm.overrides"; pnpm-workspace.yaml is their home.
+# Enforced by tests/architecture/dependency-floors.test.ts.
+overrides:
+  # DL6-F1 (delta audit 2026-09-18): advisories reachable only through fastify's own
+  # compilers and the Hatchet SDK. Every floor below was published at least 19 days ago, so
+  # the 7-day cooldown is satisfied with NO new minimumReleaseAgeExclude row; fastify itself
+  # is pinned to 5.12.1 (31 days) rather than 5.12.5 (2 days old at the time of writing).
+  'fast-uri@<3.1.6': '3.1.6'
+  'fast-uri@>=4.0.0 <4.1.3': '4.1.3'
+  'qs@<6.16.0': '6.16.0'
+  'postcss@<8.5.23': '8.5.23'
+  'sharp@<0.35.4': '0.35.4'
+  'nanoid@<3.3.18': '3.3.18'
+  'esbuild@<0.24.3': '0.28.1'
+  'esbuild@>=0.27.3 <0.28.1': '0.28.1'

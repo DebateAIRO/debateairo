@@ -6,6 +6,7 @@ import {
   lstat,
   mkdir,
   open,
+  readdir,
   rename,
   unlink
 } from "node:fs/promises";
@@ -16,7 +17,17 @@ const CAPTURE_DIRECTORY_ENV = "DEBATEAI_DEV_MAIL_CAPTURE_DIR";
 const MAX_MESSAGE_BYTES = 256 * 1024;
 const DIRECTORY_MODE = 0o700;
 const MESSAGE_MODE = 0o600;
+// Captured mail holds a recipient address and a working verification link, and
+// is never needed beyond the local debugging session that produced it (L7-F8).
+const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/;
+// The mailer emits exactly one `To:` holding one bare address. A display name,
+// angle brackets, a second address, a folded continuation or a `Cc:`/`Bcc:`
+// would each hand a real MTA a recipient this sink never saw, so all are
+// refused rather than guessed at (L7-F7).
+const RECIPIENT_GRAMMAR =
+  /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
+const FANOUT_HEADER = /^(?:cc|bcc|resent-to|resent-cc|resent-bcc):/i;
 
 class CaptureError extends Error {
   constructor(code) {
@@ -26,16 +37,38 @@ class CaptureError extends Error {
 }
 
 function requireInvocation(argv) {
-  if (argv.length !== 5
+  // `-i -t -f <envelope sender>` and nothing else: with `-t` the recipient
+  // rides in the header block on stdin instead of argv, where every local user
+  // could read it out of `ps` (L7-F7).
+  if (argv.length !== 4
     || argv[0] !== "-i"
-    || argv[1] !== "-f"
-    || argv[3] !== "--"
-    || !EMAIL_SHAPE.test(argv[2] ?? "")
-    || !EMAIL_SHAPE.test(argv[4] ?? "")
-    || /[\r\n]/.test(argv[2] ?? "")
-    || /[\r\n]/.test(argv[4] ?? "")) {
+    || argv[1] !== "-t"
+    || argv[2] !== "-f"
+    || !EMAIL_SHAPE.test(argv[3] ?? "")
+    || /[\r\n]/.test(argv[3] ?? "")) {
     throw new CaptureError("DEV_MAIL_CAPTURE_INVOCATION_INVALID");
   }
+}
+
+function requireSingleRecipient(message) {
+  const text = message.toString("utf8");
+  const separator = text.indexOf("\r\n\r\n");
+  if (separator < 0) throw new CaptureError("DEV_MAIL_CAPTURE_RECIPIENT_INVALID");
+  let recipient = null;
+  for (const header of text.slice(0, separator).split("\r\n")) {
+    // An obs-fold continuation line could hide a second address behind a
+    // header that already passed.
+    if (/^[ \t]/.test(header) || FANOUT_HEADER.test(header)) {
+      throw new CaptureError("DEV_MAIL_CAPTURE_RECIPIENT_INVALID");
+    }
+    if (!/^to:/i.test(header)) continue;
+    if (recipient !== null) throw new CaptureError("DEV_MAIL_CAPTURE_RECIPIENT_INVALID");
+    recipient = header.slice(3).trim();
+  }
+  if (recipient === null || !RECIPIENT_GRAMMAR.test(recipient)) {
+    throw new CaptureError("DEV_MAIL_CAPTURE_RECIPIENT_INVALID");
+  }
+  return recipient;
 }
 
 async function requirePrivateDirectory(path) {
@@ -48,6 +81,29 @@ async function requirePrivateDirectory(path) {
     || (metadata.mode & 0o777) !== DIRECTORY_MODE
     || (currentUid !== null && metadata.uid !== currentUid)) {
     throw new CaptureError("DEV_MAIL_CAPTURE_CUSTODY_INVALID");
+  }
+}
+
+async function pruneExpiredMessages(directory, now) {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    // Regular files only. A dirent reports a symlink as a symlink, and lstat
+    // confirms it, so the spool can never delete a target outside itself.
+    if (!entry.isFile() || !entry.name.endsWith(".eml")) continue;
+    const path = resolve(directory, entry.name);
+    try {
+      const metadata = await lstat(path);
+      if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
+      if (now - metadata.mtimeMs > RETENTION_MS) await unlink(path);
+    } catch {
+      // A concurrent send may have renamed or removed it. Retention is
+      // best-effort and must never fail the capture that triggered it.
+    }
   }
 }
 
@@ -111,8 +167,10 @@ async function main() {
   }
   const directory = resolve(configuredDirectory);
   await requirePrivateDirectory(directory);
+  await pruneExpiredMessages(directory, Date.now());
   if (process.argv[2] === "--preflight") return;
   const message = await readBoundedMessage();
+  requireSingleRecipient(message);
   await captureMessage(directory, message);
 }
 

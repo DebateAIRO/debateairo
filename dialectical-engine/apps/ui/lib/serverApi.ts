@@ -1,4 +1,5 @@
 import { ContractHttpError, createContractClient, type Answer, type ContractClient, type RunProjection } from "@debateai/contract";
+import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../trusted-client-ip.mjs";
 import type { DebateDetail, DebateSummary } from "./types.js";
 import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.js";
 
@@ -12,22 +13,58 @@ import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.j
  */
 
 export const USER_TOKEN_COOKIE = "__Host-debateai-session";
+const SESSION_COOKIE_GRAMMAR = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * L3-F5: the only cookie value that is a session is the exact 43-character
+ * grammar the API mints and the /api proxy enforces. Next decodes cookie
+ * values before handing them over, so anything else — a smuggled second
+ * pair, a control character, a truncated value — is treated as signed out
+ * and never interpolated into an upstream Cookie header.
+ */
+export function sessionCookieValue(value: unknown): string | null {
+  return typeof value === "string" && SESSION_COOKIE_GRAMMAR.test(value) ? value : null;
+}
+
+/** The session from Next's cookie store, or null when absent or malformed. */
+export function readSessionCookie(
+  store: Readonly<{ get(name: string): Readonly<{ value: string }> | undefined }>
+): string | null {
+  return sessionCookieValue(store.get(USER_TOKEN_COOKIE)?.value);
+}
+
+/**
+ * DL3-F1: server-rendered reads reach the API from the SSR hop, so without this every
+ * visitor was `127.0.0.1` to the API and B10's per-source public-read budget collapsed
+ * into one bucket shared by everyone. server.mjs strips every inbound forwarded header
+ * and re-stamps the visitor's address; the same rule as the /api proxy applies here: the
+ * stamp is vouched for only behind server.mjs (L3-F6), and only as one exact address.
+ */
+export function readTrustedClientIp(
+  store: Readonly<{ get(name: string): string | null }>
+): string | undefined {
+  if (process.env.DIALECTICAL_UI_EDGE !== "server.mjs") return undefined;
+  return normalizeClientIp(store.get(TRUSTED_CLIENT_IP_HEADER)) ?? undefined;
+}
 
 export function createServerContractClient(
   fetchImplementation: typeof fetch = fetch,
   sessionCookie?: string,
-  userAgent?: string
+  userAgent?: string,
+  clientIp?: string
 ): ContractClient {
   const baseUrl = process.env.DIALECTICAL_API_BASE?.trim();
   if (baseUrl === undefined || baseUrl.length === 0) {
     throw new Error("DIALECTICAL_API_BASE_REQUIRED");
   }
+  const session = sessionCookieValue(sessionCookie);
   return createContractClient(baseUrl, fetchImplementation, {
     mode: "cookie",
-    ...(sessionCookie === undefined ? {} : {
-      cookieHeader: `${USER_TOKEN_COOKIE}=${sessionCookie}`
+    ...(session === null ? {} : {
+      cookieHeader: `${USER_TOKEN_COOKIE}=${session}`
     }),
-    ...(userAgent === undefined ? {} : { userAgent })
+    ...(userAgent === undefined ? {} : { userAgent }),
+    ...(clientIp === undefined ? {} : { forwardedFor: clientIp })
   });
 }
 
@@ -47,32 +84,19 @@ export type DebateListPage = {
 export async function listDebatesPageServer(
   token: string,
   client?: ContractClient,
-  userAgent?: string
+  userAgent?: string,
+  clientIp?: string
 ): Promise<DebateListPage> {
-  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent);
+  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent, clientIp);
+  // DL3-F2: exactly one upstream call for the whole page. This used to read the
+  // index and then fetch every listed answer in full, sequentially — up to 50
+  // decrypting projection reads per `GET /`, on routes with no per-user
+  // admission budget and with no timeout on the SSR hop — to colour a model
+  // dot. The index row carries its own lineage now (AnswerSummarySchema.models),
+  // derived by the query from projections it had already read.
   const index = await resolvedClient.readAnswerIndex(HOME_PAGE_SIZE, 0);
-  const modelsByAnswerId = new Map<string, string[]>();
-  for (const item of index.items) {
-    try {
-      const answer = await resolvedClient.readAnswer(item.answer_id);
-      const models = [...new Set(answer.nodes.flatMap((node) =>
-        node.maker_lineage === null ? [] : [node.maker_lineage.model_id]
-      ))];
-      modelsByAnswerId.set(item.answer_id, models);
-    } catch {
-      // Model lineage is decorative library metadata. If an individual owned
-      // answer becomes unavailable between the index read and this hydration,
-      // preserve the usable row and render typed absence instead of failing
-      // the entire library page or inventing a model.
-      modelsByAnswerId.set(item.answer_id, []);
-    }
-  }
-  const summaries = debateSummariesFromIndex(index).map((summary) => ({
-    ...summary,
-    models: modelsByAnswerId.get(summary.id) ?? summary.models
-  }));
   return {
-    summaries,
+    summaries: debateSummariesFromIndex(index),
     shown: index.items.length,
     total: index.total
   };
@@ -95,9 +119,10 @@ export async function getDebateServer(
   id: string,
   token: string,
   client?: ContractClient,
-  userAgent?: string
+  userAgent?: string,
+  clientIp?: string
 ): Promise<GetDebateServerResult> {
-  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent);
+  const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent, clientIp);
   let answer: Answer;
   try {
     try {

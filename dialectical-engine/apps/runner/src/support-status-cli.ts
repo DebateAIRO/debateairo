@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TypedDomainError } from "@debateai/kernel";
 import { createPool, createSupportControlPlanePool, PostgresSupportStatusRepository, type Pool } from "@debateai/db";
@@ -10,6 +10,7 @@ import type {
 } from "@debateai/register";
 import { createPostgresRegisterPublicationPort } from "@debateai/register";
 import { withProductionSupportConfigCliConnection } from "./support-config-cli-credentials.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 import {
   loadDevelopmentSupportStatusCliCredentials,
   loadProductionSupportStatusCliCredentials
@@ -55,7 +56,7 @@ type ConfigurationEnvelope = Readonly<{
 }>;
 
 const RETENTION_UNAVAILABLE = "retention: unavailable — support register not initialized";
-const ERASURE_MANUAL_STEP = "erasures: run pnpm support:shred --owner <owner_ref> after each account erasure (wiring pending V, row SUP-D5)";
+const ERASURE_MANUAL_STEP = "erasures: run pnpm support:shred --owner <owner_ref> --yes after each account erasure (wiring pending V, row V-26)";
 const RETENTION_ACTOR_UNAVAILABLE = "retention actor: unavailable — no age-based shred command is implemented";
 
 export function formatSpend(input: Readonly<{
@@ -98,7 +99,7 @@ function configurationRows(status: NonNullable<SupportConfigurationStatus>): rea
   const parsed = JSON.parse(status.configurationText) as unknown;
   if (!Array.isArray(parsed)) throw new TypeError("SUPPORT_STATUS_INVALID");
   return Object.freeze((parsed as ConfigurationEnvelope[]).map((row) => Object.freeze(row))
-    .sort((left, right) => left.row_key.localeCompare(right.row_key)));
+    .sort((left, right) => (left.row_key < right.row_key ? -1 : left.row_key > right.row_key ? 1 : 0)));
 }
 
 function retentionLines(rows: readonly ConfigurationEnvelope[]): readonly string[] {
@@ -261,7 +262,7 @@ async function main(): Promise<void> {
   if (arguments_.configurationCredentialFile === null
     || arguments_.supportDataCredentialFile === null) {
     const credentials = await loadDevelopmentSupportStatusCliCredentials(
-      resolve(".local/dev-auth/database-principals.env")
+      join(resolveDevCustodyRoot(resolve(".")), "database-principals.env")
     );
     const configurationPool = createSupportControlPlanePool(credentials.configurationDatabaseUrl);
     const supportPool = createPool(credentials.supportDatabaseUrl);

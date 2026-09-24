@@ -4,13 +4,14 @@ import type { PostgresIdentityRepository, AuthSourceContext } from "@debateai/db
 import type { AuthPolicy, AuthRouteLimit } from "@debateai/register";
 import {
   Argon2InfrastructureError,
+  argon2EnvelopeRefusal,
   createEmailBlindIndex,
   encrypt,
   generateDek,
   generatePseudonym,
   generateVerificationToken,
   hashPassword,
-  hashVerificationToken,
+  hashToken,
   normalizeEmailForBlindIndex,
   type Argon2Executor,
   type UserDekStore
@@ -47,6 +48,36 @@ export interface RegistrationApplication {
  * envelope to a pool failure that never passed through this service.
  */
 export const AUTH_RETRYABLE_UNAVAILABLE_CODE = "AUTH_TEMPORARILY_UNAVAILABLE";
+
+/**
+ * V-22. The gate every stored Argon2id record passes before it is verified.
+ *
+ * Named for exactly what it decides: among records the global envelope can
+ * PARSE, this one is not over twice its governing policy. It deliberately does
+ * NOT decide parseability — a malformed, wrong-version or out-of-envelope
+ * record (say a planted `m=1048576`) answers `true` here and is refused
+ * immediately afterwards by `verifyPassword`/`verifyRecoveryCode`, which parse
+ * before they hand anything to a worker. Nothing may read this boolean as
+ * "safe to hash without parsing".
+ *
+ * Only the caller knows which sealed cost governs a given record — a password
+ * hash answers to `passwordPolicy`, a recovery-code hash to the MFA policy — so
+ * the ceiling is derived from the cost passed in here, never from one global
+ * number. A refused record is never verified, which on every route is the same
+ * outcome as a wrong credential: the visitor learns nothing new, the audit row
+ * is written exactly as it would have been, and no worker slot or Argon2 arena
+ * is ever occupied by a planted envelope. The operator gets the typed code.
+ */
+export function storedArgon2EnvelopeNotOverPolicy(
+  encodedHash: string,
+  cost: Readonly<{ memoryCostKiB: number; timeCost: number; parallelism: number }>,
+  use: "password" | "recovery-code"
+): boolean {
+  const refusal = argon2EnvelopeRefusal(encodedHash, cost);
+  if (refusal === undefined) return true;
+  console.error(`[${refusal}] use=${use}`);
+  return false;
+}
 
 export class AuthFlowError extends Error {
   constructor(readonly code:
@@ -1224,7 +1255,7 @@ export class RegistrationService implements RegistrationApplication {
       const userId = randomUUID();
       const pseudonym = generatePseudonym();
       const token = this.dependencies.verificationTokenFactory?.() ?? generateVerificationToken();
-      const tokenHash = hashVerificationToken(token);
+      const tokenHash = hashToken("verification", token);
       const expiresAt = new Date(
         input.requestedAt.getTime() + this.dependencies.policy.verification.tokenTtlMs
       );
@@ -1335,9 +1366,14 @@ export class RegistrationService implements RegistrationApplication {
     let releaseAdmission: (() => void) | undefined;
     try {
       try {
+        const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
         if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
           || typeof input.password !== "string"
           || input.password.length < this.dependencies.policy.password.minimumLength
+          // V-14: the ruled maximum, in the same unit as the minimum. The route
+          // keeps its own 1024-byte request-shape bound ahead of this; a
+          // register version that publishes no maximum leaves that bound alone.
+          || (maximumPasswordLength !== null && input.password.length > maximumPasswordLength)
           || input.adultAffirmed !== true) {
           throw new AuthFlowError("AUTH_INPUT_INVALID");
         }
@@ -1503,23 +1539,37 @@ export class RegistrationService implements RegistrationApplication {
       throw new AuthFlowError("VERIFICATION_TOKEN_INVALID");
     }
     const source = sourceContext(rawSource);
-    const tokenHash = hashVerificationToken(input.token);
-    const identity = await this.dependencies.repository.findAuditIdentityByVerificationHash(tokenHash);
-    const now = this.clock();
+    const tokenHash = hashToken("verification", input.token);
+    // V-2 (5). The visitor's OWN budget is charged first, before the indexed
+    // repository lookup below, so an exhausted source can no longer buy a
+    // database read per attempt. The ruled admission budget is source-owned
+    // (S3c D2: an attacker-supplied token can never own one), so the key it
+    // needs is the token hash, which is knowable without the lookup and is the
+    // same value for a given token whether or not an account holds it — the
+    // refusal is therefore identical either way and carries no enumeration
+    // signal.
+    const admittedAt = this.clock();
     const limit = this.dependencies.limiter.consume({
       route: "verify",
       ip: source.ip,
-      addressKey: identity?.addressKey ?? tokenHash,
-      now
+      addressKey: tokenHash,
+      now: admittedAt
     });
     if (!limit.allowed) {
       await this.refuseRateLimit({
         route: "verify",
         scope: limit.scope,
-        now,
+        now: admittedAt,
         source
       });
     }
+    // The stable address-limiter key lives behind this lookup. Nothing is
+    // charged against it today; a per-address budget can only be charged AFTER
+    // this await, never before it, which is why the read stays here.
+    await this.dependencies.repository.findAuditIdentityByVerificationHash(tokenHash);
+    // S3 rework4: the clock is re-read after the repository await, so the
+    // consumed-at instant is the one the mutation actually happens at.
+    const now = this.clock();
     if (!await this.dependencies.repository.consumeVerification({ tokenHash, occurredAt: now, source })) {
       throw new AuthFlowError("VERIFICATION_TOKEN_INVALID");
     }
@@ -1560,7 +1610,7 @@ export class RegistrationService implements RegistrationApplication {
       const expiresAt = new Date(now.getTime() + this.dependencies.policy.verification.tokenTtlMs);
       const prepared = await this.dependencies.repository.prepareVerificationResend({
         emailBlindIndex,
-        tokenHash: hashVerificationToken(token),
+        tokenHash: hashToken("verification", token),
         expiresAt,
         occurredAt: now,
         cooldownMs: this.dependencies.policy.verification.resendCooldownMs,

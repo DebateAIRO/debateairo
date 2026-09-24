@@ -16,7 +16,9 @@ import {
   type SupportCaseSummaryRecord
 } from "../../apps/api/src/support/cases.js";
 import { SupportModelError } from "../../apps/api/src/support/model.js";
+import { SUPPORT_DRAFT_SUMMARY_CONTRACT_ID } from "../../apps/api/src/support/prompt.js";
 import { createSupportCaseService } from "../../apps/api/src/support/session.js";
+import { readFramedMaterial } from "../support/framed-packet.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -46,6 +48,17 @@ async function session(ownerRef: string | null = null): Promise<string> {
     createdAt
   });
   return sessionId;
+}
+
+/** Opens the fixed `contentV2` snapshot as a one-message transcript. */
+function readableKeys() {
+  return Object.freeze({
+    unwrapDataKey: async () => Buffer.alloc(32,7),
+    openContent: () => Buffer.from(JSON.stringify([
+      Object.freeze({ role: "user",text: "I cannot publish",messageId: randomUUID() })
+    ]),"utf8"),
+    sealContent: () => contentV2(7)
+  });
 }
 
 function service() {
@@ -269,6 +282,85 @@ describe("SUP-02 cases", () => {
     )).rowCount).toBe(0);
   });
 
+  /**
+   * DL1-F5(a). A case token is a bearer capability that travels in a URL — the
+   * API path and the help link — so it reached browser history, shared
+   * links and proxy access logs, and it authorised the whole decrypted
+   * transcript forever. It now expires thirty days after the creation
+   * timestamp already on the row, as the same typed 404 an unknown token gets.
+   */
+  it("refuses a case token past the thirty-day ceiling and admits it at the edge", async () => {
+    const sessionId = await session();
+    const caseId = randomUUID();
+    const tokenSha256 = "7".repeat(64);
+    await service().openCase({
+      caseId,tokenSha256,sessionId,identityOwnerRef: null,
+      language: "en",createdAt,triggerPredicate: "E1",toolCalls: [],
+      kbVersion: "b".repeat(64),slaHours: 48
+    });
+    const ttlMs = 30 * 24 * 60 * 60 * 1_000;
+    const access = (at: Date) => createSupportCaseAccessService({
+      repository: new PostgresSupportCaseSummaryRepository(database.pool),
+      keys: readableKeys(),clock: () => at
+    });
+
+    await expect(access(new Date(createdAt.getTime() + ttlMs))
+      .readByToken(tokenSha256,{ limit: 20 })).resolves.toMatchObject({
+      kind: "READABLE",caseId
+    });
+    const expiredAt = new Date(createdAt.getTime() + ttlMs + 1);
+    await expect(access(expiredAt).readByToken(tokenSha256,{ limit: 20 }))
+      .resolves.toBeNull();
+    await expect(access(expiredAt).replyByToken({
+      tokenSha256,text: "too late",at: expiredAt,
+      messageByteLimit: 2_000,caseMessageLimit: 40
+    })).resolves.toBeNull();
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM support.case_message WHERE case_id=$1",[caseId]
+    )).rows).toEqual([{ count: 0 }]);
+  });
+
+  /**
+   * DL1-F5(b). An owner-bound case was fully readable, and appendable, by the
+   * raw token alone, so a leaked link bypassed the identity binding the row
+   * already carries. The caller must now be that owner; anyone else gets the
+   * unknown-token 404, never a 403 that would confirm the case exists.
+   */
+  it("refuses an owner-bound case token from an anonymous or foreign caller", async () => {
+    const ownerRef = randomUUID();
+    const sessionId = await session(ownerRef);
+    const caseId = randomUUID();
+    const tokenSha256 = "6".repeat(64);
+    await service().openCase({
+      caseId,tokenSha256,sessionId,identityOwnerRef: ownerRef,
+      language: "en",createdAt,triggerPredicate: "E1",toolCalls: [],
+      kbVersion: "b".repeat(64),slaHours: 48
+    });
+    const access = createSupportCaseAccessService({
+      repository: new PostgresSupportCaseSummaryRepository(database.pool),
+      keys: readableKeys(),clock: () => createdAt
+    });
+    const reply = (callerOwnerRef: string | null) => access.replyByToken({
+      tokenSha256,text: "let me in",at: createdAt,
+      messageByteLimit: 2_000,caseMessageLimit: 40,callerOwnerRef
+    });
+
+    await expect(access.readByToken(tokenSha256,{ limit: 20 })).resolves.toBeNull();
+    await expect(access.readByToken(tokenSha256,{ limit: 20,callerOwnerRef: null }))
+      .resolves.toBeNull();
+    await expect(access.readByToken(tokenSha256,{ limit: 20,callerOwnerRef: randomUUID() }))
+      .resolves.toBeNull();
+    await expect(reply(null)).resolves.toBeNull();
+    await expect(reply(randomUUID())).resolves.toBeNull();
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS count FROM support.case_message WHERE case_id=$1",[caseId]
+    )).rows).toEqual([{ count: 0 }]);
+
+    await expect(access.readByToken(tokenSha256,{ limit: 20,callerOwnerRef: ownerRef }))
+      .resolves.toMatchObject({ kind: "READABLE",caseId });
+    await expect(reply(ownerRef)).resolves.toBe("WAITING_ON_V");
+  });
+
   it("returns a shredded case discriminator without unwrapping and preserves ciphertext bytes", async () => {
     const sessionId = await session();
     const caseId = randomUUID();
@@ -413,7 +505,20 @@ describe("SUP-02 cases", () => {
     }.`;
     const service = createAdvisorySummaryService({
       complete: async (request) => {
-        expect(request.system).toContain("exactly kind, text, sourceIds, and actionIds");
+        // FW-B / B-I1: the summary directive is the OWNERS' instruction slot of
+        // a framed packet now, and the door's own reader is the only way a test
+        // may open one. dev's directive asks for a JSON draft, so the packet is
+        // the sealed v2 JSON-draft contract (SYNC3, R1); the reply is dev's
+        // case_summary object.
+        const material = readFramedMaterial(request.packet);
+        expect(material.contractId).toBe(SUPPORT_DRAFT_SUMMARY_CONTRACT_ID);
+        expect(request.packet.messages[0]!.content)
+          .toContain("exactly kind, text, sourceIds, and actionIds");
+        expect(request.packet.messages[0]!.content).toContain(
+          "Summarize the user's problem in one paragraph of at most 80 words. "
+          + "Do not state or guess who the user is, whether they are the account owner, "
+          + "or whether their request is legitimate."
+        );
         return JSON.stringify({ kind: "case_summary",text: summary,sourceIds: [],actionIds: [] });
       },
       seal: async (_caseId,text) => Buffer.from(text,"utf8"),
@@ -501,6 +606,11 @@ describe("SUP-02 cases", () => {
         listOwnCases: vi.fn(async () => []),
         readCaseEncrypted: vi.fn(async () => ({
           case_id: caseId,language: "en",state: "NEW",sla_hours: 48,
+          // DL1-F5(a)/(b): a case row carries its creation instant and its
+          // owner binding, and a read without them is refused (fail-closed).
+          // dev's fixture predates that; it states them instead of the read
+          // being loosened.
+          created_at: new Date(),identity_owner_ref: null,
           shredded_at: null,destroyed_at: null,wrapped_key: Buffer.from("wrapped"),
           transcript_snapshot_ciphertext: Buffer.from("transcript"),
           summary_ciphertext: Buffer.from("summary"),case_message_next_cursor: null,

@@ -479,7 +479,8 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
           valueJsonText: parseCanonicalRegisterJson(Buffer.from("true")),
           sourceRef: "deployment:general-later"
         }],
-        sourceRef: "deployment:general-later"
+        sourceRef: "deployment:general-later",
+        deployment: "local"
       });
       expect(generic.registerVersion).toBe("9007199254740994");
       expect(deployedRegisterVersion).toBe("4");
@@ -1229,8 +1230,12 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
     `);
     expect(privileges.rows).toEqual([
       {
+        // DB1 / DL5-F4: migrations/0065_security_delta_guards.sql §3 revoked the
+        // surplus general-publish EXECUTE from debateai_runtime — no service caller
+        // exists; register-publication.ts:782,813 runs only from the migrator-credential
+        // CLIs, and runtime consumers read a pinned REGISTER_VERSION.
         role_name: "debateai_runtime", support_publish: false,
-        general_publish: true, allocator: false, row_insert: false, sequence_usage: false
+        general_publish: false, allocator: false, row_insert: false, sequence_usage: false
       },
       {
         role_name: "debateai_support_config_operator", support_publish: true,

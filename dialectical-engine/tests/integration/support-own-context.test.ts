@@ -15,7 +15,8 @@ describe("SUP-03 no private-context authority", () => {
   it("keeps human cases while removing private-context composition", async () => {
     expect(SUPPORT_ROUTE_PATHS).toEqual(expect.arrayContaining([
       "POST /v1/support/sessions/{id}/escalate","GET /v1/support/cases",
-      "GET /v1/support/cases/{token}","POST /v1/support/cases/{token}/messages"
+      // DL1-F5c/DL3-F4: the case bearer rides a header, never a path segment.
+      "GET /v1/support/case","POST /v1/support/case/messages"
     ]));
     const source = await readFile("apps/api/src/support/index.ts","utf8");
     expect(source).not.toMatch(/ownContext|consentOwnContextAt|run_id|body[.]latest/iu);

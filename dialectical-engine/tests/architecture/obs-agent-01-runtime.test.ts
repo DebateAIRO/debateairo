@@ -169,7 +169,11 @@ describe("OBS-01 launchd custody and runtime bounds", () => {
     expect(launch).toMatch(/\[\[ "\$mode" != "600" \]\]/u);
     expect(launch).toMatch(/\[\[ "\$owner" != "\$\(id -u\)" \]\]/u);
     expect(launch).toContain('cd "$repo_root"');
-    expect(launch).toContain("exec node --import tsx apps/observation-agent/src/main.ts");
+    // DL7-F5: the runtime is deduced by name and PROVEN to be a program before
+    // exec, so the entrypoint is reached through the verified path and never
+    // through a bare `node` the shell would re-run as a script on ENOEXEC.
+    // The guard itself is pinned in obs-agent-dl7-f5-launcher.test.ts.
+    expect(launch).toContain('exec "$node_bin" --import tsx apps/observation-agent/src/main.ts');
     expect((await stat(launchPath)).mode & 0o111).not.toBe(0);
   });
 

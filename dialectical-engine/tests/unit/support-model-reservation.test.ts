@@ -5,13 +5,30 @@ import type {
   SupportConfigurationState
 } from "../../packages/register/src/support-config.js";
 import {
+  SUPPORT_MODEL_RESERVATION_EVENT_CAP,
   SupportModelReservationLedger,
   createReservedSupportModelPort,
   reserveSupportModelCall
 } from "../../apps/api/src/support/model-reservation.js";
 import { SupportModelError,type SupportModelPort } from "../../apps/api/src/support/model.js";
+import { buildSupportAnswerPrompt } from "../../apps/api/src/support/prompt.js";
 import { SUPPORT_LIMIT_DEFAULTS } from "../../apps/api/src/support/limits.js";
 import { SupportRelayQueue } from "../../apps/api/src/support/queue.js";
+
+/**
+ * FW-B / B-I1: the port carries one framed packet now. What this suite measures
+ * is the RESERVATION around a call, never the prompt, so every case asks with
+ * the same shipped-builder fixture — and because it is the shipped builder, a
+ * packet that would not pass the transport's door cannot pass here either.
+ */
+function ask(): Parameters<SupportModelPort["complete"]>[0] {
+  return Object.freeze({
+    packet: buildSupportAnswerPrompt({
+      instruction: "system",visitorMessage: "help"
+    }).packet,
+    language: "en" as const
+  });
+}
 
 const enabledState = (supportEnabled = true): SupportConfigurationState => Object.freeze({
   kind: "AVAILABLE",
@@ -101,7 +118,7 @@ describe("SUP-01 final model-call reservation", () => {
     });
     const controller = new AbortController();
     const completion = admitted.complete({
-      system: "system",messages: [],language: "en",signal: controller.signal
+      ...ask(),signal: controller.signal
     });
 
     controller.abort();
@@ -145,7 +162,7 @@ describe("SUP-01 final model-call reservation", () => {
     });
     const controller = new AbortController();
     const completion = admitted.complete({
-      system: "system",messages: [],language: "en",signal: controller.signal
+      ...ask(),signal: controller.signal
     });
     for (let turn = 0;turn < 4 && durableCalls === 0;turn += 1) await Promise.resolve();
 
@@ -181,7 +198,7 @@ describe("SUP-01 final model-call reservation", () => {
     });
     const controller = new AbortController();
     const completion = admitted.complete({
-      system: "system",messages: [],language: "en",signal: controller.signal
+      ...ask(),signal: controller.signal
     });
     for (let turn = 0;turn < 6 && providerSignal === undefined;turn += 1) await Promise.resolve();
 
@@ -211,7 +228,7 @@ describe("SUP-01 final model-call reservation", () => {
     controller.abort();
 
     await expect(admitted.complete({
-      system: "system",messages: [],language: "en",signal: controller.signal
+      ...ask(),signal: controller.signal
     })).rejects.toBeInstanceOf(SupportModelError);
   });
 
@@ -375,9 +392,7 @@ describe("SUP-01 final model-call reservation", () => {
     const held = await queue.acquireRelaySlot({ language: "en" });
     const queued = queue.execute({ modelBacked: true,language: "en" },async (signal) =>
       admitted.complete({
-        system: "system",
-        messages: [],
-        language: "en",
+        ...ask(),
         ...(signal === undefined ? {} : { signal }),
       })
     );
@@ -413,7 +428,7 @@ describe("SUP-01 final model-call reservation", () => {
         return () => `nonce-concurrent-${String(++value).padStart(24,"0")}`;
       })()
     });
-    const request = Object.freeze({ system: "system",messages: [],language: "en" as const });
+    const request = ask();
 
     await expect(admitted.complete(request))
       .rejects.toMatchObject({ code: "SUPPORT_DISABLED" });
@@ -450,10 +465,99 @@ describe("SUP-01 final model-call reservation", () => {
       nonce: () => "nonce-durable-denial-0000000000000000000"
     });
 
-    await expect(admitted.complete({ system: "system",messages: [],language: "en" }))
+    await expect(admitted.complete(ask()))
       .rejects.toMatchObject({ code: "SUPPORT_MODEL_UNAVAILABLE" });
     expect(durableCalls).toBe(1);
     expect(providerCalls).toBe(0);
+    expect(reservations.activeCount()).toBe(0);
+  });
+
+  /**
+   * V-30 review finding 3. The configured `supportModelRef` and the composed
+   * model map can disagree — a hosted cutover that publishes a vendor target
+   * before the support configuration row, or the reverse. The condition already
+   * has a name, `SUPPORT_RELAY_NOT_COMPOSED`, and it was being answered with the
+   * generic UNAVAILABLE: every visitor saw DEGRADED and no log line said why.
+   * The refusal now carries the name, and the diagnostic carries the ref that
+   * could not be composed, which is the one fact an operator needs.
+   */
+  it("names the uncomposed model ref instead of degrading silently", async () => {
+    const reservations = ledger();
+    const seen: string[] = [];
+    let durableCalls = 0;
+    const admitted = createReservedSupportModelPort({
+      configuration: configuration(enabledState()),
+      ledger: reservations,
+      durableCalls: recordedDurableCalls(() => { durableCalls += 1; }),
+      modelFor: () => undefined,
+      reportDiagnostic: (diagnostic) => { seen.push(diagnostic.code); },
+      nonce: () => "nonce-uncomposed-000000000000000000000"
+    });
+
+    await expect(admitted.complete(ask()))
+      .rejects.toMatchObject({ code: "SUPPORT_RELAY_NOT_COMPOSED" });
+    expect(seen).toEqual(["SUPPORT_RELAY_NOT_COMPOSED:development:claude-cli"]);
+    // The reservation is released before any durable call is recorded: an
+    // uncomposed model must not spend a slot of the daily cap.
+    expect(durableCalls).toBe(0);
+    expect(reservations.activeCount()).toBe(0);
+  });
+
+  /**
+   * Re-review finding 1. The sink is the caller's code. Unguarded, a sink that
+   * throws escaped as a plain TypeError, which `answer.ts` re-throws rather than
+   * degrading — a 500 to the visitor instead of the DEGRADED answer, caused by a
+   * broken log line. The guard is the one this repository already uses
+   * (`support/index.ts:232-241`): try the sink, fall back to `console.error`.
+   */
+  it("still refuses with the typed code when the diagnostic sink throws", async () => {
+    const reservations = ledger();
+    const logged: unknown[] = [];
+    const consoleError = console.error;
+    console.error = (...parts: readonly unknown[]) => { logged.push(parts[0]); };
+    try {
+      const admitted = createReservedSupportModelPort({
+        configuration: configuration(enabledState()),
+        ledger: reservations,
+        durableCalls: recordedDurableCalls(),
+        modelFor: () => undefined,
+        reportDiagnostic: () => { throw new TypeError("the sink is broken"); },
+        nonce: () => "nonce-broken-sink-00000000000000000000"
+      });
+
+      await expect(admitted.complete(ask()))
+        .rejects.toMatchObject({ code: "SUPPORT_RELAY_NOT_COMPOSED" });
+    } finally {
+      console.error = consoleError;
+    }
+    expect(logged).toEqual([{ code: "SUPPORT_RELAY_NOT_COMPOSED:development:claude-cli" }]);
+    expect(reservations.activeCount()).toBe(0);
+  });
+
+  /**
+   * DL1-F8. `#events` grew one frozen record per model call for the lifetime of
+   * the process and nothing in production ever read it back, so the ledger's
+   * memory tracked uptime x the daily cap. The retained window is now a fixed
+   * bound; `#active`, which the release path depends on, is untouched.
+   */
+  it("bounds the retained reservation events and keeps the newest", () => {
+    const reservations = ledger();
+    for (let index = 0;index < 5_000;index += 1) {
+      reservations.reserve({
+        kind: "new",
+        nonce: `nonce-bounded-${String(index).padStart(12,"0")}`,
+        supportRegisterVersion: "9007199254740992",
+        atMs: index
+      }).releaseBeforePost();
+    }
+    const retained = reservations.events();
+
+    expect(retained.length).toBeLessThanOrEqual(64);
+    expect(SUPPORT_MODEL_RESERVATION_EVENT_CAP).toBe(64);
+    expect(retained.at(-1)?.nonce).toBe(`nonce-bounded-${String(4_999).padStart(12,"0")}`);
+    expect(retained.at(0)?.nonce).toBe(
+      `nonce-bounded-${String(5_000 - retained.length).padStart(12,"0")}`
+    );
     expect(reservations.activeCount()).toBe(0);
   });
 

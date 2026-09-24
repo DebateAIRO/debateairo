@@ -3,11 +3,16 @@ import { constants } from "node:fs";
 import { lstat, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
-import { EVALUATOR_CONTRACT_TEXT } from "./index.js";
+import { EVALUATOR_PROMPT_CONTRACT } from "./index.js";
+import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
+import { promptContractFingerprintText } from "@debateai/providers";
+import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 import { CLAIM_TYPES } from "@debateai/kernel";
 import {
+  ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
-  AUTH_POLICY_REGISTER_ROWS,
+  AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
   MFA_POLICY_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
@@ -32,6 +37,7 @@ import {
   type RegisterVersionText
 } from "@debateai/register";
 import type { DevelopmentConfiguredProvider, DevelopmentProviderPanel } from "./dev-provider-panel.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 export type DevelopmentDeploymentRegisterRow = Readonly<{
   rowKey: string;
@@ -61,13 +67,40 @@ export const DEVELOPMENT_RUN_DEATH_POLICY = Object.freeze({
   max_cooldown_holds_per_run: 2,
   applies_to: "TRANSPORT_EXHAUSTION" as const
 });
-/** First allocated version on a fresh database; runtime pins use the returned receipt. */
+/**
+ * First allocated version on a fresh database; runtime pins use the returned receipt.
+ *
+ * THE NUMBER IS THE ALLOCATOR'S, NOT THIS FILE'S (C-I4). Migration 0055's
+ * sequence contract sets the next version to
+ * `greatest(4, max(register_version)) + 1`, and the only version a fresh
+ * database holds when `seedDevelopmentDeploymentRegister` publishes is the
+ * sealed bootstrap — imported as HISTORICAL, which never touches the allocator
+ * sequence. So a fresh database allocates 5, and this constant says 5.
+ *
+ * WHAT A STANDING DEV DATABASE GETS, and why that is not a contradiction: one
+ * that already sealed a 5 allocates 6 for the new rows, because the allocator
+ * never reuses a version. That is constraint 5 enforced where it belongs — in
+ * the database — rather than by a number in this file: RUN1 moved the prompt
+ * contract hashes this version carries, and superseding them is a new
+ * publication, whatever number it is given. Both dev roots read the version off
+ * the RECEIPT (`dev-api-process.ts`, `dev-api-environment.ts`), so nothing at
+ * runtime depends on which of the two a particular machine got.
+ *
+ * `tests/architecture/dev-deployment-register.test.ts` recomputes this from the
+ * migration and the bootstrap, so the two cannot drift again.
+ */
 export const DEVELOPMENT_REGISTER_VERSION = 5 as const;
 export const DEVELOPMENT_HISTORICAL_REGISTER_VERSION = 4 as const;
 export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_SCHEMA =
   "debateai.dev-deployment-register-receipt.v1" as const;
-export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_RELATIVE_PATH =
-  ".local/dev-auth/deployment-register-receipt.v1.json" as const;
+/**
+ * DL7-F4: the receipt lives in dev custody, and dev custody is movable
+ * (DEBATEAI_DEV_CUSTODY_ROOT, F-05) so keys need never sit inside a cloud-synced checkout.
+ * The name is custody-relative; {@link developmentDeploymentRegisterReceiptPath} resolves it
+ * through the one resolver that owns the rule.
+ */
+export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_FILENAME =
+  "deployment-register-receipt.v1.json" as const;
 export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX =
   "DEV_DEPLOYMENT_REGISTER_RECEIPT_V1=" as const;
 
@@ -180,7 +213,7 @@ async function readReceiptBytes(path: string): Promise<string> {
 
 export function developmentDeploymentRegisterReceiptPath(repositoryRoot: string): string {
   if (!isAbsolute(repositoryRoot)) throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_PATH_INVALID");
-  return join(resolve(repositoryRoot), DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_RELATIVE_PATH);
+  return join(resolveDevCustodyRoot(resolve(repositoryRoot)), DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_FILENAME);
 }
 
 function parseReceiptJson(source: string): DevelopmentDeploymentRegisterMachineReceiptV1 {
@@ -473,28 +506,24 @@ export function buildDevelopmentAlgorithmRegisterRows(
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
 
-function requireMatch(source: string, expression: RegExp, label: string): string {
-  const value = source.match(expression)?.[1];
-  if (value === undefined) throw new TypeError(`DEV_RUNNER_CONTRACT_TEXT_UNRESOLVED:${label}`);
-  return value;
-}
 
 
 async function computeDevelopmentContractRows(): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
-  const [judge, runner, propagation, serve] = await Promise.all([
-    readFile(new URL("../../../packages/judgement/src/index.ts", import.meta.url), "utf8"),
-    readFile(new URL("./index.ts", import.meta.url), "utf8"),
+  const [propagation, serve] = await Promise.all([
     readFile(new URL("../../../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
   const values = Object.freeze({
-    judgeContractHash: digest(requireMatch(judge, /content: `([\s\S]*?)`/, "judge")),
-    composerContractHash: digest(requireMatch(
-      runner,
-      /content: "(Return only JSON with a segments array[^"]+)"/,
-      "composer"
-    )),
-    conformanceContractHash: digest(EVALUATOR_CONTRACT_TEXT),
+    // RUN1 (V-11 addendum): every prompt is now `SAFETY FRAME OWNED BY CODE +
+    // INSTRUCTION TEXT`, so a fingerprint taken over a SEARCH of the source no
+    // longer describes what is sent. Each row is the digest of the prompt
+    // contracts themselves, through `promptContractFingerprintText`, which
+    // folds in the frame version — so a change to the frame, to a code-owned
+    // answer form, or to an owner's instruction slot is a NEW sealed version
+    // and none of them can ship under an old hash.
+    judgeContractHash: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
+    composerContractHash: digest(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+    conformanceContractHash: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)),
     // codex r2 B1a: the fingerprint is taken from the constant the runner
     // SENDS, not from a search of the runner's source. There is nothing left
     // for a comment, string, regex or template literal to confuse.
@@ -628,11 +657,23 @@ function developmentRows(
   );
   const rows = [
     ...bootstrapRows,
-    ...AUTH_POLICY_REGISTER_ROWS,
+    // V-14: a deployment register publishes the SUPERSEDING authentication
+    // rows (`passwordPolicy` with `max_length`). The sealed historical set is
+    // published unchanged by `persistBootstrapRegister` at its own version.
+    ...AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
     MFA_POLICY_REGISTER_ROW,
     SESSION_POLICY_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
+    // DL1-F2/DL1-F7: the SUPERSEDING admission row, on the same precedent as
+    // V-14's authentication rows above. The sealed three-scope row stays the
+    // historical one; this version adds the three support budgets.
+    ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
+    // V-28 (DL4-F2): the per-run and daily spending ceilings, in money. The
+    // values are the TEMPORARY development ones and the row says so about
+    // itself; the owner seals the real ones as a NEW version after the first
+    // measured paid run, never as an edit of this one (constraint 5).
+    COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
     ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs)
   ];
@@ -825,7 +866,11 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
     publicationId: developmentProviderSetPublicationId(input.baseRegisterVersion, snapshotSha256),
     baseRegisterVersion: input.baseRegisterVersion,
     rows,
-    sourceRef: DEVELOPMENT_PROVIDER_SET_SOURCE_REF
+    sourceRef: DEVELOPMENT_PROVIDER_SET_SOURCE_REF,
+    // C-I5: this publisher republishes the LOCAL dev panel's provider set (CLI
+    // relays on loopback, the local product path V-9(c) ruled), exactly as the
+    // seeder below does; a hosted publication is held to V-9(4) at this door.
+    deployment: "local"
   });
   if (published.snapshotSha256 !== snapshotSha256 || published.rowCount !== rows.length) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_INVALID");
@@ -883,7 +928,12 @@ export async function seedDevelopmentDeploymentRegister(
     publicationId,
     baseRegisterVersion: parseRegisterVersionText(String(bootstrap.registerVersion)),
     rows: publicationRows,
-    sourceRef: DEVELOPMENT_ALGORITHM_SOURCE_REF
+    sourceRef: DEVELOPMENT_ALGORITHM_SOURCE_REF,
+    // C-I5: this seeder IS the local deployment — a fixed roster of CLI relays
+    // on loopback, which is the local product path V-9(c) ruled. The hosted
+    // publication declares itself `hosted` and is then held to V-9(4)'s vendor
+    // vetting at this same door.
+    deployment: "local"
   });
   const receipt = createDevelopmentDeploymentRegisterMachineReceipt({
     registerVersion: imported.registerVersion,

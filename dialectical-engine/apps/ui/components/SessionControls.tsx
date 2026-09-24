@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { ContractClient, SessionSummary } from "@debateai/contract";
 import { contractClient } from "../lib/api.js";
+import { clearStoredSupportConversation } from "./support/conversation.js";
 
 export type SessionControlClient = Pick<ContractClient,
   "listSessions" | "logout" | "revokeSession" | "revokeAllSessions" | "stepUp"
@@ -70,6 +71,10 @@ export function SessionControls({
   const [deviceLabel, setDeviceLabel] = useState<string | null>(null);
   useEffect(() => { setDeviceLabel(currentDeviceLabel()); }, []);
   const finishSession = () => {
+    // DL3-F3: the support widget's transcript is tab-scoped, so without this it
+    // outlived the account that produced it — the next person to sign in on this
+    // browser opened Help and read the previous person's support conversation.
+    clearStoredSupportConversation();
     if (onSessionEnded !== undefined) onSessionEnded();
     else if (typeof window !== "undefined") window.location.assign("/settings");
   };

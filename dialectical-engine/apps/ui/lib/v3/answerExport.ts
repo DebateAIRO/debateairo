@@ -34,7 +34,9 @@ export type AnswerExportInput = Readonly<{
 export type AnswerExportWithheldReason =
   | "NO_SERVED_ANSWER"
   | "LEDGER_DIGEST_PENDING"
-  | "LEDGER_DIGEST_UNREADABLE";
+  | "LEDGER_DIGEST_UNREADABLE"
+  /** Public (reader) mode with no published export supplied by the page. */
+  | "ANSWER_UNAVAILABLE";
 
 export type AnswerExport =
   | Readonly<{ available: true; href: string; filename: string; label: string; toast: string }>

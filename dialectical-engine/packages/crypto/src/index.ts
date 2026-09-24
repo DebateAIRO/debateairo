@@ -8,8 +8,17 @@ import {
   randomInt,
   timingSafeEqual
 } from "node:crypto";
-import { readFileSync, realpathSync, statSync } from "node:fs";
-import type { Dirent } from "node:fs";
+import {
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  openSync,
+  readFileSync,
+  readSync,
+  realpathSync,
+  statSync
+} from "node:fs";
+import type { Dirent, Stats } from "node:fs";
 import { chmod, lstat, mkdir, open, readFile, readdir, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -32,6 +41,7 @@ export {
   ARGON2ID_ENCODING_BOUNDS,
   Argon2InfrastructureError,
   Argon2WorkerPool,
+  argon2EnvelopeRefusal,
   parseEncodedArgon2id,
   type Argon2idEncodingParameters,
   type Argon2AuditParameters,
@@ -120,13 +130,75 @@ export class KekUnresolvedError extends CryptoError {
   }
 }
 
+/**
+ * A key file that exists but does not satisfy the custody contract. Distinct
+ * from KEK_UNRESOLVED (nothing is configured at that path) so an operator can
+ * tell "you did not provision this" from "this file is not safe to trust".
+ */
+export class CryptoCustodyError extends CryptoError {
+  constructor(code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID") {
+    super(code, code);
+    this.name = "CryptoCustodyError";
+  }
+}
+
+/**
+ * `DEBATEAI_CUSTODY_GROUP` is configured but does not name a group this host
+ * knows. Deliberately NOT a silent fall-back to the single-owner contract:
+ * an operator who mistypes the group would otherwise get a deployment that
+ * boots and then refuses every key file for an unrelated-looking reason.
+ */
+export class CustodyGroupUnresolvedError extends CryptoError {
+  constructor() {
+    super("CUSTODY_GROUP_UNRESOLVED", "CUSTODY_GROUP_UNRESOLVED");
+    this.name = "CustodyGroupUnresolvedError";
+  }
+}
+
+/**
+ * V-9(2), ruled 2026-09-22: a provider credential file exists and satisfies the
+ * custody contract, but its contents are not one printable `authorization`
+ * header line. Its message is the code and NOTHING else — not the path, not a
+ * length, not a prefix of the value — because the value is the credential.
+ */
+export class ProviderCredentialInvalidError extends CryptoError {
+  constructor() {
+    super("PROVIDER_CREDENTIAL_FILE_INVALID", "PROVIDER_CREDENTIAL_FILE_INVALID");
+    this.name = "ProviderCredentialInvalidError";
+  }
+}
+
+/**
+ * Nothing is provisioned at that path. The same distinction `KEK_UNRESOLVED`
+ * draws against `KEK_CUSTODY_INVALID`, drawn again for a vendor credential: "you
+ * did not provision this" is a different operator action from "this file is not
+ * safe to trust", and calling a missing vendor key file a KEK sends an operator
+ * looking at the wrong tree. Like every refusal on this path it carries the code
+ * and nothing else — no path, no vendor, no length.
+ */
+export class ProviderCredentialAbsentError extends CryptoError {
+  constructor() {
+    super("PROVIDER_CREDENTIAL_FILE_ABSENT", "PROVIDER_CREDENTIAL_FILE_ABSENT");
+    this.name = "ProviderCredentialAbsentError";
+  }
+}
+
+/** The handle's master copy has been zeroed; it can never be revived. */
+export class KekDestroyedError extends CryptoError {
+  constructor() {
+    super("KEK_DESTROYED", "KEK_DESTROYED");
+    this.name = "KekDestroyedError";
+  }
+}
+
 class CryptoInputError extends CryptoError {
   constructor(code:
     | "CRYPTO_AAD_INVALID"
     | "CRYPTO_AUDIT_CHAIN_INVALID"
     | "CRYPTO_CANONICAL_VALUE_INVALID"
     | "CRYPTO_EMAIL_INVALID"
-    | "CRYPTO_KEY_INVALID") {
+    | "CRYPTO_KEY_INVALID"
+    | "CRYPTO_TOKEN_KIND_INVALID") {
     super(code, code);
     this.name = "CryptoInputError";
   }
@@ -138,7 +210,12 @@ export interface KekHandle {
 }
 
 const kekMaterials = new WeakMap<KekHandle, Buffer>();
+const destroyedKekHandles = new WeakSet<KekHandle>();
 
+/**
+ * Short-lived working copy for one encrypt/decrypt. Pooled on purpose: this is
+ * the per-message path, and every caller zeroes it in a `finally`.
+ */
 function copyKey(material: Uint8Array): Buffer {
   const key = Buffer.from(material);
   if (key.byteLength !== KEY_BYTES) {
@@ -148,8 +225,24 @@ function copyKey(material: Uint8Array): Buffer {
   return key;
 }
 
+/**
+ * L2-F7: `Buffer.from` of a 32-byte source is served from Node's shared 8 KiB
+ * pool slab, so the copy sits adjacent to unrelated allocations and `fill(0)`
+ * erases only the view — the bytes stay in the slab until it is reused.
+ * `allocUnsafeSlow` gives the key its own exactly-sized allocation that zeroing
+ * really erases. Reserved for the long-lived master copies and the key-file
+ * reads: a non-pooled allocation per message would cost RSS and GC for no
+ * benefit, since those copies are zeroed immediately anyway.
+ */
+function isolatedKeyCopy(material: Uint8Array): Buffer {
+  if (material.byteLength !== KEY_BYTES) throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  const key = Buffer.allocUnsafeSlow(KEY_BYTES);
+  key.set(material);
+  return key;
+}
+
 function makeKekHandle(material: Uint8Array): KekHandle {
-  const key = copyKey(material);
+  const key = isolatedKeyCopy(material);
   const handle = Object.freeze(Object.create(null)) as KekHandle;
   kekMaterials.set(handle, key);
   return handle;
@@ -157,8 +250,119 @@ function makeKekHandle(material: Uint8Array): KekHandle {
 
 function readKek(handle: KekHandle): Buffer {
   const material = kekMaterials.get(handle);
-  if (material === undefined) throw new KekUnresolvedError();
-  return Buffer.from(material);
+  if (material === undefined) {
+    // A destroyed handle is a shutdown-ordering fault, not a missing config.
+    if (destroyedKekHandles.has(handle)) throw new KekDestroyedError();
+    throw new KekUnresolvedError();
+  }
+  return copyKey(material);
+}
+
+const KEK_ID_DOMAIN = "debateai:kek-id:v1\0";
+const KEK_ID_BYTES = 8;
+
+/**
+ * V-3. A stable, NON-SECRET label for a KEK, written into every wrapped-key
+ * record so a rotation can tell which master key wrapped it without trying to
+ * decrypt. Eight bytes of a domain-separated SHA-256 over the 32-byte key, the
+ * same shape every key-management system uses for a key id: a 64-bit truncation
+ * of a hash of a high-entropy secret is not a practical route back to it, and
+ * the domain string keeps this digest from colliding with any other use of the
+ * same bytes.
+ */
+export function kekId(kek: KekHandle): string {
+  const material = readKek(kek);
+  try {
+    return createHash("sha256")
+      .update(KEK_ID_DOMAIN, "utf8")
+      .update(material)
+      .digest()
+      .subarray(0, KEK_ID_BYTES)
+      .toString("hex");
+  } finally {
+    material.fill(0);
+  }
+}
+
+/**
+ * The keys a process may unwrap with during a changeover. `previous` is absent
+ * in the steady state, which is the whole point: an operator retires the old
+ * KEK by deleting the setting once a verification pass is clean.
+ */
+export interface KekRing {
+  readonly current: KekHandle;
+  readonly previous?: KekHandle | undefined;
+}
+
+/** Every store still accepts a bare handle, which means "current, no previous". */
+export type KekSource = KekHandle | KekRing;
+
+function toKekRing(source: KekSource): KekRing {
+  if (!("current" in source)) return { current: source };
+  if (source.previous !== undefined) {
+    // A "previous" key that IS the current one is not a changeover. Every
+    // record would look already-current whichever key really wrapped it, and a
+    // verification pass over it would mean nothing. The support port refuses
+    // the same shape; the file stores used to accept it silently.
+    const current = readKek(source.current);
+    const previous = readKek(source.previous);
+    try {
+      if (current.byteLength === previous.byteLength
+        && timingSafeEqual(current, previous)) {
+        throw new CryptoError("KEK_RING_NOT_A_CHANGEOVER", "KEK_RING_NOT_A_CHANGEOVER");
+      }
+    } finally {
+      current.fill(0);
+      previous.fill(0);
+    }
+  }
+  return source;
+}
+
+/**
+ * Chooses the KEK for one record and unwraps with it.
+ *
+ * A LABELLED record is authoritative: the label names exactly one key, and a
+ * process holding neither that key nor a previous one refuses rather than
+ * try-decrypting its way in. An UNLABELLED record — everything written before
+ * V-3 — is "wrapped by the original KEK", which during a changeover may be
+ * either key, so those two are tried in turn. That fallback is bounded to the
+ * two keys the process already holds and disappears record by record as the
+ * rotation re-writes each one labelled.
+ */
+function unwrapUnderRing(
+  ring: KekRing,
+  label: string | undefined,
+  envelope: CryptoEnvelope,
+  aad: AeadAad
+): Buffer {
+  if (label === undefined) {
+    try {
+      return unwrapDek(ring.current, envelope, aad);
+    } catch (error) {
+      if (ring.previous === undefined) throw error;
+      return unwrapDek(ring.previous, envelope, aad);
+    }
+  }
+  if (label === kekId(ring.current)) return unwrapDek(ring.current, envelope, aad);
+  if (ring.previous !== undefined && label === kekId(ring.previous)) {
+    return unwrapDek(ring.previous, envelope, aad);
+  }
+  throw new KekUnresolvedError();
+}
+
+/**
+ * Zeroes the KEK master copy and forgets the handle (L2-F7). Idempotent, so the
+ * shutdown lifecycle may run it on both the signal and the controller path.
+ * Every later wrap/unwrap through this handle fails closed with KEK_DESTROYED.
+ */
+export function destroyKek(handle: KekHandle): void {
+  const material = kekMaterials.get(handle);
+  if (material !== undefined) {
+    material.fill(0);
+    kekMaterials.delete(handle);
+  }
+  destroyedKekHandles.add(handle);
 }
 
 function canonicalCandidatePath(candidate: string): string {
@@ -181,30 +385,56 @@ function pathsOverlap(left: string, right: string): boolean {
   return left === right || left.startsWith(`${right}${sep}`) || right.startsWith(`${left}${sep}`);
 }
 
-/** Fail closed if any configured secret path or store root aliases another. */
+/**
+ * Fail closed if any configured secret path or store root aliases another.
+ *
+ * L2-F8: this ran only when publication was enabled, so a private-only
+ * deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one file and
+ * silently make the KEK the email HMAC key — after which "rotating the blind
+ * index" would be a KEK rotation. The corpus KEK and publication store are now
+ * optional and every other domain is checked unconditionally. A private-only
+ * violation reports SECRET_DOMAIN_MUST_BE_SEPARATE; the publication pair keeps
+ * its established PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE code.
+ */
 export function assertPublicationSecretDomains(input: Readonly<{
   privateKek: KekHandle;
-  corpusKek: KekHandle;
+  corpusKek?: KekHandle | undefined;
   privateKekPath: string;
-  corpusKekPath: string;
+  corpusKekPath?: string | undefined;
   privateStorePath: string;
-  publicationStorePath: string;
+  publicationStorePath?: string | undefined;
+  /**
+   * V-3, fix round 1. The PREVIOUS key of each ring a changeover configures.
+   * They are key material this process holds, so they are in the same pairwise
+   * check as everything else: `toKekRing` only refuses a previous key equal to
+   * its OWN current one, which leaves `KEK_PREVIOUS_PATH` aimed at the
+   * blind-index key, the audit salt or the corpus KEK unnoticed — the L2-F8
+   * aliasing this function exists to refuse, one changeover later.
+   */
+  previousKeks?: readonly Readonly<{ handle: KekHandle;path: string }>[];
   additionalSecrets?: readonly Readonly<{
     path: string;
     material: Uint8Array;
   }>[];
   additionalStorePaths?: readonly string[];
 }>): void {
+  const code = input.corpusKek === undefined
+    ? "SECRET_DOMAIN_MUST_BE_SEPARATE"
+    : "PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE";
   const materials: Buffer[] = [];
   try {
-    materials.push(readKek(input.privateKek), readKek(input.corpusKek));
+    materials.push(readKek(input.privateKek));
+    if (input.corpusKek !== undefined) materials.push(readKek(input.corpusKek));
+    for (const previous of input.previousKeks ?? []) {
+      materials.push(readKek(previous.handle));
+    }
     for (const secret of input.additionalSecrets ?? []) {
       materials.push(copyKey(secret.material));
     }
     for (let leftIndex = 0; leftIndex < materials.length; leftIndex += 1) {
       for (let rightIndex = leftIndex + 1; rightIndex < materials.length; rightIndex += 1) {
         if (timingSafeEqual(materials[leftIndex]!, materials[rightIndex]!)) {
-          throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+          throw new TypeError(code);
         }
       }
     }
@@ -214,8 +444,10 @@ export function assertPublicationSecretDomains(input: Readonly<{
   const paths = [
     canonicalCandidatePath(input.privateKekPath),
     canonicalCandidatePath(input.privateStorePath),
-    canonicalCandidatePath(input.corpusKekPath),
-    canonicalCandidatePath(input.publicationStorePath),
+    ...(input.corpusKekPath === undefined ? [] : [canonicalCandidatePath(input.corpusKekPath)]),
+    ...(input.publicationStorePath === undefined
+      ? [] : [canonicalCandidatePath(input.publicationStorePath)]),
+    ...(input.previousKeks ?? []).map((previous) => canonicalCandidatePath(previous.path)),
     ...(input.additionalSecrets ?? []).map((secret) => canonicalCandidatePath(secret.path)),
     ...(input.additionalStorePaths ?? []).map(canonicalCandidatePath)
   ];
@@ -224,13 +456,13 @@ export function assertPublicationSecretDomains(input: Readonly<{
       const left = paths[leftIndex]!;
       const right = paths[rightIndex]!;
       if (pathsOverlap(left, right)) {
-        throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+        throw new TypeError(code);
       }
       try {
         const leftStat = statSync(left);
         const rightStat = statSync(right);
         if (leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino) {
-          throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+          throw new TypeError(code);
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -315,30 +547,379 @@ export function decrypt(dek: Uint8Array, envelope: CryptoEnvelope, aad: AeadAad)
   }
 }
 
-export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
+/**
+ * The POSIX group database. Not a one-computer path (constraint 7): it is the
+ * same location on every Unix host, and a deployment that does not have one can
+ * configure the gid as a decimal number instead, which is resolved without
+ * reading any file at all.
+ */
+const POSIX_GROUP_DATABASE = "/etc/group";
+
+/** `name:password:gid:members` — POSIX group-database name grammar. */
+const GROUP_NAME = /^[A-Za-z_][A-Za-z0-9_.-]*\$?$/;
+
+/**
+ * Finds `name`'s gid in the text of a POSIX group database. Pure, so the whole
+ * grammar is testable without a host that happens to have the group.
+ */
+export function parseGroupDatabaseGid(database: string, name: string): number | undefined {
+  if (typeof database !== "string" || typeof name !== "string" || name === "") return undefined;
+  for (const line of database.split("\n")) {
+    if (line === "" || line.startsWith("#")) continue;
+    const fields = line.split(":");
+    if (fields.length < 3 || fields[0] !== name) continue;
+    const gid = fields[2]!;
+    if (!/^[0-9]+$/.test(gid)) return undefined;
+    const parsed = Number(gid);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Resolves the configured custody group to a gid. `undefined` means the group
+ * mode is OFF and the contract is exactly the single-owner one. Anything that
+ * is configured but cannot be resolved throws: a custody rule must never be
+ * decided by a value nobody could read.
+ */
+export function resolveCustodyGroupGid(
+  configured: string | undefined,
+  readGroupDatabase: () => string
+): number | undefined {
+  if (configured === undefined) return undefined;
+  const value = configured.trim();
+  if (value === "") return undefined;
+  if (/^[0-9]+$/.test(value)) {
+    const gid = Number(value);
+    // A gid is a uint32, and `0` is root/wheel — a group every privileged
+    // process is already in, which is not a custody boundary at all. Both were
+    // accepted unchecked, so a typo became the custody gid and surfaced as
+    // KEK_CUSTODY_INVALID at the first key open instead of here, which is what
+    // V-19 promises the operator (final review A, Minor).
+    if (!Number.isSafeInteger(gid) || gid <= 0 || gid > 0xffff_ffff) {
+      throw new CustodyGroupUnresolvedError();
+    }
+    return gid;
+  }
+  if (!GROUP_NAME.test(value)) throw new CustodyGroupUnresolvedError();
+  let database: string;
   try {
-    if (typeof pathOrBuffer !== "string") return makeKekHandle(pathOrBuffer);
-    const metadata = statSync(pathOrBuffer);
-    if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
+    database = readGroupDatabase();
+  } catch {
+    throw new CustodyGroupUnresolvedError();
+  }
+  const gid = parseGroupDatabaseGid(database, value);
+  if (gid === undefined) throw new CustodyGroupUnresolvedError();
+  return gid;
+}
+
+// Default: no group, so the contract is the single-owner one until a
+// composition root says otherwise. A process that never configures anything
+// therefore gets the STRICTER rule, which is the right way round.
+let custodyGroupGid: number | undefined;
+
+/**
+ * V-19. The composition root hands the value of `DEBATEAI_CUSTODY_GROUP`
+ * through, already parsed by the register loader — this package never reads the
+ * process environment itself (the structural purity law), and the group is
+ * resolved ONCE here rather than on every record read, which matters because
+ * the wrapped-key stores consult the contract per request and a group NAME
+ * would otherwise re-read the group database every time.
+ *
+ * Resolving eagerly is also what makes a misconfigured group a boot failure:
+ * `CUSTODY_GROUP_UNRESOLVED` is thrown here, before the first key is opened.
+ * Call it with `undefined` to return to the single-owner contract.
+ */
+export function configureCustodyGroup(configured: string | undefined): void {
+  // Cleared first, so a resolution that throws leaves the STRICTEST contract
+  // behind rather than whatever group happened to be configured before it.
+  custodyGroupGid = undefined;
+  custodyGroupGid = resolveCustodyGroupGid(
+    configured,
+    () => readFileSync(POSIX_GROUP_DATABASE, "utf8")
+  );
+}
+
+function currentCustodyGid(): number | undefined {
+  return custodyGroupGid;
+}
+
+export type CustodyFileFacts = Readonly<{
+  isFile: boolean;
+  nlink: number;
+  mode: number;
+  uid: number;
+  gid: number;
+  size: number;
+}>;
+
+export type CustodyParentFacts = Readonly<{
+  isDirectory: boolean;
+  mode: number;
+  uid: number;
+  gid: number;
+}>;
+
+export type CustodyContract = Readonly<{
+  /** `undefined` on a platform without uids, exactly as the uid rule has always been. */
+  callerUid: number | undefined;
+  /** `undefined` = the group mode is off and the contract is the single-owner one. */
+  custodyGid: number | undefined;
+  /** `undefined` for the JSON wrapped-key records, which are not 32-byte keys. */
+  expectedSize: number | undefined;
+}>;
+
+/**
+ * One accepted mode owned by the caller, or — only while a custody group is
+ * configured — one accepted mode whose gid is that group's. Exact equality, so
+ * a world bit, a group-write bit, an execute bit or a stranger's gid can never
+ * pass: the refusals are consequences of the equality, not separate branches
+ * that could drift apart from it.
+ */
+function custodyMemberAccepts(
+  facts: Readonly<{ mode: number;uid: number;gid: number }>,
+  ownerMode: number,
+  groupMode: number,
+  contract: CustodyContract
+): boolean {
+  const permissions = facts.mode & 0o777;
+  if (permissions === ownerMode) {
+    return contract.callerUid === undefined || facts.uid === contract.callerUid;
+  }
+  if (contract.custodyGid !== undefined && permissions === groupMode) {
+    return facts.gid === contract.custodyGid;
+  }
+  return false;
+}
+
+/**
+ * The V-19 custody contract, as one decision over facts already taken from the
+ * opened descriptor. With `custodyGid: undefined` it decides byte-for-byte what
+ * the single-owner rule decided before the group mode existed:
+ * 0600 file owned by the caller, one link, exact size, inside a 0700 directory
+ * owned by the caller. With a custody group configured it additionally accepts
+ * a 0640 file whose gid is that group's inside a 0750 directory whose gid is
+ * that group's — which is how a second read-only principal reads the store
+ * without ever being able to replace what is in it.
+ */
+export function custodyAccepts(
+  file: CustodyFileFacts,
+  parent: CustodyParentFacts,
+  contract: CustodyContract
+): boolean {
+  if (!file.isFile || file.nlink !== 1) return false;
+  if (contract.expectedSize !== undefined && file.size !== contract.expectedSize) return false;
+  if (!parent.isDirectory) return false;
+  // One owner for the record and the directory holding it. In the single-owner
+  // contract this is already implied (both must be the caller); in group mode
+  // the FILE's uid is deliberately free, and without this a directory owned by
+  // some other principal — who could therefore replace the record — would pass.
+  if (file.uid !== parent.uid) return false;
+  if (!custodyMemberAccepts(file, 0o600, 0o640, contract)) return false;
+  return custodyMemberAccepts(parent, 0o700, 0o750, contract);
+}
+
+/**
+ * The production custody contract for a raw 32-byte secret file (L2-F6). It is
+ * the discipline `apps/runner/src/dev-secret-files.ts` already enforced for dev
+ * secrets, which the production loaders did not:
+ *
+ * - `O_NOFOLLOW` so a symlinked key path is refused rather than followed;
+ * - every check taken from `fstat` on the descriptor actually read, so there is
+ *   no stat -> read window another process can slip through;
+ * - `uid` owned by this process, `nlink === 1` (no second name for the key),
+ *   exact 0600, exact 32 bytes;
+ * - a 0700 parent owned by the same uid, because a key anyone may replace is
+ *   not a key.
+ *
+ * The bytes land in an exactly-sized `allocUnsafeSlow` buffer (L2-F7) so the
+ * caller's `fill(0)` really erases them instead of a shared pool slab.
+ */
+function readCustodyFile(
+  path: string,
+  code: "KEK_CUSTODY_INVALID" | "SECRET_CUSTODY_INVALID",
+  /**
+   * V-9(2): a 32-byte key file pins an EXACT size; a provider credential is a
+   * vendor's text token, so it pins a ceiling instead. Everything else about
+   * the contract — `O_NOFOLLOW`, facts from the descriptor, `custodyAccepts`,
+   * the exactly-sized `allocUnsafeSlow` buffer — is the same for both.
+   */
+  size: Readonly<{ exact: number } | { maximum: number; refuseOversize: () => Error }>
+): Buffer {
+  let descriptor: number;
+  try {
+    descriptor = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  } catch (error) {
+    // Nothing provisioned at all stays the configuration code. ELOOP means the
+    // path WAS a symlink, which is a custody decision, not a missing file.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new KekUnresolvedError();
+    throw new CryptoCustodyError(code);
+  }
+  let material: Buffer | undefined;
+  try {
+    const metadata = fstatSync(descriptor);
+    const parent = statSync(dirname(resolve(path)));
+    if (!custodyAccepts(
+      {
+        isFile: metadata.isFile(),
+        nlink: metadata.nlink,
+        mode: metadata.mode,
+        uid: metadata.uid,
+        gid: metadata.gid,
+        size: metadata.size
+      },
+      {
+        isDirectory: parent.isDirectory(),
+        mode: parent.mode,
+        uid: parent.uid,
+        gid: parent.gid
+      },
+      {
+        callerUid: typeof process.getuid === "function" ? process.getuid() : undefined,
+        custodyGid: currentCustodyGid(),
+        expectedSize: "exact" in size ? size.exact : undefined
+      }
+    )) {
+      throw new CryptoCustodyError(code);
+    }
+    // A bounded file is checked BEFORE a byte of it is read, so an over-long
+    // one can never be loaded and never reach a message. It is the caller's own
+    // content refusal: permissions were fine, the contents are not.
+    const bytes = "exact" in size ? size.exact : metadata.size;
+    if (!("exact" in size) && (bytes < 1 || bytes > size.maximum)) {
+      throw size.refuseOversize();
+    }
+    material = Buffer.allocUnsafeSlow(bytes);
+    if (readSync(descriptor, material, 0, bytes, 0) !== bytes) {
+      throw new CryptoCustodyError(code);
+    }
+    return material;
+  } catch (error) {
+    material?.fill(0);
+    // A `CustodyGroupUnresolvedError` branch stood here. Nothing inside the try
+    // above can throw one: the group is resolved ONCE, in
+    // `configureCustodyGroup`, before the first key file is opened, and
+    // `currentCustodyGid()` only reads the variable it left behind. Dead since
+    // the group became eager; removed so no reader believes this path can
+    // report that refusal (final review A, Minor).
+    if (error instanceof CryptoCustodyError || error instanceof KekUnresolvedError) throw error;
+    // V-9(2): a bounded credential file's own content refusal keeps its name too.
+    if (error instanceof ProviderCredentialInvalidError) throw error;
+    throw new CryptoCustodyError(code);
+  } finally {
+    try {
+      closeSync(descriptor);
+    } catch {
+      // The key is already read or already refused; a failed close must not
+      // turn a good load into a custody refusal.
+    }
+  }
+}
+
+export function loadKek(pathOrBuffer: string | Uint8Array): KekHandle {
+  if (typeof pathOrBuffer !== "string") {
+    try {
+      return makeKekHandle(pathOrBuffer);
+    } catch {
       throw new KekUnresolvedError();
     }
-    return makeKekHandle(readFileSync(pathOrBuffer));
-  } catch (error) {
-    if (error instanceof KekUnresolvedError) throw error;
+  }
+  const material = readCustodyFile(pathOrBuffer, "KEK_CUSTODY_INVALID", { exact: KEY_BYTES });
+  try {
+    return makeKekHandle(material);
+  } catch {
     throw new KekUnresolvedError();
+  } finally {
+    material.fill(0);
+  }
+}
+
+/**
+ * V-3 — the changeover ring a SERVICE builds from the two paths it is
+ * configured with. `previousPath` absent is the steady state and answers a ring
+ * that is byte-for-byte today's single-key behaviour.
+ *
+ * `hold` exists because of DL7-F7: each handle is offered to the owner the
+ * MOMENT it exists, so a refusal on the previous key can never leave the
+ * current key live in memory with nothing responsible for it. The default is
+ * identity, for callers that own the handles themselves.
+ *
+ * The two keys being the same file, or the same bytes under two names, is
+ * refused here (`KEK_RING_NOT_A_CHANGEOVER`, via `toKekRing`) rather than at the
+ * first store construction: during a changeover that mistake makes every record
+ * look already-current whichever key really wrapped it, so a verification pass
+ * over it would mean nothing.
+ */
+export function loadKekRing(
+  currentPath: string,
+  previousPath: string | undefined,
+  hold: (handle: KekHandle) => KekHandle = (handle) => handle
+): KekRing {
+  const current = hold(loadKek(currentPath));
+  if (previousPath === undefined) return Object.freeze({ current });
+  return Object.freeze(toKekRing({ current, previous: hold(loadKek(previousPath)) }));
+}
+
+/**
+ * V-9(2). A provider credential is text, not 32 raw bytes, so it is bounded
+ * rather than sized exactly. Four kilobytes is far above any vendor's token and
+ * far below anything worth loading by accident.
+ */
+const MAX_PROVIDER_CREDENTIAL_BYTES = 4_096;
+/** One header line: printable US-ASCII only, no control bytes, nothing to fold. */
+const PRINTABLE_HEADER_LINE = /^[\x20-\x7e]+$/u;
+
+/**
+ * V-9(2) / task 10b — the hosted deployment's provider credential, read from a
+ * FILE under the SAME custody contract as every key file (V-19: owner-only, or
+ * the custody group), and returned as the `authorization` header value.
+ *
+ * The file holds the header value verbatim, with at most one trailing newline —
+ * `Bearer ` and the vendor's token, or whatever scheme that vendor's OpenAI-
+ * compatible endpoint documents. Nothing is inferred and nothing is repaired:
+ * a value that is not one printable line is refused, so a stray space or a
+ * second line can never be sent to a vendor as if it were a credential.
+ *
+ * The bytes land in an exactly-sized `allocUnsafeSlow` buffer and are zeroed
+ * before this returns. The header STRING that comes back cannot be zeroed —
+ * JavaScript strings are immutable — so it is built once here, held by the
+ * gateway that needs it, and never written anywhere.
+ */
+export function readCustodyAuthorizationHeader(path: string): string {
+  let material: Buffer;
+  try {
+    material = readCustodyFile(path, "SECRET_CUSTODY_INVALID", {
+      maximum: MAX_PROVIDER_CREDENTIAL_BYTES,
+      refuseOversize: () => new ProviderCredentialInvalidError()
+    });
+  } catch (error) {
+    // The shared reader speaks the KEK vocabulary for a path that does not
+    // exist. Translated here, at the only place that knows the file is a vendor
+    // credential, so the KEK loaders keep reporting exactly what they always did.
+    if (error instanceof KekUnresolvedError) throw new ProviderCredentialAbsentError();
+    throw error;
+  }
+  try {
+    const decoded = material.toString("latin1");
+    const value = decoded.endsWith("\n") ? decoded.slice(0, -1) : decoded;
+    if (!PRINTABLE_HEADER_LINE.test(value) || value !== value.trim()) {
+      throw new ProviderCredentialInvalidError();
+    }
+    return value;
+  } finally {
+    material.fill(0);
   }
 }
 
 export function loadSecretKey(path: string): Buffer {
+  const material = readCustodyFile(path, "SECRET_CUSTODY_INVALID", { exact: KEY_BYTES });
   try {
-    const metadata = statSync(path);
-    if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-      throw new KekUnresolvedError();
-    }
-    return copyKey(readFileSync(path));
+    return copyKey(material);
   } catch (error) {
-    if (error instanceof KekUnresolvedError || error instanceof CryptoInputError) throw error;
+    if (error instanceof CryptoInputError) throw error;
     throw new KekUnresolvedError();
+  } finally {
+    material.fill(0);
   }
 }
 
@@ -390,7 +971,9 @@ function canonicalJson(value: unknown): string {
       throw new CryptoInputError("CRYPTO_CANONICAL_VALUE_INVALID");
     }
     const entries = Object.entries(value as Readonly<Record<string, unknown>>)
-      .sort(([left], [right]) => left.localeCompare(right));
+      // UTF-16 code-unit order: locale-independent and identical to the SQL
+      // chain's COLLATE "C" order for the ASCII keys the audit rows use (L2-F4).
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
     return `{${entries.map(([key, item]) =>
       `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
   }
@@ -1040,6 +1623,46 @@ export function generateVerificationToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
+/**
+ * DL2-F4: `support-session` and `support-case` join the vocabulary so the two
+ * support capabilities have purpose labels no other subsystem can reuse. The
+ * support module computes their digests itself — SUP-01 forbids support code
+ * from importing this package — and `tests/unit/dl2-f4-support-capability-hash`
+ * pins its bytes to `hashToken`'s, so the two constructions cannot drift.
+ */
+export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant"
+  | "verification" | "support-session" | "support-case";
+
+const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
+  "session", "csrf", "login-challenge", "step-up-grant", "verification",
+  "support-session", "support-case"
+]);
+
+/**
+ * Purpose-bound opaque-token hash: `sha256("debateai:token:<kind>:v1\0" || token)`,
+ * rendered in the `sha256:<hex>` grammar every token-hash column CHECKs. A token
+ * presented as one kind can never match a hash stored for another kind (L2-F12).
+ * The MFA enrolment token is the consumed verification credential (looked up by
+ * `channel_binding.verification_token_hash`), so it hashes as "verification".
+ */
+export function hashToken(kind: TokenKind, token: string): string {
+  if (typeof kind !== "string" || !TOKEN_KINDS.has(kind)) {
+    throw new CryptoInputError("CRYPTO_TOKEN_KIND_INVALID");
+  }
+  if (typeof token !== "string" || token.length < 32) {
+    throw new CryptoInputError("CRYPTO_KEY_INVALID");
+  }
+  return `sha256:${createHash("sha256")
+    .update(`debateai:token:${kind}:v1\0`, "utf8")
+    .update(token, "utf8")
+    .digest("hex")}`;
+}
+
+/**
+ * @deprecated Unkeyed, purpose-free digest. No production call site uses it;
+ * it remains only for fixtures that need an opaque `sha256:<hex>` value.
+ * Use `hashToken(kind, token)` for every stored or compared token hash.
+ */
 export function hashVerificationToken(token: string): string {
   if (typeof token !== "string" || token.length < 32) {
     throw new CryptoInputError("CRYPTO_KEY_INVALID");
@@ -1083,6 +1706,8 @@ export interface UserDekStoreFileSystem {
   readonly open: typeof open;
   readonly readFile: typeof readFile;
   readonly lstat: typeof lstat;
+  /** V-3: only the rotation enumerates the store; ordinary reads are by id. */
+  readonly readdir: typeof readdir;
   readonly rename: typeof rename;
   readonly rm: typeof rm;
   readonly stat: typeof stat;
@@ -1094,13 +1719,329 @@ const defaultUserDekStoreFileSystem: UserDekStoreFileSystem = Object.freeze({
   open,
   readFile,
   lstat,
+  readdir,
   rename,
   rm,
   stat
 });
 
+/** What one record's re-wrap did. See `RotatableKeyStore`. */
+export type KeyRotationOutcome = "REWRAPPED" | "ALREADY_CURRENT";
+
+/**
+ * V-3. The three operations a KEK rotation needs from a key store, and nothing
+ * else. `verifyUnderCurrentKek` deliberately returns nothing: the rotation must
+ * never hold plaintext key material, so each store opens its own record, proves
+ * it opens, and zeroes what it read before returning.
+ */
+export interface RotatableKeyStore {
+  listKeyRefs(): Promise<readonly string[]>;
+  rewrapUnderCurrentKek(ref: string): Promise<KeyRotationOutcome>;
+  verifyUnderCurrentKek(ref: string): Promise<void>;
+}
+
+/**
+ * Replaces one already-published record in place. The directory exists, so this
+ * is deliberately NOT the create path: write a temporary beside it, fsync,
+ * rename over the old name, fsync the directory. The rename is atomic, so an
+ * interrupted rotation leaves the ORIGINAL record intact and the pass simply
+ * re-does that record — which is what "resumable" means here.
+ */
+async function republishRecord(
+  root: string,
+  directory: string,
+  location: string,
+  payload: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "chmod" | "open" | "rename" | "rm" | "stat">
+): Promise<void> {
+  const modes = await custodyWriteModes(root, fileSystem);
+  // A distinct suffix from the create path's, so a rotation and a concurrent
+  // first write can never contend for one temporary name.
+  const temporary = `${location}.rotate.tmp`;
+  let file: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    await fileSystem.rm(temporary, { force: true });
+    file = await fileSystem.open(temporary, "wx", modes.file);
+    await file.writeFile(payload, "utf8");
+    // A-I3: the group first, while the temporary is still 0600, then the mode,
+    // then the read-back — a re-wrap must not turn a readable record into one
+    // the reader refuses, and it is checked before the rename, so the ORIGINAL
+    // record survives a refusal.
+    await applyCustodyGroupOwnership(file, modes);
+    await fileSystem.chmod(temporary, modes.file);
+    await assertPublishableUnderCustody(file, directory, modes, fileSystem);
+    await file.sync();
+    await file.close();
+    file = undefined;
+    await fileSystem.rename(temporary, location);
+    const directoryHandle = await fileSystem.open(directory, "r");
+    try {
+      await directoryHandle.sync();
+    } finally {
+      await directoryHandle.close();
+    }
+  } catch (error) {
+    if (file !== undefined) {
+      try { await file.close(); } catch { /* the throw below is the real fault */ }
+    }
+    try { await fileSystem.rm(temporary, { force: true }); } catch { /* as above */ }
+    throw error;
+  }
+}
+
+/**
+ * The sub-directory names of `parent` that are canonical UUIDs, sorted.
+ *
+ * The store ROOT must exist: "not there" is never "empty". A rotation that read
+ * a mistyped store path as an empty store would report a clean pass, and the
+ * runbook keys key-retirement to that pass. The container INSIDE the root may
+ * legitimately be absent — that is a provisioned store nothing has been written
+ * into yet — and only that case answers an empty list.
+ */
+async function listRecordRefs(
+  root: string,
+  absentCode: string,
+  parent: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "readdir" | "stat">,
+  accepts: (name: string) => boolean
+): Promise<readonly string[]> {
+  try {
+    if (!(await fileSystem.stat(root)).isDirectory()) {
+      throw new CryptoError(absentCode, absentCode);
+    }
+  } catch (error) {
+    if (error instanceof CryptoError) throw error;
+    throw new CryptoError(absentCode, absentCode);
+  }
+  let entries: Dirent<string>[];
+  try {
+    entries = await fileSystem.readdir(parent, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return Object.freeze([]);
+    throw error;
+  }
+  // A record directory that is a SYMLINK is refused, never skipped. The dirent
+  // of a symlink answers `isDirectory()` false, so it used to fall out of the
+  // listing silently while `load` followed it happily: the record was neither
+  // re-wrapped nor verified and the rotation still printed a clean pass — the
+  // "never opened store reports clean" class, one record at a time. Only an
+  // operator can put a symlink here, and a custody refusal is what a link in a
+  // key store means everywhere else in this module.
+  if (entries.some((entry) =>
+    typeof entry !== "string" && entry.isSymbolicLink() && accepts(entry.name))) {
+    throw new CryptoCustodyError("SECRET_CUSTODY_INVALID");
+  }
+  return Object.freeze(entries
+    .filter((entry) => typeof entry !== "string" && entry.isDirectory() && accepts(entry.name))
+    .map((entry) => entry.name)
+    .sort());
+}
+
+/**
+ * The async half of the custody contract (L2-F6), for the wrapped-key JSON
+ * records the three file stores hold. Same discipline as `readCustodyFile`
+ * minus the 32-byte size rule, because these records are JSON envelopes:
+ * O_NOFOLLOW, decisions taken from the opened descriptor, exactly one link,
+ * 0600 inside a 0700 directory, both owned by this process.
+ *
+ * It throws `CryptoCustodyError("SECRET_CUSTODY_INVALID")`, and every store's
+ * `load` lets that code through rather than collapsing it into its own
+ * `*_UNRESOLVED`. The two mean different things to an operator — "nothing is
+ * provisioned at that path" versus "this exists but is not safe to trust" —
+ * and V-19 makes the second the likelier failure on a first deploy.
+ */
+async function readCustodyRecord(
+  location: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "open" | "stat">
+): Promise<unknown> {
+  const handle = await fileSystem.open(location, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const metadata = await handle.stat();
+    const parent = await fileSystem.stat(dirname(location));
+    if (!custodyAccepts(
+      {
+        isFile: metadata.isFile(),
+        nlink: metadata.nlink,
+        mode: metadata.mode,
+        uid: metadata.uid,
+        gid: metadata.gid,
+        size: metadata.size
+      },
+      {
+        isDirectory: parent.isDirectory(),
+        mode: parent.mode,
+        uid: parent.uid,
+        gid: parent.gid
+      },
+      {
+        callerUid: typeof process.getuid === "function" ? process.getuid() : undefined,
+        custodyGid: currentCustodyGid(),
+        // A wrapped-key record is a JSON envelope, not a 32-byte key.
+        expectedSize: undefined
+      }
+    )) {
+      throw new CryptoCustodyError("SECRET_CUSTODY_INVALID");
+    }
+    return JSON.parse(await handle.readFile("utf8")) as unknown;
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * V-19, the write half. The read relaxation is inert unless the writer produces
+ * records the second principal can read, and the store used to impose 0700/0600
+ * on every directory and record it created — including the store root an
+ * operator had just provisioned for the custody group.
+ *
+ * The decision follows the store ROOT rather than the setting alone, so one
+ * setting cannot widen a store that no second principal reads: the user-DEK
+ * store's root carries the custody group and gets the group modes, while the
+ * publication-key store's root (group `debateai-api`) keeps the single-owner
+ * modes even with the same setting on.
+ *
+ * The directory mode carries setgid on purpose. A new file in a non-setgid
+ * directory takes the WRITING process's primary group on Linux, which is the
+ * API's own group, not the custody group; with setgid it takes the directory's.
+ * `mode & 0o777` is still 0o750, which is what the read contract checks.
+ */
+type CustodyWriteModes = Readonly<{ directory: number;file: number }>;
+
+const OWNER_CUSTODY_MODES: CustodyWriteModes = Object.freeze({
+  directory: 0o700, file: 0o600
+});
+const GROUP_CUSTODY_MODES: CustodyWriteModes = Object.freeze({
+  directory: 0o2750, file: 0o640
+});
+
+async function custodyWriteModes(
+  root: string,
+  fileSystem: Pick<UserDekStoreFileSystem, "stat">
+): Promise<CustodyWriteModes> {
+  const custodyGid = currentCustodyGid();
+  if (custodyGid === undefined) return OWNER_CUSTODY_MODES;
+  try {
+    const metadata = await fileSystem.stat(root);
+    // The gid ALONE is not enough. A store may TIGHTEN a root it writes into
+    // but must never LOOSEN one: after a `chgrp -R` with no matching `chmod` —
+    // a half-done repair — the group matches while the mode is still 0700, and
+    // widening on the gid alone would make the key store group-readable with no
+    // operator action at all. The root must already BE group mode.
+    if (metadata.isDirectory()
+      && metadata.gid === custodyGid
+      && (metadata.mode & 0o777) === (GROUP_CUSTODY_MODES.directory & 0o777)) {
+      return GROUP_CUSTODY_MODES;
+    }
+  } catch {
+    // No store root yet. The operator provisions the group ON the root, so a
+    // tree this process creates out of nothing stays single-owner.
+  }
+  return OWNER_CUSTODY_MODES;
+}
+
+/**
+ * V-19, fix wave A-I3. The first half of the write path's custody step: give
+ * the temporary the custody GROUP, BEFORE the mode is widened to 0640.
+ *
+ * The order is the point. The temporary is created 0600 under the unit's
+ * umask, so while it is still owner-only its group may be changed safely;
+ * widening to 0640 first and setting the group second would leave a window in
+ * which the record is group-readable by the WRITER's primary group — not the
+ * custody group — and no byte of a wrapped key may be readable by the wrong
+ * group, however briefly.
+ *
+ * `fchown(fd, -1, gid)` is attempted rather than required: an owner may only
+ * set a group it belongs to, and on many hosts the gid is already right by
+ * inheritance. The read-back below is the authority, not this call's exit.
+ */
+async function applyCustodyGroupOwnership(
+  file: Readonly<{ chown(uid: number, gid: number): Promise<void> }>,
+  modes: CustodyWriteModes
+): Promise<void> {
+  const custodyGid = currentCustodyGid();
+  if (custodyGid === undefined || modes !== GROUP_CUSTODY_MODES) return;
+  try {
+    await file.chown(-1, custodyGid);
+  } catch {
+    // Not permitted, or not needed. The read-back decides.
+  }
+}
+
+/**
+ * The second half, between `chmod` and the rename: read the record's own facts
+ * back through the acceptance function the READER uses, and refuse to publish
+ * anything that function would not accept.
+ *
+ * Why it is needed. `custodyWriteModes` decides the modes from the store ROOT,
+ * but a new file's gid comes from the directory it lands in — the parent's with
+ * setgid, the writing process's primary group without it — and nothing checked
+ * either. A root provisioned for the custody group above leaf directories that
+ * are still `debateai-api`-grouped (the recipe half-applied, or the root
+ * re-provisioned alone) produced a 0640 record the reader refuses: a
+ * registration that "succeeded" whose user can never log in.
+ *
+ * `SECRET_CUSTODY_INVALID` is the reader's own code for "this exists and is not
+ * safe to trust", which is exactly what the refusal is saying, one moment
+ * earlier and about a record nobody has seen yet.
+ */
+async function assertPublishableUnderCustody(
+  file: Readonly<{ stat(): Promise<Stats> }>,
+  directory: string,
+  modes: CustodyWriteModes,
+  fileSystem: Pick<UserDekStoreFileSystem, "stat">
+): Promise<void> {
+  const custodyGid = currentCustodyGid();
+  // Single-owner modes are what this process creates by itself under its own
+  // umask, and the contract for them is unchanged; the group shape is the one
+  // that depends on facts the writer does not control.
+  if (custodyGid === undefined || modes !== GROUP_CUSTODY_MODES) return;
+  const metadata = await file.stat();
+  const parent = await fileSystem.stat(directory);
+  if (!custodyAccepts(
+    {
+      isFile: metadata.isFile(),
+      nlink: metadata.nlink,
+      mode: metadata.mode,
+      uid: metadata.uid,
+      gid: metadata.gid,
+      size: metadata.size
+    },
+    {
+      isDirectory: parent.isDirectory(),
+      mode: parent.mode,
+      uid: parent.uid,
+      gid: parent.gid
+    },
+    {
+      callerUid: typeof process.getuid === "function" ? process.getuid() : undefined,
+      custodyGid,
+      // A wrapped-key record is a JSON envelope, not a 32-byte key.
+      expectedSize: undefined
+    }
+  )) {
+    throw new CryptoCustodyError("SECRET_CUSTODY_INVALID");
+  }
+}
+
+/**
+ * V-3. `undefined` means "this record carries no label" (a v1 record); a present
+ * label must be exactly the 16 hex characters `kekId` produces, because a record
+ * whose label is malformed is a record whose provenance is unknown.
+ */
+function parseRecordKekId(record: Readonly<Record<string, unknown>>): string | undefined {
+  const label = record.kek_id;
+  if (label === undefined) return undefined;
+  if (typeof label !== "string" || !/^[0-9a-f]{16}$/.test(label)) {
+    throw new KekUnresolvedError();
+  }
+  return label;
+}
+
+const USER_DEK_STORE_USER_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function assertUserDekStoreUserId(userId: string): void {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+  if (!USER_DEK_STORE_USER_ID.test(userId)) {
     throw new TypeError("USER_DEK_STORE_USER_ID_INVALID");
   }
 }
@@ -1140,22 +2081,77 @@ async function durableRemoveDirectory(
   return existed ? "DESTROYED" : "ALREADY_ABSENT";
 }
 
+function userDekAad(userId: string): AeadAad {
+  return [
+    "secret-store", "user-dek", userId, "run:none", userId, `user-dek:${userId}`, "1"
+  ];
+}
+
+type StoredUserDek = Readonly<{
+  /** Absent on v1 records, which are read as wrapped by the original KEK. */
+  kek_id: string | undefined;
+  wrapped_dek: CryptoEnvelope;
+}>;
+
+/**
+ * One parser for the user-DEK record, used by the read path and by the
+ * rotation, so the two can never disagree about what a valid record is.
+ */
+function parseStoredUserDek(value: unknown, userId: string): StoredUserDek {
+  if (typeof value !== "object" || value === null) throw new KekUnresolvedError();
+  const record = value as Record<string, unknown>;
+  const envelope = record.wrapped_dek;
+  const label = parseRecordKekId(record);
+  // v1 carries no kek_id and is read as "wrapped by the original KEK"; v2 names
+  // its KEK. Any other version is a record this build does not understand, and
+  // a key store fails closed on those.
+  if ((record.version !== 1 && record.version !== 2)
+    || record.user_id !== userId || record.key_id !== `user-dek:${userId}`
+    || typeof envelope !== "object" || envelope === null) {
+    throw new KekUnresolvedError();
+  }
+  const candidate = envelope as Record<string, unknown>;
+  if (candidate.v !== 1 || candidate.keyId !== `user-dek:${userId}`
+    || typeof candidate.nonce !== "string" || typeof candidate.ct !== "string"
+    || typeof candidate.tag !== "string") {
+    throw new KekUnresolvedError();
+  }
+  return Object.freeze({
+    kek_id: label,
+    wrapped_dek: candidate as unknown as CryptoEnvelope
+  });
+}
+
+function userDekRecordJson(
+  userId: string,
+  kek: KekHandle,
+  envelope: CryptoEnvelope
+): string {
+  return JSON.stringify({
+    version: 2,
+    user_id: userId,
+    key_id: envelope.keyId,
+    kek_id: kekId(kek),
+    wrapped_dek: envelope
+  });
+}
+
 export class FileUserDekStore implements ReadableUserDekStore {
+  private readonly keks: KekRing;
+
   constructor(
     private readonly root: string,
-    private readonly kek: KekHandle,
+    kek: KekSource,
     private readonly fileSystem: UserDekStoreFileSystem = defaultUserDekStoreFileSystem
   ) {
     if (root.trim() === "") throw new TypeError("USER_DEK_STORE_PATH_REQUIRED");
+    this.keks = toKekRing(kek);
   }
 
   async store(userId: string, dek: Uint8Array): Promise<void> {
     assertUserDekStoreUserId(userId);
-    const aad = [
-      "secret-store", "user-dek", userId, "run:none", userId,
-      `user-dek:${userId}`, "1"
-    ] as const;
-    const envelope = wrapDek(this.kek, dek, aad);
+    const aad = userDekAad(userId);
+    const envelope = wrapDek(this.keks.current, dek, aad);
     const users = join(this.root, "users");
     const directory = join(users, userId);
     const location = join(directory, "dek.v1.json");
@@ -1165,20 +2161,26 @@ export class FileUserDekStore implements ReadableUserDekStore {
     let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
     let published = false;
+    const modes = await custodyWriteModes(this.root, this.fileSystem);
     try {
-      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(this.root, 0o700);
-      await this.fileSystem.mkdir(users, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(users, 0o700);
-      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(this.root, modes.directory);
+      await this.fileSystem.mkdir(users, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(users, modes.directory);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: modes.directory });
       directoryCreated = true;
-      file = await this.fileSystem.open(temporary, "wx", 0o600);
-      await file.writeFile(JSON.stringify({
-        version: 1,
-        user_id: userId,
-        key_id: envelope.keyId,
-        wrapped_dek: envelope
-      }), "utf8");
+      // The units run with UMask=0077, which would strip a mode passed to
+      // mkdir/open down to 0700/0600 and leave the second principal locked out.
+      // Widening after the restrictive creation never exposes an open moment.
+      await this.fileSystem.chmod(directory, modes.directory);
+      file = await this.fileSystem.open(temporary, "wx", modes.file);
+      await file.writeFile(userDekRecordJson(userId, this.keks.current, envelope), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
+      await this.fileSystem.chmod(temporary, modes.file);
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;
@@ -1234,30 +2236,68 @@ export class FileUserDekStore implements ReadableUserDekStore {
     assertUserDekStoreUserId(userId);
     const location = join(this.root, "users", userId, "dek.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) throw new KekUnresolvedError();
-      const parsed = JSON.parse(await this.fileSystem.readFile(location, "utf8")) as unknown;
-      if (typeof parsed !== "object" || parsed === null) throw new KekUnresolvedError();
-      const record = parsed as Record<string, unknown>;
-      const envelope = record.wrapped_dek;
-      if (record.version !== 1 || record.user_id !== userId || record.key_id !== `user-dek:${userId}`
-        || typeof envelope !== "object" || envelope === null) {
-        throw new KekUnresolvedError();
-      }
-      const candidate = envelope as Record<string, unknown>;
-      if (candidate.v !== 1 || candidate.keyId !== `user-dek:${userId}`
-        || typeof candidate.nonce !== "string" || typeof candidate.ct !== "string"
-        || typeof candidate.tag !== "string") {
-        throw new KekUnresolvedError();
-      }
-      return unwrapDek(this.kek, candidate as unknown as CryptoEnvelope, [
-        "secret-store", "user-dek", userId, "run:none", userId,
-        `user-dek:${userId}`, "1"
-      ]);
+      const record = parseStoredUserDek(
+        await readCustodyRecord(location, this.fileSystem), userId
+      );
+      return unwrapUnderRing(
+        this.keks, record.kek_id, record.wrapped_dek, userDekAad(userId)
+      );
     } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof KekUnresolvedError || error instanceof CryptoAuthenticationError) throw error;
       throw new KekUnresolvedError();
     }
+  }
+
+  async listKeyRefs(): Promise<readonly string[]> {
+    return listRecordRefs(
+      this.root,
+      "USER_DEK_STORE_ROOT_ABSENT",
+      join(this.root, "users"),
+      this.fileSystem,
+      (name) => USER_DEK_STORE_USER_ID.test(name)
+    );
+  }
+
+  async rewrapUnderCurrentKek(userId: string): Promise<KeyRotationOutcome> {
+    assertUserDekStoreUserId(userId);
+    const directory = join(this.root, "users", userId);
+    const location = join(directory, "dek.v1.json");
+    const record = parseStoredUserDek(
+      await readCustodyRecord(location, this.fileSystem), userId
+    );
+    // A record already labelled with the current KEK needs no work and is not
+    // even decrypted: the label is authoritative, and the verification pass at
+    // the end of the rotation opens every record anyway.
+    if (record.kek_id === kekId(this.keks.current)) return "ALREADY_CURRENT";
+    const dek = unwrapUnderRing(
+      this.keks, record.kek_id, record.wrapped_dek, userDekAad(userId)
+    );
+    try {
+      const envelope = wrapDek(this.keks.current, dek, userDekAad(userId));
+      await republishRecord(
+        this.root, directory, location,
+        userDekRecordJson(userId, this.keks.current, envelope),
+        this.fileSystem
+      );
+      return "REWRAPPED";
+    } finally {
+      dek.fill(0);
+    }
+  }
+
+  async verifyUnderCurrentKek(userId: string): Promise<void> {
+    assertUserDekStoreUserId(userId);
+    const location = join(this.root, "users", userId, "dek.v1.json");
+    const record = parseStoredUserDek(
+      await readCustodyRecord(location, this.fileSystem), userId
+    );
+    // The CURRENT key alone. Accepting the previous one here would certify a
+    // rotation that had not happened.
+    const dek = unwrapUnderRing(
+      { current: this.keks.current }, record.kek_id, record.wrapped_dek, userDekAad(userId)
+    );
+    dek.fill(0);
   }
 
   async exists(userId: string): Promise<boolean> {
@@ -1509,15 +2549,23 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
     let published = false;
+    const modes = await custodyWriteModes(this.root, this.fileSystem);
     try {
-      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(this.root, 0o700);
-      await this.fileSystem.mkdir(runs, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(runs, 0o700);
-      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(this.root, modes.directory);
+      await this.fileSystem.mkdir(runs, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(runs, modes.directory);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: modes.directory });
       directoryCreated = true;
-      file = await this.fileSystem.open(temporary, "wx", 0o600);
+      await this.fileSystem.chmod(directory, modes.directory);
+      file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
+      await this.fileSystem.chmod(temporary, modes.file);
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;
@@ -1592,13 +2640,12 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
     const location = join(this.root, "runs", runId, "content-key.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new RunContentKeyUnresolvedError();
-      }
-      const record = parseStoredRunContentKey(JSON.parse(await this.fileSystem.readFile(location, "utf8")), runId);
+      const record = parseStoredRunContentKey(
+        await readCustodyRecord(location, this.fileSystem), runId
+      );
       return await unwrapRunContentKey(this.users, this.resolveUserId, record);
     } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof RunContentKeyUnresolvedError) throw error;
       throw new RunContentKeyUnresolvedError();
     }
@@ -1619,15 +2666,12 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
     try {
       const location = join(this.root, "runs", runId, "content-key.v1.json");
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new RunContentKeyUnresolvedError();
-      }
       return parseStoredRunContentKey(
-        JSON.parse(await this.fileSystem.readFile(location, "utf8")),
+        await readCustodyRecord(location, this.fileSystem),
         runId
       ).owner_ref;
     } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof RunContentKeyUnresolvedError) throw error;
       throw new RunContentKeyUnresolvedError();
     }
@@ -1824,9 +2868,11 @@ export class PublicationKeyUnresolvedError extends CryptoError {
 }
 
 type StoredPublicationKey = Readonly<{
-  version: 1;
+  version: 1 | 2;
   publication_ref: string;
   key_id: string;
+  /** Absent on v1 records, which are read as wrapped by the original corpus KEK. */
+  kek_id: string | undefined;
   wrapped_publication_key: CryptoEnvelope;
 }>;
 
@@ -1859,9 +2905,10 @@ function wrapPublicationKey(
   assertPublicationRef(publicationRef);
   const envelope = wrapDek(corpusKek, key, publicationKeyAad(publicationRef));
   return Object.freeze({
-    version: 1,
+    version: 2,
     publication_ref: publicationRef,
     key_id: envelope.keyId,
+    kek_id: kekId(corpusKek),
     wrapped_publication_key: envelope
   });
 }
@@ -1871,7 +2918,14 @@ function parseStoredPublicationKey(value: unknown, publicationRef: string): Stor
   if (typeof value !== "object" || value === null) throw new PublicationKeyUnresolvedError();
   const record = value as Record<string, unknown>;
   const envelope = record.wrapped_publication_key;
-  if (record.version !== 1 || record.publication_ref !== publicationRef
+  let label: string | undefined;
+  try {
+    label = parseRecordKekId(record);
+  } catch {
+    throw new PublicationKeyUnresolvedError();
+  }
+  if ((record.version !== 1 && record.version !== 2)
+    || record.publication_ref !== publicationRef
     || record.key_id !== `publication-key:${publicationRef}:v1`
     || typeof envelope !== "object" || envelope === null) {
     throw new PublicationKeyUnresolvedError();
@@ -1883,20 +2937,22 @@ function parseStoredPublicationKey(value: unknown, publicationRef: string): Stor
     throw new PublicationKeyUnresolvedError();
   }
   return Object.freeze({
-    version: 1,
+    version: record.version,
     publication_ref: publicationRef,
     key_id: String(record.key_id),
+    kek_id: label,
     wrapped_publication_key: candidate as unknown as CryptoEnvelope
   });
 }
 
 function unwrapPublicationKey(
-  corpusKek: KekHandle,
+  corpusKek: KekRing,
   record: StoredPublicationKey
 ): LoadedPublicationKey {
   try {
-    const key = unwrapDek(
+    const key = unwrapUnderRing(
       corpusKek,
+      record.kek_id,
       record.wrapped_publication_key,
       publicationKeyAad(record.publication_ref)
     );
@@ -1909,18 +2965,23 @@ function unwrapPublicationKey(
 
 export class MemoryPublicationKeyStore implements PublicationKeyStore {
   readonly #records = new Map<string, StoredPublicationKey>();
+  readonly #keks: KekRing;
 
-  constructor(private readonly corpusKek: KekHandle) {}
+  constructor(corpusKek: KekSource) {
+    this.#keks = toKekRing(corpusKek);
+  }
 
   async store(publicationRef: string, key: Uint8Array): Promise<void> {
     if (this.#records.has(publicationRef)) throw new TypeError("PUBLICATION_KEY_EXISTS");
-    this.#records.set(publicationRef, wrapPublicationKey(this.corpusKek, publicationRef, key));
+    this.#records.set(
+      publicationRef, wrapPublicationKey(this.#keks.current, publicationRef, key)
+    );
   }
 
   async load(publicationRef: string): Promise<LoadedPublicationKey> {
     const record = this.#records.get(publicationRef);
     if (record === undefined) throw new PublicationKeyUnresolvedError();
-    return unwrapPublicationKey(this.corpusKek, record);
+    return unwrapPublicationKey(this.#keks, record);
   }
 
   async exists(publicationRef: string): Promise<boolean> {
@@ -1935,16 +2996,19 @@ export class MemoryPublicationKeyStore implements PublicationKeyStore {
 }
 
 export class FilePublicationKeyStore implements PublicationKeyStore {
+  private readonly keks: KekRing;
+
   constructor(
     private readonly root: string,
-    private readonly corpusKek: KekHandle,
+    corpusKek: KekSource,
     private readonly fileSystem: PublicationKeyFileSystem = defaultRunContentKeyFileSystem
   ) {
     if (root.trim() === "") throw new TypeError("PUBLICATION_KEY_STORE_PATH_REQUIRED");
+    this.keks = toKekRing(corpusKek);
   }
 
   async store(publicationRef: string, key: Uint8Array): Promise<void> {
-    const record = wrapPublicationKey(this.corpusKek, publicationRef, key);
+    const record = wrapPublicationKey(this.keks.current, publicationRef, key);
     const publications = join(this.root, "publications");
     const directory = join(publications, publicationRef);
     const location = join(directory, "publication-key.v1.json");
@@ -1954,15 +3018,23 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
     let directoryCreated = false;
     let published = false;
+    const modes = await custodyWriteModes(this.root, this.fileSystem);
     try {
-      await this.fileSystem.mkdir(this.root, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(this.root, 0o700);
-      await this.fileSystem.mkdir(publications, { recursive: true, mode: 0o700 });
-      await this.fileSystem.chmod(publications, 0o700);
-      await this.fileSystem.mkdir(directory, { recursive: false, mode: 0o700 });
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(this.root, modes.directory);
+      await this.fileSystem.mkdir(publications, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(publications, modes.directory);
+      await this.fileSystem.mkdir(directory, { recursive: false, mode: modes.directory });
       directoryCreated = true;
-      file = await this.fileSystem.open(temporary, "wx", 0o600);
+      await this.fileSystem.chmod(directory, modes.directory);
+      file = await this.fileSystem.open(temporary, "wx", modes.file);
       await file.writeFile(JSON.stringify(record), "utf8");
+      // A-I3: the custody group while the temporary is still 0600, THEN the
+      // wider mode, then the record's own facts through the reader's own
+      // acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
+      await this.fileSystem.chmod(temporary, modes.file);
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
       await file.sync();
       await file.close();
       file = undefined;
@@ -2025,16 +3097,13 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     assertPublicationRef(publicationRef);
     const location = join(this.root, "publications", publicationRef, "publication-key.v1.json");
     try {
-      const metadata = await this.fileSystem.stat(location);
-      if (!metadata.isFile() || (metadata.mode & 0o777) !== 0o600) {
-        throw new PublicationKeyUnresolvedError();
-      }
       const record = parseStoredPublicationKey(
-        JSON.parse(await this.fileSystem.readFile(location, "utf8")),
+        await readCustodyRecord(location, this.fileSystem),
         publicationRef
       );
-      return unwrapPublicationKey(this.corpusKek, record);
+      return unwrapPublicationKey(this.keks, record);
     } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof PublicationKeyUnresolvedError) throw error;
       throw new PublicationKeyUnresolvedError();
     }
@@ -2057,6 +3126,55 @@ export class FilePublicationKeyStore implements PublicationKeyStore {
     return durableRemoveDirectory(
       join(publications, publicationRef),publications,this.fileSystem
     );
+  }
+
+  async listKeyRefs(): Promise<readonly string[]> {
+    return listRecordRefs(
+      this.root,
+      "PUBLICATION_KEY_STORE_ROOT_ABSENT",
+      join(this.root, "publications"),
+      this.fileSystem,
+      (name) => UUID_V4.test(name)
+    );
+  }
+
+  async #read(publicationRef: string): Promise<StoredPublicationKey> {
+    assertPublicationRef(publicationRef);
+    const location = join(
+      this.root, "publications", publicationRef, "publication-key.v1.json"
+    );
+    return parseStoredPublicationKey(
+      await readCustodyRecord(location, this.fileSystem), publicationRef
+    );
+  }
+
+  async rewrapUnderCurrentKek(publicationRef: string): Promise<KeyRotationOutcome> {
+    const record = await this.#read(publicationRef);
+    if (record.kek_id === kekId(this.keks.current)) return "ALREADY_CURRENT";
+    const key = unwrapUnderRing(
+      this.keks, record.kek_id, record.wrapped_publication_key,
+      publicationKeyAad(publicationRef)
+    );
+    try {
+      const directory = join(this.root, "publications", publicationRef);
+      await republishRecord(
+        this.root, directory, join(directory, "publication-key.v1.json"),
+        JSON.stringify(wrapPublicationKey(this.keks.current, publicationRef, key)),
+        this.fileSystem
+      );
+      return "REWRAPPED";
+    } finally {
+      key.fill(0);
+    }
+  }
+
+  async verifyUnderCurrentKek(publicationRef: string): Promise<void> {
+    const record = await this.#read(publicationRef);
+    const key = unwrapUnderRing(
+      { current: this.keks.current }, record.kek_id, record.wrapped_publication_key,
+      publicationKeyAad(publicationRef)
+    );
+    key.fill(0);
   }
 }
 

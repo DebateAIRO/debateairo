@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pool, PoolClient } from "pg";
@@ -20,6 +21,7 @@ import {
   declareHatchetWalkingSkeletonTask,
   type RunnerExecutionResult,
 } from "@debateai/runner";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 const ROOT = process.cwd();
 
@@ -127,18 +129,36 @@ describe("S06 runner task binding", () => {
     });
     if (taskFn === undefined) throw new Error("TASK_FN_NOT_DECLARED");
 
+    // pin updated 2026-09-18 (DEV-SYNC, DL4-F1): the task still REJECTS with the same typed
+    // code — what this row is about, together with the capture-before-terminal order below —
+    // but it may no longer be the same OBJECT. The Hatchet SDK serialises whatever is thrown
+    // into its own Postgres and to stderr, outside the AEAD store, so the runner rethrows a
+    // scrubbed error carrying the code and no model text (apps/runner/src/index.ts,
+    // `scrubbedTaskFailure`; tests/unit/runner-failure-redaction.test.ts owns that contract).
+    // RUN1 (L4-F6): the dispatch is validated against a strict UUID schema BEFORE
+    // the runner runs, so the ids are real UUIDs — a `run:s06` string is refused
+    // RUNNER_WORKFLOW_INPUT_INVALID and the task never reaches the failure this
+    // case is about.
+    const runId = randomUUID();
+    const workItemId = randomUUID();
     await expect(taskFn(
-      { runId: "run:s06", workItemId: "work:s06" },
+      { runId, workItemId },
       { retryCount: () => 2 },
-    )).rejects.toBe(failure);
+    )).rejects.toMatchObject({ code: failure.code });
 
     expect(order).toEqual(["capture", "terminal"]);
     expect(captured).toHaveLength(1);
+    // pin updated 2026-09-22 (INT2, the V-11 amendment): `@debateai/obs-capture`
+    // is a SECOND sink for error text and carries whatever it is handed as
+    // `payload_ref`. The envelope now carries the failure's CODE and its bounded
+    // diagnostic PATH — never the error object, whose message can hold model
+    // output (apps/runner/src/index.ts, `captureFailureEnvelope`;
+    // tests/unit/runner-hatchet-task-input.test.ts owns that contract).
     expect(captured[0]).toMatchObject({
       kind: "envelope",
       payload_ref: {
         code: "JUDGEMENT_POLICY_UNRESOLVED",
-        error: failure,
+        path: "JUDGEMENT_POLICY_UNRESOLVED",
         taxonomy_class: "JOB_FAILURE",
         capture_point: "job",
         disposition: "THROWN",
@@ -146,10 +166,16 @@ describe("S06 runner task binding", () => {
         attempt_index: 2,
       },
       ambient_context_ref: {
-        run_ref: { kind: "run", value: "run:s06" },
-        work_item_ref: { kind: "work_item", value: "work:s06" },
+        run_ref: { kind: "run", value: runId },
+        work_item_ref: { kind: "work_item", value: workItemId },
       },
     });
+    // `toMatchObject` cannot see what is absent, so the absence is its own pin:
+    // no error object, and no byte of the private message anywhere in what was
+    // emitted.
+    expect((captured[0] as { payload_ref: Record<string, unknown> }).payload_ref)
+      .not.toHaveProperty("error");
+    expect(JSON.stringify(captured[0])).not.toContain("private register diagnostic");
     expect(createSharedRedactor({
       environment: "test",
       build_ref: "UNTRACKED-DEV:s06",
@@ -180,10 +206,12 @@ describe("S06 runner task binding", () => {
         return {};
       },
     };
-    const failure = new TypedDomainError(
-      "JUDGEMENT_POLICY_UNRESOLVED",
-      "private failure that must reach Hatchet",
-    );
+    // DL4-F1: this message stands in for model-derived text. Until 2026-09-22 this fixture
+    // read "private failure that must reach Hatchet" — the one thing DL4-F1 forbids, since
+    // the SDK writes whatever is thrown into Hatchet's own Postgres and to stderr, outside
+    // the AEAD store. It must NOT reach Hatchet, and the assertion below now says so.
+    const privateText = "private failure text that must not reach Hatchet";
+    const failure = new TypedDomainError("JUDGEMENT_POLICY_UNRESOLVED", privateText);
     const order: string[] = [];
     const captured = installRecordingEmitter(order);
     const recordTerminalFailure = vi.fn(async () => {
@@ -202,27 +230,40 @@ describe("S06 runner task binding", () => {
     });
     if (taskFn === undefined) throw new Error("TASK_FN_NOT_DECLARED");
 
+    // RUN1 (L4-F6): real UUIDs, for the reason given in the case above.
+    const runId = randomUUID();
+    const workItemId = randomUUID();
     let observed: unknown;
     try {
       await taskFn(
-        { runId: "run:s06:record-failure", workItemId: "work:s06:record-failure" },
+        { runId, workItemId },
         { retryCount: () => 1 },
       );
     } catch (error) {
       observed = error;
     }
 
-    const chainContainsFailure = causeChainContains(observed, failure);
+    // pin updated 2026-09-22 (DEV-SYNC, DL4-F1), exactly as 097f7bbb adapted the sibling row
+    // above: what OBS-R064 protects here is that the unrecorded state never REPLACES the
+    // task's own failure — the code that escapes is still the task's, never
+    // RUNNER_FAILURE_STATE_NOT_RECORDED, which is emitted as an alarm beside it. What it
+    // may no longer assert is OBJECT identity: the runner rethrows a scrubbed error that
+    // carries the code and drops the text, the stack and the cause
+    // (apps/runner/src/index.ts, `scrubbedTaskFailure`;
+    // tests/unit/runner-failure-redaction.test.ts owns that contract). So the chain is now
+    // pinned ABSENT rather than present, which also proves the scrub left no route back to
+    // the original object, and the private text is pinned absent from what does escape.
     expect.soft({
-      chainContainsFailure,
-      replacementCode: chainContainsFailure
-        ? "CHAIN_PRESERVED"
-        : observed instanceof TypedDomainError
-          ? observed.code
-          : "NOT_TYPED_DOMAIN_ERROR",
+      escapedCode: observed instanceof TypedDomainError ? observed.code : "NOT_TYPED_DOMAIN_ERROR",
+      chainContainsFailure: causeChainContains(observed, failure),
+      carriesPrivateText: JSON.stringify({
+        message: (observed as Error | undefined)?.message,
+        stack: (observed as Error | undefined)?.stack,
+      }).includes(privateText),
     }).toEqual({
-      chainContainsFailure: true,
-      replacementCode: "CHAIN_PRESERVED",
+      escapedCode: "JUDGEMENT_POLICY_UNRESOLVED",
+      chainContainsFailure: false,
+      carriesPrivateText: false,
     });
     expect.soft(order).toEqual(["capture", "terminal", "capture"]);
     expect.soft(captured.map((entry) => {
@@ -245,8 +286,8 @@ describe("S06 runner task binding", () => {
         attempt_index: 1,
       },
       ambient_context_ref: {
-        run_ref: { kind: "run", value: "run:s06:record-failure" },
-        work_item_ref: { kind: "work_item", value: "work:s06:record-failure" },
+        run_ref: { kind: "run", value: runId },
+        work_item_ref: { kind: "work_item", value: workItemId },
       },
     });
   });
@@ -347,7 +388,11 @@ describe("S06 provider gateway binding", () => {
         bound: { maxAttempts: 2, tokenCeiling: 64, deadlineMs: 1_000 },
         contractHash: "c".repeat(64),
         providerRef: "provider:s06",
-        packet: { messages: [{ role: "user", content: "fixture" }] },
+        // RUN1 (V-11 addendum): the gateway is the door, and a hand-built
+        // packet is refused PROMPT_FRAME_ABSENT before any fetch — which is a
+        // different failure from the exhaustion this case exists to capture.
+        // A packet the shipped frame builder made reaches the transport.
+        packet: framedFixturePacket("fixture"),
       }));
     } catch (error) {
       observed = error;
@@ -356,11 +401,15 @@ describe("S06 provider gateway binding", () => {
     expect(observed).toMatchObject({ code: "PROVIDER_CALL_FAILED", attempts: 2 });
     expect(fetchImplementation).toHaveBeenCalledTimes(2);
     expect(captured).toHaveLength(1);
+    // pin updated 2026-09-22 (INT2, the V-11 amendment): code + bounded path,
+    // never the error. Here it also keeps the transport's own `cause` text —
+    // "private provider transport detail" — out of the second sink, which the
+    // raw-error envelope carried straight through.
     expect(captured[0]).toMatchObject({
       kind: "envelope",
       payload_ref: {
         code: "PROVIDER_CALL_FAILED",
-        error: observed,
+        path: "PROVIDER_CALL_FAILED",
         taxonomy_class: "PROVIDER_EXHAUSTED",
         capture_point: "provider",
         disposition: "THROWN",
@@ -371,6 +420,9 @@ describe("S06 provider gateway binding", () => {
         work_item_ref: { kind: "work_item", value: "work:provider-s06" },
       },
     });
+    expect((captured[0] as { payload_ref: Record<string, unknown> }).payload_ref)
+      .not.toHaveProperty("error");
+    expect(JSON.stringify(captured[0])).not.toContain("private provider transport detail");
   });
 });
 
@@ -455,7 +507,16 @@ export async function resolve(specifier, context, nextResolve) {
       "@hatchet-dev/typescript-sdk": "export class Hatchet {}",
       "../../../packages/crypto/src/index.js": "export function loadKek() {}",
       "@debateai/battery": "export class WorkItemRepository {} export function createTerminalActivationEvaluator() {}",
-      "@debateai/register": "export function loadRunnerEnvironment() {}",
+      // INT2: every NAMED import of a stubbed module must exist, because ESM
+      // links the whole graph before any body evaluates — so a stub that falls
+      // behind main.ts fails at LINK time and this case stops measuring the
+      // install-first ordering it exists for. V-28's
+      // \`assertHostedCostEnvelopesSealed\` joined this import line and was
+      // missing here. INT3 (the Task 11 merge) brought \`readCostEnvelopePolicy\`
+      // onto the same line — the hosted start-up's fail-closed read of the
+      // sealed money ceilings — and this case went RED at link time again
+      // until the stub caught up.
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {

@@ -26,12 +26,12 @@ describe("LOAD-01 production Hatchet terminal recording", () => {
       engineRetries: 0
     } as never);
 
-    await expect(taskFn?.({ runId: "run:test", workItemId: "work:test" })).rejects.toMatchObject({
+    await expect(taskFn?.({ runId: "11111111-1111-4111-8111-111111111111", workItemId: "22222222-2222-4222-8222-222222222222" })).rejects.toMatchObject({
       code: "NODE_REVIEW_UNAVAILABLE"
     });
     expect(recordTerminalFailure).toHaveBeenCalledWith({
-      runId: "run:test",
-      workItemId: "work:test",
+      runId: "11111111-1111-4111-8111-111111111111",
+      workItemId: "22222222-2222-4222-8222-222222222222",
       reason: "RUNNER_EXECUTION_FAILED:NODE_REVIEW_UNAVAILABLE"
     });
   });

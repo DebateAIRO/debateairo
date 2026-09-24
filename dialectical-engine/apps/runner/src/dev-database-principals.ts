@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, rename, unlink } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Pool, PoolClient } from "pg";
+import { assertDevCustodyDirectory } from "../../../deploy/dev-auth/custody-root.mjs";
 
 export type DevelopmentDatabasePrincipal = Readonly<{
   roleName: string;
@@ -264,6 +265,11 @@ async function ensureCredentialFile(
   const credentialRoot = dirname(resolvedPath);
   await mkdir(credentialRoot, { recursive: true, mode: PRIVATE_DIRECTORY_MODE });
   const rootIdentity = await assertCredentialRoot(credentialRoot);
+  // The shared custody-mode policy (B4 resolver) is applied as well: it refuses
+  // drift instead of narrowing a mode back, which would hide the exposure event
+  // (L7-F10). assertCredentialRoot above holds the same floor and additionally
+  // yields the identity the later re-checks bind to.
+  await assertDevCustodyDirectory(credentialRoot);
 
   const initialStatus = await lstat(resolvedPath).catch((error: unknown) => {
     if (isMissingFileError(error)) return null;

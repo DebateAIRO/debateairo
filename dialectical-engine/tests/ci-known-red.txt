@@ -1,0 +1,166 @@
+# tests/ci-known-red.txt — recorded known-red allowlist for the CI `verify` job (B31).
+#
+# The gate is `pnpm run test:ci-gate` (tools/ci-known-red.mjs). It runs
+# `vitest run tests/unit tests/architecture` and fails ONLY on failures that are not
+# listed here. A listed test that PASSES is reported as a stale entry (warning, exit 0)
+# so this list can only shrink: delete the entry in the commit that turns it green.
+#
+# Format: one exact vitest full name per line — `<file path> > <describe…> > <it>`,
+# exactly as vitest prints it. `#` lines are comments. Every active entry is followed
+# by a `# source:` comment.
+#
+# RE-BASELINED at DEV-SYNC 2026-09-22 (docs/missions/2026-09-01-security-hardening/
+# DEV-SYNC-2026-09-22.md). The one source cited below:
+#   - "dev's closing four-count at a61206dc" — the algorithm mission's own D79 gate on a
+#     quiet host, 12 failures over 5367 tests, listed name by name in
+#     .hermes/reports/2026-09-01-algorithm-live-loop/closing-runs/four-count-a61206dc-failures.txt
+#     and ruled in DECISIONS.md D79 (i). `a61206dc` is the closing PRODUCT tip of dev; the
+#     two commits between it and cbf1b281 are records-only, so that list is dev's state at
+#     cbf1b281. Every entry below appears in it, so none is caused by this branch.
+#
+# What this re-baseline changed (of the 12 entries it started from, 7 were removed and 5
+# remain — the list may only ever shrink on its own side):
+#   - THE THREE role-token-map ENTRIES WERE RENAMED BY THE TOOL, not fixed and not renamed
+#     by dev. Corrected at INT2, 2026-09-22, because the first account named the wrong
+#     cause and a future re-baseline would have looked in the wrong place:
+#     `git log 7bae9806..cbf1b281 -- tests/architecture/role-token-map.test.ts` is EMPTY and
+#     the template `it.each(expected)("$surface binds its $role role", …)` is byte-identical
+#     at both ends. The rename came from the vitest 4.1.10 -> 5.0.1 upgrade (dev's D78):
+#     vitest 5's title formatter prints a string value WITHOUT quotes, where 4.x routed it
+#     through `inspect()`, which quoted it. That silently renamed EVERY `$prop`-interpolated
+#     title in the repository whose substituted value is a string — AT LEAST 52 templates
+#     across 12 files (a floor, not a census; the largest is s1-1-depth-contract.test.ts
+#     with 38). THE OPERATIVE POINT: the blast radius is large, and this list is correct
+#     afterwards only because role-token-map was the ONLY renamed file with entries on it.
+#     Two are re-listed below under the exact names vitest prints today; the third
+#     ('DebateMap root hub') is GREEN since dev's 830b1331 and is simply gone. A renamed
+#     entry is the quietest way for a list like this to rot: it neither fails nor goes
+#     stale, it just stops meaning anything — and a TEST-RUNNER upgrade can do it to dozens
+#     of templated titles at once, with no diff anywhere to read.
+#   - green on the merged tree, deleted: s7-authorization-contract "hardens every immutable
+#     memory scope carrier" (dev's D79 (e)2 — the assertion was VACUOUS LIVE and was
+#     repaired); s8-publication-contract "ships the deliberate controls…" (dev's 84f94f17
+#     restored the two S8 structural laws a merge had discarded); text-control-bytes (dev's
+#     6947fab9 escaped its own two raw control bytes); v2ui-pages "kills MUT-A", "kills
+#     MUT-C" and UI-02d "pins tree, thread, outline…" (dev's UI restorations e1c7f5ba,
+#     22f131c0, 830b1331, 3423285f, b1c57927).
+#   - carried, unchanged and still dev's: scaffold "27 dependency-edge rows", v2ui-pages
+#     DR-160 and v2ui-pages XREV-01.
+#
+# RECONCILED at INT2, 2026-09-22 (SYNC2 merged into the integration branch, see
+# INTEGRATION-2026-09-22.md). The union of the two sides: SYNC2's five entries above,
+# unchanged and each with its source note, plus the integration branch's own RSS paragraph
+# below. The gate was then re-run on the merged tree and reported `new=2`. NEITHER was
+# listed — a failure that exists only on the merged tree is a defect of the merge, so both
+# were fixed in the commit that found them:
+#   - sup-06-no-zone-limiter "isolates long-lived relay leases…": a semantic conflict with
+#     no marker. dev's vacuity sweep (bcb2adb2) pinned a declaration present using dev's
+#     spelling; this line's DL7-F7 had wrapped the same declaration in boot.hold(). Neither
+#     diff touched the other's line. The pin is re-fitted; both survive.
+#   - text-control-bytes: two RAW NUL bytes in this line's own tests/unit/
+#     v30-support-provider.test.ts, escaped. Not a merge defect — it surfaced because the
+#     entry that had been covering it was correctly deleted above. An entry that outlives
+#     the defect it was written for hides the next one.
+# Gate after the reconciliation → new=0 known=5 stale=0.
+#
+# RE-BASELINED at SYNC3, 2026-09-23 (origin/dev@25a0069f merged at 9a2675a4; record:
+# docs/missions/2026-09-01-security-hardening/DEV-SYNC-2026-09-23.md). The union of the two
+# sides: dev keeps no list, so the five entries above are carried; each was re-run on the
+# merged tree and still fails for exactly its recorded reason (scaffold: the same three
+# obs-capture edges and no fourth). The gate on the merged tree reported `new=14`. None
+# was listed on sight:
+#   - 7 were this line's own tests meeting dev's changes (a merge defect, never listed) and
+#     were fixed in the commits that found them: security-migration-0065 (R2, 0067),
+#     no-machine-paths (dev's review manifest named a home directory), dl1-f7 x3 (dev's
+#     retired consent route, dev's KB-snapshot binding), v9-provider-credential-files x2
+#     (dev's five-slot dev panel).
+#   - 7 were RED ON dev ITSELF, measured on a pristine extract of origin/dev@25a0069f
+#     installed offline, each with the identical message. Four were FIXED rather than
+#     listed, because an entry would blind a guard for everything after the failing
+#     assertion: p3-production-database-principals (the principal inventory),
+#     t09-synthesis-entrypoint (sealed-role resolution), v2ui-data-layer (the ask), and
+#     v2ui-node-runner (it runs the WHOLE UI node suite, so listing it would hide every
+#     UI node test). The three below are listed: each needs dev's product change or a
+#     ruling on a sealed value, not a sync.
+# Gate after this re-baseline -> new=0 known=8 stale=0.
+#
+# SPLIT at SYNC3 fix round 1 (the review's IMPORTANT 1). The gate matches by test NAME, so a
+# listed row blinds every assertion that sits after its failing one: a later regression there
+# would read as "known". Four listed rows had assertions after the failing one —
+# dev-database-principals (our L7-F10 custody line, least privilege, file custody),
+# register-support-publication (the 248-decimal census, the AST census, the canonical
+# serializer's refusal), scaffold (every other edge row, cycles and structural rules 1–5) and
+# v2ui-pages UI-02a (the drawer's two raw-value bans). Each was split: dev's failing
+# assertion(s) alone in a row named for dev's change, everything else in a row that RUNS.
+# Proved each time with a temporary product breakage that turned the RUNNING row red (a new
+# failure, not "known"), then restored; the entries below carry the new exact names.
+# Every entry now says what it blinds.
+#
+# Deliberately NOT listed:
+#   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
+#     tripwire"): they pass solo; listing them would hide a real regression. Integration
+#     tests, outside this job's directories anyway. Both are in dev's twelve.
+#   - registration.test.ts "S3c B4 keeps the isolated production RSS curve…": it is dev's
+#     row 10, so it was never this branch's doing, and it is FIXED here — Task 3 (V-25)
+#     keys the bound by platform + architecture + Node version. node_v22.23.1_darwin_arm64
+#     (256 MiB, history) and node_v26.8.2_darwin_arm64 (288 MiB) are published, so this Mac
+#     RUNS the case; a host with no entry — ubuntu — SKIPS it loudly, naming its own
+#     runtime. A skip is never a failure, so the case belongs on no list either way. dev's
+#     own D79 (h) had measured the cause as a 60-second child budget against work that
+#     needs 106 seconds, not a bound violation; that budget is now 240 s and the case adds
+#     about 110 s to the gate on this host. The 288 MiB ceiling is the headroom rule the
+#     coordinator amended on 2026-09-22 (Task 3) — worst of at least ten rounds plus one
+#     32 MiB increment — after 14 rounds measured a 22.6 MiB spread that left the original
+#     rule 0.7 MiB of margin.
+#   - the four `tests/render` rows of dev's twelve (t1-canvas ×2, t3-library, ui02e): that
+#     directory is in neither `test:ci-gate` nor `test:s00`, so nothing here gates them.
+
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+#   source: dev's closing four-count at a61206dc, row 1. Deferred by V, not broken: D79 (c)(1)
+#   ruled the card review marks out of scope for that round and into V's UI programme, and
+#   D79 (d) ruled the positive tests stay RED as an honest "ruled, not yet built".
+#   blinds: nothing — the row is one role binding (`expectRole(row)`).
+tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+#   source: dev's closing four-count at a61206dc, row 2. Same ruling as the row above.
+#   blinds: nothing — the row is one role binding (`expectRole(row)`).
+tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+#   source: dev's closing four-count at a61206dc, row 3; split out at SYNC3 fix round 1 from
+#   "matches all 27 dependency-edge rows and structural rules 1–5". Exactly three
+#   violations, all dev's: apps/{api,runner,scheduler} -> obs-capture undeclared. V's
+#   ticketed debt F31 (D79 (j)4).
+#   blinds: nothing of ours — the row filters to those three exact strings; every other edge
+#   row, cycle and structural rule 1–5 runs in "…, dev's three F31 edges apart".
+tests/unit/v2ui-pages.test.ts > UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps > uses DR-160 content-aware overflow instead of a fixed collapse breakpoint
+#   source: dev's closing four-count at a61206dc, row 11. UI source pin owned by the apps/ui lane.
+#   blinds: the rest of dev's own DR-160 source pins in the same row (the B6-W1/B6-W2
+#   mutation kills) — one feature, all the apps/ui lane's; nothing of this line's.
+tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 card and drawer vocabulary > shows typed review outcome and reviewer house on cards, including honest absence
+#   source: dev's closing four-count at a61206dc, row 12. UI source pin owned by the apps/ui lane.
+#   blinds: the three other card-review pins of the same deferred feature (D79 (c)(1)); the
+#   drawer's review pins run in their own row. Nothing of this line's.
+tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+#   source: dev, b7ca2c41 (SYNC3, 2026-09-23; split out at fix round 1 from "keeps all twelve
+#   fixed wrappers least-privileged and file-backed"). Red on origin/dev@25a0069f with the
+#   same message: dev's test demands twelve principals including
+#   debateai_dev_evaluator_worker; dev's apps/runner/src/dev-database-principals.ts declares
+#   eleven. Adding a database role is dev's product change, not a sync's.
+#   blinds: nothing of ours — the row holds only dev's count and dev's evaluator-worker pin;
+#   the least-privilege, file-custody and L7-F10 assertions run in "keeps every fixed
+#   wrapper least-privileged and file-backed".
+tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+#   source: dev, 6a05a0d0 (SYNC3, 2026-09-23; split out at fix round 1 from "preserves the
+#   exact legacy hashes while the actual port input owns all 248 policy decimals"). Red on
+#   origin/dev@25a0069f with the same message: dev moved
+#   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 (120bdfea… -> 42b90bca…) but not the sealed
+#   fixture tests/support/fixtures/register-development-v4.json, which still hashes to
+#   120bdfea…. Which side is right is a ruling on a sealed value.
+#   blinds: nothing of ours — the row is that one hash assertion; the row counts, the legacy
+#   v1 hash, both 248-decimal censuses and the canonical refusal run in "preserves the exact
+#   legacy v1 hash while the actual port input owns all 248 policy decimals".
+tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded numbers, in V2's own vocabulary > dev's b7ca2c41 pin: the drawer projects the fuller record through v3NodeScoreDetails(v3)
+#   source: dev, b7ca2c41 (SYNC3, 2026-09-23; split out at fix round 1 from "keeps the fuller
+#   record on the executable drawer projection and forbids raw-value JSX"). Red on
+#   origin/dev@25a0069f with the same message. UI source pin owned by the apps/ui lane:
+#   `v3NodeScoreDetails(v3)` moved from the drawer into apps/ui/lib/v3/adapter.ts.
+#   blinds: nothing — the row is that one pin; the drawer's raw-value bans run in "forbids
+#   raw-value JSX on the executable drawer projection".

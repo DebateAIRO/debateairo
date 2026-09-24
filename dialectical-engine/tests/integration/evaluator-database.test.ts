@@ -18,6 +18,7 @@ import {
   createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
 } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { framedFixturePacket } from "../support/framed-packet.js";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { ServeRepository } from "@debateai/serve";
 import { LivenessRepository } from "@debateai/liveness";
@@ -838,7 +839,10 @@ describe("evaluator tag attempts stay outside the product run boundary", () => {
       bound: { maxAttempts: 1, tokenCeiling: 128, deadlineMs: 250 },
       contractHash: "b".repeat(64),
       providerRef: EVALUATOR_PROVIDER_REF,
-      packet: { messages: [{ role: "user" as const, content: "scope probe" }] }
+      // RUN1 round 4: a framed packet, so the ONLY thing that can refuse these
+      // forged requests is the scope check this case is about — never the
+      // gateway's frame door, whichever of the two runs first.
+      packet: framedFixturePacket("scope probe")
     };
     for (const forged of [
       { ...request, lane: "served" as const },

@@ -8,7 +8,7 @@ import {
   MemoryPublicationKeyStore,
   PublicationCipher,
   generateDek,
-  hashVerificationToken,
+  hashToken,
   loadKek,
   verifyChain,
   type AuditContextHasher,
@@ -243,7 +243,7 @@ async function grant(
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL)
   `, [
     randomUUID(),
-    hashVerificationToken(token),
+    hashToken("step-up-grant", token),
     identity.sessionId,
     identity.userId,
     action,
@@ -334,7 +334,7 @@ describe("S8 publication on real PostgreSQL", () => {
       const publishGrant = await grant(identity,runId,"PUBLISH",String(ordinal),new Date());
       expect(await repository.publish({
         runId,userId:identity.userId,ownerRef:identity.ownerRef,
-        sessionId:identity.sessionId,grantTokenHash:hashVerificationToken(publishGrant),
+        sessionId:identity.sessionId,grantTokenHash:hashToken("step-up-grant", publishGrant),
         occurredAt:new Date(),source,publicationRef,expectedPseudonym:identity.pseudonym,
         contentCiphertext:await encryptedSnapshot(
           publicationRef,runId,`evaluator-public-${ordinal}`
@@ -602,7 +602,7 @@ describe("S8 publication on real PostgreSQL", () => {
       );
       expect(await repository.publish({
         runId,userId:identity.userId,ownerRef:identity.ownerRef,
-        sessionId:identity.sessionId,grantTokenHash:hashVerificationToken(publishGrant),
+        sessionId:identity.sessionId,grantTokenHash:hashToken("step-up-grant", publishGrant),
         occurredAt:publishedAt,source,publicationRef,
         expectedPseudonym:identity.pseudonym,
         contentCiphertext:await encryptedSnapshot(publicationRef,runId,label)
@@ -639,7 +639,7 @@ describe("S8 publication on real PostgreSQL", () => {
     await expect(repository.unpublish({
       runId:evaluatorWins.runId,userId:evaluatorWins.identity.userId,
       ownerRef:evaluatorWins.identity.ownerRef,sessionId:evaluatorWins.identity.sessionId,
-      grantTokenHash:hashVerificationToken(unpublishGrant),occurredAt:unpublishedAt,source
+      grantTokenHash:hashToken("step-up-grant", unpublishGrant),occurredAt:unpublishedAt,source
     })).resolves.toBe(evaluatorWins.publicationRef);
     const cleanup = new PostgresPublicationApplication(
       repository,publicationCipher
@@ -661,7 +661,7 @@ describe("S8 publication on real PostgreSQL", () => {
     await expect(repository.unpublish({
       runId:cleanupWins.runId,userId:cleanupWins.identity.userId,
       ownerRef:cleanupWins.identity.ownerRef,sessionId:cleanupWins.identity.sessionId,
-      grantTokenHash:hashVerificationToken(cleanupWinsGrant),occurredAt:cleanupWinsAt,source
+      grantTokenHash:hashToken("step-up-grant", cleanupWinsGrant),occurredAt:cleanupWinsAt,source
     })).resolves.toBe(cleanupWins.publicationRef);
     await expect(new PostgresPublicationApplication(
       repository,publicationCipher
@@ -685,7 +685,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const publishGrant=await grant(identity,runId,"PUBLISH","k",publishedAt);
     expect(await repository.publish({
       runId,userId:identity.userId,ownerRef:identity.ownerRef,
-      sessionId:identity.sessionId,grantTokenHash:hashVerificationToken(publishGrant),
+      sessionId:identity.sessionId,grantTokenHash:hashToken("step-up-grant", publishGrant),
       occurredAt:publishedAt,source,publicationRef,expectedPseudonym:identity.pseudonym,
       contentCiphertext:await encryptedSnapshot(publicationRef,runId,"publication-crash")
     })).toBe(true);
@@ -722,7 +722,7 @@ describe("S8 publication on real PostgreSQL", () => {
       const unpublishGrant=await grant(identity,runId,"UNPUBLISH","l",new Date());
       expect(await repository.unpublish({
         runId,userId:identity.userId,ownerRef:identity.ownerRef,
-        sessionId:identity.sessionId,grantTokenHash:hashVerificationToken(unpublishGrant),
+        sessionId:identity.sessionId,grantTokenHash:hashToken("step-up-grant", unpublishGrant),
         occurredAt:new Date(),source
       })).toBe(publicationRef);
       const pid=(await database.pool.query<{ pid:number }>(`
@@ -863,7 +863,7 @@ describe("S8 publication on real PostgreSQL", () => {
       userId: identity.userId,
       ownerRef: identity.ownerRef,
       sessionId: identity.sessionId,
-      grantTokenHash: hashVerificationToken(grantToken),
+      grantTokenHash: hashToken("step-up-grant", grantToken),
       occurredAt,
       source,
       publicationRef,
@@ -901,7 +901,7 @@ describe("S8 publication on real PostgreSQL", () => {
       userId: identity.userId,
       ownerRef: identity.ownerRef,
       sessionId: identity.sessionId,
-      grantTokenHash: hashVerificationToken("n".repeat(43)),
+      grantTokenHash: hashToken("step-up-grant", "n".repeat(43)),
       occurredAt: new Date(occurredAt.getTime() + 1_000),
       source
     })).toBeNull();
@@ -936,7 +936,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const publishGrant = await grant(identity, runId, "PUBLISH", "q", publishedAt);
     expect(await repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(publishGrant),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", publishGrant),
       occurredAt: publishedAt, source, publicationRef,
       expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(publicationRef, runId, "unpublish")
@@ -945,7 +945,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const unpublishGrant = await grant(identity, runId, "UNPUBLISH", "r", unpublishedAt);
     expect(await repository.unpublish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(unpublishGrant),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", unpublishGrant),
       occurredAt: unpublishedAt, source
     })).toBe(publicationRef);
 
@@ -1027,7 +1027,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const publishGrant = await grant(identity,runId,"PUBLISH","u",publishedAt);
     expect(await repository.publish({
       runId,userId: identity.userId,ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId,grantTokenHash: hashVerificationToken(publishGrant),
+      sessionId: identity.sessionId,grantTokenHash: hashToken("step-up-grant", publishGrant),
       occurredAt: publishedAt,source,publicationRef,
       expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(
@@ -1037,7 +1037,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const unpublishGrant = await grant(identity,runId,"UNPUBLISH","v",new Date());
     expect(await repository.unpublish({
       runId,userId: identity.userId,ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId,grantTokenHash: hashVerificationToken(unpublishGrant),
+      sessionId: identity.sessionId,grantTokenHash: hashToken("step-up-grant", unpublishGrant),
       occurredAt: new Date(),source
     })).toBe(publicationRef);
 
@@ -1046,7 +1046,7 @@ describe("S8 publication on real PostgreSQL", () => {
       erasure_id: string | null;
     }>("SELECT * FROM core.prepare_private_run_erasure($1,$2,$3,$4,$5)", [
       runId,identity.userId,identity.ownerRef,identity.sessionId,
-      hashVerificationToken(token)
+      hashToken("step-up-grant", token)
     ]);
     const firstDeleteToken = "w".repeat(43);
     await database.pool.query(`
@@ -1055,7 +1055,7 @@ describe("S8 publication on real PostgreSQL", () => {
         issued_at,expires_at,consumed_at
       ) VALUES ($1,$2,$3,'DELETE_PRIVATE_DEBATE',$4,
         clock_timestamp()-interval '1 second',clock_timestamp()+interval '1 minute',NULL)
-    `, [hashVerificationToken(firstDeleteToken),identity.sessionId,identity.userId,runId]);
+    `, [hashToken("step-up-grant", firstDeleteToken),identity.sessionId,identity.userId,runId]);
     expect((await prepare(firstDeleteToken)).rows[0]).toEqual({
       outcome: "CONTENDED",erasure_id: null
     });
@@ -1078,7 +1078,7 @@ describe("S8 publication on real PostgreSQL", () => {
         issued_at,expires_at,consumed_at
       ) VALUES ($1,$2,$3,'DELETE_PRIVATE_DEBATE',$4,
         clock_timestamp()-interval '1 second',clock_timestamp()+interval '1 minute',NULL)
-    `, [hashVerificationToken(secondDeleteToken),identity.sessionId,identity.userId,runId]);
+    `, [hashToken("step-up-grant", secondDeleteToken),identity.sessionId,identity.userId,runId]);
     const prepared = (await prepare(secondDeleteToken)).rows[0];
     expect(prepared?.outcome).toBe("PREPARED");
     const manifest = await database.pool.query<{
@@ -1097,7 +1097,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const publishGrant = await grant(identity,runId,"PUBLISH","y",new Date());
     expect(await repository.publish({
       runId,userId: identity.userId,ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId,grantTokenHash: hashVerificationToken(publishGrant),
+      sessionId: identity.sessionId,grantTokenHash: hashToken("step-up-grant", publishGrant),
       occurredAt: new Date(),source,publicationRef,
       expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(
@@ -1107,7 +1107,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const unpublishGrant = await grant(identity,runId,"UNPUBLISH","z",new Date());
     expect(await repository.unpublish({
       runId,userId: identity.userId,ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId,grantTokenHash: hashVerificationToken(unpublishGrant),
+      sessionId: identity.sessionId,grantTokenHash: hashToken("step-up-grant", unpublishGrant),
       occurredAt: new Date(),source
     })).toBe(publicationRef);
     const erasureId = (await database.pool.query<{ erasure_id: string }>(`
@@ -1168,7 +1168,7 @@ describe("S8 publication on real PostgreSQL", () => {
       expect(await repository.publish({
         runId: publicRunId,userId: identity.userId,ownerRef: identity.ownerRef,
         sessionId: identity.sessionId,
-        grantTokenHash: hashVerificationToken(publishGrant),
+        grantTokenHash: hashToken("step-up-grant", publishGrant),
         occurredAt: new Date(),source,publicationRef,
         expectedPseudonym: identity.pseudonym,
         contentCiphertext: await encryptedSnapshot(
@@ -1181,7 +1181,7 @@ describe("S8 publication on real PostgreSQL", () => {
       expect(await repository.unpublish({
         runId: publicRunId,userId: identity.userId,ownerRef: identity.ownerRef,
         sessionId: identity.sessionId,
-        grantTokenHash: hashVerificationToken(unpublishGrant),
+        grantTokenHash: hashToken("step-up-grant", unpublishGrant),
         occurredAt: new Date(),source
       })).toBe(publicationRef);
       const cleanupClaim = (await repository.claimKeyCleanup()).find(
@@ -1201,7 +1201,7 @@ describe("S8 publication on real PostgreSQL", () => {
     expect(await repository.publish({
       runId: publicRunId,userId: identity.userId,ownerRef: identity.ownerRef,
       sessionId: identity.sessionId,
-      grantTokenHash: hashVerificationToken(currentGrant),
+      grantTokenHash: hashToken("step-up-grant", currentGrant),
       occurredAt: currentAt,source,publicationRef: currentRef,
       expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(
@@ -1284,7 +1284,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const publishToken = await grant(identity,runId,"PUBLISH","a",new Date());
     expect(await repository.prepareKeyProvision({
       publicationRef,runId,userId: identity.userId,ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId,grantTokenHash: hashVerificationToken(publishToken)
+      sessionId: identity.sessionId,grantTokenHash: hashToken("step-up-grant", publishToken)
     })).toBe(true);
     const orphan = await publicationCipher.create(publicationRef,runId);
     orphan.close();
@@ -1325,7 +1325,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const runId = await createRun(identity,"publication-claim-wins");
     const publicationRef = randomUUID();
     const publishToken = await grant(identity,runId,"PUBLISH","b",new Date());
-    const grantTokenHash = hashVerificationToken(publishToken);
+    const grantTokenHash = hashToken("step-up-grant", publishToken);
     expect(await repository.prepareKeyProvision({
       publicationRef,runId,userId: identity.userId,ownerRef: identity.ownerRef,
       sessionId: identity.sessionId,grantTokenHash
@@ -1363,7 +1363,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const runId = await createRun(identity,"publication-publish-wins");
     const publicationRef = randomUUID();
     const publishToken = await grant(identity,runId,"PUBLISH","c",new Date());
-    const grantTokenHash = hashVerificationToken(publishToken);
+    const grantTokenHash = hashToken("step-up-grant", publishToken);
     const contentCiphertext = await encryptedSnapshot(
       publicationRef,runId,"publication-publish-wins"
     );
@@ -1451,7 +1451,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const runId = await createRun(identity,"t9-publication-order");
     const firstRef = randomUUID();
     const firstToken = await grant(identity,runId,"PUBLISH","d",new Date());
-    const firstHash = hashVerificationToken(firstToken);
+    const firstHash = hashToken("step-up-grant", firstToken);
     const firstCiphertext = await encryptedSnapshot(firstRef,runId,"t9-publication-order");
 
     // Provision wins the run row, then waits for the account serializer. The
@@ -1496,12 +1496,12 @@ describe("S8 publication on real PostgreSQL", () => {
       )`,[identity.userId]);
       const provisioning = repository.prepareKeyProvision({
         publicationRef: deniedRef,runId,userId: identity.userId,ownerRef: identity.ownerRef,
-        sessionId: identity.sessionId,grantTokenHash: hashVerificationToken(nextPublishToken)
+        sessionId: identity.sessionId,grantTokenHash: hashToken("step-up-grant", nextPublishToken)
       });
       await expectStillPending(provisioning);
       const unpublishing = repository.unpublish({
         runId,userId: identity.userId,ownerRef: identity.ownerRef,
-        sessionId: identity.sessionId,grantTokenHash: hashVerificationToken(unpublishToken),
+        sessionId: identity.sessionId,grantTokenHash: hashToken("step-up-grant", unpublishToken),
         occurredAt: new Date(),source
       });
       await expectStillPending(unpublishing);
@@ -1521,7 +1521,7 @@ describe("S8 publication on real PostgreSQL", () => {
     );
     expect(await repository.publish({
       runId,userId: identity.userId,ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId,grantTokenHash: hashVerificationToken(nextPublishToken),
+      sessionId: identity.sessionId,grantTokenHash: hashToken("step-up-grant", nextPublishToken),
       occurredAt: new Date(),source,publicationRef: deniedRef,
       expectedPseudonym: identity.pseudonym,contentCiphertext: republishedCiphertext
     })).toBe(true);
@@ -1537,14 +1537,14 @@ describe("S8 publication on real PostgreSQL", () => {
       const unpublishing = repository.unpublish({
         runId,userId: identity.userId,ownerRef: identity.ownerRef,
         sessionId: identity.sessionId,
-        grantTokenHash: hashVerificationToken(reverseUnpublishToken),
+        grantTokenHash: hashToken("step-up-grant", reverseUnpublishToken),
         occurredAt: new Date(),source
       });
       await expectStillPending(unpublishing);
       const provisioning = repository.prepareKeyProvision({
         publicationRef: reverseRef,runId,userId: identity.userId,ownerRef: identity.ownerRef,
         sessionId: identity.sessionId,
-        grantTokenHash: hashVerificationToken(reversePublishToken)
+        grantTokenHash: hashToken("step-up-grant", reversePublishToken)
       });
       await expectStillPending(provisioning);
       await runBarrier.query("COMMIT");
@@ -1557,7 +1557,7 @@ describe("S8 publication on real PostgreSQL", () => {
     expect(await repository.prepareKeyProvision({
       publicationRef: reverseRef,runId,userId: identity.userId,ownerRef: identity.ownerRef,
       sessionId: identity.sessionId,
-      grantTokenHash: hashVerificationToken(reversePublishToken)
+      grantTokenHash: hashToken("step-up-grant", reversePublishToken)
     })).toBe(true);
     expect(await repository.abandonKeyProvision(reverseRef,identity.userId)).toBe(true);
     const application = new PostgresPublicationApplication(repository,publicationCipher);
@@ -1600,7 +1600,7 @@ describe("S8 publication on real PostgreSQL", () => {
       const provisioning = repository.prepareKeyProvision({
         publicationRef: accountRef,runId,userId: identity.userId,ownerRef: identity.ownerRef,
         sessionId: identity.sessionId,
-        grantTokenHash: hashVerificationToken(accountPublishToken)
+        grantTokenHash: hashToken("step-up-grant", accountPublishToken)
       });
       await expectStillPending(provisioning);
       expect(await prepareAccount()).toBe("CONTENDED");
@@ -1660,7 +1660,7 @@ describe("S8 publication on real PostgreSQL", () => {
       const provisioning = repository.prepareKeyProvision({
         publicationRef: deletionRef,runId: deletionRun,userId: deletionWinner.userId,
         ownerRef: deletionWinner.ownerRef,sessionId: deletionWinner.sessionId,
-        grantTokenHash: hashVerificationToken(deletionToken)
+        grantTokenHash: hashToken("step-up-grant", deletionToken)
       });
       await expectStillPending(provisioning);
       await pauseBarrier.query("COMMIT");
@@ -1776,7 +1776,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const outcomes = await Promise.all(refs.map(async (publicationRef, index) => repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
       sessionId: identity.sessionId,
-      grantTokenHash: hashVerificationToken(index === 0 ? tokenA : tokenB),
+      grantTokenHash: hashToken("step-up-grant", index === 0 ? tokenA : tokenB),
       occurredAt, source, publicationRef, expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(publicationRef, runId, `race-${index}`)
     })));
@@ -1790,14 +1790,14 @@ describe("S8 publication on real PostgreSQL", () => {
     expect(await repository.unpublish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
       sessionId: identity.sessionId,
-      grantTokenHash: hashVerificationToken(unpublishToken),
+      grantTokenHash: hashToken("step-up-grant", unpublishToken),
       occurredAt: new Date(), source
     })).toBe(winner);
 
     const reuseRef = randomUUID();
     expect(await repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(outcomes[0] ? tokenA : tokenB),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", outcomes[0] ? tokenA : tokenB),
       occurredAt: new Date(occurredAt.getTime() + 1_000), source,
       publicationRef: reuseRef, expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(reuseRef, runId, "reuse")
@@ -1806,7 +1806,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const wrongRef = randomUUID();
     expect(await repository.publish({
       runId: otherRunId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(wrongAction),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", wrongAction),
       occurredAt, source, publicationRef: wrongRef, expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(wrongRef, otherRunId, "wrong-action")
     })).toBe(false);
@@ -1814,7 +1814,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const crossRef = randomUUID();
     expect(await repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(crossTarget),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", crossTarget),
       occurredAt, source, publicationRef: crossRef, expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(crossRef, runId, "cross-target")
     })).toBe(false);
@@ -1829,7 +1829,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const wrongSessionRef = randomUUID();
     expect(await repository.publish({
       runId: otherRunId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: alternateSessionId, grantTokenHash: hashVerificationToken(crossTarget),
+      sessionId: alternateSessionId, grantTokenHash: hashToken("step-up-grant", crossTarget),
       occurredAt, source, publicationRef: wrongSessionRef,
       expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(wrongSessionRef, otherRunId, "cross-session")
@@ -1924,15 +1924,15 @@ describe("S8 publication on real PostgreSQL", () => {
         issued_at,expires_at,consumed_at
       ) VALUES ($1,$2,$3,$4,'PUBLISH',$5,clock_timestamp()-interval '1 second',
         clock_timestamp()+interval '150 milliseconds',NULL)
-    `, [randomUUID(), hashVerificationToken(token), identity.sessionId, identity.userId, runId]);
+    `, [randomUUID(), hashToken("step-up-grant", token), identity.sessionId, identity.userId, runId]);
     expect(await repository.preflightGrant({
       runId, userId: identity.userId, sessionId: identity.sessionId,
-      grantTokenHash: hashVerificationToken(token)
+      grantTokenHash: hashToken("step-up-grant", token)
     }, "PUBLISH")).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 225));
     expect(await repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(token),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", token),
       occurredAt: presentedAt, source, publicationRef,
       expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(publicationRef, runId, "expired-db-clock")
@@ -1949,7 +1949,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const publishGrant = await grant(identity, runId, "PUBLISH", "d", new Date());
     expect(await repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(publishGrant),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", publishGrant),
       occurredAt: new Date(), source, publicationRef,
       expectedPseudonym: "wrong-pseudonym",
       contentCiphertext: await encryptedSnapshot(publicationRef, runId, "denied-audit")
@@ -1958,7 +1958,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const unpublishGrant = await grant(identity, runId, "UNPUBLISH", "f", new Date());
     expect(await repository.unpublish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(unpublishGrant),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", unpublishGrant),
       occurredAt: new Date(), source
     })).toBeNull();
 
@@ -2068,7 +2068,7 @@ describe("S8 publication on real PostgreSQL", () => {
     const publicationRef = randomUUID();
     expect(await repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(token),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", token),
       occurredAt, source, publicationRef, expectedPseudonym: identity.pseudonym,
       contentCiphertext: await encryptedSnapshot(publicationRef, runId, "legacy-plaintext")
     })).toBe(false);
@@ -2185,7 +2185,7 @@ describe("S8 publication on real PostgreSQL", () => {
         userId: identity.userId,
         ownerRef: identity.ownerRef,
         sessionId: identity.sessionId,
-        grantTokenHash: hashVerificationToken(grantToken),
+        grantTokenHash: hashToken("step-up-grant", grantToken),
         occurredAt,
         source,
         publicationRef,
@@ -2214,14 +2214,14 @@ describe("S8 publication on real PostgreSQL", () => {
     await blocker.query("SELECT 1 FROM core.run WHERE run_id=$1 FOR UPDATE", [runId]);
     const published = repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(publishGrant),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", publishGrant),
       occurredAt, source, publicationRef, expectedPseudonym: identity.pseudonym,
       contentCiphertext
     });
     await expectStillPending(published);
     const unpublished = repository.unpublish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(unpublishGrant),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", unpublishGrant),
       occurredAt: new Date(occurredAt.getTime() + 1), source
     });
     await expectStillPending(unpublished);
@@ -2245,7 +2245,7 @@ describe("S8 publication on real PostgreSQL", () => {
     await blocker.query("SELECT 1 FROM core.run WHERE run_id=$1 FOR UPDATE", [runId]);
     const published = repository.publish({
       runId, userId: original.userId, ownerRef: original.ownerRef,
-      sessionId: original.sessionId, grantTokenHash: hashVerificationToken(publishGrant),
+      sessionId: original.sessionId, grantTokenHash: hashToken("step-up-grant", publishGrant),
       occurredAt, source, publicationRef, expectedPseudonym: original.pseudonym,
       contentCiphertext
     });
@@ -2279,7 +2279,7 @@ describe("S8 publication on real PostgreSQL", () => {
     await blocker.query("SELECT 1 FROM core.run WHERE run_id=$1 FOR UPDATE", [runId]);
     const published = repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
-      sessionId: identity.sessionId, grantTokenHash: hashVerificationToken(publishGrant),
+      sessionId: identity.sessionId, grantTokenHash: hashToken("step-up-grant", publishGrant),
       occurredAt, source, publicationRef, expectedPseudonym: identity.pseudonym,
       contentCiphertext
     });

@@ -273,6 +273,59 @@ describe("lossless canonical register JSON", () => {
   });
 });
 
+/**
+ * CI-1b — CodeQL js/polynomial-redos on PR #8 (alert 8, `normalizeDecimal`).
+ * Stripping the fraction's trailing zeros with `/0+$/u` restarts at every "0"
+ * and rescans the run whenever a non-zero digit follows it, so the cost grows
+ * with the square of the run: 100 000 zeros and a final "1" took about 2.8 s,
+ * and the register JSON parser admits 1 MiB. The rows below were recorded from
+ * the regex version and must hold unchanged for the linear one.
+ */
+describe("CI-1b — a decimal's trailing fraction zeros are stripped in linear time", () => {
+  const PATHOLOGICAL = `1.${"0".repeat(100_000)}1`;
+  const WITHIN_MS = 100;
+
+  it("refuses a 100 000-zero fraction through canonicalDecimal inside the bound", () => {
+    const started = performance.now();
+    expect(() => canonicalDecimal(PATHOLOGICAL)).toThrow(/CANONICAL_DECIMAL_INVALID/u);
+    expect(performance.now() - started).toBeLessThan(WITHIN_MS);
+  });
+
+  it("refuses the same bytes through the register JSON parser inside the bound", () => {
+    const started = performance.now();
+    expect(() => parseCanonicalRegisterJson(Buffer.from(PATHOLOGICAL, "utf8")))
+      .toThrow(/CANONICAL_REGISTER_JSON_INVALID/u);
+    expect(performance.now() - started).toBeLessThan(WITHIN_MS);
+  });
+
+  it("still strips a 100 000-zero fraction that ends in zeros down to the integer", () => {
+    expect(canonicalDecimal(`1.${"0".repeat(100_000)}`).text).toBe("1");
+  });
+
+  it.each([
+    ["0", "0"], ["-0", "0"], ["10", "10"], ["100", "100"], ["001.2300", "1.23"],
+    ["-0.000000", "0"], ["1.0", "1"], ["1.10", "1.1"], ["-1.50", "-1.5"],
+    ["0.000001", "0.000001"], ["0.0000010", "0.000001"], [`1.${"0".repeat(24)}`, "1"],
+    ["12345678901234.5", "12345678901234.5"],
+    ["9007199254740991", "9007199254740991"], ["-9007199254740991", "-9007199254740991"]
+  ])("still canonicalizes %s to %s", (raw, canonical) => {
+    expect(canonicalDecimal(raw).text).toBe(canonical);
+  });
+
+  it.each([
+    "0.0000001", "1.0000001", "123456789012345.6", "9007199254740992", "9007199254740990.5",
+    ".5", "1.", "", "+1", "1e3", "0x10", " 1", "1.5.5", "--1", "١", "1.0٠"
+  ])("still refuses %j", (raw) => {
+    expect(() => canonicalDecimal(raw)).toThrow(/CANONICAL_DECIMAL_INVALID/u);
+  });
+
+  it.each([
+    ["1.50", "1.5"], ["[1.0,-0.000,2.500]", "[1,0,2.5]"], ["{\"a\":10.000100}", "{\"a\":10.0001}"]
+  ])("still reads register JSON %s as %s", (raw, canonical) => {
+    expect(parseCanonicalRegisterJson(Buffer.from(raw, "utf8"))).toBe(canonical);
+  });
+});
+
 describe("bigint-safe versions and separate publication hash domains", () => {
   it.each(["1", "9007199254740991", "9007199254740992", "9223372036854775807"])("preserves %s as text", (value) => {
     expect(parseRegisterVersionText(value)).toBe(value);
@@ -463,7 +516,10 @@ describe("closed PostgreSQL publication port", () => {
   });
 
   it("publishes a complete GENERAL input through one function, verifies receipt, commits, then resolves", async () => {
-    const input = { publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general" };
+    const input = {
+      publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general",
+      deployment: "local" as const
+    };
     const requestSha256 = computeGeneralPublicationRequestSha256(input);
     const snapshotSha256 = computeRegisterSnapshotSha256(rows);
     const fixture = fakePool([{
@@ -592,7 +648,8 @@ describe("closed PostgreSQL publication port", () => {
   ].map((rows) => [rows] as const))("rejects marker/duplicate/empty generic snapshots before checkout", async (badRows) => {
     const fixture = fakePool([]);
     await expect(createPostgresRegisterPublicationPort(fixture.pool).publishGeneral({
-      publicationId: id, baseRegisterVersion: base, rows: badRows, sourceRef: "src"
+      publicationId: id, baseRegisterVersion: base, rows: badRows, sourceRef: "src",
+      deployment: "local" as const
     })).rejects.toThrow(/REGISTER_PUBLICATION_INPUT_INVALID/u);
     expect(fixture.events).toEqual([]);
   });
@@ -607,7 +664,10 @@ describe("closed PostgreSQL publication port", () => {
   });
 
   it("rolls back every pre-commit failure and rejects a malformed receipt", async () => {
-    const input = { publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general" };
+    const input = {
+      publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general",
+      deployment: "local" as const
+    };
     const requestSha256 = computeGeneralPublicationRequestSha256(input);
     const fixture = fakePool([{
       register_version: "5", base_register_version: "4", publication_id: id,
@@ -640,7 +700,10 @@ describe("closed PostgreSQL publication port", () => {
   });
 
   it.each(MALFORMED_RESULT_KINDS)("rework B4 rejects %s GENERAL results before commit", async (kind) => {
-    const input = { publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general" };
+    const input = {
+      publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general",
+      deployment: "local" as const
+    };
     const valid = {
       register_version: "5", base_register_version: "4", publication_id: id,
       publication_kind: "GENERAL", request_sha256: computeGeneralPublicationRequestSha256(input),
@@ -736,7 +799,8 @@ describe("closed PostgreSQL publication port", () => {
     } as unknown as PoolClient;
     const pool = { connect: async () => client } as unknown as Pool;
     await expect(createPostgresRegisterPublicationPort(pool).publishGeneral({
-      publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general"
+      publicationId: id, baseRegisterVersion: base, rows, sourceRef: "src:general",
+      deployment: "local" as const
     })).rejects.toThrow("connection lost");
     expect(events).toEqual([
       "BEGIN ISOLATION LEVEL READ COMMITTED", expect.stringContaining("register.publish_register_version"), "COMMIT", "RELEASE"

@@ -51,18 +51,22 @@ function harness(input: Readonly<{
 }
 
 describe("SUP-07 support:shred CLI", () => {
+  // pin updated 2026-09-19 (DL7-F11): a shred destroys the keys that make a person's support
+  // history readable and cannot be undone, so the caller must confirm with `--yes`. The
+  // shape this row is about — exactly one canonical owner or anonymous-session target — is
+  // unchanged; tests/unit/support-operator-cli-safety.test.ts owns the confirmation contract.
   it("accepts exactly one canonical owner or anonymous-session target", () => {
-    expect(parseSupportShredArguments(["--owner", OWNER])).toEqual({
+    expect(parseSupportShredArguments(["--owner", OWNER, "--yes"])).toEqual({
       kind: "owner", targetRef: OWNER
     });
-    expect(parseSupportShredArguments(["--session", SESSION])).toEqual({
+    expect(parseSupportShredArguments(["--session", SESSION, "--yes"])).toEqual({
       kind: "session", targetRef: SESSION
     });
   });
 
   it.each([
     [[]], [["--owner"]], [["--session"]], [["--owner", ""]],
-    [["--owner", OWNER, "extra"]],
+    [["--owner", OWNER, "extra"]], [["--owner", OWNER, "--yes", "extra"]],
     [["--owner", OWNER, "--owner", OWNER]],
     [["--session", SESSION, "--session", SESSION]],
     [["--owner", OWNER, "--session", SESSION]],
@@ -78,7 +82,7 @@ describe("SUP-07 support:shred CLI", () => {
 
   it("uses OS metadata, renders the exact success lines, and closes once", async () => {
     const owner = harness();
-    await expect(runSupportShredCli(["--owner", OWNER], owner.dependencies))
+    await expect(runSupportShredCli(["--owner", OWNER, "--yes"], owner.dependencies))
       .resolves.toBe("sessions: 2, cases: 3, keys destroyed: 5\n");
     expect(owner.shredOwner).toHaveBeenCalledWith(
       OWNER, "operator", new Date("2026-09-07T10:00:00.000Z")
@@ -87,7 +91,7 @@ describe("SUP-07 support:shred CLI", () => {
     expect(owner.end).toHaveBeenCalledTimes(1);
 
     const session = harness({ result: { kind: "ALREADY_SHREDDED" } });
-    await expect(runSupportShredCli(["--session", SESSION], session.dependencies))
+    await expect(runSupportShredCli(["--session", SESSION, "--yes"], session.dependencies))
       .resolves.toBe("already shredded\n");
     expect(session.shredSession).toHaveBeenCalledWith(
       SESSION, "operator", new Date("2026-09-07T10:00:00.000Z")
@@ -97,28 +101,28 @@ describe("SUP-07 support:shred CLI", () => {
 
   it("covers acquisition, operation, and close failures without leaking live resources", async () => {
     const credential = harness({ credentialError: new Error("credential-secret") });
-    await expect(runSupportShredCli(["--owner", OWNER], credential.dependencies))
+    await expect(runSupportShredCli(["--owner", OWNER, "--yes"], credential.dependencies))
       .rejects.toThrow("credential-secret");
     expect(credential.openPool).not.toHaveBeenCalled();
     expect(credential.end).not.toHaveBeenCalled();
 
     const acquisition = harness({ poolError: new Error("pool-secret") });
-    await expect(runSupportShredCli(["--owner", OWNER], acquisition.dependencies))
+    await expect(runSupportShredCli(["--owner", OWNER, "--yes"], acquisition.dependencies))
       .rejects.toThrow("pool-secret");
     expect(acquisition.end).not.toHaveBeenCalled();
 
     const operation = harness({ operationError: new TypeError("SUPPORT_SHRED_TARGET_NOT_FOUND") });
-    await expect(runSupportShredCli(["--owner", OWNER], operation.dependencies))
+    await expect(runSupportShredCli(["--owner", OWNER, "--yes"], operation.dependencies))
       .rejects.toThrow("SUPPORT_SHRED_TARGET_NOT_FOUND");
     expect(operation.end).toHaveBeenCalledTimes(1);
 
     const primary = new TypeError("SUPPORT_SHRED_AUDIT_INVALID");
     const both = harness({ operationError: primary, closeError: new Error("password=secret") });
-    await expect(runSupportShredCli(["--owner", OWNER], both.dependencies)).rejects.toBe(primary);
+    await expect(runSupportShredCli(["--owner", OWNER, "--yes"], both.dependencies)).rejects.toBe(primary);
     expect(both.end).toHaveBeenCalledTimes(1);
 
     const close = harness({ closeError: new Error("postgresql://secret") });
-    await expect(runSupportShredCli(["--owner", OWNER], close.dependencies))
+    await expect(runSupportShredCli(["--owner", OWNER, "--yes"], close.dependencies))
       .rejects.toMatchObject({ code: "SUPPORT_SHRED_POOL_CLOSE_FAILED" });
     expect(close.end).toHaveBeenCalledTimes(1);
   });

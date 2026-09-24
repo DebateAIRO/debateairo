@@ -1,0 +1,59 @@
+# deploy/vps/Caddyfile
+# The only process on the VPS that listens on a public interface (PLAN §8 C3, R2).
+# Caddy terminates TLS (automatic ACME, HTTP->HTTPS redirect is implicit) and proxies to the
+# Next front door on loopback. Everything else — API 127.0.0.1:8790, Postgres unix socket,
+# Hatchet 127.0.0.1:7077/8888 — is unreachable from outside the box.
+#
+# Deliberately absent (audit L7 "C2/C3 validation", gap 2): no proxy-trust directive. Caddy >= 2.5
+# only replaces a client-supplied X-Forwarded-For with the peer address when such a directive is
+# set; leaving it unset keeps the "last hop wins" invariant that apps/ui/trusted-client-ip.mjs
+# relies on (it reads the LAST hop, which is the address Caddy itself observed).
+# Also absent: the log directive that un-redacts credential headers. Caddy redacts
+# Cookie/Authorization/Set-Cookie by default; turning that off would write session cookies to
+# /var/log/caddy. The architecture test pins both absences as plain substrings, so neither name
+# may appear here even in a comment.
+#
+# Set DEBATEAI_PUBLIC_HOSTNAME and DEBATEAI_ACME_EMAIL in /etc/default/caddy (see README §3).
+
+{
+	email {$DEBATEAI_ACME_EMAIL}
+	admin off
+}
+
+{$DEBATEAI_PUBLIC_HOSTNAME} {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Cross-Origin-Opener-Policy "same-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	# The API's own Fastify bodyLimit (B5) is the authority; this is the edge floor in front of it,
+	# so an oversized body is dropped before it reaches Node at all.
+	request_body {
+		max_size 1MB
+	}
+
+	# BREACH class: never compress a response that carries a session cookie, a CSRF token or a
+	# one-shot verification token. /api/* is the whole authenticated surface (the UI proxies to
+	# the API under that prefix), so it is excluded and static assets keep compression.
+	@compressible not path /api/*
+	encode @compressible gzip
+
+	reverse_proxy 127.0.0.1:3001 {
+		# {remote_host} is the socket peer Caddy observed — never a caller-supplied header.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto https
+		# C2b: the UI honours the hop above only when this secret matches (timingSafeEqual in
+		# apps/ui/trusted-client-ip.mjs). Without it any local process able to open
+		# 127.0.0.1:3001 could forge a client address and evade the per-IP admission limits.
+		# The file is 0640 root:caddy, >= 43 base64url characters (README §4).
+		header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.secret}
+	}
+}

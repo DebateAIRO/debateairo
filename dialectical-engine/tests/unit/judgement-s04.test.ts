@@ -1,5 +1,7 @@
+import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
+import { z } from "zod";
 import {
   applyCorrelatedErrorDiscount,
   applyDeclaredDisagreement,
@@ -10,6 +12,7 @@ import {
   PANEL_MEMBER_FAILURE_KINDS,
   PanelMemberFailure,
   parseJudgeAssessment,
+  parseStructuredArtifact,
   reduceAssessment,
   runJudgePanel,
   selectReducedJudgement,
@@ -482,5 +485,99 @@ describe("F-DIAG-S04-PANEL-NOTE — the panel note never carries a raw caught me
     const result = await panelWith(async () => { throw new UnknownCodeStub(); });
 
     expect(result.notes[0]!.reason).toBe("UNCLASSIFIED_MEMBER_ERROR");
+  });
+});
+
+/**
+ * CI-1b — CodeQL js/polynomial-redos on PR #8 (alert 7, the ONE_FENCE strategy).
+ * The strategy was one regular expression whose adjacent `\s*`, `\n?` and lazy
+ * body can split a run of blanks in quadratically many ways, and its input is
+ * model text: "```" and 100 000 newlines took about 4.6 s. The rows were
+ * recorded from the regex version and must hold unchanged for the linear one.
+ */
+describe("CI-1b — the one-fence strategy answers in linear time and exactly as before", () => {
+  const WITHIN_MS = 100;
+  const permissive = z.unknown();
+  const FAILED = { kind: "PARSE_FAILURE", message: "No parsing strategy produced a JSON object" };
+  const parsed = (strategy: "RAW" | "ONE_FENCE" | "BRACE_BALANCED", value: unknown) => ({
+    kind: "PARSED", strategy, value
+  });
+
+  it.each([
+    ["an opening fence and 100 000 spaces", `\`\`\`${" ".repeat(100_000)}`],
+    ["an opening fence, 100 000 newlines and a letter", `\`\`\`${"\n".repeat(100_000)}x`],
+    ["a json fence, 100 000 tabs and an unclosed brace", `\`\`\`json\n${"\t".repeat(100_000)}{`]
+  ])("answers %s inside the bound", (_label, content) => {
+    const started = performance.now();
+    expect(parseStructuredArtifact(content, permissive)).toEqual(FAILED);
+    expect(performance.now() - started).toBeLessThan(WITHIN_MS);
+  });
+
+  it.each([
+    ["a json fence", "```json\n{\"a\":1}\n```", parsed("ONE_FENCE", { a: 1 })],
+    ["an upper-case JSON tag", "```JSON\n{\"a\":1}\n```", parsed("ONE_FENCE", { a: 1 })],
+    ["a bare fence", "```\n{\"a\":1}\n```", parsed("ONE_FENCE", { a: 1 })],
+    ["an inline fence inside outer blanks", "  \n```json {\"a\":1} ```  \n", parsed("ONE_FENCE", { a: 1 })],
+    ["a fence with no blanks", "```json{\"a\":1}```", parsed("ONE_FENCE", { a: 1 })],
+    ["CRLF lines", "```json\r\n{\"a\":1}\r\n```", parsed("ONE_FENCE", { a: 1 })],
+    ["NBSP and LS outside the fences", " ```json\n{\"a\":1}\n``` ", parsed("ONE_FENCE", { a: 1 })],
+    ["NBSP between the tag and the body", "```json {\"a\":1}\n```", parsed("ONE_FENCE", { a: 1 })],
+    ["NBSP against the closing fence", "```json\n{\"a\":1} ```", parsed("BRACE_BALANCED", { a: 1 })],
+    ["an array body", "```json\n[1,2]\n```", parsed("ONE_FENCE", [1, 2])],
+    ["a string body", "```json\n\"text\"\n```", parsed("ONE_FENCE", "text")],
+    ["a number body", "```\n1\n```", parsed("ONE_FENCE", 1)],
+    ["a fence inside a JSON string", "```json\n{\"a\":\"```\"}\n```", parsed("ONE_FENCE", { a: "```" })],
+    ["a jsonc tag", "```jsonc\n{\"a\":1}\n```", parsed("BRACE_BALANCED", { a: 1 })],
+    ["a json5 tag", "```json5\n{}\n```", parsed("BRACE_BALANCED", {})],
+    ["a long s that only looks like an s", "```jſon\n{}\n```", parsed("BRACE_BALANCED", {})],
+    ["four-backtick fences", "````json\n{\"a\":1}\n````", parsed("BRACE_BALANCED", { a: 1 })],
+    ["a second closing fence", "```json\n{\"a\":1}\n```\n```", parsed("BRACE_BALANCED", { a: 1 })],
+    ["prose before the fence", "prose\n```json\n{\"a\":1}\n```", parsed("BRACE_BALANCED", { a: 1 })],
+    ["prose after the fence", "```json\n{\"a\":1}\n```\ntrailing prose", parsed("BRACE_BALANCED", { a: 1 })],
+    ["an empty fence", "```\n```", FAILED],
+    ["six backticks", "``````", FAILED],
+    ["five backticks", "`````", FAILED],
+    ["an unterminated fence", "```json", FAILED],
+    ["an unterminated fence with an object", "```json\n{\"a\":1}", parsed("BRACE_BALANCED", { a: 1 })],
+    ["raw JSON", "{\"a\":1}", parsed("RAW", { a: 1 })],
+    ["not JSON", "not-json", FAILED]
+  ])("still reads %s the same way", (_label, content, expected) => {
+    expect(parseStructuredArtifact(content, permissive)).toEqual(expected);
+  });
+
+  it("agrees with the expression it replaced on every string of up to five tokens", () => {
+    // The pre-CI-1b expression, kept ONLY as this oracle: here it never sees
+    // more than 25 characters, so its backtracking stays trivially small.
+    const legacyOneFence = /^\s*```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i;
+    const tokens = ["```", "`", "json", "JSON", "\n", " ", " ", "{}", "1", "x", "\"`\""];
+    let compared = 0;
+    let legacyFenced = 0;
+    const disagreements: string[] = [];
+    const visit = (content: string, depth: number): void => {
+      compared += 1;
+      let rawJson = true;
+      try { JSON.parse(content); } catch { rawJson = false; }
+      if (!rawJson) {
+        const legacy = legacyOneFence.exec(content);
+        let legacyValue: { readonly value: unknown } | null = null;
+        if (legacy !== null) {
+          try { legacyValue = { value: JSON.parse(legacy[1]!) as unknown }; } catch { legacyValue = null; }
+        }
+        if (legacyValue !== null) legacyFenced += 1;
+        const actual = parseStructuredArtifact(content, permissive);
+        const fencedNow = actual.kind === "PARSED" && actual.strategy === "ONE_FENCE";
+        const agrees = legacyValue === null
+          ? !fencedNow
+          : fencedNow && isDeepStrictEqual(actual.value, legacyValue.value);
+        if (!agrees && disagreements.length < 5) disagreements.push(JSON.stringify(content));
+      }
+      if (depth < 5) for (const token of tokens) visit(`${content}${token}`, depth + 1);
+    };
+    visit("", 0);
+    expect(disagreements).toEqual([]);
+    // Deterministic enumeration: 1 + 11 + … + 11^5 strings, of which exactly
+    // 357 reach the ONE_FENCE arm — so the comparison above is never vacuous.
+    expect(compared).toBe(177_156);
+    expect(legacyFenced).toBe(357);
   });
 });

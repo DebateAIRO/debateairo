@@ -114,6 +114,73 @@ export function parseEncodedArgon2id(encoded: string): Argon2idEncodingParameter
 }
 
 /**
+ * V-22, ruled 2026-09-22: a STORED envelope may not exceed twice the sealed
+ * policy that governs its own use.
+ *
+ * The table above is one global envelope — it has to be, because it is applied
+ * where no policy is in hand (here, and in the worker). It accepts 4x the
+ * password cost, which is what let a DB-write actor plant a 256 MiB record. The
+ * ceiling below is the per-use one: Argon2id runs under several sealed costs
+ * (password, MFA recovery codes, audit source hashing), so the caller that
+ * knows WHICH cost governs the record passes it in. Twice, not once, so that
+ * records minted under an older, higher cost still verify if the ruled cost is
+ * ever lowered — no real user is locked out by a policy change.
+ *
+ * THE ONE WAY THIS RULE CAN LOCK A REAL USER OUT: lowering a ruled cost by MORE
+ * than half. Records minted under the old cost then sit above twice the new one
+ * and are refused, and nothing rehashes a password on successful login, so they
+ * are stranded until their owner goes through recovery. Halving is safe (an old
+ * record lands exactly on the ceiling); a deeper cut needs rehash-on-login
+ * first, or a superseding row that keeps the old cost as the governing one
+ * until every record has been re-minted.
+ *
+ * A carrier, like the table above, rather than a bare exported number: the
+ * structural source law refuses those outside published-arithmetic.
+ */
+export const ARGON2_POLICY_ENVELOPE = Object.freeze({ multiplier: 2 });
+
+/** The sealed cost a stored record is measured against. Shape of every ruled argon2id row. */
+export interface Argon2idPolicyCost {
+  readonly memoryCostKiB: number;
+  readonly timeCost: number;
+  readonly parallelism: number;
+}
+
+function usablePolicyCost(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+/**
+ * The typed refusal for a stored record whose memory, time or parallelism
+ * exceeds `ARGON2_POLICY_ENVELOPE.multiplier` times its governing policy, and
+ * `undefined` for a record this check admits.
+ *
+ * Deliberately decided on the PARSED costs alone: no salt, no digest, no
+ * password, no allocation — so it can be answered before a worker slot is
+ * occupied. An encoding the global envelope already refuses is not this
+ * check's question and stays `undefined`, so the existing parse refusal keeps
+ * its own meaning. A policy cost that is not a usable positive integer is
+ * refused rather than turned into a ceiling.
+ */
+export function argon2EnvelopeRefusal(
+  encodedHash: string,
+  cost: Argon2idPolicyCost
+): "ARGON2_ENVELOPE_EXCEEDS_POLICY" | undefined {
+  const parsed = parseEncodedArgon2id(encodedHash);
+  if (parsed === undefined) return undefined;
+  if (!usablePolicyCost(cost?.memoryCostKiB) || !usablePolicyCost(cost.timeCost)
+    || !usablePolicyCost(cost.parallelism)) {
+    return "ARGON2_ENVELOPE_EXCEEDS_POLICY";
+  }
+  const multiplier = ARGON2_POLICY_ENVELOPE.multiplier;
+  return parsed.memoryCostKiB > cost.memoryCostKiB * multiplier
+    || parsed.timeCost > cost.timeCost * multiplier
+    || parsed.parallelism > cost.parallelism * multiplier
+    ? "ARGON2_ENVELOPE_EXCEEDS_POLICY"
+    : undefined;
+}
+
+/**
  * PROVISIONAL engineering bounds — candidate values only.
  *
  * These are NOT ruled auth policy and are deliberately not persisted as a
@@ -175,6 +242,13 @@ export interface Argon2WorkerPoolOptions {
   readonly terminationConfirmTimeoutMs?: number;
   readonly spawn?: (index: number) => Argon2WorkerHandle;
   readonly now?: () => number;
+  /**
+   * Invoked exactly once, when the rolling restart breaker trips. The pool
+   * cannot end the process itself; this is how its owner learns that every
+   * future credential operation will fail closed and that a supervisor restart
+   * is the only cure (L2-F9).
+   */
+  readonly onBreakerTripped?: () => void;
 }
 
 export interface Argon2PoolStats {
@@ -372,9 +446,18 @@ const HEX_DIGEST = /^[0-9a-f]+$/;
  */
 export const ARGON2_LAWFUL_WORKER_FAILURE_CODE = "ARGON2_WORKER_JOB_FAILED";
 
-/** Unpadded standard base64 of a salt, exactly as an Argon2 encoding carries it. */
+/**
+ * Unpadded standard base64 of a salt, exactly as an Argon2 encoding carries it.
+ *
+ * CI-1b (CodeQL js/polynomial-redos, PR #8): this used `.replace(/=+$/, "")`.
+ * Node's base64 ends in at most two "=", so the pattern never met a long run
+ * here; a backwards scan removes the same characters with no pattern at all.
+ */
 function encodeSalt(salt: Uint8Array): string {
-  return Buffer.from(salt).toString("base64").replace(/=+$/, "");
+  const padded = Buffer.from(salt).toString("base64");
+  let end = padded.length;
+  while (end > 0 && padded.charCodeAt(end - 1) === 0x3d) end -= 1;
+  return padded.slice(0, end);
 }
 
 /**
@@ -457,6 +540,7 @@ export class Argon2WorkerPool {
   private readonly terminationConfirmMs: number;
   private readonly spawnWorker: (index: number) => Argon2WorkerHandle;
   private readonly now: () => number;
+  private readonly onBreakerTripped: (() => void) | undefined;
 
   /**
    * Every handle whose `terminate()` has been called but not yet confirmed.
@@ -489,6 +573,7 @@ export class Argon2WorkerPool {
     this.terminationConfirmMs = options.terminationConfirmTimeoutMs
       ?? ARGON2_PROVISIONAL_BOUNDS.terminationConfirmTimeoutMs;
     this.now = options.now ?? Date.now;
+    this.onBreakerTripped = options.onBreakerTripped;
     this.spawnWorker = options.spawn ?? ((index) => Argon2WorkerPool.spawnRealWorker(index));
     if (!Number.isInteger(this.workerCount) || this.workerCount < 1) {
       throw new TypeError("ARGON2_POOL_WORKER_COUNT_INVALID");
@@ -1052,6 +1137,22 @@ export class Argon2WorkerPool {
   private tripBreaker(): void {
     if (this.breakerTripped) return;
     this.breakerTripped = true;
+    // L2-F9: the breaker latches for the life of the process, so without this
+    // announcement four worker losses inside the window became a silent,
+    // permanent authentication outage — the process stayed up, so systemd's
+    // Restart=on-failure never fired. Operational counters only: no password,
+    // no salt, no digest may ride this record.
+    try {
+      console.error(JSON.stringify({
+        event: "argon2.breaker.tripped",
+        workers: this.workerCount,
+        restartBudget: this.restartBudget,
+        restartWindowMs: this.restartWindowMs,
+        restartsInWindow: this.restarts.length
+      }));
+    } catch {
+      // Announcing must never replace failing closed.
+    }
     this.settleReady();
     this.rejectAllQueued(new Argon2InfrastructureError("ARGON2_POOL_UNAVAILABLE"));
     for (const slot of this.slots) {
@@ -1066,6 +1167,13 @@ export class Argon2WorkerPool {
       slot.generation += 1;
       this.clearReadyTimer(slot);
       if (handle !== undefined) void this.retire(handle);
+    }
+    // Last, so the owner observes a pool that has already failed closed. The
+    // guard above makes this at-most-once for the life of the pool.
+    try {
+      this.onBreakerTripped?.();
+    } catch {
+      // A failing handler must not corrupt the breaker's own state.
     }
   }
 

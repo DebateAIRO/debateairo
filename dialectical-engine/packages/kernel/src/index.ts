@@ -386,6 +386,40 @@ export function exhaustive(value: never): never {
   throw new TypeError(`Unknown closed-vocabulary member: ${String(value)}`);
 }
 
+/**
+ * V-28 (DL4-F2) — THE RUN-LEVEL SPEND STOPS.
+ *
+ * Three refusals that are the RUN's business and never one step's: the run has
+ * reached its money ceiling, the application has reached its day, or a hosted
+ * vendor answered without the usage figures its cost can be read from. Each must
+ * travel UNTOUCHED through every layer that would otherwise translate it — the
+ * panel, which turns a failure into a member note and carries on to the next
+ * member; the node-review catch, which turns one into NODE_REVIEW_UNAVAILABLE —
+ * because every such translation costs another billed call and hides which
+ * control spoke.
+ *
+ * It lives in the kernel because the code that RAISES these (`@debateai/budget`,
+ * `@debateai/providers`) and the code that must not swallow them
+ * (`@debateai/judgement`, the runner) have no other package in common, and a
+ * second copy of the list is a list that drifts.
+ *
+ * `RUN_COST_ENVELOPE_EXHAUSTED`, the ATTEMPT ceiling, is deliberately NOT here:
+ * it has always been treated as a member failure and V-28 does not change it.
+ */
+export const RUN_LEVEL_SPEND_STOP_CODES = Object.freeze([
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "DAILY_COST_ENVELOPE_REACHED",
+  "PROVIDER_USAGE_UNREPORTED"
+] as const);
+
+export type RunLevelSpendStopCode = typeof RUN_LEVEL_SPEND_STOP_CODES[number];
+
+export function isRunLevelSpendStop(error: unknown): boolean {
+  const code = (error as Readonly<{ code?: unknown }>)?.code;
+  return typeof code === "string"
+    && (RUN_LEVEL_SPEND_STOP_CODES as readonly string[]).includes(code);
+}
+
 export * from "./support-credentials.js";
 export * from "./support-text-views.js";
 

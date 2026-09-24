@@ -1,7 +1,27 @@
 import type { FastifyInstance } from "fastify";
+import { destroyKek, type KekHandle } from "@debateai/crypto";
 
 const SHUTDOWN_FAILURE_CODE = "API_SHUTDOWN_FAILED" as const;
-type ShutdownSignal = "SIGTERM" | "SIGINT";
+const SHUTDOWN_DEADLINE_CODE = "API_SHUTDOWN_DEADLINE_EXCEEDED" as const;
+const SHUTDOWN_ESCALATION_CODE = "API_SHUTDOWN_SIGNAL_ESCALATED" as const;
+
+/**
+ * Overall drain deadline. A drain that cannot finish (an unreachable database
+ * makes `pool.end()` and the audit flush wait forever) must not turn every
+ * further SIGTERM into a no-op: at the deadline the resources are force-closed
+ * and the process exits 1 with one structured line (L7-F6).
+ */
+export const SHUTDOWN_DEADLINE_MS = 20_000;
+
+/**
+ * Signals inside this window of the first one belong to the same request and
+ * coalesce into one teardown. A later signal is the operator asking again, and
+ * escalates immediately.
+ */
+export const SHUTDOWN_ESCALATION_GRACE_MS = 1_000;
+
+// SIGHUP included: closing the terminal window must drain, not kill silently.
+type ShutdownSignal = "SIGTERM" | "SIGINT" | "SIGHUP";
 
 export interface GracefulShutdownRegistration {
   drainRegistrationAdmissions(): Promise<void>;
@@ -69,7 +89,8 @@ export async function drainGracefulShutdownResources(
   registration: GracefulShutdownRegistration,
   auditContextHasher: ClosableAuditContextHasher,
   argon2Pool: ClosableArgon2Pool,
-  databasePools: readonly ClosableDatabasePool[] = []
+  databasePools: readonly ClosableDatabasePool[] = [],
+  kekHandles: readonly KekHandle[] = []
 ): Promise<void> {
   // This is a cached join in production because `preClose` already started it.
   // Keeping it in the indivisible order contract makes the resource primitive
@@ -109,6 +130,22 @@ export async function drainGracefulShutdownResources(
       closeFailed = true;
     }
   }
+
+  // L2-F7: the KEK master copy outlives every pool that borrows from it, so it
+  // is zeroed LAST — after the final wrap/unwrap any drain above could need.
+  // `destroyKek` is idempotent, and a failure here must not mask a real close
+  // failure. The `typeof` guards keep the architecture harness able to execute
+  // these exact bytes with only its three free identifiers, exactly as the
+  // `databasePools` guard above does.
+  if (typeof kekHandles !== "undefined" && typeof destroyKek === "function") {
+    for (const handle of kekHandles) {
+      try {
+        destroyKek(handle);
+      } catch {
+        // Nothing downstream can act on a failed zeroisation.
+      }
+    }
+  }
   if (closeFailed) throw firstCloseFailure;
 }
 
@@ -128,11 +165,19 @@ export function installGracefulShutdown(options: Readonly<{
   auditContextHasher: ClosableAuditContextHasher;
   argon2Pool: ClosableArgon2Pool;
   databasePools: readonly ClosableDatabasePool[];
+  kekHandles?: readonly KekHandle[];
   process?: ShutdownProcess;
   logger?: ShutdownLogger;
+  deadlineMs?: number;
+  escalationGraceMs?: number;
 }>): Readonly<{ close(reason?: string): Promise<void> }> {
   const shutdownProcess = options.process ?? process;
   const logger = options.logger ?? console;
+  const deadlineMs = options.deadlineMs ?? SHUTDOWN_DEADLINE_MS;
+  const escalationGraceMs = options.escalationGraceMs ?? SHUTDOWN_ESCALATION_GRACE_MS;
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  let firstSignalAt: number | undefined;
+  let shutdownFailed = false;
   let admissionDrain: Promise<void> | undefined;
   let resourceDrain: Promise<void> | undefined;
   let apiClose: Promise<void> | undefined;
@@ -156,6 +201,7 @@ export function installGracefulShutdown(options: Readonly<{
 
   const reportFailure = (): void => {
     shutdownProcess.exitCode = 1;
+    shutdownFailed = true;
     if (failureReported) return;
     failureReported = true;
     try {
@@ -165,11 +211,71 @@ export function installGracefulShutdown(options: Readonly<{
     }
   };
 
+  const clearDeadline = (): void => {
+    if (deadlineTimer === undefined) return;
+    clearTimeout(deadlineTimer);
+    deadlineTimer = undefined;
+  };
+
   const removeSignalHandlers = (): void => {
+    clearDeadline();
     if (!signalHandlersInstalled) return;
     signalHandlersInstalled = false;
     shutdownProcess.off("SIGTERM", signalHandler);
     shutdownProcess.off("SIGINT", signalHandler);
+    shutdownProcess.off("SIGHUP", signalHandler);
+  };
+
+  // Best effort, synchronous starts only: the process is about to exit, so this
+  // is the last chance for a worker or a pool to release its handles.
+  const forceCloseResources = (): void => {
+    if (resourcesClosed) return;
+    try {
+      options.auditContextHasher.close();
+    } catch {
+      // A forced close never replaces the deadline report.
+    }
+    try {
+      void options.argon2Pool.close().catch(() => undefined);
+    } catch {
+      // As above.
+    }
+    for (const pool of options.databasePools) {
+      try {
+        void pool.end().catch(() => undefined);
+      } catch {
+        // As above.
+      }
+    }
+  };
+
+  const escalate = (code: string): void => {
+    if (terminationRequested) return;
+    terminationRequested = true;
+    clearDeadline();
+    shutdownProcess.exitCode = 1;
+    try {
+      logger.error(`[${SHUTDOWN_FAILURE_CODE}] code=${code}`);
+    } catch {
+      // Failure reporting must never replace the exit.
+    }
+    failureReported = true;
+    forceCloseResources();
+    try {
+      shutdownProcess.exit(1);
+    } catch {
+      // Real process.exit does not return; test shims may throw.
+    }
+  };
+
+  const armDeadline = (): void => {
+    if (deadlineTimer !== undefined || resourcesClosed || terminationRequested) return;
+    deadlineTimer = setTimeout(() => {
+      deadlineTimer = undefined;
+      if (resourcesClosed) return;
+      escalate(SHUTDOWN_DEADLINE_CODE);
+    }, deadlineMs);
+    deadlineTimer.unref?.();
   };
 
   const drainResources = (): Promise<void> => {
@@ -180,7 +286,8 @@ export function installGracefulShutdown(options: Readonly<{
       lifecycleRegistration,
       options.auditContextHasher,
       options.argon2Pool,
-      options.databasePools
+      options.databasePools,
+      options.kekHandles ?? []
     ).then(() => {
       resourcesClosed = true;
       removeSignalHandlers();
@@ -211,12 +318,23 @@ export function installGracefulShutdown(options: Readonly<{
   };
 
   const signalHandler = (_signal: ShutdownSignal): void => {
+    const now = Date.now();
+    if (firstSignalAt === undefined) {
+      firstSignalAt = now;
+    } else if (!resourcesClosed && !shutdownFailed && now - firstSignalAt >= escalationGraceMs) {
+      // A drain that already failed keeps its own retry contract: a repeated
+      // signal there must re-attempt the durable write, not discard it.
+      escalate(SHUTDOWN_ESCALATION_CODE);
+      return;
+    }
+    armDeadline();
     void closeApi().catch(() => {
       terminateAfterRepeatedSignalFailure();
     });
   };
 
   options.api.addHook("preClose", async () => {
+    armDeadline();
     await drainAdmissions().catch((error: unknown) => {
       throw genericShutdownFailure(error);
     });
@@ -236,6 +354,7 @@ export function installGracefulShutdown(options: Readonly<{
 
   shutdownProcess.on("SIGTERM", signalHandler);
   shutdownProcess.on("SIGINT", signalHandler);
+  shutdownProcess.on("SIGHUP", signalHandler);
 
   function closeApi(): Promise<void> {
     if (resourcesClosed) return Promise.resolve();
@@ -257,6 +376,7 @@ export function installGracefulShutdown(options: Readonly<{
 
   return Object.freeze({
     close(_reason = "api.close"): Promise<void> {
+      armDeadline();
       return closeApi();
     }
   });

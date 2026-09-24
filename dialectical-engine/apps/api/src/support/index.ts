@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SupportConfigurationPort, SupportConfigurationState } from "@debateai/register";
 import type { LoadedHelpCorpus } from "@debateai/support-kb";
-import { normalizeClientIp } from "../client-ip.js";
+import { clientIpNetworkScope,normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
 import { classifySupportMessage,supportIntentSurface } from "./classify.js";
@@ -30,8 +30,9 @@ export const SUPPORT_ROUTE_PATHS = Object.freeze([
   "POST /v1/support/messages/{id}/rating",
   "POST /v1/support/sessions/{id}/escalate",
   "GET /v1/support/cases",
-  "GET /v1/support/cases/{token}",
-  "POST /v1/support/cases/{token}/messages",
+  // DL1-F5c/DL3-F4: the case bearer rides `x-support-case-token`, never a path.
+  "GET /v1/support/case",
+  "POST /v1/support/case/messages",
   "GET /v1/support/status"
 ] as const);
 
@@ -53,9 +54,34 @@ export interface SupportApplication {
   readonly caseAccess?: SupportCaseAccessPort;
   readonly incidents?: Pick<SupportIncidentRepositoryPort,"readActiveIncidents">;
   readonly knowledge: SupportKnowledgeStatusPort;
+  /**
+   * DL5-F3. Turns one caller's network into the pseudonym the two append-only
+   * support tables store. Required, never optional: an absent seam here would
+   * mean writing a reversible digest of a visitor's address, which is exactly
+   * the finding. `apps/api/src/main.ts` passes the support key port's keyed
+   * derivation; a composition that has no key port cannot serve support at all.
+   */
+  readonly sourcePseudonym: (value: string) => string;
   readonly clock?: () => Date;
   readonly reportDiagnostic?: (diagnostic: SupportDiagnostic) => void;
 }
+
+/** The sealed budgets the support surface charges (DL1-F2, DL1-F7). */
+export type SupportAdmissionScope = "supportReads" | "supportSessions" | "supportModelCalls";
+
+/**
+ * DL1-F2. The API's own admission bridge. A deployment whose resolved register
+ * version publishes no budget for a scope always admits, so support behaves
+ * exactly as it does today until the superseding row is published.
+ */
+export type SupportAdmission = Readonly<{
+  /** Charges the budget and, when it is spent, sends the API's own typed 429. */
+  gate(
+    reply: FastifyReply, scope: SupportAdmissionScope, route: SupportRoutePath, key: string
+  ): boolean;
+  /** Charges the budget and only reports: the caller owns the refusal it sends. */
+  charge(scope: SupportAdmissionScope, route: SupportRoutePath, key: string): boolean;
+}>;
 
 export type SupportRoutePolicy = (route: SupportRoutePath) => Readonly<{
   config: Readonly<{
@@ -71,7 +97,21 @@ function languageFrom(value: unknown): SupportLanguage | null {
 
 function capabilityFrom(request: FastifyRequest): string | null {
   const raw = request.headers["x-support-session-token"];
-  return typeof raw === "string" ? hashSupportCapability(raw) : null;
+  return typeof raw === "string" ? hashSupportCapability("support-session",raw) : null;
+}
+
+/**
+ * DL1-F5c/DL3-F4. The case bearer, out of the URL. It used to be a path
+ * segment, `/v1/support/cases/<token>`, which puts the sole capability to read
+ * a whole support case — and to reply as the reporter — into every access log,
+ * proxy log and referrer a request passes. A header reaches none of those by
+ * default. A missing or malformed value is null and the route answers the same
+ * unknown-token 404 a wrong token gets, so nothing about the header's shape is
+ * an oracle.
+ */
+function caseCapabilityFrom(request: FastifyRequest): string | null {
+  const raw = request.headers["x-support-case-token"];
+  return typeof raw === "string" ? hashSupportCapability("support-case",raw) : null;
 }
 
 function publicSession(record: SupportSessionRecord): Readonly<Record<string, unknown>> {
@@ -93,6 +133,52 @@ function unavailable(reply: FastifyReply) {
   return reply.status(503).send({ error: "SUPPORT_NOT_COMPOSED" });
 }
 
+/**
+ * DL1-F1. Every support `{id}` and `body.session_id` lands in a `uuid` column,
+ * where a non-UUID raises Postgres `22P02`; the generic handler then turned a
+ * pure client fault into a 500 plus one `api.request.failed` line. The routes
+ * mirror the API's `ResourceIdSchema` here and answer the branch's constant
+ * typed 404 before the repository is ever asked.
+ */
+const SUPPORT_RESOURCE_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+function isResourceId(value: unknown): value is string {
+  return typeof value === "string" && SUPPORT_RESOURCE_ID.test(value);
+}
+
+function notFound(reply: FastifyReply) {
+  return reply.status(404).send({ error: "NOT_FOUND",message: "NOT_FOUND" });
+}
+
+/**
+ * DL1-F9. A message body may not exceed 16 KiB of UTF-8. The register's
+ * code-point limit stays authoritative for what a session may say; this
+ * ceiling only keeps the hash, the classifier and two round-trips away from a
+ * body that cannot be lawful at any setting.
+ */
+const SUPPORT_MESSAGE_BYTE_CEILING = 16 * 1_024;
+
+/**
+ * DL1-F2. How long one composed `/v1/support/status` answer serves every
+ * caller. One second, matching the support configuration port's own cache, so
+ * an operator watching the widget sees a change within the same beat while a
+ * flood costs one aggregate per second instead of one per request.
+ */
+const SUPPORT_STATUS_CACHE_MS = 1_000;
+
+/**
+ * DL3-F4. The link the API writes into its own acknowledgement sentence. The
+ * FRAGMENT form: a fragment is never sent to a server or a proxy, so the bearer
+ * cannot be logged upstream, and `apps/ui/components/support/caseLink.ts` takes
+ * it out of navigation state before the first request. It used to put the same
+ * token in the QUERY string instead, which sits in the address bar, in browser
+ * history and in every shared screenshot for the case's whole lifetime.
+ */
+function supportCaseLink(token: string): string {
+  return `/help#case=${token}`;
+}
+
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -101,6 +187,27 @@ function clientIp(request: FastifyRequest): string {
   return normalizeClientIp(request.ip)
     ?? normalizeClientIp(request.raw.socket.remoteAddress)
     ?? "unknown";
+}
+
+/**
+ * DL1-F2. The key every per-source support budget counts against: the caller's
+ * NETWORK, not its address. An IPv6 /64 is one ordinary allocation holding
+ * 2^64 addresses, so keying on the address gave its holder an unlimited number
+ * of budgets and let it fill the limiter's key table — after which the limiter
+ * refuses every genuinely new source for CAPACITY, which turns a fairness
+ * control into an outage for whoever arrives next.
+ */
+function sourceNetwork(request: FastifyRequest): string {
+  return clientIpNetworkScope(clientIp(request));
+}
+
+/**
+ * DL5-F3. The value the support tables record for a caller's network: keyed, so
+ * it cannot be inverted back to an address, and scoped to the same /64, so one
+ * allocation is one source rather than 2^64 of them.
+ */
+function sourceOf(application: SupportApplication,request: FastifyRequest): string {
+  return application.sourcePseudonym(sourceNetwork(request));
 }
 
 function rateLimited(reply: FastifyReply, language: SupportLanguage) {
@@ -143,6 +250,15 @@ async function openEscalatedCase(
   language: SupportLanguage,
   predicate: Parameters<NonNullable<SupportApplication["cases"]>["open"]>[0]["triggerPredicate"],
   createdAt: Date,
+  /**
+   * DL1-F7. Charges this source's share of the daily model budget and reports
+   * whether it had one. A THUNK, so it is spent only when a case really opens:
+   * this funnel returns early when the composition has no case port or the
+   * predicate is absent, and a budget must not be charged for a call nobody
+   * makes. A spent share NEVER refuses the case — escalation to a person is the
+   * safety valve — it only drops the model-backed advisory summary.
+   */
+  chargeModelShare: () => boolean,
   triggerGeneration = `predicate:${predicate ?? "E1"}`
 ): Promise<
   | Readonly<{ kind: "OPENED";record: Awaited<ReturnType<NonNullable<SupportApplication["cases"]>["open"]>>["record"];token: string }>
@@ -158,7 +274,8 @@ async function openEscalatedCase(
     triggerPredicate: predicate,
     toolCalls: Object.freeze([]),
     kbVersion: session.kbVersion,
-    slaHours: 48
+    slaHours: 48,
+    summarize: chargeModelShare()
   } as const;
   if (application.cases.openOnce !== undefined) {
     return application.cases.openOnce({ ...request,triggerGeneration });
@@ -171,7 +288,7 @@ function openedCaseReceipt(
   language: SupportLanguage
 ) {
   if (opened?.kind !== "OPENED") return Object.freeze({});
-  const link = `/help?case=${opened.token}`;
+  const link = supportCaseLink(opened.token);
   const acknowledgement = supportTemplate("CASE_OPENED",language)
     .replace("{token}",opened.token)
     .replace("{sla}",String(opened.record.slaHours))
@@ -185,12 +302,46 @@ function openedCaseReceipt(
 export function installSupportRoutes(
   api: FastifyInstance,
   application: SupportApplication | undefined,
-  policy: SupportRoutePolicy
+  policy: SupportRoutePolicy,
+  /**
+   * Required, never defaulted. A security control whose default is "allow" is
+   * one forgotten argument away from being absent, and nothing would fail to
+   * say so. A composition with no sealed budget passes a bridge that admits —
+   * which is a decision it states, not one it omits.
+   */
+  admit: SupportAdmission
 ): void {
   const admission = new SupportC3AdmissionWindow();
+  /**
+   * DL1-F2. `/v1/support/status` composed a multi-CTE aggregate over
+   * `support.message`/`session`/`rating`/`case`, a configuration read and a
+   * knowledge read on EVERY anonymous call. The body is four fixed fields
+   * (DL1-F4) that no caller can influence, so one answer serves every caller
+   * for a second — the same freshness the configuration port already caches at.
+   */
+  let statusCache: Readonly<{ at: number;body: Readonly<Record<string,unknown>> }> | null = null;
+  /**
+   * DL1-F7. One unit of this source's share of the daily model cap. Every model
+   * call the support surface makes goes through here: the relay answer below,
+   * and — through `openEscalatedCase` — the model-backed advisory summary a
+   * newly opened case fires. Without the second door four or five addresses
+   * could still take the whole 500/day, which is the finding's own scenario.
+   */
+  const modelShare = (route: SupportRoutePath,sourceKey: string): boolean =>
+    admit.charge("supportModelCalls",route,sourceKey);
 
   api.post("/v1/support/sessions", policy("POST /v1/support/sessions"), async (request, reply) => {
     if (application === undefined) return unavailable(reply);
+    /**
+     * DL1-F2. An authenticated create skipped `admitIpSession` and had no cap of
+     * its own, so one account could loop a KEK wrap plus two inserts without
+     * bound. Charged before the language check so nothing is done on the way.
+     */
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (ownerRef !== undefined
+      && !admit.gate(reply, "supportSessions", "POST /v1/support/sessions", ownerRef)) {
+      return reply;
+    }
     const body = typeof request.body === "object" && request.body !== null
       ? request.body as Readonly<Record<string, unknown>> : {};
     const language = languageFrom(body.language ?? "en");
@@ -208,7 +359,7 @@ export function installSupportRoutes(
     const timeDecision = admission.observeTime(now.getTime());
     if (!timeDecision.admitted) return rateLimited(reply, language);
     if (request.authenticatedSession === undefined) {
-      const ipSha256 = sha256(clientIp(request));
+      const ipSha256 = sourceOf(application,request);
       if (application.sessions.admitIpSession !== undefined
         && await application.sessions.admitIpSession({
           ipSha256,at: now,
@@ -246,8 +397,12 @@ export function installSupportRoutes(
     policy("GET /v1/support/sessions/{id}"),
     async (request, reply) => {
       if (application === undefined) return unavailable(reply);
+      if (!admit.gate(reply, "supportReads", "GET /v1/support/sessions/{id}", sourceNetwork(request))) {
+        return reply;
+      }
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
+      if (!isResourceId(request.params.id)) return notFound(reply);
       const state = await application.configuration.current();
       if (state.kind === "DISABLED") return reply.status(503).send({ error: state.code });
       const found = await application.sessions.read({
@@ -272,6 +427,23 @@ export function installSupportRoutes(
       if (application === undefined) return unavailable(reply);
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
+      if (!isResourceId(request.params.id)) return notFound(reply);
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Readonly<Record<string, unknown>> : {};
+      /**
+       * DL1-F9. The register's 2,000-code-point rule sits behind a session read,
+       * a configuration read, a sha256 and the classifier's code-point spread —
+       * all of which used to run over a body of up to the 256 KiB transport
+       * ceiling. The cheap byte refusal comes first; everything below keeps its
+       * order, including the code-point rule that carries the RATE_LIMITED
+       * evidence.
+       */
+      if (typeof body.text === "string"
+        && Buffer.byteLength(body.text,"utf8") > SUPPORT_MESSAGE_BYTE_CEILING) {
+        return reply.status(400).send({
+          error: "MALFORMED_REQUEST",message: "MALFORMED_REQUEST"
+        });
+      }
       const found = await application.sessions.read({ sessionId: request.params.id, tokenSha256 });
       if (found === null || !sessionOwnerMatches(request,found)) {
         return reply.status(404).send({ error: "NOT_FOUND" });
@@ -295,15 +467,13 @@ export function installSupportRoutes(
           text: supportTemplate("DISABLED", found.language)
         });
       }
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Readonly<Record<string, unknown>> : {};
       if (Object.keys(body).length !== 1 || typeof body.text !== "string") {
         return reply.status(400).send({ error: "SUPPORT_MESSAGE_INVALID" });
       }
       const now = (application.clock ?? (() => new Date()))();
       const timeDecision = admission.observeTime(now.getTime());
       if (!timeDecision.admitted) return rateLimited(reply,found.language);
-      const ipSha256 = sha256(clientIp(request));
+      const ipSha256 = sourceOf(application,request);
       const messageSha256 = sha256(body.text);
       const classification = classifySupportMessage(body.text);
       const publicGuideBoundary = classifyPublicGuideBoundary(body.text,found.language);
@@ -432,7 +602,8 @@ export function installSupportRoutes(
         });
         const opened = escalationBeforeResponse === null ? null
           : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now
+            application,found,responseLanguage,escalationBeforeResponse.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         return reply.send({
           message_id: messageId,...incident,...openedCaseReceipt(opened,responseLanguage)
@@ -458,7 +629,8 @@ export function installSupportRoutes(
         });
         const opened = escalationBeforeResponse === null ? null
           : await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeResponse.predicate,now
+            application,found,responseLanguage,escalationBeforeResponse.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         return reply.send({
           outcome: classification.outcome,text,
@@ -480,6 +652,7 @@ export function installSupportRoutes(
         });
         const opened = await openEscalatedCase(
           application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
+          () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256),
           `message:${userMessageId}`
         );
         if (opened === null) return unavailable(reply);
@@ -488,7 +661,7 @@ export function installSupportRoutes(
             outcome: "CASE_ALREADY_OPENED",case_id: opened.record.caseId
           });
         }
-        const link = `/help?case=${opened.token}`;
+        const link = supportCaseLink(opened.token);
         const text = supportTemplate("CASE_OPENED",responseLanguage)
           .replace("{token}",opened.token)
           .replace("{sla}",String(opened.record.slaHours))
@@ -536,7 +709,8 @@ export function installSupportRoutes(
         });
         if (escalationBeforeAnswer !== null) {
           await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeAnswer.predicate,now
+            application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         }
         return reply.send({
@@ -576,7 +750,8 @@ export function installSupportRoutes(
         });
         if (escalationBeforeAnswer !== null) {
           await openEscalatedCase(
-            application,found,responseLanguage,escalationBeforeAnswer.predicate,now
+            application,found,responseLanguage,escalationBeforeAnswer.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         }
         return reply.send({
@@ -585,6 +760,22 @@ export function installSupportRoutes(
         });
       }
       if (application.answer !== undefined) {
+        /**
+         * DL1-F7. The model budget is one global daily bucket, so a few sources
+         * could take a whole day's calls and leave everyone else DEGRADED. The
+         * per-source share is charged HERE — after the classifier has decided
+         * this message really does need the model, so a refusal, an incident, a
+         * private-record or credential-recovery guide costs a source nothing — and
+         * the refusal is the ordinary rate-limit refusal with its evidence, so a
+         * spent share looks to that source like every other window it can hit,
+         * and to every other source like nothing at all.
+         */
+        if (!modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)) {
+          await recordRateLimitEvidence(application,{
+            sessionId: found.sessionId,messageSha256,ipSha256,at: now
+          });
+          return rateLimited(reply,responseLanguage);
+        }
         const result = await application.answer.respond({
           sessionId: found.sessionId,
           text: body.text,
@@ -608,7 +799,8 @@ export function installSupportRoutes(
         });
         const opened = escalationAfterAnswer === null ? null
           : await openEscalatedCase(
-            application,found,responseLanguage,escalationAfterAnswer.predicate,now
+            application,found,responseLanguage,escalationAfterAnswer.predicate,now,
+            () => modelShare("POST /v1/support/sessions/{id}/messages",ipSha256)
           );
         return reply.send({
           message_id: result.messageId,
@@ -643,6 +835,9 @@ export function installSupportRoutes(
         || (body.rating !== "yes" && body.rating !== "no" && body.rating !== "human")) {
         return reply.status(404).send({ error: "NOT_FOUND" });
       }
+      if (!isResourceId(request.params.id) || !isResourceId(body.session_id)) {
+        return notFound(reply);
+      }
       const found = await application.sessions.read({
         sessionId: body.session_id,tokenSha256
       });
@@ -665,7 +860,8 @@ export function installSupportRoutes(
       const opened = escalation === null ? null
         : await openEscalatedCase(
           application,found,found.language,escalation.predicate,
-          (application.clock ?? (() => new Date()))()
+          (application.clock ?? (() => new Date()))(),
+          () => modelShare("POST /v1/support/messages/{id}/rating",sourceOf(application,request))
         );
       return reply.send({
         rating: body.rating,case_opened: opened?.kind === "OPENED",
@@ -680,6 +876,7 @@ export function installSupportRoutes(
       if (application?.cases === undefined) return unavailable(reply);
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
+      if (!isResourceId(request.params.id)) return notFound(reply);
       const found = await application.sessions.read({ sessionId: request.params.id,tokenSha256 });
       if (found === null || !sessionOwnerMatches(request,found)) {
         return reply.status(404).send({ error: "NOT_FOUND" });
@@ -694,7 +891,9 @@ export function installSupportRoutes(
       if (language === null) return reply.status(400).send({ error: "SUPPORT_LANGUAGE_INVALID" });
       const opened = await openEscalatedCase(
         application,found,language,"E1",
-        (application.clock ?? (() => new Date()))(),"manual"
+        (application.clock ?? (() => new Date()))(),
+        () => modelShare("POST /v1/support/sessions/{id}/escalate",sourceOf(application,request)),
+        "manual"
       );
       if (opened === null) return unavailable(reply);
       if (opened.kind === "ALREADY_OPENED") {
@@ -702,7 +901,7 @@ export function installSupportRoutes(
           outcome: "CASE_ALREADY_OPENED",case_id: opened.record.caseId
         });
       }
-      const link = `/help?case=${opened.token}`;
+      const link = supportCaseLink(opened.token);
       const text = supportTemplate("CASE_OPENED",language)
         .replace("{token}",opened.token)
         .replace("{sla}",String(opened.record.slaHours ?? 48))
@@ -738,16 +937,19 @@ export function installSupportRoutes(
       })) });
     }
   );
-  api.get<{ Params: { token: string };Querystring: { limit?: string;cursor?: string } }>(
-    "/v1/support/cases/:token",
-    policy("GET /v1/support/cases/{token}"),
+  api.get<{ Querystring: { limit?: string;cursor?: string } }>(
+    "/v1/support/case",
+    policy("GET /v1/support/case"),
     async (request, reply) => {
       if (application?.caseAccess === undefined) return unavailable(reply);
+      if (!admit.gate(reply, "supportReads", "GET /v1/support/case", sourceNetwork(request))) {
+        return reply;
+      }
       const configuration = await application.configuration.current();
       if (configuration.kind !== "AVAILABLE") {
         return reply.status(503).send({ error: configuration.code });
       }
-      const tokenSha256 = hashSupportCapability(request.params.token);
+      const tokenSha256 = caseCapabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
       const rawLimit = request.query.limit;
       const limit = rawLimit === undefined
@@ -758,8 +960,17 @@ export function installSupportRoutes(
       }
       let found;
       try {
+        /**
+         * DL1-F5. The token alone no longer decides: the case service also sees
+         * when it was presented (the thirty-day ceiling) and who presented it
+         * (the owner binding the row already carries). A refusal is the same
+         * typed 404 an unknown token gets — a 403 here would confirm the case.
+         */
         found = await application.caseAccess.readByToken(tokenSha256,{
-          limit,...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor })
+          limit,
+          at: (application.clock ?? (() => new Date()))(),
+          callerOwnerRef: request.authenticatedSession?.ownerRef ?? null,
+          ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor })
         });
       } catch (error) {
         if (error instanceof SupportCaseError && error.code === "SUPPORT_CASE_CURSOR_INVALID") {
@@ -792,16 +1003,28 @@ export function installSupportRoutes(
       });
     }
   );
-  api.post<{ Params: { token: string } }>(
-    "/v1/support/cases/:token/messages",
-    policy("POST /v1/support/cases/{token}/messages"),
+  api.post(
+    "/v1/support/case/messages",
+    policy("POST /v1/support/case/messages"),
     async (request,reply) => {
       if (application?.caseAccess === undefined) return unavailable(reply);
+      /**
+       * DL1-F2, final review. The same per-source budget its GET twin charges
+       * (`:GET /v1/support/case`): one case bearer, one capability, one budget.
+       * This door had none, so a wrong-token flood simply moved to it — a
+       * configuration read plus an indexed unique lookup per request, with the
+       * whole reply path behind it. Charged first, so a refusal costs neither.
+       */
+      if (!admit.gate(
+        reply, "supportReads", "POST /v1/support/case/messages", sourceNetwork(request)
+      )) {
+        return reply;
+      }
       const configuration = await application.configuration.current();
       if (configuration.kind !== "AVAILABLE") {
         return reply.status(503).send({ error: configuration.code });
       }
-      const tokenSha256 = hashSupportCapability(request.params.token);
+      const tokenSha256 = caseCapabilityFrom(request);
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Readonly<Record<string,unknown>> : {};
       if (tokenSha256 === null || typeof body.text !== "string" || body.text.trim() === "") {
@@ -811,6 +1034,7 @@ export function installSupportRoutes(
       try {
         state = await application.caseAccess.replyByToken({
           tokenSha256,text: body.text,at: (application.clock ?? (() => new Date()))(),
+          callerOwnerRef: request.authenticatedSession?.ownerRef ?? null,
           messageByteLimit: configuration.snapshot.values.supportLimitMessageCharacters,
           caseMessageLimit: configuration.snapshot.values.supportLimitSessionMessages
         });
@@ -832,33 +1056,37 @@ export function installSupportRoutes(
     }
   );
 
-  api.get("/v1/support/status", policy("GET /v1/support/status"), async (_request, reply) => {
+  /**
+   * DL1-F4. This route is anonymous by design, for the help widget. It used to
+   * echo `configuration` verbatim — the internal model ref, every limiter
+   * threshold, the snapshot sha and the register version — beside daily spend,
+   * token totals, open sessions, new cases and the deflection ratios, handing
+   * an unauthenticated caller the exact tuning of the subsystem's own controls.
+   * The body is now the four fields the widget reads
+   * (`apps/ui/components/support/Assistant.tsx`); the operator view stays whole
+   * in `apps/runner/src/support-status-cli.ts`, which reads the database
+   * directly and needs no HTTP route.
+   */
+  api.get("/v1/support/status", policy("GET /v1/support/status"), async (request, reply) => {
     if (application === undefined) return unavailable(reply);
+    if (!admit.gate(reply, "supportReads", "GET /v1/support/status", sourceNetwork(request))) return reply;
+    const now = (application.clock ?? (() => new Date()))().getTime();
+    if (statusCache !== null && now - statusCache.at < SUPPORT_STATUS_CACHE_MS
+      && now >= statusCache.at) {
+      return reply.send(statusCache.body);
+    }
     const [configuration, support, knowledge] = await Promise.all([
       application.configuration.current(),
       application.sessions.status(),
       application.knowledge.status()
     ]);
-    return reply.send({
-      configuration,
-      calls_today: support.callsToday,
-      calls_last_7_days: support.callsLast7Days ?? support.callsToday,
-      input_tokens_today: support.inputTokensToday ?? null,
-      output_tokens_today: support.outputTokensToday ?? null,
-      cost_usd_today: support.costUsdToday ?? null,
-      input_tokens_last_7_days: support.inputTokensLast7Days ?? null,
-      output_tokens_last_7_days: support.outputTokensLast7Days ?? null,
-      cost_usd_last_7_days: support.costUsdLast7Days ?? null,
-      open_sessions: support.openSessions,
-      new_cases: support.newCases,
-      kb_version: knowledge.kbVersion,
-      kb_loaded: { shipped: knowledge.shipped, ignored: knowledge.ignored },
+    const body = Object.freeze({
+      configuration: { kind: configuration.kind },
       relay_state: support.relayState ?? "AVAILABLE",
-      relay_unavailable_since: support.relayUnavailableSince?.toISOString() ?? null,
-      deflection_7_days: support.deflection7Days,
-      deflection_30_days: support.deflection30Days,
-      rating_resolution_7_days: support.ratingResolution7Days,
-      rating_resolution_30_days: support.ratingResolution30Days
+      kb_version: knowledge.kbVersion,
+      kb_loaded: { shipped: knowledge.shipped }
     });
+    statusCache = Object.freeze({ at: now, body });
+    return reply.send(body);
   });
 }

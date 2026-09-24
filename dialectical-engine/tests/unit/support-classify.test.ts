@@ -1392,7 +1392,7 @@ describe("SUP-01 bounded C3 admission state", () => {
     }).admitted).toBe(false);
   });
 
-  it("accepts same-time observations but permanently poisons admission after time regresses", () => {
+  it("accepts same-time observations and refuses only the observation that regresses", () => {
     const admission = new SupportC3AdmissionWindow();
     expect(admission.admitAnonymousSession({ ipSha256: "one", atMs: now, limit: 2 }).admitted)
       .toBe(true);
@@ -1400,22 +1400,113 @@ describe("SUP-01 bounded C3 admission state", () => {
       .toBe(true);
     expect(admission.admitAnonymousSession({ ipSha256: "three", atMs: now - 1, limit: 2 }).admitted)
       .toBe(false);
+    // DL1-F3: the latch is gone, so the next forward observation is admitted.
     expect(admission.admitAnonymousSession({ ipSha256: "four", atMs: now + 1, limit: 2 }).admitted)
-      .toBe(false);
+      .toBe(true);
   });
 
-  it("does not revive a one-hour IP quota after forward expiry and rewind", () => {
+  /**
+   * DL1-F3. `#observe` set `#clockPoisoned` for the life of the process on one
+   * backward `new Date()` reading, and `observeTime` is the only admission
+   * method the support routes call, so a single NTP step, live migration or
+   * manual clock set answered every support route 429 until restart — with no
+   * log to say why. A regression now refuses exactly that call, says so once,
+   * and leaves the instance able to admit the next forward observation.
+   */
+  it("refuses only the regressing observation, records the skew once, and recovers", () => {
     const admission = new SupportC3AdmissionWindow();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const decisions = [
+      admission.observeTime(now),
+      admission.observeTime(now - 5_000),
+      admission.observeTime(now + 1),
+      admission.observeTime(now - 250),
+      admission.observeTime(now + 2)
+    ];
+    const lines = errors.mock.calls.map((call): string => String(call[0]));
+    errors.mockRestore();
+
+    expect(decisions).toEqual([
+      { admitted: true, reason: null },
+      { admitted: false, reason: "INVALID_TIME" },
+      { admitted: true, reason: null },
+      { admitted: false, reason: "INVALID_TIME" },
+      { admitted: true, reason: null }
+    ]);
+    expect(lines).toEqual([
+      JSON.stringify({ event: "support.admission.clock_regression", skew_ms: 5_000 }),
+      JSON.stringify({ event: "support.admission.clock_regression", skew_ms: 251 })
+    ]);
+  });
+
+  it("keeps the per-source window intact across a clock regression", () => {
+    const admission = new SupportC3AdmissionWindow();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(admission.admitAnonymousSession({ ipSha256: "ip", atMs: now, limit: 1 }).admitted)
+      .toBe(true);
+    // The refused rewind records nothing, so the one-per-hour quota still holds.
+    expect(admission.admitAnonymousSession({ ipSha256: "ip", atMs: now - 1, limit: 1 }))
+      .toEqual({ admitted: false, reason: "INVALID_TIME" });
+    expect(admission.admitAnonymousSession({ ipSha256: "ip", atMs: now + 1, limit: 1 }))
+      .toEqual({ admitted: false, reason: "IP_SESSIONS_1H" });
+    expect(admission.admitAnonymousSession({
+      ipSha256: "ip", atMs: now + 60 * 60 * 1_000 + 1, limit: 1
+    }).admitted).toBe(true);
+    errors.mockRestore();
+  });
+
+  it.each([
+    ["NaN", Number.NaN],
+    ["unsafe", Number.MAX_SAFE_INTEGER + 1]
+  ])("still latches closed on an invalid %s observation", (_name, atMs) => {
+    const admission = new SupportC3AdmissionWindow();
+    expect(admission.observeTime(atMs)).toEqual({ admitted: false, reason: "INVALID_TIME" });
+    expect(admission.observeTime(now)).toEqual({ admitted: false, reason: "INVALID_TIME" });
+  });
+
+  it("refuses a future-dated session row without latching the instance", () => {
+    const admission = new SupportC3AdmissionWindow();
+    expect(admission.admitSessionMessage({
+      ownerRef: "owner",
+      sessionId: "session",
+      sessionCreatedAtMs: now + 1,
+      characterCount: 1,
+      atMs: now,
+      limits
+    })).toEqual({ admitted: false, reason: "INVALID_TIME" });
+    expect(admission.admitSessionMessage({
+      ownerRef: "owner",
+      sessionId: "session",
+      sessionCreatedAtMs: now,
+      characterCount: 1,
+      atMs: now,
+      limits
+    }).admitted).toBe(true);
+  });
+
+  /**
+   * DL1-F3 moved the last two expectations: a refused rewind no longer latches
+   * the instance, so what must be proved is that the rewind recorded nothing
+   * and reset nothing — the quota still refuses inside the hour and only the
+   * genuine expiry admits.
+   */
+  it("does not revive a one-hour IP quota after a refused rewind", () => {
+    const admission = new SupportC3AdmissionWindow();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(admission.admitAnonymousSession({ ipSha256: "ip", atMs: now, limit: 1 }).admitted)
       .toBe(true);
     expect(admission.admitAnonymousSession({
       ipSha256: "ip", atMs: now + 60 * 60 * 1_000 + 1, limit: 1
     }).admitted).toBe(true);
-    expect(admission.admitAnonymousSession({ ipSha256: "ip", atMs: now, limit: 1 }).admitted)
-      .toBe(false);
+    expect(admission.admitAnonymousSession({ ipSha256: "ip", atMs: now, limit: 1 }))
+      .toEqual({ admitted: false, reason: "INVALID_TIME" });
+    expect(admission.admitAnonymousSession({
+      ipSha256: "ip", atMs: now + 60 * 60 * 1_000 + 2, limit: 1
+    })).toEqual({ admitted: false, reason: "IP_SESSIONS_1H" });
     expect(admission.admitAnonymousSession({
       ipSha256: "ip", atMs: now + 2 * 60 * 60 * 1_000 + 2, limit: 1
-    }).admitted).toBe(false);
+    }).admitted).toBe(true);
+    errors.mockRestore();
   });
 
   it.each([
@@ -1423,10 +1514,11 @@ describe("SUP-01 bounded C3 admission state", () => {
     ["twenty-four-hour", 24 * 60 * 60 * 1_000, {
       ...limits, supportLimitAnonMessages24h: 1
     }]
-  ])("does not revive the %s message-IP quota after forward expiry and rewind", (
+  ])("does not revive the %s message-IP quota after a refused rewind", (
     _name, horizonMs, horizonLimits
   ) => {
     const admission = new SupportC3AdmissionWindow();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(admission.admitAnonymousMessage({
       ipSha256: "ip",
       sessionId: "first-session",
@@ -1450,6 +1542,15 @@ describe("SUP-01 bounded C3 admission state", () => {
       characterCount: 1,
       atMs: now,
       limits: horizonLimits
+    })).toEqual({ admitted: false, reason: "INVALID_TIME" });
+    // DL1-F3: the rewind recorded nothing, so the horizon quota still refuses.
+    expect(admission.admitAnonymousMessage({
+      ipSha256: "ip",
+      sessionId: "inside-horizon-session",
+      sessionCreatedAtMs: now + horizonMs + 2,
+      characterCount: 1,
+      atMs: now + horizonMs + 2,
+      limits: horizonLimits
     }).admitted).toBe(false);
     expect(admission.admitAnonymousMessage({
       ipSha256: "ip",
@@ -1458,11 +1559,13 @@ describe("SUP-01 bounded C3 admission state", () => {
       characterCount: 1,
       atMs: now + 2 * horizonMs + 2,
       limits: horizonLimits
-    }).admitted).toBe(false);
+    }).admitted).toBe(true);
+    errors.mockRestore();
   });
 
-  it("does not revive an expired session counter after forward expiry and rewind", () => {
+  it("does not revive an expired session counter after a refused rewind", () => {
     const admission = new SupportC3AdmissionWindow();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(admission.admitSessionMessage({
       ownerRef: "owner",
       sessionId: "session",
@@ -1486,7 +1589,9 @@ describe("SUP-01 bounded C3 admission state", () => {
       characterCount: 1,
       atMs: now,
       limits: { ...limits, supportLimitSessionMessages: 1 }
-    }).admitted).toBe(false);
+    })).toEqual({ admitted: false, reason: "INVALID_TIME" });
+    // DL1-F3: the closed session stays closed on its own window, not on a latch,
+    // and a session opened at the current time is admitted again.
     expect(admission.admitSessionMessage({
       ownerRef: "owner",
       sessionId: "session",
@@ -1494,7 +1599,7 @@ describe("SUP-01 bounded C3 admission state", () => {
       characterCount: 1,
       atMs: now + 2 * 24 * 60 * 60 * 1_000,
       limits: { ...limits, supportLimitSessionMessages: 1 }
-    }).admitted).toBe(false);
+    })).toEqual({ admitted: false, reason: "SESSION_CLOSED" });
     expect(admission.admitSessionMessage({
       ownerRef: "owner",
       sessionId: "later-session",
@@ -1502,6 +1607,7 @@ describe("SUP-01 bounded C3 admission state", () => {
       characterCount: 1,
       atMs: now + 2 * 24 * 60 * 60 * 1_000,
       limits: { ...limits, supportLimitSessionMessages: 1 }
-    }).admitted).toBe(false);
+    }).admitted).toBe(true);
+    errors.mockRestore();
   });
 });

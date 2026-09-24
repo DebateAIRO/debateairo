@@ -4,7 +4,7 @@
   "notify": {
     "sendmail_path": "deploy/dev-auth/sendmail-capture.mjs",
     "dev_capture_dir": "dev-mail-capture",
-    "from": "observation-agent@localhost",
-    "to": "ops@localhost"
+    "from": "observation-agent@localhost.test",
+    "to": "ops@localhost.test"
   }
 }

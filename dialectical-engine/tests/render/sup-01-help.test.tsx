@@ -303,12 +303,35 @@ describe("SUP-01 /help assistant", () => {
     }
     await submit("ordinary safety request");
     expect(document.body.textContent).toContain(acknowledgement);
-    expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
+    // DL1-F5c: the anchor is built from the bearer this page holds in memory
+    // (`supportCaseLink(bearer.token)`), never from the `link` the body carried
+    // and never from anything persisted — so whatever form the body used, what
+    // the browser can navigate to is the fragment, which reaches no server, no
+    // proxy log and no address bar as a query.
+    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
+    expect(document.querySelector(`a[href="${link}"]`)).toBeNull();
+  });
+
+  it("normalises a case link carried by an ordinary reply to the fragment form", async () => {
+    // DL3-F4: `safeFirstPartyLink`'s case branch, which the acknowledgement no
+    // longer exercises. A reply can still carry a `link` that is a case bearer
+    // — a saved `?case=` address echoed back, a refusal link — with none of the
+    // acknowledgement fields to validate it. It becomes `/help#case=…` or it
+    // becomes nothing; the query form never becomes an href.
+    const token = "F".repeat(43);
+    await render(<Assistant client={client({
+      messageId: "m-case-link",outcome: "ANSWER_GROUNDED",text: "Your case is here.",
+      link: `/help?case=${token}`
+    })} />);
+    await submit("where do I read my case?");
+
+    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
+    expect(document.querySelector(`a[href="/help?case=${token}"]`)).toBeNull();
   });
 
   it("retains automated token/SLA/link fields from the browser client contract", async () => {
     const token = "B".repeat(43);
-    const link = `/help?case=${token}`;
+    const link = `/help#case=${token}`;
     const acknowledgement = `I've opened case ${token} for a person. Expected reply: within 48 hours. Check replies at ${link}. I can't promise an outcome.`;
     vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
       message_id: "m-client",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
@@ -317,8 +340,97 @@ describe("SUP-01 /help assistant", () => {
     await expect(supportAssistantClient.sendMessage(
       SESSION,"ordinary safety request"
     )).resolves.toMatchObject({
+      // DL1-F5c: the API mints the fragment form, and that is what is carried.
       caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link }
     });
+  });
+
+  it("refuses an acknowledgement whose link is the retired query form", async () => {
+    // DL1-F5c: the API can no longer mint `?case=`, so a body carrying it is
+    // not this server's — the widget drops the acknowledgement rather than
+    // rendering a bearer link it cannot account for.
+    const token = "C".repeat(43);
+    const link = `/help?case=${token}`;
+    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      message_id: "m-legacy",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
+      case_token: token,sla_hours: 48,link,
+      case_acknowledgement: `Check replies at ${link}.`
+    }),{ status: 200,headers: { "content-type": "application/json" } })));
+    const reply = await supportAssistantClient.sendMessage(
+      SESSION,"ordinary safety request","en"
+    );
+    expect(reply.caseAcknowledgement).toBeUndefined();
+  });
+
+  /**
+   * DL1-F5c, final review (area D, Important 1). The session capability was
+   * kept out of `sessionStorage` and the CASE bearer walked back in through the
+   * acknowledgement message: its id, its sentence and its link all carried the
+   * 30-day, cookie-free token, and the whole transcript is written to the store
+   * on every change. On a shared or kiosk browser the next person to open Help
+   * in that tab inherited it — the whole case, and the right to reply as the
+   * reporter, for thirty days. The code is rendered from memory; what rests in
+   * the browser says only that a case was opened.
+   */
+  it("keeps the case bearer out of sessionStorage while rendering it on the page", async () => {
+    const token = "D".repeat(43);
+    const link = `/help#case=${token}`;
+    const acknowledgement = `I've opened case ${token} for a person. Expected reply: within 48 hours. Check replies at ${link}. I can't promise an outcome.`;
+    vi.stubGlobal("fetch",vi.fn(async (url: string) => {
+      if (url === "/api/v1/session") return new Response("{}",{ status: 401 });
+      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
+        session: { session_id: "anonymous-session",identity_bound: false },
+        session_token: "s".repeat(43)
+      }),{ status: 201,headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({
+        message_id: "m-escalated",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
+        case_token: token,sla_hours: 48,link,case_acknowledgement: acknowledgement
+      }),{ status: 200,headers: { "content-type": "application/json" } });
+    }));
+
+    await render(<Assistant client={supportAssistantClient} />);
+    await submit("something a person must read");
+
+    // On the page: the code and the fragment link, from the in-memory bearer.
+    expect(document.body.textContent).toContain(acknowledgement);
+    expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
+
+    // At rest: the fact, and nothing that opens the case.
+    const stored = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY) ?? "";
+    expect(stored).not.toBe("");
+    expect(stored).not.toContain(token);
+    expect(stored).not.toMatch(/[A-Za-z0-9_-]{43}/u);
+    expect(stored).toContain("A case is open for a person to read.");
+  });
+
+  it("erases a pre-fix transcript, bearer and all, the first time the widget mounts", async () => {
+    // Fix round 1. A tab open across the deploy keeps its `sessionStorage`. The
+    // retired key held the acknowledgement the old build wrote — the token in
+    // the id, in the sentence and in the link — and nothing read it any more,
+    // which is not the same as nothing holding it.
+    const token = "G".repeat(43);
+    sessionStorage.setItem("debateai.support.conversation.v1",JSON.stringify({
+      language: "en",identityBound: false,ownContext: { latest: true },
+      messages: [
+        { id: "disclosure",role: "assistant",text: "Prior disclosure." },
+        {
+          id: `case-${token}`,role: "assistant",
+          text: `I've opened case ${token} for a person. Check replies at /help#case=${token}.`,
+          link: `/help#case=${token}`
+        }
+      ]
+    }));
+    vi.stubGlobal("fetch",vi.fn(async (url: string) => url === "/api/v1/session"
+      ? new Response("{}",{ status: 401 })
+      : new Response(JSON.stringify({ error: "NOT_FOUND" }),{ status: 404 })));
+
+    await render(<Assistant client={supportAssistantClient} />);
+
+    expect(sessionStorage.getItem("debateai.support.conversation.v1")).toBeNull();
+    const everything = Object.entries(sessionStorage).map(([key,value]) => `${key}=${String(value)}`).join("\n");
+    expect(everything).not.toContain(token);
+    expect(everything).not.toMatch(/[A-Za-z0-9_-]{43}/u);
+    expect(document.body.textContent).not.toContain("Prior disclosure.");
   });
 
   it("returns a structured RATE_LIMITED outcome from a real 429 response", async () => {
@@ -405,7 +517,9 @@ describe("SUP-01 /help assistant", () => {
       .find((button) => button.textContent === "No") as HTMLButtonElement).click());
     await settle();
     expect(document.body.textContent).toContain(text);
-    expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
+    // DL3-F4: rendered as the fragment form, never as a query bearer.
+    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
+    expect(document.querySelector(`a[href="${link}"]`)).toBeNull();
   });
 
   it("renders SHREDDED returned by rating and escalation mutations", async () => {
@@ -611,43 +725,71 @@ describe("SUP-01 /help assistant", () => {
       .rejects.toThrow("SUPPORT_RESPONSE_INVALID");
   });
 
+  /**
+   * SYNC3 (DL3-F3 kept, dev's reviewed decorations adopted). dev seeded this
+   * row with a stored `session`; our reader erases ANY payload carrying one, so
+   * the row passed without ever reaching the action check — the wrong reason.
+   * It is re-seeded in the stored shape this build writes (no session, bound to
+   * an identity), and the control row proves the same payload with the
+   * canonical action IS restored: only the forged decoration refuses it.
+   */
   it("rejects forged decorations restored from session storage", async () => {
-    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language: "en",session: SESSION,
-      messages: [
-        { id: "disclosure",role: "assistant",text: "Prior disclosure." },
-        { id: "forged",role: "assistant",text: "Stored forged message",outcome: "ANSWER_GROUNDED",
-          sources: [],actions: [{ id: "home",label: "Reset account",href: "/settings" }] }
-      ]
-    }));
+    const seed = (action: Readonly<{ id: string;label: string;href: string }>) =>
+      sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
+        language: "en",identityBound: false,
+        messages: [
+          { id: "disclosure",role: "assistant",text: "Prior disclosure." },
+          { id: "stored",role: "assistant",text: "Stored decorated message",outcome: "ANSWER_GROUNDED",
+            language: "en",sources: [],actions: [action] }
+        ]
+      }));
     vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response("{}",{ status: 401 })));
 
+    seed({ id: "home",label: "Reset account",href: "/settings" });
     await render(<Assistant client={supportAssistantClient} signedIn={false} />);
-
-    expect(document.body.textContent).not.toContain("Stored forged message");
+    expect(document.body.textContent).not.toContain("Stored decorated message");
     expect(document.body.textContent).toContain("I'm the Dialectical Engine support assistant, an AI");
+    expect(sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY) ?? "").not.toContain("Reset account");
+
+    await act(async () => root!.unmount());
+    root = createRoot(document.body.appendChild(document.createElement("div")));
+    seed({ id: "home",label: "Home",href: "/" });
+    await render(<Assistant client={supportAssistantClient} signedIn={false} />);
+    expect(document.body.textContent).toContain("Stored decorated message");
+    expect(document.querySelector<HTMLAnchorElement>('[aria-label="Actions"] a')?.getAttribute("href"))
+      .toBe("/");
   });
 
+  /**
+   * SYNC3: dev's snapshot restart, against the IN-MEMORY session. dev seeded
+   * session A in sessionStorage and expected the restart to store session B —
+   * both of which DL3-F3 removed on purpose (the capability never rests in the
+   * browser). Session A is now minted by the first turn, the restart mints B,
+   * and neither ever reaches storage; everything dev asserted about the turn
+   * itself — one user message, the same redacted text twice, A's token then
+   * B's — is asserted unchanged.
+   */
   it("clears stale A and retries the same redacted turn once through fresh B", async () => {
-    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language: "en",
-      session: { sessionId: "session-a",token: "token-a",identityBound: false },
-      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }]
-    }));
     const calls: Array<Readonly<{ url: string;body: unknown;token: string | null }>> = [];
+    let sessionsMinted = 0;
     vi.stubGlobal("fetch",vi.fn(async (url: string,init: RequestInit = {}) => {
       calls.push({
         url,body: typeof init.body === "string" ? JSON.parse(init.body) : null,
         token: new Headers(init.headers).get("x-support-session-token")
       });
+      if (url === "/api/v1/support/sessions") {
+        sessionsMinted += 1;
+        const letter = sessionsMinted === 1 ? "a" : "b";
+        return new Response(JSON.stringify({
+          session: { session_id: `session-${letter}`,identity_bound: false },
+          session_token: `token-${letter}`
+        }),{ status: 201,headers: { "content-type": "application/json" } });
+      }
       if (url === "/api/v1/support/sessions/session-a/messages") {
         return new Response(JSON.stringify({
           error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",restart_session: true
         }),{ status: 409,headers: { "content-type": "application/json" } });
       }
-      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
-        session: { session_id: "session-b",identity_bound: false },session_token: "token-b"
-      }),{ status: 201,headers: { "content-type": "application/json" } });
       if (url === "/api/v1/support/sessions/session-b/messages") return new Response(JSON.stringify({
         message_id: "fresh-answer",outcome: "NO_SOURCE",text: "Fresh answer.",sources: [],actions: []
       }),{ status: 200,headers: { "content-type": "application/json" } });
@@ -657,6 +799,7 @@ describe("SUP-01 /help assistant", () => {
     await submit("My code 123456 failed");
 
     expect(calls.map(({ url }) => url)).toEqual([
+      "/api/v1/support/sessions",
       "/api/v1/support/sessions/session-a/messages",
       "/api/v1/support/sessions",
       "/api/v1/support/sessions/session-b/messages"
@@ -665,27 +808,29 @@ describe("SUP-01 /help assistant", () => {
       { text: "My [REDACTED_SECRET_LIKE] failed" },
       { text: "My [REDACTED_SECRET_LIKE] failed" }
     ]);
-    expect(calls.map(({ token }) => token)).toEqual(["token-a",null,"token-b"]);
+    expect(calls.map(({ token }) => token)).toEqual([null,"token-a",null,"token-b"]);
     expect(document.querySelectorAll('[data-role="user"]')).toHaveLength(1);
     expect(document.body.textContent).toContain("Fresh answer.");
     const stored = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY)!;
-    expect(stored).not.toContain("session-a");
-    expect(stored).not.toContain("token-a");
-    expect(stored).toContain("session-b");
+    expect(stored).toContain("Fresh answer.");
+    for (const capability of ["session-a","token-a","session-b","token-b"]) {
+      expect(stored).not.toContain(capability);
+    }
   });
 
-  it("stops after a second exact snapshot mismatch", async () => {
-    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language: "en",
-      session: { sessionId: "session-a",token: "token-a",identityBound: false },
-      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }]
-    }));
+  it("stops after a second exact snapshot mismatch, holding no session", async () => {
     const urls: string[] = [];
+    let sessionsMinted = 0;
     vi.stubGlobal("fetch",vi.fn(async (url: string) => {
       urls.push(url);
-      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
-        session: { session_id: "session-b",identity_bound: false },session_token: "token-b"
-      }),{ status: 201,headers: { "content-type": "application/json" } });
+      if (url === "/api/v1/support/sessions") {
+        sessionsMinted += 1;
+        const letter = String.fromCharCode(96 + sessionsMinted);
+        return new Response(JSON.stringify({
+          session: { session_id: `session-${letter}`,identity_bound: false },
+          session_token: `token-${letter}`
+        }),{ status: 201,headers: { "content-type": "application/json" } });
+      }
       return new Response(JSON.stringify({
         error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",restart_session: true
       }),{ status: 409,headers: { "content-type": "application/json" } });
@@ -694,6 +839,7 @@ describe("SUP-01 /help assistant", () => {
     await submit("question");
 
     expect(urls).toEqual([
+      "/api/v1/support/sessions",
       "/api/v1/support/sessions/session-a/messages",
       "/api/v1/support/sessions",
       "/api/v1/support/sessions/session-b/messages"
@@ -703,6 +849,10 @@ describe("SUP-01 /help assistant", () => {
     const stored = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY) ?? "";
     expect(stored).not.toContain("session-b");
     expect(stored).not.toContain("token-b");
+
+    // No session is held after the second mismatch: the next turn mints a new one.
+    await submit("again");
+    expect(urls.slice(4,5)).toEqual(["/api/v1/support/sessions"]);
   });
 
   it.each([
@@ -711,14 +861,12 @@ describe("SUP-01 /help assistant", () => {
       error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",restart_session: true,detail: "extra"
     }]
   ])("does not restart for %s", async (_name,body) => {
-    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language: "en",
-      session: { sessionId: "session-a",token: "token-a",identityBound: false },
-      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }]
-    }));
     const urls: string[] = [];
     vi.stubGlobal("fetch",vi.fn(async (url: string) => {
       urls.push(url);
+      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
+        session: { session_id: "session-a",identity_bound: false },session_token: "token-a"
+      }),{ status: 201,headers: { "content-type": "application/json" } });
       return new Response(JSON.stringify(body),{
         status: 409,headers: { "content-type": "application/json" }
       });
@@ -726,7 +874,10 @@ describe("SUP-01 /help assistant", () => {
     await render(<Assistant client={supportAssistantClient} signedIn={false} />);
     await submit("question");
 
-    expect(urls).toEqual(["/api/v1/support/sessions/session-a/messages"]);
+    expect(urls).toEqual([
+      "/api/v1/support/sessions",
+      "/api/v1/support/sessions/session-a/messages"
+    ]);
     expect(document.body.textContent).toContain(
       "Support is unavailable right now. Please try again or choose 'Talk to a human'."
     );

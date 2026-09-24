@@ -39,7 +39,10 @@ describe("SUP-06 remains outside the identity security zone", () => {
     const main = await readFile(resolve(ROOT,"apps/api/src/main.ts"),"utf8");
     expect(main).toContain("PostgresSupportRelayReservationRepository");
     expect(main).toContain(
-      "const supportRelayLeasePool = createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })"
+      // DL7-F7: the lease pool is held by the boot custody ledger until handover.
+      "const supportRelayLeasePool = boot.hold(\n"
+      + "  createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })\n"
+      + ")"
     );
     expect(main).toContain(
       "const supportRelayReservations = new PostgresSupportRelayReservationRepository(supportRelayLeasePool)"
@@ -54,8 +57,20 @@ describe("SUP-06 remains outside the identity security zone", () => {
     expect(main).toContain("assertSupportDatabaseRole(pool, supportRelayLeasePool)");
     // VACUOUS-ORDERING GUARD: neither pool declaration was pinned present, so a
     // missing supportPool gave indexOf -1 and this ordering passed regardless.
-    expect(main).toContain("const supportPool = createPool(environment.SUPPORT_DATABASE_URL)");
-    expect(main.indexOf("const supportPool = createPool(environment.SUPPORT_DATABASE_URL)"))
+    //
+    // INT2 (2026-09-22): dev's vacuity sweep (bcb2adb2) wrote this needle as the
+    // BARE `createPool(...)`, which was dev's spelling. This line's DL7-F7 had
+    // independently wrapped the same declaration in `boot.hold(...)` so an early
+    // boot failure cannot leave the pool un-zeroed. Neither side's diff touched
+    // the other's line, so the merge produced a guard that pinned a spelling the
+    // product no longer has — a semantic conflict with no marker. Both survive:
+    // the anti-vacuity pin is re-fitted to the boot-held declaration, and ONE
+    // constant feeds both assertions so the needle can never again drift away
+    // from the thing whose position is being compared.
+    const supportPoolDeclaration =
+      "const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL))";
+    expect(main).toContain(supportPoolDeclaration);
+    expect(main.indexOf(supportPoolDeclaration))
       .toBeLessThan(main.indexOf("const supportRelayLeasePool"));
   });
 

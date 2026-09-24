@@ -20,7 +20,6 @@ import {
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
 import { createSupportCaseAccessService,type SupportCaseAccessPort } from "../../apps/api/src/support/cases.js";
 import {
-  KeyBasedAdapter,
   RelayAdapter,
   type SupportModelPort
 } from "../../apps/api/src/support/model.js";
@@ -34,14 +33,17 @@ import {
   createSupportCaseMaterial,
   createSupportCaseService,
   createSupportMessageCipher,
-  createWrappedSupportSessionKey
+  createWrappedSupportSessionKey,
+  hashSupportCapability
 } from "../../apps/api/src/support/session.js";
 import {
   createSupportKeyPort,
   SupportKeyError,
   type SupportKeyPort
 } from "../../apps/api/src/support/keys.js";
+import { SUPPORT_VISITOR_MESSAGE_FIELD } from "../../apps/api/src/support/prompt.js";
 import { supportTemplate } from "../../apps/api/src/support/templates.js";
+import { framedField, framedInstruction, readFramedMaterial } from "../support/framed-packet.js";
 import { recoverySecurityGuidance } from "../../apps/api/src/support/security-guidance.js";
 import {
   migrate,
@@ -69,6 +71,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 const KB_VERSION = "a".repeat(64);
 const IDENTITY = testHttpIdentity("support-routes");
+/** DL1-F5(b): a second account, so an owner-bound case has a foreign caller. */
+const CASE_OWNER = testHttpIdentity("support-routes-case-owner");
 const CLOCK_BASE_MS = Date.parse("2026-09-06T12:00:00.000Z");
 const MODEL_REFERENCE_REQUEST_ID = "10000000-0000-4000-8000-000000000001";
 const MODEL_SOURCE_REFERENCE = "s-10000000000040008000000000000001-1";
@@ -279,6 +283,41 @@ describe("SUP-01 support routes", () => {
     if (keyRoot !== undefined) await rm(keyRoot,{ recursive: true,force: true });
   }, 120_000);
 
+  /**
+   * DL1-F7: every mutating support route now requires the exact first-party
+   * Origin, for anonymous callers too. A real browser on the help page always
+   * sends it, and a drive-by from another site cannot — so the harness sends it
+   * on mutations, exactly as the browser this suite stands in for would, unless
+   * a case supplies its own Origin to exercise the refusal.
+   */
+  function asBrowser(server: FastifyInstance): FastifyInstance {
+    const inject: FastifyInstance["inject"] = (options?: unknown) => {
+      if (typeof options !== "object" || options === null) {
+        return (server.inject as (value?: unknown) => never)(options);
+      }
+      const request = options as Readonly<{
+        method?: string;url?: string;headers?: Readonly<Record<string,unknown>>;
+      }>;
+      const mutating = typeof request.method === "string"
+        && request.method.toUpperCase() !== "GET" && request.method.toUpperCase() !== "HEAD";
+      const carriesOrigin = Object.keys(request.headers ?? {})
+        .some((name) => name.toLowerCase() === "origin");
+      if (!mutating || carriesOrigin) {
+        return (server.inject as (value?: unknown) => never)(options);
+      }
+      return (server.inject as (value?: unknown) => never)({
+        ...request, headers: { ...request.headers, origin: TEST_APP_ORIGIN }
+      });
+    };
+    return new Proxy(server, {
+      get(target, property, receiver) {
+        if (property === "inject") return inject;
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? (value as () => unknown).bind(target) : value;
+      }
+    });
+  }
+
   function api(
     enabled: boolean,
     options: Readonly<{
@@ -294,14 +333,16 @@ describe("SUP-01 support routes", () => {
       reportDiagnostic?: (diagnostic: string) => void;
     }> = {}
   ) {
-    return buildApi({
+    return asBrowser(buildApi({
       application: askApplication(),
-      sessions: testSessionApplication([IDENTITY]),
+      sessions: testSessionApplication([IDENTITY,CASE_OWNER]),
       allowedOrigin: TEST_APP_ORIGIN,
       support: {
         configuration: options.configurationPort ?? configuration(enabled, options.configuration),
         sessions: options.sessionPort ?? sessions,
         messages: options.messagePort ?? messageCipher,
+        // DL5-F3: the real keyed derivation, so the routes store what production stores.
+        sourcePseudonym: (value: string) => supportKeys.sourcePseudonym(value),
         cases: options.casePort ?? cases,
         caseAccess: options.caseAccessPort ?? caseAccess,
         knowledge: options.knowledgePort ?? knowledge,
@@ -310,7 +351,7 @@ describe("SUP-01 support routes", () => {
         ...(options.reportDiagnostic === undefined
           ? {} : { reportDiagnostic: options.reportDiagnostic })
       }
-    });
+    }));
   }
 
   function sessionPort(overrides: Partial<SupportSessionPort>): SupportSessionPort {
@@ -348,11 +389,13 @@ describe("SUP-01 support routes", () => {
     };
   }
 
-  async function openAuthenticatedSession(server: FastifyInstance, ip: string) {
+  async function openAuthenticatedSession(
+    server: FastifyInstance, ip: string, identity = IDENTITY
+  ) {
     const response = await server.inject({
       method: "POST",
       url: "/v1/support/sessions",
-      headers: { ...testSessionHeaders(IDENTITY, true), "x-forwarded-for": ip },
+      headers: { ...testSessionHeaders(identity, true), "x-forwarded-for": ip },
       payload: { language: "en" }
     });
     const payload = response.json<{
@@ -532,10 +575,16 @@ describe("SUP-01 support routes", () => {
     expect(transcripts.rowCount).toBe(0);
   });
 
+  /**
+   * DL1-F3 moved the third expectation from 429 to 201: one backward clock
+   * reading refuses that call only. The invariant under test is unchanged —
+   * the refused observation must not create a session — and the new one is that
+   * the instance is not left denying every caller until restart.
+   */
   it.each([
     ["anonymous", false],
     ["authenticated", true]
-  ] as const)("poisons regressing %s creation observations before later mutations", async (
+  ] as const)("refuses only the regressing %s creation observation", async (
     _name, authenticated
   ) => {
     const observations = [CLOCK_BASE_MS, CLOCK_BASE_MS - 1, CLOCK_BASE_MS + 1];
@@ -567,11 +616,11 @@ describe("SUP-01 support routes", () => {
     }
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([201, 429, 429]);
-    expect(createdAt).toEqual([CLOCK_BASE_MS]);
+    expect(responses.map((response) => response.statusCode)).toEqual([201, 429, 201]);
+    expect(createdAt).toEqual([CLOCK_BASE_MS, CLOCK_BASE_MS + 1]);
   });
 
-  it("rejects regressing authenticated creation with real PostgreSQL and keeps later time poisoned", async () => {
+  it("rejects regressing authenticated creation with real PostgreSQL and admits the next", async () => {
     const before = await database.pool.query<{ count: string }>(
       "SELECT count(*)::text AS count FROM support.session"
     );
@@ -593,14 +642,14 @@ describe("SUP-01 support routes", () => {
     );
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([201, 429, 429]);
-    expect(Number(after.rows[0]?.count) - Number(before.rows[0]?.count)).toBe(1);
+    expect(responses.map((response) => response.statusCode)).toEqual([201, 429, 201]);
+    expect(Number(after.rows[0]?.count) - Number(before.rows[0]?.count)).toBe(2);
   });
 
   it.each([
     ["anonymous", null],
     ["authenticated", IDENTITY.authenticated.ownerRef]
-  ] as const)("rejects regressing %s messages without persistent admission or rate evidence", async (
+  ] as const)("rejects the regressing %s message only, without rate evidence", async (
     _name, identityOwnerRef
   ) => {
     const sessionId = `00000000-0000-4000-8000-${identityOwnerRef === null ? "000000000011" : "000000000012"}`;
@@ -638,8 +687,8 @@ describe("SUP-01 support routes", () => {
     ];
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([503, 429, 429]);
-    expect(persistentAdmissions).toBe(1);
+    expect(responses.map((response) => response.statusCode)).toEqual([503, 429, 503]);
+    expect(persistentAdmissions).toBe(2);
     expect(rateEvidenceWrites).toBe(0);
   });
 
@@ -688,7 +737,7 @@ describe("SUP-01 support routes", () => {
     expect(evidence.rowCount).toBe(0);
   });
 
-  it("preserves one-hour anonymous creation expiry before a rewind poisons the route", async () => {
+  it("preserves one-hour anonymous creation expiry across a refused rewind", async () => {
     const observations = [
       CLOCK_BASE_MS,
       CLOCK_BASE_MS + 60 * 60 * 1_000 + 1,
@@ -724,8 +773,8 @@ describe("SUP-01 support routes", () => {
     }
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([201, 201, 429, 429]);
-    expect(createCalls).toBe(2);
+    expect(responses.map((response) => response.statusCode)).toEqual([201, 201, 429, 201]);
+    expect(createCalls).toBe(3);
   });
 
   it.each([
@@ -737,7 +786,7 @@ describe("SUP-01 support routes", () => {
       supportLimitAnonMessages10m: 100,
       supportLimitAnonMessages24h: 1
     }]
-  ] as const)("preserves %s message expiry before a rewind poisons the route", async (
+  ] as const)("preserves %s message expiry across a refused rewind", async (
     _name, horizonMs, overrides
   ) => {
     const observations = [
@@ -784,12 +833,12 @@ describe("SUP-01 support routes", () => {
     }
     await server.close();
 
-    expect(responses.map((response) => response.statusCode)).toEqual([503, 503, 429, 429]);
-    expect(persistentAdmissions).toBe(2);
+    expect(responses.map((response) => response.statusCode)).toEqual([503, 503, 429, 503]);
+    expect(persistentAdmissions).toBe(3);
     expect(rateEvidenceWrites).toBe(0);
   });
 
-  it("records only the session-closed decision before a rewind poisons the route", async () => {
+  it("records a session-closed decision for every refused read but none for a rewind", async () => {
     const sessionId = "00000000-0000-4000-8000-000000000031";
     const observations = [
       CLOCK_BASE_MS,
@@ -830,7 +879,8 @@ describe("SUP-01 support routes", () => {
 
     expect(responses.map((response) => response.statusCode)).toEqual([503, 429, 429, 429]);
     expect(persistentAdmissions).toBe(1);
-    expect(rateEvidenceWrites).toBe(1);
+    // DL1-F3: the rewind writes nothing; the two aged-out reads each record one.
+    expect(rateEvidenceWrites).toBe(2);
   });
 
   it("creates an anonymous capability session without storing the raw token", async () => {
@@ -1355,6 +1405,62 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  /**
+   * DL1-F1. `{id}` and `body.session_id` reached the `uuid` columns unvalidated,
+   * Postgres raised 22P02 and a pure client fault surfaced as a 500 plus one
+   * `api.request.failed` line. Every support route now answers the branch's
+   * constant typed 404 before it touches the repository.
+   */
+  it("answers a typed 404 for non-UUID support ids before any repository call", async () => {
+    const reads: string[] = [];
+    const ratings: string[] = [];
+    const server = api(true,{
+      sessionPort: sessionPort({
+        read: async (input) => {
+          reads.push(input.sessionId);
+          return sessions.read(input);
+        },
+        rateMessage: async (input) => {
+          ratings.push(input.messageId);
+          return sessions.rateMessage!(input);
+        }
+      })
+    });
+    const failureLog = vi.spyOn(console,"error").mockImplementation(() => undefined);
+    const probes = [
+      ["GET","/v1/support/sessions/not-a-uuid",undefined],
+      ["POST","/v1/support/sessions/not-a-uuid/messages",{ text: "How do I start?" }],
+      ["POST","/v1/support/sessions/not-a-uuid/escalate",{ language: "en" }],
+      ["POST","/v1/support/messages/not-a-uuid/rating",{
+        session_id: randomUUID(),rating: "yes"
+      }],
+      [`POST`,`/v1/support/messages/${randomUUID()}/rating`,{
+        session_id: "not-a-uuid",rating: "yes"
+      }]
+    ] as const;
+    const responses = [];
+    for (const [method,url,payload] of probes) {
+      responses.push(await server.inject({
+        method,url,
+        headers: { "x-support-session-token": "A".repeat(43) },
+        ...(payload === undefined ? {} : { payload })
+      }));
+    }
+    const failures = failureLog.mock.calls
+      .map((call): string => String(call[0]))
+      .filter((line): boolean => line.includes("api.request.failed"));
+    failureLog.mockRestore();
+    await server.close();
+
+    expect(responses.map((response) => response.statusCode))
+      .toEqual([404,404,404,404,404]);
+    for (const response of responses) {
+      expect(response.json()).toEqual({ error: "NOT_FOUND",message: "NOT_FOUND" });
+    }
+    expect({ reads,ratings }).toEqual({ reads: [],ratings: [] });
+    expect(failures).toEqual([]);
+  });
+
   it("applies the 2,000-character boundary to authenticated support sessions", async () => {
     const server = api(true);
     const opened = await openAuthenticatedSession(server, "203.0.113.31");
@@ -1365,6 +1471,67 @@ describe("SUP-01 support routes", () => {
     expect(limited.statusCode).toBe(429);
     expect(limited.json()).toMatchObject({ outcome: "RATE_LIMITED" });
     await server.close();
+  });
+
+  /**
+   * DL1-F9. The handler read the session (DB), read the configuration, hashed
+   * `body.text` and ran the classifier's full code-point spread over as much as
+   * 256 KiB before the 2 000-code-point rule refused the message. The cheap
+   * byte ceiling now comes first, and the code-point rule keeps its place
+   * behind it.
+   */
+  it("refuses an oversized message body before the session read, config read, and classifier", async () => {
+    let reads = 0;
+    let configurations = 0;
+    const relay = vi.fn(async () => Object.freeze({
+      messageId: randomUUID(),outcome: "ANSWER_GROUNDED" as const,text: "must not run",
+      canEscalate: true
+    }));
+    const state = availableConfigurationState(true);
+    const server = api(true,{
+      configurationPort: Object.freeze({
+        current: async () => {
+          configurations += 1;
+          return state;
+        }
+      }),
+      sessionPort: sessionPort({
+        read: async (input) => {
+          reads += 1;
+          return sessions.read(input);
+        }
+      }),
+      answerPort: Object.freeze({ respond: relay })
+    });
+    const opened = await openSession(server,"203.0.113.212");
+    expect(opened.response.statusCode).toBe(201);
+    reads = 0;
+    configurations = 0;
+    const oversized = await sendMessage(
+      server,opened.body,"x".repeat(200 * 1_024),"203.0.113.212"
+    );
+    const refusedBeforeWork = { reads,configurations };
+    // The byte ceiling is the only thing that moved: a body inside it still
+    // reaches the register-driven 2,000-code-point rule.
+    const atCeiling = await sendMessage(
+      server,opened.body,"y".repeat(16 * 1_024),"203.0.113.212"
+    );
+    const rows = await database.pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM support.message WHERE session_id=$1",
+      [opened.body.session_id]
+    );
+    await server.close();
+
+    expect(oversized.statusCode).toBe(400);
+    expect(oversized.json()).toEqual({
+      error: "MALFORMED_REQUEST",message: "MALFORMED_REQUEST"
+    });
+    expect(refusedBeforeWork).toEqual({ reads: 0,configurations: 0 });
+    expect(atCeiling.statusCode).toBe(429);
+    expect(atCeiling.json()).toMatchObject({ outcome: "RATE_LIMITED" });
+    expect({ reads,configurations }).toEqual({ reads: 1,configurations: 1 });
+    expect(relay).not.toHaveBeenCalled();
+    expect(rows.rows).toEqual([{ count: 0 }]);
   });
 
   it("applies session counts universally while anonymous IP limits remain anonymous-only", async () => {
@@ -1600,7 +1767,10 @@ describe("SUP-01 support routes", () => {
     expect(stored.rows[0]).toMatchObject({
       class: "INJECTION",
       message_sha256: createHash("sha256").update(text, "utf8").digest("hex"),
-      ip_sha256: createHash("sha256").update("203.0.113.41", "utf8").digest("hex")
+      // DL5-F3: the stored source is the KEYED pseudonym production derives
+      // (the fixture composes the real `supportKeys.sourcePseudonym`), never a
+      // bare sha256 of the address — which an attacker can enumerate.
+      ip_sha256: supportKeys.sourcePseudonym("203.0.113.41")
     });
     expect(stored.rows[0]?.message_sha256).toMatch(/^[0-9a-f]{64}$/u);
     expect(stored.rows[0]?.ip_sha256).toMatch(/^[0-9a-f]{64}$/u);
@@ -1910,7 +2080,8 @@ describe("SUP-01 support routes", () => {
       SELECT * FROM support.abuse_event
       WHERE ip_sha256=$1 AND class IN ('LOCK','IP_COOLDOWN')
       ORDER BY at,abuse_event_id
-    `,[createHash("sha256").update(ip,"utf8").digest("hex")]);
+    `,[supportKeys.sourcePseudonym(ip)]);
+    // dev's append-only LOCK rows, under the DL5-F3 keyed source pseudonym.
     expect(events.rows.filter((row) => row.class === "LOCK")).toHaveLength(3);
     expect(events.rows.filter((row) => row.class === "IP_COOLDOWN")).toHaveLength(1);
     expect(events.rows.every((row) => row.message_sha256 === null)).toBe(true);
@@ -2126,7 +2297,8 @@ describe("SUP-01 support routes", () => {
     `, [opened.body.session_id]);
     expect(events.rows).toEqual([{
       message_sha256: createHash("sha256").update(firstText, "utf8").digest("hex"),
-      ip_sha256: createHash("sha256").update(ip, "utf8").digest("hex"),
+      // DL5-F3: the keyed pseudonym production stores, not a bare sha256.
+      ip_sha256: supportKeys.sourcePseudonym(ip),
       at
     }]);
 
@@ -2151,26 +2323,98 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
+  /**
+   * DL1-F4. The anonymous route echoed `configuration` verbatim — the internal
+   * model ref, every limiter threshold, the snapshot sha and the register
+   * version — next to daily spend, token totals, open sessions and new cases.
+   * The widget reads `configuration.kind`, `relay_state`, `kb_loaded.shipped`
+   * and `kb_version`; the operator keeps the full view in the status CLI.
+   */
+  it("discloses no model identity, limit, spend, or volume in public status", async () => {
+    const server = api(true,{
+      sessionPort: sessionPort({
+        status: async () => Object.freeze({
+          callsToday: 7,callsLast7Days: 40,
+          inputTokensToday: 900,outputTokensToday: 800,costUsdToday: 1.25,
+          inputTokensLast7Days: 9_000,outputTokensLast7Days: 8_000,costUsdLast7Days: 12.5,
+          openSessions: 3,newCases: 2,
+          relayState: "AVAILABLE" as const,
+          deflection7Days: 0.5,deflection30Days: 0.5,
+          ratingResolution7Days: 0.5,ratingResolution30Days: 0.5
+        })
+      })
+    });
+    const response = await server.inject({ method: "GET",url: "/v1/support/status" });
+    await server.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      configuration: { kind: "AVAILABLE" },
+      relay_state: "AVAILABLE",
+      kb_version: KB_VERSION,
+      kb_loaded: { shipped: 12 }
+    });
+    const names = new Set<string>();
+    const walk = (value: unknown): void => {
+      if (typeof value !== "object" || value === null) return;
+      for (const [name,nested] of Object.entries(value as Record<string,unknown>)) {
+        names.add(name);
+        walk(nested);
+      }
+    };
+    walk(response.json());
+    for (const forbidden of [
+      "supportModelRef","supportEnabled","supportDailyCallCap","supportRelayConcurrency",
+      "supportQueueDepth","supportLockAfterInjections","supportIpCooldownMinutes",
+      "supportLimitAnonMessages10m","supportLimitAnonMessages24h","supportLimitAnonSessions1h",
+      "supportLimitSessionMessages","supportLimitMessageCharacters",
+      "supportLimitAccountMessages10m","supportLimitAccountMessages24h",
+      "supportRetentionPolicy","supportRetentionRatifiedBy",
+      "snapshot","values","supportSnapshotSha256","fullSnapshotSha256","supportRegisterVersion",
+      "schemaVersion","recordedAt","code",
+      "calls_today","calls_last_7_days","cost_usd_today","cost_usd_last_7_days",
+      "input_tokens_today","output_tokens_today",
+      "input_tokens_last_7_days","output_tokens_last_7_days",
+      "open_sessions","new_cases","relay_unavailable_since",
+      "deflection_7_days","deflection_30_days",
+      "rating_resolution_7_days","rating_resolution_30_days"
+    ]) {
+      expect([...names],`disclosed ${forbidden}`).not.toContain(forbidden);
+    }
+    for (const secret of [
+      DEFAULT_CONFIGURATION.supportModelRef,"b".repeat(64),"c".repeat(64),
+      "9007199254740992","1.25","12.5"
+    ]) {
+      expect(response.body,`disclosed ${secret}`).not.toContain(secret);
+    }
+  });
+
+  /**
+   * DL1-F4 removed `calls_today` (volume) and `kb_loaded.ignored` (unread by
+   * the widget) from this pin; what the route composes from its three ports is
+   * still asserted, through the fields the widget consumes.
+   */
   it("composes public status from register, KB, and support repository ports", async () => {
     const server = api(true);
     const response = await server.inject({ method: "GET", url: "/v1/support/status" });
-    const callsToday = Number((await database.pool.query<{ count: string }>(`
-      SELECT count(*)::text AS count FROM support.message
-      WHERE role='assistant'
-        AND model_called
-        AND received_at >= date_trunc('day',statement_timestamp())
-    `)).rows[0]?.count);
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      calls_today: callsToday,
+    expect(response.json()).toEqual({
+      configuration: { kind: "AVAILABLE" },
       kb_version: KB_VERSION,
-      kb_loaded: { shipped: 12, ignored: 1 },
+      kb_loaded: { shipped: 12 },
       relay_state: "AVAILABLE"
     });
     await server.close();
   });
 
-  it("projects exact nullable deflection and rating-resolution status fields", async () => {
+  /**
+   * DL1-F4 turned this pin inside out: the deflection and rating-resolution
+   * ratios are operational volume, so the anonymous route must not project
+   * them at all. Their exact nullable arithmetic stays pinned on the
+   * repository itself in tests/integration/support-metrics.test.ts, and the
+   * operator still reads them through apps/runner/src/support-status-cli.ts.
+   */
+  it("keeps deflection and rating-resolution ratios out of public status", async () => {
     const server = api(true,{
       sessionPort: sessionPort({
         status: async () => Object.freeze({
@@ -2182,10 +2426,10 @@ describe("SUP-01 support routes", () => {
     });
     const response = await server.inject({ method: "GET",url: "/v1/support/status" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      deflection_7_days: null,deflection_30_days: 0.625,
-      rating_resolution_7_days: 0.5,rating_resolution_30_days: null
-    });
+    expect(Object.keys(response.json()).sort())
+      .toEqual(["configuration","kb_loaded","kb_version","relay_state"]);
+    expect(response.body).not.toContain("0.625");
+    expect(response.body).not.toContain("0.5");
     await server.close();
   });
 
@@ -2483,7 +2727,12 @@ describe("SUP-01 support routes", () => {
     const snapshots = createHelpCorpusSnapshotLookup(corpus([article]));
     const model: SupportModelPort = Object.freeze({
       complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
-        relayInputs.push(input.messages[0]!.content);
+        // FW-B / B-I1: the visitor's message is a fenced material field now, so
+        // the redaction this row measures is read out of that field through the
+        // door's own reader instead of off a bare `user` turn.
+        relayInputs.push(framedField(
+          readFramedMaterial(input.packet),SUPPORT_VISITOR_MESSAGE_FIELD
+        ));
         return Object.freeze({
           text: JSON.stringify({
             kind: "answer",
@@ -2740,7 +2989,7 @@ describe("SUP-01 support routes", () => {
       entries: [article],snapshots,messages: messageCipher,
       modelFor: () => Object.freeze({
         complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
-          system = input.system;
+          system = framedInstruction(input.packet);
           return Object.freeze({ text: JSON.stringify({
             kind: "answer",
             text: "JSON export requires a served answer and readable ledger digest.",
@@ -2903,7 +3152,7 @@ describe("SUP-01 support routes", () => {
     expect(body.case).toMatchObject({ state: "NEW",language: "ro" });
     expect(body.text).toBe(
       `Am deschis cazul ${body.case_token} pentru o persoană. Răspuns estimat: în 48 ore. `
-      + `Vezi răspunsurile la /help?case=${body.case_token}. Nu pot promite un rezultat.`
+      + `Vezi răspunsurile la /help#case=${body.case_token}. Nu pot promite un rezultat.`
     );
 
     const stored = (await database.pool.query<{
@@ -2919,7 +3168,10 @@ describe("SUP-01 support routes", () => {
       JOIN support.case_key AS key ON key.case_id=opened.case_id
       WHERE opened.case_id=$1
     `,[body.case.case_id])).rows[0]!;
-    expect(stored.token_sha256).toBe(createHash("sha256").update(body.case_token,"utf8").digest("hex"));
+    // DL2-F4: the stored hash carries the case purpose label, never a bare digest.
+    expect(stored.token_sha256).toBe(hashSupportCapability("support-case",body.case_token));
+    expect(stored.token_sha256)
+      .not.toBe(createHash("sha256").update(body.case_token,"utf8").digest("hex"));
     expect(stored.row_text).not.toContain(body.case_token);
     expect(stored.row_text).not.toContain(question);
     expect(stored.transcript_snapshot_ciphertext.includes(Buffer.from(question,"utf8"))).toBe(false);
@@ -2948,7 +3200,8 @@ describe("SUP-01 support routes", () => {
     }
 
     const viewed = await server.inject({
-      method: "GET",url: `/v1/support/cases/${body.case_token}`
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": body.case_token }
     });
     expect(viewed.statusCode).toBe(200);
     expect(viewed.json()).toMatchObject({
@@ -2956,7 +3209,8 @@ describe("SUP-01 support routes", () => {
       messages: expect.arrayContaining([expect.objectContaining({ role: "user",text: question })])
     });
     const replied = await server.inject({
-      method: "POST",url: `/v1/support/cases/${body.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": body.case_token },
       payload: { text: "Thank you" }
     });
     expect(replied.statusCode).toBe(200);
@@ -2982,7 +3236,8 @@ describe("SUP-01 support routes", () => {
       kind: "SHREDDED",text: "This conversation was erased at the owner's request."
     });
     const shreddedCase = await server.inject({
-      method: "GET",url: `/v1/support/cases/${body.case_token}`
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": body.case_token }
     });
     expect(shreddedCase.statusCode).toBe(200);
     expect(shreddedCase.json()).toMatchObject({
@@ -2990,7 +3245,8 @@ describe("SUP-01 support routes", () => {
       case: { case_id: body.case.case_id,summary: null },messages: [],next_cursor: null
     });
     const rejectedReply = await server.inject({
-      method: "POST",url: `/v1/support/cases/${body.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": body.case_token },
       payload: { text: "must not append" }
     });
     expect(rejectedReply.statusCode).toBe(200);
@@ -3007,6 +3263,121 @@ describe("SUP-01 support routes", () => {
     `,[body.case.case_id])).rows[0]!;
     expect(afterShred).toEqual(beforeShred);
     await server.close();
+  });
+
+  /**
+   * DL1-F5(b) at the route. The case token travels in the URL path and in the
+   * link the API mints, so it reached history, shared links and access logs.
+   * DL1-F5c took it out of both: the header below, and the fragment form.
+   * When the case carries an owner, holding the token is no longer enough: the
+   * caller must present that owner's session, and anyone else gets the same
+   * 404 an unknown token gets — never a 403 that would confirm it exists.
+   */
+  it("binds an owner-bound case token to the owner's session", async () => {
+    const server = api(true,{ clock: () => new Date(CLOCK_BASE_MS + 40) });
+    const opened = await openAuthenticatedSession(server,"203.0.113.213",CASE_OWNER);
+    const escalated = await server.inject({
+      method: "POST",
+      url: `/v1/support/sessions/${opened.body.session_id}/escalate`,
+      headers: {
+        ...testSessionHeaders(CASE_OWNER,true),
+        "x-support-session-token": opened.body.session_token
+      },
+      payload: { language: "en" }
+    });
+    expect(escalated.statusCode).toBe(201);
+    const caseBody = escalated.json<{ case: { case_id: string };case_token: string }>();
+    const anonymousRead = await server.inject({
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token }
+    });
+    const anonymousReply = await server.inject({
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token },
+      payload: { text: "let me in" }
+    });
+    const foreignRead = await server.inject({
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token,...testSessionHeaders(IDENTITY) }
+    });
+    const foreignReply = await server.inject({
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token,...testSessionHeaders(IDENTITY,true) },payload: { text: "let me in" }
+    });
+    const ownerRead = await server.inject({
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token,...testSessionHeaders(CASE_OWNER) }
+    });
+    const ownerReply = await server.inject({
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token,...testSessionHeaders(CASE_OWNER,true) },payload: { text: "it is me" }
+    });
+    const appended = await database.pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM support.case_message WHERE case_id=$1",
+      [caseBody.case.case_id]
+    );
+    await server.close();
+
+    expect([
+      anonymousRead.statusCode,anonymousReply.statusCode,
+      foreignRead.statusCode,foreignReply.statusCode
+    ]).toEqual([404,404,404,404]);
+    expect(anonymousRead.json())
+      .toEqual({ error: "NOT_FOUND",text: supportTemplate("NOT_FOUND","en") });
+    expect(foreignRead.json()).toEqual(anonymousRead.json());
+    expect(anonymousReply.json()).toEqual({ error: "NOT_FOUND" });
+    expect(foreignReply.json()).toEqual({ error: "NOT_FOUND" });
+    expect([ownerRead.statusCode,ownerReply.statusCode]).toEqual([200,200]);
+    expect(ownerRead.json()).toMatchObject({
+      kind: "READABLE",case: { case_id: caseBody.case.case_id }
+    });
+    expect(appended.rows).toEqual([{ count: 1 }]);
+  });
+
+  /**
+   * DL1-F5(a) at the route: the same token, thirty days and one millisecond
+   * later, is refused for reads and replies alike.
+   */
+  it("expires a case token thirty days after the case was opened", async () => {
+    const opening = api(true,{ clock: () => new Date(CLOCK_BASE_MS + 45) });
+    const opened = await openSession(opening,"203.0.113.214");
+    const escalated = await opening.inject({
+      method: "POST",
+      url: `/v1/support/sessions/${opened.body.session_id}/escalate`,
+      headers: { "x-support-session-token": opened.body.session_token },
+      payload: { language: "en" }
+    });
+    expect(escalated.statusCode).toBe(201);
+    const caseBody = escalated.json<{ case: { case_id: string };case_token: string }>();
+    const fresh = await opening.inject({
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token }
+    });
+    await opening.close();
+
+    const later = api(true,{
+      clock: () => new Date(CLOCK_BASE_MS + 45 + 30 * 24 * 60 * 60 * 1_000 + 1)
+    });
+    const expiredRead = await later.inject({
+      method: "GET",url: "/v1/support/case",
+      headers: { "x-support-case-token": caseBody.case_token }
+    });
+    const expiredReply = await later.inject({
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token },
+      payload: { text: "too late" }
+    });
+    const appended = await database.pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM support.case_message WHERE case_id=$1",
+      [caseBody.case.case_id]
+    );
+    await later.close();
+
+    expect(fresh.statusCode).toBe(200);
+    expect([expiredRead.statusCode,expiredReply.statusCode]).toEqual([404,404]);
+    expect(expiredRead.json())
+      .toEqual({ error: "NOT_FOUND",text: supportTemplate("NOT_FOUND","en") });
+    expect(appended.rows).toEqual([{ count: 0 }]);
   });
 
   it("returns typed already-opened without a capability for concurrent manual escalation", async () => {
@@ -3056,7 +3427,8 @@ describe("SUP-01 support routes", () => {
     const secretLike = "My password is hunter2; keep 123456 sk-live-secret";
     expect(Buffer.byteLength(secretLike,"utf8")).toBeLessThanOrEqual(80);
     const reply = await server.inject({
-      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token },
       payload: { text: secretLike }
     });
     expect(reply.statusCode).toBe(200);
@@ -3092,7 +3464,8 @@ describe("SUP-01 support routes", () => {
     }
 
     const tooManyUtf8Bytes = await server.inject({
-      method: "POST",url: `/v1/support/cases/${caseBody.case_token}/messages`,
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseBody.case_token },
       payload: { text: "😀".repeat(21) }
     });
     expect(tooManyUtf8Bytes.statusCode).toBe(413);
@@ -3117,21 +3490,24 @@ describe("SUP-01 support routes", () => {
     });
     const caseToken = escalated.json<{ case_token: string }>().case_token;
     const responses = await Promise.all(["one","two","three"].map((text) => server.inject({
-      method: "POST",url: `/v1/support/cases/${caseToken}/messages`,payload: { text }
+      method: "POST",url: "/v1/support/case/messages",
+      headers: { "x-support-case-token": caseToken },payload: { text }
     })));
     expect(responses.map((response) => response.statusCode).sort()).toEqual([200,200,429]);
     expect(responses.find((response) => response.statusCode === 429)?.json()).toEqual({
       error: "SUPPORT_CASE_MESSAGE_LIMIT"
     });
 
-    const first = await server.inject({ method: "GET",url: `/v1/support/cases/${caseToken}?limit=1` });
+    const first = await server.inject({ method: "GET",url: "/v1/support/case?limit=1",
+      headers: { "x-support-case-token": caseToken } });
     expect(first.statusCode).toBe(200);
     const firstBody = first.json<{ messages: readonly unknown[];next_cursor: string | null }>();
     expect(firstBody.messages).toHaveLength(1);
     expect(firstBody.next_cursor).toEqual(expect.any(String));
     const second = await server.inject({
       method: "GET",
-      url: `/v1/support/cases/${caseToken}?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor!)}`
+      url: `/v1/support/case?limit=1&cursor=${encodeURIComponent(firstBody.next_cursor!)}`,
+      headers: { "x-support-case-token": caseToken }
     });
     expect(second.statusCode).toBe(200);
     expect(second.json<{ messages: readonly unknown[];next_cursor: string | null }>().messages)
@@ -3151,13 +3527,15 @@ describe("SUP-01 support routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       outcome: "REFUSE_SAFETY",case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     const responseBody = response.json<{ case_token: string;case_acknowledgement: string }>();
     expect(responseBody.case_acknowledgement).toBe(
       `I've opened case ${responseBody.case_token} for a person. Expected reply: within 48 hours. `
-      + `Check replies at /help?case=${responseBody.case_token}. I can't promise an outcome.`
+      + `Check replies at /help#case=${responseBody.case_token}. I can't promise an outcome.`
     );
     const stored = await database.pool.query<{
       case_id: string;
@@ -3214,7 +3592,9 @@ describe("SUP-01 support routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       outcome: "REFUSE_ZONE",case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     expect(response.json().text).toEqual(supportTemplate("REFUSE_ZONE",language).replace(
@@ -3234,7 +3614,9 @@ describe("SUP-01 support routes", () => {
   it("returns opaque SLA/link receipts for newly opened E3, E6, E7, and E8 cases", async () => {
     const receipt = {
       case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     };
 
@@ -3396,7 +3778,9 @@ describe("SUP-01 support routes", () => {
     expect(ratingReceipts[0]).not.toHaveProperty("case_token");
     expect(ratingReceipts[1]).toMatchObject({
       case_opened: true,case_token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u),
-      sla_hours: 48,link: expect.stringMatching(/^\/help[?]case=/u),
+      // DL3-F4: the API mints the FRAGMENT form; a query bearer reaches the
+      // address bar, browser history and any future access log.
+      sla_hours: 48,link: expect.stringMatching(/^\/help#case=/u),
       case_acknowledgement: expect.any(String)
     });
     await server.close();
@@ -3479,11 +3863,4 @@ describe("SUP-01 support routes", () => {
     await server.close();
   });
 
-  it("keeps the key-based adapter seam nonfunctional", async () => {
-    await expect(new KeyBasedAdapter().complete({
-      system: "bounded",
-      messages: [{ role: "user",content: "question" }],
-      language: "en"
-    })).rejects.toMatchObject({ code: "SUPPORT_MODEL_PATH_NOT_RATIFIED" });
-  });
 });

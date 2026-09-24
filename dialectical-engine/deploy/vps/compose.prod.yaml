@@ -1,0 +1,63 @@
+name: debateai-prod
+
+# The ONLY container on the VPS. PostgreSQL runs natively (apt postgresql-18) so the pg_hba
+# template can be honest about `local` + `hostssl` — a bridge-networked database would present
+# the docker gateway (172.x) as the client address and force a plaintext `host` rule for the
+# whole subnet (audit L5-F7, L7 "C2/C3 validation").
+#
+# The dev stack's self-hosted OpenAI-compatible inference server has no counterpart here:
+# model access on the VPS is through authenticated maker CLIs (DR-179). The architecture test
+# pins its absence as a plain substring, so its name may not appear here even in a comment.
+#
+# Note (L7): docker's published ports bypass ufw through the DOCKER iptables chain. Binding
+# every publish to 127.0.0.1 is the only reliable guard, and the architecture test pins it.
+
+services:
+  hatchet-lite:
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:latest@sha256:7198bda4d73021a9759d90c57f11f1dd2b32599b81f4c08a5a97ea4cf047c41a
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:7077:7077"
+    # Every secret — DATABASE_URL for the dedicated debateai_prod_hatchet role, ADMIN_EMAIL,
+    # ADMIN_PASSWORD, SERVER_ENCRYPTION_* — comes from this file (0600 root:root, never in the
+    # repo, written once by the operator per README §4). Nothing secret is inline here, so the
+    # compose file is safe to read on a public repository.
+    env_file:
+      - /etc/debateai/hatchet.env
+    environment:
+      SERVER_MSGQUEUE_KIND: postgres
+      # TLS everywhere: the API and runner set HATCHET_TLS_STRATEGY=tls and trust the CA through
+      # NODE_EXTRA_CA_CERTS. The dev stack's INSECURE flags have no counterpart here.
+      SERVER_TLS_STRATEGY: tls
+      SERVER_TLS_CERT_FILE: /etc/hatchet-tls/server.crt
+      SERVER_TLS_KEY_FILE: /etc/hatchet-tls/server.key
+      SERVER_TLS_ROOT_CA_FILE: /etc/hatchet-tls/ca.crt
+      # 0.0.0.0 is the bind INSIDE the container; the publish above is what decides reachability
+      # from the host, and it is 127.0.0.1 only.
+      SERVER_GRPC_BIND_ADDRESS: 0.0.0.0
+      SERVER_GRPC_PORT: "7077"
+      SERVER_GRPC_BROADCAST_ADDRESS: 127.0.0.1:7077
+      SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS: 127.0.0.1:7077
+      SERVER_URL: https://127.0.0.1:8888
+      SERVER_AUTH_SET_EMAIL_VERIFIED: "true"
+      SERVER_AUTH_BASIC_AUTH_ENABLED: "true"
+    volumes:
+      # The native cluster's socket directory. debateai_prod_hatchet authenticates with
+      # scram-sha-256 over it (pg_hba `local hatchet debateai_prod_hatchet`), so the container's
+      # uid is irrelevant — peer authentication is reserved for the postgres OS user.
+      - /var/run/postgresql:/var/run/postgresql
+      - /etc/debateai/hatchet-tls:/etc/hatchet-tls:ro
+      - hatchet-config:/config
+    # No healthcheck: this baseline has never been booted (README "What is deliberately absent"),
+    # so no readiness probe is asserted here rather than shipping one that was never observed to
+    # pass. debateai-hatchet.service therefore starts the container without --wait; the API and
+    # runner units retry their Hatchet connection on their own.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  hatchet-config:

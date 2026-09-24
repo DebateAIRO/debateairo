@@ -10,7 +10,7 @@ import {
   generateRecoveryCodes,
   generateTotpSecret,
   hashRecoveryCode,
-  hashVerificationToken,
+  hashToken,
   matchTotpStep,
   normalizeRecoveryCode,
   recoveryCodeSlot,
@@ -19,7 +19,7 @@ import {
   type Argon2Executor,
   type ReadableUserDekStore
 } from "@debateai/crypto";
-import { AuthFlowError } from "./registration.js";
+import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
 
 type MfaRepository = Pick<PostgresIdentityRepository,
   | "activateMfaEnrollment"
@@ -140,7 +140,9 @@ function enrollmentHash(token: string): string {
   if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     throw new AuthFlowError("MFA_ENROLLMENT_INVALID");
   }
-  return hashVerificationToken(token);
+  // The enrolment token is the consumed verification credential itself
+  // (channel_binding.verification_token_hash), so it shares that kind.
+  return hashToken("verification", token);
 }
 
 function normalizedSourceIp(source: AuthSourceContext): string {
@@ -366,6 +368,10 @@ export class MfaEnrollmentService implements MfaApplication {
       const record = code === "" ? null : await this.dependencies.repository
         .readRecoveryCodeForConfirmation(tokenHash, recoveryCodeSlot(code));
       const valid = record !== null
+        // V-22: twice the sealed recovery-code cost, and no further.
+        && storedArgon2EnvelopeNotOverPolicy(
+          record.codeHash, this.dependencies.policy.recoveryCodes.argon2id, "recovery-code"
+        )
         && await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, code);
       if (!valid || record === null) {
         await this.dependencies.repository.recordMfaVerificationFailure({
@@ -405,6 +411,10 @@ export class MfaEnrollmentService implements MfaApplication {
         input.userId, recoveryCodeSlot(code)
       );
       if (record === null
+        // V-22: a planted envelope is refused exactly like a wrong code.
+        || !storedArgon2EnvelopeNotOverPolicy(
+          record.codeHash, this.dependencies.policy.recoveryCodes.argon2id, "recovery-code"
+        )
         || !await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, code)) {
         return Object.freeze({ consumed: false as const });
       }

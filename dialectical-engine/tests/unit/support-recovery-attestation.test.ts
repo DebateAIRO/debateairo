@@ -22,12 +22,16 @@ const manifestPath = fileURLToPath(
   new URL("../../packages/support-kb/reviews/manifest.json", import.meta.url),
 );
 
+// SYNC3 (DL6-F4, the owner's standing rule): the review manifest's evidence
+// locators are repository-relative — a path into one contributor's home
+// directory may not ride a file the API loads at boot. The reviews, reviewers,
+// sessions, dates and every article/projection/fallback hash are unchanged.
 const REVIEW = Object.freeze({
   reviewedBy: "SOL",
   reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
   reviewedOn: "2026-09-15",
   evidence:
-    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
+    "docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
   ratifiedBy: "",
   ratifiedOn: "",
 });
@@ -37,7 +41,7 @@ const IDENTITY_REVIEW = Object.freeze({
   reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
   reviewedOn: "2026-09-17",
   evidence:
-    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md",
+    "docs/missions/support-conversation-20260914/reviews/PRODUCT-IDENTITY-EDITORIAL.md",
   ratifiedBy: "",
   ratifiedOn: "",
 });
@@ -47,7 +51,7 @@ const GUIDE_REVIEW = Object.freeze({
   reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
   reviewedOn: "2026-09-17",
   evidence:
-    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md",
+    "docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md",
   ratifiedBy: "",
   ratifiedOn: "",
 });
@@ -57,7 +61,7 @@ const QUALITY_REVIEW = Object.freeze({
   reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
   reviewedOn: "2026-09-20",
   evidence:
-    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/support-conversation-20260914/reviews/GUIDE_QUALITY_REVIEW.md",
+    "docs/missions/support-conversation-20260914/reviews/GUIDE_QUALITY_REVIEW.md",
   ratifiedBy: "",
   ratifiedOn: "",
 });
@@ -65,7 +69,7 @@ const QUALITY_REVIEW = Object.freeze({
 const QUALITY_SUPPLEMENT_REVIEW = Object.freeze({
   ...QUALITY_REVIEW,
   evidence:
-    "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement.json",
+    ".hermes/reports/support-conversation-20260914/evidence/GUIDE_QUALITY_REVIEW-wording-supplement.json",
 });
 
 const GUIDE_IDS = new Set([

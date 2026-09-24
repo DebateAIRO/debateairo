@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join,resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
+import { assertFramedPrompt,type PromptPacket } from "@debateai/providers";
 import {
   createHelpCorpusSnapshotLookup,loadHelpCorpus
 } from "../../packages/support-kb/src/index.js";
@@ -18,6 +19,7 @@ import {
   createWrappedSupportSessionKey
 } from "../../apps/api/src/support/session.js";
 import type { SupportApplication } from "../../apps/api/src/support/index.js";
+import { createEvalSourcePseudonym,supportEvalKekMaterial } from "./sourcePseudonym.js";
 import {
   migrate,
   PostgresSupportCaseRepository,
@@ -346,17 +348,25 @@ function outputReferences(system: string,key: "sourceIds"|"actionIds"): readonly
   return Object.freeze(value.split(","));
 }
 
+/**
+ * FW-B / B-I1: the support port carries ONE framed packet, never a system
+ * string. The stand-in model reads the OUTPUT CONTRACT where a real vendor
+ * would: in the framed system message, and only after the same door every
+ * shipped transport holds has accepted the packet.
+ */
 export function createDeterministicStructuralCompletion(input: Readonly<{
-  system:string;
+  packet:PromptPacket;
   language:"en"|"ro";
 }>): Readonly<{ text:string }> {
+  assertFramedPrompt(input.packet);
+  const system = input.packet.messages[0]?.content ?? "";
   return Object.freeze({ text:JSON.stringify({
     kind:"answer",
     text:input.language === "ro"
       ? "Răspuns bazat numai pe ajutorul public verificat."
       : "Answer based only on the reviewed public help.",
-    sourceIds:outputReferences(input.system,"sourceIds"),
-    actionIds:outputReferences(input.system,"actionIds")
+    sourceIds:outputReferences(system,"sourceIds"),
+    actionIds:outputReferences(system,"actionIds")
   }) });
 }
 
@@ -390,8 +400,9 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     const secrets = join(keyRoot,"secrets");
     await mkdir(secrets,{ mode: 0o700 });
     const supportKekPath = join(secrets,"support-kek.bin");
-    await writeFile(supportKekPath,Buffer.alloc(32,0x65),{ mode: 0o600 });
+    await writeFile(supportKekPath,supportEvalKekMaterial(),{ mode: 0o600 });
     keys = await createSupportKeyPort({ supportKekPath });
+    const sourcePseudonym = createEvalSourcePseudonym(keys);
     const sessionRepository = new PostgresSupportSessionRepository(
       database.pool,createWrappedSupportSessionKey(keys)
     );
@@ -438,6 +449,9 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
     });
     const support: SupportApplication = Object.freeze({
       configuration: Object.freeze({ current: async () => EVAL_CONFIGURATION }),
+      // DL5-F3 / FW-E: production's keyed derivation. The harness DOES store
+      // this value, under a CHECK that only 64 lowercase hex characters pass.
+      sourcePseudonym,
       sessions: Object.freeze({
         create: sessionRepository.create.bind(sessionRepository),
         read: sessionRepository.read.bind(sessionRepository),
@@ -471,7 +485,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
           ? testSessionHeaders(EVAL_IDENTITY,true) : {};
         const opened = await activeServer.inject({
           method: "POST",url: "/v1/support/sessions",
-          headers: { ...identityHeaders,"x-forwarded-for": ip },
+          // DL1-F7: the browser this harness stands in for sends the Origin.
+          headers: { origin: TEST_APP_ORIGIN,...identityHeaders,"x-forwarded-for": ip },
           payload: { language: testCase.expectedLanguage }
         });
         if (opened.statusCode !== 201) throw new TypeError("SUPPORT_EVAL_SESSION_FAILED");
@@ -484,7 +499,8 @@ export async function createInProcessSupportEvalExecutor(input: Readonly<{
           response = await activeServer.inject({
             method: "POST",url: `/v1/support/sessions/${capability.session.session_id}/messages`,
             headers: {
-              ...identityHeaders,"x-support-session-token": capability.session_token,
+              origin: TEST_APP_ORIGIN,...identityHeaders,
+              "x-support-session-token": capability.session_token,
               "x-forwarded-for": ip
             },
             payload: { text: message.content }

@@ -1266,11 +1266,24 @@ async function lockShredTargetRows(
     ORDER BY case_id
     FOR UPDATE
   `, [caseIds])).rows;
+  // DL2-F1: a plain SELECT, deliberately. `SELECT ... FOR UPDATE` needs UPDATE on
+  // at least one column of the relation, and support.shred_audit is append-only
+  // for the only principal that ever runs a shred: 0054:875 grants
+  // debateai_support SELECT and INSERT there, and the boot attestation
+  // (assertSupportDatabaseRole, below) refuses any UPDATE grant on it — so the
+  // lock clause made every shredOwner/shredSession abort with 42501, and the
+  // suite only passed because it ran as the embedded superuser. Widening the
+  // grant would end the table's append-only promise; the lock is not needed:
+  // both entry points already hold the owner or session advisory lock for the
+  // whole transaction (lockSupportOwners / lockSupportSessions above, which are
+  // keyed on exactly the (target_kind, target_ref) pair read here), and a second
+  // writer that somehow got past them fails closed on
+  // support_shred_audit_target_unique UNIQUE (target_kind, target_ref) (0054:257)
+  // at the INSERT in destroyLockedShredTarget.
   const audit = (await client.query<ShredAuditRow>(`
     SELECT at,os_user,target_kind,target_ref,keys_destroyed
     FROM support.shred_audit
     WHERE target_kind=$1 AND target_ref=$2
-    FOR UPDATE
   `, [targetKind, targetRef])).rows[0];
   return { sessions, cases, sessionKeys, caseKeys, audit };
 }
@@ -1354,6 +1367,87 @@ export class PostgresSupportShredRepository {
         supportShredFailure("SUPPORT_SHRED_SESSION_BOUND");
       }
       return destroyLockedShredTarget(client, target, "session", sessionId, osUser, at);
+    });
+  }
+}
+
+export type SupportWrappedKeyRow = Readonly<{
+  kind: "session" | "case";
+  ref: string;
+  wrappedKey: Buffer;
+  destroyed: boolean;
+}>;
+
+export type SupportKeyReplacement = Readonly<{
+  kind: "session" | "case";
+  ref: string;
+  previous: Uint8Array;
+  next: Uint8Array;
+}>;
+
+/**
+ * V-3. The two `bytea` columns a support-KEK rotation re-wraps. Reads and writes
+ * only `wrapped_key`; the envelope shape is unchanged (61 bytes, version byte 1),
+ * so no migration and no change to either table's CHECK constraint.
+ *
+ * The connection must be the `debateai_support` principal: it is the only role
+ * granted `UPDATE (wrapped_key, destroyed_at)` on these tables (0054:884-885).
+ */
+export class PostgresSupportKeyRotationRepository {
+  constructor(readonly pool: Pool) {}
+
+  async listWrappedKeys(): Promise<readonly SupportWrappedKeyRow[]> {
+    const rows = (await this.pool.query<{
+      kind: "session" | "case";
+      ref: string;
+      wrapped_key: Buffer;
+      destroyed: boolean;
+    }>(`
+      SELECT 'session' AS kind, key.session_id::text AS ref, key.wrapped_key,
+        key.destroyed_at IS NOT NULL AS destroyed
+      FROM support.session_key AS key
+      UNION ALL
+      SELECT 'case' AS kind, key.case_id::text AS ref, key.wrapped_key,
+        key.destroyed_at IS NOT NULL AS destroyed
+      FROM support.case_key AS key
+      ORDER BY kind, ref
+    `)).rows;
+    return Object.freeze(rows.map((row) => Object.freeze({
+      kind: row.kind,
+      ref: row.ref,
+      wrappedKey: Buffer.from(row.wrapped_key),
+      destroyed: row.destroyed
+    })));
+  }
+
+  /**
+   * Applies a whole batch in ONE transaction, so it is never half-written: an
+   * interrupted batch rolls back and the rotation re-does those rows, which are
+   * already-current no-ops if they had in fact landed.
+   *
+   * Each UPDATE is conditioned on the bytes the rotation READ still being there
+   * and on the row not having been destroyed since. A shred that lands
+   * mid-rotation therefore wins, and the row is reported as unchanged rather
+   * than resurrected.
+   */
+  async replaceWrappedKeys(replacements: readonly SupportKeyReplacement[]): Promise<number> {
+    if (replacements.length === 0) return 0;
+    return withSupportTransaction(this.pool, async (client) => {
+      let changed = 0;
+      for (const replacement of replacements) {
+        const statement = replacement.kind === "session"
+          ? `UPDATE support.session_key SET wrapped_key=$2
+             WHERE session_id=$1 AND destroyed_at IS NULL AND wrapped_key=$3`
+          : `UPDATE support.case_key SET wrapped_key=$2
+             WHERE case_id=$1 AND destroyed_at IS NULL AND wrapped_key=$3`;
+        const result = await client.query(statement, [
+          replacement.ref,
+          Buffer.from(replacement.next),
+          Buffer.from(replacement.previous)
+        ]);
+        changed += result.rowCount ?? 0;
+      }
+      return changed;
     });
   }
 }
@@ -2316,6 +2410,48 @@ async function supportRoleWitness(pool: Pool): Promise<SupportRoleWitness | unde
   `)).rows[0];
 }
 
+/**
+ * The refusal both role assertions raise. It carries a `code` as well as the
+ * message: an operator command prints `error.code`, and a bare TypeError made a
+ * wrong-role run print UNKNOWN — the one shape the typed-refusal rule exists to
+ * eliminate.
+ */
+function supportDatabaseRoleInvalid(): TypeError {
+  return Object.assign(new TypeError("SUPPORT_DATABASE_ROLE_INVALID"), {
+    code: "SUPPORT_DATABASE_ROLE_INVALID"
+  });
+}
+
+/**
+ * The SUPPORT half, on its own: this connection really is the `debateai_support`
+ * principal, with exactly the privileges that role is meant to have and nothing
+ * outside the support schema.
+ *
+ * Exported for a caller that only ever touches support data and should not hold
+ * the runtime credential to prove it — `apps/runner/src/rotate-kek-cli.ts` writes
+ * two support key columns and opens no other pool. `assertSupportDatabaseRole`
+ * below adds the runtime half for the API, which DOES hold both.
+ */
+export async function assertSupportPrincipalRole(supportPool: Pool): Promise<void> {
+  const support = await supportRoleWitness(supportPool);
+  if (support === undefined
+    || support.session_principal !== support.principal
+    || support.rolsuper || support.rolcreaterole || support.rolcreatedb
+    || support.rolreplication || support.rolbypassrls
+    || !support.support_member || support.forbidden_member
+    || support.dangerous_builtin_member || support.owns_database_or_schema
+    || support.direct_support_acl
+    || JSON.stringify(support.direct_roles) !== JSON.stringify(["debateai_support"])
+    || support.support_select_count !== "16" || support.support_insert_count !== "16"
+    || support.support_relation_count !== "17"
+    || !support.support_application_matrix_valid || !support.support_guard_inaccessible
+    || support.support_column_update_count !== "13"
+    || support.support_forbidden_column_update
+    || support.support_forbidden_privilege || support.outside_table_privilege) {
+    throw supportDatabaseRoleInvalid();
+  }
+}
+
 /** Fail closed before the API begins accepting support traffic. */
 export async function assertSupportDatabaseRole(
   runtimePool: Pool,
@@ -2355,24 +2491,13 @@ export async function assertSupportDatabaseRole(
           current_user,oid,'SELECT,INSERT')) FROM resolved),false)
           AS support_table_privilege
     `).then(({ rows }) => rows[0]),
-    supportRoleWitness(supportPool)
+    assertSupportPrincipalRole(supportPool)
   ]);
+  // The support half is asserted above, by the one implementation of it; what
+  // remains here is the runtime half — the ordinary principal must NOT be able
+  // to reach support data.
   if (runtime === undefined || runtime.support_member || runtime.support_schema_usage
-    || !runtime.support_structure_valid || runtime.support_table_privilege
-    || support === undefined
-    || support.session_principal !== support.principal
-    || support.rolsuper || support.rolcreaterole || support.rolcreatedb
-    || support.rolreplication || support.rolbypassrls
-    || !support.support_member || support.forbidden_member
-    || support.dangerous_builtin_member || support.owns_database_or_schema
-    || support.direct_support_acl
-    || JSON.stringify(support.direct_roles) !== JSON.stringify(["debateai_support"])
-    || support.support_select_count !== "16" || support.support_insert_count !== "16"
-    || support.support_relation_count !== "17"
-    || !support.support_application_matrix_valid || !support.support_guard_inaccessible
-    || support.support_column_update_count !== "13"
-    || support.support_forbidden_column_update
-    || support.support_forbidden_privilege || support.outside_table_privilege) {
-    throw new TypeError("SUPPORT_DATABASE_ROLE_INVALID");
+    || !runtime.support_structure_valid || runtime.support_table_privilege) {
+    throw supportDatabaseRoleInvalid();
   }
 }

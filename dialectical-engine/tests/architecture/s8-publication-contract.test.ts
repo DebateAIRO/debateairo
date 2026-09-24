@@ -60,13 +60,17 @@ describe("Accounts S8 publication architecture", () => {
     expect(environment).toContain("AUTHORIZATION_DATABASE_URL_MUST_BE_SEPARATE");
     expect(main).toContain("assertPublicationDatabaseRoleSeparation");
     expect(main).toContain("authorizationPool");
+    // DL7-F7: registered with the boot custody ledger as it is made.
     expect(main).toContain(
-      "const authorizationPool = createPool(environment.AUTHORIZATION_DATABASE_URL!)"
+      "const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!))"
     );
     expect(main).not.toMatch(
       /const authorizationPool = environment\.PUBLICATION_ENABLED === "true"/
     );
-    expect(main).toContain("loadKek(environment.CORPUS_KEK_PATH");
+    // V-3 (A-C2): the corpus key is loaded as a ring — current, plus the
+    // previous one for the length of a changeover — through the same
+    // custody-checked loader, and only when publication is enabled.
+    expect(main).toContain("loadKekRing(environment.CORPUS_KEK_PATH!, environment.CORPUS_KEK_PREVIOUS_PATH");
     expect(main).toContain("FilePublicationKeyStore");
     const domainAttestation = main.slice(
       main.indexOf("assertPublicationSecretDomains({"),

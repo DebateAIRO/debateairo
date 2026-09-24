@@ -261,7 +261,73 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
     });
   });
 
-  it("hydrates private library model dots from the owned served answer", async () => {
+  it("DL3-F2: carries the model lineage the index row already states", async () => {
+    const answer = buildFairShapedAnswer();
+    const client = {
+      readAnswerIndex: async () => ({
+        items: [{
+          answer_id: answer.answer_id,
+          run_ref: answer.run_ref,
+          answer_version: answer.answer_version,
+          question_line: answer.question_line,
+          verdict_state: answer.verdict_state,
+          abstention: answer.abstention,
+          serve_state: answer.serve_state,
+          staleness_state: answer.staleness_state,
+          builds_on_previous: answer.builds_on_previous.value,
+          created_at_sequence: 1,
+          models: ["gpt-5"]
+        }],
+        open_runs: [],
+        limit: 50,
+        offset: 0,
+        total: 1
+      }),
+      readAnswer: async () => {
+        throw new Error("PER_ROW_ANSWER_READ_FORBIDDEN");
+      }
+    } as unknown as ContractClient;
+
+    const page = await listDebatesPageServer("session", client);
+
+    expect(page.summaries[0]?.models).toEqual(["gpt-5"]);
+  });
+
+  it("DL3-F2: a fifty-row library page costs exactly one upstream call", async () => {
+    const answer = buildFairShapedAnswer();
+    const upstream: string[] = [];
+    const items = Array.from({ length: 50 }, (_unused, index) => ({
+      answer_id: `answer:${index}`,
+      run_ref: `run:${index}`,
+      answer_version: answer.answer_version,
+      question_line: `Question ${index + 1}`,
+      verdict_state: answer.verdict_state,
+      abstention: answer.abstention,
+      serve_state: answer.serve_state,
+      staleness_state: answer.staleness_state,
+      builds_on_previous: answer.builds_on_previous.value,
+      created_at_sequence: index + 1,
+      models: ["gpt-5"]
+    }));
+    const client = {
+      readAnswerIndex: async () => {
+        upstream.push("readAnswerIndex");
+        return { items, open_runs: [], limit: 50, offset: 0, total: 50 };
+      },
+      readAnswer: async (answerId: string) => {
+        upstream.push(`readAnswer:${answerId}`);
+        return { ...answer, answer_id: answerId };
+      }
+    } as unknown as ContractClient;
+
+    const page = await listDebatesPageServer("session", client);
+
+    expect(upstream).toEqual(["readAnswerIndex"]);
+    expect(page.summaries).toHaveLength(50);
+    expect(page.summaries.every((summary) => summary.models.length === 1)).toBe(true);
+  });
+
+  it("DL3-F2: an index row without stated lineage renders typed absence, never an invented model", async () => {
     const answer = buildFairShapedAnswer();
     const client = {
       readAnswerIndex: async () => ({
@@ -281,44 +347,12 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
         limit: 50,
         offset: 0,
         total: 1
-      }),
-      readAnswer: async () => answer
+      })
     } as unknown as ContractClient;
 
     const page = await listDebatesPageServer("session", client);
 
-    expect(page.summaries[0]?.models).toEqual(["gpt-5"]);
-  });
-
-  it("hydrates private model dots without overlapping reads on the shared contract client", async () => {
-    const answer = buildFairShapedAnswer();
-    let readActive = false;
-    const items = ["answer:first", "answer:second"].map((answerId, index) => ({
-      answer_id: answerId,
-      run_ref: `run:${index + 1}`,
-      answer_version: answer.answer_version,
-      question_line: `Question ${index + 1}`,
-      verdict_state: answer.verdict_state,
-      abstention: answer.abstention,
-      serve_state: answer.serve_state,
-      staleness_state: answer.staleness_state,
-      builds_on_previous: answer.builds_on_previous.value,
-      created_at_sequence: index + 1
-    }));
-    const client = {
-      readAnswerIndex: async () => ({ items, open_runs: [], limit: 50, offset: 0, total: 2 }),
-      readAnswer: async (answerId: string) => {
-        if (readActive) throw new Error("OVERLAPPING_READ");
-        readActive = true;
-        await Promise.resolve();
-        readActive = false;
-        return { ...answer, answer_id: answerId };
-      }
-    } as unknown as ContractClient;
-
-    const page = await listDebatesPageServer("session", client);
-
-    expect(page.summaries.map((summary) => summary.models)).toEqual([["gpt-5"], ["gpt-5"]]);
+    expect(page.summaries[0]?.models).toEqual([]);
   });
 
   it("labels ways of knowing without inventing lens names", () => {
@@ -798,6 +832,9 @@ describe("v2-ui data access over the V3 contract client", () => {
         tier_source: "MACHINE_DEFAULT",
         tier_provenance_ref: "machine:deployment-floor",
         composition_budget_tier: "low",
+        // SYNC3: dev's debate tiers (b866191f) made the plan tier a required,
+        // user-supplied ask field; the UI invents no ask values.
+        plan_tier: "free",
         depth: 1,
         decision_scope: "scope",
         as_of: "2026-08-10T00:00:00.000Z"
@@ -811,6 +848,7 @@ describe("v2-ui data access over the V3 contract client", () => {
       risk_tier: "casual",
       tier_source: "MACHINE_DEFAULT",
       tier_provenance_ref: "machine:deployment-floor",
+      plan_tier: "free",
       depth_params: { depth: 1 }
     });
   });

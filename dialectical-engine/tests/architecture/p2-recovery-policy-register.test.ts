@@ -118,8 +118,11 @@ describe("P2-02 sealed recovery-policy register", () => {
     expect(devSeed).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(devSeed).toContain("buildDevelopmentDeploymentRegisterPublicationRows");
     expect(devSeed).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");
-    const readIndex = apiMain.indexOf("await readRecoveryPolicy(pool, environment.REGISTER_VERSION)");
-    const workerIndex = apiMain.indexOf("new Argon2WorkerPool()");
+    // DL7-F7: the read is a named boot stage now, owned by the custody ledger.
+    const readIndex = apiMain.indexOf(
+      'boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION))'
+    );
+    const workerIndex = apiMain.indexOf("new Argon2WorkerPool(") /* pin updated 2026-09-02: pool takes options (L2-F9) */;
     expect(readIndex).toBeGreaterThan(-1);
     expect(workerIndex).toBeGreaterThan(readIndex);
   });

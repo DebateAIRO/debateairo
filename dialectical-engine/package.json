@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:s00": "vitest run tests/unit tests/integration tests/architecture",
+    "test:ci-gate": "node tools/ci-known-red.mjs tests/unit tests/architecture",
     "lint": "pnpm run audit:architecture && pnpm run audit:source",
     "audit:architecture": "tsx tools/orphan-audit/src/cli.ts architecture",
     "audit:source": "tsx tools/orphan-audit/src/cli.ts source",
@@ -23,6 +24,7 @@
     "generate:legal:check": "node apps/ui/scripts/generate-legal-data.mjs --check",
     "db:migrate": "tsx apps/runner/src/migrate-cli.ts",
     "db:provision-principals": "tsx apps/runner/src/production-database-principals-cli.ts",
+    "keys:rotate-kek": "tsx apps/runner/src/rotate-kek-cli.ts",
     "dev:auth:provision-principals": "tsx apps/runner/src/dev-database-principals-cli.ts",
     "dev:auth:generate-secrets": "tsx apps/runner/src/dev-secret-files-cli.ts",
     "dev:auth:seed-register": "tsx apps/runner/src/dev-deployment-register-cli.ts",
@@ -55,7 +57,7 @@
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
-    "fastify": "5.11.2",
+    "fastify": "5.12.1",
     "pg": "8.22.0",
     "zod": "4.4.3"
   },
@@ -85,7 +87,6 @@
     "@debateai/valuation": "workspace:*",
     "@types/node": "26.2.0",
     "@types/pg": "8.21.0",
-    "drizzle-kit": "0.31.10",
     "embedded-postgres": "18.4.0-beta.17",
     "fast-check": "4.9.0",
     "jsdom": "^30.0.1",

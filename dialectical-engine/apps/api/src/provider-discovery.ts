@@ -3,7 +3,17 @@ import type {
   ProviderProbeRecord
 } from "@debateai/db";
 import { probeTarget, type ProviderDiscoveryTarget } from "@debateai/providers";
-export { parseProviderDiscoveryTargets } from "@debateai/providers";
+export {
+  assertDeploymentProviderTargets,
+  assertHostedProviderTargets,
+  // V-28: the hosted DEBATE targets' price rule — deliberately its own
+  // assertion, because the support chat's target shares the mode decision above
+  // but keeps its own spend accounting (task 12).
+  assertPricedProviderTargets,
+  assertProductionProviderTargets,
+  parseProviderDiscoveryTargets,
+  resolveProviderTargetCredentials
+} from "@debateai/providers";
 
 export type ProviderDiscoveryProbeStore = Readonly<{
   readLatest(providerRefs: readonly string[]): Promise<readonly ProviderProbeRecord[]>;

@@ -45,3 +45,20 @@ dialectical-engine/apps/**/.next-build*/
 **/.pgdata/
 **/.pgdata-*
 **/.pgdata-*/
+
+# Browser-automation session logs (were tracked once; contain page dumps)
+.playwright-mcp/
+# Local env files are never source; the *.example files are.
+**/.env.local
+**/.env.*.local
+# Dev custody (keys, tokens, credentials, TLS). Mirrors dialectical-engine/.gitignore.
+**/.local/
+
+# Bulky machine recordings (V-7, 2026-09-22). Two CLASSES, never whole folders: the written
+# records that sit in the same directories are the mission's evidence and stay tracked, as does
+# the one .jsonl codex-session test fixture under acceptance/test-fixtures/. Untracked on
+# 2026-09-22 (110 Playwright trace archives, 466.0 MiB; 22 AI-session transcripts, 49.1 MiB);
+# git history keeps every byte — no rewrite (R1). The commit that still carries them is named in
+# dialectical-engine/docs/missions/2026-09-01-security-hardening/UNTRACKED-EVIDENCE-2026-09-22.md.
+dialectical-engine/.hermes/reports/**/*.zip
+dialectical-engine/docs/missions/**/logs/**/*.jsonl

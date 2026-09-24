@@ -1,5 +1,6 @@
 import type { WayOfKnowing } from "@debateai/kernel";
 import { TypedDomainError } from "@debateai/kernel";
+import type { PromptContract } from "@debateai/providers";
 
 /**
  * T9 — the synthesis serve chain (goal-v4 222-270; rulings S6-1..S6-4,
@@ -448,8 +449,18 @@ export function buildEvaluatorRequest(input: {
 
 /**
  * W9 / V-MINIMUM-PAYLOAD (2026-09-03): the ONE model-facing projection of a
- * synthesis request. Both runner call sites send exactly this string, and
+ * synthesis request. Both runner call sites send exactly these fields, and
  * `tests/unit/prompt-surface-guard.test.ts` pins that they do.
+ *
+ * RUN1 (V-11 addendum, DL4-F4/L4-F11) changed its RETURN SHAPE, not its rule.
+ * It used to render one `JSON.stringify` blob that carried the engine's own
+ * `instructions` and `role` beside the model-authored digest, the candidate
+ * statement and the prior objection — instructions and untrusted material in
+ * one compartment, with no framing that said which was which. It now returns
+ * the MATERIAL FIELDS alone; `instructions` and `role` moved to the prompt
+ * contract in the system message, where an injected line inside the digest
+ * cannot reach them. The allow-list discipline below is unchanged: a field
+ * added to a request type later is withheld by CONSTRUCTION.
  *
  * It is an ALLOW-LIST, not a delete-list, and that is the whole point. The
  * request key sets are FIXED (`assertFreshContextRequest` enforces them), and
@@ -469,38 +480,34 @@ export function buildEvaluatorRequest(input: {
  *  · `priorCandidateRef` — an artifact ADDRESS, the same class as `roleRef`, and
  *    absent from the ruling's kept-list. Withheld on that reading; see the guard.
  *
- * KEPT, because the tasks depend on them: `instructions`, `digest`, the code
- * label's real numbers, `candidateStatement` (the evaluator's entire job) and
+ * KEPT, because the tasks depend on them: `digest`, the code label's real
+ * numbers, `candidateStatement` (the evaluator's entire job) and
  * `priorObjection` on a retry (without it a rewrite is blind and can only repeat
- * itself). `role` names the task the payload IS and is not machinery.
+ * itself). `instructions` and `role` are kept too, in the system message.
  *
  * Nothing leaves the REQUEST object: `assertFreshContextRequest` inspects the
  * request, the audit record keeps full provenance, and the frozen key sets above
  * are untouched. V's rule is RECORDED and WITHHELD, never forgotten.
  */
-export function toSynthesisPromptPayload(
+export function toSynthesisPromptMaterial(
   request: SynthesizerRequest | EvaluatorRequest
-): string {
+): readonly { readonly name: string; readonly content: string }[] {
   const codeLabel = {
     verdictLabel: request.codeLabel.verdictLabel,
     servedNodeId: request.codeLabel.servedNodeId,
     servedStrength: request.codeLabel.servedStrength,
     margin: request.codeLabel.margin
   };
-  const task = {
-    role: request.role,
-    instructions: request.instructions,
-    digest: request.digest,
-    codeLabel
-  };
+  const fields = [
+    { name: "digest", content: JSON.stringify(request.digest) },
+    { name: "code_label", content: JSON.stringify(codeLabel) }
+  ];
   if (request.role === "EVALUATOR") {
-    return JSON.stringify({ ...task, candidateStatement: request.candidateStatement });
+    fields.push({ name: "candidate_statement", content: request.candidateStatement });
+  } else if (request.stage === "RETRY") {
+    fields.push({ name: "prior_objection", content: request.priorObjection });
   }
-  return JSON.stringify(
-    request.stage === "RETRY"
-      ? { ...task, priorObjection: request.priorObjection }
-      : task
-  );
+  return Object.freeze(fields);
 }
 
 /* -------------------------------------------------------------------- loop */
@@ -713,3 +720,25 @@ export async function runSynthesisLoop<TCandidate>(
     marks: Object.freeze(standingObjection === null ? [] : [SYNTHESIS_OBJECTION_STANDING_MARK])
   });
 }
+
+
+/* ------------------------------------------- V-11: the two prompt contracts */
+
+/**
+ * The SYNTHESIZER's required answer form. Moved verbatim out of
+ * `apps/runner/src/index.ts`, where it was the system message; it is code's
+ * half of the prompt and an instruction edit cannot drop it.
+ */
+export const SYNTHESIZER_ANSWER_FORM =
+  "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. "
+  + "node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing "
+  + "claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites "
+  + "rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in "
+  + "order: the first segment states the provisional answer as a hypothesis; the second segment states the research "
+  + "plan that would lift it.";
+
+export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: "serve.synthesizer.v1",
+  instruction: SYNTHESIZER_INSTRUCTIONS,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});

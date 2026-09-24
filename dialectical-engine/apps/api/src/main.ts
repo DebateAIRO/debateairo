@@ -6,25 +6,31 @@ import {
   Argon2WorkerPool,
   AuditContextHasher,
   assertPublicationSecretDomains,
+  configureCustodyGroup,
   ContentCipher,
   FilePublicationKeyStore,
   FileRunContentKeyStore,
   FileUserDekStore,
-  loadKek,
+  loadKekRing,
   loadSecretKey,
-  PublicationCipher
+  PublicationCipher,
+  readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import type { RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
+  assertHostedCostEnvelopesSealed,
+  assertHostedSupportAdmissionSealed,
   loadApiEnvironment,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
   computeStructuralCeilingBasis,
   readEnvelopeFormulaInputs,
   readPanelDiscoveryPolicy,
+  readAdmissionPolicy,
+  readCostEnvelopePolicy,
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
@@ -33,6 +39,9 @@ import {
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
+// V-28 (DL4-F2): the application-wide daily spending ceiling, over the persisted
+// model-spend ledger migration 0066 created.
+import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
@@ -41,6 +50,7 @@ import {
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
+import { AdmissionLimiter } from "./admission.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
@@ -52,18 +62,24 @@ import {
   createSingleFlightErasureReconciler,
   PostgresAccountErasureApplication
 } from "./account-erasure.js";
+import { installBootCustody } from "./boot-custody.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
+  assertDeploymentProviderTargets,
+  assertPricedProviderTargets,
   createProviderDiscoveryResolver,
-  parseProviderDiscoveryTargets
+  parseProviderDiscoveryTargets,
+  resolveProviderTargetCredentials
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
 import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
-import { RelayAdapter,parseSupportModelTargetJson } from "./support/model.js";
+import {
+  createSupportModelAdapter,parseSupportModelTargetJson,type SupportModelPort
+} from "./support/model.js";
 import {
   SupportModelReservationLedger,createReservedSupportModelPort
 } from "./support/model-reservation.js";
@@ -74,6 +90,18 @@ import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
+// V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
+// vendor, which is itself a model call — until the per-run and daily cost
+// envelopes are sealed. The seam is `readSealedCostEnvelopeStatus` in
+// @debateai/register, which task 11 replaces. Local mode is untouched.
+assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
+/**
+ * The reviewed support knowledge base, its review manifest and its recovery
+ * components (dev's SUP rework). Loading can refuse (SUPPORT_KB_*), and it is
+ * SYNCHRONOUS: it stays here, before `installBootCustody()`, where no key or
+ * secret has been loaded yet — a refusal at this line leaves nothing live to
+ * zero, which is why it needs no ledger stage (DL7-F7).
+ */
 const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"),{
   reviewManifest: JSON.parse(readFileSync(
     resolve("packages/support-kb/reviews/manifest.json"),"utf8"
@@ -82,79 +110,158 @@ const supportKnowledge = loadHelpCorpus(resolve("packages/support-kb/content"),{
   requireReviewedRecovery: true
 });
 const supportKnowledgeSnapshots = createHelpCorpusSnapshotLookup(supportKnowledge);
-const kek = loadKek(environment.KEK_PATH);
-const corpusKek = environment.PUBLICATION_ENABLED === "true"
-  ? loadKek(environment.CORPUS_KEK_PATH!) : undefined;
+// V-19: before the first key file is opened, so a group this host cannot
+// resolve refuses at boot instead of at the first private debate.
+configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
+/**
+ * DL7-F7. Custody of the boot's own secrets, from the first key load until the
+ * startup resource owner exists. Everything registered here is zeroed or closed
+ * if a later stage fails, so a boot that stops at, say, an unresolved register
+ * row no longer exits with three KEKs live in memory.
+ */
+const boot = installBootCustody();
+/**
+ * V-3 (fix wave A-C2). The KEK a service holds is a RING: the current key and,
+ * for the length of a changeover, the previous one. Reads try current then
+ * previous; every write uses the current key; verification is current-alone.
+ * With no `*_KEK_PREVIOUS_PATH` set — the steady state — each ring is exactly
+ * the single key this root has always built.
+ *
+ * Both handles are held by the boot ledger the moment they exist (DL7-F7), so a
+ * stage that rejects mid-boot zeroes the previous key too — and the LOAD itself
+ * runs under the ledger, because it can refuse between the two: a missing,
+ * short or duplicate previous key file throws with the current key already
+ * held, which is the residual A-I2 closes.
+ */
+const userKeks = boot.runSync("user-dek-kek", () => loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle)));
+const kek = userKeks.current;
+const corpusKeks = environment.PUBLICATION_ENABLED === "true"
+  ? boot.runSync("corpus-kek", () => loadKekRing(environment.CORPUS_KEK_PATH!, environment.CORPUS_KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle)))
+  : undefined;
+const corpusKek = corpusKeks?.current;
 const blindIndexKey = loadSecretKey(environment.BLIND_INDEX_KEY_PATH);
 const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
-if (corpusKek !== undefined) {
-  assertPublicationSecretDomains({
-    privateKek: kek,
+// DL7-F7: two plain secret buffers, held the moment they exist. Each has an
+// owner LATER in the boot — the salt is zeroed once the hasher has copied it,
+// the blind-index key once the session service holds it — and every stage in
+// between can reject. Zeroing twice is harmless; not zeroing once is the
+// finding.
+boot.hold({ end: async () => { blindIndexKey.fill(0); } });
+boot.hold({ end: async () => { sourceIpSalt.fill(0); } });
+// L2-F8: this guarded the whole check on publication being enabled, so a
+// private-only deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one
+// file and boot. The private domains are always checked; the corpus KEK and
+// publication store join the same check only when publication is on.
+await boot.run("publication-secret-domains", async () => assertPublicationSecretDomains({
+  privateKek: kek,
+  ...(corpusKek === undefined ? {} : {
     corpusKek,
-    privateKekPath: environment.KEK_PATH,
     corpusKekPath: environment.CORPUS_KEK_PATH!,
-    privateStorePath: environment.USER_DEK_STORE_PATH,
-    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!,
-    additionalSecrets: [
-      { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
-      { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
-    ],
-    additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
-  });
-}
-const pool = createPool(environment.DATABASE_URL);
-const authorizationPool = createPool(environment.AUTHORIZATION_DATABASE_URL!);
+    publicationStorePath: environment.PUBLICATION_KEY_STORE_PATH!
+  }),
+  privateKekPath: environment.KEK_PATH,
+  privateStorePath: environment.USER_DEK_STORE_PATH,
+  // V-3 (fix round 1): a changeover's previous keys are this process's key
+  // material too, so they join the same pairwise domain check.
+  previousKeks: [
+    ...(userKeks.previous === undefined
+      ? [] : [{ handle: userKeks.previous, path: environment.KEK_PREVIOUS_PATH! }]),
+    ...(corpusKeks?.previous === undefined
+      ? [] : [{ handle: corpusKeks.previous, path: environment.CORPUS_KEK_PREVIOUS_PATH! }])
+  ],
+  additionalSecrets: [
+    { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
+    { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
+  ],
+  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
+}));
+const pool = boot.hold(createPool(environment.DATABASE_URL));
+const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!));
 const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
-  ? createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!) : pool;
+  ? boot.hold(createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!)) : pool;
 // Cleanup remains necessary when new encrypted writes are disabled: an intent
 // left by an earlier enabled process must not abort every erasure cycle under
 // the ordinary runtime principal.
-const contentProvisionPool = createPool(environment.CONTENT_PROVISION_DATABASE_URL);
+const contentProvisionPool = boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
 // Ask admission holds a session advisory lock while the count-changing run
 // commit uses that same backend. Keep both principal paths on explicit pool
 // instances so lock waiters cannot consume ordinary runtime/provision capacity.
-const serverAskAdmissionPool=createPool(environment.CONTENT_PROVISION_DATABASE_URL);
-const legacyAskAdmissionPool=createPool(environment.DATABASE_URL);
-if (serverAskAdmissionPool === contentProvisionPool
-  || serverAskAdmissionPool === pool
-  || legacyAskAdmissionPool === pool
-  || legacyAskAdmissionPool === contentProvisionPool
-  || legacyAskAdmissionPool === serverAskAdmissionPool) {
-  throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
-}
-const erasurePool = createPool(environment.ERASURE_DATABASE_URL);
-try {
-  await Promise.all([
-    assertAccountErasureDatabaseRole(pool,erasurePool),
-    assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool),
-    assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
-    ...(environment.PUBLICATION_ENABLED === "true" ? [
-      assertPublicationCleanupDatabaseRole(publicationCleanupPool)
-    ] : []),
-    assertContentProvisionDatabaseRole(pool,contentProvisionPool),
-    assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool)
-  ]);
-} catch (error) {
-  await Promise.allSettled([...new Set([
-    pool,authorizationPool,publicationCleanupPool,contentProvisionPool,
-    serverAskAdmissionPool,legacyAskAdmissionPool,erasurePool
-  ])].map(async (databasePool) => databasePool.end()));
-  throw error;
-}
-const authPolicy = await readAuthPolicy(pool, environment.REGISTER_VERSION);
-const mfaPolicy = await readMfaPolicy(pool, environment.REGISTER_VERSION);
-const sessionPolicy = await readSessionPolicy(pool, environment.REGISTER_VERSION);
-const recoveryPolicy = await readRecoveryPolicy(pool, environment.REGISTER_VERSION);
-await readProductRolePolicy(pool, environment.REGISTER_VERSION);
+const serverAskAdmissionPool=boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
+const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL));
+await boot.run("ask-admission-pools", async () => {
+  if (serverAskAdmissionPool === contentProvisionPool
+    || serverAskAdmissionPool === pool
+    || legacyAskAdmissionPool === pool
+    || legacyAskAdmissionPool === contentProvisionPool
+    || legacyAskAdmissionPool === serverAskAdmissionPool) {
+    throw new TypeError("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
+  }
+});
+const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL));
+// DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
+// now, and it covers the KEKs the old one never reached.
+await boot.run("database-roles", () => Promise.all([
+  assertAccountErasureDatabaseRole(pool,erasurePool),
+  assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool),
+  assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
+  ...(environment.PUBLICATION_ENABLED === "true" ? [
+    assertPublicationCleanupDatabaseRole(publicationCleanupPool)
+  ] : []),
+  assertContentProvisionDatabaseRole(pool,contentProvisionPool),
+  assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool)
+]));
+const authPolicy = await boot.run("auth-policy", () => readAuthPolicy(pool, environment.REGISTER_VERSION));
+const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environment.REGISTER_VERSION));
+const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(pool, environment.REGISTER_VERSION));
+const recoveryPolicy = await boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION));
+const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION));
+/**
+ * TASK 11 AMENDMENT (V-28, from task 8's review). The support chat's three
+ * admission budgets are OPTIONAL members of the row, so a host pinned to an
+ * older `REGISTER_VERSION` runs unmetered support reads and an unshared model
+ * cap and says nothing. Hosted refuses; local keeps today's fail-open path.
+ *
+ * It is taken HERE and not beside `assertHostedCostEnvelopesSealed` at the top
+ * of this file, because the question is about the row IN FORCE at this
+ * deployment's register version — which needs the pool that only exists by now.
+ * It is still the earliest moment the question can be asked.
+ */
+await boot.run("support-admission-scopes", async () => {
+  assertHostedSupportAdmissionSealed(environment.DEPLOYMENT_MODE, admissionPolicy);
+});
+/**
+ * V-28(2): the application-wide daily ceiling, read from the row in force. In
+ * local mode there is no money to bound and the guard is not built at all, so
+ * `assertDailyCostEnvelope` is absent below and every ask is admitted exactly as
+ * it is today.
+ */
+const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
+  ? new CostEnvelopeGuard({
+      store: new PostgresModelSpendStore(pool),
+      policy: await boot.run("cost-envelope-policy",
+        () => readCostEnvelopePolicy(pool, environment.REGISTER_VERSION))
+    })
+  : undefined;
+await boot.run("product-role-policy", () => readProductRolePolicy(pool, environment.REGISTER_VERSION));
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
 // instance, and every worker completes its ready handshake before `listen`, so
 // no request can arrive while a worker is still booting.
-const argon2Pool = new Argon2WorkerPool();
-await argon2Pool.ready();
+// L2-F9: the pool cannot end the process itself, and a latched breaker means
+// every credential route fails closed forever. `shutdown` does not exist yet at
+// this point in the boot order, so the handler is late-bound; before it is
+// installed the fallback still marks the process for its supervisor.
+let announceArgon2BreakerTrip = (): void => { process.exitCode = 75; };
+const argon2Pool = new Argon2WorkerPool({
+  onBreakerTripped: () => { announceArgon2BreakerTrip(); }
+});
+boot.hold({ end: () => argon2Pool.close() });
+await boot.run("argon2-pool", () => argon2Pool.ready());
 const auditContextHasher = new AuditContextHasher(
   argon2Pool, sourceIpSalt, authPolicy.auditSourceIpKdf
 );
+// The hasher holds the Argon2 salt copy; it closes with the rest of the boot.
+boot.hold({ end: async () => auditContextHasher.close() });
 const identityRepository = new PostgresIdentityRepository(pool, auditContextHasher);
 sourceIpSalt.fill(0);
 const hatchet = new Hatchet({
@@ -163,12 +270,23 @@ const hatchet = new Hatchet({
   tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
 });
 const dispatcher = new HatchetDispatcher(hatchet, environment.HATCHET_WORKFLOW_NAME);
-const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
-const discoveryPolicy = await readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION);
-if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
-  throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
-}
-const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION);
+const deploymentMakers = await boot.run("deployment-makers", () => readDeploymentMakerCapability(pool, environment.REGISTER_VERSION));
+const discoveryPolicy = await boot.run("discovery-policy", () => readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION));
+/**
+ * DL7-F7 (fix wave A-I2): a SYNCHRONOUS decision answers to the boot ledger
+ * like every awaited one. A hosted first boot whose vendor credential file is
+ * mis-permissioned refuses here — `PROVIDER_AUTHORIZATION_FILE_UNUSABLE` —
+ * and used to end the process by top-level throw with three KEKs, the
+ * blind-index key and the audit salt live in memory and no `api.boot.failed`
+ * line. `boot.runSync` closes the ledger newest-first and names the stage.
+ */
+const providerTargetsJson = boot.runSync("provider-discovery-targets", () => {
+  if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
+  }
+  return environment.PROVIDER_DISCOVERY_TARGETS_JSON;
+});
+const structuralInputs = await boot.run("structural-ceilings", () => readStructuralCeilingPolicyInputs(pool, environment.REGISTER_VERSION));
 /**
  * T17: the sealed `envelopeFormulaInputs` row (T16). The reader is the loud
  * stop — a deployment that never sealed the row cannot boot the API, so no ask
@@ -176,12 +294,28 @@ const structuralInputs = await readStructuralCeilingPolicyInputs(pool, environme
  * constants that used to be re-declared at the call site below now come from
  * this row, which seeds them from the same `engine-shape.ts` exports.
  */
-const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION);
+const envelopeFormulaInputs = await boot.run("envelope-formula-inputs", () => readEnvelopeFormulaInputs(pool, environment.REGISTER_VERSION));
 const probes = new ProviderProbeRepository(pool);
-const providerDiscoveryTargets = parseProviderDiscoveryTargets(
-  environment.PROVIDER_DISCOVERY_TARGETS_JSON,
-  deploymentMakers.configuredProviders
-);
+const declaredProviderTargets = boot.runSync("provider-targets", () => {
+  const declared = parseProviderDiscoveryTargets(
+    providerTargetsJson, deploymentMakers.configuredProviders
+  );
+  // V-9(c): the same mode decision the runner takes, over the same target set,
+  // and taken on the DECLARED targets — before any credential file is resolved.
+  assertDeploymentProviderTargets(declared, {
+    mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+  });
+  // V-28: and a hosted DEBATE target must carry its price, or its calls cannot
+  // be billed against the per-run and daily envelopes. Separate from the rule
+  // above because the support chat's target shares that one and keeps its own
+  // accounting.
+  assertPricedProviderTargets(declared, environment.DEPLOYMENT_MODE);
+  return declared;
+});
+// V-9(2): the ask-time health probe needs the same credential the runner uses, so
+// it resolves each vendor's file through the same custody-checked seam.
+const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
+  resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: providerDiscoveryTargets,
@@ -189,8 +323,13 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
 });
-const deploymentRiskTier = await readDeploymentRiskTier(pool, environment.REGISTER_VERSION);
-const dekStore = new FileUserDekStore(environment.USER_DEK_STORE_PATH, kek);
+const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
+// V-3: over the RING, so a record still wrapped by the previous key opens for
+// the length of a changeover. Writes stay under the current key. Under the
+// ledger (A-I2) because the construction refuses a store path that is not one
+// and a ring whose two keys are the same key.
+const dekStore = boot.runSync("user-dek-store", () =>
+  new FileUserDekStore(environment.USER_DEK_STORE_PATH, userKeks));
 const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository(
   pool,auditContextHasher,dekStore,recoveryPolicy.riskSignals.rawSignalRetentionMs,
   recoveryPolicy.riskSignals.maximumEvaluatorSignals
@@ -205,20 +344,21 @@ const recovery = new RecoveryStartService({
   enumerationFloorMs: authPolicy.verification.enumerationResponseFloorMs,
   publicResponsePolicy: recoveryPolicy.publicResponse
 });
-const runKeyStore = new FileRunContentKeyStore(
-  environment.USER_DEK_STORE_PATH,
-  dekStore,
-  async (ownerRef) => {
-    const resolved = await pool.query<{ user_id: string }>(
-      `SELECT user_id FROM identity."user"
-       WHERE owner_ref=$1 AND state='active'`,
-      [ownerRef]
-    );
-    const userId = resolved.rows[0]?.user_id;
-    if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
-    return userId;
-  }
-);
+const runKeyStore = boot.runSync("run-content-key-store", () =>
+  new FileRunContentKeyStore(
+    environment.USER_DEK_STORE_PATH,
+    dekStore,
+    async (ownerRef) => {
+      const resolved = await pool.query<{ user_id: string }>(
+        `SELECT user_id FROM identity."user"
+         WHERE owner_ref=$1 AND state='active'`,
+        [ownerRef]
+      );
+      const userId = resolved.rows[0]?.user_id;
+      if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
+      return userId;
+    }
+  ));
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   configureContentEncryption(pool, new ContentCipher(runKeyStore));
 }
@@ -246,7 +386,7 @@ const mfa = new MfaEnrollmentService({
   argon2: argon2Pool,
   policy: mfaPolicy
 });
-const sessions = await SessionService.create({
+const sessions = await boot.run("session-service", () => SessionService.create({
   repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
   riskSignals:authenticationRiskSignals,
   onRiskSignalFailure:(error)=>console.error(
@@ -258,7 +398,7 @@ const sessions = await SessionService.create({
   mfaPolicy,
   sessionPolicy,
   blindIndexKey
-});
+}));
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
@@ -267,6 +407,11 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,
   settlementWatchHandle: environment.SETTLEMENT_WATCH_HANDLE,
+  // V-28(2): asked FIRST of every new ask, before the panel is discovered —
+  // discovery probes the paid vendors, and a probe is itself a request.
+  ...(costEnvelopeGuard === undefined ? {} : {
+    assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
+  }),
   resolveDiscoveredPanel: resolveProviderPanel,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
@@ -297,9 +442,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
 }));
 const publicationCipher = environment.PUBLICATION_ENABLED === "true"
-  ? new PublicationCipher(new FilePublicationKeyStore(
-      environment.PUBLICATION_KEY_STORE_PATH!,corpusKek!
-    ))
+  ? boot.runSync("publication-key-store", () => new PublicationCipher(new FilePublicationKeyStore(
+      environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
+    )))
   : undefined;
 const publications = publicationCipher === undefined
   ? undefined
@@ -315,8 +460,15 @@ if (publications !== undefined) {
   // can accept traffic. Both bounded outboxes continue reconciling while the
   // process is live; an item failure is reported only after later items in the
   // same batch were given a chance to complete.
-  await publications.reconcileKeyProvisionCleanup();
-  await publications.reconcileKeyCleanup();
+  //
+  // DL7-F7 (fix round 1): these two run DURING the boot and were the last
+  // awaits outside the ledger — indented inside this block, which is exactly
+  // what the old line-based scan could not see. A publication pool that refuses
+  // here used to leave every key live and print no `api.boot.failed` line.
+  await boot.run("publication-key-cleanup", async () => {
+    await publications.reconcileKeyProvisionCleanup();
+    await publications.reconcileKeyCleanup();
+  });
   publicationCleanupTimer = setInterval(() => {
     void Promise.all([
       publications.reconcileKeyProvisionCleanup(),
@@ -374,22 +526,32 @@ const authenticationRiskCleanupTimer=setInterval(
 );
 authenticationRiskCleanupTimer.unref();
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
-  ? createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!)
+  ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!))
   : undefined;
 const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
-const supportPool = createPool(environment.SUPPORT_DATABASE_URL);
-const supportRelayLeasePool = createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 });
-const supportKeys = await createSupportKeyPort({
+const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL));
+const supportRelayLeasePool = boot.hold(
+  createPool(environment.SUPPORT_DATABASE_URL,{ max: 18 })
+);
+const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
   supportKekPath: environment.SUPPORT_KEK_PATH,
+  // V-3: the support envelope carries no key label, so a row written before a
+  // changeover is opened by trying the current key and then this one. Absent
+  // outside a changeover, which is the steady state.
+  previousSupportKekPath: environment.SUPPORT_KEK_PREVIOUS_PATH,
   protectedKeyPaths: [
     environment.KEK_PATH,
     environment.CORPUS_KEK_PATH,
     environment.BLIND_INDEX_KEY_PATH,
     environment.AUDIT_SOURCE_IP_SALT_PATH
   ].filter((path): path is string => path !== undefined)
-});
+}));
+// DL7-F7: the support KEK is the third key the boot holds, and every stage
+// after this one — the model target parse and eight repository constructions —
+// used to be able to throw with it live in memory.
+boot.hold({ end: () => supportKeys.close() });
 const supportSessions = new PostgresSupportSessionRepository(
   supportPool,
   createWrappedSupportSessionKey(supportKeys)
@@ -415,15 +577,23 @@ const supportRelayQueue = new SupportRelayQueue({
   reportCleanupFailure: reportSupportDiagnostic
 });
 const supportDegraded = new SupportDegradedState();
-const supportModelTarget = environment.SUPPORT_MODEL_TARGET_JSON === undefined
-  ? undefined : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON);
-const supportModels = new Map<string,RelayAdapter>(supportModelTarget === undefined ? [] : [[
+// V-30(1): the support chat's model is configuration, on the SAME mode decision
+// the debate targets take above. Hosted refuses a relay target here exactly as
+// it refuses one there; local keeps today's relay path.
+const supportModelTarget = boot.runSync("support-model-target", () =>
+  (environment.SUPPORT_MODEL_TARGET_JSON === undefined
+    ? undefined
+    : parseSupportModelTargetJson(environment.SUPPORT_MODEL_TARGET_JSON,{
+      mode: environment.DEPLOYMENT_MODE,nodeEnv: environment.NODE_ENV
+    })));
+const supportModels = new Map<string,SupportModelPort>(supportModelTarget === undefined ? [] : [[
   supportModelTarget.providerRef,
-  new RelayAdapter({
-    baseUrl: supportModelTarget.baseUrl,
-    authorizationHeader: supportModelTarget.authorizationHeader,
-    model: supportModelTarget.model,
-    timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
+  // V-9(2): a declared credential FILE is resolved here, through the same
+  // custody-checked loader the debate targets use — one seam, one contract.
+  createSupportModelAdapter(supportModelTarget,{
+    readAuthorizationHeader: readCustodyAuthorizationHeader,
+    timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
+    reportDiagnostic: reportSupportDiagnostic
   })
 ] as const]);
 const supportModelReservations = new SupportModelReservationLedger({
@@ -436,7 +606,10 @@ const supportAdmittedModel = createReservedSupportModelPort({
   configuration: supportConfiguration,
   ledger: supportModelReservations,
   durableCalls: supportRelayCallRecords,
-  modelFor: (modelRef) => supportModels.get(modelRef)
+  modelFor: (modelRef) => supportModels.get(modelRef),
+  // V-30: a configured model ref that names no composed model says so, once,
+  // instead of degrading every visitor's answer with no reason recorded.
+  reportDiagnostic: reportSupportDiagnostic
 });
 const supportCaseSummaries = new PostgresSupportCaseSummaryRepository(supportPool);
 const supportSummaryService = createAdvisorySummaryService({
@@ -518,8 +691,13 @@ const api = buildApi({
   mfa,
   sessions,
   legacyRunClaim,
+  // B10: the sealed admission budgets are always composed in production.
+  admission: new AdmissionLimiter(admissionPolicy),
   support: {
     configuration: supportConfiguration,
+    // DL5-F3: the caller's network is pseudonymised under a key derived from
+    // the support KEK before it ever reaches an append-only table.
+    sourcePseudonym: (value: string) => supportKeys.sourcePseudonym(value),
     sessions: Object.freeze({
       create: supportSessions.create.bind(supportSessions),
       read: supportSessions.read.bind(supportSessions),
@@ -584,8 +762,33 @@ const startup = installStartupResourceOwner({
     supportRelayLeasePool,
     { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() }
+  ],
+  // L2-F7: zeroed after every pool that borrows from them has closed. A
+  // changeover's PREVIOUS keys are in this list for the same reason the current
+  // ones are: the process holds them, so the process zeroes them (V-3).
+  kekHandles: [
+    kek,
+    ...(userKeks.previous === undefined ? [] : [userKeks.previous]),
+    ...(corpusKek === undefined ? [] : [corpusKek]),
+    ...(corpusKeks?.previous === undefined ? [] : [corpusKeks.previous])
   ]
 });
+// DL7-F7: the boot ledger hands everything it held to the startup resource
+// owner, which is the lifecycle from here on. Exactly one owner at a time:
+// nothing can now be closed twice, and the ledger's own `run` becomes a
+// pass-through so a later stage answers to `startup.run` alone.
+boot.release();
+
+// EX_TEMPFAIL (75): a transient, restartable failure. systemd's
+// Restart=on-failure then replaces the process instead of leaving a latched
+// 503 on every authentication route until a human notices.
+announceArgon2BreakerTrip = (): void => {
+  console.error(JSON.stringify({
+    event: "argon2.breaker.tripped", action: "graceful-shutdown", exit_code: 75
+  }));
+  process.exitCode = 75;
+  void startup.close("ARGON2_BREAKER_TRIPPED").catch(() => undefined);
+};
 await startup.run("support-attestation", async () => {
   await assertSupportDatabaseRole(pool, supportPool);
   await assertSupportDatabaseRole(pool, supportRelayLeasePool);

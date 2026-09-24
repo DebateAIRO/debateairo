@@ -1,23 +1,51 @@
 import "@debateai/obs-capture/install/runner";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import {
+  configureCustodyGroup,
   ContentCipher,
   FileRunContentKeyStore,
   FileUserDekStore,
-  loadKek
+  loadKekRing,
+  readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
-import { loadRunnerEnvironment } from "@debateai/register";
+import {
+  assertHostedCostEnvelopesSealed,
+  loadRunnerEnvironment,
+  readCostEnvelopePolicy
+} from "@debateai/register";
+import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { observeProviderTarget, parseProviderDiscoveryTargets } from "@debateai/providers";
+// ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
+// import line so `probeTarget` — the persisting probe — cannot enter this module under
+// any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
+import { assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
-import { createRunnerProviderTopology } from "./provider-topology.js";
+import {
+  assertRunnerPrimaryProviderConfiguration,
+  createRunnerProviderTopology
+} from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 
 const environment = loadRunnerEnvironment();
-const kek = loadKek(environment.KEK_PATH);
+// V-9(c) / V-28: a hosted deployment spends money on paid vendor APIs, so it may
+// not claim work until the per-run and daily cost envelopes are sealed. The seam
+// is `readSealedCostEnvelopeStatus` in @debateai/register — task 11 publishes the
+// rows behind it; until then hosted refuses here, before anything is opened.
+// Local mode spends nothing this control could bound and is untouched.
+assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
+// V-19: this principal owns nothing in the user-DEK store it reads, so without
+// the custody group every load below refuses. Configured before the first open
+// so an unresolvable group is a boot failure, not a mid-run one.
+configureCustodyGroup(environment.DEBATEAI_CUSTODY_GROUP);
+// V-3 (fix wave A-C2): the runner reads the store the API writes, so it must
+// hold the same ring for the length of a KEK changeover — its own copy of the
+// current key and, while `KEK_PREVIOUS_PATH` is set, of the previous one.
+// Absent, this is the single key it has always loaded. The runner only ever
+// READS this store, so no write ever chooses between the two.
+const kek = loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH);
 const pool = createPool(environment.DATABASE_URL);
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   const users = new FileUserDekStore(environment.USER_DEK_STORE_PATH!, kek);
@@ -43,32 +71,76 @@ const deploymentMakers = await readDeploymentMakerCapability(pool, environment.R
 if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
 }
-const providerTargets = parseProviderDiscoveryTargets(
+const declaredProviderTargets = parseProviderDiscoveryTargets(
   environment.PROVIDER_DISCOVERY_TARGETS_JSON,
   deploymentMakers.configuredProviders
+);
+// The mode decision is taken on what the operator DECLARED, before any credential
+// is resolved: that is what makes an inline `authorization_header` refusable in
+// hosted mode even though a resolved target legitimately carries a header.
+assertDeploymentProviderTargets(declaredProviderTargets, {
+  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+});
+// V-28: and a hosted DEBATE target must carry its price, or its calls cannot be
+// billed against the per-run and daily envelopes. Separate from the rule above
+// because the support chat's target shares that one and keeps its own accounting.
+assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
+// V-9(2): each vendor's credential file, read once under the custody contract.
+const providerTargets = resolveProviderTargetCredentials(
+  declaredProviderTargets, readCustodyAuthorizationHeader
 );
 const hatchet = new Hatchet({
   token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
   api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
   tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
 });
-const providerTopology = createRunnerProviderTopology(providerTargets, (target) =>
-  createPostgresProviderGateway(pool, {
+/**
+ * V-28 (DL4-F2) — THE PER-RUN MONEY ENVELOPE, wired per target.
+ *
+ * HOSTED only, and the mode decides it once here rather than at every call:
+ * local mode is the relays and loopback model servers, which report no usage and
+ * cost no money, and V-28(3) leaves it untouched with the attempt ceiling it has
+ * always had. In hosted mode `assertPricedProviderTargets` above has already
+ * refused any target with no declared price, so `providerTargetPrice` below
+ * cannot be null there — the refusal is kept anyway, because a control that
+ * depends on another control having run is one edit away from being none.
+ */
+const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
+  ? new CostEnvelopeGuard({
+      store: new PostgresModelSpendStore(pool),
+      policy: await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+    })
+  : undefined;
+const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
+  const price = providerTargetPrice(target);
+  if (costEnvelopeGuard !== undefined && price === null) {
+    throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
+  }
+  return createPostgresProviderGateway(pool, {
     endpoint: target.baseUrl,
     model: target.model,
     maker: target.maker,
     ...(target.authorizationHeader === undefined
-      ? {} : { authorizationHeader: target.authorizationHeader })
-  })
-);
+      ? {} : { authorizationHeader: target.authorizationHeader }),
+    ...(costEnvelopeGuard === undefined || price === null ? {} : {
+      // The run is not known until a work item is claimed, so the seam is built
+      // per call from the run the gateway was handed. Hosted requires the vendor
+      // to report usage: a call that cannot be billed cannot be bounded.
+      buildCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.providerSeam({
+        runId, price, requireReportedUsage: true
+      })
+    })
+  });
+});
 const runRepository = new RunRepository(pool);
-if (providerTopology.primary.providerRef !== environment.PROVIDER_REF
-  || providerTopology.primary.maker !== environment.VLLM_MAKER
-  || providerTargets[0]?.baseUrl !== environment.VLLM_BASE_URL.replace(/\/$/u, "")
-  || providerTargets[0]?.model !== environment.VLLM_MODEL
-  || providerTargets[0]?.authorizationHeader !== environment.VLLM_AUTHORIZATION) {
-  throw new TypeError("RUNNER_PRIMARY_PROVIDER_CONFIGURATION_DRIFT");
-}
+// V-20: taken on the DECLARED targets, because the three optional keys describe
+// what the operator wrote, credential included — a credential resolved from a
+// file was never in this environment to compare against.
+assertRunnerPrimaryProviderConfiguration({
+  primary: providerTopology.primary,
+  firstTarget: declaredProviderTargets[0],
+  declared: environment
+});
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
   judgeBound: policy.bounds.JUDGE,

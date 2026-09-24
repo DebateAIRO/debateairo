@@ -122,7 +122,7 @@ describe("SUP-01 support control CLIs", () => {
     expect(output).toContain("rating resolution last 30 days: UNVERIFIED");
     expect(output).toContain("retention: unavailable — support register not initialized");
     expect(output).toContain(
-      "erasures: run pnpm support:shred --owner <owner_ref> after each account erasure (wiring pending V, row SUP-D5)"
+      "erasures: run pnpm support:shred --owner <owner_ref> --yes after each account erasure (wiring pending V, row V-26)"
     );
     expect(output).not.toMatch(/(?:databaseUrl|password|token|identity|transcript)/iu);
   });

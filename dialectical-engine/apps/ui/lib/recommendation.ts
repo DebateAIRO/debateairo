@@ -28,6 +28,11 @@ export function selectAdditionalRecommendations(
  * machine-specific path. A code-unit comparison is total, stable and identical
  * on every machine. The five InvestigationAction values are distinct
  * lowercase ASCII, so their order is unchanged by this.
+ *
+ * Both lines reached this fix independently — S14 / W19 on `dev` and B30 on the
+ * security line — with byte-identical bodies and no textual conflict, so the
+ * 2026-09-22 merge silently kept BOTH declarations and the module stopped
+ * parsing. One declaration, both ticket ids.
  */
 function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;

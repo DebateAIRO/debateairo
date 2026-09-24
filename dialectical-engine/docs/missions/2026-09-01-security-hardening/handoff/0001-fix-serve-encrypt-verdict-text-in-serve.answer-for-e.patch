@@ -1,0 +1,897 @@
+From 40d1e3a36a4193e8d500af198bf1981143fb600c Mon Sep 17 00:00:00 2001
+From: Nour <stefan.nour@adesso-romania.ro>
+Date: Wed, 2 Sep 2026 07:45:59 +0300
+Subject: [PATCH] fix(serve): encrypt verdict text in serve.answer for
+ encrypted runs (L5-F2)
+
+Security-hardening mission 2026-09-01, task B21 (finding L5-F2, HIGH).
+Handoff patch series for the live mission's orchestrator; NOT merged into
+the security branch. Base: b5a6b6eb (origin/dev).
+
+Encrypted runs persisted their final verdict / hypothesis / research-plan
+text in plaintext in serve.answer.answer_form (packages/serve/src/index.ts:
+the answerForm derivation, the serve.answer INSERT, the answer_form
+projection read) because serve.answer was never declared in the 0038
+carrier set. The AEAD control was bypassed for the highest-value derived
+artifact.
+
+Now, for a run with content_encryption_version=1, ServeRepository.persist
+encrypts {answerForm} with the run content key through the existing
+encryptAttestedContentForRun path (carrier "serve.answer", primary key
+answer_id) before the write transaction, stores the JSON compatibility
+sentinel in answer_form plus content_ciphertext / content_attestation, and
+readAnswerProjection decrypts it beside core.run, serve.fact_bundle and
+serve.composed_text. readReviewCatchUpSource (the runner's supersede path)
+already reads through that projection. Legacy plaintext rows keep NULL
+carrier columns, the existing legacy marking, and read exactly as before.
+
+Migration migrations/0057_serve_answer_content_carrier.sql carries a
+PROVISIONAL NUMBER: the live mission continues from 0057 after the security
+mission's 0056, so the folding orchestrator must renumber it to the next
+free slot (nothing inside it depends on the number; the tests locate it by
+suffix). It adds the two carrier columns to serve.answer, re-declares
+core.enforce_content_ciphertext() (0038 body verbatim plus one serve.answer
+ELSIF) and core.enforce_content_attestation_v2() (0040 body verbatim plus
+one CASE arm), and attaches the three carrier triggers (attestation,
+plaintext-write guard, erasure barrier; the barrier function is unchanged
+because its generic branch resolves run_id). Additive and replay-safe; no
+historical tuple is rewritten.
+
+Outside packages/serve, migrations and tests: packages/crypto/src/index.ts
+gains "serve.answer" in CONTENT_CARRIERS (the ContentCarrier union derives
+from it; nothing else can express a new carrier). packages/db is untouched.
+
+RED first: tests/integration/serve-answer-content-encryption.test.ts on the
+untouched base fails at the stored-row assertion, the verdict marker
+appearing verbatim in SELECT to_jsonb(answer) FROM serve.answer. GREEN
+after the change: 2/2 in 9.7 s on real embedded PostgreSQL (sentinel plus
+envelope on the row, projection decrypts, a direct plaintext INSERT raises
+CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.answer, the legacy row is
+unchanged, a run-key shred makes the envelope and the projection
+unrecoverable while the legacy row stays readable, and the migration
+replays cleanly). tests/architecture/s6-content-encryption-contract.test.ts
+pins the new carrier (7/7). tests/unit/s6-content-encryption.test.ts is
+15/16: the one failure (ZodError REGISTER_VERSION NaN at line 586) is
+pre-existing and identical with this change stashed. Typecheck: only the
+8 pre-existing tests/unit/s14-ui.test.ts errors.
+
+Residual for the orchestrator: the envelope is bound to answer_id only,
+because answer_version is allocated inside the write transaction after key
+material must already be prepared, so two versions of one answer share an
+attestation scope (every other carrier binds by its single uuid as well).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ .../0057_serve_answer_content_carrier.sql     | 279 ++++++++++++++
+ .../packages/crypto/src/index.ts              |   3 +-
+ .../packages/serve/src/index.ts               |  33 +-
+ .../s6-content-encryption-contract.test.ts    |  40 +-
+ .../serve-answer-content-encryption.test.ts   | 353 ++++++++++++++++++
+ 5 files changed, 697 insertions(+), 11 deletions(-)
+ create mode 100644 dialectical-engine/migrations/0057_serve_answer_content_carrier.sql
+ create mode 100644 dialectical-engine/tests/integration/serve-answer-content-encryption.test.ts
+
+diff --git a/dialectical-engine/migrations/0057_serve_answer_content_carrier.sql b/dialectical-engine/migrations/0057_serve_answer_content_carrier.sql
+new file mode 100644
+index 00000000..bb4027a5
+--- /dev/null
++++ b/dialectical-engine/migrations/0057_serve_answer_content_carrier.sql
+@@ -0,0 +1,279 @@
++-- Security hardening 2026-09-01 / B21 (finding L5-F2, HIGH) — serve.answer becomes
++-- a content carrier.
++--
++-- PROVISIONAL NUMBER: this file is numbered 0057 only as a placeholder. The
++-- live mission continues from 0057 after the security mission's 0056, so the
++-- folding orchestrator MUST renumber this file (and nothing else in it depends
++-- on the number) to the next free slot at fold time. Never edit 0038 / 0040.
++--
++-- Additive and replay-safe, in the 0038 / 0040 pattern. No historical heap
++-- tuple is rewritten: rows written before this migration keep NULL carrier
++-- columns, which is the existing "legacy plaintext" marking that the reader
++-- honours (an envelope-less row is returned as stored). A data migration
++-- cannot encrypt them without the per-run key; S10 erasure covers them.
++--
++-- For a run with content_encryption_version=1 every later serve.answer INSERT
++-- must carry the JSON compatibility sentinel in answer_form plus an AEAD
++-- envelope attested with the run key (the verdict / hypothesis / research-plan
++-- text is inside the envelope, payload {"answerForm": …}). Legacy runs keep
++-- writing plaintext and must not carry an envelope.
++
++ALTER TABLE serve.answer
++  ADD COLUMN IF NOT EXISTS content_ciphertext jsonb,
++  ADD COLUMN IF NOT EXISTS content_attestation bytea;
++
++-- 0038 plaintext-write guard, extended with the serve.answer branch. The body
++-- is the 0038 definition verbatim plus that one ELSIF.
++CREATE OR REPLACE FUNCTION core.enforce_content_ciphertext()
++RETURNS trigger
++LANGUAGE plpgsql
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  row_json jsonb := to_jsonb(NEW);
++  target_run_id uuid;
++  encrypted boolean;
++  sentinel constant text := '⟦DEBATEAI:CIPHERTEXT:V1⟧';
++BEGIN
++  IF TG_TABLE_SCHEMA = 'core' AND TG_TABLE_NAME = 'run' THEN
++    encrypted := NEW.content_encryption_version = 1;
++    IF encrypted THEN
++      IF NEW.question_line <> sentinel
++        OR NEW.ask_contract <> '{"ciphertext":true,"v":1}'::jsonb
++        OR octet_length(NEW.question_blind_index) <> 32
++        OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++        RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: core.run'
++          USING ERRCODE = '22023';
++      END IF;
++    ELSIF NEW.content_encryption_version IS NOT NULL
++      OR NEW.question_blind_index IS NOT NULL
++      OR NEW.content_ciphertext IS NOT NULL
++      OR NEW.question_line = sentinel THEN
++      RAISE EXCEPTION 'CONTENT_ENCRYPTION_STATE_INVALID: core.run'
++        USING ERRCODE = '22023';
++    END IF;
++    RETURN NEW;
++  END IF;
++
++  IF TG_TABLE_SCHEMA = 'serve' AND TG_TABLE_NAME = 'composed_text' THEN
++    SELECT bundle.run_id INTO target_run_id
++    FROM serve.fact_bundle AS bundle
++    WHERE bundle.fact_bundle_id = NEW.fact_bundle_id;
++  ELSIF TG_TABLE_SCHEMA = 'memory' AND TG_TABLE_NAME = 'pull_record' THEN
++    SELECT link.source_run_id INTO target_run_id
++    FROM memory.memory_link AS link
++    WHERE link.memory_link_id = NEW.memory_link_id;
++  ELSE
++    target_run_id := (row_json->>'run_id')::uuid;
++  END IF;
++
++  IF target_run_id IS NULL THEN
++    IF row_json->'content_ciphertext' = 'null'::jsonb THEN
++      RETURN NEW;
++    END IF;
++    RAISE EXCEPTION 'CONTENT_ENCRYPTION_RUN_UNRESOLVED: %.%', TG_TABLE_SCHEMA, TG_TABLE_NAME
++      USING ERRCODE = '22023';
++  END IF;
++  encrypted := core.run_uses_content_encryption(target_run_id);
++
++  IF NOT encrypted THEN
++    IF row_json->'content_ciphertext' <> 'null'::jsonb THEN
++      RAISE EXCEPTION 'CONTENT_ENCRYPTION_STATE_INVALID: %.%', TG_TABLE_SCHEMA, TG_TABLE_NAME
++        USING ERRCODE = '22023';
++    END IF;
++    RETURN NEW;
++  END IF;
++
++  IF TG_TABLE_SCHEMA = 'core' AND TG_TABLE_NAME = 'node' THEN
++    IF NEW.claim_text <> sentinel OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: core.node' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'core' AND TG_TABLE_NAME = 'stranger_restatement' THEN
++    IF NEW.restatement_text <> sentinel OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: core.stranger_restatement' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'ledger' AND TG_TABLE_NAME = 'raw_artifact' THEN
++    IF NEW.raw_text <> sentinel OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: ledger.raw_artifact' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'serve' AND TG_TABLE_NAME = 'fact_bundle' THEN
++    IF NEW.facts <> '[]'::jsonb OR NEW.residual_objections <> '[]'::jsonb
++      OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.fact_bundle' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'serve' AND TG_TABLE_NAME = 'composed_text' THEN
++    IF NEW.segments <> '[]'::jsonb OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.composed_text' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'ledger' AND TG_TABLE_NAME = 'node_review' THEN
++    IF NEW.reasons <> jsonb_build_array(sentinel) OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: ledger.node_review' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'memory' AND TG_TABLE_NAME = 'question_key' THEN
++    IF NEW.canonical_question_text <> sentinel OR octet_length(NEW.question_blind_index) <> 32
++      OR NEW.normalized_binding <> '{}'::jsonb OR NEW.frozen_terms <> '[]'::jsonb
++      OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: memory.question_key' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'memory' AND TG_TABLE_NAME = 'pull_record' THEN
++    IF NEW.payload_snapshot <> '{"ciphertext":true,"v":1}'::jsonb
++      OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: memory.pull_record' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'core' AND TG_TABLE_NAME = 'investigation_request' THEN
++    IF (NEW.user_input IS NULL) <> (NEW.content_ciphertext IS NULL)
++      OR (NEW.user_input IS NOT NULL AND (
++        NEW.user_input <> sentinel OR NOT core.is_content_envelope(NEW.content_ciphertext)
++      )) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: core.investigation_request' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'evidence' AND TG_TABLE_NAME = 'query_set' THEN
++    IF NEW.queries <> jsonb_build_array(sentinel) OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: evidence.query_set' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'evidence' AND TG_TABLE_NAME = 'query_amendment' THEN
++    IF NEW.amended_query <> sentinel OR NEW.reason <> sentinel
++      OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: evidence.query_amendment' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'evidence' AND TG_TABLE_NAME = 'evidence_item' THEN
++    IF (NEW.excerpt IS NULL) <> (NEW.content_ciphertext IS NULL)
++      OR (NEW.excerpt IS NOT NULL AND (
++        NEW.excerpt <> sentinel OR NOT core.is_content_envelope(NEW.content_ciphertext)
++      )) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: evidence.evidence_item' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'evidence' AND TG_TABLE_NAME = 'absence_row' THEN
++    IF NEW.query_text <> sentinel OR NEW.reason <> sentinel
++      OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: evidence.absence_row' USING ERRCODE = '22023';
++    END IF;
++  ELSIF TG_TABLE_SCHEMA = 'serve' AND TG_TABLE_NAME = 'answer' THEN
++    IF NEW.answer_form <> '{"ciphertext":true,"v":1}'::jsonb
++      OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
++      RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.answer' USING ERRCODE = '22023';
++    END IF;
++  ELSE
++    RAISE EXCEPTION 'CONTENT_ENCRYPTION_CARRIER_UNDECLARED: %.%', TG_TABLE_SCHEMA, TG_TABLE_NAME
++      USING ERRCODE = '22023';
++  END IF;
++
++  RETURN NEW;
++END;
++$$;
++
++-- 0040 attestation guard, extended so serve.answer resolves its primary key.
++-- The body is the 0040 definition verbatim plus that one CASE arm.
++CREATE OR REPLACE FUNCTION core.enforce_content_attestation_v2()
++RETURNS trigger
++LANGUAGE plpgsql
++SECURITY DEFINER
++SET search_path = pg_catalog
++AS $$
++DECLARE
++  row_json jsonb:=to_jsonb(NEW);
++  target_run_id uuid;
++  target_primary_key text;
++  target_encrypted boolean;
++  attestation_secret bytea;
++  expected_attestation bytea;
++BEGIN
++  IF TG_TABLE_SCHEMA='core' AND TG_TABLE_NAME='run' THEN
++    target_run_id:=NEW.run_id;
++    target_primary_key:=NEW.run_id::text;
++    target_encrypted:=COALESCE(NEW.content_encryption_version=1,false);
++  ELSIF TG_TABLE_SCHEMA='serve' AND TG_TABLE_NAME='composed_text' THEN
++    target_primary_key:=NEW.composed_text_id::text;
++    SELECT bundle.run_id INTO target_run_id FROM serve.fact_bundle AS bundle
++    WHERE bundle.fact_bundle_id=NEW.fact_bundle_id;
++  ELSIF TG_TABLE_SCHEMA='memory' AND TG_TABLE_NAME='pull_record' THEN
++    target_primary_key:=NEW.pull_record_id::text;
++    SELECT link.source_run_id INTO target_run_id FROM memory.memory_link AS link
++    WHERE link.memory_link_id=NEW.memory_link_id;
++  ELSE
++    target_run_id:=NULLIF(row_json->>'run_id','')::uuid;
++    target_primary_key:=CASE TG_TABLE_SCHEMA||'.'||TG_TABLE_NAME
++      WHEN 'core.node' THEN row_json->>'node_id'
++      WHEN 'core.stranger_restatement' THEN row_json->>'restatement_id'
++      WHEN 'ledger.raw_artifact' THEN row_json->>'raw_artifact_id'
++      WHEN 'serve.fact_bundle' THEN row_json->>'fact_bundle_id'
++      WHEN 'ledger.node_review' THEN row_json->>'node_review_id'
++      WHEN 'memory.question_key' THEN row_json->>'question_key_id'
++      WHEN 'core.investigation_request' THEN row_json->>'investigation_request_id'
++      WHEN 'evidence.query_set' THEN row_json->>'query_set_id'
++      WHEN 'evidence.query_amendment' THEN row_json->>'query_amendment_id'
++      WHEN 'evidence.evidence_item' THEN row_json->>'evidence_item_id'
++      WHEN 'evidence.absence_row' THEN row_json->>'absence_row_id'
++      WHEN 'serve.answer' THEN row_json->>'answer_id'
++      ELSE NULL END;
++  END IF;
++  IF target_run_id IS NULL OR target_primary_key IS NULL THEN
++    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='CONTENT_ATTESTATION_SCOPE_UNRESOLVED';
++  END IF;
++  IF target_encrypted IS NULL THEN
++    SELECT COALESCE(run.content_encryption_version=1,false) INTO target_encrypted
++    FROM core.run AS run WHERE run.run_id=target_run_id;
++    IF NOT FOUND THEN
++      RAISE EXCEPTION USING ERRCODE='23503', MESSAGE='CONTENT_ATTESTATION_RUN_UNRESOLVED';
++    END IF;
++  END IF;
++  IF NOT target_encrypted OR NEW.content_ciphertext IS NULL THEN
++    IF NEW.content_attestation IS NOT NULL THEN
++      RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='CONTENT_ATTESTATION_STATE_INVALID';
++    END IF;
++    RETURN NEW;
++  END IF;
++  IF NOT core.is_content_envelope(NEW.content_ciphertext)
++    OR NEW.content_attestation IS NULL
++    OR octet_length(NEW.content_attestation)<>32 THEN
++    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='CONTENT_ATTESTATION_REQUIRED';
++  END IF;
++  SELECT secret INTO attestation_secret
++  FROM core.run_content_attestation_secret WHERE run_id=target_run_id;
++  IF NOT FOUND THEN
++    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='CONTENT_ATTESTATION_SECRET_UNRESOLVED';
++  END IF;
++  expected_attestation:=audit_crypto_internal.hmac(
++    core.content_envelope_attestation_bytes(
++      target_run_id,TG_TABLE_SCHEMA||'.'||TG_TABLE_NAME,target_primary_key,
++      'content_ciphertext',NEW.content_ciphertext
++    ),attestation_secret,'sha256'
++  );
++  IF NOT audit_crypto_internal.digest(NEW.content_attestation,'sha256')
++      =audit_crypto_internal.digest(expected_attestation,'sha256') THEN
++    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='CONTENT_ATTESTATION_INVALID';
++  END IF;
++  NEW.content_attestation:=expected_attestation;
++  -- The older S6 trigger executes next and expects a 32-byte index. Give it a
++  -- transient authenticated value; the v2 QBI trigger then clears it before
++  -- the tuple is written because lookup is decrypt-and-compare only.
++  IF (TG_TABLE_SCHEMA='core' AND TG_TABLE_NAME='run')
++    OR (TG_TABLE_SCHEMA='memory' AND TG_TABLE_NAME='question_key') THEN
++    NEW.question_blind_index:=expected_attestation;
++    NEW.question_blind_index_version:=2;
++  END IF;
++  RETURN NEW;
++END;
++$$;
++
++DROP TRIGGER IF EXISTS aaa_enforce_content_attestation_v2 ON serve.answer;
++CREATE TRIGGER aaa_enforce_content_attestation_v2
++BEFORE INSERT ON serve.answer
++FOR EACH ROW EXECUTE FUNCTION core.enforce_content_attestation_v2();
++
++DROP TRIGGER IF EXISTS enforce_content_ciphertext ON serve.answer;
++CREATE TRIGGER enforce_content_ciphertext
++BEFORE INSERT ON serve.answer
++FOR EACH ROW EXECUTE FUNCTION core.enforce_content_ciphertext();
++
++-- 0040 erasure barrier: its generic branch resolves run_id from the row, so
++-- the function itself is unchanged; serve.answer only joins its trigger set.
++DROP TRIGGER IF EXISTS enforce_erasure_barrier ON serve.answer;
++CREATE TRIGGER enforce_erasure_barrier
++BEFORE INSERT ON serve.answer
++FOR EACH ROW EXECUTE FUNCTION core.enforce_erasure_barrier();
++
++-- CREATE OR REPLACE keeps the existing ACLs; restated for explicitness.
++REVOKE ALL ON FUNCTION core.enforce_content_ciphertext() FROM PUBLIC;
++GRANT EXECUTE ON FUNCTION core.enforce_content_ciphertext() TO debateai_runtime;
++REVOKE ALL ON FUNCTION core.enforce_content_attestation_v2() FROM PUBLIC;
+diff --git a/dialectical-engine/packages/crypto/src/index.ts b/dialectical-engine/packages/crypto/src/index.ts
+index aef50525..19ad9165 100644
+--- a/dialectical-engine/packages/crypto/src/index.ts
++++ b/dialectical-engine/packages/crypto/src/index.ts
+@@ -1294,7 +1294,8 @@ export const CONTENT_CARRIERS = Object.freeze([
+   "evidence.query_set",
+   "evidence.query_amendment",
+   "evidence.evidence_item",
+-  "evidence.absence_row"
++  "evidence.absence_row",
++  "serve.answer"
+ ] as const);
+ 
+ export type ContentCarrier = typeof CONTENT_CARRIERS[number];
+diff --git a/dialectical-engine/packages/serve/src/index.ts b/dialectical-engine/packages/serve/src/index.ts
+index 4b555445..36141989 100644
+--- a/dialectical-engine/packages/serve/src/index.ts
++++ b/dialectical-engine/packages/serve/src/index.ts
+@@ -4,6 +4,7 @@ import { TypedDomainError } from "@debateai/kernel";
+ import type { Pool } from "pg";
+ import {
+   CONTENT_CIPHERTEXT_SENTINEL,
++  CONTENT_JSON_SENTINEL,
+   MAX_OWNER_PRIVATE_HISTORY_SCAN,
+   allocateSequence,
+   decryptContentForRun,
+@@ -1028,6 +1029,11 @@ export class ServeRepository {
+         this.pool, input.runId, "serve.composed_text", nextComposedTextId,
+         { segments: storedSegments }
+       );
++    const answerId = input.supersedes?.answerId ?? randomUUID();
++    const answerContent = await encryptAttestedContentForRun(
++      this.pool, input.runId, "serve.answer", answerId,
++      { answerForm: input.result.answerForm }
++    );
+     return withWriteTransaction(this.pool, async (client) => {
+       const prior = input.supersedes === undefined ? null : await client.query<{
+         answer_id: string;
+@@ -1113,18 +1119,19 @@ export class ServeRepository {
+           answer_id, answer_version, run_id, work_item_id, terminal, serve_state, verdict_state,
+           answer_form, condition_marks, fact_bundle_id, composed_text_id,
+           conformance_record_id, sealed_at_seq, confidence_band, band_ceiling,
+-          reversal_point, builds_on_previous, badges, verdict_unavailable, memory_disclosure
+-        ) VALUES (COALESCE($1::uuid,gen_random_uuid()),$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17::jsonb,$18::jsonb,$19::jsonb,$20::jsonb)
++          reversal_point, builds_on_previous, badges, verdict_unavailable, memory_disclosure,
++          content_ciphertext, content_attestation
++        ) VALUES (COALESCE($1::uuid,gen_random_uuid()),$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17::jsonb,$18::jsonb,$19::jsonb,$20::jsonb,$21::jsonb,$22)
+         RETURNING answer_id`,
+         [
+-          priorAnswer?.answer_id ?? null,
++          answerId,
+           answerVersion,
+           input.runId,
+           input.workItemId,
+           input.result.terminal,
+           serveState,
+           priorAnswer === undefined ? verdict.verdictState : priorAnswer.verdict_state,
+-          JSON.stringify(input.result.answerForm),
++          JSON.stringify(answerContent === null ? input.result.answerForm : CONTENT_JSON_SENTINEL),
+           JSON.stringify(input.result.conditionMarks),
+           storedFactBundleId,
+           composedTextId,
+@@ -1154,7 +1161,9 @@ export class ServeRepository {
+             : JSON.stringify({ reason_ref: verdict.unavailable.reasonRef }),
+           input.result.projections.memoryDisclosure === null
+             ? null
+-            : JSON.stringify(input.result.projections.memoryDisclosure)
++            : JSON.stringify(input.result.projections.memoryDisclosure),
++          answerContent === null ? null : JSON.stringify(answerContent.envelope),
++          answerContent?.attestation ?? null
+         ]
+       );
+       for (const record of conditionMarkRecords) {
+@@ -1376,6 +1385,7 @@ export class ServeRepository {
+       confidence_band: string | null;
+       band_ceiling: Answer["band_ceiling"];
+       answer_form: unknown;
++      answer_content_ciphertext: CryptoEnvelope | null;
+       segments: Answer["composed_text"] | null;
+       residual_objections: string[];
+       condition_marks: string[];
+@@ -1405,7 +1415,8 @@ export class ServeRepository {
+               answer.terminal,
+               answer.serve_state, answer.verdict_state, answer.verdict_unavailable,
+               answer.confidence_band, answer.band_ceiling,
+-              answer.answer_form, composed.segments, facts.residual_objections, answer.condition_marks,
++              answer.answer_form, answer.content_ciphertext AS answer_content_ciphertext,
++              composed.segments, facts.residual_objections, answer.condition_marks,
+                answer.badges, answer.reversal_point, answer.builds_on_previous, answer.memory_disclosure, answer.sealed_at_seq,
+                run.risk_tier, run.tier_source, run.tier_provenance_ref, run.envelope_basis,
+                (SELECT value_json #>> '{}' FROM core.run_progress_event
+@@ -1432,7 +1443,7 @@ export class ServeRepository {
+     const row = answer.rows[0];
+     if (row === undefined) return null;
+     return this.#memory.withDisclosureContentLease([row.run_id],async () => {
+-    const [runContent, factContent, composedContent] = await Promise.all([
++    const [runContent, factContent, composedContent, answerContent] = await Promise.all([
+       decryptContentForRun<{ questionLine: string }>(
+         this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
+         { questionLine: row.question_line }
+@@ -1447,7 +1458,11 @@ export class ServeRepository {
+         : decryptContentForRun<{ segments: Answer["composed_text"] }>(
+           this.pool, row.run_id, "serve.composed_text", row.composed_text_id,
+           row.composed_content_ciphertext, { segments: row.segments ?? [] }
+-        )
++        ),
++      decryptContentForRun<{ answerForm: unknown }>(
++        this.pool, row.run_id, "serve.answer", row.answer_id,
++        row.answer_content_ciphertext, { answerForm: row.answer_form }
++      )
+     ]);
+     const staleness = await this.#liveness.readSubjectStaleness({
+       runId: row.run_id,
+@@ -1597,7 +1612,7 @@ export class ServeRepository {
+         : row.verdict_unavailable,
+       confidence_band: hasEviction ? null : row.confidence_band,
+       band_ceiling: hasEviction ? null : row.band_ceiling,
+-      answer_form: hasEviction ? null : row.answer_form,
++      answer_form: hasEviction ? null : answerContent.answerForm,
+       serve_state: answerServeState.serveState,
+       composed_text: hasEviction ? [] : composedContent.segments,
+       number_slots: numberSlots,
+diff --git a/dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts b/dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts
+index e61fac29..4c0c52c8 100644
+--- a/dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts
++++ b/dialectical-engine/tests/architecture/s6-content-encryption-contract.test.ts
+@@ -1,4 +1,4 @@
+-import { readFile } from "node:fs/promises";
++import { readFile, readdir } from "node:fs/promises";
+ import { describe, expect, it } from "vitest";
+ 
+ const root = new URL("../../", import.meta.url);
+@@ -19,6 +19,44 @@ describe("S6 content-encryption architecture contract", () => {
+     expect(migration).toContain("IF NOT EXISTS");
+   });
+ 
++  it("declares serve.answer as the fifteenth carrier through the B21 forward migration (L5-F2)", async () => {
++    // The migration number is provisional until fold time, so locate it by suffix.
++    const names = (await readdir(new URL("migrations/", root)))
++      .filter((name) => /^\d+_serve_answer_content_carrier\.sql$/.test(name));
++    expect(names).toHaveLength(1);
++    const migration = await read(`migrations/${names[0]}`);
++    expect(migration).toContain("ALTER TABLE serve.answer");
++    expect(migration).toContain("ADD COLUMN IF NOT EXISTS content_ciphertext jsonb");
++    expect(migration).toContain("ADD COLUMN IF NOT EXISTS content_attestation bytea");
++    expect(migration).toContain("CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.answer");
++    expect(migration).toContain("WHEN 'serve.answer' THEN row_json->>'answer_id'");
++    for (const trigger of [
++      "aaa_enforce_content_attestation_v2", "enforce_content_ciphertext", "enforce_erasure_barrier"
++    ]) {
++      expect(migration).toContain(`DROP TRIGGER IF EXISTS ${trigger} ON serve.answer`);
++      expect(migration).toContain(`CREATE TRIGGER ${trigger}\nBEFORE INSERT ON serve.answer`);
++    }
++
++    const crypto = await read("packages/crypto/src/index.ts");
++    const carriers = crypto.slice(
++      crypto.indexOf("export const CONTENT_CARRIERS"), crypto.indexOf("export type ContentCarrier")
++    );
++    expect(carriers).toContain('"serve.answer"');
++
++    const serve = await read("packages/serve/src/index.ts");
++    expect(serve).toMatch(
++      /encryptAttestedContentForRun\(\s*this\.pool, input\.runId, "serve\.answer", answerId,\s*\{ answerForm: input\.result\.answerForm \}/
++    );
++    expect(serve).toContain(
++      "JSON.stringify(answerContent === null ? input.result.answerForm : CONTENT_JSON_SENTINEL)"
++    );
++    expect(serve).toMatch(
++      /decryptContentForRun<\{ answerForm: unknown \}>\(\s*this\.pool, row\.run_id, "serve\.answer", row\.answer_id,\s*row\.answer_content_ciphertext, \{ answerForm: row\.answer_form \}/
++    );
++    expect(serve).toContain("answer_form: hasEviction ? null : answerContent.answerForm");
++    expect(serve).not.toContain("answer_form: hasEviction ? null : row.answer_form");
++  });
++
+   it("keeps irreversible enablement default-off and wires both API and runner through the external key store", async () => {
+     const [environment, apiMain, runnerMain] = await Promise.all([
+       read("packages/register/src/runtime-environment.ts"),
+diff --git a/dialectical-engine/tests/integration/serve-answer-content-encryption.test.ts b/dialectical-engine/tests/integration/serve-answer-content-encryption.test.ts
+new file mode 100644
+index 00000000..940cd312
+--- /dev/null
++++ b/dialectical-engine/tests/integration/serve-answer-content-encryption.test.ts
+@@ -0,0 +1,353 @@
++import { createHash, randomBytes, randomUUID } from "node:crypto";
++import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { afterAll, beforeAll, describe, expect, it } from "vitest";
++import {
++  ContentCipher,
++  FileRunContentKeyStore,
++  FileUserDekStore,
++  generateDek,
++  loadKek
++} from "../../packages/crypto/src/index.js";
++import {
++  CONTENT_JSON_SENTINEL,
++  RunRepository,
++  configureContentEncryption,
++  migrate
++} from "@debateai/db";
++import { WorkItemRepository } from "@debateai/battery";
++import { LedgerRepository } from "@debateai/ledger";
++import {
++  ServeRepository,
++  buildFactBundle,
++  type AnswerForm,
++  type ConformanceJudgement,
++  type GateTrace,
++  type ServeGateResult
++} from "@debateai/serve";
++import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
++import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
++
++// L5-F2 (security hardening, B21): an encrypted run's final verdict text lives
++// in serve.answer.answer_form. This proves it is an AEAD carrier like
++// serve.fact_bundle / serve.composed_text: sentinel + envelope on the stored
++// row, decrypted only through the projection, unrecoverable after the run key
++// is shredded, while legacy plaintext rows keep reading exactly as before.
++
++let database: TestDatabase;
++let secretRoot: string;
++let userId: string;
++let ownerRef: string;
++let authSessionId: string;
++let cipher: ContentCipher;
++
++async function createActiveUser(): Promise<void> {
++  userId = randomUUID();
++  ownerRef = randomUUID();
++  authSessionId = randomUUID();
++  await database.pool.query(
++    `INSERT INTO identity."user" (
++       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
++       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
++       adult_affirmed_at,created_at
++     ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
++    [userId, Buffer.alloc(32, 0x73), `b21-${randomUUID()}`, randomUUID(), ownerRef]
++  );
++  await database.pool.query(
++    `INSERT INTO identity.session(
++       session_id,user_id,token_hash,csrf_token_hash,binding_context,
++       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
++     ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
++       now()+interval '2 hours',now())`,
++    [authSessionId,userId,`sha256:${randomBytes(32).toString("hex")}`,
++      `sha256:${randomBytes(32).toString("hex")}`]
++  );
++}
++
++function runInput(
++  questionLine: string,
++  principal: Parameters<RunRepository["startRun"]>[0]["principal"],
++  sessionId: string
++): Parameters<RunRepository["startRun"]>[0] {
++  return {
++    questionLine,
++    askContract: { audience: "b21-test" },
++    principal,
++    sessionId,
++    callerScope: "ASKER",
++    asOf: new Date("2026-09-01T00:00:00.000Z"),
++    askerRiskTier: "casual",
++    effectiveRiskTier: "casual",
++    tierSource: "ASKER",
++    tierProvenanceRef: "b21:integration",
++    compositionBudgetTier: "low",
++    depthParams: { depth: 1 },
++    discoveredPanel: fixtureDiscoveredPanel(1),
++    strangerSampleRate: 1,
++    envelopeBasis: { source: "b21:integration" },
++    registerVersion: 1,
++    batteryVersion: "b21:integration",
++    batteryRows: []
++  };
++}
++
++async function createEncryptedRun(questionLine: string): Promise<string> {
++  return new RunRepository(database.pool).startRun(
++    runInput(questionLine, { kind: "server", userId, ownerRef }, authSessionId)
++  );
++}
++
++async function createLegacyRun(questionLine: string, legacyAskerId: string): Promise<string> {
++  return new RunRepository(database.pool).startRun(
++    runInput(questionLine, { kind: "legacy", legacyAskerId }, randomUUID())
++  );
++}
++
++/** Persists one SERVED verdict through the production serve write path. */
++async function persistVerdict(runId: string, answerForm: AnswerForm, segmentText: string): Promise<string> {
++  const work = new WorkItemRepository(database.pool);
++  const workItemId = await work.enqueue({
++    runId,
++    batteryRowId: "Q1",
++    nodeSet: [],
++    commandKey: `b21:verdict:${runId}`
++  });
++  const compositionArtifactId = randomUUID();
++  await new LedgerRepository(database.pool).appendRawArtifact({
++    artifactId: compositionArtifactId,
++    attemptId: randomUUID(),
++    runId,
++    providerRef: "provider:b21-composer",
++    provider: "test",
++    model: "model/b21-composer",
++    maker: "maker:b21-composer",
++    modelVersion: "v1",
++    rawText: `b21-composition-${runId}`,
++    metadata: {},
++    parseStatus: "PARSED",
++    inputHash: "1".repeat(64),
++    contractHash: "2".repeat(64),
++    contentHash: "3".repeat(64)
++  });
++  const factBundle = buildFactBundle({
++    facts: [`b21-fact-${runId}`],
++    residualObjections: [],
++    badges: [],
++    conditionMarks: [],
++    reversalPoint: `b21-reversal-${runId}`,
++    buildsOnPrevious: { value: false, answerRef: null },
++    memoryDisclosure: null
++  });
++  const segments = Object.freeze([{
++    segmentId: `segment-${runId}`,
++    text: segmentText,
++    loadBearing: true,
++    assertedNodeRefs: [],
++    servedNumberRefs: []
++  }]);
++  const gateTrace: readonly GateTrace[] = Object.freeze(["GATE4_Q51_PASS", "POST_COMPOSE_R9_PASS", "SERVE"]);
++  const conformance: readonly ConformanceJudgement[] = Object.freeze([
++    { segmentId: segments[0]!.segmentId, state: "JUDGED", conforms: true }
++  ]);
++  const result: ServeGateResult = Object.freeze({
++    terminal: "SERVED",
++    answerForm,
++    factBundle,
++    gateTrace,
++    conditionMarks: Object.freeze([]),
++    conformance,
++    coverageMode: "EXHAUSTIVE",
++    segments,
++    compositionBudget: Object.freeze({
++      tier: "low",
++      bound: 1,
++      registerRowKey: "b21:composition-budget",
++      registerVersion: 1,
++      sourceRef: "b21:integration"
++    }),
++    confidenceBand: null,
++    bandCeiling: null,
++    projections: Object.freeze({
++      reversalPoint: factBundle.reversalPoint,
++      buildsOnPrevious: factBundle.buildsOnPrevious,
++      memoryDisclosure: factBundle.memoryDisclosure
++    })
++  });
++  const persisted = await new ServeRepository(database.pool).persist({
++    runId,
++    workItemId,
++    factBundleVersion: 1,
++    factBundleContentHash: createHash("sha256").update(JSON.stringify(factBundle)).digest("hex"),
++    factBundle,
++    result,
++    segments,
++    compositionRawArtifactRef: compositionArtifactId,
++    compositionAttempt: 1,
++    conformanceRawArtifactRefs: [compositionArtifactId],
++    servedNumber: null
++  });
++  await work.settle({ workItemId, attemptId: randomUUID(), artifactRef: persisted.answerId });
++  return persisted.answerId;
++}
++
++interface StoredAnswerRow {
++  readonly row_text: string;
++  readonly answer_form: unknown;
++}
++
++async function readStoredAnswer(answerId: string): Promise<StoredAnswerRow> {
++  const stored = await database.pool.query<StoredAnswerRow>(
++    `SELECT to_jsonb(answer)::text AS row_text, answer.answer_form
++     FROM serve.answer AS answer
++     WHERE answer.answer_id=$1
++     ORDER BY answer.answer_version DESC LIMIT 1`,
++    [answerId]
++  );
++  expect(stored.rows).toHaveLength(1);
++  return stored.rows[0]!;
++}
++
++beforeAll(async () => {
++  database = await startTestDatabase();
++  await migrate(database.pool);
++  secretRoot = await mkdtemp(join(tmpdir(), "debateai-b21-serve-answer-"));
++  await createActiveUser();
++  const users = new FileUserDekStore(secretRoot, loadKek(generateDek()));
++  await users.store(userId, generateDek());
++  const keys = new FileRunContentKeyStore(
++    secretRoot,
++    users,
++    async (candidate) => {
++      const result = await database.pool.query<{ user_id: string }>(
++        `SELECT user_id FROM identity."user" WHERE owner_ref=$1 AND state='active'`,
++        [candidate]
++      );
++      const resolved = result.rows[0]?.user_id;
++      if (resolved === undefined) throw new Error("OWNER_REF_UNRESOLVED");
++      return resolved;
++    }
++  );
++  cipher = new ContentCipher(keys);
++  configureContentEncryption(database.pool, cipher);
++}, 120_000);
++
++afterAll(async () => {
++  await database?.stop();
++  if (secretRoot !== undefined) await rm(secretRoot, { recursive: true, force: true });
++});
++
++describe("serve.answer verdict text is an encrypted content carrier (L5-F2)", () => {
++  it("applies the (provisionally numbered) serve.answer carrier migration replay-safely", async () => {
++    const directory = new URL("../../migrations/", import.meta.url);
++    const names = (await readdir(directory))
++      .filter((name) => /^\d+_serve_answer_content_carrier\.sql$/.test(name));
++    expect(names).toHaveLength(1);
++    const migration = await readFile(new URL(names[0]!, directory), "utf8");
++    await expect(database.pool.query(migration)).resolves.toBeDefined();
++    await expect(database.pool.query(migration)).resolves.toBeDefined();
++    const triggers = await database.pool.query<{ tgname: string }>(
++      `SELECT tgname FROM pg_trigger
++       WHERE tgrelid='serve.answer'::regclass AND NOT tgisinternal ORDER BY tgname`
++    );
++    // Other guards may already sit on serve.answer; the three carrier triggers must.
++    expect(triggers.rows.map((row) => row.tgname)).toEqual(expect.arrayContaining([
++      "aaa_enforce_content_attestation_v2", "enforce_content_ciphertext", "enforce_erasure_barrier"
++    ]));
++  });
++
++  it("stores only sentinel + envelope for an encrypted run, decrypts through the projection, and shreds with the run key while a legacy row stays readable", async () => {
++    const marker = randomUUID();
++    const verdictText = `B21_DISTINCTIVE_VERDICT_${marker} the private conclusion`;
++    const segmentText = `b21-segment-${marker}`;
++    const runId = await createEncryptedRun(`b21 encrypted question ${marker}`);
++    const answerId = await persistVerdict(runId, { kind: "VERDICT", text: verdictText }, segmentText);
++
++    // 1. The stored row never carries the verdict in plaintext.
++    const storedRow = await readStoredAnswer(answerId);
++    expect(storedRow.row_text).not.toContain(verdictText);
++    expect(storedRow.row_text).not.toContain("B21_DISTINCTIVE_VERDICT");
++    expect(storedRow.answer_form).toEqual(CONTENT_JSON_SENTINEL);
++
++    // 2. The row carries the 0038/0040-shaped envelope and attestation.
++    const carrier = await database.pool.query<{
++      content_ciphertext: Record<string, unknown> | null;
++      attestation_length: number | null;
++    }>(
++      `SELECT content_ciphertext, octet_length(content_attestation) AS attestation_length
++       FROM serve.answer WHERE answer_id=$1 ORDER BY answer_version DESC LIMIT 1`,
++      [answerId]
++    );
++    const envelope = carrier.rows[0]!.content_ciphertext;
++    expect(envelope).toMatchObject({ v: 1 });
++    expect(Object.keys(envelope ?? {}).sort()).toEqual(["ct", "keyId", "nonce", "tag", "v"]);
++    expect(JSON.stringify(envelope)).not.toContain(verdictText);
++    expect(carrier.rows[0]!.attestation_length).toBe(32);
++
++    // 3. The projection is the only reader and returns the decrypted form.
++    const serve = new ServeRepository(database.pool);
++    const projection = await serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null });
++    expect(projection).toMatchObject({
++      answer_id: answerId,
++      run_ref: runId,
++      terminal: "SERVED",
++      answer_form: { kind: "VERDICT", text: verdictText }
++    });
++    // The runner's supersede path reads through the same projection.
++    await expect(serve.readReviewCatchUpSource(runId)).resolves.toMatchObject({
++      answerId,
++      answer: { answer_form: { kind: "VERDICT", text: verdictText } }
++    });
++
++    // 4. A direct plaintext write for an encrypted run is refused by the DB guard.
++    await expect(database.pool.query(
++      `INSERT INTO serve.answer
++       SELECT (jsonb_populate_record(NULL::serve.answer, to_jsonb(source)
++         || jsonb_build_object(
++              'answer_version', source.answer_version + 1,
++              'answer_form', $2::jsonb,
++              'sealed_at_seq', ledger.allocate_sequence()
++            ))).*
++       FROM serve.answer AS source
++       WHERE source.answer_id=$1
++       ORDER BY source.answer_version DESC LIMIT 1`,
++      [answerId, JSON.stringify({ kind: "VERDICT", text: `b21-plaintext-mutation-${marker}` })]
++    )).rejects.toThrow("CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.answer");
++
++    // 5. Legacy (default-off) runs keep the explicit plaintext contract: the
++    //    verdict is stored as before and the carrier columns stay NULL.
++    const legacyMarker = randomUUID();
++    const legacyVerdict = `B21_LEGACY_VERDICT_${legacyMarker}`;
++    const legacyAskerId = `legacy-b21-${randomUUID()}`;
++    const legacyRunId = await createLegacyRun(`b21 legacy question ${legacyMarker}`, legacyAskerId);
++    const legacyAnswerId = await persistVerdict(
++      legacyRunId, { kind: "VERDICT", text: legacyVerdict }, `b21-legacy-segment-${legacyMarker}`
++    );
++    const legacyRow = await readStoredAnswer(legacyAnswerId);
++    expect(legacyRow.answer_form).toEqual({ kind: "VERDICT", text: legacyVerdict });
++    const legacyCarrier = await database.pool.query<{
++      content_ciphertext: unknown;
++      content_attestation: Buffer | null;
++    }>(
++      `SELECT content_ciphertext, content_attestation
++       FROM serve.answer WHERE answer_id=$1 ORDER BY answer_version DESC LIMIT 1`,
++      [legacyAnswerId]
++    );
++    expect(legacyCarrier.rows[0]).toEqual({ content_ciphertext: null, content_attestation: null });
++    await expect(serve.readAnswerProjection(legacyAnswerId, { ownerRef: null, legacyAskerId }))
++      .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: legacyVerdict } });
++
++    // 6. Shred the run key: the stored envelope is unrecoverable and the
++    //    projection fails closed, while the legacy row is still readable.
++    await cipher.destroyRunKey(runId);
++    await expect(cipher.decrypt(runId, "serve.answer", answerId, envelope as never))
++      .rejects.toThrow("RUN_CONTENT_KEY_UNRESOLVED");
++    await expect(serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }))
++      .rejects.toThrow("RUN_CONTENT_KEY_UNRESOLVED");
++    const afterShred = await readStoredAnswer(answerId);
++    expect(afterShred.row_text).not.toContain(verdictText);
++    expect(afterShred.answer_form).toEqual(CONTENT_JSON_SENTINEL);
++    await expect(serve.readAnswerProjection(legacyAnswerId, { ownerRef: null, legacyAskerId }))
++      .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: legacyVerdict } });
++  }, 120_000);
++});
+-- 
+2.50.1 (Apple Git-155)
+

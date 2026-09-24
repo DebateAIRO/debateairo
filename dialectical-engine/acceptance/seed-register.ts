@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
-import { EVALUATOR_CONTRACT_TEXT } from "@debateai/runner";
+import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
+import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
+import { promptContractFingerprintText } from "@debateai/providers";
+import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 import {
   ENGINE_BAND_ORDER,
   buildAlgorithmRegisterRows,
@@ -137,28 +140,24 @@ export interface AcceptanceRegisterRow {
 
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
 
-function requireMatch(source: string, expression: RegExp, label: string): string {
-  const value = source.match(expression)?.[1];
-  if (value === undefined) throw new Error(`SHIPPED_CONTRACT_TEXT_UNRESOLVED:${label}`);
-  return value;
-}
 
 
 async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]> {
-  const [judge, runner, propagation, serve] = await Promise.all([
-    readFile(new URL("../packages/judgement/src/index.ts", import.meta.url), "utf8"),
-    readFile(new URL("../apps/runner/src/index.ts", import.meta.url), "utf8"),
+  const [propagation, serve] = await Promise.all([
     readFile(new URL("../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
   const values = {
-    judgeContractHash: digest(requireMatch(judge, /content: `([\s\S]*?)`/, "judge")),
-    composerContractHash: digest(requireMatch(
-      runner,
-      /content: "(Return only JSON with a segments array[^"]+)"/,
-      "composer"
-    )),
-    conformanceContractHash: digest(EVALUATOR_CONTRACT_TEXT),
+    // RUN1 (V-11 addendum): every prompt is now `SAFETY FRAME OWNED BY CODE +
+    // INSTRUCTION TEXT`, so a fingerprint taken over a SEARCH of the source no
+    // longer describes what is sent. Each row is the digest of the prompt
+    // contracts themselves, through `promptContractFingerprintText`, which
+    // folds in the frame version — so a change to the frame, to a code-owned
+    // answer form, or to an owner's instruction slot is a NEW sealed version
+    // and none of them can ship under an old hash.
+    judgeContractHash: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
+    composerContractHash: digest(promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT)),
+    conformanceContractHash: digest(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT)),
     // codex r2 B1a: the fingerprint is taken from the constant the runner
     // SENDS, not from a search of the runner's source. There is nothing left
     // for a comment, string, regex or template literal to confuse.

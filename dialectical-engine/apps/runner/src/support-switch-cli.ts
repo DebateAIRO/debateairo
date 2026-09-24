@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TypedDomainError } from "@debateai/kernel";
 import { createSupportControlPlanePool, type Pool } from "@debateai/db";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 import {
   canonicalRegisterJson,
   createPostgresRegisterPublicationPort,
@@ -149,7 +150,7 @@ async function main(): Promise<void> {
     );
   } else {
     const credentials = await loadDevelopmentSupportConfigCliCredentials(
-      resolve(".local/dev-auth/database-principals.env")
+      join(resolveDevCustodyRoot(resolve(".")), "database-principals.env")
     );
     const pool = createSupportControlPlanePool(credentials.databaseUrl);
     try {

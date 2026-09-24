@@ -106,10 +106,8 @@ export class SupportC3AdmissionWindow {
     limits: SessionMessageLimits;
   }>): SupportAdmissionDecision {
     if (!this.#observe(input.atMs)) return refused("INVALID_TIME");
-    if (!this.#validSessionCreatedTime(input)) {
-      this.#clockPoisoned = true;
-      return refused("INVALID_TIME");
-    }
+    // DL1-F3: a session row dated ahead of the clock refuses this call only.
+    if (!this.#validSessionCreatedTime(input)) return refused("INVALID_TIME");
     const universal = this.#universalMessageRefusal(input);
     if (universal !== null) return universal;
     if (!this.#accountMessages.has(input.ownerRef)
@@ -145,10 +143,8 @@ export class SupportC3AdmissionWindow {
     limits: AnonymousLimits;
   }>): SupportAdmissionDecision {
     if (!this.#observe(input.atMs)) return refused("INVALID_TIME");
-    if (!this.#validSessionCreatedTime(input)) {
-      this.#clockPoisoned = true;
-      return refused("INVALID_TIME");
-    }
+    // DL1-F3: a session row dated ahead of the clock refuses this call only.
+    if (!this.#validSessionCreatedTime(input)) return refused("INVALID_TIME");
     const universal = this.#universalMessageRefusal(input);
     if (universal !== null) return universal;
 
@@ -228,6 +224,15 @@ export class SupportC3AdmissionWindow {
     return Number.isSafeInteger(value) && value >= 0;
   }
 
+  /**
+   * DL1-F3. A backward wall-clock reading refuses only the call that carried
+   * it: the per-source windows keep their high-water mark, nothing is recorded
+   * for the refused call, and the next forward observation is admitted. One
+   * structured line per regression makes the skew visible; an NTP step used to
+   * answer every support route 429 until restart, silently. An unusable
+   * timestamp (NaN, infinite, negative, unsafe) still latches closed — that is
+   * a broken clock, not a step.
+   */
   #observe(atMs: number): boolean {
     if (this.#clockPoisoned) return false;
     if (!this.#validTimestamp(atMs)) {
@@ -235,7 +240,10 @@ export class SupportC3AdmissionWindow {
       return false;
     }
     if (this.#lastObservedAtMs !== null && atMs < this.#lastObservedAtMs) {
-      this.#clockPoisoned = true;
+      console.error(JSON.stringify(Object.freeze({
+        event: "support.admission.clock_regression",
+        skew_ms: this.#lastObservedAtMs - atMs
+      })));
       return false;
     }
     this.#lastObservedAtMs = atMs;

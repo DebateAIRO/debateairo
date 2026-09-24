@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   AccountErasureScheduleRequestSchema,
@@ -67,6 +67,7 @@ import {
   AuthFlowError,
   type RegistrationApplication
 } from "./registration.js";
+import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
@@ -76,6 +77,7 @@ import type { RecoveryApplication } from "./recovery.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import {
   installSupportRoutes,
+  type SupportAdmission,
   type SupportApplication,
   type SupportRoutePath
 } from "./support/index.js";
@@ -250,11 +252,23 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "CONVERGENCE_CONTROLS_INVALID",
   "CONVERGENCE_CONTROLS_PROVENANCE_MISSING",
   "CONVERGENCE_CONTROLS_UNRESOLVED",
+  "COST_ENVELOPE_CEILING_INVALID",
+  "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "COST_ENVELOPE_DAY_INVALID",
+  "COST_ENVELOPE_GUARD_INPUT_INVALID",
+  "COST_ENVELOPE_PRICE_INVALID",
+  "COST_ENVELOPE_PRICE_UNPRICED",
+  "COST_ENVELOPE_PROJECTION_INVALID",
+  "COST_ENVELOPE_RESERVATION_TTL_INVALID",
+  "COST_ENVELOPE_RUN_REQUIRED",
+  "COST_ENVELOPE_SPEND_INVALID",
+  "COST_ENVELOPE_USAGE_INVALID",
   "CRITERION_ID_DUPLICATE",
   "CRITERION_ID_INVALID",
   "CRITERION_LABEL_INVALID",
   "CRITIC_UNAVAILABLE_BAND_CAP_UNRESOLVED",
   "CRITIQUE_CONTEXT_NOT_ISOLATED",
+  "DAILY_COST_ENVELOPE_REACHED",
   "DATABASE_POOL_FAILED",
   "DEBATE_EXPANSION_PARENT_MISSING",
   "DEBATE_MAKER_UNRESOLVED",
@@ -349,6 +363,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "INSTRUMENT_REF_REQUIRED",
   "INVALID_COMPOSITION_ATTEMPT",
   "JUDGEMENT_POLICY_UNRESOLVED",
+  // FW-B / F-I2: the judgement package's closed leg table refuses an undeclared
+  // material name (packages/judgement/src/index.ts) on the way INTO the frame,
+  // so the refusal travels the same path a schema failure does.
+  "JUDGE_LEG_MATERIAL_UNDECLARED",
   "JUDGE_PARSE_FAILURE",
   "JUDGE_SCHEMA_FAILURE",
   "LABEL_BASIS_DISCLOSURE_MISMATCH",
@@ -367,6 +385,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "LIVENESS_TIME_INVALID",
   "MAKER_INVENTORY_UNSATISFIED",
   "MAKER_POLICY_INVALID",
+  "MAKER_POSITION_DISCLOSURE_UNRESOLVED",
   "MAKER_POSITION_UNAVAILABLE",
   "MALFORMED_ARROW_ORDER",
   "MEMORY_ASKER_SCOPE_MISMATCH",
@@ -424,6 +443,24 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PRODUCT_ROLE_POLICY_REGISTER_COUNT_MISMATCH",
   "PRODUCT_ROLE_POLICY_REGISTER_UNSEALED",
   "PRODUCT_ROLE_POLICY_UNRESOLVED",
+  // FW-B / F-I2: every refusal packages/providers/src/prompt-frame.ts can raise —
+  // the BUILDER's six as well as the DOOR's five. A refused packet short-circuits
+  // the gateway, is re-thrown by the phase catch and reaches the task boundary;
+  // without these rows it became `UNRECOGNIZED_DOMAIN_ERROR` — durable state
+  // naming nothing, which is the defect codex r1b F3 closed for the provider
+  // subclasses. The list is swept from that file by test, so a seventh refusal
+  // added there cannot land without a row here.
+  "PROMPT_CANARY_UNAVAILABLE",
+  "PROMPT_CONTRACT_INCOMPLETE",
+  "PROMPT_FENCE_UNAVAILABLE",
+  "PROMPT_FRAME_ABSENT",
+  "PROMPT_FRAME_FENCE_FORGED",
+  "PROMPT_FRAME_FENCE_MISMATCH",
+  "PROMPT_FRAME_FOREIGN_TURN",
+  "PROMPT_FRAME_MATERIAL_MALFORMED",
+  "PROMPT_INSTRUCTION_RESERVED_TOKEN",
+  "PROMPT_MATERIAL_FIELD_NAME_INVALID",
+  "PROMPT_REPAIR_NOT_A_LOCATOR",
   "PROPAGATION_MAGNITUDE_INVALID",
   "PROPAGATION_RECEIPT_INVALID",
   "PROPAGATION_RECEIPT_MISSING",
@@ -434,6 +471,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROVIDER_CALL_INSIDE_TRANSACTION",
   "PROVIDER_CONTENT_UNACCEPTED",
   "PROVIDER_RUN_REQUIRED",
+  "PROVIDER_USAGE_INVALID",
+  "PROVIDER_USAGE_UNREPORTED",
   "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN",
   "QUERY_SET_REF_REQUIRED",
   "RAW_ARTIFACT_RUN_REQUIRED",
@@ -458,6 +497,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
   "RUN_COST_ENVELOPE_UNRESOLVED",
   "RUN_DEPTH_PARAMS_INVALID",
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
@@ -1029,14 +1069,21 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
-  { route: "POST /v1/support/sessions", auth: "public", session: "optional", resource: "support-session", action: "create" },
+  // DL1-F7: every mutating support route requires the exact first-party Origin,
+  // for anonymous callers too. Without it a page on any site could drive every
+  // one of its visitors' browsers into the support surface — spending the shared
+  // model budget from real visitors' addresses, which defeats the per-IP windows
+  // as well. The reads stay Origin-free: the widget's first paint and a case
+  // link opened from an e-mail are both GETs.
+  { route: "POST /v1/support/sessions", auth: "public", origin: "trusted", session: "optional", resource: "support-session", action: "create" },
   { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
-  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", session: "optional", resource: "support-message", action: "create" },
-  { route: "POST /v1/support/messages/{id}/rating", auth: "public", session: "optional", resource: "support-message", action: "rate" },
-  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", session: "optional", resource: "support-case", action: "create" },
+  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
+  { route: "POST /v1/support/messages/{id}/rating", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "rate" },
+  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "create" },
   { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
-  { route: "GET /v1/support/cases/{token}", auth: "public", session: "optional", resource: "support-case", action: "read" },
-  { route: "POST /v1/support/cases/{token}/messages", auth: "public", session: "optional", resource: "support-case", action: "reply" },
+  // DL1-F5c/DL3-F4: the bearer is `x-support-case-token`, never a path segment.
+  { route: "GET /v1/support/case", auth: "public", session: "optional", resource: "support-case", action: "read" },
+  { route: "POST /v1/support/case/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
@@ -1088,17 +1135,68 @@ function routePolicy(route: AuthorizationRoute): { readonly config: {
   });
 }
 
+/**
+ * Credential, token, and management routes carry at most ~1.1 KiB of
+ * legitimate body (L1 "B5"); each declares the 16 KiB ceiling explicitly.
+ */
+function credentialRoutePolicy(route: AuthorizationRoute): ReturnType<typeof routePolicy> & {
+  readonly bodyLimit: typeof AUTH_BODY_LIMIT_BYTES;
+} {
+  return Object.freeze({ ...routePolicy(route), bodyLimit: AUTH_BODY_LIMIT_BYTES });
+}
+
 function canonicalRoute(method: string, url: string): string {
   return `${method.toUpperCase()} ${url.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}")}`;
 }
 
 export const SESSION_COOKIE_NAME = "__Host-debateai-session" as const;
 export const CSRF_COOKIE_NAME = "__Host-debateai-csrf" as const;
+/**
+ * F-07 / L1-F4 request ceilings. The server default bounds the free-text
+ * routes (asks, investigations: realistic worst case is tens of KiB); every
+ * credential, token, and management route declares the 16 KiB ceiling (its
+ * largest legitimate field is a 1024-byte legacy token). The request timeout
+ * bounds how long a client may take to deliver one request; SSE responses are
+ * unaffected. The param length stays at Fastify's default: L1 ruled against
+ * loosening it to 128.
+ */
+export const API_BODY_LIMIT_BYTES = 262_144 as const;
+export const AUTH_BODY_LIMIT_BYTES = 16_384 as const;
+export const API_REQUEST_TIMEOUT_MS = 30_000 as const;
+export const API_MAX_PARAM_LENGTH = 100 as const;
+/**
+ * The request-shape bound, in UTF-8 bytes, so an unbounded password can never
+ * reach Argon2. V-14 (ruled 2026-09-21) also made the maximum register policy:
+ * a deployment register publishes a superseding `passwordPolicy` row carrying
+ * `max_length: 1024`, which `RegistrationService` enforces beside the ruled
+ * minimum, counted in UTF-16 code units. This bound stays, and stays first: it
+ * is never looser than the policy rule (UTF-8 bytes are never fewer than UTF-16
+ * code units) and it is the only ceiling for a register version that publishes
+ * no maximum.
+ */
+export const AUTH_PASSWORD_MAX_BYTES = 1_024 as const;
+/**
+ * L4-F2: `question_line` is trimmed but not bounded by the contract, and the runner re-sends it
+ * verbatim on every model attempt — so an unbounded question turns one ask into unbounded model
+ * spend. Bounded at the route (no contract edit) in UTF-8 bytes, measured after the contract trim.
+ */
+export const ASK_QUESTION_MAX_BYTES = 8_192 as const;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
 const ResourceIdSchema = z.uuid();
 const SessionIdSchema = ResourceIdSchema;
+/**
+ * L1-F7: `{gapRef}` was unvalidated free text bounded only by the router's
+ * parameter length. It is model-authored, so it is bounded here at the route
+ * rather than in `@debateai/contract`, which is a live-mission surface. The
+ * blank guard mirrors the contract's `gap_ref` (`z.string().trim().min(1)`)
+ * while keeping the caller's value verbatim — the API never silently repairs.
+ * A gapRef longer than the router's `maxParamLength` never reaches this
+ * schema; it takes the typed 414 (L1-F6) instead.
+ */
+const InvestigationGapRefSchema = z.string().min(1).max(API_MAX_PARAM_LENGTH)
+  .refine((value) => value.trim().length > 0);
 const SECURITY_HEADERS = Object.freeze({
   "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; object-src 'none'",
   "strict-transport-security": "max-age=31536000; includeSubDomains",
@@ -1107,6 +1205,31 @@ const SECURITY_HEADERS = Object.freeze({
   "referrer-policy": "no-referrer",
   "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 });
+
+/**
+ * Fastify classifies a request body before any handler runs. Each of these
+ * is a client fault with a constant envelope; none is a server failure.
+ */
+type TransportFaultEnvelope = Readonly<{
+  statusCode: 400 | 413 | 414 | 415;
+  code: "MALFORMED_REQUEST" | "PAYLOAD_TOO_LARGE" | "URI_TOO_LONG" | "UNSUPPORTED_MEDIA_TYPE";
+}>;
+const TRANSPORT_FAULT_ENVELOPES: ReadonlyMap<string, TransportFaultEnvelope> = new Map<string, TransportFaultEnvelope>([
+  ["FST_ERR_CTP_BODY_TOO_LARGE", { statusCode: 413, code: "PAYLOAD_TOO_LARGE" }],
+  ["FST_ERR_CTP_EMPTY_JSON_BODY", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  ["FST_ERR_CTP_INVALID_JSON_BODY", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  ["FST_ERR_CTP_INVALID_MEDIA_TYPE", { statusCode: 415, code: "UNSUPPORTED_MEDIA_TYPE" }],
+  ["FST_ERR_CTP_INVALID_CONTENT_LENGTH", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  ["FST_ERR_BAD_URL", { statusCode: 400, code: "MALFORMED_REQUEST" }],
+  // L1-F6: the framework 414 echoed the oversized parameter back at the
+  // caller. The constant envelope reflects nothing.
+  ["FST_ERR_MAX_PARAM_LENGTH", { statusCode: 414, code: "URI_TOO_LONG" }]
+]);
+
+function passwordWithinRequestBound(body: Readonly<Record<string, unknown>>): boolean {
+  return typeof body.password !== "string"
+    || Buffer.byteLength(body.password, "utf8") <= AUTH_PASSWORD_MAX_BYTES;
+}
 
 declare module "fastify" {
   interface FastifyContextConfig {
@@ -1155,6 +1278,9 @@ export interface ApiOptions {
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
+  /** B10 admission budgets; optional for test compositions, always supplied by main. */
+  readonly admission?: AdmissionLimiter;
+  readonly admissionClock?: () => Date;
   readonly support?: SupportApplication;
 }
 
@@ -1173,6 +1299,47 @@ export interface EvaluatorDevMenuApplication {
  * be admitted. Typed errors from deployment reads or persistence deliberately
  * do not receive this marker and therefore remain internal failures.
  */
+/**
+ * RULING R1 (V-28, review round 2) — THE DAY-SPENT REFUSAL IS A RETRY.
+ *
+ * Every ask refusal answers 422 ("this request is wrong") except this one, which
+ * is not wrong: it is well formed, it would have been admitted an hour earlier,
+ * and it will be admitted again after midnight. 429 with `Retry-After` says "not
+ * now, and here is when" — the next UTC midnight, the instant the daily envelope
+ * resets — so a caller waits the right amount of time instead of hammering the
+ * surface or giving up on a debate it could still have.
+ */
+export function askRefusalStatus(code: string): 422 | 429 {
+  return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
+}
+
+/**
+ * I6 (re-review) — WHAT THE CALLER IS TOLD.
+ *
+ * The daily refusal's message carries the deployment's ceiling and its spend so
+ * far, because that is what an operator needs to see. It is NOT what a caller
+ * needs: it is a commercial figure, and a capacity oracle for anyone who wants
+ * to exhaust the day — ask once, read the ceiling, ask again and watch the
+ * number climb. Same class as the support status-page leak DL1-F4.
+ *
+ * So the public body for this one refusal is the CODE. Every other ask refusal
+ * keeps its message, because those describe the ASK the caller sent and
+ * withholding them would only make a lawful refusal unactionable. The figures
+ * stay on the error, and the boundary logs them for the operator.
+ */
+export function askRefusalPublicMessage(code: string, message: string): string {
+  return code === "DAILY_COST_ENVELOPE_REACHED" ? code : message;
+}
+
+/** The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. */
+export function askRefusalRetryAfter(code: string, now: Date): string | null {
+  if (askRefusalStatus(code) !== 429) return null;
+  const midnight = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1
+  ));
+  return midnight.toUTCString();
+}
+
 export class AskRefusal extends Error {
   readonly code: string;
 
@@ -1184,8 +1351,14 @@ export class AskRefusal extends Error {
 }
 
 class MalformedRequestError extends Error {
+  /**
+   * L1-F5: a ZodError message is the entire issue list — every field path,
+   * every expected enum value, and each `.strict()` extra-key name. The
+   * transport message is therefore the constant code, and the schema detail
+   * survives only on `cause`, which never leaves the process.
+   */
   constructor(error: Error) {
-    super(error.message);
+    super("MALFORMED_REQUEST", { cause: error });
     this.name = "MalformedRequestError";
   }
 }
@@ -1262,7 +1435,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   const api = Fastify({
     logger: false,
     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
-    exposeHeadRoutes: false
+    exposeHeadRoutes: false,
+    bodyLimit: API_BODY_LIMIT_BYTES,
+    requestTimeout: API_REQUEST_TIMEOUT_MS,
+    routerOptions: { maxParamLength: API_MAX_PARAM_LENGTH },
+    /**
+     * Router-level faults never reach `setErrorHandler`: Fastify serializes
+     * them itself, and its 414 quotes the offending URL straight back at the
+     * caller (L1-F6). They take the same constant typed envelopes here, and an
+     * unrecognised one falls back to the constant 400 rather than a framework
+     * body. Nothing here echoes any part of the request.
+     */
+    frameworkErrors: (error: FastifyError, _request: FastifyRequest, reply: FastifyReply) => {
+      const fault = TRANSPORT_FAULT_ENVELOPES.get(error.code)
+        ?? { statusCode: 400 as const, code: "MALFORMED_REQUEST" as const };
+      void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
+    }
   });
   api.addHook("onRoute", (route) => {
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
@@ -1294,6 +1482,39 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       : "unknown",
     requestId: request.id
   });
+  const admissionRefusalAuditedUntil = new Map<string, number>();
+  const ADMISSION_ALLOWED: AdmissionDecision = Object.freeze({ allowed: true as const });
+  /**
+   * B10: refuses when the sealed admission budget for `key` is spent. The
+   * audit is one structured line per route, reason, and window; never one
+   * per request, and never carrying an address or owner.
+   */
+  const chargeAdmission = (
+    scope: AdmissionScope, route: AuthorizationRoute, key: string
+  ): AdmissionDecision => {
+    if (options.admission === undefined) return ADMISSION_ALLOWED;
+    const now = options.admissionClock?.() ?? new Date();
+    const decision = options.admission.decide(scope, key, now);
+    if (decision.allowed) return decision;
+    const auditKey = `${route}:${decision.reason}`;
+    if ((admissionRefusalAuditedUntil.get(auditKey) ?? 0) <= now.getTime()) {
+      admissionRefusalAuditedUntil.set(auditKey, now.getTime() + decision.windowMs);
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.admission.refused", route, reason: decision.reason, windowMs: decision.windowMs
+      })));
+    }
+    return decision;
+  };
+  const admitOrRefuse = (
+    reply: FastifyReply, scope: AdmissionScope, route: AuthorizationRoute, key: string
+  ): boolean => {
+    const decision = chargeAdmission(scope, route, key);
+    if (decision.allowed) return true;
+    void reply.status(429)
+      .header("retry-after", String(Math.max(1, Math.ceil(decision.retryAfterMs / 1_000))))
+      .send({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
+    return false;
+  };
   const ownershipFor = (request: Readonly<{
     session: Session;
     authenticatedSession?: AuthenticatedSession;
@@ -1383,6 +1604,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
+  /**
+   * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
+   * stays false), returned Fastify's own {message,error,statusCode} envelope —
+   * a framework fingerprint and a route-existence oracle. One constant typed
+   * 404 covers all of them; it is a client fault, never an `api.request.failed`.
+   */
+  api.setNotFoundHandler((_request, reply) =>
+    reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" }));
   api.setErrorHandler((error, request, reply) => {
     if (reply.sent || reply.raw.headersSent) {
       // A streaming response has no lawful error envelope left to send. Abort
@@ -1403,6 +1632,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return;
     }
     const knownError = error instanceof Error ? error : new Error(String(error));
+    const frameworkCode = (knownError as Error & Readonly<{ code?: unknown }>).code;
+    const transportFault = typeof frameworkCode === "string"
+      ? TRANSPORT_FAULT_ENVELOPES.get(frameworkCode) : undefined;
+    if (transportFault !== undefined) {
+      // Too large, empty or invalid JSON, unsupported media type: the client
+      // is at fault, so the envelope is constant and the >=500 failure log
+      // below is never reached (L1-F4).
+      return reply.status(transportFault.statusCode).send({
+        error: transportFault.code, message: transportFault.code
+      });
+    }
     const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
     const authFlow = knownError instanceof AuthFlowError;
     // Only an error marked at the ask-evaluation stage is a refusal. Register,
@@ -1417,7 +1657,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const statusCode = malformed ? 400
       : authFlow ? knownError.statusCode
         : argon2Unavailable ? 503
-          : askRefusal ? 422 : 500;
+          // R1: an ask refusal is 422, except the one that will pass tomorrow.
+          : askRefusal ? askRefusalStatus(knownError.code) : 500;
     const errorCode = malformed
       ? "MALFORMED_REQUEST"
       : authFlow ? knownError.code
@@ -1432,16 +1673,35 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         diagnostic: apiOperationalErrorDiagnostic(knownError)
       })));
     }
+    // R1: `Retry-After` names the instant the daily envelope resets, so a client
+    // library that honours the header waits exactly as long as it must.
+    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date()) : null;
+    if (retryAfter !== null) reply.header("retry-after", retryAfter);
+    // I6: the spend figures the refusal carries are the OPERATOR's, so they are
+    // logged here and withheld from the body below.
+    if (askRefusal && askRefusalPublicMessage(knownError.code, knownError.message) !== knownError.message) {
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.ask.refused",
+        requestId: request.id,
+        code: knownError.code,
+        detail: knownError.message
+      })));
+    }
     return reply.status(statusCode).send({
       error: errorCode,
-      message: statusCode >= 500 ? errorCode : knownError.message
+      message: statusCode >= 500 || malformed
+        ? errorCode
+        : askRefusal ? askRefusalPublicMessage(knownError.code, knownError.message) : knownError.message
     });
   });
 
   if (options.sessions !== undefined) {
-    api.post("/v1/auth/login", routePolicy("POST /v1/auth/login"), async (request, reply) => {
+    api.post("/v1/auth/login", credentialRoutePolicy("POST /v1/auth/login"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       if (typeof body.challenge_token === "string") {
         const result = await options.sessions!.completeLogin({
           challengeToken: body.challenge_token,
@@ -1465,7 +1725,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.status(202).send({ status: result.status, challenge_token: result.challengeToken });
     });
-    api.post("/v1/auth/logout", routePolicy("POST /v1/auth/logout"), async (request, reply) => {
+    api.post("/v1/auth/logout", credentialRoutePolicy("POST /v1/auth/logout"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       await options.sessions!.logout(authenticated, sourceFor(request));
@@ -1477,7 +1737,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       return reply.send({ sessions: await options.sessions!.listSessions(authenticated) });
     });
-    api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", routePolicy("DELETE /v1/auth/sessions/{id}"), async (request, reply) => {
+    api.delete<{ Params: { id: string } }>("/v1/auth/sessions/:id", credentialRoutePolicy("DELETE /v1/auth/sessions/{id}"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const parsedSessionId = SessionIdSchema.safeParse(request.params.id);
@@ -1487,18 +1747,21 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (parsedSessionId.data === authenticated.session.session_id) reply.header("set-cookie", expiredCookies());
       return reply.status(204).send();
     });
-    api.delete("/v1/auth/sessions", routePolicy("DELETE /v1/auth/sessions"), async (request, reply) => {
+    api.delete("/v1/auth/sessions", credentialRoutePolicy("DELETE /v1/auth/sessions"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const revoked = await options.sessions!.revokeAllSessions(authenticated, sourceFor(request));
       reply.header("set-cookie", expiredCookies());
       return reply.send({ revoked });
     });
-    api.post("/v1/auth/step-up", routePolicy("POST /v1/auth/step-up"), async (request, reply) => {
+    api.post("/v1/auth/step-up", credentialRoutePolicy("POST /v1/auth/step-up"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown> : {};
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       const authorization = body.authorization === undefined
         ? undefined
         : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
@@ -1538,7 +1801,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       });
     });
   }
-  api.delete("/v1/account",routePolicy("DELETE /v1/account"),async (request,reply)=>{
+  api.delete("/v1/account",credentialRoutePolicy("DELETE /v1/account"),async (request,reply)=>{
     const authenticated=request.authenticatedSession;
     if (authenticated===undefined) {
       return reply.status(409).send({ error:"COOKIE_SESSION_REQUIRED" });
@@ -1578,7 +1841,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.post(
     "/v1/account/erasure/cancel",
-    routePolicy("POST /v1/account/erasure/cancel"),
+    credentialRoutePolicy("POST /v1/account/erasure/cancel"),
     async (request,reply)=>{
       const authenticated=request.authenticatedSession;
       if (authenticated===undefined) {
@@ -1598,7 +1861,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   );
   api.post(
     "/v1/account/legacy-runs/claim",
-    routePolicy("POST /v1/account/legacy-runs/claim"),
+    credentialRoutePolicy("POST /v1/account/legacy-runs/claim"),
     async (request,reply)=>{
       const authenticated=request.authenticatedSession;
       if (authenticated===undefined) {
@@ -1621,7 +1884,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   );
   api.delete<{ Params:{ id:string } }>(
     "/v1/debates/:id",
-    routePolicy("DELETE /v1/debates/{id}"),
+    credentialRoutePolicy("DELETE /v1/debates/{id}"),
     async (request,reply)=>{
       const runId=ResourceIdSchema.safeParse(request.params.id);
       const authenticated=request.authenticatedSession;
@@ -1653,11 +1916,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/public/debates",
     routePolicy("GET /v1/public/debates"),
     async (request, reply) => {
+      if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/debates", sourceFor(request).ip)) return reply;
       const limit = Number(request.query.limit);
       const offset = Number(request.query.offset);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100
         || !Number.isInteger(offset) || offset < 0) {
-        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
       if (options.publications === undefined) {
         return reply.send(PublicDebateListSchema.parse({ items: [], total: 0 }));
@@ -1672,6 +1936,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/public/debates/:id",
     routePolicy("GET /v1/public/debates/{id}"),
     async (request, reply) => {
+      if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/debates/{id}", sourceFor(request).ip)) return reply;
       const publicationRef = ResourceIdSchema.safeParse(request.params.id);
       if (!publicationRef.success || options.publications === undefined) {
         return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
@@ -1683,10 +1948,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
   );
   if (options.registration !== undefined) {
-    api.post("/v1/auth/register", routePolicy("POST /v1/auth/register"), async (request, reply) => {
+    api.post("/v1/auth/register", credentialRoutePolicy("POST /v1/auth/register"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
+      if (!passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
       const response = await options.registration!.register({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : "",
@@ -1695,7 +1963,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.status(202).send(response);
     });
-    api.post("/v1/auth/verify-email", routePolicy("POST /v1/auth/verify-email"), async (request, reply) => {
+    api.post("/v1/auth/verify-email", credentialRoutePolicy("POST /v1/auth/verify-email"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -1704,7 +1972,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }, sourceFor(request));
       return reply.send(response);
     });
-    api.post("/v1/auth/resend-verification", routePolicy("POST /v1/auth/resend-verification"), async (request, reply) => {
+    api.post("/v1/auth/resend-verification", credentialRoutePolicy("POST /v1/auth/resend-verification"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -1716,7 +1984,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   if (options.recovery !== undefined) {
-    api.post("/v1/auth/recovery/start", routePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
+    api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
+      // L1-F3: this route had no per-source admission control at all — only a
+      // 500 ms enumeration floor — so one source could drive unbounded blind
+      // -index computations, recovery-start round trips and risk-signal writes.
+      // The budget is charged to the SOURCE and never to the address, so the
+      // refusal is identical whether or not the account exists: it adds no
+      // enumeration oracle to a route whose whole design is generic.
+      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", sourceFor(request).ip)) {
+        return reply;
+      }
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -1728,7 +2005,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   if (options.mfa !== undefined) {
-    api.post("/v1/auth/mfa/totp/begin", routePolicy("POST /v1/auth/mfa/totp/begin"), async (request, reply) => {
+    api.post("/v1/auth/mfa/totp/begin", credentialRoutePolicy("POST /v1/auth/mfa/totp/begin"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -1736,7 +2013,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/totp/verify", routePolicy("POST /v1/auth/mfa/totp/verify"), async (request, reply) => {
+    api.post("/v1/auth/mfa/totp/verify", credentialRoutePolicy("POST /v1/auth/mfa/totp/verify"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -1745,7 +2022,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         code: typeof body.code === "string" ? body.code : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/recovery-codes/generate", routePolicy("POST /v1/auth/mfa/recovery-codes/generate"), async (request, reply) => {
+    api.post("/v1/auth/mfa/recovery-codes/generate", credentialRoutePolicy("POST /v1/auth/mfa/recovery-codes/generate"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -1753,7 +2030,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
       }, sourceFor(request)));
     });
-    api.post("/v1/auth/mfa/recovery-codes/confirm", routePolicy("POST /v1/auth/mfa/recovery-codes/confirm"), async (request, reply) => {
+    api.post("/v1/auth/mfa/recovery-codes/confirm", credentialRoutePolicy("POST /v1/auth/mfa/recovery-codes/confirm"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -1785,7 +2062,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const body = request.body;
       if (typeof body !== "object" || body === null || !("model_id" in body)
         || typeof body.model_id !== "string" || body.model_id.trim() === "") {
-        return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
       try {
         const selection = await options.evaluatorDevMenu!.selectConsumerModel({
@@ -1808,7 +2085,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
+    if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
+      request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
     const ask = parseRequest(AskRequestSchema, request.body);
+    if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,
       request.session,
@@ -1825,7 +2107,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const offset = Number(request.query.offset);
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_OWNER_PRIVATE_HISTORY_SCAN
       || !Number.isInteger(offset) || offset < 0) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     return reply.send(AnswerIndexSchema.parse(await options.application.readAnswerIndex(
       request.session, limit, offset, ownershipFor(request)
@@ -1838,7 +2120,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const rawVersion = request.query.version;
     const version = rawVersion === undefined ? undefined : Number(rawVersion);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const answer = await options.application.readAnswer(
       answerId.data, request.session, version, ownershipFor(request)
@@ -1852,7 +2134,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const rawVersion = request.query.version;
     const version = rawVersion === undefined ? undefined : Number(rawVersion);
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
-      return reply.status(400).send({ error: "MALFORMED_REQUEST" });
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const inspection = await options.application.readInspection(
       answerId.data, request.session, version, ownershipFor(request)
@@ -1882,9 +2164,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post<{ Params: { id: string; gapRef: string } }>("/v1/answers/:id/investigations/:gapRef", routePolicy("POST /v1/answers/{id}/investigations/{gapRef}"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     if (!answerId.success) return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
+    const gapRef = parseRequest(InvestigationGapRefSchema, request.params.gapRef);
     const input = parseRequest(InvestigationRequestSchema, request.body);
     const accepted = await options.application.recordInvestigation(
-      answerId.data, request.params.gapRef, input.user_input, request.session, ownershipFor(request)
+      answerId.data, gapRef, input.user_input, request.session, ownershipFor(request)
     );
     return accepted === null ? reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" }) : reply.status(202).send(InvestigationAcceptedSchema.parse(accepted));
   });
@@ -1941,7 +2224,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/publish",
-    routePolicy("POST /v1/runs/{id}/publish"),
+    credentialRoutePolicy("POST /v1/runs/{id}/publish"),
     async (request, reply) => {
       const runId = ResourceIdSchema.safeParse(request.params.id);
       const authenticated = request.authenticatedSession;
@@ -1986,7 +2269,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   );
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/unpublish",
-    routePolicy("POST /v1/runs/{id}/unpublish"),
+    credentialRoutePolicy("POST /v1/runs/{id}/unpublish"),
     async (request, reply) => {
       const runId = ResourceIdSchema.safeParse(request.params.id);
       const authenticated = request.authenticatedSession;
@@ -2036,7 +2319,25 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ? reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" })
       : reply.send(unlinked);
   });
-  installSupportRoutes(api, options.support, (route: SupportRoutePath) => routePolicy(route));
+  /**
+   * DL1-F2. The B10 limiter never reached a support route: every public support
+   * read was unmetered and the heavy `/status` aggregate ran uncached on every
+   * call. The support routes charge the same limiter, through the same typed
+   * refusal, under their own sealed scopes. A deployment whose register version
+   * carries no support budget is unchanged: `admitSupport` admits.
+   */
+  const admitSupport: SupportAdmission = Object.freeze({
+    gate: (reply, scope, route, key) => options.admission?.configured(scope) !== true
+      || admitOrRefuse(reply, scope, route, key),
+    // DL1-F7: decides and audits without answering, so the support routes can
+    // send their own RATE_LIMITED envelope — the one the widget renders — for
+    // a spent model share, exactly as they do for every other window.
+    charge: (scope, route, key) => options.admission?.configured(scope) !== true
+      || chargeAdmission(scope, route, key).allowed
+  });
+  installSupportRoutes(
+    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
+  );
   return api;
 }
 
@@ -2072,6 +2373,17 @@ export interface RunCreationSettings {
   readonly batteryVersion: string;
   readonly settlementWatchHandle: string;
   readonly memoryPullPolicy?: MemoryQuestionRegistration["pullPolicy"];
+  /**
+   * V-28(2) — THE DAILY MONEY ENVELOPE, asked of a NEW run and nowhere else.
+   *
+   * Absent means no daily bound, which is local mode's behaviour byte-for-byte:
+   * the relays and loopback model servers spend nothing this could bound. The
+   * hosted composition supplies `CostEnvelopeGuard.assertDailyEnvelopeAdmitsNew-
+   * Run`, which refuses `DAILY_COST_ENVELOPE_REACHED` once the application's UTC
+   * day has reached the sealed ceiling. Runs already under way never consult it
+   * and finish.
+   */
+  readonly assertDailyCostEnvelope?: () => Promise<void>;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
@@ -2106,6 +2418,25 @@ export async function evaluateAskAdmission(
   readonly discoveredPanel: readonly DiscoveredPanelMember[];
   readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
 }> {
+  /**
+   * V-28(2) — FIRST, before anything is discovered or probed.
+   *
+   * Panel discovery probes every configured vendor, and a probe is itself a
+   * request to a paid gateway. Taking the money decision after it would spend
+   * money to find out that no money may be spent, so the day's ceiling is the
+   * first question this function asks.
+   *
+   * It is marked as an ask REFUSAL, like every other decision taken at this
+   * stage: the boundary answers 422 with the typed code for an `AskRefusal` and
+   * 500 INTERNAL_ERROR for anything else, so an unwrapped budget-reached ask
+   * would read to the caller — and in the operator's logs — as the engine having
+   * broken, when in fact it worked exactly as ruled.
+   */
+  try {
+    await settings.assertDailyCostEnvelope?.();
+  } catch (error) {
+    markAskRefusal(error);
+  }
   const risk = settings.resolveRisk(ask.risk_tier, ask.tier_source, ask.tier_provenance_ref);
   const planTier = ask.plan_tier as string;
   if (!Object.hasOwn(PLAN_TIER_ROSTERS, planTier)) {

@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { lstat, open } from "node:fs/promises";
+import { open } from "node:fs/promises";
 import { get } from "node:http";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseApiEnvironment } from "@debateai/register";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "./dev-api-environment.js";
@@ -10,6 +10,10 @@ import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
   parseDevelopmentProviderPanelTargets
 } from "./dev-provider-panel.js";
+import {
+  assertDevCustodyRootCustody,
+  resolveDevCustodyRoot
+} from "../../../deploy/dev-auth/custody-root.mjs";
 import {
   developmentDeploymentRegisterReceiptPath,
   readDevelopmentDeploymentRegisterReceipt,
@@ -22,7 +26,6 @@ import {
 } from "./dev-auth-stack-profile.js";
 
 const PRIVATE_FILE_MODE = 0o600;
-const PRIVATE_DIRECTORY_MODE = 0o700;
 const MAX_ENVIRONMENT_BYTES = 64 * 1024;
 const MAX_PROBE_BODY_BYTES = 1_024;
 const LOCAL_API_HOST = "127.0.0.1";
@@ -70,9 +73,8 @@ export async function loadDevelopmentApiProcessEnvironment(
   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): Promise<Readonly<Record<string, string>>> {
   const root = resolve(repositoryRoot);
-  const custodyRoot = join(root, ".local", "dev-auth");
-  await assertPrivateDirectory(dirname(custodyRoot));
-  await assertPrivateDirectory(custodyRoot);
+  const custodyRoot = resolveDevCustodyRoot(root);
+  await assertPrivateCustodyRoot(custodyRoot);
   const values = parseExactEnvironment(
     await readPrivateEnvironment(join(custodyRoot, "api.env"))
   );
@@ -88,14 +90,14 @@ function currentUid(): number {
   return process.getuid();
 }
 
-async function assertPrivateDirectory(path: string): Promise<void> {
-  const metadata = await lstat(path).catch(() => null);
-  if (metadata === null
-    || metadata.isSymbolicLink()
-    || !metadata.isDirectory()
-    || metadata.uid !== currentUid()
-    || (metadata.mode & 0o777) !== PRIVATE_DIRECTORY_MODE) {
-    throw new DevelopmentApiProcessError("DEV_API_PROCESS_CUSTODY_INVALID");
+// V-21(c): the custody root and its parent are checked by the shared resolver, which owns
+// the "real directory, yours, exactly 0700, never repaired" rule (L7-F10). This command
+// keeps only its own typed code.
+async function assertPrivateCustodyRoot(custodyRoot: string): Promise<void> {
+  try {
+    await assertDevCustodyRootCustody(custodyRoot);
+  } catch (error) {
+    throw new DevelopmentApiProcessError("DEV_API_PROCESS_CUSTODY_INVALID", error);
   }
 }
 
@@ -175,7 +177,7 @@ function validateExactEnvironment(
       values.SUPPORT_MODEL_TARGET_JSON!,
       profile
     );
-    const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
+    const custodyRoot = resolveDevCustodyRoot(repositoryRoot);
     const exact = new Map<string, string>([
       ["KEK_PATH", join(custodyRoot, "secrets", "kek.bin")],
       ["SUPPORT_KEK_PATH", join(custodyRoot, "secrets", "support-kek.bin")],

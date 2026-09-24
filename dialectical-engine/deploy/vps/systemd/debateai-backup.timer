@@ -1,0 +1,14 @@
+# deploy/vps/systemd/debateai-backup.timer
+[Unit]
+Description=Nightly DebateAI encrypted backup
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+RandomizedDelaySec=20m
+# Catch up after downtime: a VPS that was off at 03:20 still gets its backup on the next boot.
+Persistent=true
+Unit=debateai-backup.service
+
+[Install]
+WantedBy=timers.target

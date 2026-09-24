@@ -11,6 +11,37 @@ USER_DEK_STORE_PATH/                 mode 0700
 
 `dek.v1.json` contains the envelope version, opaque user UUID, key identifier, nonce, ciphertext, and authentication tag. It never contains plaintext contact data or the unwrapped DEK. The wrapping KEK is loaded separately and never written here or to Postgres. A later account-deletion slice owns removal of this file; S3 only creates it.
 
+Since V-3 the record is `version: 2` and carries `kek_id`: sixteen hex characters
+naming WHICH master key wrapped it, so a rotation can re-wrap without trying to
+decrypt. It is eight bytes of a domain-separated SHA-256 over the key — a label,
+never the key bytes. A `version: 1` record carries no `kek_id` and keeps opening:
+it is read as wrapped by the original KEK, which during a changeover means the
+current key is tried and then the previous one. The file name does not change
+with the record version; it is the store layout's version, not the record's.
+
+The same applies to `publication-key.v1.json` under the corpus KEK. Run content
+keys are wrapped by the user DEK rather than by a KEK, so `content-key.v1.json`
+stays `version: 1` with no `kek_id` and a KEK rotation never rewrites it — which
+is why rotation never re-encrypts content.
+
+### Changing the master key
+
+`pnpm keys:rotate-kek` re-wraps every stored key under a new master key. The same command
+spelled out is `pnpm exec tsx apps/runner/src/rotate-kek-cli.ts`, which is what the VPS
+runbook runs under `systemd-run`. It reads
+with both keys (the new one and `*_KEK_PREVIOUS_PATH`), writes each record back
+labelled with the new one, and ends with a verification pass that opens every
+record under the new key alone — against a SECOND listing of the store, so a
+record written while the pass ran is verified too rather than missed. The
+previous-key setting is removed once that pass is clean; its absence is the
+normal steady state.
+
+The SERVICES read the same setting: `loadKekRing(currentPath, previousPath)` is
+what both composition roots build, so for the length of a changeover the API and
+the runner open a record under either key and write every new one under the
+current key. Without that the rotation would have to happen while the services
+are down. See `deploy/vps/README.md` for the operator procedure.
+
 The stable audit source-context Argon2id salt is a separate 32-byte mode-0600
 secret at `AUDIT_SOURCE_IP_SALT_PATH`. It is loaded by the API process, never
 stored in Postgres, and domain-separates the memory-hard source-IP and user-agent

@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readCustodiedSecretFile } from "../../core/custody.js";
+import { assertLoopbackUrl } from "../../core/loopback.js";
 import { parsePrometheusMetrics, type HatchetMetricValues } from "./prometheus.js";
 
 type Fetch = typeof fetch;
@@ -32,7 +33,11 @@ export async function readHatchetRest(input: Readonly<{
   queueUrl: string; tokenPath: string; timeoutMs: number; fetcher?: Fetch;
 }>): Promise<HatchetMetricValues> {
   const fetcher = input.fetcher ?? fetch;
-  const token = (await readFile(input.tokenPath, "utf8")).trim();
+  // DL7-F1: the target names a host before it names anything else. The pin is
+  // checked first, then the token is read under custody — never the other way
+  // round, so a target pointing elsewhere never causes the token to be opened.
+  assertLoopbackUrl(input.queueUrl);
+  const token = (await readCustodiedSecretFile(input.tokenPath)).trim();
   if (token.length === 0) throw new TypeError("OBSERVATION_HATCHET_TOKEN_INVALID");
   const stepUrl = input.queueUrl.replace(/\/queue-metrics$/u, "/step-run-queue-metrics");
   const workerUrl = input.queueUrl.replace(/\/queue-metrics$/u, "/worker");
@@ -59,6 +64,7 @@ export async function readHatchetRest(input: Readonly<{
 export async function readHatchetPrometheus(input: Readonly<{
   url: string; timeoutMs: number; fetcher?: Fetch;
 }>): Promise<HatchetMetricValues> {
+  assertLoopbackUrl(input.url);
   const response = await (input.fetcher ?? fetch)(input.url, {
     method: "GET", headers: { Connection: "close", "User-Agent": "dialectical-engine-observation-agent" },
     signal: AbortSignal.timeout(Math.min(2_000, input.timeoutMs))

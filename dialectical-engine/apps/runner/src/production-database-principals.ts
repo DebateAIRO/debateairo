@@ -158,6 +158,17 @@ export class ProductionDatabasePrincipalProvisioningError extends Error {
   }
 }
 
+/**
+ * DL2-F6: UTF-16 code-unit order — the same order PostgreSQL gives a `name` column, and the
+ * same on every host. The manifest is sorted here and compared INDEX-WISE against rows the
+ * database returned under `ORDER BY rolname`, so the two orderings must agree; localeCompare
+ * does not order by bytes and would fail the attestation closed on the first role name that
+ * carries a digit (ICU puts "_" before a digit, the database puts the digit first).
+ */
+function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function fail(code: string, cause?: unknown): never {
   throw new ProductionDatabasePrincipalProvisioningError(code, cause);
 }
@@ -431,11 +442,12 @@ function managedPrincipals(manifest: ProductionPrincipalManifest): readonly Mana
     !== JSON.stringify(expectedGrants.sort(grantOrder))) {
     fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
   }
-  return Object.freeze(rows.sort((left, right) => left.id.localeCompare(right.id)));
+  return Object.freeze(rows.sort((left, right) => compareCodeUnits(left.id, right.id)));
 }
 
 function grantOrder(left: ManifestMembershipGrant, right: ManifestMembershipGrant): number {
-  return `${left.memberRole}:${left.grantedRole}`.localeCompare(
+  return compareCodeUnits(
+    `${left.memberRole}:${left.grantedRole}`,
     `${right.memberRole}:${right.grantedRole}`
   );
 }
@@ -595,7 +607,7 @@ async function assertCapabilityRoles(
   manifest: ProductionPrincipalManifest
 ): Promise<void> {
   const expected = [...manifest.capabilityRoles].sort((left, right) =>
-    left.roleName.localeCompare(right.roleName));
+    compareCodeUnits(left.roleName, right.roleName));
   const roleNames = expected.map(({ roleName }) => assertRoleName(roleName));
   const rows = await client.query<{
     rolname: string;
@@ -986,7 +998,7 @@ async function assertExactPrincipalState(
     WHERE target.rolname=ANY($1::text[])
     ORDER BY target.rolname
   `,[roleNames, governedRoles]);
-  const expected = [...principals].sort((left, right) => left.roleName.localeCompare(right.roleName));
+  const expected = [...principals].sort((left, right) => compareCodeUnits(left.roleName, right.roleName));
   if (rows.rows.length !== expected.length
     || rows.rows.some((row, index) => {
       const principal = expected[index]!;

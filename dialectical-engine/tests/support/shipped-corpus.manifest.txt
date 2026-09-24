@@ -11,6 +11,8 @@
 # tests/unit/s1-1-depth-contract.test.ts and are NOT duplicated here.
 
 apps/api/src/account-erasure.ts
+apps/api/src/admission.ts
+apps/api/src/boot-custody.ts
 apps/api/src/client-ip.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
@@ -38,6 +40,7 @@ apps/api/src/support/limits.ts
 apps/api/src/support/model-references.ts
 apps/api/src/support/model-reservation.ts
 apps/api/src/support/model.ts
+apps/api/src/support/prompt.ts
 apps/api/src/support/public-guide-boundary.ts
 apps/api/src/support/queue.ts
 apps/api/src/support/recovery-intent.ts
@@ -48,9 +51,11 @@ apps/api/src/support/shred.ts
 apps/api/src/support/templates.ts
 apps/api/src/support/tools.ts
 apps/evaluator-worker/src/index.ts
+apps/observation-agent/src/core/custody.ts
 apps/observation-agent/src/core/database.ts
 apps/observation-agent/src/core/errors.ts
 apps/observation-agent/src/core/lifecycle.ts
+apps/observation-agent/src/core/loopback.ts
 apps/observation-agent/src/core/modules.ts
 apps/observation-agent/src/core/paths.ts
 apps/observation-agent/src/core/routing.ts
@@ -154,6 +159,7 @@ apps/observation-agent/src/store/postgres.ts
 apps/observation-agent/src/store/samples.ts
 apps/observation-agent/src/store/status.ts
 apps/replay/src/cli.ts
+apps/replay/src/database-url.ts
 apps/replay/src/index.ts
 apps/runner/src/dev-api-environment-cli.ts
 apps/runner/src/dev-api-environment.ts
@@ -187,6 +193,8 @@ apps/runner/src/migrate-cli.ts
 apps/runner/src/production-database-principals-cli.ts
 apps/runner/src/production-database-principals.ts
 apps/runner/src/provider-topology.ts
+apps/runner/src/rotate-kek-cli.ts
+apps/runner/src/rotate-kek.ts
 apps/runner/src/runner-startup-reconciliation.ts
 apps/runner/src/support-config-cli-credentials.ts
 apps/runner/src/support-inbox-cli.ts
@@ -258,7 +266,9 @@ apps/ui/components/consent/ConsentSettingsPanel.tsx
 apps/ui/components/consent/CookieBar.tsx
 apps/ui/components/consent/CookieConsent.tsx
 apps/ui/components/consent/CookiePreferencesCard.tsx
+apps/ui/components/consent/LegalDocumentModal.tsx
 apps/ui/components/consent/PrivacyPolicyModal.tsx
+apps/ui/components/consent/TermsOfServiceModal.tsx
 apps/ui/components/consent/modalSemantics.ts
 apps/ui/components/debateReferenceDesign.source-test.mjs
 apps/ui/components/landing/LandingChrome.tsx
@@ -273,15 +283,25 @@ apps/ui/components/modeTransition.ts
 apps/ui/components/support/Assistant.tsx
 apps/ui/components/support/CaseView.tsx
 apps/ui/components/support/SupportWidget.tsx
+apps/ui/components/support/caseLink.test.mjs
+apps/ui/components/support/caseLink.ts
+apps/ui/components/support/conversation.ts
 apps/ui/components/support/http.ts
+apps/ui/components/support/supportConversation.test.mjs
+apps/ui/content-security-policy.d.mts
+apps/ui/content-security-policy.mjs
+apps/ui/edge-upgrade.mjs
 apps/ui/lib/api.ts
 apps/ui/lib/authNavigationGuard.ts
 apps/ui/lib/canvasViewport.ts
 apps/ui/lib/consent.ts
+apps/ui/lib/contentSecurityPolicy.test.mjs
 apps/ui/lib/debateHeaderOverflow.ts
 apps/ui/lib/debatePresentation.ts
 apps/ui/lib/debateTreeUtils.ts
+apps/ui/lib/edgeUpgrade.test.mjs
 apps/ui/lib/format.ts
+apps/ui/lib/legalDocument.ts
 apps/ui/lib/makerIdentity.ts
 apps/ui/lib/mfaEnrollment.ts
 apps/ui/lib/models.ts
@@ -291,6 +311,7 @@ apps/ui/lib/observability/suspiciousScoring.ts
 apps/ui/lib/privacyPolicy.ts
 apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts
+apps/ui/lib/recommendation.test.mjs
 apps/ui/lib/recommendation.ts
 apps/ui/lib/returnPath.ts
 apps/ui/lib/scoring/scoringResponseSpecification.ts
@@ -300,9 +321,12 @@ apps/ui/lib/scoringResponse.ts
 apps/ui/lib/scoringStatusCopy.ts
 apps/ui/lib/scrutiny.ts
 apps/ui/lib/scrutinyDepth.ts
+apps/ui/lib/serverApi.test.mjs
 apps/ui/lib/serverApi.ts
 apps/ui/lib/sessionProxy.test.mjs
+apps/ui/lib/termsOfService.ts
 apps/ui/lib/totpQr.ts
+apps/ui/lib/trustedClientIp.test.mjs
 apps/ui/lib/types.ts
 apps/ui/lib/v3/adapter.ts
 apps/ui/lib/v3/answerExport.ts
@@ -311,10 +335,14 @@ apps/ui/lib/v3/labels.ts
 apps/ui/lib/v3/liveEvents.ts
 apps/ui/lib/v3/missingCapabilities.ts
 apps/ui/lib/v3/publicAnswerExport.ts
+apps/ui/lib/v3/requestFailure.ts
 apps/ui/lib/v3/tokenUnlock.ts
+apps/ui/middleware.ts
 apps/ui/next-env.d.ts
 apps/ui/next.config.mjs
 apps/ui/scripts/assert-production-auth-routes.mjs
+apps/ui/scripts/generate-legal-data.d.mts
+apps/ui/scripts/generate-legal-data.mjs
 apps/ui/scripts/next-config-csp.test.mjs
 apps/ui/scripts/run-node-tests.mjs
 apps/ui/server.mjs
@@ -324,7 +352,9 @@ packages/battery/decision/src/index.ts
 packages/battery/src/index.ts
 packages/battery/src/split.ts
 packages/battery/src/terminal.ts
+packages/budget/src/cost-envelope.ts
 packages/budget/src/index.ts
+packages/budget/src/model-spend.ts
 packages/contract/src/client.ts
 packages/contract/src/generate.ts
 packages/contract/src/index.ts
@@ -356,6 +386,7 @@ packages/evaluator/src/public-aggregate-provider.ts
 packages/evidence/src/index.ts
 packages/graph/src/index.ts
 packages/judgement/src/index.ts
+packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
 packages/kernel/src/index.ts
 packages/kernel/src/support-credentials.ts
@@ -383,11 +414,15 @@ packages/obs-capture/src/zone/index.ts
 packages/obs-capture/src/zone/manifest.ts
 packages/propagation/src/index.ts
 packages/providers/src/index.ts
+packages/providers/src/prompt-frame.ts
+packages/providers/src/prompt-tripwire.ts
 packages/providers/src/provider-probe.ts
 packages/published-arithmetic/src/index.ts
 packages/register/src/algorithm-policy.ts
 packages/register/src/auth-policy.ts
 packages/register/src/compose-env.ts
+packages/register/src/configured-provider-set.ts
+packages/register/src/cost-envelope-policy.ts
 packages/register/src/engine-shape.ts
 packages/register/src/index.ts
 packages/register/src/mfa-policy.ts

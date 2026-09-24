@@ -34,4 +34,44 @@ describe("DEV-06 mail capture executable contract", () => {
       mode: "0700"
     });
   });
+
+  it("keeps every recipient address off the sendmail argv (L7-F7)", () => {
+    const mailer = readFileSync("apps/api/src/mail-channel.ts", "utf8");
+    // The argv array literal of each `spawn(...)`, whitespace removed.
+    const spawnArgv = [...mailer.matchAll(/spawn\([\s\S]{0,200}?\[([^\]]*)\]/g)]
+      .map((match) => match[1]!.replace(/\s+/g, ""));
+    expect(spawnArgv).toHaveLength(2);
+    for (const argv of spawnArgv) {
+      // `-t` makes the MTA read recipients from the header block on stdin, so
+      // only the fixed envelope sender may reach argv, which every local user
+      // can read out of `ps`. No `--`, no recipient, nothing else.
+      expect(argv).toBe('"-i","-t","-f",this.options.from');
+    }
+    // Both senders route the recipient through the one guard that refuses a
+    // separator, which would fan the message out to a second mailbox once the
+    // MTA parses `To:`. One definition, two call sites.
+    expect(mailer).toContain("[,;]");
+    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(3);
+
+    const capture = readFileSync("deploy/dev-auth/sendmail-capture.mjs", "utf8");
+    expect(capture).toContain('argv[1] !== "-t"');
+    expect(capture).not.toContain('argv[3] !== "--"');
+    expect(capture).toContain("RECIPIENT_GRAMMAR");
+    expect(capture).toContain("DEV_MAIL_CAPTURE_RECIPIENT_INVALID");
+  });
+
+  it("prunes the spool on every invocation and never follows a symlink (L7-F8)", () => {
+    const capture = readFileSync("deploy/dev-auth/sendmail-capture.mjs", "utf8");
+    expect(capture).toContain("RETENTION_MS");
+    expect(capture).toContain("7 * 24 * 60 * 60 * 1000");
+    expect(capture).toContain("pruneExpiredMessages");
+    // Regular files only, resolved through lstat so a symlink in the spool can
+    // never delete its target.
+    expect(capture).toContain("lstat");
+    expect(capture).toMatch(/mtimeMs/);
+
+    const readme = readFileSync("deploy/dev-auth/README.md", "utf8");
+    expect(readme).toMatch(/7 days|seven days/);
+    expect(readme).toContain(".eml");
+  });
 });

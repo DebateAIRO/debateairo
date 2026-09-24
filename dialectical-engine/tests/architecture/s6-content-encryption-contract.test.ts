@@ -325,8 +325,13 @@ describe("S6 content-encryption architecture contract", () => {
     expect(dispatch).toBeGreaterThan(enqueue);
     expect(submit.slice(lease,memoryWrite)).toContain("},lease.client);");
     expect(submit.slice(start,memoryWrite)).toContain("});\n    } catch");
-    expect(main).toContain("const serverAskAdmissionPool=createPool(environment.CONTENT_PROVISION_DATABASE_URL)");
-    expect(main).toContain("const legacyAskAdmissionPool=createPool(environment.DATABASE_URL)");
+    // DL7-F7: each pool is registered with the boot custody ledger as it is made.
+    expect(main).toContain(
+      "const serverAskAdmissionPool=boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL))"
+    );
+    expect(main).toContain(
+      "const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL))"
+    );
     expect(main).toContain("ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE");
     expect(main).toContain("assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool)");
     expect(main).toContain("assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool)");

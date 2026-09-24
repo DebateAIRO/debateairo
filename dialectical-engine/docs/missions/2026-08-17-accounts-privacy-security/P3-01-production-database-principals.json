@@ -29,48 +29,196 @@
     ]
   },
   "principalProvisioning": [
-    { "principalId": "migration-admin", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "api-runtime", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "api-content-provision", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "api-erasure", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "api-authorization", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "api-publication-cleanup", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "api-support", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "runner-runtime", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "scheduler-replay", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "scheduler-liveness", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "scheduler-settlement", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "evaluator-worker", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "evaluator-api", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "evaluator-reader", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "obs-writer", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
-    { "principalId": "obs-listener", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
-    { "principalId": "obs-watchdog", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
-    { "principalId": "obs-human", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0034_obs_foundation.sql" },
-    { "principalId": "observation-agent", "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL", "source": "migrations/0057_observation_foundation.sql" },
-    { "principalId": "support-config-operator", "state": "SPECIFIED_NOT_PROVISIONED", "source": null },
-    { "principalId": "hatchet", "state": "EXTERNAL_COMPONENT", "source": "compose.dev.yaml" }
+    {
+      "principalId": "migration-admin",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "api-runtime",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "api-content-provision",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "api-erasure",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "api-authorization",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "api-publication-cleanup",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "api-support",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "runner-runtime",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "scheduler-replay",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "scheduler-liveness",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "scheduler-settlement",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "evaluator-worker",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "evaluator-api",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "evaluator-reader",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "obs-writer",
+      "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL",
+      "source": "migrations/0034_obs_foundation.sql"
+    },
+    {
+      "principalId": "obs-listener",
+      "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL",
+      "source": "migrations/0034_obs_foundation.sql"
+    },
+    {
+      "principalId": "obs-watchdog",
+      "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL",
+      "source": "migrations/0034_obs_foundation.sql"
+    },
+    {
+      "principalId": "obs-human",
+      "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL",
+      "source": "migrations/0034_obs_foundation.sql"
+    },
+    {
+      "principalId": "observation-agent",
+      "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL",
+      "source": "migrations/0057_observation_foundation.sql"
+    },
+    {
+      "principalId": "support-config-operator",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "hatchet",
+      "state": "EXTERNAL_COMPONENT",
+      "source": "compose.dev.yaml"
+    }
   ],
   "capabilityRoles": [
-    { "roleName": "debateai_authorization_runtime", "login": false, "inherit": true, "directMemberships": ["debateai_runtime"] },
-    { "roleName": "debateai_content_provision", "login": false, "inherit": false, "directMemberships": [] },
-    { "roleName": "debateai_erasure_runtime", "login": false, "inherit": false, "directMemberships": [] },
-    { "roleName": "debateai_evaluator_api", "login": false, "inherit": true, "directMemberships": [] },
-    { "roleName": "debateai_evaluator_reader", "login": false, "inherit": true, "directMemberships": [] },
-    { "roleName": "debateai_evaluator_worker", "login": false, "inherit": true, "directMemberships": [] },
-    { "roleName": "debateai_publication_cleanup", "login": false, "inherit": false, "directMemberships": [] },
-    { "roleName": "debateai_replay", "login": false, "inherit": true, "directMemberships": [] },
-    { "roleName": "debateai_runtime", "login": false, "inherit": true, "directMemberships": [] },
-    { "roleName": "debateai_settlement_watch", "login": false, "inherit": true, "directMemberships": [] },
-    { "roleName": "debateai_support", "login": false, "inherit": false, "directMemberships": [] },
-    { "roleName": "debateai_support_config_operator", "login": false, "inherit": false, "directMemberships": [] }
+    {
+      "roleName": "debateai_authorization_runtime",
+      "login": false,
+      "inherit": true,
+      "directMemberships": [
+        "debateai_runtime"
+      ]
+    },
+    {
+      "roleName": "debateai_content_provision",
+      "login": false,
+      "inherit": false,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "login": false,
+      "inherit": false,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_evaluator_api",
+      "login": false,
+      "inherit": true,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_evaluator_reader",
+      "login": false,
+      "inherit": true,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_evaluator_worker",
+      "login": false,
+      "inherit": true,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_publication_cleanup",
+      "login": false,
+      "inherit": false,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_replay",
+      "login": false,
+      "inherit": true,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_runtime",
+      "login": false,
+      "inherit": true,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_settlement_watch",
+      "login": false,
+      "inherit": true,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_support",
+      "login": false,
+      "inherit": false,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_support_config_operator",
+      "login": false,
+      "inherit": false,
+      "directMemberships": []
+    }
   ],
   "ownershipRoles": [
     {
       "roleName": "debateai_evaluator_ddl",
       "login": false,
       "inherit": true,
-      "ownsSchemas": ["evaluator"],
+      "ownsSchemas": [
+        "evaluator"
+      ],
       "ownsRelations": []
     },
     {
@@ -78,7 +226,9 @@
       "login": false,
       "inherit": false,
       "ownsSchemas": [],
-      "ownsRelations": ["obs.run_correlation_v"]
+      "ownsRelations": [
+        "obs.run_correlation_v"
+      ]
     },
     {
       "roleName": "debateai_register_publication_owner",
@@ -105,7 +255,9 @@
       "directMemberships": [],
       "effectiveMemberships": [],
       "forbiddenMemberships": [],
-      "ownsDatabases": ["debateai"],
+      "ownsDatabases": [
+        "debateai"
+      ],
       "ownsSchemas": [
         "audit_crypto_internal",
         "core",
@@ -145,6 +297,14 @@
           "condition": "package script dev:auth:seed-register"
         },
         {
+          "component": "apps/runner:dev-provider-set-publish-cli",
+          "sourceFile": "apps/runner/src/dev-provider-set-publish-cli.ts",
+          "environmentKey": "MIGRATION_DATABASE_URL",
+          "purpose": "DEVELOPMENT_PROVIDER_SET_PUBLICATION",
+          "binding": "DEVELOPMENT_ONLY",
+          "condition": "package script dev:auth:publish-provider-set"
+        },
+        {
           "component": "apps/runner:production-database-principals-cli",
           "sourceFile": "apps/runner/src/production-database-principals-cli.ts",
           "environmentKey": "MIGRATION_DATABASE_URL",
@@ -166,8 +326,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_runtime"],
-      "effectiveMemberships": ["debateai_runtime"],
+      "directMemberships": [
+        "debateai_runtime"
+      ],
+      "effectiveMemberships": [
+        "debateai_runtime"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -189,8 +353,20 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/api", "sourceFile": "apps/api/src/main.ts", "environmentKey": "DATABASE_URL", "purpose": "PRODUCT_RUNTIME", "binding": "WIRED" },
-        { "component": "apps/api", "sourceFile": "apps/api/src/main.ts", "environmentKey": "DATABASE_URL", "purpose": "LEGACY_ASK_ADMISSION_POOL", "binding": "WIRED" }
+        {
+          "component": "apps/api",
+          "sourceFile": "apps/api/src/main.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "PRODUCT_RUNTIME",
+          "binding": "WIRED"
+        },
+        {
+          "component": "apps/api",
+          "sourceFile": "apps/api/src/main.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "LEGACY_ASK_ADMISSION_POOL",
+          "binding": "WIRED"
+        }
       ]
     },
     {
@@ -205,8 +381,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_content_provision"],
-      "effectiveMemberships": ["debateai_content_provision"],
+      "directMemberships": [
+        "debateai_content_provision"
+      ],
+      "effectiveMemberships": [
+        "debateai_content_provision"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_erasure_runtime",
@@ -228,8 +408,20 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/api", "sourceFile": "apps/api/src/main.ts", "environmentKey": "CONTENT_PROVISION_DATABASE_URL", "purpose": "CONTENT_PROVISION", "binding": "WIRED" },
-        { "component": "apps/api", "sourceFile": "apps/api/src/main.ts", "environmentKey": "CONTENT_PROVISION_DATABASE_URL", "purpose": "SERVER_ASK_ADMISSION_POOL", "binding": "WIRED" }
+        {
+          "component": "apps/api",
+          "sourceFile": "apps/api/src/main.ts",
+          "environmentKey": "CONTENT_PROVISION_DATABASE_URL",
+          "purpose": "CONTENT_PROVISION",
+          "binding": "WIRED"
+        },
+        {
+          "component": "apps/api",
+          "sourceFile": "apps/api/src/main.ts",
+          "environmentKey": "CONTENT_PROVISION_DATABASE_URL",
+          "purpose": "SERVER_ASK_ADMISSION_POOL",
+          "binding": "WIRED"
+        }
       ]
     },
     {
@@ -244,8 +436,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_erasure_runtime"],
-      "effectiveMemberships": ["debateai_erasure_runtime"],
+      "directMemberships": [
+        "debateai_erasure_runtime"
+      ],
+      "effectiveMemberships": [
+        "debateai_erasure_runtime"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -267,7 +463,13 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/api", "sourceFile": "apps/api/src/main.ts", "environmentKey": "ERASURE_DATABASE_URL", "purpose": "ACCOUNT_AND_PRIVATE_RUN_ERASURE", "binding": "WIRED" }
+        {
+          "component": "apps/api",
+          "sourceFile": "apps/api/src/main.ts",
+          "environmentKey": "ERASURE_DATABASE_URL",
+          "purpose": "ACCOUNT_AND_PRIVATE_RUN_ERASURE",
+          "binding": "WIRED"
+        }
       ]
     },
     {
@@ -282,8 +484,13 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_authorization_runtime"],
-      "effectiveMemberships": ["debateai_authorization_runtime", "debateai_runtime"],
+      "directMemberships": [
+        "debateai_authorization_runtime"
+      ],
+      "effectiveMemberships": [
+        "debateai_authorization_runtime",
+        "debateai_runtime"
+      ],
       "forbiddenMemberships": [
         "debateai_content_provision",
         "debateai_erasure_runtime",
@@ -304,7 +511,13 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/api", "sourceFile": "apps/api/src/main.ts", "environmentKey": "AUTHORIZATION_DATABASE_URL", "purpose": "STEP_UP_SESSION_ROTATION", "binding": "WIRED" }
+        {
+          "component": "apps/api",
+          "sourceFile": "apps/api/src/main.ts",
+          "environmentKey": "AUTHORIZATION_DATABASE_URL",
+          "purpose": "STEP_UP_SESSION_ROTATION",
+          "binding": "WIRED"
+        }
       ]
     },
     {
@@ -319,8 +532,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_publication_cleanup"],
-      "effectiveMemberships": ["debateai_publication_cleanup"],
+      "directMemberships": [
+        "debateai_publication_cleanup"
+      ],
+      "effectiveMemberships": [
+        "debateai_publication_cleanup"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -364,8 +581,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_support"],
-      "effectiveMemberships": ["debateai_support"],
+      "directMemberships": [
+        "debateai_support"
+      ],
+      "effectiveMemberships": [
+        "debateai_support"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -400,6 +621,13 @@
           "environmentKey": null,
           "purpose": "SUPPORT_STATUS_DATA",
           "binding": "WIRED"
+        },
+        {
+          "component": "apps/runner",
+          "sourceFile": "apps/runner/src/rotate-kek-cli.ts",
+          "environmentKey": "SUPPORT_DATABASE_URL",
+          "purpose": "SUPPORT_KEK_ROTATION",
+          "binding": "WIRED"
         }
       ]
     },
@@ -415,8 +643,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_runtime"],
-      "effectiveMemberships": ["debateai_runtime"],
+      "directMemberships": [
+        "debateai_runtime"
+      ],
+      "effectiveMemberships": [
+        "debateai_runtime"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -438,7 +670,13 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/runner", "sourceFile": "apps/runner/src/main.ts", "environmentKey": "DATABASE_URL", "purpose": "RUNNER_PRODUCT_RUNTIME", "binding": "WIRED" }
+        {
+          "component": "apps/runner",
+          "sourceFile": "apps/runner/src/main.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "RUNNER_PRODUCT_RUNTIME",
+          "binding": "WIRED"
+        }
       ]
     },
     {
@@ -453,8 +691,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_replay"],
-      "effectiveMemberships": ["debateai_replay"],
+      "directMemberships": [
+        "debateai_replay"
+      ],
+      "effectiveMemberships": [
+        "debateai_replay"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -476,7 +718,13 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/scheduler:replay-self-test", "sourceFile": "apps/scheduler/src/cli.ts", "environmentKey": "REPLAY_SELF_TEST_DATABASE_URL", "purpose": "REPLAY_SELF_TEST", "binding": "WIRED" }
+        {
+          "component": "apps/scheduler:replay-self-test",
+          "sourceFile": "apps/scheduler/src/cli.ts",
+          "environmentKey": "REPLAY_SELF_TEST_DATABASE_URL",
+          "purpose": "REPLAY_SELF_TEST",
+          "binding": "WIRED"
+        }
       ]
     },
     {
@@ -491,8 +739,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_runtime"],
-      "effectiveMemberships": ["debateai_runtime"],
+      "directMemberships": [
+        "debateai_runtime"
+      ],
+      "effectiveMemberships": [
+        "debateai_runtime"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -514,7 +766,13 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/scheduler:liveness", "sourceFile": "apps/scheduler/src/cli.ts", "environmentKey": "LIVENESS_DATABASE_URL", "purpose": "LIVENESS_SWEEP", "binding": "WIRED" }
+        {
+          "component": "apps/scheduler:liveness",
+          "sourceFile": "apps/scheduler/src/cli.ts",
+          "environmentKey": "LIVENESS_DATABASE_URL",
+          "purpose": "LIVENESS_SWEEP",
+          "binding": "WIRED"
+        }
       ]
     },
     {
@@ -529,8 +787,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_settlement_watch"],
-      "effectiveMemberships": ["debateai_settlement_watch"],
+      "directMemberships": [
+        "debateai_settlement_watch"
+      ],
+      "effectiveMemberships": [
+        "debateai_settlement_watch"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -552,7 +814,13 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/scheduler:settlement", "sourceFile": "apps/scheduler/src/cli.ts", "environmentKey": "SETTLEMENT_DATABASE_URL", "purpose": "SETTLEMENT_WATCH", "binding": "WIRED" }
+        {
+          "component": "apps/scheduler:settlement",
+          "sourceFile": "apps/scheduler/src/cli.ts",
+          "environmentKey": "SETTLEMENT_DATABASE_URL",
+          "purpose": "SETTLEMENT_WATCH",
+          "binding": "WIRED"
+        }
       ]
     },
     {
@@ -567,8 +835,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_evaluator_worker"],
-      "effectiveMemberships": ["debateai_evaluator_worker"],
+      "directMemberships": [
+        "debateai_evaluator_worker"
+      ],
+      "effectiveMemberships": [
+        "debateai_evaluator_worker"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -590,7 +862,12 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/evaluator-worker", "environmentKey": "EVALUATOR_WORKER_DATABASE_URL", "purpose": "EVALUATOR_COLLECTION", "binding": "REQUIRED_NOT_WIRED" }
+        {
+          "component": "apps/evaluator-worker",
+          "environmentKey": "EVALUATOR_WORKER_DATABASE_URL",
+          "purpose": "EVALUATOR_COLLECTION",
+          "binding": "REQUIRED_NOT_WIRED"
+        }
       ]
     },
     {
@@ -605,8 +882,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_evaluator_api"],
-      "effectiveMemberships": ["debateai_evaluator_api"],
+      "directMemberships": [
+        "debateai_evaluator_api"
+      ],
+      "effectiveMemberships": [
+        "debateai_evaluator_api"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -628,7 +909,12 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "apps/api:evaluator", "environmentKey": "EVALUATOR_API_DATABASE_URL", "purpose": "EVALUATOR_SELECTION", "binding": "REQUIRED_NOT_WIRED" }
+        {
+          "component": "apps/api:evaluator",
+          "environmentKey": "EVALUATOR_API_DATABASE_URL",
+          "purpose": "EVALUATOR_SELECTION",
+          "binding": "REQUIRED_NOT_WIRED"
+        }
       ]
     },
     {
@@ -643,8 +929,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_evaluator_reader"],
-      "effectiveMemberships": ["debateai_evaluator_reader"],
+      "directMemberships": [
+        "debateai_evaluator_reader"
+      ],
+      "effectiveMemberships": [
+        "debateai_evaluator_reader"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -666,7 +956,12 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "operator:evaluator-reader", "environmentKey": "EVALUATOR_READER_DATABASE_URL", "purpose": "EVALUATOR_READ_ONLY", "binding": "REQUIRED_NOT_WIRED" }
+        {
+          "component": "operator:evaluator-reader",
+          "environmentKey": "EVALUATOR_READER_DATABASE_URL",
+          "purpose": "EVALUATOR_READ_ONLY",
+          "binding": "REQUIRED_NOT_WIRED"
+        }
       ]
     },
     {
@@ -705,7 +1000,12 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "obs-capture", "environmentKey": "OBS_WRITER_DATABASE_URL", "purpose": "OBS_APPEND_ONLY_CAPTURE", "binding": "REQUIRED_NOT_WIRED" }
+        {
+          "component": "obs-capture",
+          "environmentKey": "OBS_WRITER_DATABASE_URL",
+          "purpose": "OBS_APPEND_ONLY_CAPTURE",
+          "binding": "REQUIRED_NOT_WIRED"
+        }
       ]
     },
     {
@@ -744,7 +1044,12 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "obs-listener", "environmentKey": "OBS_LISTENER_DATABASE_URL", "purpose": "OBS_MACHINE_SAFE_LISTENER", "binding": "REQUIRED_NOT_WIRED" }
+        {
+          "component": "obs-listener",
+          "environmentKey": "OBS_LISTENER_DATABASE_URL",
+          "purpose": "OBS_MACHINE_SAFE_LISTENER",
+          "binding": "REQUIRED_NOT_WIRED"
+        }
       ]
     },
     {
@@ -783,7 +1088,12 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "obs-watchdog", "environmentKey": "OBS_WATCHDOG_DATABASE_URL", "purpose": "OBS_WATCHDOG", "binding": "REQUIRED_NOT_WIRED" }
+        {
+          "component": "obs-watchdog",
+          "environmentKey": "OBS_WATCHDOG_DATABASE_URL",
+          "purpose": "OBS_WATCHDOG",
+          "binding": "REQUIRED_NOT_WIRED"
+        }
       ]
     },
     {
@@ -822,7 +1132,12 @@
       "ownsDatabases": [],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "human:observability", "environmentKey": null, "purpose": "JIT_OBSERVABILITY_READ", "binding": "JIT_HUMAN" }
+        {
+          "component": "human:observability",
+          "environmentKey": null,
+          "purpose": "JIT_OBSERVABILITY_READ",
+          "binding": "JIT_HUMAN"
+        }
       ]
     },
     {
@@ -837,8 +1152,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["pg_monitor"],
-      "effectiveMemberships": ["pg_monitor"],
+      "directMemberships": [
+        "pg_monitor"
+      ],
+      "effectiveMemberships": [
+        "pg_monitor"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -881,8 +1200,12 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": ["debateai_support_config_operator"],
-      "effectiveMemberships": ["debateai_support_config_operator"],
+      "directMemberships": [
+        "debateai_support_config_operator"
+      ],
+      "effectiveMemberships": [
+        "debateai_support_config_operator"
+      ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -946,10 +1269,17 @@
         "debateai_support_config_operator",
         "pg_*"
       ],
-      "ownsDatabases": ["hatchet"],
+      "ownsDatabases": [
+        "hatchet"
+      ],
       "ownsSchemas": [],
       "connectionPurposes": [
-        { "component": "hatchet", "environmentKey": "HATCHET_DATABASE_URL", "purpose": "HATCHET_INTERNAL_DATABASE", "binding": "EXTERNAL_COMPONENT" }
+        {
+          "component": "hatchet",
+          "environmentKey": "HATCHET_DATABASE_URL",
+          "purpose": "HATCHET_INTERNAL_DATABASE",
+          "binding": "EXTERNAL_COMPONENT"
+        }
       ]
     }
   ],
@@ -968,45 +1298,250 @@
   ],
   "unboundConnectionPurposes": [],
   "membershipGrants": [
-    { "memberRole": "debateai_authorization_runtime", "grantedRole": "debateai_runtime", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_api_runtime", "grantedRole": "debateai_runtime", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_api_content_provision", "grantedRole": "debateai_content_provision", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_api_erasure", "grantedRole": "debateai_erasure_runtime", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_api_authorization", "grantedRole": "debateai_authorization_runtime", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_api_publication_cleanup", "grantedRole": "debateai_publication_cleanup", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_api_support", "grantedRole": "debateai_support", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_runner_runtime", "grantedRole": "debateai_runtime", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_scheduler_replay", "grantedRole": "debateai_replay", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_scheduler_liveness", "grantedRole": "debateai_runtime", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_scheduler_settlement", "grantedRole": "debateai_settlement_watch", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_evaluator_worker", "grantedRole": "debateai_evaluator_worker", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_evaluator_api", "grantedRole": "debateai_evaluator_api", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_evaluator_reader", "grantedRole": "debateai_evaluator_reader", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_observation_agent", "grantedRole": "pg_monitor", "adminOption": false, "inheritOption": true, "setOption": true },
-    { "memberRole": "debateai_prod_support_config_operator", "grantedRole": "debateai_support_config_operator", "adminOption": false, "inheritOption": true, "setOption": true }
+    {
+      "memberRole": "debateai_authorization_runtime",
+      "grantedRole": "debateai_runtime",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_runtime",
+      "grantedRole": "debateai_runtime",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_content_provision",
+      "grantedRole": "debateai_content_provision",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_erasure",
+      "grantedRole": "debateai_erasure_runtime",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_authorization",
+      "grantedRole": "debateai_authorization_runtime",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_publication_cleanup",
+      "grantedRole": "debateai_publication_cleanup",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_support",
+      "grantedRole": "debateai_support",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_runner_runtime",
+      "grantedRole": "debateai_runtime",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_scheduler_replay",
+      "grantedRole": "debateai_replay",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_scheduler_liveness",
+      "grantedRole": "debateai_runtime",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_scheduler_settlement",
+      "grantedRole": "debateai_settlement_watch",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_evaluator_worker",
+      "grantedRole": "debateai_evaluator_worker",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_evaluator_api",
+      "grantedRole": "debateai_evaluator_api",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_evaluator_reader",
+      "grantedRole": "debateai_evaluator_reader",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_observation_agent",
+      "grantedRole": "pg_monitor",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_support_config_operator",
+      "grantedRole": "debateai_support_config_operator",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    }
   ],
   "credentialRequirements": [
-    { "principalId": "migration-admin", "credentialId": "credential:migration-admin", "lifecycle": "EPHEMERAL_JIT", "ownerTicket": "P3-02" },
-    { "principalId": "api-runtime", "credentialId": "credential:api-runtime", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "api-content-provision", "credentialId": "credential:api-content-provision", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "api-erasure", "credentialId": "credential:api-erasure", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "api-authorization", "credentialId": "credential:api-authorization", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "api-publication-cleanup", "credentialId": "credential:api-publication-cleanup", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "api-support", "credentialId": "credential:api-support", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "runner-runtime", "credentialId": "credential:runner-runtime", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "scheduler-replay", "credentialId": "credential:scheduler-replay", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "scheduler-liveness", "credentialId": "credential:scheduler-liveness", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "scheduler-settlement", "credentialId": "credential:scheduler-settlement", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "evaluator-worker", "credentialId": "credential:evaluator-worker", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "evaluator-api", "credentialId": "credential:evaluator-api", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "evaluator-reader", "credentialId": "credential:evaluator-reader", "lifecycle": "ROTATED_SERVICE", "ownerTicket": "P3-02" },
-    { "principalId": "obs-writer", "credentialId": "credential:obs-writer", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
-    { "principalId": "obs-listener", "credentialId": "credential:obs-listener", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
-    { "principalId": "obs-watchdog", "credentialId": "credential:obs-watchdog", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0034_obs_foundation.sql", "ownerTicket": "P3-02" },
-    { "principalId": "obs-human", "credentialId": "credential:obs-human-jit", "lifecycle": "JIT_SHORT_LIVED", "ownerTicket": "P3-02" },
-    { "principalId": "observation-agent", "credentialId": "credential:observation-agent", "lifecycle": "MIGRATION_MINTED_UNMANAGED", "currentProvisioner": "migrations/0057_observation_foundation.sql", "ownerTicket": "P3-02" },
-    { "principalId": "support-config-operator", "credentialId": "credential:support-config-operator-jit", "lifecycle": "JIT_SHORT_LIVED", "ownerTicket": "P3-02" },
-    { "principalId": "hatchet", "credentialId": "credential:hatchet", "lifecycle": "EXTERNAL_COMPONENT", "ownerTicket": "P3-02" }
+    {
+      "principalId": "migration-admin",
+      "credentialId": "credential:migration-admin",
+      "lifecycle": "EPHEMERAL_JIT",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "api-runtime",
+      "credentialId": "credential:api-runtime",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "api-content-provision",
+      "credentialId": "credential:api-content-provision",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "api-erasure",
+      "credentialId": "credential:api-erasure",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "api-authorization",
+      "credentialId": "credential:api-authorization",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "api-publication-cleanup",
+      "credentialId": "credential:api-publication-cleanup",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "api-support",
+      "credentialId": "credential:api-support",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "runner-runtime",
+      "credentialId": "credential:runner-runtime",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "scheduler-replay",
+      "credentialId": "credential:scheduler-replay",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "scheduler-liveness",
+      "credentialId": "credential:scheduler-liveness",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "scheduler-settlement",
+      "credentialId": "credential:scheduler-settlement",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "evaluator-worker",
+      "credentialId": "credential:evaluator-worker",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "evaluator-api",
+      "credentialId": "credential:evaluator-api",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "evaluator-reader",
+      "credentialId": "credential:evaluator-reader",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "obs-writer",
+      "credentialId": "credential:obs-writer",
+      "lifecycle": "MIGRATION_MINTED_UNMANAGED",
+      "currentProvisioner": "migrations/0034_obs_foundation.sql",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "obs-listener",
+      "credentialId": "credential:obs-listener",
+      "lifecycle": "MIGRATION_MINTED_UNMANAGED",
+      "currentProvisioner": "migrations/0034_obs_foundation.sql",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "obs-watchdog",
+      "credentialId": "credential:obs-watchdog",
+      "lifecycle": "MIGRATION_MINTED_UNMANAGED",
+      "currentProvisioner": "migrations/0034_obs_foundation.sql",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "obs-human",
+      "credentialId": "credential:obs-human-jit",
+      "lifecycle": "JIT_SHORT_LIVED",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "observation-agent",
+      "credentialId": "credential:observation-agent",
+      "lifecycle": "MIGRATION_MINTED_UNMANAGED",
+      "currentProvisioner": "migrations/0057_observation_foundation.sql",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "support-config-operator",
+      "credentialId": "credential:support-config-operator-jit",
+      "lifecycle": "JIT_SHORT_LIVED",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "hatchet",
+      "credentialId": "credential:hatchet",
+      "lifecycle": "EXTERNAL_COMPONENT",
+      "ownerTicket": "P3-02"
+    }
   ],
   "privilegeDisclosures": [
     {
@@ -1028,9 +1563,21 @@
     }
   ],
   "deploymentObligations": [
-    { "id": "CREDENTIAL_MATERIAL_PAIRWISE_DISTINCT", "ownerTicket": "P3-02", "requiredEvidence": "catalog principal-to-secret mapping and pairwise secret fingerprint inequality" },
-    { "id": "JIT_HUMAN_CREDENTIAL_HAS_BOUNDED_EXPIRY", "ownerTicket": "P3-02", "requiredEvidence": "role validity and revocation receipt" },
-    { "id": "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS", "ownerTicket": "P3-02", "requiredEvidence": "resolved connection principal identities for each component" }
+    {
+      "id": "CREDENTIAL_MATERIAL_PAIRWISE_DISTINCT",
+      "ownerTicket": "P3-02",
+      "requiredEvidence": "catalog principal-to-secret mapping and pairwise secret fingerprint inequality"
+    },
+    {
+      "id": "JIT_HUMAN_CREDENTIAL_HAS_BOUNDED_EXPIRY",
+      "ownerTicket": "P3-02",
+      "requiredEvidence": "role validity and revocation receipt"
+    },
+    {
+      "id": "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS",
+      "ownerTicket": "P3-02",
+      "requiredEvidence": "resolved connection principal identities for each component"
+    }
   ],
   "invariants": [
     "NO_LONG_LIVED_SUPERUSER_CREDENTIAL",

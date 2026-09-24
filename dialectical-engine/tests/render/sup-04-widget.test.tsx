@@ -63,7 +63,10 @@ describe("SUP-04 product-route support widget", () => {
     const createSession = vi.fn(async () => ({
       sessionId: "new-session",token: "new-token",identityBound: false
     }));
-    const escalate = vi.fn(async () => ({ token: "case-token",text: "Case opened" }));
+    // DL1-F5c: a case bearer is 43 base64url characters, and only a value in
+    // that grammar is held in memory and rendered as the case's link — so the
+    // fixture is a bearer the API could actually mint, not a placeholder.
+    const escalate = vi.fn(async () => ({ token: "E".repeat(43),text: "Case opened" }));
     await act(async () => root!.render(<Assistant signedIn={false} client={{
       createSession,sendMessage: vi.fn(),rate: vi.fn(),escalate
     }} />));
@@ -77,6 +80,29 @@ describe("SUP-04 product-route support widget", () => {
       sessionId: "new-session",token: "new-token",identityBound: false
     },"en");
     expect(document.body.textContent).toContain("Case opened");
+  });
+
+  it("refuses a case token outside the API's grammar: the notice, and no link", async () => {
+    // DL1-F5c: `caseBearerOf`'s refusal branch. A bearer is 43 base64url
+    // characters; anything else is not the capability it claims to be, so it
+    // never enters memory and never becomes an href — the page falls back to
+    // the token-free notice rather than linking to a case nobody can open.
+    const escalate = vi.fn(async () => ({ token: "case-token",text: "Case opened" }));
+    await act(async () => root!.render(<Assistant signedIn={false} client={{
+      createSession: vi.fn(async () => ({
+        sessionId: "new-session",token: "new-token",identityBound: false
+      })),
+      sendMessage: vi.fn(),rate: vi.fn(),escalate
+    }} />));
+    const human = [...document.querySelectorAll("button")]
+      .find((button) => button.textContent === "Talk to a human") as HTMLButtonElement;
+    await act(async () => human.click());
+    await settle();
+
+    expect(escalate).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).toContain("A case is open for a person to read.");
+    expect(document.body.textContent).not.toContain("Case opened");
+    expect(document.querySelector('a[href^="/help#case="]')).toBeNull();
   });
 
   it("expands, focuses the message control, and follows the Romanian override", async () => {
@@ -174,7 +200,7 @@ describe("SUP-04 product-route support widget", () => {
     await act(async () => document.querySelector<HTMLButtonElement>('[data-support-widget-toggle]')!.click());
     await submit("Use 123456 abc.def.ghi and key-private-value");
 
-    const stored = sessionStorage.getItem("debateai.support.conversation.v1") ?? "";
+    const stored = sessionStorage.getItem("debateai.support.conversation.v2") ?? "";
     expect(sent).toEqual(["Use [REDACTED_SECRET_LIKE] [REDACTED_SECRET_LIKE] and [REDACTED_SECRET_LIKE]"]);
     expect(stored).toContain("[REDACTED_SECRET_LIKE]");
     expect(stored).not.toMatch(/123456|654321|abc[.]def[.]ghi|eyJhbGci|key-private|sk-live/u);

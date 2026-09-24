@@ -23,10 +23,31 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
   // .hermes/reports/2026-09-01-algorithm-live-loop/PROGRESS.md:32,
   // DECISIONS.md:810), and its unguarded manifest read was what made this audit
   // throw ENOENT instead of reporting.
-  it("matches all 27 dependency-edge rows and structural rules 1–5", async () => {
+  //
+  // SYNC3 fix round 1. This was ONE row whose single `violations` assertion
+  // carried dev's three undeclared obs-capture edges (V's ticketed debt F31)
+  // AND every other edge row and structural rules 1-5. Listed by name as known
+  // red, it hid ANY new violation — ours included — behind dev's three. The
+  // three are now named exactly and live alone in the next row; everything else
+  // must be empty in this one, which runs. A new obs-capture edge from any other
+  // app is not one of the three and still fails here.
+  const DEV_F31_OBS_CAPTURE_EDGES: readonly string[] = Object.freeze([
+    "apps/api -> obs-capture is not a declared edge",
+    "apps/runner -> obs-capture is not a declared edge",
+    "apps/scheduler -> obs-capture is not a declared edge"
+  ]);
+
+  it("matches all 27 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
     const report = await auditArchitecture();
     expect(report.edgeRowsChecked).toBe(27);
-    expect(report.violations).toEqual([]);
+    expect(report.violations.filter((violation) => !DEV_F31_OBS_CAPTURE_EDGES.includes(violation)))
+      .toEqual([]);
+  });
+
+  it("dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge", async () => {
+    const report = await auditArchitecture();
+    expect(report.violations.filter((violation) => DEV_F31_OBS_CAPTURE_EDGES.includes(violation)))
+      .toEqual([]);
   });
 
   // PROPERTY: a declared edge row whose directory ships no package.json is

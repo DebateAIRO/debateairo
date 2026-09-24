@@ -9,6 +9,7 @@ import { performance } from "node:perf_hooks";
 import { promisify } from "node:util";
 import { describe, expect, it, vi } from "vitest";
 import {
+  AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   AUTH_POLICY_REGISTER_ROWS,
   authPolicyFromRegisterRows,
   type AuthPolicyRegisterRow
@@ -20,7 +21,7 @@ import {
   generatePseudonym,
   generateVerificationToken,
   hashPassword,
-  hashVerificationToken,
+  hashToken,
   loadKek,
   verifyPassword,
   type UserDekStoreFileSystem
@@ -268,13 +269,198 @@ describe("S3 ruled authentication policy", () => {
       );
   });
 
-  it("S3c B4 keeps the isolated production RSS curve below the published measured bound", async () => {
+  /**
+   * V-25, ruled 2026-09-21. The ceiling is a MEASUREMENT, and a measurement
+   * belongs to ONE runtime — platform, architecture AND Node version. The sealed
+   * row (register version 1) carries a single measurement taken under node
+   * v22.23.1 on darwin_arm64; a sealed value is never edited, so the superseding
+   * DEPLOYMENT row republishes that measurement verbatim as history beside a
+   * second one taken under node v26.8.2 on the same Mac, in a map keyed by
+   * runtime.
+   *
+   * A runtime with no published entry SKIPS LOUDLY rather than compare a live
+   * curve against a number that was never measured there — the GitHub ubuntu
+   * runner reads 273 MiB against this Mac's 256 MiB, so a shared number would
+   * quietly stop detecting drift on both. Linux keeps that loud skip until CI
+   * publishes its own measurement.
+   */
+  type IsolatedRuntimeMeasurement = {
+    measurement: string;
+    runtime: string;
+    occupancy_percent: number;
+    measured_100_percent_rss_mib: number;
+    max_measured_curve_rss_mib: number;
+    isolated_measurement_ceiling_mib: number;
+    curve_rss_mib: Record<"0" | "25" | "50" | "100", number>;
+  };
+  type IsolatedRuntimeVersion = {
+    ceiling_rule: string;
+    measurement_rounds?: number;
+    measurement: IsolatedRuntimeMeasurement;
+  };
+  const RSS_RUNTIME = `node_${process.version}_${process.platform}_${process.arch}`;
+  const RSS_MEASUREMENT_VERSIONS = (AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS
+    .find((row) => row.rowKey === "rateLimitPolicy")!.value as {
+      sketch_design: {
+        isolated_limiter_resident_measurement_versions?: {
+          measurement_rounding_increment_mib: number;
+          by_runtime: Record<string, IsolatedRuntimeVersion>;
+        };
+      };
+    }).sketch_design.isolated_limiter_resident_measurement_versions;
+  const RSS_MEASUREMENT = RSS_MEASUREMENT_VERSIONS?.by_runtime[RSS_RUNTIME]?.measurement;
+  if (RSS_MEASUREMENT === undefined) {
+    const published = Object.keys(RSS_MEASUREMENT_VERSIONS?.by_runtime ?? {});
+    console.warn(
+      `[S3c B4 / V-25] NO PUBLISHED ISOLATED RSS MEASUREMENT FOR ${RSS_RUNTIME}.`
+      + " The live RSS curve case is SKIPPED on this host: comparing it against another"
+      + " runtime's number would stop detecting drift on both."
+      + ` Published runtimes: ${published.length === 0 ? "(none)" : published.join(", ")}.`
+      + " Re-measure on this runtime and publish a NEW versioned register row (V-25)."
+    );
+  }
+
+  it("S3c B4 publishes one isolated RSS measurement per runtime and keeps the sealed one verbatim (V-25)", () => {
+    const sealedSketch = (AUTH_POLICY_REGISTER_ROWS
+      .find((row) => row.rowKey === "rateLimitPolicy")!.value as {
+        sketch_design: { isolated_limiter_resident_measurement: IsolatedRuntimeMeasurement };
+      }).sketch_design;
+    const versions = RSS_MEASUREMENT_VERSIONS;
+    expect(versions).toBeDefined();
+
+    // The exact published set. A runtime may only be added by the change that
+    // measures it, and were an entry to vanish the live curve case would skip
+    // in SILENCE on that host — the failure this list makes impossible.
+    expect(Object.keys(versions!.by_runtime).sort())
+      .toEqual(["node_v22.23.1_darwin_arm64", "node_v26.8.2_darwin_arm64"]);
+
+    // Constraint 5: the sealed measurement is superseded, never edited. The
+    // historical entry wraps the sealed object itself, member for member.
+    expect(versions!.by_runtime["node_v22.23.1_darwin_arm64"]!.measurement)
+      .toEqual(sealedSketch.isolated_limiter_resident_measurement);
+    expect(sealedSketch.isolated_limiter_resident_measurement.runtime)
+      .toBe("node_v22.23.1_darwin_arm64");
+
+    // Every entry names the rule its ceiling was derived under, and the rule is
+    // RECOMPUTED here rather than asserted as a literal. Two rules exist, and
+    // the row says which is which instead of leaving the change silent:
+    //
+    //   WORST_..._ROUNDED_UP_TO_INCREMENT  — the original, calibrated on five
+    //     rounds with a 5 MiB spread. The sealed node 22 entry keeps it as
+    //     history: ceil(250 / 32) * 32 = 256. It is the same rule
+    //     booted_process_resident_bound publishes as
+    //     provisioning_rounding_increment_mib, ceil(368.7 / 32) * 32 = 384.
+    //
+    //   WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP — amended by
+    //     the coordinator on 2026-09-22 (Task 3) for this and every future
+    //     entry. Under node 26 the spread is 22.6 MiB over 14 rounds, and the
+    //     original rule left 0.7 MiB of margin: a fence that fails on noise
+    //     teaches everyone to ignore it. One whole increment of headroom gives
+    //     ceil((255.3 + 32) / 32) * 32 = 288, which still catches any
+    //     regression above ~33 MiB (about 13 %) — the class of leak this case
+    //     exists for.
+    const increment = versions!.measurement_rounding_increment_mib;
+    expect(increment).toBe(32);
+    const derive: Readonly<Record<string, (worst: number) => number>> = {
+      WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT:
+        (worst) => Math.ceil(worst / increment) * increment,
+      WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP:
+        (worst) => Math.ceil((worst + increment) / increment) * increment
+    };
+    expect(versions!.by_runtime["node_v22.23.1_darwin_arm64"]!.ceiling_rule)
+      .toBe("WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT");
+    expect(versions!.by_runtime["node_v26.8.2_darwin_arm64"]!.ceiling_rule)
+      .toBe("WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP");
+    // The amended rule's own precondition: it may not be claimed without
+    // declaring the rounds that back it.
+    expect(versions!.by_runtime["node_v26.8.2_darwin_arm64"]!.measurement_rounds)
+      .toBeGreaterThanOrEqual(10);
+
+    for (const [runtime, version] of Object.entries(versions!.by_runtime)) {
+      const entry = version.measurement;
+      const rule = derive[version.ceiling_rule];
+      expect(rule, `${runtime}: unknown ceiling rule ${version.ceiling_rule}`).toBeDefined();
+      expect(entry.runtime, runtime).toBe(runtime);
+      expect(entry.measurement, runtime)
+        .toBe("isolated_process_rss_at_100_percent_slot_occupancy");
+      expect(entry.occupancy_percent, runtime).toBe(100);
+      expect(entry.measured_100_percent_rss_mib, runtime).toBe(entry.curve_rss_mib["100"]);
+      expect(Math.max(...Object.values(entry.curve_rss_mib)), runtime)
+        .toBe(entry.max_measured_curve_rss_mib);
+      expect(entry.isolated_measurement_ceiling_mib, runtime)
+        .toBe(rule!(entry.max_measured_curve_rss_mib));
+      expect(entry.max_measured_curve_rss_mib, runtime)
+        .toBeLessThanOrEqual(entry.isolated_measurement_ceiling_mib);
+    }
+  });
+
+  it("S3c B4 refuses a runtime measurement that does not derive from its own curve (V-25)", () => {
+    // The refinements above are fail-closed CONTROLS, so each one is shown to
+    // bite. A measurement filed under the wrong runtime, or a ceiling somebody
+    // typed rather than derived, would otherwise parse member by member and
+    // then hand a host a bound that was never measured for it.
+    const sealedVersion = RSS_MEASUREMENT_VERSIONS!.by_runtime["node_v22.23.1_darwin_arm64"]!;
+    const sealedEntry = sealedVersion.measurement;
+    const tenRoundVersion =
+      RSS_MEASUREMENT_VERSIONS!.by_runtime["node_v26.8.2_darwin_arm64"]!;
+    const republished = (versions: unknown) => AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS
+      .map((row) => row.rowKey !== "rateLimitPolicy" ? row : {
+        ...row,
+        value: {
+          ...row.value,
+          sketch_design: {
+            ...(row.value as { sketch_design: Readonly<Record<string, unknown>> }).sketch_design,
+            isolated_limiter_resident_measurement_versions: versions
+          }
+        }
+      });
+    const wrap = (by_runtime: Record<string, unknown>) =>
+      ({ measurement_rounding_increment_mib: 32, by_runtime });
+
+    // The control: unmodified, the deployment set resolves.
+    expect(() => authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS)).not.toThrow();
+
+    const sealedAs = (measurement: unknown) =>
+      ({ "node_v22.23.1_darwin_arm64": { ...sealedVersion, measurement } });
+
+    for (const [label, versions] of [
+      ["a key that is not a runtime", wrap({ whatever: sealedVersion })],
+      ["a measurement under another runtime's key",
+        wrap({ "node_v26.8.2_darwin_arm64": sealedVersion })],
+      ["a ceiling that is not what its own rule derives",
+        wrap(sealedAs({ ...sealedEntry, isolated_measurement_ceiling_mib: 1_024 }))],
+      ["a 100 % figure that disagrees with its own curve",
+        wrap(sealedAs({ ...sealedEntry, measured_100_percent_rss_mib: 1 }))],
+      ["a worst point that disagrees with the curve",
+        wrap(sealedAs({ ...sealedEntry, max_measured_curve_rss_mib: 300, isolated_measurement_ceiling_mib: 320 }))],
+      ["an unknown extra member",
+        wrap(sealedAs({ ...sealedEntry, sneaked: 1 }))],
+      // The amendment's own guards: a rule name nobody defined, history
+      // relabelled under the ten-round rule without the rounds to back it, and
+      // the ten-round entry keeping its 288 while claiming the original rule.
+      ["a ceiling rule that does not exist",
+        wrap({ "node_v22.23.1_darwin_arm64": { ...sealedVersion, ceiling_rule: "WHATEVER_I_LIKE" } })],
+      ["the ten-round rule claimed without ten rounds",
+        wrap({ "node_v22.23.1_darwin_arm64": {
+          ceiling_rule: "WORST_OF_AT_LEAST_TEN_ROUNDS_PLUS_ONE_INCREMENT_ROUNDED_UP",
+          measurement_rounds: 9,
+          measurement: { ...sealedEntry, isolated_measurement_ceiling_mib: 288 }
+        } })],
+      ["a ten-round ceiling relabelled as the original rule",
+        wrap({ "node_v26.8.2_darwin_arm64": {
+          ...tenRoundVersion, ceiling_rule: "WORST_MEASURED_CURVE_POINT_ROUNDED_UP_TO_INCREMENT"
+        } })]
+    ] as const) {
+      expect(() => authPolicyFromRegisterRows(republished(versions)), label)
+        .toThrowError(expect.objectContaining({ code: "AUTH_POLICY_INVALID" }));
+    }
+  });
+
+  it.skipIf(RSS_MEASUREMENT === undefined)(
+    "S3c B4 keeps the isolated production RSS curve below the published measured bound", async () => {
     const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
     const sketch = (rateLimitRow.value as {
-      sketch_design: {
-        flat_storage: { allocated_bytes: number };
-        isolated_limiter_resident_measurement: { isolated_measurement_ceiling_mib: number };
-      };
+      sketch_design: { flat_storage: { allocated_bytes: number } };
     }).sketch_design;
     const childProgram = [
       "import { InProcessAuthRateLimiter } from './apps/api/src/registration.ts';",
@@ -295,7 +481,12 @@ describe("S3 ruled authentication policy", () => {
     ], {
       cwd: process.cwd(),
       maxBuffer: 1024 * 1024,
-      timeout: 60_000
+      // The fill is ~3.4 M limiter admissions per route. Ten rounds on this Mac
+      // under node v26.8.2 took 105.2-109.5 s wall each (V-25 re-measurement);
+      // the old 60 s budget was a node v22 figure and SIGTERMs the child here
+      // before it ever reaches the 100 % sample, which is why the case could
+      // not find a number on this host. Roughly twice the worst observed round.
+      timeout: 240_000
     });
     const curve = stdout.trim().split("\n").map((line) => JSON.parse(line) as {
       target: number;
@@ -311,13 +502,13 @@ describe("S3 ruled authentication policy", () => {
     expect(curve.at(-1)!.occupied).toBe(curve.at(-1)!.capacity);
     expect(curve.every((sample) => sample.allocated_bytes === sketch.flat_storage.allocated_bytes))
       .toBe(true);
+    // Against THIS runtime's own published measurement, never another's.
+    expect(RSS_MEASUREMENT!.runtime).toBe(RSS_RUNTIME);
     expect(Math.max(...curve.map((sample) => sample.rss_mib)))
-      .toBeLessThanOrEqual(
-        sketch.isolated_limiter_resident_measurement.isolated_measurement_ceiling_mib
-      );
+      .toBeLessThanOrEqual(RSS_MEASUREMENT!.isolated_measurement_ceiling_mib);
     expect(Object.values(curve.at(-1)!.sources).every((sources) => sources > 1_600_000))
       .toBe(true);
-  }, 70_000);
+  }, 300_000);
 
   it("publishes S3c collateral and cooldown plus S3d non-interfering credential lifecycle", () => {
     const rateLimitRow = AUTH_POLICY_REGISTER_ROWS.find((row) => row.rowKey === "rateLimitPolicy")!;
@@ -606,8 +797,8 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
   it("creates single-purpose opaque tokens and stable-format non-derived pseudonym candidates", () => {
     const token = generateVerificationToken();
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(hashVerificationToken(token)).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(hashVerificationToken(token)).not.toContain(token);
+    expect(hashToken("verification", token)).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(hashToken("verification", token)).not.toContain(token);
 
     const forbidden = ["alice", "example", "00000000", "secret-value"];
     const pseudonyms = new Set(Array.from({ length: 200 }, () => generatePseudonym()));
@@ -634,7 +825,13 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
       expect((await stat(file)).mode & 0o777).toBe(0o600);
       const stored = await readFile(file, "utf8");
       expect(stored).not.toContain(dek.toString("base64"));
-      expect(JSON.parse(stored)).toMatchObject({ version: 1, user_id: userId });
+      // V-3: records written now are v2 and name the KEK that wrapped them. The
+      // label is a truncated domain-separated digest, never the key bytes, and a
+      // v1 record without one still opens — tests/unit/kek-rotation.test.ts.
+      const record = JSON.parse(stored) as Record<string, unknown>;
+      expect(record).toMatchObject({ version: 2, user_id: userId });
+      expect(record.kek_id).toMatch(/^[0-9a-f]{16}$/);
+      expect(stored).not.toContain(Buffer.alloc(32, 0x5a).toString("base64"));
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -1163,7 +1360,14 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     for (const recipient of [
       "not-an-email",
       "victim@example.test\r\nBcc: attacker@example.test",
-      "victim@example.test\r\nBcc: attacker.example.test"
+      "victim@example.test\r\nBcc: attacker.example.test",
+      // Under `-t` the MTA parses the `To:` header, so a separator inside a
+      // single address fans the message out to a mailbox we never vetted
+      // (L7-F7). These carry one `@`, so the address shape alone accepts them.
+      "victim,attacker@example.test",
+      "victim;attacker@example.test",
+      "victim@example.test,attacker",
+      "victim@example.test;attacker"
     ]) {
       await expect(mail.sendVerification({
         attemptId: "00000000-0000-4000-8000-000000000780",
@@ -1174,7 +1378,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     }
   });
 
-  it("S3 rework4 fold-in terminates sendmail options before the recipient", async () => {
+  it("never puts a recipient address on the sendmail argv (L7-F7)", async () => {
     const root = await mkdtemp(join(tmpdir(), "debateai-s3-sendmail-args-"));
     const executable = join(root, "capture-sendmail");
     const argumentsFile = join(root, "arguments.txt");
@@ -1188,7 +1392,8 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       executable,
       from: "noreply@debateai.test",
       publicAppUrl: "https://debateai.test",
-      timeoutMs: 1_000
+      // This test pins argv, not timing; a 1s budget flakes on a loaded host.
+      timeoutMs: 30_000
     });
     try {
       await mail.sendVerification({
@@ -1197,9 +1402,18 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
         token: "a".repeat(43),
         expiresAt: new Date("2026-08-20T00:00:00.000Z")
       });
-      expect((await readFile(argumentsFile, "utf8")).trim().split("\n")).toEqual([
-        "-i", "-f", "noreply@debateai.test", "--", "alice@example.test"
-      ]);
+      const argv = (await readFile(argumentsFile, "utf8")).trim().split("\n");
+      // `-t` makes the MTA read recipients from the header block, so the
+      // address never reaches argv, where every local user can read it out of
+      // `ps` (L7-F7). The envelope sender is a fixed operator constant, not a
+      // user asset, and stays on `-f`.
+      expect(argv).toEqual(["-i", "-t", "-f", "noreply@debateai.test"]);
+      expect(argv).not.toContain("--");
+      for (const argument of argv) {
+        expect(argument).not.toContain("alice@example.test");
+      }
+      expect(argv.filter((argument) => argument.includes("@")))
+        .toEqual(["noreply@debateai.test"]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

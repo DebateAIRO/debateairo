@@ -55,4 +55,69 @@ describe("S10 own-sendmail security notification adapter", () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+
+  it("never puts a recipient address on the sendmail argv (L7-F7)", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "debateai-s10-mail-argv-"));
+    const executable = join(directory, "sendmail-capture");
+    const argumentsFile = join(directory, "arguments.txt");
+    writeFileSync(
+      executable,
+      `#!/bin/sh\nprintf '%s\\n' "$@" > '${argumentsFile.replaceAll("'", "'\\''")}'\ncat >/dev/null\n`,
+      { encoding: "utf8", mode: 0o700 }
+    );
+    chmodSync(executable, 0o700);
+    try {
+      const sender = new SendmailSecurityNotificationSender({
+        executable,
+        from: "noreply@debateai.test",
+        // This test pins argv, not timing; a 1s budget flakes on a loaded host.
+        timeoutMs: 30_000
+      });
+      await sender.sendSecurityNotification({
+        messageId: "11111111-1111-4111-8111-111111111111",
+        recipient: "person@example.test",
+        eventKind: "SCHEDULED",
+        executeAt: new Date("2026-08-31T00:00:00.000Z")
+      });
+      const argv = readFileSync(argumentsFile, "utf8").trim().split("\n");
+      // `-t` reads the recipient out of the header block on stdin, so it never
+      // appears in `ps` output for every local user (L7-F7).
+      expect(argv).toEqual(["-i", "-t", "-f", "noreply@debateai.test"]);
+      expect(argv).not.toContain("--");
+      for (const argument of argv) {
+        expect(argument).not.toContain("person@example.test");
+      }
+      expect(argv.filter((argument) => argument.includes("@")))
+        .toEqual(["noreply@debateai.test"]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a recipient that could fan the message out under -t", async () => {
+    const sender = new SendmailSecurityNotificationSender({
+      executable: "/definitely/not/a/sendmail-binary",
+      from: "noreply@debateai.test",
+      timeoutMs: 1_000
+    });
+    // Under `-t` the MTA parses the `To:` header, so a separator inside a
+    // single address would deliver a second copy to a mailbox we never vetted.
+    // Each of these carries one `@`, so the address shape alone accepts them:
+    // only the explicit `,`/`;` guard refuses them.
+    for (const recipient of [
+      "person,attacker@example.test",
+      "person;attacker@example.test",
+      "person@example.test,attacker",
+      "person@example.test;attacker"
+    ]) {
+      await expect(sender.sendSecurityNotification({
+        messageId: "11111111-1111-4111-8111-111111111111",
+        recipient,
+        eventKind: "SCHEDULED",
+        executeAt: new Date("2026-08-31T00:00:00.000Z")
+      })).rejects.toEqual(expect.objectContaining<Partial<MailDeliveryError>>({
+        operatorCode: "MAIL_INPUT_INVALID"
+      }));
+    }
+  });
 });

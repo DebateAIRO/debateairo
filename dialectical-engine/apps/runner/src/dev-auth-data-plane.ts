@@ -5,6 +5,12 @@ import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import type { DevelopmentProviderPanel } from "./dev-provider-panel.js";
 import {
+  developmentComposeSecretsPath,
+  ensureDevelopmentComposeSecrets,
+  readDevelopmentComposeSecret
+} from "../../../deploy/dev-auth/compose-secrets.mjs";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
+import {
   parseDevelopmentDeploymentRegisterCliOutput,
   type DevelopmentDeploymentRegisterMachineReceiptV1
 } from "./dev-deployment-register.js";
@@ -19,7 +25,37 @@ import {
 } from "./dev-auth-stack-profile.js";
 
 const DATA_PLANE_SERVICES = Object.freeze(["postgres", "hatchet-lite"] as const);
+const LOCAL_MIGRATOR_ORIGIN = "postgresql://127.0.0.1:55432/debateai";
+const LOCAL_MIGRATOR_ROLE = "debateai";
 const MAX_CHILD_OUTPUT_BYTES = 128 * 1024;
+
+/**
+ * The bootstrap superuser URL the migration, principal and register children connect with.
+ *
+ * V-21(a): the password used to be a literal in this file and in compose.dev.yaml, which made
+ * a superuser on published loopback port 55432 readable by every process on the workstation.
+ * It is now generated once into the 0600 custody file that already feeds compose, and read
+ * back here. The password is opaque material, so it is assigned through URL, never pasted:
+ * a reserved character must not be able to re-point the connection at another host.
+ */
+export function developmentMigratorDatabaseUrl(
+  password: string,
+  postgresPort: number = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE.postgresPort
+): string {
+  if (password.length === 0
+    || !Number.isInteger(postgresPort)
+    || postgresPort < 1
+    || postgresPort > 65_535) {
+    throw new DevelopmentAuthDataPlaneError("DEV_AUTH_DATA_PLANE_SECRET_FAILED");
+  }
+  const url = new URL(LOCAL_MIGRATOR_ORIGIN);
+  // The stack profile selects the published port (dev's support-preview stack is not on
+  // 55432); host, database and role stay fixed.
+  url.port = String(postgresPort);
+  url.username = LOCAL_MIGRATOR_ROLE;
+  url.password = password;
+  return url.toString();
+}
 
 export type DevelopmentAuthDataPlaneReceipt = Readonly<{
   postgres: "READY";
@@ -255,11 +291,17 @@ async function resolveDockerExecutable(
   throw new DevelopmentAuthDataPlaneError("DEV_AUTH_DATA_PLANE_DOCKER_UNAVAILABLE");
 }
 
-function composeArguments(...arguments_: readonly string[]): readonly string[] {
+function composeArguments(
+  secretsEnvFile: string,
+  ...arguments_: readonly string[]
+): readonly string[] {
   return Object.freeze([
     "compose",
     "--progress", "quiet",
     "--env-file", ".env.compose",
+    // Service credentials never live in the repository: compose reads them from
+    // the 0600 custody file, and refuses to start without it (L7-F2 .. L7-F4).
+    "--env-file", secretsEnvFile,
     "-f", "compose.dev.yaml",
     ...arguments_
   ]);
@@ -272,6 +314,8 @@ export function createDevelopmentAuthDataPlaneOperations(
   profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
 ): DevelopmentAuthDataPlaneOperations {
   const cwd = resolve(repositoryRoot);
+  const custodyRoot = resolveDevCustodyRoot(cwd, commandEnvironment);
+  const secretsEnvFile = developmentComposeSecretsPath(custodyRoot);
   const composeEnvironment = Object.freeze({
     VLLM_MODEL: "dev-auth-not-started",
     DEBATEAI_DEV_COMPOSE_PROJECT_NAME: profile.composeProjectName,
@@ -279,9 +323,13 @@ export function createDevelopmentAuthDataPlaneOperations(
     DEBATEAI_DEV_HATCHET_GRPC_PORT: String(profile.hatchetGrpcPort),
     DEBATEAI_DEV_HATCHET_API_PORT: String(profile.hatchetApiPort)
   });
-  const migrationEnvironment = Object.freeze({
-    MIGRATION_DATABASE_URL:
-      `postgresql://debateai:debateai-dev-only@127.0.0.1:${profile.postgresPort}/debateai`
+  // Read per step, not once at construction: prepareComposeEnvironment generates the custody
+  // file, so nothing may capture the password before that step has run.
+  const migrationEnvironment = async () => Object.freeze({
+    MIGRATION_DATABASE_URL: developmentMigratorDatabaseUrl(
+      await readDevelopmentComposeSecret(custodyRoot, "POSTGRES_SUPERUSER_PASSWORD"),
+      profile.postgresPort
+    )
   });
   const pnpm = commandEnvironment.PNPM_EXECUTABLE?.trim() || "pnpm";
   const runPnpm = (arguments_: readonly string[], failureCode: string, environment = {}) =>
@@ -299,7 +347,7 @@ export function createDevelopmentAuthDataPlaneOperations(
     failureCode: string
   ) => runCommand({
     executable: dockerExecutable,
-    arguments: composeArguments(...arguments_),
+    arguments: composeArguments(secretsEnvFile, ...arguments_),
     cwd,
     baseEnvironment: commandEnvironment,
     environment: composeEnvironment,
@@ -309,6 +357,10 @@ export function createDevelopmentAuthDataPlaneOperations(
   return Object.freeze({
     async prepareComposeEnvironment() {
       await runPnpm(["compose:env"], "DEV_AUTH_DATA_PLANE_COMPOSE_ENV_FAILED");
+      await fixedStep(
+        "DEV_AUTH_DATA_PLANE_COMPOSE_ENV_FAILED",
+        () => ensureDevelopmentComposeSecrets(custodyRoot)
+      );
     },
     async resolveDockerExecutable() {
       return resolveDockerExecutable(commandEnvironment);
@@ -372,13 +424,17 @@ export function createDevelopmentAuthDataPlaneOperations(
       throw new DevelopmentAuthDataPlaneError("DEV_AUTH_DATA_PLANE_POSTGRES_UNAVAILABLE");
     },
     async migrate() {
-      await runPnpm(["db:migrate"], "DEV_AUTH_DATA_PLANE_MIGRATION_FAILED", migrationEnvironment);
+      await runPnpm(
+        ["db:migrate"],
+        "DEV_AUTH_DATA_PLANE_MIGRATION_FAILED",
+        await migrationEnvironment()
+      );
     },
     async provisionPrincipals() {
       await runPnpm(
         ["dev:auth:provision-principals"],
         "DEV_AUTH_DATA_PLANE_PRINCIPAL_FAILED",
-        migrationEnvironment
+        await migrationEnvironment()
       );
     },
     async seedRegister() {
@@ -386,7 +442,7 @@ export function createDevelopmentAuthDataPlaneOperations(
         ["dev:auth:seed-register"],
         "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
         {
-          ...migrationEnvironment,
+          ...await migrationEnvironment(),
           DEBATEAI_DEV_PROVIDER_TARGETS_JSON: providerPanel.targetsJson
         }
       );
@@ -394,7 +450,7 @@ export function createDevelopmentAuthDataPlaneOperations(
     },
     async initializeSupportConfiguration(registerReceipt) {
       const pool = await createDevelopmentSupportConfigInitializationPool(
-        join(cwd,".local","dev-auth","database-principals.env"),
+        join(custodyRoot, "database-principals.env"),
         String(profile.postgresPort)
       );
       try {
@@ -416,7 +472,7 @@ export function createDevelopmentAuthDataPlaneOperations(
         cwd,
         baseEnvironment: commandEnvironment,
         environment: {
-          DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(cwd, ".local/dev-auth/mail")
+          DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(custodyRoot, "mail")
         },
         failureCode: "DEV_AUTH_DATA_PLANE_MAIL_FAILED"
       });

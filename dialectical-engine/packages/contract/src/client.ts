@@ -105,6 +105,7 @@ async function requestJson<T>(
     const headers = new Headers(init.headers);
     if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
     if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+    if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
     if (init.method !== undefined && !["GET", "HEAD"].includes(init.method.toUpperCase())) {
       const csrf = auth.csrfToken?.() ?? browserCsrfToken();
       if (csrf !== null) headers.set("x-csrf-token", csrf);
@@ -146,6 +147,7 @@ async function requestNoContent(
     const headers = new Headers(init.headers);
     if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
     if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+    if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
     const csrf = auth.csrfToken?.() ?? browserCsrfToken();
     if (csrf !== null) headers.set("x-csrf-token", csrf);
     response = await fetchImplementation(new URL(path, baseUrl), {
@@ -169,6 +171,9 @@ export type ContractClientAuth = Readonly<{
     cookieHeader?: string;
     /** Server-side rendering only; preserves the browser UA used to bind the session. */
     userAgent?: string;
+    /** Server-side rendering only; the visitor address the UI edge vouched for, so per-source
+     * budgets and the audit source see the visitor rather than the SSR hop (DL3-F1). */
+    forwardedFor?: string;
     csrfToken?: () => string | null;
   }>;
 
@@ -325,6 +330,7 @@ export function createContractClient(
       const headers = new Headers();
       if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
       if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+      if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
       response = await fetchImplementation(new URL(`/v1/runs/${encodeURIComponent(runId)}/events`, root), {
         headers,
         cache: "no-store",
@@ -407,6 +413,7 @@ export function createContractClient(
       const headers = new Headers();
       if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
       if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+      if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
       const csrf = auth.csrfToken?.() ?? browserCsrfToken();
       if (csrf !== null) headers.set("x-csrf-token", csrf);
       try {

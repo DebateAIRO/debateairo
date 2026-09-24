@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createPool,type Pool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -8,6 +8,7 @@ import {
   type SupportIncidentRepositoryPort,type SupportIncidentSeverity,type SupportIncidentSurface
 } from "../../api/src/support/incidents.js";
 import { loadDevelopmentSupportStatusCliCredentials } from "./support-status-cli-credentials.js";
+import { resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 
 type ParsedCommand = Readonly<{
   command: "publish";incidentId: string;severity: SupportIncidentSeverity;
@@ -67,7 +68,7 @@ export async function runSupportIncidentCli(
 ): Promise<string> {
   const command = parseSupportIncidentArguments(arguments_);
   const credentials = await dependencies.loadCredentials(
-    resolve(".local/dev-auth/database-principals.env")
+    join(resolveDevCustodyRoot(resolve(".")), "database-principals.env")
   );
   const pool = dependencies.openPool(credentials.supportDatabaseUrl);
   let operationError: unknown;

@@ -46,7 +46,15 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
   it("RESIL-01 rev2 H1/H2/H7 pins both maker roots to the cooldown seam and the effective preflight bound", async () => {
     const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
     expect(source).toMatch(/const primaryAttempt = await cooldownAttempt\(\{\s*callSiteKey: "JUDGE",[\s\S]*?failureScope: "MAKER_POSITION"/);
-    expect(source).toMatch(/const secondary = await authorPosition\(\{[\s\S]*?callSiteKey: "JUDGE:root:secondary",[\s\S]*?parentNodeId: null/);
+    // V-28 (task 11) changed the DECLARATION, not the routing: the secondary
+    // root is authored inside a try/catch that turns a spend refusal into a
+    // clean stop instead of discarding an already-minted root 0, so `secondary`
+    // is a `let` assigned in the try rather than a `const`. What this row is
+    // about — that the secondary root goes through `authorPosition`, and so
+    // through the cooldown seam, under that call-site key with a null parent —
+    // is unchanged and is still pinned, declaration included.
+    expect(source).toMatch(/let secondary: Awaited<ReturnType<typeof authorPosition>> \| null = null;/);
+    expect(source).toMatch(/secondary = await authorPosition\(\{[\s\S]*?callSiteKey: "JUDGE:root:secondary",[\s\S]*?parentNodeId: null/);
     expect(source).toMatch(/const childAttempt = await cooldownAttempt\(\{[\s\S]*?failureScope: input\.parentNodeId === null \? "MAKER_POSITION" : "EXPANSION"/);
     expect(source).toContain("maxAttempts: this.settings.judgeBound.maxAttempts + (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0)");
   });

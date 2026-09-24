@@ -6,6 +6,7 @@ import type { Pool, PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   assertSupportKeyCoverage,
+  createPool,
   lockSupportOwners,
   lockSupportSessions,
   migrate,
@@ -316,7 +317,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     ]);
   });
 
-  it("installs five statement markers and one deferred guard-only constraint trigger", async () => {
+  it("installs five deferred per-row scope guards and no global dirty marker", async () => {
     const triggers = await database.pool.query<{
       trigger_name: string;
       relation_name: string;
@@ -333,20 +334,50 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
       WHERE namespace.nspname='support' AND NOT trigger.tgisinternal
       ORDER BY trigger.tgname
     `);
-    expect(triggers.rows).toHaveLength(13);
+    // 7 content-v2 envelope triggers from 0054, plus the 5 deferred per-row scope
+    // guards and the 32 DL5-F2 guards that migrations/0065_security_delta_guards.sql
+    // installs: reject_truncate on all 17 support relations, reject_mutation on the
+    // 9 append-only ones, reject_delete on the 6 never-deleted column-mutable ones.
+    expect(triggers.rows).toHaveLength(44);
+    // DB1 / DL2-F2 + DL5-F1: 0054's five AFTER ... FOR EACH STATEMENT dirty
+    // markers and the singleton constraint trigger they armed are gone. They were
+    // the global serialisation point (one row lock held to COMMIT for every
+    // support write) and the whole-schema re-scan at every commit. The invariant
+    // is now enforced per touched row, scoped to that row's session or shred
+    // target — see tests/integration/support-shred-scope-guard.test.ts.
     expect(triggers.rows.filter(({ trigger_name }) =>
       trigger_name === "support_shred_integrity_guard_trigger"
-    )).toEqual([expect.objectContaining({
-      relation_name: "_shred_integrity_guard",
-      deferrable: true,
-      initially_deferred: true,
-      definition: expect.stringContaining("UPDATE OF mutation_generation")
-    })]);
-    expect(triggers.rows.filter(({ trigger_name }) =>
-      trigger_name.startsWith("support_shred_dirty_"))).toHaveLength(5);
+        || trigger_name.startsWith("support_shred_dirty_"))).toEqual([]);
+    const scopeGuards = triggers.rows
+      .filter(({ trigger_name }) => trigger_name === "support_shred_row_guard")
+      .sort((left, right) => left.relation_name < right.relation_name ? -1 : 1);
+    expect(scopeGuards.map(({ relation_name }) => relation_name))
+      .toEqual(["case", "case_key", "session", "session_key", "shred_audit"]);
+    for (const guard of scopeGuards) {
+      expect(guard.deferrable, guard.relation_name).toBe(true);
+      expect(guard.initially_deferred, guard.relation_name).toBe(true);
+      expect(guard.definition, guard.relation_name)
+        .toContain("support.assert_shred_integrity_row()");
+      expect(guard.definition, guard.relation_name).toContain("FOR EACH ROW");
+    }
     expect(triggers.rows.filter(({ trigger_name }) =>
       trigger_name.includes("_content_v2_") || trigger_name.includes("_snapshot_v2_")
         || trigger_name.includes("_summary_v2_"))).toHaveLength(7);
+    expect(triggers.rows.filter(({ trigger_name }) => trigger_name === "reject_truncate")
+      .map(({ relation_name }) => relation_name).sort()).toEqual([
+      "_shred_integrity_guard", "abuse_event", "admission_event", "case", "case_event",
+      "case_key", "case_message", "message", "public_incident", "rating", "relay_call",
+      "relay_waiter", "relay_waiter_event", "session", "session_key", "shred_audit", "tool_call"
+    ]);
+    expect(triggers.rows.filter(({ trigger_name }) => trigger_name === "reject_mutation")
+      .map(({ relation_name }) => relation_name).sort()).toEqual([
+      "abuse_event", "admission_event", "case_event", "rating", "relay_call",
+      "relay_waiter", "relay_waiter_event", "shred_audit", "tool_call"
+    ]);
+    expect(triggers.rows.filter(({ trigger_name }) => trigger_name === "reject_delete")
+      .map(({ relation_name }) => relation_name).sort()).toEqual([
+      "_shred_integrity_guard", "case", "case_key", "public_incident", "session", "session_key"
+    ]);
 
     const functions = await database.pool.query<{
       proname: string;
@@ -385,6 +416,52 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
         support_execute: false,
         body_sha256: "538dac0a59a56771a1081636404cd2f9d6e32c0550ae465a0f8085dc02c55276"
       }
+    ]);
+    // 0054's two functions keep their bodies byte for byte — 0054:507-538 and
+    // 753-787 pin them by hash, and 0063:20-39 forbids replacing another
+    // migration's function — they are simply unreachable now.
+    expect((await database.pool.query<{ count: number }>(`
+      SELECT count(*)::int AS count FROM pg_catalog.pg_trigger AS trigger
+      WHERE NOT trigger.tgisinternal AND trigger.tgfoid=ANY(ARRAY[
+        'support.mark_shred_integrity_dirty()'::regprocedure,
+        'support.assert_shred_integrity()'::regprocedure
+      ])
+    `)).rows[0]?.count).toBe(0);
+
+    const scoped = await database.pool.query<{
+      proname: string; security_definer: boolean; configuration: string[];
+      public_execute: boolean; support_execute: boolean;
+    }>(`
+      SELECT procedure.proname,procedure.prosecdef AS security_definer,
+        procedure.proconfig AS configuration,
+        has_function_privilege('public',procedure.oid,'EXECUTE') AS public_execute,
+        has_function_privilege('debateai_support',procedure.oid,'EXECUTE') AS support_execute
+      FROM pg_catalog.pg_proc AS procedure
+      WHERE procedure.pronamespace='support'::regnamespace
+        AND procedure.proname IN ('assert_shred_integrity_row','assert_shred_integrity_scope')
+      ORDER BY procedure.proname
+    `);
+    expect(scoped.rows.map(({ proname }) => proname))
+      .toEqual(["assert_shred_integrity_row", "assert_shred_integrity_scope"]);
+    for (const row of scoped.rows) {
+      expect(row.security_definer, row.proname).toBe(true);
+      expect(row.public_execute, row.proname).toBe(false);
+      expect(row.support_execute, row.proname).toBe(false);
+      expect(row.configuration, row.proname).toContain("search_path=pg_catalog, pg_temp");
+      // Without this the plan cache re-creates the O(N) commit: a backend that
+      // first ran the guard against an empty support.session keeps a
+      // sequential-scan generic plan as the table grows.
+      expect(row.configuration, row.proname).toContain("plan_cache_mode=force_custom_plan");
+    }
+    expect((await database.pool.query<{ indexdef: string }>(`
+      SELECT indexdef FROM pg_catalog.pg_indexes
+      WHERE schemaname='support'
+        AND indexname IN ('support_session_identity_owner_ref_idx','support_case_session_id_idx')
+      ORDER BY indexname
+    `)).rows.map(({ indexdef }) => indexdef)).toEqual([
+      "CREATE INDEX support_case_session_id_idx ON support.\"case\" USING btree (session_id)",
+      "CREATE INDEX support_session_identity_owner_ref_idx ON support.session"
+        + " USING btree (identity_owner_ref) WHERE (identity_owner_ref IS NOT NULL)"
     ]);
   });
 
@@ -450,7 +527,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     expect(restored).toEqual({ destroyed_at: null, zero: false });
   });
 
-  it("revalidates every dirty generation after an early constraint flush", async () => {
+  it("revalidates the touched scope after an early constraint flush", async () => {
     const sessionId = randomUUID();
     await createSessionPair({ sessionId, fill: 4 });
     const client = await database.pool.connect();
@@ -461,23 +538,19 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
         "UPDATE support.session SET shredded_at=shredded_at WHERE session_id=$1",
         [sessionId]
       );
-      await client.query(
-        "SET CONSTRAINTS support.support_shred_integrity_guard_trigger IMMEDIATE"
-      );
+      await client.query("SET CONSTRAINTS support.support_shred_row_guard IMMEDIATE");
       expect((await client.query<{ count: string }>(`
         SELECT current_setting('debateai.support_shred_validation_count') AS count
       `)).rows[0]?.count).toBe("1");
-      await client.query(
-        "SET CONSTRAINTS support.support_shred_integrity_guard_trigger DEFERRED"
-      );
+      await client.query("SET CONSTRAINTS support.support_shred_row_guard DEFERRED");
       await client.query(`UPDATE support.session_key
         SET wrapped_key=decode(repeat('00',61),'hex'),destroyed_at=$2 WHERE session_id=$1`,
       [sessionId, at]);
       await expect(client.query(
-        "SET CONSTRAINTS support.support_shred_integrity_guard_trigger IMMEDIATE"
+        "SET CONSTRAINTS support.support_shred_row_guard IMMEDIATE"
       )).rejects.toThrow("SUPPORT_SHRED_INTEGRITY_INVALID");
-      await client.query("ROLLBACK").catch(() => undefined);
     } finally {
+      await client.query("ROLLBACK").catch(() => undefined);
       client.release();
     }
   });
@@ -535,7 +608,7 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
     }
   });
 
-  it("runs one scan per dirty generation including a later valid generation", async () => {
+  it("runs one scoped check per touched row, not one whole-schema scan", async () => {
     const first = randomUUID();
     const second = randomUUID();
     const client = await database.pool.connect();
@@ -545,9 +618,11 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
       await insertSessionPair(client, { sessionId: first, fill: 7 });
       await insertSessionPair(client, { sessionId: second, fill: 8 });
       await client.query("SET CONSTRAINTS ALL IMMEDIATE");
+      // Two sessions x (session row + key row) = four scope checks, each one
+      // session wide. 0054 counted one whole-schema scan per dirty generation.
       expect((await client.query<{ count: string }>(`
         SELECT current_setting('debateai.support_shred_validation_count') AS count
-      `)).rows[0]?.count).toBe("1");
+      `)).rows[0]?.count).toBe("4");
       await client.query("SET CONSTRAINTS ALL DEFERRED");
       await client.query(`UPDATE support.session_key
         SET wrapped_key=decode(repeat('00',61),'hex'),destroyed_at=$1
@@ -561,9 +636,11 @@ describe("SUP-07 support key schema and transaction-bound integrity", () => {
       ) SELECT $1,'vitest','session',session_id::text,1
         FROM support.session WHERE session_id=ANY($2::uuid[])`, [at, [first, second]]);
       await client.query("SET CONSTRAINTS ALL IMMEDIATE");
+      // Six more touched rows (2 keys + 2 sessions + 2 audit rows), six more
+      // scoped checks, and the transaction still commits: the invariant holds.
       expect((await client.query<{ count: string }>(`
         SELECT current_setting('debateai.support_shred_validation_count') AS count
-      `)).rows[0]?.count).toBe("2");
+      `)).rows[0]?.count).toBe("10");
       await client.query("COMMIT");
     } finally {
       await client.query("ROLLBACK").catch(() => undefined);
@@ -1051,5 +1128,180 @@ describe("SUP-07 transactional shred boundary", () => {
       "DELETE FROM support.shred_audit WHERE target_kind='owner' AND target_ref=$1", [auditOwner]
     );
     await database.pool.query("ALTER TABLE support.shred_audit ENABLE TRIGGER USER");
+  });
+});
+
+/**
+ * DL2-F1. Every other test in this file drives the shred through
+ * `database.pool`, whose connections are the embedded cluster's initdb
+ * superuser (tests/support/testDatabase.ts:86-90,113). The only principal that
+ * ever runs `pnpm support:shred` in dev or production is `debateai_support`
+ * (apps/runner/src/support-shred-cli.ts:117-130 through
+ * support-status-cli-credentials.ts:122,158), which holds SELECT+INSERT on
+ * support.shred_audit and nothing else — the boot attestation
+ * (packages/db/src/support.ts:2386-2402) refuses any UPDATE grant there. So the
+ * suite proved a path no real caller can take.
+ */
+describe("SUP-07 shred under the attested support principal (DL2-F1)", () => {
+  async function supportRolePool(): Promise<Pool> {
+    const pool = createPool(database.connectionString);
+    pool.on("connect", (client) => {
+      // Queued on the client before any later query, so every connection this
+      // pool hands out has already dropped to the capability role.
+      void client.query("SET ROLE debateai_support");
+    });
+    const role = await pool.query<{ current_user: string }>("SELECT current_user");
+    expect(role.rows[0]?.current_user).toBe("debateai_support");
+    return pool;
+  }
+
+  it("completes an owner shred and an anonymous session shred as debateai_support", async () => {
+    const ownerRef = randomUUID();
+    const ownerSession = randomUUID();
+    const ownerCase = randomUUID();
+    await seedShredTarget({ ownerRef, sessionId: ownerSession, caseId: ownerCase });
+    const anonymousSession = randomUUID();
+    await seedShredTarget({ sessionId: anonymousSession });
+
+    const pool = await supportRolePool();
+    try {
+      const repository = new PostgresSupportShredRepository(pool);
+      await expect(repository.shredOwner(ownerRef, "vitest", at)).resolves.toEqual({
+        kind: "SHREDDED", counts: { sessions: 1, cases: 1, keysDestroyed: 2 }
+      });
+      await expect(repository.shredOwner(ownerRef, "vitest", at))
+        .resolves.toEqual({ kind: "ALREADY_SHREDDED" });
+      await expect(repository.shredSession(anonymousSession, "vitest", at)).resolves.toEqual({
+        kind: "SHREDDED", counts: { sessions: 1, cases: 0, keysDestroyed: 1 }
+      });
+      await expect(repository.shredSession(anonymousSession, "vitest", at))
+        .resolves.toEqual({ kind: "ALREADY_SHREDDED" });
+    } finally {
+      await pool.end();
+    }
+
+    const audits = await database.pool.query<{ target_kind: string; keys_destroyed: number }>(`
+      SELECT target_kind,keys_destroyed FROM support.shred_audit
+      WHERE target_ref=ANY($1::text[]) ORDER BY target_kind
+    `, [[ownerRef, anonymousSession]]);
+    expect(audits.rows).toEqual([
+      { target_kind: "owner", keys_destroyed: 2 },
+      { target_kind: "session", keys_destroyed: 1 }
+    ]);
+    await expect(assertSupportKeyCoverage(database.pool)).resolves.toBeUndefined();
+  });
+
+  it("holds no UPDATE on support.shred_audit, so no lock clause there may need one", async () => {
+    // The grant the fix must NOT widen: SELECT ... FOR UPDATE needs UPDATE on at
+    // least one column, and 0054:875 gives the role only SELECT and INSERT.
+    const privileges = await database.pool.query<{
+      table_update: boolean; any_column_update: boolean; select: boolean; insert: boolean;
+    }>(`
+      SELECT pg_catalog.has_table_privilege('debateai_support','support.shred_audit','UPDATE') AS table_update,
+        EXISTS (
+          SELECT 1 FROM pg_catalog.pg_attribute AS attribute
+          WHERE attribute.attrelid='support.shred_audit'::regclass
+            AND attribute.attnum>0 AND NOT attribute.attisdropped
+            AND pg_catalog.has_column_privilege(
+              'debateai_support','support.shred_audit',attribute.attname,'UPDATE'
+            )
+        ) AS any_column_update,
+        pg_catalog.has_table_privilege('debateai_support','support.shred_audit','SELECT') AS select,
+        pg_catalog.has_table_privilege('debateai_support','support.shred_audit','INSERT') AS insert
+    `);
+    expect(privileges.rows[0]).toEqual({
+      table_update: false, any_column_update: false, select: true, insert: true
+    });
+
+    const pool = await supportRolePool();
+    try {
+      await expect(pool.query("SELECT 1 FROM support.shred_audit FOR UPDATE"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(pool.query("SELECT 1 FROM support.shred_audit")).resolves.toBeDefined();
+      // The four locks the shred still takes are all on relations that do carry a
+      // column-level UPDATE grant, so they stay legal for this principal.
+      for (const relation of [
+        "support.session", "support.\"case\"", "support.session_key", "support.case_key"
+      ]) {
+        await expect(pool.query(`SELECT 1 FROM ${relation} FOR UPDATE`)).resolves.toBeDefined();
+      }
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it("locks no support relation that the attested role cannot UPDATE", async () => {
+    // The regression pin for the whole class: a row lock is a write intent, and
+    // PostgreSQL refuses SELECT ... FOR UPDATE/SHARE without UPDATE on at least
+    // one column. Every lock clause in the repository is resolved back to the
+    // relations it names and compared with the column-level UPDATE grants
+    // 0054:882-885 makes, so the next lock clause on an append-only relation
+    // fails here instead of in production.
+    const source = await readFile(
+      new URL("../../packages/db/src/support.ts", import.meta.url), "utf8"
+    );
+    const lockClause = /FOR\s+(?:NO\s+KEY\s+)?(?:UPDATE|KEY\s+SHARE|SHARE)(?:\s+OF\s+([A-Za-z_,\s"\\]+?))?\s*(?:`|"|\n)/gu;
+    const locked = new Set<string>();
+    let found = 0;
+    for (const match of source.matchAll(lockClause)) {
+      const start = source.slice(0, match.index).search(/SELECT[^;]*$/u);
+      if (start < 0) continue;
+      found += 1;
+      const span = source.slice(start, match.index);
+      const relations = new Map<string, string>();
+      for (const reference of span.matchAll(
+        /support\.\\?"?([a-z_]+)\\?"?(?:\s+AS\s+([a-z_]+))?/gu
+      )) {
+        const relation = `support.${reference[1]!}`;
+        relations.set(reference[2] ?? reference[1]!, relation);
+      }
+      const named = match[1]?.split(",").map((entry) => entry.trim().replaceAll(/[\\"]/gu, ""));
+      for (const [alias, relation] of relations) {
+        if (named === undefined || named.includes(alias)) locked.add(relation);
+      }
+    }
+    expect(found).toBeGreaterThanOrEqual(6);
+    const grants = await database.pool.query<{ relation: string }>(`
+      SELECT DISTINCT 'support.' || relation.relname AS relation
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=relation.relnamespace
+      JOIN pg_catalog.pg_attribute AS attribute ON attribute.attrelid=relation.oid
+      WHERE namespace.nspname='support' AND relation.relkind IN ('r','p')
+        AND attribute.attnum>0 AND NOT attribute.attisdropped
+        AND pg_catalog.has_column_privilege(
+          'debateai_support',relation.oid,attribute.attname,'UPDATE'
+        )
+    `);
+    const updatable = new Set(grants.rows.map(({ relation }) => relation));
+    expect([...locked].sort()).toEqual([
+      "support.case", "support.case_key", "support.session", "support.session_key"
+    ]);
+    for (const relation of locked) {
+      expect(updatable.has(relation), `${relation} is locked but not UPDATE-able`).toBe(true);
+    }
+    expect(locked.has("support.shred_audit")).toBe(false);
+  });
+
+  it("serialises two concurrent owner shreds on the advisory lock and the audit UNIQUE", async () => {
+    // What replaces the dropped FOR UPDATE: lockSupportOwners/lockSupportSessions
+    // (packages/db/src/support.ts:356-368) plus
+    // support_shred_audit_target_unique (0054:257).
+    const ownerRef = randomUUID();
+    await seedShredTarget({ ownerRef, sessionId: randomUUID() });
+    const pool = await supportRolePool();
+    try {
+      const repository = new PostgresSupportShredRepository(pool);
+      const outcomes = await Promise.all([
+        repository.shredOwner(ownerRef, "vitest", at),
+        repository.shredOwner(ownerRef, "vitest", at)
+      ]);
+      expect(outcomes.filter(({ kind }) => kind === "SHREDDED")).toHaveLength(1);
+      expect(outcomes.filter(({ kind }) => kind === "ALREADY_SHREDDED")).toHaveLength(1);
+    } finally {
+      await pool.end();
+    }
+    expect((await database.pool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM support.shred_audit WHERE target_ref=$1", [ownerRef]
+    )).rows).toEqual([{ count: 1 }]);
   });
 });

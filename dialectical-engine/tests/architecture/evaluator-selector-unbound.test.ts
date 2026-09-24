@@ -13,7 +13,8 @@ function productionSources(directory: string): readonly string[] {
 describe("evaluator selectors dark launch", () => {
   it("has zero callers in every workspace source root while evaluator dispatch is UNBOUND", () => {
     const definition = join(process.cwd(), "packages/evaluator/src/index.ts");
-    const workspaceSourceRoots = ["apps", "packages", "web", "tools", "acceptance"];
+    // pin updated 2026-09-02: the root-level web/ app was removed from the tree (dev drift, see docs/missions/2026-09-01-security-hardening/VERIFICATION.md)
+    const workspaceSourceRoots = ["apps", "packages", "tools", "acceptance"];
     const callers = workspaceSourceRoots
       .flatMap((root) => productionSources(join(process.cwd(), root)))
       .filter((path) => path !== definition).filter((path) =>
