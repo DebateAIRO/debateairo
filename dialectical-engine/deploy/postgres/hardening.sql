@@ -10,8 +10,10 @@
 \set ON_ERROR_STOP on
 
 -- Who may connect at all. PUBLIC keeps CONNECT by default; close it, then open it for exactly the
--- capability roles the 16 managed principals inherit from (INHERIT TRUE memberships, P3-01), the
--- four NOINHERIT obs LOGIN roles minted by migration 0034, the migrator and the Hatchet owner.
+-- twelve capability roles the managed principals inherit from (INHERIT TRUE memberships, P3-01),
+-- the NOINHERIT LOGIN roles the migrations mint themselves (the four obs roles of 0034 and the
+-- observation agent of 0057), the migrator and the Hatchet owner.
+-- tests/architecture/vps-deployment-baseline.test.ts checks this list against the manifest.
 REVOKE CONNECT ON DATABASE debateai FROM PUBLIC;
 REVOKE CONNECT ON DATABASE hatchet FROM PUBLIC;
 GRANT CONNECT ON DATABASE hatchet TO debateai_prod_hatchet;
@@ -21,8 +23,16 @@ GRANT CONNECT ON DATABASE debateai TO
   debateai_authorization_runtime, debateai_publication_cleanup, debateai_replay,
   debateai_settlement_watch, debateai_evaluator_worker, debateai_evaluator_api,
   debateai_evaluator_reader;
+-- DL5-F7: the support data plane (inherited by debateai_prod_api_support) and the JIT
+-- support-config operator. Without this line the API boots and then refuses every support
+-- request, because its support pool cannot connect.
+GRANT CONNECT ON DATABASE debateai TO
+  debateai_support, debateai_support_config_operator;
 GRANT CONNECT ON DATABASE debateai TO
   debateai_obs_writer, debateai_obs_listener, debateai_obs_watchdog, debateai_obs_human;
+-- Migration 0057 already grants this one inside the migration; restated so this file alone says
+-- who can connect.
+GRANT CONNECT ON DATABASE debateai TO debateai_observation_agent;
 
 -- Database-level defaults (stored with setrole = 0, invisible to the provisioner's drift check).
 -- search_path = pg_catalog: every app statement and migration is schema-qualified (L5 verified,

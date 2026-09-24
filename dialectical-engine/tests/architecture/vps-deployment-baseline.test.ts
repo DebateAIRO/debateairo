@@ -176,6 +176,47 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
   });
 });
 
+/**
+ * DL5-F7. hardening.sql closes CONNECT to PUBLIC and re-opens it by name, so a role missing from
+ * its list cannot connect at all: the support data plane and the support-config operator were
+ * missing, and on the VPS the support chat failed closed at boot. The list is checked against the
+ * manifest rather than restated: every capability role the managed principals inherit CONNECT
+ * through, and every principal a migration mints with its own LOGIN.
+ */
+describe("VPS baseline: hardening.sql re-opens CONNECT for every manifest role (DL5-F7)", () => {
+  const fullManifest = JSON.parse(
+    read("docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json")
+  ) as {
+    capabilityRoles: ReadonlyArray<{ roleName: string }>;
+    principals: ReadonlyArray<{ id: string; roleName: string; database: string }>;
+    principalProvisioning: ReadonlyArray<{ principalId: string; state: string }>;
+  };
+
+  function connectGrantees(sql: string): ReadonlySet<string> {
+    const grantees = new Set<string>();
+    for (const match of sqlStatements(sql).matchAll(/GRANT\s+CONNECT\s+ON\s+DATABASE\s+debateai\s+TO\s+([^;]+);/giu)) {
+      for (const role of (match[1] ?? "").split(",")) grantees.add(role.trim());
+    }
+    return grantees;
+  }
+
+  it("grants CONNECT on debateai to every capability role and every migration-minted principal", () => {
+    const grantees = connectGrantees(read("deploy/postgres/hardening.sql"));
+    const migrationMinted = new Set(fullManifest.principalProvisioning
+      .filter(({ state }) => state === "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL")
+      .map(({ principalId }) => principalId));
+    const expected = [
+      ...fullManifest.capabilityRoles.map(({ roleName }) => roleName),
+      ...fullManifest.principals
+        .filter(({ id, database }) => database === "debateai" && migrationMinted.has(id))
+        .map(({ roleName }) => roleName)
+    ];
+    expect(expected).toContain("debateai_support");
+    expect(expected).toContain("debateai_support_config_operator");
+    expect(expected.filter((role) => !grantees.has(role))).toEqual([]);
+  });
+});
+
 describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd units (L7-F2, L7-F3, L7-F7)", () => {
   it("ships every edge file", () => {
     for (const file of EDGE_FILES) expect(exists(file), file).toBe(true);
