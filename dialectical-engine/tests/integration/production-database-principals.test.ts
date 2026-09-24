@@ -15,7 +15,7 @@ import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import type { PoolClient } from "pg";
+import pg, { type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPool, migrate, type Pool } from "../../packages/db/src/index.js";
 import {
@@ -513,13 +513,31 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
 
     // Present and unusable: the role exists with its SCRAM verifier, and a login is refused.
     const urls = databaseUrls(envelope);
+    // PostgreSQL refuses an expired password with the same answer as a wrong one — SQLSTATE
+    // 28P01, "password authentication failed" — so the expiry is proven by the catalog above
+    // and the refusal here is the exact authentication refusal, not any error.
+    // A raw client, not the application pool: the pool wraps every failure as
+    // DATABASE_POOL_FAILED and the SQLSTATE is the assertion.
     for (const id of UNWIRED_PRINCIPAL_IDS) {
-      const loginPool = createPool(urls.get(id)!);
-      try {
-        await expect(loginPool.query("SELECT 1"), id).rejects.toThrow();
-      } finally {
-        await loginPool.end();
-      }
+      const client = new pg.Client({ connectionString: urls.get(id)! });
+      const refusal = await client.connect().then(
+        () => null,
+        (error: unknown) => error as { code?: string; message?: string }
+      );
+      await client.end().catch(() => undefined);
+      expect(refusal?.code, id).toBe("28P01");
+      expect(refusal?.message, id).toMatch(/^password authentication failed for user "debateai_/u);
+    }
+    // The control: the same password works the moment the expiry is lifted, so 28P01 above was
+    // the expiry and not a wrong password.
+    const control = manifest.principals.find(({ id }) => id === UNWIRED_PRINCIPAL_IDS[0])!;
+    await adminPool.query(`ALTER ROLE ${control.roleName} VALID UNTIL 'infinity'`);
+    const controlPool = createPool(urls.get(control.id)!);
+    try {
+      await expect(controlPool.query("SELECT 1 AS one")).resolves.toMatchObject({ rows: [{ one: 1 }] });
+    } finally {
+      await controlPool.end();
+      await adminPool.query(`ALTER ROLE ${control.roleName} VALID UNTIL '-infinity'`);
     }
   }, 120_000);
 
@@ -539,6 +557,53 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       adminDatabaseUrl,
       manifest,
       credentialEnvelope: tlsEnvelope,
+      supportConfigCredentialFilePath
+    });
+    expect(JSON.parse(await readFile(supportConfigCredentialFilePath, "utf8"))).toEqual({
+      databaseUrl: supportCredential.databaseUrl,
+      validUntil: supportCredential.validUntil
+    });
+    await expect(loadProductionSupportConfigCliCredentials(supportConfigCredentialFilePath))
+      .resolves.toMatchObject({ databaseUrl: supportCredential.databaseUrl });
+    await provisionProductionDatabasePrincipals({
+      adminPool,
+      adminDatabaseUrl,
+      manifest,
+      credentialEnvelope: credentialEnvelope(),
+      supportConfigCredentialFilePath
+    });
+  }, 120_000);
+
+  it("publishes the socket-shaped support-config URL the README's §4 envelope uses (DL7-F6)", async () => {
+    // On the VPS the migrator connects over the socket, so every credential URL is
+    // `@localhost/debateai` and the support-config operator's carries `?host=/var/run/postgresql`.
+    // The provisioner compares hosts against the admin URL it is GIVEN and never connects as the
+    // credentials, so the VPS shapes are exercised here against the real database.
+    const vpsAdminUrl = new URL(adminDatabaseUrl);
+    vpsAdminUrl.hostname = "localhost";
+    vpsAdminUrl.port = "";
+    vpsAdminUrl.search = "?host=/var/run/postgresql&options=-c%20statement_timeout%3D0";
+    const socketEnvelope = structuredClone(credentialEnvelope()) as {
+      credentials: Array<{ principalId: string; databaseUrl: string; validUntil?: string }>;
+    };
+    for (const credential of socketEnvelope.credentials) {
+      const url = new URL(credential.databaseUrl);
+      url.hostname = "localhost";
+      url.port = "";
+      if (credential.principalId === "support-config-operator") url.search = "?host=/var/run/postgresql";
+      credential.databaseUrl = url.toString();
+    }
+    const supportCredential = socketEnvelope.credentials.find(
+      ({ principalId }) => principalId === "support-config-operator"
+    )!;
+    expect(supportCredential.databaseUrl).toMatch(
+      /^postgresql:\/\/debateai_prod_support_config_operator:[^@]+@localhost\/debateai\?host=\/var\/run\/postgresql$/u
+    );
+    await provisionProductionDatabasePrincipals({
+      adminPool,
+      adminDatabaseUrl: vpsAdminUrl.toString(),
+      manifest,
+      credentialEnvelope: socketEnvelope,
       supportConfigCredentialFilePath
     });
     expect(JSON.parse(await readFile(supportConfigCredentialFilePath, "utf8"))).toEqual({
