@@ -300,7 +300,7 @@ describe("CP1 composed answer context", () => {
     language,signedIn,query,answerText,sourceId,actionIds
   ) => {
     const snapshot = productionReviewedCorpus();
-    expect(snapshot.entries).toHaveLength(44);
+    expect(snapshot.entries).toHaveLength(46);
     const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{ signedIn,language })
       .map(({ id }) => id);
     const context = buildSupportKnowledgeContext({
