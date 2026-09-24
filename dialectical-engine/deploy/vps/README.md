@@ -180,7 +180,8 @@ observation agent's is set separately (§12).
 | `api.env` `PUBLICATION_CLEANUP_DATABASE_URL` | `api-publication-cleanup` | `debateai_prod_api_publication_cleanup` | publication-key cleanup |
 | `api.env` `ERASURE_DATABASE_URL` | `api-erasure` | `debateai_prod_api_erasure` | account and private-run erasure |
 | `runner.env` `DATABASE_URL` | `runner-runtime` | `debateai_prod_runner_runtime` | the runner, and nothing else |
-| `observation-agent.env` `OBSERVATION_DATABASE_URL` | `observation-agent` | `debateai_observation_agent` | the observation agent (§12) |
+| `observation-agent.env` `OBSERVATION_DATABASE_URL` | `observation-agent` | `debateai_observation_agent` | the observation agent (§12); reads the threshold policy, cannot write it |
+| `observation-threshold-operator.env` `OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL` | `observation-threshold-operator` | `debateai_observation_threshold_operator` | `oactl thresholds apply` only — the one principal that may write the threshold policy (§12, `DL7-F9`) |
 
 ### The key-file contract
 
@@ -562,8 +563,9 @@ What the two config files pin, and why:
   the eighteen service passwords as bind parameters and the dev tooling as `format()`-built SQL;
   with statement logging on, `/var/log/postgresql` would hold every one of them (audit L5-F11).
   **Never raise `log_statement` on this cluster**, including "just for one debugging session".
-- `pg_hba.conf`: `local` + `scram-sha-256` for the migrator and all nineteen service LOGIN
-  principals (the eighteen the provisioner manages plus the observation agent), `peer` for the
+- `pg_hba.conf`: `local` + `scram-sha-256` for the migrator and all twenty service LOGIN
+  principals (the eighteen the provisioner manages, the observation agent and its threshold
+  operator), `peer` for the
   `postgres` OS user (that is how backups run), `hostssl` on `127.0.0.1/32` and `::1/128`, and
   `host all all 0.0.0.0/0 reject` + `::/0 reject` **last**. First match wins, so order is
   load-bearing. `hatchet` is reachable only by `debateai_prod_hatchet` (audit L7-F2).
@@ -1161,15 +1163,22 @@ run on the owners' Macs under launchd. What a Linux host still lacks, measured a
   exist here, and its mail channel takes a sendmail path relative to the repository, so it cannot
   name `/usr/sbin/sendmail`. On this host signals would be recorded in its journal and in the
   `observation` schema, and nobody would be told.
-- **`oactl` reads a development file.** Its `thresholds show` and `thresholds apply` read
-  `observation-agent.env` from the development custody root, not from `/etc/debateai`.
-- **`oactl thresholds apply` runs as the agent's own principal**, which may therefore insert new
-  versions of the threshold policy that rules it (`DL7-F9`, open). The fix is a second, separate
-  operator principal for `apply`; until it exists the grant stays, because revoking it would break
-  the only apply path.
+- **`oactl` reads a development file.** Its `thresholds show` reads `observation-agent.env` from
+  the development custody root, not from `/etc/debateai`.
+- **`oactl` reads development files.** Besides the daemon's file, `thresholds apply` reads the
+  threshold operator's credential (below) from the development custody root too.
 
 Its database principal is `debateai_observation_agent`, minted by migration `0057` with a random
-password nobody knows; `hardening.sql` and `pg_hba.conf` already admit it on the socket. Its
+password nobody knows; `hardening.sql` and `pg_hba.conf` already admit it on the socket.
+
+**The daemon cannot re-rule its own monitor (`DL7-F9`, closed by migration `0071`).** The threshold
+policy the daemon obeys is written only by a second principal,
+`debateai_observation_threshold_operator`: SELECT and INSERT on `observation.threshold_policy` and
+nothing else (rows stay immutable). The daemon's principal lost its INSERT there and kept SELECT,
+so it still reads and reloads every ratified version; `0071` refuses to finish if the daemon can
+still insert by any path. `oactl thresholds apply` connects only with the operator's credential,
+from its own `0600` file holding exactly one key, `OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL`,
+and never with the daemon's. Like the agent's, its password is random until someone sets one. Its
 access is its own `observation` schema, the `obs` views, and a narrow statistics window (V-29):
 migration `0068` revoked its `pg_monitor` membership and gave it EXECUTE on one definer function,
 `obs.postgres_capacity`, which returns ten aggregated numbers (session counts, states and ages,
@@ -1185,6 +1194,9 @@ install -d -m 0700 -o debateai-observer -g debateai-observer /etc/debateai/obser
 test ! -e /etc/debateai/observation-agent.env && install -m 0600 -o debateai-observer -g debateai-observer deploy/vps/env/observation-agent.env.example /etc/debateai/observation-agent.env
 sudo -u postgres psql -d debateai -c '\password debateai_observation_agent'
 ```
+
+The threshold operator's password is set the same way, only when `oactl` has a production path,
+and its credential file is never given to `debateai-observer`: whoever runs `apply` holds it.
 
 then filling in the placeholders of `/etc/debateai/observation-agent.env` (the password you just
 typed, URL-safe), writing the targets catalog, and only then

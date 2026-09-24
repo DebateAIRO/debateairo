@@ -299,11 +299,16 @@ describe("OBS-01 core oactl controls", () => {
     const { provisionObservationAgent } = await import(
       "../../apps/observation-agent/src/oactl/core/provision.js"
     );
+    // DL7-F9: provision mints a second, distinct credential for the threshold operator
+    // (tests/unit/obs-agent-dl7-f9-oactl.test.ts); this pin is about the daemon's file.
+    const passwords = ["deterministic-test-secret", "deterministic-operator-secret"];
     const result = await provisionObservationAgent({
       repoRoot,
       home,
-      passwordFactory: () => "deterministic-test-secret",
-      setRolePassword: async (password) => { appliedPassword = password; }
+      passwordFactory: () => passwords.shift()!,
+      setRolePassword: async (password, role) => {
+        if (role === "debateai_observation_agent") appliedPassword = password;
+      }
     });
     expect(appliedPassword).toBe("deterministic-test-secret");
     // pin updated 2026-09-19 (DL7-F4): dev custody is movable (DEBATEAI_DEV_CUSTODY_ROOT),
@@ -312,9 +317,11 @@ describe("OBS-01 core oactl controls", () => {
     // resolver returns <repoRoot>/.local/dev-auth, so this fixture's path is unchanged.
     expect(result).toEqual({
       output: `PROVISIONED ${join(repoRoot, ".local/dev-auth/observation-agent.env")}`,
-      environmentPath: join(repoRoot, ".local/dev-auth/observation-agent.env")
+      environmentPath: join(repoRoot, ".local/dev-auth/observation-agent.env"),
+      operatorEnvironmentPath: join(repoRoot, ".local/dev-auth/observation-threshold-operator.env")
     });
     expect(JSON.stringify(result)).not.toContain("deterministic-test-secret");
+    expect(JSON.stringify(result)).not.toContain("deterministic-operator-secret");
     const source = await readFile(result.environmentPath, "utf8");
     expect(source.trim().split("\n").map((line) => line.split("=", 1)[0])).toEqual([
       "OBSERVATION_DATABASE_URL",

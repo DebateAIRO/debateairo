@@ -11,8 +11,8 @@
 
 -- Who may connect at all. PUBLIC keeps CONNECT by default; close it, then open it for exactly the
 -- twelve capability roles the managed principals inherit from (INHERIT TRUE memberships, P3-01),
--- the NOINHERIT LOGIN roles the migrations mint themselves (the four obs roles of 0034 and the
--- observation agent of 0057), the migrator and the Hatchet owner.
+-- the NOINHERIT LOGIN roles the migrations mint themselves (the four obs roles of 0034, the
+-- observation agent of 0057 and its threshold operator of 0071), the migrator and the Hatchet owner.
 -- tests/architecture/vps-deployment-baseline.test.ts checks this list against the manifest.
 REVOKE CONNECT ON DATABASE debateai FROM PUBLIC;
 REVOKE CONNECT ON DATABASE hatchet FROM PUBLIC;
@@ -30,9 +30,11 @@ GRANT CONNECT ON DATABASE debateai TO
   debateai_support, debateai_support_config_operator;
 GRANT CONNECT ON DATABASE debateai TO
   debateai_obs_writer, debateai_obs_listener, debateai_obs_watchdog, debateai_obs_human;
--- Migration 0057 already grants this one inside the migration; restated so this file alone says
--- who can connect.
+-- Migrations 0057 and 0071 already grant these inside the migrations; restated so this file alone
+-- says who can connect. The second is the principal `oactl thresholds apply` writes the threshold
+-- policy as (DL7-F9), so the daemon's own principal cannot.
 GRANT CONNECT ON DATABASE debateai TO debateai_observation_agent;
+GRANT CONNECT ON DATABASE debateai TO debateai_observation_threshold_operator;
 
 -- Database-level defaults (stored with setrole = 0, invisible to the provisioner's drift check).
 -- search_path = pg_catalog: every app statement and migration is schema-qualified (L5 verified,
