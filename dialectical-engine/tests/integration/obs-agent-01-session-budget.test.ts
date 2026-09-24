@@ -259,8 +259,11 @@ describe("OBS-01 daemon database session budget", () => {
     const port = createObservationDatabasePort(pool);
     const stateDir = await mkdtemp(join(tmpdir(), "obs-port-role-"));
     try {
+      // V-29: the agent's principal no longer holds pg_monitor. The role a leaked
+      // SET ROLE would carry into the next callback is now the statistics-window owner
+      // (it holds pg_read_all_stats and can write no observation table).
       await port.withClient(async (client) => {
-        await client.query("SET ROLE pg_monitor");
+        await client.query("SET ROLE debateai_obs_stats_owner");
       });
       await new HeartbeatWriter({ pool, stateDir }).write({
         now: new Date("2026-09-06T00:00:00.000Z"),
@@ -291,7 +294,7 @@ describe("OBS-01 daemon database session budget", () => {
     const callbackError = new Error("CALLBACK_FAILED");
     try {
       await expect(port.withClient(async (client) => {
-        await client.query("SET ROLE pg_monitor");
+        await client.query("SET ROLE debateai_obs_stats_owner");
         throw callbackError;
       })).rejects.toBe(callbackError);
       const result = await port.withClient((client) => client.query<{ baseline_role: boolean }>(

@@ -216,26 +216,45 @@
       "roleName": "debateai_evaluator_ddl",
       "login": false,
       "inherit": true,
+      "directMemberships": [],
       "ownsSchemas": [
         "evaluator"
       ],
-      "ownsRelations": []
+      "ownsRelations": [],
+      "ownsFunctions": []
+    },
+    {
+      "roleName": "debateai_obs_stats_owner",
+      "login": false,
+      "inherit": false,
+      "directMemberships": [
+        "pg_read_all_stats"
+      ],
+      "ownsSchemas": [],
+      "ownsRelations": [],
+      "ownsFunctions": [
+        "obs.postgres_capacity(double precision,double precision)"
+      ]
     },
     {
       "roleName": "debateai_obs_view_owner",
       "login": false,
       "inherit": false,
+      "directMemberships": [],
       "ownsSchemas": [],
       "ownsRelations": [
         "obs.run_correlation_v"
-      ]
+      ],
+      "ownsFunctions": []
     },
     {
       "roleName": "debateai_register_publication_owner",
       "login": false,
       "inherit": false,
+      "directMemberships": [],
       "ownsSchemas": [],
-      "ownsRelations": []
+      "ownsRelations": [],
+      "ownsFunctions": []
     }
   ],
   "principals": [
@@ -340,6 +359,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -394,6 +414,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -449,6 +470,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -498,6 +520,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -546,6 +569,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_register_publication_owner",
@@ -595,6 +619,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -657,6 +682,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -705,6 +731,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -753,6 +780,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -801,6 +829,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -848,6 +877,7 @@
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -895,6 +925,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -942,6 +973,7 @@
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -986,6 +1018,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -1030,6 +1063,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -1074,6 +1108,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -1118,6 +1153,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -1152,12 +1188,8 @@
       "createRole": false,
       "replication": false,
       "bypassRls": false,
-      "directMemberships": [
-        "pg_monitor"
-      ],
-      "effectiveMemberships": [
-        "pg_monitor"
-      ],
+      "directMemberships": [],
+      "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
@@ -1166,6 +1198,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -1174,7 +1207,8 @@
         "debateai_runtime",
         "debateai_settlement_watch",
         "debateai_support",
-        "debateai_support_config_operator"
+        "debateai_support_config_operator",
+        "pg_*"
       ],
       "ownsDatabases": [],
       "ownsSchemas": [],
@@ -1214,6 +1248,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -1258,6 +1293,7 @@
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
         "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
@@ -1392,13 +1428,6 @@
     {
       "memberRole": "debateai_prod_evaluator_reader",
       "grantedRole": "debateai_evaluator_reader",
-      "adminOption": false,
-      "inheritOption": true,
-      "setOption": true
-    },
-    {
-      "memberRole": "debateai_observation_agent",
-      "grantedRole": "pg_monitor",
       "adminOption": false,
       "inheritOption": true,
       "setOption": true

@@ -62,8 +62,10 @@ type Manifest = Readonly<{
     roleName: string;
     login: false;
     inherit: boolean;
+    directMemberships: readonly string[];
     ownsSchemas: readonly string[];
     ownsRelations: readonly string[];
+    ownsFunctions: readonly string[];
   }>[];
   principals: readonly Principal[];
   developmentOnlyPrincipalBindings: readonly (ConnectionPurpose & Readonly<{
@@ -120,18 +122,19 @@ const capabilityRoles = [
 
 const ownershipRoles = [
   "debateai_evaluator_ddl",
+  // V-29: owns obs.postgres_capacity(...), the observation agent's statistics window.
+  "debateai_obs_stats_owner",
   "debateai_obs_view_owner",
   "debateai_register_publication_owner"
 ] as const;
 
-function exactForbidden(
-  effectiveMemberships: readonly string[],
-  options: Readonly<{ allowPgMonitor?: boolean }> = {}
-): readonly string[] {
+// V-29 removed the one exception (the observation agent's pg_monitor login): no
+// principal may hold any predefined pg_* role.
+function exactForbidden(effectiveMemberships: readonly string[]): readonly string[] {
   const governedRoles: string[] = [...capabilityRoles, ...ownershipRoles];
   return governedRoles
     .filter((role) => !effectiveMemberships.includes(role))
-    .concat("debateai_prod_*", ...(options.allowPgMonitor === true ? [] : ["pg_*"]))
+    .concat("debateai_prod_*", "pg_*")
     .sort();
 }
 
@@ -175,22 +178,37 @@ describe("P3-01 production database-principal manifest", () => {
         roleName: "debateai_evaluator_ddl",
         login: false,
         inherit: true,
+        directMemberships: [],
         ownsSchemas: ["evaluator"],
-        ownsRelations: []
+        ownsRelations: [],
+        ownsFunctions: []
+      },
+      {
+        roleName: "debateai_obs_stats_owner",
+        login: false,
+        inherit: false,
+        directMemberships: ["pg_read_all_stats"],
+        ownsSchemas: [],
+        ownsRelations: [],
+        ownsFunctions: ["obs.postgres_capacity(double precision,double precision)"]
       },
       {
         roleName: "debateai_obs_view_owner",
         login: false,
         inherit: false,
+        directMemberships: [],
         ownsSchemas: [],
-        ownsRelations: ["obs.run_correlation_v"]
+        ownsRelations: ["obs.run_correlation_v"],
+        ownsFunctions: []
       },
       {
         roleName: "debateai_register_publication_owner",
         login: false,
         inherit: false,
+        directMemberships: [],
         ownsSchemas: [],
-        ownsRelations: []
+        ownsRelations: [],
+        ownsFunctions: []
       }
     ]);
 
@@ -260,7 +278,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "obs-listener", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-watchdog", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-human", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
-        { id: "observation-agent", database: "debateai", inherit: false, directMemberships: ["pg_monitor"], effectiveMemberships: ["pg_monitor"] },
+        { id: "observation-agent", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "support-config-operator", database: "debateai", inherit: true, directMemberships: ["debateai_support_config_operator"], effectiveMemberships: ["debateai_support_config_operator"] },
         { id: "hatchet", database: "hatchet", inherit: true, directMemberships: [], effectiveMemberships: [] }
       ]);
@@ -336,9 +354,7 @@ describe("P3-01 production database-principal manifest", () => {
       expect(principal.createRole).toBe(false);
       expect(principal.ownsSchemas).toEqual([]);
       expect(principal.forbiddenMemberships)
-        .toEqual(exactForbidden(principal.effectiveMemberships, {
-          allowPgMonitor: principal.id === "observation-agent"
-        }));
+        .toEqual(exactForbidden(principal.effectiveMemberships));
       if (principal.id === "hatchet") {
         expect(principal.ownsDatabases).toEqual(["hatchet"]);
       } else {
@@ -671,6 +687,30 @@ describe("P3-01 production database-principal manifest", () => {
     );
     expect(migrations.replace(/\s+/gu, " ")).toContain(
       "ALTER VIEW obs.run_correlation_v OWNER TO debateai_obs_view_owner"
+    );
+
+    // V-29: the net predefined-role grants across all migrations (every GRANT pg_* not
+    // later revoked) are exactly the ones the manifest declares — on ownership roles
+    // only, never on a principal. 0059's pg_monitor grant is revoked by 0068.
+    const predefinedPairs = (pattern: RegExp) => [...migrations.matchAll(pattern)]
+      .map(([, grantedRole, memberRole]) => `${memberRole!}:${grantedRole!}`);
+    const revokedPredefined = new Set(predefinedPairs(
+      /\bREVOKE\s+(pg_[a-z_]+)\s+FROM\s+(debateai_[a-z0-9_]+)\s*;/giu
+    ));
+    const netPredefinedGrants = [...new Set(predefinedPairs(
+      /\bGRANT\s+(pg_[a-z_]+)\s+TO\s+(debateai_[a-z0-9_]+)\b/giu
+    ))].filter((pair) => !revokedPredefined.has(pair)).sort();
+    const declaredPredefinedGrants = [
+      ...manifest.ownershipRoles.flatMap(({ roleName, directMemberships }) =>
+        directMemberships.map((granted) => `${roleName}:${granted}`)),
+      ...manifest.principals.flatMap(({ roleName, directMemberships }) =>
+        directMemberships.map((granted) => `${roleName}:${granted}`))
+    ].filter((pair) => pair.includes(":pg_")).sort();
+    expect(netPredefinedGrants).toEqual(declaredPredefinedGrants);
+    expect(netPredefinedGrants).toEqual(["debateai_obs_stats_owner:pg_read_all_stats"]);
+    expect(revokedPredefined).toEqual(new Set(["debateai_observation_agent:pg_monitor"]));
+    expect(migrations.replace(/\s+/gu, " ")).toContain(
+      "ALTER FUNCTION obs.postgres_capacity(double precision,double precision) OWNER TO debateai_obs_stats_owner"
     );
     expect(manifest.status).toBe("MIXED_PROVISIONING_STATE");
   });
