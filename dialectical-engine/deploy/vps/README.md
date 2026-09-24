@@ -593,6 +593,19 @@ test -e /etc/debateai/hatchet.pgpass || (umask 0177 && openssl rand -hex 32 > /e
 sudo -u postgres psql -v ON_ERROR_STOP=1 -v hatchet_password="$(cat /etc/debateai/hatchet.pgpass)" -f deploy/postgres/bootstrap.sql
 ```
 
+Then write the Hatchet container's `DATABASE_URL` with that same password, so the role and the
+container agree. The password goes from the file to the new file through the shell's builtin
+`printf` — never onto a command line, a process listing or your terminal — and the line does
+nothing if `hatchet.env` already exists:
+
+```sh
+test ! -e /etc/debateai/hatchet.env && (umask 0177 && printf 'DATABASE_URL=postgresql://debateai_prod_hatchet:%s@localhost/hatchet?host=/var/run/postgresql\n' "$(cat /etc/debateai/hatchet.pgpass)" > /etc/debateai/hatchet.env)
+```
+
+The container reaches the socket through its bind mount (`compose.prod.yaml`). The file's other
+keys (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) are Hatchet's own: add them with an
+editor, `0600 root:root` stays, and no seeded or example value is ever used (audit L7-F3).
+
 **2. Open the migrator for fifteen minutes.** Its password is NULL between ceremonies, and the
 provisioner refuses an admin whose credential is not bounded (manifest invariant
 `NO_LONG_LIVED_SUPERUSER_CREDENTIAL`). Generate a password of URL-safe characters first — the
@@ -609,9 +622,11 @@ timeout for its own sessions only — migration `0040` is one transaction and wi
 the database's 30 s cap:
 
 ```sh
-read -rs MIGRATOR_PASSWORD
-export MIGRATION_DATABASE_URL="postgresql://debateai_prod_migrator:${MIGRATOR_PASSWORD}@localhost/debateai?host=/var/run/postgresql&options=-c%20statement_timeout%3D0"
+read -rs MIGRATOR_PASSWORD && export MIGRATION_DATABASE_URL="postgresql://debateai_prod_migrator:${MIGRATOR_PASSWORD}@localhost/debateai?host=/var/run/postgresql&options=-c%20statement_timeout%3D0"
 ```
+
+Every block in this runbook that asks a question is ONE line, ending the block: a terminal that
+pastes line by line would otherwise hand the next pasted line to the prompt as its answer.
 
 **3. Schema, then hardening** (hardening after migrate: it grants CONNECT to roles the
 migrations create):
@@ -811,9 +826,7 @@ construction. Receipt: `BACKUP_OK <sha256> <bytes> <utc>`.
 Mount the removable media, then give the drill the two identity files' paths when asked:
 
 ```sh
-read -rp 'Path of the data identity on the removable medium: ' DATA_IDENTITY
-read -rp 'Path of the escrow identity on the removable medium: ' ESCROW_IDENTITY
-BACKUP_AGE_IDENTITY="$DATA_IDENTITY" BACKUP_ESCROW_IDENTITY="$ESCROW_IDENTITY" /opt/debateai/dialectical-engine/deploy/vps/restore-drill.sh
+read -rp 'Path of the data identity on the removable medium: ' DATA_IDENTITY && read -rp 'Path of the escrow identity on the removable medium: ' ESCROW_IDENTITY && BACKUP_AGE_IDENTITY="$DATA_IDENTITY" BACKUP_ESCROW_IDENTITY="$ESCROW_IDENTITY" /opt/debateai/dialectical-engine/deploy/vps/restore-drill.sh
 ```
 
 Both identities are needed, and that is the point: the DEK store rides with the dump, the KEK that
@@ -1026,8 +1039,7 @@ files first, on purpose.
 ```sh
 install -d -m 0700 -o debateai-runner -g debateai-runner /etc/debateai/runner/providers
 install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api/providers
-read -rp 'Vendor short name: ' VENDOR
-printf '%s' "$VENDOR" | grep -Eqx '[a-z0-9][a-z0-9-]*' && test ! -e "/etc/debateai/runner/providers/$VENDOR.header" && test ! -e "/etc/debateai/api/providers/$VENDOR.header" && (umask 0177 && systemd-ask-password "$VENDOR authorization header value" > "/etc/debateai/runner/providers/$VENDOR.header") && install -m 0600 -o debateai-api -g debateai-api "/etc/debateai/runner/providers/$VENDOR.header" "/etc/debateai/api/providers/$VENDOR.header" && chown debateai-runner:debateai-runner "/etc/debateai/runner/providers/$VENDOR.header"
+read -rp 'Vendor short name: ' VENDOR && printf '%s' "$VENDOR" | grep -Eqx '[a-z0-9][a-z0-9-]*' && test ! -e "/etc/debateai/runner/providers/$VENDOR.header" && test ! -e "/etc/debateai/api/providers/$VENDOR.header" && (umask 0177 && systemd-ask-password "$VENDOR authorization header value" > "/etc/debateai/runner/providers/$VENDOR.header") && install -m 0600 -o debateai-api -g debateai-api "/etc/debateai/runner/providers/$VENDOR.header" "/etc/debateai/api/providers/$VENDOR.header" && chown debateai-runner:debateai-runner "/etc/debateai/runner/providers/$VENDOR.header"
 ```
 
 The `umask` runs in a subshell so pasting this block leaves your own shell session's mask
@@ -1163,10 +1175,13 @@ run on the owners' Macs under launchd. What a Linux host still lacks, measured a
   exist here, and its mail channel takes a sendmail path relative to the repository, so it cannot
   name `/usr/sbin/sendmail`. On this host signals would be recorded in its journal and in the
   `observation` schema, and nobody would be told.
-- **`oactl` reads a development file.** Its `thresholds show` reads `observation-agent.env` from
-  the development custody root, not from `/etc/debateai`.
-- **`oactl` reads development files.** Besides the daemon's file, `thresholds apply` reads the
-  threshold operator's credential (below) from the development custody root too.
+- **`oactl` reads development files.** `thresholds show` reads the daemon's
+  `observation-agent.env`, and `thresholds apply` reads the threshold operator's credential
+  (below), both from the development custody root, not from `/etc/debateai`.
+- **The threshold operator's password is the operator's job on this host.** Until `oactl` has a
+  production credential path, nothing here sets or rotates `debateai_observation_threshold_operator`'s
+  password: set it (and rotate it) by hand with `\password` as for the agent below, or leave it at
+  the random value `0071` minted, which nobody knows and which therefore opens nothing.
 
 Its database principal is `debateai_observation_agent`, minted by migration `0057` with a random
 password nobody knows; `hardening.sql` and `pg_hba.conf` already admit it on the socket.
@@ -1178,8 +1193,10 @@ nothing else (rows stay immutable). The daemon's principal lost its INSERT there
 so it still reads and reloads every ratified version; `0071` refuses to finish if the daemon can
 still insert by any path. `oactl thresholds apply` connects only with the operator's credential,
 from its own `0600` file holding exactly one key, `OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL`,
-and never with the daemon's. Like the agent's, its password is random until someone sets one. Its
-access is its own `observation` schema, the `obs` views, and a narrow statistics window (V-29):
+and never with the daemon's. Like the agent's, its password is random until someone sets one.
+
+The agent's database access (`debateai_observation_agent`) is its own `observation` schema, the `obs` views,
+and a narrow statistics window (V-29):
 migration `0068` revoked its `pg_monitor` membership and gave it EXECUTE on one definer function,
 `obs.postgres_capacity`, which returns ten aggregated numbers (session counts, states and ages,
 two database sizes) and never the statement text. `0068` refuses to finish if the agent is still a

@@ -767,6 +767,28 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(unchainedShreds).toEqual([]);
   });
 
+  /**
+   * Re-review item 4. A terminal without bracketed paste feeds a pasted block line by line, and a
+   * `read` that waits for input swallows the NEXT pasted line as its answer — a password prompt
+   * would take a command as the password. So every `read` begins a single-line `&&` chain that
+   * uses its answer, and no line follows it inside its block.
+   */
+  it("README: every read begins a single-line chain and is the last line of its block", () => {
+    const readme = read("deploy/vps/README.md");
+    const offending: string[] = [];
+    for (const block of readme.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      const lines = (block[1] ?? "").split("\n").map((line) => line.trim())
+        .filter((line) => line !== "" && !line.startsWith("#"));
+      lines.forEach((line, index) => {
+        if (!/(^|&&\s*|;\s*)read\s/u.test(line)) return;
+        if (!/^read\s[^&]*&&\s*\S/u.test(line) || line.endsWith("\\") || index !== lines.length - 1) {
+          offending.push(line);
+        }
+      });
+    }
+    expect(offending).toEqual([]);
+  });
+
   it("README: the previous master keys are shredded only after a machine check that no service names them", () => {
     const readme = read("deploy/vps/README.md");
     const shred = /[^\n]*shred -u \/etc\/debateai\/api-previous\/kek\.bin[^\n]*/u.exec(
@@ -780,6 +802,25 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(readme).toMatch(/umask 0277[^\n]*> \/etc\/debateai\/ui-edge\.secret/u);
     expect(readme).toMatch(/chown debateai-ui:debateai-ui \/etc\/debateai\/ui-edge\.secret/u);
     expect(readme).toMatch(/install -m 0640 -o root -g caddy \/etc\/debateai\/ui-edge\.secret/u);
+  });
+
+  /**
+   * Re-review item 6. hatchet.env's DATABASE_URL must carry the same password bootstrap.sql gave
+   * debateai_prod_hatchet, which lives only in hatchet.pgpass. The step derives it from that file
+   * without the secret ever reaching a terminal or an argv: the builtin printf formats it, the
+   * redirect writes it, and the line is guarded so a second paste cannot rewrite the file.
+   */
+  it("README: hatchet.env's DATABASE_URL is derived from hatchet.pgpass, guarded, never echoed", () => {
+    const readme = read("deploy/vps/README.md");
+    expect(readme).toContain(
+      "test ! -e /etc/debateai/hatchet.env && (umask 0177 && printf 'DATABASE_URL=postgresql://debateai_prod_hatchet:%s@localhost/hatchet?host=/var/run/postgresql\\n' \"$(cat /etc/debateai/hatchet.pgpass)\" > /etc/debateai/hatchet.env)"
+    );
+    const bring = readme.slice(readme.indexOf("### Bring-up order"), readme.indexOf("## 5. Application units"));
+    expect(bring.indexOf("> /etc/debateai/hatchet.env")).toBeGreaterThan(bring.indexOf("-f deploy/postgres/bootstrap.sql"));
+    for (const block of readme.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      expect(block[1], block[1]).not.toMatch(/\becho\b[^\n]*(pgpass|password|secret)/iu);
+      expect(block[1], block[1]).not.toMatch(/^\s*cat\s+\/etc\/debateai\/hatchet\.pgpass\s*$/mu);
+    }
   });
 });
 
