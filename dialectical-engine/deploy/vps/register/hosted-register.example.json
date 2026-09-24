@@ -1,0 +1,56 @@
+{
+  "format": "debateai.hosted-register.v1",
+  "sourceRef": "V-28 provisional cost envelopes and V-9 vetted vendors: first hosted register (EXAMPLE vendors, replace before publishing)",
+  "configuredProviderSet": {
+    "requiredDistinctMakers": 2,
+    "providers": [
+      {
+        "providerRef": "vendor:example-alpha",
+        "adapterKind": "openai-compatible-http",
+        "maker": "ExampleAlpha",
+        "vetting": {
+          "dataUseTermsReviewedOn": "2026-09-25",
+          "retentionTermsReviewedOn": "2026-09-25",
+          "namedInPrivacyNotice": true
+        }
+      },
+      {
+        "providerRef": "vendor:example-beta",
+        "adapterKind": "openai-compatible-http",
+        "maker": "ExampleBeta",
+        "vetting": {
+          "dataUseTermsReviewedOn": "2026-09-25",
+          "retentionTermsReviewedOn": "2026-09-25",
+          "namedInPrivacyNotice": true
+        }
+      }
+    ]
+  },
+  "costEnvelopePolicy": {
+    "kind": "COST_ENVELOPE_POLICY",
+    "currency": "USD",
+    "minor_units_per_unit": 1000000,
+    "per_run_ceiling_micros": 250000,
+    "daily_ceiling_micros": 2000000,
+    "provisional": true,
+    "provisional_reason": "PROVISIONAL first hosted run ceiling under V-28: the owner seals the real values as a NEW version of this row after the first measured paid run"
+  },
+  "providerTargets": [
+    {
+      "provider_ref": "vendor:example-alpha",
+      "base_url": "https://api.alpha.example/v1",
+      "model": "example-alpha-chat",
+      "authorization_file": "/etc/debateai/runner/providers/example-alpha.header",
+      "input_price_micros_per_million": 2500000,
+      "output_price_micros_per_million": 10000000
+    },
+    {
+      "provider_ref": "vendor:example-beta",
+      "base_url": "https://api.beta.example/v1",
+      "model": "example-beta-chat",
+      "authorization_file": "/etc/debateai/runner/providers/example-beta.header",
+      "input_price_micros_per_million": 1000000,
+      "output_price_micros_per_million": 4000000
+    }
+  ]
+}

@@ -345,6 +345,17 @@ describe("P3-01 production database-principal manifest", () => {
             purpose: "PRODUCTION_PRINCIPAL_PROVISIONING",
             binding: "WIRED",
             condition: "package script db:provision-principals"
+          },
+          // Task 14b: the hosted register publication. The migrator is the only
+          // principal that can execute register.publish_register_version since
+          // 0065 revoked it from debateai_runtime; no new privilege is granted.
+          {
+            component: "apps/runner:hosted-register-publish-cli",
+            sourceFile: "apps/runner/src/hosted-register-publish-cli.ts",
+            environmentKey: "MIGRATION_DATABASE_URL",
+            purpose: "PRODUCTION_REGISTER_PUBLICATION",
+            binding: "WIRED",
+            condition: "package script register:publish-hosted"
           }
         ]);
         continue;
@@ -375,6 +386,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/runner:dev-deployment-register-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_REGISTER_SEED", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:seed-register" },
         { component: "apps/runner:dev-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_PROVIDER_SET_PUBLICATION", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:publish-provider-set" },
         { component: "apps/runner:production-database-principals-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_PRINCIPAL_PROVISIONING", binding: "WIRED", condition: "package script db:provision-principals" },
+        { component: "apps/runner:hosted-register-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_REGISTER_PUBLICATION", binding: "WIRED", condition: "package script register:publish-hosted" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },

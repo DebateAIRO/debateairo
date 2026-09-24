@@ -330,6 +330,14 @@
           "purpose": "PRODUCTION_PRINCIPAL_PROVISIONING",
           "binding": "WIRED",
           "condition": "package script db:provision-principals"
+        },
+        {
+          "component": "apps/runner:hosted-register-publish-cli",
+          "sourceFile": "apps/runner/src/hosted-register-publish-cli.ts",
+          "environmentKey": "MIGRATION_DATABASE_URL",
+          "purpose": "PRODUCTION_REGISTER_PUBLICATION",
+          "binding": "WIRED",
+          "condition": "package script register:publish-hosted"
         }
       ]
     },
