@@ -152,7 +152,8 @@ process start: restart both units after either change.
 | `/etc/debateai/observation-agent/` | `0700` | `debateai-observer` | `targets.d/` (the production targets catalog, none ships yet) and the optional `hatchet-token` (§12) |
 | `/etc/debateai/postgres-tls/` | `0700` | `postgres` | `server.crt`, `server.key`, `ca.crt` |
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
-| `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret (a second `0640 root:caddy` copy for Caddy) |
+| `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret, the UI's copy |
+| `/etc/debateai/ui-edge.caddy.secret` | `0640` | `root:caddy` | the same bytes, Caddy's copy (the `Caddyfile` reads this one) |
 | `/etc/debateai/backup.conf` | `0600` | `root:root` | age **public** keys and paths — see `backup.conf.example` |
 | `/run/debateai/support-config/` | `0700` | `root:root` | `operator.json`, the JIT support-config operator credential the provisioner publishes (§4, §13). Under `/run`, so it does not survive a reboot |
 | `/run/debateai/support-data/` | `0700` | `root:root` | `api-support.json`, the support data credential `support:status` and `support:shred` read (§13), written for the length of an operator session |
@@ -183,13 +184,14 @@ observation agent's is set separately (§12).
 
 ### The key-file contract
 
-Every `*_PATH` key is a **raw 32-byte file** — not hex, not base64:
+Every `*_PATH` key is a **raw 32-byte file** — not hex, not base64. Every line that creates a
+secret in this runbook begins with `test ! -e`: on a second paste the file already exists and the
+line does nothing, because replacing a live master key replaces the only key every stored record
+is wrapped under. A key that must really change goes through §3 "Changing a master key".
 
 ```sh
 install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api
-head -c 32 /dev/urandom > /etc/debateai/api/kek.bin
-chown debateai-api:debateai-api /etc/debateai/api/kek.bin
-chmod 0600 /etc/debateai/api/kek.bin
+test ! -e /etc/debateai/api/kek.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/kek.bin) && chown debateai-api:debateai-api /etc/debateai/api/kek.bin
 ```
 
 - `@debateai/crypto` refuses a hex or base64 file (65 / 45 bytes) with an opaque `KEK_UNRESOLVED`.
@@ -204,11 +206,10 @@ chmod 0600 /etc/debateai/api/kek.bin
 The other four are made the same way. Each is its own 32 random bytes:
 
 ```sh
-(umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/corpus-kek.bin)
-(umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/blind-index-key.bin)
-(umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/audit-source-ip-salt.bin)
-(umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/support-kek.bin)
-chown debateai-api:debateai-api /etc/debateai/api/corpus-kek.bin /etc/debateai/api/blind-index-key.bin /etc/debateai/api/audit-source-ip-salt.bin /etc/debateai/api/support-kek.bin
+test ! -e /etc/debateai/api/corpus-kek.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/corpus-kek.bin) && chown debateai-api:debateai-api /etc/debateai/api/corpus-kek.bin
+test ! -e /etc/debateai/api/blind-index-key.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/blind-index-key.bin) && chown debateai-api:debateai-api /etc/debateai/api/blind-index-key.bin
+test ! -e /etc/debateai/api/audit-source-ip-salt.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/audit-source-ip-salt.bin) && chown debateai-api:debateai-api /etc/debateai/api/audit-source-ip-salt.bin
+test ! -e /etc/debateai/api/support-kek.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/support-kek.bin) && chown debateai-api:debateai-api /etc/debateai/api/support-kek.bin
 ```
 
 The runner's own copy of the user-DEK KEK is the SAME 32 bytes as `/etc/debateai/api/kek.bin`,
@@ -216,17 +217,22 @@ in a file its own user owns:
 
 ```sh
 install -d -m 0700 -o debateai-runner -g debateai-runner /etc/debateai/runner
-install -m 0600 -o debateai-runner -g debateai-runner /etc/debateai/api/kek.bin /etc/debateai/runner/kek.bin
+test ! -e /etc/debateai/runner/kek.bin && install -m 0600 -o debateai-runner -g debateai-runner /etc/debateai/api/kek.bin /etc/debateai/runner/kek.bin
 ```
 
-The edge secret is text, not a key:
+The edge secret is text, not a key. It exists twice: the UI's copy, which the UI refuses unless
+no group or other bit is set (`0400 debateai-ui`), and Caddy's copy, `0640 root:caddy` under its
+own name, because Caddy runs as `caddy` and could not read the UI's:
 
 ```sh
-openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' > /etc/debateai/ui-edge.secret
+test ! -e /etc/debateai/ui-edge.secret && (umask 0277 && openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' > /etc/debateai/ui-edge.secret) && chown debateai-ui:debateai-ui /etc/debateai/ui-edge.secret
+test ! -e /etc/debateai/ui-edge.caddy.secret && install -m 0640 -o root -g caddy /etc/debateai/ui-edge.secret /etc/debateai/ui-edge.caddy.secret
 ```
 
-At least 43 base64url characters. Caddy sends it as `X-Debateai-Edge-Secret`; the UI compares it
-with `timingSafeEqual` and only then believes `X-Forwarded-For`.
+At least 43 base64url characters. Caddy sends its copy as `X-Debateai-Edge-Secret`; the UI
+compares it with its own using `timingSafeEqual` and only then believes `X-Forwarded-For`. The two
+files must hold the same bytes: to change the secret, remove both and paste the block again, then
+restart `debateai-ui` and reload Caddy.
 
 ### Custody and the three service users — the custody group (V-19, ruled 2026-09-22)
 
@@ -485,11 +491,14 @@ steady state, and the shred is what makes the rotation meaningful:
 systemctl restart debateai-api debateai-runner
 ```
 
+The shred is refused by a machine check unless neither `EnvironmentFile` still names a previous
+key — a service restarted with a previous path pointing at a shredded file does not start:
+
 ```sh
-shred -u /etc/debateai/api-previous/kek.bin /etc/debateai/runner-previous/kek.bin
+! grep -q '_KEK_PREVIOUS_PATH=' /etc/debateai/api.env /etc/debateai/runner.env && shred -u /etc/debateai/api-previous/kek.bin /etc/debateai/runner-previous/kek.bin
 ```
 
-Shred the corpus and support previous keys too if you rotated them, then remove
+Shred the corpus and support previous keys too if you rotated them, the same way, then remove
 the two directories:
 
 ```sh
@@ -559,19 +568,26 @@ What the two config files pin, and why:
   `host all all 0.0.0.0/0 reject` + `::/0 reject` **last**. First match wins, so order is
   load-bearing. `hatchet` is reachable only by `debateai_prod_hatchet` (audit L7-F2).
 - So there are exactly **two ways in**, and every client URL must say which: the unix socket
-  (`?host=/var/run/postgresql`, what every service uses), or TLS on loopback
-  (`?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt`). A URL with neither is
-  plaintext TCP and is rejected by the last two lines (`DL7-F6`).
+  (`@localhost/debateai?host=/var/run/postgresql`, what every service uses), or TLS on loopback
+  (`@127.0.0.1/debateai?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt`). A
+  URL with neither is plaintext TCP and is rejected by the last two lines (`DL7-F6`). The server
+  certificate lists IP addresses only (`IP:127.0.0.1`, `IP:::1`), so the TLS shape names
+  `127.0.0.1`, never `localhost` — `verify-full` checks the name against the certificate. The
+  principal provisioner also requires every credential URL's host to equal the host of
+  `MIGRATION_DATABASE_URL`, so a host that runs its ceremony over the socket writes every
+  credential URL with `localhost`.
 
 ### Bring-up order
 
 Run every block below as root, from `/opt/debateai/dialectical-engine`.
 
 **1. Roles and databases**, once, before any migration. The Hatchet role's password is read from
-its file, so it never appears in this document or your shell history:
+its file, so it never appears in this document or your shell history. The file is generated only
+if it does not exist yet, because `bootstrap.sql` creates the role once and a second paste must
+not leave a password on disk that the role does not have:
 
 ```sh
-(umask 0177 && openssl rand -hex 32 > /etc/debateai/hatchet.pgpass)
+test -e /etc/debateai/hatchet.pgpass || (umask 0177 && openssl rand -hex 32 > /etc/debateai/hatchet.pgpass)
 sudo -u postgres psql -v ON_ERROR_STOP=1 -v hatchet_password="$(cat /etc/debateai/hatchet.pgpass)" -f deploy/postgres/bootstrap.sql
 ```
 
@@ -615,11 +631,12 @@ names") before the envelope is destroyed:
 
 ```sh
 install -d -m 0700 /run/debateai/support-config
-pnpm db:provision-principals --support-config-credential-file /run/debateai/support-config/operator.json < /run/debateai/principals.json
-shred -u /run/debateai/principals.json
+pnpm db:provision-principals --support-config-credential-file /run/debateai/support-config/operator.json < /run/debateai/principals.json && shred -u /run/debateai/principals.json
 ```
 
-It prints `PRODUCTION_DATABASE_PRINCIPALS_READY=18` and nothing secret.
+It prints `PRODUCTION_DATABASE_PRINCIPALS_READY=18` and nothing secret, and only then is the
+envelope destroyed. If it refuses, the envelope stays in `/run/debateai` (memory only, `0600`) so
+the run can be corrected and repeated; destroy it by hand once you are done.
 
 **Six of the eighteen are provisioned expired (V-20).** `evaluator-worker`, `evaluator-api`,
 `evaluator-reader`, `obs-writer`, `obs-listener` and `obs-watchdog` have no shipped component
@@ -718,7 +735,7 @@ systemctl reload caddy
 - **No proxy-trust directive.** Caddy >= 2.5 rewrites a client-supplied `X-Forwarded-For` only when
   such a directive is set; leaving it unset is what keeps "the last hop is the address Caddy
   observed" true for `apps/ui/trusted-client-ip.mjs`.
-- `header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.secret}` — without it, any local
+- `header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}` — without it, any local
   process able to open `127.0.0.1:3001` could forge a client address and evade the per-IP
   admission limits and the audit source IP.
 
@@ -789,10 +806,12 @@ construction. Receipt: `BACKUP_OK <sha256> <bytes> <utc>`.
 
 ### Restore drill — **quarterly**, and it is not optional
 
+Mount the removable media, then give the drill the two identity files' paths when asked:
+
 ```sh
-BACKUP_AGE_IDENTITY=/media/op/data.age.key \
-BACKUP_ESCROW_IDENTITY=/media/op/escrow.age.key \
-  /opt/debateai/dialectical-engine/deploy/vps/restore-drill.sh
+read -rp 'Path of the data identity on the removable medium: ' DATA_IDENTITY
+read -rp 'Path of the escrow identity on the removable medium: ' ESCROW_IDENTITY
+BACKUP_AGE_IDENTITY="$DATA_IDENTITY" BACKUP_ESCROW_IDENTITY="$ESCROW_IDENTITY" /opt/debateai/dialectical-engine/deploy/vps/restore-drill.sh
 ```
 
 Both identities are needed, and that is the point: the DEK store rides with the dump, the KEK that
@@ -996,26 +1015,26 @@ date you read each. Confirm the vendor is named in the published privacy notice.
 that record cannot be published: the register builder refuses with `PROVIDER_VENDOR_NOT_VETTED`
 and the provider ref. Data-processing agreements are V's to arrange, and V names the vendor.
 
-**2. Write the two credential files.** Run these as root on the host. The header value is typed at
-the prompt, so it never appears on a command line or in shell history:
+**2. Write the two credential files.** Run these as root on the host. The block asks for the
+vendor's short name — lower-case letters, digits and dashes, used as the file name — and then for
+the header value, which is typed at a prompt so it never appears on a command line or in shell
+history. A file that already exists is never replaced: rotating a vendor key is removing both
+files first, on purpose.
 
 ```sh
 install -d -m 0700 -o debateai-runner -g debateai-runner /etc/debateai/runner/providers
 install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api/providers
-( umask 077; systemd-ask-password "Acme authorization header value" > /etc/debateai/runner/providers/acme.header )
-install -m 0600 -o debateai-api -g debateai-api \
-  /etc/debateai/runner/providers/acme.header /etc/debateai/api/providers/acme.header
-chown debateai-runner:debateai-runner /etc/debateai/runner/providers/acme.header
-chmod 0600 /etc/debateai/runner/providers/acme.header
+read -rp 'Vendor short name: ' VENDOR
+printf '%s' "$VENDOR" | grep -Eqx '[a-z0-9][a-z0-9-]*' && test ! -e "/etc/debateai/runner/providers/$VENDOR.header" && test ! -e "/etc/debateai/api/providers/$VENDOR.header" && (umask 0177 && systemd-ask-password "$VENDOR authorization header value" > "/etc/debateai/runner/providers/$VENDOR.header") && install -m 0600 -o debateai-api -g debateai-api "/etc/debateai/runner/providers/$VENDOR.header" "/etc/debateai/api/providers/$VENDOR.header" && chown debateai-runner:debateai-runner "/etc/debateai/runner/providers/$VENDOR.header"
 ```
 
 The `umask` runs in a subshell so pasting this block leaves your own shell session's mask
-untouched; the `chmod` afterwards is what actually fixes the mode, so the two are belt and braces.
+untouched.
 
 Check both trees — the `find` printing nothing is the pass:
 
 ```sh
-stat -c '%a %U %G %n' /etc/debateai/runner/providers/acme.header /etc/debateai/api/providers/acme.header
+stat -c '%a %U %G %n' /etc/debateai/runner/providers/* /etc/debateai/api/providers/*
 find /etc/debateai/runner/providers -type f ! -perm 0600 -print
 find /etc/debateai/runner/providers ! -user debateai-runner -print
 find /etc/debateai/api/providers -type f ! -perm 0600 -print
@@ -1034,7 +1053,7 @@ JSON array; add one object to it. Its members:
 | `input_price_micros_per_million` | the vendor's price for input tokens, in whole USD micro-units per million tokens — the unit vendors publish in, so 3.00 USD per million is `3000000`. **Required in hosted mode** (V-28) |
 | `output_price_micros_per_million` | the same for output tokens. Both or neither, never zero |
 
-In `runner.env` the entry for the example above reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000}`,
+For a vendor whose short name was `acme`, the `runner.env` entry reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000}`,
 and in `api.env` the same entry with `/etc/debateai/api/providers/acme.header`. The prices are the
 vendor's published list prices on the day you add it; when the vendor changes them, change both
 files and restart both units, or the envelopes count at the old price.
@@ -1050,12 +1069,9 @@ enforced by `buildConfiguredProviderSetDeploymentRow` in
 call takes the deployment (`"hosted"` or `"local"`) and a hosted publication carrying an unvetted
 vendor is refused there rather than at boot.
 
-**There is no hosted publish command yet.** This step is the register publication path — the same
-one the deployment's other rows go through — driven by whoever publishes a register version on
-this host; nothing in `deploy/vps/` runs it for you, and the seeder under `apps/runner/src` is the
-DEVELOPMENT one. Until a hosted command exists, expect to publish the row through that path by
-hand and to verify the new version before restarting anything. `REGISTER_VERSION` in both
-`EnvironmentFile`s then names the new version. Every `provider_ref` in step 3 must appear in this
+Publishing it is §11 "Publishing the settings register on this host" — which, today, is not
+possible (a go-live blocker). `REGISTER_VERSION` in both `EnvironmentFile`s then names the new
+version. Every `provider_ref` in step 3 must appear in this
 row and in the same order, or both services refuse at boot with
 `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`.
 
@@ -1109,12 +1125,12 @@ version must carry, besides the algorithm's own rows:
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |
 
-**There is no hosted publish command yet.** The only code that assembles a complete deployment
+**A hosted publish command lands in a companion change (Task 14b); until it does, publishing is
+not possible — go-live blocker.** The only code in this tree that assembles a complete deployment
 version is the development seeder (`pnpm dev:auth:seed-register`), which publishes DEVELOPMENT
-values — its own provider panel and source refs — and is not a hosted publication. Until a hosted
-command exists, the first hosted version is published through the register publication path
-(`publishGeneral` with `deployment: "hosted"`, `packages/register/src/register-publication.ts`) by
-whoever holds the migrator's fifteen-minute window (§4). This is a go-live blocker, not a detail.
+values — its own provider panel and source refs — and is not a hosted publication. Do not publish
+by hand: a first version also needs the sealed historical bootstrap imported before it, which the
+seeder does and a hand-made publication would not.
 
 Before restarting anything on a new version, check that the newest version carries the three
 rows a hosted start-up refuses without:
@@ -1154,16 +1170,19 @@ run on the owners' Macs under launchd. What a Linux host still lacks, measured a
 
 Its database principal is `debateai_observation_agent`, minted by migration `0057` with a random
 password nobody knows; `hardening.sql` and `pg_hba.conf` already admit it on the socket. Its
-access is its own `observation` schema, the `obs` views, and a narrow statistics window (V-29).
-Nothing in `deploy/` ever grants it `pg_monitor` or `pg_read_all_stats`: either would let it read
-other sessions' statement text.
+access is its own `observation` schema, the `obs` views, and a narrow statistics window (V-29):
+migration `0068` revoked its `pg_monitor` membership and gave it EXECUTE on one definer function,
+`obs.postgres_capacity`, which returns ten aggregated numbers (session counts, states and ages,
+two database sizes) and never the statement text. `0068` refuses to finish if the agent is still a
+member of any `pg_*` role. Nothing in `deploy/` grants it `pg_monitor`, `pg_read_all_stats` or any
+other `pg_*` role: either of those two would let it read other sessions' statement text again.
 
 When the gaps above are closed, preparing the host is:
 
 ```sh
 adduser --system --group --no-create-home --home /nonexistent debateai-observer
 install -d -m 0700 -o debateai-observer -g debateai-observer /etc/debateai/observation-agent
-install -m 0600 -o debateai-observer -g debateai-observer deploy/vps/env/observation-agent.env.example /etc/debateai/observation-agent.env
+test ! -e /etc/debateai/observation-agent.env && install -m 0600 -o debateai-observer -g debateai-observer deploy/vps/env/observation-agent.env.example /etc/debateai/observation-agent.env
 sudo -u postgres psql -d debateai -c '\password debateai_observation_agent'
 ```
 
@@ -1193,23 +1212,25 @@ support data, as `debateai_prod_api_support`, from a one-entry credential file. 
 carry one of the two shapes the host's `pg_hba` admits — the socket or verified TLS (§4,
 `DL7-F6`); the URL in `api.env` already does. Run as root from `/opt/debateai/dialectical-engine`.
 
-Name the support model — the `provider_ref` of `SUPPORT_MODEL_TARGET_JSON`, here the §11 example —
-then switch the chat on:
+Name the support model — the `provider_ref` of the target in `SUPPORT_MODEL_TARGET_JSON`, read
+from `api.env` itself so the published value is the one the API will compose — then switch the chat
+on. Each command publishes a new register version that is never edited afterwards, so the chain
+stops before publishing anything if `api.env` does not hold a real target yet:
 
 ```sh
-pnpm support:limits set support_model_ref vendor:acme --source-ref vps-support-model --credential-file /run/debateai/support-config/operator.json
-pnpm support:switch on --source-ref vps-support-on --credential-file /run/debateai/support-config/operator.json
+SUPPORT_MODEL_REF="$(sed -n 's/^SUPPORT_MODEL_TARGET_JSON=//p' /etc/debateai/api.env | node -e 'let s="";process.stdin.on("data",(d)=>{s+=d;}).on("end",()=>{const r=JSON.parse(s).provider_ref;if(typeof r!=="string"||r===""){process.exit(1);}process.stdout.write(r);});')" && pnpm support:limits set support_model_ref "$SUPPORT_MODEL_REF" --source-ref vps-support-model --credential-file /run/debateai/support-config/operator.json && pnpm support:switch on --source-ref vps-support-on --credential-file /run/debateai/support-config/operator.json
 ```
 
 Check it, writing the data credential from `api.env` through a pipe so the password never
-reaches a command line, and destroying it afterwards:
+reaches a command line, and destroying it once the status has printed:
 
 ```sh
 install -d -m 0700 /run/debateai/support-data
-(umask 0177 && sed -n 's/^SUPPORT_DATABASE_URL=//p' /etc/debateai/api.env | node -e 'let u="";process.stdin.on("data",(d)=>{u+=d;}).on("end",()=>{process.stdout.write(JSON.stringify({format:"debateai.production-database-principal-credentials.v1",credentials:[{principalId:"api-support",databaseUrl:u.trim()}]}));});' > /run/debateai/support-data/api-support.json)
-pnpm support:status --credential-file /run/debateai/support-config/operator.json --support-data-credential-file /run/debateai/support-data/api-support.json
-shred -u /run/debateai/support-data/api-support.json
+test ! -e /run/debateai/support-data/api-support.json && (umask 0177 && sed -n 's/^SUPPORT_DATABASE_URL=//p' /etc/debateai/api.env | node -e 'let u="";process.stdin.on("data",(d)=>{u+=d;}).on("end",()=>{process.stdout.write(JSON.stringify({format:"debateai.production-database-principal-credentials.v1",credentials:[{principalId:"api-support",databaseUrl:u.trim()}]}));});' > /run/debateai/support-data/api-support.json) && pnpm support:status --credential-file /run/debateai/support-config/operator.json --support-data-credential-file /run/debateai/support-data/api-support.json && shred -u /run/debateai/support-data/api-support.json
 ```
+
+If `support:status` refuses, the credential stays in `/run/debateai/support-data` (memory only,
+`0600`); read the refusal, then destroy it by hand.
 
 `support:switch off` is the emergency stop and takes the same arguments.
 

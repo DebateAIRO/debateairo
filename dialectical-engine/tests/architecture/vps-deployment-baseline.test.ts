@@ -2,7 +2,7 @@
 // Pins the VPS deployment baseline (PLAN §8 C3, §9.1 C3 amendments, audit corrections
 // L2-F3, L5-F6/F7/F8/F11, L7-F2/F3/F7). Every assertion is a floor on a file under
 // deploy/; the files are configuration, so the pins are textual and deliberately exact.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -228,7 +228,8 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
       "reverse_proxy 127.0.0.1:3001",
       "header_up X-Forwarded-For {remote_host}",
       "header_up X-Forwarded-Proto https",
-      "header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.secret}",
+      // Caddy's own 0640 root:caddy copy: the UI refuses a secret file with any group bit.
+      "header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}",
       'Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"',
       "-Server",
       "protocols tls1.2 tls1.3",
@@ -680,7 +681,7 @@ describe("VPS baseline: runbook and environment templates", () => {
       "`250000`", "`2000000`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false",
       // The settings register on this host, and the rows a hosted start-up refuses without.
       "### Publishing the settings register on this host", "costEnvelopePolicy", "admissionPolicy",
-      "configuredProviderSet", "There is no hosted publish command yet",
+      "configuredProviderSet", "Task 14b", "go-live blocker",
       // Rehearsals as runbook steps.
       "#### Rehearsing the rotation", "tests/unit/rotate-kek.test.ts", "#### The restore rehearsal",
       // V-9(a)(b).
@@ -709,11 +710,76 @@ describe("VPS baseline: runbook and environment templates", () => {
     }
   });
 
-  it("deploy/ never grants the observation principal pg_monitor or pg_read_all_stats (V-29)", () => {
+  /**
+   * V-29 (migration 0068, merged). The kit's wording — "a narrow statistics window" — is true only
+   * while (1) a migration really revokes pg_monitor from the agent and hands it the definer
+   * function, (2) no LATER migration grants it a pg_* role again, and (3) nothing in deploy/
+   * grants any pg_* role to anyone.
+   */
+  it("V-29: the window exists in the migrations, nothing re-grants a pg_* role, and deploy/ grants none", () => {
+    const migrationsDirectory = resolve(engineRoot, "migrations");
+    const migrations = readdirSync(migrationsDirectory).filter((name) => name.endsWith(".sql")).sort();
+    const window = migrations.find((name) => name.startsWith("0068_"));
+    expect(window).toBeDefined();
+    const windowSql = sqlStatements(read(`migrations/${window!}`));
+    expect(windowSql).toMatch(/REVOKE\s+pg_monitor\s+FROM\s+debateai_observation_agent\s*;/u);
+    expect(windowSql).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+obs\.postgres_capacity\([^)]*\)\s+TO\s+debateai_observation_agent\s*;/u);
+    expect(windowSql).toContain("OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP");
+    for (const name of migrations.filter((candidate) => candidate > window!)) {
+      expect(sqlStatements(read(`migrations/${name}`)), name)
+        .not.toMatch(/GRANT\s+pg_[a-z_]+\s+TO\s+[^;]*debateai_observation_agent/iu);
+    }
     for (const file of POSTGRES_FILES) {
       if (!file.endsWith(".sql")) continue;
+      expect(sqlStatements(read(file)), file).not.toMatch(/GRANT\s+pg_[a-z_]+\s+TO/iu);
       expect(sqlStatements(read(file)), file).not.toMatch(/\bpg_(monitor|read_all_stats)\b/iu);
     }
+  });
+
+  /**
+   * Task 14 review, items 1, 5, 6 and 7. A runbook block is pasted, and pasted again. A bare
+   * `>` onto a key or credential file on a live host replaces the only copy of that secret —
+   * every record it wraps is then lost. So every redirect that writes a secret must be guarded
+   * (a `test ! -e` / `test -e … ||` check in the same command, or noclobber), and every
+   * `shred -u` must run only after the command before it SUCCEEDED (`&&`), so a failed step
+   * never destroys the evidence or the envelope it needed.
+   */
+  it("README: every secret-writing redirect is guarded and every shred -u is chained with &&", () => {
+    const readme = read("deploy/vps/README.md");
+    const unguarded: string[] = [];
+    const unchainedShreds: string[] = [];
+    for (const block of readme.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      const commands = (block[1] ?? "").replace(/\\\n\s*/gu, " ").split("\n")
+        .map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#"));
+      for (const command of commands) {
+        for (const redirect of command.matchAll(/(?<![0-9&])>\s*(\S+)/gu)) {
+          const target = redirect[1] ?? "";
+          if (!/(secret|key|pgpass|\.bin|\.header|\.json|token|password)/iu.test(target)) continue;
+          if (/\btest\s+(!\s+)?-e\s/u.test(command) || /\bset\s+(-C|-o\s+noclobber)\b/u.test(command)) continue;
+          unguarded.push(command);
+        }
+        if (/\bshred\s+-u\b/u.test(command) && !/&&\s*shred\s+-u\b/u.test(command)) {
+          unchainedShreds.push(command);
+        }
+      }
+    }
+    expect(unguarded).toEqual([]);
+    expect(unchainedShreds).toEqual([]);
+  });
+
+  it("README: the previous master keys are shredded only after a machine check that no service names them", () => {
+    const readme = read("deploy/vps/README.md");
+    const shred = /[^\n]*shred -u \/etc\/debateai\/api-previous\/kek\.bin[^\n]*/u.exec(
+      readme.replace(/\\\n\s*/gu, " ")
+    )?.[0] ?? "";
+    expect(shred).toMatch(/!\s*grep -q '_KEK_PREVIOUS_PATH=' \/etc\/debateai\/api\.env \/etc\/debateai\/runner\.env\s*&&/u);
+  });
+
+  it("README: the edge secret is created unreadable to others, owned by the UI, with the Caddy copy", () => {
+    const readme = read("deploy/vps/README.md").replace(/\\\n\s*/gu, " ");
+    expect(readme).toMatch(/umask 0277[^\n]*> \/etc\/debateai\/ui-edge\.secret/u);
+    expect(readme).toMatch(/chown debateai-ui:debateai-ui \/etc\/debateai\/ui-edge\.secret/u);
+    expect(readme).toMatch(/install -m 0640 -o root -g caddy \/etc\/debateai\/ui-edge\.secret/u);
   });
 });
 
