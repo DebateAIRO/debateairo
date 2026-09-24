@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync,readFileSync,rmSync,writeFileSync } from "node:fs";
+import { mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach,describe,expect,it } from "vitest";
@@ -58,6 +58,30 @@ function fixture() {
     }
   };
   return { directory,componentBytes,reviewManifest };
+}
+
+const OWNER_EVIDENCE = "docs/support-kb/owner-signoff.md";
+const OWNER_SIGNATURE = Object.freeze({
+  reviewedBy: "OWNER",reviewerSession: "owner-signoff-session",reviewedOn: "2026-09-24",
+  evidence: OWNER_EVIDENCE,ratifiedBy: "V",ratifiedOn: "2026-09-24"
+});
+
+/** A scratch evidence root holding the owner's sign-off file under docs/. */
+function ownerEvidenceRoot(): string {
+  const root = mkdtempSync(join(tmpdir(),"support-recovery-owner-"));
+  directories.push(root);
+  mkdirSync(join(root,"docs","support-kb"),{ recursive: true });
+  writeFileSync(join(root,OWNER_EVIDENCE),"The owner read the exact bytes and signed.\n");
+  return root;
+}
+
+/** The fixture's recovery rows signed by the owner; `override` amends row 0 (`undefined` removes a key). */
+function ownerSignedRecovery(data: ReturnType<typeof fixture>,override: Record<string,unknown> = {}) {
+  const components = data.reviewManifest.recovery.components.map((row,index) => Object.fromEntries(
+    Object.entries({ ...row,...OWNER_SIGNATURE,...(index === 0 ? override : {}) })
+      .filter(([,value]) => value !== undefined)
+  ));
+  return { ...data.reviewManifest,recovery: { ...data.reviewManifest.recovery,components } };
 }
 
 afterEach(() => {
@@ -248,5 +272,72 @@ describe("reviewed Support recovery components", () => {
       requireReviewedRecovery: true
     } as never);
     expect(corpusB.kbVersion).not.toBe(corpusA.kbVersion);
+  });
+
+  it("hashes an editorial-role (SOL) recovery line exactly as the 2026-09 records were hashed", () => {
+    // Pins SOL recovery rows: the kbVersion line format, and an evidence locator the loader never opens.
+    const data = fixture();
+    const corpus = loadHelpCorpus(data.directory,{
+      reviewManifest: data.reviewManifest,recoveryComponents: data.componentBytes,requireReviewedRecovery: true
+    });
+    const rows = data.reviewManifest.recovery.components;
+    const expected = [
+      `catalog:${sha256(SUPPORT_CATALOG_CANONICAL)}`,
+      ...rows.map((row) => `${row.id}.${row.lang}.md:${row.articleSha256}`),
+      ...rows.map((row) => `ratification:${row.id}.${row.lang}:V:2026-09-01`),
+      `recovery-file:${sha256(data.componentBytes)}`,
+      ...rows.map((row) =>
+        `${row.id}.${row.lang}:${row.articleSha256}:${row.modelProjectionSha256}:${row.fallbackSha256}`),
+      ...rows.map((row) => [
+        `recovery:${row.id}.${row.lang}`,row.articleSha256,row.modelProjectionSha256,row.fallbackSha256,
+        "SOL","/fixture/editor","2026-09-14","/fixture/recovery-review.md","",""
+      ].join(":"))
+    ].join("\n");
+    expect(corpus.manifest).toBe(expected);
+    expect(corpus.kbVersion).toBe(sha256(expected));
+  });
+
+  it("admits recovery components the owner signed, counted as owner-ratified and bound into kbVersion", () => {
+    // Catches an owner-signed recovery row being refused, rewritten, or hashed without its signature.
+    const data = fixture();
+    const reviewManifest = ownerSignedRecovery(data);
+    const corpus = loadHelpCorpus(data.directory,{
+      reviewManifest,recoveryComponents: data.componentBytes,requireReviewedRecovery: true,
+      evidenceRoot: ownerEvidenceRoot()
+    });
+
+    expect(corpus.entries).toHaveLength(2);
+    expect(corpus.recoveryReviewedCount).toBe(1);
+    expect(corpus.recoveryOwnerRatifiedCount).toBe(1);
+    expect(corpus.entries.map(({ recoveryReview }) => recoveryReview))
+      .toStrictEqual(reviewManifest.recovery.components);
+    expect(corpus.manifest.split("\n").filter((line) => line.startsWith("recovery:"))).toEqual(
+      data.reviewManifest.recovery.components.map((row) => [
+        `recovery:${row.id}.${row.lang}`,row.articleSha256,row.modelProjectionSha256,row.fallbackSha256,
+        "OWNER","owner-signoff-session","2026-09-24",OWNER_EVIDENCE,"V","2026-09-24"
+      ].join(":"))
+    );
+  });
+
+  it.each([
+    { name: "without ratifiedBy",override: { ratifiedBy: undefined },field: "recovery.components[0].ratifiedBy" },
+    { name: "with a blank ratifiedBy",override: { ratifiedBy: "" },field: "recovery.components[0].ratifiedBy" },
+    { name: "with a ratifiedOn that is not a date",override: { ratifiedOn: "2026-13-01" },
+      field: "recovery.components[0].ratifiedOn" },
+    { name: "with a blank ratifiedOn",override: { ratifiedOn: "" },field: "recovery.components[0].ratifiedOn" },
+    { name: "with a blank reviewerSession",override: { reviewerSession: "" },
+      field: "recovery.components[0].reviewerSession" },
+    { name: "without evidence",override: { evidence: undefined },field: "recovery.components[0].evidence" },
+    { name: "whose evidence file is missing",override: { evidence: "docs/support-kb/never-written.md" },
+      field: "recovery.components[0].evidence" }
+  ])("refuses an OWNER recovery row $name, naming $field",({ override,field }) => {
+    // Catches the owner-signature rules skipping the recovery rows the chat texts ride on.
+    const data = fixture();
+    expect(() => loadHelpCorpus(data.directory,{
+      reviewManifest: ownerSignedRecovery(data,override),recoveryComponents: data.componentBytes,
+      requireReviewedRecovery: true,evidenceRoot: ownerEvidenceRoot()
+    })).toThrowError(expect.objectContaining({
+      name: "TypedDomainError",code: "SUPPORT_KB_RECOVERY_REVIEW_INVALID",message: expect.stringContaining(field)
+    }));
   });
 });
