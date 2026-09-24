@@ -22,7 +22,6 @@ const VERIFIED_TLS = "?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tl
 const ACCEPTED: ReadonlyArray<readonly [string, string, string?]> = [
   ["no query, on loopback localhost (today's shape)", ""],
   ["no query, on 127.0.0.1", "", "127.0.0.1"],
-  ["no query, on ::1", "", "[::1]"],
   ["the unix socket the kit uses", SOCKET],
   ["the Debian/Ubuntu socket directory", "?host=/run/postgresql"],
   ["verified TLS on loopback", VERIFIED_TLS, "127.0.0.1"],
@@ -56,7 +55,12 @@ const REFUSED: ReadonlyArray<readonly [string, string, string?]> = [
   ["an empty parameter", `${SOCKET}&`],
   ["no query to an off-box host (plaintext TCP)", "", "db.example.com"],
   ["no query to a private address", "", "10.0.0.5"],
-  ["the socket shape on a non-loopback host name", SOCKET, "db.example.com"]
+  ["the socket shape on a non-loopback host name", SOCKET, "db.example.com"],
+  ["a root certificate path that climbs out with ..",
+    "?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/../../../tmp/ca.crt", "127.0.0.1"],
+  // node-pg keeps the brackets of a URL's IPv6 host and resolves "[::1]" as a NAME, which
+  // fails (ENOTFOUND): a shape the client cannot connect with is refused, not advertised.
+  ["no query, on the bracketed IPv6 loopback", "", "[::1]"]
 ];
 
 let root: string;

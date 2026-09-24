@@ -4,6 +4,7 @@
 // It now reads a separate, custody-checked credential file for the threshold operator
 // principal (migration 0071), and `oactl provision` mints both. No database is needed: every
 // case here must refuse, or write files, before a connection is ever opened.
+import { createServer, type Server } from "node:net";
 import { chmod, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -58,6 +59,37 @@ describe("DL7-F9: `oactl thresholds apply` never uses the daemon's credential", 
       code: 2,
       stderr: ["OBSERVATION_THRESHOLD_OPERATOR_ENV_INVALID"]
     });
+  });
+
+  it("connects with the OPERATOR's URL, never the daemon's (two listeners, one per credential)", async () => {
+    // No database: each credential points at its own loopback listener, which records the
+    // connection and hangs up. Whichever listener is reached is the credential `apply` used.
+    const hits = { daemon: 0, operator: 0 };
+    const listen = (name: keyof typeof hits): Promise<Readonly<{ server: Server; port: number }>> =>
+      new Promise((resolvePromise) => {
+        const server = createServer((socket) => { hits[name] += 1; socket.destroy(); });
+        server.listen(0, "127.0.0.1", () => {
+          const address = server.address();
+          resolvePromise({ server, port: typeof address === "object" && address !== null ? address.port : 0 });
+        });
+      });
+    const daemon = await listen("daemon");
+    const operator = await listen("operator");
+    try {
+      const root = await custodyRoot();
+      await writeFile(join(root, "observation-agent.env"), DAEMON_ENV.replace(":55432/", `:${daemon.port}/`), { mode: 0o600 });
+      await writeFile(
+        join(root, "observation-threshold-operator.env"),
+        `OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL='${OPERATOR_URL.replace(":55432/", `:${operator.port}/`)}'\n`,
+        { mode: 0o600 }
+      );
+      const result = await runApply();
+      expect(result.code).toBe(2);
+      expect(hits).toEqual({ daemon: 0, operator: 1 });
+    } finally {
+      await new Promise((resolvePromise) => daemon.server.close(resolvePromise));
+      await new Promise((resolvePromise) => operator.server.close(resolvePromise));
+    }
   });
 
   it("reads exactly one key, from a private file, for the operator principal only", async () => {

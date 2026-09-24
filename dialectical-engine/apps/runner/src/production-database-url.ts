@@ -7,7 +7,7 @@
  * (`deploy/postgres/pg_hba.conf.template`): the unix socket, and TLS on loopback. So exactly
  * three shapes are accepted, and nothing else:
  *
- * - no query at all, and ONLY to a loopback host (`localhost`, `127.0.0.1`, `[::1]`): plaintext
+ * - no query at all, and ONLY to a loopback host (`localhost`, `127.0.0.1`): plaintext
  *   TCP that never leaves the machine, for hosts whose pg_hba admits it. The VPS pg_hba does
  *   NOT (its last two lines reject it); an off-box or private address with no query is refused
  *   here, because it would send the password in the clear across a network;
@@ -22,7 +22,9 @@
  * value, an upper-case name or value, an empty or repeated parameter, a `..` segment, and every
  * weaker `sslmode` (`disable`, `require`, `no-verify`, `uselibpqcompat`, …) are refused.
  */
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+// Not `[::1]`: node-pg keeps a URL's IPv6 brackets and resolves "[::1]" as a host NAME, which
+// fails (ENOTFOUND). A shape the client cannot connect with is refused rather than advertised.
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const SOCKET_DIRECTORIES = new Set(["/var/run/postgresql", "/run/postgresql"]);
 
 function rawParameters(search: string): ReadonlyMap<string, string> | null {
