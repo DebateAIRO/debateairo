@@ -153,6 +153,56 @@ describe("OBS-05 V-29 statistics window replaces pg_monitor", () => {
       .resolves.toMatchObject({ rows: [{ roles: [] }] });
   });
 
+  // 0068 ends with guards that refuse, rather than warn: its REVOKE only removes the
+  // direct pg_monitor grant, and its role creation adopts a pre-existing role silently.
+  async function replayWindowMigration(): Promise<string> {
+    await fixture().pool.query(
+      "DELETE FROM public.debateai_schema_migration WHERE name='0068_observation_stats_window.sql'"
+    );
+    try {
+      await migrate(fixture().pool);
+      return "APPLIED";
+    } catch (error) {
+      return (error as Error).message;
+    }
+  }
+
+  it("refuses to finish 0068 while the agent reaches a predefined role by another path", async () => {
+    await fixture().pool.query("CREATE ROLE v29_indirect_path NOLOGIN");
+    await fixture().pool.query("GRANT pg_read_all_settings TO v29_indirect_path");
+    await fixture().pool.query(`GRANT v29_indirect_path TO ${agentRole}`);
+    try {
+      expect(await replayWindowMigration()).toMatch(/^OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP/u);
+    } finally {
+      await fixture().pool.query("DROP ROLE v29_indirect_path");
+    }
+    expect(await replayWindowMigration()).toBe("APPLIED");
+  });
+
+  it("refuses to adopt a statistics owner that has a member", async () => {
+    await fixture().pool.query("CREATE ROLE v29_owner_member NOLOGIN");
+    await fixture().pool.query("GRANT debateai_obs_stats_owner TO v29_owner_member");
+    try {
+      expect(await replayWindowMigration()).toMatch(/^OBS_STATS_OWNER_NOT_EXCLUSIVE/u);
+    } finally {
+      await fixture().pool.query("DROP ROLE v29_owner_member");
+    }
+    expect(await replayWindowMigration()).toBe("APPLIED");
+  });
+
+  it("refuses to adopt a statistics owner that owns any other object", async () => {
+    await fixture().pool.query("CREATE TABLE public.v29_adopted_object (id integer)");
+    await fixture().pool.query(
+      "ALTER TABLE public.v29_adopted_object OWNER TO debateai_obs_stats_owner"
+    );
+    try {
+      expect(await replayWindowMigration()).toMatch(/^OBS_STATS_OWNER_NOT_EXCLUSIVE/u);
+    } finally {
+      await fixture().pool.query("DROP TABLE public.v29_adopted_object");
+    }
+    expect(await replayWindowMigration()).toBe("APPLIED");
+  });
+
   it("keeps every other agent grant, including INSERT on observation.threshold_policy", async () => {
     await expect(fixture().pool.query(`
       SELECT has_table_privilege('${agentRole}','observation.threshold_policy','INSERT') AS can_insert,
@@ -173,8 +223,7 @@ describe("OBS-05 V-29 statistics window replaces pg_monitor", () => {
       owner_login: boolean;
       owner_super: boolean;
       owner_stats: string[];
-      executors: string[];
-      public_execute: boolean;
+      acl: string[];
       columns: string[];
     }>(`
       SELECT proc.prosecdef, proc.proconfig, owner.rolname AS owner,
@@ -185,17 +234,9 @@ describe("OBS-05 V-29 statistics window replaces pg_monitor", () => {
                  AND pg_has_role(owner.oid, granted.oid, 'USAGE')
                ORDER BY granted.rolname
              )::text[] AS owner_stats,
-             ARRAY(
-               SELECT caller.rolname FROM pg_catalog.pg_roles AS caller
-               WHERE caller.oid <> owner.oid AND NOT caller.rolsuper
-                 AND caller.rolname NOT LIKE 'pg\\_%'
-                 AND has_function_privilege(caller.oid, proc.oid, 'EXECUTE')
-               ORDER BY caller.rolname
-             )::text[] AS executors,
-             EXISTS (
-               SELECT 1 FROM aclexplode(proc.proacl) AS entry
-               WHERE entry.grantee = 0 AND entry.privilege_type = 'EXECUTE'
-             ) AS public_execute,
+             -- The EXACT access list: owner and agent, nothing else (no PUBLIC,
+             -- no predefined role, no other grantor).
+             ARRAY(SELECT item::text FROM unnest(proc.proacl) AS item ORDER BY 1)::text[] AS acl,
              proc.proargnames AS columns
       FROM pg_catalog.pg_proc AS proc
       JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = proc.pronamespace
@@ -209,8 +250,10 @@ describe("OBS-05 V-29 statistics window replaces pg_monitor", () => {
       owner_login: false,
       owner_super: false,
       owner_stats: ["pg_read_all_stats"],
-      executors: [agentRole],
-      public_execute: false,
+      acl: [
+        "debateai_obs_stats_owner=X/debateai_obs_stats_owner",
+        `${agentRole}=X/debateai_obs_stats_owner`
+      ],
       columns: [
         "lock_wait_seconds", "idle_in_transaction_seconds",
         "used_connections", "max_connections", "lock_waiters", "longest_lock_wait_seconds",

@@ -34,7 +34,8 @@
 --
 -- Idempotent statement by statement: the role is created once and its attributes
 -- restated; the membership grant restates the same options; CREATE OR REPLACE keeps
--- the function's owner and ACL; REVOKE of a membership that is already gone only warns.
+-- the function's owner and ACL; REVOKE of a membership that is already gone only warns,
+-- and the closing guards then prove the end state instead of trusting that warning.
 
 DO $$
 BEGIN
@@ -116,3 +117,57 @@ GRANT EXECUTE ON FUNCTION obs.postgres_capacity(double precision,double precisio
   TO debateai_observation_agent;
 
 REVOKE pg_monitor FROM debateai_observation_agent;
+
+-- Guards. They refuse, never warn, so a replay or a pre-existing database cannot end in
+-- a state the window's reasoning does not hold for (ERRCODE 55000, as in 0056).
+--   * The REVOKE above removes only the direct pg_monitor grant from this grantor. A
+--     membership reached another way (a grant from another grantor, or through any
+--     intermediate role) would leave the agent able to read statement text again.
+--   * The role statement at the top adopts a role that already exists. An adopted
+--     statistics owner with a member would lend pg_read_all_stats to that member, and one
+--     owning any other object would give that object the same reach.
+DO $$
+DECLARE
+  agent_predefined text;
+  owner_members text;
+  owner_other_objects bigint;
+BEGIN
+  SELECT string_agg(granted.rolname, ',' ORDER BY granted.rolname) INTO agent_predefined
+  FROM pg_catalog.pg_roles AS granted
+  WHERE granted.rolname LIKE 'pg\_%'
+    AND pg_catalog.pg_has_role('debateai_observation_agent', granted.oid, 'MEMBER');
+  IF agent_predefined IS NOT NULL THEN
+    RAISE EXCEPTION 'OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP: %', agent_predefined
+      USING ERRCODE = '55000';
+  END IF;
+
+  SELECT string_agg(member.rolname, ',' ORDER BY member.rolname) INTO owner_members
+  FROM pg_catalog.pg_auth_members AS membership
+  JOIN pg_catalog.pg_roles AS member ON member.oid = membership.member
+  WHERE membership.roleid = 'debateai_obs_stats_owner'::regrole;
+  IF owner_members IS NOT NULL THEN
+    RAISE EXCEPTION 'OBS_STATS_OWNER_NOT_EXCLUSIVE: members %', owner_members
+      USING ERRCODE = '55000';
+  END IF;
+
+  -- Ownership recorded in pg_shdepend covers every database of the cluster.
+  SELECT count(*) INTO owner_other_objects
+  FROM pg_catalog.pg_shdepend AS dependency
+  WHERE dependency.refclassid = 'pg_catalog.pg_authid'::regclass
+    AND dependency.refobjid = 'debateai_obs_stats_owner'::regrole
+    AND dependency.deptype = 'o'
+    AND NOT (
+      dependency.dbid = (
+        SELECT database.oid FROM pg_catalog.pg_database AS database
+        WHERE database.datname = pg_catalog.current_database()
+      )
+      AND dependency.classid = 'pg_catalog.pg_proc'::regclass
+      AND dependency.objid
+        = 'obs.postgres_capacity(double precision,double precision)'::regprocedure
+    );
+  IF owner_other_objects <> 0 THEN
+    RAISE EXCEPTION 'OBS_STATS_OWNER_NOT_EXCLUSIVE: owns % other object(s)', owner_other_objects
+      USING ERRCODE = '55000';
+  END IF;
+END;
+$$;

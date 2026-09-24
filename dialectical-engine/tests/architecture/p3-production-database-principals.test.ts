@@ -689,17 +689,25 @@ describe("P3-01 production database-principal manifest", () => {
       "ALTER VIEW obs.run_correlation_v OWNER TO debateai_obs_view_owner"
     );
 
-    // V-29: the net predefined-role grants across all migrations (every GRANT pg_* not
-    // later revoked) are exactly the ones the manifest declares — on ownership roles
-    // only, never on a principal. 0059's pg_monitor grant is revoked by 0068.
-    const predefinedPairs = (pattern: RegExp) => [...migrations.matchAll(pattern)]
-      .map(([, grantedRole, memberRole]) => `${memberRole!}:${grantedRole!}`);
-    const revokedPredefined = new Set(predefinedPairs(
-      /\bREVOKE\s+(pg_[a-z_]+)\s+FROM\s+(debateai_[a-z0-9_]+)\s*;/giu
-    ));
-    const netPredefinedGrants = [...new Set(predefinedPairs(
-      /\bGRANT\s+(pg_[a-z_]+)\s+TO\s+(debateai_[a-z0-9_]+)\b/giu
-    ))].filter((pair) => !revokedPredefined.has(pair)).sort();
+    // V-29: the net predefined-role grants across all migrations are exactly the ones
+    // the manifest declares — on ownership roles only, never on a principal. GRANT and
+    // REVOKE statements are replayed in migration order (`migrations` is the sorted
+    // files joined in order, the order migrate() applies them), so a re-grant after a
+    // revoke stays visible. 0059's pg_monitor grant is revoked by 0068.
+    const netPredefined = new Set<string>();
+    const revokedPredefinedInOrder: string[] = [];
+    for (const [, verb, grantedRole, memberRole] of migrations.matchAll(
+      /\b(GRANT|REVOKE)\s+(pg_[a-z_]+)\s+(?:TO|FROM)\s+(debateai_[a-z0-9_]+)\b/giu
+    )) {
+      const pair = `${memberRole!}:${grantedRole!}`;
+      if (verb!.toUpperCase() === "GRANT") {
+        netPredefined.add(pair);
+      } else {
+        netPredefined.delete(pair);
+        revokedPredefinedInOrder.push(pair);
+      }
+    }
+    const netPredefinedGrants = [...netPredefined].sort();
     const declaredPredefinedGrants = [
       ...manifest.ownershipRoles.flatMap(({ roleName, directMemberships }) =>
         directMemberships.map((granted) => `${roleName}:${granted}`)),
@@ -708,7 +716,7 @@ describe("P3-01 production database-principal manifest", () => {
     ].filter((pair) => pair.includes(":pg_")).sort();
     expect(netPredefinedGrants).toEqual(declaredPredefinedGrants);
     expect(netPredefinedGrants).toEqual(["debateai_obs_stats_owner:pg_read_all_stats"]);
-    expect(revokedPredefined).toEqual(new Set(["debateai_observation_agent:pg_monitor"]));
+    expect(revokedPredefinedInOrder).toEqual(["debateai_observation_agent:pg_monitor"]);
     expect(migrations.replace(/\s+/gu, " ")).toContain(
       "ALTER FUNCTION obs.postgres_capacity(double precision,double precision) OWNER TO debateai_obs_stats_owner"
     );
