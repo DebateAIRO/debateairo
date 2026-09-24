@@ -355,6 +355,32 @@ describe("VPS baseline: encrypted DB + custody backups with separate escrow, res
     expect(script).not.toMatch(/age -r "\$\{?BACKUP_DATA_RECIPIENT\}?"[^\n]*(kek|secrets)/);
   });
 
+  /**
+   * DL2-F5. The support session and case keys live in Postgres, wrapped by the support KEK, so
+   * the nightly dump carries them — and without the support KEK in escrow a restore from that
+   * dump can never open a single support conversation. It is the fifth escrowed secret, beside
+   * the four the C3 baseline named, and the drill proves it came back.
+   */
+  it("backup.sh escrows the support KEK as the fifth secret, and the drill proves it came back (DL2-F5)", () => {
+    const script = read("deploy/vps/backup.sh");
+    expect(script).toContain(': "${SUPPORT_KEK_PATH:?}"');
+    const escrow = script.slice(script.indexOf('tar -cf "$WORK/keys.tar"'), script.indexOf("KEY_DIGEST="));
+    for (const key of ["KEK_PATH", "CORPUS_KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_SOURCE_IP_SALT_PATH", "SUPPORT_KEK_PATH"]) {
+      expect(escrow, key).toContain(`"$(basename "$${key}")"`);
+    }
+    // The support KEK never rides in the data envelope with the dump it unlocks.
+    const dataEnvelope = script.slice(script.indexOf("# --- 3. the custody tree"), script.indexOf("# --- 5."));
+    expect(dataEnvelope).not.toContain("SUPPORT_KEK_PATH");
+    const conf = envKeys(read("deploy/vps/backup.conf.example"));
+    expect(conf.get("SUPPORT_KEK_PATH")).toBe("/etc/debateai/api/support-kek.bin");
+    expect(envKeys(read("deploy/vps/env/api.env.example")).get("SUPPORT_KEK_PATH")).toBe(conf.get("SUPPORT_KEK_PATH"));
+    const drill = read("deploy/vps/restore-drill.sh");
+    expect(drill).toContain(': "${SUPPORT_KEK_PATH:?}"');
+    expect(drill).toContain("RESTORE_DRILL_REFUSED no restored support KEK");
+    expect(drill.indexOf("RESTORE_DRILL_REFUSED no restored support KEK"))
+      .toBeLessThan(drill.indexOf("RESTORE_DRILL_OK"));
+  });
+
   it("restore-drill.sh: scratch DB + scratch custody, core.run count, chain SQL, sample decrypt, RESTORE_DRILL_OK, cleanup", () => {
     const script = read("deploy/vps/restore-drill.sh");
     expect(script.startsWith("#!/usr/bin/env bash\n")).toBe(true);

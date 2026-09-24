@@ -110,6 +110,7 @@ echo "RESTORE_DRILL_CHAIN broken=$BROKEN roots=$ROOTS total=$TOTAL form=post-004
 : "${BACKUP_ESCROW_IDENTITY:?path to the escrow age identity, brought to the drill by the key holder}"
 : "${USER_DEK_STORE_PATH:?}"
 : "${KEK_PATH:?}"
+: "${SUPPORT_KEK_PATH:?}"
 ESCROW_ARTEFACT="${BACKUP_ESCROW_ARTEFACT:-}"
 if [ -z "$ESCROW_ARTEFACT" ]; then
   # shellcheck disable=SC2012
@@ -125,6 +126,15 @@ DRILL_STORE="$WORK/custody/$(basename "$USER_DEK_STORE_PATH")"
 DRILL_KEK="$WORK/keys/$(basename "$KEK_PATH")"
 [ -d "$DRILL_STORE" ] || { echo "RESTORE_DRILL_REFUSED no restored DEK store" >&2; exit 1; }
 [ -s "$DRILL_KEK" ] || { echo "RESTORE_DRILL_REFUSED no restored KEK" >&2; exit 1; }
+
+# DL2-F5: the support KEK is the fifth escrowed secret. The support session and case keys it
+# wraps came back with the dump; this arm proves the key that opens them came back too. It checks
+# presence and size only — no support conversation is decrypted here.
+DRILL_SUPPORT_KEK="$WORK/keys/$(basename "$SUPPORT_KEK_PATH")"
+if [ ! -f "$DRILL_SUPPORT_KEK" ] || [ "$(wc -c < "$DRILL_SUPPORT_KEK" | tr -d ' ')" != "32" ]; then
+  echo "RESTORE_DRILL_REFUSED no restored support KEK" >&2; exit 1
+fi
+echo "RESTORE_DRILL_SUPPORT_KEK bytes=32"
 
 # The probe runs as the postgres OS user (peer auth is the only way into the scratch database),
 # so the restored custody must be readable by it and by nobody else: the crypto loaders require

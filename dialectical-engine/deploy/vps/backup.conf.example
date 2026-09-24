@@ -6,7 +6,7 @@
 # needed for a restore, so it is held by the operator offline, NOT on the VPS.
 BACKUP_DATA_RECIPIENT=age1exampledatarecipientreplacewiththerealpublickey000000000000
 
-# Public key of the escrow recipient. Opens the envelope holding the four raw 32-byte secrets.
+# Public key of the escrow recipient. Opens the envelope holding the five raw 32-byte secrets.
 # Its private key is held by V, offline, on different media from the data key: whoever holds one
 # envelope alone can restore nothing.
 BACKUP_ESCROW_RECIPIENT=age1exampleescrowrecipientreplacewiththerealpublickey00000000000
@@ -21,7 +21,9 @@ BACKUP_RCLONE_REMOTE=debateai-offsite:debateai
 #BACKUP_SCP_TARGET=backup@offsite.example:/srv/debateai
 
 # Custody paths — must match /etc/debateai/api.env exactly. The three stores go into the data
-# envelope; the four raw keys go to the escrow recipient instead.
+# envelope; the five raw keys go to the escrow recipient instead. The support KEK is the fifth
+# (DL2-F5): the support session and case keys it wraps live in the database dump, so without it
+# in escrow a restore opens no support conversation.
 USER_DEK_STORE_PATH=/var/lib/debateai/api/user-deks
 PUBLICATION_KEY_STORE_PATH=/var/lib/debateai/api/publication-keys
 AUDIT_KEY_STORE_PATH=/var/lib/debateai/api/audit-keys
@@ -29,6 +31,7 @@ KEK_PATH=/etc/debateai/api/kek.bin
 CORPUS_KEK_PATH=/etc/debateai/api/corpus-kek.bin
 BLIND_INDEX_KEY_PATH=/etc/debateai/api/blind-index-key.bin
 AUDIT_SOURCE_IP_SALT_PATH=/etc/debateai/api/audit-source-ip-salt.bin
+SUPPORT_KEK_PATH=/etc/debateai/api/support-kek.bin
 
 # Set only for the duration of a drill, from removable media; never written into this file.
 #BACKUP_AGE_IDENTITY=/media/operator/data.age.key
