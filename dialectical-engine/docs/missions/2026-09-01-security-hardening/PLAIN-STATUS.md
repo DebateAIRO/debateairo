@@ -20,10 +20,16 @@ PENDING is the best result this bench can give on its own, on purpose: it will o
 
 | Checked | Result |
 |---|---|
-| The work branch | `security/dev-sync-2026-09-18` — **pushed to GitHub on 23 September, twice**: first as it was (your "push to dev"), then again after the third bringing-up-to-date with `dev` (your "push again when it's green"); GitHub's secret check found nothing either time. Pull request #8 points at the latest tip |
+| The work branch | **Merged into `dev` on 24 September** (pull request #8, merge commit `9c5ffd87`, your "merge") after GitHub's own checks went green: the gate, the secret scan of the change, and CodeQL — three slow regular expressions fixed in code, five alerts dismissed with written reasons on your "go 6" (one of them, #13, on your "won't fix" ruling). Everything this mission built is now in `dev` |
 | GitHub switches | **23 September: secret scanning + push protection are ON** (your "go 1"). That was the one switch that had to precede the first push. The others wait for their own "go" |
 | This Mac's Node version (Node is the program that runs the code) | 26.8.2 — exactly what `dev` now requires |
 | `dev`, the main V3 line | has moved on by 36 commits since this branch last absorbed it |
+
+### It is in `dev` (24 September, 08:01 Bucharest)
+
+Pull request #8 merged. What GitHub checked on the way in: the gate (0 new failures), the secret scan of every commit in the change (clean), CodeQL (fixed or dismissed with reasons). The Cloudflare preview build of `dev` fails, as you said it would — the `dezbatere` worker deploys from `main`.
+
+**Next, each on your "go":** switch 4 — private vulnerability reporting (due "at the moment PR #8 merges"); switch 5 — the default-branch label moves to `dev`; switch 6 — Dependabot security updates; then the branch rules, the pinned-Actions policy, and the organisation's two-factor requirement once your colleague has it on. Then the packages still owed: 5 and 7 (the database items, encryption, deletion — no Docker needed after all), 16 (plan tiers by deployment), 14 (the server kit), 13 when you name a vendor, and your paid confirmation run.
 
 ### The third bringing-up-to-date with `dev`, and the first run of the database-backed tests (23 September)
 
