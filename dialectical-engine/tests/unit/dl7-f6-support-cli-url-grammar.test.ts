@@ -69,19 +69,19 @@ async function privateFile(contents: string): Promise<string> {
   return path;
 }
 
-function statusEnvelope(query: string, host = "localhost"): string {
+function statusEnvelope(query: string, host: string | undefined): string {
   return JSON.stringify({
     format: "debateai.production-database-principal-credentials.v1",
     credentials: [{
       principalId: "api-support",
-      databaseUrl: `postgresql://debateai_prod_api_support:${SECRET}@${host}/debateai${query}`
+      databaseUrl: `postgresql://debateai_prod_api_support:${SECRET}@${host ?? "localhost"}/debateai${query}`
     }]
   });
 }
 
-function configCredential(query: string, host = "localhost"): string {
+function configCredential(query: string, host: string | undefined): string {
   return JSON.stringify({
-    databaseUrl: `postgresql://debateai_prod_support_config_operator:${SECRET}@${host}/debateai${query}`,
+    databaseUrl: `postgresql://debateai_prod_support_config_operator:${SECRET}@${host ?? "localhost"}/debateai${query}`,
     validUntil: new Date(Date.now() + 10 * 60 * 1_000).toISOString()
   });
 }
@@ -97,14 +97,14 @@ afterAll(async () => {
 describe("DL7-F6: the support-status / support-shred data credential", () => {
   it.each(ACCEPTED)("accepts %s", async (_name, query, host) => {
     const loaded = await loadProductionSupportStatusCliCredentials(
-      await privateFile(statusEnvelope(query, host))
+      await privateFile(statusEnvelope(query ?? "", host))
     );
     expect(loaded.supportDatabaseUrl.endsWith(`/debateai${query}`)).toBe(true);
   });
 
   it.each(REFUSED)("refuses %s", async (_name, query, host) => {
     await expect(loadProductionSupportStatusCliCredentials(
-      await privateFile(statusEnvelope(query, host))
+      await privateFile(statusEnvelope(query ?? "", host))
     )).rejects.toThrow("SUPPORT_STATUS_DATABASE_URL_INVALID");
   });
 });
@@ -112,14 +112,14 @@ describe("DL7-F6: the support-status / support-shred data credential", () => {
 describe("DL7-F6: the JIT support-config operator credential", () => {
   it.each(ACCEPTED)("accepts %s", async (_name, query, host) => {
     const loaded = await loadProductionSupportConfigCliCredentials(
-      await privateFile(configCredential(query, host))
+      await privateFile(configCredential(query ?? "", host))
     );
     expect(loaded.databaseUrl.endsWith(`/debateai${query}`)).toBe(true);
   });
 
   it.each(REFUSED)("refuses %s", async (_name, query, host) => {
     await expect(loadProductionSupportConfigCliCredentials(
-      await privateFile(configCredential(query, host))
+      await privateFile(configCredential(query ?? "", host))
     )).rejects.toThrow("SUPPORT_CONFIG_DATABASE_URL_INVALID");
   });
 });
