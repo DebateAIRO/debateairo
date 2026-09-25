@@ -56,7 +56,7 @@ export function parseTrustedProxies(text) {
  * (no group/other bits) holding >= 32 random bytes as base64url (>= 43
  * characters; `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`). The
  * reverse proxy sends the same text in `x-debateai-edge-secret`
- * (Caddy: `header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.secret}`).
+ * (Caddy: `header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}`, its own 0640 root:caddy copy of the same bytes).
  * Read once at boot; unset means no secret is required; anything else that
  * is not exactly right refuses to start.
  */

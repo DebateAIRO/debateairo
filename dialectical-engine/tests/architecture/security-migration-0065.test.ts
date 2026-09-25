@@ -391,7 +391,13 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // is idempotent statement by statement, so a database that applied it
         // under the old name re-applies it harmlessly under this one (the runner
         // tracks migrations by full file name).
-        "0067_plan_tier_on_run.sql"
+        "0067_plan_tier_on_run.sql",
+        // V-29 (owner ruling 2026-09-22): the observation agent's statistics window
+        // replaces its pg_monitor membership. A new prefix, no pair.
+        "0068_observation_stats_window.sql",
+        // DL7-F9 (Task 14): the threshold operator principal; the daemon loses INSERT on the
+        // policy that rules it. 0069 and 0070 are reserved for V-6. A new prefix, no pair.
+        "0071_observation_threshold_operator.sql"
       ]);
   });
 });

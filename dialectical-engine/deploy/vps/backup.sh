@@ -14,10 +14,12 @@
 # in the later key snapshot; a key erased between the two corresponds to a row that was already
 # erased. The reverse order can produce a row whose key no longer exists.
 #
-# The four raw 32-byte secrets are NOT in that envelope. They go to a SECOND age recipient whose
+# The five raw 32-byte secrets are NOT in that envelope. They go to a SECOND age recipient whose
 # private key never touches this host (offline escrow held by V). The audit source-IP salt is a
 # key, not metadata: bundling it with the dump would let whoever holds one backup re-identify
-# every hashed source IP in it.
+# every hashed source IP in it. The fifth, the support KEK (DL2-F5), wraps the support session
+# and case keys that live IN the dump: without it in escrow a restore opens no support
+# conversation at all, and beside the dump it would open every one.
 #
 # Runs as root from debateai-backup.timer. Reaches PostgreSQL as the postgres OS user over the
 # unix socket (peer auth, pg_hba line 1) — no DebateAI principal has read-all rights, and the
@@ -40,6 +42,7 @@ CONFIG="${DEBATEAI_BACKUP_CONFIG:-/etc/debateai/backup.conf}"
 : "${CORPUS_KEK_PATH:?}"
 : "${BLIND_INDEX_KEY_PATH:?}"
 : "${AUDIT_SOURCE_IP_SALT_PATH:?}"
+: "${SUPPORT_KEK_PATH:?}"
 
 KEEP_DAILY=14
 KEEP_WEEKLY=8
@@ -92,14 +95,23 @@ DIGEST="$(sha256sum "$ARTEFACT" | cut -d' ' -f1)"
 BYTES="$(wc -c < "$ARTEFACT" | tr -d ' ')"
 UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# --- 5. the four raw secrets, escrowed separately -----------------------------------------
+# --- 5. the five raw secrets, escrowed separately -----------------------------------------
 # Written only when their contents changed: an escrow copy per night would multiply the number
-# of envelopes an attacker could try against the offline key for no added recoverability.
+# of envelopes an attacker could try against the offline key for no added recoverability. A
+# master-key rotation (README §3) changes the digest, so the next night escrows the new keys.
+# Each secret is archived under its own basename; refuse rather than let one shadow another.
+secret_names="$(printf '%s\n' "$KEK_PATH" "$CORPUS_KEK_PATH" "$BLIND_INDEX_KEY_PATH" \
+  "$AUDIT_SOURCE_IP_SALT_PATH" "$SUPPORT_KEK_PATH" | xargs -n 1 basename | sort)"
+if [ "$(printf '%s\n' "$secret_names" | uniq | wc -l | tr -d ' ')" != "5" ]; then
+  echo "BACKUP_REFUSED escrowed secret basenames must be distinct" >&2
+  exit 1
+fi
 tar -cf "$WORK/keys.tar" \
   -C "$(dirname "$KEK_PATH")" "$(basename "$KEK_PATH")" \
   -C "$(dirname "$CORPUS_KEK_PATH")" "$(basename "$CORPUS_KEK_PATH")" \
   -C "$(dirname "$BLIND_INDEX_KEY_PATH")" "$(basename "$BLIND_INDEX_KEY_PATH")" \
-  -C "$(dirname "$AUDIT_SOURCE_IP_SALT_PATH")" "$(basename "$AUDIT_SOURCE_IP_SALT_PATH")"
+  -C "$(dirname "$AUDIT_SOURCE_IP_SALT_PATH")" "$(basename "$AUDIT_SOURCE_IP_SALT_PATH")" \
+  -C "$(dirname "$SUPPORT_KEK_PATH")" "$(basename "$SUPPORT_KEK_PATH")"
 KEY_DIGEST="$(sha256sum "$WORK/keys.tar" | cut -d' ' -f1)"
 STATE="$ESCROW_DIR/.last-sha256"
 PREVIOUS=""

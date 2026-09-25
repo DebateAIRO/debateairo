@@ -62,8 +62,10 @@ type Manifest = Readonly<{
     roleName: string;
     login: false;
     inherit: boolean;
+    directMemberships: readonly string[];
     ownsSchemas: readonly string[];
     ownsRelations: readonly string[];
+    ownsFunctions: readonly string[];
   }>[];
   principals: readonly Principal[];
   developmentOnlyPrincipalBindings: readonly (ConnectionPurpose & Readonly<{
@@ -120,18 +122,19 @@ const capabilityRoles = [
 
 const ownershipRoles = [
   "debateai_evaluator_ddl",
+  // V-29: owns obs.postgres_capacity(...), the observation agent's statistics window.
+  "debateai_obs_stats_owner",
   "debateai_obs_view_owner",
   "debateai_register_publication_owner"
 ] as const;
 
-function exactForbidden(
-  effectiveMemberships: readonly string[],
-  options: Readonly<{ allowPgMonitor?: boolean }> = {}
-): readonly string[] {
+// V-29 removed the one exception (the observation agent's pg_monitor login): no
+// principal may hold any predefined pg_* role.
+function exactForbidden(effectiveMemberships: readonly string[]): readonly string[] {
   const governedRoles: string[] = [...capabilityRoles, ...ownershipRoles];
   return governedRoles
     .filter((role) => !effectiveMemberships.includes(role))
-    .concat("debateai_prod_*", ...(options.allowPgMonitor === true ? [] : ["pg_*"]))
+    .concat("debateai_prod_*", "pg_*")
     .sort();
 }
 
@@ -175,22 +178,37 @@ describe("P3-01 production database-principal manifest", () => {
         roleName: "debateai_evaluator_ddl",
         login: false,
         inherit: true,
+        directMemberships: [],
         ownsSchemas: ["evaluator"],
-        ownsRelations: []
+        ownsRelations: [],
+        ownsFunctions: []
+      },
+      {
+        roleName: "debateai_obs_stats_owner",
+        login: false,
+        inherit: false,
+        directMemberships: ["pg_read_all_stats"],
+        ownsSchemas: [],
+        ownsRelations: [],
+        ownsFunctions: ["obs.postgres_capacity(double precision,double precision)"]
       },
       {
         roleName: "debateai_obs_view_owner",
         login: false,
         inherit: false,
+        directMemberships: [],
         ownsSchemas: [],
-        ownsRelations: ["obs.run_correlation_v"]
+        ownsRelations: ["obs.run_correlation_v"],
+        ownsFunctions: []
       },
       {
         roleName: "debateai_register_publication_owner",
         login: false,
         inherit: false,
+        directMemberships: [],
         ownsSchemas: [],
-        ownsRelations: []
+        ownsRelations: [],
+        ownsFunctions: []
       }
     ]);
 
@@ -219,6 +237,13 @@ describe("P3-01 production database-principal manifest", () => {
           roleName: "debateai_observation_agent",
           kind: "SERVICE"
         },
+        // DL7-F9 (migration 0071): the principal `oactl thresholds apply` writes as, so the
+        // daemon's own principal no longer holds INSERT on the policy that rules it.
+        {
+          id: "observation-threshold-operator",
+          roleName: "debateai_observation_threshold_operator",
+          kind: "SERVICE"
+        },
         {
           id: "support-config-operator",
           roleName: "debateai_prod_support_config_operator",
@@ -230,11 +255,14 @@ describe("P3-01 production database-principal manifest", () => {
       principalId, state, source
     }))).toEqual(manifest.principals.map(({ id }) => ({
       principalId: id,
-      state: id === "observation-agent" || id.startsWith("obs-")
+      state: id === "observation-agent" || id === "observation-threshold-operator"
+        || id.startsWith("obs-")
         ? "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL"
         : id === "hatchet" ? "EXTERNAL_COMPONENT" : "SPECIFIED_NOT_PROVISIONED",
       source: id === "observation-agent"
         ? "migrations/0057_observation_foundation.sql"
+        : id === "observation-threshold-operator"
+          ? "migrations/0071_observation_threshold_operator.sql"
         : id.startsWith("obs-") ? "migrations/0034_obs_foundation.sql"
         : id === "hatchet" ? "compose.dev.yaml" : null
     })));
@@ -260,7 +288,8 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "obs-listener", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-watchdog", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-human", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
-        { id: "observation-agent", database: "debateai", inherit: false, directMemberships: ["pg_monitor"], effectiveMemberships: ["pg_monitor"] },
+        { id: "observation-agent", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
+        { id: "observation-threshold-operator", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "support-config-operator", database: "debateai", inherit: true, directMemberships: ["debateai_support_config_operator"], effectiveMemberships: ["debateai_support_config_operator"] },
         { id: "hatchet", database: "hatchet", inherit: true, directMemberships: [], effectiveMemberships: [] }
       ]);
@@ -327,6 +356,17 @@ describe("P3-01 production database-principal manifest", () => {
             purpose: "PRODUCTION_PRINCIPAL_PROVISIONING",
             binding: "WIRED",
             condition: "package script db:provision-principals"
+          },
+          // Task 14b: the hosted register publication. The migrator is the only
+          // principal that can execute register.publish_register_version since
+          // 0065 revoked it from debateai_runtime; no new privilege is granted.
+          {
+            component: "apps/runner:hosted-register-publish-cli",
+            sourceFile: "apps/runner/src/hosted-register-publish-cli.ts",
+            environmentKey: "MIGRATION_DATABASE_URL",
+            purpose: "PRODUCTION_REGISTER_PUBLICATION",
+            binding: "WIRED",
+            condition: "package script register:publish-hosted"
           }
         ]);
         continue;
@@ -336,9 +376,7 @@ describe("P3-01 production database-principal manifest", () => {
       expect(principal.createRole).toBe(false);
       expect(principal.ownsSchemas).toEqual([]);
       expect(principal.forbiddenMemberships)
-        .toEqual(exactForbidden(principal.effectiveMemberships, {
-          allowPgMonitor: principal.id === "observation-agent"
-        }));
+        .toEqual(exactForbidden(principal.effectiveMemberships));
       if (principal.id === "hatchet") {
         expect(principal.ownsDatabases).toEqual(["hatchet"]);
       } else {
@@ -359,6 +397,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/runner:dev-deployment-register-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_REGISTER_SEED", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:seed-register" },
         { component: "apps/runner:dev-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_PROVIDER_SET_PUBLICATION", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:publish-provider-set" },
         { component: "apps/runner:production-database-principals-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_PRINCIPAL_PROVISIONING", binding: "WIRED", condition: "package script db:provision-principals" },
+        { component: "apps/runner:hosted-register-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_REGISTER_PUBLICATION", binding: "WIRED", condition: "package script register:publish-hosted" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
@@ -385,6 +424,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "obs-watchdog", environmentKey: "OBS_WATCHDOG_DATABASE_URL", purpose: "OBS_WATCHDOG", binding: "REQUIRED_NOT_WIRED" },
         { component: "human:observability", environmentKey: null, purpose: "JIT_OBSERVABILITY_READ", binding: "JIT_HUMAN" },
         { component: "apps/observation-agent", environmentKey: "OBSERVATION_DATABASE_URL", purpose: "OBSERVATION_AGENT_MONITORING", binding: "WIRED" },
+        { component: "operator:oactl-thresholds-apply", environmentKey: null, purpose: "OBSERVATION_THRESHOLD_RATIFICATION", binding: "WIRED" },
         { component: "operator:support-config", environmentKey: null, purpose: "JIT_SUPPORT_CONFIGURATION", binding: "JIT_HUMAN" },
         { component: "operator:support-status", environmentKey: null, purpose: "SUPPORT_STATUS_DATA", binding: "WIRED" },
         { component: "hatchet", environmentKey: "HATCHET_DATABASE_URL", purpose: "HATCHET_INTERNAL_DATABASE", binding: "EXTERNAL_COMPONENT" }
@@ -434,6 +474,13 @@ describe("P3-01 production database-principal manifest", () => {
     )).toMatchObject({
       lifecycle: "MIGRATION_MINTED_UNMANAGED",
       currentProvisioner: "migrations/0057_observation_foundation.sql",
+      ownerTicket: "P3-02"
+    });
+    expect(manifest.credentialRequirements.find(
+      ({ principalId }) => principalId === "observation-threshold-operator"
+    )).toMatchObject({
+      lifecycle: "MIGRATION_MINTED_UNMANAGED",
+      currentProvisioner: "migrations/0071_observation_threshold_operator.sql",
       ownerTicket: "P3-02"
     });
     expect(manifest.credentialRequirements.find(
@@ -551,7 +598,7 @@ describe("P3-01 production database-principal manifest", () => {
       ...manifest.ownershipRoles.map(({ roleName }) => roleName),
       ...manifest.principals
         .map(({ roleName }) => roleName)
-        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent)$/u.test(roleName))
+        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator)$/u.test(roleName))
     ].sort();
     expect(sourceCreatedRoles).toEqual(manifestMigrationRoles);
 
@@ -671,6 +718,38 @@ describe("P3-01 production database-principal manifest", () => {
     );
     expect(migrations.replace(/\s+/gu, " ")).toContain(
       "ALTER VIEW obs.run_correlation_v OWNER TO debateai_obs_view_owner"
+    );
+
+    // V-29: the net predefined-role grants across all migrations are exactly the ones
+    // the manifest declares — on ownership roles only, never on a principal. GRANT and
+    // REVOKE statements are replayed in migration order (`migrations` is the sorted
+    // files joined in order, the order migrate() applies them), so a re-grant after a
+    // revoke stays visible. 0059's pg_monitor grant is revoked by 0068.
+    const netPredefined = new Set<string>();
+    const revokedPredefinedInOrder: string[] = [];
+    for (const [, verb, grantedRole, memberRole] of migrations.matchAll(
+      /\b(GRANT|REVOKE)\s+(pg_[a-z_]+)\s+(?:TO|FROM)\s+(debateai_[a-z0-9_]+)\b/giu
+    )) {
+      const pair = `${memberRole!}:${grantedRole!}`;
+      if (verb!.toUpperCase() === "GRANT") {
+        netPredefined.add(pair);
+      } else {
+        netPredefined.delete(pair);
+        revokedPredefinedInOrder.push(pair);
+      }
+    }
+    const netPredefinedGrants = [...netPredefined].sort();
+    const declaredPredefinedGrants = [
+      ...manifest.ownershipRoles.flatMap(({ roleName, directMemberships }) =>
+        directMemberships.map((granted) => `${roleName}:${granted}`)),
+      ...manifest.principals.flatMap(({ roleName, directMemberships }) =>
+        directMemberships.map((granted) => `${roleName}:${granted}`))
+    ].filter((pair) => pair.includes(":pg_")).sort();
+    expect(netPredefinedGrants).toEqual(declaredPredefinedGrants);
+    expect(netPredefinedGrants).toEqual(["debateai_obs_stats_owner:pg_read_all_stats"]);
+    expect(revokedPredefinedInOrder).toEqual(["debateai_observation_agent:pg_monitor"]);
+    expect(migrations.replace(/\s+/gu, " ")).toContain(
+      "ALTER FUNCTION obs.postgres_capacity(double precision,double precision) OWNER TO debateai_obs_stats_owner"
     );
     expect(manifest.status).toBe("MIXED_PROVISIONING_STATE");
   });

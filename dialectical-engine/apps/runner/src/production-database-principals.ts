@@ -5,6 +5,7 @@ import { link, lstat, open, readFile, rename, unlink } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Pool, PoolClient } from "pg";
+import { acceptsProductionDatabaseUrlQuery } from "./production-database-url.js";
 import {
   validateProductionSupportConfigCredentialFileForCleanup
 } from "./support-config-cli-credentials.js";
@@ -44,6 +45,7 @@ type ManifestPrincipal = Readonly<{
   effectiveMemberships: readonly string[];
   ownsDatabases: readonly string[];
   ownsSchemas: readonly string[];
+  connectionPurposes?: readonly Readonly<{ binding?: unknown }>[];
 }>;
 
 type ManifestCapabilityRole = Readonly<{
@@ -95,9 +97,27 @@ type ManagedPrincipal = Readonly<{
   roleName: string;
   inherit: boolean;
   human: boolean;
+  /**
+   * V-20 (second half), ruled 2026-09-22: every connection purpose of this principal is
+   * REQUIRED_NOT_WIRED — no shipped component connects as it. It is provisioned present and
+   * unusable, `VALID UNTIL '-infinity'`, instead of with a live credential nothing uses. The
+   * rule is read from the manifest, so wiring a principal (its binding becoming WIRED) is what
+   * gives it a usable credential on the next provisioning run.
+   */
+  unwired: boolean;
   directMemberships: readonly string[];
   effectiveMemberships: readonly string[];
 }>;
+
+const UNWIRED_PRINCIPAL_VALID_UNTIL = "-infinity";
+
+function isUnwiredPrincipal(principal: ManifestPrincipal): boolean {
+  const purposes = principal.connectionPurposes;
+  if (purposes === undefined) return false;
+  if (!Array.isArray(purposes)) fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
+  return purposes.length > 0
+    && purposes.every((purpose) => isRecord(purpose) && purpose.binding === "REQUIRED_NOT_WIRED");
+}
 
 type DirectMembershipState = Readonly<{
   roleName: string;
@@ -378,6 +398,7 @@ function managedPrincipals(manifest: ProductionPrincipalManifest): readonly Mana
       roleName: principal.roleName,
       inherit: principal.inherit,
       human: principal.kind === "HUMAN_READ_ONLY" || principal.kind === "HUMAN_EXECUTE_ONLY",
+      unwired: isUnwiredPrincipal(principal),
       directMemberships: asStringArray(principal.directMemberships),
       effectiveMemberships: asStringArray(principal.effectiveMemberships)
     }));
@@ -505,7 +526,9 @@ function parseCredentialEnvelope(
       || url.pathname !== `/${principalDatabaseName(principal)}`
       || url.hostname !== admin.hostname
       || url.port !== admin.port
-      || url.search !== ""
+      // DL7-F6: the support-config URL is published verbatim as the support CLIs' credential,
+      // so it must be able to carry the socket or verified-TLS shape the VPS pg_hba admits.
+      || !acceptsProductionDatabaseUrlQuery(url)
       || url.hash !== ""
       || passwordBytes < MINIMUM_PASSWORD_BYTES
       || passwordBytes > MAXIMUM_PASSWORD_BYTES
@@ -887,6 +910,16 @@ async function assertNoDirectObjectPrivileges(
   if (direct !== false) fail("PRODUCTION_DATABASE_PRINCIPAL_DIRECT_ACL_INVALID");
 }
 
+/**
+ * The `VALID UNTIL` a principal is reconciled to: the human JIT window when it has one, the
+ * past for an unwired principal (V-20), otherwise no expiry. The drift check compares against
+ * the same value, so a hand-extended unwired principal is repaired on the next run.
+ */
+function principalValidUntil(principal: ManagedPrincipal, credential: ParsedCredential): string {
+  if (credential.validUntil !== null) return credential.validUntil.toISOString();
+  return principal.unwired ? UNWIRED_PRINCIPAL_VALID_UNTIL : "infinity";
+}
+
 async function reconcilePrincipal(
   client: PoolClient,
   principal: ManagedPrincipal,
@@ -909,7 +942,7 @@ async function reconcilePrincipal(
       principal.roleName,
       credential.password,
       principal.inherit,
-      credential.validUntil?.toISOString() ?? "infinity"
+      principalValidUntil(principal, credential)
     ]
   );
   for (const roleName of principal.directMemberships) {
@@ -1010,7 +1043,7 @@ async function assertExactPrincipalState(
         setOption: true
       }));
       const expiryMatches = credential.validUntil === null
-        ? row.validUntil === "infinity"
+        ? row.validUntil === principalValidUntil(principal, credential)
         : Math.abs(new Date(row.validUntil).getTime() - credential.validUntil.getTime()) < 1_000;
       return row.rolname !== principal.roleName
         || !row.rolcanlogin

@@ -187,11 +187,14 @@ apps/runner/src/dev-support-config.ts
 apps/runner/src/dev-support-model.ts
 apps/runner/src/dev-ui-process-cli.ts
 apps/runner/src/dev-ui-process.ts
+apps/runner/src/hosted-register-publish-cli.ts
+apps/runner/src/hosted-register-publish.ts
 apps/runner/src/index.ts
 apps/runner/src/main.ts
 apps/runner/src/migrate-cli.ts
 apps/runner/src/production-database-principals-cli.ts
 apps/runner/src/production-database-principals.ts
+apps/runner/src/production-database-url.ts
 apps/runner/src/provider-topology.ts
 apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts

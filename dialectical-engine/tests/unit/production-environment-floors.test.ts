@@ -236,7 +236,7 @@ describe("production provider targets refuse cleartext off-box (L4-F7)", () => {
 
 // DEV-SYNC 2026-09-18: the observation agent's loader landed on dev after C1 and read
 // its database URL past the floor. The rule is C1's — EVERY loader floors every
-// `*_DATABASE_URL` in production — and the agent's pg_monitor login is no exception.
+// `*_DATABASE_URL` in production — and the agent's monitoring login is no exception.
 describe("production floors reach the observation agent's loader (C1, L5-F3)", () => {
   const REMOTE_PLAIN = "postgresql://observation:secret@db.internal:5432/debateai";
   const REMOTE_VERIFIED = `${REMOTE_PLAIN}?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt`;
