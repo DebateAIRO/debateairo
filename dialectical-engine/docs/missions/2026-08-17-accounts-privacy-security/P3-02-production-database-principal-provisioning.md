@@ -64,7 +64,12 @@ The top-level object has exactly these fields:
 
 `credentials` must contain exactly the eighteen IDs listed in
 `provisioner.managedPrincipalIds` in the P3-01 manifest. Each URL must use the
-exact role name, database, host, and port; each decoded password must be 32 to
+exact role name, database, host, and port, and carries either no query or one
+of the two connection shapes the VPS `pg_hba` admits: `host=` an absolute
+socket directory alone (host `localhost`), or `sslmode=verify-full` with an
+absolute `sslrootcert` and nothing else (DL7-F6, 2026-09-25). The support-config
+operator's URL is published verbatim as the support CLIs' credential, so on the
+VPS it carries the socket shape; each decoded password must be 32 to
 1,024 UTF-8 bytes and pairwise distinct. Exactly the two human purposes,
 `obs-human` and `support-config-operator`, carry `validUntil`; each window is
 checked independently against the database clock. The example is a shape
@@ -78,6 +83,10 @@ For each governed LOGIN wrapper the command transactionally:
 - creates the role when absent and otherwise reuses it;
 - rotates the supplied credential under `password_encryption=scram-sha-256`;
 - sets exact LOGIN/INHERIT/NOINHERIT and non-elevated attributes;
+- sets `VALID UNTIL '-infinity'` — present, unusable — on every principal whose
+  connection purposes in the manifest are all `REQUIRED_NOT_WIRED` (V-20, six on
+  2026-09-25), the human JIT window on the two human principals, and no expiry
+  on every other;
 - revokes every unexpected direct membership and every member of the wrapper;
 - revokes direct database, schema, table, sequence, column, function, and
   procedure privileges using catalog-derived, identifier-safe statements;

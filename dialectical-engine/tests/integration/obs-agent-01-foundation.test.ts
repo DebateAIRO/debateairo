@@ -323,8 +323,10 @@ describe("OBS-01 observation schema foundation", () => {
       { table_schema: "observation", table_name: "sample_hourly", privilege_type: "INSERT" },
       { table_schema: "observation", table_name: "sample_ring", privilege_type: "INSERT" },
       { table_schema: "observation", table_name: "sample_ring", privilege_type: "UPDATE" },
-      { table_schema: "observation", table_name: "signal", privilege_type: "INSERT" },
-      { table_schema: "observation", table_name: "threshold_policy", privilege_type: "INSERT" }
+      { table_schema: "observation", table_name: "signal", privilege_type: "INSERT" }
+      // DL7-F9 (migration 0071): no INSERT on observation.threshold_policy any more — the
+      // daemon must not write the policy that rules it; `oactl thresholds apply` writes as
+      // debateai_observation_threshold_operator (tests/integration/obs-agent-dl7-f9-*).
     ]);
   });
 

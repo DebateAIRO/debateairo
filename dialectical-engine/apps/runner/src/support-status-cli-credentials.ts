@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
+import { acceptsProductionDatabaseUrlQuery } from "./production-database-url.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;
@@ -97,11 +98,14 @@ function assertUrl(raw: string, roleName: string, development: boolean): void {
   }
   const passwordBytes = Buffer.byteLength(password, "utf8");
   if ((url.protocol !== "postgres:" && url.protocol !== "postgresql:")
-    || url.pathname !== "/debateai" || url.search !== "" || url.hash !== ""
+    || url.pathname !== "/debateai" || url.hash !== ""
     || url.username !== roleName || /[\0\r\n]/u.test(password)
     || (development
-      ? url.hostname !== "127.0.0.1" || url.port !== "55432" || passwordBytes < 1
-      : url.hostname.length === 0 || passwordBytes < 32 || passwordBytes > 1_024)) {
+      ? url.search !== "" || url.hostname !== "127.0.0.1" || url.port !== "55432"
+        || passwordBytes < 1
+      // DL7-F6: the two shapes the VPS pg_hba admits (socket, verified TLS) need a query.
+      : !acceptsProductionDatabaseUrlQuery(url) || url.hostname.length === 0
+        || passwordBytes < 32 || passwordBytes > 1_024)) {
     throw new TypeError("SUPPORT_STATUS_DATABASE_URL_INVALID");
   }
 }

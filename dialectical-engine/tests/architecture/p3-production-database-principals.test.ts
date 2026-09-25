@@ -237,6 +237,13 @@ describe("P3-01 production database-principal manifest", () => {
           roleName: "debateai_observation_agent",
           kind: "SERVICE"
         },
+        // DL7-F9 (migration 0071): the principal `oactl thresholds apply` writes as, so the
+        // daemon's own principal no longer holds INSERT on the policy that rules it.
+        {
+          id: "observation-threshold-operator",
+          roleName: "debateai_observation_threshold_operator",
+          kind: "SERVICE"
+        },
         {
           id: "support-config-operator",
           roleName: "debateai_prod_support_config_operator",
@@ -248,11 +255,14 @@ describe("P3-01 production database-principal manifest", () => {
       principalId, state, source
     }))).toEqual(manifest.principals.map(({ id }) => ({
       principalId: id,
-      state: id === "observation-agent" || id.startsWith("obs-")
+      state: id === "observation-agent" || id === "observation-threshold-operator"
+        || id.startsWith("obs-")
         ? "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL"
         : id === "hatchet" ? "EXTERNAL_COMPONENT" : "SPECIFIED_NOT_PROVISIONED",
       source: id === "observation-agent"
         ? "migrations/0057_observation_foundation.sql"
+        : id === "observation-threshold-operator"
+          ? "migrations/0071_observation_threshold_operator.sql"
         : id.startsWith("obs-") ? "migrations/0034_obs_foundation.sql"
         : id === "hatchet" ? "compose.dev.yaml" : null
     })));
@@ -279,6 +289,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "obs-watchdog", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "obs-human", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "observation-agent", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
+        { id: "observation-threshold-operator", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "support-config-operator", database: "debateai", inherit: true, directMemberships: ["debateai_support_config_operator"], effectiveMemberships: ["debateai_support_config_operator"] },
         { id: "hatchet", database: "hatchet", inherit: true, directMemberships: [], effectiveMemberships: [] }
       ]);
@@ -401,6 +412,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "obs-watchdog", environmentKey: "OBS_WATCHDOG_DATABASE_URL", purpose: "OBS_WATCHDOG", binding: "REQUIRED_NOT_WIRED" },
         { component: "human:observability", environmentKey: null, purpose: "JIT_OBSERVABILITY_READ", binding: "JIT_HUMAN" },
         { component: "apps/observation-agent", environmentKey: "OBSERVATION_DATABASE_URL", purpose: "OBSERVATION_AGENT_MONITORING", binding: "WIRED" },
+        { component: "operator:oactl-thresholds-apply", environmentKey: null, purpose: "OBSERVATION_THRESHOLD_RATIFICATION", binding: "WIRED" },
         { component: "operator:support-config", environmentKey: null, purpose: "JIT_SUPPORT_CONFIGURATION", binding: "JIT_HUMAN" },
         { component: "operator:support-status", environmentKey: null, purpose: "SUPPORT_STATUS_DATA", binding: "WIRED" },
         { component: "hatchet", environmentKey: "HATCHET_DATABASE_URL", purpose: "HATCHET_INTERNAL_DATABASE", binding: "EXTERNAL_COMPONENT" }
@@ -450,6 +462,13 @@ describe("P3-01 production database-principal manifest", () => {
     )).toMatchObject({
       lifecycle: "MIGRATION_MINTED_UNMANAGED",
       currentProvisioner: "migrations/0057_observation_foundation.sql",
+      ownerTicket: "P3-02"
+    });
+    expect(manifest.credentialRequirements.find(
+      ({ principalId }) => principalId === "observation-threshold-operator"
+    )).toMatchObject({
+      lifecycle: "MIGRATION_MINTED_UNMANAGED",
+      currentProvisioner: "migrations/0071_observation_threshold_operator.sql",
       ownerTicket: "P3-02"
     });
     expect(manifest.credentialRequirements.find(
@@ -567,7 +586,7 @@ describe("P3-01 production database-principal manifest", () => {
       ...manifest.ownershipRoles.map(({ roleName }) => roleName),
       ...manifest.principals
         .map(({ roleName }) => roleName)
-        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent)$/u.test(roleName))
+        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator)$/u.test(roleName))
     ].sort();
     expect(sourceCreatedRoles).toEqual(manifestMigrationRoles);
 

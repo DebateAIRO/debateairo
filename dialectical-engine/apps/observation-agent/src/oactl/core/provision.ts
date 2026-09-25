@@ -9,6 +9,9 @@ import { resolveDevCustodyRoot } from "../../../../../deploy/dev-auth/custody-ro
 const DEV_DATABASE_ORIGIN = "postgresql://127.0.0.1:55432/debateai";
 const DEV_ADMIN_ROLE = "debateai";
 const DEV_OBSERVATION_ROLE = "debateai_observation_agent";
+// DL7-F9 (migration 0071): the principal `oactl thresholds apply` writes the policy as.
+const DEV_THRESHOLD_OPERATOR_ROLE = "debateai_observation_threshold_operator";
+const THRESHOLD_OPERATOR_ENVIRONMENT_FILE = "observation-threshold-operator.env";
 
 /**
  * V-21(a): the bootstrap superuser password is generated once into the 0600 dev key-custody
@@ -34,15 +37,16 @@ function shellValue(value: string): string {
 // is one nobody can see at the call site.
 export async function setObservationRolePassword(
   password: string,
-  databaseUrl: string
+  databaseUrl: string,
+  role: typeof DEV_OBSERVATION_ROLE | typeof DEV_THRESHOLD_OPERATOR_ROLE = DEV_OBSERVATION_ROLE
 ): Promise<void> {
   const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
   const client = await pool.connect();
   try {
     await client.query("SET statement_timeout = 2000");
     const formatted = await client.query<{ statement: string }>(
-      "SELECT format('ALTER ROLE debateai_observation_agent PASSWORD %L', $1::text) AS statement",
-      [password]
+      "SELECT format('ALTER ROLE %I PASSWORD %L', $2::text, $1::text) AS statement",
+      [password, role]
     );
     const statement = formatted.rows[0]?.statement;
     if (statement === undefined) throw new Error("OBSERVATION_PROVISION_FAILED");
@@ -57,12 +61,23 @@ export async function provisionObservationAgent(input: Readonly<{
   repoRoot: string;
   home: string;
   passwordFactory?: () => string;
-  setRolePassword?: (password: string) => Promise<void>;
-}>): Promise<Readonly<{ output: string; environmentPath: string }>> {
-  const password = (input.passwordFactory ?? (() => randomBytes(32).toString("hex")))();
-  await (input.setRolePassword ?? (async (value: string) => {
-    await setObservationRolePassword(value, await devAdminDatabaseUrl(input.repoRoot));
-  }))(password);
+  setRolePassword?: (password: string, role?: string) => Promise<void>;
+}>): Promise<Readonly<{ output: string; environmentPath: string; operatorEnvironmentPath: string }>> {
+  const passwordFactory = input.passwordFactory ?? (() => randomBytes(32).toString("hex"));
+  const setRolePassword = input.setRolePassword ?? (async (value: string, role?: string) => {
+    await setObservationRolePassword(
+      value,
+      await devAdminDatabaseUrl(input.repoRoot),
+      role === DEV_THRESHOLD_OPERATOR_ROLE ? DEV_THRESHOLD_OPERATOR_ROLE : DEV_OBSERVATION_ROLE
+    );
+  });
+  const password = passwordFactory();
+  await setRolePassword(password, DEV_OBSERVATION_ROLE);
+  // DL7-F9: a SECOND, distinct credential for the threshold operator, in its own file. The
+  // daemon's env file never carries it, so the daemon cannot write the policy that rules it.
+  const operatorPassword = passwordFactory();
+  if (operatorPassword === password) throw new Error("OBSERVATION_PROVISION_FAILED");
+  await setRolePassword(operatorPassword, DEV_THRESHOLD_OPERATOR_ROLE);
 
   const databaseUrl = new URL(DEV_DATABASE_ORIGIN);
   databaseUrl.username = DEV_OBSERVATION_ROLE;
@@ -84,8 +99,19 @@ export async function provisionObservationAgent(input: Readonly<{
     { mode: 0o600 }
   );
   await chmod(environmentPath, 0o600);
+  const operatorUrl = new URL(DEV_DATABASE_ORIGIN);
+  operatorUrl.username = DEV_THRESHOLD_OPERATOR_ROLE;
+  operatorUrl.password = operatorPassword;
+  const operatorEnvironmentPath = join(authDirectory, THRESHOLD_OPERATOR_ENVIRONMENT_FILE);
+  await writeFile(
+    operatorEnvironmentPath,
+    `OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL=${shellValue(operatorUrl.toString())}\n`,
+    { mode: 0o600 }
+  );
+  await chmod(operatorEnvironmentPath, 0o600);
   return Object.freeze({
     output: `PROVISIONED ${environmentPath}`,
-    environmentPath
+    environmentPath,
+    operatorEnvironmentPath
   });
 }

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 import { z } from "zod";
+import { readCustodiedSecretFile } from "../../core/custody.js";
 import { normalizeObservationError, ObservationError } from "../../core/errors.js";
 import { discoverObservationRuntimeModules } from "../../core/modules.js";
 import { OBSERVATION_COMPONENTS, STATUS_VIEW_PATTERN } from "../../core/types.js";
@@ -163,6 +164,42 @@ async function readProvisionedEnvironment(repoRoot: string): Promise<z.infer<typ
   }
 }
 
+/**
+ * DL7-F9. `oactl thresholds apply` writes the policy the daemon obeys, so it must never run on
+ * the daemon's own credential: migration 0071 moved that INSERT to a second principal,
+ * `debateai_observation_threshold_operator`, and this is the only place its credential is read.
+ * It lives in its own file beside the daemon's, read through the agent's custody loader (a
+ * private, singly-linked, non-symlink 0600 file in a 0700 directory, both this uid's), holds
+ * exactly one key, and must name that principal and no other. Any deviation refuses before a
+ * connection is opened.
+ */
+export const THRESHOLD_OPERATOR_ENVIRONMENT_FILE = "observation-threshold-operator.env";
+const THRESHOLD_OPERATOR_ENVIRONMENT_KEY = "OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL";
+const THRESHOLD_OPERATOR_ROLE = "debateai_observation_threshold_operator";
+
+export async function readThresholdOperatorDatabaseUrl(repoRoot: string): Promise<string> {
+  const path = join(resolveDevCustodyRoot(repoRoot), THRESHOLD_OPERATOR_ENVIRONMENT_FILE);
+  try {
+    const source = await readCustodiedSecretFile(path);
+    if (!source.endsWith("\n") || source.includes("\r")) throw new Error("bad file");
+    const rows = source.slice(0, -1).split("\n");
+    const row = rows[0] ?? "";
+    const separator = row.indexOf("=");
+    if (rows.length !== 1 || row.slice(0, separator) !== THRESHOLD_OPERATOR_ENVIRONMENT_KEY) {
+      throw new Error("bad row");
+    }
+    const value = unquote(row.slice(separator + 1));
+    const url = new URL(value);
+    if ((url.protocol !== "postgres:" && url.protocol !== "postgresql:")
+      || url.username !== THRESHOLD_OPERATOR_ROLE || url.password === "") {
+      throw new Error("bad url");
+    }
+    return value;
+  } catch (error) {
+    throw new ObservationError("OBSERVATION_THRESHOLD_OPERATOR_ENV_INVALID", error);
+  }
+}
+
 function requireNoArgs(args: readonly string[]): void {
   if (args.length !== 0) throw new ObservationError("OBSERVATION_ARGUMENTS_INVALID");
 }
@@ -194,12 +231,11 @@ function optionValue(args: readonly string[], option: string): string | undefine
   return value;
 }
 
-async function withRepository<T>(repoRoot: string, operation: (repository: ThresholdRepository) => Promise<T>): Promise<T> {
-  const environment = await readProvisionedEnvironment(repoRoot);
-  const pool = new pg.Pool({
-    connectionString: environment.OBSERVATION_DATABASE_URL,
-    max: 1
-  });
+async function withRepository<T>(
+  connectionString: string,
+  operation: (repository: ThresholdRepository) => Promise<T>
+): Promise<T> {
+  const pool = new pg.Pool({ connectionString, max: 1 });
   try {
     return await operation(new ThresholdRepository(pool));
   } finally {
@@ -281,7 +317,12 @@ async function runCoreVerb(
       const subcommand = args[0];
       if (subcommand === "show") {
         if (args.length !== 1) throw new ObservationError("OBSERVATION_ARGUMENTS_INVALID");
-        const current = await withRepository(context.repoRoot, (repository) => repository.readCurrent());
+        // Reading is the daemon's own right (it keeps SELECT), so `show` uses its credential.
+        const environment = await readProvisionedEnvironment(context.repoRoot);
+        const current = await withRepository(
+          environment.OBSERVATION_DATABASE_URL,
+          (repository) => repository.readCurrent()
+        );
         io.stdout(`THRESHOLDS v${current.version}\n${JSON.stringify(current.value, null, 2)}`);
         return 0;
       }
@@ -291,11 +332,14 @@ async function runCoreVerb(
         if (file === undefined || sourceRef === undefined || args.length !== 4) {
           throw new ObservationError("OBSERVATION_ARGUMENTS_INVALID");
         }
+        // DL7-F9: the operator's credential, read first, so a missing or unsafe one refuses
+        // before anything else is loaded or any connection is opened.
+        const operatorDatabaseUrl = await readThresholdOperatorDatabaseUrl(context.repoRoot);
         const value = await loadMergedThresholdPolicy({
           defaultsDirectory: join(context.repoRoot, "deploy", "observation-agent", "thresholds", "defaults"),
           overrideFile: resolve(context.repoRoot, file)
         });
-        const applied = await withRepository(context.repoRoot, (repository) =>
+        const applied = await withRepository(operatorDatabaseUrl, (repository) =>
           repository.apply(value, sourceRef, userInfo().username));
         for (const row of applied.diff) io.stdout(row);
         io.stdout(`THRESHOLDS v${applied.version} APPLIED`);
