@@ -662,6 +662,34 @@ provisioner gives them `VALID UNTIL '-infinity'`: the role exists with its verif
 login is refused. Their passwords are still required in the envelope; nothing ever uses them. The
 day one is wired, its manifest binding changes and the next provisioning run makes it usable.
 
+**4b. Publish the settings register (Task 14b)** — still inside the migrator window, because the
+publish command connects as the migrator through the `MIGRATION_DATABASE_URL` exported in step 2.
+What the command does, what the file holds and every refusal code are in §11 "Publishing the
+settings register on this host"; read it first. Put the kit's example into custody (a `0600` file
+in a `0700` directory, both root's; an existing file is never overwritten):
+
+```sh
+install -d -m 0700 -o root -g root /etc/debateai/register
+test ! -e /etc/debateai/register/hosted-register.json && install -m 0600 -o root -g root deploy/vps/register/hosted-register.example.json /etc/debateai/register/hosted-register.json
+```
+
+Edit `/etc/debateai/register/hosted-register.json` as §11 says (the real vendors and their
+vetting, `providerTargets` equal to `runner.env`'s `PROVIDER_DISCOVERY_TARGETS_JSON`), then
+validate it without writing anything, then publish:
+
+```sh
+pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json
+```
+
+```sh
+pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
+```
+
+Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`. A
+`HOSTED_REGISTER_NOT_BOOT_READY` line instead means the version was sealed but a start-up reader
+refused it: pin nothing, read the refusal code, correct the file and publish again (a new
+version; the refused one stays sealed and unused).
+
 **5. Close the migrator:**
 
 ```sh
@@ -913,8 +941,12 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
 - **Account deletion does not erase the account's support conversations (V-26, not built).** A
   deleted account's support chats and case replies stay in the database; the erasure never
   reaches them (go-live checklist line 5).
-- **No hosted register-publication command.** §11 says what the register must carry and how it is
-  published today.
+- **A hosted register carries development source refs on its code-owned rows.** `pnpm
+  register:publish-hosted` (§11) reuses the development seeder's row builder byte for byte, because
+  the runner's start-up reader (`readDevelopmentRunnerPolicy`) refuses runner and algorithm rows
+  whose source ref is not one of its `DEVELOPMENT_*` constants. No hosted-mode check is relaxed by
+  it — it is provenance only, and the command's plan says so (`provenance=development-source-refs
+  (known limitation)`). Renaming it means changing that reader, which needs its own ruling.
 - **Support-chat spend is outside the daily money ceiling.** It is bounded by its own daily call
   cap and per-visitor share (go-live checklist line 2).
 - **One API instance only** (§1, go-live checklist line 4).
@@ -1083,9 +1115,9 @@ enforced by `buildConfiguredProviderSetDeploymentRow` in
 call takes the deployment (`"hosted"` or `"local"`) and a hosted publication carrying an unvetted
 vendor is refused there rather than at boot.
 
-Publishing it is §11 "Publishing the settings register on this host" — which, today, is not
-possible (a go-live blocker). `REGISTER_VERSION` in both `EnvironmentFile`s then names the new
-version. Every `provider_ref` in step 3 must appear in this
+Publishing it is §11 "Publishing the settings register on this host": add the vendor to
+`/etc/debateai/register/hosted-register.json` and run `pnpm register:publish-hosted` inside a
+migrator window. `REGISTER_VERSION` in both `EnvironmentFile`s then names the new version. Every `provider_ref` in step 3 must appear in this
 row and in the same order, or both services refuse at boot with
 `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`.
 
@@ -1139,12 +1171,54 @@ version must carry, besides the algorithm's own rows:
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |
 
-**A hosted publish command lands in a companion change (Task 14b); until it does, publishing is
-not possible — go-live blocker.** The only code in this tree that assembles a complete deployment
-version is the development seeder (`pnpm dev:auth:seed-register`), which publishes DEVELOPMENT
-values — its own provider panel and source refs — and is not a hosted publication. Do not publish
-by hand: a first version also needs the sealed historical bootstrap imported before it, which the
-seeder does and a hand-made publication would not.
+**The hosted publish command is `pnpm register:publish-hosted` (Task 14b)**
+(`apps/runner/src/hosted-register-publish.ts`). Never use the development seeder
+(`pnpm dev:auth:seed-register`) here, and never publish by hand. The command:
+
+- reads ONE operator file, `/etc/debateai/register/hosted-register.json` (custody-checked: `0600`
+  in a `0700` directory, both root's, no symlink; strict JSON, unknown members refused). Its
+  members are described in `deploy/vps/register/README.md`; the kit's example
+  (`deploy/vps/register/hosted-register.example.json`) carries the provisional ceilings and two
+  clearly fake vendors, and **a file that still carries any example literal is refused on
+  publish**;
+- checks it with the same functions both services run at start-up (hosted mode: no relay, no
+  loopback or private address, TLS only, no inline credential, every target priced, every vendor
+  vetted, envelopes well formed) before anything is written — `--dry-run` stops there;
+- imports the sealed historical bootstrap first (refusing a database that holds a different one),
+  then publishes ONE new version: the engine's code-owned rows plus the two rows the file
+  supplies, `configuredProviderSet` and `costEnvelopePolicy`. It never edits a sealed version. A
+  changed file is a new version; the same file again returns the version that already holds it;
+- then runs the start-up readers against the new version, and only then prints the version to pin.
+
+`providerTargets` in the file (prices, addresses, credential paths) is never sealed: it is there
+so the checks can run, and it must equal `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env`.
+
+The first publication is bring-up step 4b (§4), inside the migrator window. A later one — a new
+vendor, the real ceilings after the owner's first paid run — opens a migrator window the same way
+(§4 steps 2 and 5), edits the file, and runs the same two commands.
+
+| Output line | What to do |
+|---|---|
+| `HOSTED_REGISTER_PLAN …` | the plan: vendors, ceilings, row count, snapshot hash, `provenance=development-source-refs (known limitation)` (§10); nothing secret is printed |
+| `HOSTED_REGISTER_PUBLISHED outcome=CREATED` / `outcome=REPLAYED` | a new version was sealed / this exact content was already sealed and nothing was added |
+| `HOSTED_REGISTER_BOOT_READY register_version=N` then `REGISTER_VERSION=N` | both services' start-up readers accept version N in hosted mode: write `REGISTER_VERSION=N` into `api.env` and `runner.env`, restart both units |
+| `HOSTED_REGISTER_NOT_BOOT_READY register_version=N` | sealed, but a start-up reader refused it (`HOSTED_REGISTER_BOOT_CHECK_FAILED:` + the reader's code on stderr): pin nothing, correct the file, publish again |
+
+| Refusal code | Meaning |
+|---|---|
+| `HOSTED_REGISTER_FILE_ABSENT` / `HOSTED_REGISTER_FILE_CUSTODY_INVALID` | no file at that path, or not `0600` in a `0700` directory you own, or a symlink |
+| `HOSTED_REGISTER_FILE_INVALID` / `HOSTED_REGISTER_FILE_KEY_UNKNOWN` | not the declared format, not strict JSON (a duplicated member included), or a member the command does not know |
+| `HOSTED_REGISTER_ROW_MISSING:` + row | `configuredProviderSet` or `costEnvelopePolicy` absent; a hosted start-up needs both |
+| `HOSTED_REGISTER_PROVIDER_TARGETS_MISSING` | the file has no `providerTargets` to check prices and addresses against |
+| `HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT` | fewer distinct makers than the algorithm requires |
+| `HOSTED_REGISTER_ROLE_REFS_REQUIRED` / `HOSTED_REGISTER_ROLE_REF_UNCONFIGURED` | with a single maker the synthesis roles must be named, and each must be a configured vendor |
+| `PROVIDER_TARGET_PRICE_REQUIRED:` / `PROVIDER_TARGET_PRICE_ZERO:` + ref | the same refusals the units raise at start-up |
+| `PROVIDER_TARGET_LOOPBACK_REFUSED:` / `PROVIDER_BASE_URL_TLS_REQUIRED:` / `PROVIDER_INLINE_CREDENTIAL_REFUSED:` + ref | a relay, a local or private address, cleartext, or a credential written into the file |
+| `PROVIDER_VENDOR_NOT_VETTED:` + ref | the vendor's V-9(4) record is missing or incomplete |
+| `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units, or the daily ceiling is below the per-run one |
+| `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
+| `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
+| `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
 
 Before restarting anything on a new version, check that the newest version carries the three
 rows a hosted start-up refuses without:
