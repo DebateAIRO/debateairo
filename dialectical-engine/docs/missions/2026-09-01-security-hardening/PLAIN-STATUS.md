@@ -1,8 +1,32 @@
 # Security work — where we stand, in plain words
 
-*Written 2026-09-18 for the owner. **Last updated: 22 September 2026.** This is the easy-to-read companion to the technical records in this folder. Every item links to the file that holds the detail. The newest news is in the first section; the dated sections below it are the history.*
+*Written 2026-09-18 for the owner. **Last updated: 25 September 2026.** This is the easy-to-read companion to the technical records in this folder. Every item links to the file that holds the detail. The newest news is in the first section; the dated sections below it are the history.*
 
-## Right now — 22 September
+## Right now — 25 September
+
+**What you chose this morning:** "only V-29, V-6 … also do Task 14. Then push and merge to Dev." The rest of Tasks 5 and 7 — the database-map drift test (V-17), the tamper check on applied database changes (B28) and account deletion erasing support chats (V-26) — stay as they are, together with Tasks 16 and 13. Everything below was built by agents in separate copies of the code, checked by an independent reviewer, fixed until approved, passed GitHub's checks, and merged into `dev` on your word.
+
+| What | In plain words | Pull request |
+|---|---|---|
+| **V-29** — the monitoring login's window | The monitoring agent can no longer read what other database connections are doing (including commands that set passwords). It gets ten numbers — how many connections, how many waiting, how big the databases are — through one narrow function, and nothing else | [#14](https://github.com/DebateAIRO/debateairo/pull/14) |
+| **Task 14** — the server kit | The kit for the future server is true to today's code: every setting the programs require is in its example files (a test keeps them in step), the support chat's master key is backed up with the others, the six unused database logins start expired, every key-creating step is safe to paste twice, the website's shared secret is no longer readable by every account, the rehearsals for changing a master key and restoring a backup are runbook steps, and the "out of date" banner is gone. The monitoring agent also lost its permission to change its own alert settings: a separate login, used only by the settings command, does that now | [#15](https://github.com/DebateAIRO/debateairo/pull/15) |
+| **Task 14b** — publishing the settings list | The server can now publish its settings list (vendors, prices, money ceilings) with one command that checks the file exactly as the site checks itself at start-up, never edits an old version, and prints the version to use only if the site would really start with it. Before this, the kit had to say "publishing is not possible — go-live blocker" | [#16](https://github.com/DebateAIRO/debateairo/pull/16) |
+| **V-6** — encrypting the remaining debate text | Every remaining place that held text people wrote is encrypted like the verdicts: per-section results, the "who owns these value weights" notes, the alias memory (under the newer debate's key), and the "investigation gap" progress notes. Progress codes and the notes on stored AI replies stay readable — the cost counting needs them — but the database now refuses anything in them except the exact codes, numbers, ids and dates the product writes, so no sentence can hide there. Reading a debate's live progress costs the same as before when there is nothing encrypted to show | [#18](https://github.com/DebateAIRO/debateairo/pull/18) |
+| **A fix to V-29** — on your one-time exception | V-29's extra safety check looked at every database on the server instead of only its own, so setting up a second database on the same server failed. Fixing it meant editing an already-merged database change, which your rule forbids; you allowed it once ("Yes, edit it"). The exception is written into the file itself | [#17](https://github.com/DebateAIRO/debateairo/pull/17) |
+
+**Two honest notes about the day.**
+- **V-6 looked slow because it was stuck, not busy.** Its work and tests were finished around 03:00; its last step waited "until no other test is running", and on this Mac that check sees itself, so it waited five and a half hours on nothing. Every agent now uses a check that works, with a deadline.
+- **The fix to V-29 exists because the extra safety check I asked for was wrong.** GitHub's automatic check does not run the database tests, so it went green; the database tests caught it later the same day, while checking V-6.
+
+**Still yours** (details in [GO-LIVE-CHECKLIST.md](GO-LIVE-CHECKLIST.md)):
+- the organisation-wide two-factor requirement (a browser switch; both pre-checks print 0);
+- your paid confirmation run, which sets the real money ceilings (0.25 USD per debate and 2.00 USD per day are deliberately low placeholders);
+- choosing the AI vendors for the hosted site, then the server itself;
+- a word on the items left as they are — V-26 is still a line on the go-live checklist (line 5), so before go-live it is either built or you remove it.
+
+**Known limits the kit now states openly** ([deploy/vps/README.md](../../../deploy/vps/README.md) §10 and §12): the monitoring agent only runs on a Mac today, so its service file ships switched off; the monitoring-settings login's password is set by hand on the server for now; the published settings still carry "development" labels on the engine's own rows (a naming matter — no check is relaxed); the job system's database password is briefly visible to other accounts on the server during one setup step.
+
+## 22 September
 
 ### The support-chat test bench is measuring again (22 September, evening)
 
