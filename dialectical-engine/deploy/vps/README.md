@@ -940,7 +940,8 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
   exactly the roster's names.
 - **Account deletion does not erase the account's support conversations (V-26, not built).** A
   deleted account's support chats and case replies stay in the database; the erasure never
-  reaches them (go-live checklist line 5).
+  reaches them. The owner removed this from the go-live checklist on 2026-09-25: an accepted
+  limitation, not a go-live condition.
 - **A hosted register carries development source refs on its code-owned rows.** `pnpm
   register:publish-hosted` (§11) reuses the development seeder's row builder byte for byte, because
   the runner's start-up reader (`readDevelopmentRunnerPolicy`) refuses runner and algorithm rows
