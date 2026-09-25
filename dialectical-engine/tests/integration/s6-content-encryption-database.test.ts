@@ -573,9 +573,11 @@ async function createBoundedEvaluatorFixture(pool: Pool, marker: string): Promis
     producer: "judge:s6-evaluator",
     wayOfKnowing: "REASONING"
   });
+  // V-6 (0069): an encrypted run's TERMINAL value is its closed terminal code,
+  // exactly as ServeRepository.persist writes it; the harvest reads the kind.
   await pool.query(
     `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
-     VALUES ($1,ledger.allocate_sequence(),'TERMINAL','{"state":"SETTLED"}'::jsonb)`,
+     VALUES ($1,ledger.allocate_sequence(),'TERMINAL','"SERVED"'::jsonb)`,
     [runId]
   );
   return { runId, questionLine, claimText };

@@ -395,6 +395,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // V-29 (owner ruling 2026-09-22): the observation agent's statistics window
         // replaces its pg_monitor membership. A new prefix, no pair.
         "0068_observation_stats_window.sql",
+        // V-6 (owner ruling 2026-09-22, scope ruled 2026-09-25): the remaining
+        // debate-text carriers take 0063's mechanism. A new prefix, no pair.
+        "0069_remaining_content_carriers.sql",
         // DL7-F9 (Task 14): the threshold operator principal; the daemon loses INSERT on the
         // policy that rules it. 0069 and 0070 are reserved for V-6. A new prefix, no pair.
         "0071_observation_threshold_operator.sql"

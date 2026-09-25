@@ -1019,6 +1019,22 @@ const observedFinishReasonSchema = z.object({
   choices: z.array(z.object({ finish_reason: z.string().nullable().optional() }).passthrough()).min(1)
 }).passthrough();
 
+/**
+ * V-6 fix round 1 / 5c. What the artifact RECORDS as `finish_reason`. An
+ * encrypted run's `raw_artifact.metadata_json` accepts only engine tokens
+ * (migration 0069), and the vendor writes this string. A value that is already
+ * a short token is kept verbatim; any other value becomes
+ * `UNRECOGNIZED:sha256:<first 16 hex>` of itself — typed, deterministic, and
+ * never the vendor's free text — so one odd vendor string cannot block
+ * persisting an artifact whose charge is recorded right after it. The gateway's
+ * own decisions (the `length` truncation) still read the observed value.
+ */
+export function recordableFinishReason(observed: string | null): string | null {
+  if (observed === null) return null;
+  if (/^[A-Za-z0-9_.:-]{1,64}$/.test(observed)) return observed;
+  return `UNRECOGNIZED:sha256:${createHash("sha256").update(observed, "utf8").digest("hex").slice(0, 16)}`;
+}
+
 function observedFinishReason(decoded: unknown): string | null {
   const parsed = observedFinishReasonSchema.safeParse(decoded);
   return parsed.success ? parsed.data.choices[0]!.finish_reason ?? null : null;
@@ -1281,7 +1297,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // W10/1: the reason this completion stopped, recorded on EVERY
             // attempt. `raw_artifact.metadata` is unconstrained jsonb, so the
             // truncation is durable even though `parse_status` cannot name it.
-            finish_reason: finishReason,
+            finish_reason: recordableFinishReason(finishReason),
             // W10/2: the bound this attempt actually asked for. Without it the
             // ledger cannot tell a raised retry from a repeat of the attempt
             // that was just cut off.

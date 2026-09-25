@@ -299,10 +299,11 @@ beforeAll(async () => {
   owned = await createOwnedTerminalRun(owner, "owned");
   foreignRun = await createOwnedTerminalRun(foreign, "foreign");
   priorOwned = await createOwnedTerminalRun(owner, "prior");
-  await database.pool.query(
-    `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
-     VALUES ($1,ledger.allocate_sequence(),'honesty.investigation_gap_opened',$2::jsonb)`,
-    [owned.runId, JSON.stringify({
+  // V-6 (0069): an encrypted run's gap is written through the sealing writer;
+  // a plaintext gap row for an encrypted run is refused by the database.
+  await new RunRepository(database.pool).recordInvestigationGapOpened({
+    runId: owned.runId,
+    gap: {
       gap_ref: GAP_REF,
       gap: "An owner may request deeper investigation.",
       verdict: "UNDER-EXPLORED",
@@ -311,12 +312,13 @@ beforeAll(async () => {
       constructed_prompt: "Investigate the bounded S7 fixture gap.",
       accepts_user_input: true,
       model_authored: true
-    })]
-  );
-  await database.pool.query(
-    `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
-     VALUES ($1,ledger.allocate_sequence(),'honesty.investigation_gap_opened',$2::jsonb)`,
-    [foreignRun.runId, JSON.stringify({
+    }
+  });
+  // V-6 (0069): an encrypted run's gap is written through the sealing writer;
+  // a plaintext gap row for an encrypted run is refused by the database.
+  await new RunRepository(database.pool).recordInvestigationGapOpened({
+    runId: foreignRun.runId,
+    gap: {
       gap_ref: GAP_REF,
       gap: "A foreign owner may request deeper investigation.",
       verdict: "UNDER-EXPLORED",
@@ -325,8 +327,8 @@ beforeAll(async () => {
       constructed_prompt: "Investigate the bounded foreign S7 fixture gap.",
       accepts_user_input: true,
       model_authored: true
-    })]
-  );
+    }
+  });
   memoryLinkId = await seedMemoryLink(owned, priorOwned, owner.ownerRef);
   foreignMemoryLinkId = await seedMemoryLink(foreignRun, owned, foreign.ownerRef);
   const sessionsByToken = new Map([

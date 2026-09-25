@@ -47,8 +47,11 @@ import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository 
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RunRepository,
+  decryptLeasedContentForRun,
+  prepareLeasedContentEncryptionForRun,
   withOwnerAskAdmissionLease,
   withRunContentLease,
+  type CryptoEnvelope,
   type DiscoveredPanelMember,
   type RunOwnershipAccess
 } from "@debateai/db";
@@ -2710,8 +2713,9 @@ export class PostgresAskApplication implements AskApplication {
       kind: string;
       at_seq: string;
       value_json: unknown;
+      content_ciphertext: CryptoEnvelope | null;
     }>(
-      `SELECT event.event_id, event.kind, event.at_seq, event.value_json
+      `SELECT event.event_id, event.kind, event.at_seq, event.value_json, event.content_ciphertext
        FROM core.run_progress_event AS event
        JOIN core.run AS run ON run.run_id = event.run_id
       WHERE event.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) ORDER BY event.at_seq`,
@@ -2739,7 +2743,29 @@ export class PostgresAskApplication implements AskApplication {
       [runId, access.ownerRef, access.legacyAskerId]
     );
     if (stillOwned.rows[0]?.owned !== true) return;
-    const storedEvents = result.rows.flatMap((row) => {
+    // V-6 (0069): only an encrypted run's investigation-gap rows carry an
+    // envelope; every other row is read as stored, with no key work at all.
+    // Fix round 1 / 4: the run's key is prepared ONCE per read (one lease, one
+    // key load), however many gap rows the stream holds.
+    let decryptedRows = result.rows;
+    if (result.rows.some((row) => (row.content_ciphertext ?? null) !== null)) {
+      const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+      try {
+        decryptedRows = result.rows.map((row) => (row.content_ciphertext ?? null) === null
+          ? row
+          : {
+            ...row,
+            value_json: decryptLeasedContentForRun<{ value: unknown }>(
+              leased, "core.run_progress_event", row.event_id, row.content_ciphertext ?? null,
+              { value: row.value_json }
+            ).value
+          });
+        await leased.assertLive();
+      } finally {
+        await leased.close();
+      }
+    }
+    const storedEvents = decryptedRows.flatMap((row) => {
       const direct = EventTypeSchema.safeParse(row.kind);
       const eventType = direct.success
         ? direct.data
