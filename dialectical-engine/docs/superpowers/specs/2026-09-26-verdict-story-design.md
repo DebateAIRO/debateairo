@@ -283,8 +283,17 @@ typical story should take a few minutes.
     call-bound rows, counted over `STORY:` call sites only. The run's
     `assertModelAttemptAllowed` is not used.
   - Hosted mode uses its own money envelope, register row `storyCostEnvelopePolicy`: provisional
-    **$0.25 per story**, with the same provisional status as the V-28 per-run cap, revisited
-    after the first measured run. Its spend rows carry `spend_source = 'STORY'`.
+    **$0.05 per story** (owner, 2026-09-26: "we will adjust based on real costs"). Its spend
+    rows carry `spend_source = 'STORY'`.
+  - **What $0.05 means in practice.** Before each call, the envelope checks the worst case
+    (request bytes ÷ 2 as input tokens, plus the full output token ceiling) against what is left.
+    At an illustrative price of $3 per million input tokens and $15 per million output tokens,
+    Free-tier material (40,000 bytes) plus a 12,000-token ceiling projects to about $0.24, so the
+    call is refused before it is made. At $0.50 / $2 per million it projects to about $0.034 and
+    fits. So on the website, the story needs a lower-priced storyteller model, a smaller budget,
+    or a higher cap. A refusal is stored as `FAILED`/`STORY_ENVELOPE_EXHAUSTED`, and the site falls
+    back to today's paragraphs. The first measured hosted runs set the real numbers. Local mode
+    has no money envelope, so this does not affect it.
   - Story spend **counts toward the $2 daily ceiling** but not toward the debate's per-run
     envelope.
 - **The run's counters exclude the story.** `countRunModelAttempts` and `readRunSpentMicros`
@@ -442,11 +451,10 @@ with the gate.
   button.
 - Translating the PDF's fixed headings.
 
-## 13. Decisions to confirm at spec review
+## 13. Decisions confirmed at spec review (owner, 2026-09-26)
 
-1. **New third-party dependency `@react-pdf/renderer`** (MIT) in `apps/ui`. It must pass the
-   7-day release cooldown, `strictDepBuilds` and a clean `pnpm audit`. The alternative, `pdfkit`,
-   is also a new dependency and needs hand-made layout.
-2. **The provisional hosted story cap of $0.25 per story** (hosted only, counted in the $2 daily
-   cap). No money has been measured yet.
-3. **Public pages get the short story only in v1**; the PDF is owner-only.
+1. **New third-party dependency `@react-pdf/renderer`** (MIT) in `apps/ui`: **agreed.** It must
+   still pass the 7-day release cooldown, `strictDepBuilds` and a clean `pnpm audit`.
+2. **Hosted story cap:** **$0.05 per story**, provisional, adjusted from real costs (see §8 for
+   what it implies); counted in the $2 daily cap.
+3. **Public pages get the short story only in v1; the PDF is owner-only:** **agreed.**
