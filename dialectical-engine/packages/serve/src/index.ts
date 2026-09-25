@@ -1827,8 +1827,25 @@ export async function resolveTrueUnjudgedReasons(
 }
 
 /**
- * V-6 (0069): an encrypted run's conformance record stores `[]` beside an
- * envelope sealed to its own id; a legacy row (NULL envelope) reads as stored.
+ * V-6 (0069), fix round 1 / 5a: what an encrypted run's conformance record
+ * stores in the clear. Not `[]` — an empty judgement list is a legitimate
+ * plaintext value — but one segment no real record holds. It passes 0006's
+ * shape CHECK, and it says conforms=false, so a reader that ever skipped
+ * decryption would report FAIL, never PASS. 0069's guard pins the same value.
+ */
+const CONFORMANCE_SEGMENT_RESULTS_SENTINEL: readonly ConformanceJudgement[] = Object.freeze([
+  Object.freeze({ segmentId: CONTENT_CIPHERTEXT_SENTINEL, state: "NOT_SAMPLED" as const, conforms: false })
+]);
+
+function isConformanceSentinel(stored: readonly ConformanceJudgement[] | null): boolean {
+  return stored !== null && stored.length === 1 && stored[0]!.segmentId === CONTENT_CIPHERTEXT_SENTINEL;
+}
+
+/**
+ * V-6 (0069): an encrypted run's conformance record stores the sentinel beside
+ * an envelope sealed to its own id; a legacy row (NULL envelope) reads as
+ * stored. A sentinel WITHOUT an envelope is sealed content that cannot be
+ * opened, and is refused rather than served as a judgement.
  */
 async function readConformanceSegmentResults(
   pool: Pool,
@@ -1838,7 +1855,15 @@ async function readConformanceSegmentResults(
   stored: ConformanceJudgement[] | null
 ): Promise<ConformanceJudgement[] | null> {
   // `?? null`: a row read from a pre-0069 projection has no such column at all.
-  if (conformanceRecordId === null || (envelope ?? null) === null) return stored;
+  if (conformanceRecordId === null || (envelope ?? null) === null) {
+    if (isConformanceSentinel(stored)) {
+      throw new TypedDomainError(
+        "CONTENT_CIPHERTEXT_ENVELOPE_MISSING",
+        "A sealed conformance record carries no envelope"
+      );
+    }
+    return stored;
+  }
   return (await decryptContentForRun<{ segmentResults: ConformanceJudgement[] }>(
     pool, runId, "serve.conformance_record", conformanceRecordId, envelope ?? null,
     { segmentResults: stored ?? [] }
@@ -2142,7 +2167,9 @@ export class ServeRepository {
         [
           nextConformanceRecordId,
           composedTextId,
-          JSON.stringify(conformanceContent === null ? input.result.conformance : []),
+          JSON.stringify(conformanceContent === null
+            ? input.result.conformance
+            : CONFORMANCE_SEGMENT_RESULTS_SENTINEL),
           input.result.coverageMode,
           JSON.stringify(input.conformanceRawArtifactRefs),
           await allocateSequence(client),

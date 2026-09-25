@@ -3,7 +3,8 @@
 -- encrypted carrier set, by the SAME mechanism 0063 gave serve.answer.
 --
 -- Scope, exactly as ruled after the Phase-1 inventory:
---   1. serve.conformance_record.segment_results — encrypted; sentinel '[]';
+--   1. serve.conformance_record.segment_results — encrypted; a one-segment
+--      sentinel no real row holds (fix round 1 / 5a, see the guard);
 --      run resolved composed_text -> fact_bundle.run_id (the table has no run_id).
 --   2. core.value_hinge.weight_owner and ledger.overlay_run.weight_owner —
 --      encrypted; text sentinel when an owner is named, NULL stays NULL.
@@ -53,113 +54,140 @@ ALTER TABLE memory.alias_row
   ADD COLUMN IF NOT EXISTS content_ciphertext jsonb,
   ADD COLUMN IF NOT EXISTS content_attestation bytea;
 
--- A "code-shaped" JSON value: numbers, booleans, nulls, and strings that are
--- one whitespace-free engine token (codes, ids, call-site keys, timestamps) of
--- at most 256 characters, nested at most four levels, with identifier keys.
--- It bounds what a plaintext progress value / artifact metadata can say; it is
--- a shape rule, not a cipher (a token can still be a word — see the report).
-CREATE OR REPLACE FUNCTION core.jsonb_is_code_shaped(candidate jsonb, depth integer)
+-- The shape rules below are CLOSED allow-lists: every kind (and the artifact
+-- metadata) names its exact keys, each key its exact type, each code field its
+-- exact vocabulary, verified against every writer in the tree (V-6 fix round
+-- 1). Free strings survive only where an engine identifier lives (a call-site
+-- key, a ref, a timestamp), and there only as ONE token: no whitespace, a
+-- closed character set, at most 256 characters. A token can still spell a
+-- word; it cannot carry a sentence.
+CREATE OR REPLACE FUNCTION core.jsonb_is_code_token(candidate jsonb)
 RETURNS boolean
-LANGUAGE plpgsql
+LANGUAGE sql
 IMMUTABLE
 SET search_path = pg_catalog
 AS $$
-DECLARE
-  item record;
-  token text;
-BEGIN
-  IF depth > 4 THEN
-    RETURN false;
-  END IF;
-  CASE jsonb_typeof(candidate)
-    WHEN 'null', 'number', 'boolean' THEN
-      RETURN true;
-    WHEN 'string' THEN
-      token := candidate #>> '{}';
-      RETURN length(token) <= 256 AND token ~ '^[][A-Za-z0-9_.:@/+>=#-]*$';
-    WHEN 'array' THEN
-      FOR item IN SELECT value FROM jsonb_array_elements(candidate) LOOP
-        IF NOT core.jsonb_is_code_shaped(item.value, depth + 1) THEN
-          RETURN false;
-        END IF;
-      END LOOP;
-      RETURN true;
-    WHEN 'object' THEN
-      FOR item IN SELECT key, value FROM jsonb_each(candidate) LOOP
-        IF item.key !~ '^[A-Za-z][A-Za-z0-9_]{0,63}$'
-          OR NOT core.jsonb_is_code_shaped(item.value, depth + 1) THEN
-          RETURN false;
-        END IF;
-      END LOOP;
-      RETURN true;
-    ELSE
-      RETURN false;
-  END CASE;
-END;
+  SELECT COALESCE(
+    jsonb_typeof(candidate) = 'string'
+    AND length(candidate #>> '{}') BETWEEN 1 AND 256
+    AND (candidate #>> '{}') ~ '^[][A-Za-z0-9_.:@/+>=#-]+$',
+    false)
+$$;
+
+-- An object with EXACTLY these keys (no more, no fewer).
+CREATE OR REPLACE FUNCTION core.jsonb_has_exact_keys(candidate jsonb, expected text[])
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = pg_catalog
+AS $$
+  SELECT COALESCE(
+    jsonb_typeof(candidate) = 'object'
+    AND ARRAY(SELECT key FROM jsonb_object_keys(candidate) AS key ORDER BY key)
+      = ARRAY(SELECT key FROM unnest(expected) AS key ORDER BY key),
+    false)
 $$;
 
 -- The closed shape of every NON-prose progress kind, for an encrypted run.
--- The kinds are 0037's run_progress_event_kind_check vocabulary; a kind added
--- later is refused here until it is declared (fail closed).
+-- Writers (all verified): run start — RunRepository.startRun and the two
+-- in-database core.create_encrypted_run bodies (0040:4326, 0067:77) write
+-- PHASE "EMPIRICAL", ENVELOPE_STATE "WITHIN", ENVELOPE_CONSUMED 0;
+-- ValuationRepository.recordOverlay writes PHASE "VALUE"; the budget
+-- repository writes ENVELOPE_CONSUMED <count> and ENVELOPE_STATE
+-- "ENRICHMENT_SKIPPED" / "EXHAUSTED"; ServeRepository.persist writes TERMINAL
+-- <ServeGateResult.terminal>; RunRepository.recordRunLifecycleEvent writes the
+-- RunCooldownLifecycleValue (both kinds) and the RunSynthesisRoleRefusalValue
+-- (ledger.could_not_do only); LivenessRepository.recordTriggerFired writes the
+-- staleness value. A kind not named here is refused (fail closed).
 CREATE OR REPLACE FUNCTION core.progress_value_is_code_shaped(event_kind text, value jsonb)
 RETURNS boolean
 LANGUAGE sql
 IMMUTABLE
 SET search_path = pg_catalog
 AS $$
-  SELECT core.jsonb_is_code_shaped(value, 0) AND CASE
+  SELECT COALESCE(CASE
+    WHEN event_kind = 'PHASE' THEN
+      value IN ('"EMPIRICAL"'::jsonb, '"VALUE"'::jsonb)
+    WHEN event_kind = 'ENVELOPE_STATE' THEN
+      value IN ('"WITHIN"'::jsonb, '"ENRICHMENT_SKIPPED"'::jsonb, '"EXHAUSTED"'::jsonb)
+    WHEN event_kind = 'TERMINAL' THEN
+      value IN ('"SERVED"'::jsonb, '"DOWNGRADED"'::jsonb, '"BLOCKED"'::jsonb, '"COMPONENTS_ONLY"'::jsonb)
     WHEN event_kind = 'ENVELOPE_CONSUMED' THEN
       jsonb_typeof(value) = 'number'
-    WHEN event_kind IN ('PHASE', 'ENVELOPE_STATE', 'TERMINAL') THEN
-      jsonb_typeof(value) IN ('string', 'object')
-    WHEN event_kind IN ('node.retrying', 'ledger.could_not_do') THEN
-      jsonb_typeof(value) = 'object'
-      AND NOT EXISTS (
-        SELECT 1 FROM jsonb_object_keys(value) AS key
-        WHERE key NOT IN (
-          'state', 'call_site_key', 'parent_node_ref', 'hold_ms', 'hold_until',
-          'attempts_spent', 'transport_outcome', 'planned_leg_count',
-          'role_ref', 'role', 'absent_failure_code'
-        )
+    WHEN event_kind IN ('node.retrying', 'ledger.could_not_do')
+      AND core.jsonb_has_exact_keys(value, ARRAY[
+        'state', 'call_site_key', 'parent_node_ref', 'hold_ms', 'hold_until',
+        'attempts_spent', 'transport_outcome', 'planned_leg_count'
+      ]) THEN
+      value->'state' IN (
+        '"COOLDOWN_HOLD"'::jsonb, '"COOLDOWN_RETRY"'::jsonb, '"MAKER_POSITION_HALTED"'::jsonb,
+        '"EXPANSION_HALTED"'::jsonb, '"REVIEW_HALTED"'::jsonb
       )
-    WHEN event_kind = 'honesty.staleness_trigger_fired' THEN
-      jsonb_typeof(value) = 'object'
+      AND core.jsonb_is_code_token(value->'call_site_key')
+      AND (value->'parent_node_ref' = 'null'::jsonb OR core.jsonb_is_code_token(value->'parent_node_ref'))
+      AND jsonb_typeof(value->'hold_ms') = 'number'
+      AND (value->'hold_until' = 'null'::jsonb OR core.jsonb_is_code_token(value->'hold_until'))
+      AND jsonb_typeof(value->'attempts_spent') = 'number'
+      AND value->'transport_outcome' IN ('"TIMED_OUT"'::jsonb, '"FAILED"'::jsonb)
+      AND jsonb_typeof(value->'planned_leg_count') = 'number'
+    WHEN event_kind = 'ledger.could_not_do'
+      AND core.jsonb_has_exact_keys(value, ARRAY[
+        'state', 'call_site_key', 'role_ref', 'role', 'absent_failure_code'
+      ]) THEN
+      value->'state' = '"SYNTHESIS_ROLE_PROVIDER_ABSENT"'::jsonb
+      AND core.jsonb_is_code_token(value->'call_site_key')
+      AND core.jsonb_is_code_token(value->'role_ref')
+      AND value->'role' IN ('"SYNTHESIZER"'::jsonb, '"EVALUATOR"'::jsonb)
+      AND (value->'absent_failure_code' = 'null'::jsonb
+        OR core.jsonb_is_code_token(value->'absent_failure_code'))
+    WHEN event_kind = 'honesty.staleness_trigger_fired'
+      AND core.jsonb_has_exact_keys(value, ARRAY['trigger_key', 'affected_subjects']) THEN
+      core.jsonb_is_code_token(value->'trigger_key')
+      AND jsonb_typeof(value->'affected_subjects') = 'array'
+      AND jsonb_array_length(value->'affected_subjects') > 0
       AND NOT EXISTS (
-        SELECT 1 FROM jsonb_object_keys(value) AS key
-        WHERE key NOT IN ('trigger_key', 'affected_subjects')
+        SELECT 1 FROM jsonb_array_elements(value->'affected_subjects') AS subject
+        WHERE NOT core.jsonb_has_exact_keys(subject, ARRAY['kind', 'ref'])
+          OR subject->'kind' NOT IN ('"ANSWER"'::jsonb, '"NODE"'::jsonb)
+          OR NOT core.jsonb_is_code_token(subject->'ref')
       )
     ELSE false
-  END
+  END, false)
 $$;
 
--- The closed shape of ledger.raw_artifact.metadata_json for an encrypted run:
--- the six fields packages/providers writes (status, attempt, prompt_tripwires,
--- usage, finish_reason, token_ceiling), each in its code / number form.
+-- The closed shape of ledger.raw_artifact.metadata_json for an encrypted run.
+-- The one writer is LedgerRepository.appendRawArtifact, fed by the provider
+-- gateway (packages/providers): status, attempt, usage, finish_reason,
+-- token_ceiling always, prompt_tripwires only when a signal fired. A subset of
+-- the six keys is accepted (fixtures and older gateways write fewer); each key
+-- that is present has its exact type.
 CREATE OR REPLACE FUNCTION core.raw_artifact_metadata_is_code_shaped(value jsonb)
 RETURNS boolean
 LANGUAGE sql
 IMMUTABLE
 SET search_path = pg_catalog
 AS $$
-  SELECT jsonb_typeof(value) = 'object'
-    AND core.jsonb_is_code_shaped(value, 0)
+  SELECT COALESCE(
+    jsonb_typeof(value) = 'object'
     AND NOT EXISTS (
       SELECT 1 FROM jsonb_object_keys(value) AS key
       WHERE key NOT IN (
         'status', 'attempt', 'prompt_tripwires', 'usage', 'finish_reason', 'token_ceiling'
       )
     )
-    AND COALESCE(jsonb_typeof(value->'status'), 'null') IN ('null', 'number')
-    AND COALESCE(jsonb_typeof(value->'attempt'), 'null') IN ('null', 'number')
-    AND COALESCE(jsonb_typeof(value->'token_ceiling'), 'null') IN ('null', 'number')
-    AND COALESCE(jsonb_typeof(value->'finish_reason'), 'null') IN ('null', 'string')
+    AND (NOT value ? 'status' OR jsonb_typeof(value->'status') = 'number')
+    AND (NOT value ? 'attempt' OR jsonb_typeof(value->'attempt') = 'number')
+    AND (NOT value ? 'token_ceiling' OR jsonb_typeof(value->'token_ceiling') IN ('number', 'null'))
+    AND (NOT value ? 'finish_reason' OR value->'finish_reason' = 'null'::jsonb
+      OR core.jsonb_is_code_token(value->'finish_reason'))
     AND (
-      COALESCE(jsonb_typeof(value->'usage'), 'null') = 'null'
+      NOT value ? 'usage' OR value->'usage' = 'null'::jsonb
       OR (
         jsonb_typeof(value->'usage') = 'object'
         AND NOT EXISTS (
           SELECT 1 FROM jsonb_each(value->'usage') AS entry
-          WHERE jsonb_typeof(entry.value) <> 'number'
+          WHERE entry.key NOT IN ('prompt_tokens', 'completion_tokens', 'total_tokens', 'x_cost_usd')
+            OR jsonb_typeof(entry.value) <> 'number'
         )
       )
     )
@@ -169,15 +197,18 @@ AS $$
         jsonb_typeof(value->'prompt_tripwires') = 'array'
         AND NOT EXISTS (
           SELECT 1 FROM jsonb_array_elements(value->'prompt_tripwires') AS signal
-          WHERE jsonb_typeof(signal) <> 'object'
-            OR EXISTS (
-              SELECT 1 FROM jsonb_object_keys(signal) AS key
-              WHERE key NOT IN ('signal', 'contractId', 'field', 'hits')
+          WHERE NOT core.jsonb_has_exact_keys(signal, ARRAY['signal', 'contractId', 'field', 'hits'])
+            OR signal->'signal' NOT IN (
+              '"PROMPT_CANARY_ECHOED"'::jsonb, '"PROMPT_FENCE_ECHOED"'::jsonb,
+              '"PROMPT_MATERIAL_INSTRUCTION_LIKE"'::jsonb
             )
-            OR COALESCE(jsonb_typeof(signal->'hits'), 'null') NOT IN ('null', 'number')
+            OR NOT core.jsonb_is_code_token(signal->'contractId')
+            OR NOT (signal->'field' = 'null'::jsonb OR core.jsonb_is_code_token(signal->'field'))
+            OR jsonb_typeof(signal->'hits') <> 'number'
         )
       )
-    )
+    ),
+    false)
 $$;
 
 -- The plaintext-write guard of the five new carriers. Same shape as 0038's
@@ -192,6 +223,12 @@ DECLARE
   target_run_id uuid;
   encrypted boolean;
   sentinel constant text := '⟦DEBATEAI:CIPHERTEXT:V1⟧';
+  -- Fix round 1 / 5a: not '[]' (what an empty judgement list looks like) but a
+  -- value no legitimate row holds. It passes 0006's shape CHECK
+  -- (serve.conformance_segment_results_are_valid), and its one segment
+  -- conforms=false, so a reader that skipped decryption would report FAIL.
+  conformance_sentinel constant jsonb :=
+    '[{"segmentId":"⟦DEBATEAI:CIPHERTEXT:V1⟧","state":"NOT_SAMPLED","conforms":false}]';
 BEGIN
   IF TG_TABLE_SCHEMA = 'serve' AND TG_TABLE_NAME = 'conformance_record' THEN
     SELECT bundle.run_id INTO target_run_id
@@ -214,7 +251,17 @@ BEGIN
   encrypted := core.run_uses_content_encryption(target_run_id);
 
   IF NOT encrypted THEN
-    IF row_json->'content_ciphertext' <> 'null'::jsonb THEN
+    -- A legacy (plaintext) row may carry neither an envelope nor a sentinel:
+    -- a sentinel there would read as sealed content that no key can open.
+    IF row_json->'content_ciphertext' <> 'null'::jsonb
+      -- row_json, never NEW.<column>: PL/pgSQL resolves every NEW field an
+      -- expression names, so a column of another table would raise here.
+      OR row_json->'segment_results' = conformance_sentinel
+      OR row_json->>'weight_owner' = sentinel
+      OR row_json->>'surface' = sentinel OR row_json->>'canonical' = sentinel
+      OR (row_json->>'kind' = 'honesty.investigation_gap_opened'
+        AND jsonb_typeof(row_json->'value_json') = 'object'
+        AND row_json->'value_json' ? 'ciphertext') THEN
       RAISE EXCEPTION 'CONTENT_ENCRYPTION_STATE_INVALID: %.%', TG_TABLE_SCHEMA, TG_TABLE_NAME
         USING ERRCODE = '22023';
     END IF;
@@ -222,7 +269,7 @@ BEGIN
   END IF;
 
   IF TG_TABLE_SCHEMA = 'serve' AND TG_TABLE_NAME = 'conformance_record' THEN
-    IF NEW.segment_results <> '[]'::jsonb OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
+    IF NEW.segment_results <> conformance_sentinel OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
       RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve.conformance_record' USING ERRCODE = '22023';
     END IF;
   ELSIF (TG_TABLE_SCHEMA = 'core' AND TG_TABLE_NAME = 'value_hinge')
@@ -238,7 +285,7 @@ BEGIN
     IF NEW.kind = 'honesty.investigation_gap_opened' THEN
       IF jsonb_typeof(NEW.value_json) <> 'object'
         OR jsonb_typeof(NEW.value_json->'gap_ref') <> 'string'
-        OR NOT core.jsonb_is_code_shaped(NEW.value_json->'gap_ref', 0)
+        OR NOT core.jsonb_is_code_token(NEW.value_json->'gap_ref')
         OR (NEW.value_json - 'gap_ref') <> '{"ciphertext":true,"v":1}'::jsonb
         OR NOT core.is_content_envelope(NEW.content_ciphertext) THEN
         RAISE EXCEPTION 'CONTENT_PLAINTEXT_WRITE_FORBIDDEN: core.run_progress_event' USING ERRCODE = '22023';
@@ -448,13 +495,15 @@ FOR EACH ROW EXECUTE FUNCTION core.enforce_raw_artifact_metadata_code_shaped();
 -- ACLs in 0038's / 0040's / 0063's pattern: the invoker-rights plaintext guard
 -- and the helpers it calls are granted to the runtime role; the SECURITY
 -- DEFINER functions are revoked from PUBLIC and granted to nobody.
-REVOKE ALL ON FUNCTION core.jsonb_is_code_shaped(jsonb, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION core.jsonb_is_code_token(jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION core.jsonb_has_exact_keys(jsonb, text[]) FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.progress_value_is_code_shaped(text, jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.raw_artifact_metadata_is_code_shaped(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.enforce_content_ciphertext_remaining_carriers() FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.enforce_content_attestation_v2_remaining_carriers() FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.enforce_erasure_barrier_remaining_carriers() FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.enforce_raw_artifact_metadata_code_shaped() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION core.jsonb_is_code_shaped(jsonb, integer) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION core.jsonb_is_code_token(jsonb) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION core.jsonb_has_exact_keys(jsonb, text[]) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION core.progress_value_is_code_shaped(text, jsonb) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION core.enforce_content_ciphertext_remaining_carriers() TO debateai_runtime;

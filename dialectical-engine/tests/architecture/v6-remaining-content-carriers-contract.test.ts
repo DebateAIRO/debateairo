@@ -44,7 +44,8 @@ describe("V-6 remaining content carriers — architecture contract", () => {
     ].map((match) => match[1]!.toLowerCase());
     const definedHere = defined(migration);
     expect(definedHere).toEqual([
-      "core.jsonb_is_code_shaped",
+      "core.jsonb_is_code_token",
+      "core.jsonb_has_exact_keys",
       "core.progress_value_is_code_shaped",
       "core.raw_artifact_metadata_is_code_shaped",
       "core.enforce_content_ciphertext_remaining_carriers",

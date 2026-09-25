@@ -15,12 +15,14 @@ import {
   CONTENT_CIPHERTEXT_SENTINEL,
   RunRepository,
   configureContentEncryption,
+  encryptAttestedContentForRun,
   migrate
 } from "@debateai/db";
 import { WorkItemRepository } from "@debateai/battery";
 import { reconcileEvaluatorMetering } from "../../packages/evaluator/src/index.js";
 import { GraphRepository } from "@debateai/graph";
 import { LedgerRepository } from "@debateai/ledger";
+import { LivenessRepository } from "@debateai/liveness";
 import { MemoryRepository, canonicalizeQuestionText } from "@debateai/memory";
 import { evaluate, type EvaluationSnapshot } from "@debateai/propagation";
 import {
@@ -58,6 +60,19 @@ let authSessionId: string;
 let cipher: ContentCipher;
 
 const ENVELOPE_KEYS = ["ct", "keyId", "nonce", "tag", "v"];
+const CONFORMANCE_SENTINEL = [{ segmentId: CONTENT_CIPHERTEXT_SENTINEL, state: "NOT_SAMPLED", conforms: false }];
+
+/** A run-row copy with a fresh primary key: the envelope must not follow it. */
+async function copyWithNewId(table: string, idColumn: string, id: string, extra: Record<string, string> = {}) {
+  const overrides = Object.entries({ [idColumn]: "gen_random_uuid()", at_seq: "ledger.allocate_sequence()", ...extra })
+    .map(([column, expression]) => `'${column}', ${expression}`).join(", ");
+  return database.pool.query(
+    `INSERT INTO ${table}
+     SELECT (jsonb_populate_record(NULL::${table}, to_jsonb(source) || jsonb_build_object(${overrides}))).*
+     FROM ${table} AS source WHERE source.${idColumn}=$1`,
+    [id]
+  );
+}
 
 beforeAll(async () => {
   database = await startTestDatabase();
@@ -376,7 +391,11 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
       `SELECT segment_results, content_ciphertext, octet_length(content_attestation) AS attestation_length
        FROM serve.conformance_record WHERE conformance_record_id=$1`, [conformanceRecordId]
     )).rows[0]!;
-    expect(stored.segment_results).toEqual([]);
+    // Fix round 1 / 5a: a sentinel no legitimate plaintext value can equal
+    // ('[]' was what an empty judgement list looks like). It satisfies the
+    // 0006 shape CHECK, and its one segment conforms=false, so a reader that
+    // ever skipped decryption would report FAIL, never PASS.
+    expect(stored.segment_results).toEqual(CONFORMANCE_SENTINEL);
     expect(Object.keys(stored.content_ciphertext ?? {}).sort()).toEqual(ENVELOPE_KEYS);
     expect(stored.attestation_length).toBe(32);
 
@@ -478,6 +497,21 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
        ) VALUES ($1,'train','bus','[]','{}','owner_elicited',$2,'{"speed":1}',ledger.allocate_sequence())`,
       [runId, `plaintext-owner-${marker}`]
     )).rejects.toThrow("CONTENT_PLAINTEXT_WRITE_FORBIDDEN: core.value_hinge");
+
+    // Fix round 1 / 5b: a copied envelope is bound to its own row id.
+    await expect(copyWithNewId("core.value_hinge", "value_hinge_id", persisted.valueHingeIds[0]!))
+      .rejects.toThrow("CONTENT_ATTESTATION_INVALID");
+    await expect(copyWithNewId("ledger.overlay_run", "overlay_run_id", persisted.overlayRunId))
+      .rejects.toThrow("CONTENT_ATTESTATION_INVALID");
+    // A legacy-style row may not carry the sentinel either.
+    const legacySentinelRunId = await createLegacyRun(`v6 sentinel ${marker}`, `legacy-v6-${randomUUID()}`);
+    await expect(database.pool.query(
+      `INSERT INTO core.value_hinge (
+         run_id, left_option_id, right_option_id, criterion_ids, reversal_boundary,
+         weight_source, weight_owner, weight_vector, at_seq
+       ) VALUES ($1,'train','bus','[]','{}','owner_elicited',$2,'{"speed":1}',ledger.allocate_sequence())`,
+      [legacySentinelRunId, CONTENT_CIPHERTEXT_SENTINEL]
+    )).rejects.toThrow("CONTENT_ENCRYPTION_STATE_INVALID: core.value_hinge");
 
     // weight_source 'none' carries no owner and no envelope, encrypted run or not.
     const unownedRunId = await createEncryptedRun(`v6 overlay none ${marker}`);
@@ -640,6 +674,9 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
        ) VALUES ($1,$2,'owner:v6',clock_timestamp(),$3,$4,1,ledger.allocate_sequence())`,
       [`plaintext-surface-${marker}`, `plaintext-canonical-${marker}`, sourceRunId, priorRunId]
     )).rejects.toThrow("CONTENT_PLAINTEXT_WRITE_FORBIDDEN: memory.alias_row");
+    // Fix round 1 / 5b: a copied envelope is bound to its own row id.
+    await expect(copyWithNewId("memory.alias_row", "alias_row_id", stored.alias_row_id))
+      .rejects.toThrow("CONTENT_ATTESTATION_INVALID");
 
     // The SOURCE run's key protects it: shredding it makes the alias unreadable.
     await cipher.destroyRunKey(sourceRunId);
@@ -713,6 +750,199 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
     const legacyRunId = await createLegacyRun(`v6 legacy metadata ${marker}`, `legacy-v6-${randomUUID()}`);
     await expect(ledger.appendRawArtifact({ ...artifact({ fixture: "legacy free text" }), runId: legacyRunId }))
       .resolves.toBeDefined();
+  }, 180_000);
+
+  it("refuses object- and array-smuggled prose in every code-only progress kind and in artifact metadata (closed allow-lists)", async () => {
+    const runId = await createEncryptedRun(`v6 smuggling ${randomUUID()}`);
+    const objectProse = { w1: "The", w2: "verdict", w3: "is", w4: "guilty" };
+    const arrayProse = ["the", "defendant", "lied"];
+    const cooldown = {
+      state: "COOLDOWN_HOLD", call_site_key: "JUDGE:review:node:1", parent_node_ref: null,
+      hold_ms: 10, hold_until: null, attempts_spent: 1, transport_outcome: "TIMED_OUT", planned_leg_count: 1
+    };
+    const refusal = {
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT", call_site_key: "SYNTHESIZER:provider:x",
+      role_ref: "provider:x", role: "SYNTHESIZER", absent_failure_code: null
+    };
+    const staleness = { trigger_key: "test-layer:q58", affected_subjects: [{ kind: "NODE", ref: randomUUID() }] };
+    const smuggled: Array<readonly [string, unknown]> = [
+      ["PHASE", objectProse], ["PHASE", arrayProse], ["PHASE", "UNDECLARED_PHASE"],
+      ["ENVELOPE_STATE", objectProse], ["ENVELOPE_STATE", arrayProse],
+      ["TERMINAL", objectProse], ["TERMINAL", arrayProse], ["TERMINAL", { state: "SETTLED" }],
+      ["ENVELOPE_CONSUMED", objectProse], ["ENVELOPE_CONSUMED", arrayProse],
+      ["node.retrying", { ...cooldown, state: arrayProse }],
+      ["node.retrying", { ...cooldown, call_site_key: objectProse }],
+      ["node.retrying", { ...cooldown, hold_ms: objectProse }],
+      ["node.retrying", { ...cooldown, extra: "x" }],
+      ["node.retrying", refusal],
+      ["ledger.could_not_do", { ...refusal, role: arrayProse }],
+      ["ledger.could_not_do", { ...refusal, absent_failure_code: objectProse }],
+      ["ledger.could_not_do", { ...cooldown, transport_outcome: "the defendant" }],
+      ["honesty.staleness_trigger_fired", { ...staleness, trigger_key: objectProse }],
+      ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [{ kind: arrayProse, ref: "x" }] }],
+      ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [{ kind: "NODE", ref: "x", ...objectProse }] }],
+      ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [] }],
+      ["honesty.staleness_trigger_fired", { ...staleness, w1: "The" }]
+    ];
+    for (const [kind, value] of smuggled) {
+      await expect(database.pool.query(
+        `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
+         VALUES ($1,ledger.allocate_sequence(),$2,$3::jsonb)`,
+        [runId, kind, JSON.stringify(value)]
+      ), `${kind} ${JSON.stringify(value)}`).rejects.toThrow(`PROGRESS_EVENT_VALUE_NOT_CODE_SHAPED: ${kind}`);
+    }
+    // Every legitimate shape still lands.
+    for (const [kind, value] of [
+      ["PHASE", "VALUE"], ["ENVELOPE_STATE", "EXHAUSTED"], ["ENVELOPE_STATE", "ENRICHMENT_SKIPPED"],
+      ["ENVELOPE_CONSUMED", 7], ["node.retrying", cooldown], ["ledger.could_not_do", cooldown],
+      ["ledger.could_not_do", refusal], ["honesty.staleness_trigger_fired", staleness], ["TERMINAL", "SERVED"]
+    ] as const) {
+      await database.pool.query(
+        `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
+         VALUES ($1,ledger.allocate_sequence(),$2,$3::jsonb)`,
+        [runId, kind, JSON.stringify(value)]
+      );
+    }
+
+    const ledger = new LedgerRepository(database.pool);
+    const base = {
+      status: 200, attempt: 1, usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      finish_reason: "stop", token_ceiling: 64
+    };
+    const tripwire = { signal: "PROMPT_FENCE_ECHOED", contractId: "runner.author.v1", field: null, hits: 1 };
+    for (const metadata of [
+      { ...base, status: arrayProse },
+      { ...base, attempt: objectProse },
+      { ...base, usage: objectProse },
+      { ...base, usage: { prompt_tokens: 1, w1: 2 } },
+      { ...base, finish_reason: objectProse },
+      { ...base, token_ceiling: arrayProse },
+      { ...base, prompt_tripwires: [{ ...tripwire, ...objectProse }] },
+      { ...base, prompt_tripwires: [{ ...tripwire, signal: "THE_DEFENDANT" }] },
+      { ...base, prompt_tripwires: [{ ...tripwire, field: arrayProse }] },
+      { ...base, prompt_tripwires: objectProse }
+    ]) {
+      await expect(ledger.appendRawArtifact({
+        artifactId: randomUUID(), attemptId: randomUUID(), runId, providerRef: "provider:v6",
+        provider: "openai-compatible-http", model: "model:v6", maker: "maker:v6", modelVersion: "v1",
+        rawText: "v6 raw", metadata, parseStatus: "PARSED",
+        inputHash: "4".repeat(64), contractHash: "5".repeat(64), contentHash: "6".repeat(64)
+      }), JSON.stringify(metadata)).rejects.toThrow("RAW_ARTIFACT_METADATA_NOT_CODE_SHAPED");
+    }
+  }, 180_000);
+
+  it("the erasure barrier refuses every carrier's sealed write once the run's private content is erased; code-only progress keeps flowing", async () => {
+    const marker = randomUUID();
+    const runId = await createEncryptedRun(`v6 erasure ${marker}`);
+    const priorRunId = await createEncryptedRun(`v6 erasure prior ${marker}`);
+    const overlay = await recordOverlay(runId, `V6_ERASURE_OWNER_${marker}`);
+    const answerId = await persistVerdict(runId, `V6_ERASURE_SEGMENT_${marker}`, true);
+    const { composed_text_id: composedTextId } = (await database.pool.query<{ composed_text_id: string }>(
+      "SELECT composed_text_id FROM serve.answer WHERE answer_id=$1", [answerId]
+    )).rows[0]!;
+    const { propagation_run_id: propagationRunId } = (await database.pool.query<{ propagation_run_id: string }>(
+      "SELECT propagation_run_id FROM ledger.overlay_run WHERE overlay_run_id=$1", [overlay.overlayRunId]
+    )).rows[0]!;
+    // Every envelope is sealed while the run is still live, to a fresh row id.
+    const seal = async (carrier: Parameters<typeof encryptAttestedContentForRun>[2], value: unknown) => {
+      const id = randomUUID();
+      const sealed = (await encryptAttestedContentForRun(database.pool, runId, carrier, id, value))!;
+      return { id, envelope: JSON.stringify(sealed.envelope), attestation: sealed.attestation };
+    };
+    const conformance = await seal("serve.conformance_record", { segmentResults: [] });
+    const hinge = await seal("core.value_hinge", { weightOwner: "x" });
+    const overlayRow = await seal("ledger.overlay_run", { weightOwner: "x" });
+    const gap = await seal("core.run_progress_event", { value: { gap_ref: `gap:${marker}` } });
+    const alias = await seal("memory.alias_row", { surface: "s", canonical: "c" });
+
+    // Erase: the run's key cleanup intent makes core.run_private_content_is_live false.
+    await database.pool.query(
+      `INSERT INTO serve.private_run_key_cleanup_intent (
+         request_ref,user_id,run_id,requested_at,cleanup_publication_refs
+       ) VALUES ($1,$2,$3,now(),'{}')`,
+      [randomUUID(), userId, runId]
+    );
+    const attempts: Array<readonly [string, () => Promise<unknown>]> = [
+      ["serve.conformance_record", () => database.pool.query(
+        `INSERT INTO serve.conformance_record (
+           conformance_record_id,composed_text_id,segment_results,coverage_mode,raw_artifact_refs,
+           sealed_at_seq,content_ciphertext,content_attestation
+         ) VALUES ($1,$2,$3::jsonb,'EXHAUSTIVE','[]',ledger.allocate_sequence(),$4::jsonb,$5)`,
+        [conformance.id, composedTextId, JSON.stringify(CONFORMANCE_SENTINEL), conformance.envelope, conformance.attestation]
+      )],
+      ["core.value_hinge", () => database.pool.query(
+        `INSERT INTO core.value_hinge (
+           value_hinge_id,run_id,left_option_id,right_option_id,criterion_ids,reversal_boundary,
+           weight_source,weight_owner,weight_vector,at_seq,content_ciphertext,content_attestation
+         ) VALUES ($1,$2,'train','bus','[]','{}','owner_elicited',$3,'{"speed":1}',
+           ledger.allocate_sequence(),$4::jsonb,$5)`,
+        [hinge.id, runId, CONTENT_CIPHERTEXT_SENTINEL, hinge.envelope, hinge.attestation]
+      )],
+      ["ledger.overlay_run", () => database.pool.query(
+        `INSERT INTO ledger.overlay_run (
+           overlay_run_id,run_id,propagation_run_id,weight_source,weight_owner,weight_vector,
+           accepted_criteria,rejected_criteria,pareto_option_ids,recorded_arrow_order,
+           recorded_strengths,detached_strengths,detachment_byte_identical,at_seq,
+           content_ciphertext,content_attestation
+         ) SELECT $1,run_id,propagation_run_id,weight_source,$2,weight_vector,accepted_criteria,
+           rejected_criteria,pareto_option_ids,recorded_arrow_order,recorded_strengths,
+           detached_strengths,true,ledger.allocate_sequence(),$3::jsonb,$4
+         FROM ledger.overlay_run WHERE overlay_run_id=$5`,
+        [overlayRow.id, CONTENT_CIPHERTEXT_SENTINEL, overlayRow.envelope, overlayRow.attestation, overlay.overlayRunId]
+      )],
+      ["core.run_progress_event", () => database.pool.query(
+        `INSERT INTO core.run_progress_event (
+           event_id,run_id,at_seq,kind,value_json,content_ciphertext,content_attestation
+         ) VALUES ($1,$2,ledger.allocate_sequence(),'honesty.investigation_gap_opened',$3::jsonb,$4::jsonb,$5)`,
+        [gap.id, runId, JSON.stringify({ gap_ref: `gap:${marker}`, ciphertext: true, v: 1 }), gap.envelope, gap.attestation]
+      )],
+      ["memory.alias_row", () => database.pool.query(
+        `INSERT INTO memory.alias_row (
+           alias_row_id,surface,canonical,confirmed_by,confirmed_at,source_run_id,prior_run_id,
+           key_version,at_seq,content_ciphertext,content_attestation
+         ) VALUES ($1,$2,$2,'owner:v6',clock_timestamp(),$3,$4,1,ledger.allocate_sequence(),$5::jsonb,$6)`,
+        [alias.id, CONTENT_CIPHERTEXT_SENTINEL, runId, priorRunId, alias.envelope, alias.attestation]
+      )]
+    ];
+    expect(propagationRunId).toBeDefined();
+    for (const [carrier, attempt] of attempts) {
+      await expect(attempt(), carrier).rejects.toThrow("PRIVATE_CONTENT_ERASED");
+    }
+    // Bookkeeping is not private content: a code-only event still lands.
+    await database.pool.query(
+      `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
+       VALUES ($1,ledger.allocate_sequence(),'ENVELOPE_CONSUMED','5'::jsonb)`,
+      [runId]
+    );
+  }, 180_000);
+
+  it("maps an odd vendor model version to one deterministic token before the liveness sweep writes it", async () => {
+    const marker = randomUUID();
+    const runId = await createEncryptedRun(`v6 liveness ${marker}`);
+    await persistVerdict(runId, `v6-liveness-segment-${marker}`, true);
+    const ledger = new LedgerRepository(database.pool);
+    for (const modelVersion of ["2026-09-01", "gpt 5 (preview build, see notes)"]) {
+      await ledger.appendRawArtifact({
+        artifactId: randomUUID(), attemptId: randomUUID(), runId, providerRef: "provider:v6-liveness",
+        provider: "openai-compatible-http", model: "model:v6", maker: "maker:v6", modelVersion,
+        rawText: "v6 raw", metadata: {}, parseStatus: "PARSED",
+        inputHash: "4".repeat(64), contractHash: "5".repeat(64), contentHash: "6".repeat(64)
+      });
+    }
+    const liveness = new LivenessRepository(database.pool);
+    await liveness.detectProviderModelVersionTriggers();
+    await liveness.detectProviderModelVersionTriggers();
+    const fired = (await database.pool.query<{ trigger_key: string }>(
+      `SELECT DISTINCT trigger_key FROM core.revision_trigger WHERE run_id=$1`, [runId]
+    )).rows.map((row) => row.trigger_key);
+    expect(fired).toEqual([
+      `provider-model-version:provider:v6-liveness:sha256:${createHash("sha256")
+        .update("gpt 5 (preview build, see notes)").digest("hex")}`
+    ]);
+    expect((await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM core.run_progress_event
+       WHERE run_id=$1 AND kind='honesty.staleness_trigger_fired'`, [runId]
+    )).rows[0]!.count).toBe("1");
   }, 180_000);
 
   it("stays guarded after 0038, 0040, 0063 or 0069 itself is replayed over the applied chain", async () => {
