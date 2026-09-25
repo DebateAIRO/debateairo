@@ -99,6 +99,20 @@ import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 export const HOSTED_REGISTER_FILE_FORMAT = "debateai.hosted-register.v1" as const;
 export const HOSTED_REGISTER_DEPLOYMENT_REF = "hosted-register-publication" as const;
 
+/**
+ * The kit example's own literals (deploy/vps/register/hosted-register.example.json).
+ * A file that still carries ANY of them — the sourceRef, a `vendor:example-`
+ * ref, an `Example…` maker, the example vetting date — is the example, or a
+ * half-edited copy of it, and is refused on publish (review Minor 3). The date
+ * is deliberately one no operator would write for a real review.
+ */
+export const HOSTED_REGISTER_EXAMPLE_SOURCE_REF =
+  "V-28 provisional cost envelopes and V-9 vetted vendors: first hosted register"
+  + " (EXAMPLE vendors, replace before publishing)";
+export const HOSTED_REGISTER_EXAMPLE_VETTING_DATE = "2000-01-01" as const;
+const EXAMPLE_PROVIDER_REF_PREFIX = "vendor:example-";
+const EXAMPLE_MAKER_PREFIX = "Example";
+
 const MAX_FILE_BYTES = 64 * 1_024;
 const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
@@ -124,10 +138,35 @@ export class HostedRegisterPublicationError extends TypeError {
  * operator knows which version NOT to pin in `REGISTER_VERSION`.
  */
 export class HostedRegisterBootCheckFailedError extends HostedRegisterPublicationError {
-  constructor(readonly refusal: string, readonly result: HostedRegisterPublicationResult) {
+  readonly refusal: string;
+
+  constructor(error: unknown, readonly result: HostedRegisterPublicationResult) {
+    const refusal = bootCheckRefusal(error);
     super(`HOSTED_REGISTER_BOOT_CHECK_FAILED:${refusal}`);
+    this.refusal = refusal;
     this.name = "HostedRegisterBootCheckFailedError";
   }
+}
+
+const LEADING_TYPED_CODE = /^[A-Z][A-Z0-9]*(?:[_-][A-Z0-9]+)+(?::\S*)?/u;
+
+/**
+ * The reader's code, made printable WITHOUT losing the label (review
+ * Important 2). Only a leading typed code is taken — never prose — and every
+ * character outside the printable code alphabet becomes `_`, so a provider ref
+ * carrying `/` or `,` cannot push the line out of that alphabet and into the
+ * generic fallback. Anything with no typed code at all is `UNKNOWN`.
+ */
+function bootCheckRefusal(error: unknown): string {
+  const holder = typeof error === "object" && error !== null
+    ? error as { readonly code?: unknown; readonly message?: unknown }
+    : {};
+  for (const candidate of [holder.code, holder.message]) {
+    if (typeof candidate !== "string") continue;
+    const token = LEADING_TYPED_CODE.exec(candidate)?.[0];
+    if (token !== undefined) return token.replace(/[^A-Za-z0-9_.:-]/gu, "_").slice(0, 200);
+  }
+  return "UNKNOWN";
 }
 
 function refuse(code: string): never {
@@ -147,6 +186,8 @@ const TYPED_CODE_PREFIX = /^([A-Z][A-Z0-9_]*):\s/u;
  * an error's prose is printed: it could hold a path, a URL or a value.
  */
 export function hostedRegisterRefusalCode(error: unknown): string {
+  // Built from a sanitised code, so it is always printable; never generic.
+  if (error instanceof HostedRegisterBootCheckFailedError) return error.code;
   const code = (error as { readonly code?: unknown } | null)?.code;
   if (typeof code === "string" && TYPED_CODE.test(code)) return code;
   const message = (error as { readonly message?: unknown } | null)?.message;
@@ -358,7 +399,10 @@ export type HostedRegisterPlan = Readonly<{
   costEnvelope: CostEnvelopePolicy;
   synthesisRoles: DevelopmentSynthesisRoleRefs;
   pricedTargetCount: number;
+  /** Vendors still carrying an example literal: reserved host, `vendor:example-` ref, `Example` maker, example date. */
   exampleTargetRefs: readonly string[];
+  /** The file kept the kit example's sourceRef. */
+  exampleSourceRef: boolean;
   /** The canonical targets JSON the boot readiness check re-parses. Never printed: it names credential files. */
   providerTargetsJson: string;
 }>;
@@ -410,6 +454,12 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     requiredDistinctMakers: file.configuredProviderSet.requiredDistinctMakers,
     providers: file.configuredProviderSet.providers as readonly VettedConfiguredProvider[]
   }, file.sourceRef);
+  // The boot reads `deploymentMakerCapability` as distinct makers >= the
+  // required count; a set that fails it is refused here, not sealed.
+  const distinctMakers = new Set(file.configuredProviderSet.providers.map((provider) => provider.maker));
+  if (distinctMakers.size < file.configuredProviderSet.requiredDistinctMakers) {
+    refuse("HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT");
+  }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
   const configured: readonly DevelopmentConfiguredProvider[] = Object.freeze(
@@ -466,6 +516,12 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     JSON.parse(admission.valueJsonText) as unknown, admission.sourceRef
   ));
 
+  const exampleLiteralVendors = new Set(file.configuredProviderSet.providers
+    .filter((provider) => provider.providerRef.startsWith(EXAMPLE_PROVIDER_REF_PREFIX)
+      || provider.maker.startsWith(EXAMPLE_MAKER_PREFIX)
+      || provider.vetting?.dataUseTermsReviewedOn === HOSTED_REGISTER_EXAMPLE_VETTING_DATE
+      || provider.vetting?.retentionTermsReviewedOn === HOSTED_REGISTER_EXAMPLE_VETTING_DATE)
+    .map((provider) => provider.providerRef));
   const baseRegisterVersion = parseRegisterVersionText(String(bootstrap.registerVersion));
   const snapshotSha256 = computeRegisterSnapshotSha256(rows);
   return Object.freeze({
@@ -479,9 +535,12 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     costEnvelope,
     synthesisRoles,
     pricedTargetCount: targets.length,
-    exampleTargetRefs: Object.freeze(targets
-      .filter((target) => isReservedExampleHost(new URL(target.baseUrl).hostname))
-      .map((target) => target.providerRef)),
+    exampleTargetRefs: Object.freeze(configured
+      .filter((provider) => exampleLiteralVendors.has(provider.providerRef)
+        || targets.some((target) => target.providerRef === provider.providerRef
+          && isReservedExampleHost(new URL(target.baseUrl).hostname)))
+      .map((provider) => provider.providerRef)),
+    exampleSourceRef: file.sourceRef === HOSTED_REGISTER_EXAMPLE_SOURCE_REF,
     providerTargetsJson: targetsJson
   });
 }
@@ -497,6 +556,10 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
     `vendors=${plan.vendorRefs.join(",")}`,
     `provider_targets=${plan.pricedTargetCount} priced=${plan.pricedTargetCount}`,
     `example_vendors=${plan.exampleTargetRefs.length === 0 ? "none" : plan.exampleTargetRefs.join(",")}`,
+    `example_source_ref=${plan.exampleSourceRef}`,
+    // Review item 6: the production runner's boot reader pins the seeder's
+    // source refs on the code-owned rows, so this register carries them too.
+    "provenance=development-source-refs (known limitation)",
     `cost_envelope currency=${plan.costEnvelope.currency}`
       + ` per_run_ceiling_micros=${plan.costEnvelope.perRunCeilingMicros}`
       + ` daily_ceiling_micros=${plan.costEnvelope.dailyCeilingMicros}`
@@ -542,6 +605,7 @@ export function assertHostedRegisterPlanPublishable(plan: HostedRegisterPlan): v
   if (plan.exampleTargetRefs.length > 0) {
     refuse(`HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:${plan.exampleTargetRefs[0]}`);
   }
+  if (plan.exampleSourceRef) refuse("HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED");
 }
 
 export async function publishHostedRegister(input: Readonly<{
@@ -573,7 +637,7 @@ export async function publishHostedRegister(input: Readonly<{
   try {
     await operations.verifyBootReadiness(receipt.registerVersion, plan.providerTargetsJson);
   } catch (error) {
-    throw new HostedRegisterBootCheckFailedError(hostedRegisterRefusalCode(error), result);
+    throw new HostedRegisterBootCheckFailedError(error, result);
   }
   return result;
 }
@@ -598,6 +662,7 @@ export async function verifyHostedRegisterBootReadiness(
   await readCostEnvelopePolicy(pool, version);
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);
+  if (!makers.deploymentMakerCapability) refuse("HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT");
   await readPanelDiscoveryPolicy(pool, version);
   await readStructuralCeilingPolicyInputs(pool, version);
   await readEnvelopeFormulaInputs(pool, version);

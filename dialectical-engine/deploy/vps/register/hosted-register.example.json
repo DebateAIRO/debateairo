@@ -9,8 +9,8 @@
         "adapterKind": "openai-compatible-http",
         "maker": "ExampleAlpha",
         "vetting": {
-          "dataUseTermsReviewedOn": "2026-09-25",
-          "retentionTermsReviewedOn": "2026-09-25",
+          "dataUseTermsReviewedOn": "2000-01-01",
+          "retentionTermsReviewedOn": "2000-01-01",
           "namedInPrivacyNotice": true
         }
       },
@@ -19,8 +19,8 @@
         "adapterKind": "openai-compatible-http",
         "maker": "ExampleBeta",
         "vetting": {
-          "dataUseTermsReviewedOn": "2026-09-25",
-          "retentionTermsReviewedOn": "2026-09-25",
+          "dataUseTermsReviewedOn": "2000-01-01",
+          "retentionTermsReviewedOn": "2000-01-01",
           "namedInPrivacyNotice": true
         }
       }

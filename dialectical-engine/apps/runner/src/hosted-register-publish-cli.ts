@@ -13,6 +13,11 @@
  * `HOSTED_REGISTER_BOOT_READY register_version=N` and `REGISTER_VERSION=N` — the
  * value both `EnvironmentFile`s pin. A refusal is ONE typed code on stderr.
  *
+ * A version that was SEALED but that a boot reader refused prints
+ * `HOSTED_REGISTER_NOT_BOOT_READY register_version=N …` instead, never a
+ * `REGISTER_VERSION=` line, and exits non-zero with
+ * `HOSTED_REGISTER_BOOT_CHECK_FAILED:` and the reader's code.
+ *
  * Every decision lives in ./hosted-register-publish.ts. This file only opens things.
  */
 import { pathToFileURL } from "node:url";
@@ -28,49 +33,80 @@ import {
   publishHostedRegister,
   readHostedRegisterFile,
   renderHostedRegisterPlan,
+  type HostedRegisterOperations,
   type HostedRegisterPublicationResult
 } from "./hosted-register-publish.js";
 
-function publishedLine(result: HostedRegisterPublicationResult): string {
-  return `HOSTED_REGISTER_PUBLISHED outcome=${result.outcome} register_version=${result.registerVersion}`
+export type HostedRegisterCliOutput = Readonly<{
+  stdout(text: string): void;
+  stderr(text: string): void;
+}>;
+
+/** Opened only after every file-level refusal has had its chance; closed whatever happens. */
+export type OpenHostedRegisterOperations = () => Promise<Readonly<{
+  operations: HostedRegisterOperations;
+  close(): Promise<void>;
+}>>;
+
+function receiptFields(result: HostedRegisterPublicationResult): string {
+  return `register_version=${result.registerVersion} outcome=${result.outcome}`
     + ` row_count=${result.rowCount} snapshot_sha256=${result.snapshotSha256}`
-    + ` publication_id=${result.publicationId}\n`;
+    + ` publication_id=${result.publicationId}`;
 }
 
-async function main(): Promise<void> {
-  const args = parseHostedRegisterArguments(process.argv.slice(2));
-  const plan = await planHostedRegisterPublication(await readHostedRegisterFile(args.filePath));
-  process.stdout.write(renderHostedRegisterPlan(plan));
-  if (args.dryRun) {
-    process.stdout.write("HOSTED_REGISTER_DRY_RUN written=none\n");
-    return;
-  }
-  assertHostedRegisterPlanPublishable(plan);
-  const environment = loadMigrationEnvironment();
-  const pool = createPool(environment.MIGRATION_DATABASE_URL);
-  let result: HostedRegisterPublicationResult;
+const OPERATOR_INPUT_REFUSAL =
+  /USAGE|INVALID|UNKNOWN|MISSING|REQUIRED|REFUSED|ABSENT|ZERO|NOT_VETTED|MISMATCH|UNCONFIGURED|INSUFFICIENT/u;
+
+/** The whole command, with its outputs and its database seam injected. Returns the exit code. */
+export async function runHostedRegisterPublishCli(
+  args: readonly string[],
+  output: HostedRegisterCliOutput,
+  openOperations: OpenHostedRegisterOperations
+): Promise<number> {
   try {
-    result = await publishHostedRegister({
-      plan, operations: createPostgresHostedRegisterOperations(pool)
-    });
-  } finally {
-    await pool.end().catch(() => undefined);
+    const parsed = parseHostedRegisterArguments(args);
+    const plan = await planHostedRegisterPublication(await readHostedRegisterFile(parsed.filePath));
+    output.stdout(renderHostedRegisterPlan(plan));
+    if (parsed.dryRun) {
+      output.stdout("HOSTED_REGISTER_DRY_RUN written=none\n");
+      return 0;
+    }
+    assertHostedRegisterPlanPublishable(plan);
+    const opened = await openOperations();
+    let result: HostedRegisterPublicationResult;
+    try {
+      result = await publishHostedRegister({ plan, operations: opened.operations });
+    } finally {
+      await opened.close().catch(() => undefined);
+    }
+    output.stdout(`HOSTED_REGISTER_PUBLISHED outcome=${result.outcome} ${receiptFields(result)}\n`);
+    output.stdout(`HOSTED_REGISTER_BOOT_READY register_version=${result.registerVersion}\n`);
+    output.stdout(`REGISTER_VERSION=${result.registerVersion}\n`);
+    return 0;
+  } catch (error) {
+    // Sealed, and refused by a boot reader: say which version NOT to pin, in a
+    // line that cannot be read as success, and never print REGISTER_VERSION=.
+    if (error instanceof HostedRegisterBootCheckFailedError) {
+      output.stdout(`HOSTED_REGISTER_NOT_BOOT_READY ${receiptFields(error.result)}\n`);
+      output.stderr(`${error.code}\n`);
+      return 1;
+    }
+    const code = hostedRegisterRefusalCode(error);
+    output.stderr(`${code}\n`);
+    return OPERATOR_INPUT_REFUSAL.test(code) ? 2 : 1;
   }
-  process.stdout.write(publishedLine(result));
-  process.stdout.write(`HOSTED_REGISTER_BOOT_READY register_version=${result.registerVersion}\n`);
-  process.stdout.write(`REGISTER_VERSION=${result.registerVersion}\n`);
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error: unknown) => {
-    // A sealed version the boot readers refused is still sealed: say which one,
-    // so it is never pinned, then the reason.
-    if (error instanceof HostedRegisterBootCheckFailedError) {
-      process.stdout.write(publishedLine(error.result));
-    }
-    const code = hostedRegisterRefusalCode(error);
-    process.stderr.write(`${code}\n`);
-    process.exitCode = /USAGE|INVALID|UNKNOWN|MISSING|REQUIRED|REFUSED|ABSENT|ZERO|NOT_VETTED|MISMATCH|UNCONFIGURED/u
-      .test(code) ? 2 : 1;
+  process.exitCode = await runHostedRegisterPublishCli(process.argv.slice(2), {
+    stdout: (text) => { process.stdout.write(text); },
+    stderr: (text) => { process.stderr.write(text); }
+  }, async () => {
+    const environment = loadMigrationEnvironment();
+    const pool = createPool(environment.MIGRATION_DATABASE_URL);
+    return {
+      operations: createPostgresHostedRegisterOperations(pool),
+      close: () => pool.end()
+    };
   });
 }
