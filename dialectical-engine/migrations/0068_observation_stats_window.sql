@@ -150,12 +150,26 @@ BEGIN
       USING ERRCODE = '55000';
   END IF;
 
-  -- Ownership recorded in pg_shdepend covers every database of the cluster.
+  -- Ownership recorded in pg_shdepend covers every database of the cluster, but the role is
+  -- cluster-global and every database this chain migrates owns its own capacity function
+  -- (tests/integration/obs-l1-s01-foundation.test.ts "reapply from another database"). So the
+  -- guard looks at THIS database and at shared objects (dbid 0) only; each other database is
+  -- guarded when the chain migrates it.
+  -- Edited after merge (PR #14) on the owner's one-time exception to "never edit an existing
+  -- migration", ruled 2026-09-25: the first version counted every database, so migrating a
+  -- second database of the same cluster refused with "owns 1 other object(s)". No later
+  -- migration can lift a refusal raised while this file applies, and the edit changes nothing
+  -- for a database where this file already applied.
   SELECT count(*) INTO owner_other_objects
   FROM pg_catalog.pg_shdepend AS dependency
   WHERE dependency.refclassid = 'pg_catalog.pg_authid'::regclass
     AND dependency.refobjid = 'debateai_obs_stats_owner'::regrole
     AND dependency.deptype = 'o'
+    AND dependency.dbid IN (
+      0,
+      (SELECT database.oid FROM pg_catalog.pg_database AS database
+       WHERE database.datname = pg_catalog.current_database())
+    )
     AND NOT (
       dependency.dbid = (
         SELECT database.oid FROM pg_catalog.pg_database AS database
