@@ -11,6 +11,7 @@ import {
   allocateSequence,
   contentCipherFor,
   decryptContentForRun,
+  decryptLeasedContentForRun,
   encryptAttestedContentForRun,
   encryptAttestedLeasedContentForRun,
   normalizeRunOwnership,
@@ -2876,15 +2877,25 @@ export class ServeRepository {
        WHERE hinge.run_id=$1 ORDER BY hinge.at_seq`, [row.run_id]
     );
     // V-6 (0069): an encrypted run's weight owner is sealed per hinge row.
-    const valueHinges = { rows: await Promise.all(storedValueHinges.rows.map(async (
-      { content_ciphertext: envelope, ...hinge }
-    ) => ({
-      ...hinge,
-      weight_owner: (await decryptContentForRun<{ weightOwner: string | null }>(
-        this.pool, row.run_id, "core.value_hinge", hinge.value_hinge_ref, envelope ?? null,
-        { weightOwner: hinge.weight_owner }
-      )).weightOwner
-    }))) };
+    // Fix round 1 / 4: the run's key is prepared ONCE for all of them.
+    const hingeCipher = storedValueHinges.rows.some((hinge) => (hinge.content_ciphertext ?? null) !== null)
+      ? await prepareLeasedContentEncryptionForRun(this.pool, row.run_id)
+      : null;
+    let valueHinges: { rows: Answer["value_hinges"] };
+    try {
+      valueHinges = { rows: storedValueHinges.rows.map(({ content_ciphertext: envelope, ...hinge }) => ({
+        ...hinge,
+        weight_owner: hingeCipher === null || (envelope ?? null) === null
+          ? hinge.weight_owner
+          : decryptLeasedContentForRun<{ weightOwner: string | null }>(
+            hingeCipher, "core.value_hinge", hinge.value_hinge_ref, envelope ?? null,
+            { weightOwner: hinge.weight_owner }
+          ).weightOwner
+      })) };
+      await hingeCipher?.assertLive();
+    } finally {
+      await hingeCipher?.close();
+    }
     return {
       answer_id: row.answer_id,
       answer_version: row.answer_version,

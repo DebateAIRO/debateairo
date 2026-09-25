@@ -47,7 +47,8 @@ import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository 
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RunRepository,
-  decryptContentForRun,
+  decryptLeasedContentForRun,
+  prepareLeasedContentEncryptionForRun,
   withOwnerAskAdmissionLease,
   withRunContentLease,
   type CryptoEnvelope,
@@ -2744,15 +2745,26 @@ export class PostgresAskApplication implements AskApplication {
     if (stillOwned.rows[0]?.owned !== true) return;
     // V-6 (0069): only an encrypted run's investigation-gap rows carry an
     // envelope; every other row is read as stored, with no key work at all.
-    const decryptedRows = await Promise.all(result.rows.map(async (row) => (row.content_ciphertext ?? null) === null
-      ? row
-      : {
-        ...row,
-        value_json: (await decryptContentForRun<{ value: unknown }>(
-          this.pool, runId, "core.run_progress_event", row.event_id, row.content_ciphertext ?? null,
-          { value: row.value_json }
-        )).value
-      }));
+    // Fix round 1 / 4: the run's key is prepared ONCE per read (one lease, one
+    // key load), however many gap rows the stream holds.
+    let decryptedRows = result.rows;
+    if (result.rows.some((row) => (row.content_ciphertext ?? null) !== null)) {
+      const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+      try {
+        decryptedRows = result.rows.map((row) => (row.content_ciphertext ?? null) === null
+          ? row
+          : {
+            ...row,
+            value_json: decryptLeasedContentForRun<{ value: unknown }>(
+              leased, "core.run_progress_event", row.event_id, row.content_ciphertext ?? null,
+              { value: row.value_json }
+            ).value
+          });
+        await leased.assertLive();
+      } finally {
+        await leased.close();
+      }
+    }
     const storedEvents = decryptedRows.flatMap((row) => {
       const direct = EventTypeSchema.safeParse(row.kind);
       const eventType = direct.success
