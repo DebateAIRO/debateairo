@@ -199,8 +199,9 @@ guarded by `tests/unit/prompt-surface-guard.test.ts`.
 | `set_aside` | frozen or stopped branches and why |
 | `prior_objection` | round 2 onward only: the checker's objection, verbatim |
 
-**Size budget** (register row `storyMaterialBudget`, provisional): Free 40,000 bytes, Premium
-120,000 bytes, always below the 256 KiB packet cap. The shrinking order when over budget:
+**Size budget** (register row `storyMaterialBudget`, provisional, keyed like the answer writer's
+`compositionBundleBudget` by the run's `compositionBudgetTier`): low 40,000 bytes, medium 80,000,
+high 120,000, always below the 256 KiB packet cap. The shrinking order when over budget:
 1. Judge texts of points outside the top-10 leverage are cut to 240 characters.
 2. All judge texts are cut to 240 characters.
 3. Claims follow the digest ladder: full, 480, 240, 120 characters.
@@ -229,8 +230,9 @@ output.
 - Every position is covered (subject to the 8-cap).
 - The chosen shape exists.
 
-A failure is sent back as a code + path repair, the same way frame repairs work today, and counts
-as a round.
+They run as the call's content classifier. A failure is sent back as a code + path repair inside
+the same call's attempts, the same way the synthesizer's schema repairs work today. If the attempts
+run out, the round fails.
 
 ## 6. The write-and-check loop
 
@@ -288,7 +290,7 @@ typical story should take a few minutes.
   - **What $0.05 means in practice.** Before each call, the envelope checks the worst case
     (request bytes ÷ 2 as input tokens, plus the full output token ceiling) against what is left.
     At an illustrative price of $3 per million input tokens and $15 per million output tokens,
-    Free-tier material (40,000 bytes) plus a 12,000-token ceiling projects to about $0.24, so the
+    low-tier material (40,000 bytes) plus a 12,000-token ceiling projects to about $0.24, so the
     call is refused before it is made. At $0.50 / $2 per million it projects to about $0.034 and
     fits. So on the website, the story needs a lower-priced storyteller model, a smaller budget,
     or a higher cap. A refusal is stored as `FAILED`/`STORY_ENVELOPE_EXHAUSTED`, and the site falls
