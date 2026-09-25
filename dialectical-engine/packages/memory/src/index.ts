@@ -540,12 +540,26 @@ export class MemoryRepository {
       }
       const aliasIds: string[] = [];
       for (const alias of input.confirmedAliases ?? []) {
+        // V-6 (0069): the alias is question text, sealed under the SOURCE
+        // run's key — the rule memory.pull_record already follows — so
+        // erasing the source run makes it unreadable.
+        const aliasRowId = randomUUID();
+        const aliasContent = encryptAttestedLeasedContentForRun(
+          sourceLease, "memory.alias_row", aliasRowId,
+          { surface: alias.surface, canonical: alias.canonical }
+        );
         const inserted = await client.query<{ alias_row_id: string }>(
           `INSERT INTO memory.alias_row (
-           surface, canonical, confirmed_by, confirmed_at, source_run_id, prior_run_id, key_version, at_seq
-           ) VALUES ($1,$2,$3,clock_timestamp(),$4,$5,$6,$7) RETURNING alias_row_id`,
-          [alias.surface, alias.canonical, alias.confirmedBy, input.key.runId, selected.priorRunId,
-            input.key.keyVersion, await allocateSequence(client)]
+           alias_row_id, surface, canonical, confirmed_by, confirmed_at, source_run_id, prior_run_id,
+           key_version, at_seq, content_ciphertext, content_attestation
+           ) VALUES ($1,$2,$3,$4,clock_timestamp(),$5,$6,$7,$8,$9::jsonb,$10) RETURNING alias_row_id`,
+          [aliasRowId,
+            aliasContent === null ? alias.surface : CONTENT_CIPHERTEXT_SENTINEL,
+            aliasContent === null ? alias.canonical : CONTENT_CIPHERTEXT_SENTINEL,
+            alias.confirmedBy, input.key.runId, selected.priorRunId,
+            input.key.keyVersion, await allocateSequence(client),
+            aliasContent === null ? null : JSON.stringify(aliasContent.envelope),
+            aliasContent?.attestation ?? null]
         );
         aliasIds.push(inserted.rows[0]!.alias_row_id);
       }

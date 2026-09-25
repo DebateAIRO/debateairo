@@ -11,6 +11,7 @@ import {
   allocateSequence,
   contentCipherFor,
   decryptContentForRun,
+  decryptLeasedContentForRun,
   encryptAttestedContentForRun,
   encryptAttestedLeasedContentForRun,
   normalizeRunOwnership,
@@ -1827,6 +1828,50 @@ export async function resolveTrueUnjudgedReasons(
 }
 
 /**
+ * V-6 (0069), fix round 1 / 5a: what an encrypted run's conformance record
+ * stores in the clear. Not `[]` — an empty judgement list is a legitimate
+ * plaintext value — but one segment no real record holds. It passes 0006's
+ * shape CHECK, and it says conforms=false, so a reader that ever skipped
+ * decryption would report FAIL, never PASS. 0069's guard pins the same value.
+ */
+const CONFORMANCE_SEGMENT_RESULTS_SENTINEL: readonly ConformanceJudgement[] = Object.freeze([
+  Object.freeze({ segmentId: CONTENT_CIPHERTEXT_SENTINEL, state: "NOT_SAMPLED" as const, conforms: false })
+]);
+
+function isConformanceSentinel(stored: readonly ConformanceJudgement[] | null): boolean {
+  return stored !== null && stored.length === 1 && stored[0]!.segmentId === CONTENT_CIPHERTEXT_SENTINEL;
+}
+
+/**
+ * V-6 (0069): an encrypted run's conformance record stores the sentinel beside
+ * an envelope sealed to its own id; a legacy row (NULL envelope) reads as
+ * stored. A sentinel WITHOUT an envelope is sealed content that cannot be
+ * opened, and is refused rather than served as a judgement.
+ */
+async function readConformanceSegmentResults(
+  pool: Pool,
+  runId: string,
+  conformanceRecordId: string | null,
+  envelope: CryptoEnvelope | null,
+  stored: ConformanceJudgement[] | null
+): Promise<ConformanceJudgement[] | null> {
+  // `?? null`: a row read from a pre-0069 projection has no such column at all.
+  if (conformanceRecordId === null || (envelope ?? null) === null) {
+    if (isConformanceSentinel(stored)) {
+      throw new TypedDomainError(
+        "CONTENT_CIPHERTEXT_ENVELOPE_MISSING",
+        "A sealed conformance record carries no envelope"
+      );
+    }
+    return stored;
+  }
+  return (await decryptContentForRun<{ segmentResults: ConformanceJudgement[] }>(
+    pool, runId, "serve.conformance_record", conformanceRecordId, envelope ?? null,
+    { segmentResults: stored ?? [] }
+  )).segmentResults;
+}
+
+/**
  * V-SEC-1 / FL-1 finding F3 (D26 open point (2)). `serve.answer` is the only
  * VERSIONED content carrier: its key is `(answer_id, answer_version)` and
  * DR-184 appends new versions under the SAME id. An owner ref of the id alone
@@ -2103,18 +2148,34 @@ export class ServeRepository {
         composedContent === null ? null : JSON.stringify(composedContent.envelope),composedContent?.attestation ?? null]
       );
       const composedTextId = priorAnswer?.composed_text_id ?? composed?.rows[0]!.composed_text_id ?? null;
+      // V-6 (0069): the conformance record is a carrier. Its id is minted here
+      // so the envelope can be sealed to it, synchronously, against the cipher
+      // prepared before this transaction (the same D26 pattern as the answer).
+      const nextConformanceRecordId = randomUUID();
+      const conformanceContent = priorAnswer !== undefined || composedTextId === null
+        || answerCipher === null
+        ? null
+        : encryptAttestedLeasedContentForRun(
+          answerCipher, "serve.conformance_record", nextConformanceRecordId,
+          { segmentResults: input.result.conformance }
+        );
       const conformance = priorAnswer !== undefined || composedTextId === null ? null : await client.query<{ conformance_record_id: string }>(
         `INSERT INTO serve.conformance_record (
-          composed_text_id, segment_results, coverage_mode,
-          raw_artifact_refs, sealed_at_seq
-        ) VALUES ($1,$2::jsonb,$3,$4::jsonb,$5)
+          conformance_record_id, composed_text_id, segment_results, coverage_mode,
+          raw_artifact_refs, sealed_at_seq, content_ciphertext, content_attestation
+        ) VALUES ($1,$2,$3::jsonb,$4,$5::jsonb,$6,$7::jsonb,$8)
         RETURNING conformance_record_id`,
         [
+          nextConformanceRecordId,
           composedTextId,
-          JSON.stringify(input.result.conformance),
+          JSON.stringify(conformanceContent === null
+            ? input.result.conformance
+            : CONFORMANCE_SEGMENT_RESULTS_SENTINEL),
           input.result.coverageMode,
           JSON.stringify(input.conformanceRawArtifactRefs),
-          await allocateSequence(client)
+          await allocateSequence(client),
+          conformanceContent === null ? null : JSON.stringify(conformanceContent.envelope),
+          conformanceContent?.attestation ?? null
         ]
       );
       const serveState = priorAnswer?.serve_state ?? (input.result.terminal === "COMPONENTS_ONLY"
@@ -2601,6 +2662,8 @@ export class ServeRepository {
        composition_budget_tier: Answer["composition_budget_tier"];
       conformance_segment_results: ConformanceJudgement[] | null;
       conformance_coverage_mode: ServeGateResult["coverageMode"] | null;
+      conformance_record_id: string | null;
+      conformance_content_ciphertext: CryptoEnvelope | null;
       sealed_at_seq: number | string;
       as_of: Date;
       relevant_as_of: Date;
@@ -2626,6 +2689,8 @@ export class ServeRepository {
                 ORDER BY at_seq DESC LIMIT 1) AS envelope_consumed,
                run.composition_budget_tier, conformance.segment_results AS conformance_segment_results,
               conformance.coverage_mode AS conformance_coverage_mode,
+              conformance.conformance_record_id,
+              conformance.content_ciphertext AS conformance_content_ciphertext,
               run.as_of, answer.relevant_as_of
        FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id = answer.run_id
@@ -2642,7 +2707,7 @@ export class ServeRepository {
     const row = answer.rows[0];
     if (row === undefined) return null;
     return this.#memory.withDisclosureContentLease([row.run_id],async () => {
-    const [runContent, factContent, composedContent, answerContent] = await Promise.all([
+    const [runContent, factContent, composedContent, answerContent, conformanceContent] = await Promise.all([
       decryptContentForRun<{ questionLine: string }>(
         this.pool, row.run_id, "core.run", row.run_id, row.run_content_ciphertext,
         { questionLine: row.question_line }
@@ -2662,6 +2727,10 @@ export class ServeRepository {
         this.pool, row.run_id, "serve.answer",
         serveAnswerContentRef(row.answer_id, Number(row.answer_version)),
         row.answer_content_ciphertext, { answerForm: row.answer_form }
+      ),
+      readConformanceSegmentResults(
+        this.pool, row.run_id, row.conformance_record_id,
+        row.conformance_content_ciphertext, row.conformance_segment_results
       )
     ]);
     const staleness = await this.#liveness.readSubjectStaleness({
@@ -2793,11 +2862,13 @@ export class ServeRepository {
       [row.answer_id, row.answer_version]
     );
     const memoryDisclosure = await this.#memory.readDisclosure(row.run_id);
-    const valueHinges = await this.pool.query<Answer["value_hinges"][number]>(
+    const storedValueHinges = await this.pool.query<Answer["value_hinges"][number] & {
+      content_ciphertext: CryptoEnvelope | null;
+    }>(
       `SELECT hinge.value_hinge_id::text AS value_hinge_ref,
               hinge.left_option_id AS left_option_ref, hinge.right_option_id AS right_option_ref,
               hinge.criterion_ids AS criterion_refs, hinge.weight_source, hinge.weight_owner,
-              reversal.rejected_criteria
+              reversal.rejected_criteria, hinge.content_ciphertext
        FROM core.value_hinge AS hinge
        JOIN LATERAL (
          SELECT point.rejected_criteria FROM core.reversal_point AS point
@@ -2805,6 +2876,26 @@ export class ServeRepository {
        ) AS reversal ON true
        WHERE hinge.run_id=$1 ORDER BY hinge.at_seq`, [row.run_id]
     );
+    // V-6 (0069): an encrypted run's weight owner is sealed per hinge row.
+    // Fix round 1 / 4: the run's key is prepared ONCE for all of them.
+    const hingeCipher = storedValueHinges.rows.some((hinge) => (hinge.content_ciphertext ?? null) !== null)
+      ? await prepareLeasedContentEncryptionForRun(this.pool, row.run_id)
+      : null;
+    let valueHinges: { rows: Answer["value_hinges"] };
+    try {
+      valueHinges = { rows: storedValueHinges.rows.map(({ content_ciphertext: envelope, ...hinge }) => ({
+        ...hinge,
+        weight_owner: hingeCipher === null || (envelope ?? null) === null
+          ? hinge.weight_owner
+          : decryptLeasedContentForRun<{ weightOwner: string | null }>(
+            hingeCipher, "core.value_hinge", hinge.value_hinge_ref, envelope ?? null,
+            { weightOwner: hinge.weight_owner }
+          ).weightOwner
+      })) };
+      await hingeCipher?.assertLive();
+    } finally {
+      await hingeCipher?.close();
+    }
     return {
       answer_id: row.answer_id,
       answer_version: row.answer_version,
@@ -2876,7 +2967,7 @@ export class ServeRepository {
       composition_budget_tier: row.composition_budget_tier,
       conformance_outcome: deriveConformanceOutcome(
         row.conformance_coverage_mode ?? "NOT_RUN",
-        row.conformance_segment_results ?? []
+        conformanceContent ?? []
       ),
       ledger_digest_handle: `ledger:${row.run_id}`,
       inspection_handle: `inspection:${row.answer_id}`,
@@ -3150,10 +3241,15 @@ export class ServeRepository {
       answer_version: number;
       terminal: Answer["terminal"];
       coverage_mode: Inspection["conformance"]["coverage_mode"] | null;
+      run_id: string;
       segment_results: Array<{ segmentId: string; state: "JUDGED" | "SAMPLED_PASSED" | "NOT_SAMPLED"; conforms: boolean }> | null;
+      conformance_record_id: string | null;
+      conformance_content_ciphertext: CryptoEnvelope | null;
     }>(
-      `SELECT answer.answer_id, answer.answer_version, answer.terminal,
-              conformance.coverage_mode, conformance.segment_results
+      `SELECT answer.answer_id, answer.answer_version, answer.terminal, answer.run_id,
+              conformance.coverage_mode, conformance.segment_results,
+              conformance.conformance_record_id,
+              conformance.content_ciphertext AS conformance_content_ciphertext
        FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id = answer.run_id
        LEFT JOIN serve.conformance_record AS conformance
@@ -3165,6 +3261,10 @@ export class ServeRepository {
     );
     const row = result.rows[0];
     if (row === undefined) return null;
+    const segmentResults = await readConformanceSegmentResults(
+      this.pool, row.run_id, row.conformance_record_id,
+      row.conformance_content_ciphertext, row.segment_results
+    );
     const segmentSuppressions = await this.pool.query<Inspection["segment_suppressions"][number]>(
       `SELECT segment_id, evicted_number_ref
        FROM serve.segment_suppression
@@ -3183,9 +3283,9 @@ export class ServeRepository {
       answer_id: row.answer_id,
       answer_version: row.answer_version,
       conformance: {
-        outcome: deriveConformanceOutcome(row.coverage_mode ?? "NOT_RUN", row.segment_results ?? []),
+        outcome: deriveConformanceOutcome(row.coverage_mode ?? "NOT_RUN", segmentResults ?? []),
         coverage_mode: row.coverage_mode ?? "NOT_RUN",
-        segment_results: (row.segment_results ?? []).map((segment) => ({
+        segment_results: (segmentResults ?? []).map((segment) => ({
           segment_id: segment.segmentId,
           state: segment.state,
           conforms: segment.conforms

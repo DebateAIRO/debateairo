@@ -394,11 +394,22 @@ export class LivenessRepository {
   }
 
   async detectProviderModelVersionTriggers(): Promise<number> {
+    // V-6 fix round 1 / 5c. The trigger key lands in an encrypted run's
+    // code-only progress event (0069), which accepts one engine token. The
+    // provider ref and the vendor's model version are therefore mapped, in SQL,
+    // BEFORE the write: a value that is already a token is kept verbatim, any
+    // other value becomes `sha256:<hex>` of itself — deterministic, so the
+    // dedupe below matches it on the next sweep, and one odd vendor string can
+    // no longer abort the whole sweep.
+    const tokenSegment = (column: string) =>
+      `CASE WHEN ${column} ~ '^[A-Za-z0-9_.:@/+-]{1,96}$' THEN ${column}
+            ELSE 'sha256:' || encode(sha256(convert_to(${column}, 'UTF8')), 'hex') END`;
     const transitions = await this.pool.query<{
       run_id: string;
       provider_ref: string;
       previous_version: string;
       model_version: string;
+      trigger_key: string;
     }>(
       `WITH ordered AS (
          SELECT run_id, provider_ref, model_version, at_seq,
@@ -413,14 +424,21 @@ export class LivenessRepository {
                )
            )
        )
-       SELECT transition.run_id, transition.provider_ref, transition.previous_version, transition.model_version
-       FROM ordered AS transition
+       , keyed AS (
+         SELECT transition.*,
+                'provider-model-version:' || ${tokenSegment("transition.provider_ref")}
+                  || ':' || ${tokenSegment("transition.model_version")} AS trigger_key
+         FROM ordered AS transition
+       )
+       SELECT transition.run_id, transition.provider_ref, transition.previous_version,
+              transition.model_version, transition.trigger_key
+       FROM keyed AS transition
        WHERE transition.previous_version IS NOT NULL
          AND transition.previous_version <> transition.model_version
          AND NOT EXISTS (
            SELECT 1 FROM core.revision_trigger AS trigger
            WHERE trigger.run_id=transition.run_id
-             AND trigger.trigger_key=('provider-model-version:' || transition.provider_ref || ':' || transition.model_version)
+             AND trigger.trigger_key=transition.trigger_key
          )
        ORDER BY transition.at_seq`
     );
@@ -433,7 +451,7 @@ export class LivenessRepository {
       if (subjects.rows.length === 0) continue;
       await this.recordTriggerFired({
         runId: transition.run_id,
-        triggerKey: `provider-model-version:${transition.provider_ref}:${transition.model_version}`,
+        triggerKey: transition.trigger_key,
         triggerKind: "PROVIDER_MODEL_VERSION",
         affectedSubjects: subjects.rows,
         reason: `RECORDED_MODEL_VERSION_CHANGED:${transition.previous_version}->${transition.model_version}`

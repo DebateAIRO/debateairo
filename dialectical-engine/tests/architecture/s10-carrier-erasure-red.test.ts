@@ -189,6 +189,11 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       .map(([path]) => path)
       .sort();
     expect(primitiveFiles).toEqual([
+      // V-6 (0069): the live event stream decrypts an encrypted run's
+      // investigation-gap rows, and the value overlay seals the weight owner.
+      // Both prepare the run's cipher through prepareLeasedContentEncryptionForRun,
+      // which establishes or borrows the session content lease (checked below).
+      "apps/api/src/index.ts",
       "apps/evaluator-worker/src/index.ts",
       "packages/db/src/index.ts",
       "packages/evaluator/src/index.ts",
@@ -199,7 +204,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/liveness/src/index.ts",
       "packages/memory/src/index.ts",
       "packages/serve/src/index.ts",
-      "packages/settlement/src/index.ts"
+      "packages/settlement/src/index.ts",
+      "packages/valuation/src/index.ts"
     ]);
     for (const path of primitiveFiles.filter((path) => path !== "packages/db/src/index.ts")) {
       const body = contents.get(path)!;
