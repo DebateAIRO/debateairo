@@ -681,7 +681,12 @@ describe("VPS baseline: runbook and environment templates", () => {
       "`250000`", "`2000000`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false",
       // The settings register on this host, and the rows a hosted start-up refuses without.
       "### Publishing the settings register on this host", "costEnvelopePolicy", "admissionPolicy",
-      "configuredProviderSet", "Task 14b", "go-live blocker",
+      "configuredProviderSet",
+      // Task 14b: the hosted publish command, inside the migrator window, and its not-ready line.
+      "pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json",
+      "pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json",
+      "HOSTED_REGISTER_NOT_BOOT_READY", "HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT",
+      "development-source-refs",
       // Rehearsals as runbook steps.
       "#### Rehearsing the rotation", "tests/unit/rotate-kek.test.ts", "#### The restore rehearsal",
       // V-9(a)(b).
@@ -693,6 +698,14 @@ describe("VPS baseline: runbook and environment templates", () => {
       // The observation agent's database access, consistent with V-29.
       "a narrow statistics window (V-29)"
     ]) expect(readme, needle).toContain(needle);
+    // Task 14b landed: the runbook must no longer say publishing is impossible.
+    for (const stale of ["No hosted register-publication command", "A hosted publish command lands in a companion change", "which, today, is not\npossible"]) {
+      expect(readme, stale).not.toContain(stale);
+    }
+    // The first publication runs inside the migrator window: after the principals, before it closes.
+    const publish = readme.indexOf("pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json");
+    expect(publish).toBeGreaterThan(readme.indexOf("pnpm db:provision-principals"));
+    expect(publish).toBeLessThan(readme.indexOf("ALTER ROLE debateai_prod_migrator PASSWORD NULL"));
   });
 
   /** Constraint 10, over the whole runbook now rather than one section. */
