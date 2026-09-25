@@ -53,7 +53,9 @@
 		# C2b: the UI honours the hop above only when this secret matches (timingSafeEqual in
 		# apps/ui/trusted-client-ip.mjs). Without it any local process able to open
 		# 127.0.0.1:3001 could forge a client address and evade the per-IP admission limits.
-		# The file is 0640 root:caddy, >= 43 base64url characters (README §4).
-		header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.secret}
+		# Caddy's own copy of the secret: 0640 root:caddy, >= 43 base64url characters, the same
+		# bytes as the UI's 0400 debateai-ui copy at /etc/debateai/ui-edge.secret, which the UI
+		# refuses to share with any group (README §3 "The key-file contract").
+		header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}
 	}
 }

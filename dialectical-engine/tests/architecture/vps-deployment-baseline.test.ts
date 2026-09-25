@@ -2,7 +2,7 @@
 // Pins the VPS deployment baseline (PLAN §8 C3, §9.1 C3 amendments, audit corrections
 // L2-F3, L5-F6/F7/F8/F11, L7-F2/F3/F7). Every assertion is a floor on a file under
 // deploy/; the files are configuration, so the pins are textual and deliberately exact.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -73,7 +73,8 @@ const EDGE_FILES = [
   "deploy/vps/systemd/debateai-api.service",
   "deploy/vps/systemd/debateai-ui.service",
   "deploy/vps/systemd/debateai-runner.service",
-  "deploy/vps/systemd/debateai-hatchet.service"
+  "deploy/vps/systemd/debateai-hatchet.service",
+  "deploy/vps/systemd/debateai-observation-agent.service"
 ] as const;
 const BACKUP_FILES = [
   "deploy/vps/backup.sh",
@@ -87,7 +88,8 @@ const RUNBOOK_FILES = [
   "deploy/vps/README.md",
   "deploy/vps/env/api.env.example",
   "deploy/vps/env/runner.env.example",
-  "deploy/vps/env/ui.env.example"
+  "deploy/vps/env/ui.env.example",
+  "deploy/vps/env/observation-agent.env.example"
 ] as const;
 
 describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => {
@@ -174,6 +176,47 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
   });
 });
 
+/**
+ * DL5-F7. hardening.sql closes CONNECT to PUBLIC and re-opens it by name, so a role missing from
+ * its list cannot connect at all: the support data plane and the support-config operator were
+ * missing, and on the VPS the support chat failed closed at boot. The list is checked against the
+ * manifest rather than restated: every capability role the managed principals inherit CONNECT
+ * through, and every principal a migration mints with its own LOGIN.
+ */
+describe("VPS baseline: hardening.sql re-opens CONNECT for every manifest role (DL5-F7)", () => {
+  const fullManifest = JSON.parse(
+    read("docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json")
+  ) as {
+    capabilityRoles: ReadonlyArray<{ roleName: string }>;
+    principals: ReadonlyArray<{ id: string; roleName: string; database: string }>;
+    principalProvisioning: ReadonlyArray<{ principalId: string; state: string }>;
+  };
+
+  function connectGrantees(sql: string): ReadonlySet<string> {
+    const grantees = new Set<string>();
+    for (const match of sqlStatements(sql).matchAll(/GRANT\s+CONNECT\s+ON\s+DATABASE\s+debateai\s+TO\s+([^;]+);/giu)) {
+      for (const role of (match[1] ?? "").split(",")) grantees.add(role.trim());
+    }
+    return grantees;
+  }
+
+  it("grants CONNECT on debateai to every capability role and every migration-minted principal", () => {
+    const grantees = connectGrantees(read("deploy/postgres/hardening.sql"));
+    const migrationMinted = new Set(fullManifest.principalProvisioning
+      .filter(({ state }) => state === "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL")
+      .map(({ principalId }) => principalId));
+    const expected = [
+      ...fullManifest.capabilityRoles.map(({ roleName }) => roleName),
+      ...fullManifest.principals
+        .filter(({ id, database }) => database === "debateai" && migrationMinted.has(id))
+        .map(({ roleName }) => roleName)
+    ];
+    expect(expected).toContain("debateai_support");
+    expect(expected).toContain("debateai_support_config_operator");
+    expect(expected.filter((role) => !grantees.has(role))).toEqual([]);
+  });
+});
+
 describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd units (L7-F2, L7-F3, L7-F7)", () => {
   it("ships every edge file", () => {
     for (const file of EDGE_FILES) expect(exists(file), file).toBe(true);
@@ -185,7 +228,8 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
       "reverse_proxy 127.0.0.1:3001",
       "header_up X-Forwarded-For {remote_host}",
       "header_up X-Forwarded-Proto https",
-      "header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.secret}",
+      // Caddy's own 0640 root:caddy copy: the UI refuses a secret file with any group bit.
+      "header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}",
       'Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"',
       "-Server",
       "protocols tls1.2 tls1.3",
@@ -239,6 +283,28 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(unit).not.toMatch(/^User=debateai$/m);
   });
 
+  /**
+   * Task 14: the observation agent's unit. Same hardening floor as the three application units,
+   * its own OS user, no custody group, no writable path but its state directory — and it is NOT
+   * switched on by the runbook's enable line, because the agent has never run on Linux (§12).
+   */
+  it("debateai-observation-agent.service: own user, hardening floor, no custody, not enabled by §5", () => {
+    const unit = read("deploy/vps/systemd/debateai-observation-agent.service");
+    expect(unit).toContain("User=debateai-observer");
+    expect(unit).toContain("EnvironmentFile=/etc/debateai/observation-agent.env");
+    for (const needle of HARDENING) expect(unit, `observation-agent: ${needle}`).toContain(needle);
+    expect(unit).not.toContain("MemoryDenyWriteExecute=true");
+    expect(unit).not.toMatch(/^ReadWritePaths=/m);
+    expect(unit).not.toContain("debateai-custody");
+    expect(unit).toContain("StateDirectory=debateai-observation-agent");
+    expect(unit).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/observation-agent/src/main.ts");
+    expect(unit).toMatch(/^After=.*\bpostgresql\.service\b/m);
+    const readme = read("deploy/vps/README.md");
+    const enable = /systemctl enable --now ([^\n]*(?:\\\n[^\n]*)*)/u.exec(readme)?.[1] ?? "";
+    expect(enable).toContain("debateai-api");
+    expect(enable).not.toContain("debateai-observation-agent");
+  });
+
   it("ReadWritePaths are exactly the custody trees each service writes (L2 out-of-scope, C3 amendment)", () => {
     const api = read("deploy/vps/systemd/debateai-api.service");
     expect(api).toMatch(/^ReadWritePaths=\/var\/lib\/debateai\/api\/user-deks \/var\/lib\/debateai\/api\/publication-keys \/var\/lib\/debateai\/api\/audit-keys$/m);
@@ -288,6 +354,32 @@ describe("VPS baseline: encrypted DB + custody backups with separate escrow, res
     expect(script.indexOf("pg_dump --format=custom")).toBeLessThan(script.indexOf("custody.tar"));
     expect(script).toMatch(/printf 'BACKUP_OK %s %s %s\\n'/);
     expect(script).not.toMatch(/age -r "\$\{?BACKUP_DATA_RECIPIENT\}?"[^\n]*(kek|secrets)/);
+  });
+
+  /**
+   * DL2-F5. The support session and case keys live in Postgres, wrapped by the support KEK, so
+   * the nightly dump carries them — and without the support KEK in escrow a restore from that
+   * dump can never open a single support conversation. It is the fifth escrowed secret, beside
+   * the four the C3 baseline named, and the drill proves it came back.
+   */
+  it("backup.sh escrows the support KEK as the fifth secret, and the drill proves it came back (DL2-F5)", () => {
+    const script = read("deploy/vps/backup.sh");
+    expect(script).toContain(': "${SUPPORT_KEK_PATH:?}"');
+    const escrow = script.slice(script.indexOf('tar -cf "$WORK/keys.tar"'), script.indexOf("KEY_DIGEST="));
+    for (const key of ["KEK_PATH", "CORPUS_KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_SOURCE_IP_SALT_PATH", "SUPPORT_KEK_PATH"]) {
+      expect(escrow, key).toContain(`"$(basename "$${key}")"`);
+    }
+    // The support KEK never rides in the data envelope with the dump it unlocks.
+    const dataEnvelope = script.slice(script.indexOf("# --- 3. the custody tree"), script.indexOf("# --- 5."));
+    expect(dataEnvelope).not.toContain("SUPPORT_KEK_PATH");
+    const conf = envKeys(read("deploy/vps/backup.conf.example"));
+    expect(conf.get("SUPPORT_KEK_PATH")).toBe("/etc/debateai/api/support-kek.bin");
+    expect(envKeys(read("deploy/vps/env/api.env.example")).get("SUPPORT_KEK_PATH")).toBe(conf.get("SUPPORT_KEK_PATH"));
+    const drill = read("deploy/vps/restore-drill.sh");
+    expect(drill).toContain(': "${SUPPORT_KEK_PATH:?}"');
+    expect(drill).toContain("RESTORE_DRILL_REFUSED no restored support KEK");
+    expect(drill.indexOf("RESTORE_DRILL_REFUSED no restored support KEK"))
+      .toBeLessThan(drill.indexOf("RESTORE_DRILL_OK"));
   });
 
   it("restore-drill.sh: scratch DB + scratch custody, core.run count, chain SQL, sample decrypt, RESTORE_DRILL_OK, cleanup", () => {
@@ -558,4 +650,177 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(ui.get("NEXT_PUBLIC_API_BASE")).toBe("/api");
     for (const [key] of ui) expect(key).not.toMatch(/KEK|DATABASE_URL|HATCHET|SECRET$/);
   });
+
+  /**
+   * Task 14 (DEPLOY1). The kit carried a "Known-stale sections" banner listing what a first
+   * provision would trip over. Each item is pinned here as fixed, and the banner is gone.
+   */
+  it("README: the Task 14 refresh — banner removed, every item it listed fixed", () => {
+    const readme = read("deploy/vps/README.md");
+    expect(readme).not.toContain("Known-stale sections");
+    const providers = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    for (const code of [
+      "PROVIDER_TARGET_PRICE_REQUIRED", "PROVIDER_TARGET_PRICE_ZERO",
+      "PROVIDER_DISCOVERY_TARGET_PRICE_INVALID", "COST_ENVELOPE_POLICY_UNRESOLVED",
+      "COST_ENVELOPE_POLICY_INVALID", "SUPPORT_ADMISSION_SCOPES_NOT_SEALED"
+    ]) expect(providers, code).toMatch(new RegExp(`\\| \`${code}`, "u"));
+    expect(providers).toContain('"input_price_micros_per_million":3000000');
+    expect(providers).toContain('"output_price_micros_per_million":15000000');
+    expect(readme).not.toMatch(/daily\s+call\s+cap\s+is\s+the\s+only\s+ceiling\s+until/u);
+    expect(readme).not.toMatch(/KEK rotation\*\* is not implemented/u);
+    expect(readme).toContain("pnpm keys:rotate-kek");
+    const layout = readme.slice(readme.indexOf("## 3. `/etc/debateai` layout"), readme.indexOf("### The key-file contract"));
+    expect(layout).toMatch(/\| `\/etc\/debateai\/api\/` \|[^\n]*`support-kek\.bin`/u);
+    expect(layout).toMatch(/SUPPORT_DATABASE_URL[^\n]*debateai_prod_api_support/u);
+  });
+
+  it("README: cost envelopes, register publication, rehearsals, V-9(a)(b), known limitations", () => {
+    const readme = read("deploy/vps/README.md");
+    for (const needle of [
+      // V-28: the temporary values for the owner's first paid run, and how they are superseded.
+      "`250000`", "`2000000`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false",
+      // The settings register on this host, and the rows a hosted start-up refuses without.
+      "### Publishing the settings register on this host", "costEnvelopePolicy", "admissionPolicy",
+      "configuredProviderSet", "Task 14b", "go-live blocker",
+      // Rehearsals as runbook steps.
+      "#### Rehearsing the rotation", "tests/unit/rotate-kek.test.ts", "#### The restore rehearsal",
+      // V-9(a)(b).
+      "V-9(a) and (b)", "ssh -L 8888:127.0.0.1:8888",
+      // Honest limitations for what the owner ruled out of this round.
+      "ASK_PLAN_TIER_MODEL_UNAVAILABLE", "Task 16", "V-26", "V-17", "B28", "Task 13",
+      // The provisioner's real command line, and the six principals provisioned expired.
+      "pnpm db:provision-principals --support-config-credential-file", "VALID UNTIL '-infinity'",
+      // The observation agent's database access, consistent with V-29.
+      "a narrow statistics window (V-29)"
+    ]) expect(readme, needle).toContain(needle);
+  });
+
+  /** Constraint 10, over the whole runbook now rather than one section. */
+  it("README: every fenced block is a paste-safe sh block or an explicit text block", () => {
+    const readme = read("deploy/vps/README.md");
+    const fences = [...readme.matchAll(/^```(\S*)$/gmu)].map((match) => match[1]);
+    expect(fences.length % 2).toBe(0);
+    for (let index = 0; index < fences.length; index += 2) {
+      expect(["sh", "text"], `opening fence #${index / 2}`).toContain(fences[index]);
+      expect(fences[index + 1], `closing fence #${index / 2}`).toBe("");
+    }
+    for (const block of readme.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      expect(block[1], block[1]).not.toMatch(/<[A-Za-z][A-Za-z0-9_-]*>/u);
+      expect(block[1], block[1]).not.toContain("→");
+    }
+  });
+
+  /**
+   * V-29 (migration 0068, merged). The kit's wording — "a narrow statistics window" — is true only
+   * while (1) a migration really revokes pg_monitor from the agent and hands it the definer
+   * function, (2) no LATER migration grants it a pg_* role again, and (3) nothing in deploy/
+   * grants any pg_* role to anyone.
+   */
+  it("V-29: the window exists in the migrations, nothing re-grants a pg_* role, and deploy/ grants none", () => {
+    const migrationsDirectory = resolve(engineRoot, "migrations");
+    const migrations = readdirSync(migrationsDirectory).filter((name) => name.endsWith(".sql")).sort();
+    const window = migrations.find((name) => name.startsWith("0068_"));
+    expect(window).toBeDefined();
+    const windowSql = sqlStatements(read(`migrations/${window!}`));
+    expect(windowSql).toMatch(/REVOKE\s+pg_monitor\s+FROM\s+debateai_observation_agent\s*;/u);
+    expect(windowSql).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+obs\.postgres_capacity\([^)]*\)\s+TO\s+debateai_observation_agent\s*;/u);
+    expect(windowSql).toContain("OBS_AGENT_PREDEFINED_ROLE_MEMBERSHIP");
+    for (const name of migrations.filter((candidate) => candidate > window!)) {
+      expect(sqlStatements(read(`migrations/${name}`)), name)
+        .not.toMatch(/GRANT\s+pg_[a-z_]+\s+TO\s+[^;]*debateai_observation_agent/iu);
+    }
+    for (const file of POSTGRES_FILES) {
+      if (!file.endsWith(".sql")) continue;
+      expect(sqlStatements(read(file)), file).not.toMatch(/GRANT\s+pg_[a-z_]+\s+TO/iu);
+      expect(sqlStatements(read(file)), file).not.toMatch(/\bpg_(monitor|read_all_stats)\b/iu);
+    }
+  });
+
+  /**
+   * Task 14 review, items 1, 5, 6 and 7. A runbook block is pasted, and pasted again. A bare
+   * `>` onto a key or credential file on a live host replaces the only copy of that secret —
+   * every record it wraps is then lost. So every redirect that writes a secret must be guarded
+   * (a `test ! -e` / `test -e … ||` check in the same command, or noclobber), and every
+   * `shred -u` must run only after the command before it SUCCEEDED (`&&`), so a failed step
+   * never destroys the evidence or the envelope it needed.
+   */
+  it("README: every secret-writing redirect is guarded and every shred -u is chained with &&", () => {
+    const readme = read("deploy/vps/README.md");
+    const unguarded: string[] = [];
+    const unchainedShreds: string[] = [];
+    for (const block of readme.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      const commands = (block[1] ?? "").replace(/\\\n\s*/gu, " ").split("\n")
+        .map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#"));
+      for (const command of commands) {
+        for (const redirect of command.matchAll(/(?<![0-9&])>\s*(\S+)/gu)) {
+          const target = redirect[1] ?? "";
+          if (!/(secret|key|pgpass|\.bin|\.header|\.json|token|password)/iu.test(target)) continue;
+          if (/\btest\s+(!\s+)?-e\s/u.test(command) || /\bset\s+(-C|-o\s+noclobber)\b/u.test(command)) continue;
+          unguarded.push(command);
+        }
+        if (/\bshred\s+-u\b/u.test(command) && !/&&\s*shred\s+-u\b/u.test(command)) {
+          unchainedShreds.push(command);
+        }
+      }
+    }
+    expect(unguarded).toEqual([]);
+    expect(unchainedShreds).toEqual([]);
+  });
+
+  /**
+   * Re-review item 4. A terminal without bracketed paste feeds a pasted block line by line, and a
+   * `read` that waits for input swallows the NEXT pasted line as its answer — a password prompt
+   * would take a command as the password. So every `read` begins a single-line `&&` chain that
+   * uses its answer, and no line follows it inside its block.
+   */
+  it("README: every read begins a single-line chain and is the last line of its block", () => {
+    const readme = read("deploy/vps/README.md");
+    const offending: string[] = [];
+    for (const block of readme.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      const lines = (block[1] ?? "").split("\n").map((line) => line.trim())
+        .filter((line) => line !== "" && !line.startsWith("#"));
+      lines.forEach((line, index) => {
+        if (!/(^|&&\s*|;\s*)read\s/u.test(line)) return;
+        if (!/^read\s[^&]*&&\s*\S/u.test(line) || line.endsWith("\\") || index !== lines.length - 1) {
+          offending.push(line);
+        }
+      });
+    }
+    expect(offending).toEqual([]);
+  });
+
+  it("README: the previous master keys are shredded only after a machine check that no service names them", () => {
+    const readme = read("deploy/vps/README.md");
+    const shred = /[^\n]*shred -u \/etc\/debateai\/api-previous\/kek\.bin[^\n]*/u.exec(
+      readme.replace(/\\\n\s*/gu, " ")
+    )?.[0] ?? "";
+    expect(shred).toMatch(/!\s*grep -q '_KEK_PREVIOUS_PATH=' \/etc\/debateai\/api\.env \/etc\/debateai\/runner\.env\s*&&/u);
+  });
+
+  it("README: the edge secret is created unreadable to others, owned by the UI, with the Caddy copy", () => {
+    const readme = read("deploy/vps/README.md").replace(/\\\n\s*/gu, " ");
+    expect(readme).toMatch(/umask 0277[^\n]*> \/etc\/debateai\/ui-edge\.secret/u);
+    expect(readme).toMatch(/chown debateai-ui:debateai-ui \/etc\/debateai\/ui-edge\.secret/u);
+    expect(readme).toMatch(/install -m 0640 -o root -g caddy \/etc\/debateai\/ui-edge\.secret/u);
+  });
+
+  /**
+   * Re-review item 6. hatchet.env's DATABASE_URL must carry the same password bootstrap.sql gave
+   * debateai_prod_hatchet, which lives only in hatchet.pgpass. The step derives it from that file
+   * without the secret ever reaching a terminal or an argv: the builtin printf formats it, the
+   * redirect writes it, and the line is guarded so a second paste cannot rewrite the file.
+   */
+  it("README: hatchet.env's DATABASE_URL is derived from hatchet.pgpass, guarded, never echoed", () => {
+    const readme = read("deploy/vps/README.md");
+    expect(readme).toContain(
+      "test ! -e /etc/debateai/hatchet.env && (umask 0177 && printf 'DATABASE_URL=postgresql://debateai_prod_hatchet:%s@localhost/hatchet?host=/var/run/postgresql\\n' \"$(cat /etc/debateai/hatchet.pgpass)\" > /etc/debateai/hatchet.env)"
+    );
+    const bring = readme.slice(readme.indexOf("### Bring-up order"), readme.indexOf("## 5. Application units"));
+    expect(bring.indexOf("> /etc/debateai/hatchet.env")).toBeGreaterThan(bring.indexOf("-f deploy/postgres/bootstrap.sql"));
+    for (const block of readme.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      expect(block[1], block[1]).not.toMatch(/\becho\b[^\n]*(pgpass|password|secret)/iu);
+      expect(block[1], block[1]).not.toMatch(/^\s*cat\s+\/etc\/debateai\/hatchet\.pgpass\s*$/mu);
+    }
+  });
 });
+

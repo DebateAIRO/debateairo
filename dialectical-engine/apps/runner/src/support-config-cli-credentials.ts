@@ -3,6 +3,7 @@ import { lstat, open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import pg, { type Pool, type PoolClient } from "pg";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
+import { acceptsProductionDatabaseUrlQuery } from "./production-database-url.js";
 
 const { Pool: PgPool } = pg;
 
@@ -183,7 +184,8 @@ function parseExactProductionCredentials(
   if ((parsedUrl.protocol !== "postgres:" && parsedUrl.protocol !== "postgresql:")
     || parsedUrl.hostname.length === 0
     || parsedUrl.pathname !== "/debateai"
-    || parsedUrl.search !== ""
+    // DL7-F6: the two shapes the VPS pg_hba admits (socket, verified TLS) need a query.
+    || !acceptsProductionDatabaseUrlQuery(parsedUrl)
     || parsedUrl.hash !== ""
     || parsedUrl.username !== PRODUCTION_SUPPORT_CONFIG_OPERATOR_ROLE
     || passwordBytes < 32

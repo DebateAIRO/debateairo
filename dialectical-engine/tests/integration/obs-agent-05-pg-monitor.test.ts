@@ -203,11 +203,13 @@ describe("OBS-05 V-29 statistics window replaces pg_monitor", () => {
     expect(await replayWindowMigration()).toBe("APPLIED");
   });
 
-  it("keeps every other agent grant, including INSERT on observation.threshold_policy", async () => {
+  it("keeps every other agent grant; the threshold policy is read-only for it since 0071 (DL7-F9)", async () => {
+    // 0068 kept this INSERT on purpose until `oactl thresholds apply` had its own principal;
+    // 0071 gave it one and revoked the grant. SELECT stays: the daemon reads every version.
     await expect(fixture().pool.query(`
       SELECT has_table_privilege('${agentRole}','observation.threshold_policy','INSERT') AS can_insert,
              has_table_privilege('${agentRole}','observation.threshold_policy','SELECT') AS can_select
-    `)).resolves.toMatchObject({ rows: [{ can_insert: true, can_select: true }] });
+    `)).resolves.toMatchObject({ rows: [{ can_insert: false, can_select: true }] });
     await expect(fixture().pool.query(`
       SELECT count(*)::text AS grants FROM information_schema.role_table_grants
       WHERE grantee='${agentRole}'

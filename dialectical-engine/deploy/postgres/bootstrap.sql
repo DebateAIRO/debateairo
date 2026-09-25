@@ -1,10 +1,10 @@
 -- deploy/postgres/bootstrap.sql
 -- Phase 1 of the cluster bring-up, run ONCE as the `postgres` OS user over the socket, BEFORE the
--- first `pnpm db:migrate` (README §5):
+-- first `pnpm db:migrate` (README §4):
 --   sudo -u postgres psql -v ON_ERROR_STOP=1 -v hatchet_password="$(cat /etc/debateai/hatchet.pgpass)" -f bootstrap.sql
 -- It creates the two roles no migration or provisioner creates, and the two databases. It never
 -- contains a literal password: the Hatchet password is a psql variable, the migrator has NONE
--- until a ceremony mints a just-in-time one (README §6). Idempotent by guard blocks.
+-- until a ceremony mints a just-in-time one (README §4). Idempotent by guard blocks.
 \set ON_ERROR_STOP on
 
 -- Just-in-time superuser (P3-01 `migration-admin`, invariant NO_LONG_LIVED_SUPERUSER_CREDENTIAL).

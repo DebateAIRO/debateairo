@@ -125,6 +125,11 @@
       "source": "migrations/0057_observation_foundation.sql"
     },
     {
+      "principalId": "observation-threshold-operator",
+      "state": "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL",
+      "source": "migrations/0071_observation_threshold_operator.sql"
+    },
+    {
       "principalId": "support-config-operator",
       "state": "SPECIFIED_NOT_PROVISIONED",
       "source": null
@@ -1231,6 +1236,52 @@
       ]
     },
     {
+      "id": "observation-threshold-operator",
+      "roleName": "debateai_observation_threshold_operator",
+      "kind": "SERVICE",
+      "database": "debateai",
+      "login": true,
+      "inherit": false,
+      "superuser": false,
+      "createDatabase": false,
+      "createRole": false,
+      "replication": false,
+      "bypassRls": false,
+      "directMemberships": [],
+      "effectiveMemberships": [],
+      "forbiddenMemberships": [
+        "debateai_authorization_runtime",
+        "debateai_content_provision",
+        "debateai_erasure_runtime",
+        "debateai_evaluator_api",
+        "debateai_evaluator_ddl",
+        "debateai_evaluator_reader",
+        "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
+        "debateai_obs_view_owner",
+        "debateai_prod_*",
+        "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
+        "debateai_replay",
+        "debateai_runtime",
+        "debateai_settlement_watch",
+        "debateai_support",
+        "debateai_support_config_operator",
+        "pg_*"
+      ],
+      "ownsDatabases": [],
+      "ownsSchemas": [],
+      "connectionPurposes": [
+        {
+          "component": "operator:oactl-thresholds-apply",
+          "sourceFile": "apps/observation-agent/src/oactl/core/commands.ts",
+          "environmentKey": null,
+          "purpose": "OBSERVATION_THRESHOLD_RATIFICATION",
+          "binding": "WIRED"
+        }
+      ]
+    },
+    {
       "id": "support-config-operator",
       "roleName": "debateai_prod_support_config_operator",
       "kind": "HUMAN_EXECUTE_ONLY",
@@ -1565,6 +1616,13 @@
       "credentialId": "credential:observation-agent",
       "lifecycle": "MIGRATION_MINTED_UNMANAGED",
       "currentProvisioner": "migrations/0057_observation_foundation.sql",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "observation-threshold-operator",
+      "credentialId": "credential:observation-threshold-operator",
+      "lifecycle": "MIGRATION_MINTED_UNMANAGED",
+      "currentProvisioner": "migrations/0071_observation_threshold_operator.sql",
       "ownerTicket": "P3-02"
     },
     {

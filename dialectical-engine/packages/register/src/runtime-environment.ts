@@ -545,8 +545,7 @@ export function loadRunnerEnvironment() {
   return parseRunnerEnvironment(process.env);
 }
 
-export function parseRunnerEnvironment(source: EnvironmentSource) {
-  const environment = parseEnvironmentSource({
+const runnerEnvironmentShape = {
     KEK_PATH: kekPath,
     /**
      * V-3, fix wave A-C2. The runner's half of a changeover. It holds ONE
@@ -592,7 +591,10 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     // Same key, same shape, same default — one knob, two entry points.
     PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
     ...hatchetShape
-  }, source);
+} as const;
+
+export function parseRunnerEnvironment(source: EnvironmentSource) {
+  const environment = parseEnvironmentSource(runnerEnvironmentShape, source);
   if (environment.CONTENT_BLIND_INDEX_KEY_PATH !== undefined) {
     throw new TypeError("CONTENT_BLIND_INDEX_V1_KEY_MUST_BE_RETIRED");
   }
@@ -622,19 +624,60 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
   };
 }
 
+const observationAbsolutePath = z.string().min(1).regex(/^\//u);
+const observationAgentEnvironmentShape = {
+  OBSERVATION_DATABASE_URL: z.string().url(),
+  OBSERVATION_STATE_DIR: observationAbsolutePath,
+  OBSERVATION_TARGETS_PATH: observationAbsolutePath,
+  OBSERVATION_HATCHET_TOKEN_PATH: z.string().min(1).optional()
+} as const;
+
 export function loadObservationAgentEnvironment() {
   const observationEnvironment = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => key.startsWith("OBSERVATION_"))
   );
-  const absolutePath = z.string().min(1).regex(/^\//u);
-  const environment = Object.freeze(z.object({
-    OBSERVATION_DATABASE_URL: z.string().url(),
-    OBSERVATION_STATE_DIR: absolutePath,
-    OBSERVATION_TARGETS_PATH: absolutePath,
-    OBSERVATION_HATCHET_TOKEN_PATH: z.string().min(1).optional()
-  }).strict().parse(observationEnvironment));
+  const environment = Object.freeze(
+    z.object(observationAgentEnvironmentShape).strict().parse(observationEnvironment)
+  );
   // C1 / L5-F3: every loader floors its `*_DATABASE_URL` in production. NODE_ENV is read
   // for the floor only — the agent's ruled inputs stay the four OBSERVATION_ keys above.
   assertProductionFloors({ ...environment, NODE_ENV: process.env.NODE_ENV });
   return environment;
 }
+
+/**
+ * Task 14 amendment. Which keys each service's strict shape REQUIRES and which it merely
+ * ACCEPTS, read from the shape itself so a deployment template can be checked against it
+ * (`tests/architecture/vps-env-examples-match-shapes.test.ts`). A key is required when the
+ * shape refuses it absent — a zod failure or a typed refusal such as `KEK_UNRESOLVED`; a key
+ * with a default or an `.optional()` is accepted-only. Conditional requirements (a key made
+ * mandatory by another key's value, like `CORPUS_KEK_PATH` under `PUBLICATION_ENABLED=true`)
+ * are the loaders' business and are not reported here.
+ */
+export type EnvironmentKeyInventory = Readonly<{
+  required: readonly string[];
+  optional: readonly string[];
+}>;
+
+function environmentKeyInventory(shape: z.ZodRawShape): EnvironmentKeyInventory {
+  const required: string[] = [];
+  const optional: string[] = [];
+  for (const [key, schema] of Object.entries(shape)) {
+    let acceptsAbsent: boolean;
+    try {
+      acceptsAbsent = (schema as z.ZodType).safeParse(undefined).success;
+    } catch {
+      acceptsAbsent = false;
+    }
+    (acceptsAbsent ? optional : required).push(key);
+  }
+  return Object.freeze({
+    required: Object.freeze(required),
+    optional: Object.freeze(optional)
+  });
+}
+
+export const API_ENVIRONMENT_KEYS = environmentKeyInventory(apiEnvironmentShape);
+export const RUNNER_ENVIRONMENT_KEYS = environmentKeyInventory(runnerEnvironmentShape);
+export const OBSERVATION_AGENT_ENVIRONMENT_KEYS =
+  environmentKeyInventory(observationAgentEnvironmentShape);
