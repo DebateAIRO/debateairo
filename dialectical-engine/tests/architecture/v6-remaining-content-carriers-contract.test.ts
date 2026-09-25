@@ -46,6 +46,7 @@ describe("V-6 remaining content carriers — architecture contract", () => {
     expect(definedHere).toEqual([
       "core.jsonb_is_code_token",
       "core.jsonb_has_exact_keys",
+      "core.jsonb_is_uuid_text",
       "core.progress_value_is_code_shaped",
       "core.raw_artifact_metadata_is_code_shaped",
       "core.enforce_content_ciphertext_remaining_carriers",

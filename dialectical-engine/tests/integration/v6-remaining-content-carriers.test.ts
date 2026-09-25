@@ -614,7 +614,7 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
       runId,
       kind: "node.retrying",
       value: {
-        state: "COOLDOWN_HOLD", call_site_key: "JUDGE:cross-root:0->1", parent_node_ref: randomUUID(),
+        state: "COOLDOWN_HOLD", call_site_key: "JUDGE", parent_node_ref: null,
         hold_ms: 10, hold_until: new Date("2026-09-01T00:00:00.000Z").toISOString(), attempts_spent: 1,
         transport_outcome: "TIMED_OUT", planned_leg_count: 1
       }
@@ -754,17 +754,27 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
 
   it("refuses object- and array-smuggled prose in every code-only progress kind and in artifact metadata (closed allow-lists)", async () => {
     const runId = await createEncryptedRun(`v6 smuggling ${randomUUID()}`);
+    // Real subjects of THIS run: the pinned refs must name them.
+    await recordOverlay(runId, null);
+    const nodeId = (await database.pool.query<{ node_id: string }>(
+      "SELECT node_id::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq LIMIT 1", [runId]
+    )).rows[0]!.node_id;
+    const answerId = await persistVerdict(runId, `v6-smuggling-segment-${randomUUID()}`, true);
     const objectProse = { w1: "The", w2: "verdict", w3: "is", w4: "guilty" };
     const arrayProse = ["the", "defendant", "lied"];
     const cooldown = {
-      state: "COOLDOWN_HOLD", call_site_key: "JUDGE:review:node:1", parent_node_ref: null,
-      hold_ms: 10, hold_until: null, attempts_spent: 1, transport_outcome: "TIMED_OUT", planned_leg_count: 1
+      state: "COOLDOWN_HOLD", call_site_key: `JUDGE:review:${nodeId}`, parent_node_ref: nodeId,
+      hold_ms: 10, hold_until: new Date("2026-09-01T00:00:10.000Z").toISOString(), attempts_spent: 1,
+      transport_outcome: "TIMED_OUT", planned_leg_count: 1
     };
     const refusal = {
       state: "SYNTHESIS_ROLE_PROVIDER_ABSENT", call_site_key: "SYNTHESIZER:provider:x",
-      role_ref: "provider:x", role: "SYNTHESIZER", absent_failure_code: null
+      role_ref: "provider:x", role: "SYNTHESIZER", absent_failure_code: "PROVIDER_PROBE_FAILED"
     };
-    const staleness = { trigger_key: "test-layer:q58", affected_subjects: [{ kind: "NODE", ref: randomUUID() }] };
+    const staleness = {
+      trigger_key: "test-layer:q58",
+      affected_subjects: [{ kind: "NODE", ref: nodeId }, { kind: "ANSWER", ref: answerId }]
+    };
     const smuggled: Array<readonly [string, unknown]> = [
       ["PHASE", objectProse], ["PHASE", arrayProse], ["PHASE", "UNDECLARED_PHASE"],
       ["ENVELOPE_STATE", objectProse], ["ENVELOPE_STATE", arrayProse],
@@ -782,7 +792,20 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
       ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [{ kind: arrayProse, ref: "x" }] }],
       ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [{ kind: "NODE", ref: "x", ...objectProse }] }],
       ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [] }],
-      ["honesty.staleness_trigger_fired", { ...staleness, w1: "The" }]
+      ["honesty.staleness_trigger_fired", { ...staleness, w1: "The" }],
+      // Final round: one word per element / per field is refused too. Every
+      // free-looking field is pinned to the exact format its writer emits.
+      ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [
+        { kind: "NODE", ref: "The" }, { kind: "NODE", ref: "verdict" }, { kind: "NODE", ref: "is" }
+      ] }],
+      ["node.retrying", { ...cooldown, parent_node_ref: "defendant" }],
+      ["node.retrying", { ...cooldown, hold_until: "the-defendant-lied" }],
+      ["node.retrying", { ...cooldown, hold_until: "2026-09-01" }],
+      ["node.retrying", { ...cooldown, call_site_key: "JUDGE:the:defendant:lied" }],
+      ["node.retrying", { ...cooldown, call_site_key: "verdict" }],
+      ["node.retrying", { ...cooldown, call_site_key: "JUDGE:review:guilty" }],
+      ["ledger.could_not_do", { ...refusal, call_site_key: "SYNTHESIZER:the-defendant" }],
+      ["ledger.could_not_do", { ...refusal, absent_failure_code: "the-defendant-lied" }]
     ];
     for (const [kind, value] of smuggled) {
       await expect(database.pool.query(
@@ -791,11 +814,35 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
         [runId, kind, JSON.stringify(value)]
       ), `${kind} ${JSON.stringify(value)}`).rejects.toThrow(`PROGRESS_EVENT_VALUE_NOT_CODE_SHAPED: ${kind}`);
     }
-    // Every legitimate shape still lands.
+    // A well-formed id that is not a subject of this run is refused as well.
+    for (const [kind, value] of [
+      ["node.retrying", { ...cooldown, parent_node_ref: randomUUID() }],
+      ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [{ kind: "NODE", ref: randomUUID() }] }],
+      ["honesty.staleness_trigger_fired", { ...staleness, affected_subjects: [{ kind: "ANSWER", ref: nodeId }] }]
+    ] as const) {
+      await expect(database.pool.query(
+        `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
+         VALUES ($1,ledger.allocate_sequence(),$2,$3::jsonb)`,
+        [runId, kind, JSON.stringify(value)]
+      ), `${kind} ${JSON.stringify(value)}`).rejects.toThrow(`PROGRESS_EVENT_SUBJECT_UNRESOLVED: ${kind}`);
+    }
+    // Every legitimate shape still lands — every call-site family the runner's
+    // hold path emits (apps/runner/src/index.ts: JUDGE primary, the root and
+    // expansion legs, cross-root, the review and the catch-up review).
+    const families = [
+      "JUDGE", "JUDGE:root:secondary", "JUDGE:root:2", "JUDGE:critic:root0:r1:p0",
+      "JUDGE:defender:root1:r2:p3", "JUDGE:cross-root:0->1", `JUDGE:review:${nodeId}`,
+      `JUDGE:review:catch-up:${randomUUID()}:${nodeId}`
+    ];
     for (const [kind, value] of [
       ["PHASE", "VALUE"], ["ENVELOPE_STATE", "EXHAUSTED"], ["ENVELOPE_STATE", "ENRICHMENT_SKIPPED"],
       ["ENVELOPE_CONSUMED", 7], ["node.retrying", cooldown], ["ledger.could_not_do", cooldown],
-      ["ledger.could_not_do", refusal], ["honesty.staleness_trigger_fired", staleness], ["TERMINAL", "SERVED"]
+      ["ledger.could_not_do", { ...cooldown, parent_node_ref: null, hold_until: null }],
+      ["ledger.could_not_do", refusal], ["ledger.could_not_do", { ...refusal, absent_failure_code: null }],
+      // TERMINAL "SERVED" already landed through ServeRepository.persist above
+      // (one TERMINAL per run is a unique index).
+      ["honesty.staleness_trigger_fired", staleness],
+      ...families.map((callSiteKey) => ["node.retrying", { ...cooldown, call_site_key: callSiteKey }] as const)
     ] as const) {
       await database.pool.query(
         `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)

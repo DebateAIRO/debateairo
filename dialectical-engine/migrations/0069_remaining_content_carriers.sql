@@ -88,6 +88,33 @@ AS $$
     false)
 $$;
 
+-- Final round (reviewer residual): a single token could still spell a word,
+-- one per field or one per array element. Every free-looking field is now
+-- pinned to the exact format its writer emits:
+--   * refs are the uuid text of a core.node / serve.answer row
+--     (liveness: answer_id::text / node_id::text; runner: node.nodeId);
+--   * hold_until is Date.prototype.toISOString() (apps/runner/src/index.ts,
+--     withCooldownRetry: `new Date(...).toISOString()`);
+--   * call_site_key is one of the runner hold path's call-site families
+--     (JUDGE primary; JUDGE:root:secondary / JUDGE:root:<n>;
+--     JUDGE:<defender|critic>:root<n>:r<n>:p<n>; JUDGE:cross-root:<n>-><n>;
+--     JUDGE:review:<node uuid>; JUDGE:review:catch-up:<uuid>:<node uuid>),
+--     and for the synthesis-role refusal exactly role || ':' || role_ref;
+--   * absent_failure_code is an UPPER_SNAKE engine code.
+-- The guard below additionally requires every ref to name a subject of THIS
+-- run, so a well-formed id cannot be minted to carry bits either. That is also
+-- why affected_subjects needs no count cap: each element is an existing
+-- (kind, id) of the run, and the writer lists each subject once.
+CREATE OR REPLACE FUNCTION core.jsonb_is_uuid_text(candidate jsonb)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = pg_catalog
+AS $$
+  SELECT COALESCE(jsonb_typeof(candidate) = 'string'
+    AND (candidate #>> '{}') ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', false)
+$$;
+
 -- The closed shape of every NON-prose progress kind, for an encrypted run.
 -- Writers (all verified): run start — RunRepository.startRun and the two
 -- in-database core.create_encrypted_run bodies (0040:4326, 0067:77) write
@@ -123,10 +150,20 @@ AS $$
         '"COOLDOWN_HOLD"'::jsonb, '"COOLDOWN_RETRY"'::jsonb, '"MAKER_POSITION_HALTED"'::jsonb,
         '"EXPANSION_HALTED"'::jsonb, '"REVIEW_HALTED"'::jsonb
       )
-      AND core.jsonb_is_code_token(value->'call_site_key')
-      AND (value->'parent_node_ref' = 'null'::jsonb OR core.jsonb_is_code_token(value->'parent_node_ref'))
+      AND jsonb_typeof(value->'call_site_key') = 'string'
+      AND (value->>'call_site_key') ~ ('^JUDGE('
+        || ':root:(secondary|[0-9]{1,4})'
+        || '|:(defender|critic):root[0-9]{1,4}:r[0-9]{1,4}:p[0-9]{1,4}'
+        || '|:cross-root:[0-9]{1,4}->[0-9]{1,4}'
+        || '|:review:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+        || '|:review:catch-up:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+        || ':[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+        || ')?$')
+      AND (value->'parent_node_ref' = 'null'::jsonb OR core.jsonb_is_uuid_text(value->'parent_node_ref'))
       AND jsonb_typeof(value->'hold_ms') = 'number'
-      AND (value->'hold_until' = 'null'::jsonb OR core.jsonb_is_code_token(value->'hold_until'))
+      AND (value->'hold_until' = 'null'::jsonb
+        OR (jsonb_typeof(value->'hold_until') = 'string'
+          AND (value->>'hold_until') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$'))
       AND jsonb_typeof(value->'attempts_spent') = 'number'
       AND value->'transport_outcome' IN ('"TIMED_OUT"'::jsonb, '"FAILED"'::jsonb)
       AND jsonb_typeof(value->'planned_leg_count') = 'number'
@@ -135,11 +172,14 @@ AS $$
         'state', 'call_site_key', 'role_ref', 'role', 'absent_failure_code'
       ]) THEN
       value->'state' = '"SYNTHESIS_ROLE_PROVIDER_ABSENT"'::jsonb
-      AND core.jsonb_is_code_token(value->'call_site_key')
+      -- role_ref is the SEALED provider ref of the role (register policy, not
+      -- model text); the call-site key is derived from it and nothing else.
       AND core.jsonb_is_code_token(value->'role_ref')
       AND value->'role' IN ('"SYNTHESIZER"'::jsonb, '"EVALUATOR"'::jsonb)
+      AND value->>'call_site_key' = (value->>'role') || ':' || (value->>'role_ref')
       AND (value->'absent_failure_code' = 'null'::jsonb
-        OR core.jsonb_is_code_token(value->'absent_failure_code'))
+        OR (jsonb_typeof(value->'absent_failure_code') = 'string'
+          AND (value->>'absent_failure_code') ~ '^[A-Z][A-Z0-9_]{0,95}$'))
     WHEN event_kind = 'honesty.staleness_trigger_fired'
       AND core.jsonb_has_exact_keys(value, ARRAY['trigger_key', 'affected_subjects']) THEN
       core.jsonb_is_code_token(value->'trigger_key')
@@ -149,7 +189,7 @@ AS $$
         SELECT 1 FROM jsonb_array_elements(value->'affected_subjects') AS subject
         WHERE NOT core.jsonb_has_exact_keys(subject, ARRAY['kind', 'ref'])
           OR subject->'kind' NOT IN ('"ANSWER"'::jsonb, '"NODE"'::jsonb)
-          OR NOT core.jsonb_is_code_token(subject->'ref')
+          OR NOT core.jsonb_is_uuid_text(subject->'ref')
       )
     ELSE false
   END, false)
@@ -294,6 +334,27 @@ BEGIN
       RAISE EXCEPTION 'CONTENT_ENCRYPTION_STATE_INVALID: core.run_progress_event' USING ERRCODE = '22023';
     ELSIF NOT core.progress_value_is_code_shaped(NEW.kind, NEW.value_json) THEN
       RAISE EXCEPTION 'PROGRESS_EVENT_VALUE_NOT_CODE_SHAPED: %', NEW.kind USING ERRCODE = '22023';
+    ELSIF (NEW.kind IN ('node.retrying', 'ledger.could_not_do')
+        AND NEW.value_json->'parent_node_ref' IS NOT NULL
+        AND NEW.value_json->'parent_node_ref' <> 'null'::jsonb
+        AND NOT EXISTS (
+          SELECT 1 FROM core.node AS node
+          WHERE node.run_id = NEW.run_id
+            AND node.node_id = (NEW.value_json->>'parent_node_ref')::uuid
+        ))
+      OR (NEW.kind = 'honesty.staleness_trigger_fired' AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(NEW.value_json->'affected_subjects') AS subject
+        WHERE NOT CASE subject->>'kind'
+          WHEN 'NODE' THEN EXISTS (
+            SELECT 1 FROM core.node AS node
+            WHERE node.run_id = NEW.run_id AND node.node_id = (subject->>'ref')::uuid)
+          WHEN 'ANSWER' THEN EXISTS (
+            SELECT 1 FROM serve.answer AS answer
+            WHERE answer.run_id = NEW.run_id AND answer.answer_id = (subject->>'ref')::uuid)
+          ELSE false END
+      )) THEN
+      -- Every ref must name a subject of THIS run (final round).
+      RAISE EXCEPTION 'PROGRESS_EVENT_SUBJECT_UNRESOLVED: %', NEW.kind USING ERRCODE = '22023';
     END IF;
   ELSIF TG_TABLE_SCHEMA = 'memory' AND TG_TABLE_NAME = 'alias_row' THEN
     IF NEW.surface <> sentinel OR NEW.canonical <> sentinel
@@ -497,6 +558,7 @@ FOR EACH ROW EXECUTE FUNCTION core.enforce_raw_artifact_metadata_code_shaped();
 -- DEFINER functions are revoked from PUBLIC and granted to nobody.
 REVOKE ALL ON FUNCTION core.jsonb_is_code_token(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.jsonb_has_exact_keys(jsonb, text[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION core.jsonb_is_uuid_text(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.progress_value_is_code_shaped(text, jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.raw_artifact_metadata_is_code_shaped(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION core.enforce_content_ciphertext_remaining_carriers() FROM PUBLIC;
@@ -505,5 +567,6 @@ REVOKE ALL ON FUNCTION core.enforce_erasure_barrier_remaining_carriers() FROM PU
 REVOKE ALL ON FUNCTION core.enforce_raw_artifact_metadata_code_shaped() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION core.jsonb_is_code_token(jsonb) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION core.jsonb_has_exact_keys(jsonb, text[]) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION core.jsonb_is_uuid_text(jsonb) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION core.progress_value_is_code_shaped(text, jsonb) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION core.enforce_content_ciphertext_remaining_carriers() TO debateai_runtime;
