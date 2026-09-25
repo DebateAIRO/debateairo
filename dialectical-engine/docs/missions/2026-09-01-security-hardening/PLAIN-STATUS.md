@@ -22,7 +22,7 @@
 - the organisation-wide two-factor requirement (a browser switch; both pre-checks print 0);
 - your paid confirmation run, which sets the real money ceilings (0.25 USD per debate and 2.00 USD per day are deliberately low placeholders);
 - choosing the AI vendors for the hosted site, then the server itself;
-- a word on the items left as they are — V-26 is still a line on the go-live checklist (line 5), so before go-live it is either built or you remove it.
+- ~~a word on V-26~~ — **you removed it from the go-live checklist** (25 September). Deleting an account still leaves that person's support chats; the server kit lists it as an accepted limitation.
 
 **Known limits the kit now states openly** ([deploy/vps/README.md](../../../deploy/vps/README.md) §10 and §12): the monitoring agent only runs on a Mac today, so its service file ships switched off; the monitoring-settings login's password is set by hand on the server for now; the published settings still carry "development" labels on the engine's own rows (a naming matter — no check is relaxed); the job system's database password is briefly visible to other accounts on the server during one setup step.
 
