@@ -109,6 +109,8 @@ Write the full report to the report file named in your dispatch: what you did; e
 
 ## Task 5: HYG-DB — three database items (V-17, V-29, B28)
 
+**Status 2026-09-25:** 5b (V-29) DONE — migration 0068, pull request #14; its ownership guard narrowed to one database in #17 on the owner's one-time exception to constraint 9. 5a (V-17's drift test; the two columns were already mirrored by `b50ff0bb4`) and 5c (B28) NOT BUILT — the owner left them "as they are" (2026-09-25). No task needs Docker: the database suites start an embedded Postgres.
+
 **Needs Docker** (the database-backed suites start their own Postgres through `testcontainers`). The coordinator dispatches this task only once the Docker engine is running; you never start or stop it (constraint 11). Migration numbers are assigned in your dispatch message.
 
 **5a — V-17, the schema mirror.** `packages/db/src/schema.ts` lacks the two `serve.answer` columns that migration `0063_serve_answer_content_carrier.sql` added. Mirror them, and add a test that compares the mirror with the real database for that table so it cannot drift again (RED first — it fails today because the columns are missing).
@@ -130,6 +132,8 @@ Write the full report to the report file named in your dispatch: what you did; e
 ---
 
 ## Task 7: DATA1 — encrypt the remaining debate text (V-6) and make account erasure cover support conversations (V-26)
+
+**Status 2026-09-25:** 7a (V-6) DONE — migration 0069, pull request #18, on the owner's scope ruling after the inventory (text-bearing fields encrypted; other progress kinds and `raw_artifact.metadata_json` readable but closed to their writers' exact shapes; alias rows under the SOURCE run's key). 7b (V-26) NOT BUILT — the owner left it "as it is"; GO-LIVE-CHECKLIST line 5 stays open.
 
 **Needs Docker** for the database-backed suites (constraint 11 — the coordinator dispatches only when the engine is up). Migration numbers are assigned in your dispatch message. Rulings: rows V-6 and V-26. The owner must be told BEFORE this task passes one agent-day: if 7a looks larger than that, stop with `DONE_WITH_CONCERNS` after the inventory and say why.
 
@@ -211,6 +215,8 @@ Today the run-wide bound counts ATTEMPTS only (`packages/budget`, `assertModelAt
 ---
 
 ## Task 14: DEPLOY1 — refresh the VPS kit for everything decided
+
+**Status 2026-09-25:** DONE — pull request #15 (kit, DL7-F9 as migration 0071, banner removed) and #16 (Task 14b: `pnpm register:publish-hosted`, the hosted register publication the kit lacked). Open items are listed in `deploy/vps/README.md` §10 and §12.
 
 **Starts after Tasks 5, 6, 10, 11 and 12 are merged.** The kit (`deploy/vps/`) was written before the support chat, the observation agent and these rulings. Refresh it, keeping its own tests green and constraint 10 in every documented command: the support chat's and the observation agent's settings and service definition; the support KEK in the backup-and-escrow list (DL2-F5 — without it backed-up support conversations can never be decrypted); `hardening.sql` CONNECT for the support roles (DL5-F7); the support CLIs' URL grammar against both VPS `pg_hba` shapes (DL7-F6); a second database principal so the observation daemon can lose its INSERT on the table that rules it (DL7-F9) — only now may that INSERT be revoked, and `oactl thresholds apply` must keep working under the new principal; unwired principals provisioned with `VALID UNTIL` in the past (V-20, second half — re-count them first); the custody group and its modes (Task 6); the hosted deployment mode, provider key files and the "add a vendor" procedure (Task 10); the cost envelopes and the temporary low value for the owner's first paid run (Task 11); the step that publishes the settings register on the server; the KEK-rotation and backup-restore rehearsals as runbook steps; native Postgres and a loopback-only job-system dashboard (V-9 a and b).
 
