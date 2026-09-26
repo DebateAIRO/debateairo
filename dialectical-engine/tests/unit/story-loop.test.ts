@@ -126,6 +126,8 @@ describe("verdict story — the loop's outcomes", () => {
       outcome: "READY",
       body: storyFor(1),
       reservation: null,
+      servedRound: 1,
+      laterFailure: null,
       rounds: [{
         round: 1,
         writer: { artifactRef: "artifact:storyteller:1", callSiteKey: "STORY:STORYTELLER:1", lineage: WRITER_LINEAGE },
@@ -144,7 +146,7 @@ describe("verdict story — the loop's outcomes", () => {
     const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
     expect(double.writes).toEqual([{ round: 1, priorObjection: null }, { round: 2, priorObjection: objection }]);
     expect(double.checks.map((check) => check.candidate)).toEqual([storyFor(1), storyFor(2)]);
-    expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(2), reservation: null });
+    expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(2), reservation: null, servedRound: 2, laterFailure: null });
     expect(outcome.rounds.map((round) => [round.round, round.satisfied, round.objection])).toEqual([
       [1, false, objection], [2, true, null]
     ]);
@@ -156,7 +158,10 @@ describe("verdict story — the loop's outcomes", () => {
     expect(outcome).toMatchObject({
       outcome: "READY_WITH_RESERVATION",
       body: storyFor(2),
-      reservation: "Second objection."
+      reservation: "Second objection.",
+      // The rounds ran out: the last draft is served, and nothing failed.
+      servedRound: 2,
+      laterFailure: null
     });
     expect(outcome.rounds.map((round) => [round.round, round.satisfied, round.objection])).toEqual([
       [1, false, "First objection."], [2, false, "Second objection."]
@@ -171,7 +176,9 @@ describe("verdict story — the loop's outcomes", () => {
   it("stops after one round when one round is all it has", async () => {
     const double = recorder({ verdicts: [unsatisfied("Only objection.")] });
     const outcome = await runStoryLoop({ maxRounds: 1 }, double.deps);
-    expect(outcome).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: "Only objection." });
+    expect(outcome).toMatchObject({
+      outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: "Only objection.", servedRound: 1, laterFailure: null
+    });
     expect(double.writes).toHaveLength(1);
   });
 
@@ -306,7 +313,12 @@ describe("verdict story — a later round's failure keeps the earlier checked dr
       writeFails: (round) => (round === 2 ? transportDied() : undefined)
     });
     const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
-    expect(outcome).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: "Fix the summary." });
+    expect(outcome).toMatchObject({
+      outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: "Fix the summary.",
+      // The kept draft is round 1's, and the round-2 failure is named, never lost.
+      servedRound: 1,
+      laterFailure: { failureCode: "STORY_TRANSPORT_DEATH", cause: "PROVIDER_CALL_FAILED" }
+    });
     expect(outcome.rounds.map((round) => [round.round, round.satisfied, round.objection])).toEqual([
       [1, false, "Fix the summary."]
     ]);
@@ -324,6 +336,8 @@ describe("verdict story — a later round's failure keeps the earlier checked dr
       outcome: "READY_WITH_RESERVATION",
       body: storyFor(1),
       reservation: "Fix the summary.",
+      servedRound: 1,
+      laterFailure: { failureCode: "STORY_ENVELOPE_EXHAUSTED", cause: "STORY_COST_ENVELOPE_REACHED" },
       rounds: [{ round: 1, writer: writerRecord(1), checker: checkerRecord(1), satisfied: false, objection: "Fix the summary." }]
     });
     expect(double.writes).toEqual([{ round: 1, priorObjection: null }, { round: 2, priorObjection: "Fix the summary." }]);
@@ -331,12 +345,13 @@ describe("verdict story — a later round's failure keeps the earlier checked dr
   });
 
   it.each([
-    ["the checker's content is refused", contentRefused],
-    ["the checker's transport dies", transportDied],
+    ["the checker's content is refused", contentRefused, "STORY_CHECK_UNAVAILABLE", "PROVIDER_CONTENT_UNACCEPTED"],
+    ["the checker's transport dies", transportDied, "STORY_TRANSPORT_DEATH", "PROVIDER_CALL_FAILED"],
     ["the story money envelope refuses the check",
-      (): unknown => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story has spent its envelope")],
-    ["a plain error arrives", (): unknown => new Error("bug")]
-  ])("keeps the first draft when round 2's check fails: %s", async (_name, failure) => {
+      (): unknown => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story has spent its envelope"),
+      "STORY_ENVELOPE_EXHAUSTED", "STORY_COST_ENVELOPE_REACHED"],
+    ["a plain error arrives", (): unknown => new Error("bug"), "STORY_UNEXPECTED_ERROR", "Error"]
+  ])("keeps the first draft when round 2's check fails: %s", async (_name, failure, failureCode, cause) => {
     const double = recorder({
       verdicts: [unsatisfied("Fix the summary.")],
       checkFails: (round) => (round === 2 ? failure() : undefined)
@@ -346,6 +361,9 @@ describe("verdict story — a later round's failure keeps the earlier checked dr
       outcome: "READY_WITH_RESERVATION",
       body: storyFor(1),
       reservation: "Fix the summary.",
+      // Round 1's draft AND round 1's checker are what is served; round 2 only failed.
+      servedRound: 1,
+      laterFailure: { failureCode, cause },
       rounds: [
         { round: 1, writer: writerRecord(1), checker: checkerRecord(1), satisfied: false, objection: "Fix the summary." },
         { round: 2, writer: writerRecord(2), checker: null, satisfied: false, objection: null }
@@ -359,7 +377,10 @@ describe("verdict story — a later round's failure keeps the earlier checked dr
     const outcome = await runStoryLoop(
       { maxRounds: 2 }, recorder({ verdicts: [unsatisfied("Fix the summary."), broken] }).deps
     );
-    expect(outcome).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: "Fix the summary." });
+    expect(outcome).toMatchObject({
+      outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: "Fix the summary.", servedRound: 1,
+      laterFailure: { failureCode: "STORY_CHECK_UNAVAILABLE", cause: "STORY_CHECKER_OBJECTION_REQUIRED" }
+    });
     expect(outcome.rounds.map((round) => [round.round, round.checker, round.satisfied, round.objection])).toEqual([
       [1, checkerRecord(1), false, "Fix the summary."], [2, checkerRecord(2), false, null]
     ]);
@@ -371,7 +392,10 @@ describe("verdict story — a later round's failure keeps the earlier checked dr
       writeFails: (round) => (round === 3 ? transportDied() : undefined)
     });
     const outcome = await runStoryLoop({ maxRounds: 3 }, double.deps);
-    expect(outcome).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(2), reservation: "Second objection." });
+    expect(outcome).toMatchObject({
+      outcome: "READY_WITH_RESERVATION", body: storyFor(2), reservation: "Second objection.", servedRound: 2,
+      laterFailure: { failureCode: "STORY_TRANSPORT_DEATH", cause: "PROVIDER_CALL_FAILED" }
+    });
     expect(outcome.rounds.map((round) => round.round)).toEqual([1, 2]);
   });
 });

@@ -63,11 +63,27 @@ export interface StoryRoundRecord {
   readonly objection: string | null;
 }
 
+/** A later round's failure, when the loop kept an earlier checked draft instead (spec §6). */
+export interface StoryLaterFailure {
+  readonly failureCode: string;
+  /** Same shape as a FAILED outcome's cause: a typed code or a class name, never model text. */
+  readonly cause: string;
+}
+
 export type StoryLoopOutcome =
   | {
     readonly outcome: "READY" | "READY_WITH_RESERVATION";
     readonly body: StoryBody;
     readonly reservation: string | null;
+    /**
+     * The round whose draft is served, and whose writer and checker made it.
+     * Under the earlier-draft fallback this is that earlier round, not the last
+     * one run, so the stored lineage names the models that wrote and judged the
+     * story the reader sees.
+     */
+    readonly servedRound: number;
+    /** Set only when a later round failed and the earlier draft was kept. */
+    readonly laterFailure: StoryLaterFailure | null;
     readonly rounds: readonly StoryRoundRecord[];
   }
   | {
@@ -138,18 +154,21 @@ export async function runStoryLoop(
   }
   const rounds: StoryRoundRecord[] = [];
   let priorObjection: string | null = null;
-  let lastUnsatisfied: { readonly body: StoryBody; readonly objection: string } | null = null;
-  const reserved = (draft: { readonly body: StoryBody; readonly objection: string }): StoryLoopOutcome =>
+  type ObjectedDraft = { readonly round: number; readonly body: StoryBody; readonly objection: string };
+  let lastUnsatisfied: ObjectedDraft | null = null;
+  const reserved = (draft: ObjectedDraft, laterFailure: StoryLaterFailure | null): StoryLoopOutcome =>
     Object.freeze({
       outcome: "READY_WITH_RESERVATION" as const,
       body: draft.body,
       reservation: draft.objection,
+      servedRound: draft.round,
+      laterFailure,
       rounds: Object.freeze([...rounds])
     });
   /** A failure keeps the latest checked-but-objected draft when one exists (spec §6); otherwise it is FAILED. */
   const stopped = (failureCode: string, cause: string): StoryLoopOutcome => {
     const earlierDraft = lastUnsatisfied;
-    if (earlierDraft !== null) return reserved(earlierDraft);
+    if (earlierDraft !== null) return reserved(earlierDraft, Object.freeze({ failureCode, cause }));
     return Object.freeze({ outcome: "FAILED" as const, failureCode, cause, rounds: Object.freeze([...rounds]) });
   };
 
@@ -181,16 +200,23 @@ export async function runStoryLoop(
     }
     rounds.push(Object.freeze({ round, writer, checker, satisfied, objection }));
     if (satisfied) {
-      return Object.freeze({ outcome: "READY" as const, body, reservation: null, rounds: Object.freeze([...rounds]) });
+      return Object.freeze({
+        outcome: "READY" as const,
+        body,
+        reservation: null,
+        servedRound: round,
+        laterFailure: null,
+        rounds: Object.freeze([...rounds])
+      });
     }
     // The parser refuses an unsatisfied verdict without an objection; a checker
     // double that returns one anyway has broken its contract.
     if (objection === null) return stopped(STORY_LOOP_FAILURE_CODES.checkUnavailable, STORY_CHECKER_OBJECTION_REQUIRED);
     priorObjection = objection;
-    lastUnsatisfied = { body, objection };
+    lastUnsatisfied = { round, body, objection };
   }
 
   // Every round either returned or left an objected draft, so the rounds ran out with one.
   if (lastUnsatisfied === null) return stopped(STORY_LOOP_FAILURE_CODES.unexpected, STORY_CAUSE_UNKNOWN);
-  return reserved(lastUnsatisfied);
+  return reserved(lastUnsatisfied, null);
 }

@@ -23,6 +23,13 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
 import { assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import {
+  STORY_SHAPES_DIR_ENV_KEY,
+  StoryWriter,
+  loadStoryPack,
+  resolveStoryPackDir,
+  type StoryPack
+} from "@debateai/story";
 import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
@@ -87,6 +94,37 @@ const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER
     return null;
   });
 const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
+/** Codes and ids only: a story log line never carries story or debate text. */
+const storyLog = (event: string, detail: Record<string, unknown>): void => {
+  console.warn(JSON.stringify({ kind: "DEBATEAI_STORY", event, ...detail }));
+};
+/**
+ * The shape pack is loaded ONCE, here (spec §5.1). An invalid pack never stops
+ * the runner: every story is then FAILED/STORY_PACK_INVALID, and this line says
+ * exactly which rule failed. ANY error counts — a typed pack refusal, an
+ * unresolvable directory, or a raw file-system or URL error — so the story can
+ * never stop this runner from booting. The directory comes from the runner's
+ * environment shape, never from the process environment directly (the source
+ * audit's law).
+ */
+let storyPack: StoryPack | { readonly error: string };
+try {
+  storyPack = loadStoryPack(resolveStoryPackDir({
+    env: { [STORY_SHAPES_DIR_ENV_KEY]: environment.DEBATEAI_STORY_SHAPES_DIR },
+    moduleUrl: import.meta.url
+  }));
+} catch (error) {
+  // The rule the pack broke (a typed refusal names it), or, for a raw failure,
+  // the error's own code or class name — never a file's text.
+  const rawCode = typeof error === "object" && error !== null ? (error as { readonly code?: unknown }).code : undefined;
+  const cause = typeof rawCode === "string" && /^[A-Z][A-Z0-9_]{0,63}$/u.test(rawCode)
+    ? rawCode
+    : error instanceof Error ? error.name : "UNKNOWN";
+  storyPack = Object.freeze({
+    error: error instanceof TypedDomainError ? `${error.code}: ${error.message}` : `STORY_PACK_UNREADABLE: ${cause}`
+  });
+  storyLog("STORY_PACK_INVALID", { reason: storyPack.error });
+}
 const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
 if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
@@ -173,6 +211,27 @@ assertRunnerPrimaryProviderConfiguration({
   firstTarget: declaredProviderTargets[0],
   declared: environment
 });
+/**
+ * VERDICT STORY: one writer for this runner, on the runner's OWN pool (the
+ * content lease is borrowed by pool identity). Its boot resolver covers every
+ * configured provider; at each run the runner hands it the run's own
+ * claim-eligible providers, which take precedence.
+ */
+const storyWriter = new StoryWriter({
+  pool,
+  pack: storyPack,
+  policy: storyPolicy,
+  hosted: environment.DEPLOYMENT_MODE === "hosted",
+  resolveProvider: (roleRef) => {
+    const member = [
+      providerTopology.primary,
+      ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]),
+      ...providerTopology.additionalMakers
+    ].find((candidate) => candidate.providerRef === roleRef);
+    return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef };
+  },
+  log: storyLog
+});
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
   judgeBound: policy.bounds.JUDGE,
@@ -240,6 +299,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // every register family the run reads. Without this line the claim-time
   // gate refuses every work item and no statement is ever synthesized.
   synthesisRolePolicy: policy.synthesisRolePolicy,
+  // Verdict story (spec §3): written after each settled debate; never inside it.
+  story: storyWriter,
   claimTimeSynthesisRoleProbe: async (providerRef) => {
     const target = providerTargets.find((candidate) => candidate.providerRef === providerRef);
     if (target === undefined) {

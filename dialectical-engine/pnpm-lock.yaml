@@ -278,6 +278,9 @@ importers:
       '@debateai/serve':
         specifier: workspace:*
         version: link:../../packages/serve
+      '@debateai/story':
+        specifier: workspace:*
+        version: link:../../packages/story
       '@debateai/support-kb':
         specifier: workspace:*
         version: link:../../packages/support-kb
@@ -727,6 +730,9 @@ importers:
       '@debateai/providers':
         specifier: workspace:*
         version: link:../providers
+      '@debateai/register':
+        specifier: workspace:*
+        version: link:../register
       zod:
         specifier: 4.4.3
         version: 4.4.3

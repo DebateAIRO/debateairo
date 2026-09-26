@@ -48,6 +48,7 @@ export {
   storyCallSiteKey,
   type StoryCallRecord,
   type StoryLoopDependencies,
+  type StoryLaterFailure,
   type StoryLoopOutcome,
   type StoryRoundRecord
 } from "./loop.js";
@@ -57,3 +58,10 @@ export {
   type StoryRecordInput
 } from "./repository.js";
 export { readStoryEnrichment } from "./enrichment.js";
+export {
+  StoryWriter,
+  type StoryRecordSink,
+  type StoryRoleResolver,
+  type StoryWriteInput,
+  type StoryWriterDependencies
+} from "./writer.js";

@@ -590,6 +590,10 @@ const runnerEnvironmentShape = {
     // (DR-182 VROW-5), so it needs the same probe timeout the API already reads.
     // Same key, same shape, same default — one knob, two entry points.
     PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
+    // Verdict story (spec §5.1): the shape pack's directory. Absent, the pack is
+    // found relative to the repository; a path that does not resolve fails loudly
+    // (STORY_PACK_DIR_UNRESOLVED) and only switches the story off.
+    DEBATEAI_STORY_SHAPES_DIR: z.string().min(1).optional(),
     ...hatchetShape
 } as const;
 

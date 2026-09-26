@@ -199,6 +199,7 @@ apps/runner/src/provider-topology.ts
 apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts
 apps/runner/src/runner-startup-reconciliation.ts
+apps/runner/src/story-snapshot.ts
 apps/runner/src/support-config-cli-credentials.ts
 apps/runner/src/support-inbox-cli.ts
 apps/runner/src/support-incident-cli.ts
@@ -451,6 +452,7 @@ packages/story/src/material.ts
 packages/story/src/pack.ts
 packages/story/src/repository.ts
 packages/story/src/validate.ts
+packages/story/src/writer.ts
 packages/support-kb/src/catalog.ts
 packages/support-kb/src/context.ts
 packages/support-kb/src/index.ts

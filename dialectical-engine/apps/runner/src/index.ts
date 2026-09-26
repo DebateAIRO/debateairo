@@ -121,7 +121,9 @@ import {
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, exhaustive, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
+import type { StoryWriteInput } from "@debateai/story";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
+import { buildStoryRunSnapshot } from "./story-snapshot.js";
 
 /**
  * T9 / J24 — the two sealed synthesis roles, named ONCE. Every check that has
@@ -1415,6 +1417,14 @@ export interface WalkingSkeletonSettings {
    * reason (S06 codex r1 B1, board F33).
    */
   readonly synthesisRolePolicy: RunnerSynthesisRolePolicy;
+  /**
+   * VERDICT STORY (docs/superpowers/specs/2026-09-26-verdict-story-design.md).
+   * Written after the work item is settled, inside this run's content lease,
+   * and never able to change the answer, the label or the work item. OPTIONAL
+   * on purpose: an absent writer means no story (every fixture, and the
+   * acceptance root, which stays story-free on register v3).
+   */
+  readonly story?: { writeAfterSettle(input: StoryWriteInput): Promise<void> };
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -5023,7 +5033,66 @@ export class WalkingSkeletonRunner {
       attemptId: runnerAttemptId,
       artifactRef: persisted.answerId
     });
-    if (wonSettlement) return { kind: "COMPLETED", answerId: persisted.answerId };
+    if (wonSettlement) {
+      /**
+       * VERDICT STORY (spec §3): the work item is DONE and nothing can re-claim
+       * it; this is still inside the run's content lease, so the in-memory
+       * material is here and the encrypted rows can be read and written on this
+       * runner's own pool (the lease is borrowed, never taken twice). Only an
+       * answer that carries a label gets a story. The writer never rejects; the
+       * catch below exists so that no defect in the snapshot or the writer can
+       * ever reach the failure path of a work item that is already DONE.
+       */
+      const storyWriter = this.settings.story;
+      if (storyWriter !== undefined && answerCarriesLabel) {
+        try {
+          await storyWriter.writeAfterSettle(buildStoryRunSnapshot({
+            runId: run.runId,
+            workItemId: claimed.workItemId,
+            answerId: persisted.answerId,
+            answerVersion: persisted.answerVersion,
+            questionLine: run.questionLine,
+            compositionBudgetTier: run.compositionBudgetTier,
+            verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
+            servedRootNodeId: servedRoot.nodeId,
+            servedStrength: servedRootSelection.servedStrength,
+            runnerUp: servedRootSelection.runnerUp,
+            margin: servedRootSelection.margin,
+            // The SAME quantity the label's disagreement rung read: the winning
+            // root's recorded panel dispersion, or ABSENT with s04's reason.
+            disagreement: verdictLabelBasis.disagreement,
+            thresholds: {
+              gamma: verdictLabelControls.gamma,
+              highCut: verdictLabelControls.highCut,
+              lowCut: verdictLabelControls.lowCut,
+              disagreementThreshold: verdictLabelControls.disagreementThreshold
+            },
+            confidenceBand: result.confidenceBand,
+            answerMarks: result.conditionMarks,
+            servedSegments: finalSegments,
+            authored: authoredNodeList,
+            positionNodeIds: makerPositionNodeIds,
+            baseStrengths: materialised.nodes,
+            finalStrengths: propagation.strengths,
+            // The WHOLE graph's arrows, in the engine's fixed order, so every
+            // argued point keeps its arrow and the points number the same way.
+            arrows: materialised.arrows,
+            arrowOrder: materialised.arrowOrder,
+            sensitivity: propagation.sensitivityRecords,
+            conditionMarkRecords,
+            // The run's OWN claim-eligible providers: a role provider that the
+            // claim-time probe found absent is never called for the story.
+            resolveProvider: (roleRef) => {
+              const maker = synthesisMakers.find((candidate) => candidate.providerRef === roleRef);
+              return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
+            }
+          }));
+        } catch {
+          // See above: the story can never cost the verdict.
+        }
+      }
+      return { kind: "COMPLETED", answerId: persisted.answerId };
+    }
     const winningArtifact = await this.#work.readSettledArtifact(claimed.workItemId);
     if (winningArtifact === null) {
       throw new TypedDomainError("SETTLEMENT_RACE_WITHOUT_WINNER", claimed.workItemId);
