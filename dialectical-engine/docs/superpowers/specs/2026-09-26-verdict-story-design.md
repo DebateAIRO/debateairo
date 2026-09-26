@@ -264,7 +264,7 @@ answer), and `goal_marked_as_reading`.
 - A later round's call fails (for example the money envelope refuses the second draft) after an earlier
   round produced a checked-but-objected draft → `READY_WITH_RESERVATION` with that earlier draft and
   its objection.
-- A candidate that never passes the deterministic checks fails inside its own call → `FAILED`/`STORY_WRITE_REJECTED`. The other failure codes are `STORY_CHECK_UNAVAILABLE`, `STORY_TRANSPORT_DEATH`, `STORY_ENVELOPE_EXHAUSTED` and `STORY_UNEXPECTED_ERROR` (see the plan's Task 4).
+- Otherwise (no earlier checked draft), a candidate that never passes the deterministic checks fails inside its own call → `FAILED`/`STORY_WRITE_REJECTED`. The other failure codes are `STORY_CHECK_UNAVAILABLE`, `STORY_TRANSPORT_DEATH`, `STORY_ENVELOPE_EXHAUSTED` and `STORY_UNEXPECTED_ERROR` (see the plan's Task 4).
 
 `storyLoopMaxRounds` is provisional at 2.
 
