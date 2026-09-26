@@ -265,7 +265,7 @@ answer), and `goal_marked_as_reading`.
 - Satisfied → `READY`.
 - Not satisfied and rounds remain → next round with `prior_objection`.
 - Rounds exhausted, last candidate passes the deterministic checks → `READY_WITH_RESERVATION`,
-  storing the objection. The site and PDF show it as "Our checker still had a reservation: …".
+  storing the objection. The site and PDF show it in a box titled "Our checker's reservation".
 - A later round's call fails (for example the money envelope refuses the second draft) after an earlier
   round produced a checked-but-objected draft → `READY_WITH_RESERVATION` with that earlier draft and
   its objection.
