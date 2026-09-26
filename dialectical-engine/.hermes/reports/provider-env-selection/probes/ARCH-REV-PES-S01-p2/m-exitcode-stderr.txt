@@ -1,0 +1,24 @@
+(node:76624) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+node:fs:3418
+      const stats = binding.lstat(base, true, undefined, true /* throwIfNoEntry */);
+                            ^
+
+Error: ENOENT: no such file or directory, lstat '/nonexistent'
+    at Object.realpathSync (node:fs:3418:29)
+    at ../../../../../setup-pnpm/store/v11/links/@/temp-dir/2.0.0/4198b35b752c049d4a3d393f440171b7cd6505e7cfe07700ea9fdea5db17538a/node_modules/temp-dir/index.js (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:136498:22)
+    at __require3 (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:24:53)
+    at ../../../../../setup-pnpm/store/v11/links/@/tempy/3.0.0/3d67cef696bf4252940e546ecc39f835e45f7d4463663a59cd65519fd5d12c64/node_modules/tempy/index.js (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:136525:31)
+    at __init (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:17:58)
+    at ../fetching/binary-fetcher/lib/index.js (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:136683:5)
+    at __init (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:17:58)
+    at ../installing/client/lib/index.js (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:140347:5)
+    at __init (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:17:58)
+    at lib/checkForUpdates.js (file:///Users/vladmihaimiron/.local/lib/node_modules/pnpm/dist/pnpm.mjs:140908:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'lstat',
+  path: '/nonexistent'
+}
+
+Node.js v26.9.0

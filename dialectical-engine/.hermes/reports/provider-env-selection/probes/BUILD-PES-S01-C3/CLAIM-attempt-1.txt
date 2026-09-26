@@ -1,0 +1,29 @@
+CLAIM · BUILD-PES-S01-C3 · BUILD(S01-C3) coding · pass 1 · t_b2472fe7
+start: 2026-09-25 15:01:56 EEST (date output)
+session: 01a0d870-9285-7002-ac49-7815cf8d4d98
+rollout: /Users/vladmihaimiron/.codex/sessions/2026/09/25/rollout-2026-09-25T15-00-51-01a0d870-9285-7002-ac49-7815cf8d4d98.jsonl
+lane HEAD: 3e6f438b5ef3ce0eff97f4990ca68249db55d292 · branch slice/provider-env-selection-s01 · dirty count 0
+START re-measured before any lane edit, cluster marker BROKEN (two suites absent as dispatched). Log: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/START-attempt-1.log
+BROKEN tests/integration/pes-s01-hosted-provider-set-publish.test.ts (no summary line)
+BROKEN tests/architecture/pes-s01-hosted-publish-boundary.test.ts (no summary line)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ FAIL  tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > accounts for every current page pathname by name
+ Test Files  5 failed | 100 passed (105)
+      Tests  6 failed | 719 passed (725)
+tests/architecture rc=1 passed=719 failed=6 (expect 723/6)
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+tests/integration/dev-deployment-register.test.ts rc=0 passed=15 failed=0 (expect 15/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+BROKEN
+Typecheck START: rc=1, only apps/ui/lib/v3/answerExport.ts(2,38): TS2835. Log: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/START-typecheck-attempt-1.log
+N4 START re-measure: base rows 32; I15 count before=3 after=3; I16 seed rows=49 published rowCount=49. Log: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/START-role-counts-attempt-2.log
+Probe attempt 1 was my probe error: spreading the builder row retained its value member and the exact publication gate refused REGISTER_PUBLICATION_INPUT_INVALID; attempt 2 projects rowKey/valueJsonText/sourceRef. Both scratch databases stopped; no product edits.
+RED events in order: S01-16 → passed=0 failed=16; S01-17 → passed=0 failed=4; CLUSTER_RED.
+comments read through: 1

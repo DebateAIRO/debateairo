@@ -1,0 +1,42 @@
++  const refusalTableRows = (readme: string): string[] => {
++    const refusal = readme.slice(
++      readme.indexOf("### What the hosted mode refuses, in code"),
++      readme.indexOf("### The credential-file contract")
++    ).split("\n");
++    const header = refusal.findIndex((line) => /^\s*\|\s*Code\s*\|\s*Meaning\s*\|\s*$/u.test(line));
++    if (header < 0 || !/^\s*\|[ \t:-]+\|[ \t:-]+\|\s*$/u.test(refusal[header + 1] ?? "")) return [];
++    const body = refusal.slice(header + 2);
++    const end = body.findIndex((line) => !/^\s*\|/u.test(line));
++    return body.slice(0, end < 0 ? body.length : end);
++  };
++    // (2) R3.5 — source-derived codes belong to the refusal table, including nested reasons.
++    const tableRows = refusalTableRows(readme);
++    for (const code of union) expect(tableRows.join("\n"), code).toContain(code);
++    // R3.3 / V-8 — independently pin the operator table's first-column contract.
++    // Prose mentions cannot replace rows; extra, duplicate and run-time rows also fail.
++    const rowCodes = tableRows.map((row) => {
++      const firstColumn = row.split("|")[1] ?? "";
++      const codes = [...firstColumn.matchAll(/`([A-Z][A-Z0-9_]*):?`/gu)].map((match) => match[1]!);
++      return codes.length === 1 ? codes[0] : null;
++    });
++    expect(rowCodes.sort(), "exact start-up refusal codes in the table's first column").toEqual([
++      "DEPLOYMENT_MODE_UNRESOLVED",
++      "DEPLOYMENT_MODE_INVALID",
++      "PROVIDER_BASE_URL_TLS_REQUIRED",
++      "PROVIDER_TARGET_LOOPBACK_REFUSED",
++      "PROVIDER_INLINE_CREDENTIAL_REFUSED",
++      "PROVIDER_AUTHORIZATION_FILE_ABSENT",
++      "PROVIDER_AUTHORIZATION_FILE_UNUSABLE",
++      "COST_ENVELOPES_NOT_SEALED",
++      "RUNNER_PRIMARY_PROVIDER_REF_DRIFT",
++      "SUPPORT_MODEL_CREDENTIAL_ABSENT",
++      "SUPPORT_MODEL_PATH_NOT_RATIFIED",
++      "PROVIDER_DISCOVERY_TARGET_PRICE_INVALID",
++      "PROVIDER_TARGET_PRICE_REQUIRED",
++      "PROVIDER_TARGET_PRICE_ZERO",
++      "COST_ENVELOPE_POLICY_UNRESOLVED",
++      "COST_ENVELOPE_POLICY_INVALID",
++      "SUPPORT_ADMISSION_SCOPES_NOT_SEALED"
++    ].sort());
++    const table = refusalTableRows(readme).join("\n");
++      expect(table, code).toContain(code);

@@ -1,0 +1,10 @@
+41c8bef3010bfbf306d15d2079691404992abf1d
+docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json
+tests/architecture/p3-production-database-principals.test.ts
+
+Auto-merging dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json
+CONFLICT (content): Merge conflict in dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json
+Auto-merging dialectical-engine/package.json
+Auto-merging dialectical-engine/packages/register/src/runtime-environment.ts
+Auto-merging dialectical-engine/tests/architecture/p3-production-database-principals.test.ts
+CONFLICT (content): Merge conflict in dialectical-engine/tests/architecture/p3-production-database-principals.test.ts

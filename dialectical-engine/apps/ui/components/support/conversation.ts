@@ -5,6 +5,7 @@ import {
 } from "@debateai/support-kb/catalog";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import type { SupportAssistantLanguage, SupportAssistantOutcome } from "./Assistant.js";
+import { isLocale } from "../../lib/i18n/locales.js";
 
 /**
  * DL3-F3. What the support widget is allowed to leave behind in the browser.
@@ -211,7 +212,7 @@ function storedDecorations(
   sources?: readonly SupportSource[];
   actions?: readonly SupportAction[];
 }> | null {
-  const language = message.language === "en" || message.language === "ro"
+  const language = isLocale(message.language)
     ? message.language : undefined;
   const sources = message.sources === undefined ? undefined : supportSourcesFrom(message.sources);
   const actions = message.actions === undefined ? undefined : supportActionsFrom(
@@ -284,7 +285,7 @@ export function readStoredSupportConversation(
       clearStoredSupportConversation(storage);
       return null;
     }
-    if ((value.language !== "en" && value.language !== "ro")
+    if (!isLocale(value.language)
       || typeof value.identityBound !== "boolean"
       || !Array.isArray(value.messages) || !value.messages.every(isMessage)) {
       clearStoredSupportConversation(storage);

@@ -1,0 +1,43 @@
+REQ-FIX-PES pass-2 detector runs. Lane .worktrees/pes-base/dialectical-engine @ 776359c3 (dirty 0). No listener, no database connection, no suite re-run, no git write.
+
+=== v1 (the text the blind REQ-REV pass reviewed) — watched FAILING ===
+REQ-FIX-PES detectors against v1
+  FAIL  B1  hosted-set inputs determine the row
+          - no `row member | its ONE source` table in the S01 SPEC of record
+          - still claims two inputs determine the row
+          - vacuous order code still live: before publishing, printing `PES_PUBLISH_SET_ORDER_MISMATCH:` and the first ref that diffe
+          - vacuous order code still live: `PES-S01 CASE order-mismatch ` whose remainder begins `PES_PUBLISH_SET_ORDER_MISMATCH:`; a
+          - no shipped-parser self-check replaces the order code
+  FAIL  B2  S02 is vertical in every document
+          - S02:~7 still claims the S01 dependency: Depends on S01: step 5 of §5 publishes the hosted row with the command S01 ships. Until S0
+          - S02:~7 still claims the S01 dependency: Until S01 is merged into the lane, steps 1–4 and 6–9 run and step 5 is UNVERIFIED.  ## 1.
+          - INSTRUCTIONS:~34 still claims the S01 dependency: S02 depends on S01 (its acceptance step 5 publishes with S01's command). S03 is independen
+          - INSTRUCTIONS:~34 still claims the S01 dependency: publishes with S01's command). S03 is independent of both.  ## Roster and review route  |
+          - S02PLAN:~22 still claims the S01 dependency: merged into this lane, or step 5 of SPEC §5 is UNVERIFIED | SPEC header |  ## 2. SPEC → st
+  FAIL  B3  the stdout rule admits the codes the acceptance prints
+          - R2.9 forbids the WORD `authorization`, which the acceptance must print
+          - acceptance prints PROVIDER_AUTHORIZATION_FILE_ABSENT; R2.9 does not declare it lawful
+          - acceptance prints PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT; R2.9 does not declare it lawful
+  FAIL  N3,N4,N5,N7,N8,N9,N10  named sources
+          - N3: R2.5 does not quote the body provider-probe.ts:103 accepts
+          - N4: the TLS trust mechanism is not named
+          - N5: the runner environment record is not named
+          - N7: acceptance step 2 still defers the path to PLAN.md
+          - N8: no step records the lsof baseline before the run
+          - N9: R1.8 names no literal receipt prefix
+          - N10: the two parse call sites are not cited at 300 / 74
+  pass  --  no banned word in a SPEC
+  pass  --  SPEC<->PLAN trace, both directions
+v1: FAIL (4 failing checks)
+rc=1
+
+=== v2 (the rework) ===
+REQ-FIX-PES detectors against v2
+  pass  B1  hosted-set inputs determine the row
+  pass  B2  S02 is vertical in every document
+  pass  B3  the stdout rule admits the codes the acceptance prints
+  pass  N3,N4,N5,N7,N8,N9,N10  named sources
+  pass  --  no banned word in a SPEC
+  pass  --  SPEC<->PLAN trace, both directions
+v2: PASS (0 failing checks)
+rc=0

@@ -8,6 +8,16 @@ import { PublicHonestyDrawer } from "../../apps/ui/components/PublicHonestyDrawe
 import { PublicAnswerDisclosure } from "../../apps/ui/components/PublicAnswerDisclosure.js";
 import { PublicDebatePageClient } from "../../apps/ui/app/public/debate/[id]/PublicDebatePageClient.js";
 import { buildPublicAnswerExport } from "../../apps/ui/lib/v3/publicAnswerExport.js";
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
+import timeEnglish from "../../apps/ui/messages/en/time.json" with { type: "json" };
+import debateChromeEnglish from "../../apps/ui/messages/en/debateChrome.json" with { type: "json" };
+
+const PUBLIC_PAGE_I18N = {
+  locale: "en" as const,
+  publicCatalog: publicEnglish,
+  timeCatalog: timeEnglish,
+  debateChromeCatalog: debateChromeEnglish
+};
 
 const publicDebate = PublicDebateSchema.parse({
   public_ref: "33333333-3333-4333-8333-333333333333",
@@ -50,11 +60,20 @@ describe("S02 public honesty and export", () => {
   it("renders public fields and explicit typed absence without implying owner artifacts exist", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const container = await mount(
-      <PublicHonestyDrawer answer={publicDebate.answer} onClose={() => undefined} />
+      <PublicHonestyDrawer
+        answer={publicDebate.answer}
+        catalog={publicEnglish}
+        locale="en"
+        onClose={() => undefined}
+      />
     );
     const text = container.textContent ?? "";
-    expect(text.match(/not included in this public snapshot/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(text.match(new RegExp(publicEnglish["public.honesty.riskTierUnavailable"], "g"))?.length ?? 0).toBe(1);
+    expect(text).toContain(publicEnglish["public.honesty.costEnvelopeUnavailable"]);
     expect(text).toContain(publicDebate.answer.reversal_point);
+    expect(text).toContain(publicEnglish["public.honesty.inspectionUnavailable"]);
+    // Dev's English pin, kept next to the key-based reads.
+    expect(text.match(/not included in this public snapshot/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(text).toContain("owner-only");
     const verdict = container.querySelector('section[aria-label="Verdict"]')!;
     expect(verdict.querySelector("p")?.closest('[data-ai-generated="true"]')).not.toBeNull();
@@ -63,7 +82,7 @@ describe("S02 public honesty and export", () => {
 
   it("opens honesty from the public page and exposes export immediately", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    const container = await mount(<PublicDebatePageClient debate={publicDebate} />);
+    const container = await mount(<PublicDebatePageClient debate={publicDebate} {...PUBLIC_PAGE_I18N} />);
     const notice = container.querySelector('[aria-label="AI disclosure"]');
     expect(notice?.textContent).toContain("may be inaccurate");
     expect(notice?.querySelector('a[href="/ai-transparency"]')).not.toBeNull();
@@ -104,11 +123,18 @@ describe("S02 public honesty and export", () => {
 
   it("discloses legacy answer-only publications and omits that notice for tree snapshots", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    const legacy = await mount(<PublicAnswerDisclosure answer={publicDebate.answer} />);
+    const legacy = await mount(
+      <PublicAnswerDisclosure answer={publicDebate.answer} catalog={publicEnglish} locale="en" />
+    );
+    expect(legacy.textContent).toContain(publicEnglish["public.disclosure.legacySummaryOnly"]);
     expect(legacy.textContent).toContain("predates argument-tree publishing");
 
     const tree = await mount(
-      <PublicAnswerDisclosure answer={{ ...publicDebate.answer, nodes: [], edges: [], tree_included: true }} />
+      <PublicAnswerDisclosure
+        answer={{ ...publicDebate.answer, nodes: [], edges: [], tree_included: true }}
+        catalog={publicEnglish}
+        locale="en"
+      />
     );
     expect(tree.textContent).not.toContain("predates argument-tree publishing");
   });

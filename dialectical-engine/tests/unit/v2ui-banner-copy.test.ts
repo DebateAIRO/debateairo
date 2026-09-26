@@ -110,10 +110,10 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
 
   it("leaves no contract error text in a page's error banner", async () => {
     const [create, debate] = await Promise.all([
-      readFile(new URL("apps/ui/app/new/page.tsx", root), "utf8"),
+      readFile(new URL("apps/ui/app/new/NewDebatePageClient.tsx", root), "utf8"),
       readFile(new URL("apps/ui/app/debate/[id]/DebatePageClient.tsx", root), "utf8")
     ]);
-    for (const [name, source] of [["app/new/page.tsx", create], ["DebatePageClient.tsx", debate]] as const) {
+    for (const [name, source] of [["app/new/NewDebatePageClient.tsx", create], ["DebatePageClient.tsx", debate]] as const) {
       expect(source, `${name} classifies its failures`).toContain("requestFailureMessage(");
       expect(source, `${name} interpolates no caught message`)
         .not.toMatch(/exc instanceof Error \? exc\.message/u);

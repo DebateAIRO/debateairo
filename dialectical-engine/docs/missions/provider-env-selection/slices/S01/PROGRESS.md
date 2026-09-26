@@ -1,0 +1,6 @@
+- 2026-09-24 14:12 EEST · REQ READY: SPEC.md frozen (ui: no), PLAN scaffold, DECISIONS by the REQ seat; slice ticket created; REQ-REV (blind, grok-4.7) next, then ARCH(S01).
+- 2026-09-24 14:36 EEST · REQ-REV p1 = REWORK (S01): SPEC-v2 by REQ-FIX (same REQ-PES session), then REQ-REV pass 2 (scoped), then ARCH.
+- 2026-09-24 14:58 EEST · REQ-FIX READY: SPEC-v2.md is the SPEC of record (v1 frozen); REQ-REV pass 2 (scoped) next, then ARCH(S01).
+- 2026-09-24 15:08 EEST · REQ-REV p2 REWORK: B1 (targets-rejected code unreachable; base row absent from the acceptance database) → REQ-FIX p3 t_690beb44; N3 (PLAN.md:40 vs R1.9) assigned to the same node.
+- 2026-09-24 19:53 EEST · REQ-FIX p3 READY: SPEC-v3 is the SPEC of record (SPEC.md and SPEC-v2.md frozen). B1 closed: a duplicate provider_ref is refused by the command before builder or parser; the targets-rejected case now prints PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID; the base row comes from the v4 register fixture at REGISTER_VERSION=4; V-10 (role-ref rows carried forward) default applied. → REQ-REV pass 3 t_94301ea0 (last pass; a REWORK there is a V row).
+- 2026-09-25 08:39 EEST · REQ-REV p3 PASS: requirements closed; SPEC-v3 is the SPEC of record → ARCH S01 t_96e1881a (READY).

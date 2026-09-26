@@ -1,0 +1,36 @@
+CLAIM RESUMED · BUILD-PES-S01-C3 · BUILD(S01-C3) · pass 1 · t_b2472fe7
+resume start: 2026-09-25 20:34:13 EEST (date output); original start 2026-09-25 15:01:56 EEST
+session: 01a0d870-9285-7002-ac49-7815cf8d4d98
+rollout: /Users/vladmihaimiron/.codex/sessions/2026/09/25/rollout-2026-09-25T15-00-51-01a0d870-9285-7002-ac49-7815cf8d4d98.jsonl
+lane HEAD: 3e6f438b5ef3ce0eff97f4990ca68249db55d292; branch slice/provider-env-selection-s01; dirty count 4, all retained S01-16..19 files, no sibling dirt.
+Corrected packet and COMMON reread in full; all six comments read, including PACKET CORRECTED. S01-27 and S01-20 reread at PLAN 598-636; S01-27 reference diffs read. Existing skill loads retained from this same session.
+RESUME START before any new edit: CLUSTER_RED, exactly the corrected PLAN frame (p3 1/2; architecture 722/729, seven failures = six original failures + C3-F1 caused by this C3 work). Typecheck only apps/ui/lib/v3/answerExport.ts(2,38) TS2835. Logs: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/RESUME-START-attempt-1.log and RESUME-START-typecheck-attempt-1.log.
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+tests/integration/pes-s01-hosted-provider-set-publish.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+tests/architecture/pes-s01-hosted-publish-boundary.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+ FAIL  tests/architecture/p3-production-database-principals.test.ts > P3-01 production database-principal manifest > maps the manifest to current migrations and executable connection seams without inventing completion
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+tests/architecture/p3-production-database-principals.test.ts rc=1 passed=1 failed=1 (expect 2/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/p3-production-database-principals.test.ts > P3-01 production database-principal manifest > maps the manifest to current migrations and executable connection seams without inventing completion
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ FAIL  tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > accounts for every current page pathname by name
+ Test Files  6 failed | 100 passed (106)
+      Tests  7 failed | 722 passed (729)
+tests/architecture rc=1 passed=722 failed=7 (expect 723/6)
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+tests/integration/dev-deployment-register.test.ts rc=0 passed=15 failed=0 (expect 15/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_RED
+Next ordered RED: S01-27 audit expectations -> passed=0 failed=2, before manifest object; then green and three full exit runs. No lane edit during the frame.
+comments read through: 6

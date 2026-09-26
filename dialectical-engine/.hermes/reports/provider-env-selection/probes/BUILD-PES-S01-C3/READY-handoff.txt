@@ -1,0 +1,142 @@
+SKILLS LOADED: [using-superpowers/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/using-superpowers/SKILL.md) · [heartbeat-protocol/SKILL.md](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md) · [heartbeat-worker/SKILL.md](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md) · [test-driven-development/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/test-driven-development/SKILL.md) · [verification-before-completion/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/verification-before-completion/SKILL.md) · [using-superpowers/references/codex-tools.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/using-superpowers/references/codex-tools.md) · [test-driven-development/writing-good-tests.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/test-driven-development/writing-good-tests.md) · [systematic-debugging/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/systematic-debugging/SKILL.md)
+
+2. **READY — BUILD(S01-C3), pass 1, t_b2472fe7.** Session `01a0d870-9285-7002-ac49-7815cf8d4d98`; rollout `/Users/vladmihaimiron/.codex/sessions/2026/09/25/rollout-2026-09-25T15-00-51-01a0d870-9285-7002-ac49-7815cf8d4d98.jsonl`.
+3. Branch `slice/provider-env-selection-s01`; ONE commit **`c90177f6ccf6d83d0ba9473f02035f93855a9b3e`**. Exactly six allowed lane paths committed with explicit `git add --`; final porcelain status empty. No push.
+4. Verification: corrected cluster command **CLUSTER_GREEN ×3; worst CLUSTER_GREEN**. Each run: integration **16/16**, boundary **4/4**, principal audit **2/2**, architecture **723/729** (the six START failures), deployment regression **15/15**, text bytes **3/3**.
+5. **C3-F1 closed by S01-27:** [audit expectations:334](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/tests/architecture/p3-production-database-principals.test.ts:334) and [manifest declaration:316](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json:316). C3-F2, the no-tests classification at [run-suites.sh:18](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-suites.sh:18), remains a previously reported tooling finding outside this seat's write surface (ticket comment 4).
+6. **UNVERIFIED:** C4 acceptance, whole-slice REV, cross-mission merge reconciliation and real-provider execution; none is claimed by this cluster.
+7. Self-report updated before READY: [BUILD-PES-S01-C3.md](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/agent-reports/BUILD-PES-S01-C3.md).
+8. comments read through: **8**.
+
+The retained S01-16..19 work implements the operator entry, its package script and the 20 command/boundary cases. S01-27 adds only the existing connection's declaration under the JIT migration owner: `MIGRATION_DATABASE_URL`, purpose `HOSTED_PROVIDER_SET_PUBLICATION`, binding `WIRED`, condition `package script hosted:publish-provider-set`. No principal, role, grant or migration changed.
+
+**Three-run table — all pairs are passed/total.**
+
+| Run | Marker | Every pair | Log |
+|---|---|---|---|
+| 1 | CLUSTER_GREEN | integration 16/16; boundary 4/4; p3 2/2; architecture 723/729 (6 failed); deployment 15/15; text 3/3 | [run 1](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-20-resume-GREEN-attempt-1.log) |
+| 2 | CLUSTER_GREEN | integration 16/16; boundary 4/4; p3 2/2; architecture 723/729 (6 failed); deployment 15/15; text 3/3 | [run 2](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-20-resume-GREEN-attempt-2.log) |
+| 3 | CLUSTER_GREEN | integration 16/16; boundary 4/4; p3 2/2; architecture 723/729 (6 failed); deployment 15/15; text 3/3 | [run 3](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-20-resume-GREEN-attempt-3.log) |
+
+Final frame, verbatim from run 3:
+
+```text
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+tests/integration/pes-s01-hosted-provider-set-publish.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+tests/architecture/pes-s01-hosted-publish-boundary.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+tests/architecture/p3-production-database-principals.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ FAIL  tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > accounts for every current page pathname by name
+ Test Files  5 failed | 101 passed (106)
+      Tests  6 failed | 723 passed (729)
+tests/architecture rc=1 passed=723 failed=6 (expect 723/6)
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+tests/integration/dev-deployment-register.test.ts rc=0 passed=15 failed=0 (expect 15/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+```
+
+Those six failures were present at START on **2026-09-25**, and their names match exactly in all three final logs. Typecheck retains only `apps/ui/lib/v3/answerExport.ts(2,38): TS2835`, with no C3 diagnostic ([typecheck log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-20-resume-typecheck-attempt-1.log)).
+
+**START and ordered RED evidence.** Original START was measured before any lane edit at **2026-09-25 15:01:56 EEST**, HEAD `3e6f438b5ef3ce0eff97f4990ca68249db55d292`, dirty 0: both new suites absent, architecture 719/725 (6 failed), deployment 15/15, text 3/3, marker BROKEN ([original START](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/START-attempt-1.log)). Resume START at **20:34:13 EEST**, same HEAD, four retained C3 files, before either S01-27 edit: 16/16; 4/4; p3 1/2; architecture 722/729 (7 failed); 15/15; 3/3; CLUSTER_RED ([resume START](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/RESUME-START-attempt-1.log)). Both CLAIMs carry their verbatim frames.
+
+**RED events in order: S01-16 → passed=0 failed=16; S01-17 → passed=0 failed=4; S01-27 (1) → p3 passed=0 failed=2; CLUSTER_RED.**
+
+Logs: [S01-16 RED](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-16-RED-attempt-2.log), [S01-17 RED](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-17-RED-attempt-1.log), [S01-27 full cluster RED](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-27-cluster-RED-attempt-1.log). The initial S01-16 collection-error attempt is excluded from valid RED evidence. S01-27's two assertion failures preceded the manifest edit; [S01-27 GREEN](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-27-GREEN-attempt-1.log) then records 2/2.
+
+Pairs changed, as **passed/failed**: integration absent → 0/16 → 16/0; boundary absent → 0/4 → 4/0; architecture 719/6 → 719/10 → 722/7 → 721/8 → 723/6; resumed p3 1/1 → 0/2 → 2/0. Regression pairs stayed 15/0 and 3/0. S01-18 passed I1–I16/H1–H3, S01-19 passed H4, S01-27 closed C3-F1, and S01-20 passed all three gates.
+
+**Refutation matrix.** M01–M22 were temporary edits to the CLI or its one package-script line. For each `Mnn`, the probe directory contains `Mnn-source-diff.log`, `Mnn-RED-attempt-1.log`, `Mnn-restore-GREEN-attempt-1.log`, and `Mnn-restore-status.log`. Targeted runs include any earlier publication cases they need; skipped cases are not counted as passed.
+
+| Mutant | Property broken by mutant | Target suite | RED | Restore | Neighbour |
+|---|---|---|---|---|---|
+| M01 | eager database validation → I1/I3 | integration | 2 failed | 2/2 passed; status saved | N01 |
+| M02 | drop NODE_ENV → I2 unresolved | integration | 1 failed | 1/1 passed; status saved | N01 |
+| M03 | lowercase mode → I2 invalid | integration | 1 failed | 1/1 passed; status saved | N01 |
+| M04 | echo malformed roster → I4 | integration | 1 failed | 1/1 passed; status saved | N01 |
+| M05 | exit 0 on refusal → I1–I7 | integration | 7 failed | 7/7 passed; status saved | N01 |
+| M06 | bind base 4 for every query → I5 | integration | 1 failed | 1/1 passed; status saved | N01 |
+| M07 | change carried source refs → I9 | integration | 2 failed | 2/2 passed; status saved | N01 |
+| M08 | drop 31 base rows → I9 | integration | 2 failed | 2/2 passed; status saved | N01 |
+| M09 | double existing suffix → I11 | integration | 1 failed | 3/3 passed; status saved | N01 |
+| M10 | copy fake credential into provenance → I10 | integration | 1 failed | 2/2 passed; status saved | N01 |
+| M11 | swap targets lines → I8/I10 | integration | 2 failed | 2/2 passed; status saved | N01 |
+| M12 | randomize publication identity → I12 | integration | 1 failed | 2/2 passed; status saved | N01 |
+| M13 | force production base 4 → I13 | integration | 1 failed | 3/3 passed; status saved | N01 |
+| M14 | publish from inferred head → I14 | integration | 1 failed | 3/3 passed; status saved | N01 |
+| M15 | omit role rows → I15 | integration | 1 failed | 2/2 passed; status saved | N01 |
+| M16 | change kept role provenance → I16 | integration | 1 failed | 2/2 passed; status saved | N01 |
+| M17 | replace kept role provider → I15/I16 | integration | 2 failed | 3/3 passed; status saved | N01 |
+| M18 | add local publication literal → H1 | boundary | 1 failed | 1/1 passed; status saved | N01 |
+| M19 | runtime export of dev module → H2 | boundary | 1 failed | 1/1 passed; status saved | N01 |
+| M20 | rename roster environment key → H3 | boundary | 1 failed | 1/1 passed; status saved | N01 |
+| M21 | point script to dev command → H4 | boundary | 1 failed | 1/1 passed; status saved | N01 |
+| M22 | publish while printing correct refusal → I5/I6/I7/I15 | integration | 5 failed | 5/5 passed; status saved | N01 |
+
+N01 reverses SQL row ordering, writes stdout one line at a time, adds a type-only dev import and unrelated local metadata, repeats the roster key within the same file, and changes JSON indentation. It remains **16/16 + 4/4**, CLUSTER_GREEN; restoring it remains **16/16 + 4/4**, CLUSTER_GREEN. Logs: `N01-neighbour-attempt-1.log`, `N01-restore-GREEN-attempt-1.log`; diffs and restore status are retained. All mutated files were finally compared byte for byte with their original contents.
+
+Each M01–M22 and N01 restore printed this status and saved it in its own log:
+
+```text
+ M dialectical-engine/package.json
+?? dialectical-engine/apps/runner/src/hosted-provider-set-publish-cli.ts
+?? dialectical-engine/tests/architecture/pes-s01-hosted-publish-boundary.test.ts
+?? dialectical-engine/tests/integration/pes-s01-hosted-provider-set-publish.test.ts
+```
+
+**Earlier guards, including the review folds.** g1 resolves mode; g2 requires hosted; g3 reads an absolute roster path; g4 checks JSON/top-level/element keys, adapter, vetting keys and duplicates; g5 parses the version; g6 loads database configuration; g7 queries base rows; g8 requires the base row; g9 checks builder shape then vetting; g10 parses runner then API targets; g10b checks synthesizer then evaluator; g11 publishes.
+
+| Refusal | Guard and every earlier guard | Example that would steal the expected refusal |
+|---|---|---|
+| I1 | g1 → g2 | Invalid mode at g1 |
+| I2 | g1 | No earlier guard |
+| I3/I4 | g1 → g2 → g3 → g4 | Local mode at g2 or unreadable path at g3 |
+| I5 | g1 → g2 → g3 → g4 → g5 → g6 → g7 → g8 | Invalid version at g5 |
+| I6 | g1 → g2 → g3 → g4 → g5 → g6 → g7 → g8 → g9 shape → vetting | Missing vetting object at g4 |
+| I7 | g1 → g2 → g3 → g4 → g5 → g6 → g7 → g8 → g9 → g10 | False vetting member at g9 |
+| I15 | g1 → g2 → g3 → g4 → g5 → g6 → g7 → g8 → g9 → g10 → g10b synthesizer passes, evaluator refuses | A /v2 URL at g10 |
+
+For I7, the parser reaches URL validation after size/JSON/array, configured-set validity, target object/allow-list, prices, ref/duplicate/membership, and credentials. Its runner URL refusal occurs before the API parse.
+
+
+S01-27 adds the following product-manifest refutations. Their logs use the same `Mnn-source-diff.log`, `Mnn-RED-attempt-1.log`, `Mnn-restore-GREEN-attempt-1.log`, and `Mnn-restore-status.log` convention in [the probe directory](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/).
+
+| Mutant | Property and mutation | Target suite | RED | Restore | Neighbour |
+|---|---|---|---|---|---|
+| M23 | Hosted entry must be WIRED; change binding to DEVELOPMENT_ONLY | p3 principal audit | inventory fails, 1/2 passed | 2/2; status saved | N02 |
+| M24 | Every executable connection pair must be declared; remove hosted object | p3 principal audit | inventory and pair cases fail, 0/2 passed | 2/2; status saved | N02 |
+
+N02 reverses the hosted JSON object's member order without changing its values: **2/2 GREEN**; restoration **2/2 GREEN**. Logs: `N02-neighbour-attempt-1.log`, `N02-restore-GREEN-attempt-1.log`, `N02-source-diff.log`, `N02-restore-status.log`. The restored manifest was compared byte for byte with its pre-mutation copy.
+
+Each M23, M24 and N02 restore printed and saved exactly:
+
+```text
+ M dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json
+ M dialectical-engine/package.json
+ M dialectical-engine/tests/architecture/p3-production-database-principals.test.ts
+?? dialectical-engine/apps/runner/src/hosted-provider-set-publish-cli.ts
+?? dialectical-engine/tests/architecture/pes-s01-hosted-publish-boundary.test.ts
+?? dialectical-engine/tests/integration/pes-s01-hosted-provider-set-publish.test.ts
+```
+
+## PROGRESS records
+
+- S01-16, S01-17, S01-18, S01-19, S01-27 and S01-20 completed in that order, retaining the first four steps across the authorized resume. C3-F1 is closed; all three final markers are CLUSTER_GREEN.
+- Original START role measurements: 32 base rows; I15 version count **3 → 3**; I16 seed/published rows **49 → 49** (`START-role-counts-attempt-2.log`; attempt 1 was my probe error).
+- Protected diffs from `776359c3` are empty with positive tracked-path matches for every pathspec: both dev publishers, configured-provider-set, register-publication, providers/index, API/runner main, deploy/vps, env examples, tests/support, migrations and orphan-audit. Five required CLI greps print 0; readFile lines=1 for the roster. Package diff is exactly one script addition. Evidence: [boundary log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-20-resume-boundaries-attempt-1.log).
+- Principal manifest numstat **8/0** and audit **11/0**, additions only. Hosted-entry grep counts **2** and **3**. JSON parses; exactly one declaration is under `debateai_prod_migrator`; removing it yields the base manifest. Same boundary log.
+- All **208** recorded scratch ports are above 4400 and outside NO-TOUCH; cleanup finds no listener. The six baseline failure names and sole inherited typecheck diagnostic match. Evidence: [cleanup/delta log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-20-resume-cleanup-and-delta-attempt-2.log).
+- Cleanup attempt 1 exceeded lsof’s 100-address limit and is retained as a probe error. Attempt 2 batches 50 ports per invocation and is the authoritative cleanup evidence; no product edit or test rerun was needed.
+- ONE commit `c90177f6ccf6d83d0ba9473f02035f93855a9b3e`, six explicit allowed lane paths, clean final status ([commit evidence](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S01-C3/S01-20-commit-attempt-1.log)). No sibling paths staged, no real key, live database, NO-TOUCH listener, desktop action, install, push, merge or stash. No new V-ROW; V-20's existing default and V-21's “Finish S01 anyway” were followed.

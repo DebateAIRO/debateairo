@@ -1,0 +1,17 @@
+{
+  "time.justNow": "vừa xong",
+  "time.minutes.other": "{count} phút trước",
+  "time.hours.other": "{count} giờ trước",
+  "time.yesterday": "Hôm qua",
+  "time.days.other": "{count} ngày trước",
+  "time.weeks.other": "{count} tuần trước",
+  "time.status.complete": "Hoàn tất",
+  "time.status.queued": "Đang xếp hàng",
+  "time.status.claimed": "Đã nhận",
+  "time.status.running": "Đang chạy",
+  "time.status.holding": "Tạm giữ để nhà cung cấp khôi phục",
+  "time.status.settled": "Đã xử lý xong",
+  "time.status.generating": "Đang tạo",
+  "time.status.failed": "Thất bại",
+  "time.status.draft": "Bản nháp"
+}

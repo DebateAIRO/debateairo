@@ -1,4 +1,5 @@
-import type { SupportLanguage, SupportOutcome } from "./templates.js";
+import type { SupportOutcome } from "./templates.js";
+import type { SupportCorpusLanguage } from "@debateai/support-kb/catalog";
 import { analyzePreparedRecoverySemanticsViews } from "./recovery-intent.js";
 import { classifySecurityRecoveryViews } from "./security-guidance.js";
 import { isPreparedPublicAccountLocationGuide } from "./public-guide-boundary.js";
@@ -6,7 +7,7 @@ import { isPreparedPublicAccountLocationGuide } from "./public-guide-boundary.js
 export type SupportClassification = Readonly<{
   outcome: Extract<SupportOutcome,
     "REFUSE_ZONE" | "REFUSE_INJECTION" | "REFUSE_SAFETY"> | "INCIDENT" | null;
-  language: SupportLanguage;
+  language: SupportCorpusLanguage;
   link: "/login" | "/sign-up" | "/settings" | null;
   securityNavigation?: "FORGOT_PASSWORD";
   securityOperation?: "CREDENTIAL_OPERATION";
@@ -355,13 +356,13 @@ export function supportSensitiveIntentFamily(message: string): SupportSensitiveI
   return sensitiveIntentFamilyFromViews(prepareMessage(message).ordinaryViews);
 }
 
-function detectPreparedLanguage(prepared: PreparedMessage): SupportLanguage {
+function detectPreparedLanguage(prepared: PreparedMessage): SupportCorpusLanguage {
   if (prepared.ordinaryViews.some((text) => /[ăâîșşțţ]/u.test(text))) return "ro";
   const tokens = prepared.ordinaryViews.flatMap((text) => text.match(/[\p{L}]+/gu) ?? []);
   return tokens.some((token) => ROMANIAN_WORDS.has(token)) ? "ro" : "en";
 }
 
-export function detectSupportLanguage(message: string): SupportLanguage {
+export function detectSupportLanguage(message: string): SupportCorpusLanguage {
   return detectPreparedLanguage(prepareMessage(message));
 }
 

@@ -1,0 +1,10 @@
+{
+  "stoppedCommit": "c90177f6ccf6d83d0ba9473f02035f93855a9b3e",
+  "stoppedTitle": "feat(provider-env-selection/S01-C3): add audited hosted publish command",
+  "currentHead": "bac925b3eddc5fb4594dde8c085a136875ea215e",
+  "conflicts": [
+    "docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json",
+    "tests/architecture/p3-production-database-principals.test.ts"
+  ],
+  "status": "A  dialectical-engine/apps/runner/src/hosted-provider-set-publish-cli.ts\nUU dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json\nM  dialectical-engine/package.json\nUU dialectical-engine/tests/architecture/p3-production-database-principals.test.ts\nA  dialectical-engine/tests/architecture/pes-s01-hosted-publish-boundary.test.ts\nA  dialectical-engine/tests/integration/pes-s01-hosted-provider-set-publish.test.ts\n"
+}

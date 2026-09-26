@@ -37,7 +37,7 @@ describe("SUP-04 widget mount boundary", () => {
       .map(({ file }) => file).sort();
     expect(importers).toEqual([
       "apps/ui/app/debate/[id]/DebatePageGate.tsx",
-      "apps/ui/app/new/page.tsx",
+      "apps/ui/app/new/NewDebatePageClient.tsx",
       "apps/ui/app/page.tsx",
       "apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx"
     ]);

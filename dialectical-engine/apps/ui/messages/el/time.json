@@ -1,0 +1,21 @@
+{
+  "time.justNow": "μόλις τώρα",
+  "time.minutes.one": "πριν από {count} λεπτό",
+  "time.minutes.other": "πριν από {count} λεπτά",
+  "time.hours.one": "πριν από {count} ώρα",
+  "time.hours.other": "πριν από {count} ώρες",
+  "time.yesterday": "Χθες",
+  "time.days.one": "πριν από {count} ημέρα",
+  "time.days.other": "πριν από {count} ημέρες",
+  "time.weeks.one": "πριν από {count} εβδομάδα",
+  "time.weeks.other": "πριν από {count} εβδομάδες",
+  "time.status.complete": "Ολοκληρώθηκε",
+  "time.status.queued": "Σε ουρά",
+  "time.status.claimed": "Αναλήφθηκε",
+  "time.status.running": "Εκτελείται",
+  "time.status.holding": "Αναμονή ανάκαμψης παρόχου",
+  "time.status.settled": "Διευθετήθηκε",
+  "time.status.generating": "Δημιουργείται",
+  "time.status.failed": "Απέτυχε",
+  "time.status.draft": "Πρόχειρο"
+}

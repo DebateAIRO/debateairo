@@ -1,13 +1,23 @@
 "use client";
 
 import type { DebateNode } from "@/lib/types";
-import { SCRUTINY_STATUS } from "@/lib/scrutiny";
+import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
+import composeEnglish from "@/messages/en/compose.json";
 
-const RESOLUTIONS: { key: string; label: string }[] = [
-  { key: "contested", label: "Contested" },
-  { key: "strengthened", label: "Strengthened" },
-  { key: "refuted", label: "Refuted" }
+const RESOLUTIONS: { key: string; labelKey: string }[] = [
+  { key: "contested", labelKey: "debateDrawers.investigation.contested" },
+  { key: "strengthened", labelKey: "debateDrawers.investigation.strengthened" },
+  { key: "refuted", labelKey: "debateDrawers.investigation.refuted" }
 ];
+
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  working: "debateDrawers.investigation.investigating",
+  contested: "debateDrawers.investigation.contested",
+  strengthened: "debateDrawers.investigation.strengthened",
+  refuted: "debateDrawers.investigation.refuted"
+};
 
 export function InvestigationDrawer({
   node,
@@ -15,7 +25,9 @@ export function InvestigationDrawer({
   flagged,
   onClose,
   onResolve,
-  onClear
+  onClear,
+  catalog = debateDrawersEnglish,
+  composeCatalog = composeEnglish
 }: {
   node: DebateNode | null;
   status: string;
@@ -23,47 +35,51 @@ export function InvestigationDrawer({
   onClose: () => void;
   onResolve: (status: string) => void;
   onClear: () => void;
+  catalog?: MessageCatalog;
+  /** The interface locale's `compose` catalogue: the scrutiny status table. */
+  composeCatalog?: MessageCatalog;
 }) {
-  const current = SCRUTINY_STATUS[status] ?? SCRUTINY_STATUS.working;
+  const statuses = scrutinyStatuses(composeCatalog);
+  const current = statuses[status] ?? statuses.working;
+  const currentLabel = t(catalog, STATUS_LABEL_KEYS[status] ?? STATUS_LABEL_KEYS.working);
   const resolved = status !== "working";
 
   return (
     <>
       <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label="Investigation">
+      <aside className="drawer scroll" role="dialog" aria-modal aria-label={t(catalog, "debateDrawers.investigation.title")}>
         <div className="drawerHead">
           <div className="drawerHeadMeta">
-            <span className="invLabel">Investigation</span>
+            <span className="invLabel">{t(catalog, "debateDrawers.investigation.title")}</span>
             <span className="pill" style={{ background: current.bg, borderColor: current.color, color: current.color }}>
               <span className="dot" style={{ background: current.color }} />
-              {current.label}
+              {currentLabel}
             </span>
           </div>
-          <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
+          <button type="button" className="iconBtn" onClick={onClose} aria-label={t(catalog, "debateDrawers.common.close")}>
             ×
           </button>
         </div>
 
         <div className="drawerBody">
-          <div className="nodeEyebrow">Flagged claim</div>
+          <div className="nodeEyebrow">{t(catalog, "debateDrawers.investigation.flaggedClaim")}</div>
           <div className="invFlagged" style={{ borderLeftColor: current.color }}>
             <div className="invFlaggedClaim">{node?.claim ?? "—"}</div>
-            {flagged ? <div className="invFlaggedSpan">flagged span — “{flagged}”</div> : null}
+            {flagged ? <div className="invFlaggedSpan">{t(catalog, "debateDrawers.investigation.flaggedSpan", { text: flagged })}</div> : null}
           </div>
 
           <div className="drawerDivider" />
 
           <div className="drawerHistoryHead">
-            <span>Resolution</span>
+            <span>{t(catalog, "debateDrawers.investigation.resolution")}</span>
           </div>
           <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, marginTop: 0 }}>
-            Record how this claim held up under scrutiny. The claim carries the badge so the rest of the tree reads it
-            in context.
+            {t(catalog, "debateDrawers.investigation.instructions")}
           </p>
 
           <div className="invResolutions">
             {RESOLUTIONS.map((resolution) => {
-              const meta = SCRUTINY_STATUS[resolution.key];
+              const meta = statuses[resolution.key];
               const active = status === resolution.key;
               return (
                 <button
@@ -78,7 +94,7 @@ export function InvestigationDrawer({
                   onClick={() => onResolve(resolution.key)}
                 >
                   <span className="dot" style={{ background: meta.color }} />
-                  {resolution.label}
+                  {t(catalog, resolution.labelKey)}
                 </button>
               );
             })}
@@ -86,15 +102,15 @@ export function InvestigationDrawer({
 
           {resolved ? (
             <div className="invFinal" style={{ background: current.bg, borderColor: current.color }}>
-              <div className="invFinalText">{current.label} — this is recorded on the claim.</div>
+              <div className="invFinalText">{t(catalog, "debateDrawers.investigation.recorded", { status: currentLabel })}</div>
               <button type="button" className="btn" style={{ marginTop: 11 }} onClick={onClear}>
-                Resolve &amp; clear scrutiny
+                {t(catalog, "debateDrawers.investigation.resolveAndClear")}
               </button>
             </div>
           ) : (
             <div className="invWorking">
               <span className="invWorkingDot" />
-              Awaiting your judgement…
+              {t(catalog, "debateDrawers.investigation.awaitingJudgement")}
             </div>
           )}
         </div>

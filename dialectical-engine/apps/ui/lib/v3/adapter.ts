@@ -7,6 +7,8 @@ import type {
 } from "@debateai/contract";
 import type { RunProjection } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
+import composeEnglish from "../../messages/en/compose.json" with { type: "json" };
+import { t, tPlural, type MessageCatalog } from "../i18n/translate.js";
 import type {
   DebateAdaptiveDepthDryRunResponse,
   DebateCompletion,
@@ -50,11 +52,14 @@ export type TreeProjectableAnswer = Pick<
  * the honesty drawer lists every edge verbatim.
  */
 
-export function wayOfKnowingLabel(way: ContractNode["way_of_knowing"]): string {
+export function wayOfKnowingLabel(
+  way: ContractNode["way_of_knowing"],
+  catalog: MessageCatalog = composeEnglish
+): string {
   switch (way) {
-    case "LOOKED_UP": return "Looked up";
-    case "RAN": return "Ran";
-    case "REASONING": return "Reasoning";
+    case "LOOKED_UP": return t(catalog, "compose.v3.wayOfKnowing.lookedUp");
+    case "RAN": return t(catalog, "compose.v3.wayOfKnowing.ran");
+    case "REASONING": return t(catalog, "compose.v3.wayOfKnowing.reasoning");
   }
 }
 
@@ -69,16 +74,31 @@ export function debateStatusFromTerminal(terminal: Answer["terminal"]): string {
   }
 }
 
-function completionFromTerminal(terminal: Answer["terminal"]): DebateCompletion {
+function completionFromTerminal(
+  terminal: Answer["terminal"],
+  catalog: MessageCatalog
+): DebateCompletion {
   switch (terminal) {
     case "SERVED":
       return { state: "complete", reasonCode: terminal, humanReason: null };
     case "DOWNGRADED":
-      return { state: "complete", reasonCode: terminal, humanReason: "Served downgraded" };
+      return {
+        state: "complete",
+        reasonCode: terminal,
+        humanReason: t(catalog, "compose.v3.completion.servedDowngraded")
+      };
     case "COMPONENTS_ONLY":
-      return { state: "complete", reasonCode: terminal, humanReason: "Components-only serve: prose withheld" };
+      return {
+        state: "complete",
+        reasonCode: terminal,
+        humanReason: t(catalog, "compose.v3.completion.componentsOnly")
+      };
     case "BLOCKED":
-      return { state: "failed", reasonCode: terminal, humanReason: "Blocked at terminal" };
+      return {
+        state: "failed",
+        reasonCode: terminal,
+        humanReason: t(catalog, "compose.v3.completion.blocked")
+      };
   }
 }
 
@@ -89,7 +109,10 @@ type GraphProjection = {
 
 type ParentLink = { parentId: string; edge: Edge };
 
-function childNodeType(relation: Edge["relation"]): { nodeType: string; label: string | null } {
+function childNodeType(
+  relation: Edge["relation"],
+  catalog: MessageCatalog
+): { nodeType: string; label: string | null } {
   switch (relation) {
     case "attack":
     case "defeat":
@@ -97,11 +120,11 @@ function childNodeType(relation: Edge["relation"]): { nodeType: string; label: s
     case "support":
       return { nodeType: "PRO", label: null };
     case "shared-crux":
-      return { nodeType: "SHARED-CRUX", label: "Shared crux" };
+      return { nodeType: "SHARED-CRUX", label: t(catalog, "compose.v3.sharedCrux") };
   }
 }
 
-function projectGraph(answer: TreeProjectableAnswer): GraphProjection {
+function projectGraph(answer: TreeProjectableAnswer, catalog: MessageCatalog): GraphProjection {
   const contractById = new Map<string, ContractNode>(answer.nodes.map((node) => [node.node_id, node]));
   const parentLinks = new Map<string, ParentLink>();
   const usedEdgeIds = new Set<string>();
@@ -144,14 +167,14 @@ function projectGraph(answer: TreeProjectableAnswer): GraphProjection {
     const link = parentLinks.get(nodeId);
     if (link !== undefined) usedEdgeIds.add(link.edge.edge_id);
     const typed = link === undefined
-      ? { nodeType: "CLAIM", label: wayOfKnowingLabel(contractNode.way_of_knowing) }
-      : childNodeType(link.edge.relation);
+      ? { nodeType: "CLAIM", label: wayOfKnowingLabel(contractNode.way_of_knowing, catalog) }
+      : childNodeType(link.edge.relation, catalog);
     const childIds = (childIdsByParent.get(nodeId) ?? []).filter((childId) => !visited.has(childId));
     const hiddenRecord = hiddenRecordByNodeId.get(nodeId);
     const ownHiddenReason = hiddenRecord?.mark === "HIDDEN-UNJUDGEABLE"
-      ? `Disclosed as unjudged — excluded from the served number: ${hiddenRecord.reason}`
+      ? t(catalog, "compose.v3.hidden.unjudged", { reason: hiddenRecord.reason })
       : hiddenRecord?.mark === "HIDDEN-LOW-SCORE"
-        ? `Disclosed as set aside at the ruled score threshold: ${hiddenRecord.reason}`
+        ? t(catalog, "compose.v3.hidden.lowScore", { reason: hiddenRecord.reason })
         : null;
     const hiddenReason = ownHiddenReason;
     const view: DebateNode = {
@@ -205,12 +228,15 @@ function projectGraph(answer: TreeProjectableAnswer): GraphProjection {
 }
 
 /** Edges the tree projection cannot carry — never dropped, always listed. */
-export function unrepresentedEdges(answer: Answer): Edge[] {
-  const { usedEdgeIds } = projectGraph(answer);
+export function unrepresentedEdges(
+  answer: Answer,
+  catalog: MessageCatalog = composeEnglish
+): Edge[] {
+  const { usedEdgeIds } = projectGraph(answer, catalog);
   return answer.edges.filter((edge) => !usedEdgeIds.has(edge.edge_id));
 }
 
-function synthesisFromAnswer(answer: TreeProjectableAnswer): Synthesis | null {
+function synthesisFromAnswer(answer: TreeProjectableAnswer, catalog: MessageCatalog): Synthesis | null {
   const prose = answer.composed_text.map((segment) => segment.text).join("\n\n").trim();
   const componentsOnly = answer.serve_state === "COMPONENTS_ONLY";
   if (prose.length === 0 && !componentsOnly) return null;
@@ -220,7 +246,7 @@ function synthesisFromAnswer(answer: TreeProjectableAnswer): Synthesis | null {
     strongest_pro: "",
     strongest_con: "",
     verdict: componentsOnly
-      ? "Components-only: composed prose was not cleared to serve. Open Honesty for the verified projections."
+      ? t(catalog, "compose.v3.componentsOnlyVerdict")
       : prose,
     verdict_gate: null,
     model_id: "",
@@ -229,8 +255,11 @@ function synthesisFromAnswer(answer: TreeProjectableAnswer): Synthesis | null {
   };
 }
 
-export function debateDetailFromAnswer(answer: TreeProjectableAnswer): DebateDetail {
-  const { rootChildren } = projectGraph(answer);
+export function debateDetailFromAnswer(
+  answer: TreeProjectableAnswer,
+  catalog: MessageCatalog = composeEnglish
+): DebateDetail {
+  const { rootChildren } = projectGraph(answer, catalog);
   const status = debateStatusFromTerminal(answer.terminal);
   const root: DebateNode = {
     id: answer.answer_id,
@@ -260,7 +289,7 @@ export function debateDetailFromAnswer(answer: TreeProjectableAnswer): DebateDet
     completed_at: null,
     tree: root,
     scoring: null,
-    synthesis: synthesisFromAnswer(answer),
+    synthesis: synthesisFromAnswer(answer, catalog),
     active_synthesis: null,
     branch_lineage: [],
     analyzer_runs: [],
@@ -271,7 +300,7 @@ export function debateDetailFromAnswer(answer: TreeProjectableAnswer): DebateDet
     agent_runs: [],
     skills_used: [],
     provenance_records: [],
-    completion: completionFromTerminal(answer.terminal),
+    completion: completionFromTerminal(answer.terminal, catalog),
     workers: [],
     models: [],
     node_count: answer.nodes.length
@@ -357,16 +386,25 @@ export type V3ScorePresentation =
  * This is the one formatter shared by cards, drawers and tooltips. It never
  * clamps or defaults a contract number (DR-115 / AC-76).
  */
-export function v3ScorePercentage(value: number): Readonly<{ text: string; detail: string }> {
+export function v3ScorePercentage(
+  value: number,
+  catalog: MessageCatalog = composeEnglish
+): Readonly<{ text: string; detail: string }> {
   const percentage = value * 100;
   const rounded = Math.round(percentage * 100) / 100;
   const decimal = rounded.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
   const exact = rounded / 100 === value;
   return exact
-    ? { text: `${decimal}%`, detail: `${decimal}% (exact percentage restatement)` }
+    ? {
+        text: `${decimal}%`,
+        detail: t(catalog, "compose.v3.score.exactPercentage", { percentage: `${decimal}%` })
+      }
     : {
         text: `≈${decimal}%`,
-        detail: `≈${decimal}% (rounded to the nearest 0.01 percentage point from recorded probability ${value})`
+        detail: t(catalog, "compose.v3.score.roundedPercentage", {
+          percentage: `≈${decimal}%`,
+          probability: value
+        })
       };
 }
 
@@ -382,23 +420,26 @@ export type V3NodeScoreDetail = Readonly<{
 export type V3NodeScoreDetails = readonly [V3NodeScoreDetail, V3NodeScoreDetail];
 
 /** The drawer-ready score records, kept executable so percentage drift is test-visible. */
-export function v3NodeScoreDetails(node: ContractNode): V3NodeScoreDetails {
+export function v3NodeScoreDetails(
+  node: ContractNode,
+  catalog: MessageCatalog = composeEnglish
+): V3NodeScoreDetails {
   if (node.final_strength === null) {
     throw new TypedDomainError("FINAL_STRENGTH_WITHHELD", `Node ${node.node_id} was excluded from the served number`);
   }
   return [
     {
       id: "base_score",
-      label: `base score (${node.base_score.kind})`,
-      percentage: v3ScorePercentage(node.base_score.value),
+      label: t(catalog, "compose.v3.score.baseLabel", { kind: node.base_score.kind }),
+      percentage: v3ScorePercentage(node.base_score.value, catalog),
       producer: node.base_score.producer,
       source: node.base_score.source,
       replay_handle: node.base_score.replay_handle
     },
     {
       id: "final_strength",
-      label: `final strength (${node.final_strength.kind})`,
-      percentage: v3ScorePercentage(node.final_strength.value),
+      label: t(catalog, "compose.v3.score.finalLabel", { kind: node.final_strength.kind }),
+      percentage: v3ScorePercentage(node.final_strength.value, catalog),
       producer: node.final_strength.producer,
       source: node.final_strength.source,
       replay_handle: node.final_strength.replay_handle
@@ -407,35 +448,45 @@ export function v3NodeScoreDetails(node: ContractNode): V3NodeScoreDetails {
 }
 
 export type V3NodeHonestyRow = Readonly<{
-  key: "BASE SCORE" | "FINAL STRENGTH" | "REPLAY" | "RESTATEMENT" | "DEFEATERS" | "JUDGE DISAGREEMENT";
+  key: string;
   value: string;
   title?: string;
 }>;
 
-function scoreSourceLabel(detail: V3NodeScoreDetail): string {
+function scoreSourceLabel(detail: V3NodeScoreDetail, catalog: MessageCatalog): string {
   const producer = detail.producer.toLowerCase();
   if (detail.id === "base_score") {
-    return producer.includes("judg") ? "judge-panel" : "recorded assessment";
+    return producer.includes("judg")
+      ? t(catalog, "compose.v3.score.source.judgePanel")
+      : t(catalog, "compose.v3.score.source.recordedAssessment");
   }
-  return producer.includes("propagat") ? "replayed" : "recorded result";
+  return producer.includes("propagat")
+    ? t(catalog, "compose.v3.score.source.replayed")
+    : t(catalog, "compose.v3.score.source.recordedResult");
 }
 
-function restatementStatusLabel(status: ContractNode["stranger_restatement"]["check_status"]): string {
+function restatementStatusLabel(
+  status: ContractNode["stranger_restatement"]["check_status"],
+  catalog: MessageCatalog
+): string {
   switch (status) {
-    case "PASS": return "passed";
-    case "FAIL": return "failed";
-    case "NOT_SAMPLED": return "not sampled";
+    case "PASS": return t(catalog, "compose.v3.restatement.passed");
+    case "FAIL": return t(catalog, "compose.v3.restatement.failed");
+    case "NOT_SAMPLED": return t(catalog, "compose.v3.restatement.notSampled");
   }
 }
 
-function disagreementLabel(disagreement: ContractNode["disagreement"]): string {
-  if (disagreement === null) return "No disagreement record";
+function disagreementLabel(
+  disagreement: ContractNode["disagreement"],
+  catalog: MessageCatalog
+): string {
+  if (disagreement === null) return t(catalog, "compose.v3.disagreement.none");
   if (disagreement.kind === "NOT_MEASURED") {
     return disagreement.reason === "SINGLE_JUDGE_WALKING_SKELETON"
-      ? "Not measured · single-judge run"
-      : "Not measured";
+      ? t(catalog, "compose.v3.disagreement.singleJudge")
+      : t(catalog, "compose.v3.disagreement.notMeasured");
   }
-  return "Disagreement recorded";
+  return t(catalog, "compose.v3.disagreement.recorded");
 }
 
 /**
@@ -443,79 +494,120 @@ function disagreementLabel(disagreement: ContractNode["disagreement"]): string {
  * traceability, but this visual surface follows the design's semantic labels
  * and never exposes UUIDs or raw JSON as prose.
  */
-export function v3NodeHonestyRows(node: ContractNode): readonly V3NodeHonestyRow[] {
-  const [baseScore, finalStrength] = v3NodeScoreDetails(node);
+export function v3NodeHonestyRows(
+  node: ContractNode,
+  catalog: MessageCatalog = composeEnglish,
+  locale = "en"
+): readonly V3NodeHonestyRow[] {
+  const [baseScore, finalStrength] = v3NodeScoreDetails(node, catalog);
   const defeaters = node.defeater_refs.length === 0
     ? node.defeater_exhaustion_marked
-      ? "Rotation exhausted and marked"
-      : "Obligation remains open"
-    : `${node.defeater_refs.length} recorded defeater${node.defeater_refs.length === 1 ? "" : "s"}`;
+      ? t(catalog, "compose.v3.defeaters.exhausted")
+      : t(catalog, "compose.v3.defeaters.open")
+    : tPlural(catalog, "compose.v3.defeaters.recorded", node.defeater_refs.length, locale);
 
   return [
     {
-      key: "BASE SCORE",
-      value: `${baseScore.percentage.text} · ${scoreSourceLabel(baseScore)}`,
+      key: t(catalog, "compose.v3.honesty.baseScore"),
+      value: `${baseScore.percentage.text} · ${scoreSourceLabel(baseScore, catalog)}`,
       title: baseScore.percentage.detail
     },
     {
-      key: "FINAL STRENGTH",
-      value: `${finalStrength.percentage.text} · ${scoreSourceLabel(finalStrength)}`,
+      key: t(catalog, "compose.v3.honesty.finalStrength"),
+      value: `${finalStrength.percentage.text} · ${scoreSourceLabel(finalStrength, catalog)}`,
       title: finalStrength.percentage.detail
     },
-    { key: "REPLAY", value: "Recorded replay available" },
     {
-      key: "RESTATEMENT",
-      value: `Stranger restatement check ${restatementStatusLabel(node.stranger_restatement.check_status)}`
+      key: t(catalog, "compose.v3.honesty.replay"),
+      value: t(catalog, "compose.v3.honesty.replayAvailable")
     },
-    { key: "DEFEATERS", value: defeaters },
-    { key: "JUDGE DISAGREEMENT", value: disagreementLabel(node.disagreement) }
+    {
+      key: t(catalog, "compose.v3.honesty.restatement"),
+      value: t(catalog, "compose.v3.honesty.restatementCheck", {
+        status: restatementStatusLabel(node.stranger_restatement.check_status, catalog)
+      })
+    },
+    { key: t(catalog, "compose.v3.honesty.defeaters"), value: defeaters },
+    {
+      key: t(catalog, "compose.v3.honesty.judgeDisagreement"),
+      value: disagreementLabel(node.disagreement, catalog)
+    }
   ];
 }
 
 function labeledNumberBadge(
   id: V3ScoreBadge["id"],
-  name: string,
-  abbreviation: string,
-  number: V3LabeledNumber
+  nameKey: string,
+  abbreviationKey: string,
+  number: V3LabeledNumber,
+  catalog: MessageCatalog
 ): V3ScoreBadge {
-  const percentage = v3ScorePercentage(number.value);
+  const percentage = v3ScorePercentage(number.value, catalog);
   return {
     id,
-    pillText: `${abbreviation} ${percentage.text}`,
-    title:
-      `${name} ${percentage.detail} · ${number.kind} · produced by ${number.producer} · ` +
-      `source ${number.source} · replay ${number.replay_handle}`
+    pillText: t(catalog, "compose.v3.score.badge", {
+      abbreviation: t(catalog, abbreviationKey),
+      percentage: percentage.text
+    }),
+    title: t(catalog, "compose.v3.score.badgeTitle", {
+      kind: number.kind,
+      name: t(catalog, nameKey),
+      percentage: percentage.detail,
+      producer: number.producer,
+      replay: number.replay_handle,
+      source: number.source
+    })
   };
 }
 
 /** The typed reason a card carries no number — never a 0, never a dash (DR-115). */
-export function v3ScoreAbsenceCopy(reason: V3NodeScoreAbsence): Readonly<{ pillText: string; title: string }> {
+export function v3ScoreAbsenceCopy(
+  reason: V3NodeScoreAbsence,
+  catalog: MessageCatalog = composeEnglish
+): Readonly<{ pillText: string; title: string }> {
   switch (reason) {
     case "QUESTION_CARD_IS_NOT_A_NODE":
       return {
-        pillText: "NO SCORE",
-        title: "The question line is not a graph node, so V3 records no score for it."
+        pillText: t(catalog, "compose.v3.score.noScore"),
+        title: t(catalog, "compose.v3.score.questionHasNoScore")
       };
     case "NO_SERVED_ANSWER":
       return {
-        pillText: "NO SCORE YET",
-        title: "No served answer exists yet, so V3 has recorded no score for this claim."
+        pillText: t(catalog, "compose.v3.score.noScoreYet"),
+        title: t(catalog, "compose.v3.score.answerHasNoScoreYet")
       };
     case "NODE_ABSENT_FROM_SERVED_ANSWER":
       return {
-        pillText: "NO SCORE",
-        title: "The served answer graph does not carry this card, so V3 has no recorded score for it."
+        pillText: t(catalog, "compose.v3.score.noScore"),
+        title: t(catalog, "compose.v3.score.cardHasNoScore")
       };
   }
 }
 
-export function v3ScorePresentation(state: V3NodeScoreState): V3ScorePresentation {
-  if (state.status === "ABSENT") return { status: "ABSENT", badge: v3ScoreAbsenceCopy(state.reason) };
+export function v3ScorePresentation(
+  state: V3NodeScoreState,
+  catalog: MessageCatalog = composeEnglish
+): V3ScorePresentation {
+  if (state.status === "ABSENT") {
+    return { status: "ABSENT", badge: v3ScoreAbsenceCopy(state.reason, catalog) };
+  }
   return {
     status: "PRESENT",
     badges: [
-      labeledNumberBadge("base_score", "Base score", "BASE", state.base_score),
-      labeledNumberBadge("final_strength", "Final strength", "FINAL", state.final_strength)
+      labeledNumberBadge(
+        "base_score",
+        "compose.v3.score.baseName",
+        "compose.v3.score.baseAbbreviation",
+        state.base_score,
+        catalog
+      ),
+      labeledNumberBadge(
+        "final_strength",
+        "compose.v3.score.finalName",
+        "compose.v3.score.finalAbbreviation",
+        state.final_strength,
+        catalog
+      )
     ]
   };
 }
@@ -563,7 +655,11 @@ export function liveDebateDetail(runId: string, tree: DebateNode): DebateDetail 
 }
 
 /** V2's generating card, backed only by the asker-owned typed run projection. */
-export function debateDetailFromRunProjection(run: RunProjection): DebateDetail {
+export function debateDetailFromRunProjection(
+  run: RunProjection,
+  catalog: MessageCatalog = composeEnglish,
+  locale = "en"
+): DebateDetail {
   const status = run.state === "FAILED" ? "failed" : "generating";
   const presentedState = run.state === "CLAIMED" ? "RUNNING" : run.state;
   const holdUntilMs = run.hold_until === null ? null : Date.parse(run.hold_until);
@@ -571,7 +667,10 @@ export function debateDetailFromRunProjection(run: RunProjection): DebateDetail 
     ? null
     : Math.max(0, Math.ceil((holdUntilMs - Date.now()) / 60_000));
   const holdReason = run.state === "HOLDING" && run.hold_until !== null
-    ? `The model provider stopped responding; one final attempt is scheduled for ${new Date(run.hold_until).toLocaleString()} (${remainingMinutes ?? 0} minute${remainingMinutes === 1 ? "" : "s"} remaining).`
+    ? t(catalog, "compose.v3.providerHold", {
+        retryAt: new Date(run.hold_until).toLocaleString(),
+        remaining: tPlural(catalog, "compose.v3.minutesRemaining", remainingMinutes ?? 0, locale)
+      })
     : null;
   return { ...liveDebateDetail(run.run_ref, {
     id: run.run_ref,
@@ -653,11 +752,9 @@ export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
  * endpoint, and the refresh/feedback loop that hangs off it) and where V3's own
  * numbers actually are, now that the cards carry them too.
  */
-export const SCORING_ABSENCE_REASON =
-  "V3 scores every claim on the answer graph itself: each card carries its recorded base score and final " +
-  "strength, with the full labels and replay handles in each badge tooltip and claim drawer. What V3 has no resource for is " +
-  "V2's separate per-node scoring endpoint — so no scoring refresh, holes, fatal flags or score feedback " +
-  "exist here.";
+export function scoringAbsenceReason(catalog: MessageCatalog): string {
+  return t(catalog, "compose.v3.scoringAbsenceReason");
+}
 
 /**
  * The status label V2's top bar must use for V3's scoring-endpoint absence, or
@@ -672,29 +769,51 @@ export const SCORING_ABSENCE_REASON =
  * judge-informed numbers exist on every node. It now says the scores are on the
  * graph and names the one thing that is genuinely absent.
  */
-export const V3_SCORING_STATUS_LABEL = "Scored on the graph — no V2 scoring endpoint";
-
-export function v3ScoringStatusLabel(reason: string | null | undefined): string | null {
-  return (reason ?? "").trim() === SCORING_ABSENCE_REASON ? V3_SCORING_STATUS_LABEL : null;
+export function v3ScoringStatus(catalog: MessageCatalog): string {
+  return t(catalog, "compose.v3.scoringStatus");
 }
 
-export function scoringUnavailable(debateId: string): DebateScoringResponse {
+export function v3ScoringStatusLabel(
+  reason: string | null | undefined,
+  catalog: MessageCatalog = composeEnglish
+): string | null {
+  const normalizedReason = (reason ?? "").trim();
+  // The reason is recognised in the reader's locale and, because a reason
+  // recorded before the locale was known reads in English, in English too.
+  // Recognition only: the label returned is always the reader's locale.
+  return normalizedReason === scoringAbsenceReason(composeEnglish)
+    || normalizedReason === scoringAbsenceReason(catalog)
+    ? v3ScoringStatus(catalog)
+    : null;
+}
+
+export function scoringUnavailable(
+  debateId: string,
+  catalog: MessageCatalog = composeEnglish
+): DebateScoringResponse {
   return {
     debate_id: debateId,
     status: "unavailable",
     node_ids: [],
     items: [],
-    reason: SCORING_ABSENCE_REASON
+    reason: t(catalog, "compose.v3.scoringAbsenceReason")
   };
 }
 
-export function adaptiveDepthUnavailable(debateId: string): DebateAdaptiveDepthDryRunResponse {
+export function adaptiveDepthUnavailable(
+  debateId: string,
+  catalog: MessageCatalog = composeEnglish
+): DebateAdaptiveDepthDryRunResponse {
   return {
     debate_id: debateId,
     status: "unavailable",
-    reason: "V3 has no adaptive-depth dry-run resource; expansion decisions live in the run itself.",
+    reason: t(catalog, "compose.v3.adaptiveDepthUnavailable"),
     plan: {
-      policy: { mode: "fixed", target_depth: null, reason: "No V3 adaptive-depth plan exists." },
+      policy: {
+        mode: "fixed",
+        target_depth: null,
+        reason: t(catalog, "compose.v3.adaptiveDepthPlanUnavailable")
+      },
       candidate_count: 0,
       expansion_count: 0,
       items: []

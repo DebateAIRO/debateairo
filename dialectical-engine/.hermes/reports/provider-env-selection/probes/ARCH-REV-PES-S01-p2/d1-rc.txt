@@ -1,0 +1,8 @@
+rc=0
+port=58299
+lsof-on-port-lines=0
+stdout-lines=14
+stderr-bytes=492
+bearer=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/ARCH-REV-PES-S01-p2/d1-stdout.txt:0
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/ARCH-REV-PES-S01-p2/d1-stderr.txt:0
+last=PES-S01-ACCEPT: PASS

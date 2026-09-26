@@ -1,0 +1,21 @@
+{
+  "time.justNow": "nyss",
+  "time.minutes.one": "för {count} minut sedan",
+  "time.minutes.other": "för {count} minuter sedan",
+  "time.hours.one": "för {count} timme sedan",
+  "time.hours.other": "för {count} timmar sedan",
+  "time.yesterday": "I går",
+  "time.days.one": "för {count} dag sedan",
+  "time.days.other": "för {count} dagar sedan",
+  "time.weeks.one": "för {count} vecka sedan",
+  "time.weeks.other": "för {count} veckor sedan",
+  "time.status.complete": "Slutförd",
+  "time.status.queued": "I kö",
+  "time.status.claimed": "Tilldelad",
+  "time.status.running": "Körs",
+  "time.status.holding": "Väntar på att leverantören återställs",
+  "time.status.settled": "Avgjord",
+  "time.status.generating": "Genereras",
+  "time.status.failed": "Misslyckad",
+  "time.status.draft": "Utkast"
+}

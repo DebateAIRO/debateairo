@@ -1,0 +1,829 @@
+# PLAN — slice S01 · The hosted provider set is published by a command that declares itself hosted
+
+**Revision 3** — ARCH-FIX-PES-S01-p3 (node ARCH-FIX(S01), pass 3 of 3, ticket `t_33713b4f`, 2026-09-25), on BUILD
+S01-C3's BLOCKED finding **C3-F1** (`t_b2472fe7`: `tests/architecture/p3-production-database-principals.test.ts:600`
+finds the connection pair `apps/runner/src/hosted-provider-set-publish-cli.ts::MIGRATION_DATABASE_URL` that the P3-01
+production-principals manifest does not declare — architecture 722/7), and on the SPEC of record moving to
+`SPEC-v5.md` (V-15 ruled "Yes, seed all 17": R1.12's role seed is the 17 rows Revision 2 planned). Changed: **C3** —
+NEW **S01-27** (the hosted publish command registered in the manifest and in both hard-coded lists of the audit, as the
+JIT migrator, binding `WIRED`), S01-20 (its checks), §3's C3 row (write surface +2 files, command +1 pair, verdict re-run) and a §3 note on the
+C1/C2/C4 re-runs;
+§2 traces re-pointed at `SPEC-v5.md` lines (+S01-27 → R1.2); §4 V9 (13 → 15 paths), NEW V14 (the principal pair), V12(h);
+§5 (write surface, the principal invariant); §7 row S01-27; §9 F11 (C3-F1 and its class sweep, incl. the shipped-corpus
+manifest, named not fixed); the "V-ROW NEW default" marks of C4 now read V-15. C1 and C2 are BUILT (lane HEAD
+`3e6f438b5`) and unchanged; C4's steps are unchanged.
+
+**Revision 2** — ARCH-FIX-PES-S01-p2 (node ARCH-FIX(S01), pass 2 of 3, ticket `t_bba02e7f`, 2026-09-25), on V's rulings
+of 2026-09-25 12:44 (`docs/missions/provider-env-selection/V-DECISIONS-PACKET.md:20-28`: V-10 "Yes, refuse at publish";
+V-12/V-13 "Exit 1 on FAIL") as `SPEC-v4.md` words them (R1.3, R1.12, NEW R1.14, §5 steps 2/3/4/6). S01-C1 is BUILT
+(lane HEAD `5b12b2e15`) and unchanged. Changed: **C2** — S01-06 (G12–G16; 32 → 37 cases), S01-14 (seven checks),
+NEW **S01-26** (the role-row check); **C3** — S01-16 (I15, I16; 14 → 16 cases), S01-18 (Done-when), S01-20;
+**C4** — S01-21 (K1 fourteen lines; K3/K4 exit codes; NEW K6–K9; 5 → 9 cases), S01-22 (role seed, UNVERIFIED,
+exit code returned), S01-23 (the role seed rows, lazy roster directory, `process.exit`), S01-25; §1 rows; §2 both
+traces (+R1.14, re-pointed at `SPEC-v4.md` lines); §3 counts, RED events and verdicts re-run at `5b12b2e15`; §4 V3,
+V10, V12, NEW V13 (the trace checker); §5 "Not built" (the role check is now built); §7 rows; §8 item 6; §9 F4, F9, F10. **CONTESTED:** SPEC-v4
+R1.12's role seed of exactly two rows is refused by the database (`REGISTER_REQUIRED_ROW_MISSING:envelope:envelopeFormulaInputs`,
+probe d2) — a `V-ROW: NEW` in `DECISIONS.md`; C4 is planned on that row's recommended default and marked where.
+
+Filled by ARCH-PES-S01 (node ARCH(S01), pass 1 of 3, ticket `t_96e1881a`, 2026-09-25) in place of REQ's
+scaffold: the scaffold's five sections keep their headings and order, and §6–§9 are appended. REQ owns the WHAT
+in **`SPEC-v5.md`** (the SPEC of record, frozen — `SPEC.md`, `SPEC-v2.md`, `SPEC-v3.md` and `SPEC-v4.md` are history); this file owns the HOW,
+and every choice in it is a row of `DECISIONS.md` dated 2026-09-25. Every `path:LINE` below was re-grepped in the
+slice lane `.worktrees/pes-s01/dialectical-engine` @ `776359c3` (= `origin/dev`), never copied from the SPEC; every
+`path:LINE` Revision 2 adds or touches was re-measured in the lane @ `5b12b2e15`.
+
+**Goal:** an operator on the VPS runs `pnpm hosted:publish-provider-set` with `DEBATEAI_DEPLOYMENT_MODE=hosted`
+and a roster file, and the register gains a version whose `configuredProviderSet` row is the vetted version-2
+row built by the shipped builder — or the command prints one named refusal and writes nothing.
+**Architecture:** a pure library (`apps/runner/src/hosted-provider-set.ts`: the roster gate, the R1.1 mapping, the
+derived targets, the publication id, the seven ordered checks behind injected ports) under a thin entry
+(`apps/runner/src/hosted-provider-set-publish-cli.ts`: environment, database, streams, exit code); the environment
+is read through one new function of the register loader (ADR-0027); the operator acceptance is a function plus an
+entry under `acceptance/`.
+**Tech stack:** TypeScript on node 26.9.0 via `tsx`, `pg`, the repository's embedded PostgreSQL for tests and the
+acceptance, Vitest 5.
+**Spec:** `docs/missions/provider-env-selection/slices/S01/SPEC-v5.md`.
+**Reference code (not product code):** `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/ARCH-FIX-PES-S01-p2/proposed/*.ts`
+(Revision 2; pass 1's copy stays at `probes/ARCH-PES-S01/proposed/`) — type-checked with the lane's `tsc` and compiler
+options against the BUILT C1 export (probe d0: 0 diagnostics, 5 files) and run end to end against the embedded
+database (probe d1: SPEC-v4 §5's fourteen stdout lines — SPEC-v5's §5 is byte-identical — `PES-S01-ACCEPT: PASS`, rc 0). A product file may differ in
+form from its reference; it may not differ in any behaviour a case below pins.
+
+**The quantifiability law.** Every step is finite, categoric and mechanically checkable by a
+stranger. The banned words — improve, better, robust, handle, appropriate — appear in this
+paragraph ONLY as the counter-example that names them, and in no criterion of this slice.
+WRONG: "improve error handling". RIGHT: "the command parses both derived targets values with the
+shipped `parseProviderDiscoveryTargets` before publishing and, on a throw, exits non-zero printing
+`PES_PUBLISH_SET_TARGETS_REJECTED:` and the parser's own code — and the test asserting this
+passes." A step no stranger can mark done is not a step.
+
+## 1. START frame — measured before the first step, never assumed
+
+Every row was measured by ARCH-PES-S01 on 2026-09-25 between 08:44 and 09:40 EEST in the lane; `probes/` below is
+`/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/ARCH-PES-S01/`.
+Rows marked **R2** were measured by ARCH-FIX-PES-S01-p2 on 2026-09-25 between 13:10 and 13:40 EEST in the lane @
+`5b12b2e15`; `probes-r2/` below is `…/probes/ARCH-FIX-PES-S01-p2/`.
+
+| what | measured value | where / command | read by |
+|---|---|---|---|
+| lane HEAD | `776359c3` on `slice/provider-env-selection-s01`, dirty `0` before and after every base run · **R2:** `5b12b2e15` ("feat(provider-env-selection/S01-C1): add frozen operator command environment reader", S01-C1 built: `packages/register/src/runtime-environment.ts:246`, `packages/register/src/index.ts:791`), dirty `0` before and after every Revision-2 run | `git -C <lane> rev-parse --short HEAD; git -C <lane> status --porcelain \| wc -l` | ARCH now; every BUILD at start |
+| node | `v26.9.0` only with `/opt/homebrew/bin` first on PATH (plain PATH gives `v22.23.1`) | `node --version` both ways | every command |
+| third-party modules | the lane's `node_modules/.pnpm` is a SYMLINK to `/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/i18n-turn12/dialectical-engine/node_modules/.pnpm`; the `@debateai/*` links resolve inside the lane | `ls -la <lane>/node_modules/.pnpm`; `realpath <lane>/node_modules/@debateai/register` | every command — removing or reinstalling `i18n-turn12` turns every command here BROKEN, not RED |
+| suite pairs at base (the 36) | the intake's table | `docs/missions/provider-env-selection/00-intake.md:40` (§5b); machine-readable `.hermes/reports/provider-env-selection/logs/baselines.tsv` | V1 |
+| the four RED-at-base suites | `dev-api-environment` 9/10 · `dev-api-process` 5/10 · `dev-provider-panel` 3/4 · `t16-algorithm-register` 20/21 | `00-intake.md:41`; `baselines.tsv` | V1 — `SPEC-v5.md` §4: none is changed by this slice |
+| `tests/architecture` whole, at base, in THIS lane | `Tests 6 failed \| 719 passed (725)`, 5 files; the same six names in three separate runs (md5 `baf7d658…` of the sorted list) — named in V2 | `probes/base-architecture-dir.log`, `base-C1.log`, `base-C2.log` | every cluster command; V2 |
+| suites this plan adds to cluster commands that the 36 do not carry | `tests/unit/v9-configured-provider-set-deployment.test.ts` 14/14 · `tests/unit/text-control-bytes.test.ts` 3/3 | `probes/measure-unlisted.log` | C2, C3, C4 |
+| typecheck at base, in THIS lane | rc=1, one diagnostic: `apps/ui/lib/v3/answerExport.ts(2,38): error TS2835` — identical to the intake | `probes/base-typecheck.log` | every EXIT step; V5 |
+| the four cluster commands at base (created paths omitted) | C1, C2, C3, C4 each `CLUSTER_GREEN`; lane dirty `0` after | `probes/base-all-clusters.out` (`base-C1.sh` … `base-C4.sh`) | §3 |
+| the shipped chain for §5's fixtures | all six case lines reproduced through the shipped resolver, builder and parser, plus the extra fixtures of §6 | `probes/p1-shipped-chain.log` | C2's EXACT oracles |
+| the scratch database | `startTestDatabase()` bound `127.0.0.1:56165` (OS-assigned, above 4400, not NO-TOUCH); v4 seeded: 32 rows, snapshot `120bdfea…`; read back byte-equal; version `999` holds 0 rows; hosted `publishGeneral` from base 4 → version `5`, rowCount 32; 31 rows carried byte-equal; identical replay → version `5` again; a new id on base 4 after the head moved → version `6` (no head check); republication from 5 → suffix once; `stop()` → `ECONNREFUSED`; `:55432` PID 19920 before and after | `probes/p2-scratch-db.log`, `p2-lsof-55432-*.txt` | C3, C4; Review Focus 3–4 |
+| the runtime module graph the command will import | `@debateai/db`, `@debateai/register`, `@debateai/providers` reach 36 modules in `contract, crypto, db, kernel, providers, register`; zero `dev-` segments; `dev-provider-panel.ts` unreachable | `probes/p6-module-graph.log` | H2 (R1.6) |
+| pnpm 11.20.0 streams | the `$ <command>` echo goes to STDERR (also with `-s`); a failing script's `[ELIFECYCLE] Command failed with exit code 1.` goes to STDOUT | `probes/p3-*.txt`, `probes/p4-*.txt` | the V-ROW in `DECISIONS.md`; V10 |
+| stderr of `node --import tsx <file>` on a clean run | 0 bytes | `probes/p5-*.txt` | EXACT stderr oracles (C3, C4) |
+| the §5 acceptance with the plan's reference code | stdout = exactly the 12 lines of pass 1's K1, stderr empty, rc 0, the port refused after, no `Bearer`, `:55432` PID unchanged | `probes/p8-*.txt` | superseded by the R2 row below |
+| **R2** the register's required-row law | a publication whose rows hold ANY key of `register.required_row` (17 keys, the set `ALGORITHM_REGISTER_ROW_KEYS` names, `packages/register/src/algorithm-policy.ts:87`), or whose base carries a profile, gets the `algorithm` profile and must hold ALL 17 (`migrations/0061_algorithm_publication_profiles.sql:10-35`, trigger `:35`, assert `:28`; manifest `migrations/0050_t16_algorithm_register_rows.sql:31-46` + `migrations/0064_synthesis_role_cost_rows.sql`); SPEC-v4 R1.12's two-row seed on version 5 or 4 → `REGISTER_REQUIRED_ROW_MISSING:envelope:envelopeFormulaInputs` (SQLSTATE 22023) | `probes-r2/d2-role-seed-debug.log` | the `V-ROW: NEW` (DECISIONS); S01-16, S01-22, S01-23 |
+| **R2** the role seed V ruled (V-15, SPEC-v5 R1.12; planned at Revision 2 as the V-ROW default) | the two R1.12 role rows + the other 15 required rows from the shipped `buildAlgorithmRegisterRows` (`algorithm-policy.ts:233`) on version 5 → version 6, rowCount 49; the hosted publish on 6 → `PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef`, `register.register_version` count 3 before and after; control (evaluator `vendor:a`) → publishes 7 → 8, rowCount 49, both role rows byte-equal 7 → 8 | `probes-r2/d4-role-seed-remedy.log` | I15, I16, K1, K7 |
+| **R2** the exit code under the embedded database | importing `embedded-postgres` registers `async-exit-hook` (`node_modules/.pnpm/embedded-postgres@18.4.0-beta.17/node_modules/embedded-postgres/dist/index.js:16`, `:397`), whose `beforeExit` listener (`…/async-exit-hook/index.js:90`) calls `process.exit(0)` (`:24`): `process.exitCode = 1` after a start/stop → rc `0`, with or without pnpm; without the database → rc `1` | `probes-r2/d3-exitcode.log` | S01-23 (explicit `process.exit`), K6 |
+| **R2** the §5 acceptance with the Revision-2 reference code | stdout = exactly the 14 lines of K1 (role seed version `6`), stderr 0 bytes, rc 0, the port refused after, 0 `Bearer`, `:55432` listing unchanged, lane dirty 0 | `probes-r2/d1-*.txt` | C4; V10 |
+| **R2** the four mutants, each watched FAILING | m1 no role check → `FAIL role-provider-dropped`, rc 1 · m2 refuse whenever a role row exists → prints `…:synthesizerRoleRef`, `FAIL role-provider-dropped`, rc 1 · m3 = m1 with `process.exitCode` → `FAIL …` but rc **0** · m4 the two-row seed as SPEC-v4 words it → `PES-S01-CASE-ERROR`, `FAIL role-provider-dropped`, rc 1 | `probes-r2/d5-mutants.log` | K1, K6, S01-26 |
+| **R2** the UNVERIFIED outcome end to end | `TMPDIR=/nonexistent/…` + `TSX_DISABLE_CACHE=1` (tsx keeps its disk cache under TMPDIR: without the flag the run dies `ENOENT … mkdir '/nonexistent/…/tsx-501'` before any code) → stdout exactly one line `PES-S01-ACCEPT: UNVERIFIED ENOENT: no such file or directory, mkdtemp '/nonexistent/pes-s01-d6/debateai-s00-postgres-<6>'`, stderr 0 bytes, rc 1; the m3 mutant → the same line, rc **0** | `probes-r2/d6-unverified.log` | K6 |
+
+**EXACT oracles measured through the shipped functions (p1, p2, p8)** — every later EXACT below cites this block:
+
+- `E` = SPEC-v5 §5's ROSTER ELEMENT E, byte for byte (`SPEC-v5.md:290`; the same bytes as `SPEC-v3.md:247`). `E′` = `E` with `provider_ref` `vendor:b`, `maker` `Beta`. `V1REF` = `DEV-01-local-auth-topology.md#ordered-bootstrap:DEV-05`. `SUFFIX` = `CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF` (`packages/register/src/configured-provider-set.ts:26-28`).
+- RUNNER line (EXACT): `PES_HOSTED_TARGETS_RUNNER_V1=[{"provider_ref":"vendor:a","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header","input_price_micros_per_million":1000,"output_price_micros_per_million":2000}]`
+- API line (EXACT): `PES_HOSTED_TARGETS_API_V1=[{"provider_ref":"vendor:a","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/api/providers/acme.header","input_price_micros_per_million":1000,"output_price_micros_per_million":2000}]`
+- BUILT ROW value, canonical (EXACT): `{"kind":"CONFIGURED_PROVIDER_SET","providers":[{"adapterKind":"openai-compatible-http","maker":"Acme","providerRef":"vendor:a","vetting":{"dataUseTermsReviewedOn":"2026-09-01","namedInPrivacyNotice":true,"retentionTermsReviewedOn":"2026-09-01"}}],"requiredDistinctMakers":1,"setVersion":2}`
+- BUILT ROW sourceRef (EXACT): `V1REF` + `SUFFIX`, i.e. `DEV-01-local-auth-topology.md#ordered-bootstrap:DEV-05 + V-9 ruled 2026-09-22 (V, chat): versioned configuredProviderSet row carrying each vendor's V-9(4) vetting record, superseding the sealed row without altering it`
+- SNAPSHOT of seed v4 with the built row (EXACT): `579690d7a51248ea486632c347c32ee0dbd99814206f1a5c05d85c7d405931c9`; its publication id on base 4 (EXACT): `2a1ff6e9-7bfe-4bc8-b7d9-36e786ab80b4`.
+- RECEIPT line in a fresh scratch database (EXACT, tests only — acceptance/ may not write the literal version, §6 C4): `PES_HOSTED_PROVIDER_SET_RECEIPT_V1={"registerVersion":"5","rowCount":32,"snapshotSha256":"579690d7a51248ea486632c347c32ee0dbd99814206f1a5c05d85c7d405931c9"}`
+- ID vectors (EXACT): hosted construction of (`4`, 64 × `0`) → `f46205a2-12c8-4dad-a14a-abb2b836354e`; the shipped `developmentProviderSetPublicationId` of the same → `e5e29eff-627c-4507-b9d5-e131a69c35de`.
+- ROLE-SEED version in a fresh scratch database (EXACT, tests only): `6` (probe d1); the role seed's row count (EXACT): 49 = 32 + 17.
+- `ROLE_ROWS(s, e)` = the 17 rows of SPEC-v5 R1.12 (V-15): `synthesizerRoleRef` with value `{"kind":"SYNTHESIZER_ROLE_REF","providerRef":s,"provisional":true}`, `evaluatorRoleRef` with value `{"kind":"EVALUATOR_ROLE_REF","providerRef":e,"provisional":true}` (both source ref `provider-env-selection/S01#acceptance-role-rows`, SPEC-v5 R1.12), plus every other row `buildAlgorithmRegisterRows({ deploymentSourceRef: "provider-env-selection/S01#acceptance-role-rows", synthesizerRoleRef: s, evaluatorRoleRef: e, providerFamilies: [{ familyRef: "acme", providerRefs: ["vendor:a"] }] })` returns, each value through `parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value), "utf8"))`.
+- These move only if `tests/support/fixtures/register-development-v4.json` moves (see V12(e)); then re-run `probes/p1-shipped-chain.sh`.
+
+## 2. SPEC → step trace skeleton
+
+Every requirement gets at least one step id. A requirement with no step is a PLAN defect the
+ARCH-REV pass fails; a step tracing to no requirement is scope the REV(S) pass fails.
+
+Each requirement cell names its line in the SPEC of record (`SPEC-v5.md:<line>`, measured at Revision 3; SPEC-v5 moved R1.13, R1.14, §4, §5 and §6 by +15 lines).
+
+| requirement | what it constrains | step ids | cluster |
+|---|---|---|---|
+| R1.1 (`SPEC-v5.md:61`) | the hosted roster's type and members | S01-06 (B1–B3), S01-09, S01-15 (B1's type assertion under `tsc`) | C2 |
+| R1.2 (`SPEC-v5.md:67`) | four inputs, each from ONE source (mode, database, roster, base register version); the roster gate and `PES_PUBLISH_ROSTER_INVALID:` (ten keys, unique `provider_ref`, shipped adapter kinds, vetting keys); the base row and `PES_PUBLISH_BASE_ROW_ABSENT:`; the row-member source table, the four `publishGeneral` arguments included; the two DERIVED targets values | inputs: S01-01, S01-02, S01-03, S01-18, S01-27 (the database input's principal, registered in P3-01) · gate: S01-08 (A1–A9), S01-16 (I3, I4) · base row: S01-14 (G4, G5, G10), S01-16 (I5, I14) · member table: S01-09, S01-11 (D1, D2), S01-14 (G9–G11), S01-16 (I8, I9, I11, I12, I16) · derived: S01-10 (C1, C2) | C1, C2, C3 |
+| R1.3 (`SPEC-v5.md:126`) | the order of checks — (1) mode, (2) roster gate, (3) base row, (4) build, (5) self-check, (6) the role rows, (7) publication; the shipped-parser self-check and `PES_PUBLISH_SET_TARGETS_REJECTED:` followed by the parser's own code | S01-14 (G1–G8, G13, G16), S01-26 (step (6)), S01-16 (I1, I3, I7, I15) | C2, C3 |
+| R1.4 (`SPEC-v5.md:142`) | `publishGeneral` with `deployment: "hosted"` as a literal | S01-14 (G9), S01-17 (H1) | C2, C3 |
+| R1.5 (`SPEC-v5.md:146`) | the mode resolved by the shipped `resolveDeploymentMode`; `PES_PUBLISH_SET_NOT_HOSTED:` and the mode; the resolver's own codes verbatim | S01-13 (F1, F2), S01-14 (G1), S01-16 (I1, I2, I13) | C2, C3 |
+| R1.6 (`SPEC-v5.md:153`) | no `dev-` module in the import graph | S01-17 (H2), S01-18 | C3 |
+| R1.7 (`SPEC-v5.md:157`) | `PROVIDER_VENDOR_NOT_VETTED:` from the shipped builder, verbatim, non-zero exit — a vetting CONTENT error; a SHAPE error is R1.2's | S01-14 (G6, G16), S01-08 (A5), S01-16 (I6) | C2, C3 |
+| R1.8 (`SPEC-v5.md:166`) | the three stdout lines, and the literal prefix `PES_HOSTED_PROVIDER_SET_RECEIPT_V1=` | S01-07, S01-12 (E1–E3), S01-14 (G9), S01-16 (I8) | C2, C3 |
+| R1.9 (`SPEC-v5.md:176`) | no credential value anywhere; a credential FILE PATH only inside the two `PES_HOSTED_TARGETS_RUNNER_V1=` / `PES_HOSTED_TARGETS_API_V1=` lines of R1.8, never in a refusal message or the published row | S01-08 (A8), S01-09 (B1 member set), S01-16 (I4, I10), S01-21 (K1 `Bearer`), S01-25 | C2, C3, C4 |
+| R1.10 (`SPEC-v5.md:184`) | the sealed v1 shape untouched | S01-15 (the v9 pair 14/14), S01-20 (git diff), V6 | C2, C3 |
+| R1.11 (`SPEC-v5.md:189`) | the dev command untouched | S01-20 (git diff), V7, the C3 pair `tests/integration/dev-deployment-register.test.ts` 15/15 | C3 |
+| R1.12 (`SPEC-v5.md:193`) | the operator acceptance on the repository's embedded PostgreSQL (`startTestDatabase`, a port the OS assigns), seeded at register version 4 from `register-development-v4.json` (32 rows); `database.stop()` on every exit; nothing on `:55432`; after `published`, the role seed on the published version, `PES-S01 ROLE-SEED version=<v>`, then `role-provider-dropped` with `REGISTER_VERSION=<v>` (the seed's row set: the `V-ROW: NEW` default, CONTESTED) | S01-21 (K1–K9), S01-22, S01-23, S01-24, S01-25, V10 | C4 |
+| R1.13 (`SPEC-v5.md:243`) | no booting service reads `PROVIDER_HOSTED_ROSTER_PATH` | S01-02 (the name stays out of the loader), S01-04 (ADR-0027), S01-05 (grep), S01-17 (H3), V8 | C1, C3 |
+| R1.14 (`SPEC-v5.md:248`) | step (6): `synthesizerRoleRef` then `evaluatorRoleRef` of the base rows; an absent row is not checked; a present row passes only when its value is a JSON object whose `providerRef` is a string equal to a roster `provider_ref`; the first present row that does not pass → non-zero exit, `PES_PUBLISH_ROLE_PROVIDER_DROPPED:<row key>`, no write; a passing row carried forward byte for byte | S01-26 (the check), S01-14 (step (6) wired between (5) and (7); G12–G16), S01-06 (G12–G16 RED), S01-16 (I15, I16), S01-18 (Done-when I15, I16), S01-21 (K1 line [11], K7), S01-22 (the case), S01-23 (the seed rows) | C2, C3, C4 |
+| §4 (`SPEC-v5.md:264`) | the 36 suites at their pairs; the four RED-at-base pinned; typecheck by per-file delta | every EXIT step (S01-05, S01-15, S01-20, S01-25), V1, V5 | all |
+| §5 (`SPEC-v5.md:281`) | V's numbered acceptance: seven cases; step 2 prints `exit=$?`; pnpm's `$ tsx …` echo before and `[ELIFECYCLE]` notice after are allowed; the verdict is the acceptance's OWN last line; exit 0 on PASS, 1 on FAIL and on UNVERIFIED (the scratch database could not start) | S01-21 (K1, K3, K4, K6, K8, K9), S01-22, S01-23, S01-25, V10 | C4 |
+| §6 (`SPEC-v5.md:353`) | none open: V-10 ruled (→ R1.14), V-12/V-13 ruled (→ §5 steps 2, 3, 6) | the R1.14 and §5 rows above | C2, C3, C4 |
+
+**Reverse trace — every step to its requirement(s):** S01-01 R1.2, R1.13 · S01-02 R1.2, R1.13 · S01-03 R1.2 ·
+S01-04 R1.13 (ADR of the reader) · S01-05 R1.2, R1.13, §4 · S01-06 R1.1–R1.5, R1.7–R1.9, R1.14 · S01-07 R1.8, R1.2
+(`sourceRef` literal) · S01-08 R1.2, R1.9 · S01-09 R1.1, R1.2, R1.9 · S01-10 R1.2, R1.9 · S01-11 R1.2 · S01-12 R1.8 ·
+S01-13 R1.5 · S01-14 R1.2, R1.3, R1.4, R1.7, R1.14 · S01-15 R1.1, R1.2, R1.10, §4 · S01-16 R1.2, R1.3, R1.5, R1.7–R1.9,
+R1.14 · S01-17 R1.4, R1.6, R1.13 · S01-18 R1.2, R1.3, R1.5, R1.8, R1.9, R1.14 · S01-19 R1.12 (the publish command the
+acceptance runs, distinct from `pes:accept-publish-set`) · S01-20 R1.10, R1.11, §4 · S01-21 R1.9, R1.12, R1.14, §5 ·
+S01-22 R1.12, R1.14, §5 · S01-23 R1.12, R1.14, §5 · S01-24 R1.12 · S01-25 R1.12, §4, §5 · S01-26 R1.3, R1.14 ·
+S01-27 R1.2 (the database input `MIGRATION_DATABASE_URL`: its connection declared under its principal), §4 (the
+`tests/architecture` pair).
+**Gaps: 0 each way** (checked by `probes-r2/trace_check.py`, §4 V13).
+
+## 3. Cluster table — build units, one verification command each
+
+A cluster is the smallest step-group verifiable on its own. It is a BUILD node, run three times,
+worst run wins. The review unit is the whole slice at REV(S), never a cluster.
+
+Every command runs in the lane with `export PATH="/opt/homebrew/bin:$PATH"` first and
+`RS=/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-orchestrator/scripts/run-suites.sh`;
+`LOG` is an absolute path, one file per run. The verdict is the marker, never the rc.
+
+| cluster | steps | write surface (disjoint) | one verification command (as it now stands, Revision 2) | run in the lane @ `5b12b2e15` (2026-09-25 13:20–13:26, `probes-r2/base-all-clusters.out`), created paths omitted | RED event written first |
+|---|---|---|---|---|---|
+| S01-C1 · **BUILT** (`5b12b2e15`) | S01-01 … S01-05 | `packages/register/src/runtime-environment.ts` · `packages/register/src/index.ts` · `tests/unit/pes-s01-operator-command-environment.test.ts` (new) · `docs/architecture/01-decisions/ADR-0027-operator-command-environment-keys.md` (new, copied) | `LOG=<abs> zsh $RS tests/unit/pes-s01-operator-command-environment.test.ts:3:0 tests/architecture:719:6 tests/unit/v9-deployment-mode.test.ts:201:0 tests/unit/production-environment-floors.test.ts:24:0 tests/unit/dl7-f7-boot-custody.test.ts:14:0 tests/unit/v20-optional-primary-provider-keys.test.ts:11:0` (unchanged) | `probes-r2/base-C1.sh` → `CLUSTER_GREEN`, nothing omitted: 3/3 · 719 passed, 6 failed (the six names of V2, md5 `baf7d658…`) · 201/201 · 24/24 · 14/14 · 11/11 | (built) S01-01 → `passed=0 failed=3` at pass 1's base |
+| S01-C2 | S01-06 … S01-15, S01-26 | `apps/runner/src/hosted-provider-set.ts` (new) · `tests/unit/pes-s01-hosted-provider-set.test.ts` (new) | `LOG=<abs> zsh $RS tests/unit/pes-s01-hosted-provider-set.test.ts:37:0 tests/architecture:719:6 tests/unit/v9-configured-provider-set-deployment.test.ts:14:0 tests/unit/text-control-bytes.test.ts:3:0` (was `:32:0`) | `probes-r2/base-C2.sh` → `CLUSTER_GREEN`: 719 passed, 6 failed (same six) · 14/14 · 3/3 (the new suite omitted: S01-06 creates it) | S01-06 (suite + stub) → `passed=0 failed=37`, `CLUSTER_RED` |
+| S01-C3 | S01-16 … S01-20, S01-27 | `apps/runner/src/hosted-provider-set-publish-cli.ts` (new) · `package.json` (one line) · `tests/integration/pes-s01-hosted-provider-set-publish.test.ts` (new) · `tests/architecture/pes-s01-hosted-publish-boundary.test.ts` (new) · **Revision 3:** `tests/architecture/p3-production-database-principals.test.ts` (two rows) · `docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json` (one object) | `LOG=<abs> zsh $RS tests/integration/pes-s01-hosted-provider-set-publish.test.ts:16:0 tests/architecture/pes-s01-hosted-publish-boundary.test.ts:4:0 tests/architecture/p3-production-database-principals.test.ts:2:0 tests/architecture:723:6 tests/integration/dev-deployment-register.test.ts:15:0 tests/unit/text-control-bytes.test.ts:3:0` (Revision 3 adds the p3 audit's own pair; the directory pair stays `723:6`) | Revision 3, in the lane AS IT STANDS (HEAD `3e6f438b5` + BUILD S01-C3's 4 uncommitted paths, 2026-09-25 16:33, `probes/ARCH-FIX-PES-S01-p3/lane-C3.out`): `CLUSTER_RED` — 16/16 · 4/4 · p3 audit **1/2** · directory **722/7** (V2's six + the p3 pair case, C3-F1) · 15/15 · 3/3; S01-27 moves it to 2/2 and 723/6 (probe q2 on a mirror: 1/2 → 0/2 → 2/2). (Revision 2 at `5b12b2e15`, created paths omitted: `CLUSTER_GREEN` with `tests/architecture:719:6`.) | S01-16 → `passed=0 failed=16`; S01-17 → `passed=0 failed=4`; S01-27 (1) → p3 audit `passed=0 failed=2`; `CLUSTER_RED` |
+| S01-C4 | S01-21 … S01-25 | `acceptance/pes-s01-publish-set-acceptance.ts` (new) · `acceptance/pes-accept-publish-set.ts` (new) · `acceptance/pes-s01-publish-set-acceptance.test.ts` (new) · `package.json` (one line) | `LOG=<abs> zsh $RS acceptance/pes-s01-publish-set-acceptance.test.ts:9:0 tests/architecture:723:6 tests/unit/text-control-bytes.test.ts:3:0` (was `:5:0`) | `probes-r2/base-C4.sh` → `CLUSTER_GREEN` with `tests/architecture:719:6`: 719 passed, 6 failed (same six) · 3/3 (the new suite omitted: S01-21 creates it; C3 adds the +4) | S01-21 (suite + stub) → `passed=0 failed=9`, `CLUSTER_RED` |
+
+Lane dirty `0` and HEAD `5b12b2e15` after the four runs (13:26:40). **Revision 3 re-run of C1, C2, C4** in the lane as it
+stands (HEAD `3e6f438b5` + C3's 4 uncommitted paths, 16:35–16:37, `probes/ARCH-FIX-PES-S01-p3/lane-C1-C2-C4.out`, the 4 paths
+byte-identical after): each `CLUSTER_RED` through the directory pair alone — `722/7` (C3's +4 boundary cases and the C3-F1
+case) against its `719:6` (C1, C2) or `723:6` (C4); every other pair held: C1 3/3 · 201/201 · 24/24 · 14/14 · 11/11;
+C2 37/37 · 14/14 · 3/3; C4 3/3 (its suite omitted). C1 and C2 are built; once S01-27 lands with C3, a re-run of their
+commands reads the directory pair as `723:6`. C4's K6/K7 and S01-22/S01-23's role seed follow the
+17-row seed V ruled on 2026-09-25 (V-15 "Yes, seed all 17"; SPEC-v5 R1.12); C2 and C3 never depended on it.
+
+**Order and parallelism.** C1 is built. C2 needs nothing from C1; C3 needs C1 (the reader) and C2 (the library); C4 needs C3 (it
+spawns the command). Every command carries the whole `tests/architecture` directory, which scans every file under
+`apps/`, `packages/`, `tools/` and `acceptance/` — so two clusters in ONE lane see each other's half-written files
+(TOOLING-TRAPS "Disjoint WRITE surfaces do not imply independent EFFECTS"). In the one slice lane the order is
+**C1 → C2 → C3 → C4**; C1 ∥ C2 only in two sub-lanes cut from the slice branch. `package.json` is written by C3 and C4
+only, one after the other (single writer at a time).
+
+**Why the whole `tests/architecture` directory is in every command.** The source-rule audit
+(`tools/orphan-audit/src/index.ts:659-712`, asserted by `tests/architecture/scaffold.test.ts:68`) blocks
+`process.env`, `test`/`fixture` import specifiers, `switch` without `exhaustive`, and exported numeric literals in
+every file under `apps/`, `packages/`, `tools/`; the SQL census (`tests/architecture/register-support-publication.test.ts:492-587`)
+classifies every register query and bans latest-version reads, literal future versions, `Number(…registerVersion…)`,
+and `publishGeneral` beside `supportActivation`. Neither suite is among the intake's 36, so a `process.env` in the
+new command would pass every SPEC-named suite and fail only here. The directory costs 50 s (`probes/base-architecture-dir.log`).
+
+## 4. Verification list
+
+What `REV(S01)` runs once every cluster is green, in the lane, `export PATH="/opt/homebrew/bin:$PATH"` first.
+Suites as `passed/total`; every failure named and dated.
+
+- **V1 — the 36 suites that read the provider surface, at their intake pairs** (`00-intake.md:40`), the four
+  RED-at-base suites among them at their RED pairs: `LOG=<abs> zsh $RS $(awk -F'\t' 'NR>1{print $1":"$2":"$3}' /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/logs/baselines.tsv)`
+  → `CLUSTER_GREEN`; the failing cases of the four are the ones `logs/baseline-intake-suites.log` names (dated
+  2026-09-24, pre-existing). `dev-provider-panel`'s pair depends on the peer's relays (intake §5b) — a changed pair
+  there is measured against a same-hour base run before it is called this slice's.
+- **V2 — the whole architecture directory**: `LOG=<abs> zsh run-capture.sh pnpm exec vitest run tests/architecture`
+  → `Tests  6 failed | 723 passed (729)`, and `grep -E '^ FAIL  tests/architecture' <log> | sed 's/^ FAIL  //' | sort -u`
+  prints EXACTLY these six (pre-existing at `776359c3`, measured 2026-09-25):
+  `tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker` ·
+  `tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant` ·
+  `tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role` ·
+  `tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role` ·
+  `tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge` ·
+  `tests/architecture/support-catalog-coverage.test.ts > Support catalog route coverage > accounts for every current page pathname by name`.
+- **V3 — the five new suites**: `LOG=<abs> zsh $RS tests/unit/pes-s01-operator-command-environment.test.ts:3:0 tests/unit/pes-s01-hosted-provider-set.test.ts:37:0 tests/integration/pes-s01-hosted-provider-set-publish.test.ts:16:0 tests/architecture/pes-s01-hosted-publish-boundary.test.ts:4:0 acceptance/pes-s01-publish-set-acceptance.test.ts:9:0` → `CLUSTER_GREEN`.
+- **V4 — the cluster regressions outside the 36**: `LOG=<abs> zsh $RS tests/unit/v9-configured-provider-set-deployment.test.ts:14:0 tests/unit/text-control-bytes.test.ts:3:0` → `CLUSTER_GREEN`.
+- **V5 — `pnpm typecheck` by per-file delta**: `LOG=<abs> zsh run-capture.sh pnpm typecheck`, then
+  `grep -E '^[^ ]+\([0-9]+,[0-9]+\): error TS[0-9]+' <log> | sed -E 's/\([0-9]+,[0-9]+\).*//' | sort -u` prints
+  exactly `apps/ui/lib/v3/answerExport.ts` (base: the same one line, `probes/base-typecheck.log`).
+- **V6 — R1.10**: `git -C <lane> diff --stat 776359c3 -- packages/register/src/configured-provider-set.ts` prints
+  nothing; `grep -n 'SEALED_VERSION = 1 as const\|DEPLOYMENT_VERSION = 2 as const' packages/register/src/configured-provider-set.ts` prints `:22` and `:23`.
+- **V7 — R1.11**: `git -C <lane> diff --stat 776359c3 -- apps/runner/src/dev-provider-set-publish-cli.ts apps/runner/src/dev-deployment-register.ts`
+  prints nothing; `git -C <lane> diff -U0 776359c3 -- package.json | grep -c '^[-+].*dev:auth:publish-provider-set'`
+  prints `0`; `git -C <lane> diff --numstat 776359c3 -- package.json` prints `2	0	…package.json` (two lines added, none removed).
+- **V8 — R1.13**, run from inside the lane's `dialectical-engine/` (pathspecs are cwd-relative — TOOLING-TRAPS
+  "`git diff/log/ls-tree -- <pathspec>` from inside `dialectical-engine/`"): `git grep -l PROVIDER_HOSTED_ROSTER_PATH -- apps packages`
+  prints exactly `apps/runner/src/hosted-provider-set-publish-cli.ts`; `git grep -l PROVIDER_HOSTED_ROSTER_PATH -- apps/api/src/main.ts apps/runner/src/main.ts packages/register/src/runtime-environment.ts '*.env.example'` prints nothing.
+- **V9 — the slice's diff surface, EXACT**: `git -C <lane> diff --relative --name-status 776359c3...HEAD` lists these
+  15 paths and no other (Revision 3: 13 + the two S01-27 files): `A` `apps/runner/src/hosted-provider-set.ts` · `A` `apps/runner/src/hosted-provider-set-publish-cli.ts` ·
+  `A` `acceptance/pes-s01-publish-set-acceptance.ts` · `A` `acceptance/pes-accept-publish-set.ts` ·
+  `A` `acceptance/pes-s01-publish-set-acceptance.test.ts` · `A` `tests/unit/pes-s01-operator-command-environment.test.ts` ·
+  `A` `tests/unit/pes-s01-hosted-provider-set.test.ts` · `A` `tests/integration/pes-s01-hosted-provider-set-publish.test.ts` ·
+  `A` `tests/architecture/pes-s01-hosted-publish-boundary.test.ts` · `A` `docs/architecture/01-decisions/ADR-0027-operator-command-environment-keys.md` ·
+  `M` `packages/register/src/runtime-environment.ts` · `M` `packages/register/src/index.ts` · `M` `package.json` ·
+  `M` `tests/architecture/p3-production-database-principals.test.ts` · `M` `docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json`.
+- **V10 — the acceptance, once, as V types it (SPEC-v5 §5 steps 1–8)**: `lsof -nP -iTCP:55432 -sTCP:LISTEN` (record
+  the PID), then, in the lane, `pnpm pes:accept-publish-set > <abs log> 2>&1; echo "exit=$?"` → prints `exit=0`; the
+  log's first line is pnpm's `$ tsx acceptance/pes-accept-publish-set.ts` (allowed by V-13, SPEC-v5 §5 step 2), then
+  K1's fourteen lines in order, the last EXACT `PES-S01-ACCEPT: PASS` (the verdict: no `[ELIFECYCLE]` line follows on a
+  PASS); `grep -c Bearer <log>` prints `0`; `lsof -nP -iTCP:<p> -sTCP:LISTEN` prints nothing for the `<p>` of the
+  SCRATCH-DB line; `:55432` lists the recorded PID. The FAIL and UNVERIFIED exits (`exit=1`) are K3/K4/K8/K9 (function)
+  and K6 (entry, end to end); REV does not have to break the lane to see them.
+- **V11 — the security lens (R1.9, R1.12, REQ-REV-p1 N12)**: I4 (the parser message never printed), I10 (the credential
+  sentinel and the two paths), K2 (the port), K3/K4 (`stop()` on every exit path), and
+  `grep -c readFile apps/runner/src/hosted-provider-set-publish-cli.ts` → `1` (the roster) and
+  `grep -c readFile apps/runner/src/hosted-provider-set.ts` → `0` (no credential file is ever opened).
+- **V12 — cross-slice and cross-mission mounts** (UNVERIFIED by this seat: S02's and S03's files are outside its
+  reading floor; checked at MERGE): (a) `package.json` — S02's `pes:accept-hosted` line against S01's two lines after
+  `:31`, a textual merge; (b) `packages/register/src/runtime-environment.ts` / `index.ts` — if S02 edits them;
+  (c) `deploy/vps/README.md:862` "There is no hosted publish command yet." is false once S01 merges — S03's §11 text
+  should name `pnpm hosted:publish-provider-set`; (d) ADR numbers — ADR-0025 (`62a4c367`) and ADR-0026 (`5ef138b7`)
+  exist on other missions' refs, hence 0027; (e) `tests/support/fixtures/register-development-v4.json` —
+  `tests/architecture/register-support-publication.test.ts:473-476` is RED at base because the fixture hashes to
+  `120bdfea…` and the constant says `42b90bca…`; a later commit that regenerates the fixture moves SPEC-v5's
+  `rows=32`, K1's `rows=32` and I8's snapshot with it; (f) the register's required-row manifest
+  (`migrations/0050_t16_algorithm_register_rows.sql:31-46`, `migrations/0064_synthesis_role_cost_rows.sql`) — a
+  migration that adds an 18th required key makes the role seed of I15/I16/K1 fail with `REGISTER_REQUIRED_ROW_MISSING:`
+  unless `buildAlgorithmRegisterRows` mints it too (it minted all 17 at `5b12b2e15`, probe d4); (g) R1.12's role seed —
+  V ruled V-15 "Yes, seed all 17" (SPEC-v5 R1.12 now names the 17 rows); S01-21/22/23 already plan exactly them;
+  (h) (Revision 3) the P3-01 production-principals manifest — S01-27 adds one `connectionPurposes` object under
+  `migration-admin`; a mission that edits the same list (`docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json:275-315`
+  or the audit's `:289-331`, `:349-391`) meets it at merge, a textual merge; and S03's `deploy/vps/README.md` §11 should
+  tell the operator that `pnpm hosted:publish-provider-set` needs the JIT migrator credential in `MIGRATION_DATABASE_URL`
+  (UNVERIFIED by this seat: S03's files are outside its floor).
+- **V14 — (Revision 3) the hosted publish command's database principal, mechanically**: `LOG=<abs> zsh $RS
+  tests/architecture/p3-production-database-principals.test.ts:2:0` → `CLUSTER_GREEN`; `python3 -c 'import json;
+  m=json.load(open("docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json"));
+  print([(p["roleName"], c["binding"], c.get("condition")) for p in m["principals"] for c in p["connectionPurposes"] if c.get("sourceFile")=="apps/runner/src/hosted-provider-set-publish-cli.ts"])'`
+  prints EXACT `[('debateai_prod_migrator', 'WIRED', 'package script hosted:publish-provider-set')]` (one declaration,
+  under the JIT migrator, never under a runtime service principal); and `probes/ARCH-FIX-PES-S01-p3/pair_check.py <lane>`
+  prints `PAIRS: PASS` (every `createPool` file's `…DATABASE_URL` pair under `apps/{api,runner,scheduler}/src` declared,
+  the audit's own rule, run without Vitest; watched FAILING on the lane before S01-27).
+- **V13 — the SPEC↔PLAN trace, mechanically**: `python3 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/ARCH-FIX-PES-S01-p3/trace_check.py`
+  prints `TRACE: PASS` (every `**R1.n` of `SPEC-v5.md` has a §2 row; every §2 row names a requirement; every step id of §6
+  appears in the reverse trace and every reverse-trace id is a §6 step); the same script on its bundled mutant
+  (R1.14's row removed) prints `TRACE: FAIL`.
+
+## 5. Boundaries, DDD impact, ADRs — ARCH's to fill
+
+The builder range REQ-REV's N2 names as the packet's own omission — `packages/register/src/configured-provider-set.ts:145-196`, which carries `assertHostedConfiguredProviderSetVetted` and `buildConfiguredProviderSetDeploymentRow` — was read at pass 2 and is the source of R1.2's row-member table (`SPEC-v2.md`; carried into `SPEC-v3.md` with the four `publishGeneral` arguments added).
+
+The ADR ranges REQ read and did not exceed:
+`docs/architecture/01-decisions/ADR-0011-register-mechanism-and-resolution-chains.md:103-140`
+(the register's write and read surfaces),
+`ADR-0015-deployment-maker-inventory.md:86-131` (the deployment's configuration vs the maker
+inventory), `ADR-0018-deployment-topology.md:117-141` (one provider adapter behind the gateway;
+selecting it is a register-row change), `docs/architecture/05-register-skeleton.md:501-513` (the
+configured-provider-set row class). ARCH decides whether this slice needs an ADR of its own.
+
+**ARCH's answer (2026-09-25).** One ADR: **ADR-0027** "An operator command names its own environment keys, and the
+register loader stays their only reader" (`docs/architecture/01-decisions/ADR-0027-operator-command-environment-keys.md`,
+written by this seat in the main tree; S01-04 carries it into the lane so it lands on `dev` with the code). It
+outlives the mission: `@debateai/register` gains a public function every later operator command may use.
+
+**Bounded contexts touched.** (1) *Register configuration* (`packages/register`): one new public function in the
+loader, no change to any row, parser, builder or publication port. (2) *Runner operations* (`apps/runner/src`): one
+new operator command and its library. (3) *Acceptance tooling* (`acceptance/`): one new operator acceptance.
+Tests under `tests/unit`, `tests/integration`, `tests/architecture`.
+
+**Invariants owned or kept.** The exact-set invariant `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`
+(`packages/providers/src/index.ts:295-296`, `:330-332`) — unchanged, and now proved at publish time by the self-check.
+The sealed v1 row — `configured-provider-set.ts:21-23`, `:108-125` untouched. The vetting door
+(`register-publication.ts:550-559` → `configured-provider-set.ts:146-170`) — unchanged, and on the path of every hosted
+publication. The role-provider invariant (R1.14, V-10) — a hosted publication never carries forward a
+`synthesizerRoleRef`/`evaluatorRoleRef` row whose `providerRef` its roster drops; the development publisher's check
+(`apps/runner/src/dev-deployment-register.ts:848-858`) is the precedent, and the runner's claim-time stop
+(`apps/runner/src/index.ts:2906-2938`) stays as the last line. The required-row law of the register
+(`migrations/0061_algorithm_publication_profiles.sql:10-35`) — kept: a base carrying role rows carries all 17, and the
+hosted publication carries every row forward (probe d4: 49 → 49). The maker-diversity floor — `requiredDistinctMakers` read from the base row only, never lowerable by the
+roster. The source-purity law — `process.env` in `runtime-environment.ts` only (ADR-0027). The credential-file
+contract (`deploy/vps/README.md:784-800`) — the command never opens a credential file. The production-principals
+law (Revision 3, S01-27) — every pool a file under `apps/{api,runner,scheduler}/src` creates is declared in the P3-01
+manifest under the principal it connects as (`tests/architecture/p3-production-database-principals.test.ts:563-600`):
+the hosted publish command connects as `migration-admin` = `debateai_prod_migrator` (`PERSISTENT_MIGRATION_OWNER`,
+`EPHEMERAL_JIT` credential, `superuser: true`; manifest `:243-316`), binding `WIRED`, condition
+`package script hosted:publish-provider-set` — the same principal and binding as `db:provision-principals` (`:307-314`),
+not the dev publisher's `DEVELOPMENT_ONLY` (`:299-306`); no principal, role, grant, membership or migration is added.
+
+**Domain terms introduced.** *Hosted roster* — the operator's JSON file at `PROVIDER_HOSTED_ROSTER_PATH`, top level
+`{"providers":[…]}`, ten keys per provider (R1.2). *Derived targets* — the two `PROVIDER_DISCOVERY_TARGETS_JSON`
+values the command prints and never writes. *Hosted publication* — `publishGeneral` with `deployment: "hosted"`
+carrying the complete base snapshot with one row replaced. *Operator command environment* — the keys a hand-run
+command names for `readOperatorCommandEnvironment` (ADR-0027). *Role rows* — the base register's `synthesizerRoleRef`
+and `evaluatorRoleRef` rows R1.14 reads. *Role seed* — the acceptance's publication that adds the role rows to the
+`published` version before `role-provider-dropped` (R1.12; its row set is SPEC-v5 R1.12's seventeen rows, V-15).
+
+**Global constraints (every step; values verbatim from SPEC-v5 and COMMON).** No real API key anywhere (row V-5).
+`DEBATEAI_DEPLOYMENT_MODE` is the only mode switch (row V-1). No listener on `:3000 :3001 :4310 :8790 :8791 :8792
+:8793 :8795 :8796 :55432`; a scratch database takes the port the OS assigns. Every command with
+`export PATH="/opt/homebrew/bin:$PATH"` first. Never `pnpm install`. In every new file under `apps/`: no text
+`process.env`, no import specifier containing `test` or `fixture`, no `switch (`, no `export const <UPPER> = <number>`,
+no text `supportActivation`, no `provider.call(`/`gateway.call(`. In every new file under `apps/`, `packages/` or
+`acceptance/`: no `REGISTER_VERSION`/`registerVersion` written as `5`. In every new file anywhere: no
+`Number(`/`parseInt(`/`parseFloat(` over a register version (compare with `BigInt`), no SQL naming a literal register
+version above 4 (bind `$1`), no `max(register_version)` and no `ORDER BY register_version DESC LIMIT 1`.
+
+**Written outside `apps/` and `packages/` (Revision 3, S01-27 only):** `tests/architecture/p3-production-database-principals.test.ts`
+(two additions: `:289-331`, `:349-391`) and `docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json`
+(one object in `migration-admin`'s `connectionPurposes`, `:275-315`); every other line of both files stays as it is.
+
+**What this slice must NOT touch** (a diff line on any is a scope finding): `packages/providers/src/index.ts`
+(the parser `:232-338`, its allow-list `:264-268`, `BUILT_IN_PROVIDER_ADAPTERS` `:807-809`) ·
+`packages/register/src/configured-provider-set.ts` (all of it) · `packages/register/src/register-publication.ts` ·
+`apps/runner/src/dev-provider-set-publish-cli.ts` · `apps/runner/src/dev-deployment-register.ts` ·
+`apps/api/src/main.ts` · `apps/runner/src/main.ts` · `deploy/vps/**` (README §11 is S03's) · every `*.env.example` ·
+`tests/support/**` (used, never edited) · `migrations/**` · `tools/orphan-audit/**` · the other slices' files.
+
+**Built since Revision 2.** The role-reference check (V ruled V-10 "Yes, refuse at publish"; R1.14; S01-26) — it
+REFUSES only; a row that passes is carried forward byte for byte. **Not built, by design.** A head check on `REGISTER_VERSION` (the shipped port has none — probe p2 — and the census bans latest-version
+reads, `tests/architecture/register-support-publication.test.ts:539-554`; the base is what the operator names).
+Any read of a credential file. A de-duplication of the roster (DECISIONS 2026-09-24, coder C, rejected).
+
+## 6. Steps — by cluster
+
+Anchors re-grepped in the lane @ `776359c3` (Revision 2's @ `5b12b2e15`). `<lane>` = `/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine`.
+A REJECTION criterion names the guard it expects and every guard that fires before it on the same operation; the
+full chain of one run of the command, in order, is: **g1** `resolveDeploymentMode` (`packages/register/src/runtime-environment.ts:94-99`:
+`DEPLOYMENT_MODE_UNRESOLVED` `:95`, `DEPLOYMENT_MODE_INVALID` `:99`) → **g2** the not-hosted refusal → **g3** the
+roster path (unset / not absolute / unreadable) → **g4** the roster gate (JSON · top level · per element in array
+order: key set, adapter kind, vetting keys, repeat) → **g5** `parseRegisterVersionText` (`packages/register/src/register-publication.ts:59-67`)
+→ **g6** `loadMigrationEnvironment` (`runtime-environment.ts:205-211`, zod + the production floor `:379-386`) → **g7**
+the base-rows query → **g8** the base-row absence → **g9** the builder: `assertConfiguredProviderSetShape`
+(`configured-provider-set.ts:64-85`, `CONFIGURED_PROVIDER_SET_INVALID`) then `assertVendorVetted` (`:87-99`,
+`PROVIDER_VENDOR_NOT_VETTED:<ref>`) → **g10** the self-check, runner value then API value, each through the parser's
+own order (`packages/providers/src/index.ts:236-247` size/JSON/array, `:248-257` the configured set, then per target
+`:260-270` object/allow-list, `:275-287` prices, `:288-296` ref/duplicate/set membership, `:297-319` credentials,
+`:323` → `:226-227` the base URL) → **g10b** the role rows (S01-26, SPEC-v5 R1.14, R1.3 step (6):
+`synthesizerRoleRef` then `evaluatorRoleRef` of the base rows) → **g11** `publishGeneral` (`register-publication.ts:869-879`: exact members,
+deployment, rows, `supportActivation`, the hosted door `:550-559`).
+
+### S01-C1 — the register loader's operator-command reader
+
+**S01-01 · TEST (RED) · the reader's suite.** Create `tests/unit/pes-s01-operator-command-environment.test.ts`
+with exactly three cases; it imports `* as loader from "../../packages/register/src/runtime-environment.js"` and
+`* as register from "@debateai/register"` as NAMESPACES, so a missing export fails a case and never the file load;
+`afterEach(() => vi.unstubAllEnvs())`.
+1. `returns exactly the listed keys that are set, and nothing else` — `vi.stubEnv("PES_S01_PROBE_A", "a")`,
+   `vi.stubEnv("PES_S01_PROBE_B", "")`, `vi.stubEnv("PES_S01_PROBE_D", "d")`; precondition
+   `expect(process.env.PES_S01_PROBE_C).toBeUndefined()`; then
+   `loader.readOperatorCommandEnvironment(["PES_S01_PROBE_A", "PES_S01_PROBE_B", "PES_S01_PROBE_C"])`
+   `toStrictEqual` EXACT `{"PES_S01_PROBE_A":"a","PES_S01_PROBE_B":""}`.
+2. `returns a frozen object` — `Object.isFrozen(loader.readOperatorCommandEnvironment(["PES_S01_PROBE_A"]))` is `true`.
+3. `is re-exported by the package entry` — `typeof register.readOperatorCommandEnvironment` is `"function"` and
+   `register.readOperatorCommandEnvironment` `toBe` `loader.readOperatorCommandEnvironment`.
+Done when: `LOG=<abs> zsh $RS tests/unit/pes-s01-operator-command-environment.test.ts:3:0` prints
+`passed=0 failed=3` and `CLUSTER_RED` (not `BROKEN`).
+
+**S01-02 · PROD · the reader.** In `packages/register/src/runtime-environment.ts`, between the `}` at `:238` that
+closes `loadDevelopmentCommandEnvironment` (opens `:213`; `grep -n '^export function loadDevelopmentCommandEnvironment'`)
+and `export function parseReplaySelfTestEnvironment` at `:240`, insert the function of
+`probes/ARCH-PES-S01/proposed/runtime-environment-addition.ts` with its doc comment:
+`export function readOperatorCommandEnvironment<const K extends string>(keys: readonly K[]): Readonly<Partial<Record<K, string>>>`
+— for each listed key, `process.env[key]` when it is not `undefined`; the result `Object.freeze`d.
+Done when: S01-01 cases 1 and 2 pass; `grep -c PROVIDER_HOSTED_ROSTER_PATH packages/register/src/runtime-environment.ts`
+prints `0`; `grep -c 'process\.env\[key\]' packages/register/src/runtime-environment.ts` prints `1`.
+RED when omitted: S01-01 cases 1, 2 and 3.
+
+**S01-03 · PROD · the package entry.** In `packages/register/src/index.ts`, inside the export block
+`from "./runtime-environment.js"` (`:786-814`), insert the line `  readOperatorCommandEnvironment,` between
+`  assertProductionFloors,` (`:790`) and `  readSealedCostEnvelopeStatus,` (`:791`).
+Done when: S01-01 prints `passed=3 failed=0`. RED when omitted: S01-01 case 3.
+
+**S01-04 · DOC · ADR-0027 lands with the code.** Copy
+`/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/architecture/01-decisions/ADR-0027-operator-command-environment-keys.md`
+to `<lane>/docs/architecture/01-decisions/ADR-0027-operator-command-environment-keys.md`, byte for byte. No index row
+(DECISIONS 2026-09-25: the lane's `docs/architecture/01-decisions/README.md` ends at 0022, `:91`).
+Done when: `cmp` of the two paths prints nothing and exits 0.
+
+**S01-05 · EXIT · C1.** (1) the C1 command, three runs, each `CLUSTER_GREEN`; (2) V5's typecheck delta on this tree
+prints exactly `apps/ui/lib/v3/answerExport.ts`; (3) `git -C <lane> diff --numstat 776359c3 -- packages/register/src/runtime-environment.ts packages/register/src/index.ts`
+prints two rows, each with `0` in the removed column.
+
+### S01-C2 — the hosted provider-set library (`apps/runner/src/hosted-provider-set.ts`, new)
+
+Reference code: `probes/ARCH-FIX-PES-S01-p2/proposed/hosted-provider-set.ts` (sha256 `3f5e382e358049af…`; Revision 2
+adds S01-26 and step (6) to pass 1's `d9e11e79fcc147cb…`). Imports:
+`node:crypto`; `@debateai/providers` (`BUILT_IN_PROVIDER_ADAPTERS`, `parseProviderDiscoveryTargets`);
+`@debateai/register` (`CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF`, `CONFIGURED_PROVIDER_SET_ROW_KEY`,
+`buildConfiguredProviderSetDeploymentRow`, `computeRegisterSnapshotSha256`, `parseCanonicalRegisterJson`,
+`parseRegisterVersionText`, `resolveDeploymentMode`, and the types `RegisterPublicationPort`,
+`RegisterPublicationReceipt`, `RegisterPublicationRow`, `RegisterVersionText`, `VettedConfiguredProvider`) — nothing else.
+The file obeys §5's global constraints and contains neither `"openai-compatible-http"` nor `"vllm-openai-compatible-http"`.
+
+**S01-06 · TEST (RED) · the library's suite and a stub.** Create `tests/unit/pes-s01-hosted-provider-set.test.ts`
+with the 37 cases below, and a STUB `apps/runner/src/hosted-provider-set.ts` that exports every name of S01-07 …
+S01-14 and S01-26 with its final signature, whose four string constants are `""` and whose every function body is
+`throw new TypeError("PES_S01_NOT_BUILT")` (the stub imports nothing from `@debateai/providers`). Fixtures:
+`E`, `E′`, `V1REF`, `SUFFIX` of §1; `text(elements) = JSON.stringify({ providers: elements })`. Every refusal below is
+asserted on the thrown `TypeError`'s `message`, EXACT.
+- **A1** `admits element E and keeps the roster's providers in order` — `gateHostedRoster(text([E, E′])).providers` `toStrictEqual` `[E, E′]`.
+- **A2** `refuses a repeated provider_ref with the repeated ref` — `text([E, E])` → `PES_PUBLISH_ROSTER_INVALID:vendor:a` (guards before: JSON, top level, element 0 whole, element 1's key set / adapter kind / vetting — all pass).
+- **A3** `refuses a missing, an eleventh or a renamed key, naming the provider_ref` — `E` without `model`; `E` plus `"authorization_header":"x"`; `E` with `base_url` renamed `baseUrl` → each `PES_PUBLISH_ROSTER_INVALID:vendor:a`.
+- **A4** `refuses an adapter_kind outside BUILT_IN_PROVIDER_ADAPTERS and admits both shipped kinds` — `adapter_kind: "anthropic-http"` → `PES_PUBLISH_ROSTER_INVALID:vendor:a`; `adapter_kind: "vllm-openai-compatible-http"` → admitted.
+- **A5** `refuses a vetting that is not an object or has an unknown key, and admits one with a member missing` — `vetting: "yes"` → `…:vendor:a`; `vetting` = E's plus `"reviewed_by":"V"` → `…:vendor:a`; `vetting: {}` → admitted (R1.7 judges it).
+- **A6** `names the array index when the offending element has no string provider_ref` — `[E, E-without-model-and-with-provider_ref-7]` → `PES_PUBLISH_ROSTER_INVALID:1`; `["x"]` → `PES_PUBLISH_ROSTER_INVALID:0`.
+- **A7** `refuses a top level that is not one non-empty providers array, with an empty suffix` — the texts `[]`, `null`, `{"providers":[]}`, `{"providers":{}}`, and `text([E])` with a second member `"extra":1` → each `PES_PUBLISH_ROSTER_INVALID:`.
+- **A8** `refuses text that is not JSON without quoting it` — `{"providers":[{"runner_authorization_file":/etc/debateai/runner/providers/acme.header}]}` → `PES_PUBLISH_ROSTER_INVALID:` (V8's own message for this text is `Unexpected token '/', ..."ion_file":/etc/debat"... is not valid JSON` — probe p1).
+- **A9** `reads the adapter kinds from the shipped constant, never retyped` — `readFile("apps/runner/src/hosted-provider-set.ts", "utf8")` CONTAINS `BUILT_IN_PROVIDER_ADAPTERS` and contains neither `"openai-compatible-http"` nor `"vllm-openai-compatible-http"`.
+- **B1** `maps element E to the VettedConfiguredProvider of R1.1` — `hostedConfiguredProviders(gateHostedRoster(text([E])))` `toStrictEqual` EXACT `[{"providerRef":"vendor:a","adapterKind":"openai-compatible-http","maker":"Acme","vetting":{"dataUseTermsReviewedOn":"2026-09-01","retentionTermsReviewedOn":"2026-09-01","namedInPrivacyNotice":true}}]`; `Object.keys(result[0])` EXACT `["providerRef","adapterKind","maker","vetting"]`; and `expectTypeOf(hostedConfiguredProviders).returns.toEqualTypeOf<VettedConfiguredProvider[]>()` (a compile-time assertion `pnpm typecheck` judges at S01-15).
+- **B2** `leaves a vetting member the roster omits absent` — `vetting: {"data_use_terms_reviewed_on":"2026-09-01"}` → `result[0].vetting` `toStrictEqual` EXACT `{"dataUseTermsReviewedOn":"2026-09-01"}`.
+- **B3** `keeps the roster's order` — `[E, E′]` → refs EXACT `["vendor:a","vendor:b"]`; `[E′, E]` → `["vendor:b","vendor:a"]`.
+- **C1** `derives the runner and the API targets` — `deriveHostedProviderTargets(gateHostedRoster(text([E])))`: `runner` EXACT the RUNNER line after its prefix; `api` EXACT the API line after its prefix.
+- **C2** `derives only the six allow-listed keys, in the roster's order` — for `[E, E′]`: `JSON.parse(runner).map(Object.keys)` is two copies of EXACT `["provider_ref","base_url","model","authorization_file","input_price_micros_per_million","output_price_micros_per_million"]`; refs EXACT `["vendor:a","vendor:b"]`; `parseProviderDiscoveryTargets(runner, [{providerRef:"vendor:a",maker:"Acme"},{providerRef:"vendor:b",maker:"Beta"}])` has length 2.
+- **D1** `builds the publication id in the hosted namespace` — `hostedProviderSetPublicationId(parseRegisterVersionText("4"), "0".repeat(64))` EXACT `f46205a2-12c8-4dad-a14a-abb2b836354e`; the shipped `developmentProviderSetPublicationId` (imported by the TEST from `apps/runner/src/dev-deployment-register.ts`; R1.6 binds the command's graph, not the test's) of the same EXACT `e5e29eff-627c-4507-b9d5-e131a69c35de`.
+- **D2** `removes one trailing deployment suffix` — `sealedSourceRefOf(V1REF)` → `V1REF`; `sealedSourceRefOf(V1REF + SUFFIX)` → `V1REF`.
+- **E1** `formats the receipt line` — `formatHostedProviderSetReceipt({ registerVersion: parseRegisterVersionText("5"), rowCount: 32, snapshotSha256: "579690d7a51248ea486632c347c32ee0dbd99814206f1a5c05d85c7d405931c9" })` EXACT the RECEIPT line of §1.
+- **E2** `is refused by the development receipt reader` — `parseDevelopmentDeploymentRegisterCliOutput(<E1's line> + "\n", "/nonexistent")` rejects with message EXACT `DEV_DEPLOYMENT_REGISTER_RECEIPT_OUTPUT_INVALID`. Guards before: `apps/runner/src/dev-deployment-register.ts:320` (a string that ends in `\n` and holds no `\r`) — this input passes it, so `:324` (the development prefix) is the guard that fires; both throw the same code, so the input's shape is what makes `:324` the one observed.
+- **E3** `names this slice's literals` — `HOSTED_TARGETS_RUNNER_STDOUT_PREFIX` EXACT `PES_HOSTED_TARGETS_RUNNER_V1=`; `HOSTED_TARGETS_API_STDOUT_PREFIX` EXACT `PES_HOSTED_TARGETS_API_V1=`; `HOSTED_PROVIDER_SET_RECEIPT_STDOUT_PREFIX` EXACT `PES_HOSTED_PROVIDER_SET_RECEIPT_V1=` and not equal to `DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX` (`dev-deployment-register.ts:104-105`); `HOSTED_PROVIDER_SET_PUBLICATION_SOURCE_REF` EXACT `provider-env-selection/S01#hosted-provider-set:published`.
+- **F1** `admits hosted and refuses every other resolved mode by name` — `hostedDeploymentModeOrRefuse("hosted", undefined)` → `"hosted"`; `("local", undefined)` → `PES_PUBLISH_SET_NOT_HOSTED:local`; `(undefined, undefined)` → `PES_PUBLISH_SET_NOT_HOSTED:local`.
+- **F2** `passes the shipped resolver's codes through verbatim` — `("HOSTED", undefined)` → `DEPLOYMENT_MODE_INVALID`; `(undefined, "production")` → `DEPLOYMENT_MODE_UNRESOLVED` (g1).
+- **G — the seven checks with fake ports.** `seed = await readLegacyDevelopmentV4Rows()` (`tests/support/registerFixtures.ts:115-118`, 32 rows). Fake ports record every call: `readRosterText(path)` returns the case's roster text; `openRegister()` returns `{ readVersionRows: (v) => v === "4" ? baseRows : [], port: { publishGeneral: (p) => ({ registerVersion: parseRegisterVersionText("5"), rowCount: p.rows.length, snapshotSha256: computeRegisterSnapshotSha256(p.rows), … }) } }` with `baseRows = seed` unless the case says otherwise. Default inputs `{ deploymentMode: "hosted", nodeEnv: undefined, registerVersion: "4", rosterPath: "/roster.json" }`, roster `text([E])`.
+  - **G1** `not-hosted: refused before the roster is read or the register opened` — `deploymentMode: "local"` → `PES_PUBLISH_SET_NOT_HOSTED:local`; `readRosterText` 0 calls, `openRegister` 0 calls.
+  - **G2** `roster-invalid: refused before the register opens` — roster `text([E, E])` → `PES_PUBLISH_ROSTER_INVALID:vendor:a`; `openRegister` 0 calls (guards before: g1, g2, g3 pass).
+  - **G3** `an unset, relative or unreadable roster path is refused with an empty suffix` — `rosterPath: undefined` → `PES_PUBLISH_ROSTER_INVALID:` and `readRosterText` 0 calls; `rosterPath: "roster.json"` → the same, 0 calls; `readRosterText` rejecting `new Error("ENOENT: no such file or directory, open '/roster.json'")` → `PES_PUBLISH_ROSTER_INVALID:` (no path in the message); `openRegister` 0 calls in all three.
+  - **G4** `a REGISTER_VERSION that is not a version text is refused before the register opens` — `registerVersion: "abc"` and `registerVersion: undefined` → each `REGISTER_VERSION_TEXT_INVALID` (g5; g1–g4 pass); `openRegister` 0 calls.
+  - **G5** `base-row-absent: refused before the builder, nothing published` — `registerVersion: "999"` → `PES_PUBLISH_BASE_ROW_ABSENT:999` (g1–g7 pass: `"999"` is a version text and the query returns no row); `publishGeneral` 0 calls.
+  - **G6** `unvetted: the shipped builder's line, nothing published` — `E` with `named_in_privacy_notice: false` → `PROVIDER_VENDOR_NOT_VETTED:vendor:a` (g1–g8 pass; the shape guard of g9 passes: floor 1, one provider, named texts, one ref); `publishGeneral` 0 calls.
+  - **G7** `a shape refusal of the shipped builder is printed verbatim` — `E` with `maker: ""` → `CONFIGURED_PROVIDER_SET_INVALID` (g9's shape guard, `configured-provider-set.ts:79`); `publishGeneral` 0 calls.
+  - **G8** `targets-rejected: the parser's code behind the prefix, nothing published` — `E` with `base_url: "https://api.acme.example/v2"` → `PES_PUBLISH_SET_TARGETS_REJECTED:PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID` (g1–g9 pass; within g10 every guard before `:226-227` passes for E's values); `E` with `api_authorization_file: "relative/acme.header"` → `PES_PUBLISH_SET_TARGETS_REJECTED:PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID` (the runner value passes; the API value fails at `:317-318`); `publishGeneral` 0 calls in both.
+  - **G9** `published: one hosted publication and the three lines` — resolves to EXACT `[RUNNER line, API line, RECEIPT line]`; `publishGeneral` 1 call whose argument has EXACT own keys `publicationId, baseRegisterVersion, rows, sourceRef, deployment` with `publicationId` `2a1ff6e9-7bfe-4bc8-b7d9-36e786ab80b4`, `baseRegisterVersion` `"4"`, `sourceRef` `provider-env-selection/S01#hosted-provider-set:published`, `deployment` `"hosted"`, `rows` of length 32 whose `configuredProviderSet` entry is EXACT `{ rowKey: "configuredProviderSet", valueJsonText: <BUILT ROW value>, sourceRef: <BUILT ROW sourceRef> }` and whose other 31 entries `toStrictEqual` the seed row of the same `rowKey`.
+  - **G10** `requiredDistinctMakers comes from the base row` — `baseRows` = the seed with the `configuredProviderSet` value re-serialized with `"requiredDistinctMakers":2` (through `parseCanonicalRegisterJson`) → the published `configuredProviderSet.valueJsonText` CONTAINS `"requiredDistinctMakers":2`, and the one-maker roster still publishes (the command never compares the floor with the roster; ADR-0015:86 evaluates it at startup).
+  - **G11** `a republication from a hosted base appends the suffix once` — `baseRows` = the seed with the `configuredProviderSet` `sourceRef` set to `V1REF + SUFFIX` → the published row's `sourceRef` EXACT `V1REF + SUFFIX`.
+  - **G12–G16 — the role rows (SPEC-v5 R1.14, Revision 2).** `role(key, value)` = `{ rowKey: key, valueJsonText: parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value), "utf8")), sourceRef: "pes-s01-unit-role" }`; `SYN(r)` = `role("synthesizerRoleRef", {"kind":"SYNTHESIZER_ROLE_REF","providerRef":r,"provisional":true})`; `EVA(r)` = `role("evaluatorRoleRef", {"kind":"EVALUATOR_ROLE_REF","providerRef":r,"provisional":true})`; `baseRows` = the seed plus the rows a case names.
+  - **G12** `a present role row naming a roster provider passes and is carried forward byte for byte` — seed + `SYN("vendor:a")` + `EVA("vendor:a")`, roster `[E]` → resolves; `publishGeneral` 1 call with `rows` of length 34 whose two role entries `toStrictEqual` the two base role rows; seed + `SYN("vendor:a")` + `EVA("vendor:b")`, roster `[E, E′]` → resolves (the ref may be ANY element's, not only the first).
+  - **G13** `the first present role row naming no roster provider refuses by its key, nothing published` — seed + `SYN("vendor:a")` + `EVA("vendor:z")` → `PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef`; seed + `SYN("vendor:z")` + `EVA("vendor:z")` → `PES_PUBLISH_ROLE_PROVIDER_DROPPED:synthesizerRoleRef` (the synthesizer row is read first); `publishGeneral` 0 calls in both (guards before: g1–g10 pass for roster `[E]`).
+  - **G14** `an absent role row is not checked` — seed + `EVA("vendor:z")` only → `PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef` (the absent synthesizer row did not stop the check); seed + `SYN("vendor:a")` only → resolves, `rows` of length 33.
+  - **G15** `a present role row whose value holds no string providerRef refuses` — seed + `role("synthesizerRoleRef", {"kind":"SYNTHESIZER_ROLE_REF","providerRef":7,"provisional":true})` → `PES_PUBLISH_ROLE_PROVIDER_DROPPED:synthesizerRoleRef`; seed + `role("synthesizerRoleRef", {"kind":"SYNTHESIZER_ROLE_REF","provisional":true})` → the same; `publishGeneral` 0 calls.
+  - **G16** `the role rows are step (6): after the build and the self-check` — seed + `EVA("vendor:z")` with roster `[E with base_url "https://api.acme.example/v2"]` → `PES_PUBLISH_SET_TARGETS_REJECTED:PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID` (g10 fires first); the same base with roster `[E with named_in_privacy_notice false]` → `PROVIDER_VENDOR_NOT_VETTED:vendor:a` (g9 fires first).
+Done when: `LOG=<abs> zsh $RS tests/unit/pes-s01-hosted-provider-set.test.ts:37:0` prints `passed=0 failed=37` and `CLUSTER_RED`.
+
+**S01-07 · PROD · the literals.** Export `HOSTED_TARGETS_RUNNER_STDOUT_PREFIX = "PES_HOSTED_TARGETS_RUNNER_V1="`,
+`HOSTED_TARGETS_API_STDOUT_PREFIX = "PES_HOSTED_TARGETS_API_V1="`, `HOSTED_PROVIDER_SET_RECEIPT_STDOUT_PREFIX =
+"PES_HOSTED_PROVIDER_SET_RECEIPT_V1="`, `HOSTED_PROVIDER_SET_PUBLICATION_SOURCE_REF =
+"provider-env-selection/S01#hosted-provider-set:published"`, each `as const`. Done when: E3 passes.
+RED when omitted: E1, E3, G9.
+
+**S01-08 · PROD · the roster gate.** Export `type HostedRosterProvider` (the ten keys, each `unknown`),
+`type HostedRoster = Readonly<{ providers: readonly HostedRosterProvider[] }>` and `gateHostedRoster(text: string): HostedRoster`:
+`JSON.parse` failing → `PES_PUBLISH_ROSTER_INVALID:` (never the parser's message); a top level that is not a plain
+object with exactly one member `providers` holding a non-empty array → `PES_PUBLISH_ROSTER_INVALID:`; then per element
+in array order, the first failing rule refuses with `PES_PUBLISH_ROSTER_INVALID:` + (the element's `provider_ref` when
+it is a string, else its array index): (a) a plain object whose own keys are exactly the ten; (b) `adapter_kind` equal
+to one `adapterKind` of `BUILT_IN_PROVIDER_ADAPTERS`; (c) `vetting` a plain object whose keys are among the three
+snake-case names; (d) `JSON.stringify(provider_ref)` not seen in an earlier element. Returns the parsed roster.
+Done when: A1–A9 pass. RED when omitted: A1–A9, G2.
+
+**S01-09 · PROD · R1.1.** Export `hostedConfiguredProviders(roster: HostedRoster): VettedConfiguredProvider[]` —
+per element in order `{ providerRef: provider_ref, adapterKind: adapter_kind, maker, vetting }`, `vetting` renamed
+member by member (`data_use_terms_reviewed_on` → `dataUseTermsReviewedOn`, `retention_terms_reviewed_on` →
+`retentionTermsReviewedOn`, `named_in_privacy_notice` → `namedInPrivacyNotice`), an absent member left absent; no
+other member. Done when: B1–B3 pass. RED when omitted: B1–B3, G6, G9.
+
+**S01-10 · PROD · the derived targets.** Export `deriveHostedProviderTargets(roster: HostedRoster):
+Readonly<{ runner: string; api: string }>` — `JSON.stringify` of one object per element, in order, with EXACTLY the
+keys `provider_ref, base_url, model, authorization_file, input_price_micros_per_million,
+output_price_micros_per_million` in that order, `authorization_file` from `runner_authorization_file` for `runner`
+and from `api_authorization_file` for `api`; values copied unchanged. Done when: C1, C2 pass.
+RED when omitted: C1, C2, G8, G9.
+
+**S01-11 · PROD · identity and provenance.** Export `hostedProviderSetPublicationId(baseRegisterVersion:
+RegisterVersionText, snapshotSha256: string): string` — the construction of `apps/runner/src/dev-deployment-register.ts:784-799`
+(first 16 bytes of `sha256`, byte 6 `(& 0x0f) | 0x40`, byte 8 `(& 0x3f) | 0x80`, 8-4-4-4-12 hex) over
+`debateai:hosted-provider-set:${baseRegisterVersion}:${snapshotSha256}`, written in this file, never imported; and
+`sealedSourceRefOf(baseSourceRef: string): string` — `baseSourceRef` without one trailing
+`CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF` when present, else unchanged. Done when: D1, D2 pass.
+RED when omitted: D1, D2, G9, G11.
+
+**S01-12 · PROD · the receipt.** Export `formatHostedProviderSetReceipt(receipt: Pick<RegisterPublicationReceipt,
+"registerVersion" | "rowCount" | "snapshotSha256">): string` — the prefix followed by `JSON.stringify` of
+`{ registerVersion, rowCount, snapshotSha256 }` in that key order and no other key. Done when: E1, E2 pass.
+RED when omitted: E1, E2, G9.
+
+**S01-13 · PROD · the mode.** Export `hostedDeploymentModeOrRefuse(configured: string | undefined, nodeEnv: string |
+undefined): "hosted"` — calls the shipped `resolveDeploymentMode(configured, nodeEnv)` (its throws pass through
+unchanged) and throws `PES_PUBLISH_SET_NOT_HOSTED:${mode}` for any mode but `"hosted"`. Done when: F1, F2 pass.
+RED when omitted: F1, F2, G1.
+
+**S01-26 · PROD · the role rows (Revision 2; SPEC-v5 R1.14, V-10).** Export `HOSTED_ROLE_ROW_KEYS =
+Object.freeze(["synthesizerRoleRef", "evaluatorRoleRef"] as const)` and `assertHostedRoleProvidersKept(baseRows:
+readonly RegisterPublicationRow[], roster: HostedRoster): void` — for each key of `HOSTED_ROLE_ROW_KEYS` in that
+order: the base row with that `rowKey`, skipped when absent; else `JSON.parse(row.valueJsonText)`, and when that value
+is not a plain object, or its `providerRef` is not a string, or no roster element's `provider_ref` `===` it, throw
+`new TypeError("PES_PUBLISH_ROLE_PROVIDER_DROPPED:" + <the key>)`. It returns nothing and changes no row. Done when:
+G12–G15 pass. RED when omitted: G13, G14, G15 (G12 and G16 pass without the check — G12 publishes either way, and
+in G16 an earlier guard fires; they pin the carry-forward and the ORDER, not the refusal).
+
+**S01-14 · PROD · the seven checks (SPEC-v5 R1.3).** Export `type HostedPublishInputs` (`deploymentMode`, `nodeEnv`,
+`registerVersion`, `rosterPath`, each `string | undefined`), `type HostedRegisterAccess = Readonly<{ readVersionRows(version:
+RegisterVersionText): Promise<readonly RegisterPublicationRow[]>; port: Pick<RegisterPublicationPort, "publishGeneral"> }>`,
+`type HostedPublishPorts = Readonly<{ readRosterText(path: string): Promise<string>; openRegister(): Promise<HostedRegisterAccess> }>`
+and `publishHostedProviderSet(inputs, ports): Promise<readonly [string, string, string]>`, which in this order:
+(1) `hostedDeploymentModeOrRefuse`; (2) refuses an unset or non-`/`-prefixed `rosterPath` and a rejected
+`readRosterText` with `PES_PUBLISH_ROSTER_INVALID:`, then `gateHostedRoster`; (3) `parseRegisterVersionText(registerVersion)`,
+then `openRegister()`, `readVersionRows(version)`, and `PES_PUBLISH_BASE_ROW_ABSENT:${version}` when no row has
+`rowKey` `configuredProviderSet`; (4) `buildConfiguredProviderSetDeploymentRow({ requiredDistinctMakers: <the base
+row's value member>, providers: hostedConfiguredProviders(roster) }, sealedSourceRefOf(<the base row's sourceRef>))`;
+(5) `parseProviderDiscoveryTargets` over the runner value, then the API value, each against the built row's
+`value.providers`, a throw becoming `PES_PUBLISH_SET_TARGETS_REJECTED:${message}`; (6) `assertHostedRoleProvidersKept(baseRows,
+roster)` (S01-26); (7) `rows` = the base rows in their
+order with the `configuredProviderSet` row replaced by `{ rowKey, valueJsonText:
+parseCanonicalRegisterJson(Buffer.from(JSON.stringify(built.value), "utf8")), sourceRef }`, then ONE literal call
+`port.publishGeneral({ publicationId: hostedProviderSetPublicationId(version, computeRegisterSnapshotSha256(rows)),
+baseRegisterVersion: version, rows, sourceRef: HOSTED_PROVIDER_SET_PUBLICATION_SOURCE_REF, deployment: "hosted" })`,
+and returns `[RUNNER prefix + runner, API prefix + api, formatHostedProviderSetReceipt(receipt)]`.
+Done when: G1–G16 pass, i.e. the C2 suite prints `passed=37 failed=0`. RED when omitted: G1–G16.
+
+**S01-15 · EXIT · C2.** (1) the C2 command, three runs, each `CLUSTER_GREEN`; (2) V5's typecheck delta prints
+exactly `apps/ui/lib/v3/answerExport.ts` (B1's `expectTypeOf` is judged here); (3) on
+`apps/runner/src/hosted-provider-set.ts`: `grep -c 'process\.env'` → `0`, `grep -c supportActivation` → `0`,
+`grep -cE 'switch *\('` → `0`, `grep -cE '"(vllm-)?openai-compatible-http"'` → `0`, `grep -cE 'export const [A-Z_]+ = -?[0-9]'` → `0`.
+
+### S01-C3 — the operator command, its script, and its end-to-end and boundary suites
+
+**S01-16 · TEST (RED) · the end-to-end suite.** Create `tests/integration/pes-s01-hosted-provider-set-publish.test.ts`,
+16 cases in this order (later cases read earlier publications), one scratch database for the file:
+`beforeAll` → `database = await startTestDatabase(); await migrate(database.pool); await
+importHistoricalRegisterFixture(database.pool, 4, await readLegacyDevelopmentV4Rows())`; `afterAll` →
+`await database.stop()`. Helper `run(rosterText, overrides)`: writes the roster to a fresh
+`mkdtemp(join(tmpdir(), "pes-s01-int-"))/roster.json`, spawns `process.execPath` with `["--import",
+createRequire(import.meta.url).resolve("tsx"), <product root>/apps/runner/src/hosted-provider-set-publish-cli.ts]`
+(the shape of `tests/integration/dev-deployment-register.test.ts:118-122`), `cwd` the product root, `env` =
+`{ PATH, HOME }` of the test process + `{ REGISTER_VERSION: "4", MIGRATION_DATABASE_URL: database.connectionString,
+DEBATEAI_DEPLOYMENT_MODE: "hosted", PROVIDER_HOSTED_ROSTER_PATH: <file> }` + `overrides` (an override of `undefined`
+deletes the key; `NODE_ENV` absent unless a case sets it), and resolves `{ exitCode, stdout, stderr }`. Helper
+`rowsAt(version)` = `SELECT row_key,value_json::text AS value_json_text,source_ref FROM register.register_row WHERE
+register_version=$1 ORDER BY row_key` with `[version]`, each value through `parseCanonicalRegisterJson`.
+Every refusal case asserts `exitCode` `1`, `stdout` `""` and `stderr` EXACT (the line + `\n`).
+- **I1** `not-hosted is refused before the database input is read` — `{ DEBATEAI_DEPLOYMENT_MODE: "local", MIGRATION_DATABASE_URL: "not-a-url" }` → `PES_PUBLISH_SET_NOT_HOSTED:local\n` (had g6 run first, the zod refusal of `not-a-url` would print instead).
+- **I2** `a mode that does not resolve prints the shipped code verbatim` — `{ DEBATEAI_DEPLOYMENT_MODE: undefined, NODE_ENV: "production" }` → `DEPLOYMENT_MODE_UNRESOLVED\n`; `{ DEBATEAI_DEPLOYMENT_MODE: "HOSTED" }` → `DEPLOYMENT_MODE_INVALID\n`.
+- **I3** `roster-invalid is refused before the database input is read` — roster `[E, E]`, `{ MIGRATION_DATABASE_URL: "not-a-url" }` → `PES_PUBLISH_ROSTER_INVALID:vendor:a\n`.
+- **I4** `a roster that is not JSON is refused without a byte of its text` — roster text `{"providers":[{"runner_authorization_file":/etc/debateai/runner/providers/acme.header}]}` → `PES_PUBLISH_ROSTER_INVALID:\n`.
+- **I5** `base-row-absent prints the version and publishes nothing` — `{ REGISTER_VERSION: "999" }` → `PES_PUBLISH_BASE_ROW_ABSENT:999\n`; `rowsAt("5")` has 0 rows.
+- **I6** `unvetted prints the shipped builder's line and publishes nothing` — `E` with `named_in_privacy_notice: false` → `PROVIDER_VENDOR_NOT_VETTED:vendor:a\n`; `rowsAt("5")` 0 rows.
+- **I7** `targets-rejected prints the parser's code and publishes nothing` — `E` with `base_url` `https://api.acme.example/v2` → `PES_PUBLISH_SET_TARGETS_REJECTED:PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID\n`; `rowsAt("5")` 0 rows.
+- **I8** `published prints exactly the three lines of R1.8` — roster `[E]` → `exitCode` 0, `stderr` `""`, `stdout` EXACT = RUNNER line + `\n` + API line + `\n` + RECEIPT line + `\n` (§1).
+- **I9** `the new version carries the other 31 rows byte for byte and the hosted row` — `rowsAt("5")` and `rowsAt("4")` have the same 32 `row_key`s; the 31 rows other than `configuredProviderSet` are equal in (`row_key`, canonical value, `source_ref`); `configuredProviderSet` at `"5"` has canonical value EXACT the BUILT ROW value and `source_ref` EXACT the BUILT ROW sourceRef.
+- **I10** `no credential byte leaves the command, and each credential path appears only on its targets line` — two files in a fresh `mkdtemp` directory, `runner.header` and `api.header`, mode `0600`, each holding `Bearer pes-s01-sentinel-7f3a`; roster `[E]` with `runner_authorization_file` / `api_authorization_file` set to those absolute paths; `{ REGISTER_VERSION: "5" }` → exit 0; `pes-s01-sentinel-7f3a` occurs in neither stdout nor stderr nor any value or `source_ref` of `rowsAt(<the receipt's registerVersion>)`; the runner path occurs once in stdout, on line 1; the API path once, on line 2; line 3 contains neither.
+- **I11** `a republication from the hosted row appends the suffix once` — `configuredProviderSet`'s `source_ref` at I10's new version EXACT the BUILT ROW sourceRef (`SUFFIX` occurs once).
+- **I12** `an identical re-run returns the first receipt` — I8's roster and overrides again → stdout EXACT I8's stdout (replay of the same request identity, `packages/register/src/register-publication.ts:426-432`; probe p2).
+- **I13** `NODE_ENV=production against a loopback database publishes` — roster `[E]`, `{ NODE_ENV: "production", REGISTER_VERSION: <I10's receipt registerVersion> }` → exit 0; stdout lines 1–2 EXACT RUNNER and API; the receipt's `registerVersion` compared with `BigInt` is greater than I10's (the floor `runtime-environment.ts:379-386` admits a loopback host, `:358-367`).
+- **I14** `the base is the version REGISTER_VERSION names` — roster `[E with maker "Acme Labs"]`, `{ REGISTER_VERSION: "4" }` → exit 0; for the receipt's version `v`, `SELECT base_register_version::text AS base FROM register.register_version WHERE register_version=$1` with `[v]` returns EXACT `"4"` (`migrations/0055_register_support_publication.sql:60-61`), although later versions exist.
+- **I15** `role-provider-dropped: a base whose evaluator row names a dropped provider is refused, nothing written` (Revision 2, R1.14) — `w` = the `registerVersion` of `publishReplacementRegisterFixture(database.pool, parseRegisterVersionText("5"), ROLE_ROWS("vendor:a", "vendor:z"), "provider-env-selection/S01#acceptance-role-rows")` (`tests/support/registerFixtures.ts:70`; `ROLE_ROWS` of §1, built in the test from the shipped `buildAlgorithmRegisterRows`; version 5 is I8's); `c0` = `SELECT count(*)::text AS n FROM register.register_version`; roster `[E]`, `{ REGISTER_VERSION: w }` → `exitCode` 1, `stdout` `""`, `stderr` EXACT `PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef\n`; the count after equals `c0`.
+- **I16** `a base whose role rows name roster providers publishes, and both role rows are carried forward byte for byte` (Revision 2, R1.14 + R1.2 `rows`) — `w2` = the `registerVersion` of the same call with `ROLE_ROWS("vendor:a", "vendor:a")`; roster `[E]`, `{ REGISTER_VERSION: w2 }` → exit 0, `stderr` `""`; the receipt's `rowCount` is `49`; for the receipt's version `v`, the `synthesizerRoleRef` and `evaluatorRoleRef` rows of `rowsAt(v)` equal those of `rowsAt(w2)` in (`row_key`, canonical value, `source_ref`), and `base_register_version` of `v` is EXACT `w2` (probe d4: 49 → 49, byte-equal).
+Done when: `LOG=<abs> zsh $RS tests/integration/pes-s01-hosted-provider-set-publish.test.ts:16:0` prints
+`passed=0 failed=16` and `CLUSTER_RED` (the file loads; each spawn of the absent entry exits 1 with Node's
+module-not-found text, which no EXACT expectation matches).
+
+**S01-17 · TEST (RED) · the boundary suite.** Create `tests/architecture/pes-s01-hosted-publish-boundary.test.ts`, 4 cases:
+- **H1** `R1.4: the command's one publishGeneral literal declares deployment "hosted"` — over `apps/runner/src/hosted-provider-set.ts` and `apps/runner/src/hosted-provider-set-publish-cli.ts`, the brace-matched literal from each `publishGeneral({` (the technique of `tests/unit/v9-configured-provider-set-deployment.test.ts:384-403`): count EXACT 1, and it matches `/\bdeployment: "hosted"/u`; neither file contains `publishDevelopmentDeploymentRegisterProviderSet`.
+- **H2** `R1.6: the command's runtime module graph holds no dev- module` — walk from `apps/runner/src/hosted-provider-set-publish-cli.ts`: edges are `import`/`export … from "…"` specifiers except `import type`/`export type`, and `import("…")`; a relative specifier resolves (`.js` → `.ts`) beside its importer; `@debateai/<name>` resolves to `packages/<name>/src/index.ts`; `node:` and third-party specifiers are leaves. No module path has a segment beginning `dev-`; `apps/runner/src/dev-provider-panel.ts` is absent; every module path begins `apps/runner/src/` or `packages/`; the graph CONTAINS `apps/runner/src/hosted-provider-set.ts`, `packages/register/src/configured-provider-set.ts` and `packages/providers/src/index.ts` (the walk is not vacuous; probe p6 is the same walk from the three package entries).
+- **H3** `R1.13: PROVIDER_HOSTED_ROSTER_PATH is named in one file under apps and packages` — `git grep -l --untracked PROVIDER_HOSTED_ROSTER_PATH -- apps packages` with `cwd` the product root → EXACT `["apps/runner/src/hosted-provider-set-publish-cli.ts"]` (git's exit status 1 is no match and reads as `[]`); `git grep -l --untracked PROVIDER_HOSTED_ROSTER_PATH -- '*.env.example'` → `[]`.
+- **H4** `the operator runs the command as pnpm hosted:publish-provider-set` — `package.json` `scripts["hosted:publish-provider-set"]` EXACT `tsx apps/runner/src/hosted-provider-set-publish-cli.ts`.
+Done when: `LOG=<abs> zsh $RS tests/architecture/pes-s01-hosted-publish-boundary.test.ts:4:0` prints `passed=0 failed=4`.
+
+**S01-18 · PROD · the entry.** Create `apps/runner/src/hosted-provider-set-publish-cli.ts` from
+`probes/ARCH-FIX-PES-S01-p2/proposed/hosted-provider-set-publish-cli.ts` (sha256 `0a31bc00f75bb756…`; Revision 2
+imports the reader from the BUILT `@debateai/register` export instead of pass 1's stand-in), with
+`readOperatorCommandEnvironment` imported from `@debateai/register`: it reads exactly `DEBATEAI_DEPLOYMENT_MODE`,
+`NODE_ENV`, `REGISTER_VERSION`, `PROVIDER_HOSTED_ROSTER_PATH` through `readOperatorCommandEnvironment`; its
+`openRegister` is the only place `loadMigrationEnvironment()` and `createPool` run; its `readVersionRows` is the
+command's own query (the text of S01-16's `rowsAt`) through `parseCanonicalRegisterJson`; its `port` is
+`createPostgresRegisterPublicationPort(pool)`; on success it writes the three lines, each + `\n`, to stdout and
+nothing to stderr (exit 0); on any throw it writes the message + `\n` to stderr and nothing to stdout, and sets
+`process.exitCode = 1` (safe here: its module graph holds no `embedded-postgres` and so no `async-exit-hook`, §1 R2
+row; I1–I7 and I15 assert the 1); the pool, when opened, ends in `finally`. It reads no file but the roster, and it
+needs no change for R1.14: `readVersionRows` already returns every base row, the role rows among them. §5's global
+constraints hold for it. Done when: I1–I16 and H1–H3 pass. RED when omitted: I1–I16, H1, H2, H3.
+
+**S01-19 · PROD · the publish script.** In `package.json`, as the line after `:31`
+(`"dev:auth:publish-provider-set": …`), insert `    "hosted:publish-provider-set": "tsx apps/runner/src/hosted-provider-set-publish-cli.ts",`.
+Done when: H4 passes. RED when omitted: H4.
+
+**S01-27 · TEST (RED) then PROD · the hosted publish command in the production-principals audit (Revision 3; C3-F1;
+R1.2's database input).** The audit `tests/architecture/p3-production-database-principals.test.ts` requires every
+`<sourceFile>::<…DATABASE_URL>` pair of a file under `apps/api/src`, `apps/runner/src` or `apps/scheduler/src` that
+contains `createPool` to be declared in the P3-01 manifest (`:563-600`); S01-18's entry creates a pool from
+`MIGRATION_DATABASE_URL`, so the pair `apps/runner/src/hosted-provider-set-publish-cli.ts::MIGRATION_DATABASE_URL` must be
+declared. Principal: `migration-admin` (`debateai_prod_migrator`, `PERSISTENT_MIGRATION_OWNER`, credential
+`EPHEMERAL_JIT`) — the principal `MIGRATION_DATABASE_URL` names (DECISIONS 2026-09-25 Revision 3). Two files, in this order:
+(1) RED — in the audit test: (a) in case `defines the exact capability, ownership, service, and connection-purpose
+inventory`, in the migration owner's `expect(principal.connectionPurposes).toEqual([…])` list (`:289-331`), after the
+`apps/runner:production-database-principals-cli` object (`:323-330`), append EXACT
+`{ component: "apps/runner:hosted-provider-set-publish-cli", sourceFile: "apps/runner/src/hosted-provider-set-publish-cli.ts", environmentKey: "MIGRATION_DATABASE_URL", purpose: "HOSTED_PROVIDER_SET_PUBLICATION", binding: "WIRED", condition: "package script hosted:publish-provider-set" }`
+(one property per line, as its neighbours); (b) in the sorted `allConnectionPurposes` expectation (`:349-391`), after the
+`production-database-principals-cli` row (`:361`), insert EXACT
+`{ component: "apps/runner:hosted-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "HOSTED_PROVIDER_SET_PUBLICATION", binding: "WIRED", condition: "package script hosted:publish-provider-set" },`.
+Done when (RED): `LOG=<abs> zsh $RS tests/architecture/p3-production-database-principals.test.ts:2:0` prints
+`passed=0 failed=2` (before (1) it prints `passed=1 failed=1`, the pair case at `:600`; after (1) the inventory case
+fails as well, because the manifest lacks the object).
+(2) GREEN — in `docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json`, in the
+principal `"id": "migration-admin"` (`:243`), in its `connectionPurposes`, after the
+`apps/runner:production-database-principals-cli` object (`:307-314`), append EXACT
+`{"component": "apps/runner:hosted-provider-set-publish-cli", "sourceFile": "apps/runner/src/hosted-provider-set-publish-cli.ts", "environmentKey": "MIGRATION_DATABASE_URL", "purpose": "HOSTED_PROVIDER_SET_PUBLICATION", "binding": "WIRED", "condition": "package script hosted:publish-provider-set"}`
+(one member per line, 2-space nesting as its neighbours). No other file, principal, role, grant or migration changes.
+Done when: the same command prints `passed=2 failed=0`; `python3 -c 'import json,sys; json.load(open(sys.argv[1]))'
+docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json` exits 0; the C3 command's
+`tests/architecture:723:6` pair holds with exactly V2's six failing names. RED when omitted: the pair case at `:600`
+(architecture 722/7, measured 2026-09-25 16:33, `probes/ARCH-FIX-PES-S01-p3/lane-C3.out`). Reference edits:
+`probes/ARCH-FIX-PES-S01-p3/proposed/s01-27-test.diff` and `s01-27-manifest.diff`, applied by `apply_s01_27.py` to a mirror of
+the lane (probe q2: `1/2` → `0/2` → `2/2`; mutants m1 `binding "DEVELOPMENT_ONLY"` and m2 manifest-only each `1/2`).
+
+**S01-20 · EXIT · C3.** (1) the C3 command, three runs, each `CLUSTER_GREEN`; (2) V5's typecheck delta prints exactly
+`apps/ui/lib/v3/answerExport.ts`; (3) `git -C <lane> diff --stat 776359c3 -- apps/runner/src/dev-provider-set-publish-cli.ts
+apps/runner/src/dev-deployment-register.ts packages/register/src/configured-provider-set.ts packages/register/src/register-publication.ts
+packages/providers/src/index.ts apps/api/src/main.ts apps/runner/src/main.ts` prints nothing; (4) S01-15's five greps
+print `0` on `apps/runner/src/hosted-provider-set-publish-cli.ts`; (5) (Revision 3) `git -C <lane> diff --numstat 776359c3 --
+docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json` prints `8	0	…` and
+`git -C <lane> diff --numstat 776359c3 -- tests/architecture/p3-production-database-principals.test.ts` prints `11	0	…`
+(additions only; measured on the reference edits with `git diff --no-index --numstat`: 8/0 and 11/0), and `grep -c 'hosted-provider-set-publish-cli' ` on each of
+the two files prints `2` (manifest: component + sourceFile) and `3` (test: list 1's component + sourceFile, list 2's row).
+
+### S01-C4 — the operator acceptance (R1.12)
+
+**S01-21 · TEST (RED) · the acceptance suite and a stub.** Create `acceptance/pes-s01-publish-set-acceptance.test.ts`
+(9 cases) and a STUB `acceptance/pes-s01-publish-set-acceptance.ts` exporting S01-22's names with their final
+types, `PES_S01_CASES` empty, and `runPesS01PublishSetAcceptance` and `buildPesS01RoleSeedRows` whose bodies are
+`throw new TypeError("PES_S01_NOT_BUILT")`. No literal register version above 4 in this file (the census,
+`tests/architecture/register-support-publication.test.ts:573-579`, covers `acceptance/`): a fake receipt's version is
+written `(4n + 1n).toString()`. `FAKES` = `startDatabase` → `{ connectionString: "postgresql://u:p@127.0.0.1:60001/x",
+pool: {}, stop: <spy> }`, `seedVersion4` → `32`, `seedRoleRows` → `(4n + 2n).toString()`, `writeRoster` → `"/r.json"`,
+`print` → pushes to an array, and `runPublishCommand` → for each case in order the result that case expects (a
+refusal case: `exitCode` 1, `stdout` `""`, `stderr` its line + `\n`; `published`: `exitCode` 0, `stderr` `""`,
+`stdout` = `PES_S01_EXPECTED_RUNNER_LINE` + `\n` + `PES_S01_EXPECTED_API_LINE` + `\n` +
+`"PES_HOSTED_PROVIDER_SET_RECEIPT_V1=" + JSON.stringify({ registerVersion: (4n + 1n).toString(), rowCount: 32, snapshotSha256: "a".repeat(64) })` + `\n`);
+each case below overrides one fake.
+- **K1** `the operator command prints §5's lines in order and ends PES-S01-ACCEPT: PASS` — spawn `process.execPath` with `["--import", <tsx>, "acceptance/pes-accept-publish-set.ts"]`, `cwd` the product root, `env` `{ PATH, HOME }` → exit 0; stdout is EXACTLY 14 lines: [0] matches `^PES-S01 SCRATCH-DB port=(\d+) seeded-version=4 rows=32$`; [1] `PES-S01 CASE not-hosted PES_PUBLISH_SET_NOT_HOSTED:local`; [2] `PES-S01 CASE roster-invalid PES_PUBLISH_ROSTER_INVALID:vendor:a`; [3] `PES-S01 CASE base-row-absent PES_PUBLISH_BASE_ROW_ABSENT:999`; [4] `PES-S01 CASE unvetted PROVIDER_VENDOR_NOT_VETTED:vendor:a`; [5] `PES-S01 CASE targets-rejected PES_PUBLISH_SET_TARGETS_REJECTED:PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID`; [6] `PES-S01 CASE published`; [7] the RUNNER line; [8] the API line; [9] matches `^PES_HOSTED_PROVIDER_SET_RECEIPT_V1=\{"registerVersion":"([1-9][0-9]*)","rowCount":32,"snapshotSha256":"[0-9a-f]{64}"\}$` with `BigInt(<group 1>) > 4n`; [10] matches `^PES-S01 ROLE-SEED version=([1-9][0-9]*)$` with `BigInt(<its group 1>) > BigInt(<[9]'s group 1>)`; [11] `PES-S01 CASE role-provider-dropped PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef`; [12] `PES-S01 SCRATCH-DB STOPPED`; [13] `PES-S01-ACCEPT: PASS` (all EXACT but [0], [9] and [10]); neither stream contains `Bearer`. (Probe d1 printed these 14 lines with ROLE-SEED `version=6`; mutants m1, m2, m4 of probe d5 each end `PES-S01-ACCEPT: FAIL role-provider-dropped`.)
+- **K2** `the scratch server was never a NO-TOUCH port and is gone after the run` — K1's port `p`: `p > 4400`; `p` not in `3000, 3001, 4310, 8790, 8791, 8792, 8793, 8795, 8796, 55432`; a TCP connect to `127.0.0.1:p` fails with `ECONNREFUSED`.
+- **K3** `a case that does not hold still stops the database, names that case and resolves 1` — `FAKES` with `runPublishCommand` → `{ exitCode: 1, stdout: "", stderr: "SOMETHING_ELSE\n" }` from the third call on → resolves `1`; the printed lines include `PES-S01 SCRATCH-DB STOPPED`; the last printed line EXACT `PES-S01-ACCEPT: FAIL base-row-absent`; `stop` called exactly once.
+- **K4** `a throw mid-run and a seed failure still stop the database and resolve 1` — (a) `runPublishCommand` throws on its second call → resolves `1`, last line EXACT `PES-S01-ACCEPT: FAIL roster-invalid`, `stop` once; (b) `seedVersion4` rejects → resolves `1`, last line EXACT `PES-S01-ACCEPT: FAIL scratch-db`, `stop` once.
+- **K5** `the operator runs the acceptance as pnpm pes:accept-publish-set` — `package.json` `scripts["pes:accept-publish-set"]` EXACT `tsx acceptance/pes-accept-publish-set.ts`.
+- **K6** `a scratch database that cannot start ends UNVERIFIED and the process exits 1` (Revision 2; SPEC-v5 §5 step 6, V-12/V-13; measured on the entry's twin `proposed/p8-acceptance-dry-run.ts`, probe d6) — spawn as K1 with `env` `{ PATH, HOME, TMPDIR: "/nonexistent/pes-s01-k6", TSX_DISABLE_CACHE: "1" }` (tsx keeps its cache under TMPDIR; §1 R2 row) → exit code EXACT `1`; `stderr` `""`; stdout is EXACTLY one line matching `^PES-S01-ACCEPT: UNVERIFIED ENOENT: no such file or directory, mkdtemp '/nonexistent/pes-s01-k6/debateai-s00-postgres-[A-Za-z0-9]{6}'$` (`tests/support/testDatabase.ts:84`'s `mkdtemp` throws before any server starts). The entry that ends with `process.exitCode = 1` instead of `process.exit(1)` exits `0` here (probe d6, mutant m3) — K6 is the case that sees the exit code of a non-PASS run.
+- **K7** `the role seed rows are R1.12's two rows plus the other 15 required rows` (Revision 2; SPEC-v5 R1.12, V-15) — `buildPesS01RoleSeedRows()` has 17 rows; the set of its `rowKey`s equals the set of `ALGORITHM_REGISTER_ROW_KEYS` (`packages/register/src/algorithm-policy.ts:87`); its `synthesizerRoleRef` row `toStrictEqual` EXACT `{"rowKey":"synthesizerRoleRef","valueJsonText":"{\"kind\":\"SYNTHESIZER_ROLE_REF\",\"providerRef\":\"vendor:a\",\"provisional\":true}","sourceRef":"provider-env-selection/S01#acceptance-role-rows"}` and its `evaluatorRoleRef` row EXACT the same with `EVALUATOR_ROLE_REF` and `vendor:z` (SPEC-v5 R1.12's values and source ref).
+- **K8** `a role seed that fails is a FAIL of role-provider-dropped, and the database still stops` (Revision 2) — `FAKES` with `seedRoleRows` rejecting `new Error("REGISTER_REQUIRED_ROW_MISSING:envelope:envelopeFormulaInputs")` → resolves `1`; the printed lines include `PES-S01 CASE role-provider-dropped PES-S01-CASE-ERROR` and `PES-S01 SCRATCH-DB STOPPED`; the last printed line EXACT `PES-S01-ACCEPT: FAIL role-provider-dropped`; `stop` once; `runPublishCommand` called 6 times (never for the seventh case). With unchanged `FAKES` the function resolves `0`, prints `PES-S01 ROLE-SEED version=6` before the role case's line and ends `PES-S01-ACCEPT: PASS`.
+- **K9** `a database that cannot start is UNVERIFIED with its own error on one line, and nothing is stopped` (Revision 2; SPEC-v5 §5 step 6) — `FAKES` with `startDatabase` rejecting `new Error("EMBEDDED_POSTGRES_PROVISIONING_FAILED\nsecond line")` → resolves `1`; the printed lines are EXACTLY `["PES-S01-ACCEPT: UNVERIFIED EMBEDDED_POSTGRES_PROVISIONING_FAILED second line"]`; `seedVersion4` and `runPublishCommand` 0 calls.
+Done when: `LOG=<abs> zsh $RS acceptance/pes-s01-publish-set-acceptance.test.ts:9:0` prints `passed=0 failed=9`.
+
+**S01-22 · PROD · the acceptance function.** Write `acceptance/pes-s01-publish-set-acceptance.ts` from
+`probes/ARCH-FIX-PES-S01-p2/proposed/pes-s01-publish-set-acceptance.ts` (sha256 `24cbb2c7512d086a…`): `PES_S01_ELEMENT_E`
+(SPEC-v5 §5's E, `SPEC-v5.md:290`), `PES_S01_CASES` (§5's SEVEN cases in the table's order, `role-provider-dropped`
+last), `PES_S01_ROLE_ROWS` and `PES_S01_ROLE_ROWS_SOURCE_REF` (R1.12's two rows and source ref), `buildPesS01RoleSeedRows()`
+(K7's 17 rows: R1.12's two plus every other `buildAlgorithmRegisterRows` row, `deploymentSourceRef` the R1.12 source ref,
+`providerFamilies` `[{ familyRef: "acme", providerRefs: ["vendor:a"] }]` — SPEC-v5 R1.12, V-15),
+`PES_S01_EXPECTED_RUNNER_LINE`, `PES_S01_EXPECTED_API_LINE`, `PES_S01_NO_TOUCH_PORTS`, the dependency types (with
+`seedRoleRows(pool, version): Promise<string>`), and `runPesS01PublishSetAcceptance(dependencies): Promise<0 | 1>` —
+starts the database, and when that rejects prints ONLY `PES-S01-ACCEPT: UNVERIFIED ` + the error's message with every
+line break read as one space, and resolves `1` (nothing to stop); else seeds it, prints the SCRATCH-DB line, runs every
+case with `{ ...baseEnvironment, REGISTER_VERSION: "4", MIGRATION_DATABASE_URL, DEBATEAI_DEPLOYMENT_MODE: "hosted",
+PROVIDER_HOSTED_ROSTER_PATH, ...case.environment }`, prints one line per refusal case (`PES-S01 CASE <name> <the last
+stderr line>`) and the `published` block; before `role-provider-dropped` it calls `seedRoleRows(pool, <the published
+receipt's registerVersion>)`, prints `PES-S01 ROLE-SEED version=<the version it resolves>`, and runs that case with
+`REGISTER_VERSION` = that version (a seed that rejects, or no published version, prints
+`PES-S01 CASE role-provider-dropped PES-S01-CASE-ERROR` and fails the case); it names the FIRST case that did not hold
+(`scratch-db` for a failure before the cases), and in `finally` stops the database and prints
+`PES-S01 SCRATCH-DB STOPPED`; the last printed line is `PES-S01-ACCEPT: PASS` (resolves `0`) or
+`PES-S01-ACCEPT: FAIL <name>` (resolves `1`).
+Done when: K3, K4, K7, K8, K9 pass. RED when omitted: K1, K2, K3, K4, K6, K7, K8, K9.
+
+**S01-23 · PROD · the acceptance entry.** Write `acceptance/pes-accept-publish-set.ts` from
+`probes/ARCH-FIX-PES-S01-p2/proposed/pes-accept-publish-set.ts` (sha256 `c4f64236842be3d3…`), its imports relative
+(`../tests/support/registerFixtures.js`, `../tests/support/testDatabase.js`, `./pes-s01-publish-set-acceptance.js`):
+`console.info` and `console.log` silenced from before `startTestDatabase()` until after `stop()` and restored after
+(`tests/support/testDatabase.ts:103`, `:107` write the embedded server's routine lines there, and that is stdout);
+the acceptance's own lines written with `process.stdout.write`; children spawned as S01-16's helper does with
+`env` = `PATH`, `HOME`, `TMPDIR` (when set) + the case keys; `seedRoleRows` =
+`(await publishReplacementRegisterFixture(pool, parseRegisterVersionText(version), buildPesS01RoleSeedRows(),
+PES_S01_ROLE_ROWS_SOURCE_REF)).registerVersion` (`tests/support/registerFixtures.ts:70`); rosters written `0600` into a
+`mkdtemp` directory made at the FIRST roster (so a database that cannot start is the first failure, K6) and removed in
+`finally` when made; and it ENDS with `await new Promise<void>((resolve) => { process.stdout.write("", () => resolve()); });
+process.exit(<the code the function resolved>)` — never `process.exitCode`, which `async-exit-hook`'s `beforeExit`
+listener overwrites with 0 (§1 R2 row, probe d3). Done when: K1, K2, K6 pass. RED when omitted: K1, K2, K6.
+
+**S01-24 · PROD · the acceptance script.** In `package.json`, as the line after S01-19's
+`"hosted:publish-provider-set"` line, insert `    "pes:accept-publish-set": "tsx acceptance/pes-accept-publish-set.ts",`.
+Done when: K5 passes. RED when omitted: K5.
+
+**S01-25 · EXIT · C4.** (1) the C4 command, three runs, each `CLUSTER_GREEN`; (2) V5's typecheck delta prints exactly
+`apps/ui/lib/v3/answerExport.ts`; (3) once, as SPEC-v5 §5 step 2 types it: `pnpm pes:accept-publish-set > <abs log> 2>&1;
+echo "exit=$?"` prints `exit=0`, the log's last line is EXACT `PES-S01-ACCEPT: PASS`, its fourth-from-last line matches
+`^PES-S01 ROLE-SEED version=[1-9][0-9]*$`, and `grep -c Bearer <abs log>` prints `0`.
+
+## 7. Refutation — what each criterion catches, and one thing it does not
+
+| step | catches | does NOT catch |
+|---|---|---|
+| S01-01 | a reader returning an unlisted key, returning an unset key as present, or absent from the package entry | a reader that also logs the values it returns |
+| S01-02 | the function missing, unfrozen, or projecting the wrong keys | the roster key written into its doc comment (S01-05's grep and H3 catch that) |
+| S01-03 | the re-export missing | the re-export placed in another export block of the same file (harmless) |
+| S01-04 | an edited copy of ADR-0027 | the ADR's claims going stale as the loader changes |
+| S01-05 | an environment read outside the loader, and any other whole-tree law the new code trips | a new failure offset by a fixed one inside the directory pair (V2 compares the six names) |
+| S01-06 | a suite that cannot fail (37 of 37 red against the stub) | a case that passes for the wrong reason once real code lands (the refutation rows below) |
+| S01-07 | a prefix or source-ref typo (E3, G9 EXACT) | nothing further: the step is four literals |
+| S01-08 | a dropped gate rule (A2–A7), the wrong element named, the parser's message reaching the refusal (A8), a retyped kind list (A9) | a `provider_ref` holding a newline printed raw into a refusal (Review Focus 5) |
+| S01-09 | a missing rename (B1), a defaulted vetting member (B2), reordering (B3) | wrongly typed values — the shipped builder refuses them (G7 pins one) |
+| S01-10 | the wrong credential-path source (C1), an extra key such as `maker` (C2), reordering | every parser code for a price or model value (G8 pins two codes, not all) |
+| S01-11 | the development namespace reused or the version bits wrong (D1), the suffix doubled (D2, G11) | a snapshot computed over the wrong rows (G9's EXACT id catches it through the fake) |
+| S01-12 | extra receipt members, key order, the development prefix (E2) | how a receipt is consumed — no reader of it ships |
+| S01-13 | the hosted test inverted, the resolver's codes wrapped | a `NODE_ENV` inference added elsewhere (I13 pins production admits hosted) |
+| S01-14 | any permutation of the seven checks (G1–G5 call counts; G16 for step (6) after (4) and (5); G13's 0 calls for (6) before (7)), `deployment: "local"` (G9), the floor read from the roster (G10), a missing strip (G11), the API value skipped (G8) | a real query reading the wrong version — the ports are fakes (I9, I14 catch it) |
+| S01-15 | R1.1's type drifting (under `tsc`), whole-tree laws on the library | runtime wiring (C3) |
+| S01-16 | a suite that cannot fail (16 of 16 red without the entry); a role check that exists in the library but reads a different row set than the real query returns (I15, I16) | a slow or hanging child — a hang surfaces as Vitest's 120 s timeout, not as a named refusal |
+| S01-17 | a walk or grep that cannot fail (the positive controls in H2 and H3) | a `dev-` module reached only through a dynamic import with a computed specifier |
+| S01-18 | an environment-key typo, a stream swap, the wrong exit code, the database input read before the gate (I1, I3), the wrong version read (I9, I14), a credential file opened and echoed (I10), a `dev-` import (H2), the roster key read elsewhere (H3) | a pool left open on success — the process exits and no case observes `end()` |
+| S01-19 | a script name or path typo (H4) | the script run through pnpm — only V10 and S01-25 do that |
+| S01-20 | an edit to a dev file, the builder, the port, the parser or a service main | an edit to a path outside that list (V9 catches it) |
+| S01-21 | a suite that cannot fail (9 of 9 red against the stub) | a case line printed twice (K1 counts fourteen lines, so it is caught — the miss is a line printed to stderr instead, which K1 does not read) |
+| S01-22 | a case-table typo (K1 EXACT), the wrong case named on FAIL (K3, K8), `stop()` skipped on a failure (K3, K4, K8), a FAIL or UNVERIFIED that resolves 0 (K3, K4, K8, K9), an UNVERIFIED error split over two lines (K9), the role seed of exactly two rows (K7; probe d5 m4) | a child that never exits (Vitest's timeout, not a named case) |
+| S01-23 | the embedded server's lines on stdout (K1 line [0]), the wrong command path (K1), the port rules (K2), `process.exitCode` in place of `process.exit` (K6; probe d6 m3 exits 0), a roster directory made before the database start (K6 then fails on the roster `mkdtemp` first) | the scratch roster directory left behind — no case observes the `rm`; a FAIL run's exit 1 through the entry (K6 covers UNVERIFIED; FAIL shares the same `process.exit` line) |
+| S01-24 | a script typo (K5) | pnpm's own lines around the output (the V-ROW) |
+| S01-25 | the path V types, through pnpm, with `echo "exit=$?"` | pnpm versions other than 11.20.0 printing other lines |
+| S01-26 | a role check that is missing (G13–G15; probe d5 m1), refuses whenever a role row exists (G12, and K1 line [11] would print `synthesizerRoleRef`; probe d5 m2), reads only the first row, or compares against `maker` instead of `provider_ref` (G12's `vendor:b`) | a role row whose `providerRef` names a roster provider that the parser later drops — impossible here, the self-check (5) runs before (6) and refuses first |
+| S01-27 | the hosted entry's pool undeclared (the pair case `:600`, 722/7 — C3-F1), declared under the wrong file (pair case; `pair_check.py` mutant), with a non-executable binding such as `REQUIRED_NOT_WIRED` (pair case) or as `DEVELOPMENT_ONLY` (the inventory case's list 1; probe q2 m1), in the manifest but not in the audit's lists or the reverse (probe q2 m2 / s1) | a declaration under the WRONG principal with the right file, key and binding — e.g. under `api-runtime` — passes the pair case and the sorted list (neither names a principal); V14's `roleName` print sees it, and whether the inventory case's per-principal checks see it was not measured |
+
+**Mutant classes each cluster command detects.** C1: export presence and identity; key projection; mutability; an
+environment read outside the loader (the directory pair's scaffold case). C2: gate-rule deletion; wrong suffix;
+parser-message leakage; renaming and key allow-list drift; namespace and bit mutations; suffix doubling; receipt
+shape; mode inversion; permutation of the seven checks; the deployment literal; the floor's source; a role check
+missing, over-eager or reading one row (G12–G16). C3: environment-key
+names; the stream and exit contract; ordering against the database; version selection in SQL; credential-file reads;
+`dev-` imports; roster-key placement; the script line; edits to protected files (git diff); the role check against
+the real base rows (I15, I16). C4: the acceptance's lines and order; `stop()` on every exit path; stdout hygiene; port
+rules; the script line; the role seed's row set (K7); the exit code of PASS (K1), of FAIL (K3, K4, K8, function) and of
+UNVERIFIED (K9 function, K6 through the entry).
+
+## 8. Review Focus — five inputs the SPEC implies and no requirement's own example exercises
+
+1. **A roster with a JSON syntax error beside a credential path.** V8 quotes the source around the error (probe p1:
+   `..."ion_file":/etc/debat"...`), so printing the parser's message would put a credential file path in a refusal
+   (R1.9). Pinned: A8, I4.
+2. **The VPS runs the command with `NODE_ENV=production`.** `loadMigrationEnvironment` then applies the TLS floor to
+   `MIGRATION_DATABASE_URL` (`runtime-environment.ts:379-386`), which admits a loopback host (`:358-367`); the
+   acceptance runs with `NODE_ENV` unset. Pinned: I13.
+3. **The operator re-runs after a success.** Identical inputs replay the first receipt (probe p2). Pinned: I12.
+4. **The operator forgets to move `REGISTER_VERSION`.** A changed roster on an old base publishes a new version built
+   on that base (probe p2: base 4 after the head reached 5 → version 6); the shipped port has no head check and the
+   census bans latest-version reads, so the command publishes from the NAMED base and the receipt is the operator's
+   evidence. Pinned: I14 (`base_register_version` = 4). S03's §11 is where the operator reads it (V12(c)).
+5. **A `provider_ref` carrying a newline in a refused roster.** SPEC-v5 R1.2 (unchanged from v3) prints the ref raw after
+   `PES_PUBLISH_ROSTER_INVALID:`, so the refusal spans two stderr lines; the shipped parser refuses such a ref at step
+   (5) when no gate rule fires first. Not pinned by a case: the SPEC's rule is followed as written; REV reads it.
+6. **(Revision 2) A hosted publication on a base that already carries the algorithm rows.** Such a base has the
+   register's `algorithm` profile, and the new version inherits it, so the database requires all 17 rows on the hosted
+   version too (`migrations/0061_algorithm_publication_profiles.sql:17-28`); the command carries every row forward, so
+   it publishes (probe d4: 49 → 49). Pinned: I16.
+
+## 9. Findings measured at ARCH — for the orchestrator and REV(S01)
+
+- **F1 · The SPEC's verification surface misses the two suites that hold every new file.** The source-rule audit
+  (`tools/orphan-audit/src/index.ts:671-698` via `tests/architecture/scaffold.test.ts:68`) and the SQL census
+  (`tests/architecture/register-support-publication.test.ts:492-587`) are not among the intake's 36; a `process.env`
+  in the new command passes all 36 and fails only there. Remedy in this plan: the whole directory in every cluster
+  command (§3) and V2's six-name comparison.
+- **F2 · SPEC-v3/v4 R1.13 (unchanged) plus the audit leave no house-pattern way to read the roster key.** Remedy: ADR-0027,
+  S01-02/S01-03.
+- **F3 · `startTestDatabase()` writes to stdout** (`tests/support/testDatabase.ts:103`, `:107`); without S01-23's
+  silencing, §5 step 3's first line is `[S00 DB] Testcontainers DEFERRED BY DR-121; …`. Probe p8 shows the silenced
+  stdout: exactly the twelve lines (Revision 2: fourteen, probe d1).
+- **F4 · pnpm 11.20.0 adds lines §5 does not list** — the echo on stderr (first in step 2's `2>&1` log) and, on a
+  failed run, `[ELIFECYCLE] Command failed with exit code 1.` on stdout after the FAIL line. Routed as a `V-ROW: NEW`,
+  transcribed as V-13; V RULED 2026-09-25 (V-12/V-13 "Exit 1 on FAIL"): SPEC-v5 §5 steps 2, 3, 6 allow both lines and
+  bind exit 0 / 1 / 1 on PASS / FAIL / UNVERIFIED.
+- **F5 · V8's `JSON.parse` messages quote the input** (probe p1) — a class for every command that parses operator
+  JSON beside a secret path; this slice's member is fixed by A8/I4.
+- **F6 · The lane borrows its third-party modules** from `.worktrees/i18n-turn12` through a `.pnpm` symlink (§1).
+- **F7 · Measured, not built:** the shipped `publishGeneral` accepts a stale base (probe p2); the census forbids the
+  latest-version read a head check would need.
+- **F8 · Executed here, which no review had executed** (`reviews/REQ-REV-p3.md:113-122`): the embedded PostgreSQL
+  started, `importHistorical` and `publishGeneral` called (p2), and §5 run end to end with this plan's reference code
+  (p8: twelve lines, PASS, the port refused after, `:55432` PID 19920 unchanged). `pnpm pes:accept-publish-set` itself
+  does not exist until S01-24; V10 runs it.
+- **F9 · (Revision 2, CONTESTED) SPEC-v4 R1.12's role seed cannot publish as worded.** Two role rows added through
+  `publishReplacementRegisterFixture` give the new version the register's `algorithm` profile, and the database then
+  requires all 17 rows of its required-row manifest: `REGISTER_REQUIRED_ROW_MISSING:envelope:envelopeFormulaInputs`
+  (`migrations/0061_algorithm_publication_profiles.sql:17-28`, `migrations/0050_t16_algorithm_register_rows.sql:31-46`,
+  `:88`; probe d2, on base 5 AND on base 4). REQ-FIX p4 left it UNVERIFIED ("read, not run"). Routed as a `V-ROW: NEW`
+  in `DECISIONS.md`; C4 is planned on its recommended default (R1.12's two rows unchanged, plus the other 15 rows from
+  the shipped `buildAlgorithmRegisterRows`; probe d4 and d1 PASS). Class swept: every write this plan makes to a
+  scratch register — the v4 seed (`importHistoricalRegisterFixture`: version 4 has no profile, p2/d1 publish), the hosted
+  publication (carries every base row; d1, d4), the role seed (the member that fails), and I15/I16's seeds (built from
+  the same 17 rows) — 1 of 4 members failed, and it is the SPEC-worded one.
+- **F10 · (Revision 2) `process.exitCode` does not survive the embedded database.** `embedded-postgres` registers
+  `async-exit-hook`, whose `beforeExit` listener calls `process.exit(0)`: the pass-1 entry (`process.exitCode = passed ?
+  0 : 1`) exits 0 on FAIL (probe d3; d5 m3; d6 m3) — V-12/V-13's rule would be false on every failing run while every
+  pass-1 case stayed green (pass-1 K1 asserted exit 0 on PASS only). Remedy: S01-23 ends with a flushed `process.exit`;
+  K6 pins it end to end. Class swept: every entry this slice writes — the publish CLI (no `embedded-postgres` in its
+  graph, H2/p6; `process.exitCode` is safe, I1–I7 assert 1) and the acceptance entry (the member that fails).
+- **F11 · (Revision 3) C3-F1 — the plan never named the production-principals audit for the new entry's pool.**
+  `tests/architecture/p3-production-database-principals.test.ts:582-600` pairs every `createPool` file under
+  `apps/{api,runner,scheduler}/src` with its `…DATABASE_URL` tokens and requires the P3-01 manifest to declare each pair;
+  S01-18 put `createPool(loadMigrationEnvironment().MIGRATION_DATABASE_URL)` in a new such file, so BUILD S01-C3 went
+  722/7 with every S01 case green (`probes/BUILD-PES-S01-C3/S01-20-GREEN-attempt-1.log:2176-2200`; re-measured here,
+  `probes/ARCH-FIX-PES-S01-p3/lane-C3.out`). Pass 1 ran the whole `tests/architecture` directory at base and relied on it
+  to catch whole-tree laws (F1) — it does, but only at BUILD, because at base the file did not exist: a law over files a
+  plan CREATES is invisible to a base run. Remedy: S01-27. Class swept ("a registry test that enumerates source files
+  and must list a file this slice adds"), member by member: (1) the P3-01 pair audit — the entry CLI: FAILED (fixed by
+  S01-27); the library `apps/runner/src/hosted-provider-set.ts`: not a member (no `createPool`; `pair_check.py` 19 = 19
+  after S01-27); `acceptance/*`: not scanned. (2) the shipped-corpus oracle `tests/unit/s1-1-depth-contract.test.ts`
+  (`tests/support/shipped-corpus.manifest.txt`, roots `packages`, `apps`, `web`; `:298`): RED at base `776359c3` too
+  (1009 passed, 1 failed: `added` = 3 dev UI paths), and this slice adds exactly 2 names to that `added` list —
+  `apps/runner/src/hosted-provider-set.ts` (C2, committed) and `apps/runner/src/hosted-provider-set-publish-cli.ts` (C3)
+  (`probes/ARCH-FIX-PES-S01-p3/q1-*.log`). NAMED, NOT FIXED: it is outside C3-F1, `tests/support/**` is in §5's
+  "must NOT touch", and the suite is in neither the intake's 36 nor any cluster command — routed to the orchestrator.
+  (3) `tools/orphan-audit` (scaffold) and the other whole-tree scanners of `tests/architecture`: green for both files
+  (only V2's six names plus the p3 pair case fail, `lane-C3.log`).

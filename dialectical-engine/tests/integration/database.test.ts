@@ -54,13 +54,19 @@ import {
   type PreservedConditionMarkRecord,
   type ServeGateResult
 } from "@debateai/serve";
-import { AnswerSchema } from "@debateai/contract";
-import type { ServedRootRuleHistory } from "@debateai/kernel";
+import {
+  AnswerSchema,
+  PLAN_TIER_ROSTERS,
+  type AskRequest,
+  type Session
+} from "@debateai/contract";
+import { argumentLanguageDirective, type ServedRootRuleHistory } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
   PostgresAskApplication,
-  type AskApplication
+  type AskApplication,
+  type RunCreationSettings
 } from "@debateai/api";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
@@ -438,6 +444,12 @@ async function startProviderDouble(
   // classes stay in the vocabulary so a fixture that still scripts one is
   // dispatched rather than silently served a judgement.
   type ResponseClass = "JUDGE" | "REVIEW" | "COMPOSE" | "CONFORMANCE" | "R9" | "EVALUATOR" | "GENERAL";
+  const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
+    argumentLanguageDirective("\u0000")
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace("\u0000", "[^.]+?"),
+    "gu"
+  );
   const classifyContent = (content: ProviderDoubleResponse): ResponseClass => {
     if (typeof content !== "string") return "GENERAL";
     try {
@@ -477,6 +489,15 @@ async function startProviderDouble(
       const body = Buffer.concat(chunks).toString("utf8");
       bodies.push(body);
       const askedModel = requestedModel(body);
+      // S-LANG: every packet's instruction now ends with the argument-language
+      // directive, which NAMES the machine-consumed identifiers it protects
+      // (`fatalFlags[].type`, `served_number_refs`, …). Those bare identifiers are
+      // exactly what the discriminators below key on, so the directive is
+      // removed from the text under test before any branch reads it — the
+      // discriminators keep measuring the CONTRACT, never the directive.
+      const primaryContract = ((JSON.parse(body) as {
+        messages: readonly { role: string; content: string }[];
+      }).messages[0]?.content ?? "").replace(ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN, "");
       // J12 coherence (T3/S2-2): every M>=2 fixture below now runs a judge panel, so
       // each authored node draws one assess call per non-author maker. Those legs are
       // answered FROM THE CONTRACT and never consume `pending`, so every fixture's
@@ -492,7 +513,7 @@ async function startProviderDouble(
       // WITHOUT the judge's `restatement_text` — a negative pinned by
       // `tests/unit/t03-judge-panel.test.ts`. Bare identifiers survive the JSON
       // encoding that defeats a quoted fragment (T3 N4, below).
-      if (body.includes("fatalFlags") && !body.includes("restatement_text")) {
+      if (primaryContract.includes("fatalFlags") && !primaryContract.includes("restatement_text")) {
         calls += 1;
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `panel-assess-${calls}`,
@@ -509,12 +530,12 @@ async function startProviderDouble(
       // because an evaluator request carries the candidate statement, not the
       // segment contract. Without this the evaluator was handed whatever sat at
       // the head of the queue — a judgement — and failed its own schema.
-      const requestKind: ResponseClass = body.includes("edge_bearings") ? "REVIEW"
-        : body.includes("restatement_text") ? "JUDGE"
-          : body.includes("fairness_to_losers") ? "EVALUATOR"
-            : body.includes("conforms,findings") ? "CONFORMANCE"
-              : body.includes("{pass}") ? "R9"
-                : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+      const requestKind: ResponseClass = primaryContract.includes("edge_bearings") ? "REVIEW"
+        : primaryContract.includes("restatement_text") ? "JUDGE"
+          : primaryContract.includes("fairness_to_losers") ? "EVALUATOR"
+            : primaryContract.includes("conforms,findings") ? "CONFORMANCE"
+              : primaryContract.includes("{pass}") ? "R9"
+                : primaryContract.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
       const matching = requestKind === "GENERAL" ? -1 : pending.findIndex((entry) => entry.kind === requestKind);
       const selected = pending.splice(matching < 0 ? 0 : matching, 1)[0];
       // T5/S3-1: a review response must measure exactly the edges THIS call
@@ -686,6 +707,81 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await database?.stop();
+});
+
+describe("S-LANG argument language persistence", () => {
+  it("stores Romanian detected from question_line through PostgresAskApplication.submit", async () => {
+    const askerId = `asker:slang:${randomUUID()}`;
+    const panel = PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({
+      provider_ref: `provider:slang:${String(index + 1)}`,
+      maker: `maker:slang:${String(index + 1)}`,
+      model_id: modelId,
+      probe_evidence_ref: randomUUID(),
+      probed_at: "2026-09-22T00:00:00.000Z"
+    }));
+    const settings: RunCreationSettings = {
+      strangerSampleRate: 0,
+      registerVersion: 1,
+      batteryVersion: "slang-test",
+      settlementWatchHandle: "slang-test",
+      resolveDiscoveredPanel: async () => panel,
+      resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 1),
+      resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+        effectiveRiskTier,
+        tierSource: tierSource as "ASKER" | "MACHINE_DEFAULT" | "DEPLOYMENT_POLICY",
+        tierProvenanceRef
+      })
+    };
+    const application = new PostgresAskApplication(
+      database.pool,
+      { dispatch: async () => undefined },
+      settings,
+      undefined,
+      database.pool,
+      createTestAskAdmissionPoolFacades(database.pool)
+    );
+    const ask: AskRequest = {
+      question_line: "Ar trebui ca România să investească mai mult în transportul public, deoarece orașele au nevoie de aer mai curat.",
+      risk_tier: "casual",
+      tier_source: "ASKER",
+      tier_provenance_ref: "asker-declaration:slang",
+      composition_budget_tier: "low",
+      depth_params: { depth: 1 },
+      decision_scope: "S-LANG integration test",
+      as_of: "2026-09-22T00:00:00.000Z",
+      steering_presets: [],
+      plan_tier: "free",
+      steering_annotations: []
+    };
+    const session = {
+      asker_id: askerId,
+      session_id: `session:slang:${randomUUID()}`,
+      caller_scope: "ASKER",
+      ownership_provenance: "user_dev_token",
+      provisional_identity_model: true
+    } as unknown as Session;
+
+    const accepted = await application.submit(ask, session, {
+      kind: "legacy",
+      legacyAskerId: askerId
+    });
+    try {
+      const stored = await database.pool.query<{
+        argument_language_tag: string;
+        argument_language_name: string;
+      }>(
+        `SELECT argument_language_tag,argument_language_name
+         FROM core.run WHERE run_id=$1`,
+        [accepted.run_ref]
+      );
+      expect(stored.rows[0]).toEqual({
+        argument_language_tag: "ro",
+        argument_language_name: "Romanian"
+      });
+    } finally {
+      await database.pool.query("DELETE FROM core.work_item WHERE run_id=$1", [accepted.run_ref]);
+    }
+  });
 });
 
 describe("BUG-01 content-rejection retry accounting", () => {
@@ -4343,6 +4439,8 @@ describe("apps/runner — legal command lifecycle", () => {
         expect(packet.messages[0]?.role, `attempt ${index}`).toBe("system");
         expect(packet.messages[0]?.content, `attempt ${index}`).toContain(EVALUATOR_CONTRACT_TEXT);
         expect(packet.messages[0]?.content, `attempt ${index}`).toContain(EVALUATOR_INSTRUCTIONS);
+        expect(packet.messages[0]?.content, `attempt ${index}`)
+          .toContain(argumentLanguageDirective("the same language as the question"));
       }
 
       const messages = evaluatorCalls[0]!.packet.messages;
@@ -4352,6 +4450,9 @@ describe("apps/runner — legal command lifecycle", () => {
       // inside the one system message. Containment, not byte-equality — see the
       // note on the invariant above.
       expect(system[0]!.content).toContain(EVALUATOR_CONTRACT_TEXT);
+      expect(system[0]!.content).toContain(EVALUATOR_INSTRUCTIONS);
+      expect(system[0]!.content)
+        .toContain(argumentLanguageDirective("the same language as the question"));
       // and it leads the packet, so no earlier instruction can displace it
       expect(messages[0]?.role).toBe("system");
       expect(messages[0]?.content).toContain(EVALUATOR_CONTRACT_TEXT);

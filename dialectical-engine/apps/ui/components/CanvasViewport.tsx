@@ -21,6 +21,8 @@ import {
   type FitPolicyState,
   type Point
 } from "@/lib/canvasViewport";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/translate";
 
 const PASSIVE_FALSE = { passive: false } as const;
 const ZOOM_STEP = 0.1;
@@ -89,6 +91,7 @@ export function CanvasViewport({
   children,
   canvasRef
 }: CanvasViewportProps) {
+  const { catalog } = useChromeI18n();
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const fitStateRef = useRef<FitPolicyState>({
     mode: "column-auto",
@@ -608,12 +611,12 @@ export function CanvasViewport({
       <div
         className="canvasZoomCluster"
         role="group"
-        aria-label="Canvas zoom controls"
+        aria-label={t(catalog, "debateViews.canvasZoomControls")}
       >
         <button
           type="button"
           className="canvasZoomButton"
-          aria-label="Zoom in"
+          aria-label={t(catalog, "debateViews.zoomIn")}
           onClick={() => applyUserZoom(clampZoom(zoom + ZOOM_STEP))}
         >
           +
@@ -621,7 +624,7 @@ export function CanvasViewport({
         <button
           type="button"
           className="canvasZoomButton"
-          aria-label="Zoom out"
+          aria-label={t(catalog, "debateViews.zoomOut")}
           onClick={() => applyUserZoom(clampZoom(zoom - ZOOM_STEP))}
         >
           −
@@ -629,16 +632,16 @@ export function CanvasViewport({
         <button
           type="button"
           className="canvasZoomButton canvasZoomFit"
-          aria-label="Fit whole tree (overview)"
+          aria-label={t(catalog, "debateViews.fitWholeTree")}
           aria-pressed={fitState.mode === "overview-auto"}
           onClick={setOverviewFit}
         >
-          Fit
+          {t(catalog, "debateViews.fit")}
         </button>
         <button
           type="button"
           className="canvasZoomButton canvasZoomOne"
-          aria-label="Reset zoom to 1:1"
+          aria-label={t(catalog, "debateViews.resetZoom")}
           onClick={() => applyUserZoom(1)}
         >
           1:1

@@ -121,6 +121,6 @@ describe.each(surfaces)("S5 rendered session controls — %s", (_name, Controls)
 });
 
 it("mounts the rendered session-control component on the live settings page", async () => {
-  const ui = await readFile(resolve(process.cwd(), "apps/ui/app/settings/page.tsx"), "utf8");
+  const ui = await readFile(resolve(process.cwd(), "apps/ui/components/SettingsPageClient.tsx"), "utf8");
   expect(ui).toContain("<SessionControls");
 });

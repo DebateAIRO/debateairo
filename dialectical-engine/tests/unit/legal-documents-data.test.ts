@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  buildLegalDocument,
   LEGAL_DOCUMENT_SOURCES,
   renderLegalModule
 } from "../../apps/ui/scripts/generate-legal-data.mjs";
@@ -46,11 +47,23 @@ function twoDigit(count: number): string[] {
 describe("legal documents — generated data", () => {
   it("commits exactly what the generator emits from the in-repo drafts", () => {
     expect(LEGAL_DOCUMENT_SOURCES.map((entry) => entry.key)).toEqual(["privacy", "terms"]);
+    expect(LEGAL_DOCUMENT_SOURCES.map((entry) => entry.source)).toEqual([
+      "apps/ui/legal/en/privacy-policy.md",
+      "apps/ui/legal/en/terms-of-service.md"
+    ]);
     for (const entry of LEGAL_DOCUMENT_SOURCES) {
       const markdown = readFileSync(resolve(process.cwd(), entry.source), "utf8");
       const committed = readFileSync(resolve(process.cwd(), entry.output), "utf8");
       expect(renderLegalModule(markdown, entry.key), `${entry.output} is stale`).toBe(committed);
     }
+  });
+
+  it("rejects a leading zero that changes a frozen numbered heading", () => {
+    const markdown = readFileSync(
+      resolve(process.cwd(), "apps/ui/legal/en/privacy-policy.md"),
+      "utf8"
+    ).replace("## 1. Who is responsible", "## 01. Who is responsible");
+    expect(() => buildLegalDocument(markdown, "privacy")).toThrow(/numbered headings/);
   });
 
   describe("Terms of Service", () => {

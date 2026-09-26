@@ -1,0 +1,14 @@
+PES-S01 SCRATCH-DB port=58299 seeded-version=4 rows=32
+PES-S01 CASE not-hosted PES_PUBLISH_SET_NOT_HOSTED:local
+PES-S01 CASE roster-invalid PES_PUBLISH_ROSTER_INVALID:vendor:a
+PES-S01 CASE base-row-absent PES_PUBLISH_BASE_ROW_ABSENT:999
+PES-S01 CASE unvetted PROVIDER_VENDOR_NOT_VETTED:vendor:a
+PES-S01 CASE targets-rejected PES_PUBLISH_SET_TARGETS_REJECTED:PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID
+PES-S01 CASE published
+PES_HOSTED_TARGETS_RUNNER_V1=[{"provider_ref":"vendor:a","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header","input_price_micros_per_million":1000,"output_price_micros_per_million":2000}]
+PES_HOSTED_TARGETS_API_V1=[{"provider_ref":"vendor:a","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/api/providers/acme.header","input_price_micros_per_million":1000,"output_price_micros_per_million":2000}]
+PES_HOSTED_PROVIDER_SET_RECEIPT_V1={"registerVersion":"5","rowCount":32,"snapshotSha256":"579690d7a51248ea486632c347c32ee0dbd99814206f1a5c05d85c7d405931c9"}
+PES-S01 ROLE-SEED version=6
+PES-S01 CASE role-provider-dropped PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef
+PES-S01 SCRATCH-DB STOPPED
+PES-S01-ACCEPT: PASS

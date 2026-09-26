@@ -1,0 +1,54 @@
+[
+  {
+    "table": "primary",
+    "r33": {
+      "PROVIDER_TARGET_PRICE_REQUIRED": [
+        1038
+      ],
+      "PROVIDER_TARGET_PRICE_ZERO": [
+        1039
+      ],
+      "PROVIDER_DISCOVERY_TARGET_PRICE_INVALID": [
+        1040
+      ],
+      "COST_ENVELOPE_POLICY_UNRESOLVED": [
+        1034
+      ],
+      "COST_ENVELOPE_POLICY_INVALID": [
+        1035
+      ],
+      "SUPPORT_ADMISSION_SCOPES_NOT_SEALED": [
+        1037
+      ]
+    },
+    "v8_anywhere": {
+      "RUN_COST_ENVELOPE_MONEY_REACHED": false,
+      "DAILY_COST_ENVELOPE_REACHED": false,
+      "PROVIDER_USAGE_UNREPORTED": false,
+      "COST_ENVELOPE_CHARGE_UNREPRESENTABLE": false
+    }
+  },
+  {
+    "table": "publisher-summary",
+    "r33": {
+      "PROVIDER_TARGET_PRICE_REQUIRED": [
+        1225
+      ],
+      "PROVIDER_TARGET_PRICE_ZERO": [
+        1225
+      ],
+      "PROVIDER_DISCOVERY_TARGET_PRICE_INVALID": [],
+      "COST_ENVELOPE_POLICY_UNRESOLVED": [],
+      "COST_ENVELOPE_POLICY_INVALID": [
+        1228
+      ],
+      "SUPPORT_ADMISSION_SCOPES_NOT_SEALED": []
+    },
+    "v8_anywhere": {
+      "RUN_COST_ENVELOPE_MONEY_REACHED": false,
+      "DAILY_COST_ENVELOPE_REACHED": false,
+      "PROVIDER_USAGE_UNREPORTED": false,
+      "COST_ENVELOPE_CHARGE_UNREPRESENTABLE": false
+    }
+  }
+]

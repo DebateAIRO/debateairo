@@ -62,7 +62,11 @@ test("L3-F5: createServerContractClient never forwards a malformed session cooki
 test("L3-F5: every SSR page reads the session through readSessionCookie, never the raw cookie value", () => {
   for (const page of ["../app/page.tsx", "../app/debate/[id]/page.tsx", "../app/login/page.tsx"]) {
     const source = read(page);
-    assert.match(source, /readSessionCookie\(await cookies\(\)\)/, `${page} uses the guarded reader`);
+    assert.match(
+      source,
+      /const cookieStore = await cookies\(\);[\s\S]*?readSessionCookie\(cookieStore\)/,
+      `${page} uses the guarded reader`
+    );
     assert.doesNotMatch(source, /\.get\(USER_TOKEN_COOKIE\)\?\.value/, `${page} no longer reads the raw value`);
   }
 });

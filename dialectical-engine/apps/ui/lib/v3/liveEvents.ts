@@ -1,5 +1,7 @@
 import { InvestigationGapSchema, type EventType, type InvestigationGap, type RunEvent } from "@debateai/contract";
 import type { DebateNode, Generation } from "../types.js";
+import composeEnglish from "../../messages/en/compose.json" with { type: "json" };
+import { t, type MessageCatalog } from "../i18n/translate.js";
 
 /**
  * UI-01: V3's run-event stream translated onto V2's live-debate vocabulary.
@@ -179,12 +181,17 @@ function liveStatus(lifecycle: LiveNodeState["lifecycle"]): string {
   }
 }
 
-function liveNodeType(relation: string | null, hasParent: boolean): { nodeType: string; label: string | null } {
+function liveNodeType(
+  relation: string | null,
+  hasParent: boolean,
+  catalog: MessageCatalog
+): { nodeType: string; label: string | null } {
   if (!hasParent) return { nodeType: "CLAIM", label: null };
   const normalized = (relation ?? "").toLowerCase();
   if (normalized === "attack" || normalized === "defeat") return { nodeType: "CON", label: null };
   if (normalized === "support") return { nodeType: "PRO", label: null };
-  if (normalized === "shared-crux") return { nodeType: "SHARED-CRUX", label: "Shared crux" };
+  // Same label, same key as the served projection (adapter.ts), in the reader's locale.
+  if (normalized === "shared-crux") return { nodeType: "SHARED-CRUX", label: t(catalog, "compose.v3.sharedCrux") };
   return { nodeType: "CLAIM", label: null };
 }
 
@@ -193,7 +200,12 @@ function liveNodeType(relation: string | null, hasParent: boolean): { nodeType: 
  * settled answer projection exists yet. Text and structure come verbatim from
  * events; the root claim is the question line when known, "" otherwise.
  */
-export function liveTreeFromState(state: LiveRunState, rootId: string, rootClaim: string): DebateNode | null {
+export function liveTreeFromState(
+  state: LiveRunState,
+  rootId: string,
+  rootClaim: string,
+  catalog: MessageCatalog = composeEnglish
+): DebateNode | null {
   if (state.nodeOrder.length === 0) return null;
   const childIds = new Map<string, string[]>();
   const roots: string[] = [];
@@ -211,7 +223,7 @@ export function liveTreeFromState(state: LiveRunState, rootId: string, rootClaim
   const build = (nodeId: string, parentId: string | null, depth: number, position: number, path: string): DebateNode => {
     visited.add(nodeId);
     const live = state.nodes[nodeId]!;
-    const typed = liveNodeType(live.relation, parentId !== null && parentId !== rootId);
+    const typed = liveNodeType(live.relation, parentId !== null && parentId !== rootId, catalog);
     const generation: Generation | null = live.text.length === 0
       ? null
       : { id: "streaming", model_id: "streaming", role: "streaming", argument: live.text, worker_id: "", created_at: "" };

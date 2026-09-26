@@ -85,7 +85,8 @@ function environment(
     HATCHET_TENANT_ID: "11111111-1111-4111-8111-111111111111",
     HATCHET_WORKFLOW_NAME: "debateai-dev",
     HATCHET_TLS_STRATEGY: "none",
-    DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(custodyRoot, "mail")
+    DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(custodyRoot, "mail"),
+    DEBATEAI_DEPLOYMENT_MODE: "local"
   });
 }
 
@@ -226,6 +227,50 @@ describe("DEV-10B production API host process", () => {
       HATCHET_API_URL: "http://127.0.0.1:8988"
     }));
     await apiProcess.stop();
+  });
+
+  it("refuses an environment that names a deployment mode other than local before process start", async () => {
+    const profile = SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE;
+    const test = await fixture(profile);
+    const source = await readFile(test.envPath, "utf8");
+    const hosted = source.replace(
+      "\nDEBATEAI_DEPLOYMENT_MODE=local\n",
+      "\nDEBATEAI_DEPLOYMENT_MODE=hosted\n"
+    );
+    expect(hosted).not.toBe(source);
+    await writeFile(test.envPath, hosted, { mode: 0o600 });
+    const runtime = operations([
+      null,
+      { statusCode: 401, contentType: "application/json", body: '{"error":"SESSION_REQUIRED"}' }
+    ]);
+    await expect(startDevelopmentApiProcess({
+      repositoryRoot: test.root,
+      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
+      operations: runtime,
+      profile
+    })).rejects.toThrow("DEV_API_PROCESS_ENVIRONMENT_INVALID");
+    expect(runtime.startApi).not.toHaveBeenCalled();
+
+    await writeFile(test.envPath, source, { mode: 0o600 });
+    const localRuntime = operations([
+      null,
+      { statusCode: 401, contentType: "application/json", body: '{"error":"SESSION_REQUIRED"}' }
+    ]);
+    const apiProcess = await startDevelopmentApiProcess({
+      repositoryRoot: test.root,
+      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
+      operations: localRuntime,
+      profile
+    });
+    try {
+      expect(apiProcess.receipt.port).toBe(8890);
+      expect(localRuntime.startApi).toHaveBeenCalledTimes(1);
+      expect(localRuntime.startApi).toHaveBeenCalledWith(expect.objectContaining({
+        DEBATEAI_DEPLOYMENT_MODE: "local"
+      }));
+    } finally {
+      await apiProcess.stop();
+    }
   });
 
   it("rejects unsafe or aliased environment custody before process start", async () => {

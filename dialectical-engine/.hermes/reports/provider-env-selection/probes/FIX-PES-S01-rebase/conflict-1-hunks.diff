@@ -1,0 +1,71 @@
+diff --cc dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json
+index 83ffc74ce,67a407f0c..000000000
+--- a/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json
++++ b/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json
+@@@ -337,12 -313,12 +337,21 @@@
+            "condition": "package script db:provision-principals"
+          },
+          {
+++<<<<<<< HEAD
+ +          "component": "apps/runner:hosted-register-publish-cli",
+ +          "sourceFile": "apps/runner/src/hosted-register-publish-cli.ts",
+ +          "environmentKey": "MIGRATION_DATABASE_URL",
+ +          "purpose": "PRODUCTION_REGISTER_PUBLICATION",
+ +          "binding": "WIRED",
+ +          "condition": "package script register:publish-hosted"
+++=======
++           "component": "apps/runner:hosted-provider-set-publish-cli",
++           "sourceFile": "apps/runner/src/hosted-provider-set-publish-cli.ts",
++           "environmentKey": "MIGRATION_DATABASE_URL",
++           "purpose": "HOSTED_PROVIDER_SET_PUBLICATION",
++           "binding": "WIRED",
++           "condition": "package script hosted:publish-provider-set"
+++>>>>>>> c90177f6c (feat(provider-env-selection/S01-C3): add audited hosted publish command)
+          }
+        ]
+      },
+diff --cc dialectical-engine/tests/architecture/p3-production-database-principals.test.ts
+index bfcd5a305,f0b7e08a9..000000000
+--- a/dialectical-engine/tests/architecture/p3-production-database-principals.test.ts
++++ b/dialectical-engine/tests/architecture/p3-production-database-principals.test.ts
+@@@ -357,16 -328,15 +357,28 @@@ describe("P3-01 production database-pri
+              binding: "WIRED",
+              condition: "package script db:provision-principals"
+            },
+++<<<<<<< HEAD
+ +          // Task 14b: the hosted register publication. The migrator is the only
+ +          // principal that can execute register.publish_register_version since
+ +          // 0065 revoked it from debateai_runtime; no new privilege is granted.
+ +          {
+ +            component: "apps/runner:hosted-register-publish-cli",
+ +            sourceFile: "apps/runner/src/hosted-register-publish-cli.ts",
+ +            environmentKey: "MIGRATION_DATABASE_URL",
+ +            purpose: "PRODUCTION_REGISTER_PUBLICATION",
+ +            binding: "WIRED",
+ +            condition: "package script register:publish-hosted"
+++=======
++           // provider-env-selection S01-27: the hosted provider-set publish command, an operator
++           // command run on the VPS as the JIT migrator, like db:provision-principals above.
++           {
++             component: "apps/runner:hosted-provider-set-publish-cli",
++             sourceFile: "apps/runner/src/hosted-provider-set-publish-cli.ts",
++             environmentKey: "MIGRATION_DATABASE_URL",
++             purpose: "HOSTED_PROVIDER_SET_PUBLICATION",
++             binding: "WIRED",
++             condition: "package script hosted:publish-provider-set"
+++>>>>>>> c90177f6c (feat(provider-env-selection/S01-C3): add audited hosted publish command)
+            }
+          ]);
+          continue;
+@@@ -397,7 -369,7 +409,11 @@@
+          { component: "apps/runner:dev-deployment-register-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_REGISTER_SEED", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:seed-register" },
+          { component: "apps/runner:dev-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_PROVIDER_SET_PUBLICATION", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:publish-provider-set" },
+          { component: "apps/runner:production-database-principals-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_PRINCIPAL_PROVISIONING", binding: "WIRED", condition: "package script db:provision-principals" },
+++<<<<<<< HEAD
+ +        { component: "apps/runner:hosted-register-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_REGISTER_PUBLICATION", binding: "WIRED", condition: "package script register:publish-hosted" },
+++=======
++         { component: "apps/runner:hosted-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "HOSTED_PROVIDER_SET_PUBLICATION", binding: "WIRED", condition: "package script hosted:publish-provider-set" },
+++>>>>>>> c90177f6c (feat(provider-env-selection/S01-C3): add audited hosted publish command)
+          { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
+          { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },
+          { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },

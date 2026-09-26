@@ -83,7 +83,8 @@ export async function resolveClaimType(input: { readonly text: string; readonly 
 }
 
 const fatalFlagSchema = z.object({
-  type: z.string().trim().min(1), severity: z.number().min(0).max(1), description: z.string().trim().min(1)
+  type: z.string().trim().regex(/^[A-Za-z][A-Za-z0-9_-]*$/u),
+  severity: z.number().min(0).max(1), description: z.string().trim().min(1)
 }).strict();
 
 export const judgeAssessmentSchema = z.object({

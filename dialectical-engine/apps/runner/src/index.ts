@@ -119,7 +119,15 @@ import {
   type VerdictLabelBasis
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
-import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, exhaustive, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
+import {
+  argumentLanguageDirective,
+  SERVED_ROOT_SELECTION_RULE,
+  TypedDomainError,
+  exhaustive,
+  type CompositionBudgetTier,
+  type ServedRootRule,
+  type WayOfKnowing
+} from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
@@ -135,6 +143,8 @@ export const RUNNER_BRANCHING_FACTOR = ENGINE_BRANCHING_FACTOR;
 export const RUNNER_COMPOSITION_SEGMENT_CAP = ENGINE_COMPOSITION_SEGMENT_CAP;
 export const RUNNER_FIXED_ORGANS_PER_COMPOSITION = ENGINE_FIXED_ORGANS_PER_COMPOSITION;
 export const RUNNER_MAX_RECOMPOSE = ENGINE_MAX_RECOMPOSE;
+
+const machineIdentifierSchema = z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9:._-]*$/u);
 
 /**
  * V-28 (DL4-F2) — WHICH CEILING STOPPED THE RUN, if either did.
@@ -299,10 +309,10 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
 
 const compositionSchema = z.object({
   segments: z.array(z.object({
-    segment_id: z.string().trim().min(1),
+    segment_id: machineIdentifierSchema,
     text: z.string().trim().min(1),
-    node_refs: z.array(z.string().trim().min(1)),
-    served_number_refs: z.array(z.string().trim().min(1))
+    node_refs: z.array(machineIdentifierSchema),
+    served_number_refs: z.array(machineIdentifierSchema)
   }).strict()).min(1).max(RUNNER_COMPOSITION_SEGMENT_CAP, "Composer output exceeds the engine segment cap")
 }).strict();
 // T9 retired the CONFORMANCE and post-compose-R9 organ schemas with the gates
@@ -359,6 +369,56 @@ export const EVALUATOR_PROMPT_CONTRACT: PromptContract = Object.freeze({
   answerForm: EVALUATOR_CONTRACT_TEXT
 });
 
+function promptContractInArgumentLanguage(
+  contract: PromptContract,
+  argumentLanguageName: string
+): PromptContract {
+  return Object.freeze({
+    ...contract,
+    instruction: `${contract.instruction} ${argumentLanguageDirective(argumentLanguageName)}`
+  });
+}
+
+function buildSynthesizerFramedPrompt(
+  request: SynthesizerRequest,
+  argumentLanguageName: string
+): FramedPrompt {
+  return buildFramedPrompt({
+    contract: promptContractInArgumentLanguage(
+      SYNTHESIZER_PROMPT_CONTRACT,
+      argumentLanguageName
+    ),
+    material: toSynthesisPromptMaterial(request)
+  });
+}
+
+export function buildSynthesizerPromptPacket(
+  request: SynthesizerRequest,
+  argumentLanguageName: string
+): PromptPacket {
+  return buildSynthesizerFramedPrompt(request,argumentLanguageName).packet;
+}
+
+function buildEvaluatorFramedPrompt(
+  request: EvaluatorRequest,
+  argumentLanguageName: string
+): FramedPrompt {
+  return buildFramedPrompt({
+    contract: promptContractInArgumentLanguage(
+      EVALUATOR_PROMPT_CONTRACT,
+      argumentLanguageName
+    ),
+    material: toSynthesisPromptMaterial(request)
+  });
+}
+
+export function buildEvaluatorPromptPacket(
+  request: EvaluatorRequest,
+  argumentLanguageName: string
+): PromptPacket {
+  return buildEvaluatorFramedPrompt(request,argumentLanguageName).packet;
+}
+
 // codex r3 B1 part 2: EXPORTED so the schema/prompt agreement check can read the
 // DECLARED criterion keys at runtime rather than scanning this file for them.
 // Adding or renaming a criterion here without editing EVALUATOR_CONTRACT_TEXT is a
@@ -375,7 +435,14 @@ export const evaluatorVerdictSchema = z.object({
     restatement: z.boolean(),
     citation_tracing: z.boolean()
   }).strict()
-}).strict();
+}).strict().superRefine((verdict, context) => {
+  // D2: a localized "none" sentinel (e.g. "niciuna") is a repairable schema
+  // failure. Criteria agreement and objection text stay dev's single
+  // enforcement in serve's assertEvaluatorVerdict.
+  if (verdict.satisfied && verdict.objection !== null) {
+    context.addIssue({ code: "custom", path: ["objection"], message: "a satisfied verdict requires the JSON null literal" });
+  }
+});
 
 /**
  * FAIR-01 (DR-140(b)): the SECOND real maker's leg. When configured, the
@@ -880,6 +947,7 @@ export interface ReviewCatchUpReviewer {
     readonly subjectItemId: string;
     readonly callSiteKey: string;
     readonly questionLine: string;
+    readonly argumentLanguageName?: string;
     readonly statement: string;
     readonly authorMaker: string;
     readonly providerRef: string;
@@ -990,6 +1058,7 @@ export async function runReviewCatchUp(input: {
   readonly fromVersion: number;
   readonly workItemId: string;
   readonly questionLine: string;
+  readonly argumentLanguageName?: string;
   readonly invocationId: string;
   readonly pinnedPanel: readonly { readonly maker: string; readonly providerRef: string }[];
   readonly judgeBound: CallBound;
@@ -1048,6 +1117,7 @@ export async function runReviewCatchUp(input: {
         subjectItemId: input.workItemId,
         callSiteKey,
         questionLine: input.questionLine,
+        argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
         statement: node.statement,
         authorMaker: node.authorMaker,
         providerRef: reviewer.providerRef,
@@ -3048,6 +3118,7 @@ export class WalkingSkeletonRunner {
               subjectItemId: claimed.workItemId,
               callSiteKey: `${input.callSiteKey}:${member.providerRef}`,
               questionLine: input.questionLine,
+              argumentLanguageName: run.argumentLanguageName,
               statement: input.statement,
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
@@ -3260,6 +3331,7 @@ export class WalkingSkeletonRunner {
         // DL4-F4: the question travels as the question, in its own fenced
         // field; the leg's directive is code's and rides the system message.
         questionLine: run.questionLine,
+        argumentLanguageName: run.argumentLanguageName,
         leg: { kind: "primary-root" },
         providerRef: primaryMaker.providerRef,
         contractHash: this.settings.judgeContractHash,
@@ -3467,6 +3539,7 @@ export class WalkingSkeletonRunner {
           subjectItemId: claimed.workItemId,
           callSiteKey: input.callSiteKey,
           questionLine: run.questionLine,
+          argumentLanguageName: run.argumentLanguageName,
           leg: input.leg,
           providerRef: selectedMaker.providerRef,
           contractHash: this.settings.judgeContractHash,
@@ -3695,6 +3768,7 @@ export class WalkingSkeletonRunner {
               subjectItemId: claimed.workItemId,
               callSiteKey,
               questionLine: run.questionLine,
+              argumentLanguageName: run.argumentLanguageName,
               statement: authoredNode.statement,
               authorMaker: authoredNode.maker,
               providerRef: reviewer.providerRef,
@@ -4699,10 +4773,7 @@ export class WalkingSkeletonRunner {
         // `JSON.stringify` of the whole request — the model-authored digest
         // summaries and the prior objection sat in the same compartment as the
         // engine's own `instructions`, with nothing saying which was which.
-        const framed = buildFramedPrompt({
-          contract: SYNTHESIZER_PROMPT_CONTRACT,
-          material: toSynthesisPromptMaterial(request)
-        });
+        const framed = buildSynthesizerFramedPrompt(request,run.argumentLanguageName);
         const packet = framed.packet;
         const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
@@ -4724,6 +4795,7 @@ export class WalkingSkeletonRunner {
           // judge, answering about ONE node, had 180.
           bound: this.settings.synthesisRolePolicy.synthesizerBound,
           contractHash: this.settings.composerContractHash,
+          argumentLanguageName: run.argumentLanguageName,
           providerRef: role.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
@@ -4780,10 +4852,7 @@ export class WalkingSkeletonRunner {
       evaluate: async (request: EvaluatorRequest) => {
         const role = resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR");
         const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
-        const framed = buildFramedPrompt({
-          contract: EVALUATOR_PROMPT_CONTRACT,
-          material: toSynthesisPromptMaterial(request)
-        });
+        const framed = buildEvaluatorFramedPrompt(request,run.argumentLanguageName);
         const packet = framed.packet;
         const response = await callSynthesisRole(role.provider, {
           runId: run.runId,
@@ -4798,6 +4867,7 @@ export class WalkingSkeletonRunner {
           // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
           bound: this.settings.synthesisRolePolicy.evaluatorBound,
           contractHash: this.settings.conformanceContractHash,
+          argumentLanguageName: run.argumentLanguageName,
           providerRef: role.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),

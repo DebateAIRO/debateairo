@@ -1,3 +1,6 @@
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import { t, type MessageCatalog } from "./i18n/translate.js";
+
 // Depth-of-scrutiny presets for the new-debate form (W7 budgeted adaptive
 // expansion). Each preset maps to the coordinator's per-debate budget knobs
 // (config.adaptive_expansion, sanitized server-side by merged_debate_config
@@ -15,27 +18,34 @@ export interface AdaptiveExpansionBudgets {
   max_per_debate: number;
 }
 
-export const SCRUTINY_DEPTH_OPTIONS: Array<{
+export type ScrutinyDepthOption = {
   value: ScrutinyDepth;
   label: string;
   hint: string;
-}> = [
-  {
-    value: "standard",
-    label: "Standard",
-    hint: "Site default expansion budget"
-  },
-  {
-    value: "deep",
-    label: "Deep",
-    hint: "More follow-up rounds on weak points"
-  },
-  {
-    value: "exhaustive",
-    label: "Exhaustive",
-    hint: "Agents keep digging until the tree goes quiet"
-  }
-];
+};
+
+export function scrutinyDepthOptions(catalog: MessageCatalog = composeEnglish): ScrutinyDepthOption[] {
+  return [
+    {
+      value: "standard",
+      label: t(catalog, "compose.scrutinyDepth.standard.label"),
+      hint: t(catalog, "compose.scrutinyDepth.standard.hint")
+    },
+    {
+      value: "deep",
+      label: t(catalog, "compose.scrutinyDepth.deep.label"),
+      hint: t(catalog, "compose.scrutinyDepth.deep.hint")
+    },
+    {
+      value: "exhaustive",
+      label: t(catalog, "compose.scrutinyDepth.exhaustive.label"),
+      hint: t(catalog, "compose.scrutinyDepth.exhaustive.hint")
+    }
+  ];
+}
+
+/** The presets in display order. Catalogue-free: every renderer labels them in its own locale. */
+export const SCRUTINY_DEPTHS: readonly ScrutinyDepth[] = Object.freeze(["standard", "deep", "exhaustive"]);
 
 export function adaptiveExpansionBudgetsFor(depth: ScrutinyDepth): AdaptiveExpansionBudgets | null {
   if (depth === "standard") {

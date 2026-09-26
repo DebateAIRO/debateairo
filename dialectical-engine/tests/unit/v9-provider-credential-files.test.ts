@@ -394,6 +394,106 @@ describe("V-9 the local dev stack refuses a credential file it cannot honour", (
  * the codes are read OUT OF THE SOURCE and every one of them must appear in §11.
  */
 describe("V-9 the kit names every refusal the credential path can emit", () => {
+  const refusalTableRows = (readme: string): string[] => {
+    const refusal = readme.slice(
+      readme.indexOf("### What the hosted mode refuses, in code"),
+      readme.indexOf("### The credential-file contract")
+    ).split("\n");
+    const header = refusal.findIndex((line) => /^\s*\|\s*Code\s*\|\s*Meaning\s*\|\s*$/u.test(line));
+    if (header < 0 || !/^\s*\|[ \t:-]+\|[ \t:-]+\|\s*$/u.test(refusal[header + 1] ?? "")) return [];
+    const body = refusal.slice(header + 2);
+    const end = body.findIndex((line) => !/^\s*\|/u.test(line));
+    return body.slice(0, end < 0 ? body.length : end);
+  };
+
+  it("README §11's PRICE_INVALID Meaning states the complete price domain (V-22)", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const meanings = refusalTableRows(readme)
+      .filter((row) => row.split("|")[1]?.trim() === "`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`")
+      .map((row) => row.split("|")[2]?.trim().replace(/\s+/gu, " "));
+    expect(meanings, "the price row itself names both bounds, integer amounts and the pair rule").toEqual([
+      "a price that is not an integer from 0 through `Number.MAX_SAFE_INTEGER`, or only one of the two price members."
+    ]);
+  });
+
+  it("names every start-up refusal the price and cost-envelope surfaces can raise", async () => {
+    const read = (path: string) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
+    const providers = await read("packages/providers/src/index.ts");
+    const support = await read("apps/api/src/support/model.ts");
+    const envelope = await read("packages/register/src/cost-envelope-policy.ts");
+    const runtime = await read("packages/register/src/runtime-environment.ts");
+    // slices/S03/PLAN.md §1b, rows E1…E7 in order. Anchors are strings, never line numbers.
+    const anchors: ReadonlyArray<readonly [string, string, string]> = [
+      [providers, "const PROVIDER_CREDENTIAL_REFUSAL_CODES", "] as const);"],
+      [providers, "const PROVIDER_CREDENTIAL_ABSENT_CODE = ", ";"],
+      [support, "export const SUPPORT_MODEL_STARTUP_REFUSAL_CODES", "] as const);"],
+      [providers, "export function assertPricedProviderTargets", "\n}"],
+      [providers, "function providerTargetPriceAmount", "\n}"],
+      [envelope, "export function costEnvelopePolicyFromValue", "\n}"],
+      [envelope, "export async function readCostEnvelopePolicy", "\n}"],
+      [runtime, "export class SupportAdmissionScopesNotSealedError", "\n}"]
+    ];
+    const union = new Set<string>();
+    for (const [source, from, until] of anchors) {
+      const start = source.indexOf(from);
+      expect(start, from).toBeGreaterThanOrEqual(0);
+      const body = source.slice(start, source.indexOf(until, start + from.length) + until.length);
+      const codes = [...body.matchAll(/[`"]([A-Z][A-Z0-9_]{4,})(?=[:`"])/gu)].map((match) => match[1]!);
+      expect(codes.length, from).toBeGreaterThan(0);
+      for (const code of codes) union.add(code);
+    }
+    expect(union.size).toBe(12);
+    const readme = await read("deploy/vps/README.md");
+    const refusal = readme.slice(
+      readme.indexOf("### What the hosted mode refuses, in code"),
+      readme.indexOf("### The credential-file contract")
+    );
+    // (1) ARCH-REV p1 N4 — the house style of C1-2's rows has a guard of its own.
+    expect(refusal, "no angle-bracket placeholder in §11's refusal table").not.toMatch(/<[a-z-]+>/u);
+    // (1b) ARCH-REV p2 B1 — hosted boot runs rules before the parse (C1-3), so this order claim is false.
+    expect(refusal, "no 'before any hosted rule' order claim in §11's refusal span").not.toMatch(
+      /\bbefore (?:any|every|all|the) hosted rules?\b/iu
+    );
+    // (2) R3.5 — source-derived codes belong to the refusal table, including nested reasons.
+    const tableRows = refusalTableRows(readme);
+    for (const code of union) expect(tableRows.join("\n"), code).toContain(code);
+    // R3.3 / V-8 — independently pin the operator table's first-column contract.
+    // Prose mentions cannot replace rows; extra, duplicate and run-time rows also fail.
+    const rowCodes = tableRows.map((row) => {
+      const firstColumn = row.split("|")[1] ?? "";
+      const codes = [...firstColumn.matchAll(/`([A-Z][A-Z0-9_]*):?`/gu)].map((match) => match[1]!);
+      return codes.length === 1 ? codes[0] : null;
+    });
+    expect(rowCodes.sort(), "exact start-up refusal codes in the table's first column").toEqual([
+      "DEPLOYMENT_MODE_UNRESOLVED",
+      "DEPLOYMENT_MODE_INVALID",
+      "PROVIDER_BASE_URL_TLS_REQUIRED",
+      "PROVIDER_TARGET_LOOPBACK_REFUSED",
+      "PROVIDER_INLINE_CREDENTIAL_REFUSED",
+      "PROVIDER_AUTHORIZATION_FILE_ABSENT",
+      "PROVIDER_AUTHORIZATION_FILE_UNUSABLE",
+      "COST_ENVELOPES_NOT_SEALED",
+      "RUNNER_PRIMARY_PROVIDER_REF_DRIFT",
+      "SUPPORT_MODEL_CREDENTIAL_ABSENT",
+      "SUPPORT_MODEL_PATH_NOT_RATIFIED",
+      "PROVIDER_DISCOVERY_TARGET_PRICE_INVALID",
+      "PROVIDER_TARGET_PRICE_REQUIRED",
+      "PROVIDER_TARGET_PRICE_ZERO",
+      "COST_ENVELOPE_POLICY_UNRESOLVED",
+      "COST_ENVELOPE_POLICY_INVALID",
+      "SUPPORT_ADMISSION_SCOPES_NOT_SEALED"
+    ].sort());
+    // (3) ARCH-REV p1 N1, p2 B1 — C1-3's EXACT sentence, BELOW the table only, whitespace collapsed.
+    const lines = refusal.split("\n");
+    const belowTable = lines
+      .slice(lines.map((line) => line.startsWith("|")).lastIndexOf(true) + 1)
+      .join(" ")
+      .replace(/\s+/gu, " ");
+    expect(belowTable, "guard-order sentence below the table, EXACT (C1-3)").toContain(
+      "`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two."
+    );
+  });
+
   it("lists each code the resolver can produce, read from the source", async () => {
     const providers = await readFile(
       new URL("../../packages/providers/src/index.ts", import.meta.url), "utf8"
@@ -410,8 +510,9 @@ describe("V-9 the kit names every refusal the credential path can emit", () => {
       new URL("../../deploy/vps/README.md", import.meta.url), "utf8"
     );
     const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    const table = refusalTableRows(readme).join("\n");
     for (const code of [...codes, absent!, "PROVIDER_AUTHORIZATION_FILE_ABSENT"]) {
-      expect(section, code).toContain(code);
+      expect(table, code).toContain(code);
     }
     // ...and it may no longer promise a code the credential reader cannot emit.
     expect(codes).not.toContain("KEK_UNRESOLVED");
@@ -596,5 +697,129 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
       model: "vendor-new-large"
     }]), [{ providerRef: "vendor-old", maker: "maker-old" }]))
       .toThrowError(new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH"));
+  });
+});
+
+describe("S03 §11 says what the shipped code does", () => {
+  it("README §11's hosted target carries both price members, in the member table and in both env forms", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    const memberStart = section.indexOf("| Member | Value |");
+    const members = section.slice(memberStart, section.indexOf("\n\n", memberStart));
+    for (const member of ["input_price_micros_per_million", "output_price_micros_per_million"]) {
+      expect(members, member).toContain(member);
+    }
+    const examples = section.split("\n").filter((line) =>
+      /"input_price_micros_per_million":\s*\d+/u.test(line));
+    expect(examples, "two distinct priced env forms").toHaveLength(2);
+    for (const service of ["runner", "api"]) {
+      const example = examples.find((line) => line.includes(`/etc/debateai/${service}/providers/`)) ?? "";
+      expect(example, `${service} input price`).toMatch(/"input_price_micros_per_million":\s*\d+/u);
+      expect(example, `${service} output price`).toMatch(/"output_price_micros_per_million":\s*\d+/u);
+    }
+  });
+
+  it("README §11's support-chat note names the sealed-envelope refusal, not a daily cap ceiling", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    expect(section.replace(/\s+/gu, " ")).not.toMatch(/the daily call cap is the only ceiling/u);
+    const paragraph = section.split(/\n[ \t]*\n/u)
+      .find((block) => block.includes("SUPPORT_MODEL_COST_UNREPORTED")) ?? "";
+    expect(paragraph).toContain("COST_ENVELOPES_NOT_SEALED");
+  });
+
+  it("README §11 states the paid-probe cost exposure in the tree's own numbers", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
+    expect(section.match(/max_tokens/gu) ?? [], "max_tokens appears once in §11").toHaveLength(1);
+    const paragraph = section.split(/\n[ \t]*\n/u).find((block) => block.includes("max_tokens")) ?? "";
+    for (const token of ["probe_freshness_ms", "panelDiscoveryPolicy"]) expect(paragraph, token).toContain(token);
+    expect(paragraph, "the seed's 600000").toMatch(/\b600_?000\b/u);
+    const withoutSpecPhrase = paragraph.replace(/no recommended value/giu, "");
+    for (const word of [/\brecommend\w*/iu, /\bsuggest\w*/iu, /\bshould be\b/iu]) {
+      expect(withoutSpecPhrase, `no recommended value: ${word}`).not.toMatch(word);
+    }
+  });
+
+  it("README §11's probe-cost paragraph names the hosted publisher's fixed window (V-23)", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const section = readme.split("## 11. Providers and vendors", 2)[1]?.split("\n## ", 1)[0] ?? "";
+    const paragraph = section.split(/\n[ \t]*\n/u)
+      .find((block) => block.includes("max_tokens")) ?? "";
+    expect(paragraph.replace(/\s+/gu, " "), "the hosted sentence, independent of the seed's value").toContain(
+      "The hosted publish command (`pnpm register:publish-hosted`) publishes the code-owned `panelDiscoveryPolicy` row with `probe_freshness_ms` set to `600000`, and its file has no member to change it; a different window needs a code change."
+    );
+  });
+
+  it("README's known-stale list no longer carries the bullets §11 now answers", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    // Dev retired the entire banner once its surviving items were documented.
+    // Reintroducing any obsolete §11 bullet must still fail without that heading.
+    const refreshed = readme.replace(/\s+/gu, " ");
+    expect(refreshed).not.toContain("## Known-stale sections");
+    for (const obsolete of [
+      "§11's hosted provider target example",
+      "§11's refusal-code table is incomplete",
+      "the daily call cap is the only ceiling"
+    ]) expect(refreshed, obsolete).not.toContain(obsolete);
+  });
+});
+
+describe("S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14)", () => {
+  const kit = () => readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+  const collapse = (text: string) => text.replace(/\s+/gu, " ");
+  const supportNote = (readme: string) => readme
+    .slice(readme.indexOf("## 11. Providers and vendors"))
+    .split(/\n[ \t]*\n/u)
+    .find((block) => block.includes("SUPPORT_MODEL_COST_UNREPORTED")) ?? "";
+  const ROW_START = "| `COST_ENVELOPES_NOT_SEALED` |";
+
+  it("README §11's support-chat note names the refusal a hosted operator meets (R3.4)", async () => {
+    const note = collapse(supportNote(await kit()));
+    expect(note, "the overruled sentence is gone (C3-4)").not.toContain(
+      "refuses to start until the cost envelopes are sealed"
+    );
+    expect(note, "R3.4 first part, EXACT (C3-4)").toContain(
+      "A hosted deployment reads the `costEnvelopePolicy` row in force at its own `REGISTER_VERSION` and refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with `COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed."
+    );
+    expect(note, "R3.4 second part, EXACT (C3-4)").toContain(
+      "`COST_ENVELOPES_NOT_SEALED` is a check on the integrity of the build: it fires only when the envelope row this build ships was removed, emptied or made invalid, and the shipped source never reaches it at runtime."
+    );
+  });
+
+  it("README §11's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)", async () => {
+    const readme = await kit();
+    const refusal = readme.slice(
+      readme.indexOf("### What the hosted mode refuses, in code"),
+      readme.indexOf("### The credential-file contract")
+    ).split("\n");
+    expect(refusal.filter((line) => line.startsWith(ROW_START)), "the row, EXACT, once, in the table (C3-5)").toEqual([
+      "| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows above. |"
+    ]);
+    const rowAt = (code: string) => refusal.findIndex((line) => line.startsWith("| `" + code + "` |"));
+    for (const code of ["COST_ENVELOPE_POLICY_UNRESOLVED", "COST_ENVELOPE_POLICY_INVALID"]) {
+      expect(rowAt(code), `${code}'s row exists`).toBeGreaterThanOrEqual(0);
+      expect(rowAt(code), `${code}'s row is one of "the two rows above"`).toBeLessThan(rowAt("COST_ENVELOPES_NOT_SEALED"));
+    }
+    for (const stale of ["are not published yet", "refuses to claim work until they are"]) {
+      expect(collapse(readme), `no "${stale}" anywhere in the README`).not.toContain(stale);
+    }
+  });
+
+  it("README §10's production-maker bullet names the live refusal, and two lines name COST_ENVELOPES_NOT_SEALED (R3.4b b)", async () => {
+    const readme = await kit();
+    const start = readme.indexOf("- **The production maker path is now ruled");
+    expect(start, "§10's bullet exists").toBeGreaterThanOrEqual(0);
+    const bullet = readme.slice(start, readme.indexOf("\n- ", start + 1));
+    expect([...bullet.matchAll(/`([A-Z][A-Z0-9_]{4,})`/gu)].map((match) => match[1]), "the bullet names these two codes and no other (C3-6)")
+      .toEqual(["COST_ENVELOPE_POLICY_UNRESOLVED", "COST_ENVELOPE_POLICY_INVALID"]);
+    expect(collapse(bullet), "R3.4b (b), EXACT (C3-6)").toContain(
+      "Until V-28's cost-envelope policy is sealed at the register version a hosted deployment runs, that deployment refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`."
+    );
+    const mentions = readme.split("\n").filter((line) => line.includes("COST_ENVELOPES_NOT_SEALED"));
+    expect(mentions, "exactly two README lines name COST_ENVELOPES_NOT_SEALED (R3.4b)").toHaveLength(2);
+    expect(mentions.filter((line) => line.startsWith(ROW_START)), "one of them is the table row").toHaveLength(1);
+    const noteLines = supportNote(readme).split("\n");
+    expect(mentions.filter((line) => noteLines.includes(line)), "the other is inside the support-chat note").toHaveLength(1);
   });
 });

@@ -1,0 +1,54 @@
+26:## 1. START frame — measured before the first step, never assumed
+36:written against; a BUILD seat re-measures before its first edit and records any difference.
+41:| §11's span | **721 → 873 (EOF)** — there is no `^## ` heading after 721, so `readme.slice(readme.indexOf("## 11. Providers and vendors"))` is §11 exactly | `gr
+56:proofs"). A BUILD seat re-runs these five before its first edit; a different number means the file
+88:a row into §11's table moves every line below it, so a later step anchors on TEXT, not on a line
+89:number that an earlier step of the same cluster invalidated. **Every criterion below anchors on a
+94:### 1b. The enumeration — R3.5's source anchors, PROVED before they were written down
+170:C1-4 does: its command re-runs `tests/architecture/vps-deployment-baseline.test.ts:378` after C1's §11
+177:boundary — no criterion needs a later step. A RED step's criterion is a measured failing pair; a
+181:Revision 2: pass 1 broke that rule once (C2-6's count was true only after C2-9) and derived two
+220:  for (const [source, from, until] of anchors) {
+223:    const body = source.slice(start, source.indexOf(until, start + from.length) + until.length);
+245:  expect(belowTable, "guard-order sentence below the table: before").toMatch(/\bbefore\b/u);
+251:`PROVIDER_TARGET_PRICE_REQUIRED`; after C1-2 it fails on (3) with
+252:`guard-order sentence below the table: PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`; after C1-3 it passes.
+270:  this boundary, which is why the check runs here and not later.
+275:  non-empty set — e.g. E4 terminated on the first `}` of the `for` body instead of the function's.
+282:Insert six rows into the table that begins at the line `| Code | Meaning |` after
+283:`### What the hosted mode refuses, in code`. One row per code, in this order, appended after the
+287:| Code cell (EXACT text, including the trailing colon where a ref follows) | condition the Meaning cell states | source `path:line` |
+289:| `` `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` `` | one of the two price members is declared without the other, **or** a declared amount is not an integer in `[0, Num
+290:| `` `PROVIDER_TARGET_PRICE_REQUIRED:` `` and the provider ref | hosted mode, and a debate target declares no price pair at all | `packages/providers/src/index.ts:687
+323:- **Does NOT catch:** a Meaning cell whose CONDITION is wrong while the code is right. Nothing
+328:Below the table (one blank line after its last row, so Markdown ends the table there), and before
+332:`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before any hosted rule runs and before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER
+340:later, at `:700`. No price at all refuses at `:687`. Revision 2 narrowed pass 1's wording ("then the
+342:environment loader raises before any target is parsed.
+346:- **RED when omitted (ARCH-REV p1 N1):** after C1-2 and without this sentence, the cluster command
+352:  own Meaning cell says "before any hosted rule runs", and the rows carry both codes. A check over the
+354:  case. Measured: the whole-span check PASSES after C1-2 with no sentence (`simulate.log`, "NAIVE
+358:  before …INVALID"). The case checks presence, not order; the EXACT text fixes the order, and
+372:Runs **after** C1 is green: both clusters write `deploy/vps/README.md` and
+376:C2's line anchors are re-measured after C1 lands (TOOLING-TRAPS `:3076` — a cluster's base moves
+464:`| Member | Value |`, after the `model` row and before the `authorization_file` row. Their first cells
+480:  Measured (`oracles.log`, section B1.2): 8 after a simulated correct C2-5, in both prose variants;
+483:  Revision 2 replaced pass 1's "C2-1's member-table half passes" with the two first-cell commands. A
+496:`/etc/debateai/api/providers/acme.header`. One sentence after them states that the two amounts are
+513:  input_price_micros_per_million` returns 3" was true only after C2-9 removes bullet B1 (`:20`); at
+528:to start until the cost envelopes are sealed, with the code `COST_ENVELOPES_NOT_SEALED` that the
+541:oracle so that a seat who follows this step passes it (ARCH-REV p1 N2):
+546:   exception is R3.6's own phrase `no recommended value`, which C2-3 strips before it checks.
+559:**C2-9 · the known-stale list.** Runs **after C2-7**, because B3's verdict depends on it.
+570:  contains exactly **2** lines beginning `- `. Named members: B4's first line, B5's first line.
+598:once, after both are green.
+600:| cluster | steps | write surface | one verification command | RED event written first | base verdict, measured |
+602:| **S03-C1** | C1-1 … C1-4 | `tests/unit/v9-provider-credential-files.test.ts` · `deploy/vps/README.md` between `### What the hosted mode refuses, in code` and `##
+603:| **S03-C2** | C2-1 … C2-10 | `tests/unit/v9-provider-credential-files.test.ts` · `deploy/vps/README.md` **everywhere except** C1's block | `LOG=<abs> zsh .claude/
+613:rows and after the slice** — it is never edited, which is what makes SPEC §5 step 2 pass as frozen.
+656:  START frame's capability proof, before accepting the empty output.
+667:  recorded in `probes/ARCH-PES-S03/accept-base.log`, so each step's AFTER answer is compared against
+668:  a measured BEFORE rather than against an expectation:
+670:| §5 step | answer at base (measured) | answer required after |
+675:| 5 | 5 bullets in the `14,40p` window | 2 lines beginning `- ` (B4, B5) and no line carrying `hosted provider target example` or `refusal-code table is incomplete`. 
+717:later node does not re-measure.

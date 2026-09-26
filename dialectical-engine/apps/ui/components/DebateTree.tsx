@@ -7,7 +7,11 @@ import type { DebateNode, Generation, NodeScoringPayload } from "@/lib/types";
 import { isAbandonedArgumentStatus, isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { branchLabelOf } from "@/lib/debatePresentation";
 import { ModelBadge, modelColorStyle } from "@/components/ModelPresentation";
-import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import miscEnglish from "@/messages/en/misc.json";
+import debateChromeEnglish from "@/messages/en/debateChrome.json";
+import composeEnglish from "@/messages/en/compose.json";
 
 function isAbandonedNode(node: DebateNode): boolean {
   return isAbandonedArgumentStatus(node.status)
@@ -31,12 +35,12 @@ function nodeClass(node: DebateNode, lowStrength: boolean): string {
   return `nodeCard ${roleClass}${ab}${ls}`;
 }
 
-function nodeLabel(node: DebateNode): string {
-  if (node.node_type === "ROOT_CLAIM") return "Root";
-  if (node.node_type === "PRO") return "Pro";
-  if (node.node_type === "CON") return "Con";
+function nodeLabel(node: DebateNode, catalog: MessageCatalog, debateChromeCatalog: MessageCatalog): string {
+  if (node.node_type === "ROOT_CLAIM") return t(catalog, "debateViews.root");
+  if (node.node_type === "PRO") return t(catalog, "debateViews.pro");
+  if (node.node_type === "CON") return t(catalog, "debateViews.con");
   // Data-driven: backend-provided label/lens wins, else derive from node_type.
-  return branchLabelOf(node);
+  return branchLabelOf(node, debateChromeCatalog);
 }
 
 type DebateTreeProps = {
@@ -47,6 +51,12 @@ type DebateTreeProps = {
   selectedNodeId?: string | null;
   scoringByNodeId?: Map<string, NodeScoringPayload>;
   lowStrengthThreshold?: number;
+  /** The interface locale's `misc` catalogue, for the model badges. */
+  miscCatalog?: MessageCatalog;
+  /** The interface locale's `debateChrome` catalogue: branch labels. */
+  debateChromeCatalog?: MessageCatalog;
+  /** The interface locale's `compose` catalogue: model family names. */
+  composeCatalog?: MessageCatalog;
 };
 
 type ArgumentNodeCardProps = {
@@ -61,6 +71,12 @@ type ArgumentNodeCardProps = {
   selectionLabel?: string;
   scoring?: NodeScoringPayload;
   lowStrengthThreshold?: number;
+  /** The interface locale's `misc` catalogue, for the model badges. */
+  miscCatalog?: MessageCatalog;
+  /** The interface locale's `debateChrome` catalogue: branch labels. */
+  debateChromeCatalog?: MessageCatalog;
+  /** The interface locale's `compose` catalogue: model family names. */
+  composeCatalog?: MessageCatalog;
 };
 
 function errorMessage(exc: unknown, fallback: string): string {
@@ -79,7 +95,11 @@ export function ArgumentNodeCard({
   selectionLabel,
   scoring,
   lowStrengthThreshold,
+  miscCatalog = miscEnglish,
+  debateChromeCatalog = debateChromeEnglish,
+  composeCatalog = composeEnglish,
 }: ArgumentNodeCardProps) {
+  const { catalog } = useChromeI18n();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Generation[]>([]);
 
@@ -91,7 +111,7 @@ export function ArgumentNodeCard({
       }
       setHistoryOpen(!historyOpen);
     } catch (exc) {
-      const message = errorMessage(exc, "Unable to load generation history");
+      const message = errorMessage(exc, t(catalog, "debateViews.unableToLoadGenerationHistory"));
       onError(message);
     }
   }
@@ -114,10 +134,10 @@ export function ArgumentNodeCard({
   }
 
   const generation = node.active_generation;
-  const argument = generation?.argument || (node.status === "pending" ? "Queued" : "");
+  const argument = generation?.argument || (node.status === "pending" ? t(catalog, "debateViews.queued") : "");
   const workerName = generation?.worker_name || generation?.worker_id;
   const isCardInteractive = Boolean(onSelectNode);
-  const cardLabel = selectionLabel ?? (isCardInteractive ? `Select argument: ${node.claim}` : undefined);
+  const cardLabel = selectionLabel ?? (isCardInteractive ? t(catalog, "debateViews.selectArgument", { claim: node.claim }) : undefined);
   const modelStyle = generation ? modelColorStyle(generation.maker ?? generation.model_id) : undefined;
   // Additive, flag-gated low-strength dimming (Phase 9 Task 3). Never replaces
   // the existing abandoned/selection classes -- a node can be both abandoned
@@ -151,12 +171,12 @@ export function ArgumentNodeCard({
           onKeyDown={isCardInteractive ? selectOrToggleFromKeyboard : undefined}
         >
           <div className="toolbar">
-            <span className="badge">{nodeLabel(node)}</span>
+            <span className="badge">{nodeLabel(node, catalog, debateChromeCatalog)}</span>
             <span className={`badge${isAbandonedNode(node) ? " abandonedBadge" : ""}`}>
-              {isAbandonedNode(node) ? "Stopped" : node.status}
+              {isAbandonedNode(node) ? t(catalog, "debateViews.stopped") : node.status}
             </span>
             {generation || node.maker !== undefined ? (
-              <ModelBadge modelId={generation?.model_id ?? null} maker={node.maker} />
+              <ModelBadge modelId={generation?.model_id ?? null} maker={node.maker} catalog={miscCatalog} composeCatalog={composeCatalog} />
             ) : null}
             {generation ? <span className="badge" data-worker-name={workerName}>{workerName}</span> : null}
             {generation ? <span className="badge">{generation.role}</span> : null}
@@ -179,10 +199,12 @@ export function ArgumentNodeCard({
               className="secondary"
               type="button"
               aria-expanded={childrenOpen}
-              aria-label={`${childrenOpen ? "Collapse" : "Expand"} child arguments for: ${node.claim}`}
+              aria-label={childrenOpen
+                ? t(catalog, "debateViews.collapseChildArgumentsFor", { claim: node.claim })
+                : t(catalog, "debateViews.expandChildArgumentsFor", { claim: node.claim })}
               onClick={onToggleChildren}
             >
-              {childrenOpen ? "Collapse" : "Expand"}
+              {childrenOpen ? t(catalog, "debateViews.collapse") : t(catalog, "debateViews.expand")}
             </button>
           ) : null}
           {token && !isAbandonedNode(node) ? (
@@ -191,21 +213,23 @@ export function ArgumentNodeCard({
               type="button"
               disabled
               aria-disabled="true"
-              aria-label={`Regenerate argument: ${node.claim}`}
-              title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+              aria-label={t(catalog, "debateViews.regenerateArgument", { claim: node.claim })}
+              title={t(catalog, "debateViews.nodeRegenerationUnavailable")}
             >
-              Regenerate
+              {t(catalog, "debateViews.regenerate")}
             </button>
           ) : null}
           {token && !isAbandonedNode(node) ? (
             <button
               className="secondary"
               type="button"
-              aria-label={`${historyOpen ? "Hide" : "Show"} generation history for argument: ${node.claim}`}
+              aria-label={historyOpen
+                ? t(catalog, "debateViews.hideGenerationHistory", { claim: node.claim })
+                : t(catalog, "debateViews.showGenerationHistory", { claim: node.claim })}
               aria-expanded={historyOpen}
               onClick={toggleHistory}
             >
-              History
+              {t(catalog, "debateViews.history")}
             </button>
           ) : null}
         </div>
@@ -213,13 +237,13 @@ export function ArgumentNodeCard({
       {historyOpen ? (
         <div className="historyPanel">
           {history.length === 0 ? (
-            <p className="muted">No generations yet.</p>
+            <p className="muted">{t(catalog, "debateViews.noGenerationsYet")}</p>
           ) : (
             history.map((item) => (
               <section key={item.id}>
                 <div className="toolbar">
-                  <span className="badge">{item.is_active ? "Active" : "Archived"}</span>
-                  <ModelBadge modelId={item.model_id} />
+                  <span className="badge">{item.is_active ? t(catalog, "debateViews.active") : t(catalog, "debateViews.archived")}</span>
+                  <ModelBadge modelId={item.model_id} catalog={miscCatalog} composeCatalog={composeCatalog} />
                   <span className="badge">{item.worker_name || item.worker_id}</span>
                   <span className="badge">{item.role}</span>
                 </div>
@@ -241,7 +265,11 @@ export function DebateTree({
   selectedNodeId,
   scoringByNodeId,
   lowStrengthThreshold,
+  miscCatalog = miscEnglish,
+  debateChromeCatalog = debateChromeEnglish,
+  composeCatalog = composeEnglish,
 }: DebateTreeProps) {
+  const { catalog, locale } = useChromeI18n();
   const [childrenOpen, setChildrenOpen] = useState(node.node_type === "ROOT_CLAIM");
 
   const activeChildren = node.children.filter((c) => !isAbandonedNode(c));
@@ -263,6 +291,9 @@ export function DebateTree({
         onToggleChildren={() => setChildrenOpen((current) => !current)}
         scoring={scoringByNodeId?.get(node.id)}
         lowStrengthThreshold={lowStrengthThreshold}
+        miscCatalog={miscCatalog}
+        debateChromeCatalog={debateChromeCatalog}
+        composeCatalog={composeCatalog}
       />
       {hasActiveChildren && childrenOpen ? (
         <div
@@ -279,14 +310,17 @@ export function DebateTree({
               selectedNodeId={selectedNodeId}
               scoringByNodeId={scoringByNodeId}
               lowStrengthThreshold={lowStrengthThreshold}
+              miscCatalog={miscCatalog}
+              debateChromeCatalog={debateChromeCatalog}
+              composeCatalog={composeCatalog}
             />
           ))}
         </div>
       ) : null}
       {abandonedChildren.length > 0 ? (
-        <div className="abandonedPaths" aria-label={`${abandonedChildren.length} stopped path${abandonedChildren.length === 1 ? "" : "s"}`}>
+        <div className="abandonedPaths" aria-label={tPlural(catalog, "debateViews.stoppedPathCount", abandonedChildren.length, locale)}>
           <div className="abandonedPathsSummary">
-            ⊗ {abandonedChildren.length} stopped path{abandonedChildren.length === 1 ? "" : "s"}
+            ⊗ {tPlural(catalog, "debateViews.stoppedPathCount", abandonedChildren.length, locale)}
           </div>
           <div className="children vertical" data-child-layout="vertical">
             {abandonedChildren.map((child) => (
@@ -299,6 +333,9 @@ export function DebateTree({
                 selectedNodeId={selectedNodeId}
                 scoringByNodeId={scoringByNodeId}
                 lowStrengthThreshold={lowStrengthThreshold}
+                miscCatalog={miscCatalog}
+                debateChromeCatalog={debateChromeCatalog}
+                composeCatalog={composeCatalog}
               />
             ))}
           </div>

@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ModeToggle } from "@/components/ModeToggle";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/translate";
 
 const SCREEN_TITLES: Record<string, string> = {
-  "/": "Library",
-  "/new": "New debate",
-  "/settings": "Settings",
-  "/ai-transparency": "AI transparency",
-  "/admin/workers": "Workers"
+  "/": "chrome.library",
+  "/new": "chrome.newDebate",
+  "/settings": "chrome.settings",
+  "/ai-transparency": "chrome.aiTransparency",
+  "/admin/workers": "chrome.workers"
 };
 
 const AUTH_PATHS = new Set(["/login", "/sign-up", "/verify-email", "/enroll-mfa"]);
@@ -22,6 +25,7 @@ export function BrandMark({
   href?: string;
   homeNavigationAvailable?: boolean;
 }) {
+  const { catalog } = useChromeI18n();
   const mark = (
     <>
       <span className="brandDiamond" aria-hidden>
@@ -36,20 +40,21 @@ export function BrandMark({
 
   if (href === "/" && !homeNavigationAvailable) {
     return (
-      <span className="brand" aria-label="Dialectical Engine — home" aria-disabled="true">
+      <span className="brand" aria-label={t(catalog, "chrome.brandHome")} aria-disabled="true">
         {mark}
       </span>
     );
   }
 
   return (
-    <Link className="brand" href={href} aria-label="Dialectical Engine — home">
+    <Link className="brand" href={href} aria-label={t(catalog, "chrome.brandHome")}>
       {mark}
     </Link>
   );
 }
 
 export function TopBar() {
+  const { catalog } = useChromeI18n();
   const pathname = usePathname();
   const recoveryAcknowledgementPending = useRecoveryAcknowledgementPending();
 
@@ -62,12 +67,14 @@ export function TopBar() {
     return (
       <header className="authTopBar">
         <BrandMark homeNavigationAvailable={!recoveryAcknowledgementPending} />
+        <LanguageSwitcher />
         <ModeToggle />
       </header>
     );
   }
 
-  const title = SCREEN_TITLES[pathname ?? "/"] ?? "";
+  const titleKey = SCREEN_TITLES[pathname ?? "/"];
+  const title = titleKey === undefined ? "" : t(catalog, titleKey);
 
   return (
     <header className="topBar">
@@ -82,14 +89,15 @@ export function TopBar() {
       )}
       <div className="topBarActions">
         <Link className="btn" href="/settings">
-          Account
+          {t(catalog, "chrome.account")}
         </Link>
         <Link className="btn btnDark" href="/new">
-          + New debate
+          + {t(catalog, "chrome.newDebate")}
         </Link>
-        <span className="roleChip" title="Asker role placeholder">ASKER</span>
+        <span className="roleChip" title={t(catalog, "chrome.askerRolePlaceholder")}>{t(catalog, "chrome.asker")}</span>
+        <LanguageSwitcher />
         <ModeToggle />
-        <Link className="iconBtn" href="/settings" aria-label="Settings" title="Settings">
+        <Link className="iconBtn" href="/settings" aria-label={t(catalog, "chrome.settings")} title={t(catalog, "chrome.settings")}>
           ⚙
         </Link>
       </div>

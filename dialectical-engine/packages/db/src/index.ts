@@ -658,6 +658,17 @@ async function planTierColumnIsApplied(
   return result.rows[0]?.applied === true;
 }
 
+async function argumentLanguageColumnsAreApplied(
+  executor: Pick<Pool, "query"> | PoolClient
+): Promise<boolean> {
+  const result = await executor.query<{ applied: boolean }>(
+    `SELECT count(*)=2 AS applied
+     FROM information_schema.columns
+     WHERE table_schema='core' AND table_name='run'
+       AND column_name IN ('argument_language_tag','argument_language_name')`
+  );
+  return result.rows[0]?.applied === true;
+}
 type UntypedMethod = (...args: unknown[]) => unknown;
 
 function typedPoolFailure(error: unknown): TypedDomainError {
@@ -862,6 +873,8 @@ export interface InitialBatteryRow {
 
 export interface StartRunInput {
   readonly questionLine: string;
+  readonly argumentLanguageTag?: string;
+  readonly argumentLanguageName?: string;
   readonly principal: RunCreationPrincipal;
   readonly sessionId: string;
   readonly callerScope: "ASKER" | "OPERATOR";
@@ -1211,6 +1224,10 @@ export class RunRepository {
     }
     const planTierColumnApplied = input.principal.kind === "legacy"
       && await planTierColumnIsApplied(this.pool);
+    const argumentLanguageColumnsApplied = input.principal.kind === "legacy"
+      && await argumentLanguageColumnsAreApplied(this.pool);
+    const argumentLanguageTag = input.argumentLanguageTag ?? "und";
+    const argumentLanguageName = input.argumentLanguageName ?? "the same language as the question";
     const askContract = input.askContract ?? {};
     let storedQuestionLine = input.questionLine;
     let storedAskContract: Readonly<Record<string, unknown>> = askContract;
@@ -1271,6 +1288,7 @@ export class RunRepository {
         const created = await provisionExecutor.query<{
           created: boolean;
           plan_tier_supported: boolean;
+          argument_language_supported: boolean;
         }>(
           `WITH capability AS (
              SELECT COALESCE(
@@ -1278,14 +1296,24 @@ export class RunRepository {
                  to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
                ) LIKE '%''planTier''%',
                false
-             ) AS plan_tier_supported
+             ) AS plan_tier_supported,
+             COALESCE(
+               pg_get_functiondef(
+                 to_regprocedure('core.create_encrypted_run(jsonb,uuid,uuid,jsonb)')
+               ) LIKE '%''argumentLanguageTag''%',
+               false
+             ) AS argument_language_supported
            )
            SELECT core.create_encrypted_run(
-             CASE WHEN capability.plan_tier_supported
-               THEN $1::jsonb ELSE $1::jsonb-'planTier' END,
+             (CASE WHEN capability.plan_tier_supported
+                THEN $1::jsonb ELSE $1::jsonb-'planTier' END)
+              - CASE WHEN capability.argument_language_supported
+                  THEN ARRAY[]::text[]
+                  ELSE ARRAY['argumentLanguageTag','argumentLanguageName']::text[] END,
              $2,$3,$4::jsonb
            ) AS created,
-           capability.plan_tier_supported
+           capability.plan_tier_supported,
+           capability.argument_language_supported
            FROM capability`,
           [JSON.stringify({
             runId,
@@ -1300,6 +1328,8 @@ export class RunRepository {
             tierProvenanceRef: input.tierProvenanceRef,
             compositionBudgetTier: input.compositionBudgetTier,
             planTier: input.planTier ?? null,
+            argumentLanguageTag,
+            argumentLanguageName,
             depthParams: input.depthParams,
             discoveredPanel: input.discoveredPanel,
             strangerSampleRate: input.strangerSampleRate,
@@ -1324,6 +1354,13 @@ export class RunRepository {
           && input.planTier !== undefined) {
           console.warn(
             "[RUN_PLAN_TIER_DROPPED] core.create_encrypted_run does not accept planTier; run created without plan tier"
+          );
+        }
+        if (created.rows[0]?.created === true
+          && created.rows[0].argument_language_supported === false
+          && argumentLanguageTag !== "und") {
+          console.warn(
+            "[RUN_ARGUMENT_LANGUAGE_DROPPED] core.create_encrypted_run does not accept argument language; run created with the fallback directive"
           );
         }
         if (created.rows[0]?.created !== true) {
@@ -1351,23 +1388,26 @@ export class RunRepository {
         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
         input.compositionBudgetTier,
         ...(planTierColumnApplied ? [input.planTier ?? null] : []),
+        ...(argumentLanguageColumnsApplied ? [argumentLanguageTag, argumentLanguageName] : []),
         JSON.stringify(input.depthParams),
         JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
         JSON.stringify(input.envelopeBasis), input.registerVersion,
         input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
       ];
-      const bindOffset = planTierColumnApplied ? 1 : 0;
+      const planTierBindOffset = planTierColumnApplied ? 1 : 0;
+      const argumentLanguageBindOffset = argumentLanguageColumnsApplied ? 2 : 0;
+      const bindOffset = planTierBindOffset + argumentLanguageBindOffset;
       await client.query(
         `INSERT INTO core.run (
           run_id, question_line, asker_id, session_id, caller_scope, as_of,
           asker_risk_tier, risk_tier, tier_source, tier_provenance_ref,
-          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""},
+          composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""}${argumentLanguageColumnsApplied ? ", argument_language_tag, argument_language_name" : ""},
           depth_params, agent_count, discovered_panel,
           stranger_sample_rate, envelope_basis, register_version,
           battery_version, ask_contract, created_at_seq
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11${planTierColumnApplied ? ", $12" : ""},
+          $11${planTierColumnApplied ? ", $12" : ""}${argumentLanguageColumnsApplied ? `, $${12 + planTierBindOffset}, $${13 + planTierBindOffset}` : ""},
           $${12 + bindOffset}::jsonb,
           jsonb_array_length($${13 + bindOffset}::jsonb),
           $${13 + bindOffset}::jsonb, $${14 + bindOffset},
@@ -1633,6 +1673,7 @@ export class RunRepository {
   async readFrozenHead(runId: string): Promise<{
     readonly runId: string;
     readonly questionLine: string;
+    readonly argumentLanguageName: string;
     readonly agentCount: number;
     readonly discoveredPanel: readonly DiscoveredPanelMember[];
     readonly depthParams: Readonly<Record<string, unknown>>;
@@ -1645,9 +1686,12 @@ export class RunRepository {
     const contentCiphertextProjection = encryptionSchemaApplied
       ? ", content_encryption_version, content_ciphertext"
       : "";
+    const argumentLanguageApplied = await argumentLanguageColumnsAreApplied(this.pool);
+    const argumentLanguageProjection = argumentLanguageApplied ? ", argument_language_name" : "";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
+      argument_language_name?: string;
       content_encryption_version?: number | null;
       content_ciphertext?: CryptoEnvelope | null;
       agent_count: number;
@@ -1657,7 +1701,8 @@ export class RunRepository {
       stranger_sample_rate: number;
       envelope_basis: Readonly<Record<string, unknown>>;
     }>(
-      `SELECT run_id, question_line${contentCiphertextProjection}, agent_count, discovered_panel, depth_params,
+      `SELECT run_id, question_line${contentCiphertextProjection}${argumentLanguageProjection},
+              agent_count, discovered_panel, depth_params,
               composition_budget_tier, stranger_sample_rate, envelope_basis
        FROM core.run WHERE run_id = $1`,
       [runId]
@@ -1677,6 +1722,7 @@ export class RunRepository {
     return {
       runId: row.run_id,
       questionLine: content.questionLine,
+      argumentLanguageName: row.argument_language_name ?? "the same language as the question",
       agentCount: Number(row.agent_count),
       discoveredPanel: Object.freeze(row.discovered_panel.map((member) => Object.freeze({ ...member }))),
       depthParams: Object.freeze({ ...row.depth_params }),

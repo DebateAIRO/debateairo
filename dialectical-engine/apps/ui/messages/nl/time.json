@@ -1,0 +1,21 @@
+{
+  "time.justNow": "zojuist",
+  "time.minutes.one": "{count} minuut geleden",
+  "time.minutes.other": "{count} minuten geleden",
+  "time.hours.one": "{count} uur geleden",
+  "time.hours.other": "{count} uur geleden",
+  "time.yesterday": "Gisteren",
+  "time.days.one": "{count} dag geleden",
+  "time.days.other": "{count} dagen geleden",
+  "time.weeks.one": "{count} week geleden",
+  "time.weeks.other": "{count} weken geleden",
+  "time.status.complete": "Voltooid",
+  "time.status.queued": "In wachtrij",
+  "time.status.claimed": "Toegewezen",
+  "time.status.running": "Wordt uitgevoerd",
+  "time.status.holding": "Herstelpauze bij aanbieder",
+  "time.status.settled": "Afgehandeld",
+  "time.status.generating": "Wordt gegenereerd",
+  "time.status.failed": "Mislukt",
+  "time.status.draft": "Concept"
+}

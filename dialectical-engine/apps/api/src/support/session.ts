@@ -1,9 +1,10 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { TypedDomainError,redactSupportText } from "@debateai/kernel";
+import type { SupportLanguage } from "@debateai/support-kb/catalog";
 import type { SupportKeyPort } from "./keys.js";
 import type { SupportCasePredicate, SupportCaseToolCall } from "./cases.js";
 import type { SupportAdvisorySummaryPort } from "./cases.js";
-import type { SupportLanguage, SupportOutcome } from "./templates.js";
+import type { SupportOutcome } from "./templates.js";
 import type { SupportConfigurationValues } from "@debateai/register";
 
 const CAPABILITY_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
@@ -104,8 +105,8 @@ export type SupportMessageMetadata = Readonly<{
   role: SupportMessageRole;
   outcome: SupportOutcome;
   language: SupportLanguage;
-  detectedLanguage: SupportLanguage;
-  overrideLanguage: SupportLanguage | null;
+  detectedLanguage: "en" | "ro";
+  overrideLanguage: "en" | "ro" | null;
   redacted: boolean;
   receivedAt: Date;
   firstTokenAt: Date | null;

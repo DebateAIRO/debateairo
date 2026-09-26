@@ -1,0 +1,17 @@
+--- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json	2026-09-24 14:10:36
++++ /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/ARCH-FIX-PES-S01-p3/proposed/P3-01-production-database-principals.json.after	2026-09-25 16:28:46
+@@ -311,6 +311,14 @@
+           "purpose": "PRODUCTION_PRINCIPAL_PROVISIONING",
+           "binding": "WIRED",
+           "condition": "package script db:provision-principals"
++        },
++        {
++          "component": "apps/runner:hosted-provider-set-publish-cli",
++          "sourceFile": "apps/runner/src/hosted-provider-set-publish-cli.ts",
++          "environmentKey": "MIGRATION_DATABASE_URL",
++          "purpose": "HOSTED_PROVIDER_SET_PUBLICATION",
++          "binding": "WIRED",
++          "condition": "package script hosted:publish-provider-set"
+         }
+       ]
+     },

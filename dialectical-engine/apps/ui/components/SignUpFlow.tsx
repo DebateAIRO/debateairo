@@ -14,18 +14,28 @@ import { AuthShell } from "@/components/AuthShell";
 import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
 import { TermsOfServiceModal } from "@/components/consent/TermsOfServiceModal";
 import { contractClient } from "@/lib/api";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import authEnglish from "@/messages/en/auth.json";
 
-type RegistrationClient = Pick<ContractClient, "register" | "resendVerification">;
+type RegistrationClient = Pick<ContractClient, "register">;
+type SuccessMessageKey = "auth.signUp.registrationSent";
 
 type Validity = Readonly<{ state: "idle" | "ok" | "bad"; text: string }>;
 
+function successMessage(catalog: MessageCatalog, key: SuccessMessageKey): string {
+  switch (key) {
+    case "auth.signUp.registrationSent":
+      return t(catalog, "auth.signUp.registrationSent");
+  }
+}
+
 /* The document's ✓/✗ rules under the password field (Turn 8 · 8a). */
-const PASSWORD_RULES: ReadonlyArray<{ label: string; met: (value: string) => boolean }> = [
-  { label: "At least eight characters", met: (value) => value.length >= 8 },
-  { label: "One capital letter", met: (value) => /[A-Z]/.test(value) },
-  { label: "One number", met: (value) => /[0-9]/.test(value) },
-  { label: "One special character", met: (value) => /[^A-Za-z0-9]/.test(value) }
-];
+const passwordRules = (catalog: MessageCatalog) => [
+  { label: t(catalog, "auth.signUp.passwordRuleEight"), met: (value: string) => value.length >= 8 },
+  { label: t(catalog, "auth.passwordRuleCapital"), met: (value: string) => /[A-Z]/.test(value) },
+  { label: t(catalog, "auth.passwordRuleNumber"), met: (value: string) => /[0-9]/.test(value) },
+  { label: t(catalog, "auth.passwordRuleSpecial"), met: (value: string) => /[^A-Za-z0-9]/.test(value) }
+] as const;
 
 /* The ids the two document rows' inputs point at with aria-labelledby: each sentence holds an
    interactive control, so neither row can be a <label> (see the consent group below). */
@@ -35,23 +45,38 @@ const TERMS_CONSENT_TEXT_ID = "signup-terms-consent-text";
 // Deliberately permissive: the address is checked for shape, not existence.
 const shapedEmail = (value: string) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value);
 
-function emailValidity(value: string, sent: boolean): Validity {
+function emailValidity(value: string, sent: boolean, catalog: MessageCatalog): Validity {
   const trimmed = value.trim();
   if (trimmed.length === 0) return { state: "idle", text: "" };
-  if (!shapedEmail(trimmed)) return { state: "bad", text: "✗ That does not look like an email address" };
+  if (!shapedEmail(trimmed)) return { state: "bad", text: t(catalog, "auth.invalidEmail") };
   return sent
-    ? { state: "ok", text: "✓ Valid address · verification link sent — awaiting confirmation" }
-    : { state: "ok", text: "✓ Valid address" };
+    ? { state: "ok", text: t(catalog, "auth.signUp.validAddressSent") }
+    : { state: "ok", text: t(catalog, "auth.validAddress") };
 }
 
-function recoveryValidity(value: string, primary: string): Validity {
+function confirmEmailValidity(value: string, primary: string, catalog: MessageCatalog): Validity {
   const trimmed = value.trim();
   if (trimmed.length === 0) return { state: "idle", text: "" };
-  if (!shapedEmail(trimmed)) return { state: "bad", text: "✗ That does not look like an email address" };
+  return trimmed.toLowerCase() === primary.trim().toLowerCase()
+    ? { state: "ok", text: t(catalog, "auth.signUp.confirmEmailMatch") }
+    : { state: "bad", text: t(catalog, "auth.signUp.confirmEmailMismatch") };
+}
+
+function confirmPasswordValidity(value: string, primary: string, catalog: MessageCatalog): Validity {
+  if (value.length === 0) return { state: "idle", text: "" };
+  return value === primary
+    ? { state: "ok", text: t(catalog, "auth.signUp.confirmPasswordMatch") }
+    : { state: "bad", text: t(catalog, "auth.signUp.confirmPasswordMismatch") };
+}
+
+function recoveryValidity(value: string, primary: string, catalog: MessageCatalog): Validity {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { state: "idle", text: "" };
+  if (!shapedEmail(trimmed)) return { state: "bad", text: t(catalog, "auth.invalidEmail") };
   if (trimmed.toLowerCase() === primary.trim().toLowerCase()) {
-    return { state: "bad", text: "✗ Must differ from the primary email" };
+    return { state: "bad", text: t(catalog, "auth.signUp.recoveryMustDiffer") };
   }
-  return { state: "ok", text: "✓ Valid recovery address" };
+  return { state: "ok", text: t(catalog, "auth.signUp.validRecoveryAddress") };
 }
 
 /* THE ONE CLICK RULE for a document row — the privacy row and the terms row share it, built
@@ -106,13 +131,16 @@ function gatedRowClick(
 }
 
 export function SignUpFlow({
+  catalog = authEnglish,
   client = contractClient
-}: Readonly<{ client?: RegistrationClient }>) {
+}: Readonly<{ catalog?: MessageCatalog; client?: RegistrationClient }>) {
   const [email, setEmail] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [messageKey, setMessageKey] = useState<SuccessMessageKey | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginHref, setLoginHref] = useState("/login");
@@ -138,11 +166,21 @@ export function SignUpFlow({
     const data = new FormData(form);
     /* Defence in depth. A bare `new Event("submit")` bypasses HTML constraint
        validation, so `required` alone gates nothing against a scripted submit.
-       These are the three FormData reads, never the mirrors above. */
+       Consent and confirmation are read from FormData, never the mirrors above. */
     if (
       data.get("adult-affirmed") !== "on" ||
       data.get("privacy-accepted") !== "on" ||
-      data.get("terms-accepted") !== "on"
+      data.get("terms-accepted") !== "on" ||
+      confirmEmailValidity(
+        String(data.get("confirm-email") ?? ""),
+        String(data.get("email") ?? ""),
+        catalog
+      ).state !== "ok" ||
+      confirmPasswordValidity(
+        String(data.get("confirm-password") ?? ""),
+        String(data.get("password") ?? ""),
+        catalog
+      ).state !== "ok"
     ) {
       return;
     }
@@ -150,30 +188,16 @@ export function SignUpFlow({
     setBusy(true);
     setError(null);
     try {
-      const result = await client.register(
+      await client.register(
         submitted,
         String(data.get("password") ?? ""),
         String(data.get("recovery-email") ?? "").trim(),
         data.get("adult-affirmed") === "on"
       );
       setSubmittedEmail(submitted);
-      setMessage(result.message);
+      setMessageKey("auth.signUp.registrationSent");
     } catch {
-      setError("Account creation could not be completed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function resendVerification(): Promise<void> {
-    if (submittedEmail === null) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await client.resendVerification(submittedEmail);
-      setMessage(result.message);
-    } catch {
-      setError("Verification instructions could not be resent.");
+      setError(t(catalog, "auth.signUp.creationFailed"));
     } finally {
       setBusy(false);
     }
@@ -221,51 +245,56 @@ export function SignUpFlow({
   }
 
   const sent = submittedEmail !== null;
-  const emailState = emailValidity(email, sent);
-  const recoveryState = recoveryValidity(recoveryEmail, email);
+  const emailState = emailValidity(email, sent, catalog);
+  const confirmEmailState = confirmEmailValidity(confirmEmail, email, catalog);
+  const recoveryState = recoveryValidity(recoveryEmail, email, catalog);
+  const confirmPasswordState = confirmPasswordValidity(confirmPassword, password, catalog);
+  const rules = passwordRules(catalog);
 
   return (
     <AuthShell
-      eyebrow="Create an account"
-      title="Put a claim to the bench."
-      description="Email verification and authenticator enrolment are required before your account can be used."
+      eyebrow={t(catalog, "auth.signUp.eyebrow")}
+      title={t(catalog, "auth.signUp.title")}
+      description={t(catalog, "auth.signUp.description")}
       footer={null}
     >
       {error ? <div className="authAlert" role="alert">{error}</div> : null}
 
       <form className="authForm" data-form="signup" method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
         <div className="authField">
-          <label htmlFor="signup-email">Email</label>
-          <div className="authEmailRow">
-            <input
-              id="signup-email"
-              name="email"
-              type="email"
-              autoComplete="section-primary-email email"
-              placeholder="you@institution.edu"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              autoFocus
-              disabled={busy || sent}
-            />
-            {/* Create account is what mails the link; this control resends it,
-                so it stays inert until there is something to resend. */}
-            <button
-              type="button"
-              className="authVerifyEmail"
-              disabled={busy || !sent}
-              title={sent ? "Resend the verification link" : "Create the account to send the verification link"}
-              onClick={() => void resendVerification()}
-            >
-              Verify email
-            </button>
-          </div>
+          <label htmlFor="signup-email">{t(catalog, "auth.email")}</label>
+          <input
+            id="signup-email"
+            name="email"
+            type="email"
+            autoComplete="section-primary-email email"
+            placeholder={t(catalog, "auth.emailPlaceholder")}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            autoFocus
+            disabled={busy || sent}
+          />
           <p className="authValidity" data-state={emailState.state}>{emailState.text}</p>
         </div>
 
         <div className="authField">
-          <label htmlFor="signup-recovery-email">Recovery email</label>
+          <label htmlFor="signup-confirm-email">{t(catalog, "auth.signUp.confirmEmail")}</label>
+          <input
+            id="signup-confirm-email"
+            name="confirm-email"
+            type="email"
+            autoComplete="off"
+            value={confirmEmail}
+            onChange={(event) => setConfirmEmail(event.target.value)}
+            required
+            disabled={busy || sent}
+          />
+          <p className="authValidity" data-state={confirmEmailState.state}>{confirmEmailState.text}</p>
+        </div>
+
+        <div className="authField">
+          <label htmlFor="signup-recovery-email">{t(catalog, "auth.signUp.recoveryEmail")}</label>
           <input
             id="signup-recovery-email"
             name="recovery-email"
@@ -278,13 +307,13 @@ export function SignUpFlow({
             disabled={busy || sent}
           />
           <span className="authFieldHint" id="recovery-email-hint">
-            Use a different address reserved for account recovery.
+            {t(catalog, "auth.signUp.recoveryEmailHint")}
           </span>
           <p className="authValidity" data-state={recoveryState.state}>{recoveryState.text}</p>
         </div>
 
         <div className="authField">
-          <label htmlFor="signup-password">Password</label>
+          <label htmlFor="signup-password">{t(catalog, "auth.password")}</label>
           <input
             id="signup-password"
             name="password"
@@ -297,7 +326,7 @@ export function SignUpFlow({
             disabled={busy || sent}
           />
           <ul className="authRules" data-stack="true">
-            {PASSWORD_RULES.map((rule) => {
+            {rules.map((rule) => {
               const met = rule.met(password);
               return (
                 <li className="authRule" key={rule.label} data-met={password.length === 0 ? undefined : met}>
@@ -306,6 +335,21 @@ export function SignUpFlow({
               );
             })}
           </ul>
+        </div>
+
+        <div className="authField">
+          <label htmlFor="signup-confirm-password">{t(catalog, "auth.signUp.confirmPassword")}</label>
+          <input
+            id="signup-confirm-password"
+            name="confirm-password"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            required
+            disabled={busy || sent}
+          />
+          <p className="authValidity" data-state={confirmPasswordState.state}>{confirmPasswordState.text}</p>
         </div>
 
         {/* Consent group — design artboard 8a (turn-8a-checkbox-group.html:1-10), plus the
@@ -327,7 +371,7 @@ export function SignUpFlow({
               disabled={busy || sent}
               onChange={(event) => setAdultAffirmed(event.currentTarget.checked)}
             />
-            <span className="consentText">I am 18 or over.</span>
+            <span className="consentText">{t(catalog, "auth.signUp.adultAffirmation")}</span>
           </label>
           {/* ONE onClick, on the ROW: the check square, the sentence and the document
               control are three entry points onto one behaviour, and a handler placed on any
@@ -351,9 +395,11 @@ export function SignUpFlow({
               }
             />
             <span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>
-              I have read the{" "}
-              <button type="button" className="consentPolicyLink">Privacy Policy</button>
-              .
+              {t(catalog, "auth.signUp.privacyAgreementPrefix")}{" "}
+              <button type="button" className="consentPolicyLink">
+                {t(catalog, "auth.signUp.privacyPolicy")}
+              </button>
+              {t(catalog, "auth.signUp.privacyAgreementSuffix")}
             </span>
           </div>
           <div className="consentRow" onClick={onTermsRowClick}>
@@ -372,9 +418,11 @@ export function SignUpFlow({
               }
             />
             <span className="consentText" id={TERMS_CONSENT_TEXT_ID}>
-              I have read and agree to the{" "}
-              <button type="button" className="consentPolicyLink">Terms of Service</button>
-              .
+              {t(catalog, "auth.signUp.termsAgreementPrefix")}{" "}
+              <button type="button" className="consentPolicyLink">
+                {t(catalog, "auth.signUp.termsOfService")}
+              </button>
+              {t(catalog, "auth.signUp.privacyAgreementSuffix")}
             </span>
           </div>
         </div>
@@ -384,15 +432,16 @@ export function SignUpFlow({
           type="submit"
           disabled={busy || sent || !adultAffirmed || !privacyAccepted || !termsAccepted}
         >
-          {busy ? "Creating…" : "Create account"}
+          {busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}
         </button>
 
-        <p className="authPanelFooter">Already have one? <Link href={loginHref}>Log in</Link></p>
+        <p className="authPanelFooter">
+          {t(catalog, "auth.signUp.alreadyHaveOne")} <Link href={loginHref}>{t(catalog, "auth.signUp.logIn")}</Link>
+        </p>
 
-        {sent && message !== null ? (
+        {sent && messageKey !== null ? (
           <p className="authFinePrint" role="status" aria-live="polite">
-            {message} The verification page continues into mandatory authenticator setup. No account status is
-            revealed here.
+            {successMessage(catalog, messageKey)} {t(catalog, "auth.signUp.verificationStatusSuffix")}
           </p>
         ) : null}
       </form>

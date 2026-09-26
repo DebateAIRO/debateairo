@@ -1,6 +1,8 @@
 "use client";
 
 import { requestPreferences } from "../../lib/consent";
+import { t } from "@/lib/i18n/translate";
+import { useConsentCatalog } from "./useConsentCatalog";
 
 /**
  * Settings → Privacy (S01-R21): one panel, one button, and the promise the 10b
@@ -31,14 +33,15 @@ import { requestPreferences } from "../../lib/consent";
  * route to the card is the bar itself, which is app-wide.
  */
 export function ConsentSettingsPanel() {
+  const catalog = useConsentCatalog();
   return (
     <section aria-labelledby="consent-privacy-heading">
       <div className="setSectionHead">
         <h2 className="setSectionTitle" id="consent-privacy-heading">
-          Privacy
+          {t(catalog, "consent.settings.title")}
         </h2>
         <p className="setSectionHint">
-          Choose what this browser stores. Asked once; change it here any time.
+          {t(catalog, "consent.settings.hint")}
         </p>
       </div>
       <div className="setList">
@@ -50,7 +53,7 @@ export function ConsentSettingsPanel() {
           // carried, never consulted: it is not a discriminator of behaviour.
           onClick={(event) => requestPreferences(event.currentTarget)}
         >
-          Cookie preferences
+          {t(catalog, "consent.settings.button")}
         </button>
       </div>
     </section>

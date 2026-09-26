@@ -7,7 +7,11 @@ import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { requestPreferences } from "../../lib/consent.js";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
-import { AiNotice } from "../AiNotice";
+import { LanguageSwitcher } from "../LanguageSwitcher";
+import { useChromeI18n } from "../../lib/i18n/I18nProvider";
+import type { LocaleCode } from "../../lib/i18n/locales";
+import { t } from "../../lib/i18n/translate";
+import { AiBanner } from "../AiNotice";
 import { supportCaseLink } from "./caseLink.js";
 import {
   browserSupportConversationStorage,
@@ -23,7 +27,7 @@ import {
 } from "./conversation.js";
 import { isStaleSupportSession, supportPost, SupportHttpError } from "./http.js";
 
-export type SupportAssistantLanguage = "en" | "ro";
+export type SupportAssistantLanguage = LocaleCode;
 export type SupportAssistantOutcome =
   | "ANSWER_GROUNDED"
   | "NO_SOURCE"
@@ -56,6 +60,7 @@ type SupportSession = Readonly<{
   identityBound: boolean;
   /** The language the session was opened in; its actions resolve in it. */
   language?: SupportAssistantLanguage;
+  firstMessage?: string;
 }>;
 export type SupportCaseAcknowledgement = Readonly<{
   text: string;
@@ -86,22 +91,6 @@ export type SupportAssistantClient = Readonly<{
   }>>;
 }>;
 
-const DISCLOSURE = Object.freeze({
-  en: "Hi — I'm the Dialectical Engine support assistant, an AI. I can explain how the product works and point you to the right page. I can't sign you in, change your account, or reset anything. For those, use the links I give you, or ask for a person.",
-  ro: "Bună — sunt asistentul de suport Dialectical Engine, o inteligență artificială. Pot explica cum funcționează produsul și te pot îndruma către pagina potrivită. Nu pot să te autentific, să îți modific contul sau să resetez ceva. Pentru acestea folosește linkurile pe care ți le dau sau cere să vorbești cu o persoană."
-});
-
-const WORDS = Object.freeze({
-  en: Object.freeze({
-    label: "Message",send: "Send",human: "Talk to a human",yes: "Yes",no: "No",
-    close: "Close help"
-  }),
-  ro: Object.freeze({
-    label: "Mesaj",send: "Trimite",human: "Vorbește cu o persoană",yes: "Da",no: "Nu",
-    close: "Închide ajutorul"
-  })
-});
-
 // Points inward, back toward the dock corner the panel folds into.
 const CLOSE_ARROW = <svg
   width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
@@ -114,24 +103,24 @@ const PERSON_MARK = <svg
 ><circle cx="8" cy="5.4" r="2.6" /><path d="M3 13.6c.6-2.6 2.6-4.1 5-4.1s4.4 1.5 5 4.1" /></svg>;
 
 const HELP_TOPICS = Object.freeze([
-  Object.freeze({ key: "getting-started",label: "Getting started",count: 6,tone: "gold",
-    prompt: "How do I start my first debate?" }),
-  Object.freeze({ key: "reading",label: "Reading a debate tree",count: 9,tone: "reasoning",
-    prompt: "What does a condition mark mean?" }),
-  Object.freeze({ key: "scores",label: "Scores, reviews & verdicts",count: 11,tone: "pro",
-    prompt: "How should I read scores, reviews, and verdicts?" }),
-  Object.freeze({ key: "publishing",label: "Publishing & visibility",count: 5,tone: "con",
-    prompt: "Can I unpublish a debate?" }),
-  Object.freeze({ key: "account",label: "Account, MFA & sessions",count: 8,tone: "muted",
-    prompt: "How do I manage MFA and active sessions?" }),
-  Object.freeze({ key: "privacy",label: "Privacy & your data",count: 7,tone: "agree",
-    prompt: "How is my support conversation protected?" })
+  Object.freeze({ key: "getting-started",labelKey: "support.topic.gettingStarted",count: 6,
+    tone: "gold",promptKey: "support.topic.gettingStarted.prompt" }),
+  Object.freeze({ key: "reading",labelKey: "support.topic.reading",count: 9,
+    tone: "reasoning",promptKey: "support.topic.reading.prompt" }),
+  Object.freeze({ key: "scores",labelKey: "support.topic.scores",count: 11,
+    tone: "pro",promptKey: "support.topic.scores.prompt" }),
+  Object.freeze({ key: "publishing",labelKey: "support.topic.publishing",count: 5,
+    tone: "con",promptKey: "support.topic.publishing.prompt" }),
+  Object.freeze({ key: "account",labelKey: "support.topic.account",count: 8,
+    tone: "muted",promptKey: "support.topic.account.prompt" }),
+  Object.freeze({ key: "privacy",labelKey: "support.topic.privacy",count: 7,
+    tone: "agree",promptKey: "support.topic.privacy.prompt" })
 ]);
 
 const HELP_SUGGESTIONS = Object.freeze([
-  "Report a bug in this debate",
-  "What does a condition mark mean?",
-  "Can I unpublish a debate?"
+  "support.suggestion.bug",
+  "support.suggestion.condition",
+  "support.suggestion.unpublish"
 ]);
 
 type SupportPageStatus = Readonly<{
@@ -140,22 +129,33 @@ type SupportPageStatus = Readonly<{
   shippedDocs: number | null;
 }>;
 
-const REQUEST_UNAVAILABLE = Object.freeze({
-  en: "Support is unavailable right now. Please try again or choose 'Talk to a human'.",
-  ro: "Serviciul de suport nu este disponibil acum. Încearcă din nou sau alege „Vorbește cu o persoană”."
-});
+const SUPPORT_EMAIL = "support@dezbatere.ro";
+
+/** The agent's own state words, each with its own label key (never collapsed). */
+const SUPPORT_STATUS_LABEL_KEYS = Object.freeze({
+  UNAVAILABLE: "support.status.unavailable",
+  CHECKING: "support.status.checking",
+  ONLINE: "support.status.online"
+} as const);
 
 /**
- * DL1-F5c: what the stored transcript says about an open case, and what the
- * page shows once the bearer is gone — a reload, another tab, the next person
- * at a shared browser. The API's own acknowledgement sentence carries the
- * 30-day case capability twice (the code and the link); this one carries it
- * nowhere, so it is what rests in `sessionStorage`.
+ * The model-fleet row states what the relay reported, as dev did with the raw
+ * `relay_state`: each known state has its own label, CHECKING only while no
+ * status has arrived, and an unknown state is shown as reported rather than
+ * mapped onto a state the page did not observe.
  */
-const CASE_OPENED_NOTICE = Object.freeze({
-  en: "A case is open for a person to read. Its code is never kept in this browser, so it is not shown here — use the case link from when it was opened, or ask for a person again.",
-  ro: "Un caz este deschis pentru ca o persoană să îl citească. Codul lui nu este păstrat în acest browser, așa că nu este afișat aici — folosește linkul cazului de la deschidere sau cere din nou o persoană."
+const RELAY_STATE_LABEL_KEYS: Readonly<Record<string,string>> = Object.freeze({
+  AVAILABLE: "support.status.available",
+  UNAVAILABLE: "support.status.unavailable"
 });
+
+function relayStateLabel(
+  catalog: Readonly<Record<string,string>>,relayState: string | undefined
+): string {
+  if (relayState === undefined) return t(catalog,"support.status.checking");
+  const key = RELAY_STATE_LABEL_KEYS[relayState];
+  return key === undefined ? relayState : t(catalog,key);
+}
 
 const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help"]);
 const PUBLIC_DEBATE = /^\/public\/debate\/[A-Za-z0-9_-]+$/u;
@@ -269,9 +269,15 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
       throw new Error("SUPPORT_RESPONSE_INVALID");
     }
     const session = body.session as Record<string,unknown>;
+    const firstMessage = body.first_message !== null && typeof body.first_message === "object"
+      && (body.first_message as Record<string,unknown>).role === "assistant"
+      && typeof (body.first_message as Record<string,unknown>).text === "string"
+      ? String((body.first_message as Record<string,unknown>).text)
+      : undefined;
     return Object.freeze({
       sessionId: String(session.session_id),token: String(body.session_token),
-      identityBound: session.identity_bound === true,language
+      identityBound: session.identity_bound === true,language,
+      ...(firstMessage === undefined ? {} : { firstMessage })
     });
   },
   async sendMessage(session,text) {
@@ -325,29 +331,28 @@ function caseBearerOf(token: string,text: string): SupportCaseBearer | null {
  * is a stable React key that carries nothing (it used to be `case-<token>`).
  */
 function caseOpenedMessage(
-  index: number,language: SupportAssistantLanguage
+  index: number,catalog: Readonly<Record<string,string>>
 ): ConversationMessage {
   return Object.freeze({
     id: `case-${index}`,role: "assistant" as const,
-    text: CASE_OPENED_NOTICE[language],caseOpened: true as const
+    text: t(catalog,"support.caseOpenedNotice"),caseOpened: true as const
   });
 }
 
 export { SUPPORT_CONVERSATION_STORAGE_KEY };
 
 export function Assistant({
-  client = supportAssistantClient,signedIn,onLanguageChange,
+  client = supportAssistantClient,signedIn,
   fullPage = false,auxiliaryContent,onClose
 }: Readonly<{
   client?: SupportAssistantClient;
   signedIn?: boolean;
-  onLanguageChange?: (language: SupportAssistantLanguage) => void;
   fullPage?: boolean;
   auxiliaryContent?: ReactNode;
   onClose?: () => void;
 }>) {
+  const { catalog: chromeCatalog,locale: language } = useChromeI18n();
   const persistent = client === supportAssistantClient;
-  const [language,setLanguage] = useState<SupportAssistantLanguage>("en");
   // DL3-F3: the capability lives here and nowhere else. It is never written to
   // sessionStorage, so it cannot outlive the page that minted it.
   const [session,setSession] = useState<SupportSession | null>(null);
@@ -359,9 +364,7 @@ export function Assistant({
    * the code and its link back on screen for the page that opened the case.
    */
   const [caseBearer,setCaseBearer] = useState<SupportCaseBearer | null>(null);
-  const [messages,setMessages] = useState<readonly ConversationMessage[]>([
-    { id: "disclosure",role: "assistant",text: DISCLOSURE.en }
-  ]);
+  const [messages,setMessages] = useState<readonly ConversationMessage[]>([]);
   const [busy,setBusy] = useState(false);
   const [identityAvailable,setIdentityAvailable] = useState(signedIn ?? false);
   // DL3-F3: nothing stored is read back until the identity at the keyboard is
@@ -376,10 +379,6 @@ export function Assistant({
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
 
-  useEffect(() => {
-    onLanguageChange?.(language);
-  },[language,onLanguageChange]);
-
   // DL3-F3: the transcript is restored once, against the identity that produced
   // it. A transcript belonging to anyone else is erased on the way past.
   useEffect(() => {
@@ -389,10 +388,15 @@ export function Assistant({
       browserSupportConversationStorage(),identityAvailable
     );
     if (conversation === null) return;
-    setLanguage(conversation.language);
-    if (conversation.messages.length > 0) setMessages(conversation.messages);
-  },[identityAvailable,identityResolved,persistent,restored]);
+    if (conversation.language !== language) {
+      clearStoredSupportConversation(browserSupportConversationStorage());
+      return;
+    }
+    setMessages(conversation.messages);
+  },[identityAvailable,identityResolved,language,persistent,restored]);
 
+  // DL3-F3: the transcript is restored once, against the identity that produced
+  // it. A transcript belonging to anyone else is erased on the way past.
   useEffect(() => {
     if (!persistent || !restored) return;
     writeStoredSupportConversation(browserSupportConversationStorage(),{
@@ -457,16 +461,6 @@ export function Assistant({
     return () => { active = false; };
   },[fullPage,persistent]);
 
-  function chooseLanguage(next: SupportAssistantLanguage): void {
-    if (next === language) return;
-    setSession(null);
-    setLanguage(next);
-    onLanguageChange?.(next);
-    setMessages((current) => current.map((message,index) => index === 0
-      ? { ...message,text: DISCLOSURE[next] }
-      : message));
-  }
-
   function primeComposer(prompt: string): void {
     if (inputRef.current === null) return;
     inputRef.current.value = prompt;
@@ -477,7 +471,7 @@ export function Assistant({
     setSession(null);
     // DL1-F5c: the bearer goes with the transcript it belongs to.
     setCaseBearer(null);
-    setMessages([{ id: "disclosure",role: "assistant",text: DISCLOSURE[language] }]);
+    setMessages([]);
     setActiveTopic("reading");
     if (inputRef.current !== null) inputRef.current.value = "";
     if (persistent) clearStoredSupportConversation(browserSupportConversationStorage());
@@ -500,8 +494,23 @@ export function Assistant({
         actions: response.actions ?? Object.freeze([]),
         ...(response.link === undefined ? {} : { link: response.link })
       },
-      ...(acknowledgement === undefined ? [] : [caseOpenedMessage(current.length + 1,language)])
+      ...(acknowledgement === undefined ? [] : [caseOpenedMessage(current.length + 1,chromeCatalog)])
     ]);
+  }
+
+  function appendFirstMessage(started: SupportSession): void {
+    const firstMessage = started.firstMessage;
+    if (firstMessage === undefined) return;
+    setMessages((current) => {
+      const message: ConversationMessage = {
+      id: `session-${started.sessionId}-${current.length}`,role: "assistant",
+      text: redactSupportText(firstMessage).text,language
+      };
+      const last = current.at(-1);
+      return last?.role === "user"
+        ? [...current.slice(0,-1),message,last]
+        : [...current,message];
+    });
   }
 
   async function activeSession(discardCurrent = false): Promise<SupportSession | null> {
@@ -525,6 +534,7 @@ export function Assistant({
       appendReply(started);
       return null;
     }
+    appendFirstMessage(started);
     setSession(started);
     return started;
   }
@@ -575,7 +585,7 @@ export function Assistant({
       const response = await withSupportSession((active) => client.sendMessage(active,request));
       if (response !== null) appendReply(response);
     } catch {
-      appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
+      appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
     } finally {
       setBusy(false);
     }
@@ -598,10 +608,10 @@ export function Assistant({
         appendReply(opened);
       } else {
         setCaseBearer(caseBearerOf(opened.token,opened.text));
-        setMessages((current) => [...current,caseOpenedMessage(current.length,language)]);
+        setMessages((current) => [...current,caseOpenedMessage(current.length,chromeCatalog)]);
       }
     } catch {
-      appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
+      appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
     } finally {
       setBusy(false);
     }
@@ -619,17 +629,12 @@ export function Assistant({
         appendReply(acknowledgement);
       } else {
         setCaseBearer(caseBearerOf(acknowledgement.token,acknowledgement.text));
-        setMessages((current) => [...current,caseOpenedMessage(current.length,language)]);
+        setMessages((current) => [...current,caseOpenedMessage(current.length,chromeCatalog)]);
       }
     } catch {
-      appendReply({ messageId: "",outcome: "DEGRADED",text: REQUEST_UNAVAILABLE[language] });
+      appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
     }
   }
-
-  const languageControls = <div className="supportLanguage" aria-label="Language override">
-    <button type="button" aria-pressed={language === "en"} onClick={() => chooseLanguage("en")}>EN</button>
-    <button type="button" aria-pressed={language === "ro"} onClick={() => chooseLanguage("ro")}>RO</button>
-  </div>;
 
   /**
    * DL1-F5c: the acknowledgement the in-memory bearer belongs to — the newest
@@ -641,7 +646,8 @@ export function Assistant({
     (newest,message) => message.caseOpened === true ? message.id : newest,null
   );
 
-  const conversation = <div className="supportConversation" aria-label="Support conversation" aria-live="polite">
+  const conversation = <div className="supportConversation"
+    aria-label={t(chromeCatalog,"support.conversation")} aria-live="polite">
     {messages.map((message) => {
       const bearer = caseBearer !== null && message.id === liveCaseMessageId ? caseBearer : null;
       const text = bearer === null ? message.text : bearer.text;
@@ -658,15 +664,15 @@ export function Assistant({
           <div className="supportMessageCore">
             <p>{text}</p>
             {!hasFooter ? null : <footer className="supportCitation">
-              {sources.length === 0 ? null : <div role="list" aria-label={language === "en" ? "Sources" : "Surse"}>
+              {sources.length === 0 ? null : <div role="list" aria-label={t(chromeCatalog,"support.sources")}>
                 {sources.map((source) => <span role="listitem" key={source.id}>{source.label}</span>)}
               </div>}
-              {actions.length === 0 ? null : <nav aria-label={language === "en" ? "Actions" : "Acțiuni"}>
+              {actions.length === 0 ? null : <nav aria-label={t(chromeCatalog,"support.actions")}>
                 {actions.map((action) => <a href={action.href} key={action.id}>{action.label}</a>)}
               </nav>}
               {link === null ? null : <>
-                <span>{generated ? "AI · " : ""}DOCS · PRODUCT GUIDE</span>
-                <a href={link}>View source →</a>
+                <span>{generated ? "AI · " : ""}{t(chromeCatalog,"support.docsProductGuide")}</span>
+                <a href={link}>{t(chromeCatalog,"support.viewSource")} →</a>
               </>}
             </footer>}
           </div>
@@ -676,41 +682,40 @@ export function Assistant({
   </div>;
 
   const ratingControls = canRate && last !== undefined ? (
-    <div className="supportRating" aria-label="Answer rating">
-      <span>{language === "en" ? "Did this answer your question?" : "Ți-a răspuns la întrebare?"}</span>
-      <button type="button" onClick={() => void rateLast(last.id,"yes")}>{WORDS[language].yes}</button>
-      <button type="button" onClick={() => void rateLast(last.id,"no")}>{WORDS[language].no}</button>
+    <div className="supportRating" aria-label={t(chromeCatalog,"support.answerRating")}>
+      <span>{t(chromeCatalog,"support.ratingQuestion")}</span>
+      <button type="button" onClick={() => void rateLast(last.id,"yes")}>{t(chromeCatalog,"support.yes")}</button>
+      <button type="button" onClick={() => void rateLast(last.id,"no")}>{t(chromeCatalog,"support.no")}</button>
     </div>
   ) : null;
 
   const composer = <form className="supportComposer" onSubmit={(event) => void submit(event)}>
-    <label className="supportComposerLabel" htmlFor="support-message">{WORDS[language].label}</label>
+    <label className="supportComposerLabel" htmlFor="support-message">{t(chromeCatalog,"support.message")}</label>
     <input
       ref={inputRef}
       id="support-message"
       name="support-message"
       autoComplete="off"
-      placeholder={language === "en" ? "Describe what happened…" : "Descrie ce s-a întâmplat…"}
+      placeholder={t(chromeCatalog,"support.placeholder")}
     />
     {fullPage ? <div className="supportComposerBar">
-      <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
+      <button className="supportSend" type="submit" disabled={busy}>{t(chromeCatalog,"support.send")}</button>
     </div> : <div className="supportComposerBar supportComposerBar--compact">
-      <button className="supportSend" type="submit" disabled={busy}>{WORDS[language].send}</button>
+      <button className="supportSend" type="submit" disabled={busy}>{t(chromeCatalog,"support.send")}</button>
     </div>}
   </form>;
 
   if (!fullPage) return (
-    <section className="supportAssistantCompact" aria-label="Dialectical Engine support assistant">
+    <section className="supportAssistantCompact" aria-label={t(chromeCatalog,"support.assistantLabel")}>
       <div className="supportCompactHeader">
         {onClose === undefined ? null : <button
           type="button"
           className="supportCompactClose"
-          aria-label={WORDS[language].close}
+          aria-label={t(chromeCatalog,"support.close")}
           onClick={onClose}
         >{CLOSE_ARROW}</button>}
-        {languageControls}
       </div>
-      <AiNotice variant="banner" language={language} />
+      <AiBanner catalog={chromeCatalog} />
       {conversation}
       {ratingControls}
       <button
@@ -718,13 +723,16 @@ export function Assistant({
         className="supportEscalateCompact"
         disabled={busy}
         onClick={() => void escalate()}
-      >{PERSON_MARK}<span>{WORDS[language].human}</span></button>
+      >{PERSON_MARK}<span>{t(chromeCatalog,"support.talkToHuman")}</span></button>
       {composer}
     </section>
   );
 
-  const statusLabel = statusUnavailable || pageStatus?.available === false
+  // The modifier class keys on the untranslated state, so dev's
+  // `.supportOnline--unavailable` styling applies in every locale.
+  const statusState = statusUnavailable || pageStatus?.available === false
     ? "UNAVAILABLE" : pageStatus === null ? "CHECKING" : "ONLINE";
+  const statusLabel = t(chromeCatalog,SUPPORT_STATUS_LABEL_KEYS[statusState]);
   const reference = session === null ? "HLP—NEW" : `HLP-${session.sessionId.slice(0,4).toUpperCase()}`;
   const privacyShortcut = resolveSupportActions(["privacy-preferences"],{
     signedIn: identityAvailable,language
@@ -734,19 +742,20 @@ export function Assistant({
     <header className="supportHeader" data-support-header>
       <BrandMark />
       <span className="supportHeaderDivider" aria-hidden />
-      <span className="supportHeaderTitle">Help</span>
+      <span className="supportHeaderTitle">{t(chromeCatalog, "chrome.help")}</span>
       <div className="supportHeaderActions">
+        <LanguageSwitcher />
         <ModeToggle compact />
         <span className="supportIdentity">
           <span className="supportIdentityMark" aria-hidden>{identityAvailable ? "A" : "G"}</span>
-          <span>{identityAvailable ? "Signed-in asker" : "Guest session"}</span>
+          <span>{t(chromeCatalog, identityAvailable ? "chrome.signedInAsker" : "chrome.guestSession")}</span>
         </span>
       </div>
     </header>
 
     <div className="supportDeskBody">
-      <nav className="supportRail supportTopicRail" aria-label="Browse by topic">
-        <p className="supportEyebrow">Browse by topic</p>
+      <nav className="supportRail supportTopicRail" aria-label={t(chromeCatalog,"support.browseByTopic")}>
+        <p className="supportEyebrow">{t(chromeCatalog,"support.browseByTopic")}</p>
         <div className="supportTopicList">
           {HELP_TOPICS.map((topic) => <button
             type="button"
@@ -756,40 +765,47 @@ export function Assistant({
             aria-pressed={activeTopic === topic.key}
             onClick={() => {
               setActiveTopic(topic.key);
-              primeComposer(topic.prompt);
+              primeComposer(t(chromeCatalog,topic.promptKey));
             }}
           >
             <span className={`supportTopicDiamond supportTone--${topic.tone}`} aria-hidden />
-            <span>{topic.label}</span>
+            <span>{t(chromeCatalog,topic.labelKey)}</span>
             <span className="supportTopicCount">{topic.count}</span>
           </button>)}
         </div>
 
-        <section className="supportService" id="service-status" aria-label="Service status">
-          <p className="supportEyebrow">Service status</p>
+        <section className="supportService" id="service-status"
+          aria-label={t(chromeCatalog,"support.serviceStatus")}>
+          <p className="supportEyebrow">{t(chromeCatalog,"support.serviceStatus")}</p>
           <div className="supportServiceRow">
-            <span><i className={`supportStatusDot ${statusUnavailable ? "is-down" : "is-ok"}`} />Debate engine</span>
-            <strong>{statusUnavailable ? "CHECK" : "NORMAL"}</strong>
+            <span><i className={`supportStatusDot ${statusUnavailable ? "is-down" : "is-ok"}`} />
+              {t(chromeCatalog,"support.debateEngine")}</span>
+            <strong>{t(chromeCatalog,statusUnavailable ? "support.status.check" : "support.status.normal")}</strong>
           </div>
           <div className="supportServiceRow">
-            <span><i className="supportStatusDot is-warn" />Scoring queue</span>
-            <strong>IN APP</strong>
+            <span><i className="supportStatusDot is-warn" />{t(chromeCatalog,"support.scoringQueue")}</span>
+            <strong>{t(chromeCatalog,"support.status.inApp")}</strong>
           </div>
           <div className="supportServiceRow">
-            <span><i className={`supportStatusDot ${pageStatus?.relayState === "AVAILABLE" ? "is-ok" : "is-warn"}`} />Model fleet</span>
-            <strong>{pageStatus?.relayState ?? "CHECKING"}</strong>
+            <span><i className={`supportStatusDot ${pageStatus?.relayState === "AVAILABLE" ? "is-ok" : "is-warn"}`} />
+              {t(chromeCatalog,"support.modelFleet")}</span>
+            <strong>{relayStateLabel(chromeCatalog,pageStatus?.relayState)}</strong>
           </div>
         </section>
       </nav>
 
-      <section className="supportAgent" aria-label="Support agent conversation">
+      <section className="supportAgent" aria-label={t(chromeCatalog,"support.agentConversation")}>
         <header className="supportAgentHeader">
-          <div className="supportAgentAvatar" aria-hidden>◆</div>
-          <div className="supportAgentIdentity">
-            <div><h1>Support agent</h1><span className={`supportOnline supportOnline--${statusLabel.toLowerCase()}`}>{statusLabel}</span></div>
-            <p><strong>You are talking to an AI, not a person.</strong> It answers from public product guidance, cites its source, and hands off to a person when it cannot.</p>
+            <div className="supportAgentAvatar" aria-hidden>◆</div>
+            <div className="supportAgentIdentity">
+              <div><h1>{t(chromeCatalog,"support.agentTitle")}</h1>
+                <span className={`supportOnline supportOnline--${statusState.toLowerCase()}`}>{statusLabel}</span></div>
+            <p><strong>{t(chromeCatalog,"support.aiLead")}</strong>{" "}
+              {t(chromeCatalog,"support.agentLead")}</p>
           </div>
-          <button className="supportNewConversation" type="button" onClick={beginNewConversation}>New conversation</button>
+          <button className="supportNewConversation" type="button" onClick={beginNewConversation}>
+            {t(chromeCatalog,"support.newConversation")}
+          </button>
         </header>
 
         <div
@@ -801,16 +817,16 @@ export function Assistant({
             followLatestRef.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight <= 48;
           }}
         >
-          <AiNotice variant="banner" language={language} />
-          <p className="supportTimestamp">Today · Support conversation</p>
+          <AiBanner catalog={chromeCatalog} />
+          <p className="supportTimestamp">{t(chromeCatalog,"support.timestamp")} · {t(chromeCatalog,"support.conversation")}</p>
           {conversation}
           <div ref={conversationEndRef} data-support-conversation-end aria-hidden />
           {ratingControls}
-          <div className="supportSuggestions" aria-label="Suggested questions">
-            {HELP_SUGGESTIONS.map((suggestion) => <button
-              type="button" key={suggestion} disabled={busy}
-              onClick={() => void sendRequest(suggestion)}
-            >{suggestion}</button>)}
+          <div className="supportSuggestions" aria-label={t(chromeCatalog,"support.suggestions")}>
+            {HELP_SUGGESTIONS.map((suggestionKey) => <button
+              type="button" key={suggestionKey} disabled={busy}
+              onClick={() => void sendRequest(t(chromeCatalog,suggestionKey))}
+            >{t(chromeCatalog,suggestionKey)}</button>)}
           </div>
         </div>
 
@@ -819,38 +835,41 @@ export function Assistant({
         </div>
       </section>
 
-      <aside className="supportRail supportRightRail" aria-label="Conversation details">
+      <aside className="supportRail supportRightRail" aria-label={t(chromeCatalog,"support.conversationDetails")}>
         <section className="supportSideCard">
-          <p className="supportEyebrow">This conversation</p>
+          <p className="supportEyebrow">{t(chromeCatalog,"support.thisConversation")}</p>
           <dl className="supportMetadata">
-            <div><dt>Reference</dt><dd>{reference}</dd></div>
-            <div><dt>Opened</dt><dd>This visit</dd></div>
-            <div><dt>Data</dt><dd>Public product guidance only</dd></div>
+            <div><dt>{t(chromeCatalog,"support.reference")}</dt><dd>{reference}</dd></div>
+            <div><dt>{t(chromeCatalog,"support.opened")}</dt><dd>{t(chromeCatalog,"support.thisVisit")}</dd></div>
+            <div><dt>{t(chromeCatalog,"support.data")}</dt><dd>{t(chromeCatalog,"support.publicGuidance")}</dd></div>
           </dl>
-          <div className="supportSideLanguage"><span>Language</span>{languageControls}</div>
         </section>
 
         <section className="supportSideCard supportEscalation">
           <span className="supportEscalationTab" aria-hidden />
-          <h2>Need a person?</h2>
-          <p>Escalate and a human reads the whole thread. Weekdays, replies within one working day.</p>
-          <button type="button" disabled={busy} onClick={() => void escalate()}>Escalate to a human</button>
-          <a href="mailto:support@dezbatere.ro">support@dezbatere.ro</a>
+          <h2>{t(chromeCatalog,"support.needPerson")}</h2>
+          <p>{t(chromeCatalog,"support.escalateBody")}</p>
+          <button type="button" disabled={busy} onClick={() => void escalate()}>
+            {t(chromeCatalog,"support.escalate")}
+          </button>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
         </section>
 
-        <section className="supportSideCard" aria-label="Support shortcuts">
-          <p className="supportEyebrow">Shortcuts</p>
+        <section className="supportSideCard" aria-label={t(chromeCatalog,"support.shortcutsLabel")}>
+          <p className="supportEyebrow">{t(chromeCatalog,"support.shortcuts")}</p>
           <ul className="supportShortcuts">
             {privacyShortcut === undefined ? null : <li>
-              <a href={privacyShortcut.href}>{privacyShortcut.label} <span>↗</span></a>
+              <a href={privacyShortcut.href}>{t(chromeCatalog,"support.privacyPreferences")} <span>↗</span></a>
             </li>}
             <li><button type="button" onClick={(event) => requestPreferences(event.currentTarget)}>
-              Cookie preferences <span>↗</span>
+              {t(chromeCatalog,"support.cookiePreferences")} <span>↗</span>
             </button></li>
-            <li><a href="#service-status">Model fleet status <span>↗</span></a></li>
-            <li><button type="button" onClick={() => primeComposer("Report a bug in this debate")}>Report a bug <span>→</span></button></li>
+            <li><a href="#service-status">{t(chromeCatalog,"support.modelFleetStatus")} <span>↗</span></a></li>
+            <li><button type="button" onClick={() => primeComposer(t(chromeCatalog,"support.suggestion.bug"))}>
+              {t(chromeCatalog,"support.reportBug")} <span>→</span>
+            </button></li>
           </ul>
-          <p className="supportShortcutNote">Opens a public product-guide conversation here.</p>
+          <p className="supportShortcutNote">{t(chromeCatalog,"support.shortcutNote")}</p>
         </section>
 
         {auxiliaryContent === undefined ? null : <div className="supportAuxiliary">{auxiliaryContent}</div>}

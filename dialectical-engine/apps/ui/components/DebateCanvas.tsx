@@ -14,7 +14,7 @@ import {
   type PlacedClaim
 } from "@/lib/debatePresentation";
 import { ModelMetaLine } from "@/components/ModelPresentation";
-import { SCRUTINY_STATUS } from "@/lib/scrutiny";
+import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
 import {
   formatIndependencePill,
   formatScoreBadgeLabel,
@@ -27,13 +27,25 @@ import { CanvasViewport } from "@/components/CanvasViewport";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import type { Node as ContractNode } from "@debateai/contract";
 import { v3NodeScoreState, v3ScorePresentation, type V3ScorePresentation } from "@/lib/v3/adapter";
-import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import miscEnglish from "@/messages/en/misc.json";
+import debateChromeEnglish from "@/messages/en/debateChrome.json";
+import composeEnglish from "@/messages/en/compose.json";
 
 // Verdict-first UI (Phase 9): low-strength node dimming is additive and
 // gated behind NEXT_PUBLIC_VERDICT_FIRST_UI -- flag off must leave rendering
 // byte-identical to pre-Task-4 behavior. See debateTreeUtils.isLowStrengthNode
 // for the honesty contract (missing score is never treated as low strength).
 const VERDICT_FIRST_UI_ENABLED = process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true";
+
+function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog, debateChromeCatalog: MessageCatalog): string {
+  const role = roleOf(node);
+  if (role === "root") return t(catalog, "debateViews.rootClaim");
+  if (role === "pro") return t(catalog, "debateViews.pro");
+  if (role === "con") return t(catalog, "debateViews.con");
+  return roleLabel(node, debateChromeCatalog);
+}
 
 function isSetAsidePath(node: DebateNode): boolean {
   const pathStatus = node.path_status?.trim().toLowerCase();
@@ -78,6 +90,12 @@ type DebateCanvasProps = CanvasCallbacks & {
   lowStrengthThreshold?: number;
   meta: { claims: number; depth: number; judged: number; derivedStanding: number; setAside: number; decomposer?: string };
   canvasRef?: (el: HTMLDivElement | null) => void;
+  /** The interface locale's `misc` catalogue, for the model identity lines. */
+  miscCatalog?: MessageCatalog;
+  /** The interface locale's `debateChrome` catalogue: role labels and score pills. */
+  debateChromeCatalog?: MessageCatalog;
+  /** The interface locale's `compose` catalogue: scrutiny status, V3 score copy, model family. */
+  composeCatalog?: MessageCatalog;
 };
 
 export function DebateCanvas({
@@ -95,8 +113,12 @@ export function DebateCanvas({
   onChallengeNode,
   onToggleExpand,
   onProseSelect,
-  canvasRef
+  canvasRef,
+  miscCatalog = miscEnglish,
+  debateChromeCatalog = debateChromeEnglish,
+  composeCatalog = composeEnglish
 }: DebateCanvasProps) {
+  const { catalog, locale } = useChromeI18n();
   const [heights, setHeights] = useState<Record<string, number>>({});
   const [showSetAsidePaths, setShowSetAsidePaths] = useState(false);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -146,14 +168,16 @@ export function DebateCanvas({
       canvasRef={canvasRef}
       stickyControl={
         <div className="canvasStickyControl">
-          <span>{meta.claims} claims across {meta.depth} levels · {meta.judged} judged · {meta.derivedStanding} standing on their arguments · {meta.setAside} set aside</span>
+          <span>
+            {tPlural(catalog, "debateViews.claimCount", meta.claims, locale)} {t(catalog, "debateViews.across")} {tPlural(catalog, "debateViews.levelCount", meta.depth, locale)} · {tPlural(catalog, "debateViews.judgedCount", meta.judged, locale)} · {tPlural(catalog, "debateViews.standingCount", meta.derivedStanding, locale)} · {tPlural(catalog, "debateViews.setAsideCount", meta.setAside, locale)}
+          </span>
           <label className="canvasStickyToggle">
             <input
               type="checkbox"
               checked={showSetAsidePaths}
               onChange={(event) => setShowSetAsidePaths(event.currentTarget.checked)}
             />
-            Show set-aside paths
+            {t(catalog, "debateViews.showSetAsidePaths")}
           </label>
         </div>
       }
@@ -192,6 +216,11 @@ export function DebateCanvas({
           onChallengeNode={onChallengeNode}
           onToggleExpand={onToggleExpand}
           onProseSelect={onProseSelect}
+          catalog={catalog}
+          miscCatalog={miscCatalog}
+          debateChromeCatalog={debateChromeCatalog}
+          composeCatalog={composeCatalog}
+          locale={locale}
         />
       ))}
     </CanvasViewport>
@@ -210,6 +239,11 @@ type CanvasCardProps = CanvasCallbacks & {
   lowStrengthThreshold?: number;
   meta: { claims: number; depth: number; judged: number; derivedStanding: number; setAside: number; decomposer?: string };
   registerRef: (el: HTMLDivElement | null) => void;
+  catalog: MessageCatalog;
+  miscCatalog: MessageCatalog;
+  debateChromeCatalog: MessageCatalog;
+  composeCatalog: MessageCatalog;
+  locale: string;
 };
 
 function CanvasCard({
@@ -227,7 +261,12 @@ function CanvasCard({
   onOpenNode,
   onChallengeNode,
   onToggleExpand,
-  onProseSelect
+  onProseSelect,
+  catalog,
+  miscCatalog,
+  debateChromeCatalog,
+  composeCatalog,
+  locale
 }: CanvasCardProps) {
   const { node, state, role } = placed;
   const pal = role === "root" ? null : ROLE_PALETTES[role];
@@ -248,7 +287,7 @@ function CanvasCard({
       break;
   }
   const generation = node.active_generation;
-  const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
+  const scrutiny = scrutinyStatus ? scrutinyStatuses(composeCatalog)[scrutinyStatus] : null;
   const setAside = isSetAsidePath(node);
   // Task 13 (P1.5): sourcing-breadth chip, derived straight from the node's
   // own EVIDENCE children -- independent of whether scoring has run, so it
@@ -257,10 +296,10 @@ function CanvasCard({
   // callers byte-identical; anything else renders either both numbers or the
   // typed reason there are none (never 0, never a dash — DR-115).
   const v3Scores =
-    v3NodesById === undefined ? null : v3ScorePresentation(v3NodeScoreState(node, v3NodesById));
+    v3NodesById === undefined ? null : v3ScorePresentation(v3NodeScoreState(node, v3NodesById), composeCatalog);
   // Evidence sourcing breadth. Null below one distinct source, so a card with
   // no record stays silent rather than printing "sources: 0".
-  const independencePill = formatIndependencePill(node.evidence_independence);
+  const independencePill = formatIndependencePill(node.evidence_independence, debateChromeCatalog, locale);
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -375,22 +414,22 @@ function CanvasCard({
               borderColor: "var(--line-2)"
             }}
           >
-            Set aside
+            {t(catalog, "debateViews.setAside")}
           </span>
         ) : null}
 
         {role === "root" ? (
           <>
-            <div className="nodeEyebrow">Root claim</div>
+            <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
             <div className="nodeClaim root">{node.claim}</div>
             <div className="nodeRootMeta">
-              <span>{meta.claims} claims</span>
+              <span>{tPlural(catalog, "debateViews.claimCount", meta.claims, locale)}</span>
               <span className="sep">/</span>
-              <span>depth {meta.depth}</span>
+              <span>{t(catalog, "debateViews.depthValue", { depth: meta.depth })}</span>
               {meta.decomposer ? (
                 <>
                   <span className="sep">/</span>
-                  <span>decomposed by {meta.decomposer}</span>
+                  <span>{t(catalog, "debateViews.decomposedBy", { model: meta.decomposer })}</span>
                 </>
               ) : null}
             </div>
@@ -401,11 +440,11 @@ function CanvasCard({
               ∅
             </span>
             <div>
-              <div className="nodeEmptyText">No strong argument found.</div>
+              <div className="nodeEmptyText">{t(catalog, "debateViews.noStrongArgument")}</div>
               {generation || node.maker !== undefined ? (
                 <div className="metaLine" style={{ marginTop: 5 }}>
-                  <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />
-                  {generation ? " conceded" : null}
+                  <ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} catalog={miscCatalog} composeCatalog={composeCatalog} />
+                  {generation ? ` ${t(catalog, "debateViews.conceded")}` : null}
                 </div>
               ) : null}
             </div>
@@ -414,18 +453,18 @@ function CanvasCard({
           <div className="nodeAbandoned">
             <span className="nodeAbandonedMark" aria-hidden>⊗</span>
             <div>
-              <div className="nodeAbandonedLabel">Stopped path</div>
-              <div className="nodeAbandonedClaim">{node.claim || "Abandoned argument"}</div>
+              <div className="nodeAbandonedLabel">{t(catalog, "debateViews.stoppedPath")}</div>
+              <div className="nodeAbandonedClaim">{node.claim || t(catalog, "debateViews.abandonedArgument")}</div>
             </div>
           </div>
         ) : state === "failed" ? (
           <div className="nodeAbandoned">
             <span className="nodeAbandonedMark" aria-hidden>⚠</span>
             <div>
-              <div className="nodeAbandonedLabel">Failed branch</div>
-              <div className="nodeAbandonedClaim">{node.claim || "Generation failed"}</div>
+              <div className="nodeAbandonedLabel">{t(catalog, "debateViews.failedBranch")}</div>
+              <div className="nodeAbandonedClaim">{node.claim || t(catalog, "debateViews.generationFailed")}</div>
               <div className="metaLine" style={{ marginTop: 5 }}>
-                Generation failed. The debate continued without this branch.
+                {t(catalog, "debateViews.generationFailedContinued")}
               </div>
             </div>
           </div>
@@ -433,33 +472,35 @@ function CanvasCard({
           <>
             <div className="nodeArgHeader">
               <span className="roleBadge" style={{ color: pal?.text, background: pal?.bg, borderColor: pal?.border }}>
-                {pal?.arrow} {roleLabel(node)}
+                {pal?.arrow} {localizedRoleLabel(node, catalog, debateChromeCatalog)}
               </span>
               {generation || node.maker !== undefined ? (
                 <ModelMetaLine
                   modelId={generation?.model_id ?? null}
                   maker={node.maker}
                   className="modelPill metaLine"
+                  catalog={miscCatalog}
+                  composeCatalog={composeCatalog}
                 />
               ) : null}
             </div>
             <div className="nodeScoreRow">
-              <ScoringErrorBoundary>
+              <ScoringErrorBoundary catalog={miscCatalog}>
                 {scoring ? (
-                  <ScoreBadges node={node} scoring={scoring} openNodeDetails={openNodeDetails} />
+                  <ScoreBadges node={node} scoring={scoring} openNodeDetails={openNodeDetails} catalog={catalog} debateChromeCatalog={debateChromeCatalog} locale={locale} />
                 ) : scoringError ? (
-                  <span className="scoreBadge unavailable" aria-label={`Scoring unavailable: ${scoringError.reason}`}>
-                    SCORING N/A
+                  <span className="scoreBadge unavailable" aria-label={t(catalog, "debateViews.scoringUnavailableReason", { reason: scoringError.reason })}>
+                    {t(catalog, "debateViews.scoringNotAvailableBadge")}
                   </span>
                 ) : null}
                 {v3Scores ? (
-                  <V3ScoreBadges node={node} presentation={v3Scores} openNodeDetails={openNodeDetails} />
+                  <V3ScoreBadges node={node} presentation={v3Scores} openNodeDetails={openNodeDetails} catalog={catalog} />
                 ) : null}
               </ScoringErrorBoundary>
               {independencePill ? (
                 <span
                   className="scoreBadge independence"
-                  aria-label={`Evidence sourcing for ${node.claim}: ${independencePill.title}`}
+                  aria-label={t(catalog, "debateViews.evidenceSourcingFor", { claim: node.claim, detail: independencePill.title })}
                   title={independencePill.title}
                 >
                   {independencePill.pillText}
@@ -490,7 +531,7 @@ function CanvasCard({
                         onChallengeNode(node, event.currentTarget);
                       }}
                     >
-                      ⚐ Challenge
+                      ⚐ {t(catalog, "debateViews.challenge")}
                     </button>
                   ) : (
                     <span
@@ -499,7 +540,7 @@ function CanvasCard({
                       tabIndex={-1}
                       style={{ opacity: 0.55 }}
                     >
-                      🔒 Challenge
+                      🔒 {t(catalog, "debateViews.challenge")}
                     </span>
                   )}
                   {onChallengeNode ? (
@@ -508,22 +549,22 @@ function CanvasCard({
                       className="nodeCtrl"
                       disabled
                       aria-disabled="true"
-                      title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+                      title={t(catalog, "debateViews.nodeRegenerationUnavailable")}
                     >
-                      ↻ Regenerate
+                      ↻ {t(catalog, "debateViews.regenerate")}
                     </button>
                   ) : null}
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"
                     className="nodeCtrl"
-                    aria-label="Details"
+                    aria-label={t(catalog, "debateViews.details")}
                     onClick={(event) => {
                       event.stopPropagation();
                       openNodeDetails();
                     }}
                   >
-                    Details <span aria-hidden="true">▸</span>
+                    {t(catalog, "debateViews.details")} <span aria-hidden="true">▸</span>
                   </button>
                 </div>
               </>
@@ -538,24 +579,30 @@ function CanvasCard({
 function ScoreBadges({
   node,
   scoring,
-  openNodeDetails
+  openNodeDetails,
+  catalog,
+  debateChromeCatalog,
+  locale
 }: {
   node: DebateNode;
   scoring: NodeScoringPayload;
   openNodeDetails: () => void;
+  catalog: MessageCatalog;
+  debateChromeCatalog: MessageCatalog;
+  locale: string;
 }) {
-  const strength = formatScorePercent(scoring.scores.strength);
-  const uncertainty = formatScorePercent(scoring.scores.uncertainty);
-  const impact = formatScorePercent(scoring.scores.impact);
-  const issueSummary = summarizeCardScoringIssues(scoring);
-  const uncertaintyPill = formatUncertaintyPill(scoring.uncertainty_drivers, scoring.uncertainty_source, uncertainty);
-  const strengthPill = formatStrengthPill(scoring.strength_kind, strength);
+  const strength = formatScorePercent(scoring.scores.strength, debateChromeCatalog);
+  const uncertainty = formatScorePercent(scoring.scores.uncertainty, debateChromeCatalog);
+  const impact = formatScorePercent(scoring.scores.impact, debateChromeCatalog);
+  const issueSummary = summarizeCardScoringIssues(scoring, catalog, locale);
+  const uncertaintyPill = formatUncertaintyPill(scoring.uncertainty_drivers, scoring.uncertainty_source, uncertainty, debateChromeCatalog);
+  const strengthPill = formatStrengthPill(scoring.strength_kind, strength, debateChromeCatalog);
 
   return (
     <button
       type="button"
       className="scoreBadgeButton"
-      aria-label={`Open scoring explanation for ${node.claim}`}
+      aria-label={t(catalog, "debateViews.openScoringExplanation", { claim: node.claim })}
       onClick={(event) => {
         event.stopPropagation();
         openNodeDetails();
@@ -563,20 +610,20 @@ function ScoreBadges({
     >
       <span
         className="scoreBadge strength"
-        aria-label={formatScoreBadgeLabel("Strength", scoring.labels.strength_label, strength)}
+        aria-label={formatScoreBadgeLabel(t(catalog, "debateViews.strength"), scoring.labels.strength_label, strength, debateChromeCatalog)}
         title={strengthPill.title}
       >
         {strengthPill.pillText}
       </span>
       <span
         className="scoreBadge uncertainty"
-        aria-label={formatScoreBadgeLabel("Uncertainty", scoring.labels.uncertainty_label, uncertainty)}
+        aria-label={formatScoreBadgeLabel(t(catalog, "debateViews.uncertainty"), scoring.labels.uncertainty_label, uncertainty, debateChromeCatalog)}
         title={uncertaintyPill.title}
       >
         {uncertaintyPill.pillText}
       </span>
-      <span className="scoreBadge impact" aria-label={formatScoreBadgeLabel("Impact", scoring.labels.impact_label, impact)}>
-        IMP {impact.value}
+      <span className="scoreBadge impact" aria-label={formatScoreBadgeLabel(t(catalog, "debateViews.impact"), scoring.labels.impact_label, impact, debateChromeCatalog)}>
+        {t(catalog, "debateViews.impactBadge", { value: impact.value })}
       </span>
       {issueSummary ? (
         <span className="scoreBadge issue" aria-label={issueSummary.ariaLabel}>
@@ -598,11 +645,13 @@ function ScoreBadges({
 function V3ScoreBadges({
   node,
   presentation,
-  openNodeDetails
+  openNodeDetails,
+  catalog
 }: {
   node: DebateNode;
   presentation: V3ScorePresentation;
   openNodeDetails: () => void;
+  catalog: MessageCatalog;
 }) {
   if (presentation.status === "ABSENT") {
     return (
@@ -619,7 +668,7 @@ function V3ScoreBadges({
     <button
       type="button"
       className="scoreBadgeButton"
-      aria-label={`Open the recorded V3 scores for ${node.claim}`}
+      aria-label={t(catalog, "debateViews.openRecordedScores", { claim: node.claim })}
       onClick={(event) => {
         event.stopPropagation();
         openNodeDetails();
@@ -640,7 +689,7 @@ function V3ScoreBadges({
   );
 }
 
-function summarizeCardScoringIssues(scoring: NodeScoringPayload) {
+function summarizeCardScoringIssues(scoring: NodeScoringPayload, catalog: MessageCatalog, locale: string) {
   const highPriorityHoles = scoring.holes.filter(
     (hole) => hole.severity === "high" && hole.description.trim()
   );
@@ -651,21 +700,21 @@ function summarizeCardScoringIssues(scoring: NodeScoringPayload) {
 
   const label =
     fatalFlags.length > 0 && highPriorityHoles.length > 0
-      ? `ISS ${issueCount}`
+      ? t(catalog, "debateViews.issuesBadge", { count: issueCount })
       : fatalFlags.length > 0
-        ? `FLAG ${fatalFlags.length}`
-        : `HOLE ${highPriorityHoles.length}`;
+        ? t(catalog, "debateViews.flagsBadge", { count: fatalFlags.length })
+        : t(catalog, "debateViews.holeBadge", { count: highPriorityHoles.length });
   const parts = [
     fatalFlags.length > 0
-      ? `${fatalFlags.length} fatal ${fatalFlags.length === 1 ? "flag" : "flags"}`
+      ? tPlural(catalog, "debateViews.fatalFlagCount", fatalFlags.length, locale)
       : null,
     highPriorityHoles.length > 0
-      ? `${highPriorityHoles.length} high-priority ${highPriorityHoles.length === 1 ? "hole" : "holes"}`
+      ? tPlural(catalog, "debateViews.highPriorityHoleCount", highPriorityHoles.length, locale)
       : null
   ].filter(Boolean);
 
   return {
     label,
-    ariaLabel: `Scoring issues: ${parts.join(" and ")}`
+    ariaLabel: t(catalog, "debateViews.scoringIssues", { issues: parts.join(t(catalog, "debateViews.and")) })
   };
 }

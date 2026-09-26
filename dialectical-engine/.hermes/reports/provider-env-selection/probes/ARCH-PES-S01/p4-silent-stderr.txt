@@ -1,0 +1,1 @@
+$ tsx tools/check-text-control-bytes.ts

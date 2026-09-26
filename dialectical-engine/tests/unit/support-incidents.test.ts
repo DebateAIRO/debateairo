@@ -150,6 +150,30 @@ describe("SUP-05 deterministic incident answers", () => {
     expect(applyIncidentNotice(reply,"publishing",[],"en")).toBe(reply);
   });
 
+  it.each([
+    ["debates","publishing"],["publishing","publishing"],["sign-in","sign-in"],["whole-site","sign-in"]
+  ] as const)("keeps dev's en/ro notice bytes: the raw %s surface enum, not a localized label", (
+    affectedSurface,intent
+  ) => {
+    // en and ro render dev's exact bytes (orchestrator rule 1); the localized
+    // {surface} word is only for the 33 new interface locales.
+    const incident = { ...ACTIVE,affectedSurface };
+    expect(applyIncidentNotice("R.",intent,[incident],"en")).toBe(
+      `Note: there is a known incident affecting ${affectedSurface} since 2026-09-07T08:30:00.000Z.\n\nR.`
+    );
+    expect(applyIncidentNotice("R.",intent,[incident],"ro")).toBe(
+      `Notă: există un incident cunoscut care afectează ${affectedSurface} din 2026-09-07T08:30:00.000Z.\n\nR.`
+    );
+  });
+
+  it("renders the incident surface label in the interface locale", () => {
+    const reply = "モデルの回答。";
+    expect(applyIncidentNotice(reply,"publishing",[ACTIVE],"ja")).toBe(
+      "注：2026-09-07T08:30:00.000Z 以降、ディベートに影響する既知の障害があります。\n\n"
+      + reply
+    );
+  });
+
   it("adds the notice after relay completion without putting it in the model prompt", async () => {
     const complete = vi.fn(async (_input: Parameters<SupportModelPort["complete"]>[0]) => ({
       text: "Model reply."

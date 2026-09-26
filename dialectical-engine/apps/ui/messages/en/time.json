@@ -1,0 +1,21 @@
+{
+  "time.justNow": "just now",
+  "time.minutes.one": "{count} minute ago",
+  "time.minutes.other": "{count} minutes ago",
+  "time.hours.one": "{count} hour ago",
+  "time.hours.other": "{count} hours ago",
+  "time.yesterday": "Yesterday",
+  "time.days.one": "{count} day ago",
+  "time.days.other": "{count} days ago",
+  "time.weeks.one": "{count} week ago",
+  "time.weeks.other": "{count} weeks ago",
+  "time.status.complete": "Complete",
+  "time.status.queued": "Queued",
+  "time.status.claimed": "Claimed",
+  "time.status.running": "Running",
+  "time.status.holding": "Provider recovery hold",
+  "time.status.settled": "Settled",
+  "time.status.generating": "Generating",
+  "time.status.failed": "Failed",
+  "time.status.draft": "Draft"
+}

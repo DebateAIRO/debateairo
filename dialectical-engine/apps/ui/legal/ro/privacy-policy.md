@@ -1,0 +1,214 @@
+# DebateAI — Politica de confidențialitate
+
+<!-- legal-chrome
+summaryTitle: Pe scurt
+eyebrow: POLITICA DE CONFIDENȚIALITATE · v3.0 · ÎN VIGOARE DE LA [DATE]
+title: Ce stocăm și de ce
+lede: Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.
+endMarker: SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.0
+bodyLabel: Textul Politicii de confidențialitate
+annexTitle: Anexa B — Condiții regionale privind confidențialitatea
+jumps:
+01 OPERATOR
+02 CE COLECTĂM
+04 TEMEI JURIDIC
+05 MODELE ȘI TRANSFERURI
+06 PUBLICARE
+07 PĂSTRARE
+10 DREPTURILE DVS. GDPR
+13 MODULE COOKIE
+-->
+
+2026-09-21 · @Someone
+
+**Proiect v3.0 pentru examinare juridică — înlocuiește versiunea v2.1 livrată (`apps/ui/lib/privacyPolicy.ts`). Nu constituie consultanță juridică.** Această versiune reflectă ceea ce face efectiv codul și corectează cele cinci afirmații din v2.1 pe care codul le contrazicea: datele de sesiune, perioadele de păstrare, analiza utilizării, exportul și ceea ce se întâmplă cu dezbaterile publicate la ștergere. Parantezele pătrate marchează informațiile pe care numai dumneavoastră le puteți completa; \[pending\] marchează o funcționalitate descrisă de politică, dar care nu a fost încă realizată și care trebuie să existe înainte de publicarea politicii.
+
+**Version 3.0 · Effective \[date\] · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DebateAIRO S.R.L., București**
+
+**In short.** Colectăm ceea ce este necesar unui cont și ceea ce alegeți să introduceți. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA; acestea nu sunt folosite pentru antrenarea modelelor. Dezbaterile sunt private dacă nu le publicați. Ștergerea contului distruge cheile datelor dumneavoastră și elimină dezbaterile publicate. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot solicita eliminarea fără a avea cont.
+
+## 1. Cine răspunde pentru datele dumneavoastră
+
+Operatorul datelor dumneavoastră cu caracter personal este **DebateAIRO S.R.L.**, \[address\], București, România, Registrul Comerțului \[J40/…\], CUI \[…\]. Scrieți la **privacy@dezbatere.ro** pentru orice aspect al acestei politici; răspundem în termen de o lună. Nu am desemnat un responsabil cu protecția datelor deoarece legea nu ne obligă; această adresă este monitorizată de \[role\]. Dacă am desemnat un reprezentant sau un responsabil pentru confidențialitate într-o anumită țară, Anexa B îi indică.
+
+## 2. Ce colectăm și de unde provin datele
+
+Colectăm numai ceea ce este necesar pentru funcționarea unui cont, ceea ce alegeți să ne furnizați și ceea ce legea ne obligă să păstrăm.
+
+| Categorie | Date exacte | Sursă |
+| --- | --- | --- |
+| **Cont** | Adresa de e-mail și adresa de e-mail pentru recuperare (stocate criptat, cu un index bazat pe cheie pentru a putea găsi contul fără a citi adresa); parola (stocată sub formă de hash, niciodată în clar); secretul pentru autentificarea cu doi factori (criptat); zece coduri de recuperare (stocate sub formă de hash); pseudonimul dumneavoastră; momentul în care ați confirmat că aveți cel puțin 18 ani | Dumneavoastră, la înregistrare |
+| **Sesiuni și securitate** | Un token de sesiune stocat sub formă de hash; un hash bazat pe cheie al șirului user-agent al browserului, folosit pentru a observa când o sesiune trece la alt browser; marcajele temporale ale creării, ultimei utilizări și expirării. **Nu** stocăm împreună cu o sesiune adresa IP, numele dispozitivului sau detaliile browserului, iar lista de sesiuni afișată în Setări conține numai marcaje temporale | Browserul dumneavoastră |
+| **Jurnal de audit al securității** | Un jurnal exclusiv cu adăugare al evenimentelor relevante pentru securitate — înregistrare, verificare, încercări de autentificare, recuperare, publicare, ștergere. Adresa IP și user-agent-ul fiecărui eveniment sunt stocate numai ca amprente ireversibile bazate pe cheie (Argon2id), astfel încât nu pot fi citite, dar pot fi corelate într-o anumită perioadă. Semnalele de risc privind autentificarea și recuperarea sunt stocate criptat timp de 90 de zile | Browserul dumneavoastră, la momentul fiecărui eveniment |
+| **Conținutul dezbaterii** | Întrebarea introdusă; indicațiile de orientare stabilite; susținerile, criticile, trimiterile la dovezi, punctajele și verdictele generate de motor; o înregistrare textuală exactă a răspunsului fiecărui furnizor de IA; interogările de regăsire și referințele la surse. Toate acestea sunt stocate criptat cu o cheie specifică contului dumneavoastră | Dumneavoastră și modelele de IA care lucrează la întrebarea dumneavoastră |
+| **Asistență** | Mesajele schimbate cu asistentul de suport sau cu o persoană, stocate criptat; limba folosită; dacă ați permis asistentului să vadă starea (niciodată conținutul) dezbaterilor; evaluările acordate. Dacă un mesaj declanșează controalele împotriva abuzurilor, păstrăm un hash al mesajului și un hash al adresei IP de la care a provenit | Dumneavoastră |
+| **Evidențe privind acceptarea și consimțământul** | Versiunea și hash-ul conținutului Termenilor acceptați și al politicii care v-a fost prezentată; momentul; ecranul și mecanismul utilizate; limba dumneavoastră; adresa IP și user-agent-ul din acel moment; fiecare consimțământ acordat sau retras și data acestuia | Browserul dumneavoastră, la înregistrare și ori de câte ori modificați o opțiune |
+| **Plăți** \[pending — once a paid plan exists\] | Planul, prețul, perioada de facturare, referințele tranzacției, dovezile privind localizarea fiscală. Datele cardului sunt deținute de furnizorul nostru de plăți, niciodată de noi | Dumneavoastră și furnizorul de plăți |
+| **Persoane care nu sunt utilizatorii noștri** | Date cu caracter personal despre alte persoane pe care le includeți într-o întrebare sau pe care motorul le generează atunci când răspunde. Vă solicităm să nu faceți acest lucru; secțiunea 11 explică ce facem dacă totuși se întâmplă | Dumneavoastră, indirect |
+
+**Nu** colectăm date analitice sau de telemetrie despre modul în care utilizați produsul și nu setăm module cookie în acest scop. Dacă acest lucru se schimbă, prezenta politică și Politica privind modulele cookie vor fi modificate mai întâi, iar dumneavoastră veți fi întrebat.
+
+## 3. Informații sensibile
+
+Un motor de dezbatere invită la întrebări despre politică, religie, sănătate, sexualitate și convingeri. Acestea sunt categorii speciale de date potrivit articolului 9 din GDPR și pot apărea în întrebările dumneavoastră indiferent dacă intenționăm sau nu să le colectăm.
+
+**Despre dumneavoastră.** La înregistrare acordați, printr-o propoziție separată, consimțământul explicit pentru prelucrarea de către noi a informațiilor sensibile pe care alegeți să le includeți în propriile întrebări, în scopul desfășurării dezbaterilor. Îl puteți retrage oricând prin neincluderea unor asemenea informații sau prin ștergerea unei dezbateri. Ceea ce publicați despre dumneavoastră reprezintă date pe care ați ales să le faceți publice.
+
+**Despre alte persoane.** Nicio condiție juridică nu ne permite să prelucrăm date sensibile despre un terț pe care îl menționați într-o întrebare și niciunul dintre furnizorii noștri de IA nu dispune de un asemenea temei. De aceea Termenii interzic acest lucru, reducem la minimum ceea ce transmitem și eliminăm rapid un asemenea conținut la cerere — secțiunea 11.
+
+**Informații privind sănătatea.** Unele țări supun datele legate de sănătate, inclusiv deducțiile, unor legi speciale. Dacă locuiți în \[the State of Washington\], se aplică o \[Consumer Health Data Privacy Notice\] separată.
+
+## 4. De ce folosim datele și în baza cărui temei
+
+Fiecare scop are un singur temei juridic potrivit articolului 6 alineatul (1) din GDPR și nu reutilizăm într-un alt scop datele colectate pentru un anumit scop.
+
+| Scop | Date | Temei |
+| --- | --- | --- |
+| Crearea și administrarea contului, autentificarea dumneavoastră, desfășurarea și stocarea dezbaterilor pentru a le putea redeschide și reda | Cont, sesiuni, conținutul dezbaterilor | **Contract** — Art. 6(1)(b) |
+| Trimiterea întrebării și a afirmațiilor motorului către furnizorii de IA pentru generarea unei dezbateri | Conținutul dezbaterii | **Contract** — Art. 6(1)(b) |
+| Menținerea securității serviciului, detectarea abuzurilor, posibilitatea de a identifica o autentificare pe care nu ați efectuat-o, păstrarea unui jurnal de audit | Sesiuni, jurnal de audit al securității, hash-uri ale mesajelor abuzive transmise serviciului de asistență | **Interese legitime** — Art. 6(1)(f): ale noastre și ale dumneavoastră într-un serviciu sigur. Vă puteți opune; secțiunea 10 |
+| Dovedirea faptului că ați acceptat Termenii și ați acordat sau retras un consimțământ | Evidențe privind acceptarea și consimțământul | **Obligație legală** — Art. 6(1)(c), obligația noastră de a demonstra consimțământul potrivit Art. 7(1) — și interese legitime pentru dovedirea contractului |
+| Soluționarea solicitărilor de asistență | Asistență | **Contract** — Art. 6(1)(b) |
+| Prelucrarea informațiilor sensibile pe care le includeți despre dumneavoastră | Conținutul dezbaterii | **Consimțământ explicit** — Art. 9(2)(a), acordat separat la înregistrare |
+| Publicarea unei dezbateri pe care alegeți să o publicați | Conținutul dezbaterii, pseudonim | **Contract** — Art. 6(1)(b), conform instrucțiunii dumneavoastră; pentru date sensibile despre dumneavoastră, Art. 9(2)(e) — date pe care le-ați făcut publice în mod manifest |
+| Trimiterea noutăților despre produs | Adresa de e-mail | **Consimțământ** — Art. 6(1)(a), o căsuță nebifată; îl puteți retrage oricând din orice e-mail sau din Setări |
+| Îndeplinirea obligațiilor fiscale, contabile și juridice \[pending paid plans\] | Plăți, evidențe privind acceptarea | **Obligație legală** — Art. 6(1)(c) |
+| Gestionarea solicitărilor legale, a raportărilor privind conținutul ilegal și a obligațiilor noastre ca serviciu de găzduire | Orice este relevant pentru solicitare | **Obligație legală** — Art. 6(1)(c) — și interese legitime |
+
+Nu vă creăm profiluri, nu folosim datele dumneavoastră pentru publicitate și nu le vindem. Nu folosim conținutul dumneavoastră pentru antrenarea modelelor și nu permitem furnizorilor noștri să facă acest lucru — secțiunea 5.
+
+## 5. Furnizorii de IA și transferurile internaționale
+
+**Ce se trimite.** Pentru desfășurarea unei dezbateri trimitem text unuia sau mai multor furnizori externi de IA: întrebarea dumneavoastră, indicațiile de orientare stabilite și afirmațiile pe care motorul le compune pe măsură ce dezbaterea evoluează. Prin urmare, furnizorul vede text derivat din și construit în jurul celor introduse de dumneavoastră. Acesta nu primește niciodată adresa de e-mail, identificatorii contului sau ai sesiunii, adresa IP ori datele de plată.
+
+**Care furnizori.** Aceștia sunt enumerați în **Registrul furnizorilor de IA** la \[dezbatere.ro/providers\], care face parte din această politică. Pentru fiecare furnizor, Registrul precizează entitatea juridică și țara de stabilire; ce primește și în ce scop; țările sau regiunile în care prelucrează; condițiile sale de păstrare și dacă păstrarea zero a datelor este activă pentru punctul final și funcțiile utilizate de noi; dacă poate utiliza datele de intrare pentru antrenare potrivit contractului nostru; mecanismul de transfer pe care ne bazăm; și data ultimei verificări a fiecărei înregistrări. Furnizorii se pot schimba; Registrul este versionat, iar modificarea este consemnată acolo.
+
+**Antrenarea și păstrarea sunt lucruri diferite.** Contractele noastre cu furnizorii exclud utilizarea conținutului dumneavoastră pentru antrenarea sau îmbunătățirea modelelor lor. \[Publish only once verified per route.\] Unii furnizori păstrează solicitările și răspunsurile o perioadă limitată pentru securitate, prevenirea abuzurilor sau propriile obligații legale; Registrul precizează durata și motivul. Dacă este activă păstrarea zero a datelor, Registrul arată acest lucru și funcțiile vizate. Nu vom descrie conținutul ca fiind nepăstrat atunci când este păstrat.
+
+**Transferuri în afara SEE.** Furnizorii stabiliți în Statele Unite primesc date în baza unuia dintre mecanismele din capitolul V al GDPR: Cadrul UE–SUA privind confidențialitatea datelor, dacă entitatea contractantă specifică este certificată pentru aceste date, sau clauzele contractuale standard ale Comisiei Europene (Modulul doi, de la operator la persoana împuternicită), susținute de o evaluare a riscului transferului și de măsuri suplimentare. Registrul indică mecanismul fiecărui furnizor. Puteți obține o copie a clauzelor pe care ne bazăm scriind la privacy@dezbatere.ro. Dacă un mecanism pe care ne bazăm este invalidat, trecem la altul înainte de a continua transferurile și vă informăm.
+
+**Alți destinatari.** Furnizorul nostru de găzduire \[Hetzner, Germany — region …\]; furnizorul nostru de distribuire a conținutului și transport \[Cloudflare\]; serviciul nostru de retransmitere a e-mailurilor \[…\]; \[our payment provider, once a paid plan exists\]. Fiecare acționează pe baza instrucțiunilor noastre documentate, în temeiul unui acord de prelucrare a datelor care include garanțiile impuse de articolul 28, și fiecare figurează în Registru cu locația și mecanismul de transfer. Nu permitem niciunei persoane împuternicite să folosească datele dumneavoastră în scopuri proprii. Dacă un furnizor ar proceda astfel, acesta ar fi operator de sine stătător, iar noi nu îi trimitem datele dumneavoastră.
+
+**Autorități publice.** Divulgăm date cu caracter personal instanțelor, autorităților de reglementare sau organelor de aplicare a legii atunci când legea ne obligă și vă informăm, cu excepția cazului în care legea ne interzice.
+
+## 6. Publicare și vizibilitate
+
+Dezbaterile sunt private până când le publicați. Publicarea este o acțiune deliberată, confirmată separat. O dezbatere publicată afișează **pseudonimul** dumneavoastră, întrebarea exact așa cum ați formulat-o, arborele argumentelor, punctajele, verdictul și intervalul de încredere și poartă o etichetă vizibilă care arată că materialul este generat de IA. Nu afișează niciodată adresa de e-mail, evidențele sesiunilor sau istoricul contului. \[Published debates are / are not\] indexate de motoarele de căutare \[unless you choose\].
+
+Retragerea publicării elimină dezbaterea din DebateAI și distruge cheia copiei noastre publice. Copiile deja realizate de cititori, motoare de căutare sau arhive nu se află sub controlul nostru și nu le putem retrage.
+
+Când vă ștergeți contul, eliminăm din accesul public fiecare dezbatere publicată, fără întârzieri nejustificate și în cel mult 30 de zile, cu excepția cazului în care legea ne obligă să păstrăm un anumit element. \[Option B — a product change; see the Terms, section 9.\]
+
+## 7. Cât timp păstrăm datele
+
+| Date | Durată | Ulterior |
+| --- | --- | --- |
+| Cont | Cât timp există contul, plus o perioadă de grație de 7 zile după ce solicitați închiderea | Cheile sunt distruse; înregistrarea este ștearsă |
+| Evidențele sesiunilor | 14 zile de la ultima utilizare sau 90 de zile de la creare, oricare termen survine primul | Șterse |
+| Linkuri de verificare a e-mailului | 24 de ore | Șterse |
+| Semnale de risc privind autentificarea și recuperarea | 90 de zile, perioadă impusă de baza de date | Eliminate definitiv |
+| Jurnal de audit al securității | Pe durata de viață a serviciului | Exclusiv cu adăugare; IP-ul și user-agent-ul sunt amprente ireversibile și nu pot fi citite |
+| Conținutul dezbaterii (privat) | Cât timp există contul | Cheile sunt distruse la închidere, făcând conținutul ilizibil |
+| Conținutul dezbaterii (publicat) | Cât timp este publicat și există contul | Eliminat din accesul public la retragerea publicării sau la închidere; cheile sunt distruse |
+| Evidențele răspunsurilor furnizorilor și referințele de regăsire | La fel ca dezbaterea căreia îi aparțin | La fel |
+| Conversații și cazuri de asistență | \[Until closed plus 12 months\] | Cheile sunt distruse |
+| Evidențe privind acceptarea și consimțământul | Durata de viață a contului plus 6 ani — cel mai lung termen de prescripție care ni se aplică | Șterse |
+| Evidențe de plată \[pending\] | 10 ani, conform cerințelor legislației contabile române | Șterse |
+| Copii de siguranță \[pending\] | \[… days\] după ștergerea copiei active | Suprascrise |
+
+**Ce produce efectiv ștergerea.** Dezbaterile și datele contului sunt criptate cu chei specifice contului și fiecărei dezbateri. Ștergerea contului distruge aceste chei, după care înregistrările criptate nu mai pot fi citite de noi sau de altcineva, iar noi ștergem înregistrarea contului. Numim acest lucru ștergere deoarece acesta este efectul său și deținem o evaluare documentată care îl susține; dacă doriți mai multe informații, întrebați-ne. Trebuie cunoscute trei aspecte: jurnalul de audit al securității este exclusiv cu adăugare și nu se șterge, dar nu conține identificatori lizibili despre dumneavoastră; un număr mic de dezbateri mai vechi precedă schema noastră actuală de criptare, iar dacă aceasta este situația contului dumneavoastră vă explicăm ce efect are închiderea asupra lor; copiile datelor deja trimise unui furnizor de IA sunt guvernate de condițiile de păstrare ale furnizorului din Registru, nu de ștergerea efectuată de noi.
+
+&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
+
+## 8. Decizii automatizate și creare de profiluri
+
+Punctajele, marcajele condițiilor și verdictele dintr-o dezbatere sunt evaluări automatizate ale **argumentelor, nu ale persoanelor**. Ele nu produc efecte juridice asupra dumneavoastră și nici nu vă afectează în mod similar într-o măsură semnificativă. Nu luăm nicio decizie privind persoana dumneavoastră care să se bazeze exclusiv pe prelucrarea automatizată și să producă efecte juridice sau efecte semnificative similare și nu vă creăm profiluri.
+
+Dacă vom automatiza vreodată o decizie referitoare la contul dumneavoastră — suspendarea acestuia, refuzul publicării unei dezbateri — o persoană va examina orice asemenea decizie înainte ca aceasta să producă efecte sau la cererea dumneavoastră, veți putea să vă exprimați punctul de vedere și să o contestați. Termenii descriu procedura.
+
+## 9. Securitatea și ce se întâmplă dacă apare o problemă
+
+Parolele sunt stocate sub formă de hash folosind Argon2id. Autentificarea cu doi factori este obligatorie. Adresa de e-mail, dezbaterile, conversațiile de asistență și secretele de autentificare sunt criptate în repaus cu chei specifice contului dumneavoastră, iar cheile dezbaterilor publicate sunt păstrate separat de cele pentru dezbaterile private. Accesul la datele de producție este jurnalizat. Adresele IP și detaliile browserului din jurnalul nostru de securitate sunt stocate numai ca amprente ireversibile.
+
+Dacă are loc o încălcare a securității datelor cu caracter personal, notificăm autoritatea română de supraveghere în termen de 72 de ore atunci când legea o impune și vă informăm direct, fără întârzieri nejustificate, dacă este probabil ca încălcarea să genereze un risc ridicat pentru drepturile și libertățile dumneavoastră. Anexa B enumeră regulile de notificare aplicabile în celelalte regiuni în care oferim servicii.
+
+## 10. Drepturile dumneavoastră și cum le puteți exercita
+
+Puteți exercita gratuit oricare dintre aceste drepturi scriind la **privacy@dezbatere.ro** sau din **Setări → Confidențialitate**, dacă există o comandă. Răspundem în termen de o lună; dacă o solicitare este complexă, putem prelungi termenul cu cel mult două luni și vă vom comunica motivul. Vă putem solicita să vă confirmați identitatea prin intermediul contului.
+
+| Drept | Ce înseamnă aici |
+| --- | --- |
+| **Acces** (Art. 15) | O copie a datelor cu caracter personal pe care le deținem despre dumneavoastră și aceste informații. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Rectificare** (Art. 16) | Corectați adresa de e-mail sau adresa de recuperare din Setări. Pseudonimul nu poate fi schimbat, din motivele indicate în Termeni; puteți închide contul și deschide unul nou |
+| **Ștergere** (Art. 17) | Ștergeți oricând o dezbatere privată de pe pagina dezbaterii. Închideți contul din Setări; secțiunea 7 explică exact efectele. Solicitați-ne să eliminăm o dezbatere publicată care conține datele dumneavoastră, indiferent dacă sunteți sau nu autorul |
+| **Restricționare** (Art. 18) | Solicitați-ne să oprim prelucrarea anumitor date până la soluționarea unei contestații privind aceste date |
+| **Opoziție** (Art. 21) | Opuneți-vă prelucrării întemeiate pe interese legitime — prelucrarea pentru securitate și audit din secțiunea 4 — iar noi o oprim dacă nu putem demonstra motive imperioase. Vă puteți opune oricând marketingului, iar noi îl oprim |
+| **Portabilitate** (Art. 20) | Dezbaterile și datele contului într-un format utilizat în mod curent și care poate fi citit automat. \[Pending: same export as Access.\] Conținutul fără caracter personal pe care l-ați creat, precum întrebările, vă este restituit la cerere la încetarea contractului |
+| **Retragerea consimțământului** (Art. 7(3)) | Retrageți consimțământul pentru marketing din orice e-mail sau din Setări; retrageți consimțământul privind datele sensibile prin neincluderea unor asemenea date sau prin ștergerea unei dezbateri. Retragerea nu afectează prelucrarea care a avut deja loc |
+| **Depunerea unei plângeri** | La autoritatea română de supraveghere, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, București, <anspdcp@dataprotection.ro>, sau la autoritatea din țara în care locuiți. Am prefera să ne contactați mai întâi |
+
+Nu percepem niciodată taxe pentru o solicitare și nu vă tratăm niciodată mai puțin favorabil pentru formularea acesteia.
+
+## 11. Persoane menționate în dezbateri care nu sunt utilizatorii noștri
+
+Dacă cineva adresează DebateAI o întrebare în care vă menționează, este posibil să deținem date cu caracter personal despre dumneavoastră, chiar dacă nu ați utilizat niciodată serviciul. Termenii le interzic utilizatorilor acest lucru și reducem la minimum ceea ce trimitem furnizorilor de IA, însă se poate întâmpla.
+
+Această secțiune reprezintă informarea pe care trebuie să v-o furnizăm potrivit articolului 14 din GDPR. Datele sunt cele introduse de utilizator și cele generate de motor ca răspuns; sursa este utilizatorul respectiv; scopurile și temeiul juridic sunt cele din secțiunea 4; destinatarii sunt furnizorii de IA din Registru; păstrarea urmează secțiunea 7. Beneficiați de toate drepturile din secțiunea 10 și, în special, ne puteți solicita să eliminăm o dezbatere publicată sau una privată care conține datele dumneavoastră și să vă comunicăm ce date deținem. Nu aveți nevoie de cont pentru aceasta. Scrieți la **privacy@dezbatere.ro** sau folosiți comanda **Raportare** din orice dezbatere publicată, iar noi soluționăm solicitările justificate fără întârzieri nejustificate. Nu vă putem notifica individual când se întâmplă acest lucru deoarece nu știm cine sunteți sau cum vă putem contacta; această informare publică și calea de eliminare sunt măsurile pe care le luăm în schimb.
+
+Același lucru este valabil pentru informațiile sensibile despre dumneavoastră — politică, sănătate, religie — care apar în întrebarea altei persoane. Nicio condiție juridică nu ne permite să continuăm prelucrarea lor după ce vă opuneți, iar noi nu o vom face.
+
+## 12. Copii
+
+DebateAI este destinat adulților. La înregistrare confirmați că aveți cel puțin 18 ani și nu prelucrăm cu bună știință datele niciunei persoane sub 18 ani. Dacă aflăm că un cont aparține unei persoane sub 18 ani, îl închidem și ștergem datele conform secțiunii 7. Unele țări consideră că o confirmare nu este suficientă sau impun cerințe suplimentare; Anexa B precizează normele aplicabile, iar Termenii explică măsurile noastre.
+
+## 13. Module cookie
+
+Setăm două module cookie, ambele strict necesare: unul care menține autentificarea și unul care protejează formularele împotriva falsificării. Nu setăm module cookie analitice, publicitare sau de urmărire. **Politica privind modulele cookie** de la \[dezbatere.ro/cookies\] le enumeră împreună cu duratele lor, explică modul în care este stocată opțiunea dumneavoastră și va fi modificată înainte de adăugarea oricărui alt modul cookie. Dacă legislația din regiunea dumneavoastră tratează diferit anumite module cookie — de exemplu, regula Regatului Unit privind renunțarea la analiza utilizării — Politica privind modulele cookie precizează acest lucru.
+
+## 14. Modificări ale acestei politici
+
+Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la \[dezbatere.ro/privacy/versions\]. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune.
+
+Această politică a fost actualizată ultima dată la \[date\]. Versiunea 3.0 a înlocuit versiunea 2.1, care descria datele de sesiune, perioadele de păstrare, analiza utilizării, exportul și efectul ștergerii asupra dezbaterilor publicate în moduri care nu mai reflectau serviciul.
+
+## Annex B — Condiții regionale privind confidențialitatea
+
+Fiecare intrare se aplică numai dacă regiunea sa este enumerată în secțiunea 2 din Termeni și precizează exclusiv diferențele față de corpul acestei politici.
+
+### B.1 Uniunea Europeană și Spațiul Economic European
+
+Corpul acestei politici este redactat pentru dumneavoastră. Autoritatea noastră de supraveghere este **ANSPDCP** din România; de asemenea, puteți depune o plângere la autoritatea din țara în care locuiți. Utilizatori români: această politică este disponibilă în limba română la \[URL\].
+
+### B.2 Regatul Unit *(numai dacă este enumerat)*
+
+Reprezentantul nostru în Regatul Unit potrivit articolului 27 din GDPR din Regatul Unit este **\[name, address, email\]**; îl puteți contacta pentru orice aspect al acestei politici. Autoritatea de supraveghere este **Oficiul Comisarului pentru Informații**, [ico.org.uk](https://ico.org.uk). Ne puteți transmite o plângere prin formularul de la \[URL\], iar noi confirmăm primirea în termen de 30 de zile. Transferurile datelor dumneavoastră din Regatul Unit către furnizorii de IA din Statele Unite se bazează pe \[the UK Extension to the EU–US Data Privacy Framework, where the provider is certified / the UK International Data Transfer Addendum to the EU standard contractual clauses\], susținut de o evaluare a riscului transferului. Modulele cookie analitice, dacă le-am seta vreodată, ar face obiectul unei opțiuni de renunțare, nu al consimțământului, în Regatul Unit; în prezent nu setăm asemenea module. Dacă aveți sub 18 ani și accesați serviciul în pofida regulii noastre de vârstă, standardele Codului pentru copii al ICO se aplică modului în care vă tratăm datele.
+
+### B.3 Statele Unite *(numai dacă sunt enumerate)*
+
+**Informare la colectare.** Tabelul din secțiunea 2 enumeră fiecare categorie de informații cu caracter personal pe care o colectăm, scopul și durata păstrării acesteia (secțiunea 7). Colectăm următoarele categorii de informații cu caracter personal *sensibile* numai atunci când le includeți în propriile întrebări: \[health, religious or philosophical beliefs, sexual orientation, union membership, political views\] și le folosim exclusiv pentru desfășurarea dezbaterilor. **Nu vindem și nu partajăm informații cu caracter personal și nu am făcut acest lucru în precedentele douăsprezece luni.** Nu folosim informațiile cu caracter personal sensibile în niciun scop în afara furnizării serviciului solicitat. **Semnale privind preferința de renunțare:** respectăm semnalele Global Privacy Control ca solicitare de renunțare la vânzare sau partajare, activități pe care oricum nu le desfășurăm. **Drepturile dumneavoastră:** de a cunoaște, a șterge, a corecta, a renunța, a limita utilizarea informațiilor cu caracter personal sensibile și de a nu fi discriminat pentru exercitarea lor; formulați o solicitare la privacy@dezbatere.ro sau \[toll-free number / form\]. **Stimulente financiare:** nu oferim asemenea stimulente; planurile gratuite și plătite nu diferă în modul în care vă tratăm datele. **Păstrarea** este descrisă în secțiunea 7. Prezenta informare este actualizată cel puțin o dată la douăsprezece luni; ultima actualizare \[date\].
+
+*Washington:* **Informarea privind confidențialitatea datelor de sănătate ale consumatorilor** de la \[URL\] este un document separat care se aplică oricăror informații legate de sănătate, inclusiv deducțiilor. *Texas și Nebraska:* nu vindem date cu caracter personal sensibile; dacă acest lucru s-ar schimba vreodată, am obține mai întâi consimțământul dumneavoastră \[statutory language\]. *Colorado, Connecticut, Virginia și alte state cu legi cuprinzătoare privind confidențialitatea:* drepturile de mai sus vi se aplică dacă ni se aplică legea; contestați refuzul unei solicitări scriind la \[appeals@dezbatere.ro\].
+
+### B.4 Canada și Quebec *(numai dacă sunt enumerate)*
+
+Responsabilul nostru pentru confidențialitate este **\[name, email\]**. Rămânem răspunzători pentru informațiile cu caracter personal pe care le transferăm furnizorilor de IA din afara Canadei și folosim contracte pentru a impune o protecție comparabilă; acești furnizori pot fi supuși legislației țărilor în care funcționează, inclusiv accesului legal al autorităților. E-mailurile de marketing sunt trimise numai cu consimțământul dumneavoastră explicit potrivit CASL. **Quebec:** înainte de a comunica informații cu caracter personal în afara Quebecului efectuăm o evaluare a impactului asupra vieții private; setările care mențin dezbaterile private sunt activate implicit; ne puteți solicita să dezindexăm sau să încetăm diseminarea informațiilor cu caracter personal despre dumneavoastră; puteți solicita datele într-un format structurat, utilizat în mod curent; secțiunea 8 descrie prelucrarea automatizată.
+
+### B.5 Australia și Noua Zeelandă *(numai dacă sunt enumerate)*
+
+**Australia.** Destinatarii din străinătate ai informațiilor dumneavoastră cu caracter personal sunt furnizorii de IA și persoanele împuternicite enumerate în Registru, situate în \[the United States and the European Union\]; luăm măsuri rezonabile pentru a ne asigura că le gestionează conform Principiilor australiene privind confidențialitatea. **Decizii automatizate:** începând cu 10 decembrie 2026, această politică identifică tipurile de decizii luate de programe informatice care vă afectează semnificativ drepturile sau interesele — nu există asemenea decizii; punctajele și verdictele privesc argumentele, nu persoana dumneavoastră — și informațiile cu caracter personal folosite în acestea. Plângerile pot fi adresate **Oficiului Comisarului australian pentru informații**. **Noua Zeelandă.** Responsabilul nostru pentru confidențialitate este \[name\]. Dacă colectăm indirect informații cu caracter personal despre dumneavoastră — deoarece alt utilizator le-a inclus într-o întrebare — această politică și secțiunea 11 constituie informarea pe care v-o furnizăm. Divulgăm date furnizorilor de IA din Registru în calitate de agenți ai noștri, în baza unor contracte care impun garanții comparabile. Plângerile pot fi adresate **Oficiului Comisarului pentru confidențialitate**.
+
+### B.6 America Latină *(anexă în limba spaniolă; numai dacă este enumerată)*
+
+&#91;Published in Spanish.\] Consimțământul este temeiul prelucrării atunci când nu există necesitatea contractuală. Drepturile ARCO — acces, rectificare, anulare, opoziție — pot fi exercitate la privacy@dezbatere.ro, cu răspunsuri în termen de \[per country\]. *Mexic:* documentul *aviso de privacidad* complet, cu elementele obligatorii, se află la \[URL\]. *Argentina:* \[AAIP mandatory legend\]; datele sunt înregistrate la \[…\]. *Columbia:* *política de tratamiento de datos* a noastră este la \[URL\]; autoritatea este SIC. *Chile* (de la 1 decembrie 2026): datele de contact ale Agenției sunt \[…\]; secțiunea 8 explică prelucrarea automatizată.
+
+### B.7 Golf — EAU și Arabia Saudită *(numai dacă sunt enumerate)*
+
+Dacă prelucrăm datele dumneavoastră în alte scopuri decât furnizarea serviciului, ne bazăm pe consimțământul dumneavoastră, pe care îl puteți retrage. Datele părăsesc \[UAE / Kingdom of Saudi Arabia\] și sunt prelucrate în Uniunea Europeană și Statele Unite în temeiul \[SDAIA standard contractual clauses / the mechanism in the Register\]. Marketingul este transmis numai cu consimțământul dumneavoastră. Nu includeți date cu caracter personal sensibile în întrebări.
+
+### B.8 Asia-Pacific *(numai rândurile pentru regiunile enumerate)*
+
+*Singapore:* responsabilul nostru cu protecția datelor este **\[name, email\]**; transferurile se bazează pe obligații contractuale care oferă o protecție comparabilă cu PDPA; notificăm PDPC despre încălcările care trebuie notificate în termen de 3 zile. *Japonia:* folosim informațiile dumneavoastră cu caracter personal în scopurile din secțiunea 4 și nu în alte scopuri; conținutul este transferat furnizorilor din \[named countries — e.g. the United States\], ale căror regimuri de confidențialitate și garanții sunt descrise în Registru, iar dumneavoastră consimțiți la aceasta la înregistrare. *Coreea de Sud:* responsabilul nostru pentru confidențialitate este **\[name\]**; elementele, destinația, momentul, destinatarul, scopul și durata păstrării transferurilor în străinătate sunt indicate în Registru; opiniile politice din întrebări sunt informații sensibile și le prelucrăm exclusiv pentru desfășurarea dezbaterilor; consimțămintele pentru prelucrările opționale sunt colectate separat. *India* (după intrarea în vigoare a normelor DPDP): se aplică informarea separată privind consimțământul de la \[URL\]; solicitările primesc răspuns în termen de 90 de zile; utilizatorii sub 18 ani necesită consimțământ parental verificabil. *Filipine:* responsabilul nostru cu protecția datelor este \[name\]; plângerile pot fi depuse la Comisia Națională pentru Confidențialitate; secțiunea 8 descrie prelucrarea automatizată. *Thailanda:* reprezentantul nostru este \[name\] \[if appointed\].
+
+### B.9 Rezervat
+
+Turcia, Brazilia și Indonezia necesită fiecare o informare în limba locală, un reprezentant sau o înregistrare și depunerea unor documente, iar acestea nu sunt redactate aici. China, Vietnam și Rusia nu sunt deservite.

@@ -94,7 +94,7 @@ describe("T9-C1 route split & chrome", () => {
   it("keeps the library document for a request carrying the session cookie", async () => {
     // PROPERTY: cookie presence selects the unchanged library branch, including
     // its discriminating library section, and excludes the landing-only headline.
-    const document = await renderRoute("t9-c1-session");
+    const document = await renderRoute("t".repeat(43));
 
     expect(
       document.querySelector('.sectionHead[aria-label="Debate library"]'),
@@ -111,7 +111,7 @@ describe("T9-C1 route split & chrome", () => {
     const accessibleName = toggle?.getAttribute("aria-label") ?? toggle?.textContent?.trim() ?? "";
 
     expect(toggle?.tagName).toBe("BUTTON");
-    expect(accessibleName).toMatch(/Switch to (Chamber|Terracotta) mode/);
+    expect(accessibleName).toMatch(/Switch to (dark|light) mode/);
   });
 
   it("composes the five landing sections in contract order", async () => {
@@ -129,7 +129,7 @@ describe("T9-C1 route split & chrome", () => {
     // PROPERTY: the cookie read is followed by the landing branch before any
     // library work, AuthGate stays off `/`, and LandingPage remains server-rendered.
     const pageSource = readFileSync(resolve(process.cwd(), "apps/ui/app/page.tsx"), "utf8");
-    const cookieReadIndex = pageSource.indexOf("const token = (await cookies()).get(USER_TOKEN_COOKIE)?.value ?? null;");
+    const cookieReadIndex = pageSource.indexOf("const token = readSessionCookie(cookieStore);");
     // b300ee91 (feat(support): add guarded SupportAgent experience) mounted the
     // support dock on the anonymous landing route, so the branch returns a
     // fragment rather than the bare landing. The PROPERTY above is untouched by
@@ -138,7 +138,7 @@ describe("T9-C1 route split & chrome", () => {
     // nothing looser: an arbitrary body here would let real work sneak in front
     // of the landing and the ordering assertions below would stop meaning it.
     const landingBranch =
-      /if\s*\(\s*token\s*===\s*null\s*\)\s*(?:\{\s*)?return\s*(?:<LandingPage\s*\/>|<>\s*<LandingPage\s*\/>\s*<SupportWidget\s*\/>\s*<\/>)\s*;/.exec(
+      /if\s*\(\s*token\s*===\s*null\s*\)\s*(?:\{\s*)?return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;/.exec(
         pageSource
       );
     const landingReturnIndex = landingBranch?.index ?? -1;
@@ -262,7 +262,7 @@ describe("T9-C2 chrome labels & CTAs", () => {
       const signUpUrl = new URL(createOne!.href);
       window.history.replaceState({}, "", `${signUpUrl.pathname}${signUpUrl.search}`);
       await act(async () => root.render(
-        <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+        <SignUpFlow client={{ register: vi.fn() }} />
       ));
       await act(async () => {
         await Promise.resolve();
@@ -338,7 +338,8 @@ describe("T9-C4 landing content", () => {
     const card = sample?.querySelector('[data-bezel="shell"][data-stance]');
     const cardText = card?.textContent ?? "";
     expect(card?.querySelector('[data-bezel="core"]')).not.toBeNull();
-    expect(cardText).toMatch(/PRO|CON|REASONING/);
+    // The role chip now renders the catalogue word ("Reasoning"); `.lpChipStance` uppercases it in CSS.
+    expect(cardText).toMatch(/PRO|CON|REASONING/i);
     expect(cardText).toContain("BASE");
     expect(cardText).toContain("FINAL");
     expect(cardText).toMatch(/\S+\s+·\s+\S+/);

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "missing-COST_ENVELOPE_POLICY_UNRESOLVED",
+    "rc": 0,
+    "detector_matched": false,
+    "lines": [
+      "Test Files  1 passed (1)",
+      "Tests  1 passed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/before-existence-missing-COST_ENVELOPE_POLICY_UNRESOLVED.log"
+  },
+  {
+    "name": "missing-COST_ENVELOPE_POLICY_INVALID",
+    "rc": 0,
+    "detector_matched": false,
+    "lines": [
+      "Test Files  1 passed (1)",
+      "Tests  1 passed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/before-existence-missing-COST_ENVELOPE_POLICY_INVALID.log"
+  }
+]
