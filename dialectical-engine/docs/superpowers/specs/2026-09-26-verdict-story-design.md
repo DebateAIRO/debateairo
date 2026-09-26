@@ -201,10 +201,22 @@ guarded by `tests/unit/prompt-surface-guard.test.ts`.
 
 **Size budget** (register row `storyMaterialBudget`, provisional, keyed like the answer writer's
 `compositionBundleBudget` by the run's `compositionBudgetTier`): low 40,000 bytes, medium 80,000,
-high 120,000, always below the 256 KiB packet cap. The shrinking order when over budget:
-1. Judge texts of points outside the top-10 leverage are cut to 240 characters.
+high 120,000, always below the 256 KiB packet cap. **The model never sees the long internal ids.** Every point gets a short reference (`p1`…`pn`)
+in the material, and code maps the references back to node ids before storing the story. A
+measured depth-5, three-model debate (195 points) was about 216 KB with full ids even at the last
+shrinking step, so without short references deep debates could not fit any budget.
+
+The shrinking order when over budget:
+1. Judge texts (best case, objection, review reasons) of points outside the top-10 leverage are
+   cut to 240 characters.
 2. All judge texts are cut to 240 characters.
-3. Claims follow the digest ladder: full, 480, 240, 120 characters.
+3. Claims follow the digest ladder: 480, 240, 120 characters.
+4. Points outside the top-20 leverage lose their judge texts and review reasons (claim, scores
+   and relations stay).
+5. Only the positions, their direct children, and the top-20 leverage points (with the chain from
+   each up to its position) keep their own entry. The rest become a per-position count
+   (`omitted: {position_ref, supports, attacks}`). The story may then speak only of what it can
+   see; the PDF appendix still lists every point, because code builds it from the answer.
 
 If it still does not fit, the story is `FAILED`/`STORY_MATERIAL_TOO_LARGE`.
 
