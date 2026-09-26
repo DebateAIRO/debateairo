@@ -20,6 +20,14 @@ export const STORY_REVIEWER_NOTE_TITLE = "Reviewer's note";
 export const STORY_REVIEWER_NOTE_CAVEAT = "Written by the AI storyteller. It does not change the verdict.";
 /** The reservation box's title; the box then shows the checker's own words, with no second lead. */
 export const STORY_RESERVATION_TITLE = "Our checker's reservation";
+/**
+ * The accessible name of the short story's list of positions.
+ * TODO(story localization): like every other string in this file it is English
+ * only. It moved here out of the JSX attribute in StoryShortBlocks.tsx when
+ * dev's no-hardcoded-english scanner arrived; the localization task moves it,
+ * with the rest of the story's words, into the catalogues for all 35 locales.
+ */
+export const STORY_PATHS_LIST_NAME = "Positions the debate explored";
 
 /**
  * The line under the checker's reservation when it names a point by number

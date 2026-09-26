@@ -1,15 +1,17 @@
+/** @jsxRuntime classic */
+/** @jsx createElement */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { JSX } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import type { AnswerStory } from "@debateai/contract";
-import { AiNotice } from "../components/AiNotice";
-import { StoryPanel } from "../components/StoryPanel";
-import { t } from "../lib/i18n/translate";
-import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, storyFixture } from "../lib/v3/storyFixture";
-import { toStoryView } from "../lib/v3/storyView";
-import debateChromeEnglish from "../messages/en/debateChrome.json" with { type: "json" };
+import { AiNotice } from "../apps/ui/components/AiNotice";
+import { StoryPanel } from "../apps/ui/components/StoryPanel";
+import { t } from "../apps/ui/lib/i18n/translate";
+import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, storyFixture } from "../apps/ui/lib/v3/storyFixture";
+import { toStoryView } from "../apps/ui/lib/v3/storyView";
+import debateChromeEnglish from "../apps/ui/messages/en/debateChrome.json" with { type: "json" };
 
 /**
  * The owner's look-first mock (spec 2026-09-26 §10). Renders the REAL
@@ -23,6 +25,17 @@ import debateChromeEnglish from "../messages/en/debateChrome.json" with { type: 
  *
  * Usage: pnpm --filter dialectical-engine-v2ui run story:mock <absolute path to the output .html>
  * (pnpm runs the script from apps/ui, so a relative path is resolved from there).
+ *
+ * WHY IT LIVES IN tools/ AND NOT apps/ui/scripts/: it is a developer's preview
+ * for the owner, never shipped, and its page is written in English for the
+ * owner. dev's no-hardcoded-english gate (apps/ui/scripts/
+ * no-hardcoded-english.test.mjs) scans every .ts/.tsx file under apps/ui, so
+ * the mock moved out of that tree rather than onto the gate's allowlist. It
+ * still renders the REAL components from apps/ui, and it takes React from
+ * apps/ui too (below): the repository root does not depend on React, and the
+ * page and the panel must share one React. Nothing type-checks this file any
+ * more (the root tsconfig takes only .ts files under tools/, the UI one only
+ * apps/ui); tests/render/story-mock-script.test.tsx runs it end to end instead.
  */
 
 const outputPath = process.argv[2];
@@ -34,7 +47,13 @@ if (outputPath === undefined || outputPath.trim().length === 0) {
   process.exit(2);
 }
 
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../apps/ui");
+// React and react-dom are the UI app's dependencies: resolve them from apps/ui,
+// the package whose components this mock renders. The two pragmas at the top
+// make this file's own JSX call this createElement.
+const uiRequire = createRequire(resolve(appRoot, "package.json"));
+const { createElement } = uiRequire("react") as typeof import("react");
+const { renderToStaticMarkup } = uiRequire("react-dom/server") as typeof import("react-dom/server");
 const siteCss = readFileSync(resolve(appRoot, "app/globals.css"), "utf8");
 
 function tokenBlock(selector: RegExp): string {

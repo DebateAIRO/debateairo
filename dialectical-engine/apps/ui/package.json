@@ -10,7 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node scripts/run-node-tests.mjs",
-    "story:mock": "TSX_TSCONFIG_PATH=tsconfig.scripts.json node --import tsx scripts/story-mock.tsx",
+    "story:mock": "TSX_TSCONFIG_PATH=tsconfig.scripts.json node --import tsx ../../tools/story-mock.tsx",
     "story:sample-pdf": "TSX_TSCONFIG_PATH=tsconfig.scripts.json node --import tsx scripts/story-sample-pdf.ts"
   },
   "dependencies": {

@@ -2,6 +2,7 @@ import type { JSX } from "react";
 import {
   STORY_CHANGE_LEAD,
   STORY_FATE_WORDS,
+  STORY_PATHS_LIST_NAME,
   STORY_RESERVATION_TITLE,
   STORY_REVIEWER_NOTE_CAVEAT,
   STORY_REVIEWER_NOTE_TITLE,
@@ -57,7 +58,7 @@ export function StoryShortBlocks({
     <div className={className} data-ai-generated="true">
       {story.headline === null ? null : <Headline className="storyHeadline">{story.headline}</Headline>}
       {story.summary === null ? null : <p className="storySummary">{story.summary}</p>}
-      <ul className="storyPaths" aria-label="Positions the debate explored">
+      <ul className="storyPaths" aria-label={STORY_PATHS_LIST_NAME}>
         {story.paths.map((path, index) => (
           <li key={`${index}:${path.positionRef}`} className="storyPath">
             <span className="storyFate" data-fate={path.fate}>{STORY_FATE_WORDS[path.fate]}</span>

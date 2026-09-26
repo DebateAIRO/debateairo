@@ -2,7 +2,7 @@ import { PLAN_TIER_ROSTERS, type Answer, type AnswerStory } from "@debateai/cont
 
 /**
  * A realistic sample debate and its story, for the owner's look-first mock
- * (scripts/story-mock.tsx), the sample PDF (scripts/story-sample-pdf.ts) and
+ * (tools/story-mock.tsx), the sample PDF (apps/ui/scripts/story-sample-pdf.ts) and
  * the story tests. No page imports it. The question is Romanian, so the mock
  * and the PDF show ș ț ă î â and „…” the way real stories will.
  */

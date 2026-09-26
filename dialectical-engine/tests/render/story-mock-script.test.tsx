@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 describe("the owner's story mock (look first, then wire)", () => {
   it("writes one self-contained HTML file with every state, desktop, phone and dark", () => {
     const output = join(mkdtempSync(join(tmpdir(), "story-mock-")), "story-panel-mock.html");
-    const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/story-mock.tsx", output], {
+    const result = spawnSync(process.execPath, ["--import", "tsx", "../../tools/story-mock.tsx", output], {
       cwd: resolve(process.cwd(), "apps/ui"),
       env: { ...process.env, TSX_TSCONFIG_PATH: "tsconfig.scripts.json" },
       encoding: "utf8",
@@ -37,7 +37,7 @@ describe("the owner's story mock (look first, then wire)", () => {
   }, 125_000);
 
   it("fails loudly without an output path", () => {
-    const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/story-mock.tsx"], {
+    const result = spawnSync(process.execPath, ["--import", "tsx", "../../tools/story-mock.tsx"], {
       cwd: resolve(process.cwd(), "apps/ui"),
       env: { ...process.env, TSX_TSCONFIG_PATH: "tsconfig.scripts.json" },
       encoding: "utf8",

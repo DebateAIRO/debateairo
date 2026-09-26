@@ -476,7 +476,6 @@ apps/ui/scripts/next-config-csp.test.mjs
 apps/ui/scripts/no-hardcoded-english.test.mjs
 apps/ui/scripts/run-node-tests.mjs
 apps/ui/scripts/server-client-boundary.source-test.mjs
-apps/ui/scripts/story-mock.tsx
 apps/ui/scripts/story-sample-pdf.ts
 apps/ui/server.mjs
 apps/ui/trusted-client-ip.d.mts
