@@ -97,10 +97,11 @@ export interface StoryMaterialPoint {
 }
 
 /**
- * Points the last ladder step left out, counted per position by the polarity
- * of the arrow that reached them. `position_ref` is null for points that reach
- * no position (for example a point that argues about a relation between two
- * points rather than about a point).
+ * Points the last ladder step left out, counted per position by their net
+ * stance toward it: the arrows on the chain that reached them, with each attack
+ * flipping the sign. `position_ref` is null for points that reach no position
+ * (for example a point that argues about a relation between two points rather
+ * than about a point); those count by their own first arrow.
  */
 export interface StoryMaterialOmitted {
   readonly position_ref: string | null;
@@ -153,11 +154,11 @@ export type StoryMaterialResult =
   }
   | { readonly kind: "TOO_LARGE"; readonly bytes: number; readonly budgetBytes: number };
 
-/** How many hinge references the material names (spec §5.2). */
+/** How many hinge references the material names (spec §5.2); positions are never hinges. */
 const STORY_HINGE_COUNT = 5;
-/** Ladder step 1 spares the judge texts of this many highest-leverage points. */
+/** Ladder step 1 spares the judge texts of this many highest-leverage points (positions are not ranked). */
 const STORY_TOP_LEVERAGE = 10;
-/** Ladder steps 6 and 7 spare this many highest-leverage points. */
+/** Ladder steps 6 and 7 spare this many highest-leverage points (positions are not ranked). */
 const STORY_KEPT_LEVERAGE = 20;
 
 /**
@@ -169,8 +170,10 @@ const STORY_KEPT_LEVERAGE = 20;
  *   6    spec 4: points outside the top-20 leverage lose their judge texts and review
  *        reasons (the positions keep theirs: the story's path chapters are built on them)
  *   7    spec 5: only the positions, their direct children, and the top-20 points with the
- *        chain up to a position keep an entry; the rest become `omitted` counts
+ *        chain up to a position keep an entry; the rest become `omitted` counts, by
+ *        net stance toward their position
  * A judge text is a point's best case, its strongest objection, and each review reason.
+ * The top-10 and top-20 rank points only: the positions are named apart (spec §5.2).
  */
 interface StoryShrinkStep {
   readonly outsideTopJudgeChars: number | null;
@@ -335,6 +338,20 @@ function storyTreeOf(
   return { refOf, tree, links };
 }
 
+/**
+ * A point's net stance toward the position its tree reaches: walk up the chain
+ * that reached it and flip at every attack. A support of a support supports the
+ * position, a support of an attack attacks it, and an attack on an attack
+ * supports it. The chain always ends at its position, which has no tree entry.
+ */
+function storyStanceTowardPosition(nodeId: string, tree: ReadonlyMap<string, StoryTreeEntry>): "support" | "attack" {
+  let supports = true;
+  for (let entry = tree.get(nodeId); entry !== undefined; entry = tree.get(entry.parent)) {
+    if (entry.polarity === "attack") supports = !supports;
+  }
+  return supports ? "support" : "attack";
+}
+
 type StoryMaterialCore = Omit<StoryMaterial, "bytes">;
 
 function storyCoreFields(core: StoryMaterialCore): FramedMaterialField[] {
@@ -387,7 +404,10 @@ export function buildStoryMaterial(input: {
     .sort((left, right) => Number(ref(left.nodeId).slice(1)) - Number(ref(right.nodeId).slice(1)));
 
   const leverage = storyLeverageByNode(snapshot, nodeIds);
+  // Only points are ranked. The positions are protected at steps 6 and 7 and
+  // covered by the paths, and a hinge is a point that would flip the verdict.
   const byLeverage = [...leverage.entries()]
+    .filter(([nodeId]) => !positionIds.has(nodeId))
     .sort((left, right) => right[1] - left[1] || storyCompareIds(left[0], right[0]))
     .map(([nodeId]) => nodeId);
   const topLeverage = new Set(byLeverage.slice(0, STORY_TOP_LEVERAGE));
@@ -485,10 +505,13 @@ export function buildStoryMaterial(input: {
     for (const node of nodesInRefOrder) {
       if (visible.has(node.nodeId)) continue;
       const entry = tree.get(node.nodeId);
-      // Only points with an arrow can be left out, so the fallback is never taken.
-      const polarity = entry?.polarity
-        ?? snapshot.arrows.find((arrow) => arrow.sourceNodeId === node.nodeId)?.polarity
-        ?? "support";
+      // Under a position, a point counts by its net stance toward that position. A
+      // point no position reaches has no position to take a stance on, so its own
+      // first arrow counts. Only points with an arrow can be left out, so the last
+      // fallback is never taken.
+      const polarity = entry !== undefined
+        ? storyStanceTowardPosition(node.nodeId, tree)
+        : snapshot.arrows.find((arrow) => arrow.sourceNodeId === node.nodeId)?.polarity ?? "support";
       const key = entry === undefined ? null : ref(entry.root);
       const counts = omittedCounts.get(key) ?? { supports: 0, attacks: 0 };
       if (polarity === "support") counts.supports += 1;

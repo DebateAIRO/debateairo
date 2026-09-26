@@ -123,6 +123,16 @@ function built(result: StoryMaterialResult): BuiltMaterial {
   return result;
 }
 
+/**
+ * Walk the ladder down to its last step: each build's budget is one byte under
+ * the size the step before fitted at, so every step that shrinks is taken in turn.
+ */
+function atLastStep(build: (budgetBytes: number) => StoryMaterialResult): BuiltMaterial {
+  let result = built(build(10_000_000));
+  while (result.compressionStep < 7) result = built(build(result.material.bytes - 1));
+  return result;
+}
+
 function field(fields: readonly FramedMaterialField[], name: string): unknown {
   const found = fields.find((entry) => entry.name === name);
   if (found === undefined) throw new Error(`no ${name} field`);
@@ -270,7 +280,10 @@ describe("verdict story — the material fields", () => {
   });
 
   it("names the hinges by leverage and keeps set-aside branches of this debate only", () => {
-    expect(field(fields, "hinges")).toEqual(["P3", "P4", "P2"]);
+    // position:b (P2) has leverage recorded too, but a position is never a hinge:
+    // the hinges are the points that would flip the verdict, and the paths cover the positions.
+    expect(field(fields, "hinges")).toEqual(["P3", "P4"]);
+    expect(pointFor(result, "position:b").leverage).toBe(0.05);
     expect(field(fields, "set_aside")).toEqual([
       { id: "P5", reason: "Frozen: its leverage was below the threshold." }
     ]);
@@ -567,13 +580,15 @@ describe("verdict story — the shrink ladder, step by step", () => {
     expect(characters(pointFor(step6, id(1)).best_case)).toBe(240);
 
     // Step 7: only the positions, their direct children and the top-20 points with their
-    // chains keep an entry; node:23-26 become per-position counts.
+    // chains keep an entry; node:23-26 become per-position counts, by their net stance
+    // toward the position: node:23 and node:25 support down a chain of supports, and
+    // node:24 and node:26 attack down a chain of six attacks, which nets to support.
     const step7 = built(at(step6.material.bytes - 1));
     expect(step7.compressionStep).toBe(7);
     expect(step7.material.points).toHaveLength(22);
     expect(field(toStoryPromptMaterial(step7.material, null), "omitted") as StoryMaterialOmitted[]).toEqual([
-      { position_ref: refFor(step7, id(1)), supports: 1, attacks: 1 },
-      { position_ref: refFor(step7, id(2)), supports: 1, attacks: 1 }
+      { position_ref: refFor(step7, id(1)), supports: 2, attacks: 0 },
+      { position_ref: refFor(step7, id(2)), supports: 2, attacks: 0 }
     ]);
     expect(step7.index.nodeIds.has(refFor(step7, id(23)))).toBe(false);
     expect(step7.index.nodeIds.size).toBe(22);
@@ -584,8 +599,58 @@ describe("verdict story — the shrink ladder, step by step", () => {
     });
   });
 
+  it("counts each left-out point by its net stance toward its position, not by its own arrow", () => {
+    // position:a <- point:a1 (attack). Below it, point:a2s supports a1, so it attacks A;
+    // point:a2a attacks a1, an attack on an attack, so it supports A; point:a3s supports
+    // a2s, a support of an attack, so it attacks A. position:b <- point:b1 (support);
+    // point:b2 attacks b1, so it attacks B; point:b3 attacks b2, so it supports B.
+    // No point has leverage, so the last step keeps only the positions, a1 and b1.
+    const stance = snapshot({
+      nodes: [
+        node({ nodeId: "position:a", isPosition: true, finalStrength: 0.6, claim: text("Position A", 700) }),
+        node({ nodeId: "position:b", isPosition: true, finalStrength: 0.4, claim: text("Position B", 700) }),
+        ...["point:a1", "point:a2s", "point:a2a", "point:a3s", "point:b1", "point:b2", "point:b3"]
+          .map((nodeId) => node({ nodeId, claim: text(`Claim ${nodeId}`, 700) }))
+      ],
+      arrows: [
+        { sourceNodeId: "point:a1", targetNodeId: "position:a", polarity: "attack" },
+        { sourceNodeId: "point:a2s", targetNodeId: "point:a1", polarity: "support" },
+        { sourceNodeId: "point:a2a", targetNodeId: "point:a1", polarity: "attack" },
+        { sourceNodeId: "point:a3s", targetNodeId: "point:a2s", polarity: "support" },
+        { sourceNodeId: "point:b1", targetNodeId: "position:b", polarity: "support" },
+        { sourceNodeId: "point:b2", targetNodeId: "point:b1", polarity: "attack" },
+        { sourceNodeId: "point:b3", targetNodeId: "point:b2", polarity: "attack" }
+      ],
+      sensitivity: [],
+      setAside: []
+    });
+    const result = atLastStep((budgetBytes) => buildStoryMaterial({
+      snapshot: stance, enrichment: new Map(), budgetBytes, shapeIds: SHAPES
+    }));
+    expect(result.material.points.map((point) => result.refMap.get(point.id)))
+      .toEqual(["position:a", "position:b", "point:a1", "point:b1"]);
+    // Counted by their own arrows, these would read A: 2 supports, 1 attack; B: 0 supports, 2 attacks.
+    expect(result.material.omitted).toEqual([
+      { position_ref: refFor(result, "position:a"), supports: 1, attacks: 2 },
+      { position_ref: refFor(result, "position:b"), supports: 1, attacks: 1 }
+    ]);
+  });
+
+  it("counts a left-out point that no position reaches under a null position_ref", () => {
+    // point:e's arrows land on an edge and on a node outside the debate: no position
+    // reaches it, and it is not arrow-less, so the last step leaves it out and counts it apart.
+    const result = atLastStep((budgetBytes) => buildStoryMaterial({
+      snapshot: snapshot(), enrichment: ENRICHMENT, budgetBytes, shapeIds: SHAPES
+    }));
+    expect(result.material.omitted).toEqual([{ position_ref: null, supports: 0, attacks: 1 }]);
+    expect(result.index.nodeIds.has(refFor(result, "point:e"))).toBe(false);
+    expect(result.material.setAside).toEqual([]);
+  });
+
   it("refuses a budget that is not a positive whole number of bytes", () => {
-    expect(() => at(0)).toThrowError(expect.objectContaining({ code: "STORY_MATERIAL_BUDGET_INVALID" }));
+    for (const budgetBytes of [0, 1.5, -1, Number.NaN]) {
+      expect(() => at(budgetBytes)).toThrowError(expect.objectContaining({ code: "STORY_MATERIAL_BUDGET_INVALID" }));
+    }
   });
 });
 
@@ -693,6 +758,11 @@ describe("verdict story — large debates against the tier budgets", () => {
       for (const target of [...(point.supports ?? []), ...(point.attacks ?? [])]) expect(visible.has(target)).toBe(true);
     }
     for (const hinge of result.material.hinges) expect(visible.has(hinge)).toBe(true);
+    // No node id survives anywhere in what the models read: points, links, hinges,
+    // set-aside, omitted counts and the verdict's winner and runner-up alike.
+    const uuidShaped = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/u;
+    expect(JSON.stringify(debate.snapshot)).toMatch(uuidShaped);
+    expect(JSON.stringify(result.material)).not.toMatch(uuidShaped);
   });
 
   it("fits a 12-position, 150-point debate into the low budget at step 7, and counts what it leaves out", () => {
@@ -737,6 +807,8 @@ describe("verdict story — large debates against the tier budgets", () => {
     const counted = result.material.omitted.reduce((total, entry) => total + entry.supports + entry.attacks, 0);
     expect(result.material.points.length + counted).toBe(150);
     expect(result.material.omitted).toHaveLength(12);
+    // The positions carry the highest leverage here, and still no position is a hinge.
+    expect(result.material.hinges.map((ref) => result.refMap.get(ref))).toEqual([12, 13, 14, 15, 16].map(idOf));
 
     // Past the 8-path cap, the checks let only the 8 strongest be paths, so the
     // index's order must be the material's: strongest first, P1 onwards.
