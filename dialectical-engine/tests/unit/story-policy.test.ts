@@ -164,6 +164,7 @@ describe("every sealed register that exists today still parses, and reads as 'no
     const rows = Object.entries(bootstrap.values).map(([rowKey, value]) => ({
       rowKey, value: value as unknown, sourceRef: "register.bootstrap.json"
     }));
+    expect(rows.length).toBeGreaterThan(0);
     expect(readStoryPolicy(rows, bootstrap.registerVersion)).toBeNull();
   });
 });

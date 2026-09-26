@@ -853,10 +853,6 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_PATH_INVALID");
   }
   const bootstrap = await loadBootstrapRegister();
-  const generatedRows = await buildDevelopmentDeploymentRegisterPublicationRows(
-    bootstrap,
-    input.providerPanel
-  );
   const operations = input.operations ?? {
     ...createPostgresRegisterPublicationPort(input.adminPool),
     async readBaseAlgorithmRows(version: RegisterVersionText) {
@@ -874,6 +870,7 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
   };
   const baseAlgorithmRows = await operations.readBaseAlgorithmRows(input.baseRegisterVersion);
   const preservedRoles = new Map<string, RegisterPublicationRow>();
+  const preservedRoleRefs = new Map<string, string>();
   // A pre-algorithm bootstrap has no such rows. Once sealed, a provider-set
   // publication must preserve the operator's role choices and provenance.
   if (baseAlgorithmRows.length > 0) {
@@ -889,8 +886,24 @@ export async function publishDevelopmentDeploymentRegisterProviderSet(
         throw new TypeError("DEV_ALGORITHM_REGISTER_ROLE_REFS_UNRESOLVED");
       }
       preservedRoles.set(rowKey, row!);
+      preservedRoleRefs.set(rowKey, value.providerRef as string);
     }
   }
+  // Verdict story (spec 2026-09-26 §9): the story role rows are built from the
+  // SAME two identities the preserved synthesis rows seal, so a republish never
+  // re-derives a storyteller or checker that differs from an operator-chosen
+  // synthesizer or evaluator. With no sealed roles, the default derivation.
+  const roleRefs: DevelopmentSynthesisRoleRefs = preservedRoleRefs.size === 0
+    ? deriveSynthesisRoleRefs(input.providerPanel.configuredProviders)
+    : Object.freeze({
+      synthesizerRoleRef: preservedRoleRefs.get("synthesizerRoleRef")!,
+      evaluatorRoleRef: preservedRoleRefs.get("evaluatorRoleRef")!
+    });
+  const generatedRows = await buildDevelopmentDeploymentRegisterPublicationRows(
+    bootstrap,
+    input.providerPanel,
+    roleRefs
+  );
   const rows = generatedRows.map((row) => preservedRoles.get(row.rowKey) ?? row);
   const snapshotSha256 = computeRegisterSnapshotSha256(rows);
   const published = await operations.publishGeneral({

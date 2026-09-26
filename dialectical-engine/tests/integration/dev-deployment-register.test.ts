@@ -171,6 +171,20 @@ describe("DEV-05 complete development deployment register", () => {
     );
     expect(before.rows).toHaveLength(2);
     expect(after.rows).toEqual(before.rows);
+    // Verdict story (Task 5 fix round 1): the republished story roles follow the
+    // PRESERVED synthesis roles, never the default derivation. The override here
+    // differs from the default, so a republish that re-derived them fails below.
+    expect(roleRefs).not.toEqual(deriveSynthesisRoleRefs(configured));
+    const preserved = new Map(after.rows.map((row) => [
+      row.row_key as string, (row.value_json as { readonly providerRef: string }).providerRef
+    ]));
+    const story = await readStoryPolicyFromRegister(
+      database.pool, registerVersionToSafeLegacyNumber(published.registerVersion)
+    );
+    expect(story?.storytellerRoleRef).toBe(preserved.get("synthesizerRoleRef"));
+    expect(story?.storyCheckerRoleRef).toBe(preserved.get("evaluatorRoleRef"));
+    expect(story?.storytellerRoleRef).toBe(roleRefs.synthesizerRoleRef);
+    expect(story?.storyCheckerRoleRef).toBe(roleRefs.evaluatorRoleRef);
   });
 
   it("initializes the complete 16-key development support snapshot enabled from the explicit deployed receipt", async () => {
