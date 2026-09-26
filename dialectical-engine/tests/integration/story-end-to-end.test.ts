@@ -6,6 +6,7 @@ import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery"
 import { BudgetRepository, CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { StoryBodySchema } from "@debateai/contract";
 import { RunRepository, migrate } from "@debateai/db";
+import { argumentLanguageDirective } from "@debateai/kernel";
 import { CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY, type StoryPolicy } from "@debateai/register";
 import {
   createPostgresProviderGateway,
@@ -74,7 +75,7 @@ const CHECKER_SATISFIED = JSON.stringify({
   criteria: {
     faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true,
     no_overstatement: true, citations_correct: true, reviewer_note_separate: true,
-    goal_marked_as_reading: true
+    goal_marked_as_reading: true, speaks_to_the_person: true
   }
 });
 
@@ -84,7 +85,7 @@ const CHECKER_OBJECTS = JSON.stringify({
   criteria: {
     faithful_to_material: true, agrees_with_label: false, fair_to_losing_paths: true,
     no_overstatement: false, citations_correct: true, reviewer_note_separate: true,
-    goal_marked_as_reading: true
+    goal_marked_as_reading: true, speaks_to_the_person: true
   }
 });
 
@@ -103,9 +104,11 @@ function oneNodeStory(): string {
     short: {
       headline: "The one position held up under review.",
       summary: "The debate examined one position, and it held up against its strongest objection.",
+      confidence: "Fairly sure, until a sourced objection turns up.",
       paths: [{ position_ref: "P1", fate: "HELD_UP", line: "The position held up.", node_refs: ["P1"] }],
       change: paragraph("A stronger, sourced objection would change the answer.")
     },
+    why: { reasons: [paragraph("The one position held up against its strongest objection.")] },
     long: {
       sections: ["What you are deciding", "The verdict", "What would change it"].map((title) => ({
         title, paragraphs: [paragraph(`${title}, in the debate's own terms.`)]
@@ -134,17 +137,22 @@ async function startStoryDebateProvider(input: {
   storyCalls(): number;
   /** Every material field every story request carried, repair turns included. */
   storyMaterial(): readonly string[];
+  /** Every story request's system message: the owners' instruction and dev's language directive. */
+  storySystem(): readonly string[];
   stop(): Promise<void>;
 }> {
   let storyCalls = 0;
   let checkerCalls = 0;
   let served = 0;
   const storyMaterial: string[] = [];
+  const storySystem: string[] = [];
   const contentFor = async (body: string): Promise<string> => {
     const framed = readFramedMaterial(wirePacket(body));
     const contractId = framed.contractId;
     if (contractId === STORYTELLER_CONTRACT_ID || contractId === STORY_CHECKER_CONTRACT_ID) {
       storyMaterial.push(...framed.fields.map((field) => field.content));
+      const messages = (JSON.parse(body) as { readonly messages?: readonly { role: string; content: string }[] }).messages ?? [];
+      storySystem.push(...messages.filter((message) => message.role === "system").map((message) => message.content));
     }
     if (contractId === STORYTELLER_CONTRACT_ID) {
       storyCalls += 1;
@@ -186,6 +194,7 @@ async function startStoryDebateProvider(input: {
     endpoint: `http://127.0.0.1:${address.port}`,
     storyCalls: () => storyCalls,
     storyMaterial: () => [...storyMaterial],
+    storySystem: () => [...storySystem],
     async stop() { server.close(); await once(server, "close"); }
   };
 }
@@ -279,7 +288,11 @@ function runnerSettings(): WalkingSkeletonSettings {
   };
 }
 
-async function createStoryDebate(label: string, maxModelAttempts = 10): Promise<{
+async function createStoryDebate(
+  label: string,
+  maxModelAttempts = 10,
+  language: { readonly tag: string; readonly name: string } | null = null
+): Promise<{
   readonly runId: string; readonly workItemId: string; readonly askerId: string;
 }> {
   // Unique without being id-shaped, so the material check below can refuse ANY
@@ -293,7 +306,8 @@ async function createStoryDebate(label: string, maxModelAttempts = 10): Promise<
     tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${question}`, compositionBudgetTier: "low",
     depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(1), strangerSampleRate: 1,
     envelopeBasis: fixtureStructuralCeiling(maxModelAttempts, 1, 1),
-    registerVersion: 1, batteryVersion: "s00", batteryRows
+    registerVersion: 1, batteryVersion: "s00", batteryRows,
+    ...(language === null ? {} : { argumentLanguageTag: language.tag, argumentLanguageName: language.name })
   });
   const workItemId = await new WorkItemRepository(database.pool).enqueue({
     runId, batteryRowId: "Q1", nodeSet: [], commandKey: `story-e2e:${runId}`
@@ -352,7 +366,7 @@ afterAll(async () => {
 
 describe("verdict story — end to end, after the debate is settled", () => {
   it("writes a READY story that the asker reads back, on the story's own call sites", async () => {
-    const debate = await createStoryDebate("story-e2e-ready");
+    const debate = await createStoryDebate("story-e2e-ready", 10, { tag: "ro", name: "Romanian" });
     const provider = await startStoryDebateProvider({ storyteller: "valid" });
     try {
       const result = await runnerWith(provider.endpoint, storyWriter(LOCAL_STORY_POLICY)).executeWorkItem(debate.workItemId);
@@ -378,6 +392,11 @@ describe("verdict story — end to end, after the debate is settled", () => {
         expect.objectContaining({ position_ref: rootNodeId, node_refs: [rootNodeId] })
       ]);
       expect(stored?.pointNumbers).toEqual({ [rootNodeId]: "P1" });
+      // R1: the run's own language, from its frozen head, is sealed with the story,
+      // and both story prompts carry dev's directive in their one system message.
+      expect(stored?.languageTag).toBe("ro");
+      expect(provider.storySystem()).toHaveLength(2);
+      for (const system of provider.storySystem()) expect(system).toContain(argumentLanguageDirective("Romanian"));
       expect(stored?.artifactRefs).toHaveLength(2);
       const storyRows = await database.pool.query<{ call_site_key: string }>(
         `SELECT call_site_key FROM ledger.ledger_entry
@@ -464,7 +483,8 @@ describe("verdict story — end to end, after the debate is settled", () => {
         answerId: result.answerId, answerVersion: null, ownership: { legacyAskerId: debate.askerId }
       })).resolves.toMatchObject({
         outcome: "FAILED", failureCode: "STORY_NOT_CONFIGURED", packVersion: PACK.version, rounds: 0,
-        pointNumbers: null
+        // A run with no confident language carries "und", dev's tag for it.
+        pointNumbers: null, languageTag: "und"
       });
       expect(provider.storyCalls()).toBe(0);
     } finally {

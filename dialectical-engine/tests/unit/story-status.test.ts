@@ -125,6 +125,7 @@ describe("verdict story status (spec §7)", () => {
       pack: { version: "2026-09-26.1", fingerprint: stored.packFingerprint },
       written_at: "2026-09-26T10:04:00.000Z",
       rounds: 1,
+      language: "en",
       reservation: null,
       point_numbers: { "node:position": "P1", "node:defeater": "P2" },
       story: STORY_TEST_BODY
@@ -132,6 +133,23 @@ describe("verdict story status (spec §7)", () => {
     expect(response.storyteller?.model_id).toBe("gpt-5.6-sol");
     expect(response.checker?.model_id).toBe("claude-opus-5");
     expect(response.verdict_basis?.trigger).toBe("MID_BAND");
+  });
+
+  it("names the question's language from the stored story (R1): a BCP-47 tag, und, or null when none was stored", () => {
+    const build = (languageTag: string | null) => AnswerStorySchema.parse(buildAnswerStory({
+      answerId: STORY_TEST_ANSWER_ID, answerVersion: 1, stored: storedStoryRecord({ languageTag }),
+      derived: { status: "READY", unavailableReason: null }
+    })).language;
+    expect(build("ro")).toBe("ro");
+    expect(build("und")).toBe("und");
+    expect(build(null)).toBeNull();
+    // The contract holds the tag to BCP-47's own length.
+    const ready = buildAnswerStory({
+      answerId: STORY_TEST_ANSWER_ID, answerVersion: 1, stored: storedStoryRecord(),
+      derived: { status: "READY", unavailableReason: null }
+    });
+    expect(AnswerStorySchema.safeParse({ ...ready, language: "x".repeat(36) }).success).toBe(false);
+    expect(AnswerStorySchema.safeParse({ ...ready, language: "" }).success).toBe(false);
   });
 
   it("carries the checker's reservation only with READY_WITH_RESERVATION", () => {
@@ -155,7 +173,7 @@ describe("verdict story status (spec §7)", () => {
     expect(response).toEqual({
       answer_id: STORY_TEST_ANSWER_ID, answer_version: 2, status: "UNAVAILABLE",
       unavailable_reason: "STORY_WRITE_REJECTED", shape: null, pack: null, written_at: null,
-      storyteller: null, checker: null, rounds: null, reservation: null, verdict_basis: null,
+      storyteller: null, checker: null, rounds: null, language: null, reservation: null, verdict_basis: null,
       point_numbers: null, story: null
     });
   });

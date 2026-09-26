@@ -46,6 +46,7 @@ const OLD_SNAPSHOT = {
 const SHORT: PublicStoryShort = {
   headline: STORY_TEST_BODY.short.headline,
   summary: STORY_TEST_BODY.short.summary,
+  confidence: STORY_TEST_BODY.short.confidence,
   paths: STORY_TEST_BODY.short.paths,
   change: STORY_TEST_BODY.short.change,
   reviewer_note: null
@@ -121,6 +122,11 @@ describe("public short story contract (spec §10)", () => {
     expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, story_short: { ...SHORT, answer_id: "x" } }).success).toBe(false);
   });
 
+  it("refuses a short story without its confidence sentence (R1)", () => {
+    const { confidence: _left, ...withoutConfidence } = SHORT;
+    expect(PublicStoryShortSchema.safeParse(withoutConfidence).success).toBe(false);
+  });
+
   it("refuses the checker's reservation: it stays owner-only", () => {
     expect(PublicStoryShortSchema.safeParse({ ...SHORT, reservation: null }).success).toBe(false);
     expect(PublicStoryShortSchema.safeParse({ ...SHORT, reservation: "P7 comes from one source." }).success).toBe(false);
@@ -145,6 +151,9 @@ describe("public short story limits", () => {
     ["a blank headline", { headline: "   " }, false],
     ["a summary of 900 characters", { summary: at(900) }, true],
     ["a summary of 901 characters", { summary: at(901) }, false],
+    ["a confidence sentence of 300 characters", { confidence: at(300) }, true],
+    ["a confidence sentence of 301 characters", { confidence: at(301) }, false],
+    ["a blank confidence sentence", { confidence: "   " }, false],
     ["no path", { paths: [] }, false],
     ["8 paths", { paths: paths(8) }, true],
     ["9 paths", { paths: paths(9) }, false],
@@ -163,7 +172,10 @@ describe("public short story limits", () => {
     const probe = { ...SHORT, ...change };
     const body: StoryBody = {
       ...STORY_TEST_BODY,
-      short: { headline: probe.headline, summary: probe.summary, paths: probe.paths, change: probe.change },
+      short: {
+        headline: probe.headline, summary: probe.summary, confidence: probe.confidence,
+        paths: probe.paths, change: probe.change
+      },
       reviewer_note: probe.reviewer_note
     };
     expect(StoryBodySchema.safeParse(body).success).toBe(accepted);
@@ -181,13 +193,16 @@ describe("toPublicStoryShort", () => {
     const stored = storedStoryRecord({ body: { ...STORY_TEST_BODY, reviewer_note: note } });
     const short = toPublicStoryShort(stored);
     expect(short?.reviewer_note).toEqual(note);
-    expect(Object.keys(short ?? {}).sort()).toEqual(["change", "headline", "paths", "reviewer_note", "summary"]);
+    expect(Object.keys(short ?? {}).sort()).toEqual(["change", "confidence", "headline", "paths", "reviewer_note", "summary"]);
     const text = JSON.stringify(short);
     expect(text).not.toContain(stored.packFingerprint!);
     expect(text).not.toContain(stored.storytellerLineage!.model_id);
     expect(text).not.toContain(stored.checkerLineage!.model_id);
     expect(text).not.toContain("\"P1\"");
     expect(text).not.toContain(stored.verdictBasis!.trigger);
+    // The long story and the reasons are for the full report only.
+    expect(text).not.toContain(STORY_TEST_BODY.why.reasons[0]!.text);
+    expect(text).not.toContain(STORY_TEST_BODY.long.sections[0]!.paragraphs[0]!.text);
   });
 
   it("publishes a READY_WITH_RESERVATION story without the checker's reservation", () => {

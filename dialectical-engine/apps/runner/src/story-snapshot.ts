@@ -51,6 +51,8 @@ export interface StorySnapshotSource {
   readonly answerId: string;
   readonly answerVersion: number;
   readonly questionLine: string;
+  /** The question's language the run recorded (its frozen head's tag and English name), or null. */
+  readonly argumentLanguage: { readonly tag: string; readonly name: string } | null;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
     readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
@@ -138,6 +140,9 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     answerId: source.answerId,
     answerVersion: source.answerVersion,
     questionLine: source.questionLine,
+    argumentLanguage: source.argumentLanguage === null
+      ? null
+      : Object.freeze({ tag: source.argumentLanguage.tag, name: source.argumentLanguage.name }),
     compositionBudgetTier: source.compositionBudgetTier,
     verdictBasis: {
       label: source.verdict.label,

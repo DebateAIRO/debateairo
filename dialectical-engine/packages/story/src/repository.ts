@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   MakerLineageSchema,
   StoryBodySchema,
+  StoryLanguageTagSchema,
   StoryOutcomeSchema,
   StoryVerdictBasisSchema,
   type MakerLineage,
@@ -23,9 +24,11 @@ import { TypedDomainError, exhaustive } from "@debateai/kernel";
 
 /**
  * THE STORY ROW (migration 0074, spec §7). Insert-once per answer version, and
- * a content carrier. The story JSON, the reservation, the verdict basis and the
- * point numbers are sealed together for an encrypted run and stored as plaintext for a legacy
- * one, exactly as `serve.answer`'s answer form is. The readable columns hold
+ * a content carrier. The story JSON, the reservation, the verdict basis, the
+ * point numbers and the question's language tag are sealed together for an
+ * encrypted run and stored as plaintext for a legacy one, exactly as
+ * `serve.answer`'s answer form is. The tag rides in the content, so migration
+ * 0074 is unchanged. The readable columns hold
  * only codes, ids, the owner's pack label and fingerprint, and model lineage.
  */
 export interface StoryRecordInput {
@@ -49,6 +52,8 @@ export interface StoryRecordInput {
    * storyteller and the checker wrote in). Null when no material was built.
    */
   readonly pointNumbers: Readonly<Record<string, string>> | null;
+  /** The question's language (spec §14.3): a BCP-47 tag or "und"; null when the run held none. */
+  readonly languageTag: string | null;
 }
 
 export interface StoredStory extends StoryRecordInput {
@@ -64,7 +69,8 @@ const StoredStoryContentSchema = z.object({
   body: StoryBodySchema.nullable(),
   reservation: z.string().nullable(),
   verdictBasis: StoryVerdictBasisSchema.nullable(),
-  pointNumbers: z.record(z.string().min(1), z.string().regex(/^P[1-9][0-9]*$/u)).nullable()
+  pointNumbers: z.record(z.string().min(1), z.string().regex(/^P[1-9][0-9]*$/u)).nullable(),
+  languageTag: StoryLanguageTagSchema.nullable()
 }).strict();
 
 type StoredStoryContent = z.infer<typeof StoredStoryContentSchema>;
@@ -164,7 +170,8 @@ export class StoryRepository {
       body: record.body,
       reservation: record.reservation,
       verdictBasis: record.verdictBasis,
-      pointNumbers: record.pointNumbers
+      pointNumbers: record.pointNumbers,
+      languageTag: record.languageTag
     });
     if (!parsed.success) {
       const fields = [...new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? "content")))];
@@ -296,6 +303,7 @@ export class StoryRepository {
           reservation: content.data.reservation,
           verdictBasis: content.data.verdictBasis,
           pointNumbers: content.data.pointNumbers === null ? null : Object.freeze({ ...content.data.pointNumbers }),
+          languageTag: content.data.languageTag,
           createdAt: row.created_at
         };
         return Object.freeze(stored);

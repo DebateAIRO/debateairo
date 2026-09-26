@@ -5140,6 +5140,9 @@ export class WalkingSkeletonRunner {
               answerId: persisted.answerId,
               answerVersion: persisted.answerVersion,
               questionLine: run.questionLine,
+              // The same language the debate's own prompts were told to write in
+              // (argumentLanguageDirective), and the tag the story is stored with.
+              argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
               compositionBudgetTier: run.compositionBudgetTier,
               verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
               servedRootNodeId: servedRoot.nodeId,

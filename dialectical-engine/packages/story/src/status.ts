@@ -94,6 +94,7 @@ export function buildAnswerStory(input: {
     storyteller: stored === null ? null : stored.storytellerLineage,
     checker: stored === null ? null : stored.checkerLineage,
     rounds: stored === null ? null : stored.rounds,
+    language: stored === null ? null : stored.languageTag,
     reservation: stored !== null && input.derived.status === "READY_WITH_RESERVATION" ? stored.reservation : null,
     verdict_basis: stored === null ? null : stored.verdictBasis,
     point_numbers: stored === null || stored.pointNumbers === null ? null : { ...stored.pointNumbers },

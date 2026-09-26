@@ -43,7 +43,7 @@ describe("StoryPanel (spec §10)", () => {
     const html = markup(storyFixture("READY"));
     expect(html).toContain('data-story-status="READY"');
     expect(html).toContain("<details class=\"storyPanelDetails\" open=\"\">");
-    expect(html).toContain("Mutarea poate merita, dar nu dintr-odată: totul depinde de lucrul hibrid.");
+    expect(html).toContain("Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.");
     expect(html).toContain("Held up");
     expect(html).toContain("Partly held");
     expect(html).toContain("Fell");

@@ -1,4 +1,4 @@
-import type { MakerLineage, StoryBody } from "@debateai/contract";
+import { StoryLanguageTagSchema, type MakerLineage, type StoryBody } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -15,7 +15,12 @@ import {
   type TypedRole
 } from "@debateai/providers";
 import type { StoryPolicy } from "@debateai/register";
-import { buildStoryCheckerContract, buildStorytellerContract, storyContractHash } from "./contracts.js";
+import {
+  buildStoryCheckerContract,
+  buildStorytellerContract,
+  storyContractHash,
+  storyContractInArgumentLanguage
+} from "./contracts.js";
 import { readStoryEnrichment } from "./enrichment.js";
 import { runStoryLoop, storyCallSiteKey, type StoryLoopOutcome } from "./loop.js";
 import {
@@ -199,6 +204,16 @@ function storyCallRequest(input: {
   return Object.freeze(request);
 }
 
+/**
+ * The tag stored with the story: the run's, when the contract can carry it.
+ * The database already holds the tag to a BCP-47 shape; this is the last guard,
+ * so a tag the stored schema would refuse costs the tag and never the story.
+ */
+function storyLanguageTag(input: StoryWriteInput): string | null {
+  const tag = input.argumentLanguage?.tag ?? null;
+  return tag !== null && StoryLanguageTagSchema.safeParse(tag).success ? tag : null;
+}
+
 /** A readiness refusal: nothing ran, so no lineage, no artifact and no point numbers. */
 function failedRecord(input: StoryWriteInput, failureCode: string, pack: StoryPack | null): StoryRecordInput {
   const record: StoryRecordInput = {
@@ -218,18 +233,20 @@ function failedRecord(input: StoryWriteInput, failureCode: string, pack: StoryPa
     reservation: null,
     verdictBasis: input.verdictBasis,
     // No material was built, so no point was numbered.
-    pointNumbers: null
+    pointNumbers: null,
+    languageTag: storyLanguageTag(input)
   };
   return Object.freeze(record);
 }
 
 /**
  * The record written when the first one could not be: FAILED/STORY_UNEXPECTED_ERROR.
- * It carries NO verdict basis and no point numbers, so the repository's
- * parse-before-seal cannot refuse it for the same reason it refused the first.
+ * It carries NO verdict basis, no point numbers and no language tag, so the
+ * repository's parse-before-seal cannot refuse it for the same reason it
+ * refused the first.
  */
 function fallbackRecord(input: StoryWriteInput, pack: StoryPack | null): StoryRecordInput {
-  return Object.freeze({ ...failedRecord(input, "STORY_UNEXPECTED_ERROR", pack), verdictBasis: null });
+  return Object.freeze({ ...failedRecord(input, "STORY_UNEXPECTED_ERROR", pack), verdictBasis: null, languageTag: null });
 }
 
 function recordFromOutcome(
@@ -261,7 +278,8 @@ function recordFromOutcome(
     verdictBasis: input.verdictBasis,
     // The short refs the models wrote in ARE the story's point numbers (node id
     // -> Pn), so a reservation that says "P3" matches appendix entry P3.
-    pointNumbers: pointNumbersFrom(refMap)
+    pointNumbers: pointNumbersFrom(refMap),
+    languageTag: storyLanguageTag(input)
   };
   if (outcome.outcome === "FAILED") {
     const failed: StoryRecordInput = {
@@ -379,6 +397,7 @@ export class StoryWriter {
       answerId: input.answerId,
       answerVersion: input.answerVersion,
       questionLine: input.questionLine,
+      argumentLanguage: input.argumentLanguage,
       compositionBudgetTier: input.compositionBudgetTier,
       verdictBasis: input.verdictBasis,
       servedStatement: input.servedStatement,
@@ -411,8 +430,11 @@ export class StoryWriter {
       return failedRecord(input, "STORY_MATERIAL_TOO_LARGE", pack);
     }
 
-    const storytellerContract = buildStorytellerContract(pack);
-    const checkerContract = buildStoryCheckerContract(pack);
+    // Both prompts carry dev's argument-language directive (spec §14.1), so the
+    // story and the checker's objection come out in the question's language.
+    const languageName = input.argumentLanguage?.name ?? null;
+    const storytellerContract = storyContractInArgumentLanguage(buildStorytellerContract(pack), languageName);
+    const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack), languageName);
     const storytellerHash = storyContractHash(storytellerContract);
     const checkerHash = storyContractHash(checkerContract);
     const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds }, {

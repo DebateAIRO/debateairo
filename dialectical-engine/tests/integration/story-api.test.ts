@@ -127,7 +127,8 @@ function readyRecord(runId: string, answerId: string): StoryRecordInput {
     body: STORY_TEST_BODY,
     reservation: null,
     verdictBasis: STORY_TEST_BASIS,
-    pointNumbers: { "node:position": "P1", "node:defeater": "P2" }
+    pointNumbers: { "node:position": "P1", "node:defeater": "P2" },
+    languageTag: "ro"
   };
 }
 
@@ -202,6 +203,8 @@ describe("GET /v1/answers/{id}/story over the real database (spec §11)", () => 
       shape: { id: "money-decision", title: "Money decision" },
       pack: { version: "2026-09-26.1", fingerprint: "e".repeat(64) },
       rounds: 2,
+      // R1: the question's language, sealed with the story, comes back through the owner route.
+      language: "ro",
       reservation: null,
       point_numbers: { "node:position": "P1", "node:defeater": "P2" },
       story: STORY_TEST_BODY,

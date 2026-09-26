@@ -47,6 +47,13 @@ export interface StoryRunSnapshot {
   readonly answerId: string;
   readonly answerVersion: number;
   readonly questionLine: string;
+  /**
+   * The question's language as the run recorded it (dev's
+   * `core.run.argument_language_tag` and `argument_language_name`, spec §14.3):
+   * the name goes into the argument-language directive of both story prompts,
+   * the tag is stored with the story. Null when the run holds none.
+   */
+  readonly argumentLanguage: { readonly tag: string; readonly name: string } | null;
   readonly compositionBudgetTier: "low" | "medium" | "high";
   readonly verdictBasis: StoryVerdictBasis;
   readonly servedStatement: readonly string[];
@@ -208,6 +215,47 @@ function storyClip(text: string, limit: number | null): string {
 /** Scores travel at four decimals: exact enough to explain a rung, short enough for the budget. */
 function storyNumber(value: number): number {
   return Math.round(value * 10_000) / 10_000;
+}
+
+/**
+ * A score as a story might print it (spec §14.1): two decimals, rounded half up
+ * the way a person rounds (0.575 prints 0.58, though the float sits a hair
+ * below), with a point and with a comma. A threshold also in its one-decimal
+ * form when that form is exact (0.7, not 0.35 as 0.3). Scores are at most four
+ * decimals here (`storyNumber`), so the small nudge never crosses a real half.
+ */
+function storyScoreForms(value: number, threshold: boolean): readonly string[] {
+  const magnitude = Math.abs(value);
+  const printed = [(Math.round(magnitude * 100 + 1e-7) / 100).toFixed(2)];
+  if (threshold && Number(magnitude.toFixed(1)) === magnitude) printed.push(magnitude.toFixed(1));
+  return printed.flatMap((form) => [form, form.replace(".", ",")]);
+}
+
+/**
+ * Every score the fitted material shows (each point's base and final, each
+ * position's final, the verdict's winner, runner-up, margin and disagreement)
+ * and every threshold, as a story might print them. Only what the material
+ * shows: a point the last ladder step left out adds nothing. Leverage and the
+ * judges' spread are not scores and are not held.
+ */
+function storyScoreTexts(material: StoryMaterial): ReadonlySet<string> {
+  const texts = new Set<string>();
+  const add = (value: number | null | undefined, threshold = false): void => {
+    if (value === null || value === undefined || !Number.isFinite(value)) return;
+    for (const form of storyScoreForms(value, threshold)) texts.add(form);
+  };
+  for (const point of material.points) {
+    add(point.base);
+    add(point.final);
+  }
+  for (const position of material.positions) add(position.final);
+  const verdict = material.verdict;
+  add(verdict.winner_final);
+  add(verdict.runner_up_final);
+  add(verdict.margin);
+  add(verdict.disagreement);
+  for (const threshold of Object.values(verdict.thresholds)) add(threshold, true);
+  return texts;
 }
 
 function storyNumberWords(value: number | null): string {
@@ -561,7 +609,8 @@ export function buildStoryMaterial(input: {
           positionOrder,
           shapeIds: input.shapeIds,
           // The site shows at most this many path lines (spec §5.3); one cap, shared with the schema.
-          pathCap: STORY_BODY_LIMITS.maxPaths
+          pathCap: STORY_BODY_LIMITS.maxPaths,
+          scoreTexts: storyScoreTexts(material)
         }),
         refMap,
         compressionStep: step
@@ -604,6 +653,7 @@ export function restoreStoryRefs(body: StoryBody, refMap: ReadonlyMap<string, st
     short: {
       headline: body.short.headline,
       summary: body.short.summary,
+      confidence: body.short.confidence,
       paths: body.short.paths.map((path) => ({
         position_ref: restore(path.position_ref),
         fate: path.fate,
@@ -611,6 +661,9 @@ export function restoreStoryRefs(body: StoryBody, refMap: ReadonlyMap<string, st
         node_refs: path.node_refs.map(restore)
       })),
       change: paragraph(body.short.change)
+    },
+    why: {
+      reasons: body.why.reasons.map(paragraph)
     },
     long: {
       sections: body.long.sections.map((section) => ({

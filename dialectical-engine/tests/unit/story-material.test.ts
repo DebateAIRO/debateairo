@@ -67,6 +67,7 @@ function snapshot(overrides: Partial<StoryRunSnapshot> = {}): StoryRunSnapshot {
     answerId: "answer:story",
     answerVersion: 1,
     questionLine: "Should the city fund the tram extension?",
+    argumentLanguage: { tag: "en", name: "English" },
     compositionBudgetTier: "low",
     verdictBasis: BASIS,
     servedStatement: ["The debate leans towards funding the extension.", "What would settle it is a ridership count."],
@@ -165,9 +166,11 @@ function storyWithPaths(positionRefs: readonly string[]): StoryBody {
     short: {
       headline: "The debate leans one way.",
       summary: "Our reading of your question.",
+      confidence: "Fairly sure, if the count holds.",
       paths: positionRefs.map((ref) => ({ position_ref: ref, fate: "PARTLY_HELD" as const, line: "This position partly held.", node_refs: [ref] })),
       change: { text: "A count would change it.", node_refs: [] }
     },
+    why: { reasons: [{ text: "One reason decided it.", node_refs: [] }] },
     long: {
       sections: [1, 2, 3].map((index) => ({ title: `Section ${String(index)}`, paragraphs: [{ text: "A paragraph.", node_refs: [] }] }))
     },
@@ -345,8 +348,15 @@ describe("verdict story — restoring node ids before storage", () => {
     short: {
       headline: "The debate leans towards funding.",
       summary: "Our reading of your question.",
+      confidence: "Fairly sure, if ridership holds.",
       paths,
       change: { text: "A ridership count.", node_refs: ["P3"] }
+    },
+    why: {
+      reasons: [
+        { text: "The fares argument decided it (P3).", node_refs: ["P3", "P1"] },
+        { text: "The overrun objection was answered.", node_refs: ["P4"] }
+      ]
     },
     long: {
       sections: [1, 2, 3].map((index) => ({
@@ -368,10 +378,13 @@ describe("verdict story — restoring node ids before storage", () => {
       { position_ref: "position:b", fate: "FELL", line: "Not funding fell.", node_refs: ["position:b"] }
     ]);
     expect(restored.short.change.node_refs).toEqual(["point:c"]);
+    expect(restored.why.reasons.map((reason) => reason.node_refs)).toEqual([["point:c", "position:a"], ["point:d"]]);
     expect(restored.long.sections[1]!.paragraphs[0]!.node_refs).toEqual(["position:a", "point:d"]);
     expect(restored.reviewer_note?.node_refs).toEqual(["point:c"]);
     // The words are untouched: only the references change.
     expect(restored.short.headline).toBe(story.short.headline);
+    expect(restored.short.confidence).toBe("Fairly sure, if ridership holds.");
+    expect(restored.why.reasons.map((reason) => reason.text)).toEqual(story.why.reasons.map((reason) => reason.text));
     expect(restored.long.sections.map((section) => section.paragraphs[0]!.text))
       .toEqual(story.long.sections.map((section) => section.paragraphs[0]!.text));
     expect(restored.reviewer_note?.text).toBe("One point carries it.");
@@ -395,6 +408,93 @@ describe("verdict story — restoring node ids before storage", () => {
     const story = cited([{ position_ref: "P1", fate: "PARTLY_HELD", line: "Funding.", node_refs: [bad] }], null);
     expect(() => restoreStoryRefs(story, result.refMap))
       .toThrowError(expect.objectContaining({ code: "STORY_REF_UNMAPPED" }));
+    const inReason = cited([{ position_ref: "P1", fate: "PARTLY_HELD", line: "Funding.", node_refs: [] }], null);
+    inReason.why.reasons[0]!.node_refs = [bad];
+    expect(() => restoreStoryRefs(inReason, result.refMap))
+      .toThrowError(expect.objectContaining({ code: "STORY_REF_UNMAPPED" }));
+  });
+});
+
+/**
+ * R1 — the story never prints a score. The index carries every score and
+ * threshold the material shows, as a story might print it: two decimals with a
+ * point and with a comma, and a threshold's one-decimal form when it is exact.
+ */
+describe("verdict story — the score values a story may never print", () => {
+  const result = built(buildStoryMaterial({ snapshot: snapshot(), enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES }));
+  const both = (...values: readonly string[]): string[] => values.flatMap((value) => [value, value.replace(".", ",")]);
+
+  it("holds every point's base and final score, every position's, the verdict's four and every threshold", () => {
+    expect([...result.index.scoreTexts].sort()).toEqual(both(
+      // points: base 0.5 everywhere; finals 0.45 (points) and the positions' 0.6123 and 0.4
+      "0.50", "0.45", "0.61", "0.40",
+      // verdict: winner 0.6123, runner-up 0.4, margin 0.2123, disagreement 0.08
+      "0.21", "0.08",
+      // thresholds: tie margin 0.05, high cut 0.7 (and 0.7 itself, exact at one decimal), low cut 0.35, disagreement 0.25
+      "0.05", "0.70", "0.7", "0.35", "0.25"
+    ).sort());
+  });
+
+  it("leaves out what is not a score: leverage and the judges' spread", () => {
+    // Leverage 0.3 and 0.2, spread 0.1 and 0.08: 0.08 is there only as the verdict's disagreement.
+    for (const absent of ["0.30", "0,30", "0.20", "0,20", "0.10", "0,10", "0.3", "0.4", "0.6"]) {
+      expect(result.index.scoreTexts.has(absent)).toBe(false);
+    }
+  });
+
+  it("rounds half up, the way a person prints a score, whatever the float underneath", () => {
+    // 0.575 is stored a hair below itself: toFixed(2) would print 0.57, a person 0.58.
+    const half = built(buildStoryMaterial({
+      snapshot: snapshot({ verdictBasis: { ...BASIS, margin: 0.575 } }),
+      enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES
+    }));
+    expect(half.index.scoreTexts.has("0.58")).toBe(true);
+    expect(half.index.scoreTexts.has("0,58")).toBe(true);
+    expect(half.index.scoreTexts.has("0.57")).toBe(false);
+  });
+
+  it("refuses, through the classifier, a story that prints one of them", () => {
+    const story = storyWithPaths(["P1", "P2"]);
+    story.long.sections[0]!.paragraphs[0]!.text = "Funding finished at 0,61.";
+    const refused = classifyStoryContent(JSON.stringify(story), result.index);
+    expect(refused.parseStatus).toBe("SCHEMA_FAILED");
+    expect(refused.parseError).toContain("STORY_TEXT_SCORE_VALUE");
+    story.long.sections[0]!.paragraphs[0]!.text = "Funding came out ahead, though not by much.";
+    expect(classifyStoryContent(JSON.stringify(story), result.index)).toEqual({ parseStatus: "PARSED", parseError: null });
+  });
+
+  it("holds only what the material still shows once the last ladder step leaves points out", () => {
+    // The last step keeps the two positions and their direct children (a1, b1)
+    // and leaves the deeper points out; only those carry 0.13 and 0.17.
+    const deep = ["point:a2", "point:a3", "point:b2"];
+    const shaped = snapshot({
+      nodes: [
+        node({ nodeId: "position:a", isPosition: true, finalStrength: 0.6, claim: text("Position A", 700) }),
+        node({ nodeId: "position:b", isPosition: true, finalStrength: 0.4, claim: text("Position B", 700) }),
+        ...["point:a1", "point:b1"].map((nodeId) => node({ nodeId, claim: text(`Claim ${nodeId}`, 700) })),
+        ...deep.map((nodeId) => node({ nodeId, claim: text(`Claim ${nodeId}`, 700), baseScore: 0.13, finalStrength: 0.17 }))
+      ],
+      arrows: [
+        { sourceNodeId: "point:a1", targetNodeId: "position:a", polarity: "attack" },
+        { sourceNodeId: "point:a2", targetNodeId: "point:a1", polarity: "support" },
+        { sourceNodeId: "point:a3", targetNodeId: "point:a2", polarity: "attack" },
+        { sourceNodeId: "point:b1", targetNodeId: "position:b", polarity: "support" },
+        { sourceNodeId: "point:b2", targetNodeId: "point:b1", polarity: "attack" }
+      ],
+      sensitivity: [],
+      setAside: []
+    });
+    const full = built(buildStoryMaterial({ snapshot: shaped, enrichment: new Map(), budgetBytes: 10_000_000, shapeIds: SHAPES }));
+    const last = atLastStep((budgetBytes) => buildStoryMaterial({
+      snapshot: shaped, enrichment: new Map(), budgetBytes, shapeIds: SHAPES
+    }));
+    // Positive control: while the deep points are shown, their scores are there.
+    expect(full.index.scoreTexts.has("0,13")).toBe(true);
+    expect(full.index.scoreTexts.has("0.17")).toBe(true);
+    expect(last.material.omitted.length).toBeGreaterThan(0);
+    for (const gone of ["0.13", "0,13", "0.17", "0,17"]) expect(last.index.scoreTexts.has(gone)).toBe(false);
+    expect(last.index.scoreTexts.has("0.60")).toBe(true);
+    expect(last.index.scoreTexts.has("0.45")).toBe(true);
   });
 });
 

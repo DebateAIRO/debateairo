@@ -64,7 +64,7 @@ const CHECKER_SATISFIED = JSON.stringify({
   criteria: {
     faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true,
     no_overstatement: true, citations_correct: true, reviewer_note_separate: true,
-    goal_marked_as_reading: true
+    goal_marked_as_reading: true, speaks_to_the_person: true
   }
 });
 
@@ -75,9 +75,11 @@ function oneNodeStory(): string {
     short: {
       headline: "The one position held up under review.",
       summary: "The debate examined one position, and it held up against its strongest objection.",
+      confidence: "Fairly sure, until a sourced objection turns up.",
       paths: [{ position_ref: "P1", fate: "HELD_UP", line: "The position held up.", node_refs: ["P1"] }],
       change: paragraph("A stronger, sourced objection would change the answer.")
     },
+    why: { reasons: [paragraph("The one position held up against its strongest objection.")] },
     long: {
       sections: ["What you are deciding", "The verdict", "What would change it"].map((title) => ({
         title, paragraphs: [paragraph(`${title}, in the debate's own terms.`)]
@@ -136,7 +138,8 @@ function snapshotFor(runId: string, answerId: string, stepLease: StoryStepLease)
   };
   return {
     runId, workItemId: `work:${runId}`, answerId, answerVersion: 1,
-    questionLine: "Should the step lease hold up?", compositionBudgetTier: "low", verdictBasis,
+    questionLine: "Should the step lease hold up?", argumentLanguage: { tag: "en", name: "English" },
+    compositionBudgetTier: "low", verdictBasis,
     servedStatement: ["It holds up."],
     nodes: [{
       nodeId, claim: "It holds up.", isPosition: true, wayOfKnowing: "REASONING", baseScore: 0.6, finalStrength: 0.6,

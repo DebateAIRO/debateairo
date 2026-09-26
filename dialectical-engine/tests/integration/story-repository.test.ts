@@ -66,9 +66,11 @@ function bodyWith(marker: string): StoryBody {
     short: {
       headline: `Headline ${marker}`,
       summary: `Summary ${marker}`,
+      confidence: `Confidence ${marker}`,
       paths: [{ position_ref: "node-1", fate: "HELD_UP", line: `Line ${marker}`, node_refs: ["node-1"] }],
       change: paragraph("Change")
     },
+    why: { reasons: [paragraph("Reason")] },
     long: {
       sections: ["Reading", "Verdict", "Change"].map((title) => ({ title, paragraphs: [paragraph(title)] }))
     },
@@ -93,7 +95,8 @@ function readyRecord(runId: string, answerId: string, marker: string): StoryReco
     body: bodyWith(marker),
     reservation: `RESERVATION ${marker}`,
     verdictBasis: VERDICT_BASIS,
-    pointNumbers: { "node-1": "P1", "node-2": "P2" }
+    pointNumbers: { "node-1": "P1", "node-2": "P2" },
+    languageTag: "ro"
   };
 }
 
@@ -120,7 +123,7 @@ function storyContent(mark: string): Record<string, unknown> {
   const record = readyRecord(randomUUID(), randomUUID(), mark);
   return {
     body: record.body, reservation: record.reservation,
-    verdictBasis: record.verdictBasis, pointNumbers: record.pointNumbers
+    verdictBasis: record.verdictBasis, pointNumbers: record.pointNumbers, languageTag: record.languageTag
   };
 }
 
@@ -204,6 +207,8 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     expect(stored.rows).toHaveLength(1);
     expect(stored.rows[0]!.row_text).not.toContain(mark);
     expect(stored.rows[0]!.row_text).not.toContain("\"P2\"");
+    // The language tag is sealed with the content (R1): no readable column carries it.
+    expect(stored.rows[0]!.row_text).not.toContain("languageTag");
     // The verdict basis is sealed too: none of its code-computed values is readable.
     expect(stored.rows[0]!.row_text).not.toContain(VERDICT_BASIS.trigger);
     expect(stored.rows[0]!.row_text).not.toContain(VERDICT_BASIS.winner_node_id);
@@ -227,7 +232,7 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       shapeId: "general", packVersion: "2026-09-26.1", packFingerprint: "f".repeat(64), rounds: 2,
       storytellerLineage: record.storytellerLineage, checkerLineage: record.checkerLineage,
       artifactRefs: record.artifactRefs, reservation: `RESERVATION ${mark}`, verdictBasis: VERDICT_BASIS,
-      pointNumbers: { "node-1": "P1", "node-2": "P2" }
+      pointNumbers: { "node-1": "P1", "node-2": "P2" }, languageTag: "ro"
     });
     expect(read?.body).toEqual(record.body);
     expect(read?.storyId).toMatch(/^[0-9a-f-]{36}$/u);
@@ -240,6 +245,18 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       .resolves.toBeNull();
     await expect(repository.readForAnswer({ answerId, answerVersion: Number.MAX_SAFE_INTEGER, ownership }))
       .resolves.toBeNull();
+  });
+
+  it("keeps a story stored without a language tag, and refuses a tag no BCP-47 tag could be", async () => {
+    const mark = marker();
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story no language ${mark}`);
+    const answerId = await answerFor(runId, mark);
+    const repository = new StoryRepository(database.pool);
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), languageTag: "x".repeat(36) }))
+      .rejects.toMatchObject({ code: "STORY_RECORD_INVALID", message: expect.stringContaining("languageTag") });
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), languageTag: null })).resolves.toBe("INSERTED");
+    await expect(repository.readForAnswer({ answerId, answerVersion: null, ownership: { ownerRef: theOwner().ownerRef } }))
+      .resolves.toMatchObject({ languageTag: null });
   });
 
   it("closes the story to a foreign owner and to a malformed principal", async () => {

@@ -10,12 +10,24 @@ import { MakerLineageSchema } from "./lineage.js";
  */
 
 /**
- * The most paths the short story carries: the schema's cap, and the ceiling of
- * the material index's `pathCap`, so the two can never disagree.
+ * The story body's limits that other code reads, in one place.
+ *  - maxPaths: the most paths the short story carries: the schema's cap, and
+ *    the ceiling of the material index's `pathCap`, so the two can never disagree.
+ *  - confidenceMaxChars: the confidence sentence (spec §14.2), one sentence.
+ *  - whyReasonsMax: the reasons that decided the answer (spec §14.2), one to three.
  */
 export const STORY_BODY_LIMITS = Object.freeze({
-  maxPaths: 8
+  maxPaths: 8,
+  confidenceMaxChars: 300,
+  whyReasonsMax: 3
 });
+
+/**
+ * The question's language (spec §14.3): the BCP-47 tag dev detects and keeps
+ * in `core.run.argument_language_tag`, or "und" when it could not tell. 35
+ * characters is BCP-47's own practical ceiling for a tag.
+ */
+export const StoryLanguageTagSchema = z.string().min(1).max(35);
 
 export const StoryFateSchema = z.enum(["HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE"]);
 export type StoryFate = z.infer<typeof StoryFateSchema>;
@@ -37,13 +49,24 @@ export const StoryPathSchema = z.object({
 }).strict();
 export type StoryPath = z.infer<typeof StoryPathSchema>;
 
+/**
+ * The story (spec §5.3, amended by §14). `short.confidence` is one sentence,
+ * in plain words, saying how sure we are, anchored in this debate. `why` holds
+ * the one to three reasons that decided the answer; it is printed only in the
+ * full report, so its prose may name points (P3), as the long story's may.
+ * What would change the answer stays in `short.change`.
+ */
 export const StoryBodySchema = z.object({
   shape_id: z.string().regex(/^[a-z][a-z0-9-]{1,31}$/),
   short: z.object({
     headline: z.string().trim().min(1).max(160),
     summary: z.string().trim().min(1).max(900),
+    confidence: z.string().trim().min(1).max(STORY_BODY_LIMITS.confidenceMaxChars),
     paths: z.array(StoryPathSchema).min(1).max(STORY_BODY_LIMITS.maxPaths),
     change: StoryParagraphSchema(400)
+  }).strict(),
+  why: z.object({
+    reasons: z.array(StoryParagraphSchema(700)).min(1).max(STORY_BODY_LIMITS.whyReasonsMax)
   }).strict(),
   long: z.object({
     sections: z.array(z.object({
@@ -96,7 +119,9 @@ export type StoryVerdictBasis = z.infer<typeof StoryVerdictBasisSchema>;
  * id to the story's canonical point number (P1…Pn), the numbers the story text
  * and the checker may cite and the PDF appendix uses. `rounds` is the number of
  * write-and-check rounds the story took; the PDF's "About this report" page
- * prints it.
+ * prints it. `language` is the question's language, the one the story is
+ * written in (spec §14.3): a BCP-47 tag, "und" when it could not be told, or
+ * null for a story stored without one.
  */
 export const AnswerStorySchema = z.object({
   answer_id: z.string(),
@@ -109,6 +134,7 @@ export const AnswerStorySchema = z.object({
   storyteller: MakerLineageSchema.nullable(),
   checker: MakerLineageSchema.nullable(),
   rounds: z.number().int().nonnegative().nullable(),
+  language: StoryLanguageTagSchema.nullable(),
   reservation: z.string().nullable(),
   verdict_basis: StoryVerdictBasisSchema.nullable(),
   point_numbers: z.record(z.string(), z.string().regex(/^P[1-9][0-9]*$/)).nullable(),
@@ -120,8 +146,9 @@ const StoryShortShape = StoryBodySchema.shape.short.shape;
 
 /**
  * The short story a public snapshot carries (spec 2026-09-26 §10): the short
- * fields of a READY or READY_WITH_RESERVATION story and the reviewer's note.
- * Everything else stays owner-only: the long story, the PDF, the checker's
+ * fields of a READY or READY_WITH_RESERVATION story, its confidence sentence
+ * among them (§14.2), and the reviewer's note. Everything else stays
+ * owner-only: the long story, the reasons in `why`, the PDF, the checker's
  * reservation (it names points by numbers only the owner's appendix explains),
  * the lineages, the point numbers, the verdict basis and the pack.
  *
@@ -136,6 +163,7 @@ const StoryShortShape = StoryBodySchema.shape.short.shape;
 export const PublicStoryShortSchema = z.object({
   headline: StoryShortShape.headline,
   summary: StoryShortShape.summary,
+  confidence: StoryShortShape.confidence,
   paths: StoryShortShape.paths,
   change: StoryShortShape.change,
   reviewer_note: StoryBodySchema.shape.reviewer_note

@@ -27,12 +27,13 @@ const BASE = {
 } as const;
 
 const STORY: PublicStoryShort = {
-  headline: "Mutarea poate merita, dar nu dintr-odată.",
-  summary: "Dezbaterea a cântărit trei drumuri. Cel mai solid a fost mutarea treptată.",
+  headline: "Răspunsul nostru: mutați-vă treptat, cu lucru hibrid.",
+  summary: "Răspunsul nostru: da, dar treptat. E o decizie strânsă, pentru că și mutarea imediată are argumente bune.",
+  confidence: "Destul de siguri, dar totul depinde de acceptul angajatorului pentru lucrul hibrid.",
   paths: [
-    { position_ref: "n-hybrid", fate: "HELD_UP", line: "Mutare treptată, cu lucru hibrid: a rezistat.", node_refs: ["n-hybrid"] },
+    { position_ref: "n-hybrid", fate: "HELD_UP", line: "Mutare treptată, cu lucru hibrid: cea mai bună variantă.", node_refs: ["n-hybrid"] },
     { position_ref: "n-yes", fate: "PARTLY_HELD", line: "Mutare imediată: chiria îi taie din avantaj.", node_refs: ["n-yes"] },
-    { position_ref: "n-not-now", fate: "FELL", line: "Nu acum: a căzut.", node_refs: ["n-not-now"] }
+    { position_ref: "n-not-now", fate: "FELL", line: "Nu acum: nu a rezistat.", node_refs: ["n-not-now"] }
   ],
   change: { text: "Răspunsul s-ar schimba dacă angajatorul refuză lucrul hibrid.", node_refs: ["n-hybrid"] },
   reviewer_note: { text: "Chiria poate fi mai mică într-un cartier mai ieftin.", node_refs: [] }
@@ -71,7 +72,7 @@ describe("public page short story (spec §10)", () => {
     expect(text).toContain("Held up");
     expect(text).toContain("Partly held");
     expect(text).toContain("Fell");
-    expect(text).toContain("Mutare treptată, cu lucru hibrid: a rezistat.");
+    expect(text).toContain("Mutare treptată, cu lucru hibrid: cea mai bună variantă.");
     expect(text).toContain("What would change the answer:");
     expect(text).toContain("Reviewer's note");
     expect(text).toContain("It does not change the verdict.");

@@ -28,9 +28,11 @@ function storyFor(round: number): StoryBody {
     short: {
       headline: `Draft ${String(round)}`,
       summary: "Our reading of your question, and the answer.",
+      confidence: "Fairly sure, if ridership holds.",
       paths: [{ position_ref: "P1", fate: "HELD_UP", line: "It held up.", node_refs: ["P1"] }],
       change: { text: "A ridership count would change it.", node_refs: [] }
     },
+    why: { reasons: [{ text: "Ridership decided it.", node_refs: [] }] },
     long: {
       sections: [1, 2, 3].map((index) => ({
         title: `Section ${String(index)}`,
@@ -51,7 +53,8 @@ const SATISFIED: StoryCheckerVerdict = Object.freeze({
     no_overstatement: true,
     citations_correct: true,
     reviewer_note_separate: true,
-    goal_marked_as_reading: true
+    goal_marked_as_reading: true,
+    speaks_to_the_person: true
   })
 });
 

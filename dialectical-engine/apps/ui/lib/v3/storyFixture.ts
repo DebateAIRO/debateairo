@@ -253,95 +253,127 @@ const FIXTURE_BASIS: NonNullable<AnswerStory["verdict_basis"]> = {
   marks: []
 };
 
+/**
+ * The sample story, written the way the owners asked at the look gate (spec
+ * §14.1, §14.2): it speaks to the person about their question, leads with our
+ * best answer even though the label is a close call, says how sure we are in
+ * one sentence tied to this debate, and never shows a score, a threshold or
+ * the machinery's words. Its phrasing follows the owners' picks (a1, b1, c1,
+ * d). The site texts name no point number; the reasons and the long story cite
+ * points through node_refs, which the PDF prints as [Pn].
+ */
 const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
   shape_id: "personal-choice",
   short: {
-    headline: "Mutarea poate merita, dar nu dintr-odată: totul depinde de lucrul hibrid.",
-    summary: "Întrebarea de fond este dacă un salariu mai mare compensează costurile și stresul unei mutări cu toată familia. Dezbaterea a cântărit trei drumuri. Cel mai solid a fost o mutare treptată, cu lucru hibrid, după încheierea anului școlar. Mutarea imediată a rămas aproape, dar chiriile mai mari din Cluj îi reduc avantajul. Varianta „nu acum” a căzut: mutarea costă o singură dată, pe când diferența de salariu vine în fiecare lună.",
+    headline: "Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.",
+    summary: "Ne-ați întrebat dacă merită să vă mutați cu familia din București la Cluj pentru un salariu mai mare. Răspunsul nostru: da, dar treptat. Începeți noul job lucrând parțial de acasă, iar familia vi se alătură după încheierea anului școlar. E o decizie strânsă, pentru că și mutarea imediată are argumente bune: oferta este cu aproximativ 35% mai mare, după impozite. Varianta treptată vă păstrează însă câștigul de salariu fără să-i mutați pe copii la jumătatea anului.",
+    confidence: "Cât de siguri suntem: destul de siguri, dar totul depinde de un lucru pe care nu îl știm încă: dacă angajatorul acceptă lucrul hibrid.",
     paths: [
       {
         position_ref: "n-hybrid", fate: "HELD_UP",
-        line: "Mutare treptată, cu lucru hibrid: a rezistat cel mai bine, pentru că protejează anul școlar al copiilor.",
+        line: "Mutare treptată, cu lucru hibrid: cea mai bună variantă, pentru că vă aduce salariul mai mare fără să-i scoată pe copii din școală la jumătatea anului.",
         node_refs: ["n-hybrid", "n-hybrid-school"]
       },
       {
         position_ref: "n-yes", fate: "PARTLY_HELD",
-        line: "Mutare imediată: salariul cu 35% mai mare ajută, dar chiriile cu circa 30% mai mari îi taie din avantaj.",
+        line: "Mutare imediată: aproape la fel de bună. Salariul cu 35% mai mare ajută, dar chiriile cu circa 30% mai mari din Cluj îi taie din avantaj.",
         node_refs: ["n-yes", "n-yes-pay", "n-yes-rent"]
       },
       {
         position_ref: "n-not-now", fate: "FELL",
-        line: "Nu acum: a căzut, fiindcă mutarea costă o singură dată, iar diferența de salariu vine lunar.",
+        line: "Nu acum: nu a rezistat, pentru că socotește costul mutării ca și cum l-ați plăti în fiecare an, deși îl plătiți o singură dată.",
         node_refs: ["n-not-now", "n-not-now-once"]
       }
     ],
     change: {
-      text: "Răspunsul s-ar schimba dacă angajatorul refuză lucrul hibrid sau dacă găsiți în Cluj o locuință la un preț apropiat de cel de acum.",
+      text: "Răspunsul s-ar schimba dacă angajatorul refuză lucrul hibrid. Iar dacă găsiți în Cluj o locuință la un preț apropiat de cel de acum, mutarea imediată devine la fel de bună.",
       node_refs: ["n-hybrid", "n-yes-rent"]
     }
+  },
+  why: {
+    reasons: [
+      {
+        text: "Câștigul de salariu este real și verificat: oferta este cu aproximativ 35% mai mare decât salariul de acum, după impozite. El vine în fiecare lună, pe când mutarea se plătește o singură dată, așa că nu are rost să renunțați la el.",
+        node_refs: ["n-yes-pay", "n-not-now-once"]
+      },
+      {
+        text: "Momentul contează pentru copii. Schimbarea școlii la jumătatea anului are un cost real pentru ei, iar varianta treptată îl evită: familia se mută abia după încheierea anului școlar.",
+        node_refs: ["n-hybrid", "n-hybrid-school"]
+      },
+      {
+        text: "Chiriile pentru trei camere sunt în Cluj cu circa 30% mai mari decât în cartierul de acum. De aceea mutarea imediată aduce mai puțin decât pare și rămâne pe locul al doilea, deși are argumente bune.",
+        node_refs: ["n-yes", "n-yes-rent"]
+      }
+    ]
   },
   long: {
     sections: [
       {
         title: "Ce încercați de fapt să decideți",
         paragraphs: [{
-          text: "Așa cum înțelegem noi întrebarea, nu este vorba doar despre bani. Vreți să știți dacă un salariu mai bun merită schimbarea orașului, a școlii și a rutinei întregii familii, și în ce ordine ar trebui făcute aceste schimbări.",
+          text: "Așa cum înțelegem noi întrebarea, nu este vorba doar despre bani. Vreți să știți dacă un salariu mai bun merită schimbarea orașului, a școlii și a rutinei întregii familii, și în ce ordine ar fi bine să faceți aceste schimbări.",
           node_refs: ["n-yes", "n-hybrid"]
         }]
       },
       {
-        title: "Verdictul pe scurt",
+        title: "Răspunsul nostru pe scurt",
         paragraphs: [{
-          text: "Verdictul este „disputat”. Cea mai puternică poziție, mutarea treptată cu lucru hibrid, a obținut 0,64. Mutarea imediată a obținut 0,58. Diferența este mică, iar niciuna nu a ajuns la pragul de 0,70 pentru un verdict „susținut”.",
+          text: "Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar. E o decizie strânsă, pentru că și mutarea imediată are argumente bune, dar varianta treptată vă păstrează câștigul de salariu fără să-i mutați pe copii la jumătatea anului.",
           node_refs: ["n-hybrid", "n-yes"]
         }]
       },
       {
-        title: "Drumurile cercetate",
+        title: "Variantele cântărite",
         paragraphs: [
           {
-            text: "Mutarea treptată cu lucru hibrid. Un părinte începe noul job lucrând parțial de acasă, iar familia se mută după încheierea anului școlar. Cel mai bun argument pentru ea: schimbarea școlii în mijlocul anului are un cost real pentru copii. Evaluatorul nu a putut verifica acest punct, pentru că nu avea date despre școală. Drumul este fezabil dacă angajatorul acceptă lucrul hibrid.",
+            text: "Mutarea treptată, cu lucru hibrid. Începeți noul job lucrând parțial de acasă, iar familia vi se alătură după încheierea anului școlar. Cel mai puternic argument pentru ea este că schimbarea școlii la jumătatea anului are un cost real pentru copii. Varianta ține însă doar dacă angajatorul acceptă lucrul hibrid.",
             node_refs: ["n-hybrid", "n-hybrid-school"]
           },
           {
-            text: "Mutarea imediată. Oferta este cu aproximativ 35% mai mare decât salariul actual, după impozite, iar cifra a fost verificată. Cea mai puternică obiecție: chiriile pentru trei camere în Cluj sunt cu circa 30% mai mari decât în cartierul actual. Drumul rămâne posibil, dar avantajul este mai mic decât pare la prima vedere.",
+            text: "Mutarea imediată. Oferta este cu aproximativ 35% mai mare decât salariul de acum, după impozite, iar cifra se potrivește cu oferta scrisă. Cea mai serioasă obiecție: chiriile pentru trei camere în Cluj sunt cu circa 30% mai mari decât în cartierul de acum. Varianta rămâne bună, aproape la fel de bună ca a noastră, dar avantajul ei este mai mic decât pare la prima vedere.",
             node_refs: ["n-yes", "n-yes-pay", "n-yes-rent"]
           },
           {
-            text: "Varianta „nu acum”. Argumentul era că primii doi ani costă mai mult decât aduce salariul. A căzut, pentru că amestecă un cost unic, mutarea, cu un câștig care se repetă lunar. Un evaluator a contestat-o direct din acest motiv.",
+            text: "Varianta „nu acum”. Argumentul ei era că primii doi ani costă mai mult decât aduce salariul, din cauza chiriei și a mutării. Nu a rezistat, pentru că pune în aceeași socoteală un cost care se plătește o singură dată, mutarea, și un câștig care vine în fiecare lună.",
             node_refs: ["n-not-now", "n-not-now-once"]
           },
           {
-            text: "Un drum a fost lăsat deoparte: un comentariu anonim de pe un forum, potrivit căruia angajatorul refuză des lucrul hibrid. A primit un scor mic, 0,21, și nu putea schimba răspunsul.",
+            text: "Am lăsat deoparte o singură obiecție, pentru că se baza pe o sursă slabă: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Asta nu înseamnă că obiecția e greșită, doar că nu ne putem sprijini pe ea; răspunsul angajatorului o lămurește.",
             node_refs: ["n-hybrid-forum"]
           }
         ]
       },
       {
-        title: "De ce depinde verdictul",
+        title: "De ce depinde răspunsul",
         paragraphs: [{
-          text: "Verdictul se sprijină cel mai mult pe două puncte: condiția lucrului hibrid și diferența de chirie. Dacă oricare dintre ele se schimbă, ordinea dintre primele două drumuri se poate inversa.",
+          text: "Răspunsul nostru se sprijină cel mai mult pe două lucruri: acceptul angajatorului pentru lucrul hibrid și diferența de chirie dintre Cluj și cartierul de acum. Dacă oricare dintre ele se schimbă, mutarea imediată poate deveni la fel de bună sau chiar mai bună.",
           node_refs: ["n-hybrid", "n-yes-rent"]
         }]
       },
       {
-        title: "Ce rămâne nesigur",
-        paragraphs: [{
-          text: "Majoritatea argumentelor se bazează pe raționament, nu pe date verificate. Doar două puncte au fost verificate în surse: oferta de salariu și chiriile. De aceea încrederea în verdict este limitată.",
-          node_refs: ["n-yes-pay", "n-yes-rent"]
-        }]
+        title: "Ce nu am putut afla",
+        paragraphs: [
+          {
+            text: "Nu am putut confirma cât de greu le-ar fi copiilor să schimbe școala, pentru că dezbaterea nu a avut informații despre școala lor. Merită să întrebați direct școlile din Cluj unde v-ați gândi să-i înscrieți.",
+            node_refs: ["n-hybrid-school"]
+          },
+          {
+            text: "Cele mai multe argumente de aici sunt raționamente, nu date verificate. Doar două lucruri au fost verificate în surse: oferta de salariu și nivelul chiriilor. De aceea ne-am baza pe răspuns abia după ce aflați dacă angajatorul acceptă lucrul hibrid.",
+            node_refs: ["n-yes-pay", "n-yes-rent"]
+          }
+        ]
       },
       {
         title: "Ce ar schimba răspunsul și ce puteți face acum",
         paragraphs: [{
-          text: "Cereți angajatorului confirmarea scrisă a lucrului hibrid pentru primul an. Căutați apoi locuințe în două-trei cartiere mai ieftine din Cluj. Cu aceste două răspunsuri, alegerea devine mult mai clară.",
+          text: "Cereți angajatorului confirmarea scrisă a lucrului hibrid pentru primul an. Căutați apoi locuințe în două-trei cartiere mai ieftine din Cluj. Dacă găsiți una la un preț apropiat de cel de acum, mutarea imediată devine la fel de bună ca varianta treptată.",
           node_refs: ["n-hybrid", "n-yes-rent"]
         }]
       }
     ]
   },
   reviewer_note: {
-    text: "Scorurile tratează chiria din Cluj ca pe un cost fix. În realitate, familia ar putea alege un cartier mai ieftin, iar atunci mutarea imediată ar deveni mai atractivă. Nota aceasta nu schimbă verdictul.",
+    text: "Dezbaterea a tratat chiria din Cluj ca pe un cost fix. În realitate, ați putea alege un cartier mai ieftin, iar atunci mutarea imediată ar deveni mai atractivă. Nota aceasta nu schimbă răspunsul nostru.",
     node_refs: ["n-yes-rent"]
   }
 };
@@ -395,6 +427,7 @@ export function storyFixture(status: AnswerStory["status"]): AnswerStory {
     storyteller: ready ? lineage("OpenAI") : null,
     checker: ready ? lineage("Anthropic") : null,
     rounds: ready ? (status === "READY" ? 1 : 2) : null,
+    language: ready ? "ro" : null,
     reservation: status === "READY_WITH_RESERVATION" ? FIXTURE_RESERVATION : null,
     verdict_basis: ready ? structuredClone(FIXTURE_BASIS) : null,
     point_numbers: ready ? { ...STORY_FIXTURE_POINT_NUMBERS } : null,

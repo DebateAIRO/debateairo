@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, argumentLanguageDirective } from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -13,10 +13,12 @@ import {
   STORY_CHECKER_CONTRACT_ID,
   STORYTELLER_CONTRACT_ID,
   StoryWriter,
+  buildStoryCheckerContract,
   buildStorytellerContract,
   loadStoryPack,
   resolveStoryPackDir,
   storyContractHash,
+  storyContractInArgumentLanguage,
   type StoryNodeEnrichment,
   type StoryRecordInput,
   type StoryStepLease,
@@ -52,6 +54,7 @@ const SNAPSHOT: StoryWriteInput = Object.freeze<StoryWriteInput>({
   answerId: "55555555-5555-4555-8555-555555555555",
   answerVersion: 1,
   questionLine: "Should the team adopt a four-day week?",
+  argumentLanguage: { tag: "ro", name: "Romanian" },
   compositionBudgetTier: "low",
   verdictBasis: {
     label: "CONTESTED", rung: 0, trigger: "BASIS_INCOMPLETE",
@@ -92,9 +95,11 @@ function story(): string {
     short: {
       headline: "The four-day week held up, with one open question.",
       summary: "You asked whether to adopt a four-day week; the debate says yes, with costs unresolved.",
+      confidence: "Fairly sure, as long as payroll costs stay flat.",
       paths: [{ position_ref: "P1", fate: "HELD_UP", line: "Adopting it held up.", node_refs: ["P1", "P2"] }],
       change: paragraph("Payroll figures showing a rise would change the answer.")
     },
+    why: { reasons: [{ text: "The cost objection (P2) gave no figures.", node_refs: ["P2"] }] },
     long: {
       sections: ["Our reading", "The verdict", "What would change it"].map((title) => ({
         title, paragraphs: [paragraph(`${title}.`)]
@@ -110,7 +115,7 @@ const CHECKER_SATISFIED = JSON.stringify({
   criteria: {
     faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true,
     no_overstatement: true, citations_correct: true, reviewer_note_separate: true,
-    goal_marked_as_reading: true
+    goal_marked_as_reading: true, speaks_to_the_person: true
   }
 });
 
@@ -250,6 +255,8 @@ describe("StoryWriter — the write-and-check loop, on the story lane", () => {
     // and the same numbering is stored as the story's point numbers.
     expect(inserted[0]?.body?.short.paths[0]).toMatchObject({ position_ref: ROOT, node_refs: [ROOT, ATTACK] });
     expect(inserted[0]?.body?.short.change.node_refs).toEqual([ROOT]);
+    expect(inserted[0]?.body?.why.reasons[0]?.node_refs).toEqual([ATTACK]);
+    expect(inserted[0]?.body?.short.confidence).toBe("Fairly sure, as long as payroll costs stay flat.");
     expect(JSON.stringify(inserted[0]?.body)).not.toMatch(/"P[0-9]+"/u);
     expect(inserted[0]?.pointNumbers).toEqual({ [ROOT]: "P1", [ATTACK]: "P2" });
     expect(calls.map((call) => ({
@@ -269,7 +276,13 @@ describe("StoryWriter — the write-and-check loop, on the story lane", () => {
     expect(Object.keys(calls[0]!).sort()).toEqual(Object.keys(calls[1]!).sort());
     expect(calls[0]?.bound).toEqual(POLICY.storytellerBound);
     expect(calls[1]?.bound).toEqual(POLICY.checkerBound);
-    expect(calls[0]?.contractHash).toBe(storyContractHash(buildStorytellerContract(PACK)));
+    // The hash is of the contract actually sent: the pack plus the question's language.
+    expect(calls[0]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStorytellerContract(PACK), "Romanian"))
+    );
+    expect(calls[1]?.contractHash).toBe(
+      storyContractHash(storyContractInArgumentLanguage(buildStoryCheckerContract(PACK), "Romanian"))
+    );
     expect(readPromptFrame(calls[1]!.packet).contractId).toBe(STORY_CHECKER_CONTRACT_ID);
     // The checker judges the candidate in the SAME short refs as its material.
     const candidate = readPromptFrame(calls[1]!.packet).fields.find((field) => field.name === "candidate_story");
@@ -331,12 +344,73 @@ const CHECKER_OBJECTS = JSON.stringify({
   criteria: {
     faithful_to_material: true, agrees_with_label: false, fair_to_losing_paths: true,
     no_overstatement: false, citations_correct: true, reviewer_note_separate: true,
-    goal_marked_as_reading: true
+    goal_marked_as_reading: true, speaks_to_the_person: true
   }
 });
 
 const isStoryteller = (request: ProviderCallRequest): boolean =>
   readPromptFrame(request.packet).contractId === STORYTELLER_CONTRACT_ID;
+
+describe("StoryWriter — the question's language (R1)", () => {
+  const systemOf = (packet: ProviderCallRequest["packet"]): string[] =>
+    packet.messages.filter((message) => message.role === "system").map((message) => message.content);
+
+  it("writes both prompts in the question's language: dev's directive in the one system message, repairs included", async () => {
+    const { provider, calls } = scripted(byContract);
+    const { writer } = harness(providing(provider));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(systemOf(call.packet)).toHaveLength(1);
+      expect(call.packet.messages[0]?.role).toBe("system");
+      expect(call.packet.messages[0]?.content).toContain(argumentLanguageDirective("Romanian"));
+      const repaired = call.buildRepairPacket?.({
+        rawText: "{}", parseStatus: "SCHEMA_FAILED",
+        parseError: JSON.stringify([{ path: ["short"], message: "STORY_TEXT_SCORE_VALUE" }])
+      });
+      if (repaired === undefined) throw new Error("STORY_WRITER_TEST_NO_REPAIR_PACKET");
+      expect(systemOf(repaired)).toHaveLength(1);
+      expect(systemOf(repaired)[0]).toContain(argumentLanguageDirective("Romanian"));
+    }
+  });
+
+  it("stores the question's language tag with the story, and with a readiness refusal", async () => {
+    const { provider } = scripted(byContract);
+    const ready = harness(providing(provider));
+    await ready.writer.writeAfterSettle(SNAPSHOT);
+    expect(ready.inserted[0]).toMatchObject({ outcome: "READY", languageTag: "ro" });
+    const refused = harness({ policy: null });
+    await refused.writer.writeAfterSettle(SNAPSHOT);
+    expect(refused.inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_NOT_CONFIGURED", languageTag: "ro" });
+  });
+
+  it("with no language on record, sends dev's own fallback directive and stores no tag", async () => {
+    const { provider, calls } = scripted(byContract);
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle({ ...SNAPSHOT, argumentLanguage: null });
+    expect(inserted[0]).toMatchObject({ outcome: "READY", languageTag: null });
+    for (const call of calls) {
+      expect(call.packet.messages[0]?.content).toContain(argumentLanguageDirective(""));
+      expect(call.packet.messages[0]?.content).toContain("the same language as the question");
+    }
+  });
+
+  it("keeps und, the tag for a language that could not be told", async () => {
+    const { provider } = scripted(byContract);
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle({
+      ...SNAPSHOT, argumentLanguage: { tag: "und", name: "the same language as the question" }
+    });
+    expect(inserted[0]).toMatchObject({ outcome: "READY", languageTag: "und" });
+  });
+
+  it("never loses a story over a tag the contract cannot carry: it stores none", async () => {
+    const { provider } = scripted(byContract);
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle({ ...SNAPSHOT, argumentLanguage: { tag: "x".repeat(36), name: "Romanian" } });
+    expect(inserted[0]).toMatchObject({ outcome: "READY", languageTag: null });
+  });
+});
 
 describe("StoryWriter — the served round's lineage, and every loop failure logged", () => {
   it("keeps round 1's draft with round 1's storyteller AND checker when round 2's checker fails", async () => {
@@ -454,7 +528,7 @@ describe("StoryWriter — never rejects", () => {
       // The fallback carries no verdict basis and no point numbers, so it cannot
       // be refused by the repository's parse for the same reason the first was.
       outcome: "FAILED", failureCode: "STORY_UNEXPECTED_ERROR", pointNumbers: null, verdictBasis: null,
-      body: null, reservation: null, rounds: 0, artifactRefs: []
+      body: null, reservation: null, rounds: 0, artifactRefs: [], languageTag: null
     })]);
     expect(events).toEqual(["STORY_WRITE_FAILED", "STORY_STORED"]);
   });

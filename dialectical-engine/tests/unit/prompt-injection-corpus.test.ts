@@ -341,6 +341,7 @@ function storyMaterialWith(input: { readonly question: string; readonly pointCla
     answerId: "answer:injection-corpus",
     answerVersion: 1,
     questionLine: input.question,
+    argumentLanguage: { tag: "en", name: "English" },
     compositionBudgetTier: "low",
     verdictBasis: {
       label: "CONTESTED", rung: 4, trigger: "MID_BAND", winner_node_id: "position:a", winner_strength: 0.61,
@@ -369,12 +370,14 @@ function storyCandidateWith(paragraph: string): StoryBody {
     short: {
       headline: "The debate leans towards funding the extension.",
       summary: "Our reading of your question: whether the extension is worth its cost.",
+      confidence: "Fairly sure, as long as ridership holds.",
       paths: [
         { position_ref: "P1", fate: "PARTLY_HELD", line: "Funding partly held.", node_refs: ["P1"] },
         { position_ref: "P2", fate: "PARTLY_HELD", line: "Not funding partly held.", node_refs: ["P2"] }
       ],
       change: { text: "A ridership count would change it.", node_refs: ["P3"] }
     },
+    why: { reasons: [{ text: "The savings held up.", node_refs: ["P3"] }] },
     long: {
       sections: [
         section("What you are really trying to decide", "Our reading of your question."),

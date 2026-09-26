@@ -1673,6 +1673,8 @@ export class RunRepository {
   async readFrozenHead(runId: string): Promise<{
     readonly runId: string;
     readonly questionLine: string;
+    /** The BCP-47 tag detected from the question ("und" when not confident, or before migration 0072). */
+    readonly argumentLanguageTag: string;
     readonly argumentLanguageName: string;
     readonly agentCount: number;
     readonly discoveredPanel: readonly DiscoveredPanelMember[];
@@ -1687,10 +1689,11 @@ export class RunRepository {
       ? ", content_encryption_version, content_ciphertext"
       : "";
     const argumentLanguageApplied = await argumentLanguageColumnsAreApplied(this.pool);
-    const argumentLanguageProjection = argumentLanguageApplied ? ", argument_language_name" : "";
+    const argumentLanguageProjection = argumentLanguageApplied ? ", argument_language_tag, argument_language_name" : "";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
+      argument_language_tag?: string;
       argument_language_name?: string;
       content_encryption_version?: number | null;
       content_ciphertext?: CryptoEnvelope | null;
@@ -1722,6 +1725,7 @@ export class RunRepository {
     return {
       runId: row.run_id,
       questionLine: content.questionLine,
+      argumentLanguageTag: row.argument_language_tag ?? "und",
       argumentLanguageName: row.argument_language_name ?? "the same language as the question",
       agentCount: Number(row.agent_count),
       discoveredPanel: Object.freeze(row.discovered_panel.map((member) => Object.freeze({ ...member }))),

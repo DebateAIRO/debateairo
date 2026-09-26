@@ -41,10 +41,11 @@ const fakeAuditHasher = Object.freeze({
   hashUserAgent: async () => "22".repeat(32)
 }) as unknown as AuditContextHasher;
 
-/** The five public fields of STORY_TEST_BODY: the short version and the reviewer's note. */
+/** The six public fields of STORY_TEST_BODY: the short version (R1: with its confidence sentence) and the reviewer's note. */
 const PUBLIC_SHORT = Object.freeze({
   headline: STORY_TEST_BODY.short.headline,
   summary: STORY_TEST_BODY.short.summary,
+  confidence: STORY_TEST_BODY.short.confidence,
   paths: STORY_TEST_BODY.short.paths,
   change: STORY_TEST_BODY.short.change,
   reviewer_note: STORY_TEST_BODY.reviewer_note
@@ -112,7 +113,8 @@ function storyRecord(runId: string, answerId: string, outcome: StoredOutcome): S
     body: ready ? STORY_TEST_BODY : null,
     reservation: outcome === "READY_WITH_RESERVATION" ? RESERVATION : null,
     verdictBasis: ready ? STORY_TEST_BASIS : null,
-    pointNumbers: ready ? { "node:position": "P1", "node:defeater": "P2" } : null
+    pointNumbers: ready ? { "node:position": "P1", "node:defeater": "P2" } : null,
+    languageTag: ready ? "ro" : null
   };
 }
 
@@ -176,6 +178,8 @@ describe("publishing copies story_short over the real database (spec §11)", () 
     expect(text).not.toContain("model-a");
     expect(text).not.toContain("e".repeat(64));
     expect(text).not.toContain(STORY_TEST_BODY.long.sections[0]!.title);
+    // The reasons are for the full report only (R1).
+    expect(text).not.toContain(STORY_TEST_BODY.why.reasons[0]!.text);
   });
 
   it("copies a READY_WITH_RESERVATION story without the checker's reservation", async () => {

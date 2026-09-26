@@ -215,7 +215,7 @@ describe("GET /v1/answers/{id}/story (spec §10)", () => {
     expect(AnswerStorySchema.parse(response.json())).toEqual({
       answer_id: STORY_TEST_ANSWER_ID, answer_version: 1, status: "UNAVAILABLE",
       unavailable_reason: "STORY_UNREADABLE", shape: null, pack: null, written_at: null,
-      storyteller: null, checker: null, rounds: null, reservation: null, verdict_basis: null,
+      storyteller: null, checker: null, rounds: null, language: null, reservation: null, verdict_basis: null,
       point_numbers: null, story: null
     });
     expect(calls).toHaveLength(1);

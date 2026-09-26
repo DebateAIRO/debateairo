@@ -14,7 +14,8 @@ export {
   STORY_CHECKER_CONTRACT_ID,
   buildStoryCheckerContract,
   buildStorytellerContract,
-  storyContractHash
+  storyContractHash,
+  storyContractInArgumentLanguage
 } from "./contracts.js";
 export {
   StoryCheckerVerdictSchema,

@@ -27,6 +27,7 @@ function source(): StorySnapshotSource {
     answerId: "answer-1",
     answerVersion: 2,
     questionLine: "Should we?",
+    argumentLanguage: { tag: "ro", name: "Romanian" },
     compositionBudgetTier: "medium",
     verdict: { label: "CONTESTED", rung: 2, trigger: "MARGIN_WITHIN_GAMMA" },
     servedRootNodeId: ROOT,
@@ -128,6 +129,11 @@ describe("buildStoryRunSnapshot", () => {
       runId: "run-1", workItemId: "work-1", answerId: "answer-1", answerVersion: 2,
       questionLine: "Should we?", compositionBudgetTier: "medium"
     });
+  });
+
+  it("carries the question's language the run recorded, for the story's prompts and its stored tag (R1)", () => {
+    expect(buildStoryRunSnapshot(source()).argumentLanguage).toEqual({ tag: "ro", name: "Romanian" });
+    expect(buildStoryRunSnapshot({ ...source(), argumentLanguage: null }).argumentLanguage).toBeNull();
   });
 
   it("drops an arrow onto an edge to a null target", () => {

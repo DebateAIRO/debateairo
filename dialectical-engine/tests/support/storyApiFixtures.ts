@@ -10,6 +10,7 @@ export const STORY_TEST_BODY: StoryBody = {
   short: {
     headline: "Keep the plan, but check the rent first.",
     summary: "The debate weighed the plan against its main objection. The plan held up, but the rent question could still change it.",
+    confidence: "Fairly sure, as long as the rent stays close to what you pay now.",
     paths: [{
       position_ref: "node:position",
       fate: "HELD_UP",
@@ -17,6 +18,9 @@ export const STORY_TEST_BODY: StoryBody = {
       node_refs: ["node:position"]
     }],
     change: { text: "A verified counter-example to the plan would change the answer.", node_refs: ["node:defeater"] }
+  },
+  why: {
+    reasons: [{ text: "The plan's main objection was answered: the rent rise it feared is smaller than the pay rise.", node_refs: ["node:position", "node:defeater"] }]
   },
   long: {
     sections: [
@@ -66,6 +70,7 @@ export function storedStoryRecord(overrides: Partial<StoredStory> = {}): StoredS
     reservation: null,
     verdictBasis: STORY_TEST_BASIS,
     pointNumbers: { "node:position": "P1", "node:defeater": "P2" },
+    languageTag: "en",
     createdAt: new Date("2026-09-26T10:04:00.000Z"),
     ...overrides
   };

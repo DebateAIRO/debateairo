@@ -15,13 +15,23 @@ import {
  * repair packet as a CODE and a machine PATH, never as the model's own words.
  */
 
-/** The material names points by short references (Task 3); the index holds exactly those. */
+/**
+ * The material names points by short references (Task 3); the index holds
+ * exactly those, and every score and threshold of the material as a story
+ * might print it (R1): here a winner of 0.64, a runner-up of 0.58, a high cut
+ * of 0.7 (also printed 0,7: its one-decimal form is exact) and a low cut of
+ * 0.35 (whose one-decimal form is not).
+ */
+const SCORE_TEXTS: ReadonlySet<string> = new Set([
+  "0.64", "0,64", "0.58", "0,58", "0.70", "0,70", "0.7", "0,7", "0.35", "0,35"
+]);
 const INDEX: StoryMaterialIndex = {
   nodeIds: new Set(["P1", "P2", "P3", "P4"]),
   positionIds: new Set(["P1", "P2"]),
   positionOrder: ["P1", "P2"],
   shapeIds: new Set(["general", "health"]),
-  pathCap: 8
+  pathCap: 8,
+  scoreTexts: SCORE_TEXTS
 };
 
 function paragraph(text: string, refs: readonly string[] = ["P3"]): { text: string; node_refs: string[] } {
@@ -34,11 +44,15 @@ function story(): StoryBody {
     short: {
       headline: "The debate backs funding the extension, on the city's own figures.",
       summary: "Our reading of your question: whether the extension is worth its cost. It is, on the figures argued.",
+      confidence: "Fairly sure, as long as the ridership forecast holds.",
       paths: [
         { position_ref: "P1", fate: "HELD_UP", line: "Fund it: the savings argument held up.", node_refs: ["P1", "P3"] },
         { position_ref: "P2", fate: "FELL", line: "Do not fund it: the cost objection was answered.", node_refs: ["P2", "P4"] }
       ],
       change: paragraph("A measured drop in ridership would move the savings point.")
+    },
+    why: {
+      reasons: [paragraph("The savings argument held up: fares cover the running costs (P3).", ["P1", "P3"])]
     },
     long: {
       sections: [
@@ -120,7 +134,31 @@ describe("verdict story — the story classifier", () => {
     }, "short.paths.0.node_refs.1"],
     ["an unknown citation in the reviewer's note", (body: StoryBody): void => {
       body.reviewer_note = paragraph("The verdict leans on one argued point.", ["node:elsewhere"]);
-    }, "reviewer_note.node_refs.0"]
+    }, "reviewer_note.node_refs.0"],
+    ["an unknown citation in a reason", (body: StoryBody): void => {
+      body.why.reasons[0]!.node_refs = ["node:elsewhere"];
+    }, "why.reasons.0.node_refs.0"],
+    ["a story with no confidence sentence", (body: StoryBody): void => {
+      delete (body.short as Partial<StoryBody["short"]>).confidence;
+    }, "short.confidence"],
+    ["a blank confidence sentence", (body: StoryBody): void => {
+      body.short.confidence = "   ";
+    }, "short.confidence"],
+    ["a confidence sentence over 300 characters", (body: StoryBody): void => {
+      body.short.confidence = "s".repeat(301);
+    }, "short.confidence"],
+    ["a story with no reasons", (body: StoryBody): void => {
+      body.why.reasons = [];
+    }, "why.reasons"],
+    ["four reasons", (body: StoryBody): void => {
+      body.why.reasons = [1, 2, 3, 4].map((index) => paragraph(`Reason ${String(index)}.`));
+    }, "why.reasons"],
+    ["a reason over 700 characters", (body: StoryBody): void => {
+      body.why.reasons[0]!.text = "r".repeat(701);
+    }, "why.reasons.0.text"],
+    ["a story without why", (body: StoryBody): void => {
+      delete (body as Partial<StoryBody>).why;
+    }, "why"]
   ])("refuses %s", (_name, mutate, path) => {
     const body = story();
     mutate(body);
@@ -148,14 +186,20 @@ describe("verdict story — the story classifier", () => {
     }, "short.summary"],
     ["an override in the change text", (body: StoryBody): void => {
       body.short.change.text = "A measured drop in \u202Dridership would move the savings point.";
-    }, "short.change.text"]
+    }, "short.change.text"],
+    ["an isolate in the confidence sentence", (body: StoryBody): void => {
+      body.short.confidence = "Fairly sure, as long as \u2068the forecast\u2069 holds.";
+    }, "short.confidence"],
+    ["a control character in a reason", (body: StoryBody): void => {
+      body.why.reasons[0]!.text = "The savings\u0008 argument held up.";
+    }, "why.reasons.0.text"]
   ])("refuses %s as a code and a path, without echoing the text", (_name, mutate, path) => {
     const body = story();
     mutate(body);
     const result = classifyStoryContent(JSON.stringify(body), INDEX);
     expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path });
     expect(result.parseError).toContain("STORY_TEXT_CONTROL_CHARACTER");
-    expect(result.parseError).not.toMatch(/Fund the|dleh|cost objection|really|leans on|worth its cost|ridership/u);
+    expect(result.parseError).not.toMatch(/Fund the|dleh|cost objection|really|leans on|worth its cost|ridership|forecast|savings/u);
   });
 
   describe("no point numbers in the texts the site shows (there is no appendix there)", () => {
@@ -174,14 +218,17 @@ describe("verdict story — the story classifier", () => {
       }, "short.change.text"],
       ["the reviewer's note", (body: StoryBody): void => {
         body.reviewer_note = paragraph("The verdict leans on P3, which was only argued.", ["P3"]);
-      }, "reviewer_note.text"]
+      }, "reviewer_note.text"],
+      ["the confidence sentence", (body: StoryBody): void => {
+        body.short.confidence = "Fairly sure, as long as P3 holds.";
+      }, "short.confidence"]
     ])("refuses a point number in %s, at its own path, without echoing the text", (_name, mutate, path) => {
       const body = story();
       mutate(body);
       const result = classifyStoryContent(JSON.stringify(body), INDEX);
       expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path });
       expect(result.parseError).toContain("STORY_SHORT_POINT_NUMBER");
-      expect(result.parseError).not.toMatch(/carries it|mainly on|cost objection|ridership|leans on/u);
+      expect(result.parseError).not.toMatch(/carries it|mainly on|cost objection|ridership|leans on|as long as/u);
       expect(() => parseStoryBody(JSON.stringify(body), INDEX))
         .toThrowError(expect.objectContaining({ code: "STORY_CONTENT_INVALID" }));
     });
@@ -189,6 +236,15 @@ describe("verdict story — the story classifier", () => {
     it("still accepts a point number in the long version", () => {
       const body = story();
       body.long.sections[2]!.paragraphs[0]!.text = "Funding held up, mainly on P3 and P14.";
+      expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    });
+
+    it("still accepts a point number in a reason: why is printed only in the full report", () => {
+      const body = story();
+      body.why.reasons = [
+        paragraph("The fares cover the running costs (P3).", ["P3"]),
+        paragraph("The overrun objection was answered, see P4.", ["P4"])
+      ];
       expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
     });
 
@@ -210,6 +266,83 @@ describe("verdict story — the story classifier", () => {
     });
   });
 
+  describe("no score or threshold of the material in any text (R1: the story speaks to the person)", () => {
+    it("refuses \u201ea ob\u021binut 0,64\u201d at its own path, with a code, without echoing the text", () => {
+      const body = story();
+      body.long.sections[1]!.paragraphs[0]!.text = "Mutarea treptat\u0103 a ob\u021binut 0,64.";
+      const result = classifyStoryContent(JSON.stringify(body), INDEX);
+      expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "long.sections.1.paragraphs.0.text" });
+      expect(result.parseError).toContain("STORY_TEXT_SCORE_VALUE");
+      expect(result.parseError).not.toMatch(/Mutarea|ob\u021binut|0,64/u);
+      expect(() => parseStoryBody(JSON.stringify(body), INDEX))
+        .toThrowError(expect.objectContaining({ code: "STORY_CONTENT_INVALID" }));
+    });
+
+    it("refuses 0.64 in a reason", () => {
+      const body = story();
+      body.why.reasons[0]!.text = "The savings argument scored 0.64 once the objections were counted.";
+      const result = classifyStoryContent(JSON.stringify(body), INDEX);
+      expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "why.reasons.0.text" });
+      expect(result.parseError).toContain("STORY_TEXT_SCORE_VALUE");
+    });
+
+    it("refuses a threshold written with one decimal, 0,7", () => {
+      const body = story();
+      body.long.sections[2]!.paragraphs[0]!.text = "Nicio variant\u0103 nu a ajuns la pragul de 0,7.";
+      const result = classifyStoryContent(JSON.stringify(body), INDEX);
+      expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "long.sections.2.paragraphs.0.text" });
+      expect(result.parseError).toContain("STORY_TEXT_SCORE_VALUE");
+    });
+
+    it.each([
+      ["the headline", (body: StoryBody): void => { body.short.headline = "Fund it: it scored 0.64."; }, "short.headline"],
+      ["the summary", (body: StoryBody): void => { body.short.summary = "Funding scored 0,58 against the rest."; }, "short.summary"],
+      ["the confidence sentence", (body: StoryBody): void => { body.short.confidence = "Fairly sure: below the 0.70 line."; }, "short.confidence"],
+      ["a path line", (body: StoryBody): void => { body.short.paths[1]!.line = "Do not fund it: it ended at 0.58."; }, "short.paths.1.line"],
+      ["the change text", (body: StoryBody): void => { body.short.change.text = "Anything that lifts it past 0,7 would change it."; }, "short.change.text"],
+      ["a section title", (body: StoryBody): void => { body.long.sections[1]!.title = "Why 0.64 is not enough"; }, "long.sections.1.title"],
+      ["a paragraph", (body: StoryBody): void => { body.long.sections[2]!.paragraphs[0]!.text = "Funding held up (0,35 was the floor)."; }, "long.sections.2.paragraphs.0.text"],
+      ["a reason", (body: StoryBody): void => { body.why.reasons[0]!.text = "It led, 0.64 to 0.58."; }, "why.reasons.0.text"],
+      ["the reviewer's note", (body: StoryBody): void => {
+        body.reviewer_note = paragraph("The leading answer sits at 0,64 only.", ["P3"]);
+      }, "reviewer_note.text"]
+    ])("refuses a score value in %s, at its own path", (_name, mutate, path) => {
+      const body = story();
+      mutate(body);
+      const result = classifyStoryContent(JSON.stringify(body), INDEX);
+      expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path });
+      expect(result.parseError).toContain("STORY_TEXT_SCORE_VALUE");
+    });
+
+    it.each([
+      ["a percentage the debate argued", "The new salary is 35% higher than the old one."],
+      ["a figure with a digit on either side", "The rent is 10,640 lei a year, not 0,645 of the salary."],
+      ["a longer decimal that only starts like a score", "Inflation ran at 0.643 last quarter."],
+      ["a number the material does not hold", "The tram runs every 0.25 hours at peak."],
+      ["a threshold's inexact one-decimal form", "Roughly 0,3 of the budget is fixed."],
+      ["a range that only looks like one, the point read literally", "Children aged 0-7 ride free, and 0 64 is a bus line."]
+    ])("accepts %s", (_name, text) => {
+      const body = story();
+      body.long.sections[2]!.paragraphs[0]!.text = text;
+      body.short.summary = text;
+      expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    });
+
+    it("accepts every text when the material holds no score at all", () => {
+      const body = story();
+      body.short.headline = "Fund it: it scored 0.64.";
+      expect(classifyStoryContent(JSON.stringify(body), { ...INDEX, scoreTexts: new Set() }).parseStatus).toBe("PARSED");
+    });
+
+    it("throws for score texts that are not a printed decimal: an empty one would refuse every text", () => {
+      const content = JSON.stringify(story());
+      for (const bad of ["", "0.6.4", "abc", "0,64 "]) {
+        expect(() => classifyStoryContent(content, { ...INDEX, scoreTexts: new Set(["0.64", bad]) }))
+          .toThrowError(expect.objectContaining({ code: "STORY_SCORE_TEXTS_INVALID" }));
+      }
+    });
+  });
+
   it("accepts line feeds and tabs inside a text", () => {
     const body = story();
     body.long.sections[2]!.paragraphs[0]!.text = "Funding held up.\n\tThe savings point was never answered.";
@@ -224,7 +357,8 @@ describe("verdict story — the story classifier", () => {
       positionIds: new Set(positions),
       positionOrder: positions,
       shapeIds: new Set(["general"]),
-      pathCap: 8
+      pathCap: 8,
+      scoreTexts: SCORE_TEXTS
     };
     function withPaths(ids: readonly string[]): string {
       const body = story();
@@ -233,6 +367,7 @@ describe("verdict story — the story classifier", () => {
         position_ref: id, fate: "PARTLY_HELD" as const, line: "One of the positions argued.", node_refs: [id]
       }));
       body.short.change.node_refs = [];
+      body.why.reasons.forEach((entry) => { entry.node_refs = []; });
       body.long.sections.forEach((section) => section.paragraphs.forEach((entry) => { entry.node_refs = []; }));
       return JSON.stringify(body);
     }
@@ -299,7 +434,8 @@ const SATISFIED = {
     no_overstatement: true,
     citations_correct: true,
     reviewer_note_separate: true,
-    goal_marked_as_reading: true
+    goal_marked_as_reading: true,
+    speaks_to_the_person: true
   }
 };
 
@@ -347,6 +483,22 @@ describe("verdict story — the checker classifier", () => {
     expect(refused(classifyCheckerContent(JSON.stringify({ ...SATISFIED, criteria })))).toEqual({
       code: "SCHEMA_FAILED", path: "criteria.goal_marked_as_reading"
     });
+    const { speaks_to_the_person: _alsoLeft, ...withoutSpeaks } = SATISFIED.criteria;
+    expect(refused(classifyCheckerContent(JSON.stringify({ ...SATISFIED, criteria: withoutSpeaks })))).toEqual({
+      code: "SCHEMA_FAILED", path: "criteria.speaks_to_the_person"
+    });
+  });
+
+  it("refuses a satisfied verdict for a story that does not speak to the person", () => {
+    const content = JSON.stringify({ ...SATISFIED, criteria: { ...SATISFIED.criteria, speaks_to_the_person: false } });
+    expect(refused(classifyCheckerContent(content))).toEqual({ code: "SCHEMA_FAILED", path: "satisfied" });
+    const objected = {
+      ...SATISFIED,
+      satisfied: false,
+      objection: "The summary talks about the judges and never answers the question.",
+      criteria: { ...SATISFIED.criteria, speaks_to_the_person: false }
+    };
+    expect(parseCheckerVerdict(JSON.stringify(objected))).toEqual(objected);
   });
 
   it("refuses an extra member and text that is not JSON", () => {

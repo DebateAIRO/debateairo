@@ -60,6 +60,7 @@ describe("story fixture (the owner's mock data)", () => {
     const refs = [
       ...body.short.paths.flatMap((path) => [path.position_ref, ...path.node_refs]),
       ...body.short.change.node_refs,
+      ...body.why.reasons.flatMap((reason) => reason.node_refs),
       ...body.long.sections.flatMap((section) => section.paragraphs.flatMap((paragraph) => paragraph.node_refs)),
       ...(body.reviewer_note?.node_refs ?? [])
     ];
@@ -76,12 +77,31 @@ describe("story fixture (the owner's mock data)", () => {
     const siteTexts = [
       body.short.headline,
       body.short.summary,
+      body.short.confidence,
       ...body.short.paths.map((path) => path.line),
       body.short.change.text,
       body.reviewer_note!.text
     ];
     expect(siteTexts.filter((text) => POINT_NUMBER.test(text))).toEqual([]);
     expect(storyFixture("READY_WITH_RESERVATION").reservation).toMatch(POINT_NUMBER);
+  });
+
+  it("speaks to the person: no decimal number anywhere in the story, and our answer first (R1)", () => {
+    const body = storyFixture("READY").story!;
+    const texts = [
+      body.short.headline, body.short.summary, body.short.confidence,
+      ...body.short.paths.map((path) => path.line), body.short.change.text,
+      ...body.why.reasons.map((reason) => reason.text),
+      ...body.long.sections.flatMap((section) => [section.title, ...section.paragraphs.map((paragraph) => paragraph.text)]),
+      body.reviewer_note!.text
+    ];
+    // No score, no threshold: the fixture's only figures are the question's own percentages.
+    expect(texts.filter((text) => /[0-9][.,][0-9]/u.test(text))).toEqual([]);
+    expect(texts.join(" ")).toContain("35%");
+    expect(body.short.headline.startsWith("Răspunsul nostru:")).toBe(true);
+    expect(body.why.reasons).toHaveLength(3);
+    expect(storyFixture("READY").language).toBe("ro");
+    expect(storyFixture("WRITING").language).toBeNull();
   });
 
   it("numbers every node exactly once, P1 to P8, the three positions first", () => {
@@ -105,13 +125,13 @@ describe("toStoryView (spec §10)", () => {
     expect(view.verdictState).toBe("contested");
     expect(view.labelSentence).toBe(BANNER_SENTENCE.contested);
     expect(view.confidenceWords).toBe("Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued");
-    expect(view.headline).toBe("Mutarea poate merita, dar nu dintr-odată: totul depinde de lucrul hibrid.");
+    expect(view.headline).toBe("Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.");
     expect(view.paths.map((path) => [path.positionRef, path.fateWords])).toEqual([
       ["n-hybrid", "Held up"], ["n-yes", "Partly held"], ["n-not-now", "Fell"]
     ]);
     expect(view.morePaths).toBe(0);
     expect(view.change).toContain("lucrul hibrid");
-    expect(view.reviewerNote).toContain("Nota aceasta nu schimbă verdictul.");
+    expect(view.reviewerNote).toContain("Nota aceasta nu schimbă răspunsul nostru.");
     expect(view.reservation).toBeNull();
     expect(view.reservationPointNumber).toBeNull();
     expect(view.fallbackText).toBeNull();
