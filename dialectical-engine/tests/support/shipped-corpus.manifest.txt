@@ -264,6 +264,7 @@ apps/ui/components/ReferenceNodeMeta.tsx
 apps/ui/components/ScoringErrorBoundary.tsx
 apps/ui/components/SessionControls.tsx
 apps/ui/components/SignUpFlow.tsx
+apps/ui/components/StoryPanel.tsx
 apps/ui/components/StoryShortBlocks.tsx
 apps/ui/components/SynthesisPanel.tsx
 apps/ui/components/Toast.tsx
@@ -345,8 +346,11 @@ apps/ui/lib/v3/liveEvents.ts
 apps/ui/lib/v3/missingCapabilities.ts
 apps/ui/lib/v3/publicAnswerExport.ts
 apps/ui/lib/v3/requestFailure.ts
+apps/ui/lib/v3/storyFixture.ts
+apps/ui/lib/v3/storyView.ts
 apps/ui/lib/v3/storyWords.ts
 apps/ui/lib/v3/tokenUnlock.ts
+apps/ui/lib/v3/verdictStateSentences.ts
 apps/ui/middleware.ts
 apps/ui/next-env.d.ts
 apps/ui/next.config.mjs
@@ -355,6 +359,7 @@ apps/ui/scripts/generate-legal-data.d.mts
 apps/ui/scripts/generate-legal-data.mjs
 apps/ui/scripts/next-config-csp.test.mjs
 apps/ui/scripts/run-node-tests.mjs
+apps/ui/scripts/story-mock.tsx
 apps/ui/server.mjs
 apps/ui/trusted-client-ip.d.mts
 apps/ui/trusted-client-ip.mjs

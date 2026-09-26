@@ -9,7 +9,8 @@
     "start": "node server.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node scripts/run-node-tests.mjs"
+    "test": "node scripts/run-node-tests.mjs",
+    "story:mock": "TSX_TSCONFIG_PATH=tsconfig.scripts.json node --import tsx scripts/story-mock.tsx"
   },
   "dependencies": {
     "@debateai/contract": "workspace:*",

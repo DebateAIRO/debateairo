@@ -8526,8 +8526,170 @@ a:focus-visible {
   text-transform: uppercase;
 }
 .storyBox .storyBoxNote { margin-top: 6px; color: var(--muted); font-size: 11.5px; }
+/* The owner's strip (components/StoryPanel.tsx). A direct child of .debateView,
+   a 100dvh flex column with overflow hidden: the strip keeps its natural
+   height, its body scrolls inside a bounded height, and the reading views
+   below keep the rest. It is a plain section, not a section.card, which the
+   header-actions rule clips. It shows at every width, phones included. The
+   short-story blocks inside it are the shared ones above, scoped here under
+   .storyPanelStory. */
+.storyPanel {
+  flex: 0 0 auto;
+  min-height: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  font-family: var(--font-sans);
+}
+.storyPanelSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.storyPanelSummary::-webkit-details-marker { display: none; }
+.storyPanelSummary::after {
+  content: "Hide";
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+}
+.storyPanelSummary:hover::after { border-color: var(--line-strong); color: var(--text); }
+.storyPanelDetails:not([open]) .storyPanelSummary::after { content: "Show"; }
+.storyPanelSummary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.storyPanelEyebrow {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.storyPanelLabel {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--gold-border);
+  border-radius: var(--r-pill);
+  background: var(--gold-bg);
+  color: var(--gold-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.storyPanelLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
+.storyPanelLabel[data-verdict="contested"],
+.storyPanelLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
+.storyPanelConfidence {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+/* A soft shade at the top or bottom edge shows that more text is there to
+   scroll to; the local covers hide it at either end. */
+.storyPanelBody {
+  max-height: min(40dvh, 380px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 20px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  background:
+    linear-gradient(var(--surface-2) 40%, transparent) top / 100% 24px no-repeat local,
+    linear-gradient(transparent, var(--surface-2) 60%) bottom / 100% 24px no-repeat local,
+    linear-gradient(var(--line-2), transparent) top / 100% 10px no-repeat scroll,
+    linear-gradient(transparent, var(--line-strong)) bottom / 100% 12px no-repeat scroll;
+  background-color: var(--surface-2);
+}
+.storyPanelInner { display: grid; gap: 12px; max-width: 760px; }
+.storyPanelSentence { margin: 0; color: var(--text-2); font-size: 12.5px; line-height: 1.55; }
+.storyPanelStory { display: grid; gap: 12px; }
+.storyPanelStory .storyHeadline {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -.01em;
+  color: var(--text-strong);
+}
+.storyPanelStory .storySummary { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text); }
+/* The fate words sit in one column, so the path lines start on one edge. */
+.storyPanelStory .storyPaths { grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; }
+.storyPanelStory .storyPath { grid-column: 1 / -1; grid-template-columns: subgrid; }
+.storyPanelStory .storyPathMore { grid-column: 2 / -1; }
+.storyPanelStatus { margin: 0; color: var(--text); font-size: 13.5px; font-weight: 600; }
+.storyPanelStatus[data-writing="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 9px;
+  border-radius: var(--r-dot);
+  background: var(--gold);
+  vertical-align: 1px;
+  animation: storyPanelPulse 1.6s ease-in-out infinite;
+}
+.storyPanelNote { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+.storyPanelFallback {
+  padding: 10px 14px;
+  border-left: 2px solid var(--line-strong);
+  background: var(--core);
+  border-radius: 0 var(--r-card) var(--r-card) 0;
+}
+.storyPanelFallback p { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.6; }
+.storyPanelFallback p + p { margin-top: 8px; }
+.storyPanelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 2px 0 0;
+}
+.storyPanelDownload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-btn);
+  background: var(--ink);
+  color: var(--core);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.storyPanelDownload:hover { border-color: var(--ink-hover); background: var(--ink-hover); }
+.storyPanelDownload:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.storyPanelActionsNote { flex: 1 1 260px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+@keyframes storyPanelPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .storyPanelStatus[data-writing="true"]::before { animation: none; }
+}
+@media (max-width: 920px) {
+  .storyPanelBody { max-height: min(36dvh, 340px); }
+}
 @media (max-width: 600px) {
   .storyPath { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .storyPanelSummary { padding: 9px 12px; }
+  .storyPanelBody { max-height: 38dvh; padding: 0 12px 12px; }
+  .storyPanelStory .storyHeadline { font-size: 17.5px; }
+  .storyPanelStory .storyPaths { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  .storyPanelStory .storyPathMore { grid-column: 1 / -1; }
 }
 /* === end verdict-story === */
 

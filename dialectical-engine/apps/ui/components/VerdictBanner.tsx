@@ -2,6 +2,7 @@
 
 import { formatDialecticalSupport } from "@/lib/debatePresentation";
 import type { LiveVerdictState, VerdictSummary } from "@/lib/types";
+import { VERDICT_STATE_SENTENCES } from "@/lib/v3/verdictStateSentences";
 
 const BAND_LABELS: Record<VerdictSummary["verdictBand"], string> = {
   supported: "Strongly supported",
@@ -34,13 +35,7 @@ const BAND_LABELS: Record<VerdictSummary["verdictBand"], string> = {
  * has an entry. A value from OUTSIDE the union -- a retired word arriving in an
  * older stored payload -- renders no sentence rather than a fabricated one.
  */
-const STATE_SENTENCES: Record<LiveVerdictState, string | null> = {
-  supported: null,
-  contested:
-    "The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing.",
-  unsupported:
-    "Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one."
-};
+const STATE_SENTENCES: Record<LiveVerdictState, string | null> = VERDICT_STATE_SENTENCES;
 
 const EVIDENCE_UNVERIFIED_CAVEAT =
   "Caveat — evidence unverified: extracted evidence has no resolved external source.";
