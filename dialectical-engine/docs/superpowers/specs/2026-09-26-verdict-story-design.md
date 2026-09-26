@@ -80,9 +80,14 @@ write-and-check loop, and the story repository. Keeping it out of `packages/serv
 matters: that file's full text is hashed into the sealed `serveContractHash` register row, so any
 edit there forces a new register version.
 
-**Where it runs:** inside the runner, straight after `#work.settle` returns `true`
-(`apps/runner/src/index.ts:5026`), still inside the run's content lease, so the in-memory
-material is available and the encrypted rows can be read. It runs only when the run served a
+**Where it runs:** in the runner, straight after `#work.settle` returns `true`
+(`apps/runner/src/index.ts:5026`). The run snapshot (the in-memory material) is built inside the
+run's content lease; the story itself runs AFTER that lease is released, and each story step (the
+enrichment read, each provider call, the insert) takes its own short lease on the same runs. So a
+user's erasure is never held up for the length of a story: an erasure between steps makes the next
+step fail with `PRIVATE_CONTENT_ERASED`, and the story ends as `FAILED` (amended 2026-09-26 after the
+Task 9 review; the first version held the lease for the whole story, which could delay an erasure
+by up to the story's worst-case duration). It runs only when the run served a
 verdict (terminal `SERVED` or `DOWNGRADED`, `verdict_state` not null). It **never throws**: every
 error is caught, recorded as a `FAILED` story row with a code, and logged. A thrown error there
 would otherwise reach the Hatchet handler's failure path and be recorded under the wrong name.
@@ -108,7 +113,7 @@ Known limits, accepted for v1:
    trigger, winner and runner-up strength, margin, thresholds, band, marks), served statement,
    nodes, arrows, base and final strengths, sensitivity records, frozen branches, lineage, the
    answer id and version, and the plan tier.
-2. The module reads the rest from the database inside the same lease: the judge steelman and
+2. The module reads the rest from the database under its own short lease: the judge steelman and
    critic summaries from each node's judge raw artifact (parsed leniently; a parse failure omits
    that node's judge text), review outcome + reasons, panel dispersion.
 3. It checks readiness: pack loaded and valid, story register rows present, role providers
