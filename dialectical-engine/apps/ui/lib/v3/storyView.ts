@@ -33,8 +33,8 @@ export interface StoryView {
   /**
    * The first point number (such as "P5") the checker's reservation names, or
    * null when it names none. Only the full report's appendix explains those
-   * numbers, so the panel says so beside the PDF link, and only when there is
-   * a number to explain.
+   * numbers, so the reservation box says so under the reservation, and only
+   * when there is a number to explain.
    */
   readonly reservationPointNumber: string | null;
   /** Today's composed text, shown only when the story is UNAVAILABLE. */
@@ -67,19 +67,30 @@ export function storyLabelSentence(label: Answer["verdict_state"]): string {
 }
 
 /**
- * The confidence band is the engine's own vocabulary (ENGINE_BAND_ORDER:
- * CAPPED, FULL). The band ceiling (packages/serve deriveBandCeiling, the
- * wayOfKnowingCeiling register row) counts how each point the served answer
- * cites is known: looked up in a source, run, or reasoning only. When
- * reasoning-only points make up at least the row's share (half, in the seeded
- * rows), or no cited point could be traced at all, the band is held down to
- * CAPPED; otherwise it stays FULL, so most cited points were looked up (the
- * "run" count is always 0 today). The words say that, in plain terms.
+ * The confidence band is the engine's own vocabulary (ENGINE_BAND_ORDER,
+ * weakest first: CAPPED, FULL). The served band starts at the register's
+ * candidate band, and several independent rules can each hold it down
+ * (apps/runner servedCandidateConfidenceBand, then packages/serve
+ * deriveBandCeiling):
+ *  - a run where only one AI maker argued (applySingleLineageBandCap);
+ *  - a judge panel that fell to a single voice on the served position
+ *    (applyPanelDegradedBandStepDown);
+ *  - a cross-maker review that disputed a point (the downgrade-bands row's
+ *    one-step-down);
+ *  - the way-of-knowing ceiling over the points the answer cites: too much of
+ *    it is reasoning alone, or no cited point could be traced.
+ * The answer does not record which rule fired (`band_ceiling` describes only
+ * the ceiling's own check, and can name its default while a step-down still
+ * lowered the band), and the thresholds are sealed register values the page
+ * does not read. So CAPPED is worded with examples, never one cause, and FULL
+ * says only that none of these rules lowered it. Both stay true on every route.
  */
 export function storyConfidenceWords(band: string | null): string | null {
   if (band === null) return null;
-  if (band === "FULL") return "Confidence: full, because most of what the answer rests on was looked up in sources";
-  if (band === "CAPPED") return "Confidence: capped, because too little of what the answer rests on was looked up in sources";
+  if (band === "FULL") return "Confidence: full, because none of the checks that can lower it applied";
+  if (band === "CAPPED") {
+    return "Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued";
+  }
   return `Confidence: ${band.toLowerCase()}`;
 }
 

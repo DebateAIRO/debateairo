@@ -9,11 +9,6 @@ const UNAVAILABLE_COPY = "The full story is not available for this debate. Here 
 const UNAVAILABLE_EMPTY_COPY = "The full story is not available for this debate, and no short answer was served.";
 const DOWNLOAD_COPY = "Download full report (PDF)";
 
-/** The checker's reservation may name points by number; only the PDF's appendix explains them. */
-function pointNumbersNote(example: string): string {
-  return `Point numbers such as ${example} refer to the numbered points in the appendix of the full report.`;
-}
-
 function StoryBodyView({ view }: { view: StoryView }): JSX.Element {
   if (view.status === "WRITING") {
     return (
@@ -37,15 +32,13 @@ function StoryBodyView({ view }: { view: StoryView }): JSX.Element {
     );
   }
   // The download comes first, above the story, so it shows without scrolling
-  // the bounded body, on a phone too.
+  // the bounded body, on a phone too. The note on the reservation's point
+  // numbers sits in the reservation box itself (StoryShortBlocks).
   return (
     <>
       {view.pdfHref === null ? null : (
         <p className="storyPanelActions">
           <a className="storyPanelDownload" href={view.pdfHref}>{DOWNLOAD_COPY}</a>
-          {view.reservationPointNumber === null ? null : (
-            <span className="storyPanelActionsNote">{pointNumbersNote(view.reservationPointNumber)}</span>
-          )}
         </p>
       )}
       <StoryShortBlocks story={view} className="storyPanelStory" headlineAs="h2" />

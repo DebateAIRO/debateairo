@@ -26,7 +26,7 @@ describe("the owner's story mock (look first, then wire)", () => {
     expect(html.match(/srcDoc="&lt;!doctype html&gt;&lt;html lang=&quot;en&quot; data-mode=&quot;terracotta&quot;&gt;/gi)).toHaveLength(8);
     expect(html).toContain("/* === verdict-story === */");
     expect(html).toContain("Ar trebui să ne mutăm cu familia din București la Cluj");
-    expect(html).toContain("Point numbers such as P5");
+    expect(html).toContain("Point numbers like P5 refer to the numbered points in the full report (PDF).");
     expect(html).not.toMatch(/<script|https?:\/\//);
   }, 125_000);
 

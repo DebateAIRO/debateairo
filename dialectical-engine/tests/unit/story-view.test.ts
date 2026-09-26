@@ -97,7 +97,7 @@ describe("toStoryView (spec §10)", () => {
     expect(view.labelWords).toBe("Contested");
     expect(view.verdictState).toBe("contested");
     expect(view.labelSentence).toBe(VERDICT_STATE_SENTENCES.contested);
-    expect(view.confidenceWords).toBe("Confidence: capped, because too little of what the answer rests on was looked up in sources");
+    expect(view.confidenceWords).toBe("Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued");
     expect(view.headline).toBe("Mutarea poate merita, dar nu dintr-odată: totul depinde de lucrul hibrid.");
     expect(view.paths.map((path) => [path.positionRef, path.fateWords])).toEqual([
       ["n-hybrid", "Held up"], ["n-yes", "Partly held"], ["n-not-now", "Fell"]
@@ -179,8 +179,12 @@ describe("toStoryView (spec §10)", () => {
     expect(storyLabelSentence("CONTESTED")).toBe(VERDICT_STATE_SENTENCES.contested);
     expect(storyLabelSentence(null)).toContain("without a verdict");
     expect(storyConfidenceWords(null)).toBeNull();
-    expect(storyConfidenceWords("FULL")).toBe("Confidence: full, because most of what the answer rests on was looked up in sources");
-    expect(storyConfidenceWords("CAPPED")).toBe("Confidence: capped, because too little of what the answer rests on was looked up in sources");
+    expect(storyConfidenceWords("FULL")).toBe("Confidence: full, because none of the checks that can lower it applied");
+    expect(storyConfidenceWords("CAPPED")).toBe("Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued");
+    // CAPPED is reached by several rules (the evidence mix, a one-model run, a
+    // one-voice panel, a disputed review), so the words give examples and name
+    // no single cause.
+    expect(storyConfidenceWords("CAPPED")).toContain("for example");
     expect(storyConfidenceWords("MODERATE")).toBe("Confidence: moderate");
   });
 

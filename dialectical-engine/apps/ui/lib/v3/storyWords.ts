@@ -21,6 +21,15 @@ export const STORY_REVIEWER_NOTE_CAVEAT = "Written by the AI storyteller. It doe
 /** The reservation box's title; the box then shows the checker's own words, with no second lead. */
 export const STORY_RESERVATION_TITLE = "Our checker's reservation";
 
+/**
+ * The line under the checker's reservation when it names a point by number
+ * (the owner's panel only): those numbers are explained only in the full
+ * report's appendix.
+ */
+export function storyPointNumbersNote(example: string): string {
+  return `Point numbers like ${example} refer to the numbered points in the full report (PDF).`;
+}
+
 /** The short version lists at most 8 positions; the rest are counted, never dropped silently. */
 export function morePathsWords(count: number): string | null {
   if (!Number.isInteger(count) || count <= 0) return null;

@@ -6,6 +6,7 @@ import {
   STORY_REVIEWER_NOTE_CAVEAT,
   STORY_REVIEWER_NOTE_TITLE,
   morePathsWords,
+  storyPointNumbersNote,
   type StoryFateValue
 } from "@/lib/v3/storyWords";
 
@@ -16,7 +17,9 @@ import {
  * was written by a model. `morePaths` is how many positions the short version
  * left out (0 or more). `reservation` is the checker's reservation, for the
  * owner's panel only: it names points by numbers only the owner's appendix
- * explains, so the public page never passes one.
+ * explains, so the public page never passes one. `reservationPointNumber` is
+ * the first such number (for example "P5"); when set, the box explains under
+ * the reservation where the numbers are found.
  */
 export interface StoryShortContent {
   readonly headline: string | null;
@@ -26,6 +29,7 @@ export interface StoryShortContent {
   readonly change: string | null;
   readonly reviewerNote: string | null;
   readonly reservation?: string | null;
+  readonly reservationPointNumber?: string | null;
 }
 
 /**
@@ -47,6 +51,7 @@ export function StoryShortBlocks({
 }): JSX.Element {
   const more = morePathsWords(story.morePaths);
   const reservation = story.reservation ?? null;
+  const reservationPointNumber = story.reservationPointNumber ?? null;
   const Headline = headlineAs;
   return (
     <div className={className} data-ai-generated="true">
@@ -75,6 +80,9 @@ export function StoryShortBlocks({
         <div className="storyBox" data-box="reservation">
           <span className="storyBoxTitle">{STORY_RESERVATION_TITLE}</span>
           <p>{reservation}</p>
+          {reservationPointNumber === null ? null : (
+            <p className="storyBoxNote">{storyPointNumbersNote(reservationPointNumber)}</p>
+          )}
         </div>
       )}
     </div>

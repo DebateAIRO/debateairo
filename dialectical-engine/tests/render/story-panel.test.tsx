@@ -16,12 +16,17 @@ function markup(story: AnswerStory | null, answer: Answer = STORY_FIXTURE_ANSWER
   return renderToStaticMarkup(<StoryPanel view={toStoryView(answer, story, STORY_FIXTURE_DEBATE_ID)} />);
 }
 
-/** The actions paragraph: the PDF link and, when the reservation names a point number, the note beside it. */
+/** The actions paragraph: the PDF link, alone. */
 function actions(html: string): string | null {
   return /<p class="storyPanelActions">([\s\S]*?)<\/p>/u.exec(html)?.[1] ?? null;
 }
 
-const POINT_NUMBER_NOTE = "refer to the numbered points in the appendix of the full report";
+/** The checker's reservation box, where its point numbers appear and are explained. */
+function reservationBox(html: string): string | null {
+  return /<div class="storyBox" data-box="reservation">([\s\S]*?)<\/div>/u.exec(html)?.[1] ?? null;
+}
+
+const POINT_NUMBER_NOTE = "refer to the numbered points in the full report (PDF)";
 
 describe("StoryPanel (spec §10)", () => {
   it("WRITING: says the story is being written, with no story text and no download", () => {
@@ -79,16 +84,19 @@ describe("StoryPanel (spec §10)", () => {
     expect(html).not.toContain("still had a reservation");
   });
 
-  it("READY_WITH_RESERVATION: says where the reservation's point numbers are explained, beside the PDF link", () => {
-    const row = actions(markup(storyFixture("READY_WITH_RESERVATION")));
-    expect(row).toContain("Download full report (PDF)");
-    expect(row).toContain(`Point numbers such as P5 ${POINT_NUMBER_NOTE}.`);
+  it("READY_WITH_RESERVATION: explains the reservation's point numbers inside its box, under its text", () => {
+    const html = markup(storyFixture("READY_WITH_RESERVATION"));
+    expect(reservationBox(html)).toMatch(new RegExp(
+      `<p>Rezumatul prezintă[^<]*</p><p class="storyBoxNote">Point numbers like P5 ${POINT_NUMBER_NOTE.replace(/[()]/gu, "\\$&")}\\.</p>$`,
+      "u"
+    ));
+    expect(actions(html)).toBe('<a class="storyPanelDownload" href="/debate/fe830726-05a2-4840-82de-0d6ef160231e/report">Download full report (PDF)</a>');
   });
 
   it("leaves the point-number note out when the reservation names no point number", () => {
     const story = { ...storyFixture("READY_WITH_RESERVATION"), reservation: "Cifra de 30% vine dintr-o singură comparație." };
     const html = markup(story);
-    expect(html).toContain("Our checker&#x27;s reservation");
+    expect(reservationBox(html)).toContain("Cifra de 30%");
     expect(actions(html)).toContain("Download full report (PDF)");
     expect(html).not.toContain(POINT_NUMBER_NOTE);
   });

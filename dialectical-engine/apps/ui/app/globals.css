@@ -8677,7 +8677,6 @@ a:focus-visible {
 }
 .storyPanelDownload:hover { border-color: var(--ink-hover); background: var(--ink-hover); }
 .storyPanelDownload:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.storyPanelActionsNote { flex: 1 1 260px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 @keyframes storyPanelPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: .35; }

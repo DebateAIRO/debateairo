@@ -149,7 +149,7 @@ const STATES: readonly StateCopy[] = Object.freeze([
   {
     status: "READY_WITH_RESERVATION",
     title: "Ready, with a reservation",
-    words: "The story is written, but our checker still had a doubt. The doubt gets its own box, and a note beside the download says what its point numbers mean."
+    words: "The story is written, but our checker still had a doubt. The doubt gets its own box, with a note on what its point numbers mean."
   },
   {
     status: "UNAVAILABLE",
