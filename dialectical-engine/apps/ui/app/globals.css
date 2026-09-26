@@ -8428,6 +8428,108 @@ a:focus-visible {
   .debateAiDisclosure { padding: 8px 12px; }
 }
 
+/* === verdict-story === */
+/* The verdict story (spec 2026-09-26 §10): the short-story blocks
+   (components/StoryShortBlocks.tsx) the public overview and the owner's story
+   strip share. The headline and summary are styled per surface; this block
+   styles the public one (.publicStory). The consent blocks below must stay the
+   last blocks in this file, so this one sits before them. Every colour is a
+   var(--token) reference, as outside the two token blocks everywhere in this
+   file. */
+.publicStory {
+  display: grid;
+  gap: 10px;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.publicStory > p + p { margin-top: 0; }
+.publicStory .storyHeadline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -.01em;
+  color: var(--text-strong);
+}
+.publicStory .storySummary {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.storyPaths {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.storyPath {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.storyPathMore {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.storyFate {
+  justify-self: start;
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.storyFate[data-fate="HELD_UP"] { border-color: var(--agree-border); background: var(--agree-bg); color: var(--agree-text); }
+.storyFate[data-fate="PARTLY_HELD"] { border-color: var(--score-uncertainty-border); background: var(--score-uncertainty-bg); color: var(--score-uncertainty-text); }
+.storyFate[data-fate="FELL"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
+.storyFate[data-fate="SET_ASIDE"] { border-color: var(--muted-border); background: var(--muted-bg); color: var(--muted); }
+.storyChange {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.storyChange strong { font-weight: 700; }
+.storyBox {
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  background: var(--core);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.storyBox p { margin: 0; }
+.storyBox[data-box="reservation"] { border-color: var(--score-uncertainty-border); background: var(--score-uncertainty-bg); }
+.storyBoxTitle {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.storyBox .storyBoxNote { margin-top: 6px; color: var(--muted); font-size: 11.5px; }
+@media (max-width: 600px) {
+  .storyPath { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+}
+/* === end verdict-story === */
 
 /* === consent-ui S01 === */
 /* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).

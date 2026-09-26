@@ -264,6 +264,7 @@ apps/ui/components/ReferenceNodeMeta.tsx
 apps/ui/components/ScoringErrorBoundary.tsx
 apps/ui/components/SessionControls.tsx
 apps/ui/components/SignUpFlow.tsx
+apps/ui/components/StoryShortBlocks.tsx
 apps/ui/components/SynthesisPanel.tsx
 apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
@@ -344,6 +345,7 @@ apps/ui/lib/v3/liveEvents.ts
 apps/ui/lib/v3/missingCapabilities.ts
 apps/ui/lib/v3/publicAnswerExport.ts
 apps/ui/lib/v3/requestFailure.ts
+apps/ui/lib/v3/storyWords.ts
 apps/ui/lib/v3/tokenUnlock.ts
 apps/ui/middleware.ts
 apps/ui/next-env.d.ts
@@ -452,6 +454,7 @@ packages/story/src/index.ts
 packages/story/src/loop.ts
 packages/story/src/material.ts
 packages/story/src/pack.ts
+packages/story/src/public.ts
 packages/story/src/repository.ts
 packages/story/src/status.ts
 packages/story/src/validate.ts

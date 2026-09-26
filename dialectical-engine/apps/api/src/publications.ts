@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import {
   PublicDebateSchema,
+  PublicStoryShortSchema,
   type Answer,
   type Edge,
   type Node,
   type PublicDebate,
-  type PublicNode
+  type PublicNode,
+  type PublicStoryShort
 } from "@debateai/contract";
 import {
   hashToken,
@@ -91,6 +93,46 @@ function redactEdgeForPublic(edge: Edge): Edge {
   };
 }
 
+/**
+ * Verdict story (spec 2026-09-26 §10): where publish reads the short story of
+ * the answer being published. Owner-scoped; null when there is no READY or
+ * READY_WITH_RESERVATION story for that exact answer version.
+ */
+export interface PublicationStoryReader {
+  readStoryShort(input: Readonly<{
+    answerId: string;
+    answerVersion: number;
+    ownerRef: string;
+  }>): Promise<PublicStoryShort | null>;
+}
+
+const NO_PUBLICATION_STORIES: PublicationStoryReader = Object.freeze({
+  readStoryShort: async () => null
+});
+
+/**
+ * A story that cannot be read never blocks publishing: the snapshot keeps
+ * today's summary. A reader that throws, or answers with anything the public
+ * schema refuses, publishes no story rather than failing the snapshot's parse.
+ */
+async function readPublishableStory(
+  stories: PublicationStoryReader,
+  input: Readonly<{ answer: Answer; authenticated: AuthenticatedSession }>
+): Promise<PublicStoryShort | null> {
+  try {
+    const story = await stories.readStoryShort({
+      answerId: input.answer.answer_id,
+      answerVersion: input.answer.answer_version,
+      ownerRef: input.authenticated.ownerRef
+    });
+    if (story === null) return null;
+    const parsed = PublicStoryShortSchema.safeParse(story);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
   reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
@@ -144,7 +186,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
     private readonly repository: PostgresPublicationRepository,
     private readonly cipher: PublicationCipher,
     private readonly clock: () => Date = () => new Date(),
-    private readonly cleanupRepository: PostgresPublicationRepository = repository
+    private readonly cleanupRepository: PostgresPublicationRepository = repository,
+    private readonly stories: PublicationStoryReader = NO_PUBLICATION_STORIES
   ) {}
 
   async preflightGrant(input: Readonly<{
@@ -218,6 +261,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       input.authenticated.ownerRef
     );
     if (pseudonym === null) return null;
+    const storyShort = await readPublishableStory(this.stories, input);
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
     if (!await this.repository.prepareKeyProvision({
@@ -246,7 +290,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
         nodes: input.answer.nodes.map(redactNodeForPublic),
         edges: input.answer.edges.map(redactEdgeForPublic),
         tree_included: true
-      }
+      },
+      ...(storyShort === null ? {} : { story_short: storyShort })
     });
     let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;
     try {

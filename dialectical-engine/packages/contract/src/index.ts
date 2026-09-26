@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
-import { AnswerStorySchema } from "./story.js"; export * from "./story.js";
+import { AnswerStorySchema, PublicStoryShortSchema } from "./story.js"; export * from "./story.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -571,7 +571,11 @@ export const PublicDebateSchema = z.object({
     nodes: z.array(PublicNodeSchema).optional(),
     edges: z.array(EdgeSchema).optional(),
     tree_included: z.boolean().optional()
-  }).strict()
+  }).strict(),
+  // Verdict story (spec 2026-09-26 §10): copied at publish time when the story
+  // is READY or READY_WITH_RESERVATION. Optional, so every snapshot published
+  // before it still parses.
+  story_short: PublicStoryShortSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 

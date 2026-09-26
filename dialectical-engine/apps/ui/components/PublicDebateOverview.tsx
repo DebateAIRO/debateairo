@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import type { PublicDebate } from "@debateai/contract";
+import type { PublicDebate, PublicStoryShort } from "@debateai/contract";
 import { modelMeta } from "@/lib/models";
 import {
   buildPublicDebatePresentation,
   type PublicArgumentPresentation
 } from "@/lib/publicDebatePresentation";
 import { v3ScorePercentage } from "@/lib/v3/adapter";
+import { countStoryPositions } from "@/lib/v3/storyWords";
+import { StoryShortBlocks, type StoryShortContent } from "@/components/StoryShortBlocks";
 
 function verdictLabel(verdict: PublicDebate["answer"]["verdict"]): string {
   return verdict ?? "VERDICT UNAVAILABLE";
@@ -81,6 +83,23 @@ function ArgumentCard({
   );
 }
 
+/**
+ * The snapshot's short story (spec 2026-09-26 §10) in the shape the shared
+ * blocks take. The positions the short version left out are counted from the
+ * published tree; a snapshot without a tree counts none.
+ */
+function publicStoryContent(story: PublicStoryShort, answer: PublicDebate["answer"]): StoryShortContent {
+  return {
+    headline: story.headline,
+    summary: story.summary,
+    paths: story.paths.map((path) => ({ fate: path.fate, line: path.line, positionRef: path.position_ref })),
+    morePaths: Math.max(0, countStoryPositions(answer.nodes ?? [], answer.edges ?? []) - story.paths.length),
+    change: story.change.text,
+    reviewerNote: story.reviewer_note === null ? null : story.reviewer_note.text,
+    reservation: story.reservation
+  };
+}
+
 export function PublicDebateOverview({
   debate,
   onDetails,
@@ -117,9 +136,11 @@ export function PublicDebateOverview({
               </button>
             </div>
             <div className="publicVerdictText">
-              {presentation.summary.length > 0
-                ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
-                : <p>Composed verdict prose was not included in this published snapshot.</p>}
+              {debate.story_short !== undefined
+                ? <StoryShortBlocks story={publicStoryContent(debate.story_short, debate.answer)} className="publicStory" />
+                : presentation.summary.length > 0
+                  ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+                  : <p>Composed verdict prose was not included in this published snapshot.</p>}
             </div>
             <p className="publicVerdictCaveat"><span aria-hidden>⚠</span> Caveat — {presentation.caveat}</p>
             <div className="publicMetricRow">

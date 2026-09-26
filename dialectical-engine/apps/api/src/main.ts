@@ -56,7 +56,7 @@ import { createSupportCaseMaterial, createSupportCaseService, createSupportMessa
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
-import { RepositoryAnswerStoryApplication } from "./stories.js";
+import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
@@ -476,7 +476,8 @@ const publications = publicationCipher === undefined
       new PostgresPublicationRepository(pool, auditContextHasher),
       publicationCipher,
       undefined,
-      new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher)
+      new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher),
+      new RepositoryPublicationStoryReader(storyRepository)
     );
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {

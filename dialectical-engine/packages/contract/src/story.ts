@@ -115,3 +115,21 @@ export const AnswerStorySchema = z.object({
   story: StoryBodySchema.nullable()
 }).strict();
 export type AnswerStory = z.infer<typeof AnswerStorySchema>;
+
+const StoryShortShape = StoryBodySchema.shape.short.shape;
+
+/**
+ * The short story a public snapshot carries (spec 2026-09-26 §10): the short
+ * fields of a READY or READY_WITH_RESERVATION story, the reviewer's note, and
+ * the checker's reservation. The long story and the PDF stay owner-only, and so
+ * do the lineages, the point numbers, the verdict basis and the pack.
+ */
+export const PublicStoryShortSchema = z.object({
+  headline: StoryShortShape.headline,
+  summary: StoryShortShape.summary,
+  paths: StoryShortShape.paths,
+  change: StoryShortShape.change,
+  reviewer_note: StoryBodySchema.shape.reviewer_note,
+  reservation: z.string().nullable()
+}).strict();
+export type PublicStoryShort = z.infer<typeof PublicStoryShortSchema>;

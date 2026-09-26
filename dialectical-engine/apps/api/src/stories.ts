@@ -1,5 +1,7 @@
+import type { PublicStoryShort } from "@debateai/contract";
 import type { RunOwnershipAccess } from "@debateai/db";
-import type { StoredStory, StoryRepository } from "@debateai/story";
+import { toPublicStoryShort, type StoredStory, type StoryRepository } from "@debateai/story";
+import type { PublicationStoryReader } from "./publications.js";
 
 /**
  * Verdict story (spec 2026-09-26 §10): the owner-gated read behind
@@ -35,5 +37,23 @@ export class RepositoryAnswerStoryApplication implements AnswerStoryApplication 
       answerVersion: input.answerVersion,
       ownership: storyOwnership(input.ownership)
     });
+  }
+}
+
+/** Publish-time reader: the owner's own story for the exact answer version being published. */
+export class RepositoryPublicationStoryReader implements PublicationStoryReader {
+  constructor(private readonly repository: Pick<StoryRepository, "readForAnswer">) {}
+
+  async readStoryShort(input: Readonly<{
+    answerId: string;
+    answerVersion: number;
+    ownerRef: string;
+  }>): Promise<PublicStoryShort | null> {
+    const stored = await this.repository.readForAnswer({
+      answerId: input.answerId,
+      answerVersion: input.answerVersion,
+      ownership: { ownerRef: input.ownerRef }
+    });
+    return stored === null ? null : toPublicStoryShort(stored);
   }
 }
