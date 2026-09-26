@@ -132,10 +132,10 @@ describe("verdict story — the story classifier", () => {
       body.short.headline = "Fund the\u0000 extension";
     }, "short.headline"],
     ["a right-to-left override in a paragraph", (body: StoryBody): void => {
-      body.long.sections[2]!.paragraphs[0]!.text = "Funding ‮dleh‬ up.";
+      body.long.sections[2]!.paragraphs[0]!.text = "Funding \u202Edleh\u202C up.";
     }, "long.sections.2.paragraphs.0.text"],
     ["a directional isolate in a path line", (body: StoryBody): void => {
-      body.short.paths[1]!.line = "Do not fund it: ⁧the cost objection⁩ was answered.";
+      body.short.paths[1]!.line = "Do not fund it: \u2067the cost objection\u2069 was answered.";
     }, "short.paths.1.line"],
     ["an escape character in a section title", (body: StoryBody): void => {
       body.long.sections[0]!.title = "What you are \u001B[31mreally\u001B[0m deciding";
@@ -144,10 +144,10 @@ describe("verdict story — the story classifier", () => {
       body.reviewer_note = paragraph("The verdict leans on one\u0007 argued point.", ["P3"]);
     }, "reviewer_note.text"],
     ["an isolate in the summary", (body: StoryBody): void => {
-      body.short.summary = "Our reading of your question: ⁦whether the extension is worth its cost.";
+      body.short.summary = "Our reading of your question: \u2066whether the extension is worth its cost.";
     }, "short.summary"],
     ["an override in the change text", (body: StoryBody): void => {
-      body.short.change.text = "A measured drop in ‭ridership would move the savings point.";
+      body.short.change.text = "A measured drop in \u202Dridership would move the savings point.";
     }, "short.change.text"]
   ])("refuses %s as a code and a path, without echoing the text", (_name, mutate, path) => {
     const body = story();
@@ -265,6 +265,19 @@ describe("verdict story — the checker classifier", () => {
   it("refuses an unsatisfied verdict that gives no objection, at the objection's path", () => {
     const content = JSON.stringify({ ...SATISFIED, satisfied: false });
     expect(refused(classifyCheckerContent(content))).toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+  });
+
+  it.each([
+    ["a NUL", "The summary calls the answer settled;\u0000 the label does not."],
+    ["a right-to-left override", "The summary calls the answer \u202Edelttes\u202C; the label does not."]
+  ])("refuses an objection carrying %s, at the objection's path, without echoing it", (_name, objection) => {
+    const content = JSON.stringify({
+      ...SATISFIED, satisfied: false, objection, criteria: { ...SATISFIED.criteria, agrees_with_label: false }
+    });
+    const result = classifyCheckerContent(content);
+    expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+    expect(result.parseError).toContain("STORY_TEXT_CONTROL_CHARACTER");
+    expect(result.parseError).not.toContain("calls the answer");
   });
 
   it("refuses a satisfied verdict with an unmet criterion, at satisfied", () => {

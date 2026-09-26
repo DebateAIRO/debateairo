@@ -31,6 +31,13 @@ export interface StoryMaterialIndex {
   readonly pathCap: number;
 }
 
+/**
+ * C0 control characters other than tab and line feed, and the bidirectional
+ * embedding, override and isolate characters (U+202A–U+202E, U+2066–U+2069):
+ * refused in every model text a person reads, the story's and the checker's objection.
+ */
+const STORY_TEXT_FORBIDDEN = /[\u0000-\u0008\u000B-\u001F\u202A-\u202E\u2066-\u2069]/u;
+
 export const StoryCheckerVerdictSchema = z.object({
   satisfied: z.boolean(),
   objection: z.string().trim().min(1).max(2000).nullable(),
@@ -47,6 +54,9 @@ export const StoryCheckerVerdictSchema = z.object({
   if (verdict.satisfied && Object.values(verdict.criteria).some((met) => !met)) {
     context.addIssue({ code: "custom", path: ["satisfied"], message: "STORY_CHECKER_SATISFIED_WITH_UNMET_CRITERION" });
   }
+  if (verdict.objection !== null && STORY_TEXT_FORBIDDEN.test(verdict.objection)) {
+    context.addIssue({ code: "custom", path: ["objection"], message: "STORY_TEXT_CONTROL_CHARACTER" });
+  }
   if (!verdict.satisfied && verdict.objection === null) {
     context.addIssue({ code: "custom", path: ["objection"], message: "STORY_CHECKER_OBJECTION_REQUIRED" });
   }
@@ -61,12 +71,6 @@ interface StoryIssue {
 
 /** Enough issues to name the first few problems; the locator reads only the first. */
 const STORY_ISSUE_LIMIT = 20;
-
-/**
- * C0 control characters other than tab and line feed, and the bidirectional
- * embedding, override and isolate characters (U+202A–U+202E, U+2066–U+2069).
- */
-const STORY_TEXT_FORBIDDEN = /[\u0000-\u0008\u000B-\u001F‪-‮⁦-⁩]/u;
 
 /**
  * The index is code's, built by `buildStoryMaterial`; a wrong one is a
