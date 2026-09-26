@@ -253,15 +253,30 @@ function withPoint(point: string | undefined, value: string): string {
 /**
  * score() rounds to two decimals, so an engine-legal margin of 0.052 against a tie margin of 0.05 would
  * read "0.05 > 0.05", and a winner of 0.698 "did not reach 0.70" while printed as 0.70. Rounding must
- * never contradict a comparison: each value and the threshold it is compared with are printed with the
- * same number of decimals, the fewest from `fewest` to `most` that keep a real difference visible.
- * Equal values stay at `fewest`; a difference past the last decimal is not chased further.
+ * never contradict a comparison: a value and the threshold it is compared with are printed with the same
+ * number of decimals, the fewest from `fewest` to `most` that keep every real difference visible. Equal
+ * values stay as they are. The engine compares raw floats, so a value can also differ from its threshold
+ * by float noise alone (0.20 - 0.15 = 0.05000000000000002 against a tie margin of 0.05): when the two
+ * still print alike at `most` decimals, the page never prints a comparison sign between identical
+ * numbers, and says in words which side the value is on ("just above ... (by less than 0.0001)").
  */
 const COMPARE_DECIMALS = Object.freeze({ fewest: 2, most: 4 });
+const NEAR_WORDS = `by less than ${(10 ** -COMPARE_DECIMALS.most).toFixed(COMPARE_DECIMALS.most)}`;
 
-function comparedDecimals(value: number, threshold: number): number {
+type NearSide = "above" | "below";
+
+/** The side a value is on when it differs from its threshold by less than `most` decimals can show; otherwise null. */
+function nearSide(value: number, threshold: number): NearSide | null {
+  if (value === threshold || value.toFixed(COMPARE_DECIMALS.most) !== threshold.toFixed(COMPARE_DECIMALS.most)) return null;
+  return value > threshold ? "above" : "below";
+}
+
+/** The fewest decimals at which every compared pair that really differs prints differently (near misses are worded instead). */
+function sharedDecimals(pairs: readonly (readonly [number, number])[]): number {
   for (let decimals = COMPARE_DECIMALS.fewest; decimals < COMPARE_DECIMALS.most; decimals += 1) {
-    if (value === threshold || value.toFixed(decimals) !== threshold.toFixed(decimals)) return decimals;
+    const distinct = pairs.every(([value, threshold]) =>
+      value === threshold || nearSide(value, threshold) !== null || value.toFixed(decimals) !== threshold.toFixed(decimals));
+    if (distinct) return decimals;
   }
   return COMPARE_DECIMALS.most;
 }
@@ -269,38 +284,62 @@ function comparedDecimals(value: number, threshold: number): number {
 /** The basis's compared numbers as the verdict page prints them (the decision line, the explanation, the numbers). */
 interface ComparedTexts {
   readonly winner: string;
+  readonly runnerUp: string | null;
   readonly lowCut: string;
   readonly highCut: string;
   readonly margin: string | null;
   readonly gamma: string;
   readonly disagreement: string | null;
   readonly limit: string;
+  /** For each threshold, the side its value is on when the two print alike though they differ. */
+  readonly near: Readonly<{ lowCut: NearSide | null; highCut: NearSide | null; gamma: NearSide | null; limit: NearSide | null }>;
 }
 
 function comparedTexts(basis: VerdictBasis): ComparedTexts {
   const t = basis.thresholds;
-  // The winner is compared with both cuts (between them, in the middle band), so all three share one precision.
-  const winner = Math.max(comparedDecimals(basis.winner_strength, t.low_cut), comparedDecimals(basis.winner_strength, t.high_cut));
-  const margin = basis.margin === null ? COMPARE_DECIMALS.fewest : comparedDecimals(basis.margin, t.gamma);
+  // The winner, the runner-up and the margin share one precision, so the table's subtraction adds up;
+  // the winner is compared with both cuts (between them, in the middle band), the margin with the tie margin.
+  const scores = sharedDecimals([
+    [basis.winner_strength, t.low_cut],
+    [basis.winner_strength, t.high_cut],
+    ...(basis.margin === null ? [] : [[basis.margin, t.gamma] as const])
+  ]);
   const disagreement = basis.disagreement === null
     ? COMPARE_DECIMALS.fewest
-    : comparedDecimals(basis.disagreement, t.disagreement);
+    : sharedDecimals([[basis.disagreement, t.disagreement]]);
   return {
-    winner: basis.winner_strength.toFixed(winner),
-    lowCut: t.low_cut.toFixed(winner),
-    highCut: t.high_cut.toFixed(winner),
-    margin: basis.margin === null ? null : basis.margin.toFixed(margin),
-    gamma: t.gamma.toFixed(margin),
+    winner: basis.winner_strength.toFixed(scores),
+    runnerUp: basis.runner_up_strength === null ? null : basis.runner_up_strength.toFixed(scores),
+    lowCut: t.low_cut.toFixed(scores),
+    highCut: t.high_cut.toFixed(scores),
+    margin: basis.margin === null ? null : basis.margin.toFixed(scores),
+    gamma: t.gamma.toFixed(scores),
     disagreement: basis.disagreement === null ? null : basis.disagreement.toFixed(disagreement),
-    limit: t.disagreement.toFixed(disagreement)
+    limit: t.disagreement.toFixed(disagreement),
+    near: {
+      lowCut: nearSide(basis.winner_strength, t.low_cut),
+      highCut: nearSide(basis.winner_strength, t.high_cut),
+      gamma: basis.margin === null ? null : nearSide(basis.margin, t.gamma),
+      limit: basis.disagreement === null ? null : nearSide(basis.disagreement, t.disagreement)
+    }
   };
+}
+
+/** "0.05, just above the tie margin of 0.05 (by less than 0.0001)": a near miss in words. */
+function nearWords(value: string, side: NearSide, threshold: string): string {
+  return `${value}, just ${side} ${threshold} (${NEAR_WORDS})`;
+}
+
+/** "winner 0.64 ≥ 0.70"-style comparisons for the decision line, worded instead when the two print alike. */
+function compared(value: string, sign: string, threshold: string, near: NearSide | null, thresholdName: string): string {
+  return near === null ? `${value} ${sign} ${threshold}` : nearWords(value, near, `${thresholdName}${threshold}`);
 }
 
 /** "judges' disagreement 0.12 < 0.25", or the limit alone when the disagreement was not measured. */
 function disagreementBelowLimit(shown: ComparedTexts): string {
   return shown.disagreement === null
     ? `judges' disagreement below ${shown.limit}`
-    : `judges' disagreement ${shown.disagreement} < ${shown.limit}`;
+    : `judges' disagreement ${compared(shown.disagreement, "<", shown.limit, shown.near.limit, "the limit of ")}`;
 }
 
 /** A no-break space on both sides of < > ≤ ≥ →, so a comparison is never split across two lines. */
@@ -316,28 +355,34 @@ function decisionWords(basis: VerdictBasis): string {
   const shown = comparedTexts(basis);
   const label = storyLabelWords(basis.label);
   const winner = shown.winner;
-  const margin = shown.margin ?? "not measured";
-  const runner = basis.runner_up_strength === null ? "not scored" : score(basis.runner_up_strength);
+  const runner = shown.runnerUp ?? "not scored";
+  const marginAgainstGamma = (sign: string) =>
+    shown.margin === null ? `not measured ${sign} ${shown.gamma}` : compared(shown.margin, sign, shown.gamma, shown.near.gamma, "the tie margin of ");
   if (basis.trigger === "BASIS_INCOMPLETE") {
     if (basis.runner_up_node_id === null) return `Only one position was argued, so there is no margin to measure → ${label}`;
     if (basis.margin === null) return `The margin over the runner-up could not be measured → ${label}`;
     return `The judges' disagreement could not be measured → ${label}`;
   }
-  if (basis.trigger === "BELOW_LOW_CUT") return `winner ${winner} < ${shown.lowCut} → ${label}`;
+  if (basis.trigger === "BELOW_LOW_CUT") return `winner ${compared(winner, "<", shown.lowCut, shown.near.lowCut, "")} → ${label}`;
   if (basis.trigger === "MARGIN_WITHIN_GAMMA") {
-    return `winner ${score(basis.winner_strength)}, runner-up ${runner}, margin ${margin} ≤ ${shown.gamma} → ${label}`;
+    return `winner ${winner}, runner-up ${runner}, margin ${marginAgainstGamma("≤")} → ${label}`;
   }
   if (basis.trigger === "DISAGREEMENT_AT_THRESHOLD") {
     const disagreed = shown.disagreement === null
       ? `the judges' disagreement reached the limit of ${shown.limit}`
-      : `the judges disagreed by ${shown.disagreement} ≥ ${shown.limit}`;
-    return `margin ${margin} > ${shown.gamma}, but ${disagreed} → ${label}`;
+      : `the judges disagreed by ${compared(shown.disagreement, "≥", shown.limit, shown.near.limit, "the limit of ")}`;
+    return `margin ${marginAgainstGamma(">")}, but ${disagreed} → ${label}`;
   }
   if (basis.trigger === "AT_OR_ABOVE_HIGH_CUT") {
-    return `winner ${winner} ≥ ${shown.highCut}, margin ${margin} > ${shown.gamma}, ${disagreementBelowLimit(shown)} → ${label}`;
+    return `winner ${compared(winner, "≥", shown.highCut, shown.near.highCut, "")}, margin ${marginAgainstGamma(">")}, ${disagreementBelowLimit(shown)} → ${label}`;
   }
   if (basis.trigger === "MID_BAND") {
-    return `winner ${winner} is between ${shown.lowCut} and ${shown.highCut}, margin ${margin} > ${shown.gamma}, ${disagreementBelowLimit(shown)} → ${label}`;
+    const band = shown.near.highCut !== null
+      ? nearWords(winner, shown.near.highCut, shown.highCut)
+      : shown.near.lowCut !== null
+        ? nearWords(winner, shown.near.lowCut, shown.lowCut)
+        : `${winner} is between ${shown.lowCut} and ${shown.highCut}`;
+    return `winner ${band}, margin ${marginAgainstGamma(">")}, ${disagreementBelowLimit(shown)} → ${label}`;
   }
   return `Rule ${basis.rung + 1} decided (${basis.trigger}) → ${label}`;
 }
@@ -348,14 +393,18 @@ function decisionWords(basis: VerdictBasis): string {
  */
 function aheadWords(shown: ComparedTexts): string {
   const margin = shown.margin ?? "a margin that was not measured";
-  return `ahead of the runner-up by ${margin}, more than the tie margin of ${shown.gamma} (a lead of ${shown.gamma} or less counts as a tie)`;
+  const tie = `a lead of ${shown.gamma} or less counts as a tie`;
+  return shown.near.gamma === null
+    ? `ahead of the runner-up by ${margin}, more than the tie margin of ${shown.gamma} (${tie})`
+    : `ahead of the runner-up by ${margin}, just ${shown.near.gamma} the tie margin of ${shown.gamma} (${NEAR_WORDS}; ${tie})`;
 }
 
 /** "the judges' disagreement, 0.12, stayed below the limit of 0.25", or the limit alone when it was not measured. */
 function agreementWords(shown: ComparedTexts): string {
-  return shown.disagreement === null
-    ? `the judges' disagreement stayed below the limit of ${shown.limit}`
-    : `the judges' disagreement, ${shown.disagreement}, stayed below the limit of ${shown.limit}`;
+  if (shown.disagreement === null) return `the judges' disagreement stayed below the limit of ${shown.limit}`;
+  return shown.near.limit === null
+    ? `the judges' disagreement, ${shown.disagreement}, stayed below the limit of ${shown.limit}`
+    : `the judges' disagreement, ${shown.disagreement}, was just ${shown.near.limit} the limit of ${shown.limit} (${NEAR_WORDS})`;
 }
 
 /** The decision in plain words, for the rule that actually decided; every number comes from the basis. */
@@ -373,16 +422,35 @@ function explanation(basis: VerdictBasis): string {
         return `The runner-up's score could not be compared with the winner's, so the margin could not be measured. Without it the engine cannot call the question settled, so ${rule} applies and the label is ${label}.`;
       }
       return `The judges' disagreement about the leading position could not be measured, for example because only one judge's score survived. Without it the engine cannot call the question settled, so ${rule} applies and the label is ${label}.`;
-    case "BELOW_LOW_CUT":
-      return `Even the leading position scored ${winner}, below ${shown.lowCut}, so ${rule} applies and the label is ${label}: a weak case, not a disproved one.`;
-    case "MARGIN_WITHIN_GAMMA":
-      return `The leading position was ahead by only ${shown.margin ?? "an unmeasured margin"}, which is ${shown.gamma} or less: too close to pick a winner. So ${rule} applies and the label is ${label}.`;
-    case "DISAGREEMENT_AT_THRESHOLD":
-      return `The leading position was ${aheadWords(shown)}, but the judges disagreed about it ${shown.disagreement === null ? "at least as much as" : `by ${shown.disagreement}, reaching`} the limit of ${shown.limit}. When the judges disagree that much the engine does not call the question settled, so ${rule} applies and the label is ${label}.`;
-    case "AT_OR_ABOVE_HIGH_CUT":
-      return `The leading position scored ${winner}, at or above ${shown.highCut}. It was ${aheadWords(shown)}, and ${agreementWords(shown)}. So ${rule} applies and the label is ${label}.`;
-    case "MID_BAND":
-      return `The leading position was ${aheadWords(shown)}, and ${agreementWords(shown)}. But its score of ${winner} did not reach ${shown.highCut}, the score needed for ${storyLabelWords("SUPPORTED")}. So ${rule} applies and the label is ${label}.`;
+    case "BELOW_LOW_CUT": {
+      const below = shown.near.lowCut === null ? `below ${shown.lowCut}` : `just ${shown.near.lowCut} ${shown.lowCut} (${NEAR_WORDS})`;
+      return `Even the leading position scored ${winner}, ${below}, so ${rule} applies and the label is ${label}: a weak case, not a disproved one.`;
+    }
+    case "MARGIN_WITHIN_GAMMA": {
+      const margin = shown.margin ?? "an unmeasured margin";
+      const close = shown.near.gamma === null
+        ? `which is ${shown.gamma} or less`
+        : `just ${shown.near.gamma} the tie margin of ${shown.gamma} (${NEAR_WORDS})`;
+      return `The leading position was ahead by only ${margin}, ${close}: too close to pick a winner. So ${rule} applies and the label is ${label}.`;
+    }
+    case "DISAGREEMENT_AT_THRESHOLD": {
+      const disagreed = shown.disagreement === null
+        ? `at least as much as the limit of ${shown.limit}`
+        : shown.near.limit === null
+          ? `by ${shown.disagreement}, reaching the limit of ${shown.limit}`
+          : `by ${shown.disagreement}, just ${shown.near.limit} the limit of ${shown.limit} (${NEAR_WORDS})`;
+      return `The leading position was ${aheadWords(shown)}, but the judges disagreed about it ${disagreed}. When the judges disagree that much the engine does not call the question settled, so ${rule} applies and the label is ${label}.`;
+    }
+    case "AT_OR_ABOVE_HIGH_CUT": {
+      const reached = shown.near.highCut === null ? `at or above ${shown.highCut}` : `just ${shown.near.highCut} ${shown.highCut} (${NEAR_WORDS})`;
+      return `The leading position scored ${winner}, ${reached}. It was ${aheadWords(shown)}, and ${agreementWords(shown)}. So ${rule} applies and the label is ${label}.`;
+    }
+    case "MID_BAND": {
+      const short = shown.near.highCut === null
+        ? `its score of ${winner} did not reach ${shown.highCut}`
+        : `its score of ${winner} was just ${shown.near.highCut} ${shown.highCut} (${NEAR_WORDS})`;
+      return `The leading position was ${aheadWords(shown)}, and ${agreementWords(shown)}. But ${short}, the score needed for ${storyLabelWords("SUPPORTED")}. So ${rule} applies and the label is ${label}.`;
+    }
     default:
       return storyLabelSentence(basis.label);
   }
@@ -414,7 +482,7 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
     { condition: `Anything else: the winner scores at least ${score(t.low_cut)} but less than ${score(t.high_cut)}`, result: "CONTESTED" }
   ] as const;
   const marks = basis.marks.map(markWords);
-  // The numbers beside the rule table use the same precision as the decision line, so they never disagree.
+  // The numbers beside the rule table print at the same precision as the decision line and the explanation.
   const shown = comparedTexts(basis);
   return {
     title: REPORT_TITLES.computation,
@@ -434,7 +502,7 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
         label: "Runner-up",
         value: basis.runner_up_node_id === null
           ? "None. Only one position was put forward."
-          : withPoint(runnerPoint, basis.runner_up_strength === null ? "not scored" : score(basis.runner_up_strength))
+          : withPoint(runnerPoint, shown.runnerUp ?? "not scored")
       },
       {
         label: "Margin (how far the winner is ahead)",

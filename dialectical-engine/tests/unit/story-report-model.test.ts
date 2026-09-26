@@ -319,11 +319,12 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     // The numbers beside the rule table say the same, so "Winner 0.70" never sits next to "0.70 or more".
     expect(edge.numbers.slice(0, 4)).toEqual([
       { label: "Winner (the leading position)", value: "0.698 (P3)" },
-      { label: "Runner-up", value: "0.65 (P1)" },
+      // The runner-up shares the winner's and the margin's precision, so the subtraction adds up: 0.698 − 0.646 = 0.052.
+      { label: "Runner-up", value: "0.646 (P1)" },
       { label: "Margin (how far the winner is ahead)", value: "0.052" },
       { label: "Judges' disagreement", value: "0.248 (the limit is 0.250)" }
     ]);
-    // Equal values stay at two decimals, and a difference past the fourth decimal is not chased further.
+    // Equal values stay at two decimals.
     const below = storyFixture("READY");
     below.verdict_basis = { ...below.verdict_basis!, label: "UNSUPPORTED", rung: 1, trigger: "BELOW_LOW_CUT", winner_strength: 0.349 };
     expect(buildReportModel(STORY_FIXTURE_ANSWER, below, GENERATED).computation.decision).toBe(nb("winner 0.349 < 0.350 → Unsupported"));
@@ -331,9 +332,56 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     atLimit.verdict_basis = { ...atLimit.verdict_basis!, rung: 2, trigger: "DISAGREEMENT_AT_THRESHOLD", margin: 0.17, disagreement: 0.25 };
     expect(buildReportModel(STORY_FIXTURE_ANSWER, atLimit, GENERATED).computation.decision)
       .toBe(nb("margin 0.17 > 0.05, but the judges disagreed by 0.25 ≥ 0.25 → Contested"));
-    const tiny = storyFixture("READY");
-    tiny.verdict_basis = { ...tiny.verdict_basis!, margin: 0.0500001 };
-    expect(buildReportModel(STORY_FIXTURE_ANSWER, tiny, GENERATED).computation.decision).toContain("margin 0.0500\u00A0>\u00A00.0500");
+    // The too-close line prints the winner and the runner-up at the table's precision, so the page agrees with itself.
+    const close = storyFixture("READY");
+    close.verdict_basis = {
+      ...close.verdict_basis!, rung: 2, trigger: "MARGIN_WITHIN_GAMMA",
+      winner_strength: 0.698, runner_up_strength: 0.66, margin: 0.038, disagreement: 0.12
+    };
+    const tooClose = buildReportModel(STORY_FIXTURE_ANSWER, close, GENERATED).computation;
+    expect(tooClose.decision).toBe(nb("winner 0.698, runner-up 0.660, margin 0.038 ≤ 0.050 → Contested"));
+    expect(tooClose.numbers.slice(0, 3).map((row) => row.value)).toEqual(["0.698 (P3)", "0.660 (P1)", "0.038"]);
+  });
+
+  it("words a near miss from real float arithmetic honestly, never as a comparison between identical numbers", () => {
+    const near = (basis: Partial<NonNullable<AnswerStory["verdict_basis"]>>) => {
+      const story = storyFixture("READY");
+      story.verdict_basis = { ...story.verdict_basis!, ...basis };
+      return buildReportModel(STORY_FIXTURE_ANSWER, story, GENERATED).computation;
+    };
+    // 0.20 − 0.15 = 0.05000000000000002: above the tie margin, so the lead is not a tie.
+    const marginAbove = near({ margin: 0.20 - 0.15 });
+    expect(marginAbove.decision).toBe(nb(
+      "winner 0.64 is between 0.35 and 0.70, margin 0.05, just above the tie margin of 0.05 (by less than 0.0001), judges' disagreement 0.12 < 0.25 → Contested"
+    ));
+    expect(marginAbove.explanation).toBe(
+      "The leading position was ahead of the runner-up by 0.05, just above the tie margin of 0.05 (by less than 0.0001; a lead of 0.05 or less counts as a tie), and the judges' disagreement, 0.12, stayed below the limit of 0.25. But its score of 0.64 did not reach 0.70, the score needed for Supported. So rule 5 applies and the label is Contested."
+    );
+    // 0.30 − 0.25 = 0.04999999999999999: just below the tie margin counts as a tie (rule 3).
+    const marginBelow = near({ rung: 2, trigger: "MARGIN_WITHIN_GAMMA", runner_up_strength: 0.59, margin: 0.3 - 0.25 });
+    expect(marginBelow.decision).toBe(nb("winner 0.64, runner-up 0.59, margin 0.05, just below the tie margin of 0.05 (by less than 0.0001) → Contested"));
+    expect(marginBelow.explanation).toBe(
+      "The leading position was ahead by only 0.05, just below the tie margin of 0.05 (by less than 0.0001): too close to pick a winner. So rule 3 applies and the label is Contested."
+    );
+    // (0.35 − 0.10) = 0.24999999999999997: below the limit, so the judges broadly agreed.
+    const disagreementBelow = near({ disagreement: 0.35 - 0.1 });
+    expect(disagreementBelow.decision).toBe(nb(
+      "winner 0.64 is between 0.35 and 0.70, margin 0.06 > 0.05, judges' disagreement 0.25, just below the limit of 0.25 (by less than 0.0001) → Contested"
+    ));
+    expect(disagreementBelow.explanation).toContain(
+      "and the judges' disagreement, 0.25, was just below the limit of 0.25 (by less than 0.0001). But its score of 0.64 did not reach 0.70"
+    );
+    // 0.55 − 0.30 = 0.25000000000000006: past the limit, so the judges' disagreement decided (rule 3).
+    const disagreementAbove = near({ rung: 2, trigger: "DISAGREEMENT_AT_THRESHOLD", margin: 0.17, disagreement: 0.55 - 0.3 });
+    expect(disagreementAbove.decision)
+      .toBe(nb("margin 0.17 > 0.05, but the judges disagreed by 0.25, just above the limit of 0.25 (by less than 0.0001) → Contested"));
+    expect(disagreementAbove.explanation).toBe(
+      "The leading position was ahead of the runner-up by 0.17, more than the tie margin of 0.05 (a lead of 0.05 or less counts as a tie), but the judges disagreed about it by 0.25, just above the limit of 0.25 (by less than 0.0001). When the judges disagree that much the engine does not call the question settled, so rule 3 applies and the label is Contested."
+    );
+    for (const computed of [marginAbove, marginBelow, disagreementBelow, disagreementAbove]) {
+      // No comparison sign between two numbers that print alike, at any precision.
+      expect(`${computed.decision} ${computed.explanation}`).not.toMatch(/(\d\.\d+)\u00A0[<>≤≥]\u00A0\1(?!\d)|0\.0500|0\.2500/u);
+    }
   });
 
   it("words the single-position case plainly, with no missing number printed", () => {
