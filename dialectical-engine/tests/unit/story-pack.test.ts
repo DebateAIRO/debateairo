@@ -116,6 +116,12 @@ const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles]
   ["PACK_JSON_INVALID", "pack.json is not JSON", { "pack.json": "{ not json" }],
   ["PACK_JSON_INVALID", "pack.json carries an unknown key", { "pack.json": manifest({ extra: true }) }],
   ["PACK_JSON_INVALID", "pack.json lists no shapes", { "pack.json": manifest({ shapes: [] }) }],
+  ["PACK_JSON_INVALID", "the version is blank", { "pack.json": manifest({ version: "   " }) }],
+  ["PACK_JSON_INVALID", "the version is over 64 characters", {
+    "pack.json": manifest({ version: "v".repeat(STORY_PACK_LIMITS.maxVersionChars + 1) })
+  }],
+  ["PACK_JSON_INVALID", "the version holds a tab, which is not printable", { "pack.json": manifest({ version: "t\t1" }) }],
+  ["CONTROL_CHARACTER", "the version decodes a \\u0000 escape", { "pack.json": manifest({ version: "t\u00001" }) }],
   ["ID_INVALID", "the pack id has capitals and a space", { "pack.json": manifest({ pack_id: "Test Pack" }) }],
   ["ID_INVALID", "a shape id is one character", { "pack.json": manifest({ shapes: ["alpha", "b"] }) }],
   ["ID_DUPLICATE", "a shape is listed twice", { "pack.json": manifest({ shapes: ["alpha", "alpha"] }) }],
@@ -128,6 +134,28 @@ const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles]
   }],
   ["FRONT_MATTER_INVALID", "a shape has an unknown key", {
     "shapes/alpha.md": shapeText({ id: "alpha" }).replace("when_to_use:", "whenever:")
+  }],
+  ["FRONT_MATTER_INVALID", "a shape's title is over 80 characters", {
+    "shapes/alpha.md": shapeText({ id: "alpha" })
+      .replace("title: Shape alpha\n", `title: ${"t".repeat(STORY_PACK_LIMITS.maxTitleChars + 1)}\n`)
+  }],
+  ["FRONT_MATTER_INVALID", "a shape's when_to_use is over 300 characters", {
+    "shapes/alpha.md": shapeText({ id: "alpha" }).replace(
+      "when_to_use: When the question is about alpha.\n",
+      `when_to_use: ${"w".repeat(STORY_PACK_LIMITS.maxWhenToUseChars + 1)}\n`
+    )
+  }],
+  ["FRONT_MATTER_INVALID", "a shape repeats a key", {
+    "shapes/alpha.md": shapeText({ id: "alpha" }).replace("title: Shape alpha\n", "title: Shape alpha\ntitle: Again\n")
+  }],
+  ["FRONT_MATTER_INVALID", "a shape lists sections twice", {
+    "shapes/alpha.md": shapeText({ id: "alpha" }).replace("---\nGuidance", "sections:\n  - Fourth section\n---\nGuidance")
+  }],
+  ["FRONT_MATTER_INVALID", "a shape has a list item outside sections", {
+    "shapes/alpha.md": shapeText({ id: "alpha" }).replace("sections:\n", "  - Stray item\nsections:\n")
+  }],
+  ["FRONT_MATTER_INVALID", "a shape leaves a value empty", {
+    "shapes/alpha.md": shapeText({ id: "alpha" }).replace("title: Shape alpha\n", "title:\n")
   }],
   ["SHAPE_ID_MISMATCH", "a shape file declares another id", { "shapes/beta.md": shapeText({ id: "gamma" }) }],
   ["SECTION_COUNT", "a shape has two sections", {
@@ -287,6 +315,17 @@ describe("verdict story — where the pack is read from", () => {
 
   it("fails loudly when no story-shapes directory sits above the caller", () => {
     const moduleUrl = pathToFileURL(join(scratchDir(), "deep", "module.js")).href;
+    expect(() => resolveStoryPackDir({ env: {}, moduleUrl }))
+      .toThrowError(expect.objectContaining({ code: "STORY_PACK_DIR_UNRESOLVED" }));
+  });
+
+  it("stops at the workspace root and never picks up a pack above it", () => {
+    const outer = scratchDir();
+    cpSync(SHIPPED_DIR, join(outer, "story-shapes"), { recursive: true });
+    const workspace = join(outer, "workspace");
+    mkdirSync(workspace);
+    writeFileSync(join(workspace, "pnpm-workspace.yaml"), "packages: []\n");
+    const moduleUrl = pathToFileURL(join(workspace, "apps", "runner", "src", "main.ts")).href;
     expect(() => resolveStoryPackDir({ env: {}, moduleUrl }))
       .toThrowError(expect.objectContaining({ code: "STORY_PACK_DIR_UNRESOLVED" }));
   });

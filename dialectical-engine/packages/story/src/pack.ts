@@ -59,9 +59,13 @@ export const STORY_PACK_LIMITS = Object.freeze({
 
 const STORY_SHAPES_DIRECTORY = "story-shapes";
 const STORY_PACK_MANIFEST = "pack.json";
+/** The file that marks the workspace root: the upward walk never looks above it. */
+const STORY_WORKSPACE_ROOT_MARKER = "pnpm-workspace.yaml";
 const STORY_ID_PATTERN = /^[a-z][a-z0-9-]{1,31}$/u;
 /** Every control character except line feed and tab: C0, DEL and C1. */
 const STORY_CONTROL_CHARACTER = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/u;
+/** Printable text: letters, marks, digits, punctuation, symbols and spaces; never a control or format character, a tab or a line break. */
+const STORY_PRINTABLE_TEXT = /^[\p{L}\p{M}\p{N}\p{P}\p{S}\p{Zs}]+$/u;
 const STORY_FRONT_MATTER_KEYS = new Set(["id", "title", "when_to_use"]);
 
 const StoryPackManifestSchema = z.object({
@@ -86,7 +90,9 @@ function storyPackFailure(rule: string, detail: string): TypedDomainError {
  * that names no directory holding `pack.json` fails loudly rather than falling
  * back. Otherwise the walk goes up from the caller's module to the first
  * directory that holds `story-shapes/pack.json`: relative to the repository,
- * never a path baked in for one machine.
+ * never a path baked in for one machine. The walk stops at the workspace root
+ * (the first directory holding `pnpm-workspace.yaml`), so a pack lying above
+ * the repository, in a parent folder, is never picked up by accident.
  */
 export function resolveStoryPackDir(input: {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -108,13 +114,14 @@ export function resolveStoryPackDir(input: {
   for (;;) {
     const candidate = join(cursor, STORY_SHAPES_DIRECTORY);
     if (existsSync(join(candidate, STORY_PACK_MANIFEST))) return candidate;
+    if (existsSync(join(cursor, STORY_WORKSPACE_ROOT_MARKER))) break;
     const parent = dirname(cursor);
     if (parent === cursor) break;
     cursor = parent;
   }
   throw new TypedDomainError(
     "STORY_PACK_DIR_UNRESOLVED",
-    `No ${STORY_SHAPES_DIRECTORY}/${STORY_PACK_MANIFEST} above ${start}; set ${STORY_SHAPES_DIR_ENV_KEY}`
+    `No ${STORY_SHAPES_DIRECTORY}/${STORY_PACK_MANIFEST} from ${start} up to the workspace root (${STORY_WORKSPACE_ROOT_MARKER}); set ${STORY_SHAPES_DIR_ENV_KEY}`
   );
 }
 
@@ -289,6 +296,19 @@ export function loadStoryPack(dir: string): StoryPack {
     );
   }
   const { pack_id: packId, version, default_shape: defaultShape, shapes: shapeIds } = manifest.data;
+  // The file check reads raw bytes; a JSON escape such as \u0000 only becomes a
+  // character once decoded, so the version is checked again as decoded text.
+  const versionControl = STORY_CONTROL_CHARACTER.exec(version);
+  if (versionControl !== null) {
+    const codePoint = versionControl[0].codePointAt(0) ?? 0;
+    throw storyPackFailure(
+      "CONTROL_CHARACTER",
+      `${STORY_PACK_MANIFEST} version holds U+${codePoint.toString(16).toUpperCase().padStart(4, "0")} at character ${String(versionControl.index)}`
+    );
+  }
+  if (!STORY_PRINTABLE_TEXT.test(version)) {
+    throw storyPackFailure("PACK_JSON_INVALID", `${STORY_PACK_MANIFEST} version must be printable text on one line`);
+  }
   for (const id of [packId, ...shapeIds]) {
     if (!STORY_ID_PATTERN.test(id)) {
       throw storyPackFailure("ID_INVALID", `${JSON.stringify(id.slice(0, 40))} must match ${STORY_ID_PATTERN.source}`);

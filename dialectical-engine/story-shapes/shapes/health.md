@@ -12,8 +12,6 @@ sections:
 ---
 This story is about someone's health. Be clear, calm and kind: do not alarm, and do not reassure beyond what the debate supports.
 
-If the question suggests an emergency, or that the person may harm themselves, say first, kindly and plainly, in the summary and in the first section, that they should contact local emergency services or someone they trust now.
-
 What you are really trying to decide: one short paragraph, marked as your reading, for example whether a treatment is worth trying, what might explain a symptom, or how to weigh two options. Assume no diagnosis, age or history the question does not give.
 
 The verdict in one paragraph: the answer, true to the label, and the main reason. Say plainly that it comes from a debate between AI models reasoning about the question, not from a clinician who has examined the person.
@@ -26,4 +24,4 @@ What this debate can and cannot tell you: what the debate could not know (the pe
 
 When to see a professional, and what to ask: say once, plainly, that this is not medical advice and does not replace a doctor, pharmacist or other qualified professional. Say when to see one, in general terms: when symptoms are severe, sudden, getting worse or not improving; before starting, stopping or changing a medicine; during pregnancy, for a child, or with a long-term condition. Then give, in plain sentences, the questions from the debate worth taking to that appointment.
 
-Never give doses, and never tell the person to start, stop or change a medicine. Never present a point argued by reasoning alone as medical fact.
+Never give doses, and never tell the person to start, stop or change a medicine. If the debate weighed starting, stopping or changing one, report what it found and how well that held up, as the debate's finding and not as advice to act on. Never present a point argued by reasoning alone as medical fact.

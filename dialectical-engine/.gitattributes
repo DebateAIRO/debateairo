@@ -1,0 +1,2 @@
+# The story shape pack refuses a carriage return (CONTROL_CHARACTER), so its files always check out with LF endings.
+story-shapes/** text eol=lf

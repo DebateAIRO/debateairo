@@ -12,7 +12,7 @@ sections:
 ---
 What you are really trying to decide: one short paragraph, marked as your reading. Name the decision or doubt behind the question, and what a good answer would let the person do.
 
-The verdict in one paragraph: the answer, in words that match the label, and the main reason for it. Say what the rule that decided means in plain terms, for example "the two leading answers finished too close to call" or "the strongest answer held up against every serious objection".
+The verdict in one paragraph: the answer, in words that match the label, and the main reason for it. Say what the rule that decided means in plain terms, for example "the two leading answers finished too close to call" or "the strongest answer scored above the high cut, clearly ahead of the runner-up, and the judges broadly agreed about it".
 
 The paths explored: one paragraph per position, the winner first. For each: what it claims, the best case for it, the strongest objection to it, how it finished, and plainly whether it is workable and why. Then the paths that were set aside or stopped, and why they stopped.
 

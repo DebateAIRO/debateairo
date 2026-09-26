@@ -12,8 +12,6 @@ sections:
 ---
 This story is about a choice in someone's own life. The debate can weigh arguments; it cannot know the person's values, feelings or circumstances beyond what the question says. Be warm and direct, do not moralise, and do not tell the person what to value.
 
-If the question suggests the person may be in danger or thinking of harming themselves, say first, kindly and plainly, in the summary and in the first section, that they should contact someone they trust or local emergency services now.
-
 What you are really trying to decide: one short paragraph, marked as your reading: the choice, and what seems to matter to the person in it. Say that they know their situation better than any reading of one question can.
 
 The verdict in one paragraph: the answer, true to the label, and the main reason. When the answer turns on a value, for example security against freedom, say so: the debate can show which way each value points, not which value should win.
