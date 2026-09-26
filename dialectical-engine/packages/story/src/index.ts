@@ -42,3 +42,12 @@ export {
   type StorySnapshotArrow,
   type StorySnapshotNode
 } from "./material.js";
+export {
+  STORY_LOOP_FAILURE_CODES,
+  runStoryLoop,
+  storyCallSiteKey,
+  type StoryCallRecord,
+  type StoryLoopDependencies,
+  type StoryLoopOutcome,
+  type StoryRoundRecord
+} from "./loop.js";
