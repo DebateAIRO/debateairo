@@ -5,8 +5,10 @@ import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository, insertPreparedNodeReview } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
 import { readStoryEnrichment } from "@debateai/story";
+import { FileRunContentKeyStore } from "../../packages/crypto/src/index.js";
 import {
   createEncryptedStoryRun,
+  createLegacyStoryRun,
   provisionStoryEncryptedOwner,
   releaseStoryEncryptedOwner,
   type StoryEncryptedOwner
@@ -196,6 +198,83 @@ describe("readStoryEnrichment — the story's database material, inside the run'
 
     for (const nodeId of [rootId, second, third]) {
       expect(enrichment.get(nodeId), nodeId).toMatchObject({ judgeBestCase: null, judgeObjection: null });
+    }
+  });
+
+  it("keeps another run's review and dispersion out, even for a node id it is handed", async () => {
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story own ${randomUUID()}`);
+    // The foreign run is LEGACY on purpose: its reasons and dispersion sit in
+    // plain columns, so a missing run filter would show here as leaked VALUES.
+    const foreignRunId = await createLegacyStoryRun(database.pool, `story foreign ${randomUUID()}`, randomUUID());
+    const ownArtifact = await artifact(runId, "author-maker", judgement("OWN", "OWN OBJECTION"));
+    const ownId = await node(runId, "Own claim.", ownArtifact, null);
+    await review(runId, ownId, ownArtifact, "agree", ["Own reason."]);
+    await dispersion(runId, ownId, ownArtifact, 0.1);
+    const foreignArtifact = await artifact(foreignRunId, "author-maker", judgement("FOREIGN", "FOREIGN OBJECTION"));
+    const foreignId = await node(foreignRunId, "Foreign claim.", foreignArtifact, null);
+    await review(foreignRunId, foreignId, foreignArtifact, "dispute", ["Foreign reason."]);
+    await dispersion(foreignRunId, foreignId, foreignArtifact, 0.9);
+
+    const enrichment = await withRunContentLease(database.pool, [runId], () => readStoryEnrichment(database.pool, {
+      runId,
+      nodes: [
+        { nodeId: ownId, judgeArtifactRef: ownArtifact },
+        { nodeId: foreignId, judgeArtifactRef: null }
+      ]
+    }));
+
+    expect(enrichment.get(ownId)).toMatchObject({ reviewOutcome: "agree", reviewReasons: ["Own reason."], dispersion: 0.1 });
+    expect(enrichment.get(foreignId)).toEqual({
+      judgeBestCase: null, judgeObjection: null, reviewOutcome: null, reviewReasons: [], dispersion: null
+    });
+  });
+
+  it("matches ids in any letter case and keeps the caller's own key", async () => {
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story letter case ${randomUUID()}`);
+    const judgeArtifact = await artifact(runId, "author-maker", judgement("UPPER", "UPPER OBJECTION"));
+    const nodeId = await node(runId, "A claim asked for in capitals.", judgeArtifact, null);
+    await review(runId, nodeId, judgeArtifact, "agree", ["Holds up."]);
+    await dispersion(runId, nodeId, judgeArtifact, 0.2);
+    const callerKey = nodeId.toUpperCase();
+    expect(callerKey).not.toBe(nodeId);
+
+    const enrichment = await withRunContentLease(database.pool, [runId], () => readStoryEnrichment(database.pool, {
+      runId, nodes: [{ nodeId: callerKey, judgeArtifactRef: judgeArtifact.toUpperCase() }]
+    }));
+
+    expect([...enrichment.keys()]).toEqual([callerKey]);
+    expect(enrichment.get(callerKey)).toEqual({
+      judgeBestCase: "UPPER",
+      judgeObjection: "UPPER OBJECTION",
+      reviewOutcome: "agree",
+      reviewReasons: ["Holds up."],
+      dispersion: 0.2
+    });
+  });
+
+  it("loads the run's key once for the whole read, not once per row", async () => {
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story one key ${randomUUID()}`);
+    const firstArtifact = await artifact(runId, "author-maker", judgement("FIRST", "FIRST OBJECTION"));
+    const secondArtifact = await artifact(runId, "author-maker", judgement("SECOND", "SECOND OBJECTION"));
+    const rootId = await node(runId, "Root.", firstArtifact, null);
+    const childId = await node(runId, "Child.", secondArtifact, { nodeId: rootId, ordinal: 1 });
+    await review(runId, rootId, firstArtifact, "agree", ["Sound."]);
+
+    const load = vi.spyOn(FileRunContentKeyStore.prototype, "load");
+    try {
+      const enrichment = await withRunContentLease(database.pool, [runId], () => readStoryEnrichment(database.pool, {
+        runId,
+        nodes: [
+          { nodeId: rootId, judgeArtifactRef: firstArtifact },
+          { nodeId: childId, judgeArtifactRef: secondArtifact }
+        ]
+      }));
+      // Three decrypts (two artifacts, one review), one key load.
+      expect(enrichment.get(rootId)).toMatchObject({ judgeBestCase: "FIRST", reviewReasons: ["Sound."] });
+      expect(enrichment.get(childId)).toMatchObject({ judgeBestCase: "SECOND" });
+      expect(load).toHaveBeenCalledTimes(1);
+    } finally {
+      load.mockRestore();
     }
   });
 

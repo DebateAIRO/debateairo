@@ -1,12 +1,18 @@
-import { decryptContentForRun, withRunContentLease, type CryptoEnvelope, type Pool } from "@debateai/db";
+import {
+  decryptLeasedContentForRun,
+  prepareLeasedContentEncryptionForRun,
+  type CryptoEnvelope,
+  type Pool
+} from "@debateai/db";
 import type { StoryNodeEnrichment } from "./material.js";
 
 /**
  * THE STORY'S DATABASE MATERIAL (spec §3.1 step 2). The runner holds the claims
  * and the numbers in memory. What only the database holds is read here, inside
- * the run's content lease. `withRunContentLease` BORROWS the lease the runner's
- * hook already holds (and refuses to widen its run scope), or takes one when
- * this is called on its own; each decrypt borrows it in turn:
+ * the run's content lease. `prepareLeasedContentEncryptionForRun` BORROWS the
+ * lease the runner's hook already holds (and refuses to widen its run scope),
+ * or takes one when this is called on its own, and loads the run's key ONCE for
+ * every decrypt below:
  *
  *  - the judge's best case and strongest objection, from the judge's OWN raw
  *    artifact (`ledger.raw_artifact`, carrier `{ rawText }`). Parsed LENIENTLY:
@@ -77,6 +83,15 @@ function summaryOf(judge: Readonly<Record<string, unknown>> | null, member: "ste
 type JudgeText = { readonly bestCase: string | null; readonly objection: string | null };
 type NodeReview = { readonly outcome: StoryNodeEnrichment["reviewOutcome"]; readonly reasons: readonly string[] };
 
+/**
+ * A UUID's letter case carries no meaning, and Postgres returns `uuid::text` in
+ * lower case, so every lookup goes through this. The returned map still keys
+ * each entry by the caller's own id.
+ */
+function idKey(id: string): string {
+  return id.toLowerCase();
+}
+
 export async function readStoryEnrichment(
   pool: Pool,
   input: {
@@ -86,16 +101,17 @@ export async function readStoryEnrichment(
 ): Promise<ReadonlyMap<string, StoryNodeEnrichment>> {
   const result = new Map<string, StoryNodeEnrichment>();
   for (const node of input.nodes) result.set(node.nodeId, emptyEnrichment());
-  const nodeIds = [...new Set(input.nodes.map((node) => node.nodeId).filter((id) => UUID_TEXT.test(id)))];
+  const nodeIds = [...new Set(input.nodes.map((node) => node.nodeId).filter((id) => UUID_TEXT.test(id)).map(idKey))];
   const artifactIds = [...new Set(input.nodes.flatMap((node) =>
-    node.judgeArtifactRef !== null && UUID_TEXT.test(node.judgeArtifactRef) ? [node.judgeArtifactRef] : []
+    node.judgeArtifactRef !== null && UUID_TEXT.test(node.judgeArtifactRef) ? [idKey(node.judgeArtifactRef)] : []
   ))];
   if (nodeIds.length === 0 && artifactIds.length === 0) return result;
 
   const judgeTexts = new Map<string, JudgeText>();
   const reviews = new Map<string, NodeReview>();
   const dispersions = new Map<string, number>();
-  await withRunContentLease(pool, [input.runId], async () => {
+  const leased = await prepareLeasedContentEncryptionForRun(pool, input.runId);
+  try {
     if (artifactIds.length > 0) {
       const artifacts = await pool.query<{
         raw_artifact_id: string;
@@ -108,8 +124,8 @@ export async function readStoryEnrichment(
         [input.runId, artifactIds]
       );
       for (const row of artifacts.rows) {
-        const content = await decryptContentForRun<{ readonly rawText?: unknown }>(
-          pool, input.runId, "ledger.raw_artifact", row.raw_artifact_id, row.content_ciphertext,
+        const content = decryptLeasedContentForRun<{ readonly rawText?: unknown }>(
+          leased, "ledger.raw_artifact", row.raw_artifact_id, row.content_ciphertext,
           { rawText: row.raw_text }
         );
         const judge = typeof content.rawText === "string" ? lenientJudgeObject(content.rawText) : null;
@@ -137,8 +153,8 @@ export async function readStoryEnrichment(
         [input.runId, nodeIds]
       );
       for (const row of reviewRows.rows) {
-        const content = await decryptContentForRun<{ readonly reasons?: unknown }>(
-          pool, input.runId, "ledger.node_review", row.node_review_id, row.content_ciphertext,
+        const content = decryptLeasedContentForRun<{ readonly reasons?: unknown }>(
+          leased, "ledger.node_review", row.node_review_id, row.content_ciphertext,
           { reasons: row.reasons }
         );
         const reasons = Array.isArray(content.reasons)
@@ -161,17 +177,21 @@ export async function readStoryEnrichment(
         if (value !== null && Number.isFinite(value)) dispersions.set(row.node_id, value);
       }
     }
-  });
+    // Nothing decrypted leaves unless the run's content is still live.
+    await leased.assertLive();
+  } finally {
+    await leased.close();
+  }
 
   for (const node of input.nodes) {
-    const judge = node.judgeArtifactRef === null ? undefined : judgeTexts.get(node.judgeArtifactRef);
-    const reviewed = reviews.get(node.nodeId);
+    const judge = node.judgeArtifactRef === null ? undefined : judgeTexts.get(idKey(node.judgeArtifactRef));
+    const reviewed = reviews.get(idKey(node.nodeId));
     result.set(node.nodeId, Object.freeze({
       judgeBestCase: judge?.bestCase ?? null,
       judgeObjection: judge?.objection ?? null,
       reviewOutcome: reviewed?.outcome ?? null,
       reviewReasons: reviewed?.reasons ?? Object.freeze([]),
-      dispersion: dispersions.get(node.nodeId) ?? null
+      dispersion: dispersions.get(idKey(node.nodeId)) ?? null
     }));
   }
   return result;
