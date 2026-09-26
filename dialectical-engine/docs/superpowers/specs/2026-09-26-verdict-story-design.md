@@ -201,8 +201,11 @@ guarded by `tests/unit/prompt-surface-guard.test.ts`.
 
 **Size budget** (register row `storyMaterialBudget`, provisional, keyed like the answer writer's
 `compositionBundleBudget` by the run's `compositionBudgetTier`): low 40,000 bytes, medium 80,000,
-high 120,000, always below the 256 KiB packet cap. **The model never sees the long internal ids.** Every point gets a short reference (`p1`…`pn`)
-in the material, and code maps the references back to node ids before storing the story. A
+high 120,000, always below the 256 KiB packet cap. **The model never sees the long internal ids.** Every point gets a short reference (`P1`…`Pn`,
+assigned to all points before any shrinking) in the material, and code maps the references back
+to node ids before storing the story. These references are also the story's point numbers: they
+are stored with the story (`point_numbers`), and the PDF appendix and the site use them, so "P3"
+in the story or in the checker's reservation is appendix entry P3. A
 measured depth-5, three-model debate (195 points) was about 216 KB with full ids even at the last
 shrinking step, so without short references deep debates could not fit any budget.
 
