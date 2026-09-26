@@ -13,7 +13,7 @@ export const STORYTELLER_CONTRACT_ID = "story.storyteller.v1" as const;
 export const STORY_CHECKER_CONTRACT_ID = "story.checker.v1" as const;
 
 /** Mirrors `StoryBodySchema` and the checks in `validate.ts`: every member, kind and limit. */
-export const STORYTELLER_ANSWER_FORM = `Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML and no links.
+export const STORYTELLER_ANSWER_FORM = `Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters other than line feed and tab, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).
 {
   "shape_id": the id of one shape offered in the instruction,
   "short": {
@@ -44,7 +44,7 @@ export const STORY_CHECKER_ANSWER_FORM = `Return only one JSON object with exact
     "goal_marked_as_reading": boolean
   }
 }
-When satisfied is false, objection must be a non-empty string. In the objection, refer to points by their ids, such as P7.`;
+When satisfied is true, every criterion must be true. When satisfied is false, objection must be a non-empty string. In the objection, refer to points by their ids, such as P7.`;
 
 export function buildStorytellerContract(pack: StoryPack): PromptContract {
   return Object.freeze({

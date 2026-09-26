@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { StoryBodySchema, StoryFateSchema, StoryVerdictBasisSchema } from "@debateai/contract";
+import { STORY_BODY_LIMITS, StoryBodySchema, StoryFateSchema, StoryVerdictBasisSchema } from "@debateai/contract";
 import { assertFramedPrompt, buildFramedPrompt, promptContractFingerprintText } from "@debateai/providers";
 import {
   STORYTELLER_ANSWER_FORM,
@@ -79,10 +79,16 @@ describe("verdict story — each answer form describes what its parser enforces"
       "at most 160 characters", "at most 900 characters", "at most 240 characters", "at most 400 characters",
       "at most 80 characters", "at most 2000 characters", "at most 1200 characters", "at most 40 entries",
       "at most 8 entries", "3 to 12 entries", "1 to 12 paragraphs", "each position exactly once",
-      "every point a text rests on must be listed in that entry's node_refs"
+      "every point a text rests on must be listed in that entry's node_refs",
+      // Fix round 1: the text-character check and the strongest-first rule the classifier enforces.
+      "no control characters other than line feed and tab",
+      "no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069)",
+      "for the first 8 positions listed"
     ]) {
       expect(STORYTELLER_ANSWER_FORM).toContain(limit);
     }
+    // The form's path cap is the schema's own constant.
+    expect(STORYTELLER_ANSWER_FORM).toContain(`at most ${String(STORY_BODY_LIMITS.maxPaths)} entries`);
   });
 
   it("names every member of the checker schema", () => {
@@ -93,6 +99,7 @@ describe("verdict story — each answer form describes what its parser enforces"
       expect(STORY_CHECKER_ANSWER_FORM).toContain(`"${criterion}": boolean`);
     }
     expect(STORY_CHECKER_ANSWER_FORM).toContain("at most 2000 characters");
+    expect(STORY_CHECKER_ANSWER_FORM).toContain("When satisfied is true, every criterion must be true.");
     expect(STORY_CHECKER_ANSWER_FORM).toContain("When satisfied is false, objection must be a non-empty string.");
     // The reservation is read beside the report, whose appendix numbers points the same way.
     expect(STORY_CHECKER_ANSWER_FORM).toContain("refer to points by their ids, such as P7");

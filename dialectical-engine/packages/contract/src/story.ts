@@ -8,6 +8,14 @@ import { z } from "zod";
  * the PDF render it as text and never as Markdown, HTML or links.
  */
 
+/**
+ * The most paths the short story carries: the schema's cap, and the ceiling of
+ * the material index's `pathCap`, so the two can never disagree.
+ */
+export const STORY_BODY_LIMITS = Object.freeze({
+  maxPaths: 8
+});
+
 export const StoryFateSchema = z.enum(["HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE"]);
 export type StoryFate = z.infer<typeof StoryFateSchema>;
 
@@ -33,7 +41,7 @@ export const StoryBodySchema = z.object({
   short: z.object({
     headline: z.string().trim().min(1).max(160),
     summary: z.string().trim().min(1).max(900),
-    paths: z.array(StoryPathSchema).min(1).max(8),
+    paths: z.array(StoryPathSchema).min(1).max(STORY_BODY_LIMITS.maxPaths),
     change: StoryParagraphSchema(400)
   }).strict(),
   long: z.object({

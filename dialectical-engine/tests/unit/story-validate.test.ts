@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StoryBody } from "@debateai/contract";
+import { STORY_BODY_LIMITS, type StoryBody } from "@debateai/contract";
 import { schemaFailureLocator, type ContentClassification } from "@debateai/providers";
 import {
   classifyCheckerContent,
@@ -19,6 +19,7 @@ import {
 const INDEX: StoryMaterialIndex = {
   nodeIds: new Set(["P1", "P2", "P3", "P4"]),
   positionIds: new Set(["P1", "P2"]),
+  positionOrder: ["P1", "P2"],
   shapeIds: new Set(["general", "health"]),
   pathCap: 8
 };
@@ -126,17 +127,56 @@ describe("verdict story — the story classifier", () => {
     expect(refused(classifyStoryContent(JSON.stringify(body), INDEX))).toEqual({ code: "SCHEMA_FAILED", path });
   });
 
+  it.each([
+    ["a NUL in the headline", (body: StoryBody): void => {
+      body.short.headline = "Fund the\u0000 extension";
+    }, "short.headline"],
+    ["a right-to-left override in a paragraph", (body: StoryBody): void => {
+      body.long.sections[2]!.paragraphs[0]!.text = "Funding ‮dleh‬ up.";
+    }, "long.sections.2.paragraphs.0.text"],
+    ["a directional isolate in a path line", (body: StoryBody): void => {
+      body.short.paths[1]!.line = "Do not fund it: ⁧the cost objection⁩ was answered.";
+    }, "short.paths.1.line"],
+    ["an escape character in a section title", (body: StoryBody): void => {
+      body.long.sections[0]!.title = "What you are \u001B[31mreally\u001B[0m deciding";
+    }, "long.sections.0.title"],
+    ["a control character in the reviewer's note", (body: StoryBody): void => {
+      body.reviewer_note = paragraph("The verdict leans on one\u0007 argued point.", ["P3"]);
+    }, "reviewer_note.text"],
+    ["an isolate in the summary", (body: StoryBody): void => {
+      body.short.summary = "Our reading of your question: ⁦whether the extension is worth its cost.";
+    }, "short.summary"],
+    ["an override in the change text", (body: StoryBody): void => {
+      body.short.change.text = "A measured drop in ‭ridership would move the savings point.";
+    }, "short.change.text"]
+  ])("refuses %s as a code and a path, without echoing the text", (_name, mutate, path) => {
+    const body = story();
+    mutate(body);
+    const result = classifyStoryContent(JSON.stringify(body), INDEX);
+    expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path });
+    expect(result.parseError).toContain("STORY_TEXT_CONTROL_CHARACTER");
+    expect(result.parseError).not.toMatch(/Fund the|dleh|cost objection|really|leans on|worth its cost|ridership/u);
+  });
+
+  it("accepts line feeds and tabs inside a text", () => {
+    const body = story();
+    body.long.sections[2]!.paragraphs[0]!.text = "Funding held up.\n\tThe savings point was never answered.";
+    expect(classifyStoryContent(JSON.stringify(body), INDEX).parseStatus).toBe("PARSED");
+  });
+
   describe("more positions than the site shows (the 8-path cap)", () => {
+    // Task 3 numbers the positions strongest first, so P1 is the strongest and P9 the weakest.
     const positions = Array.from({ length: 9 }, (_, index) => `P${String(index + 1)}`);
     const wide: StoryMaterialIndex = {
       nodeIds: new Set(positions),
       positionIds: new Set(positions),
+      positionOrder: positions,
       shapeIds: new Set(["general"]),
       pathCap: 8
     };
-    function withPaths(count: number): string {
+    function withPaths(ids: readonly string[]): string {
       const body = story();
-      body.short.paths = positions.slice(0, count).map((id) => ({
+      body.short.paths = ids.map((id) => ({
         position_ref: id, fate: "PARTLY_HELD" as const, line: `Position ${id}.`, node_refs: [id]
       }));
       body.short.change.node_refs = [];
@@ -144,16 +184,54 @@ describe("verdict story — the story classifier", () => {
       return JSON.stringify(body);
     }
 
-    it("accepts exactly 8 entries for 9 positions", () => {
-      expect(classifyStoryContent(withPaths(8), wide).parseStatus).toBe("PARSED");
+    it("accepts the 8 strongest of 9 positions", () => {
+      expect(classifyStoryContent(withPaths(positions.slice(0, 8)), wide).parseStatus).toBe("PARSED");
+    });
+
+    it("refuses 8 entries that drop the strongest, at the entry that is not among the 8 strongest", () => {
+      const result = classifyStoryContent(withPaths(positions.slice(1, 9)), wide);
+      expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "short.paths.7.position_ref" });
+      expect(result.parseError).toContain("STORY_PATH_NOT_AMONG_STRONGEST");
+    });
+
+    it("reads the strength order from positionOrder, not from the reference numbers", () => {
+      const weakestFirst: StoryMaterialIndex = { ...wide, positionOrder: [...positions].reverse() };
+      expect(classifyStoryContent(withPaths(positions.slice(1, 9)), weakestFirst).parseStatus).toBe("PARSED");
+      expect(refused(classifyStoryContent(withPaths(positions.slice(0, 8)), weakestFirst))).toEqual({
+        code: "SCHEMA_FAILED", path: "short.paths.0.position_ref"
+      });
     });
 
     it("refuses 7 entries for 9 positions", () => {
-      expect(refused(classifyStoryContent(withPaths(7), wide))).toEqual({ code: "SCHEMA_FAILED", path: "short.paths" });
+      expect(refused(classifyStoryContent(withPaths(positions.slice(0, 7)), wide))).toEqual({ code: "SCHEMA_FAILED", path: "short.paths" });
     });
 
     it("refuses 9 entries: the form caps the paths at 8", () => {
-      expect(refused(classifyStoryContent(withPaths(9), wide))).toEqual({ code: "SCHEMA_FAILED", path: "short.paths" });
+      expect(refused(classifyStoryContent(withPaths(positions), wide))).toEqual({ code: "SCHEMA_FAILED", path: "short.paths" });
+    });
+  });
+
+  describe("an index built wrongly is a programming error, thrown loudly", () => {
+    const content = JSON.stringify(story());
+
+    it.each([0, 9, 2.5, Number.NaN])("refuses a pathCap of %s", (pathCap) => {
+      expect(() => classifyStoryContent(content, { ...INDEX, pathCap }))
+        .toThrowError(expect.objectContaining({ code: "STORY_PATH_CAP_INVALID" }));
+      expect(() => parseStoryBody(content, { ...INDEX, pathCap }))
+        .toThrowError(expect.objectContaining({ code: "STORY_PATH_CAP_INVALID" }));
+    });
+
+    it("accepts the schema's own cap as the pathCap", () => {
+      expect(classifyStoryContent(content, { ...INDEX, pathCap: STORY_BODY_LIMITS.maxPaths }).parseStatus).toBe("PARSED");
+    });
+
+    it.each([
+      ["a position missing from the order", ["P1"]],
+      ["a reference that is not a position", ["P1", "P3"]],
+      ["a position listed twice", ["P1", "P2", "P1"]]
+    ])("refuses a positionOrder with %s", (_name, positionOrder) => {
+      expect(() => classifyStoryContent(content, { ...INDEX, positionOrder }))
+        .toThrowError(expect.objectContaining({ code: "STORY_POSITION_ORDER_INVALID" }));
     });
   });
 });
@@ -187,6 +265,15 @@ describe("verdict story — the checker classifier", () => {
   it("refuses an unsatisfied verdict that gives no objection, at the objection's path", () => {
     const content = JSON.stringify({ ...SATISFIED, satisfied: false });
     expect(refused(classifyCheckerContent(content))).toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+  });
+
+  it("refuses a satisfied verdict with an unmet criterion, at satisfied", () => {
+    const content = JSON.stringify({ ...SATISFIED, criteria: { ...SATISFIED.criteria, no_overstatement: false } });
+    const result = classifyCheckerContent(content);
+    expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "satisfied" });
+    expect(result.parseError).toContain("STORY_CHECKER_SATISFIED_WITH_UNMET_CRITERION");
+    expect(() => parseCheckerVerdict(content))
+      .toThrowError(expect.objectContaining({ code: "STORY_CHECKER_CONTENT_INVALID" }));
   });
 
   it("refuses a verdict that leaves out a criterion", () => {

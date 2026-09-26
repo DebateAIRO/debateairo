@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { StoryBodySchema, type StoryBody } from "@debateai/contract";
+import { STORY_BODY_LIMITS, StoryBodySchema, type StoryBody } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ContentClassification } from "@debateai/providers";
 
@@ -15,14 +15,19 @@ import type { ContentClassification } from "@debateai/providers";
  * what the model wrote.
  *
  * The story's TEXT is not inspected for markup: it is plain-text data, and the
- * site and the PDF never render it as anything else.
+ * site and the PDF never render it as anything else. It is inspected for
+ * control and bidirectional-override characters, which can hide or reorder
+ * what a reader sees however the text is rendered.
  */
 
 /** What the material offers a story to cite. Built by `buildStoryMaterial`. */
 export interface StoryMaterialIndex {
   readonly nodeIds: ReadonlySet<string>;
   readonly positionIds: ReadonlySet<string>;
+  /** The same references as `positionIds`, strongest first: past `pathCap` positions, only the first `pathCap` may be paths. */
+  readonly positionOrder: readonly string[];
   readonly shapeIds: ReadonlySet<string>;
+  /** 1 to `STORY_BODY_LIMITS.maxPaths`, so the check and the schema can never disagree. */
   readonly pathCap: number;
 }
 
@@ -39,6 +44,9 @@ export const StoryCheckerVerdictSchema = z.object({
     goal_marked_as_reading: z.boolean()
   }).strict()
 }).strict().superRefine((verdict, context) => {
+  if (verdict.satisfied && Object.values(verdict.criteria).some((met) => !met)) {
+    context.addIssue({ code: "custom", path: ["satisfied"], message: "STORY_CHECKER_SATISFIED_WITH_UNMET_CRITERION" });
+  }
   if (!verdict.satisfied && verdict.objection === null) {
     context.addIssue({ code: "custom", path: ["objection"], message: "STORY_CHECKER_OBJECTION_REQUIRED" });
   }
@@ -54,10 +62,40 @@ interface StoryIssue {
 /** Enough issues to name the first few problems; the locator reads only the first. */
 const STORY_ISSUE_LIMIT = 20;
 
-function storyReferenceIssues(body: StoryBody, index: StoryMaterialIndex): readonly StoryIssue[] {
+/**
+ * C0 control characters other than tab and line feed, and the bidirectional
+ * embedding, override and isolate characters (U+202A–U+202E, U+2066–U+2069).
+ */
+const STORY_TEXT_FORBIDDEN = /[\u0000-\u0008\u000B-\u001F‪-‮⁦-⁩]/u;
+
+/**
+ * The index is code's, built by `buildStoryMaterial`; a wrong one is a
+ * programming error, refused loudly rather than judged as the model's fault.
+ */
+function assertStoryMaterialIndex(index: StoryMaterialIndex): void {
+  if (!Number.isInteger(index.pathCap) || index.pathCap < 1 || index.pathCap > STORY_BODY_LIMITS.maxPaths) {
+    throw new TypedDomainError(
+      "STORY_PATH_CAP_INVALID",
+      `pathCap must be an integer from 1 to ${String(STORY_BODY_LIMITS.maxPaths)}`
+    );
+  }
+  const ordered = new Set(index.positionOrder);
+  if (ordered.size !== index.positionOrder.length || ordered.size !== index.positionIds.size
+    || index.positionOrder.some((ref) => !index.positionIds.has(ref))) {
+    throw new TypedDomainError(
+      "STORY_POSITION_ORDER_INVALID",
+      "positionOrder must list every position exactly once"
+    );
+  }
+}
+
+function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonly StoryIssue[] {
   const issues: StoryIssue[] = [];
   const issue = (path: readonly (string | number)[], message: string): void => {
     issues.push(Object.freeze({ code: "custom", path: Object.freeze([...path]), message }));
+  };
+  const text = (value: string, at: readonly (string | number)[]): void => {
+    if (STORY_TEXT_FORBIDDEN.test(value)) issue(at, "STORY_TEXT_CONTROL_CHARACTER");
   };
   const citations = (refs: readonly string[], at: readonly (string | number)[]): void => {
     refs.forEach((ref, position) => {
@@ -66,7 +104,11 @@ function storyReferenceIssues(body: StoryBody, index: StoryMaterialIndex): reado
   };
 
   if (!index.shapeIds.has(body.shape_id)) issue(["shape_id"], "STORY_UNKNOWN_SHAPE");
+  text(body.short.headline, ["short", "headline"]);
+  text(body.short.summary, ["short", "summary"]);
 
+  // Past the cap, only the strongest positions may be paths. Under it, every position is among them.
+  const strongest = new Set(index.positionOrder.slice(0, index.pathCap));
   const covered = new Set<string>();
   let pathsWellFormed = true;
   body.short.paths.forEach((path, position) => {
@@ -76,8 +118,12 @@ function storyReferenceIssues(body: StoryBody, index: StoryMaterialIndex): reado
     } else if (covered.has(path.position_ref)) {
       pathsWellFormed = false;
       issue(["short", "paths", position, "position_ref"], "STORY_DUPLICATE_POSITION");
+    } else if (!strongest.has(path.position_ref)) {
+      pathsWellFormed = false;
+      issue(["short", "paths", position, "position_ref"], "STORY_PATH_NOT_AMONG_STRONGEST");
     }
     covered.add(path.position_ref);
+    text(path.line, ["short", "paths", position, "line"]);
     citations(path.node_refs, ["short", "paths", position]);
   });
   // Every position once while they fit under the cap; exactly the cap beyond it.
@@ -86,13 +132,20 @@ function storyReferenceIssues(body: StoryBody, index: StoryMaterialIndex): reado
     issue(["short", "paths"], "STORY_POSITION_COVERAGE");
   }
 
+  text(body.short.change.text, ["short", "change", "text"]);
   citations(body.short.change.node_refs, ["short", "change"]);
   body.long.sections.forEach((section, sectionIndex) => {
+    text(section.title, ["long", "sections", sectionIndex, "title"]);
     section.paragraphs.forEach((paragraph, paragraphIndex) => {
-      citations(paragraph.node_refs, ["long", "sections", sectionIndex, "paragraphs", paragraphIndex]);
+      const at = ["long", "sections", sectionIndex, "paragraphs", paragraphIndex] as const;
+      text(paragraph.text, [...at, "text"]);
+      citations(paragraph.node_refs, at);
     });
   });
-  if (body.reviewer_note !== null) citations(body.reviewer_note.node_refs, ["reviewer_note"]);
+  if (body.reviewer_note !== null) {
+    text(body.reviewer_note.text, ["reviewer_note", "text"]);
+    citations(body.reviewer_note.node_refs, ["reviewer_note"]);
+  }
   return issues.slice(0, STORY_ISSUE_LIMIT);
 }
 
@@ -107,13 +160,18 @@ function decodeStoryJson(content: string): { readonly ok: true; readonly value: 
   }
 }
 
-/** The storyteller's content classifier: the JSON form, then every reference and the coverage. */
+/**
+ * The storyteller's content classifier: the JSON form, then the text
+ * characters, every reference and the coverage. Throws `STORY_PATH_CAP_INVALID`
+ * or `STORY_POSITION_ORDER_INVALID` for an index code built wrongly.
+ */
 export function classifyStoryContent(content: string, index: StoryMaterialIndex): ContentClassification {
+  assertStoryMaterialIndex(index);
   const decoded = decodeStoryJson(content);
   if (!decoded.ok) return { parseStatus: "PARSE_FAILED", parseError: decoded.error };
   const parsed = StoryBodySchema.safeParse(decoded.value);
   if (!parsed.success) return { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
-  const issues = storyReferenceIssues(parsed.data, index);
+  const issues = storyContentIssues(parsed.data, index);
   return issues.length === 0
     ? { parseStatus: "PARSED", parseError: null }
     : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };

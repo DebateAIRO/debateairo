@@ -465,7 +465,7 @@ describe("SYNC3 / R1 — the support chat's v2 JSON-draft contracts", () => {
  */
 describe("VERDICT STORY — the storyteller's and the checker's answer forms", () => {
   it("pins the storyteller's answer form byte for byte", () => {
-    expect(STORYTELLER_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML and no links.
+    expect(STORYTELLER_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters other than line feed and tab, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).
 {
   "shape_id": the id of one shape offered in the instruction,
   "short": {
@@ -497,7 +497,7 @@ short.paths has one entry per position in the positions field, each position exa
     "goal_marked_as_reading": boolean
   }
 }
-When satisfied is false, objection must be a non-empty string. In the objection, refer to points by their ids, such as P7.`);
+When satisfied is true, every criterion must be true. When satisfied is false, objection must be a non-empty string. In the objection, refer to points by their ids, such as P7.`);
   });
 
   it("carries each form into its contract, under a new contract id", () => {
