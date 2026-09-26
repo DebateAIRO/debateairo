@@ -1,7 +1,13 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { StoryBodySchema, type StoryBody, type StoryVerdictBasis } from "@debateai/contract";
-import { migrate, withRunContentLease } from "@debateai/db";
+import {
+  CONTENT_JSON_SENTINEL,
+  encryptAttestedContentForRun,
+  migrate,
+  withRunContentLease
+} from "@debateai/db";
 import { StoryRepository, type StoryRecordInput } from "@debateai/story";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
@@ -109,6 +115,69 @@ function marker(): string {
   return `STORYMARK${randomUUID().replaceAll("-", "")}`;
 }
 
+/** The sealed payload a story row carries, as the repository builds it. */
+function storyContent(mark: string): Record<string, unknown> {
+  const record = readyRecord(randomUUID(), randomUUID(), mark);
+  return {
+    body: record.body, reservation: record.reservation,
+    verdictBasis: record.verdictBasis, pointNumbers: record.pointNumbers
+  };
+}
+
+/** An envelope sealed while the run is live, bound to (run, serve.answer_story, storyId). */
+async function sealFor(runId: string, storyId: string, mark: string): Promise<{
+  readonly envelope: Record<string, unknown>; readonly attestation: Buffer;
+}> {
+  const sealed = await encryptAttestedContentForRun(
+    database.pool, runId, "serve.answer_story", storyId, storyContent(mark)
+  );
+  if (sealed === null) throw new Error("STORY_TEST_CIPHER_UNCONFIGURED");
+  return { envelope: { ...sealed.envelope }, attestation: Buffer.from(sealed.attestation) };
+}
+
+/**
+ * A direct INSERT that bypasses the repository and its content lease, so the
+ * row meets serve.answer_story's triggers with exactly the carrier columns given.
+ */
+function insertRawStory(row: {
+  readonly storyId: string;
+  readonly runId: string;
+  readonly answerId: string;
+  readonly content: unknown;
+  readonly envelope: unknown;
+  readonly attestation: Buffer | null;
+}) {
+  return database.pool.query(
+    `INSERT INTO serve.answer_story (
+       story_id, run_id, answer_id, answer_version, outcome, failure_code, shape_id,
+       pack_version, pack_fingerprint, storyteller_lineage, checker_lineage, rounds,
+       artifact_refs, content, content_ciphertext, content_attestation
+     ) VALUES (
+       $1,$2,$3,1,'READY',NULL,'general','2026-09-26.1',$4,NULL,NULL,1,'[]'::jsonb,$5::jsonb,$6::jsonb,$7
+     )`,
+    [
+      row.storyId, row.runId, row.answerId, "f".repeat(64), JSON.stringify(row.content),
+      row.envelope === null ? null : JSON.stringify(row.envelope), row.attestation
+    ]
+  );
+}
+
+async function storyCount(answerId: string): Promise<string> {
+  return (await database.pool.query<{ count: string }>(
+    "SELECT count(*)::text AS count FROM serve.answer_story WHERE answer_id = $1", [answerId]
+  )).rows[0]!.count;
+}
+
+async function eraseRun(runId: string): Promise<void> {
+  // The run's key cleanup intent makes core.run_private_content_is_live false.
+  await database.pool.query(
+    `INSERT INTO serve.private_run_key_cleanup_intent (
+       request_ref,user_id,run_id,requested_at,cleanup_publication_refs
+     ) VALUES ($1,$2,$3,now(),'{}')`,
+    [randomUUID(), theOwner().userId, runId]
+  );
+}
+
 describe("serve.answer_story — the encrypted, insert-once story row", () => {
   it("seals an encrypted run's story: no readable column holds any story text", async () => {
     const mark = marker();
@@ -130,6 +199,9 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     expect(stored.rows).toHaveLength(1);
     expect(stored.rows[0]!.row_text).not.toContain(mark);
     expect(stored.rows[0]!.row_text).not.toContain("\"P2\"");
+    // The verdict basis is sealed too: none of its code-computed values is readable.
+    expect(stored.rows[0]!.row_text).not.toContain(VERDICT_BASIS.trigger);
+    expect(stored.rows[0]!.row_text).not.toContain(VERDICT_BASIS.winner_node_id);
     expect(stored.rows[0]!.content).toEqual({ ciphertext: true, v: 1 });
     expect(stored.rows[0]!.has_envelope).toBe(true);
     expect(stored.rows[0]!.attestation_bytes).toBe(32);
@@ -158,6 +230,11 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     await expect(repository.readForAnswer({ answerId, answerVersion: 1, ownership }))
       .resolves.toMatchObject({ answerVersion: 1 });
     await expect(repository.readForAnswer({ answerId, answerVersion: 2, ownership })).resolves.toBeNull();
+    // Past PostgreSQL's integer range the answer is "no story", not an out-of-range error.
+    await expect(repository.readForAnswer({ answerId, answerVersion: 2_147_483_648, ownership }))
+      .resolves.toBeNull();
+    await expect(repository.readForAnswer({ answerId, answerVersion: Number.MAX_SAFE_INTEGER, ownership }))
+      .resolves.toBeNull();
   });
 
   it("closes the story to a foreign owner and to a malformed principal", async () => {
@@ -165,7 +242,11 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story foreign ${mark}`);
     const answerId = await answerFor(runId, mark);
     const repository = new StoryRepository(database.pool);
-    await repository.insert(readyRecord(runId, answerId, mark));
+    await expect(repository.insert(readyRecord(runId, answerId, mark))).resolves.toBe("INSERTED");
+    // Positive control: the rightful owner reads it, so every null below is the gate closing.
+    await expect(repository.readForAnswer({
+      answerId, answerVersion: null, ownership: { ownerRef: theOwner().ownerRef }
+    })).resolves.toMatchObject({ answerId, reservation: `RESERVATION ${mark}` });
 
     await expect(repository.readForAnswer({ answerId, answerVersion: null, ownership: { ownerRef: randomUUID() } }))
       .resolves.toBeNull();
@@ -245,6 +326,102 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     })).rejects.toThrowError(/answer_story_outcome_is_coherent/u);
   });
 
+  it("refuses a malformed record BEFORE sealing it: a typed STORY_RECORD_INVALID, and no row", async () => {
+    const mark = marker();
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story malformed ${mark}`);
+    const answerId = await answerFor(runId, mark);
+    const repository = new StoryRepository(database.pool);
+    const refused = { name: "TypedDomainError", code: "STORY_RECORD_INVALID" };
+    // A point number that is not `Pn`: sealed, it could never be read back.
+    await expect(repository.insert({
+      ...readyRecord(runId, answerId, mark), pointNumbers: { "node-1": "P1", "node-2": "Q2" }
+    })).rejects.toMatchObject(refused);
+    // A body outside the story schema.
+    await expect(repository.insert({
+      ...readyRecord(runId, answerId, mark),
+      body: { ...bodyWith(mark), shape_id: "Not A Shape" } as StoryBody
+    })).rejects.toMatchObject(refused);
+    expect(await storyCount(answerId)).toBe("0");
+    // Positive control: the same answer takes a well-formed story.
+    await expect(repository.insert(readyRecord(runId, answerId, mark))).resolves.toBe("INSERTED");
+  });
+
+  it("the attestation guard binds an envelope to its own story row: forged or copied, it is CONTENT_ATTESTATION_INVALID", async () => {
+    const mark = marker();
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story attestation ${mark}`);
+    const answerId = await answerFor(runId, mark);
+    const storyId = randomUUID();
+    const sealed = await sealFor(runId, storyId, mark);
+    const ct = String(sealed.envelope.ct);
+    const forgedEnvelope = { ...sealed.envelope, ct: `${ct.startsWith("A") ? "B" : "A"}${ct.slice(1)}` };
+
+    // A forged ciphertext under the genuine attestation.
+    await expect(insertRawStory({
+      storyId, runId, answerId, content: CONTENT_JSON_SENTINEL, envelope: forgedEnvelope,
+      attestation: sealed.attestation
+    })).rejects.toThrowError(/^CONTENT_ATTESTATION_INVALID$/u);
+    // The genuine envelope under a forged attestation.
+    await expect(insertRawStory({
+      storyId, runId, answerId, content: CONTENT_JSON_SENTINEL, envelope: sealed.envelope,
+      attestation: randomBytes(32)
+    })).rejects.toThrowError(/^CONTENT_ATTESTATION_INVALID$/u);
+    // The genuine envelope and attestation, moved to another story id.
+    await expect(insertRawStory({
+      storyId: randomUUID(), runId, answerId, content: CONTENT_JSON_SENTINEL, envelope: sealed.envelope,
+      attestation: sealed.attestation
+    })).rejects.toThrowError(/^CONTENT_ATTESTATION_INVALID$/u);
+    expect(await storyCount(answerId)).toBe("0");
+
+    // Positive control: the same envelope on its own row is accepted.
+    await insertRawStory({
+      storyId, runId, answerId, content: CONTENT_JSON_SENTINEL, envelope: sealed.envelope,
+      attestation: sealed.attestation
+    });
+    expect(await storyCount(answerId)).toBe("1");
+    // A stored row copied whole under a fresh story id. The guard is a BEFORE
+    // INSERT trigger, so it refuses before the one-per-answer-version index is consulted.
+    await expect(database.pool.query(
+      `INSERT INTO serve.answer_story
+       SELECT (jsonb_populate_record(NULL::serve.answer_story, to_jsonb(source)
+         || jsonb_build_object('story_id', gen_random_uuid()))).*
+       FROM serve.answer_story AS source WHERE source.story_id = $1`,
+      [storyId]
+    )).rejects.toThrowError(/^CONTENT_ATTESTATION_INVALID$/u);
+    expect(await storyCount(answerId)).toBe("1");
+  });
+
+  it("the plaintext guard refuses readable story content on an encrypted run", async () => {
+    const mark = marker();
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story plaintext ${mark}`);
+    const answerId = await answerFor(runId, mark);
+    await expect(insertRawStory({
+      storyId: randomUUID(), runId, answerId, content: storyContent(mark), envelope: null, attestation: null
+    })).rejects.toThrowError(/^CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve\.answer_story$/u);
+    // The sentinel alone, with no envelope behind it, is refused the same way.
+    await expect(insertRawStory({
+      storyId: randomUUID(), runId, answerId, content: CONTENT_JSON_SENTINEL, envelope: null, attestation: null
+    })).rejects.toThrowError(/^CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve\.answer_story$/u);
+    expect(await storyCount(answerId)).toBe("0");
+  });
+
+  it("a legacy run's story row may carry no envelope", async () => {
+    const mark = marker();
+    const legacyRunId = await createLegacyStoryRun(database.pool, `story legacy envelope ${mark}`, `asker:${mark}`);
+    const answerId = await answerFor(legacyRunId, mark);
+    const encryptedRunId = await createEncryptedStoryRun(database.pool, theOwner(), `story envelope donor ${mark}`);
+    const donor = await sealFor(encryptedRunId, randomUUID(), mark);
+    await expect(insertRawStory({
+      storyId: randomUUID(), runId: legacyRunId, answerId, content: CONTENT_JSON_SENTINEL,
+      envelope: donor.envelope, attestation: null
+    })).rejects.toThrowError(/^CONTENT_ENCRYPTION_STATE_INVALID: serve\.answer_story$/u);
+    // With an attestation too, the attestation guard refuses it first.
+    await expect(insertRawStory({
+      storyId: randomUUID(), runId: legacyRunId, answerId, content: CONTENT_JSON_SENTINEL,
+      envelope: donor.envelope, attestation: donor.attestation
+    })).rejects.toThrowError(/^CONTENT_ATTESTATION_STATE_INVALID$/u);
+    expect(await storyCount(answerId)).toBe("0");
+  });
+
   it("answers RUN_ERASED, never a throw, once the run's private content is erased; the read closes too", async () => {
     const mark = marker();
     const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story erased ${mark}`);
@@ -262,6 +439,23 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     await expect(repository.readForAnswer({
       answerId, answerVersion: null, ownership: { ownerRef: theOwner().ownerRef }
     })).resolves.toBeNull();
+  });
+
+  it("the erasure barrier itself refuses a sealed direct INSERT, with no lease, once the run is erased", async () => {
+    const mark = marker();
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story barrier ${mark}`);
+    const answerId = await answerFor(runId, mark);
+    const storyId = randomUUID();
+    // Sealed while the run is live, so the attestation and plaintext guards
+    // (which fire first, by trigger name) accept the row: the refusal below can
+    // only be the barrier's own.
+    const sealed = await sealFor(runId, storyId, mark);
+    await eraseRun(runId);
+    await expect(insertRawStory({
+      storyId, runId, answerId, content: CONTENT_JSON_SENTINEL, envelope: sealed.envelope,
+      attestation: sealed.attestation
+    })).rejects.toMatchObject({ code: "55000", message: "PRIVATE_CONTENT_ERASED" });
+    expect(await storyCount(answerId)).toBe("0");
   });
 
   it("is append-only: UPDATE, DELETE and TRUNCATE are refused, owner included", async () => {
@@ -297,5 +491,76 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
        VALUES ($1,'GIFT',$2,'provider-1',current_date,1,1,1)`,
       [randomUUID(), runId]
     )).rejects.toThrowError(/model_spend_spend_source_check/u);
+  });
+
+  // LAST in the file: the replays recreate the triggers, so nothing after this
+  // case may rely on the state the earlier cases built.
+  it("stays intact and guarded after 0072 and its neighbours are replayed over the finished chain", async () => {
+    const directory = new URL("../../migrations/", import.meta.url);
+    const before = Number((await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM serve.answer_story"
+    )).rows[0]!.count);
+    expect(before).toBeGreaterThan(0);
+    for (const replayed of [
+      "0063_serve_answer_content_carrier.sql",
+      "0066_model_spend_ledger.sql",
+      "0069_remaining_content_carriers.sql",
+      "0072_answer_story.sql",
+      "0072_answer_story.sql"
+    ]) {
+      await expect(database.pool.query(await readFile(new URL(replayed, directory), "utf8")))
+        .resolves.toBeDefined();
+    }
+    await expect(migrate(database.pool)).resolves.toBeUndefined();
+
+    const triggers = await database.pool.query<{ tgname: string; function_name: string; enabled: string }>(
+      `SELECT trigger.tgname, trigger.tgfoid::regproc::text AS function_name, trigger.tgenabled AS enabled
+       FROM pg_trigger AS trigger
+       WHERE trigger.tgrelid = 'serve.answer_story'::regclass AND NOT trigger.tgisinternal
+       ORDER BY trigger.tgname`
+    );
+    expect(triggers.rows).toEqual([
+      { tgname: "aaa_enforce_content_attestation_v2", function_name: "core.enforce_content_attestation_v2_answer_story", enabled: "O" },
+      { tgname: "enforce_content_ciphertext", function_name: "core.enforce_content_ciphertext_answer_story", enabled: "O" },
+      { tgname: "enforce_erasure_barrier", function_name: "core.enforce_erasure_barrier_answer_story", enabled: "O" },
+      { tgname: "reject_mutation", function_name: "core.reject_mutation", enabled: "O" },
+      { tgname: "reject_truncate", function_name: "core.reject_truncate", enabled: "O" }
+    ]);
+    const constraints = await database.pool.query<{ table_name: string; conname: string; definition: string }>(
+      `SELECT constraint_row.conrelid::regclass::text AS table_name, constraint_row.conname,
+              pg_get_constraintdef(constraint_row.oid) AS definition
+       FROM pg_constraint AS constraint_row
+       WHERE constraint_row.conname IN (
+         'answer_story_outcome_is_coherent', 'answer_story_one_per_answer_version',
+         'model_spend_spend_source_check', 'model_spend_story_charge_names_its_run',
+         'model_spend_run_charge_names_its_run'
+       )
+       ORDER BY constraint_row.conname`
+    );
+    expect(constraints.rows.map(({ table_name, conname }) => [table_name, conname])).toEqual([
+      ["serve.answer_story", "answer_story_one_per_answer_version"],
+      ["serve.answer_story", "answer_story_outcome_is_coherent"],
+      ["ledger.model_spend", "model_spend_run_charge_names_its_run"],
+      ["ledger.model_spend", "model_spend_spend_source_check"],
+      ["ledger.model_spend", "model_spend_story_charge_names_its_run"]
+    ]);
+    expect(constraints.rows.find((row) => row.conname === "model_spend_spend_source_check")?.definition)
+      .toContain("'STORY'::text");
+
+    // Nothing written before the replay moved, and the table still writes, reads and refuses.
+    expect(Number((await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM serve.answer_story"
+    )).rows[0]!.count)).toBe(before);
+    const mark = marker();
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story replay ${mark}`);
+    const answerId = await answerFor(runId, mark);
+    await expect(insertRawStory({
+      storyId: randomUUID(), runId, answerId, content: storyContent(mark), envelope: null, attestation: null
+    })).rejects.toThrowError(/^CONTENT_PLAINTEXT_WRITE_FORBIDDEN: serve\.answer_story$/u);
+    const repository = new StoryRepository(database.pool);
+    await expect(repository.insert(readyRecord(runId, answerId, mark))).resolves.toBe("INSERTED");
+    await expect(repository.readForAnswer({
+      answerId, answerVersion: null, ownership: { ownerRef: theOwner().ownerRef }
+    })).resolves.toMatchObject({ reservation: `RESERVATION ${mark}` });
   });
 });

@@ -57,6 +57,8 @@ export interface StoredStory extends StoryRecordInput {
 }
 
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+/** `serve.answer.answer_version` is a PostgreSQL `integer`: anything above cannot name a version. */
+const PG_INTEGER_MAX = 2_147_483_647;
 
 const StoredStoryContentSchema = z.object({
   body: StoryBodySchema.nullable(),
@@ -115,12 +117,22 @@ export class StoryRepository {
    */
   async insert(record: StoryRecordInput): Promise<"INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED"> {
     const storyId = randomUUID();
-    const content: StoredStoryContent = {
+    // The row is insert-once and the read parses it with this same schema, so a
+    // record it refuses is refused HERE, typed, before anything is sealed or stored.
+    const parsed = StoredStoryContentSchema.safeParse({
       body: record.body,
       reservation: record.reservation,
       verdictBasis: record.verdictBasis,
       pointNumbers: record.pointNumbers
-    };
+    });
+    if (!parsed.success) {
+      const fields = [...new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? "content")))];
+      throw new TypedDomainError(
+        "STORY_RECORD_INVALID",
+        `The story record does not match its declared shape: ${fields.sort().join(", ")}`
+      );
+    }
+    const content: StoredStoryContent = parsed.data;
     try {
       return await withRunContentLease(this.pool, [record.runId], async () => {
         const sealed = await encryptAttestedContentForRun(
@@ -167,7 +179,9 @@ export class StoryRepository {
     readonly ownership: { readonly ownerRef?: string; readonly legacyAskerId?: string };
   }): Promise<StoredStory | null> {
     if (!UUID_TEXT.test(input.answerId)) return null;
-    if (input.answerVersion !== null && (!Number.isInteger(input.answerVersion) || input.answerVersion < 1)) {
+    if (input.answerVersion !== null && (
+      !Number.isInteger(input.answerVersion) || input.answerVersion < 1 || input.answerVersion > PG_INTEGER_MAX
+    )) {
       return null;
     }
     let access: RunOwnershipAccess;
