@@ -12,7 +12,7 @@
 - A new pure package, `@debateai/scorecard`, holds the scorecard format, the picker and the moment/replay file formats. Kernel carries the role and strength vocabulary.
 - Migration 0072 adds per-call facts, an encrypted prompt record and a pinned per-run role assignment.
 - The gateway sends thinking levels and enforces declared context windows.
-- Two new subscription relays, `agy` and `pi`, join the existing three. A relay host serves any candidate set.
+- Two new subscription relays, `agy` and `pi`, join the existing three. A relay host serves any candidate set. Every relay makes lean calls (D8, Task A12b).
 - The runner fills seats from the pinned assignment, or from today's rule when none is pinned. Admission calls the picker only when a VALID scorecard exists; without one, today's roster path stays byte-identical.
 - Two acceptance tools, `moment:export` and `moment:replay`, are the only interface the private evaluator uses.
 
@@ -34,6 +34,7 @@ When it is done, the engine:
 - picks the best model and thinking level for each job, with a close second that does about one call in five and takes over if the first fails or hits a usage cap;
 - writes down, for every call, which job it was, which model and level, what the prompt was (locked like all debate text) and what it cost;
 - talks to Google through `agy` and to Z.AI through `pi`, as well as Claude, OpenAI and Grok;
+- sends each of those tools only the question and the engine's own instructions: whatever a tool would load on its own from this computer is switched off where the tool allows it, and what cannot be switched off is measured and reported;
 - can export any recorded debate moment to a file, and replay that exact moment on any model.
 
 Nothing changes for a debate until a scorecard is installed. Without one, the engine behaves exactly as today.
@@ -52,7 +53,7 @@ Every task's requirements include these.
 - **CI gate:** `pnpm run test:ci-gate`, which must print `new=0 known=8 stale=0` at the end of every phase.
 - **Depth oracle:** after any new numeric shape in shipped code (Tasks A3, A14, A20.1), run the S1-1 depth oracle named in those tasks.
 - **Commits:** `git commit … -- <explicit paths>`, only after `git diff --cached --name-only` shows exactly the task's paths. Trailer: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. **No pushes.** The owner authorises every push in words.
-- **Prompts and relays.** New relays never pass a prompt on argv, and tools stay off. Relays never run in the HOSTED deployment, and the moment tools refuse there.
+- **Prompts and relays.** New relays never pass a prompt on argv, and tools stay off. Relays never run in the HOSTED deployment, and the moment tools refuse there. Every relay makes lean calls (D8, Task A12b): an empty private working directory, the leanest measured flags, and `RELAY_MINIMAL_SYSTEM_PROMPT` in place of a CLI's own system prompt; the engine's own messages are never changed.
 - **"WHO READS THIS STRING."** When you change any literal, grep every reader across `tests`, `acceptance`, `apps` and `packages`, and update them in the same task.
 - **Privacy.** Moment files, replay results and the relay endpoints file are written 0600 and hold private debate text or relay bearers. They are never committed to this repository.
 - **The evaluator method stays private.** Nothing in this repository may describe how scorecards are produced: no test sets, traps, checklists or scoring.
@@ -63,13 +64,14 @@ Every task's requirements include these.
 |---|---|---|---|
 | 1. Vocabulary and scorecard | A1, A2, A3, A4 | — | Pure code; no database |
 | 2. Storage and gateway | A5, A6, A7a, A7b, A7c, A7d | Phase 1 | A5 adds the migration: run the integration suites before merging |
-| 3. Connections | A8, A9, A10, A11, A12 | A1; A7a before A12 Steps 8–12 | A10 and A11 each open with a one-call measurement on the owner's tool (Step 0) |
+| 3. Connections | A8, A9, A10, A11, A12, A12b | A1; A7a before A12 Steps 8–12; A7b before A12b | A10 and A11 each open with a one-call measurement on the owner's tool (Step 0); A12b (lean calls) runs after A12 and ends with an owner-run check of the five lean command lines |
 | 4. Runner and replay | A13, A14, A15a–d, A16a–c, A17, A18a–d | Phases 1–3 | A15d reads the assignment through A6's `readRunRoleAssignment(executor, runId)` |
-| 5. Admission, register, UI | A19.1, A19.2, A20.1–A20.4, A20b, A21.1–A21.3, A22 | Phases 1–4 | A20b and A22 need the owner (below) |
+| 5. Admission, register, UI | A19.1, A19.2, A20.1–A20.4, A20b, A21.1–A21.3, A22 | Phases 1–4 | A20b is owner-approved; A22 needs the owner (below) |
 
 **Owner gates inside the plan**
 - **A10 / A11, Step 0:** one short real call each on `agy` and `pi`, to settle `agy`'s stdin form and `pi`'s command line.
-- **A20b:** move the premium roster's grok id to `grok-4.7-build`. Only on the owner's "yes".
+- **A12b, Step 11:** the owner starts the five relays once through `relays:serve` (five real handshakes) and compares the five `RELAY OVERHEAD` lines with D8.
+- **A20b:** move the premium roster's grok id to `grok-4.7-build`. **OWNER APPROVED 2026-09-26.**
 - **A22:** the owner runs the end-to-end check.
 
 ## Assembler reconciliations
@@ -89,26 +91,32 @@ These were applied to the tasks below. Executors do not need to redo them.
 
 Each can be reversed.
 
-- **D1.** The `pi` relay pins model `glm-5.3`, which is what `pi` reported on 2026-09-26. The owner described "GLM 5.3 Flash", so they should confirm. The id is a start-up argument.
+- **D1.** The `pi` relay pins model `glm-5.3-flash`: the owner confirmed GLM 5.3 Flash on 2026-09-26, and `pi` reports `model: "glm-5.3-flash"` (provider `zai`) for it, while pi's own default answers as `glm-5.3` (M5, Appendix B). pi's catalog gives `glm-5.3-flash` a 1M-token context window (131.1K max output), so the relay declares `PI_GLM_CONTEXT_WINDOW_TOKENS = 1_000_000`; the "16k" mentioned earlier is not its window. The id is a start-up argument.
 - **D2.** `agy` defaults to `gemini-3.8-flash` at level `high`, and `pi` to level `high`. Both are start-up arguments.
 - **D3.** On content-encrypted runs, a backup switch is disclosed by the `BACKUP-MODEL-USED` mark and its records, but not by a progress-stream event. Migration 0069 fixes the allowed event shapes for encrypted runs, and they cannot be redefined.
 - **D4.** Every run's call-count ceiling now leaves room for one backup per seat call (formula DR-184-v5). The ceiling is a runaway guard, not a target: a run without runner-ups never uses the room, and in hosted mode the money limit still binds. For example, M=2 at depth 1 goes from 106 to 196.
 - **D5.** The answer checker *prefers* a different vendor from the answer writer, matching today's default derivation. This is a soft preference, like the judges' "not a debating vendor" preference.
 - **D6.** A backup takes over only on an outage (after the normal retries) or a usage cap (immediately). A wrong-format answer is retried as today and never switches the model.
 - **D7.** Only runs admitted after migration 0072 can be exported as moments, because older runs never recorded their prompts. Moments carry `language: null`; the private evaluator supplies the language from its own question list.
+- **D8. Lean calls (owner ruling 2026-09-26, Task A12b).** A relayed call carries what a plain API call would, and nothing the owner's computer adds on its own, because extra input costs money.
+  - **Stripped.** Every relay runs its CLI in an EMPTY private working directory (a 0700 workspace opened when the relay starts and removed when it stops), so no project file (`CLAUDE.md`, `AGENTS.md` …) is ever read. Each CLI's own system prompt is replaced by one fixed neutral sentence, `RELAY_MINIMAL_SYSTEM_PROMPT` ("Follow the instructions in the user message exactly."): claude `--system-prompt`, codex a 0600 `model_instructions_file`, grok `--system-prompt-override`, pi `--system-prompt`. codex also disables its 18 measured extras (not `code_mode_host`), agy turns slash commands off (it has no system-prompt flag), pi drops its prompt templates. claude never gets `--bare`: it would also disable the subscription login.
+  - **Unchanged.** The engine's own system and user messages stay in the prompt transcript exactly as today, so every tool is asked the same thing.
+  - **Irreducible** (measured M5, one-line prompt, per call): grok ~18k tokens, agy ~13k, codex ~6.9k, claude ~0.7k, pi ~0.08k. Results are measured WITH it and the evaluator report discloses it. Money estimates never use CLI-reported input; they use our own `promptTokensEstimate`, which is what an API call would cost. Each relay logs its own overhead once at start (`RELAY OVERHEAD …`), as information, never as a gate.
+  - **Hosted API calls have none:** the hosted site calls vendor APIs directly, with no CLI in between.
 
 ## Review Focus
 
 These are the conditions most likely to bite a real user, with where each is pinned.
 
-1. **A Romanian prompt close to `pi`'s 16k window.** The gateway and the relay must agree and refuse it before sending, never truncate silently. Pinned by A7b's `estimateWindowTokens` test (R1), A8's window tests and A18c's `CONTEXT_TOO_LARGE` test.
+1. **A Romanian prompt close to a declared context window** (`pi`/GLM declares 1M tokens since D1; a scorecard candidate may declare far less). The gateway and the relay must agree and refuse it before sending, never truncate silently. Pinned by A7b's `estimateWindowTokens` test (R1), A8's window tests and A18c's `CONTEXT_TOO_LARGE` test.
 2. **The main and the runner-up of one seat both fail or both hit caps.** Exactly one switch, then today's behaviour: the member is dropped with the usual disclosure, or the synthesis is served components-only. Never a switching loop. Pinned by A16a ("rethrows the runner-up's own failure when both fail, after exactly one switch") and A16c ("keeps today's behaviour when the runner-up fails too").
 3. **A fresh install or old runs with no scorecard and no pinned assignment.** Byte-identical to today. Pinned by A15b/A15d (the legacy seat book), A20.2 (the roster path unchanged) and A21.3 (the drawer without "Models used").
 4. **The hosted site given a scorecard whose candidates are subscription-only.** No relay is ever seated in hosted mode, and every role falls back to today's rule. Pinned by A3 ("in HOSTED mode seats only candidates with an API route").
 5. **A vendor's tool silently changes the model behind a name,** as grok moved from 4.6 to 4.7 this week.
    - Relays whose tools report the answering model refuse a changed identity (existing `PROVIDER_MODEL_IDENTITY_CHANGED`).
    - `agy` reports no model, so the private evaluator stamps each tool's `--version` on every result and re-tests when it changes (evaluator plan).
-   - The roster drift itself is A20b (owner go).
+   - The roster drift itself is A20b (owner-approved 2026-09-26). A12b gives the grok relay a `-m` selection: the grok CLI accepts `-m grok-4.7` and REPORTS `grok-4.7-build`, so a relay selects the short id and is held to the reported one.
+6. **A CLI quietly adding its own extras to every call** (a project `CLAUDE.md`, codex plugins and tools, pi prompt templates, a CLI's large default system prompt): money and influence the user never asked for (D8). Pinned by A12b's tests: each relay's exact lean argv (claude, codex, grok, agy, pi; still no prompt on argv for agy and pi), the child's working directory (empty, 0700, inside a per-relay 0700 workspace that stop removes, never the project), and the codex instructions file (0600, holding only `RELAY_MINIMAL_SYSTEM_PROMPT`).
 
 ---
 
@@ -5450,7 +5458,7 @@ const CONFIGURED = [{ providerRef: "development:pi-cli", maker: "Z.AI" }];
 const BASE_ROW = Object.freeze({
   provider_ref: "development:pi-cli",
   base_url: "http://127.0.0.1:8797/v1",
-  model: "glm-5.3",
+  model: "glm-5.3-flash",
   authorization_header: "Bearer relay-fixture-0123456789"
 });
 const parse = (extra: Readonly<Record<string, unknown>>) =>
@@ -5463,7 +5471,7 @@ describe("model scorecard — a provider target declares its thinking levels and
       providerRef: "development:pi-cli",
       maker: "Z.AI",
       baseUrl: "http://127.0.0.1:8797/v1",
-      model: "glm-5.3",
+      model: "glm-5.3-flash",
       authorizationHeader: "Bearer relay-fixture-0123456789"
     });
     expect(providerTargetGatewayControls(target!)).toEqual({});
@@ -5473,16 +5481,16 @@ describe("model scorecard — a provider target declares its thinking levels and
     const [target] = parse({
       thinking_parameter: "x_thinking_level",
       thinking_levels: ["off", "low", "high"],
-      context_window_tokens: 16_000
+      context_window_tokens: 1_000_000
     });
     expect(target).toMatchObject({
       thinkingParameter: "x_thinking_level",
       thinkingLevels: ["off", "low", "high"],
-      contextWindowTokens: 16_000
+      contextWindowTokens: 1_000_000
     });
     expect(providerTargetGatewayControls(target!)).toEqual({
       thinking: { parameter: "x_thinking_level", levels: ["off", "low", "high"] },
-      contextWindowTokens: 16_000
+      contextWindowTokens: 1_000_000
     });
   });
 
@@ -5605,7 +5613,7 @@ Insert after line 169 (`  outputPriceMicrosPerMillionTokens?: number;`), inside 
   thinkingLevels?: readonly string[];
   /**
    * Model scorecard §2.10: this connection's context window in tokens (the pi
-   * GLM relay declares 16 000). Absent = no pre-send window check.
+   * GLM relay declares 1 000 000). Absent = no pre-send window check.
    */
   contextWindowTokens?: number;
 ```
@@ -6164,8 +6172,9 @@ export function estimatePromptTokens(messages: PromptPacket["messages"]): number
  * rule the relays apply before spawning (`acceptance/relay-core.ts`
  * `exceedsContextWindow`) and the project's conservative floor
  * (`@debateai/budget` projects a request at 2 bytes per token). It over-counts
- * English on purpose so Romanian diacritics and JSON never overflow a small
- * window (pi/GLM: 16k). It is never reported as a size and never prices money.
+ * English on purpose so Romanian diacritics and JSON never overflow a declared
+ * window (pi/GLM declares 1M; a scorecard candidate may declare far less). It
+ * is never reported as a size and never prices money.
  */
 const WINDOW_BYTES_PER_TOKEN = 2;
 
@@ -7537,7 +7546,7 @@ git commit -m "feat(budget): model_spend rows name the attempt they paid for" -m
 
 ## Risks this fragment could not close
 
-1. **The chars/4 estimate under-counts** JSON, Romanian text and code. A 16 000-token GLM window can still overflow on a prompt this check admits. It is mitigated by adding the whole answer bound, and by the relay's own window refusal (relay fragment). The scorecard's `contextWindowTokens` is what keeps GLM off near-wall roles.
+1. **The chars/4 estimate under-counts** JSON, Romanian text and code. A small declared window can still overflow on a prompt this check admits (the pi/GLM relay declares 1 000 000 since D1; a scorecard candidate may declare far less). It is mitigated by adding the whole answer bound, and by the relay's own window refusal (relay fragment). A candidate's `contextWindowTokens` in the scorecard is what keeps a small-window model off near-wall roles.
 2. **Hosted vendor levels are unverified.** Some OpenAI reasoning models reject `max_tokens` when `reasoning_effort` is sent (M1 §2.5). No hosted target should declare `thinking_parameter: "reasoning_effort"` until each vendor is checked.
 3. **`candidateId` must be one token**, matching `^[A-Za-z0-9_.:@/+-]{1,128}$`, or every call on that seat is refused pre-send with `PROVIDER_CALL_RECORD_INVALID`. The scorecard schema (preceding fragment) should enforce the same pattern on `ScorecardCandidateSchema.candidateId`.
 4. **The dormant evaluator-worker role has no INSERT on `ledger.call_prompt`.** Evaluator-lane calls go through the runner's gateway (the runtime role), so this matters only if the evaluator ever gets its own gateway process.
@@ -7545,7 +7554,7 @@ git commit -m "feat(budget): model_spend rows name the attempt they paid for" -m
 
 ---
 
-## Part 3 — Relays: relay-core, level flags, agy, pi, dev panel and relay host (A8–A12)
+## Part 3 — Relays: relay-core, level flags, agy, pi, dev panel, relay host and lean calls (A8–A12b)
 
 All paths are relative to `dialectical-engine/` (worktree `…/.claude/worktrees/model-scorecard-design/dialectical-engine`). Every command runs from that directory.
 
@@ -7561,7 +7570,7 @@ Line numbers are at `19551cd8`, so they drift once earlier edits land. Two rules
 - **agy stdin form.** It is unmeasured whether agy reads plain text on stdin or needs `--input-format stream-json`. Task A10 Step 0 is a single owner-run measurement that decides it by setting one constant, `AGY_STDIN_FORMAT`. The code and tests for both forms are written in full, and the fake CLI handles both.
 - **pi command line.** These pieces are unmeasured: `--print` as a boolean flag, `--provider zai --model <id>`, `--system-prompt`, and an `@file` followed by a fixed message. Task A11 Step 0 is a single owner-run measurement that confirms them. If it fails, the task stops and the owner decides; there is no argv fallback.
 - **agy lineage.** The lineage is the pinned **base** id, for example `gemini-3.8-flash`. The level is the id suffix, so the CLI is called with `--model gemini-3.8-flash-<level>`. This keeps the reported model constant across levels, which the gateway's model-identity check needs. The defaults `AGY_DEFAULT_MODEL = "gemini-3.8-flash"` and `AGY_DEFAULT_THINKING_LEVEL = "high"` are plan choices that the owner can change.
-- **pi defaults.** pi defaults to model `glm-5.3`, per R9, and to level `high`, the owner's configured effort from §2.10.
+- **pi defaults.** pi defaults to model `glm-5.3-flash`, the owner's model confirmed on 2026-09-26 (R9, D1, M5), and to level `high`, the owner's configured effort from §2.10. Its declared window is pi's catalog value, 1 000 000 tokens.
 - **Usage caps have only one recorded signature.** It is Claude Code's "You've reached your … limit" (2026-08-11, `claude-relay.ts:50-56`). Codex, grok, agy and pi have no recorded cap output, so they keep the conservative default: a cap is an ordinary FAILED, retried and then absorbed by the backup (R4). The procedure for adding a signature once one is captured is documented in `acceptance/README.md` (Task A8).
 - `tests/support/shipped-corpus.manifest.txt` is not affected, because every new file is under `acceptance/`, which the corpus does not cover. `KNOWN_DOMAIN_CODES` is not affected either: every new code is a relay HTTP error or a dev-tool `TypeError`, not a `TypedDomainError`.
 
@@ -7579,6 +7588,7 @@ Line numbers are at `19551cd8`, so they drift once earlier edits land. Two rules
    - Level constants on the existing relays: `CLAUDE_THINKING_LEVELS`, `CODEX_THINKING_LEVELS`, `GROK_THINKING_LEVELS`, plus `thinkingLevels` on their handles.
 7. **pi argv beyond the contract list.** The relay also passes `--print`, `--provider zai` and `--model <id>`, then `@<file>` and one fixed sentence. `--system-prompt` carries a fixed engine constant, never debate text.
 8. **The dev panel declares levels and the pi window on its targets** (A12 Steps 8–12): `thinking_parameter:"x_thinking_level"`, `thinking_levels`, and `context_window_tokens` for pi. If the providers fragment also writes these dev rows, the assembler keeps one copy.
+9. **Lean calls (A12b, D8).** `relay-core` gains `RELAY_MINIMAL_SYSTEM_PROMPT`, a per-relay private workspace (`RelayWorkspace`, `openRelayWorkspace`), an instructions file for a CLI that reads its system text from a file, and the informational harness-overhead line. Every relay handle gains `harnessOverhead`; the grok relay gains a `model` selection option; a relay-host grok candidate may name `modelSelection`.
 
 **Existing tests these tasks deliberately change**
 
@@ -7596,6 +7606,7 @@ Line numbers are at `19551cd8`, so they drift once earlier edits land. Two rules
 - `tests/integration/dev-deployment-register.test.ts:450-457` and `tests/integration/dev-api-environment.test.ts:245-276`: the seven-provider set.
 - `tests/integration/dev-provider-panel.test.ts:17-22`: **already red before this plan.** It expects 3 targets and 2 healthy refs, but the fixture already had 5 slots. It is corrected to the roster because A12 changes the fixture it reads.
 - `tests/architecture/dev-real-provider-only.test.ts:36-45`: the intent is rewritten per the owner's §2.10 ruling. GLM now debates through pi, and Hermes stays Support-only.
+- A12b (lean calls, D8) changes these argv pins on purpose: `acceptance/claude-relay.test.ts:264-275`, `acceptance/grok-relay.test.ts:228-237` and `:573-576`, `acceptance/model-shim.test.ts:269-277` and `:312-321`, `acceptance/adversarial-corpus.test.ts:615-628` (CLAUDE-ARGV-01) and `:654-663` (GROK-ARGV-01), A9's codex "declares the seven measured levels" list, and A10's two pure `agyArguments` lists. The task names each one.
 
 ---
 
@@ -10458,32 +10469,32 @@ git commit -m "feat(relays): agy relay for the Google maker (stdin prompt, pinne
 **Interfaces:**
 - Consumes: A8's `promptTransport: "file"`, `CliInvocation.promptFile`, `contextWindowTokens`, `thinkingLevels`, `defaultThinkingLevel`, `childEnvironment`, `buildCliUsage` and `renderPromptTranscript`.
 - Produces (from `acceptance/pi-relay.ts`):
-  - `startPiRelay(options: PiRelayOptions): Promise<PiRelayHandle>`, where `PiRelayOptions = {port, timeoutMs, testOnlyCommand?, model?, defaultThinkingLevel?}` and `PiRelayHandle = CliRelayHandle & {model: string, maker: "Z.AI", thinkingLevels: readonly string[], contextWindowTokens: 16000}`
-  - `resolvePiBinary(source?)`, `ACCEPTANCE_PI_BINARY`, `PI_BINARY_NAME = "pi"`, `ZAI_MAKER = "Z.AI"`, `PI_ZAI_PROVIDER = "zai"`, `PI_DEFAULT_MODEL = "glm-5.3"`
-  - `PI_THINKING_LEVELS = ["off","minimal","low","medium","high","xhigh","max"]`, `PI_DEFAULT_THINKING_LEVEL = "high"`, `PI_GLM_CONTEXT_WINDOW_TOKENS = 16_000`
+  - `startPiRelay(options: PiRelayOptions): Promise<PiRelayHandle>`, where `PiRelayOptions = {port, timeoutMs, testOnlyCommand?, model?, defaultThinkingLevel?}` and `PiRelayHandle = CliRelayHandle & {model: string, maker: "Z.AI", thinkingLevels: readonly string[], contextWindowTokens: 1000000}`
+  - `resolvePiBinary(source?)`, `ACCEPTANCE_PI_BINARY`, `PI_BINARY_NAME = "pi"`, `ZAI_MAKER = "Z.AI"`, `PI_ZAI_PROVIDER = "zai"`, `PI_DEFAULT_MODEL = "glm-5.3-flash"` (owner-confirmed 2026-09-26, D1)
+  - `PI_THINKING_LEVELS = ["off","minimal","low","medium","high","xhigh","max"]`, `PI_DEFAULT_THINKING_LEVEL = "high"`, `PI_GLM_CONTEXT_WINDOW_TOKENS = 1_000_000` (pi's catalog: 1M context, 131.1K max output)
   - `PI_RELAY_SYSTEM_PROMPT`, `PI_ATTACHED_PROMPT_MESSAGE`, `PI_HANDSHAKE_PROMPT`
   - `piArguments(model, thinkingLevel, promptFile)`, `parsePiEvents(stdout, pinnedModel): CliCompletion`
   - codes: `PI_CLI_BINARY_UNRESOLVED`, `PI_CLI_FAILED`, `PI_CLI_TIMEOUT`, `PI_CLI_OUTPUT_INVALID`, `PI_CLI_MODEL_MISMATCH`, `PI_CLI_STOP_REASON_REFUSED`, `PI_CLI_PROMPT_FILE_MISSING`, `PI_CLI_MODEL_PIN_INVALID`, `PI_CLI_THINKING_LEVEL_INVALID`, `TEST_ONLY_PI_COMMAND_FORBIDDEN`
 
 - [ ] **Step 0: OWNER-RUN measurement of the exact command line (OWNER GO NEEDED — one real call, at most two; the implementer does NOT run these)**
 
-M4 measured `pi -p "<prompt>" --mode json … --thinking low` with pi's own defaults. The relay changes this in four ways: the prompt goes in an `@file` followed by a fixed sentence, and it adds `--print`, `--provider zai --model glm-5.3` and `--system-prompt`.
+M4 measured `pi -p "<prompt>" --mode json … --thinking low` with pi's own defaults. The relay changes this in four ways: the prompt goes in an `@file` followed by a fixed sentence, and it adds `--print`, `--provider zai --model glm-5.3-flash` and `--system-prompt`. (M5 measured the owner's model as `pi --model zai/glm-5.3-flash`; this step confirms the relay's split `--provider zai --model glm-5.3-flash` form.)
 
 Run in a terminal:
 
 ```bash
 probe_dir="$(mktemp -d)" && cd "$probe_dir" && chmod 700 .
 printf '%s' '{"format":"debateai.relay-messages.v1","messages":[{"role":"user","content":"Reply with exactly the word: ok"}]}' > prompt.txt && chmod 600 prompt.txt
-PI_TELEMETRY=0 pi --print --mode json --provider zai --model glm-5.3 --thinking low --no-tools --no-session --no-extensions --no-skills --no-context-files --system-prompt 'You answer one request. The attached file holds a JSON object in the format debateai.relay-messages.v1; its messages array carries the instructions and the conversation. Follow those instructions exactly and reply with the answer only.' "@$PWD/prompt.txt" 'Answer the request in the attached file.' < /dev/null > p1.ndjson 2> p1.err; echo "p1 exit=$?"
+PI_TELEMETRY=0 pi --print --mode json --provider zai --model glm-5.3-flash --thinking low --no-tools --no-session --no-extensions --no-skills --no-context-files --system-prompt 'You answer one request. The attached file holds a JSON object in the format debateai.relay-messages.v1; its messages array carries the instructions and the conversation. Follow those instructions exactly and reply with the answer only.' "@$PWD/prompt.txt" 'Answer the request in the attached file.' < /dev/null > p1.ndjson 2> p1.err; echo "p1 exit=$?"
 node -e 'const fs=require("node:fs");for(const l of fs.readFileSync("p1.ndjson","utf8").split("\n")){if(!l.trim())continue;const e=JSON.parse(l);if(e.type==="message_end"&&e.message&&e.message.role==="assistant")console.log(JSON.stringify({text:(e.message.content||[]).filter((p)=>p.type==="text").map((p)=>p.text).join(""),provider:e.message.provider,model:e.message.model,stopReason:e.message.stopReason,usageKeys:Object.keys(e.message.usage||{}).sort()}))}'
 ```
 
-- **Pass.** All of these hold: `p1 exit=0`; the printed `text`, trimmed and lower-cased, is `ok`; `provider` is `zai`; `model` is `glm-5.3`; `stopReason` is `stop`. Then continue with Step 1 as written.
-- **Model mismatch.** If only `model` differs, STOP. The pin is the owner's to confirm (R9). Set `PI_DEFAULT_MODEL` to the id pi reports for the model the owner chooses, then re-run this step.
+- **Pass.** All of these hold: `p1 exit=0`; the printed `text`, trimmed and lower-cased, is `ok`; `provider` is `zai`; `model` is `glm-5.3-flash`; `stopReason` is `stop`. Then continue with Step 1 as written.
+- **Model mismatch.** If only `model` differs, STOP. The owner confirmed `glm-5.3-flash` on 2026-09-26 (D1, M5), so another reported id means pi resolved a different model: report the printed `model` and do not change the pin without the owner.
 - **Any other failure.** Run the control call, which keeps the prompt on argv and is used for diagnosis only:
 
 ```bash
-PI_TELEMETRY=0 pi --print --mode json --provider zai --model glm-5.3 --thinking low --no-tools --no-session --no-extensions --no-skills --no-context-files 'Reply with exactly the word: ok' < /dev/null > c1.ndjson 2> c1.err; echo "c1 exit=$?"
+PI_TELEMETRY=0 pi --print --mode json --provider zai --model glm-5.3-flash --thinking low --no-tools --no-session --no-extensions --no-skills --no-context-files 'Reply with exactly the word: ok' < /dev/null > c1.ndjson 2> c1.err; echo "c1 exit=$?"
 ```
 
 - If the control passes, the `@file` form or `--system-prompt` is what fails. §2.10 forbids argv, so STOP. Do not build A11, and drop the pi slot from A12. **OWNER DECISION NEEDED.**
@@ -10647,7 +10658,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { renderPromptTranscript } from "./relay-core.js";
+import { RELAY_MESSAGE_MAX_UTF8_BYTES, renderPromptTranscript } from "./relay-core.js";
 import {
   ACCEPTANCE_PI_BINARY,
   PI_BINARY_NAME,
@@ -10751,15 +10762,16 @@ afterEach(async () => {
 });
 
 describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
-  it("handshakes before serving and reports the Z.AI maker, the pinned model and the 16k window", async () => {
+  it("handshakes before serving and reports the Z.AI maker, the pinned model and the 1M window", async () => {
     const relay = await start();
 
     expect(relay.maker).toBe(ZAI_MAKER);
     expect(relay.maker).toBe("Z.AI");
-    expect(relay.model).toBe("glm-5.3");
+    expect(relay.model).toBe("glm-5.3-flash");
     expect(relay.thinkingLevels).toEqual(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-    expect(relay.contextWindowTokens).toBe(16_000);
-    expect(PI_GLM_CONTEXT_WINDOW_TOKENS).toBe(16_000);
+    // pi's catalog (M5): glm-5.3-flash has a 1M-token context window, 131.1K max output.
+    expect(relay.contextWindowTokens).toBe(1_000_000);
+    expect(PI_GLM_CONTEXT_WINDOW_TOKENS).toBe(1_000_000);
   });
 
   it("passes the transcript through a 0600 @file that is gone after the call, never on argv", async () => {
@@ -10769,7 +10781,7 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
 
     expect(response.status).toBe(200);
     const completion = await response.json() as PiCompletion;
-    expect(completion).toMatchObject({ model: "glm-5.3", maker: "Z.AI", x_thinking_level: "DEFAULT_ONLY" });
+    expect(completion).toMatchObject({ model: "glm-5.3-flash", maker: "Z.AI", x_thinking_level: "DEFAULT_ONLY" });
     const echo = echoOf(completion);
     expect(echo.prompt).toBe(renderPromptTranscript([
       { role: "system", content: "Return strict JSON." },
@@ -10778,7 +10790,7 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
     expect(echo.promptFileMode).toBe("600");
     expect(echo.cwdEntries).toEqual([]);
     // Unasked: pi still runs at the relay's explicit default, "high".
-    expect(echo.argumentList).toEqual(piArguments("glm-5.3", "high", echo.promptFile));
+    expect(echo.argumentList).toEqual(piArguments("glm-5.3-flash", "high", echo.promptFile));
     expect(echo.argumentList.some((argument) => argument.includes("Assess this claim."))).toBe(false);
     expect(existsSync(echo.promptFile)).toBe(false);
     expect(existsSync(dirname(echo.promptFile))).toBe(false);
@@ -10818,7 +10830,7 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
         .json() as PiCompletion;
       expect(completion.x_thinking_level).toBe(level);
       const echo = echoOf(completion);
-      expect(echo.argumentList).toEqual(piArguments("glm-5.3", level, echo.promptFile));
+      expect(echo.argumentList).toEqual(piArguments("glm-5.3-flash", level, echo.promptFile));
     }
     const refused = await post(relay, "Assess this claim.", { x_thinking_level: "ultra" });
     expect(refused.status).toBe(400);
@@ -10828,16 +10840,28 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
     });
   });
 
-  it("refuses with 413 a prompt that the 16k window cannot hold together with the output bound", async () => {
+  it("refuses with 413 a prompt that the 1M window cannot hold together with the output bound", async () => {
     const relay = await start();
-    // 28 000 prompt bytes ≈ 14 000 tokens at 2 bytes per token: it fits alone,
-    // and does not fit once the dev ceiling of 2 048 output tokens is added.
-    const large = "a".repeat(28_000);
+    // 30 messages of up to 64 KiB ≈ 983 500 tokens at 2 bytes per token: they
+    // fit alone, and do not fit once pi's 131 072-token output ceiling is added.
+    // The last message carries the fake's handshake marker, so the ADMITTED call
+    // answers a short "OK" instead of echoing two megabytes past the stdout bound.
+    const chunk = "a".repeat(RELAY_MESSAGE_MAX_UTF8_BYTES);
+    const messages = [
+      ...Array.from({ length: 29 }, () => ({ role: "user", content: chunk })),
+      { role: "user", content: `${"a".repeat(RELAY_MESSAGE_MAX_UTF8_BYTES - 64)} acceptance transport handshake` }
+    ];
+    const send = (extra: Readonly<Record<string, unknown>>): Promise<Response> =>
+      fetch(`${relay.baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: relay.authorizationHeader },
+        body: JSON.stringify({ model: "ignored-by-relay", messages, ...extra })
+      });
 
-    const fits = await post(relay, large);
+    const fits = await send({});
     expect(fits.status).toBe(200);
 
-    const over = await post(relay, large, { max_tokens: 2_048 });
+    const over = await send({ max_tokens: 131_072 });
     expect(over.status).toBe(413);
     expect(await over.json()).toEqual({
       error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED",
@@ -10944,7 +10968,7 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
     } finally {
       delete process.env.FAKE_PI_WRONG_MODEL;
     }
-    await expect(start({ model: "zai/glm-5.3" })).rejects.toThrow("PI_CLI_MODEL_PIN_INVALID");
+    await expect(start({ model: "zai/glm-5.3-flash" })).rejects.toThrow("PI_CLI_MODEL_PIN_INVALID");
     await expect(start({ defaultThinkingLevel: "ultra" })).rejects.toThrow("PI_CLI_THINKING_LEVEL_INVALID");
   });
 
@@ -10976,7 +11000,7 @@ describe("PI-01 the measured pi 0.87.1 event stream", () => {
     content: [{ type: "text", text: "ok" }],
     api: "openai-completions",
     provider: "zai",
-    model: "glm-5.3",
+    model: "glm-5.3-flash",
     usage: {
       input: 480, output: 3, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 483,
       cost: { input: 0.000672, output: 0.0000132, cacheRead: 0, cacheWrite: 0, total: 0.0006852 }
@@ -11003,9 +11027,9 @@ describe("PI-01 the measured pi 0.87.1 event stream", () => {
   ].map((event) => JSON.stringify(event)).join("\n");
 
   it("takes the answer, lineage and usage from the assistant message_end", () => {
-    expect(parsePiEvents(streamOf(assistantMessage), "glm-5.3")).toEqual({
+    expect(parsePiEvents(streamOf(assistantMessage), "glm-5.3-flash")).toEqual({
       content: "ok",
-      model: "glm-5.3",
+      model: "glm-5.3-flash",
       usage: { promptTokens: 480, completionTokens: 3, totalTokens: 483, costUsd: 0.0006852, reasoningTokens: 0 }
     });
   });
@@ -11013,11 +11037,12 @@ describe("PI-01 the measured pi 0.87.1 event stream", () => {
   it("reads text parts only, so a thinking part never becomes the answer", () => {
     const withThinking = { ...assistantMessage, content: [{ type: "thinking", thinking: "hidden" }, { type: "text", text: "ok" }] };
 
-    expect(parsePiEvents(streamOf(withThinking), "glm-5.3").content).toBe("ok");
+    expect(parsePiEvents(streamOf(withThinking), "glm-5.3-flash").content).toBe("ok");
   });
 
   it("holds every answer to the pinned model", () => {
-    expect(() => parsePiEvents(streamOf(assistantMessage), "glm-5.3-flash")).toThrow("PI_CLI_MODEL_MISMATCH");
+    // pi's own default model answers as glm-5.3 (M4): never the pinned glm-5.3-flash.
+    expect(() => parsePiEvents(streamOf(assistantMessage), "glm-5.3")).toThrow("PI_CLI_MODEL_MISMATCH");
   });
 });
 
@@ -11055,7 +11080,7 @@ describe("D10 pi relay binary resolution", () => {
       handles.push(relay);
 
       expect(relay.maker).toBe("Z.AI");
-      expect(relay.model).toBe("glm-5.3");
+      expect(relay.model).toBe("glm-5.3-flash");
     } finally {
       if (previous === undefined) delete process.env.ACCEPTANCE_PI_BINARY;
       else process.env.ACCEPTANCE_PI_BINARY = previous;
@@ -11102,7 +11127,7 @@ In `acceptance/fake-cli-environment.test.ts`:
     const promptFile = join(directory, "prompt.txt");
     await writeFile(promptFile, "W6 allow-list probe", { mode: 0o600 });
     const stdout = await emit(
-      [fixturePath("fake-pi-cli.mjs"), "--print", "--mode", "json", "--model", "glm-5.3", `@${promptFile}`],
+      [fixturePath("fake-pi-cli.mjs"), "--print", "--mode", "json", "--model", "glm-5.3-flash", `@${promptFile}`],
       {
         HOME: "/tmp/w6-pi-home",
         PATH: "/usr/bin:/bin",
@@ -11158,7 +11183,8 @@ import {
  *
  * Measured once (M4, 2026-09-26): `pi --mode json` prints NDJSON events and the
  * answer is the ASSISTANT `message_end`: message.content[].text,
- * message.provider ("zai"), message.model ("glm-5.3"), message.usage {input,
+ * message.provider ("zai"), message.model ("glm-5.3-flash" for the owner's
+ * model, M5; pi's own default answers as "glm-5.3"), message.usage {input,
  * output, cacheRead, cacheWrite, reasoning, totalTokens, cost{…, total}} and
  * message.stopReason ("stop").
  *
@@ -11167,9 +11193,9 @@ import {
  * engine text only: PI_RELAY_SYSTEM_PROMPT, which replaces pi's own
  * coding-assistant prompt, and PI_ATTACHED_PROMPT_MESSAGE.
  *
- * MODEL. The owner called the model "GLM 5.3 Flash"; pi reports `glm-5.3`
- * (M4). Which id to pin is the owner's to confirm (R9), so the id is an option
- * defaulting to the reported `glm-5.3`, and every answer is held to it.
+ * MODEL. The owner confirmed GLM 5.3 Flash on 2026-09-26 (D1, M5); pi reports
+ * `glm-5.3-flash` for it (pi's own default answers as `glm-5.3`). The id is an
+ * option defaulting to `glm-5.3-flash`, and every answer is held to it.
  */
 
 /** The NAME this maker's CLI is looked up by; never a path (D10, 2026-09-17). */
@@ -11186,16 +11212,16 @@ export function resolvePiBinary(source: NodeJS.ProcessEnv = process.env): string
 export const ZAI_MAKER = "Z.AI" as const;
 /** pi's provider name for Z.AI, as pi itself reports it (M4: message.provider). */
 export const PI_ZAI_PROVIDER = "zai" as const;
-/** R9: the id pi reports today; the owner confirms the pin. */
-export const PI_DEFAULT_MODEL = "glm-5.3" as const;
+/** R9 / D1: the owner's model, confirmed 2026-09-26 — the id pi reports for it (M5). */
+export const PI_DEFAULT_MODEL = "glm-5.3-flash" as const;
 /** `pi --help` 0.87.1: `--thinking` off|minimal|low|medium|high|xhigh|max. */
 export const PI_THINKING_LEVELS = Object.freeze(
   ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const
 );
 /** §2.10: the owner's configured effort, always passed explicitly so the level that ran is KNOWN. */
 export const PI_DEFAULT_THINKING_LEVEL = "high" as const;
-/** §2.10: the owner-declared window of this candidate. */
-export const PI_GLM_CONTEXT_WINDOW_TOKENS = 16_000 as const;
+/** §2.10 / M5: pi's catalog (`pi --list-models glm`) — 1M context, 131.1K max output. */
+export const PI_GLM_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 export const PI_HANDSHAKE_PROMPT =
   "PI-01 acceptance transport handshake. Reply with the single word: OK" as const;
 /** Fixed engine text — never debate content — so it may travel on argv. */
@@ -11391,7 +11417,7 @@ Expected: `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 ```bash
 git add acceptance/pi-relay.ts acceptance/pi-relay.test.ts acceptance/test-fixtures/fake-pi-cli.mjs acceptance/relay-core.test.ts acceptance/fake-cli-environment.test.ts acceptance/README.md
 git diff --cached --name-only
-git commit -m "feat(relays): pi relay for the Z.AI GLM maker (0600 @file prompt, pinned model, 16k window)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- acceptance/pi-relay.ts acceptance/pi-relay.test.ts acceptance/test-fixtures/fake-pi-cli.mjs acceptance/relay-core.test.ts acceptance/fake-cli-environment.test.ts acceptance/README.md
+git commit -m "feat(relays): pi relay for the Z.AI GLM maker (0600 @file prompt, pinned model, 1M window)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- acceptance/pi-relay.ts acceptance/pi-relay.test.ts acceptance/test-fixtures/fake-pi-cli.mjs acceptance/relay-core.test.ts acceptance/fake-cli-environment.test.ts acceptance/README.md
 ```
 
 ---
@@ -11525,7 +11551,7 @@ with:
     {
       provider_ref: "development:pi-glm-cli",
       base_url: "http://127.0.0.1:8798/v1",
-      model: "glm-5.3",
+      model: "glm-5.3-flash",
       authorization_header: "Bearer local-relay-pi"
     }
   ]);
@@ -11623,7 +11649,7 @@ In `tests/unit/dev-cli-provider-panel.test.ts`:
       relay(ports[3], "Anthropic", "claude-premium-real"),
       relay(ports[4], "xAI", "grok-real"),
       relay(ports[5], "Google", "gemini-3.8-flash"),
-      relay(ports[6], "Z.AI", "glm-5.3")
+      relay(ports[6], "Z.AI", "glm-5.3-flash")
     ]);
 ```
 
@@ -11982,7 +12008,7 @@ describe("§2.2/§2.10 the development panel declares each healthy relay's level
       new Error("logged out"),
       new Error("logged out"),
       levelled(8797, "Google", "gemini-3.8-flash", ["low", "medium", "high"]),
-      levelled(8798, "Z.AI", "glm-5.3", ["low", "high"], 16_000)
+      levelled(8798, "Z.AI", "glm-5.3-flash", ["low", "high"], 1_000_000)
     ]));
     const rows = JSON.parse(handle.panel.targetsJson) as readonly Readonly<Record<string, unknown>>[];
 
@@ -11995,7 +12021,7 @@ describe("§2.2/§2.10 the development panel declares each healthy relay's level
       thinking_parameter: "x_thinking_level", thinking_levels: ["low", "medium", "high"]
     });
     expect(rows[6]).toMatchObject({
-      thinking_parameter: "x_thinking_level", thinking_levels: ["low", "high"], context_window_tokens: 16_000
+      thinking_parameter: "x_thinking_level", thinking_levels: ["low", "high"], context_window_tokens: 1_000_000
     });
     expect(parseDevelopmentProviderPanelTargets(handle.panel.targetsJson).targetsJson)
       .toBe(handle.panel.targetsJson);
@@ -12035,7 +12061,7 @@ export type DevelopmentCliRelay = Readonly<{
   model: string;
   /** §2.2: the levels this relay's CLI can run at; absent or empty ⇒ DEFAULT_ONLY. */
   thinkingLevels?: readonly string[];
-  /** §2.10: a declared context window (the pi relay: 16 000). */
+  /** §2.10: a declared context window (the pi relay: 1 000 000). */
   contextWindowTokens?: number;
   close(): Promise<void>;
 }>;
@@ -12180,7 +12206,7 @@ const SEAMS: RelayHostSeams = Object.freeze({
 });
 const LOCAL = Object.freeze({ NODE_ENV: "test" });
 const PI_CANDIDATE = Object.freeze({
-  providerRef: "local:pi-glm", tool: "pi", modelId: "glm-5.3", thinkingLevels: ["low", "high"]
+  providerRef: "local:pi-glm", tool: "pi", modelId: "glm-5.3-flash", thinkingLevels: ["low", "high"]
 });
 const ALL_FIVE = Object.freeze([
   { providerRef: "local:claude", tool: "claude", modelId: "claude-fake-cli-model", thinkingLevels: ["high"] },
@@ -12272,7 +12298,7 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
       { providerRef: "local:codex", maker: "OpenAI", tool: "codex", modelId: "gpt-5.6-sol", thinkingLevels: ["low", "high"], contextWindowTokens: null },
       { providerRef: "local:grok", maker: "xAI", tool: "grok", modelId: "grok-fake-cli-model", thinkingLevels: [], contextWindowTokens: null },
       { providerRef: "local:agy", maker: "Google", tool: "agy", modelId: "gemini-3.8-flash", thinkingLevels: ["low", "high"], contextWindowTokens: null },
-      { providerRef: "local:pi-glm", maker: "Z.AI", tool: "pi", modelId: "glm-5.3", thinkingLevels: ["low", "high"], contextWindowTokens: 16_000 }
+      { providerRef: "local:pi-glm", maker: "Z.AI", tool: "pi", modelId: "glm-5.3-flash", thinkingLevels: ["low", "high"], contextWindowTokens: 1_000_000 }
     ]);
     for (const relay of written.relays) {
       expect(relay.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:[0-9]+\/v1$/u);
@@ -12292,7 +12318,7 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
       })
     });
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ model: "glm-5.3", maker: "Z.AI", x_thinking_level: "low" });
+    await expect(response.json()).resolves.toMatchObject({ model: "glm-5.3-flash", maker: "Z.AI", x_thinking_level: "low" });
   });
 
   it("stops every relay and removes the endpoints file", async () => {
@@ -12420,7 +12446,7 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
       );
       await expect.poll(() => existsSync(endpointsPath), { timeout: 15_000 }).toBe(true);
       const written = JSON.parse(await readFile(endpointsPath, "utf8")) as { relays: RelayHostEndpoint[] };
-      expect(written.relays.map(({ modelId }) => modelId)).toEqual(["glm-5.3"]);
+      expect(written.relays.map(({ modelId }) => modelId)).toEqual(["glm-5.3-flash"]);
 
       signals.emit("SIGTERM");
       await running;
@@ -12810,7 +12836,7 @@ In `acceptance/README.md`, insert directly after the A8 paragraph ("…together 
 ```markdown
 **Serving relays for step replay (`pnpm run relays:serve`, model scorecard §2.9).**
 Local and operator-only: it refuses in the hosted deployment before it reads a
-file. Write a candidates file, `{"candidates":[{"providerRef":"local:pi-glm","tool":"pi","modelId":"glm-5.3","thinkingLevels":["low","high"]}]}`,
+file. Write a candidates file, `{"candidates":[{"providerRef":"local:pi-glm","tool":"pi","modelId":"glm-5.3-flash","thinkingLevels":["low","high"]}]}`,
 where `tool` is one of `claude`, `codex`, `grok`, `agy`, `pi`, then run
 `pnpm run relays:serve -- --candidates <file> --endpoints <file>`. One relay starts
 per candidate on its own loopback port with its own bearer. A candidate whose CLI
@@ -12847,13 +12873,3065 @@ git commit -m "feat(relays): relays:serve — one local relay per candidate, 060
 
 ---
 
+### Task A12b: Lean calls — every relay strips what its CLI adds
+
+**Owner ruling (2026-09-26, Decision D8, Appendix B M5).** A relayed call must carry what a plain API call would, and
+nothing this computer adds on its own, because extra input costs money. This task applies the leanest flags M5
+measured for each tool, runs every CLI in an empty private directory, replaces each CLI's own system prompt with one
+fixed neutral sentence where the CLI allows it, and logs what each CLI still adds. The engine's own system and user
+messages stay in the prompt transcript exactly as today (`renderPromptTranscript` is not touched), so every tool is
+asked the same thing.
+
+This task has two red-to-green cycles, each ending in its own commit, and one owner-run check:
+- Steps 1–5: relay-core — the per-relay workspace, the minimal system sentence, the instructions file, the overhead line;
+- Steps 6–10: the five relays, the relay host and the argv pins;
+- Step 11: the owner's check of the five lean command lines (real calls).
+
+**Reconciliation with today's code (read first).** `invokeCli` already starts every child in a fresh, empty directory
+of its own (CONT-01), created per CALL and reaped after it, and `acceptance/adversarial-corpus.test.ts` (STATE-01)
+pins that two calls never share one. The owner's ruling asks for a private directory created at relay START and
+removed at STOP. Both hold after this task:
+- each relay opens ONE workspace (mode 0700) when it starts, before its handshake, and removes it when it stops;
+- every call's empty working directory (the handshake's included), and the "file" transport's prompt directory, is
+  created INSIDE that workspace and still reaped after the call;
+- the workspace itself is never a working directory, so the codex instructions file it holds is never in a child's cwd;
+- a call made outside any relay (`acceptance/discovery.ts`'s `probeProvider`) keeps today's root, the system temp
+  directory.
+
+**Files:**
+- Modify: `acceptance/relay-core.ts` (as left by A8: the `node:fs/promises` import, `CliCompletion`, `CliInvocation`, `CliRelayAdapter`, a new block before `withRequestedLevel`, the head of `invokeCli` and its `invocation`, `CliRelayServerOptions`, `startCliRelayServer`)
+- Modify: `acceptance/claude-relay.ts` (as left by A9)
+- Modify: `acceptance/model-shim.ts` (as left by A9)
+- Modify: `acceptance/grok-relay.ts` (as left by A9)
+- Modify: `acceptance/agy-relay.ts` (as left by A10)
+- Modify: `acceptance/pi-relay.ts` (as left by A11)
+- Modify: `acceptance/relay-host.ts` (as left by A12)
+- Modify: `acceptance/README.md` (one paragraph after A12's relay-host paragraph)
+- Create: `acceptance/test-fixtures/lean-call-probe.ts` (test support only; no relay imports it)
+- Test: `acceptance/relay-core.test.ts`, `acceptance/claude-relay.test.ts`, `acceptance/model-shim.test.ts`, `acceptance/grok-relay.test.ts`, `acceptance/agy-relay.test.ts`, `acceptance/pi-relay.test.ts`, `acceptance/relay-host.test.ts`, `acceptance/adversarial-corpus.test.ts`
+
+**Existing argv pins this task changes on purpose** (each gains the lean flags, nothing else):
+- `acceptance/claude-relay.test.ts:264-275` ("maps an OpenAI request to claude -p …"): `"--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT` after `"--output-format", "json"`.
+- `acceptance/adversarial-corpus.test.ts:615-628` (CLAUDE-ARGV-01): the same two elements.
+- `acceptance/grok-relay.test.ts:228-237` ("maps the OpenAI-compatible transcript to a single, verbatim, tool-less Grok call"): `"--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT` after `"--verbatim"`.
+- `acceptance/adversarial-corpus.test.ts:654-663` (GROK-ARGV-01): the same two elements.
+- `acceptance/grok-relay.test.ts:573-576` (the degraded relay's `--` flags): `"--system-prompt-override"` after `"--verbatim"`.
+- `acceptance/model-shim.test.ts:269-277` (unasked) and `:312-321` (model pin), and A9's "declares the seven measured levels …" list: the instructions-file setting and the 18 `--disable` pairs after `"--json"`.
+- A10's two pure `agyArguments` lists in `acceptance/agy-relay.test.ts` ("text: …", "stream-json: …"): `"--disable-slash-commands"` after `"--sandbox"`.
+- Unchanged, and green as written: A9's `slice(-4)` / `slice(-5)` level pins, every `toEqual(agyArguments(…))` and `toEqual(piArguments(…))` comparison, the F26 preflight-parity test, and every cwd regex (`relay-<maker>-…` is still the LAST path component of every call's directory).
+
+**Interfaces:**
+- Consumes: relay-core as left by A8; the relays as left by A9, A10 and A11; the relay host as left by A12; `estimatePromptTokens` from `@debateai/providers` (A7b), in a test only.
+- Produces, from `acceptance/relay-core.ts`:
+  - `RELAY_MINIMAL_SYSTEM_PROMPT = "Follow the instructions in the user message exactly."`: the ONE system text a relay may give a CLI. Fixed engine text, never debate content, so it may travel on argv.
+  - `CLI_RELAY_INSTRUCTIONS_FILE_NAME = "relay-instructions.md"`, `CLI_RELAY_INSTRUCTIONS_FILE_MISSING`, `RELAY_PROMPT_CHARACTERS_PER_TOKEN = 4`.
+  - `interface RelayWorkspace { directory: string; instructionsFile?: string; close(): Promise<void> }` and `openRelayWorkspace(adapter: Pick<CliRelayAdapter, "maker" | "readsInstructionsFile">): Promise<RelayWorkspace>`.
+  - `CliRelayAdapter.readsInstructionsFile?: boolean`, `CliInvocation.instructionsFile?: string`, `CliCompletion.reportedInputTokens?: number`.
+  - `invokeCli(command, adapter, prompt, timeoutMs, options?: { thinkingLevel?: string; workspace?: RelayWorkspace })`.
+  - `CliRelayServerOptions.workspace?: RelayWorkspace`: the server owns it and removes it at `close()`; absent ⇒ the server opens its own.
+  - `interface HarnessOverhead { maker: string; reportedInputTokens: number | null; promptTokensEstimate: number; overheadTokens: number | null }`, `measureHarnessOverhead(maker, prompt, handshake)`, `harnessOverheadLine(overhead)`, `reportHarnessOverhead(maker, prompt, handshake, write?)`.
+- Produces, from the relays:
+  - every relay handle gains `harnessOverhead: HarnessOverhead` (claude, codex, grok, agy, pi);
+  - `ClaudePreflightOptions.workspace?: RelayWorkspace` (a relay lends its own; a standalone preflight opens and removes one);
+  - `CODEX_DISABLED_FEATURES` (the 18 names M5 measured) from `model-shim.ts`, the codex adapter's `readsInstructionsFile: true`, and the code `CODEX_CLI_INSTRUCTIONS_FILE_MISSING`;
+  - `GrokRelayOptions.model?: string`: the id grok's `-m` selects (`grok-4.7`, which grok REPORTS as `grok-4.7-build`); the relayed lineage stays the reported id. Code `GROK_CLI_MODEL_PIN_INVALID`;
+  - `PI_RELAY_SYSTEM_PROMPT` now IS `RELAY_MINIMAL_SYSTEM_PROMPT`;
+  - relay host: `RelayHostCandidate.modelSelection?: string`, for `grok` only (on any other tool the file is `RELAY_HOST_CANDIDATES_INVALID`).
+- Produces, test support (`acceptance/test-fixtures/lean-call-probe.ts`): `leanCwdReportSnippet(logPath)`, `LeanCwdReport`, `loggedWorkspaces(logPath)`, `expectLeanWorkingDirectory(report, makerSlug, logPath)`.
+- **The overhead line.** Printed once per relay start, on stdout beside `RELAY DEGRADED`:
+  `RELAY OVERHEAD <maker> reported=<n|none> own=<m> overhead=<n−m|unknown>`.
+  - `own` is a LOCAL count: the characters of the exact handshake prompt handed to the CLI, ÷ 4, rounded up. It is the same rule as `@debateai/providers`' `estimatePromptTokens`, and a test pins that the two agree. Relay-core restates the rule so it takes no dependency on providers.
+  - `reported` is the CLI's own input count for the handshake (`usage.promptTokens`). Claude Code counts cached input apart from it (M5: 2 input + 685 cache-creation), so the Claude relay also reports `reportedInputTokens` = input + cache-creation + cache-read, and that is what the line uses.
+  - Informational only: nothing about it can refuse a start, and it never prices anything.
+
+- [ ] **Step 1: Write the failing tests (relay-core)**
+
+In `acceptance/relay-core.test.ts`, replace the `node:fs/promises` import (as left by A8):
+
+```ts
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+```
+
+with:
+
+```ts
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
+```
+
+Insert directly after `import { afterEach, describe, expect, it } from "vitest";`:
+
+```ts
+import { estimatePromptTokens } from "@debateai/providers";
+```
+
+Replace the `./relay-core.js` import block (as left by A8):
+
+```ts
+import {
+  CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES,
+  CLI_RELAY_STDOUT_MAX_BYTES,
+  RELAY_MESSAGE_MAX_UTF8_BYTES,
+  RELAY_REQUEST_MAX_BYTES,
+  RELAY_REQUEST_MAX_MESSAGES,
+  buildCliUsage,
+  renderPromptTranscript,
+  resolveConfiguredBinary,
+  startCliRelayServer,
+  type CliFailureEvidence,
+  type CliRelayAdapter,
+  type CliRelayHandle
+} from "./relay-core.js";
+```
+
+with:
+
+```ts
+import {
+  CLI_RELAY_INSTRUCTIONS_FILE_MISSING,
+  CLI_RELAY_INSTRUCTIONS_FILE_NAME,
+  CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES,
+  CLI_RELAY_STDOUT_MAX_BYTES,
+  RELAY_MESSAGE_MAX_UTF8_BYTES,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
+  RELAY_PROMPT_CHARACTERS_PER_TOKEN,
+  RELAY_REQUEST_MAX_BYTES,
+  RELAY_REQUEST_MAX_MESSAGES,
+  buildCliUsage,
+  harnessOverheadLine,
+  invokeCli,
+  measureHarnessOverhead,
+  openRelayWorkspace,
+  renderPromptTranscript,
+  reportHarnessOverhead,
+  resolveConfiguredBinary,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliFailureEvidence,
+  type CliRelayAdapter,
+  type CliRelayHandle
+} from "./relay-core.js";
+```
+
+Append at the end of the file (after A8's "R4 usage cap at the relay" block). As in A8, no probe is named `script`,
+`fixtureScript` or `probeScript`, and the A8 helpers `fixtureAdapter`, `startFixtureRelay`, `postRelay`, `userTurn`,
+`spawnMarker` and `RelayBody` are reused:
+
+```ts
+/**
+ * D8 lean calls (owner ruling 2026-09-26, Task A12b): one private workspace per
+ * relay, the one minimal system sentence, the instructions file a codex-style
+ * CLI reads, and the informational harness-overhead line — each proven on a
+ * fixture adapter. W6: the probes report paths, modes and listings only.
+ */
+const WORKSPACE_PROBE = [
+  'const { readdirSync, statSync } = require("node:fs");',
+  "process.stdout.write(JSON.stringify({",
+  "  cwd: process.cwd(),",
+  "  cwdMode: (statSync(process.cwd()).mode & 0o777).toString(8),",
+  "  cwdEntries: readdirSync(process.cwd())",
+  "}));"
+].join("");
+
+const INSTRUCTIONS_PROBE = [
+  'const { readFileSync, readdirSync, statSync } = require("node:fs");',
+  "const instructionsFile = process.argv[process.argv.length - 1];",
+  "process.stdout.write(JSON.stringify({",
+  "  instructionsFile,",
+  "  instructionsMode: (statSync(instructionsFile).mode & 0o777).toString(8),",
+  '  instructions: readFileSync(instructionsFile, "utf8"),',
+  "  cwd: process.cwd(),",
+  "  cwdMode: (statSync(process.cwd()).mode & 0o777).toString(8),",
+  "  cwdEntries: readdirSync(process.cwd())",
+  "}));"
+].join("");
+
+interface WorkspaceObservation {
+  readonly cwd: string;
+  readonly cwdMode: string;
+  readonly cwdEntries: readonly string[];
+}
+
+interface InstructionsObservation extends WorkspaceObservation {
+  readonly instructionsFile: string;
+  readonly instructionsMode: string;
+  readonly instructions: string;
+}
+
+async function observeRelay<T>(handle: CliRelayHandle, content: string): Promise<T> {
+  const body = await (await postRelay(handle, userTurn(content))).json() as RelayBody;
+  return JSON.parse(body.choices[0]!.message.content) as T;
+}
+
+describe("D8 the relay's private workspace", () => {
+  it("allows one short neutral sentence as the only system text a relay gives a CLI", () => {
+    expect(RELAY_MINIMAL_SYSTEM_PROMPT).toBe("Follow the instructions in the user message exactly.");
+  });
+
+  it("runs every call in its own empty 0700 directory inside ONE 0700 workspace per relay, removed at stop", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("cwd-fixture"), WORKSPACE_PROBE);
+
+    const first = await observeRelay<WorkspaceObservation>(handle, "Workspace probe one.");
+    const second = await observeRelay<WorkspaceObservation>(handle, "Workspace probe two.");
+
+    const workspace = dirname(first.cwd);
+    expect(dirname(second.cwd)).toBe(workspace);
+    // CONT-01 / STATE-01 unchanged: a fresh directory per call, reaped after it.
+    expect(second.cwd).not.toBe(first.cwd);
+    for (const observed of [first, second]) {
+      expect(observed.cwdEntries).toEqual([]);
+      expect(observed.cwdMode).toBe("700");
+      expect(basename(observed.cwd)).toMatch(/^relay-cwd-fixture-/u);
+      await expect.poll(() => existsSync(observed.cwd)).toBe(false);
+    }
+    expect(basename(workspace)).toMatch(/^relay-cwd-fixture-workspace-/u);
+    expect(((await stat(workspace)).mode & 0o777).toString(8)).toBe("700");
+    const fromProject = relative(process.cwd(), workspace);
+    expect(fromProject.startsWith("..") || isAbsolute(fromProject)).toBe(true);
+
+    await handle.close();
+
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("writes the sentence ONCE per start to a 0600 file for an adapter that reads it from a file, beside every cwd and never in one", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("instructions-fixture", {
+      readsInstructionsFile: true,
+      buildArguments: (_prompt, invocation) => {
+        if (invocation?.instructionsFile === undefined) throw new Error("FIXTURE_INSTRUCTIONS_FILE_MISSING");
+        return [invocation.instructionsFile];
+      }
+    }), INSTRUCTIONS_PROBE);
+
+    const first = await observeRelay<InstructionsObservation>(handle, "Instructions probe one.");
+    const second = await observeRelay<InstructionsObservation>(handle, "Instructions probe two.");
+
+    expect(second.instructionsFile).toBe(first.instructionsFile);
+    expect(isAbsolute(first.instructionsFile)).toBe(true);
+    expect(basename(first.instructionsFile)).toBe(CLI_RELAY_INSTRUCTIONS_FILE_NAME);
+    expect(first.instructionsMode).toBe("600");
+    expect(first.instructions).toBe(RELAY_MINIMAL_SYSTEM_PROMPT);
+    expect(dirname(first.instructionsFile)).toBe(dirname(first.cwd));
+    expect(first.cwdEntries).toEqual([]);
+
+    await handle.close();
+
+    expect(existsSync(first.instructionsFile)).toBe(false);
+  });
+
+  it("never runs such an adapter without its file: refused before any directory or child exists", async () => {
+    const { marker, probe } = await spawnMarker();
+    const adapter = fixtureAdapter("no-instructions-fixture", { readsInstructionsFile: true });
+
+    await expect(invokeCli(
+      { binary: process.execPath, prefixArguments: ["-e", probe, "--"] },
+      adapter,
+      "Instructions probe.",
+      1_000
+    )).rejects.toThrow(CLI_RELAY_INSTRUCTIONS_FILE_MISSING);
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it("serves in the workspace its caller opened for the handshake, and stop removes it", async () => {
+    const adapter = fixtureAdapter("lent-workspace-fixture");
+    const command = { binary: process.execPath, prefixArguments: ["-e", WORKSPACE_PROBE, "--"] };
+    const workspace = await openRelayWorkspace(adapter);
+    const handshake = JSON.parse(
+      (await invokeCli(command, adapter, "Handshake probe.", 5_000, { workspace })).content
+    ) as WorkspaceObservation;
+    const handle = await startCliRelayServer({ port: 0, timeoutMs: 5_000, command, adapter, workspace });
+    handles.push(handle);
+
+    const served = await observeRelay<WorkspaceObservation>(handle, "Served probe.");
+
+    expect(dirname(handshake.cwd)).toBe(workspace.directory);
+    expect(dirname(served.cwd)).toBe(workspace.directory);
+    expect(served.cwd).not.toBe(handshake.cwd);
+    await handle.close();
+    expect(existsSync(workspace.directory)).toBe(false);
+  });
+
+  it("leaves a call made outside any relay (discovery) where it always ran: its own empty directory in the system temp root", async () => {
+    const observed = JSON.parse((await invokeCli(
+      { binary: process.execPath, prefixArguments: ["-e", WORKSPACE_PROBE, "--"] },
+      fixtureAdapter("bare-call-fixture"),
+      "Bare probe.",
+      5_000
+    )).content) as WorkspaceObservation;
+
+    expect(dirname(observed.cwd)).toBe(await realpath(tmpdir()));
+    expect(observed.cwdEntries).toEqual([]);
+  });
+});
+
+describe("D8 harness overhead, measured once at start and only reported", () => {
+  const reported = (promptTokens: number): CliCompletion =>
+    ({ content: "OK", model: "fixture-model", usage: { promptTokens } });
+  const unreported: CliCompletion = { content: "OK", model: "fixture-model", usage: null };
+  const PROMPT = "a".repeat(41); // ⌈41 ÷ 4⌉ = 11
+
+  it("is the CLI-reported input minus our own characters ÷ 4 count of the handshake prompt", () => {
+    expect(measureHarnessOverhead("Fixture", PROMPT, reported(700))).toEqual({
+      maker: "Fixture", reportedInputTokens: 700, promptTokensEstimate: 11, overheadTokens: 689
+    });
+    // A CLI that counts cached input apart (Claude Code) reports everything it read.
+    expect(measureHarnessOverhead("Fixture", PROMPT, { ...reported(2), reportedInputTokens: 687 }))
+      .toMatchObject({ reportedInputTokens: 687, overheadTokens: 676 });
+    expect(measureHarnessOverhead("Fixture", PROMPT, unreported)).toEqual({
+      maker: "Fixture", reportedInputTokens: null, promptTokensEstimate: 11, overheadTokens: null
+    });
+  });
+
+  it("counts exactly as @debateai/providers' estimatePromptTokens does", () => {
+    expect(RELAY_PROMPT_CHARACTERS_PER_TOKEN).toBe(4);
+    for (const prompt of [
+      "",
+      "a",
+      "Ce urmează din aceste dovezi?",
+      renderPromptTranscript([{ role: "user", content: "Handshake." }])
+    ]) {
+      expect(measureHarnessOverhead("Fixture", prompt, unreported).promptTokensEstimate, prompt)
+        .toBe(estimatePromptTokens([{ role: "user", content: prompt }]));
+    }
+  });
+
+  it("prints one informational line, and a line that cannot be written never refuses a start", () => {
+    const lines: string[] = [];
+
+    const overhead = reportHarnessOverhead("Fixture", PROMPT, reported(700), (line) => { lines.push(line); });
+
+    expect(lines).toEqual(["RELAY OVERHEAD Fixture reported=700 own=11 overhead=689"]);
+    expect(harnessOverheadLine(overhead)).toBe(lines[0]);
+    expect(harnessOverheadLine(measureHarnessOverhead("Fixture", "", unreported)))
+      .toBe("RELAY OVERHEAD Fixture reported=none own=0 overhead=unknown");
+    expect(() => reportHarnessOverhead("Fixture", PROMPT, unreported, () => { throw new Error("EPIPE"); }))
+      .not.toThrow();
+  });
+});
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `pnpm exec vitest run acceptance/relay-core.test.ts`
+Expected: the two new describe blocks FAIL and every earlier block PASSes. Among the failures:
+- `expected undefined to be 'Follow the instructions in the user message exactly.'`;
+- `measureHarnessOverhead is not a function`, `openRelayWorkspace is not a function`;
+- the workspace test fails on `expect(basename(workspace)).toMatch(/^relay-cwd-fixture-workspace-/u)`, because a served call's directory still sits directly in the system temp root;
+- the missing-file test fails with `promise resolved "{ … }" instead of rejecting`, because nothing checks `readsInstructionsFile` yet.
+
+- [ ] **Step 3: Write the implementation (relay-core)**
+
+In `acceptance/relay-core.ts` (as left by A8), make these edits, each found by the old text it quotes.
+
+Replace the import:
+
+```ts
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+```
+
+with:
+
+```ts
+import { chmod, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+```
+
+In `CliCompletion`, replace:
+
+```ts
+   * it; an adapter sets it only if its CLI reports running at another level.
+   */
+  readonly thinkingLevel?: string;
+}
+```
+
+with:
+
+```ts
+   * it; an adapter sets it only if its CLI reports running at another level.
+   */
+  readonly thinkingLevel?: string;
+  /**
+   * D8: every input token the CLI says the model read for this call, cached
+   * input included — set ONLY by a CLI that counts cache apart from
+   * `usage.promptTokens` (Claude Code). Read by the harness-overhead line and
+   * nothing else: it is never echoed and never prices anything.
+   */
+  readonly reportedInputTokens?: number;
+}
+```
+
+In `CliInvocation`, replace:
+
+```ts
+  /** Already checked against the adapter's `thinkingLevels`; absent ⇒ no level flag. */
+  readonly thinkingLevel?: string;
+}
+```
+
+with:
+
+```ts
+  /** Already checked against the adapter's `thinkingLevels`; absent ⇒ no level flag. */
+  readonly thinkingLevel?: string;
+  /** D8: absolute, mode 0600, holds RELAY_MINIMAL_SYSTEM_PROMPT; only for an adapter that `readsInstructionsFile`. */
+  readonly instructionsFile?: string;
+}
+```
+
+In `CliRelayAdapter`, replace:
+
+```ts
+  /** §2.10: a declared context window; a request that cannot fit is refused (413) before any child exists. */
+  readonly contextWindowTokens?: number;
+```
+
+with:
+
+```ts
+  /** §2.10: a declared context window; a request that cannot fit is refused (413) before any child exists. */
+  readonly contextWindowTokens?: number;
+  /**
+   * D8: true for a CLI that reads its system text from a FILE (codex:
+   * `-c model_instructions_file=…`). The relay then writes
+   * RELAY_MINIMAL_SYSTEM_PROMPT once per start, mode 0600, in its workspace,
+   * and hands the path to `buildArguments` as `invocation.instructionsFile`.
+   * Such an adapter is never run without that file.
+   */
+  readonly readsInstructionsFile?: boolean;
+```
+
+Insert immediately before `/** §2.2: stamps the level a REQUEST asked for; an unasked call stays DEFAULT_ONLY. */`:
+
+```ts
+/**
+ * D8 — lean calls (owner ruling 2026-09-26; Appendix B, M5). The ONE system
+ * text a relay may give a CLI in place of the CLI's own: fixed engine text,
+ * never debate content, so it may travel on argv. The engine's own system and
+ * user messages stay in the prompt transcript exactly as before.
+ */
+export const RELAY_MINIMAL_SYSTEM_PROMPT = "Follow the instructions in the user message exactly." as const;
+/** D8: the file RELAY_MINIMAL_SYSTEM_PROMPT is written to, for a CLI that reads its instructions from a file. */
+export const CLI_RELAY_INSTRUCTIONS_FILE_NAME = "relay-instructions.md" as const;
+export const CLI_RELAY_INSTRUCTIONS_FILE_MISSING = "CLI_RELAY_INSTRUCTIONS_FILE_MISSING" as const;
+/**
+ * D8: the local size estimate — characters ÷ 4, rounded up — the same rule as
+ * `@debateai/providers`' `estimatePromptTokens` (a relay-core test pins the
+ * agreement), restated so the relay core takes no dependency on providers.
+ */
+export const RELAY_PROMPT_CHARACTERS_PER_TOKEN = 4 as const;
+
+/** The maker's name as one lower-case path token: "Z.AI" → "z-ai", "xAI" → "xai". */
+function makerSlugOf(maker: string): string {
+  return maker.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cli";
+}
+
+/**
+ * D8: ONE private directory per relay, opened at start — before the handshake —
+ * and removed at stop. Every call's fresh, EMPTY working directory (CONT-01,
+ * still reaped after each call) and the "file" transport's prompt directory
+ * are created inside it, so nothing a relay writes outlives the relay. It is
+ * never a working directory itself: the instructions file it may hold is never
+ * in a child's cwd.
+ */
+export interface RelayWorkspace {
+  /** Absolute; mode 0700. */
+  readonly directory: string;
+  /** Absolute; mode 0600; RELAY_MINIMAL_SYSTEM_PROMPT. Only for an adapter that `readsInstructionsFile`. */
+  readonly instructionsFile?: string;
+  /** Removes the directory and everything in it; safe to call more than once. */
+  close(): Promise<void>;
+}
+
+export async function openRelayWorkspace(
+  adapter: Pick<CliRelayAdapter, "maker" | "readsInstructionsFile">
+): Promise<RelayWorkspace> {
+  const directory = await mkdtemp(
+    join(await realpath(tmpdir()), `relay-${makerSlugOf(adapter.maker)}-workspace-`)
+  );
+  const remove = (): Promise<void> => rm(directory, { recursive: true, force: true }).catch(() => undefined);
+  try {
+    // mkdtemp already creates 0700; stated again so no platform default can widen it.
+    await chmod(directory, 0o700);
+    let instructionsFile: string | undefined;
+    if (adapter.readsInstructionsFile === true) {
+      instructionsFile = join(directory, CLI_RELAY_INSTRUCTIONS_FILE_NAME);
+      // `wx`: the directory is new and empty, so an existing file is an anomaly.
+      await writeFile(instructionsFile, RELAY_MINIMAL_SYSTEM_PROMPT, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    }
+    let closing: Promise<void> | undefined;
+    return Object.freeze({
+      directory,
+      ...(instructionsFile === undefined ? {} : { instructionsFile }),
+      close: () => (closing ??= remove())
+    });
+  } catch (error) {
+    await remove();
+    throw error;
+  }
+}
+
+/** D8: what one relay's CLI adds around a prompt, measured once at start. */
+export interface HarnessOverhead {
+  readonly maker: string;
+  /** The CLI's own input count for the handshake; null when it reported none. */
+  readonly reportedInputTokens: number | null;
+  /** Our own count of the handshake prompt handed to the CLI: characters ÷ 4, rounded up. */
+  readonly promptTokensEstimate: number;
+  /** reported − own: what the CLI added. null when nothing was reported. */
+  readonly overheadTokens: number | null;
+}
+
+export function measureHarnessOverhead(
+  maker: string,
+  prompt: string,
+  handshake: CliCompletion
+): HarnessOverhead {
+  const reportedInputTokens = handshake.reportedInputTokens ?? handshake.usage?.promptTokens ?? null;
+  const promptTokensEstimate = Math.ceil(prompt.length / RELAY_PROMPT_CHARACTERS_PER_TOKEN);
+  return Object.freeze({
+    maker,
+    reportedInputTokens,
+    promptTokensEstimate,
+    overheadTokens: reportedInputTokens === null ? null : reportedInputTokens - promptTokensEstimate
+  });
+}
+
+export function harnessOverheadLine(overhead: HarnessOverhead): string {
+  return `RELAY OVERHEAD ${overhead.maker} reported=${overhead.reportedInputTokens ?? "none"}`
+    + ` own=${overhead.promptTokensEstimate} overhead=${overhead.overheadTokens ?? "unknown"}`;
+}
+
+/**
+ * D8: measures a handshake's overhead and prints ONE informational line
+ * (stdout by default, beside `RELAY DEGRADED`). Never a gate: nothing here can
+ * refuse a start, and a line that cannot be written is dropped.
+ */
+export function reportHarnessOverhead(
+  maker: string,
+  prompt: string,
+  handshake: CliCompletion,
+  write: (line: string) => void = (line) => { process.stdout.write(`${line}\n`); }
+): HarnessOverhead {
+  const overhead = measureHarnessOverhead(maker, prompt, handshake);
+  try {
+    write(harnessOverheadLine(overhead));
+  } catch {
+    // Informational only.
+  }
+  return overhead;
+}
+```
+
+In `invokeCli`, replace the parameter line:
+
+```ts
+  options: Readonly<{ thinkingLevel?: string }> = {}
+): Promise<CliCompletion> {
+```
+
+with:
+
+```ts
+  options: Readonly<{ thinkingLevel?: string; workspace?: RelayWorkspace }> = {}
+): Promise<CliCompletion> {
+```
+
+and replace:
+
+```ts
+  const transport = adapter.promptTransport ?? "argv";
+  const makerSlug = adapter.maker.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cli";
+  const temporaryRoot = await realpath(tmpdir());
+```
+
+with:
+
+```ts
+  // D8: a CLI that reads its system text from a file runs with the relay's own
+  // file or not at all — never silently with its built-in default.
+  const instructionsFile = options.workspace?.instructionsFile;
+  if (adapter.readsInstructionsFile === true && instructionsFile === undefined) {
+    throw new TypeError(CLI_RELAY_INSTRUCTIONS_FILE_MISSING);
+  }
+  const transport = adapter.promptTransport ?? "argv";
+  const makerSlug = makerSlugOf(adapter.maker);
+  // D8: inside a relay, the call's empty directory (and the "file" transport's
+  // prompt directory) is made in the relay's private workspace; a call made
+  // outside any relay (discovery) keeps the system temp root, as before.
+  const temporaryRoot = options.workspace?.directory ?? await realpath(tmpdir());
+```
+
+and replace:
+
+```ts
+    const invocation: CliInvocation = Object.freeze({
+      ...(promptFile === undefined ? {} : { promptFile }),
+      ...(thinkingLevel === undefined ? {} : { thinkingLevel })
+    });
+```
+
+with:
+
+```ts
+    const invocation: CliInvocation = Object.freeze({
+      ...(promptFile === undefined ? {} : { promptFile }),
+      ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
+      ...(instructionsFile === undefined ? {} : { instructionsFile })
+    });
+```
+
+Replace `CliRelayServerOptions`:
+
+```ts
+export interface CliRelayServerOptions {
+  readonly port: number;
+  readonly timeoutMs: number;
+  readonly command: CommandSpec;
+  readonly adapter: CliRelayAdapter;
+}
+```
+
+with:
+
+```ts
+export interface CliRelayServerOptions {
+  readonly port: number;
+  readonly timeoutMs: number;
+  readonly command: CommandSpec;
+  readonly adapter: CliRelayAdapter;
+  /**
+   * D8: the relay's private workspace, opened by its start function BEFORE the
+   * handshake. The server owns it from here and removes it at close(). Absent
+   * ⇒ the server opens one of its own.
+   */
+  readonly workspace?: RelayWorkspace;
+}
+```
+
+In `startCliRelayServer`, replace:
+
+```ts
+    throw new TypeError("CLI_RELAY_TIMEOUT_INVALID");
+  }
+  assertAdapterDeclarations(options.adapter);
+```
+
+with:
+
+```ts
+    throw new TypeError("CLI_RELAY_TIMEOUT_INVALID");
+  }
+  assertAdapterDeclarations(options.adapter);
+  // D8: every served call runs inside this relay's own workspace.
+  const workspace = options.workspace ?? await openRelayWorkspace(options.adapter);
+```
+
+replace the call inside the request handler:
+
+```ts
+      const completion = await invokeCli(
+        options.command,
+        options.adapter,
+        prompt,
+        options.timeoutMs,
+        requestedLevel === undefined ? {} : { thinkingLevel: requestedLevel }
+      );
+```
+
+with:
+
+```ts
+      const completion = await invokeCli(
+        options.command,
+        options.adapter,
+        prompt,
+        options.timeoutMs,
+        requestedLevel === undefined ? { workspace } : { thinkingLevel: requestedLevel, workspace }
+      );
+```
+
+and replace the end of the function:
+
+```ts
+  server.listen(options.port, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    server.close();
+    throw new Error("CLI_RELAY_ADDRESS_FAILED");
+  }
+  return {
+    port: address.port,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    authorizationHeader,
+    async close() {
+      if (!server.listening) return;
+      server.close();
+      await once(server, "close");
+    }
+  };
+}
+```
+
+with:
+
+```ts
+  try {
+    server.listen(options.port, "127.0.0.1");
+    await once(server, "listening");
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    server.close();
+    await workspace.close();
+    throw new Error("CLI_RELAY_ADDRESS_FAILED");
+  }
+  return {
+    port: address.port,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    authorizationHeader,
+    async close() {
+      if (server.listening) {
+        server.close();
+        await once(server, "close");
+      }
+      // D8: the workspace goes with the relay, whatever a call left in it.
+      await workspace.close();
+    }
+  };
+}
+```
+
+- [ ] **Step 4: Run the tests to verify they pass, and that every existing relay still does**
+
+Run: `pnpm exec vitest run acceptance/relay-core.test.ts acceptance/claude-relay.test.ts acceptance/grok-relay.test.ts acceptance/model-shim.test.ts acceptance/hermes-relay.test.ts acceptance/agy-relay.test.ts acceptance/pi-relay.test.ts acceptance/relay-host.test.ts acceptance/adversarial-corpus.test.ts acceptance/fake-cli-environment.test.ts acceptance/boot-relays.test.ts`
+Expected: PASS. No relay lends a workspace yet and no adapter reads an instructions file, so handshakes run exactly as
+before and served calls run inside the workspace each server opens for itself. Every cwd pin in the maker suites reads
+only the LAST path component (`relay-<maker>-…`), and STATE-01 still sees a new directory per call.
+
+Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
+Expected: both exit 0.
+
+Run: `pnpm run test:ci-gate`
+Expected: `CI_KNOWN_RED_GATE new=0 known=8 stale=0`. The depth oracle does not apply: `acceptance/` is outside the
+shipped corpus.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add acceptance/relay-core.ts acceptance/relay-core.test.ts
+git diff --cached --name-only
+git commit -m "feat(relays): lean calls in relay-core — a private workspace per relay, the minimal system sentence, the overhead line" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- acceptance/relay-core.ts acceptance/relay-core.test.ts
+```
+
+`git diff --cached --name-only` must print exactly the two paths.
+
+- [ ] **Step 6: Write the failing tests (the five relays, the relay host, the argv pins)**
+
+Create `acceptance/test-fixtures/lean-call-probe.ts`:
+
+```ts
+import { readFile, stat } from "node:fs/promises";
+import { basename, dirname, isAbsolute, relative } from "node:path";
+import { expect } from "vitest";
+
+/**
+ * D8 lean calls (Task A12b): what every relay suite checks about WHERE its CLI
+ * ran. Test support only — no relay imports this file.
+ *
+ * `leanCwdReportSnippet(logPath)` is CommonJS for a `node -e` probe. Each time
+ * the probe runs — the relay's handshake included — it appends its working
+ * directory's PARENT (the relay's workspace) to `logPath`, one line per call,
+ * and leaves `leanCwdReport` (its cwd, that directory's mode and its entries)
+ * for the probe to print inside its maker's own output shape.
+ */
+export function leanCwdReportSnippet(logPath: string): string {
+  return [
+    'const { appendFileSync: leanAppend, readdirSync: leanReaddir, statSync: leanStat } = require("node:fs");',
+    'const { dirname: leanDirname } = require("node:path");',
+    `leanAppend(${JSON.stringify(logPath)}, leanDirname(process.cwd()) + "\\n");`,
+    "const leanCwdReport = {",
+    "  cwd: process.cwd(),",
+    "  cwdMode: (leanStat(process.cwd()).mode & 0o777).toString(8),",
+    "  cwdEntries: leanReaddir(process.cwd())",
+    "};"
+  ].join("\n");
+}
+
+export interface LeanCwdReport {
+  readonly cwd: string;
+  readonly cwdMode: string;
+  readonly cwdEntries: readonly string[];
+}
+
+/** The workspaces the probe logged, one per call, in call order. */
+export async function loggedWorkspaces(logPath: string): Promise<readonly string[]> {
+  return (await readFile(logPath, "utf8")).split("\n").filter((line) => line !== "");
+}
+
+/**
+ * The served call worked in an EMPTY 0700 directory outside this project,
+ * inside the relay's own 0700 workspace (`relay-<maker>-workspace-…`), and the
+ * relay's one handshake ran in that SAME workspace — so it was opened at start.
+ * Returns the workspace, so the caller can prove that stopping the relay removes it.
+ */
+export async function expectLeanWorkingDirectory(
+  report: LeanCwdReport,
+  makerSlug: string,
+  logPath: string
+): Promise<string> {
+  const fromProject = relative(process.cwd(), report.cwd);
+  expect(isAbsolute(report.cwd)).toBe(true);
+  expect(report.cwd).not.toBe(process.cwd());
+  expect(fromProject.startsWith("..") || isAbsolute(fromProject)).toBe(true);
+  expect(report.cwdEntries).toEqual([]);
+  expect(report.cwdMode).toBe("700");
+  expect(basename(report.cwd).startsWith(`relay-${makerSlug}-`)).toBe(true);
+  const workspace = dirname(report.cwd);
+  expect(basename(workspace).startsWith(`relay-${makerSlug}-workspace-`)).toBe(true);
+  expect(((await stat(workspace)).mode & 0o777).toString(8)).toBe("700");
+  expect(await loggedWorkspaces(logPath)).toEqual([workspace, workspace]);
+  return workspace;
+}
+```
+
+**`acceptance/claude-relay.test.ts`**
+
+Replace `import { mkdtemp, rm, writeFile } from "node:fs/promises";` with:
+
+```ts
+import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+```
+
+Replace the `./claude-relay.js` import (as left by A9):
+
+```ts
+import {
+  CLAUDE_BINARY_NAME,
+  CLAUDE_USAGE_CAP_PATTERN,
+  preflightClaudeCli,
+  resolveClaudeBinary,
+  startClaudeRelay,
+  type ClaudeRelayHandle
+} from "./claude-relay.js";
+```
+
+with:
+
+```ts
+import {
+  CLAUDE_BINARY_NAME,
+  CLAUDE_HANDSHAKE_PROMPT,
+  CLAUDE_USAGE_CAP_PATTERN,
+  preflightClaudeCli,
+  resolveClaudeBinary,
+  startClaudeRelay,
+  type ClaudeRelayHandle
+} from "./claude-relay.js";
+import { RELAY_MINIMAL_SYSTEM_PROMPT } from "./relay-core.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
+```
+
+Update the argv pin at `:264-275`. Replace:
+
+```ts
+      expect(relayed.argumentList).toEqual([
+        "-p", relayed.prompt,
+        "--output-format", "json",
+        // D18: "user", not "" — "" severed the CLI's keychain login.
+```
+
+with:
+
+```ts
+      expect(relayed.argumentList).toEqual([
+        "-p", relayed.prompt,
+        "--output-format", "json",
+        // D8 (Task A12b): Claude Code's own system prompt is replaced.
+        "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT,
+        // D18: "user", not "" — "" severed the CLI's keychain login.
+```
+
+Append at the end of the file:
+
+```ts
+describe("D8 lean calls — Claude Code (Task A12b)", () => {
+  it("replaces Claude Code's own system prompt with the relay's one sentence, never passes --bare, and keeps the transcript whole", async () => {
+    const relay = await start();
+
+    const completion = await (await postCompletion(relay, "Lean canary 3c9f.")).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string;
+      argumentList: readonly string[];
+    };
+    expect(relayed.argumentList.slice(2, 6)).toEqual([
+      "--output-format", "json", "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT
+    ]);
+    // M5: --bare also disables the OAuth/keychain login, so a subscription could not sign in.
+    expect(relayed.argumentList).not.toContain("--bare");
+    expect(relayed.argumentList.flatMap((argument, index) =>
+      argument.includes("Lean canary 3c9f.") ? [index] : []
+    )).toEqual([1]);
+    expect(JSON.parse(relayed.prompt)).toEqual({
+      format: "debateai.relay-messages.v1",
+      messages: [
+        { role: "system", content: "Return strict JSON." },
+        { role: "user", content: "Lean canary 3c9f." }
+      ]
+    });
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, each call in an empty 0700 directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          'console.log(JSON.stringify({ is_error: false, result: JSON.stringify(leanCwdReport), modelUsage: { "claude-probe-model": {} } }));'
+        ].join("\n"), "--"]
+      }
+    });
+    handles.push(relay);
+
+    const completion = await (await postCompletion(relay, "Probe cwd.")).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+
+    const workspace = await expectLeanWorkingDirectory(
+      JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport, "anthropic", logPath
+    );
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what Claude Code adds around the handshake, cached input included, and only reports it", async () => {
+    // M5's lean Opus 5.5 call: 2 input tokens plus 685 cache-creation tokens.
+    const envelope = 'console.log(JSON.stringify({ is_error: false, result: "OK", modelUsage: { "claude-opus-5-5": { inputTokens: 2, outputTokens: 1, cacheCreationInputTokens: 685, cacheReadInputTokens: 0 } } }));';
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", envelope, "--"] }
+    });
+    handles.push(relay);
+    const own = Math.ceil(CLAUDE_HANDSHAKE_PROMPT.length / 4);
+
+    expect(relay.harnessOverhead).toEqual({
+      maker: "Anthropic", reportedInputTokens: 687, promptTokensEstimate: own, overheadTokens: 687 - own
+    });
+  });
+});
+```
+
+**`acceptance/adversarial-corpus.test.ts`**
+
+Replace the `./relay-core.js` import:
+
+```ts
+import {
+  RELAY_REQUEST_MAX_BYTES,
+  startCliRelayServer,
+  type CliRelayAdapter,
+  type CliRelayHandle
+} from "./relay-core.js";
+```
+
+with:
+
+```ts
+import {
+  RELAY_MINIMAL_SYSTEM_PROMPT,
+  RELAY_REQUEST_MAX_BYTES,
+  startCliRelayServer,
+  type CliRelayAdapter,
+  type CliRelayHandle
+} from "./relay-core.js";
+```
+
+In CLAUDE-ARGV-01 (`:615-628`), replace:
+
+```ts
+      "-p", observed.prompt,
+      "--output-format", "json",
+```
+
+with:
+
+```ts
+      "-p", observed.prompt,
+      "--output-format", "json",
+      // D8 (Task A12b): Claude Code's own system prompt is replaced.
+      "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT,
+```
+
+In GROK-ARGV-01 (`:654-663`), replace:
+
+```ts
+      "--single", observed.prompt,
+      "--output-format", "json",
+      "--verbatim",
+```
+
+with:
+
+```ts
+      "--single", observed.prompt,
+      "--output-format", "json",
+      "--verbatim",
+      // D8 (Task A12b): grok's own system prompt is replaced.
+      "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT,
+```
+
+Both security properties are untouched: the adversarial text still sits only at index 1, inside the prompt value.
+
+**`acceptance/model-shim.test.ts`**
+
+Replace the imports at `:2-6`:
+
+```ts
+import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { isAbsolute, join, relative } from "node:path";
+```
+
+with:
+
+```ts
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
+```
+
+Replace the `./model-shim.js` import:
+
+```ts
+import {
+  CODEX_BINARY_NAME,
+  parseCodexCompletion,
+  resolveCodexBinary,
+  startModelShim,
+  type ModelShimHandle
+} from "./model-shim.js";
+```
+
+with:
+
+```ts
+import {
+  CODEX_BINARY_NAME,
+  CODEX_DISABLED_FEATURES,
+  CODEX_HANDSHAKE_PROMPT,
+  parseCodexCompletion,
+  resolveCodexBinary,
+  startModelShim,
+  type ModelShimHandle
+} from "./model-shim.js";
+import { CLI_RELAY_INSTRUCTIONS_FILE_NAME, RELAY_MINIMAL_SYSTEM_PROMPT } from "./relay-core.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
+```
+
+Insert directly after the `relayHeaders` function:
+
+```ts
+/**
+ * D8 (Task A12b): the lean flags every codex call carries after `--json`, rebuilt
+ * around the instructions path this relay chose (the path itself is pinned by the
+ * "D8 lean calls — codex" test below).
+ */
+function codexLeanArguments(argumentList: readonly string[]): readonly string[] {
+  const setting = argumentList.find((argument) => argument.startsWith("model_instructions_file="));
+  if (setting === undefined) throw new Error("TEST_CODEX_INSTRUCTIONS_SETTING_MISSING");
+  return ["-c", setting, ...CODEX_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature])];
+}
+```
+
+Update the three argv pins. At `:269-277` (unasked), replace:
+
+```ts
+      "--ignore-user-config",
+      "--json",
+      relayed.prompt
+    ]);
+```
+
+with:
+
+```ts
+      "--ignore-user-config",
+      "--json",
+      ...codexLeanArguments(relayed.arguments),
+      relayed.prompt
+    ]);
+```
+
+At `:312-321` (model pin), replace:
+
+```ts
+      "--json",
+      "-c", 'model="gpt-5.6-sol"',
+      relayed.prompt
+    ]);
+```
+
+with:
+
+```ts
+      "--json",
+      ...codexLeanArguments(relayed.arguments),
+      "-c", 'model="gpt-5.6-sol"',
+      relayed.prompt
+    ]);
+```
+
+In A9's "declares the seven measured levels …" test, replace:
+
+```ts
+      "--json",
+      "-c", 'model_reasoning_effort="xhigh"',
+      relayed.prompt
+    ]);
+```
+
+with:
+
+```ts
+      "--json",
+      ...codexLeanArguments(relayed.arguments),
+      "-c", 'model_reasoning_effort="xhigh"',
+      relayed.prompt
+    ]);
+```
+
+Append at the end of the file:
+
+```ts
+describe("D8 lean calls — codex (Task A12b)", () => {
+  it("points codex at the relay's 0600 instructions file, disables the measured extras, and keeps the prompt last", async () => {
+    const shim = await start();
+    const response = await fetch(`${shim.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: relayHeaders(shim),
+      body: JSON.stringify({ model: "ignored-by-shim", messages: [{ role: "user", content: "Lean canary 8d0b." }] })
+    });
+
+    const completion = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string; arguments: readonly string[];
+    };
+    const setting = relayed.arguments.find((argument) => argument.startsWith("model_instructions_file="));
+    expect(setting).toBeDefined();
+    expect(relayed.arguments[relayed.arguments.indexOf(setting!) - 1]).toBe("-c");
+    const instructionsFile = JSON.parse(setting!.slice("model_instructions_file=".length)) as string;
+    expect(isAbsolute(instructionsFile)).toBe(true);
+    expect(basename(instructionsFile)).toBe(CLI_RELAY_INSTRUCTIONS_FILE_NAME);
+    expect(basename(dirname(instructionsFile))).toMatch(/^relay-openai-workspace-/u);
+    expect(((await stat(instructionsFile)).mode & 0o777).toString(8)).toBe("600");
+    expect(await readFile(instructionsFile, "utf8")).toBe(RELAY_MINIMAL_SYSTEM_PROMPT);
+    // M5: exactly these 18 are disabled. code_mode_host is NOT: disabling it adds an error item.
+    expect(CODEX_DISABLED_FEATURES).toEqual([
+      "apps", "browser_use", "browser_use_external", "computer_use", "goals", "hooks",
+      "image_generation", "multi_agent", "plugins", "shell_tool", "skill_search", "sleep_tool",
+      "tool_suggest", "unified_exec", "view_image", "workspace_dependencies", "in_app_browser",
+      "shell_snapshot"
+    ]);
+    expect(relayed.arguments.flatMap((argument, index) =>
+      relayed.arguments[index - 1] === "--disable" ? [argument] : []
+    )).toEqual([...CODEX_DISABLED_FEATURES]);
+    expect(relayed.arguments).not.toContain("code_mode_host");
+    expect(relayed.arguments.at(-1)).toBe(relayed.prompt);
+    expect(relayed.arguments.filter((argument) => argument.includes("Lean canary 8d0b.")))
+      .toEqual([relayed.prompt]);
+
+    await shim.close();
+
+    expect(existsSync(instructionsFile)).toBe(false);
+    expect(existsSync(dirname(instructionsFile))).toBe(false);
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, each call in an empty 0700 directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory(), "workspaces.log");
+    const probe = [
+      leanCwdReportSnippet(logPath),
+      'console.log(JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }));',
+      'console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: JSON.stringify(leanCwdReport) } }));'
+    ].join("\n");
+    const shim = await startModelShim({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", probe, "--"] },
+      testOnlySessionsRoot: fakeSessionsRoot
+    });
+    handles.push(shim);
+
+    const response = await fetch(`${shim.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: relayHeaders(shim),
+      body: JSON.stringify({ model: "ignored", messages: [{ role: "user", content: "Probe cwd." }] })
+    });
+
+    const completion = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const workspace = await expectLeanWorkingDirectory(
+      JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport, "openai", logPath
+    );
+    await shim.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what codex adds around the handshake and only reports it", async () => {
+    const shim = await start();
+    const own = Math.ceil(CODEX_HANDSHAKE_PROMPT.length / 4);
+
+    // The fake prints the measured default-profile usage: 15 490 input tokens.
+    expect(shim.harnessOverhead).toEqual({
+      maker: "OpenAI", reportedInputTokens: 15_490, promptTokensEstimate: own, overheadTokens: 15_490 - own
+    });
+  });
+});
+```
+
+**`acceptance/grok-relay.test.ts`**
+
+Replace the first two lines:
+
+```ts
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+```
+
+with:
+
+```ts
+import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+```
+
+Replace the `./grok-relay.js` import:
+
+```ts
+import {
+  GROK_BINARY_NAME,
+  GROK_SANDBOX_PROFILE,
+  SANDBOX_PROFILE_UNAVAILABLE,
+  resolveGrokBinary,
+  startGrokRelay,
+  type GrokRelayHandle
+} from "./grok-relay.js";
+```
+
+with:
+
+```ts
+import {
+  GROK_BINARY_NAME,
+  GROK_HANDSHAKE_PROMPT,
+  GROK_SANDBOX_PROFILE,
+  SANDBOX_PROFILE_UNAVAILABLE,
+  resolveGrokBinary,
+  startGrokRelay,
+  type GrokRelayHandle
+} from "./grok-relay.js";
+import { RELAY_MINIMAL_SYSTEM_PROMPT } from "./relay-core.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
+```
+
+Update the argv pin at `:228-237`. Replace:
+
+```ts
+      expect(relayed.argumentList).toEqual([
+        "--single", relayed.prompt,
+        "--output-format", "json",
+        "--verbatim",
+        "--sandbox", "read-only",
+```
+
+with:
+
+```ts
+      expect(relayed.argumentList).toEqual([
+        "--single", relayed.prompt,
+        "--output-format", "json",
+        "--verbatim",
+        // D8 (Task A12b): grok's own system prompt is replaced.
+        "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT,
+        "--sandbox", "read-only",
+```
+
+and the degraded relay's flag list at `:573-576`. Replace:
+
+```ts
+      "--single", "--output-format", "--verbatim",
+      "--no-memory", "--no-subagents", "--disable-web-search", "--tools"
+```
+
+with:
+
+```ts
+      "--single", "--output-format", "--verbatim", "--system-prompt-override",
+      "--no-memory", "--no-subagents", "--disable-web-search", "--tools"
+```
+
+Append at the end of the file:
+
+```ts
+describe("D8 lean calls — grok (Task A12b)", () => {
+  interface RelayedGrok {
+    readonly prompt: string;
+    readonly argumentList: readonly string[];
+  }
+
+  const relayedOf = async (handle: GrokRelayHandle, content: string): Promise<RelayedGrok> => {
+    const completion = await (await postCompletion(handle, content)).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    return JSON.parse(completion.choices[0]!.message.content) as RelayedGrok;
+  };
+
+  it("overrides grok's own system prompt with the relay's one sentence, and passes -m only when a model is selected", async () => {
+    const unselected = await relayedOf(await start(), "Lean canary 7a2e.");
+    expect(unselected.argumentList.slice(4, 7)).toEqual([
+      "--verbatim", "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT
+    ]);
+    expect(unselected.argumentList).not.toContain("-m");
+
+    const selecting = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "grok-4.7",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+    handles.push(selecting);
+    // The lineage is still what the CLI REPORTS (live, `-m grok-4.7` answers as grok-4.7-build).
+    expect(selecting.model).toBe("grok-fake-cli-model");
+    const selected = await relayedOf(selecting, "Assess this claim.");
+    expect(selected.argumentList.slice(4, 9)).toEqual([
+      "--verbatim", "-m", "grok-4.7", "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT
+    ]);
+
+    await expect(startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "grok 4.7",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    })).rejects.toThrow("GROK_CLI_MODEL_PIN_INVALID");
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, each call in an empty 0700 directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const relay = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          'console.log(JSON.stringify({ text: JSON.stringify(leanCwdReport), stopReason: "end_turn", modelUsage: { "grok-probe-model": {} } }));'
+        ].join("\n"), "--"]
+      }
+    });
+    handles.push(relay);
+
+    const completion = await (await postCompletion(relay, "Probe cwd.")).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+
+    const workspace = await expectLeanWorkingDirectory(
+      JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport, "xai", logPath
+    );
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what grok adds around the handshake and only reports it", async () => {
+    const relay = await start();
+    const own = Math.ceil(GROK_HANDSHAKE_PROMPT.length / 4);
+
+    // The fake reports 1 input token, so its "overhead" is negative: this pins the arithmetic, not a CLI.
+    expect(relay.harnessOverhead).toEqual({
+      maker: "xAI", reportedInputTokens: 1, promptTokensEstimate: own, overheadTokens: 1 - own
+    });
+  });
+});
+```
+
+**`acceptance/agy-relay.test.ts`** (as left by A10)
+
+Replace `import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";` with:
+
+```ts
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+```
+
+Replace the `./agy-relay.js` import:
+
+```ts
+import {
+  ACCEPTANCE_AGY_BINARY,
+  AGY_BINARY_NAME,
+  AGY_STDIN_FORMAT,
+  agyArguments,
+```
+
+with:
+
+```ts
+import {
+  ACCEPTANCE_AGY_BINARY,
+  AGY_BINARY_NAME,
+  AGY_HANDSHAKE_PROMPT,
+  AGY_STDIN_FORMAT,
+  agyArguments,
+```
+
+and insert directly after that import's closing `} from "./agy-relay.js";`:
+
+```ts
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
+```
+
+Update A10's two pure pins. Replace:
+
+```ts
+    expect(agyArguments("gemini-3.8-flash-high", "text")).toEqual([
+      "--output-format", "json",
+      "--mode", "plan",
+      "--sandbox",
+      "--model", "gemini-3.8-flash-high",
+```
+
+with:
+
+```ts
+    expect(agyArguments("gemini-3.8-flash-high", "text")).toEqual([
+      "--output-format", "json",
+      "--mode", "plan",
+      "--sandbox",
+      "--disable-slash-commands",
+      "--model", "gemini-3.8-flash-high",
+```
+
+and replace:
+
+```ts
+      "--input-format", "stream-json",
+      "--mode", "plan",
+      "--sandbox",
+      "--model", "gemini-3.8-flash-high",
+```
+
+with:
+
+```ts
+      "--input-format", "stream-json",
+      "--mode", "plan",
+      "--sandbox",
+      "--disable-slash-commands",
+      "--model", "gemini-3.8-flash-high",
+```
+
+Append at the end of the file:
+
+```ts
+describe("D8 lean calls — agy (Task A12b)", () => {
+  it("turns slash commands off beside plan mode and the sandbox, and still never puts the prompt on argv", async () => {
+    const relay = await start();
+
+    const echo = echoOf(await (await post(relay, "Lean canary 1b4d.")).json() as AgyCompletion);
+
+    expect(echo.argumentList).toEqual(agyArguments("gemini-3.8-flash-high", AGY_STDIN_FORMAT));
+    expect(echo.argumentList.slice(echo.argumentList.indexOf("--mode"), echo.argumentList.indexOf("--model")))
+      .toEqual(["--mode", "plan", "--sandbox", "--disable-slash-commands"]);
+    expect(echo.argumentList.some((argument) => argument.includes("Lean canary 1b4d."))).toBe(false);
+    // agy has no system-prompt flag (M5): what it is asked is the engine's transcript, unchanged.
+    expect(echo.prompt).toBe(renderPromptTranscript([
+      { role: "system", content: "Return strict JSON." },
+      { role: "user", content: "Lean canary 1b4d." }
+    ]));
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, each call in an empty 0700 directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const relay = await start({
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          'console.log(JSON.stringify({ status: "SUCCESS", response: JSON.stringify(leanCwdReport) }));'
+        ].join("\n"), "--"]
+      }
+    });
+
+    const completion = await (await post(relay, "Probe cwd.")).json() as AgyCompletion;
+
+    const workspace = await expectLeanWorkingDirectory(
+      JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport, "google", logPath
+    );
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what agy adds around the handshake and only reports it", async () => {
+    const relay = await start();
+    const own = Math.ceil(AGY_HANDSHAKE_PROMPT.length / 4);
+
+    // The fake prints the measured default usage: 13 977 input tokens.
+    expect(relay.harnessOverhead).toEqual({
+      maker: "Google", reportedInputTokens: 13_977, promptTokensEstimate: own, overheadTokens: 13_977 - own
+    });
+  });
+});
+```
+
+**`acceptance/pi-relay.test.ts`** (as left by A11)
+
+Replace:
+
+```ts
+import { RELAY_MESSAGE_MAX_UTF8_BYTES, renderPromptTranscript } from "./relay-core.js";
+import {
+  ACCEPTANCE_PI_BINARY,
+  PI_BINARY_NAME,
+  PI_GLM_CONTEXT_WINDOW_TOKENS,
+  PI_RELAY_SYSTEM_PROMPT,
+```
+
+with:
+
+```ts
+import { RELAY_MESSAGE_MAX_UTF8_BYTES, RELAY_MINIMAL_SYSTEM_PROMPT, renderPromptTranscript } from "./relay-core.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
+import {
+  ACCEPTANCE_PI_BINARY,
+  PI_ATTACHED_PROMPT_MESSAGE,
+  PI_BINARY_NAME,
+  PI_GLM_CONTEXT_WINDOW_TOKENS,
+  PI_HANDSHAKE_PROMPT,
+  PI_RELAY_SYSTEM_PROMPT,
+```
+
+Append at the end of the file:
+
+```ts
+describe("D8 lean calls — pi (Task A12b)", () => {
+  it("adds --no-prompt-templates, gives pi the relay's one sentence as its system prompt, and keeps the prompt in the @file", async () => {
+    const relay = await start();
+
+    const echo = echoOf(await (await post(relay, "Lean canary 5e1d.")).json() as PiCompletion);
+
+    expect(PI_RELAY_SYSTEM_PROMPT).toBe(RELAY_MINIMAL_SYSTEM_PROMPT);
+    expect(echo.argumentList).toEqual([
+      "--print",
+      "--mode", "json",
+      "--provider", "zai",
+      "--model", "glm-5.3-flash",
+      "--thinking", "high",
+      "--no-tools",
+      "--no-session",
+      "--no-extensions",
+      "--no-skills",
+      "--no-context-files",
+      "--no-prompt-templates",
+      "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT,
+      `@${echo.promptFile}`,
+      PI_ATTACHED_PROMPT_MESSAGE
+    ]);
+    expect(echo.argumentList.some((argument) => argument.includes("Lean canary 5e1d."))).toBe(false);
+    expect(echo.environment.PI_TELEMETRY).toBe("0");
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, the @file beside the call's empty directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const relay = await start({
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          "const leanArgv = process.argv.slice(1);",
+          'const leanModel = leanArgv[leanArgv.indexOf("--model") + 1];',
+          'const leanPromptFile = (leanArgv.find((argument) => argument.startsWith("@")) ?? "@").slice(1);',
+          "const leanText = JSON.stringify({ ...leanCwdReport, promptFile: leanPromptFile });",
+          'console.log(JSON.stringify({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: leanText }], provider: "zai", model: leanModel, stopReason: "stop" } }));'
+        ].join("\n"), "--"]
+      }
+    });
+
+    const completion = await (await post(relay, "Probe cwd.")).json() as PiCompletion;
+    const report = JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport & { readonly promptFile: string };
+
+    const workspace = await expectLeanWorkingDirectory(report, "z-ai", logPath);
+    expect(dirname(dirname(report.promptFile))).toBe(workspace);
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what pi adds around the handshake and only reports it", async () => {
+    const relay = await start();
+    const own = Math.ceil(renderPromptTranscript([{ role: "user", content: PI_HANDSHAKE_PROMPT }]).length / 4);
+
+    // The fake prints the measured default-profile usage: 480 input tokens.
+    expect(relay.harnessOverhead).toEqual({
+      maker: "Z.AI", reportedInputTokens: 480, promptTokensEstimate: own, overheadTokens: 480 - own
+    });
+  });
+});
+```
+
+**`acceptance/relay-host.test.ts`** (as left by A12)
+
+Append at the end of the file:
+
+```ts
+describe("D8 / A20b: a grok candidate may name the id grok's -m selects (Task A12b)", () => {
+  it("passes modelSelection to grok as -m and still holds the reported id to modelId", async () => {
+    const directory = await workspace();
+    const host = await serveRelayHost({
+      candidatesPath: await candidatesFile(directory, [{
+        providerRef: "local:grok",
+        tool: "grok",
+        modelId: "grok-fake-cli-model",
+        modelSelection: "grok-4.7",
+        thinkingLevels: []
+      }]),
+      endpointsPath: join(directory, "endpoints.json"),
+      environment: LOCAL,
+      seams: SEAMS,
+      emit: () => undefined
+    });
+    hosts.push(host);
+    const grok = host.endpoints[0]!;
+    expect(grok.modelId).toBe("grok-fake-cli-model");
+
+    const response = await fetch(`${grok.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${grok.bearerToken}` },
+      body: JSON.stringify({ model: grok.modelId, messages: [{ role: "user", content: "Selection probe." }] })
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const argumentList = (JSON.parse(body.choices[0]!.message.content) as { argumentList: readonly string[] })
+      .argumentList;
+    expect(argumentList[argumentList.indexOf("-m") + 1]).toBe("grok-4.7");
+  });
+
+  it("refuses modelSelection on any other tool", async () => {
+    const directory = await workspace();
+
+    await expect(serveRelayHost({
+      candidatesPath: await candidatesFile(directory, [{ ...PI_CANDIDATE, modelSelection: "glm-5.3-flash" }]),
+      endpointsPath: join(directory, "endpoints.json"),
+      environment: LOCAL,
+      seams: SEAMS,
+      emit: () => undefined
+    })).rejects.toThrow("RELAY_HOST_CANDIDATES_INVALID");
+  });
+});
+```
+
+- [ ] **Step 7: Run the tests to verify they fail**
+
+Run: `pnpm exec vitest run acceptance/claude-relay.test.ts acceptance/model-shim.test.ts acceptance/grok-relay.test.ts acceptance/agy-relay.test.ts acceptance/pi-relay.test.ts acceptance/relay-host.test.ts acceptance/adversarial-corpus.test.ts`
+Expected: FAIL. Among the failures:
+- every updated argv pin, e.g. `expected [ '-p', …, '--setting-sources', … ] to deeply equal [ '-p', …, '--system-prompt', … ]`, and the codex pins throw `TEST_CODEX_INSTRUCTIONS_SETTING_MISSING`;
+- `expected undefined to deeply equal { maker: 'Anthropic', … }`: no handle carries `harnessOverhead` yet;
+- the five working-directory tests fail on `expect(await loggedWorkspaces(logPath)).toEqual([workspace, workspace])`: the handshake still runs in the system temp root, outside the relay's workspace;
+- `expected undefined to be defined` for the codex instructions setting, and `CODEX_DISABLED_FEATURES` is undefined;
+- the grok selection test finds no `-m`, and `"grok 4.7"` still starts;
+- agy lacks `--disable-slash-commands`, and pi lacks `--no-prompt-templates` and still sends its long system text;
+- the relay host refuses the grok candidate as `RELAY_HOST_CANDIDATES_INVALID` (its strict schema does not know `modelSelection` yet).
+
+The relay-host "refuses modelSelection on any other tool" test already passes (the strict schema refuses any
+unknown key); it stays as the pin that only `grok` may carry the key.
+
+
+- [ ] **Step 8: Write the implementation (the five relays, the relay host, the README)**
+
+**`acceptance/claude-relay.ts`** (as left by A9)
+
+Replace the import block:
+
+```ts
+import {
+  CliRelayFailure,
+  invokeCli,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliFailureEvidence,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CommandSpec
+} from "./relay-core.js";
+```
+
+with:
+
+```ts
+import {
+  CliRelayFailure,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
+  invokeCli,
+  openRelayWorkspace,
+  reportHarnessOverhead,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliFailureEvidence,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CommandSpec,
+  type HarnessOverhead,
+  type RelayWorkspace
+} from "./relay-core.js";
+```
+
+Replace `observedTokenUsageSchema`:
+
+```ts
+const observedTokenUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative().optional(),
+  output_tokens: z.number().int().nonnegative().optional(),
+  inputTokens: z.number().int().nonnegative().optional(),
+  outputTokens: z.number().int().nonnegative().optional(),
+  canonicalModel: z.string().trim().min(1).optional()
+}).passthrough();
+```
+
+with:
+
+```ts
+const observedTokenUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative().optional(),
+  output_tokens: z.number().int().nonnegative().optional(),
+  inputTokens: z.number().int().nonnegative().optional(),
+  outputTokens: z.number().int().nonnegative().optional(),
+  // D8: Claude Code counts cached input APART from inputTokens (M5: 2 input +
+  // 685 cache-creation on a lean one-line call). Read for the harness-overhead
+  // line only; usage.promptTokens keeps its meaning.
+  cacheCreationInputTokens: z.number().int().nonnegative().optional(),
+  cacheReadInputTokens: z.number().int().nonnegative().optional(),
+  cache_creation_input_tokens: z.number().int().nonnegative().optional(),
+  cache_read_input_tokens: z.number().int().nonnegative().optional(),
+  canonicalModel: z.string().trim().min(1).optional()
+}).passthrough();
+```
+
+At the end of `parseClaudeEnvelope`, replace:
+
+```ts
+  return Object.freeze({
+    content,
+    model,
+    usage: Object.keys(usage).length === 0 ? null : Object.freeze(usage)
+  });
+}
+```
+
+with:
+
+```ts
+  const cacheTokens = observed.success
+    ? [
+      observed.data.cacheCreationInputTokens ?? observed.data.cache_creation_input_tokens,
+      observed.data.cacheReadInputTokens ?? observed.data.cache_read_input_tokens
+    ].filter((count): count is number => count !== undefined)
+    : [];
+  return Object.freeze({
+    content,
+    model,
+    usage: Object.keys(usage).length === 0 ? null : Object.freeze(usage),
+    // D8: everything the CLI says the model read, cache included.
+    ...(inputTokens === undefined || cacheTokens.length === 0
+      ? {}
+      : { reportedInputTokens: cacheTokens.reduce((sum, count) => sum + count, inputTokens) })
+  });
+}
+```
+
+In `createClaudeAdapter`, replace:
+
+```ts
+  // §2.2: `--effort` is APPENDED only when a level was asked, so the argument
+  // vector of an unasked call is byte-for-byte what it was.
+  buildArguments: (prompt: string, invocation?: CliInvocation) => [
+    "-p", prompt,
+    "--output-format", "json",
+    "--setting-sources", CLAUDE_SETTING_SOURCES,
+```
+
+with:
+
+```ts
+  // §2.2: `--effort` is APPENDED only when a level was asked, so an unasked
+  // call carries no level flag at all.
+  //
+  // D8 (lean calls, M5): `--system-prompt` REPLACES Claude Code's own large
+  // system prompt with the relay's one fixed sentence (a lean call measured
+  // ~687 input tokens). `--bare` would strip more, but it also disables the
+  // OAuth/keychain login, so a subscription could not sign in: never pass it.
+  buildArguments: (prompt: string, invocation?: CliInvocation) => [
+    "-p", prompt,
+    "--output-format", "json",
+    "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT,
+    "--setting-sources", CLAUDE_SETTING_SOURCES,
+```
+
+Replace `ClaudeRelayHandle` (as left by A9):
+
+```ts
+export interface ClaudeRelayHandle extends CliRelayHandle {
+  /** The model id the CLI itself reported during the startup handshake. */
+  readonly model: string;
+  readonly maker: typeof ANTHROPIC_MAKER;
+  /** §2.2: the `--effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
+}
+```
+
+with:
+
+```ts
+export interface ClaudeRelayHandle extends CliRelayHandle {
+  /** The model id the CLI itself reported during the startup handshake. */
+  readonly model: string;
+  readonly maker: typeof ANTHROPIC_MAKER;
+  /** §2.2: the `--effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
+  /** D8: what Claude Code added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
+}
+```
+
+Replace `ClaudePreflightOptions`:
+
+```ts
+export interface ClaudePreflightOptions {
+  readonly timeoutMs: number;
+  /** Test-only process seam. Rejected outside NODE_ENV=test (DR-115). */
+  readonly testOnlyCommand?: CommandSpec;
+  /** Use the same requested model for the handshake and served calls. */
+  readonly modelAlias?: string;
+}
+```
+
+with:
+
+```ts
+export interface ClaudePreflightOptions {
+  readonly timeoutMs: number;
+  /** Test-only process seam. Rejected outside NODE_ENV=test (DR-115). */
+  readonly testOnlyCommand?: CommandSpec;
+  /** Use the same requested model for the handshake and served calls. */
+  readonly modelAlias?: string;
+  /**
+   * D8: the relay's own workspace, lent for its handshake. Absent (the
+   * ceremony's standalone preflight) ⇒ a private one is opened and removed here.
+   */
+  readonly workspace?: RelayWorkspace;
+}
+```
+
+In `preflightClaudeCli`, replace:
+
+```ts
+  const handshake = await invokeCli(
+    command,
+    createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS),
+    CLAUDE_HANDSHAKE_PROMPT,
+    options.timeoutMs
+  );
+  return Object.freeze({ command, handshake });
+}
+```
+
+with:
+
+```ts
+  const adapter = createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS);
+  // D8: the handshake runs exactly where served calls run.
+  const workspace = options.workspace ?? await openRelayWorkspace(adapter);
+  try {
+    const handshake = await invokeCli(command, adapter, CLAUDE_HANDSHAKE_PROMPT, options.timeoutMs, { workspace });
+    return Object.freeze({ command, handshake });
+  } finally {
+    if (options.workspace === undefined) await workspace.close();
+  }
+}
+```
+
+Replace `startClaudeRelay` (as left by A9):
+
+```ts
+export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<ClaudeRelayHandle> {
+  const claudeAdapter = createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS);
+  const { command, handshake } = await preflightClaudeCli({
+    timeoutMs: options.timeoutMs,
+    ...(options.modelAlias === undefined ? {} : { modelAlias: options.modelAlias }),
+    ...(options.testOnlyCommand === undefined ? {} : { testOnlyCommand: options.testOnlyCommand })
+  });
+  const server = await startCliRelayServer({
+    port: options.port,
+    timeoutMs: options.timeoutMs,
+    command,
+    adapter: claudeAdapter
+  });
+  return Object.freeze({
+    port: server.port,
+    baseUrl: server.baseUrl,
+    authorizationHeader: server.authorizationHeader,
+    model: handshake.model,
+    maker: ANTHROPIC_MAKER,
+    thinkingLevels: CLAUDE_THINKING_LEVELS,
+    close: () => server.close()
+  });
+}
+```
+
+with:
+
+```ts
+export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<ClaudeRelayHandle> {
+  const claudeAdapter = createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS);
+  // D8: ONE private workspace for this relay's whole life, the handshake
+  // included; the server removes it at close().
+  const workspace = await openRelayWorkspace(claudeAdapter);
+  try {
+    const { command, handshake } = await preflightClaudeCli({
+      timeoutMs: options.timeoutMs,
+      workspace,
+      ...(options.modelAlias === undefined ? {} : { modelAlias: options.modelAlias }),
+      ...(options.testOnlyCommand === undefined ? {} : { testOnlyCommand: options.testOnlyCommand })
+    });
+    const harnessOverhead = reportHarnessOverhead(ANTHROPIC_MAKER, CLAUDE_HANDSHAKE_PROMPT, handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      adapter: claudeAdapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model: handshake.model,
+      maker: ANTHROPIC_MAKER,
+      thinkingLevels: CLAUDE_THINKING_LEVELS,
+      harnessOverhead,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
+}
+```
+
+**`acceptance/model-shim.ts`** (as left by A9)
+
+Replace the import block:
+
+```ts
+import {
+  CliRelayFailure,
+  buildCliUsage,
+  invokeCli,
+  renderPromptTranscript,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CliUsage,
+  type CommandSpec
+} from "./relay-core.js";
+```
+
+with:
+
+```ts
+import {
+  CliRelayFailure,
+  buildCliUsage,
+  invokeCli,
+  openRelayWorkspace,
+  renderPromptTranscript,
+  reportHarnessOverhead,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CliUsage,
+  type CommandSpec,
+  type HarnessOverhead
+} from "./relay-core.js";
+```
+
+Insert directly after the A9 constant `CODEX_THINKING_LEVELS` (after its closing `);`):
+
+```ts
+/**
+ * D8 (lean calls) — codex-cli 0.156.1, measured 2026-09-26 (M5): with these
+ * disabled and the relay's instructions file in place of codex's own base
+ * instructions, a one-line call read 6,909 input tokens instead of 15,370 and
+ * still answered on the subscription. `code_mode_host` is deliberately NOT
+ * here: disabling it adds an error item to the event stream.
+ */
+export const CODEX_DISABLED_FEATURES = Object.freeze([
+  "apps", "browser_use", "browser_use_external", "computer_use", "goals", "hooks",
+  "image_generation", "multi_agent", "plugins", "shell_tool", "skill_search", "sleep_tool",
+  "tool_suggest", "unified_exec", "view_image", "workspace_dependencies", "in_app_browser",
+  "shell_snapshot"
+] as const);
+```
+
+Replace `ModelShimHandle` (as left by A9):
+
+```ts
+export interface ModelShimHandle extends CliRelayHandle {
+  readonly model: string;
+  readonly maker: typeof ACCEPTANCE_MAKER;
+  /** §2.2: the `model_reasoning_effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
+}
+```
+
+with:
+
+```ts
+export interface ModelShimHandle extends CliRelayHandle {
+  readonly model: string;
+  readonly maker: typeof ACCEPTANCE_MAKER;
+  /** §2.2: the `model_reasoning_effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
+  /** D8: what codex added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
+}
+```
+
+In `createCodexAdapter` (as left by A9), replace:
+
+```ts
+    thinkingLevels: CODEX_THINKING_LEVELS,
+    // §2.2: the level is one checked token, so the quoted config value cannot
+    // be broken out of; it is APPENDED only when asked and the prompt stays last.
+    buildArguments: (prompt: string, invocation?: CliInvocation) => [
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox", "read-only",
+      "--ignore-rules",
+      "--ignore-user-config",
+      "--json",
+      ...(model === undefined ? [] : ["-c", `model="${model}"`]),
+      ...(invocation?.thinkingLevel === undefined
+        ? []
+        : ["-c", `model_reasoning_effort="${invocation.thinkingLevel}"`]),
+      prompt
+    ],
+```
+
+with:
+
+```ts
+    thinkingLevels: CODEX_THINKING_LEVELS,
+    // D8: relay-core writes RELAY_MINIMAL_SYSTEM_PROMPT to a 0600 file once per
+    // relay start and never runs this adapter without it.
+    readsInstructionsFile: true,
+    // §2.2: the level is one checked token, so the quoted config value cannot
+    // be broken out of; it is APPENDED only when asked and the prompt stays last.
+    // D8: the lean flags sit right after --json, so the prompt stays last too.
+    buildArguments: (prompt: string, invocation?: CliInvocation) => {
+      if (invocation?.instructionsFile === undefined) {
+        throw new CliRelayFailure("FAILED", "CODEX_CLI_INSTRUCTIONS_FILE_MISSING");
+      }
+      return [
+        "exec",
+        "--skip-git-repo-check",
+        "--sandbox", "read-only",
+        "--ignore-rules",
+        "--ignore-user-config",
+        "--json",
+        // D8: codex's own base instructions are REPLACED by the relay's one
+        // sentence. JSON quoting is a valid TOML basic string for any path.
+        "-c", `model_instructions_file=${JSON.stringify(invocation.instructionsFile)}`,
+        ...CODEX_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]),
+        ...(model === undefined ? [] : ["-c", `model="${model}"`]),
+        ...(invocation.thinkingLevel === undefined
+          ? []
+          : ["-c", `model_reasoning_effort="${invocation.thinkingLevel}"`]),
+        prompt
+      ];
+    },
+```
+
+In `startModelShim` (as left by A9), replace:
+
+```ts
+  const adapter = createCodexAdapter(options.testOnlySessionsRoot ?? defaultCodexSessionsRoot(), options.model);
+  const handshake = await invokeCli(command, adapter, CODEX_HANDSHAKE_PROMPT, options.timeoutMs);
+  if (options.model !== undefined && handshake.model !== options.model) {
+    throw new CliRelayFailure("FAILED", "CODEX_CLI_MODEL_MISMATCH");
+  }
+  const server = await startCliRelayServer({
+    port: options.port,
+    timeoutMs: options.timeoutMs,
+    command,
+    adapter
+  });
+  return Object.freeze({
+    port: server.port,
+    baseUrl: server.baseUrl,
+    authorizationHeader: server.authorizationHeader,
+    model: handshake.model,
+    maker: ACCEPTANCE_MAKER,
+    thinkingLevels: CODEX_THINKING_LEVELS,
+    close: () => server.close()
+  });
+}
+```
+
+with:
+
+```ts
+  const adapter = createCodexAdapter(options.testOnlySessionsRoot ?? defaultCodexSessionsRoot(), options.model);
+  // D8: ONE private workspace for this relay's whole life. It holds the 0600
+  // instructions file every call — the handshake included — points codex at.
+  const workspace = await openRelayWorkspace(adapter);
+  try {
+    const handshake = await invokeCli(command, adapter, CODEX_HANDSHAKE_PROMPT, options.timeoutMs, { workspace });
+    if (options.model !== undefined && handshake.model !== options.model) {
+      throw new CliRelayFailure("FAILED", "CODEX_CLI_MODEL_MISMATCH");
+    }
+    const harnessOverhead = reportHarnessOverhead(ACCEPTANCE_MAKER, CODEX_HANDSHAKE_PROMPT, handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      adapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model: handshake.model,
+      maker: ACCEPTANCE_MAKER,
+      thinkingLevels: CODEX_THINKING_LEVELS,
+      harnessOverhead,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
+}
+```
+
+**`acceptance/grok-relay.ts`** (as left by A9)
+
+Replace the import block:
+
+```ts
+import {
+  CliRelayFailure,
+  buildCliUsage,
+  invokeCli,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CliUsage,
+  type CommandSpec
+} from "./relay-core.js";
+```
+
+with:
+
+```ts
+import {
+  CliRelayFailure,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
+  buildCliUsage,
+  invokeCli,
+  openRelayWorkspace,
+  reportHarnessOverhead,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CliUsage,
+  type CommandSpec,
+  type HarnessOverhead,
+  type RelayWorkspace
+} from "./relay-core.js";
+```
+
+Insert directly after `export const GROK_THINKING_LEVELS = Object.freeze(["low", "medium", "high", "xhigh"] as const);`:
+
+```ts
+/**
+ * D8 / A20b (M5, 2026-09-26): grok SELECTS a model by a short id and REPORTS a
+ * longer one — `-m grok-4.7` answers as `grok-4.7-build`, and
+ * `-m grok-4.7-build` is refused ("unknown model id"). A relay started with a
+ * `model` passes it as `-m`; the relayed lineage is always the reported id.
+ */
+const GROK_MODEL_SELECTION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+```
+
+Replace `grokArguments` and `grokAdapterFor` (as left by A9):
+
+```ts
+function grokArguments(
+  prompt: string,
+  sandboxProfile: string | null,
+  thinkingLevel: string | undefined
+): readonly string[] {
+  return [
+    "--single", prompt,
+    "--output-format", "json",
+    "--verbatim",
+    ...(sandboxProfile === null ? [] : [GROK_SANDBOX_FLAG, sandboxProfile]),
+    "--no-memory",
+    "--no-subagents",
+    "--disable-web-search",
+    "--tools", "",
+    // §2.2: APPENDED only when a level was asked, so an unasked call's vector
+    // is byte-for-byte what it was (and the sandbox probe's flag list with it).
+    ...(thinkingLevel === undefined ? [] : ["--reasoning-effort", thinkingLevel])
+  ];
+}
+
+function grokAdapterFor(sandboxProfile: string | null): CliRelayAdapter {
+```
+
+with:
+
+```ts
+function grokArguments(
+  prompt: string,
+  sandboxProfile: string | null,
+  modelSelection: string | undefined,
+  thinkingLevel: string | undefined
+): readonly string[] {
+  return [
+    "--single", prompt,
+    "--output-format", "json",
+    "--verbatim",
+    // D8 / A20b: `-m` only when this relay was started with a model to select.
+    ...(modelSelection === undefined ? [] : ["-m", modelSelection]),
+    // D8 (lean calls, M5): the relay's one sentence REPLACES grok's own system
+    // prompt. grok's harness still adds ~18k tokens a call; that is disclosed.
+    "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT,
+    ...(sandboxProfile === null ? [] : [GROK_SANDBOX_FLAG, sandboxProfile]),
+    "--no-memory",
+    "--no-subagents",
+    "--disable-web-search",
+    "--tools", "",
+    // §2.2: APPENDED only when a level was asked, so an unasked call carries no
+    // level flag (and the sandbox probe's flag list is the same at every level).
+    ...(thinkingLevel === undefined ? [] : ["--reasoning-effort", thinkingLevel])
+  ];
+}
+
+function grokAdapterFor(sandboxProfile: string | null, modelSelection: string | undefined): CliRelayAdapter {
+```
+
+and, inside `grokAdapterFor`, replace:
+
+```ts
+    buildArguments: (prompt: string, invocation?: CliInvocation) =>
+      grokArguments(prompt, sandboxProfile, invocation?.thinkingLevel),
+```
+
+with:
+
+```ts
+    buildArguments: (prompt: string, invocation?: CliInvocation) =>
+      grokArguments(prompt, sandboxProfile, modelSelection, invocation?.thinkingLevel),
+```
+
+Delete the module-level sandboxed adapter (it now depends on the relay's model selection and is built per start):
+
+```ts
+/** The sandboxed adapter: argument-for-argument what every Grok call was before this seam. */
+const grokAdapter: CliRelayAdapter = grokAdapterFor(GROK_SANDBOX_PROFILE);
+```
+
+Replace `GrokRelayOptions`:
+
+```ts
+export interface GrokRelayOptions {
+  readonly port: number;
+  readonly timeoutMs: number;
+  /** Test-only process seam. Rejected outside NODE_ENV=test (DR-115). */
+  readonly testOnlyCommand?: CommandSpec;
+  /** CLI sandbox profile; defaults to `read-only`. See GrokSandboxProfile. */
+  readonly sandboxProfile?: GrokSandboxProfile;
+}
+```
+
+with:
+
+```ts
+export interface GrokRelayOptions {
+  readonly port: number;
+  readonly timeoutMs: number;
+  /** Test-only process seam. Rejected outside NODE_ENV=test (DR-115). */
+  readonly testOnlyCommand?: CommandSpec;
+  /** CLI sandbox profile; defaults to `read-only`. See GrokSandboxProfile. */
+  readonly sandboxProfile?: GrokSandboxProfile;
+  /**
+   * D8 / A20b: the id grok's `-m` SELECTS (e.g. `grok-4.7`, which grok reports
+   * as `grok-4.7-build`). Absent ⇒ the CLI's own default. The relayed lineage
+   * is always the id the CLI reports.
+   */
+  readonly model?: string;
+}
+```
+
+In `GrokRelayHandle` (as left by A9), replace:
+
+```ts
+  /** §2.2: the `--reasoning-effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
+  readonly handshakeCostUsd: number | null;
+```
+
+with:
+
+```ts
+  /** §2.2: the `--reasoning-effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
+  /** D8: what grok added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
+  readonly handshakeCostUsd: number | null;
+```
+
+In `handshakeWithProbedSandbox`, replace the parameters:
+
+```ts
+async function handshakeWithProbedSandbox(
+  command: CommandSpec,
+  timeoutMs: number
+): Promise<{
+```
+
+with:
+
+```ts
+async function handshakeWithProbedSandbox(
+  command: CommandSpec,
+  timeoutMs: number,
+  workspace: RelayWorkspace,
+  modelSelection: string | undefined
+): Promise<{
+```
+
+replace:
+
+```ts
+  const sandboxedHandshake = async (): Promise<ReturnType<typeof parseGrokEnvelope>> =>
+    await invokeCli(
+      command, grokAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs
+    ) as ReturnType<typeof parseGrokEnvelope>;
+```
+
+with:
+
+```ts
+  // The sandboxed adapter: this relay's standing configuration whenever the host can apply it.
+  const grokAdapter = grokAdapterFor(GROK_SANDBOX_PROFILE, modelSelection);
+  const sandboxedHandshake = async (): Promise<ReturnType<typeof parseGrokEnvelope>> =>
+    await invokeCli(
+      command, grokAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs, { workspace }
+    ) as ReturnType<typeof parseGrokEnvelope>;
+```
+
+and replace:
+
+```ts
+  const unsandboxedAdapter = grokAdapterFor(null);
+  const handshake = await invokeCli(
+    command, unsandboxedAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs
+  ).catch(() => { throw originalFailure; }) as ReturnType<typeof parseGrokEnvelope>;
+```
+
+with:
+
+```ts
+  const unsandboxedAdapter = grokAdapterFor(null, modelSelection);
+  const handshake = await invokeCli(
+    command, unsandboxedAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs, { workspace }
+  ).catch(() => { throw originalFailure; }) as ReturnType<typeof parseGrokEnvelope>;
+```
+
+Replace `startGrokRelay` (as left by A9):
+
+```ts
+export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRelayHandle> {
+  const command = resolveTestGuardedCommand(
+    () => ({ binary: resolveGrokBinary(), prefixArguments: [] }),
+    options.testOnlyCommand,
+    "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
+  );
+  const probed = options.sandboxProfile === "none"
+    ? await handshakeWithoutSandbox(command, options.timeoutMs)
+    : await handshakeWithProbedSandbox(command, options.timeoutMs);
+  const server = await startCliRelayServer({
+    port: options.port,
+    timeoutMs: options.timeoutMs,
+    command,
+    // The SERVED calls inherit the probed adapter, so a dropped profile is the
+    // relay's standing configuration rather than a retry the handshake hid.
+    adapter: probed.adapter
+  });
+  return Object.freeze({
+    port: server.port,
+    baseUrl: server.baseUrl,
+    authorizationHeader: server.authorizationHeader,
+    model: probed.handshake.model,
+    maker: XAI_MAKER,
+    thinkingLevels: GROK_THINKING_LEVELS,
+    handshakeCostUsd: probed.handshake.costUsd,
+    sandboxProfile: probed.sandboxProfile,
+    degradation: probed.degradation,
+    close: () => server.close()
+  });
+}
+```
+
+with:
+
+```ts
+export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRelayHandle> {
+  const command = resolveTestGuardedCommand(
+    () => ({ binary: resolveGrokBinary(), prefixArguments: [] }),
+    options.testOnlyCommand,
+    "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
+  );
+  if (options.model !== undefined && !GROK_MODEL_SELECTION_PATTERN.test(options.model)) {
+    throw new CliRelayFailure("FAILED", "GROK_CLI_MODEL_PIN_INVALID");
+  }
+  // D8: ONE private workspace for this relay's whole life, every handshake of
+  // the sandbox probe included; the server removes it at close().
+  const workspace = await openRelayWorkspace({ maker: XAI_MAKER });
+  try {
+    const probed = options.sandboxProfile === "none"
+      ? await handshakeWithoutSandbox(command, options.timeoutMs, workspace, options.model)
+      : await handshakeWithProbedSandbox(command, options.timeoutMs, workspace, options.model);
+    const harnessOverhead = reportHarnessOverhead(XAI_MAKER, GROK_HANDSHAKE_PROMPT, probed.handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      // The SERVED calls inherit the probed adapter, so a dropped profile is the
+      // relay's standing configuration rather than a retry the handshake hid.
+      adapter: probed.adapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model: probed.handshake.model,
+      maker: XAI_MAKER,
+      thinkingLevels: GROK_THINKING_LEVELS,
+      harnessOverhead,
+      handshakeCostUsd: probed.handshake.costUsd,
+      sandboxProfile: probed.sandboxProfile,
+      degradation: probed.degradation,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
+}
+```
+
+Replace the head of `handshakeWithoutSandbox`:
+
+```ts
+async function handshakeWithoutSandbox(command: CommandSpec, timeoutMs: number) {
+  const adapter = grokAdapterFor("none");
+  const handshake = await invokeCli(
+    command, adapter, GROK_HANDSHAKE_PROMPT, timeoutMs
+  ) as ReturnType<typeof parseGrokEnvelope>;
+```
+
+with:
+
+```ts
+async function handshakeWithoutSandbox(
+  command: CommandSpec,
+  timeoutMs: number,
+  workspace: RelayWorkspace,
+  modelSelection: string | undefined
+) {
+  const adapter = grokAdapterFor("none", modelSelection);
+  const handshake = await invokeCli(
+    command, adapter, GROK_HANDSHAKE_PROMPT, timeoutMs, { workspace }
+  ) as ReturnType<typeof parseGrokEnvelope>;
+```
+
+**`acceptance/agy-relay.ts`** (as left by A10)
+
+Replace the import block:
+
+```ts
+import {
+  CliRelayFailure,
+  buildCliUsage,
+  invokeCli,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CommandSpec
+} from "./relay-core.js";
+```
+
+with:
+
+```ts
+import {
+  CliRelayFailure,
+  buildCliUsage,
+  invokeCli,
+  openRelayWorkspace,
+  reportHarnessOverhead,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CommandSpec,
+  type HarnessOverhead
+} from "./relay-core.js";
+```
+
+In `agyArguments`, replace:
+
+```ts
+    "--mode", "plan",
+    "--sandbox",
+    "--model", modelWithLevel,
+    "--print"
+  ]);
+}
+```
+
+with:
+
+```ts
+    "--mode", "plan",
+    "--sandbox",
+    // D8 (lean calls, M5): agy has no system-prompt flag; slash commands are the
+    // one extra it lets a relay switch off. The ~13k tokens left are agy's own.
+    "--disable-slash-commands",
+    "--model", modelWithLevel,
+    "--print"
+  ]);
+}
+```
+
+Replace `AgyRelayHandle`:
+
+```ts
+export interface AgyRelayHandle extends CliRelayHandle {
+  /** The pinned BASE id — agy reports none (see the module note). */
+  readonly model: string;
+  readonly maker: typeof GOOGLE_MAKER;
+  readonly thinkingLevels: readonly string[];
+}
+```
+
+with:
+
+```ts
+export interface AgyRelayHandle extends CliRelayHandle {
+  /** The pinned BASE id — agy reports none (see the module note). */
+  readonly model: string;
+  readonly maker: typeof GOOGLE_MAKER;
+  readonly thinkingLevels: readonly string[];
+  /** D8: what agy added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
+}
+```
+
+In `startAgyRelay`, replace:
+
+```ts
+  const adapter = createAgyAdapter(model, thinkingLevels, defaultThinkingLevel);
+  // The handshake IS the sign-in check: agy 1.2.11 has no auth-status command.
+  await invokeCli(command, adapter, AGY_HANDSHAKE_PROMPT, options.timeoutMs);
+  const server = await startCliRelayServer({
+    port: options.port,
+    timeoutMs: options.timeoutMs,
+    command,
+    adapter
+  });
+  return Object.freeze({
+    port: server.port,
+    baseUrl: server.baseUrl,
+    authorizationHeader: server.authorizationHeader,
+    model,
+    maker: GOOGLE_MAKER,
+    thinkingLevels,
+    close: () => server.close()
+  });
+}
+```
+
+with:
+
+```ts
+  const adapter = createAgyAdapter(model, thinkingLevels, defaultThinkingLevel);
+  // D8: ONE private workspace for this relay's whole life, the handshake included.
+  const workspace = await openRelayWorkspace(adapter);
+  try {
+    // The handshake IS the sign-in check: agy 1.2.11 has no auth-status command.
+    const handshake = await invokeCli(command, adapter, AGY_HANDSHAKE_PROMPT, options.timeoutMs, { workspace });
+    const harnessOverhead = reportHarnessOverhead(GOOGLE_MAKER, AGY_HANDSHAKE_PROMPT, handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      adapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model,
+      maker: GOOGLE_MAKER,
+      thinkingLevels,
+      harnessOverhead,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
+}
+```
+
+**`acceptance/pi-relay.ts`** (as left by A11)
+
+Replace the import block:
+
+```ts
+import {
+  CliRelayFailure,
+  buildCliUsage,
+  invokeCli,
+  renderPromptTranscript,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CommandSpec
+} from "./relay-core.js";
+```
+
+with:
+
+```ts
+import {
+  CliRelayFailure,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
+  buildCliUsage,
+  invokeCli,
+  openRelayWorkspace,
+  renderPromptTranscript,
+  reportHarnessOverhead,
+  resolveConfiguredBinary,
+  resolveTestGuardedCommand,
+  startCliRelayServer,
+  type CliCompletion,
+  type CliInvocation,
+  type CliRelayAdapter,
+  type CliRelayHandle,
+  type CommandSpec,
+  type HarnessOverhead
+} from "./relay-core.js";
+```
+
+Replace `PI_RELAY_SYSTEM_PROMPT`:
+
+```ts
+/** Fixed engine text — never debate content — so it may travel on argv. */
+export const PI_RELAY_SYSTEM_PROMPT =
+  "You answer one request. The attached file holds a JSON object in the format debateai.relay-messages.v1; its messages array carries the instructions and the conversation. Follow those instructions exactly and reply with the answer only." as const;
+```
+
+with:
+
+```ts
+/**
+ * Fixed engine text — never debate content — so it may travel on argv. D8
+ * (lean calls): it IS relay-core's one minimal sentence, so pi's system text is
+ * every other relay's; the transcript in the @file says what it is.
+ */
+export const PI_RELAY_SYSTEM_PROMPT = RELAY_MINIMAL_SYSTEM_PROMPT;
+```
+
+In `piArguments`, replace:
+
+```ts
+    "--no-skills",
+    "--no-context-files",
+    "--system-prompt", PI_RELAY_SYSTEM_PROMPT,
+```
+
+with:
+
+```ts
+    "--no-skills",
+    "--no-context-files",
+    // D8 (lean calls, M5): with the flags above, 84 input tokens for a one-line prompt.
+    "--no-prompt-templates",
+    "--system-prompt", PI_RELAY_SYSTEM_PROMPT,
+```
+
+Replace `PiRelayHandle`:
+
+```ts
+export interface PiRelayHandle extends CliRelayHandle {
+  readonly model: string;
+  readonly maker: typeof ZAI_MAKER;
+  readonly thinkingLevels: readonly string[];
+  readonly contextWindowTokens: typeof PI_GLM_CONTEXT_WINDOW_TOKENS;
+}
+```
+
+with:
+
+```ts
+export interface PiRelayHandle extends CliRelayHandle {
+  readonly model: string;
+  readonly maker: typeof ZAI_MAKER;
+  readonly thinkingLevels: readonly string[];
+  readonly contextWindowTokens: typeof PI_GLM_CONTEXT_WINDOW_TOKENS;
+  /** D8: what pi added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
+}
+```
+
+In `startPiRelay`, replace:
+
+```ts
+  const adapter = createPiAdapter(model, defaultThinkingLevel);
+  // The handshake is the sign-in check AND the lineage check: parsePiEvents
+  // refuses an answer from any provider or model other than the pinned one.
+  await invokeCli(
+    command,
+    adapter,
+    renderPromptTranscript([{ role: "user", content: PI_HANDSHAKE_PROMPT }]),
+    options.timeoutMs
+  );
+  const server = await startCliRelayServer({
+    port: options.port,
+    timeoutMs: options.timeoutMs,
+    command,
+    adapter
+  });
+  return Object.freeze({
+    port: server.port,
+    baseUrl: server.baseUrl,
+    authorizationHeader: server.authorizationHeader,
+    model,
+    maker: ZAI_MAKER,
+    thinkingLevels: PI_THINKING_LEVELS,
+    contextWindowTokens: PI_GLM_CONTEXT_WINDOW_TOKENS,
+    close: () => server.close()
+  });
+}
+```
+
+with:
+
+```ts
+  const adapter = createPiAdapter(model, defaultThinkingLevel);
+  const handshakePrompt = renderPromptTranscript([{ role: "user", content: PI_HANDSHAKE_PROMPT }]);
+  // D8: ONE private workspace for this relay's whole life, the handshake included.
+  const workspace = await openRelayWorkspace(adapter);
+  try {
+    // The handshake is the sign-in check AND the lineage check: parsePiEvents
+    // refuses an answer from any provider or model other than the pinned one.
+    const handshake = await invokeCli(command, adapter, handshakePrompt, options.timeoutMs, { workspace });
+    const harnessOverhead = reportHarnessOverhead(ZAI_MAKER, handshakePrompt, handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      adapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model,
+      maker: ZAI_MAKER,
+      thinkingLevels: PI_THINKING_LEVELS,
+      contextWindowTokens: PI_GLM_CONTEXT_WINDOW_TOKENS,
+      harnessOverhead,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
+}
+```
+
+**`acceptance/relay-host.ts`** (as left by A12)
+
+Replace `candidateSchema`:
+
+```ts
+const candidateSchema = z.object({
+  providerRef: z.string().regex(/^[a-z][a-z0-9._:-]{0,127}$/u),
+  tool: z.enum(RELAY_HOST_TOOLS),
+  modelId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u),
+  thinkingLevels: z.array(z.string().regex(CLI_RELAY_THINKING_LEVEL_TOKEN)).max(16)
+}).strict();
+```
+
+with:
+
+```ts
+const candidateSchema = z.object({
+  providerRef: z.string().regex(/^[a-z][a-z0-9._:-]{0,127}$/u),
+  tool: z.enum(RELAY_HOST_TOOLS),
+  modelId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u),
+  // D8 / A20b: grok only — the id grok's `-m` selects when it differs from the
+  // id grok reports (`grok-4.7` answers as `grok-4.7-build`).
+  modelSelection: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u).optional(),
+  thinkingLevels: z.array(z.string().regex(CLI_RELAY_THINKING_LEVEL_TOKEN)).max(16)
+}).strict();
+```
+
+Replace `RelayHostCandidate`:
+
+```ts
+export type RelayHostCandidate = Readonly<{
+  providerRef: string;
+  tool: RelayHostTool;
+  /** agy: the BASE id, without its level suffix. */
+  modelId: string;
+  /** The levels replay will ask; agy: the id suffixes to serve (at least one). */
+  thinkingLevels: readonly string[];
+}>;
+```
+
+with:
+
+```ts
+export type RelayHostCandidate = Readonly<{
+  providerRef: string;
+  tool: RelayHostTool;
+  /** agy: the BASE id, without its level suffix. grok: the id grok REPORTS. */
+  modelId: string;
+  /** grok only: the id `-m` selects (`grok-4.7` for `grok-4.7-build`). Absent ⇒ grok's own default. */
+  modelSelection?: string;
+  /** The levels replay will ask; agy: the id suffixes to serve (at least one). */
+  thinkingLevels: readonly string[];
+}>;
+```
+
+In `readRelayHostCandidates`, replace:
+
+```ts
+    || candidates.some(({ tool, thinkingLevels }) => tool === "agy" && thinkingLevels.length === 0)) {
+    throw new TypeError("RELAY_HOST_CANDIDATES_INVALID");
+  }
+  return Object.freeze(candidates.map((candidate) => Object.freeze({
+    providerRef: candidate.providerRef,
+    tool: candidate.tool,
+    modelId: candidate.modelId,
+    thinkingLevels: Object.freeze([...candidate.thinkingLevels])
+  })));
+```
+
+with:
+
+```ts
+    || candidates.some(({ tool, thinkingLevels }) => tool === "agy" && thinkingLevels.length === 0)
+    || candidates.some(({ tool, modelSelection }) => modelSelection !== undefined && tool !== "grok")) {
+    throw new TypeError("RELAY_HOST_CANDIDATES_INVALID");
+  }
+  return Object.freeze(candidates.map((candidate) => Object.freeze({
+    providerRef: candidate.providerRef,
+    tool: candidate.tool,
+    modelId: candidate.modelId,
+    ...(candidate.modelSelection === undefined ? {} : { modelSelection: candidate.modelSelection }),
+    thinkingLevels: Object.freeze([...candidate.thinkingLevels])
+  })));
+```
+
+In `RELAY_STARTS`, replace:
+
+```ts
+  // grok pins no model; its CLI-reported lineage is held to modelId below.
+  grok: (_candidate, timeoutMs, seams) => startGrokRelay({
+    port: 0, timeoutMs, ...testOnlyCommandFor(seams, "grok")
+  }),
+```
+
+with:
+
+```ts
+  // D8 / A20b: grok SELECTS by a short id and REPORTS a longer one. A candidate's
+  // modelSelection, when given, is what `-m` gets; the CLI-reported lineage is
+  // still held to modelId below.
+  grok: (candidate, timeoutMs, seams) => startGrokRelay({
+    port: 0,
+    timeoutMs,
+    ...(candidate.modelSelection === undefined ? {} : { model: candidate.modelSelection }),
+    ...testOnlyCommandFor(seams, "grok")
+  }),
+```
+
+**`acceptance/README.md`**: insert this paragraph directly after A12's relay-host paragraph (after its last line,
+"endpoints file."):
+
+```markdown
+**Lean calls (model scorecard D8, owner ruling 2026-09-26).** A relayed call
+carries what an API call would, and as little else as each CLI allows. Every relay
+opens one private directory (mode 0700) when it starts and removes it when it stops;
+each call, the handshake included, runs in a fresh EMPTY directory inside it, so no
+project file (`CLAUDE.md`, `AGENTS.md` …) is ever read. Each CLI's own system prompt
+is replaced by one fixed sentence, `RELAY_MINIMAL_SYSTEM_PROMPT` in `relay-core.ts`:
+claude `--system-prompt` (never `--bare`, which also disables the subscription
+login); codex `-c model_instructions_file=` pointing at a 0600 file in the relay's
+directory, plus one `--disable` per name in `CODEX_DISABLED_FEATURES`; grok
+`--system-prompt-override`; pi `--system-prompt` plus `--no-prompt-templates`. agy
+has no system-prompt flag and gets `--disable-slash-commands`. The engine's own
+messages are untouched. What a CLI still adds is measured once, after the
+handshake, and printed as `RELAY OVERHEAD <maker> reported=<n> own=<m> overhead=<n−m>`
+(`own` is the handshake prompt's characters ÷ 4, rounded up): information, never a
+gate, and never a price. grok selects a model by a short id and reports a longer one:
+`startGrokRelay`'s `model` option, and a relay-host `grok` candidate's
+`modelSelection`, is what `-m` gets (e.g. `grok-4.7`), while the relay still reports
+what grok answers as (e.g. `grok-4.7-build`).
+```
+
+- [ ] **Step 9: Run the tests to verify they pass, then the full relay set and the gates**
+
+Run: `pnpm exec vitest run acceptance/relay-core.test.ts acceptance/claude-relay.test.ts acceptance/grok-relay.test.ts acceptance/model-shim.test.ts acceptance/hermes-relay.test.ts acceptance/agy-relay.test.ts acceptance/pi-relay.test.ts acceptance/relay-host.test.ts acceptance/fake-cli-environment.test.ts acceptance/adversarial-corpus.test.ts acceptance/boot-relays.test.ts`
+Expected: PASS, the new D8 blocks and every updated pin included. The Support relay (`hermes-relay.test.ts`) is
+untouched: its served calls already run in the workspace its server opens (Step 3).
+
+Run: `pnpm exec vitest run tests/unit/dev-cli-provider-panel.test.ts tests/architecture/dev-real-provider-only.test.ts`
+Expected: PASS. The dev panel imports these relays; their handles only gained a member.
+
+Run: `grep -n '"--bare"' acceptance/claude-relay.ts`
+Expected: no output. The flag is named only in a comment, never passed.
+
+Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run lint && pnpm run test:ci-gate`
+Expected: every command exits 0, and the gate prints `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add acceptance/claude-relay.ts acceptance/claude-relay.test.ts acceptance/model-shim.ts acceptance/model-shim.test.ts acceptance/grok-relay.ts acceptance/grok-relay.test.ts acceptance/agy-relay.ts acceptance/agy-relay.test.ts acceptance/pi-relay.ts acceptance/pi-relay.test.ts acceptance/relay-host.ts acceptance/relay-host.test.ts acceptance/adversarial-corpus.test.ts acceptance/test-fixtures/lean-call-probe.ts acceptance/README.md
+git diff --cached --name-only
+git commit -m "feat(relays): lean calls on every relay — minimal system text, codex extras off, grok -m, one workspace from handshake to stop" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- acceptance/claude-relay.ts acceptance/claude-relay.test.ts acceptance/model-shim.ts acceptance/model-shim.test.ts acceptance/grok-relay.ts acceptance/grok-relay.test.ts acceptance/agy-relay.ts acceptance/agy-relay.test.ts acceptance/pi-relay.ts acceptance/pi-relay.test.ts acceptance/relay-host.ts acceptance/relay-host.test.ts acceptance/adversarial-corpus.test.ts acceptance/test-fixtures/lean-call-probe.ts acceptance/README.md
+```
+
+`git diff --cached --name-only` must print exactly these fifteen paths.
+
+- [ ] **Step 11: OWNER-RUN check of the five lean command lines (OWNER GO NEEDED — five real handshakes, one per tool, on the owner's subscriptions; the implementer does NOT run these)**
+
+M5 measured each lean flag set with `-p`; the relays keep their own measured shapes (`--single … --verbatim` for grok,
+`@file` for pi, stdin for agy), and this check is what proves each combination on the real tools. Run from
+`dialectical-engine/` in the worktree:
+
+```bash
+check_dir="$(mktemp -d)" && chmod 700 "$check_dir"
+printf '%s\n' '{"candidates":[{"providerRef":"local:claude","tool":"claude","modelId":"claude-opus-5-5","thinkingLevels":[]},{"providerRef":"local:codex","tool":"codex","modelId":"gpt-6-sol","thinkingLevels":[]},{"providerRef":"local:grok","tool":"grok","modelId":"grok-4.7-build","modelSelection":"grok-4.7","thinkingLevels":[]},{"providerRef":"local:agy","tool":"agy","modelId":"gemini-3.8-flash","thinkingLevels":["high"]},{"providerRef":"local:pi-glm","tool":"pi","modelId":"glm-5.3-flash","thinkingLevels":["high"]}]}' > "$check_dir/candidates.json"
+pnpm run relays:serve -- --candidates "$check_dir/candidates.json" --endpoints "$check_dir/endpoints.json"
+```
+
+When `RELAYS SERVING 5 …` appears, press Ctrl-C. Read the five `RELAY OVERHEAD` lines above it.
+- **Pass:** five relays served, and each `overhead=` value is under its ceiling: Anthropic 1,500; OpenAI 10,000;
+  xAI 20,000; Google 15,000; Z.AI 400. The ceilings sit between M5's lean and default figures (D8, Appendix B), so a
+  pass shows the lean flags took effect where M5 found a gain (claude, codex, pi).
+- **A `RELAY ABSENT <providerRef> <CLI failure code>` line** (for example `CODEX_CLI_FAILED`) means that tool refused
+  one of its lean flags. STOP and report the line and the tool. Do not drop a flag without the owner's decision.
+- **A `RELAY ABSENT <providerRef> RELAY_HOST_MODEL_MISMATCH` line** means the tool answered as a different model than
+  the candidate names (for example the `opus` alias no longer meaning `claude-opus-5-5`). That is a roster fact, not a
+  lean-flag failure: report the line.
+- **An overhead above its ceiling:** report the five lines. The flags ran, but a tool still adds more than M5 measured.
+
+Afterwards you may remove `"$check_dir"`. Nothing from it enters the repository.
+
+---
+
 **Risks this fragment could not resolve (for the assembler and the owner)**
 
 1. **agy and pi may not accept the prompt off argv.** A10 Step 0 and A11 Step 0 can end in STOP → OWNER DECISION. If that happens, A12 ships with six slots, or five.
 2. **The gateway compare must follow Contract extension 1.** If the providers fragment treats "sent DEFAULT_ONLY, echo X" as `PROVIDER_THINKING_LEVEL_CHANGED`, nothing breaks, because the relays echo DEFAULT_ONLY when nothing is asked. However, if it records the echo, the recorded level for unasked agy and pi calls is DEFAULT_ONLY, not `high`.
-3. **Grok model id drift.** grok's default is now `grok-4.7-build`, but `PLAN_TIER_ROSTERS.premium` pins `grok-4.6-build` (M4). A relay-host candidate must name the id the CLI reports.
-4. **`--no-memory` is no longer in grok 1.0.41's help,** but the relay still passes it. This is unmeasured.
-5. **Claude `--effort` has not been probed with a prompt;** only the help text documents it.
+3. **Grok model id drift.** grok's default is now `grok-4.7-build`, but `PLAN_TIER_ROSTERS.premium` pins `grok-4.6-build` (M4); A20b (owner-approved 2026-09-26) moves the roster. A relay-host candidate must name the id the CLI REPORTS as `modelId`; since A12b it may also name `modelSelection`, the id grok's `-m` takes (`grok-4.7` answers as `grok-4.7-build`). The dev panel still starts grok without `-m`.
+4. **`--no-memory` is no longer in grok 1.0.41's help,** but the relay still passes it. M5 (2026-09-26): it is still accepted and made no difference, so it stays.
+5. **Claude `--effort`:** M5 (2026-09-26) ran `--effort low` with a prompt on Opus 5.5 and Sonnet 5; the other four levels are documented by the help text only.
 6. **Two more real handshakes on every `dev:auth:up`.** Every `pnpm run dev:auth:up` now handshakes agy and pi as well, which uses the owner's subscriptions.
 7. **agy and pi are discovered but never seated yet.** Ask admission still filters debaters by `PLAN_TIER_ROSTERS` (`apps/api/src/index.ts:2444-2466`), so the new dev slots are discovered but not seated until the picker lands.
 
@@ -20145,7 +23223,7 @@ Run every command from `dialectical-engine/`.
 
 - A19, A20 and A21 are each split into dotted sub-tasks (A19.1, A19.2, A20.1 … A21.3). Each sub-task has its own
   test cycle and can be rejected on its own. **A20b** is the brief's own roster task and keeps its name. A22 has no code.
-- Order: A19.1 → A19.2 → A20.1 → A20.2 → A20.3 → A20.4 → A20b (needs the owner's yes) → A21.1 → A21.2 → A21.3 → A22.
+- Order: A19.1 → A19.2 → A20.1 → A20.2 → A20.3 → A20.4 → A20b (OWNER APPROVED 2026-09-26) → A21.1 → A21.2 → A21.3 → A22.
 
 ### Assumptions (checked by a "Step 0" in the task that relies on them)
 
@@ -20352,8 +23430,8 @@ as every other boot reader. A scorecard state must not hide a database outage.
    postgres image's default local `trust` rule. If `psql` asks for a password, the owner stops; no password is ever typed.
 6. The pre-existing grok drift (M4): `PLAN_TIER_ROSTERS.premium` pins `grok-4.6-build`, but the grok CLI now answers as
    `grok-4.7-build`. So every premium ask on this Mac is refused today (`ASK_PLAN_TIER_MODEL_UNAVAILABLE`). A20.2 pins
-   the current behaviour. **A20b** changes the id, and only with the owner's yes. The durable fix, pinning grok's model
-   in its relay, belongs to the relay fragment.
+   the current behaviour. **A20b** changes the id; the owner approved it on 2026-09-26. The durable fix, pinning grok's
+   model in its relay, is Task A12b's `model` option (`-m grok-4.7`, which grok REPORTS as `grok-4.7-build`).
 
 ### Task A19.1: Register row family `modelScorecard` and the bundled public file
 
@@ -21874,9 +24952,9 @@ const TARGETS: readonly ProviderDiscoveryTarget[] = Object.freeze([
     contextWindowTokens: 200_000
   }),
   Object.freeze({
-    providerRef: "development:pi-glm-cli", maker: "Z.AI", baseUrl: "http://127.0.0.1:8798/v1", model: "glm-5.3",
+    providerRef: "development:pi-glm-cli", maker: "Z.AI", baseUrl: "http://127.0.0.1:8798/v1", model: "glm-5.3-flash",
     thinkingParameter: "x_thinking_level" as const, thinkingLevels: Object.freeze(["low", "high"]),
-    contextWindowTokens: 16_000
+    contextWindowTokens: 1_000_000
   }),
   Object.freeze({
     providerRef: "development:grok-cli", maker: "xAI", baseUrl: "http://127.0.0.1:8793/v1", model: "grok-4.7-build"
@@ -21938,7 +25016,7 @@ describe("A20 · reachable targets keep today's order", () => {
       member("vendor:b", "Anthropic", "claude-opus-5"),
       member("vendor:a", "OpenAI", "gpt-5.6-sol"),
       member("vendor:a2", "OpenAI", "gpt-5.6-sol"),
-      member("development:pi-glm-cli", "Z.AI", "glm-5.3")
+      member("development:pi-glm-cli", "Z.AI", "glm-5.3-flash")
     ];
     const reachable = reachableInTodaysOrder(
       discovered, ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"], askTargetFacts(TARGETS)
@@ -21947,8 +25025,8 @@ describe("A20 · reachable targets keep today's order", () => {
     expect(reachable.map((target) => target.providerRef))
       .toEqual(["vendor:a", "vendor:b", "vendor:x", "vendor:a2", "development:pi-glm-cli"]);
     expect(reachable.find((target) => target.providerRef === "development:pi-glm-cli")).toEqual({
-      providerRef: "development:pi-glm-cli", maker: "Z.AI", modelId: "glm-5.3",
-      thinkingLevels: ["low", "high"], contextWindowTokens: 16_000
+      providerRef: "development:pi-glm-cli", maker: "Z.AI", modelId: "glm-5.3-flash",
+      thinkingLevels: ["low", "high"], contextWindowTokens: 1_000_000
     });
     // A target the deployment declares nothing for can set no level and has no declared window.
     expect(reachable.find((target) => target.providerRef === "vendor:x"))
@@ -22382,7 +25460,7 @@ const LOCAL_PANEL: readonly DiscoveredPanelMember[] = Object.freeze([
   member("development:claude-premium-cli", "Anthropic", "claude-opus-5"),
   member("development:grok-cli", "xAI", "grok-4.7-build"),
   member("development:agy-cli", "Google", "gemini-3.8-flash-high"),
-  member("development:pi-glm-cli", "Z.AI", "glm-5.3")
+  member("development:pi-glm-cli", "Z.AI", "glm-5.3-flash")
 ]);
 
 function at(providerRef: string): DiscoveredPanelMember {
@@ -22446,7 +25524,7 @@ function valid(overrides: Partial<AskModelPickerSettings> = {}): AskModelPickerS
         thinkingLevels: Object.freeze(["low", "high", "max"]), contextWindowTokens: null, price: null
       })],
       ["development:pi-glm-cli", Object.freeze({
-        thinkingLevels: Object.freeze(["low", "high"]), contextWindowTokens: 16_000, price: null
+        thinkingLevels: Object.freeze(["low", "high"]), contextWindowTokens: 1_000_000, price: null
       })]
     ]),
     perRunCeilingMicros: null,
@@ -22532,11 +25610,11 @@ describe("A20 · with a VALID scorecard the picker replaces the roster filter", 
     await evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("premium"));
     expect(lastInput().reachable.map((target) => target.modelId)).toEqual([
       "gpt-5.6-sol", "claude-opus-5",
-      "gpt-5.6-luna", "claude-sonnet-5", "grok-4.7-build", "gemini-3.8-flash-high", "glm-5.3"
+      "gpt-5.6-luna", "claude-sonnet-5", "grok-4.7-build", "gemini-3.8-flash-high", "glm-5.3-flash"
     ]);
     expect(lastInput().reachable.find((target) => target.providerRef === "development:pi-glm-cli")).toEqual({
-      providerRef: "development:pi-glm-cli", maker: "Z.AI", modelId: "glm-5.3",
-      thinkingLevels: ["low", "high"], contextWindowTokens: 16_000
+      providerRef: "development:pi-glm-cli", maker: "Z.AI", modelId: "glm-5.3-flash",
+      thinkingLevels: ["low", "high"], contextWindowTokens: 1_000_000
     });
   });
 
@@ -23583,9 +26661,10 @@ git diff --cached --name-only
 git commit -m "feat(api): compose the model picker in the API entrypoint and the acceptance runtime (A20)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- apps/api/src/main.ts acceptance/main.ts tests/unit/model-picker-composition.test.ts
 ```
 
-### Task A20b: Align the premium roster's grok id with what the grok CLI answers (OWNER GO NEEDED)
+### Task A20b: Align the premium roster's grok id with what the grok CLI answers (OWNER APPROVED 2026-09-26)
 
-**Precondition: the owner (V) has said yes to this exact change.**
+**Precondition: OWNER APPROVED 2026-09-26.** The owner approved this exact change in the plan-review rulings of
+2026-09-26 (Appendix B, M5): the premium roster's grok id becomes `grok-4.7-build`, the id the grok CLI reports.
 
 The M4 probe measured `grok 1.0.41`: its default model is now `grok-4.7-build`, while `PLAN_TIER_ROSTERS.premium` pins
 `grok-4.6-build`. Two things follow:
@@ -23595,8 +26674,10 @@ The M4 probe measured `grok 1.0.41`: its default model is now `grok-4.7-build`, 
 `apps/runner/src/dev-cli-provider-panel.ts:128` says the xAI roster entry "is spelled as the id that CLI answers as".
 This task restores that property.
 
-Do not start without the owner's yes, and write their answer into the commit body. The durable fix is to pin grok's
-model in its relay (`-m`); that is relay work, not this task.
+Record the approval in the commit body (Step 6). The roster names the id grok REPORTS. Selecting the model is relay
+work, done in Task A12b: the grok CLI accepts `-m grok-4.7` (and refuses `-m grok-4.7-build` as "unknown model id")
+while it REPORTS `grok-4.7-build`, so a relay or relay-host candidate that pins grok passes `grok-4.7` as the selection
+and is held to `grok-4.7-build` as the lineage.
 
 **Files:**
 - Modify: `packages/contract/src/plan-tiers.ts:10`
@@ -23657,14 +26738,14 @@ Also, in the "hands the picker today's order" row of the same file, replace:
 
 ```ts
       "gpt-5.6-sol", "claude-opus-5",
-      "gpt-5.6-luna", "claude-sonnet-5", "grok-4.7-build", "gemini-3.8-flash-high", "glm-5.3"
+      "gpt-5.6-luna", "claude-sonnet-5", "grok-4.7-build", "gemini-3.8-flash-high", "glm-5.3-flash"
 ```
 
 with:
 
 ```ts
       "gpt-5.6-sol", "claude-opus-5", "grok-4.7-build",
-      "gpt-5.6-luna", "claude-sonnet-5", "gemini-3.8-flash-high", "glm-5.3"
+      "gpt-5.6-luna", "claude-sonnet-5", "gemini-3.8-flash-high", "glm-5.3-flash"
 ```
 
 Run: `pnpm exec vitest run tests/unit/model-picker-admission.test.ts`
@@ -23700,8 +26781,10 @@ For example: `sed -i '' 's/grok-4\.6-build/grok-4.7-build/g' <file>` on macOS BS
 In `tier01-new-plan-tier.test.tsx`, the probe roster line (223) also holds `"grok/4.6"`. That is an alternate id
 *shape* for the dot test, not the roster, so leave it.
 
-Then run: `grep -rn --exclude-dir=node_modules --exclude-dir=generated --exclude-dir='.next*' "grok-4.6-build" apps packages tests acceptance`
-Expected: no output.
+Then run: `grep -rn --exclude-dir=node_modules --exclude-dir=generated --exclude-dir='.next*' "grok-4.6-build" apps packages tests`
+Expected: no output. (`acceptance/` is left out on purpose: `grok-relay.test.ts`, its sandbox double and
+`test-fixtures/fake-grok-cli.mjs` replay the redacted grok 1.0.0 capture, whose reported id WAS `grok-4.6-build`. Those
+are a historical capture, not the roster, and stay as they are.)
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -23715,12 +26798,12 @@ Expected: all exit 0, then `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
 - [ ] **Step 6: Commit**
 
-Replace `<the owner's words, date>` with the owner's actual answer before running.
+The commit body records the approval exactly as the rulings give it; no answer is invented.
 
 ```bash
 git add packages/contract/src/plan-tiers.ts tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/unit/tiers-s02-admission.test.ts tests/render/tier01-new-plan-tier.test.tsx tests/unit/v2ui-banner-copy.test.ts tests/unit/model-picker-admission.test.ts tests/unit/model-picker-submit.test.ts
 git diff --cached --name-only
-git commit -m "fix(contract): premium roster names grok-4.7-build, the id the grok CLI answers as (A20b)" -m "Owner's go: <the owner's words, date>. PLAN_TIER_ROSTERS is a code constant: no migration, bootstrap or sealed register row carries the id." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- packages/contract/src/plan-tiers.ts tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/unit/tiers-s02-admission.test.ts tests/render/tier01-new-plan-tier.test.tsx tests/unit/v2ui-banner-copy.test.ts tests/unit/model-picker-admission.test.ts tests/unit/model-picker-submit.test.ts
+git commit -m "fix(contract): premium roster names grok-4.7-build, the id the grok CLI answers as (A20b)" -m "Owner's go: A20b approved by the owner on 2026-09-26 (plan-review rulings, Appendix B M5). PLAN_TIER_ROSTERS is a code constant: no migration, bootstrap or sealed register row carries the id." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- packages/contract/src/plan-tiers.ts tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/unit/tiers-s02-admission.test.ts tests/render/tier01-new-plan-tier.test.tsx tests/unit/v2ui-banner-copy.test.ts tests/unit/model-picker-admission.test.ts tests/unit/model-picker-submit.test.ts
 ```
 
 ### Task A21.1: The served answer carries the run's pinned model assignment
@@ -24954,7 +28037,7 @@ with:
       "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL"
     ));
     const unavailable = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
-      "UNPROCESSABLE", 422, "ASK_MODEL_CANDIDATE_UNAVAILABLE: glm-5.3 is down", "ASK_MODEL_CANDIDATE_UNAVAILABLE"
+      "UNPROCESSABLE", 422, "ASK_MODEL_CANDIDATE_UNAVAILABLE: glm-5.3-flash is down", "ASK_MODEL_CANDIDATE_UNAVAILABLE"
     ));
     expect(tooSmall.kind).toBe("MODEL_BUDGET_TOO_SMALL");
     expect(unavailable.kind).toBe("MODEL_UNAVAILABLE");
@@ -25440,7 +28523,7 @@ This file is BINDING. Every plan fragment must use exactly these names, paths an
   - The prompt record goes in an encrypted-carrier table `ledger.call_prompt` (following 0069).
   - The role assignment goes in the append-only side table `core.run_role_assignment`. NEVER redefine `core.create_encrypted_run`.
   - Everything goes in one migration, `migrations/0072_model_scorecard.sql`, appended to the pinned list in `tests/architecture/security-migration-0065.test.ts`.
-- **R9. Measured tool facts** are in `M4-cli-probes.md`. The pi model to pin is unconfirmed: the relay takes the id on its command line and defaults to `glm-5.3`.
+- **R9. Measured tool facts** are in `M4-cli-probes.md` and `M5-lean-calls.md` (both in Appendix B). The pi model is `glm-5.3-flash`, confirmed by the owner on 2026-09-26: the relay takes the id on its command line and defaults to `glm-5.3-flash`, whose context window is 1M tokens.
 
 #### Packages and names
 
@@ -25631,16 +28714,21 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
   - The model id is pinned via `--model`, and the level comes from the id suffix. `--mode plan --sandbox` is always passed; `--dangerously-skip-permissions` never is.
   - A non-empty `denied_actions` → FAILED.
 - **New `acceptance/pi-relay.ts`**
-  - Exports `startPiRelay`, `resolvePiBinary`, `ZAI_MAKER = "Z.AI"`, `PI_GLM_CONTEXT_WINDOW_TOKENS = 16_000`.
-  - Passes `--mode json --no-tools --no-session --no-extensions --no-skills --no-context-files --system-prompt <engine system text> --thinking <level>`.
+  - Exports `startPiRelay`, `resolvePiBinary`, `ZAI_MAKER = "Z.AI"`, `PI_GLM_CONTEXT_WINDOW_TOKENS = 1_000_000` (pi's catalog for `glm-5.3-flash`: 1M context, 131.1K max output).
+  - Passes `--mode json --no-tools --no-session --no-extensions --no-skills --no-context-files --system-prompt <engine system text> --thinking <level>`; since A12b also `--no-prompt-templates`, and the system text is `RELAY_MINIMAL_SYSTEM_PROMPT`.
   - The prompt goes through an `@file` written with mode 0600 and removed after the call.
   - `PI_TELEMETRY=0`.
 - **Existing relays gain level flags:**
   - claude: `--effort`
   - codex: `-c model_reasoning_effort="<l>"`
   - grok: `--reasoning-effort`
+- **Lean calls (owner ruling 2026-09-26, D8, Task A12b):**
+  - `relay-core.ts` exports `RELAY_MINIMAL_SYSTEM_PROMPT = "Follow the instructions in the user message exactly."`, the only system text a relay gives a CLI (never debate text).
+  - Every relay opens ONE private 0700 workspace at start (before its handshake) and removes it at stop; every call runs in a fresh EMPTY directory inside it.
+  - Flags: claude `--system-prompt <minimal>` (never `--bare`); codex `-c model_instructions_file="<0600 file in the workspace>"` plus one `--disable` per M5 feature (not `code_mode_host`); grok `--system-prompt-override <minimal>`, and `-m <selection>` when a model is selected (`-m grok-4.7` answers as `grok-4.7-build`); agy `--disable-slash-commands`; pi `--no-prompt-templates` and `--system-prompt <minimal>`.
+  - The engine's own messages stay in the transcript unchanged. Each relay logs its harness overhead once at start; informational, never a gate.
 - **New `acceptance/relay-host.ts` + script `relays:serve`**
-  - Starts one relay per entry of a candidates file `{candidates:[{providerRef, tool, modelId, thinkingLevels}]}`.
+  - Starts one relay per entry of a candidates file `{candidates:[{providerRef, tool, modelId, thinkingLevels}]}`; since A12b a `grok` entry may add `modelSelection` (the id `-m` selects).
   - Writes an endpoints file (mode 0600): `{relays:[{providerRef, maker, tool, modelId, baseUrl, bearerToken, thinkingLevels, contextWindowTokens}]}`.
   - Runs until SIGTERM.
 - **New `acceptance/export-moment.ts` + script `moment:export`**: `--run <runId> --call-site-key <key> --out <file>`, or `--run <runId> --all --out-dir <dir>`.
@@ -25707,12 +28795,12 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
 - **The answer is in the assistant `message_end`.** The event is shaped like this:
   - `message.content[0].text` holds the reply;
   - `message.provider` is "zai";
-  - `message.model` is "**glm-5.3**";
+  - `message.model` is "**glm-5.3**" (pi's own default model; the owner's model answers as `glm-5.3-flash`, M5);
   - `message.usage` is `{input, output, cacheRead, cacheWrite, reasoning, totalTokens, cost:{input, output, cacheRead, cacheWrite, total}}`;
   - `stopReason` is "stop".
-- **The owner described the model as "GLM 5.3 Flash", but pi's default reports `glm-5.3`.** Which model to pin must be confirmed with the owner. Until then, the relay pins the id passed on its command line, defaulting to the reported `glm-5.3`.
+- **The owner described the model as "GLM 5.3 Flash", but pi's default reports `glm-5.3`.** Superseded by M5: the owner confirmed `glm-5.3-flash` on 2026-09-26, and the relay pins it (still a start-up argument).
 - **pi's own system prompt** calls itself a "coding assistant" and adds a pi-docs section (~480 input tokens in total). Use `--system-prompt` to replace it with the engine's system text.
-- **Thinking values:** off|minimal|low|medium|high|xhigh|max (from `--help`). The owner states a 16k-token context window.
+- **Thinking values:** off|minimal|low|medium|high|xhigh|max (from `--help`). Context window: pi's catalog gives `glm-5.3-flash` 1M tokens and 131.1K max output (M5); the "16k" once stated is not its context window.
 
 #### codex-cli 0.156.1 (OpenAI)
 
@@ -25726,7 +28814,7 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
 - **Thinking values:** xhigh, high, medium, low. Anything else is rejected locally with exit 1.
 - **Call used:** `grok -p "<prompt>" --reasoning-effort low --output-format json --tools ""`, with stdin closed.
 - **Output:** JSON `{text, stopReason, sessionId, requestId, thought, usage:{input_tokens, cache_read_input_tokens, cache_creation_input_tokens, output_tokens, reasoning_tokens, total_tokens}, num_turns, total_cost_usd, total_cost_usd_ticks, modelUsage:{"grok-4.7-build":{...}}}`.
-- **The default model is now `grok-4.7-build`**, while `PLAN_TIER_ROSTERS.premium` still pins `grok-4.6-build`. Premium asks on this Mac are probably refused today (ASK_PLAN_TIER_MODEL_UNAVAILABLE); flag this to the owner.
+- **The default model is now `grok-4.7-build`**, while `PLAN_TIER_ROSTERS.premium` still pins `grok-4.6-build`. Premium asks on this Mac are probably refused today (ASK_PLAN_TIER_MODEL_UNAVAILABLE); flag this to the owner. (Owner-approved fix: A20b, 2026-09-26.)
 - **Overhead:** about 18,000 input tokens.
 
 #### claude 2.1.282 (Anthropic)
@@ -25746,3 +28834,47 @@ Not probed with a prompt; help only. Its thinking values are `--effort low|mediu
    | grok | low, medium, high, xhigh | `--reasoning-effort` |
    | agy | via the model id suffix low / medium / high | pinned per relay |
    | pi | off, minimal, low, medium, high, xhigh, max | `--thinking` |
+
+### M5: lean calls and owner rulings (real calls, 2026-09-26, owner-authorised)
+
+#### Owner rulings (2026-09-26, answering the plan review)
+
+- **GLM:** pin `glm-5.3-flash`. The owner selected it in pi; pi reports `model: "glm-5.3-flash"`, provider `zai`.
+- **Grok:** 4.7. A20b (the premium roster's grok id becomes `grok-4.7-build`, the id the CLI reports) is APPROVED.
+- **Candidates (v1):** Claude Opus 5.5 low and high, Sonnet 5 low; OpenAI GPT-6 Sol and GPT-6 Luna; Grok 4.7; Gemini 3.8 Flash; GLM 5.3 Flash. Where the owner named no level, the tool's own default level is used (one candidate per model; the owner may add levels later). 8 candidates, 7 relays.
+- **Lean calls (new requirement):** a call must carry no extra tokens pre-loaded from this computer; anything a tool adds is stripped where it can be, so a call reflects a normal API call: only the necessary information, because extra input costs money.
+
+#### Corrected fact: the GLM-5.3-Flash context window
+
+`pi --list-models glm` (catalog): `glm-5.3-flash`, context 1M, max output 131.1K, thinking yes. The "16k" mentioned earlier is NOT the context window. The pi/GLM candidate declares `contextWindowTokens: 1_000_000`.
+
+#### Model ids confirmed by one real call each (reply "ok")
+
+| Candidate | Tool argument | Reported model id |
+|---|---|---|
+| Opus 5.5 | `claude --model claude-opus-5-5 --effort low` | `claude-opus-5-5` |
+| Sonnet 5 | `claude --model claude-sonnet-5 --effort low` | `claude-sonnet-5` |
+| GPT-6 Sol | `codex exec -m gpt-6-sol` | none in the events (the relay's lineage comes from the rollout file) |
+| GPT-6 Luna | `codex exec -m gpt-6-luna` | as above |
+| Grok 4.7 | `grok -m grok-4.7` (`-m grok-4.7-build` is refused: "unknown model id") | `grok-4.7-build` (the `modelUsage` key) |
+| Gemini 3.8 Flash | `agy --model gemini-3.8-flash-high` | none (agy reports no id; pinned constant) |
+| GLM 5.3 Flash | `pi --model zai/glm-5.3-flash --thinking high` | `glm-5.3-flash`, provider `zai` |
+
+#### What each CLI adds to a one-line prompt, and the leanest flags that still work on the subscription
+
+All calls were made from an EMPTY working directory (no `CLAUDE.md`, `AGENTS.md` or project files).
+
+| Tool | Default input tokens | Leanest measured | Flags that achieve it | Irreducible |
+|---|---|---|---|---|
+| pi | ~480 (its own "coding assistant" prompt plus pi docs) | **84** | `--system-prompt "<fixed minimal text>" --no-tools --no-session --no-extensions --no-skills --no-context-files --no-prompt-templates --mode json`, with `PI_TELEMETRY=0` | essentially none |
+| claude | not measured (Claude Code's default system prompt is large) | **~687** (2 input + 685 cache-creation) | `-p … --system-prompt "<fixed minimal text>" --tools "" --strict-mcp-config --no-session-persistence --safe-mode --setting-sources user --output-format json`, empty cwd. **`--bare` must NOT be used:** it disables OAuth/keychain, so the subscription cannot sign in. | ~660 tokens of harness remain |
+| codex | 15,370 | **6,909** | `exec --json -m <id> -c 'model_instructions_file="<file with the fixed minimal text>"' --sandbox read-only --skip-git-repo-check --ignore-user-config --ignore-rules`, plus `--disable` for: apps, browser_use, browser_use_external, computer_use, goals, hooks, image_generation, multi_agent, plugins, shell_tool, skill_search, sleep_tool, tool_suggest, unified_exec, view_image, workspace_dependencies, in_app_browser, shell_snapshot. Do NOT disable `code_mode_host`: that adds an error item to the event stream. `experimental_instructions_file` and `base_instructions` are unknown keys in 0.156.1; `model_instructions_file` and `developer_instructions` are accepted. | ~6.9k remain (codex's own harness) |
+| grok | 18,385 | **~17,800** (no real gain) | `-p … -m grok-4.7 --system-prompt-override "<fixed minimal text>" --tools "" --no-subagents --disable-web-search --output-format json`; `--no-memory` is still accepted but made no difference | ~18k irreducible through this CLI |
+| agy | ~14,000 | **~13,200** | `-p … --model gemini-3.8-flash-high --output-format json --mode plan --sandbox --disable-slash-commands` (agy has no system-prompt flag) | ~13k irreducible through this CLI |
+
+#### Consequences (Decision D8, Task A12b)
+
+1. The relays use the leanest flags above and run each CLI in an EMPTY private working directory (mode 0700, created per relay start), never the engine or evaluator folder.
+2. One fixed minimal system text replaces each CLI's default where the CLI allows it. The engine's own system and user messages stay in the prompt transcript exactly as today, so prompts are identical across tools.
+3. Where overhead is irreducible (grok ~18k, agy ~13k, codex ~6.9k), results are measured WITH it and the evaluator report discloses it. Money estimates never use CLI-reported input; they use our own `promptTokensEstimate`, which is what an API call would cost. The hosted site (API keys) runs no CLI and has no overhead.
+4. Each relay measures its own overhead once at start (the handshake's reported input minus the handshake prompt's own estimate) and logs it. This is informational, not a gate.

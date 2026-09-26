@@ -237,13 +237,15 @@ Guardrails:
 The owner's tools, confirmed 2026-09-26:
 
 - **Google:** the command-line tool is named **`agy`**.
-- **Z.AI (GLM):** reached through the **`pi`** command. The Z.AI key is already configured inside `pi`, running GLM 5.3 Flash at high effort with a **16k-token context window**. The GLM candidate therefore carries `contextWindowTokens: 16000`. The picker, and the replay tool, must skip a candidate for any moment or role whose prompt would not fit its window, and record why.
+- **Z.AI (GLM):** reached through the **`pi`** command. The Z.AI key is already configured inside `pi`, running GLM 5.3 Flash (`glm-5.3-flash`, confirmed by the owner on 2026-09-26) at high effort. pi's own catalog gives it a **1M-token context window** (131.1K max output), so the GLM candidate carries `contextWindowTokens: 1000000`. The picker, and the replay tool, must skip a candidate for any moment or role whose prompt would not fit its window, and record why.
 
 Relays for `agy` and `pi`, following the existing relay pattern:
 - tools off;
 - prompt passed by stdin or file rather than argv;
 - the program-header guard;
 - deduced binaries.
+
+**Lean calls (owner ruling, 2026-09-26).** A call must carry only what the question needs, as a plain API call would, and nothing pre-loaded from the owner's computer, because extra input costs money. Every relay, old and new, therefore runs its tool in an empty private folder, with the leanest options measured for that tool, and replaces the tool's own system prompt with one fixed neutral sentence wherever the tool allows it; the engine's own messages are sent unchanged. What a tool still adds on its own (measured per call: grok about 18k tokens, agy about 13k, codex about 6.9k, Claude Code about 0.7k, pi about 0.08k) is logged once when each relay starts and disclosed in evaluator reports. Cost estimates never count it, and hosted API calls have none.
 
 Local mode needs them anyway ([two deployment modes](../../missions/2026-09-01-security-hardening/V-DECISIONS-PACKET.md), ruling V-9c).
 
