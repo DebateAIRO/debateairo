@@ -832,6 +832,18 @@ export {
   type CostEnvelopePolicy,
   type CostEnvelopePolicyValue
 } from "./cost-envelope-policy.js";
+// Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
+export {
+  STORY_COST_RULING_REF,
+  STORY_ROW_KEYS,
+  STORY_SPEC_RULING_REF,
+  buildStoryRegisterRows,
+  readStoryPolicy,
+  readStoryPolicyFromRegister,
+  type StoryPolicy,
+  type StoryRegisterRow,
+  type StoryRegisterRowsInput
+} from "./story-policy.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,

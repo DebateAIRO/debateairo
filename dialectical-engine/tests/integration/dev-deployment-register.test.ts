@@ -27,6 +27,7 @@ import {
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
+  readStoryPolicyFromRegister,
   SUPPORT_CONFIGURATION_KEYS,
   registerVersionToSafeLegacyNumber
 } from "../../packages/register/src/index.js";
@@ -35,6 +36,7 @@ import {
   createDevelopmentDeploymentRegisterMachineReceipt,
   DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX,
   DEVELOPMENT_REGISTER_VERSION,
+  deriveSynthesisRoleRefs,
   developmentDeploymentRegisterReceiptPath,
   parseDevelopmentDeploymentRegisterCliOutput,
   readDevelopmentDeploymentRegisterReceipt,
@@ -606,6 +608,29 @@ describe("DEV-05 complete development deployment register", () => {
     });
     expect(cli.stdout).not.toContain(database.connectionString);
   }, 120_000);
+
+  it("publishes the OPTIONAL verdict-story rows the runner's story reader resolves (local: no money row)", async () => {
+    const receipt = await seedDevelopmentDeploymentRegister({
+      adminPool: database.pool,
+      providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
+      repositoryRoot
+    });
+    const registerVersion = registerVersionToSafeLegacyNumber(receipt.registerVersion);
+    const roles = deriveSynthesisRoleRefs(TEST_DEVELOPMENT_PROVIDER_PANEL.configuredProviders);
+    await expect(readStoryPolicyFromRegister(database.pool, registerVersion)).resolves.toEqual({
+      storytellerRoleRef: roles.synthesizerRoleRef,
+      storyCheckerRoleRef: roles.evaluatorRoleRef,
+      loopMaxRounds: 2,
+      storytellerBound: { maxAttempts: 2, tokenCeiling: 12_000, deadlineMs: 300_000 },
+      checkerBound: { maxAttempts: 2, tokenCeiling: 2_048, deadlineMs: 180_000 },
+      materialBudget: { low: 40_000, medium: 80_000, high: 120_000 },
+      perStoryCeilingMicros: null,
+      registerVersion
+    });
+    // The sealed historical bootstrap never carried them, and still reads as "no story".
+    const bootstrap = await loadBootstrapRegister();
+    await expect(readStoryPolicyFromRegister(database.pool, bootstrap.registerVersion)).resolves.toBeNull();
+  });
 
   /**
    * T3C / F33 — the BEHAVIOURAL consequence, at the shipped composition.

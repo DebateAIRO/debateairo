@@ -19,6 +19,7 @@ import {
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
   buildAlgorithmRegisterRows,
+  buildStoryRegisterRows,
   loadBootstrapRegister,
   warnOnIdenticalSynthesisRoleRefs,
   persistBootstrapRegister,
@@ -52,6 +53,9 @@ export const DEVELOPMENT_RUNNER_SOURCE_REF =
 /** T16 · dev provenance for every sealed algorithm row (goal-v4 lines 80-96). */
 export const DEVELOPMENT_ALGORITHM_SOURCE_REF =
   "DEV-T16-algorithm-register.md#goal-v4:80-96" as const;
+/** Verdict story · dev provenance for the OPTIONAL story rows (spec 2026-09-26 §9). */
+export const DEVELOPMENT_STORY_SOURCE_REF =
+  "DEV-verdict-story-register.md#2026-09-26" as const;
 export const DEVELOPMENT_ORGAN_COST_BOUNDS = Object.freeze({
   kind: "ACCEPTANCE_ORGAN_COST_BOUNDS" as const,
   organs: Object.freeze({
@@ -504,6 +508,26 @@ export function buildDevelopmentAlgorithmRegisterRows(
   }).map((row) => Object.freeze(row)));
 }
 
+/**
+ * Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows, sealed with the
+ * SAME two role identities the synthesis family seals. The storyteller defaults
+ * to the synthesizer's provider and the checker to the evaluator's, so the two
+ * story roles start on different makers exactly as the synthesis roles do. The
+ * money row is sealed only for a HOSTED publication; local mode has no money
+ * envelope. No `register.required_row` names any of them.
+ */
+export function buildDevelopmentStoryRegisterRows(
+  roleRefs: DevelopmentSynthesisRoleRefs,
+  deployment: "local" | "hosted" = "local"
+): readonly DevelopmentDeploymentRegisterRow[] {
+  return Object.freeze(buildStoryRegisterRows({
+    synthesizerRoleRef: roleRefs.synthesizerRoleRef,
+    evaluatorRoleRef: roleRefs.evaluatorRoleRef,
+    sourceRef: DEVELOPMENT_STORY_SOURCE_REF,
+    hosted: deployment === "hosted"
+  }).map((row) => Object.freeze(row)));
+}
+
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
 
 
@@ -646,7 +670,8 @@ function developmentValueAst(value: unknown): CanonicalJsonAst {
 function developmentRows(
   bootstrap: BootstrapRegister,
   providerPanel: DevelopmentProviderPanel,
-  roleRefs: DevelopmentSynthesisRoleRefs
+  roleRefs: DevelopmentSynthesisRoleRefs,
+  deployment: "local" | "hosted"
 ): readonly DevelopmentDeploymentRegisterRow[] {
   const bootstrapRows = Object.entries(bootstrap.values).map(([rowKey, value]) =>
     Object.freeze({
@@ -675,7 +700,10 @@ function developmentRows(
     // measured paid run, never as an edit of this one (constraint 5).
     COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
-    ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs)
+    ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs),
+    // Verdict story (spec 2026-09-26 §9): OPTIONAL rows. Every reader treats
+    // their absence as "story off", so no older version needs them.
+    ...buildDevelopmentStoryRegisterRows(roleRefs, deployment)
   ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
     throw new TypeError("DEV_DEPLOYMENT_REGISTER_DEFINITION_INVALID");
@@ -686,10 +714,11 @@ function developmentRows(
 async function expectedRunnerRows(
   bootstrap: BootstrapRegister,
   providerPanel: DevelopmentProviderPanel,
-  roleRefs: DevelopmentSynthesisRoleRefs
+  roleRefs: DevelopmentSynthesisRoleRefs,
+  deployment: "local" | "hosted"
 ): Promise<readonly DevelopmentDeploymentRegisterRow[]> {
   const rows = [
-    ...developmentRows(bootstrap, providerPanel, roleRefs),
+    ...developmentRows(bootstrap, providerPanel, roleRefs, deployment),
     ...await buildDevelopmentRunnerRegisterRows()
   ];
   if (new Set(rows.map(({ rowKey }) => rowKey)).size !== rows.length) {
@@ -701,9 +730,11 @@ async function expectedRunnerRows(
 export async function buildDevelopmentDeploymentRegisterPublicationRows(
   bootstrap: BootstrapRegister,
   providerPanel: DevelopmentProviderPanel,
-  roleRefs: DevelopmentSynthesisRoleRefs = deriveSynthesisRoleRefs(providerPanel.configuredProviders)
+  roleRefs: DevelopmentSynthesisRoleRefs = deriveSynthesisRoleRefs(providerPanel.configuredProviders),
+  /** Verdict story: a HOSTED publication also seals the story's money row. */
+  deployment: "local" | "hosted" = "local"
 ): Promise<readonly RegisterPublicationRow[]> {
-  return Object.freeze((await expectedRunnerRows(bootstrap, providerPanel, roleRefs)).map((row) =>
+  return Object.freeze((await expectedRunnerRows(bootstrap, providerPanel, roleRefs, deployment)).map((row) =>
     Object.freeze({
       rowKey: row.rowKey,
       valueJsonText: canonicalRegisterJson(

@@ -488,7 +488,7 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     healthyProviderRefs: Object.freeze([]),
     targets,
     targetsJson
-  }, synthesisRoles);
+  }, synthesisRoles, "hosted");
   const operatorRows = new Map<string, RegisterPublicationRow>([
     [CONFIGURED_PROVIDER_SET_ROW_KEY, Object.freeze({
       rowKey: CONFIGURED_PROVIDER_SET_ROW_KEY,

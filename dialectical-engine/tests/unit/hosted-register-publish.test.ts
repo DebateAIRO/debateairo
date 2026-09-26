@@ -29,8 +29,10 @@ import {
   ALGORITHM_REGISTER_ROW_KEYS,
   COST_ENVELOPE_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
+  STORY_ROW_KEYS,
   loadBootstrapRegister,
   parseRegisterVersionText,
+  readStoryPolicy,
   type GeneralRegisterPublication
 } from "../../packages/register/src/index.js";
 
@@ -236,6 +238,19 @@ describe("Task 14b · the operator's hosted register file", () => {
     // The sealed historical bootstrap is the base, exactly as the seeder uses it.
     expect(plan.baseRegisterVersion).toBe(String((await loadBootstrapRegister()).registerVersion));
     expect(plan.exampleTargetRefs).toEqual([]);
+  });
+
+  it("seals the verdict story's rows, money row included, by the seeder's own builders", async () => {
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    const storyKeys: readonly string[] = STORY_ROW_KEYS;
+    const rows = plan.rows.filter((row) => storyKeys.includes(row.rowKey));
+    expect(rows.map((row) => row.rowKey).sort()).toEqual([...STORY_ROW_KEYS].sort());
+    const policy = readStoryPolicy(rows.map((row) => ({
+      rowKey: row.rowKey, value: JSON.parse(row.valueJsonText) as unknown, sourceRef: row.sourceRef
+    })), 9);
+    expect(policy?.perStoryCeilingMicros).toBe(50_000);
+    expect(policy?.storytellerRoleRef).toBe(plan.synthesisRoles.synthesizerRoleRef);
+    expect(policy?.storyCheckerRoleRef).toBe(plan.synthesisRoles.evaluatorRoleRef);
   });
 
   it("derives the publication id from content, so the same file replays the same publication", async () => {
