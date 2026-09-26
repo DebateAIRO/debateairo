@@ -166,7 +166,7 @@ The first pack ships six shapes: `general` (default), `health`, `money-decision`
 
 **Validation at load (fail closed, never breaks debates):** the ids match `^[a-z][a-z0-9-]{1,31}$`
 and are unique; the default shape exists; each shape has 3 to 12 sections; each file is at most
-12 KB and the assembled storyteller instruction at most 48 KB; the files are UTF-8 with no control
+24 KB (raised 2026-09-27 so owners keep room to edit) and the assembled storyteller instruction at most 48 KB; the files are UTF-8 with no control
 characters. An invalid pack disables the story (every debate gets a `FAILED`/`STORY_PACK_INVALID`
 row) and the runner logs exactly which rule failed.
 
