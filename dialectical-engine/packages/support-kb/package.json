@@ -3,11 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "generate:ui-labels": "node scripts/generate-ui-labels.mjs"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./catalog": "./src/catalog.ts",
     "./context": "./src/context.ts",
-    "./navigation": "./src/navigation.ts"
+    "./navigation": "./src/navigation.ts",
+    "./templates": "./src/templates.ts"
   },
   "dependencies": {
     "@debateai/kernel": "workspace:*"

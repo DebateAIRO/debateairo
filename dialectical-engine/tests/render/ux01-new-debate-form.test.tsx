@@ -7,6 +7,10 @@ import {
   buildNewDebateAskConfig,
   deriveSessionAskDefaults
 } from "../../apps/ui/app/new/defaults.js";
+import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
+import homeCatalog from "../../apps/ui/messages/en/home.json" with { type: "json" };
+import chromeCatalog from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+import newDebateCatalog from "../../apps/ui/messages/en/newDebate.json" with { type: "json" };
 
 process.env.TZ = "UTC";
 
@@ -122,15 +126,17 @@ function collectElements(node: ReactNode, predicate: (element: ReactElement) => 
 }
 
 async function renderRealNewDebatePageState(): Promise<{ html: string; tree: ReactNode }> {
-  const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
   let html = "";
   for (let pass = 0; pass < 4; pass += 1) {
     hooks.beginRender();
-    html = renderToStaticMarkup(<NewDebatePage />);
+    html = renderToStaticMarkup(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />);
     await hooks.flushEffects();
   }
   hooks.beginRender();
-  return { html, tree: evaluateElementTree(<NewDebatePage />) };
+  return {
+    html,
+    tree: evaluateElementTree(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />)
+  };
 }
 
 /* Risk tier is a segmented pill group: the asker's choice arrives as a click
@@ -148,8 +154,9 @@ async function submitRenderedPage(): Promise<Record<string, unknown>> {
   const initial = await renderRealNewDebatePageState();
   chooseRiskTier(initial.tree, "standard");
   hooks.beginRender();
-  const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-  const rendered = { tree: evaluateElementTree(<NewDebatePage />) };
+  const rendered = {
+    tree: evaluateElementTree(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />)
+  };
   const form = findElement(rendered.tree, (element) => element.type === "form");
   expect(form).not.toBeNull();
   await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
@@ -189,8 +196,9 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     const initial = await renderRealNewDebatePageState();
     chooseRiskTier(initial.tree, "casual");
     hooks.beginRender();
-    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-    const editedTree = evaluateElementTree(<NewDebatePage />);
+    const editedTree = evaluateElementTree(
+      <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />
+    );
     const form = findElement(editedTree, (element) => element.type === "form");
     expect(form).not.toBeNull();
     await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
@@ -250,8 +258,9 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     expect(optionsButton).not.toBeNull();
     (optionsButton!.props as { onClick: () => void }).onClick();
     hooks.beginRender();
-    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-    const openHtml = renderToStaticMarkup(<NewDebatePage />);
+    const openHtml = renderToStaticMarkup(
+      <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />
+    );
     expect(openHtml).toContain('aria-controls="additionalRunOptions"');
     expect(openHtml).toContain('id="additionalRunOptions"');
   });
@@ -337,8 +346,7 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     // never opened it.
     openOptionsPanel(initial.tree);
     hooks.beginRender();
-    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-    const openTree = evaluateElementTree(<NewDebatePage />);
+    const openTree = evaluateElementTree(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />);
     expect(
       findElement(openTree, (element) => (element.props as { id?: string }).id === "additionalRunOptions"),
       "Options panel did not open — controls inside it would go unexercised"
@@ -347,7 +355,7 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     expect(openSentinels.length, "no editable text control found with Options open").toBeGreaterThan(0);
 
     hooks.beginRender();
-    const form = findElement(evaluateElementTree(<NewDebatePage />), (element) => element.type === "form");
+    const form = findElement(evaluateElementTree(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />), (element) => element.type === "form");
     expect(form).not.toBeNull();
     await (form!.props as { onSubmit: (event: { preventDefault: () => void }) => Promise<void> })
       .onSubmit({ preventDefault: vi.fn() });
@@ -406,8 +414,7 @@ describe("UX-01 DR-181 discovery-owned rendered /new flow", () => {
     // state, so "every editable text control" above is not silently partial.
     openOptionsPanel(initial.tree);
     hooks.beginRender();
-    const { default: NewDebatePage } = await import("../../apps/ui/app/new/page.js");
-    for (const tree of [initial.tree, evaluateElementTree(<NewDebatePage />)]) {
+    for (const tree of [initial.tree, evaluateElementTree(<NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />)]) {
       expect(collectElements(tree, (element) => {
         const editable = (element.props as { contentEditable?: unknown }).contentEditable;
         return editable === true || editable === "true" || editable === "plaintext-only";

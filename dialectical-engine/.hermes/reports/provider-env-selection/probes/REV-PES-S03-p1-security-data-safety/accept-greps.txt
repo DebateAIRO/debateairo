@@ -1,0 +1,56 @@
+=== step3 six codes ===
+700:  hosted deployment runs, that deployment refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED`
+701:  or `COST_ENVELOPE_POLICY_INVALID`.
+739:`COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with
+740:`COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed.
+775:| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows below. |
+779:| `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` | one price member is declared without the other, or a declared amount is not an integer from 0 through `Number.MAX_SAFE_INTEGER`. |
+780:| `PROVIDER_TARGET_PRICE_REQUIRED:` and the provider ref | hosted mode, and a debate target declares no price pair. |
+781:| `PROVIDER_TARGET_PRICE_ZERO:` and the provider ref | hosted mode, and a declared input or output price is below 1 micro-unit per million tokens. |
+782:| `COST_ENVELOPE_POLICY_UNRESOLVED` | no `costEnvelopePolicy` row exists at the resolved `REGISTER_VERSION`. |
+783:| `COST_ENVELOPE_POLICY_INVALID` | the `costEnvelopePolicy` row exists but does not parse, or its `source_ref` is blank. |
+784:| `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` | hosted mode, and the `admissionPolicy` row in force at the resolved `REGISTER_VERSION` lacks at least one of the three support budgets: `support_reads`, `support_sessions`, `support_model_calls`. |
+786:`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two.
+850:| `input_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million input tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
+851:| `output_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million output tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
+=== step4 price member ===
+850:| `input_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million input tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
+854:In `runner.env` the entry for the example above reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000,"authorization_file":"/etc/debateai/runner/providers/acme.header"}`.
+855:In `api.env` it reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000,"authorization_file":"/etc/debateai/api/providers/acme.header"}`.
+=== step5 stale window ===
+## Known-stale sections — refreshed by Task 14
+
+Measured against the tree at this commit. Each is stale in a way that would stop
+a first provision, so read this list before following the section:
+
+- **"KEK rotation is not implemented" (§10, "What is deliberately absent") is
+  false.** It shipped as `pnpm keys:rotate-kek`; §3 "Changing a master key" is
+  the procedure.
+- **`deploy/vps/env/api.env.example`** lacked `SUPPORT_KEK_PATH` and
+  `SUPPORT_DATABASE_URL`, both REQUIRED by the API's shape and by the
+  rotation's. Both keys are in the example now; the §3 layout table below still
+  does not list `support-kek.bin` or the support database principal.
+
+---
+
+## 1. Topology
+
+One machine. Exactly one process listens on a public interface.
+
+```
+        internet
+           |  443 (and 80, redirect only)
+       [ Caddy ]                      automatic TLS, HSTS preload, 1MB body cap
+           |  127.0.0.1:3001
+       [ debateai-ui ]                Next front door, custom server.mjs
+           |  127.0.0.1:8790
+       [ debateai-api ]               Fastify
+=== step6 max_tokens ===
+762:The paid-vendor probe spends `max_tokens: 8` per target per staleness window; the window is the `panelDiscoveryPolicy` register row's `probe_freshness_ms`, validated only as a positive integer. The development seed publishes `600000`. Hosted mode enforces no minimum, so the number an operator publishes is the whole control.
+=== step7 apps packages (empty expected) ===
+=== porcelain ===
+=== sha ===
+9eaf221e01a2e9b47d7b0b275d8e348afe8f0c03cc32d055925027a1c7a723b2  deploy/vps/README.md
+=== sk- word ===
+bounded_sk []
+ask-password 1

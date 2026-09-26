@@ -1,0 +1,135 @@
+[
+  {
+    "name": "ct-p2-src-rename-zero",
+    "total": 61,
+    "passed": 60,
+    "failed": 1,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-src-rename-zero-runtime.log"
+  },
+  {
+    "name": "ct-p2-src-add-code",
+    "total": 61,
+    "passed": 60,
+    "failed": 1,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-src-add-code-runtime.log"
+  },
+  {
+    "name": "ct-p2-retype+src-rename-zero",
+    "total": 61,
+    "passed": 61,
+    "failed": 0,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-retype+src-rename-zero-runtime.log"
+  },
+  {
+    "name": "ct-p2-retype+src-add-code",
+    "total": 61,
+    "passed": 61,
+    "failed": 0,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-retype+src-add-code-runtime.log"
+  },
+  {
+    "name": "sd-source-rename-PRICE_ZERO",
+    "total": 61,
+    "passed": 60,
+    "failed": 1,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-rename-PRICE_ZERO-runtime.log"
+  },
+  {
+    "name": "sd-retype+source-rename-PRICE_ZERO",
+    "total": 61,
+    "passed": 61,
+    "failed": 0,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-retype+source-rename-PRICE_ZERO-runtime.log"
+  },
+  {
+    "name": "sd-source-add-13th-code",
+    "total": 61,
+    "passed": 60,
+    "failed": 1,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-add-13th-code-runtime.log"
+  },
+  {
+    "name": "sd-retype+source-add-13th-code",
+    "total": 61,
+    "passed": 61,
+    "failed": 0,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-retype+source-add-13th-code-runtime.log"
+  },
+  {
+    "name": "sd-source-rename-LOOPBACK-extended",
+    "total": 262,
+    "passed": 221,
+    "failed": 41,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-30 hosted: the support chat reaches a paid API and refuses a relay > refuses a TLS relay that merely names this machine",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > loopback-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > loopback-alias-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > loopback-range-end-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > loopback-shorthand-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > loopback-decimal-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > localhost-uppercase-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > localhost-trailing-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > localhost-subdomain-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > localhost-subdomain-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-loopback-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-loopback-alias-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ipv6-loopback-expanded-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > unspecified-ipv4-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > unspecified-ipv6-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > localhost-localdomain-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > localhost-localdomain-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ip6-localhost-name-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ip6-loopback-name-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > this-network-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > this-network-high-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv4-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv4-low-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv6-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv6-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-link-local-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-this-network-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > private-10-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > private-10-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > private-172-16-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > private-172-31-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > private-192-168-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > cgnat-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > cgnat-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ula-fc-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ula-fd-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ula-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-private-10-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-private-192-168-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-cgnat-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 mode x provider target (task 10a) > refuses every literal address this host holds"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-rename-LOOPBACK-extended-runtime.log"
+  },
+  {
+    "name": "sd-source-rename-AUTH_FILE_UNUSABLE-extended",
+    "total": 262,
+    "passed": 260,
+    "failed": 2,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the target set resolves its credentials once, in memory (task 10b) > names the provider and the underlying code, never the path or the credential",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-30 hosted: the support chat reaches a paid API and refuses a relay > names the provider, never the path or the credential, when the file cannot be used"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-rename-AUTH_FILE_UNUSABLE-extended-runtime.log"
+  }
+]

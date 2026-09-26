@@ -1,0 +1,21 @@
+{
+  "time.justNow": "épp most",
+  "time.minutes.one": "{count} perce",
+  "time.minutes.other": "{count} perce",
+  "time.hours.one": "{count} órája",
+  "time.hours.other": "{count} órája",
+  "time.yesterday": "Tegnap",
+  "time.days.one": "{count} napja",
+  "time.days.other": "{count} napja",
+  "time.weeks.one": "{count} hete",
+  "time.weeks.other": "{count} hete",
+  "time.status.complete": "Befejeződött",
+  "time.status.queued": "Sorba állítva",
+  "time.status.claimed": "Átvéve",
+  "time.status.running": "Fut",
+  "time.status.holding": "Szolgáltatói helyreállításra vár",
+  "time.status.settled": "Lezárva",
+  "time.status.generating": "Létrehozás",
+  "time.status.failed": "Sikertelen",
+  "time.status.draft": "Piszkozat"
+}

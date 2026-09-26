@@ -209,7 +209,7 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // the review reasons through prepareLeasedContentEncryptionForRun, which
       // borrows the lease the runner's post-settle hook already holds.
       "packages/story/src/enrichment.ts",
-      // Verdict story (0072): the story repository seals and reads serve.answer_story
+      // Verdict story (0074): the story repository seals and reads serve.answer_story
       // inside withRunContentLease, borrowed when the runner's hook already holds it.
       "packages/story/src/repository.ts",
       "packages/valuation/src/index.ts"

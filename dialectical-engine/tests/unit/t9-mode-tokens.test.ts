@@ -31,6 +31,14 @@ type ModeToggleModule = {
   ModeToggle: () => ReturnType<typeof createElement>;
 };
 
+type I18nProviderModule = {
+  I18nProvider: (props: {
+    locale: "en";
+    catalog: Readonly<Record<string, string>>;
+    children?: ReturnType<typeof createElement>;
+  }) => ReturnType<typeof createElement>;
+};
+
 const root = process.cwd();
 const globalsPath = resolve(root, "apps/ui/app/globals.css");
 const layoutPath = resolve(root, "apps/ui/app/layout.tsx");
@@ -525,7 +533,13 @@ describe("T9-C3 mode control and document guard", () => {
     // PROPERTY: the real control treats the document marker as initial truth and
     // one activation atomically flips marker, accessible state, label, and storage.
     expect(existsSync(modeTogglePath), "apps/ui/components/ModeToggle.tsx exists").toBe(true);
-    const { ModeToggle } = await vi.importActual<ModeToggleModule>("../../apps/ui/components/ModeToggle.js");
+    const [{ ModeToggle }, { I18nProvider }] = await Promise.all([
+      vi.importActual<ModeToggleModule>("../../apps/ui/components/ModeToggle.js"),
+      vi.importActual<I18nProviderModule>("../../apps/ui/lib/i18n/I18nProvider.js")
+    ]);
+    const chromeCatalog = JSON.parse(
+      readFileSync(resolve(root, "apps/ui/messages/en/chrome.json"), "utf8")
+    ) as Readonly<Record<string, string>>;
     const dom = new JSDOM("<!doctype html><html data-mode='chamber'><body><div id='root'></div></body></html>", {
       url: "https://app.debateai.test/"
     });
@@ -545,7 +559,11 @@ describe("T9-C3 mode control and document guard", () => {
     const reactRoot = createRoot(dom.window.document.getElementById("root")!);
     try {
       await act(async () => {
-        reactRoot.render(createElement(ModeToggle));
+        reactRoot.render(createElement(
+          I18nProvider,
+          { locale: "en", catalog: chromeCatalog },
+          createElement(ModeToggle)
+        ));
         await Promise.resolve();
       });
       const button = dom.window.document.querySelector<HTMLButtonElement>("button[data-mode-toggle]");
@@ -554,15 +572,16 @@ describe("T9-C3 mode control and document guard", () => {
       expect(button!.type).toBe("button");
       expect(button!.className).toBe("modeToggle");
       expect(button!.getAttribute("aria-pressed")).toBe("true");
-      expect(button!.getAttribute("aria-label")).toBe("Switch to Terracotta mode");
-      expect(button!.textContent).toBe("☀ Terracotta");
+      expect(button!.getAttribute("aria-label")).toBe("Switch to light mode");
+      // V 2026-09-26: the glyph is the whole visible control; no theme name is rendered.
+      expect(button!.textContent).toBe("☀");
 
       await act(async () => button!.click());
       expect(dom.window.document.documentElement.dataset.mode).toBe("terracotta");
       expect(dom.window.localStorage.getItem("debateai.mode")).toBe("terracotta");
       expect(button!.getAttribute("aria-pressed")).toBe("false");
-      expect(button!.getAttribute("aria-label")).toBe("Switch to Chamber mode");
-      expect(button!.textContent).toBe("☾ Chamber");
+      expect(button!.getAttribute("aria-label")).toBe("Switch to dark mode");
+      expect(button!.textContent).toBe("☾");
     } finally {
       await act(async () => reactRoot.unmount());
       dom.window.close();

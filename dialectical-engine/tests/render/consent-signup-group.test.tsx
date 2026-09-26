@@ -56,19 +56,20 @@ function groupField(name: string): HTMLInputElement {
 
 async function mount(client?: {
   register: ReturnType<typeof vi.fn>;
-  resendVerification: ReturnType<typeof vi.fn>;
 }): Promise<void> {
-  const stub = client ?? { register: vi.fn(), resendVerification: vi.fn() };
+  const stub = client ?? { register: vi.fn() };
   await act(async () => root!.render(<SignUpFlow client={stub} />));
 }
 
 /** Drive the card into its `sent` state the way a real registration does. */
 async function registerSuccessfully(): Promise<void> {
   const register = vi.fn().mockResolvedValue({ message: "sent" });
-  await mount({ register, resendVerification: vi.fn() });
+  await mount({ register });
   field("email").value = "person@example.test";
+  field("confirm-email").value = "person@example.test";
   field("recovery-email").value = "recovery@example.test";
   field("password").value = "correct horse battery staple";
+  field("confirm-password").value = "correct horse battery staple";
   field("adult-affirmed").checked = true;
   field("privacy-accepted").checked = true;
   field("terms-accepted").checked = true;

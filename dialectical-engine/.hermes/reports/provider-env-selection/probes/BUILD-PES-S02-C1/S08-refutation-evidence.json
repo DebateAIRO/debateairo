@@ -1,0 +1,240 @@
+{
+  "mutants": [
+    [
+      "M01-key",
+      "dev-api-environment",
+      "  \"DEBATEAI_DEPLOYMENT_MODE\"\n",
+      "",
+      "tests/unit/v9-deployment-mode.test.ts",
+      "declares DEBATEAI_DEPLOYMENT_MODE=local in the API"
+    ],
+    [
+      "M02-value",
+      "dev-api-environment",
+      "[\"DEBATEAI_DEPLOYMENT_MODE\", \"local\"]",
+      "[\"DEBATEAI_DEPLOYMENT_MODE\", \"hosted\"]",
+      "tests/unit/v9-deployment-mode.test.ts",
+      "declares DEBATEAI_DEPLOYMENT_MODE=local in the API"
+    ],
+    [
+      "M03-duplicate",
+      "dev-api-environment",
+      "] as const);",
+      "  , \"DEBATEAI_DEPLOYMENT_MODE\"\n] as const);",
+      "tests/unit/v9-deployment-mode.test.ts",
+      "declares DEBATEAI_DEPLOYMENT_MODE=local in the API"
+    ],
+    [
+      "M04-runner-forward",
+      "dev-runner-process",
+      "DEBATEAI_DEPLOYMENT_MODE: \"local\"",
+      "DEBATEAI_DEPLOYMENT_MODE: apiEnvironment.DEBATEAI_DEPLOYMENT_MODE!",
+      "tests/unit/v9-deployment-mode.test.ts",
+      "declares DEBATEAI_DEPLOYMENT_MODE=local in the runner"
+    ],
+    [
+      "M05-runner-twice",
+      "dev-runner-process",
+      "    child = input.operations.startRunner(createRunnerEnvironment(",
+      "    input.operations.startRunner(createRunnerEnvironment(input.commandEnvironment, apiEnvironment, profile));\n    child = input.operations.startRunner(createRunnerEnvironment(",
+      "tests/unit/v9-deployment-mode.test.ts",
+      "declares DEBATEAI_DEPLOYMENT_MODE=local in the runner"
+    ],
+    [
+      "M06-row-order",
+      "dev-api-environment",
+      "  \"DEBATEAI_DEV_MAIL_CAPTURE_DIR\",\n  \"DEBATEAI_DEPLOYMENT_MODE\"",
+      "  \"DEBATEAI_DEPLOYMENT_MODE\",\n  \"DEBATEAI_DEV_MAIL_CAPTURE_DIR\"",
+      "tests/integration/dev-api-environment.test.ts",
+      "atomically adds the declared local deployment mode"
+    ],
+    [
+      "M07-upgrade",
+      "dev-api-environment",
+      "      || isExactEnvironmentWithoutDeclaredDeploymentMode(existing, source, profile)",
+      "",
+      "tests/integration/dev-api-environment.test.ts",
+      "atomically adds the declared local deployment mode"
+    ],
+    [
+      "M08-reused",
+      "dev-api-environment",
+      "return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });",
+      "return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: true });",
+      "tests/integration/dev-api-environment.test.ts",
+      "atomically adds the declared local deployment mode"
+    ],
+    [
+      "M09-keycount",
+      "dev-api-environment",
+      "return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });",
+      "return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length - 1, reused });",
+      "tests/integration/dev-api-environment.test.ts",
+      "atomically adds the declared local deployment mode"
+    ],
+    [
+      "M10-no-rewrite",
+      "dev-api-environment",
+      "    const temporaryPath = `${path}.${randomUUID()}.tmp`;",
+      "    if (existing !== undefined) return false;\n    const temporaryPath = `${path}.${randomUUID()}.tmp`;",
+      "tests/integration/dev-api-environment.test.ts",
+      "atomically adds the declared local deployment mode"
+    ],
+    [
+      "M11-port-drift",
+      "dev-api-environment",
+      "  const declared = existing + DECLARED_LOCAL_DEPLOYMENT_MODE_ROW;",
+      "  if (existing.includes(\"API_PORT=8791\\n\")) return true;\n  const declared = existing + DECLARED_LOCAL_DEPLOYMENT_MODE_ROW;",
+      "tests/integration/dev-api-environment.test.ts",
+      "refuses to add the declared deployment mode"
+    ],
+    [
+      "M12-hosted-drift",
+      "dev-api-environment",
+      "  if (!existing.endsWith(\"\\n\") || existing.includes(\"DEBATEAI_DEPLOYMENT_MODE=\")) return false;",
+      "  if (existing.endsWith(\"DEBATEAI_DEPLOYMENT_MODE=hosted\\n\")) return true;\n  if (!existing.endsWith(\"\\n\") || existing.includes(\"DEBATEAI_DEPLOYMENT_MODE=\")) return false;",
+      "tests/integration/dev-api-environment.test.ts",
+      "refuses to add the declared deployment mode"
+    ],
+    [
+      "M13-write-before-refusal",
+      "dev-api-environment",
+      "        throw new TypeError(\"DEV_API_ENVIRONMENT_DRIFT\");",
+      "        const damaged = await open(path, constants.O_WRONLY | constants.O_TRUNC);\n        await damaged.writeFile(source, \"utf8\");\n        await damaged.close();\n        throw new TypeError(\"DEV_API_ENVIRONMENT_DRIFT\");",
+      "tests/integration/dev-api-environment.test.ts",
+      "refuses to add the declared deployment mode"
+    ],
+    [
+      "M14-launcher-guard",
+      "dev-api-process",
+      "      [\"DEBATEAI_DEPLOYMENT_MODE\", \"local\"]",
+      "",
+      "tests/integration/dev-api-process.test.ts",
+      "refuses an environment that names a deployment mode"
+    ],
+    [
+      "M15-early-spawn",
+      "dev-api-process",
+      "  const values = await loadDevelopmentApiProcessEnvironment(repositoryRoot, profile);",
+      "  input.operations.startApi(Object.freeze({}));\n  const values = await loadDevelopmentApiProcessEnvironment(repositoryRoot, profile);",
+      "tests/integration/dev-api-process.test.ts",
+      "refuses an environment that names a deployment mode"
+    ],
+    [
+      "M16-spawn-mode",
+      "dev-api-process",
+      "      ...values\n",
+      "      ...values,\n      DEBATEAI_DEPLOYMENT_MODE: \"hosted\"\n",
+      "tests/integration/dev-api-process.test.ts",
+      "refuses an environment that names a deployment mode"
+    ],
+    [
+      "M17-spawn-twice",
+      "dev-api-process",
+      "  let child: DevelopmentApiChild;",
+      "  input.operations.startApi(values);\n  let child: DevelopmentApiChild;",
+      "tests/integration/dev-api-process.test.ts",
+      "refuses an environment that names a deployment mode"
+    ],
+    [
+      "M18-receipt-port",
+      "dev-api-process",
+      "port: profile.apiPort, auth:",
+      "port: profile.apiPort + 1, auth:",
+      "tests/integration/dev-api-process.test.ts",
+      "refuses an environment that names a deployment mode"
+    ]
+  ],
+  "results": [
+    {
+      "id": "M01-key",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M02-value",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M03-duplicate",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M04-runner-forward",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M05-runner-twice",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M06-row-order",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M07-upgrade",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M08-reused",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M09-keycount",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M10-no-rewrite",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M11-port-drift",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M12-hosted-drift",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M13-write-before-refusal",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M14-launcher-guard",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M15-early-spawn",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M16-spawn-mode",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M17-spawn-twice",
+      "red": 1,
+      "green": 0
+    },
+    {
+      "id": "M18-receipt-port",
+      "red": 1,
+      "green": 0
+    }
+  ]
+}

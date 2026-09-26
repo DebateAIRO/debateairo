@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublicDebateSchema, type PublicStoryShort } from "@debateai/contract";
 import { PublicDebateOverview } from "../../apps/ui/components/PublicDebateOverview.js";
 import { StoryShortBlocks, type StoryShortContent } from "../../apps/ui/components/StoryShortBlocks.js";
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
 
 const BASE = {
   public_ref: "22222222-2222-4222-8222-222222222222",
@@ -50,7 +51,7 @@ async function mount(element: ReactElement): Promise<HTMLElement> {
 
 async function render(storyShort: PublicStoryShort | undefined): Promise<HTMLElement> {
   const debate = PublicDebateSchema.parse(storyShort === undefined ? BASE : { ...BASE, story_short: storyShort });
-  return mount(<PublicDebateOverview debate={debate} onDetails={() => undefined} onRead={() => undefined} />);
+  return mount(<PublicDebateOverview debate={debate} catalog={publicEnglish} onDetails={() => undefined} onRead={() => undefined} />);
 }
 
 afterEach(async () => {

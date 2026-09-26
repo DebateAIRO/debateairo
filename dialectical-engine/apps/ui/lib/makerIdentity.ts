@@ -1,4 +1,6 @@
 import { modelMeta } from "./models.js";
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import type { MessageCatalog } from "./i18n/translate.js";
 
 export type MakerIdentityLabel = Readonly<{
   text: string;
@@ -12,10 +14,16 @@ export type MakerIdentityLabel = Readonly<{
  */
 export function makerIdentityLabel({
   maker,
-  modelId
-}: Readonly<{ maker?: string | null; modelId: string | null }>): MakerIdentityLabel {
+  modelId,
+  catalog = composeEnglish
+}: Readonly<{
+  maker?: string | null;
+  modelId: string | null;
+  /** The reader's `compose` catalogue: the friendly model family ("… (local)", fallback name). */
+  catalog?: MessageCatalog;
+}>): MakerIdentityLabel {
   if (maker === null) return { text: "House unavailable", absence: true };
-  const modelName = modelId === null ? null : modelMeta(modelId).name;
+  const modelName = modelId === null ? null : modelMeta(modelId, catalog).name;
   const modelIdentity = modelId === null
     ? []
     : modelName === modelId

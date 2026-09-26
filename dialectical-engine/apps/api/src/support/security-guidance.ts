@@ -1,4 +1,6 @@
-import type { SupportActionId,SupportLanguage } from "@debateai/support-kb/catalog";
+import type {
+  SupportActionId,SupportCorpusLanguage,SupportLanguage
+} from "@debateai/support-kb/catalog";
 import {
   analyzePreparedRecoverySemanticsViews,type RecoverySemantics
 } from "./recovery-intent.js";
@@ -10,12 +12,12 @@ export type SupportSecurityRecoveryKind =
 
 export type SupportSecurityRecovery = Readonly<{
   kind: SupportSecurityRecoveryKind;
-  language: SupportLanguage;
+  language: SupportCorpusLanguage;
 }>;
 
 export type SupportSecurityNavigation = Readonly<{
   kind: "FORGOT_PASSWORD";
-  language: SupportLanguage;
+  language: SupportCorpusLanguage;
   actionId: Extract<SupportActionId,"forgot-password">;
 }>;
 
@@ -42,7 +44,9 @@ function decodedPreparedViews(values: readonly string[]): readonly string[] {
   }))));
 }
 
-function inferredPreparedLanguage(value: string,fallback: SupportLanguage): SupportLanguage {
+function inferredPreparedLanguage(
+  value: string,fallback: SupportCorpusLanguage
+): SupportCorpusLanguage {
   const text = value;
   return /[ăâîșşțţ]/u.test(text)
     || /\b(?:am|arat\p{L}*|g[ăa]sesc|parol\p{L}*|recupera\p{L}*|uitat\p{L}*|unde|vreau)\b/u.test(text)
@@ -50,22 +54,23 @@ function inferredPreparedLanguage(value: string,fallback: SupportLanguage): Supp
 }
 
 function recoveryDecision(semantics: RecoverySemantics): SupportSecurityRecovery | null {
+  const language: SupportCorpusLanguage = semantics.language === "ro" ? "ro" : "en";
   if (semantics.navigation === "AFFIRMATIVE") {
     return Object.freeze({
       kind:semantics.credentialOperation === "AFFIRMATIVE"
         ? "CREDENTIAL_OPERATION_AND_FORGOT_PASSWORD"
         : "FORGOT_PASSWORD",
-      language:semantics.language
+      language
     });
   }
   if (semantics.credentialOperation === "AFFIRMATIVE") {
-    return Object.freeze({ kind:"CREDENTIAL_OPERATION",language:semantics.language });
+    return Object.freeze({ kind:"CREDENTIAL_OPERATION",language });
   }
   return null;
 }
 
 export function classifySecurityRecoveryViews(
-  values: readonly string[],languageHint: SupportLanguage
+  values: readonly string[],languageHint: SupportCorpusLanguage
 ): SupportSecurityRecovery | null {
   const prepared = decodedPreparedViews(values);
   const language = inferredPreparedLanguage(prepared.join(" "),languageHint);
@@ -73,7 +78,7 @@ export function classifySecurityRecoveryViews(
 }
 
 export function classifySecurityRecovery(
-  text: string,languageHint: SupportLanguage = "en"
+  text: string,languageHint: SupportCorpusLanguage = "en"
 ): SupportSecurityRecovery | null {
   const views = normalizedViews([text]);
   return classifySecurityRecoveryViews(
@@ -90,7 +95,7 @@ export function classifySecurityNavigation(text: string): SupportSecurityNavigat
 }
 
 export function classifySecurityNavigationViews(
-  values: readonly string[],languageHint: SupportLanguage = "en"
+  values: readonly string[],languageHint: SupportCorpusLanguage = "en"
 ): SupportSecurityNavigation | null {
   const recovery = classifySecurityRecoveryViews(values,languageHint);
   if (recovery === null || recovery.kind === "CREDENTIAL_OPERATION") return null;
@@ -99,28 +104,29 @@ export function classifySecurityNavigationViews(
   });
 }
 
-const GUIDANCE: Readonly<Record<SupportLanguage,string>> = Object.freeze({
+const GUIDANCE: Readonly<Record<SupportCorpusLanguage,string>> = Object.freeze({
   en: "Use the product's Forgot password option. Support cannot receive your password or submit a reset for you.",
   ro: "Folosește opțiunea Am uitat parola din produs. Asistența nu îți poate primi parola și nu poate trimite o resetare în locul tău."
 });
-const OPERATION_REFUSAL: Readonly<Record<SupportLanguage,string>> = Object.freeze({
+const OPERATION_REFUSAL: Readonly<Record<SupportCorpusLanguage,string>> = Object.freeze({
   en: "Support cannot receive credentials or reset, validate, or submit a password, reset token, or recovery code.",
   ro: "Asistența nu poate primi credențiale și nu poate reseta, valida sau trimite o parolă, un token de resetare ori un cod de recuperare."
 });
-const MIXED_GUIDANCE: Readonly<Record<SupportLanguage,string>> = Object.freeze({
+const MIXED_GUIDANCE: Readonly<Record<SupportCorpusLanguage,string>> = Object.freeze({
   en: `${OPERATION_REFUSAL.en} Use the product's Forgot password option.`,
   ro: `${OPERATION_REFUSAL.ro} Folosește opțiunea Am uitat parola din produs.`
 });
 
 export function forgotPasswordGuidance(language: SupportLanguage): string {
-  return GUIDANCE[language];
+  return GUIDANCE[language === "ro" ? "ro" : "en"];
 }
 
 export function recoverySecurityGuidance(
   kind: SupportSecurityRecoveryKind,language: SupportLanguage
 ): string {
-  if (kind === "FORGOT_PASSWORD") return GUIDANCE[language];
+  const corpusLocale: SupportCorpusLanguage = language === "ro" ? "ro" : "en";
+  if (kind === "FORGOT_PASSWORD") return GUIDANCE[corpusLocale];
   return kind === "CREDENTIAL_OPERATION"
-    ? OPERATION_REFUSAL[language]
-    : MIXED_GUIDANCE[language];
+    ? OPERATION_REFUSAL[corpusLocale]
+    : MIXED_GUIDANCE[corpusLocale];
 }

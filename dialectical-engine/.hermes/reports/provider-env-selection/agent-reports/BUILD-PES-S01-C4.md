@@ -1,0 +1,31 @@
+# BUILD-PES-S01-C4 self-report
+
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+
+Seat BUILD-PES-S01-C4, ticket t_9eff18b5, session 01a0d9bf-7892-74c2-a3f6-1cba1f697058. Work began at the measured 2026-09-25 21:08:09 EEST frame, HEAD c90177f6c. Filed before READY. Final three-run verdict: CLUSTER_GREEN on all three runs; commit 172ee164099c9cab4dde66d80be8e9e782afc899; lane clean after commit.
+
+The implementation followed S01-21 through S01-24 without a corrective product patch: 0/9 RED, 5/9 after the function, 8/9 after the entry, 9/9 after the script. The proposed sources matched both packet digest prefixes. The six architecture failures and the one typecheck diagnostic matched START. Ten product/configuration mutations failed their selected tests and were restored; two neighboring mutations passed the unrelated tests. All evidence lives in probes/BUILD-PES-S01-C4, with a separate file per run and restore.
+
+## Causes and upgrades, ranked by likely token savings
+
+1. **Large read batches exceeded output budgets; my read orchestration caused re-reading.** I combined INSTRUCTIONS, the V packet and the 365-line DECISIONS history with another batch containing PLAN, SPEC and the architecture log. The tools reported truncation, so I could not rely on those truncated portions and repeated smaller ranges. This was my execution mistake, not missing authorization. Price: two oversized responses and several corrective ranged reads; exact token charge is UNMEASURED. The repeated material was thousands of words. Upgrade: measure byte/line sizes first and bound independent read batches by expected output size, while preserving the required full reading. VERDICT: do this at intake / CONFIDENCE: high / STRONGEST COUNTER: more small calls add latency; batching within a measured output budget retains the speed without truncation.
+
+2. **The packet's settled choices share a file with many superseded choices.** DECISIONS.md:27 onward includes the original two-input roster design, later withdrawals, role-check defaults later overruled, and multiple pointer maps. Correct execution required resolving those against V-10, V-15 and SPEC-v5. Price: mandatory reading dominates the early transcript; no incorrect implementation resulted. Exact token savings from a changed packet are UNMEASURED. Upgrade: at dispatch, name current binding decision blocks and the supersession map explicitly, leaving history addressable for disputes instead of requiring all historical decision rows. VERDICT: change future packet generation / CONFIDENCE: medium / STRONGEST COUNTER: history sometimes contains a still-binding rejected alternative; the generator needs a mechanically maintained current-decision index before it can narrow the reading safely.
+
+3. **An overly broad beforeAll started a real database for pure failure-path mutations.** My initial test suite attached the real command fixture to all nine cases. After three mutation/restoration cycles, I moved that fixture into the K1/K2 group; K3-K9 retain their own dependencies, and K6 separately exercises the real startup failure. Price: six earlier selected/restored suite runs unnecessarily executed the success fixture; exact excess wall time is UNMEASURED. After the change, M4-M10, each RED plus restored selected GREEN, completed in one orchestration call of 15.9 seconds. Upgrade: scope expensive fixtures to the smallest consumer group at test creation. VERDICT: applied / CONFIDENCE: high / STRONGEST COUNTER: grouping changes test names; the nine required case titles and suite count remain intact.
+
+4. **Short polling amplified tool traffic.** I polled some architecture and mutation runs repeatedly while they had no new output. The prescribed directory scan is the long part of each cluster command. Price: redundant calls, no verification benefit; exact token charge is UNMEASURED. Upgrade: use one bounded wait approaching the remaining scan duration, keeping commentary updates within the session's 60-second rule. VERDICT: use longer bounded waits / CONFIDENCE: high / STRONGEST COUNTER: a new failure should be read promptly; completion wakes a wait early.
+
+## Nearly wrong, and dead ends
+
+- I nearly treated the reference entry's process.exitCode alternative as ordinary Node behavior. PLAN.md:694-696 and K6 prohibit it; the M6 mutant actually exited 0, while restored K6 exited 1. The explicit stdout flush and process.exit remain.
+- I preserved the two role rows' exact source reference instead of taking all 17 rows verbatim from the builder. K7 requires those two special rows plus the other 15; dropping the latter was caught by M7.
+- I did not use a restore from HEAD for uncommitted product files. Original byte snapshots in the allowed probe directory restored every mutant; status was printed after each restore. A checkout would have destroyed new work.
+- The initial rg lookup failed because rg is unavailable. find located the installed skills. One failed lookup; no install or environment mutation.
+- No code debugging dead end occurred. Expected RED runs came from the prescribed stub, absent entry/script, or intentional mutants. No unrelated baseline failure was repaired.
+
+## Packet clarity and limits
+
+No blocking packet/plan mismatch was found. The two reference source paths named in S01-22/S01-23, their digest prefixes, the revised 17-row seed and the START frame all matched reality. One reading ambiguity is that the packet's top-level input list does not repeat those proposed-source paths; they are explicitly named in the authorized PLAN steps, which I treated as the authority to read them. List those paths directly in a future packet to remove that interpretation. VERDICT: make the input list self-contained / CONFIDENCE: medium / STRONGEST COUNTER: repeating paths introduces another place for drift; a generated list avoids it.
+
+No V product choice was needed, so no V-ROW was appended. No full-repository test run, real-key test, cross-slice integration, or external reviewer verdict is claimed. The packet's cluster checks and bounded acceptance are the evidence; REV(S01) remains independent.

@@ -1,0 +1,2 @@
+COMMAND     PID           USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+com.docke 19920 vladmihaimiron  155u  IPv4 0x4a53b4e9327bbed9      0t0  TCP 127.0.0.1:55432 (LISTEN)

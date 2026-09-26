@@ -14,6 +14,11 @@ import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { withRequestDerivedBearings, type ReviewBearingPolicy } from "../tests/support/reviewBearings.js";
 import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
+import { argumentLanguageDirective } from "@debateai/kernel";
+import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
+import { PANEL_PROMPT_CONTRACT, judgePromptContract, reviewPromptContract } from "@debateai/judgement";
+import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
+import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
 
 let database: StandingDatabase;
 let dataDirectory: string;
@@ -30,6 +35,52 @@ async function reservePort(): Promise<number> {
   server.close();
   await once(server, "close");
   return port;
+}
+
+/**
+ * S-LANG (as `tests/integration/database.test.ts` and `t17-envelope-ledger.test.ts`
+ * do): every packet's instruction now ends with the argument-language directive,
+ * which NAMES the machine-consumed identifiers it protects (`fatalFlags[].type`,
+ * `served_number_refs`, …). Those bare identifiers are exactly what the
+ * discriminators below key on, so the directive — whatever language it names —
+ * is removed from the body before any branch reads it. The directive has no
+ * character JSON escapes, so it appears in the raw body byte-for-byte.
+ */
+const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
+  argumentLanguageDirective("\u0000")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace("\u0000", "[^.]+?"),
+  "gu"
+);
+
+type RequestClass = "PANEL" | "JUDGE" | "REVIEW" | "COMPOSE" | "EVALUATOR" | "GENERAL";
+
+function classifyRequest(rawBody: string): RequestClass {
+  const body = rawBody.replace(ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN, "");
+  // W7 / V-BLIND-CONTEXT: a STRUCTURAL key, never prose. The sentence this
+  // replaces was prompt text that a ruling changed, and the branch went dead
+  // — the panel leg was answered out of the scripted queue and the ceremony
+  // came back with LABEL-BASIS-INCOMPLETE. Measured on the shipped prompts:
+  // the assessment keys are in the JUDGE prompt too (judge embeds the whole
+  // assessment schema), so the panel is the assessment WITHOUT the judge's
+  // `restatement_text`, a negative pinned by
+  // `tests/unit/t03-judge-panel.test.ts`. Bare identifiers survive the JSON
+  // encoding that defeats a quoted fragment (T3 N4, below).
+  if (body.includes("fatalFlags") && !body.includes("restatement_text")) return "PANEL";
+  // T3 N4: the JUDGE discriminator must be ESCAPE-SAFE. The rendered packet reaches
+  // the wire JSON-encoded, so a quoted fragment like `"statement": non-empty string`
+  // arrives as \"statement\" and never matches — the old check was dead, and only
+  // the FIFO fallback below hid it.
+  return body.includes("edge_bearings") ? "REVIEW"
+    : body.includes("restatement_text") ? "JUDGE"
+      // F-SEALEDROWS-B: the EVALUATOR discriminator is the SHIPPED prompt
+      // itself (see `test-fixtures/evaluator-double.ts`), so it cannot go
+      // stale against the runner the way the two retired ones did. Measured
+      // before the repair: the evaluator call matched NONE of the four
+      // discriminators here and fell through to GENERAL, where the FIFO
+      // fallback answered it out of whatever queue it landed on.
+      : isEvaluatorPacket(body) ? "EVALUATOR"
+        : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
 }
 
 async function startProviderDouble(contents: readonly string[]): Promise<{
@@ -61,17 +112,9 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
       // authored node. That leg is answered straight from the contract rather
       // than from `pending`, so every authoring/review/compose fixture below
       // keeps its exact queue position — the panel adds calls, it does not
-      // re-order the ceremony's scripted ones.
-      // W7 / V-BLIND-CONTEXT: a STRUCTURAL key, never prose. The sentence this
-      // replaces was prompt text that a ruling changed, and the branch went dead
-      // — the panel leg was answered out of the scripted queue and the ceremony
-      // came back with LABEL-BASIS-INCOMPLETE. Measured on the shipped prompts:
-      // the assessment keys are in the JUDGE prompt too (judge embeds the whole
-      // assessment schema), so the panel is the assessment WITHOUT the judge's
-      // `restatement_text`, a negative pinned by
-      // `tests/unit/t03-judge-panel.test.ts`. Bare identifiers survive the JSON
-      // encoding that defeats a quoted fragment (T3 N4, below).
-      if (body.includes("fatalFlags") && !body.includes("restatement_text")) {
+      // re-order the ceremony's scripted ones. Classification: `classifyRequest`.
+      const requestClass = classifyRequest(body);
+      if (requestClass === "PANEL") {
         calls += 1;
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `acceptance-panel-${calls}`,
@@ -80,20 +123,7 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
         }));
         return;
       }
-      // T3 N4: the JUDGE discriminator must be ESCAPE-SAFE. The rendered packet reaches
-      // the wire JSON-encoded, so a quoted fragment like `"statement": non-empty string`
-      // arrives as \"statement\" and never matches — the old check was dead, and only
-      // the FIFO fallback below hid it.
-      const requestKind: ResponseClass = body.includes("edge_bearings") ? "REVIEW"
-        : body.includes("restatement_text") ? "JUDGE"
-          // F-SEALEDROWS-B: the EVALUATOR discriminator is the SHIPPED prompt
-          // itself (see `test-fixtures/evaluator-double.ts`), so it cannot go
-          // stale against the runner the way the two retired ones did. Measured
-          // before the repair: the evaluator call matched NONE of the four
-          // discriminators here and fell through to GENERAL, where the FIFO
-          // fallback answered it out of whatever queue it landed on.
-          : isEvaluatorPacket(body) ? "EVALUATOR"
-            : body.includes("served_number_refs") ? "COMPOSE" : "GENERAL";
+      const requestKind: ResponseClass = requestClass;
       // T3 N4: never GUESS ACROSS CLASSES — in EITHER direction. A request of
       // any class, GENERAL included, consumes the first scripted response of
       // ITS OWN class and otherwise refuses by name; FIFO order survives WITHIN
@@ -876,5 +906,43 @@ describe("ACC-01 dry-run ceremony", () => {
     } finally {
       await runtime.api.close();
     }
+  });
+});
+
+describe("S-LANG — the ceremony's provider double classifies a packet the same with or without the argument-language directive", () => {
+  // The ceremony's end-to-end rows are red on clean origin/dev for dev's own
+  // reason (the ask is refused 400 MALFORMED_REQUEST before any provider call),
+  // so the double's routing is proven HERE, on real framed packets of every
+  // shipped contract it serves, built exactly as the gateway sends them.
+  const CONTRACTS: readonly (readonly [RequestClass, PromptContract])[] = [
+    ["PANEL", PANEL_PROMPT_CONTRACT],
+    ["REVIEW", reviewPromptContract(1)],
+    ["JUDGE", judgePromptContract("primary-root", "unknown")],
+    ["COMPOSE", SYNTHESIZER_PROMPT_CONTRACT],
+    ["EVALUATOR", EVALUATOR_PROMPT_CONTRACT]
+  ];
+  const LANGUAGES = ["English", "Romanian", "română", "the same language as the question"] as const;
+  const wireBody = (contract: PromptContract, directive: string | null): string => JSON.stringify({
+    model: "test-layer/model",
+    max_tokens: 1,
+    messages: buildFramedPrompt({
+      contract: directive === null ? contract : { ...contract, instruction: `${contract.instruction} ${directive}` },
+      material: [{ name: "question_line", content: "Should the proposal stand?" }]
+    }).packet.messages
+  });
+
+  it.each(CONTRACTS)("classifies a %s packet identically with and without the directive", (expected, contract) => {
+    expect(classifyRequest(wireBody(contract, null))).toBe(expected);
+    for (const language of LANGUAGES) {
+      const body = wireBody(contract, argumentLanguageDirective(language));
+      expect(body, `${language}: the directive is on the wire`).toContain(argumentLanguageDirective(language));
+      expect(classifyRequest(body), language).toBe(expected);
+    }
+  });
+
+  it("is not vacuous: unstripped, the directive alone would route a REVIEW packet to the PANEL branch", () => {
+    const body = wireBody(reviewPromptContract(1), argumentLanguageDirective("Romanian"));
+    expect(body.includes("fatalFlags") && !body.includes("restatement_text")).toBe(true);
+    expect(classifyRequest(body)).toBe("REVIEW");
   });
 });

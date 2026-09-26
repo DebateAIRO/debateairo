@@ -2342,7 +2342,7 @@ export const CONTENT_CARRIERS = Object.freeze([
   "ledger.overlay_run",
   "core.run_progress_event",
   "memory.alias_row",
-  // Verdict story (migration 0072): the story, its reservation and its verdict basis.
+  // Verdict story (migration 0074): the story, its reservation and its verdict basis.
   "serve.answer_story"
 ] as const);
 

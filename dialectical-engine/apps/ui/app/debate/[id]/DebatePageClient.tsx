@@ -1,7 +1,12 @@
 "use client";
 
 import { AiNotice } from "@/components/AiNotice";
-import { AI_NOTICE } from "@/lib/aiDisclosure";
+import debateChromeEnglish from "@/messages/en/debateChrome.json";
+import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
+import miscEnglish from "@/messages/en/misc.json";
+import publicEnglish from "@/messages/en/public.json";
+import composeEnglish from "@/messages/en/compose.json";
+import homeEnglish from "@/messages/en/home.json";
 
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -24,7 +29,8 @@ import {
 } from "@debateai/contract";
 import {
   contractNodesById,
-  liveDebateDetail
+  liveDebateDetail,
+  v3ScoringStatusLabel
 } from "@/lib/v3/adapter";
 import { buildAnswerExport, type AnswerExport } from "@/lib/v3/answerExport";
 import { projectCanvasCensus } from "@/lib/v3/census";
@@ -33,15 +39,14 @@ import {
   observeDebateHeaderFit,
   readDebateHeaderGeometry
 } from "@/lib/debateHeaderOverflow";
-import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
-import { tokenUnlockFailureMessage } from "@/lib/v3/tokenUnlock";
+import { classifyTokenUnlockFailure } from "@/lib/v3/tokenUnlock";
 import { requestFailureMessage } from "@/lib/v3/requestFailure";
 import {
   applyRunEvent,
   createLiveRunState,
   liveTreeFromState,
   refreshTriggeredBy,
-  type LiveRunState, pendingProgressCopy } from "@/lib/v3/liveEvents";
+  type LiveRunState } from "@/lib/v3/liveEvents";
 import { AnswerHonestyDrawer } from "@/components/AnswerHonestyDrawer";
 import type {
   AdaptiveDepthDryRunItem,
@@ -71,6 +76,9 @@ import { ChallengePopover } from "@/components/ChallengePopover";
 import { InvestigationDrawer } from "@/components/InvestigationDrawer";
 import { GuideModal } from "@/components/GuideModal";
 import { ModeToggle } from "@/components/ModeToggle";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
 import {
   PublicationControl,type PrivateDeletionStatus
@@ -120,6 +128,9 @@ export type DebatePageRunEventConsumerInput = {
   updateSynthesisDraft: (update: StateUpdate<SynthesisDraft | null>) => void;
   writeError: (next: string | null) => void;
   refresh: (answerExpected?: boolean) => void | Promise<void>;
+  catalog?: MessageCatalog;
+  /** The reader's `compose` catalogue: labels on the live tree (e.g. a shared crux). */
+  composeCatalog?: MessageCatalog;
 };
 
 /** The single event-consumption seam used by the live stream and render tests. */
@@ -128,7 +139,7 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
     const next = applyRunEvent(input.readLive(), event);
     input.writeLive(next);
     if (!input.hasAnswer()) {
-      const tree = liveTreeFromState(next, input.runRef, "");
+      const tree = liveTreeFromState(next, input.runRef, "", input.composeCatalog ?? composeEnglish);
       if (tree) input.updateDebate((current) => input.hasAnswer()
         ? current
         : { ...liveDebateDetail(input.runRef, tree), run_state: current?.run_state === "FAILED" ? "FAILED" : "RUNNING" });
@@ -142,7 +153,7 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
         raw: next.compositionText
       }));
     } else if (event.event_type === "node.failed") {
-      input.writeError("Claim generation failed");
+      input.writeError(t(input.catalog ?? debateChromeEnglish, "debateChrome.error.claimGenerationFailed"));
     } else if (event.event_type === "node.retrying") {
       input.writeError(null);
     } else if (event.event_type === "run.terminal") {
@@ -153,7 +164,9 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
       }
       input.writeError(next.terminalFailure === null
         ? null
-        : `Debate generation failed: ${next.terminalFailure}`);
+        : t(input.catalog ?? debateChromeEnglish, "debateChrome.error.debateGenerationFailed", {
+            reason: next.terminalFailure
+          }));
     }
     if (refreshTriggeredBy(event.event_type)) void input.refresh(event.event_type === "run.terminal");
   };
@@ -184,11 +197,11 @@ type AdaptiveDepthDryRunAsyncState =
   | { status: "error"; data: DebateAdaptiveDepthDryRunResponse | null; error: string };
 
 const SCORE_AWARE_FILTERS = [
-  { id: "all", label: "All" },
-  { id: "issues", label: "Issues" },
-  { id: "weak_uncertain", label: "Weak/uncertain" },
-  { id: "decisive", label: "Decisive" },
-  { id: "unavailable", label: "Unavailable" }
+  { id: "all", key: "debateChrome.filter.all" },
+  { id: "issues", key: "debateChrome.filter.issues" },
+  { id: "weak_uncertain", key: "debateChrome.filter.weakUncertain" },
+  { id: "decisive", key: "debateChrome.filter.decisive" },
+  { id: "unavailable", key: "debateChrome.filter.unavailable" }
 ] as const;
 
 type ScoreAwareFilter = (typeof SCORE_AWARE_FILTERS)[number]["id"];
@@ -308,17 +321,33 @@ function collectRecommendedInvestigations(response: DebateScoringResponse | null
   return (response?.items ?? []).flatMap((item) => item.recommended_investigations ?? []);
 }
 
-function formatAdaptiveDepthAction(action: InvestigationAction | null): string {
-  if (!action) return "Review";
-  return action.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+function formatAdaptiveDepthAction(
+  action: InvestigationAction | null,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
+  switch (action) {
+    case "challenge": return t(catalog, "debateChrome.adaptiveDepth.action.challenge");
+    case "support": return t(catalog, "debateChrome.adaptiveDepth.action.support");
+    case "find_evidence": return t(catalog, "debateChrome.adaptiveDepth.action.findEvidence");
+    case "decompose": return t(catalog, "debateChrome.adaptiveDepth.action.decompose");
+    case "ask_user": return t(catalog, "debateChrome.adaptiveDepth.action.askUser");
+    case null: return t(catalog, "debateChrome.adaptiveDepth.action.review");
+  }
 }
 
 function formatAdaptiveDepthReason(reason: string): string {
   return reason.replace(/_/g, " ");
 }
 
-function formatAdaptiveDepthPressure(pressure: DepthPressure): string {
-  return pressure.replace(/\b\w/g, (char) => char.toUpperCase());
+function formatAdaptiveDepthPressure(
+  pressure: DepthPressure,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
+  switch (pressure) {
+    case "low": return t(catalog, "debateChrome.adaptiveDepth.pressure.low");
+    case "medium": return t(catalog, "debateChrome.adaptiveDepth.pressure.medium");
+    case "high": return t(catalog, "debateChrome.adaptiveDepth.pressure.high");
+  }
 }
 
 function formatAdaptiveDepthScore(score: number): string {
@@ -331,16 +360,195 @@ function compactNodeId(nodeId: string): string {
 }
 
 function adaptiveDepthDryRunStateFromPayload(
-  payload: DebateAdaptiveDepthDryRunResponse
+  payload: DebateAdaptiveDepthDryRunResponse,
+  catalog: MessageCatalog = debateChromeEnglish
 ): AdaptiveDepthDryRunAsyncState {
   if (payload.status === "unavailable") {
     return {
       status: "unavailable",
       data: payload,
-      error: payload.reason || "Adaptive depth dry-run unavailable."
+      error: payload.reason || t(catalog, "debateChrome.adaptiveDepth.unavailableDetail")
     };
   }
   return { status: "loaded", data: payload, error: null };
+}
+
+function localizedTokenUnlockFailure(error: unknown, catalog: MessageCatalog): string {
+  const failure = classifyTokenUnlockFailure(error);
+  if (failure.kind === "REJECTED") return t(catalog, "debateChrome.token.rejected");
+  if (failure.kind === "UNREACHABLE") return t(catalog, "debateChrome.token.unreachable");
+  if (failure.kind === "UNCLASSIFIED") return t(catalog, "debateChrome.token.unclassified");
+  if (error instanceof ContractHttpError) {
+    if (error.code === "RATE_LIMITED") return t(catalog, "debateChrome.token.rateLimited");
+    if (error.code === "SERVER_FAILURE") {
+      return t(catalog, "debateChrome.token.serverFailure", { status: error.status });
+    }
+    if (error.code === "NOT_FOUND") {
+      return t(catalog, "debateChrome.token.endpointMissing", { status: error.status });
+    }
+  }
+  return t(catalog, "debateChrome.token.replyUnreadable");
+}
+
+function localizedAnswerExport(
+  answerExport: AnswerExport,
+  ledgerError: string | null,
+  catalog: MessageCatalog
+): AnswerExport {
+  if (answerExport.available) {
+    return {
+      ...answerExport,
+      label: t(catalog, "debateChrome.export.label"),
+      toast: t(catalog, "debateChrome.export.toast")
+    };
+  }
+  switch (answerExport.reason) {
+    case "NO_SERVED_ANSWER":
+      return { ...answerExport, message: t(catalog, "debateChrome.export.noServedAnswer") };
+    case "LEDGER_DIGEST_PENDING":
+      return { ...answerExport, message: t(catalog, "debateChrome.export.ledgerPending") };
+    case "LEDGER_DIGEST_UNREADABLE":
+      return {
+        ...answerExport,
+        message: t(catalog, "debateChrome.export.ledgerUnreadable", {
+          error: ledgerError ?? t(catalog, "debateChrome.export.unknownLedgerError")
+        })
+      };
+    // Public (reader) mode with no published export supplied by the page (dev's reason).
+    case "ANSWER_UNAVAILABLE":
+      return { ...answerExport, message: t(catalog, "debateChrome.export.answerUnavailable") };
+  }
+}
+
+function localizedPendingProgressCopy(
+  live: LiveRunState,
+  stream: StreamState,
+  catalog: MessageCatalog,
+  locale: string
+): string {
+  const total = live.nodeOrder.length;
+  const settled = live.nodeOrder.filter((ref) => {
+    const lifecycle = live.nodes[ref]?.lifecycle;
+    return lifecycle === "scored" || lifecycle === "complete";
+  }).length;
+  const noEvidence = live.runPhase === "idle" && total === 0;
+  if (stream.status === "connecting" && noEvidence) {
+    return t(catalog, "debateChrome.progress.connecting");
+  }
+
+  const parts: string[] = [];
+  if (live.servePhase === "composing" || live.servePhase === "conformance") {
+    parts.push(t(catalog, "debateChrome.progress.composing"));
+  } else if (total > 0) {
+    parts.push(t(catalog, "debateChrome.progress.debating"));
+  } else {
+    parts.push(t(catalog, live.runPhase === "planning"
+      ? "debateChrome.progress.planning"
+      : "debateChrome.progress.accepted"));
+  }
+  if (total > 0) {
+    parts.push(settled > 0
+      ? tPlural(catalog, "debateChrome.progress.nodesSettled", total, locale, { settled, total })
+      : tPlural(catalog, "debateChrome.progress.nodesInPlay", total, locale, { total }));
+  }
+  if (stream.status === "reconnecting") {
+    const seconds = Math.max(1, Math.round((stream.retryInMs ?? 1000) / 1000));
+    parts.push(tPlural(catalog, "debateChrome.progress.reconnecting", seconds, locale, { seconds }));
+  }
+  return t(catalog, "debateChrome.progress.summary", { parts: parts.join(" — ") });
+}
+
+function localizedScoringVisibility(
+  visibility: ScoringVisibilityState,
+  scoringStatus: ScoringAsyncState["status"],
+  refreshStatus: ScoringRefreshState["status"],
+  response: DebateScoringResponse | null,
+  error: string | null,
+  catalog: MessageCatalog,
+  locale: string,
+  composeCatalog: MessageCatalog
+): ScoringVisibilityState {
+  const reason = error || response?.reason || null;
+  const scoredCount = response?.scored_node_count ?? response?.items?.length ?? 0;
+  const unavailableCount = response?.errors?.length ?? 0;
+  const persisted = scoredCount > 0
+    ? tPlural(catalog, "debateChrome.scoring.persistedClaim", scoredCount, locale, { count: scoredCount })
+    : t(catalog, "debateChrome.scoring.noPersistedClaims");
+
+  if (visibility.kind === "off") {
+    return {
+      kind: visibility.kind,
+      title: t(catalog, "debateChrome.scoring.offTitle"),
+      detail: t(catalog, "debateChrome.scoring.offDetail")
+    };
+  }
+  if (visibility.kind === "refreshing") {
+    const loadingPersisted = scoringStatus === "loading" && refreshStatus === "idle";
+    const detail = loadingPersisted
+      ? t(catalog, "debateChrome.scoring.readingPersisted")
+      : scoredCount > 0
+        ? t(catalog, "debateChrome.scoring.generatingWithRetained", { persisted })
+        : t(catalog, "debateChrome.scoring.generatingJudgeOutputs");
+    return {
+      kind: visibility.kind,
+      title: t(catalog, loadingPersisted
+        ? "debateChrome.scoring.loadingTitle"
+        : "debateChrome.scoring.inProgressTitle"),
+      detail
+    };
+  }
+  if (visibility.kind === "empty") {
+    return {
+      kind: visibility.kind,
+      title: t(catalog, "debateChrome.scoring.pending"),
+      detail: t(catalog, "debateChrome.scoring.noJudgeOutputsYet")
+    };
+  }
+  if (visibility.kind === "provider_required") {
+    return {
+      kind: visibility.kind,
+      title: t(catalog, "debateChrome.scoring.providerRequired"),
+      detail: reason ?? t(catalog, "debateChrome.scoring.noPayload")
+    };
+  }
+  if (visibility.kind === "unavailable") {
+    const isV3ScoringAbsence = v3ScoringStatusLabel(reason, composeCatalog) !== null;
+    return {
+      kind: visibility.kind,
+      title: isV3ScoringAbsence
+        ? t(catalog, "debateChrome.scoring.graphScoredNoV2Endpoint")
+        : t(catalog, "debateChrome.scoring.unavailableTitle"),
+      detail: isV3ScoringAbsence
+        ? t(catalog, "debateChrome.scoring.graphScoredNoV2EndpointDetail")
+        : reason ?? t(catalog, "debateChrome.scoring.noPayload")
+    };
+  }
+  if (response?.status === "partial") {
+    const detail = unavailableCount > 0
+      ? t(catalog, "debateChrome.scoring.partialDetail", {
+          persisted,
+          unavailable: tPlural(
+            catalog,
+            "debateChrome.scoring.unavailableClaim",
+            unavailableCount,
+            locale,
+            { count: unavailableCount }
+          )
+        })
+      : t(catalog, "debateChrome.scoring.detailSentence", { detail: persisted });
+    return {
+      kind: visibility.kind,
+      title: t(catalog, "debateChrome.scoring.partialTitle"),
+      detail
+    };
+  }
+  return {
+    kind: visibility.kind,
+    title: t(catalog, "debateChrome.scoring.realScoresTitle"),
+    detail: scoredCount > 0
+      ? tPlural(catalog, "debateChrome.scoring.realScoresDetail", scoredCount, locale, { count: scoredCount })
+      : t(catalog, "debateChrome.scoring.noPersistedClaimsAvailable")
+  };
 }
 
 export default function DebatePageClient({
@@ -349,6 +557,13 @@ export default function DebatePageClient({
   initialAnswer = null,
   initialError = null,
   initialPending = false,
+  timeCatalog,
+  debateChromeCatalog = debateChromeEnglish,
+  debateDrawersCatalog = debateDrawersEnglish,
+  miscCatalog = miscEnglish,
+  publicCatalog = publicEnglish,
+  composeCatalog = composeEnglish,
+  homeCatalog = homeEnglish,
   publicMode = false,
   publicNodesById = null,
   publicExport = null,
@@ -366,6 +581,18 @@ export default function DebatePageClient({
   // client polling/stream below retries. Only a definitive failure sets
   // initialError, which is the sole seed of the fatal `error && !debate` gate.
   initialPending?: boolean;
+  timeCatalog: MessageCatalog;
+  debateChromeCatalog?: MessageCatalog;
+  /** The interface locale's drawer/panel catalogue (synthesis, node detail, challenge, investigation, guide…). */
+  debateDrawersCatalog?: MessageCatalog;
+  /** The interface locale's `misc` catalogue (model identity lines, honesty drawer, scoring fallback). */
+  miscCatalog?: MessageCatalog;
+  /** The interface locale's `public` catalogue (publication control). */
+  publicCatalog?: MessageCatalog;
+  /** The interface locale's `compose` catalogue (projected detail, scrutiny, V3 score copy, model family). */
+  composeCatalog?: MessageCatalog;
+  /** The interface locale's `home` catalogue: the AI notice's label and link (review F1). */
+  homeCatalog?: MessageCatalog;
   /**
    * Public read-only mode. A published debate is the same workspace seen by a
    * stranger: identical chrome, identical views, identical panels — minus every
@@ -390,6 +617,7 @@ export default function DebatePageClient({
    */
   publicHeader?: ReactNode;
 }) {
+  const { catalog: chromeCatalog, locale } = useChromeI18n();
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
   const [live, setLive] = useState<LiveRunState>(createLiveRunState);
@@ -455,7 +683,9 @@ export default function DebatePageClient({
     try {
       const bundle = await getDebateBundle(id, COOKIE_SESSION_MARKER, contractClient, {
         answerExpected,
-        currentAnswer: answerRef.current
+        currentAnswer: answerRef.current,
+        catalog: composeCatalog,
+        locale
       });
       if (privateDeletionRef.current!==null) return;
       if (bundle.kind === "served") {
@@ -475,7 +705,9 @@ export default function DebatePageClient({
       // poll). Without this, a debate that arrives after a transient failure
       // would stay stuck behind an old error (see the `error && !debate` gate).
       setError(bundle.kind === "failed"
-        ? `Debate generation failed: ${bundle.run.terminal_reason}`
+        ? t(debateChromeCatalog, "debateChrome.error.debateGenerationFailed", {
+            reason: bundle.run.terminal_reason ?? ""
+          })
         : null);
     } catch (exc) {
       if (privateDeletionRef.current!==null) return;
@@ -485,9 +717,9 @@ export default function DebatePageClient({
       // DL3-F7: the fatal screen and the inline banner both render this string,
       // so it is classified copy — never a contract code and never the server's
       // own sentence (lib/v3/requestFailure.ts).
-      setError(requestFailureMessage("DEBATE_READ", exc));
+      setError(requestFailureMessage("DEBATE_READ", exc, debateChromeCatalog));
     }
-  }, [id]);
+  }, [composeCatalog, debateChromeCatalog, id, locale]);
 
   const purgePrivateDebate=useCallback((status:PrivateDeletionStatus)=>{
     privateDeletionRef.current=status;
@@ -527,7 +759,7 @@ export default function DebatePageClient({
     if (privateDeletionStatus!==null) return;
     let active = true;
     setScoringState((current) => ({ status: "loading", data: current.data, error: null }));
-    getDebateScoring(id)
+    getDebateScoring(id, composeCatalog)
       .then((payload) => {
         if (!active) return;
         setScoringState({
@@ -541,36 +773,36 @@ export default function DebatePageClient({
         setScoringState((current) => ({
           status: "error",
           data: current.data,
-          error: requestFailureMessage("SCORING_READ", exc)
+          error: requestFailureMessage("SCORING_READ", exc, debateChromeCatalog)
         }));
       });
     return () => {
       active = false;
     };
-  }, [id,privateDeletionStatus]);
+  }, [composeCatalog,debateChromeCatalog,id,privateDeletionStatus]);
 
   useEffect(() => {
     if (privateDeletionStatus!==null) return;
     let active = true;
     if (publicMode) return;
     setAdaptiveDepthDryRunState((current) => ({ status: "loading", data: current.data, error: null }));
-    getDebateAdaptiveDepthDryRun(id)
+    getDebateAdaptiveDepthDryRun(id, composeCatalog)
       .then((payload) => {
         if (!active) return;
-        setAdaptiveDepthDryRunState(adaptiveDepthDryRunStateFromPayload(payload));
+        setAdaptiveDepthDryRunState(adaptiveDepthDryRunStateFromPayload(payload, debateChromeCatalog));
       })
       .catch((exc) => {
         if (!active) return;
         setAdaptiveDepthDryRunState((current) => ({
           status: "error",
           data: current.data,
-          error: requestFailureMessage("ADAPTIVE_DEPTH_READ", exc)
+          error: requestFailureMessage("ADAPTIVE_DEPTH_READ", exc, debateChromeCatalog)
         }));
       });
     return () => {
       active = false;
     };
-  }, [id,privateDeletionStatus]);
+  }, [composeCatalog,debateChromeCatalog,id,privateDeletionStatus]);
 
   useEffect(() => {
     if (publicMode) return;
@@ -582,7 +814,7 @@ export default function DebatePageClient({
       } catch (error) {
         if (active) {
           setActionToken(null);
-          setError(tokenUnlockFailureMessage(error));
+          setError(localizedTokenUnlockFailure(error, debateChromeCatalog));
         }
       }
     }
@@ -590,7 +822,7 @@ export default function DebatePageClient({
     return () => {
       active = false;
     };
-  }, []);
+  }, [debateChromeCatalog, publicMode]);
 
   // UI-01 data-access swap: V2's coordinator EventSource becomes the V3 run
   // stream (cookie-authenticated fetch streaming — EventSource cannot carry
@@ -613,7 +845,9 @@ export default function DebatePageClient({
       updateDebate: setDebate,
       updateSynthesisDraft: setSynthesisDraft,
       writeError: setError,
-      refresh
+      refresh,
+      catalog: debateChromeCatalog,
+      composeCatalog
     });
 
     if (debateTerminal) {
@@ -634,8 +868,10 @@ export default function DebatePageClient({
           if (!active) return;
           setHonestyActionState(
             failure instanceof ContractHttpError
-              ? `Recorded event replay unavailable: ${failure.code}`
-              : "Recorded event replay unavailable"
+              ? t(debateChromeCatalog, "debateChrome.error.recordedReplayUnavailableWithCode", {
+                  code: failure.code
+                })
+              : t(debateChromeCatalog, "debateChrome.error.recordedReplayUnavailable")
           );
         });
       return () => {
@@ -706,7 +942,7 @@ export default function DebatePageClient({
       controller.abort();
       if (timer) window.clearTimeout(timer);
     };
-  }, [debateTerminal,id,privateDeletionStatus,refresh,answer?.run_ref]);
+  }, [answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,id,privateDeletionStatus,refresh]);
 
   // Honesty surfaces: the execution-ledger digest rides every settled answer.
   useEffect(() => {
@@ -778,9 +1014,17 @@ export default function DebatePageClient({
   // payload.
   const answerExport = useMemo(
     () => publicMode
-      ? (publicExport ?? { available: false, reason: "NO_SERVED_ANSWER", message: "Export is not available for this debate." } as const)
-      : buildAnswerExport({ answer, ledgerDigest, ledgerError, live }),
-    [publicMode, publicExport, answer, ledgerDigest, ledgerError, live]
+      ? (publicExport ?? {
+          available: false,
+          reason: "NO_SERVED_ANSWER",
+          message: t(debateChromeCatalog, "debateChrome.error.exportUnavailable")
+        } as const)
+      : localizedAnswerExport(
+          buildAnswerExport({ answer, ledgerDigest, ledgerError, live }),
+          ledgerError,
+          debateChromeCatalog
+        ),
+    [answer, debateChromeCatalog, ledgerDigest, ledgerError, live, publicExport, publicMode]
   );
   const v3NodeById = useMemo(
     () => publicMode ? publicNodesById : (answer === null ? null : contractNodesById(answer)),
@@ -805,10 +1049,10 @@ export default function DebatePageClient({
   const synthesisStreaming = Boolean(synthesisDraft && !debate?.synthesis);
   const synthesisProvenance = debate?.synthesis?.provenance || {};
   const synthesisSections = [
-    { title: "Agreements", items: stringList(synthesisProvenance.agreements) },
-    { title: "Tensions", items: stringList(synthesisProvenance.tensions) },
-    { title: "Evidence Gaps", items: stringList(synthesisProvenance.evidence_gaps) },
-    { title: "Key Takeaways", items: stringList(synthesisProvenance.key_takeaways) }
+    { title: t(debateChromeCatalog, "debateChrome.synthesis.agreements"), items: stringList(synthesisProvenance.agreements) },
+    { title: t(debateChromeCatalog, "debateChrome.synthesis.tensions"), items: stringList(synthesisProvenance.tensions) },
+    { title: t(debateChromeCatalog, "debateChrome.synthesis.evidenceGaps"), items: stringList(synthesisProvenance.evidence_gaps) },
+    { title: t(debateChromeCatalog, "debateChrome.synthesis.keyTakeaways"), items: stringList(synthesisProvenance.key_takeaways) }
   ].filter((section) => section.items.length > 0);
   // P4.1: prefer the backend-computed lean (coordinator/app/scoring/lean.py --
   // propagated DF-QuAD strength split when usable, else a labeled structural
@@ -823,7 +1067,7 @@ export default function DebatePageClient({
   const lean =
     backendLean === undefined
       ? debate?.synthesis
-        ? computeLean(debate.tree)
+        ? computeLean(debate.tree, debateChromeCatalog)
         : null
       : backendLean && typeof backendLean.pct === "number" && typeof backendLean.label === "string"
         ? {
@@ -848,7 +1092,11 @@ export default function DebatePageClient({
 
   const progress = useMemo(() => {
     if (!debate) return { pct: 0, label: "", count: "" };
-    if (!hasTree) return { pct: 6, label: "Decomposing claim", count: "" };
+    if (!hasTree) return {
+      pct: 6,
+      label: t(debateChromeCatalog, "debateChrome.progress.decomposingClaim"),
+      count: ""
+    };
     let total = 0;
     let done = 0;
     const walk = (node: DebateNode) => {
@@ -863,12 +1111,16 @@ export default function DebatePageClient({
     };
     if (debate.tree) walk(debate.tree);
     if (total === 0 && !complete) {
-      const label = statusLabel(debate.run_state ?? "generating");
+      const label = statusLabel(debate.run_state ?? "generating", timeCatalog);
       return { pct: null, label, count: "" };
     }
     const pct = total ? Math.round((done / total) * 100) : 100;
-    return { pct, label: "Models arguing", count: `${pct}%` };
-  }, [debate, hasTree, complete]);
+    return {
+      pct,
+      label: t(debateChromeCatalog, "debateChrome.progress.modelsArguing"),
+      count: `${pct}%`
+    };
+  }, [debate, debateChromeCatalog, hasTree, complete, timeCatalog]);
 
   const hasArtifacts = Boolean(
     debate &&
@@ -959,18 +1211,27 @@ export default function DebatePageClient({
     () => selectStrongestUnresolvedScoringIssue(scoringState.data),
     [scoringState.data]
   );
-  const scoringVisibility = useMemo(
-    () =>
-      formatScoringVisibilityState({
+  const scoringVisibility = useMemo(() => {
+    const visibility = formatScoringVisibilityState({
         enabled: true,
         hasActionToken: Boolean(actionToken),
         scoringStatus: scoringState.status,
         refreshStatus: scoringRefreshState.status,
         response: scoringState.data,
-        error: scoringRefreshState.error || scoringState.error
-      }),
-    [actionToken, scoringRefreshState.error, scoringRefreshState.status, scoringState]
-  );
+        error: scoringRefreshState.error || scoringState.error,
+        composeCatalog
+      });
+    return localizedScoringVisibility(
+      visibility,
+      scoringState.status,
+      scoringRefreshState.status,
+      scoringState.data,
+      scoringRefreshState.error || scoringState.error,
+      debateChromeCatalog,
+      locale,
+      composeCatalog
+    );
+  }, [actionToken, composeCatalog, debateChromeCatalog, locale, scoringRefreshState.error, scoringRefreshState.status, scoringState]);
 
   function showToast(message: string) {
     setToast(message);
@@ -1003,7 +1264,7 @@ export default function DebatePageClient({
 
   function replayGeneration() {
     setReplayNonce((nonce) => nonce + 1);
-    showToast("Replaying generation");
+    showToast(t(debateChromeCatalog, "debateChrome.toast.replayingGeneration"));
   }
 
   function openChallenge(node: DebateNode, anchor: HTMLElement, text = "") {
@@ -1036,7 +1297,7 @@ export default function DebatePageClient({
 
   function focusRecommendationNode(targetNodeId: string): boolean {
     if (!findNode(debate?.tree ?? null, targetNodeId)) {
-      showToast("Recommendation target is no longer visible.");
+      showToast(t(debateChromeCatalog, "debateChrome.toast.recommendationNoLongerVisible"));
       return false;
     }
     setView("tree");
@@ -1061,8 +1322,9 @@ export default function DebatePageClient({
       staleReason: scoringState.data?.cache?.stale?.reason,
       checkedAt: scoringState.data?.model_metadata?.checked_at,
       provider: scoringState.data?.model_metadata?.provider,
-      model: scoringState.data?.model_metadata?.model
-    });
+      model: scoringState.data?.model_metadata?.model,
+      composeCatalog
+    }, debateChromeCatalog);
   }
 
   // Fatal dead-end ONLY for a definitive error with no data. A transient SSR
@@ -1071,14 +1333,14 @@ export default function DebatePageClient({
   if (privateDeletionStatus!==null) {
     return (
       <div className="screen scroll"><div className="screenInner narrow">
-        <p className="eyebrow">Private debate</p>
+        <p className="eyebrow">{t(debateChromeCatalog, "debateChrome.privateDebate")}</p>
         <h1>{privateDeletionStatus==="CLEANED"
-          ? "Private debate deleted"
-          : "Private debate deletion is processing"}</h1>
+          ? t(debateChromeCatalog, "debateChrome.privateDebateDeleted")
+          : t(debateChromeCatalog, "debateChrome.privateDebateDeletionProcessing")}</h1>
         <p role="status">{privateDeletionStatus==="CLEANED"
-          ? "This debate is a tombstone. Its encrypted private content is permanently unreadable."
-          : "Private content is no longer available while durable key cleanup finishes."}</p>
-        <Link className="btn" href="/">← Back to library</Link>
+          ? t(debateChromeCatalog, "debateChrome.privateDebateDeletedDetail")
+          : t(debateChromeCatalog, "debateChrome.privateDebateDeletionProcessingDetail")}</p>
+        <Link className="btn" href="/">{t(debateChromeCatalog, "debateChrome.backToLibrary")}</Link>
       </div></div>
     );
   }
@@ -1088,7 +1350,7 @@ export default function DebatePageClient({
         <div className="screenInner narrow">
           <div className="error">{error}</div>
           <Link className="btn" href="/" style={{ marginTop: 16 }}>
-            ← Back to library
+            {t(debateChromeCatalog, "debateChrome.backToLibrary")}
           </Link>
         </div>
       </div>
@@ -1099,7 +1361,9 @@ export default function DebatePageClient({
       <div className="screen scroll">
         <div className="screenInner narrow">
           <p className="muted" role="status">
-            {initialPending ? pendingProgressCopy(live, streamState) : "Loading…"}
+            {initialPending
+              ? localizedPendingProgressCopy(live, streamState, debateChromeCatalog, locale)
+              : t(debateChromeCatalog, "debateChrome.loading")}
           </p>
         </div>
       </div>
@@ -1108,7 +1372,7 @@ export default function DebatePageClient({
 
   const statusKind = complete ? "pillOk" : generating ? "pillGen" : "";
   const scoringStatusText = scoringStatusMessage();
-  const scoringConfidenceText = formatScoringConfidenceCopy();
+  const scoringConfidenceText = formatScoringConfidenceCopy(debateChromeCatalog);
   const scoringInsightsExpandable = scoringState.status === "loaded" && scoringByNodeId.size > 0;
   return (
     <div
@@ -1133,7 +1397,7 @@ export default function DebatePageClient({
             </span>
             <span className={`pill ${statusKind}`}>
               <span className="dot" />
-              {statusLabel(debate.run_state ?? debate.status)}
+              {statusLabel(debate.run_state ?? debate.status, timeCatalog)}
             </span>
             {debate.completion?.humanReason ? (
               <span className="topSwitchStatus" role="status" title={debate.completion.humanReason}>
@@ -1144,31 +1408,31 @@ export default function DebatePageClient({
         </div>
         <div className="debateTopControlRow" ref={debateHeaderControlsRef}>
           {publicMode ? (
-            <span className="publicViewPill"><span aria-hidden>🔒</span> Public view · actions locked</span>
+            <span className="publicViewPill"><span aria-hidden>🔒</span> {t(chromeCatalog, "chrome.publicViewLocked")}</span>
           ) : null}
           {/* Scoring diagnostics is a read-only drawer, so the public reader
               keeps it: "actions locked" withholds writes, not evidence. */}
-          <ScoringErrorBoundary>
+          <ScoringErrorBoundary catalog={miscCatalog}>
             <button
               type="button"
               className="debateScoringPill"
               data-debate-scoring-pill
-              aria-label="Open scoring diagnostics"
+              aria-label={t(chromeCatalog, "chrome.openScoringDiagnostics")}
               onClick={() => setScoringDiagnosticsOpen(true)}
             >
               <span className="debateScoringDot" aria-hidden />
-              Scoring · {scoringByNodeId.size}/{countClaims(debate.tree)}
+              {t(chromeCatalog, "chrome.scoring", { scored: scoringByNodeId.size, total: countClaims(debate.tree) })}
             </button>
           </ScoringErrorBoundary>
           {hasTree ? (
-            <div className="segment" role="group" aria-label="View">
+            <div className="segment" role="group" aria-label={t(chromeCatalog, "chrome.view")}>
               {publicMode && publicOverview ? (
                 <button type="button" aria-pressed={view === "overview"} onClick={() => setView("overview")}>
-                  Overview
+                  {t(chromeCatalog, "chrome.overview")}
                 </button>
               ) : null}
               <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
-                Thread
+                {t(chromeCatalog, "chrome.thread")}
               </button>
               <button
                 type="button"
@@ -1178,74 +1442,75 @@ export default function DebatePageClient({
                   setView("split");
                 }}
               >
-                Split
+                {t(chromeCatalog, "chrome.split")}
               </button>
               <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
-                Tree
+                {t(chromeCatalog, "chrome.tree")}
               </button>
               <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
-                Map
+                {t(chromeCatalog, "chrome.map")}
               </button>
             </div>
           ) : null}
+          <LanguageSwitcher />
           <ModeToggle compact />
           <div className="debateUtilityActions" ref={debateHeaderInlineActionsRef}>
-            <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
-              <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
+            <Link className="btnGhost debateOverflowAction" href="/" aria-label={t(chromeCatalog, "chrome.library")}>
+              <span aria-hidden>←</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.library")}</span>
             </Link>
             {hasTree && !publicMode ? (
-              <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title="Replay generation" aria-label="Replay">
-                <span aria-hidden>↻</span><span className="debateActionLabel">Replay</span>
+              <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title={t(chromeCatalog, "chrome.replayGeneration")} aria-label={t(chromeCatalog, "chrome.replay")}>
+                <span aria-hidden>↻</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.replay")}</span>
               </button>
             ) : null}
             {hasArtifacts && !publicMode ? (
-              <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label="Workspace">
-                <span aria-hidden>◫</span><span className="debateActionLabel">Workspace</span>
+              <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label={t(chromeCatalog, "chrome.workspace")}>
+                <span aria-hidden>◫</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.workspace")}</span>
               </button>
             ) : null}
             {honestyAvailable ? (
-              <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label="Honesty">
-                <span aria-hidden>◈</span><span className="debateActionLabel">Honesty</span>
+              <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label={t(chromeCatalog, "chrome.honesty")}>
+                <span aria-hidden>◈</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.honesty")}</span>
               </button>
             ) : null}
             {answerExport.available ? (
-              <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label="Export">
-                <span aria-hidden>↓</span><span className="debateActionLabel">Export</span>
+              <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label={t(chromeCatalog, "chrome.export")}>
+                <span aria-hidden>↓</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.export")}</span>
               </a>
             ) : null}
-            <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
-            {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>}
+            <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
+            {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label={t(chromeCatalog, "chrome.settings")}>⚙</Link>}
           </div>
           <details className="debateUtilityOverflow">
-            <summary className="iconBtn" role="button" aria-label="More debate actions" title="More debate actions">
+            <summary className="iconBtn" role="button" aria-label={t(chromeCatalog, "chrome.moreDebateActions")} title={t(chromeCatalog, "chrome.moreDebateActions")}>
               <span aria-hidden>⋯</span>
             </summary>
             <div className="debateOverflowMenu">
-              <Link className="btnGhost debateOverflowAction" href="/" aria-label="Library">
-                <span aria-hidden>←</span><span className="debateActionLabel">Library</span>
+              <Link className="btnGhost debateOverflowAction" href="/" aria-label={t(chromeCatalog, "chrome.library")}>
+                <span aria-hidden>←</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.library")}</span>
               </Link>
               {hasTree && !publicMode ? (
-                <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title="Replay generation" aria-label="Replay">
-                  <span aria-hidden>↻</span><span className="debateActionLabel">Replay</span>
+                <button type="button" className="btn debateOverflowAction" onClick={replayGeneration} title={t(chromeCatalog, "chrome.replayGeneration")} aria-label={t(chromeCatalog, "chrome.replay")}>
+                  <span aria-hidden>↻</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.replay")}</span>
                 </button>
               ) : null}
               {hasArtifacts && !publicMode ? (
-                <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label="Workspace">
-                  <span aria-hidden>◫</span><span className="debateActionLabel">Workspace</span>
+                <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label={t(chromeCatalog, "chrome.workspace")}>
+                  <span aria-hidden>◫</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.workspace")}</span>
                 </button>
               ) : null}
               {honestyAvailable ? (
-                <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label="Honesty">
-                  <span aria-hidden>◈</span><span className="debateActionLabel">Honesty</span>
+                <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label={t(chromeCatalog, "chrome.honesty")}>
+                  <span aria-hidden>◈</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.honesty")}</span>
                 </button>
               ) : null}
               {answerExport.available ? (
-                <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label="Export">
-                  <span aria-hidden>↓</span><span className="debateActionLabel">Export</span>
+                <a className="btn debateOverflowAction" href={answerExport.href} download={answerExport.filename} title={answerExport.label} onClick={() => showToast(answerExport.toast)} aria-label={t(chromeCatalog, "chrome.export")}>
+                  <span aria-hidden>↓</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.export")}</span>
                 </a>
               ) : null}
-              <button type="button" className="iconBtn debateOverflowAction" aria-label="How it works" onClick={() => setGuideOpen(true)}>?</button>
-              {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label="Settings">⚙</Link>}
+              <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
+              {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label={t(chromeCatalog, "chrome.settings")}>⚙</Link>}
             </div>
           </details>
         </div>
@@ -1253,16 +1518,18 @@ export default function DebatePageClient({
 
       {publicMode && publicHeader ? publicHeader : null}
 
-      <div className="debateAiDisclosure"><AiNotice body={AI_NOTICE.debate} /></div>
+      <div className="debateAiDisclosure">
+        <AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} body={t(debateChromeCatalog, "debateChrome.aiNotice")} />
+      </div>
 
       {/* ---- verdict-first banner (flag-gated: NEXT_PUBLIC_VERDICT_FIRST_UI) ---- */}
-      {!publicMode && process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} /> : null}
+      {!publicMode && process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} catalog={debateDrawersCatalog} debateChromeCatalog={debateChromeCatalog} /> : null}
 
-      <ScoringErrorBoundary>
+      <ScoringErrorBoundary catalog={miscCatalog}>
         {scoringInsightsExpandable ? (
           <details className="scoringInsightsPanel">
             <summary className="scoringInsightsSummary">
-              <span className="progressLabel">Scoring insights</span>
+              <span className="progressLabel">{t(debateChromeCatalog, "debateChrome.scoring.insights")}</span>
               <span className="progressCount">{scoringVisibility.title}</span>
               <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
               {scoringStatusText || scoringConfidenceText ? (
@@ -1273,13 +1540,14 @@ export default function DebatePageClient({
               ) : null}
             </summary>
             <div className="scoringInsightsBody scroll">
-              <ScoringVisibilityPanel state={scoringVisibility} />
+              <ScoringVisibilityPanel state={scoringVisibility} catalog={debateChromeCatalog} />
               <ScoringHolesSummaryPanel
                 enabled={true}
                 state={scoringState}
                 holesSummary={scoringHolesSummary}
                 fatalFlagsSummary={scoringFatalFlagsSummary}
                 strongestIssue={strongestUnresolvedScoringIssue}
+                catalog={debateChromeCatalog}
               />
               <ScoreAwareFilterPanel
                 enabled={true}
@@ -1287,29 +1555,33 @@ export default function DebatePageClient({
                 matchCount={scoreAwareFilterNodeIds?.size ?? scoringByNodeId.size}
                 scoredCount={scoringByNodeId.size}
                 onChange={setScoreAwareFilter}
+                catalog={debateChromeCatalog}
               />
               <RecommendedInvestigations
                 recommendations={debateRecommendations}
                 canOpenTarget={canFocusRecommendationNode}
                 onOpenTarget={focusRecommendationNode}
                 emptyMessage={
-                  "No recommended investigations are available from the current scoring data."
+                  t(debateChromeCatalog, "debateChrome.scoring.noRecommendedInvestigations")
                 }
+                catalog={debateDrawersCatalog}
+                composeCatalog={composeCatalog}
               />
               <AdaptiveDepthDryRunPanel
                 enabled={true}
                 state={adaptiveDepthDryRunState}
+                catalog={debateChromeCatalog}
               />
             </div>
           </details>
         ) : (
           <section
             className="scoringInsightsPanel scoringInsightsPanelCompact"
-            aria-label="Scoring insights"
+            aria-label={t(debateChromeCatalog, "debateChrome.scoring.insights")}
             data-scoring-insights-compact="true"
           >
             <div className="scoringInsightsSummary">
-              <span className="progressLabel">Scoring insights</span>
+              <span className="progressLabel">{t(debateChromeCatalog, "debateChrome.scoring.insights")}</span>
               <span className="progressCount">{scoringVisibility.title}</span>
               <span className="scoringInsightsDetail">{scoringVisibility.detail}</span>
               {scoringStatusText || scoringConfidenceText ? (
@@ -1322,6 +1594,7 @@ export default function DebatePageClient({
             <AdaptiveDepthDryRunPanel
               enabled={true}
               state={adaptiveDepthDryRunState}
+              catalog={debateChromeCatalog}
             />
           </section>
         )}
@@ -1374,6 +1647,9 @@ export default function DebatePageClient({
                 onToggleExpand={toggleExpand}
                 onToggleCollapse={toggleCollapse}
                 onProseSelect={onProseSelect}
+                miscCatalog={miscCatalog}
+                debateChromeCatalog={debateChromeCatalog}
+                composeCatalog={composeCatalog}
               />
             ) : view === "split" ? (
               <DebateSplit
@@ -1390,9 +1666,18 @@ export default function DebatePageClient({
                 {...challengeProps}
                 onToggleExpand={toggleExpand}
                 onProseSelect={onProseSelect}
+                miscCatalog={miscCatalog}
+                debateChromeCatalog={debateChromeCatalog}
+                composeCatalog={composeCatalog}
               />
             ) : view === "map" ? (
-              <DebateMap root={debate.tree} onOpenSplit={openInSplit} />
+              <DebateMap
+                root={debate.tree}
+                onOpenSplit={openInSplit}
+                miscCatalog={miscCatalog}
+                debateChromeCatalog={debateChromeCatalog}
+                composeCatalog={composeCatalog}
+              />
             ) : (
               <DebateCanvas
                 root={debate.tree}
@@ -1421,14 +1706,19 @@ export default function DebatePageClient({
                 {...challengeProps}
                 onToggleExpand={toggleExpand}
                 onProseSelect={onProseSelect}
+                miscCatalog={miscCatalog}
+                debateChromeCatalog={debateChromeCatalog}
+                composeCatalog={composeCatalog}
               />
             )
           ) : singleShotResult ? (
-            <SingleShotMain result={singleShotResult} />
+            <SingleShotMain result={singleShotResult} catalog={debateChromeCatalog} />
           ) : (
             <div className="canvasEmpty">
               <p className="muted">
-                {generating ? "Building the argument tree…" : "No argument tree was produced for this debate."}
+                {generating
+                  ? t(debateChromeCatalog, "debateChrome.tree.building")
+                  : t(debateChromeCatalog, "debateChrome.tree.notProduced")}
               </p>
             </div>
           )}
@@ -1453,6 +1743,7 @@ export default function DebatePageClient({
           meta={synthesisMeta}
           lean={lean}
           sections={synthesisSections}
+          catalog={debateDrawersCatalog}
         />
       </div>}
 
@@ -1474,11 +1765,15 @@ export default function DebatePageClient({
           onFocusRecommendationNode={focusRecommendationNode}
           canFocusRecommendationNode={canFocusRecommendationNode}
           onQueued={() => {
-            showToast("Regeneration queued");
+            showToast(t(debateChromeCatalog, "debateChrome.toast.regenerationQueued"));
             refresh();
           }}
           onError={(message) => setError(message)}
           onAuthRejected={rejectActionToken}
+          catalog={debateDrawersCatalog}
+          miscCatalog={miscCatalog}
+          debateChromeCatalog={debateChromeCatalog}
+          composeCatalog={composeCatalog}
         />
       ) : null}
 
@@ -1492,6 +1787,8 @@ export default function DebatePageClient({
             setDetailNodeId(null);
             setPopover(null);
           }}
+          catalog={debateDrawersCatalog}
+          composeCatalog={composeCatalog}
         />
       ) : null}
 
@@ -1513,11 +1810,18 @@ export default function DebatePageClient({
             });
             setInvestigation(null);
           }}
+          catalog={debateDrawersCatalog}
+          composeCatalog={composeCatalog}
         />
       ) : null}
 
       {workspaceOpen ? (
-        <DebateWorkspaceDrawer debate={debate} singleShot={singleShotResult} onClose={() => setWorkspaceOpen(false)} />
+        <DebateWorkspaceDrawer
+          debate={debate}
+          singleShot={singleShotResult}
+          onClose={() => setWorkspaceOpen(false)}
+          catalog={debateDrawersCatalog}
+        />
       ) : null}
 
       {honestyOpen && publicMode ? renderPublicHonesty?.(() => setHonestyOpen(false)) : null}
@@ -1541,6 +1845,9 @@ export default function DebatePageClient({
           answerExport={answerExport}
           token={actionToken}
           onClose={() => setHonestyOpen(false)}
+          catalog={miscCatalog}
+          debateChromeCatalog={debateChromeCatalog}
+          composeCatalog={composeCatalog}
         />
       ) : null}
 
@@ -1549,14 +1856,16 @@ export default function DebatePageClient({
           scoringState={scoringState}
           refreshState={scoringRefreshState}
           onClose={() => setScoringDiagnosticsOpen(false)}
+          catalog={debateChromeCatalog}
         />
       ) : null}
 
       {debate && !publicMode ? <PublicationControl
         runId={answer?.run_ref ?? id}
         onPrivateDeletion={purgePrivateDebate}
+        catalog={publicCatalog}
       /> : null}
-      {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} /> : null}
+      {guideOpen ? <GuideModal onClose={() => setGuideOpen(false)} catalog={debateDrawersCatalog} /> : null}
 
       {toast ? <Toast message={toast} /> : null}
 
@@ -1565,25 +1874,43 @@ export default function DebatePageClient({
           dock states an owner-mode fact and stays out of the public page. */}
       {publicMode ? null : (
         <div className="tokenDock">
-          <span className="btn" aria-live="polite">{actionToken ? "🔓 Signed in" : "Session required"}</span>
+          <span className="btn" aria-live="polite">
+            {t(
+              debateChromeCatalog,
+              actionToken ? "debateChrome.session.signedIn" : "debateChrome.session.required"
+            )}
+          </span>
         </div>
       )}
     </div>
   );
 }
 
-function formatDebugValue(value: string | number | boolean | null | undefined): string {
-  if (value === null || value === undefined || value === "") return "Unavailable";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+function formatDebugValue(
+  value: string | number | boolean | null | undefined,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
+  if (value === null || value === undefined || value === "") {
+    return t(catalog, "debateChrome.scoring.unavailable");
+  }
+  if (typeof value === "boolean") {
+    return t(catalog, value ? "debateChrome.scoring.yes" : "debateChrome.scoring.no");
+  }
   return String(value);
 }
 
-function formatCacheDebug(cache: DebateScoringResponse["cache"]): string {
-  if (!cache) return "Unavailable";
-  const base = cache.hit ? "Hit" : "Miss";
+function formatCacheDebug(
+  cache: DebateScoringResponse["cache"],
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
+  if (!cache) return t(catalog, "debateChrome.scoring.unavailable");
+  const base = t(
+    catalog,
+    cache.hit ? "debateChrome.scoring.cacheHit" : "debateChrome.scoring.cacheMiss"
+  );
   const staleReason = cache.stale?.reason;
   if (!staleReason) return base;
-  return `${base}; stale: ${staleReason}`;
+  return t(catalog, "debateChrome.scoring.cacheStale", { base, reason: staleReason });
 }
 
 function ScoreAwareFilterPanel({
@@ -1591,18 +1918,20 @@ function ScoreAwareFilterPanel({
   filter,
   matchCount,
   scoredCount,
-  onChange
+  onChange,
+  catalog = debateChromeEnglish
 }: {
   enabled: boolean;
   filter: ScoreAwareFilter;
   matchCount: number;
   scoredCount: number;
   onChange: (filter: ScoreAwareFilter) => void;
+  catalog?: MessageCatalog;
 }) {
   return (
-    <section className="progressStrip" aria-label="Score-aware navigation filters">
-      <span className="progressLabel">Score-aware navigation</span>
-      <div className="segment" role="group" aria-label="Score-aware filter">
+    <section className="progressStrip" aria-label={t(catalog, "debateChrome.scoring.navigationFilters")}>
+      <span className="progressLabel">{t(catalog, "debateChrome.scoring.navigation")}</span>
+      <div className="segment" role="group" aria-label={t(catalog, "debateChrome.scoring.filter")}>
         {SCORE_AWARE_FILTERS.map((item) => (
           <button
             key={item.id}
@@ -1611,22 +1940,32 @@ function ScoreAwareFilterPanel({
             disabled={!enabled}
             onClick={() => onChange(item.id)}
           >
-            {item.label}
+            {t(catalog, item.key)}
           </button>
         ))}
       </div>
       <span className="progressCount">
         {enabled
-          ? `${matchCount} of ${scoredCount} scored claims match`
-          : "Scoring data is required to filter by scored claim signals."}
+          ? t(catalog, "debateChrome.scoring.matches", { matches: matchCount, total: scoredCount })
+          : t(catalog, "debateChrome.scoring.filterRequiresData")}
       </span>
     </section>
   );
 }
 
-function ScoringVisibilityPanel({ state }: { state: ScoringVisibilityState }) {
+function ScoringVisibilityPanel({
+  state,
+  catalog = debateChromeEnglish
+}: {
+  state: ScoringVisibilityState;
+  catalog?: MessageCatalog;
+}) {
   return (
-    <section className="progressStrip" aria-label="Scoring visibility state" data-scoring-visibility-kind={state.kind}>
+    <section
+      className="progressStrip"
+      aria-label={t(catalog, "debateChrome.scoring.visibilityState")}
+      data-scoring-visibility-kind={state.kind}
+    >
       <span className="progressLabel">{state.title}</span>
       <span className="progressCount">{state.detail}</span>
     </section>
@@ -1638,39 +1977,41 @@ function ScoringHolesSummaryPanel({
   state,
   holesSummary,
   fatalFlagsSummary,
-  strongestIssue
+  strongestIssue,
+  catalog = debateChromeEnglish
 }: {
   enabled: boolean;
   state: ScoringAsyncState;
   holesSummary: DebateScoringHoleSummary;
   fatalFlagsSummary: DebateScoringFatalFlagSummary;
   strongestIssue: DebateScoringUnresolvedIssue | null;
+  catalog?: MessageCatalog;
 }) {
   const reason = state.error || state.data?.reason;
 
   if (!enabled) {
     return (
-      <section className="progressStrip" aria-label="Scoring issue summary">
-        <span className="progressLabel">Scoring issue summary unavailable</span>
-        <span className="progressCount">Scoring data is required to summarize unresolved holes and fatal flags from scored claims.</span>
+      <section className="progressStrip" aria-label={t(catalog, "debateChrome.scoring.issueSummary")}>
+        <span className="progressLabel">{t(catalog, "debateChrome.scoring.issueSummaryUnavailable")}</span>
+        <span className="progressCount">{t(catalog, "debateChrome.scoring.issueSummaryRequiresData")}</span>
       </section>
     );
   }
 
   if (state.status === "loading") {
     return (
-      <section className="progressStrip" aria-label="Scoring issue summary">
-        <span className="progressLabel">Loading scoring issue summary</span>
-        <span className="progressCount">Waiting for scored claims.</span>
+      <section className="progressStrip" aria-label={t(catalog, "debateChrome.scoring.issueSummary")}>
+        <span className="progressLabel">{t(catalog, "debateChrome.progress.loadingScoringSummary")}</span>
+        <span className="progressCount">{t(catalog, "debateChrome.progress.waitingForScoredClaims")}</span>
       </section>
     );
   }
 
   if (state.status === "error" || state.status === "unavailable") {
     return (
-      <section className="progressStrip" aria-label="Scoring issue summary">
-        <span className="progressLabel">Scoring issue summary unavailable</span>
-        <span className="progressCount">{reason || "No scoring payload is available."}</span>
+      <section className="progressStrip" aria-label={t(catalog, "debateChrome.scoring.issueSummary")}>
+        <span className="progressLabel">{t(catalog, "debateChrome.scoring.issueSummaryUnavailable")}</span>
+        <span className="progressCount">{reason || t(catalog, "debateChrome.scoring.noPayload")}</span>
       </section>
     );
   }
@@ -1679,9 +2020,9 @@ function ScoringHolesSummaryPanel({
 
   if (holesSummary.total === 0 && fatalFlagsSummary.total === 0) {
     return (
-      <section className="progressStrip" aria-label="Scoring issue summary">
-        <span className="progressLabel">Scoring issue summary</span>
-        <span className="progressCount">No unresolved scoring holes or fatal flags were returned by the current scoring payload.</span>
+      <section className="progressStrip" aria-label={t(catalog, "debateChrome.scoring.issueSummary")}>
+        <span className="progressLabel">{t(catalog, "debateChrome.scoring.issueSummary")}</span>
+        <span className="progressCount">{t(catalog, "debateChrome.scoring.noUnresolvedIssues")}</span>
       </section>
     );
   }
@@ -1689,35 +2030,44 @@ function ScoringHolesSummaryPanel({
   return (
     <section
       className="progressStrip scoringIssueStrip"
-      aria-label="Scoring issue summary"
+      aria-label={t(catalog, "debateChrome.scoring.issueSummary")}
     >
       <div className="scoringIssueIntro">
-        <span className="progressLabel">Scoring issue summary</span>
+        <span className="progressLabel">{t(catalog, "debateChrome.scoring.issueSummary")}</span>
         <div className="scoringIssueSubcopy">
-          {holesSummary.total} unresolved holes / {fatalFlagsSummary.total} fatal flags from {state.data.items.length} scored claims
+          {t(catalog, "debateChrome.scoring.issueCounts", {
+            holes: holesSummary.total,
+            fatalFlags: fatalFlagsSummary.total,
+            claims: state.data.items.length
+          })}
         </div>
       </div>
       <div className="scoringIssuePills">
         {strongestIssue ? (
           <div className="pill scoringIssuePill" title={`${strongestIssue.claim}: ${strongestIssue.description}`}>
-            <span>Strongest unresolved issue</span>
-            <span>{strongestIssue.kind === "fatal_flag" ? "fatal" : "hole"}</span>
+            <span>{t(catalog, "debateChrome.scoring.strongestUnresolvedIssue")}</span>
+            <span>{t(
+              catalog,
+              strongestIssue.kind === "fatal_flag"
+                ? "debateChrome.scoring.fatal"
+                : "debateChrome.scoring.hole"
+            )}</span>
             <span>{strongestIssue.severity}</span>
             <span>{strongestIssue.type}</span>
             <span title={strongestIssue.nodeId}>{compactNodeId(strongestIssue.nodeId)}</span>
           </div>
         ) : null}
-        <div className="pill scoringIssuePill" title="Severity counts from scoring payload holes">
-          <span>Holes</span>
-          <span>{holesSummary.bySeverity.high} high</span>
-          <span>{holesSummary.bySeverity.medium} medium</span>
-          <span>{holesSummary.bySeverity.low} low</span>
+        <div className="pill scoringIssuePill" title={t(catalog, "debateChrome.scoring.holeSeverityTitle")}>
+          <span>{t(catalog, "debateChrome.scoring.holes")}</span>
+          <span>{t(catalog, "debateChrome.scoring.highCount", { count: holesSummary.bySeverity.high })}</span>
+          <span>{t(catalog, "debateChrome.scoring.mediumCount", { count: holesSummary.bySeverity.medium })}</span>
+          <span>{t(catalog, "debateChrome.scoring.lowCount", { count: holesSummary.bySeverity.low })}</span>
         </div>
-        <div className="pill scoringIssuePill" title="Severity counts from scoring payload fatal flags">
-          <span>Fatal flags</span>
-          <span>{fatalFlagsSummary.bySeverity.high} high</span>
-          <span>{fatalFlagsSummary.bySeverity.medium} medium</span>
-          <span>{fatalFlagsSummary.bySeverity.low} low</span>
+        <div className="pill scoringIssuePill" title={t(catalog, "debateChrome.scoring.fatalFlagSeverityTitle")}>
+          <span>{t(catalog, "debateChrome.scoring.fatalFlags")}</span>
+          <span>{t(catalog, "debateChrome.scoring.highCount", { count: fatalFlagsSummary.bySeverity.high })}</span>
+          <span>{t(catalog, "debateChrome.scoring.mediumCount", { count: fatalFlagsSummary.bySeverity.medium })}</span>
+          <span>{t(catalog, "debateChrome.scoring.lowCount", { count: fatalFlagsSummary.bySeverity.low })}</span>
         </div>
         {fatalFlagsSummary.items.slice(0, 4).map((flag, index) => (
           <div
@@ -1725,7 +2075,7 @@ function ScoringHolesSummaryPanel({
             className="pill scoringIssuePill"
             title={`${flag.claim}: ${flag.description}`}
           >
-            <span>fatal</span>
+            <span>{t(catalog, "debateChrome.scoring.fatal")}</span>
             <span>{flag.severity}</span>
             <span>{flag.type}</span>
             <span title={flag.nodeId}>{compactNodeId(flag.nodeId)}</span>
@@ -1750,55 +2100,68 @@ function ScoringHolesSummaryPanel({
 export function ScoringDiagnosticsDrawer({
   scoringState,
   refreshState,
-  onClose
+  onClose,
+  catalog = debateChromeEnglish
 }: {
   scoringState: ScoringAsyncState;
   refreshState: ScoringRefreshState;
   onClose: () => void;
+  catalog?: MessageCatalog;
 }) {
   const data = scoringState.data;
-  const error = refreshState.error || scoringState.error || data?.reason || "No scoring error reported.";
+  const error = refreshState.error || scoringState.error || data?.reason ||
+    t(catalog, "debateChrome.error.noScoringError");
   const rows: Array<[string, string | number | boolean | null | undefined]> = [
-    ["Frontend state", scoringState.status],
-    ["Refresh state", refreshState.status],
-    ["Scoring payload status", data?.status],
-    ["Provider", data?.model_metadata?.provider],
-    ["Model", data?.model_metadata?.model],
-    ["Checked at", data?.model_metadata?.checked_at],
-    ["Generated at", data?.generated_at],
-    ["Producer", data?.producer],
-    ["Cache", formatCacheDebug(data?.cache)],
-    ["Current claims", data?.node_ids?.length],
-    ["Scored claims", data?.scored_node_count],
-    ["Skipped claims", data?.skipped_node_count],
-    ["Truncated", data?.truncated],
-    ["Call count", "Not exposed by scoring API"],
-    ["Latency", "Not exposed by scoring API"],
-    ["Error", error]
+    [t(catalog, "debateChrome.scoring.frontendState"), scoringState.status],
+    [t(catalog, "debateChrome.scoring.refreshState"), refreshState.status],
+    [t(catalog, "debateChrome.scoring.payloadStatus"), data?.status],
+    [t(catalog, "debateChrome.scoring.provider"), data?.model_metadata?.provider],
+    [t(catalog, "debateChrome.scoring.model"), data?.model_metadata?.model],
+    [t(catalog, "debateChrome.scoring.checkedAt"), data?.model_metadata?.checked_at],
+    [t(catalog, "debateChrome.scoring.generatedAt"), data?.generated_at],
+    [t(catalog, "debateChrome.scoring.producer"), data?.producer],
+    [t(catalog, "debateChrome.scoring.cache"), formatCacheDebug(data?.cache, catalog)],
+    [t(catalog, "debateChrome.scoring.currentClaims"), data?.node_ids?.length],
+    [t(catalog, "debateChrome.scoring.scoredClaims"), data?.scored_node_count],
+    [t(catalog, "debateChrome.scoring.skippedClaims"), data?.skipped_node_count],
+    [t(catalog, "debateChrome.scoring.truncated"), data?.truncated],
+    [t(catalog, "debateChrome.scoring.callCount"), t(catalog, "debateChrome.scoring.notExposedByApi")],
+    [t(catalog, "debateChrome.scoring.latency"), t(catalog, "debateChrome.scoring.notExposedByApi")],
+    [t(catalog, "debateChrome.scoring.error"), error]
   ];
 
   return (
     <>
       <div className="drawerScrim" onClick={onClose} />
-      <aside className="drawer scroll" role="dialog" aria-modal aria-label="Scoring diagnostics">
+      <aside
+        className="drawer scroll"
+        role="dialog"
+        aria-modal
+        aria-label={t(catalog, "debateChrome.scoring.diagnostics")}
+      >
         <div className="drawerHead">
           <div className="drawerHeadMeta">
-            <div className="nodeEyebrow">Developer diagnostics</div>
-            <h2>Scoring diagnostics</h2>
+            <div className="nodeEyebrow">{t(catalog, "debateChrome.scoring.developerDiagnostics")}</div>
+            <h2>{t(catalog, "debateChrome.scoring.diagnostics")}</h2>
           </div>
-          <button type="button" className="iconBtn" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="iconBtn"
+            onClick={onClose}
+            aria-label={t(catalog, "debateChrome.scoring.close")}
+          >
             x
           </button>
         </div>
         <div className="drawerBody">
-          <div className="drawerHintMuted">Only fields present in the frontend scoring payload are shown.</div>
+          <div className="drawerHintMuted">{t(catalog, "debateChrome.scoring.diagnosticsHint")}</div>
           <ul className="drawerFindingList">
             {rows.map(([label, value]) => (
               <li key={label} className="drawerFindingItem">
                 <div className="drawerFindingMeta">
                   <span>{label}</span>
                 </div>
-                <div className="drawerFindingText">{formatDebugValue(value)}</div>
+                <div className="drawerFindingText">{formatDebugValue(value, catalog)}</div>
               </li>
             ))}
           </ul>
@@ -1810,20 +2173,22 @@ export function ScoringDiagnosticsDrawer({
 
 function AdaptiveDepthDryRunPanel({
   enabled,
-  state
+  state,
+  catalog = debateChromeEnglish
 }: {
   enabled: boolean;
   state: AdaptiveDepthDryRunAsyncState;
+  catalog?: MessageCatalog;
 }) {
   const reason =
     state.error ||
     state.data?.reason ||
-    (!enabled ? "Scoring data is required to inspect the adaptive depth dry-run plan." : null);
+    (!enabled ? t(catalog, "debateChrome.adaptiveDepth.requiresScoring") : null);
 
   if (!enabled) {
     return (
-      <section className="progressStrip" aria-label="Adaptive depth dry-run">
-        <span className="progressLabel">Adaptive depth dry-run unavailable</span>
+      <section className="progressStrip" aria-label={t(catalog, "debateChrome.adaptiveDepth.title")}>
+        <span className="progressLabel">{t(catalog, "debateChrome.adaptiveDepth.unavailable")}</span>
         <span className="progressCount">{reason}</span>
       </section>
     );
@@ -1831,29 +2196,29 @@ function AdaptiveDepthDryRunPanel({
 
   if (state.status === "loading") {
     return (
-      <section className="progressStrip" aria-label="Adaptive depth dry-run">
-        <span className="progressLabel">Loading adaptive depth dry-run</span>
-        <span className="progressCount">Read-only plan</span>
+      <section className="progressStrip" aria-label={t(catalog, "debateChrome.adaptiveDepth.title")}>
+        <span className="progressLabel">{t(catalog, "debateChrome.progress.loadingAdaptiveDepth")}</span>
+        <span className="progressCount">{t(catalog, "debateChrome.progress.readOnlyPlan")}</span>
       </section>
     );
   }
 
   if (state.status === "error" || state.status === "unavailable") {
     return (
-      <section className="progressStrip" aria-label="Adaptive depth dry-run">
-        <span className="progressLabel">Adaptive depth dry-run unavailable</span>
-        <span className="progressCount">{reason || "No dry-run plan is available."}</span>
+      <section className="progressStrip" aria-label={t(catalog, "debateChrome.adaptiveDepth.title")}>
+        <span className="progressLabel">{t(catalog, "debateChrome.adaptiveDepth.unavailable")}</span>
+        <span className="progressCount">{reason || t(catalog, "debateChrome.adaptiveDepth.noPlan")}</span>
         <button
           type="button"
           className="btn btnDark"
           disabled
           aria-disabled="true"
-          title={V3_MISSING_CAPABILITIES.adaptiveDepthApproval}
+          title={t(catalog, "debateChrome.adaptiveDepth.approvalUnavailable")}
         >
-          Approve selected expansions
+          {t(catalog, "debateChrome.adaptiveDepth.approveSelected")}
         </button>
         <span className="progressCount adaptiveDepthActionMessage">
-          {V3_MISSING_CAPABILITIES.adaptiveDepthApproval}
+          {t(catalog, "debateChrome.adaptiveDepth.approvalUnavailable")}
         </span>
       </section>
     );
@@ -1865,20 +2230,23 @@ function AdaptiveDepthDryRunPanel({
   return (
     <section
       className="progressStrip adaptiveDepthStrip"
-      aria-label="Adaptive depth dry-run"
+      aria-label={t(catalog, "debateChrome.adaptiveDepth.title")}
     >
       <div className="scoringIssueIntro">
-        <span className="progressLabel">Adaptive depth dry-run</span>
+        <span className="progressLabel">{t(catalog, "debateChrome.adaptiveDepth.title")}</span>
         <div className="scoringIssueSubcopy">
-          {state.data.plan.expansion_count} expansions from {state.data.plan.candidate_count} scored candidates
+          {t(catalog, "debateChrome.adaptiveDepth.summary", {
+            expansions: state.data.plan.expansion_count,
+            candidates: state.data.plan.candidate_count
+          })}
         </div>
       </div>
       {items.length === 0 ? (
-        <span className="progressCount">No adaptive depth expansions are recommended from the current scoring data.</span>
+        <span className="progressCount">{t(catalog, "debateChrome.adaptiveDepth.noneRecommended")}</span>
       ) : (
         <div className="adaptiveDepthChips">
           {items.map((item) => (
-            <AdaptiveDepthDryRunChip key={item.node_id} item={item} />
+            <AdaptiveDepthDryRunChip key={item.node_id} item={item} catalog={catalog} />
           ))}
         </div>
       )}
@@ -1888,26 +2256,37 @@ function AdaptiveDepthDryRunPanel({
           className="btn btnDark"
           disabled
           aria-disabled="true"
-          title={V3_MISSING_CAPABILITIES.adaptiveDepthApproval}
+          title={t(catalog, "debateChrome.adaptiveDepth.approvalUnavailable")}
         >
-          Approve selected expansions
+          {t(catalog, "debateChrome.adaptiveDepth.approveSelected")}
         </button>
         <span className="progressCount adaptiveDepthActionMessage">
-          {V3_MISSING_CAPABILITIES.adaptiveDepthApproval}
+          {t(catalog, "debateChrome.adaptiveDepth.approvalUnavailable")}
         </span>
       </div>
     </section>
   );
 }
 
-function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
+function AdaptiveDepthDryRunChip({
+  item,
+  catalog = debateChromeEnglish
+}: {
+  item: AdaptiveDepthDryRunItem;
+  catalog?: MessageCatalog;
+}) {
   const reasons = item.reasons.map(formatAdaptiveDepthReason);
   const recommendedDepthLabel =
-    item.expansion_hint === "expand" ? "Recommended depth: expand" : "Recommended depth: review";
+    t(
+      catalog,
+      item.expansion_hint === "expand"
+        ? "debateChrome.adaptiveDepth.recommendedExpand"
+        : "debateChrome.adaptiveDepth.recommendedReview"
+    );
 
   return (
     <div
-      title={reasons.join(", ") || "No listed reasons"}
+      title={reasons.join(", ") || t(catalog, "debateChrome.adaptiveDepth.noListedReasons")}
       style={{
         display: "grid",
         gap: 6,
@@ -1919,12 +2298,16 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span className="progressLabel">{formatAdaptiveDepthPressure(item.pressure)} pressure</span>
+        <span className="progressLabel">{t(catalog, "debateChrome.adaptiveDepth.pressure", {
+          pressure: formatAdaptiveDepthPressure(item.pressure, catalog)
+        })}</span>
         <span className="progressCount">{formatAdaptiveDepthScore(item.score)}</span>
       </div>
       <div
         className="adaptiveDepthMeter"
-        aria-label={`Adaptive depth score ${formatAdaptiveDepthScore(item.score)}`}
+        aria-label={t(catalog, "debateChrome.adaptiveDepth.score", {
+          score: formatAdaptiveDepthScore(item.score)
+        })}
         style={{
           height: 5,
           overflow: "hidden",
@@ -1947,10 +2330,17 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
         />
       </div>
       <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
-        {recommendedDepthLabel} for {formatAdaptiveDepthAction(item.recommended_action).toLowerCase()}
+        {t(catalog, "debateChrome.adaptiveDepth.recommendation", {
+          depth: recommendedDepthLabel,
+          action: formatAdaptiveDepthAction(item.recommended_action, catalog)
+        })}
       </div>
       <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
-        {item.hole_count} holes, {item.recommended_investigation_count} investigations, claim {compactNodeId(item.node_id)}
+        {t(catalog, "debateChrome.adaptiveDepth.counts", {
+          holes: item.hole_count,
+          investigations: item.recommended_investigation_count,
+          claim: compactNodeId(item.node_id)
+        })}
       </div>
       {reasons.length > 0 ? (
         <div className="progressCount" style={{ whiteSpace: "normal", lineHeight: 1.35 }}>
@@ -1961,11 +2351,17 @@ function AdaptiveDepthDryRunChip({ item }: { item: AdaptiveDepthDryRunItem }) {
   );
 }
 
-function SingleShotMain({ result }: { result: SingleShotResult }) {
+function SingleShotMain({
+  result,
+  catalog = debateChromeEnglish
+}: {
+  result: SingleShotResult;
+  catalog?: MessageCatalog;
+}) {
   return (
     <div className="singleShot scroll">
       <div className="singleShotInner">
-        <div className="nodeEyebrow">Single-shot result</div>
+        <div className="nodeEyebrow">{t(catalog, "debateChrome.singleShot.result")}</div>
         <h1 className="display sm" style={{ marginTop: 8 }} data-ai-generated="true">
           {result.final_text}
         </h1>
@@ -1974,17 +2370,17 @@ function SingleShotMain({ result }: { result: SingleShotResult }) {
         </p>
         <div className="singleShotGrid" data-ai-generated="true">
           <section className="synthCard synthPro">
-            <div className="synthCardLabel pro">↑ Strongest Pro</div>
+            <div className="synthCardLabel pro">{t(catalog, "debateChrome.singleShot.strongestPro")}</div>
             <div className="synthCardClaim">{result.strongest_pro}</div>
           </section>
           <section className="synthCard synthCon">
-            <div className="synthCardLabel con">↓ Strongest Con</div>
+            <div className="synthCardLabel con">{t(catalog, "debateChrome.singleShot.strongestCon")}</div>
             <div className="synthCardClaim">{result.strongest_con}</div>
           </section>
         </div>
         <div className="singleShotColumns" data-ai-generated="true">
           <section>
-            <div className="synthSectionTitle">Pros ({result.pros.length})</div>
+            <div className="synthSectionTitle">{t(catalog, "debateChrome.singleShot.pros", { count: result.pros.length })}</div>
             <ul className="synthSectionList">
               {result.pros.map((item, index) => (
                 <li key={`${index}-${item}`}>{item}</li>
@@ -1992,7 +2388,7 @@ function SingleShotMain({ result }: { result: SingleShotResult }) {
             </ul>
           </section>
           <section>
-            <div className="synthSectionTitle">Cons ({result.cons.length})</div>
+            <div className="synthSectionTitle">{t(catalog, "debateChrome.singleShot.cons", { count: result.cons.length })}</div>
             <ul className="synthSectionList">
               {result.cons.map((item, index) => (
                 <li key={`${index}-${item}`}>{item}</li>
@@ -2002,8 +2398,8 @@ function SingleShotMain({ result }: { result: SingleShotResult }) {
         </div>
         <div className="singleShotMeta">
           <span className="pill">{result.model_id}</span>
-          <span className="pill">{result.tokens_in} in</span>
-          <span className="pill">{result.tokens_out} out</span>
+          <span className="pill">{t(catalog, "debateChrome.singleShot.tokensIn", { count: result.tokens_in })}</span>
+          <span className="pill">{t(catalog, "debateChrome.singleShot.tokensOut", { count: result.tokens_out })}</span>
         </div>
       </div>
     </div>

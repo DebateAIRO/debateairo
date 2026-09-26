@@ -1,0 +1,148 @@
+SKILLS LOADED: at THIS node, through the Skill tool, in packet line-4 order, before any SPEC line was written:
+- ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/using-superpowers/SKILL.md
+- ~/.claude/skills/heartbeat-protocol/SKILL.md
+- ~/.claude/skills/heartbeat-requirements/SKILL.md
+- ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/receiving-code-review/SKILL.md
+- ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/brainstorming/SKILL.md
+
+brainstorming was discharged as the fleet contract says: every rejected alternative is recorded in DECISIONS.
+
+READY — REQ-FIX-PES-p4 · REQ-FIX pass 4 (V's rulings) · t_aad48581 · 2026-09-25 13:05:21 EEST
+
+2 · NODE AND SESSION.
+- Node: REQ-FIX pass 4 on V's rulings `docs/missions/provider-env-selection/V-DECISIONS-PACKET.md:19-27`, ticket t_aad48581, seat REQ-FIX-PES-p4.
+- Session: agent a221353758f20db46, the original REQ-PES session, resumed. Transcript: /Users/vladmihaimiron/.claude/projects/-Users-vladmihaimiron-Documents-DebateAIRO/2c3aeba2-8ae1-471b-80a1-30324a7327af/subagents/agent-a221353758f20db46.jsonl — 4,537,726 bytes at CLAIM, 5,203,092 bytes at 13:03.
+- Model per transcript: claude-opus-5-5.
+- Timeline: CLAIM 12:48:30 EEST. No interruption.
+- Lane: .worktrees/pes-base/dialectical-engine @ 776359c38, dirty 0 at CLAIM and at READY. It was read only.
+
+3 · ARTIFACTS (under docs/missions/provider-env-selection/).
+- NEW slices/S01/SPEC-v4.md (351 lines). Line 3 `ui: no`; line 4 is the supersession line (pass 4, V-10 and V-12/V-13).
+  - CHANGED: R1.3, R1.12, and R1.14 (NEW).
+  - UNCHANGED byte for byte: R1.1, R1.2, R1.4–R1.11, R1.13.
+  - §5 and §6 changed.
+- NEW slices/S02/SPEC-v4.md (271 lines). Line 3 `ui: no`; line 4 is the supersession line (V-12/V-13).
+  - No requirement changed: R2.1–R2.11 are byte for byte v3's.
+  - §5 steps 4 and 8, and §6, changed.
+- NEW slices/S03/SPEC-v2.md (167 lines). Line 3 `ui: no`; line 4 is the supersession line (V-11).
+  - CHANGED: R3.4 only.
+  - UNCHANGED byte for byte: R3.1–R3.3, R3.5–R3.9, §1, §2, §4, §5.
+  - Line 4 records that C1 and C2 are ALREADY BUILT against SPEC.md (604b15158, ec66d5e7c on slice/provider-env-selection-s03), and that only R3.4's sentence moves.
+- AMENDED INSTRUCTIONS.md (99 lines): the slice table points at S01 v4, S02 v4 and S03 v2; the record paragraph, the verdict row (now naming V-DECISIONS-PACKET.md:19-27 and REQ-REV-p3.md) and the per-slice record row are updated.
+- APPENDED DECISIONS.md, with no past row edited; each append opens with a pointer map for the rows above it:
+  - S01: 227 → 251 lines. 11 rows.
+  - S02: 100 → 115 lines. 4 rows.
+  - S03: 129 → 160 lines. 2 rows and one `V-ROW: NEW`.
+- PLAN.md: NOT edited (charge 5).
+- Checks: in the session scratchpad /private/tmp/claude-501/-Users-vladmihaimiron-Documents-DebateAIRO/2c3aeba2-8ae1-471b-80a1-30324a7327af/scratchpad/p4/ — p4_checks.py, p4_mutants.py, p3_on_v4.py, detectors_on_v4.py, and p4-runs.txt with every run's own output. They are there because `allowed` names no probes/ directory at this node; the orchestrator copies them if they should last.
+- Slice table: S01 `ui: no` · S02 `ui: no` · S03 `ui: no`. Unresolved contradictions: 0.
+
+4 · VERIFICATION, verbatim from p4-runs.txt.
+- `python3 p4_checks.py old` (S01 v3, S02 v3, S03 v1) → "old: FAIL (3 failing checks)", rc=1:
+  - V-10: "no requirement refuses a set that drops a role row's provider with a PES_PUBLISH_ code".
+  - V-12/13: "S01 FAIL: step 6's rule reads `[ELIFECYCLE] Command failed with exit code 1.` as the verdict" · "S02 FAIL: step 4's command shows no `exit=1`" · "S01 step 3 says 'the first line', which is pnpm's `$ tsx …` echo, not SCRATCH-DB".
+  - V-11: "R3.4 still states `COST_ENVELOPES_NOT_SEALED` as the start-up refusal".
+- `python3 p4_checks.py new` → all three checks pass; "new: PASS (0 failing checks)", rc=0.
+- How the checks run:
+  - The exit-rule check runs each SPEC's OWN step-2/step-4 command line in zsh, with `pnpm <script>` replaced by a stub that prints pnpm's `$ tsx` echo, the verdict and `[ELIFECYCLE]`, and exits 0 or 1. It then applies the step's own verdict rule to the log.
+  - The V-10 check applies R1.14 to R1.12's seeded rows and E, and compares the result with the table. It reads each role row's `kind` and exact key set from the shipped schema (`packages/register/src/algorithm-policy.ts:404-413`).
+  - The V-11 check reads every line R3.4 cites in the lane.
+- `python3 p4_mutants.py` → "mutants: 15/15 caught", rc=0. Among the 15:
+  - the v3 `| tee` run line;
+  - `| tee …; echo "exit=$?"` (tee's code);
+  - UNVERIFIED exiting 0;
+  - a seed that keeps both providers;
+  - both rows naming the dropped provider (which cannot tell the rule from "refuse on any row");
+  - the role check placed after the publication;
+  - a wrong `kind`, and an extra key;
+  - R3.4 citing a line that does not hold its claim;
+  - R3.4 back to v1.
+- The pass-3 checks (p3_checks.py, unchanged) on S01/S02 v4 → "PASS (0 failing checks)", rc=0. The one v4 case the pass-3 executor cannot model is dropped by name and left to check_v10.
+- The pass-2 detectors (detectors.py, unchanged) on v4 plus INSTRUCTIONS plus the PLANs → 5 pass, 1 FAIL: "S01: requirement R1.14 has no PLAN trace row". This is EXPECTED: PLAN.md is off-limits at this node, and the row is item 1 of the S01 list in §5 below.
+- Frozen files: `shasum -a 256 -c` against the dispatcher-time pre-state reads OK for S01/SPEC.md, SPEC-v2.md, SPEC-v3.md; S02/SPEC.md, SPEC-v2.md, SPEC-v3.md; and S03/SPEC.md.
+- Diff stats, old → new:
+  - S01 v3 → v4: "1 file changed, 62 insertions(+), 19 deletions(-)". Hunks: 4c4 6,7c6,7 (header) · 129c129 (R1.3) · 196c196, 214c214,226 (R1.12) · 220a233,248 (R1.14) · 252c280 … 298,302c340,345 (§5 and §6).
+  - S02 v3 → v4: "1 file changed, 19 insertions(+), 8 deletions(-)". Hunks: 4c4 6,7c6,7 (header) · 231c231,234 (step 4) · 250,251c253,259 (step 8) · 258,259c266,270 (§6).
+  - S03 v1 → v2: "1 file changed, 21 insertions(+), 5 deletions(-)". Hunks: 1a2 2a4 4,5c6,7 (header) · 71,73c73,83 (R3.4) · 150a161,166 (§6).
+  - The per-requirement comparison (by block): S01 CHANGED ['R1.3','R1.12','R1.14']; S02 CHANGED []; S03 CHANGED ['R3.4']. Every other requirement is identical.
+- The banned-word grep over the three new SPECs → no hit.
+- `wc -l INSTRUCTIONS.md` → 99.
+
+5 · RULINGS — each APPLIED; none contested.
+
+V-10 → S01 — APPLIED.
+- The rule: S01/SPEC-v4.md:233-243. "**R1.14 — the role rows of the base register (V-10).** Step (6) of R1.3 reads, from the rows of the base register version (R1.2, `rows`), the row `synthesizerRoleRef` and then the row `evaluatorRoleRef`. A row that is absent is not checked, so a base that holds neither row passes this step … A row that is present passes only when its value is a JSON object whose `providerRef` member is a string equal to the `provider_ref` of one element of the roster. The first present row that does not pass stops the run before any write: the command exits non-zero and prints `PES_PUBLISH_ROLE_PROVIDER_DROPPED:` followed by that row's key"
+- Its place in R1.3's order: :129 "(5) the self-check of this requirement; (6) the role rows, R1.14; (7) the publication, R1.4."
+- A base with NO role rows: :235-238. It passes; §5's `published` case is that path.
+- The proving step: :214-226, R1.12's role seed. It uses `publishReplacementRegisterFixture` on the `published` version: "`synthesizerRoleRef` with the value `{"kind":"SYNTHESIZER_ROLE_REF","providerRef":"vendor:a","provisional":true}` and `evaluatorRoleRef` with the value `{"kind":"EVALUATOR_ROLE_REF","providerRef":"vendor:z","provisional":true}`". The case is at :297: "| `role-provider-dropped` | `E` | — | `REGISTER_VERSION=<v>` of R1.12's role seed | `PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef` |". The evaluator key, not the synthesizer key, separates the rule from "refuse whenever a role row exists".
+- §6 is now answered text: :338-345.
+
+V-12 + V-13 → one exit rule, in S01 and S02 — APPLIED.
+- S02/SPEC-v4.md:253-259: "8. The verdict is the LAST line of the acceptance's OWN output: the log's last line, or the line before it when the log's last line begins `[ELIFECYCLE]`. A passing run's verdict is exactly `PES-S02-ACCEPT: PASS` and step 4 printed `exit=0`. A failing run's verdict begins `PES-S02-ACCEPT: FAIL ` and names the first case that did not hold, and step 4 printed `exit=1`. A run that stops UNVERIFIED has the verdict `PES-S02-ACCEPT: UNVERIFIED ` … and step 4 printed `exit=1`, whatever the step."
+- S01/SPEC-v4.md:324-330 is the same words. check_exit_rule compares the PASS/FAIL sentences with the slice names normalised. S01's only UNVERIFIED outcome is "A run whose scratch database of R1.12 could not start".
+- The run lines, S02:231 and S01:307: `pnpm pes:accept-… > /tmp/pes-s0x-accept.log 2>&1; echo "exit=$?"`. The v3 `| tee` form shows no exit code, and adding `; echo "exit=$?"` after tee prints tee's 0 (both executed).
+- S01 step 3 (:311-312) now reads "the log's first line, or its second when the first is pnpm's `$ tsx …` echo".
+
+V-11 → S03 — APPLIED.
+- S03/SPEC-v2.md:72-83: "It states the shipped behaviour in two parts. First, what a hosted operator meets: a hosted deployment reads the `costEnvelopePolicy` row in force at its own register version and refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with `COST_ENVELOPE_POLICY_INVALID` when it sealed one that is malformed … Second, `COST_ENVELOPES_NOT_SEALED` is named as what it is — a check on the integrity of the build".
+- Re-grepped in the lane @ 776359c38: cost-envelope-policy.ts:163-166 (UNRESOLVED) and :131-134 (INVALID); api main.ts:241-242 and runner main.ts:111 (readCostEnvelopePolicy); runtime-environment.ts:112-115 ("unreachable at runtime") and :118-124 (the live gate).
+
+THE SWEEP, member by member.
+- V-10 class, "a carried-forward row names a provider the new set can drop". I read the seed's 32 row keys and the algorithm family; 3 members:
+  - synthesizerRoleRef and evaluatorRoleRef: FIXED (R1.14).
+  - providerFamilyMap (algorithm-policy.ts:447): HELD. A dropped ref is never looked up, and a new ref falls under `EXEMPT_FROM_REPEATED_FAMILY_DISCOUNT` (:451).
+- V-12/13 class, "a step that names a log line by position, or an exit it cannot observe". 6 members:
+  - S01 step 2: FIXED.
+  - S01 step 3: FIXED.
+  - S01 step 6: FIXED.
+  - S02 step 4: FIXED.
+  - S02 step 8: FIXED.
+  - S01 steps 4-5 and S02 steps 5-7: HELD — they name lines by order, not position.
+- V-11 class, "the README names COST_ENVELOPES_NOT_SEALED as the runtime gate". 4 members:
+  - README :747-751: FIXED (R3.4).
+  - The known-stale bullet :28-31: HELD. R3.7 already removes it where false.
+  - §11 table row :779 and §10 bullet :711-713: NOT fixed. This is new scope, so it is the `V-ROW: NEW` below.
+
+PLAN steps each amendment touches (ARCH-FIX S01 p2 / S02 p3 / S03 p4 consume this list; I did not edit PLAN.md).
+- S01 (V-10):
+  - The trace table: rows R1.3 (PLAN.md:77), R1.12 (:86) and §6 (:90), plus a NEW R1.14 row. The pass-2 detector fails until it exists.
+  - The reverse trace, :93-98.
+  - S01-06 (the library suite RED: role-row cases).
+  - S01-14 ("the six checks" become seven; the role check is (6)).
+  - S01-16 (an end-to-end role case).
+  - S01-18 (the entry reads the base rows).
+  - S01-21, S01-22 and S01-23 (the acceptance: the role seed after `published`, the `role-provider-dropped` case, and the `PES-S01 ROLE-SEED version=<v>` line).
+  - §5's "Not built, by design" (:242), which must drop the role-reference exclusion; §7/§8 as affected; §9 :599-603.
+- S01 (V-12/V-13):
+  - §4 :171-173.
+  - S01-21 K1-K4 (the last-line expectations: :497-500, :513, :532).
+  - S01-22 and S01-23 (the verdict and exit 1 on UNVERIFIED as on FAIL).
+  - §9 :599-603.
+- S02 (V-12/V-13):
+  - S02-S19 (:829-841): `process.exitCode` becomes 1 on FAIL and UNVERIFIED, 0 on PASS, and its Done-when changes.
+  - S02-S17 (the outcome and exit assertions).
+  - §7 row S02-S19 (:868).
+  - §8 item 4 (:896-897).
+  - The trace row §5 (:53).
+- S03 (V-11):
+  - C2-2 (:477-482): the RED case asserts the live codes and the build-integrity wording, where it now asserts `COST_ENVELOPES_NOT_SEALED`.
+  - C2-7 (:598-606): the rewrite.
+  - C2-9 (:636-641): the B3 verdict depends on C2-7.
+  - The trace row R3.4 (:179), the reverse trace (:188), and the occurrence note (:665).
+
+Packet defects in REQ-FIX-p4.md:
+- §1's output says "PLAN.md scaffold corrected", but charge 5 says "do NOT edit PLAN.md". I followed charge 5.
+- §3 requires checks handed forward as scripts, but `allowed` has no probes/ directory.
+- "pass: 4 of 3".
+- Charge 2 cites .worktrees/pes-s01 while the cwd is pes-base. The cited lines are identical in both trees (measured with cmp).
+
+`V-ROW: NEW · S03 · REQ-FIX t_aad48581 · Recommended default:` **leave §11's refusal-table row for `COST_ENVELOPES_NOT_SEALED` (`deploy/vps/README.md:779`) and §10's envelope bullet (`:711-713`) as they are in this slice.** After R3.4 (`SPEC-v2.md:72-83`), §11's sentence calls that code a build-integrity check. The table row will still say the envelopes "are not published yet" and that "a hosted runner refuses to claim work until they are", and §10 will still say a hosted runner "refuses to start with `COST_ENVELOPES_NOT_SEALED`". The shipped docstring calls that code unreachable at runtime (`packages/register/src/runtime-environment.ts:112-115`). A yes costs one requirement (R3.4b), which re-words the `:779` Meaning column and the `:711-713` bullet to R3.4's two facts, in one fix cluster on top of C2. Smallest yes/no for V: **"Should the §11 table row for `COST_ENVELOPES_NOT_SEALED` and §10's envelope bullet be re-worded the way you just ruled for the support-chat sentence?"** · VERDICT: yes, in the same ARCH-FIX S03 p4 as C2-7 / CONFIDENCE: medium / STRONGEST COUNTER: V's ruling named only the sentence, and R3.5's pin keeps the code in §11's table either way; only the row's Meaning text is at issue. (Verbatim in slices/S03/DECISIONS.md, the pass-4 append.)
+
+6 · UNVERIFIED.
+- R1.12's role seed was READ, not run; this node may open no listener and no database. The seed is `publishReplacementRegisterFixture` over the hosted `published` version, with deployment "local". The evidence that it publishes: the DB function checks only that the base is sealed, and its count and hash (`migrations/0055_register_support_publication.sql:689-702`); `validateRows` checks only the shape (`packages/register/src/register-publication.ts:561-572`); and no row-key catalogue was found.
+- The pnpm behaviour the stub reproduces (the `$ tsx` echo, and `[ELIFECYCLE]` on stdout after a non-zero exit) is the ARCH seats' measurement on pnpm 11.20.0 (`V-DECISIONS-PACKET.md:16-17`). I did not re-run pnpm.
+- Neither acceptance command exists yet.
+
+7 · SELF-REPORT: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/agent-reports/REQ-FIX-PES-p4.md (1,408 words; the three causes are priced there, with upgrades ranked by tokens saved).
+
+8 · comments read through: 2

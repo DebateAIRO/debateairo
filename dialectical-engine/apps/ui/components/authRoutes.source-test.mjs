@@ -17,21 +17,29 @@ const shell = read("./AuthShell.tsx");
 const gate = read("./AuthGate.tsx");
 const topBar = read("./TopBar.tsx");
 const settingsPage = read("../app/settings/page.tsx");
+const settingsClient = read("./SettingsPageClient.tsx");
 const styles = read("../app/globals.css");
 const home = read("../app/page.tsx");
 const verifyEmail = read("../app/verify-email/page.tsx");
 const enrollMfa = read("../app/enroll-mfa/page.tsx");
 const packageJson = read("../package.json");
+const authMessages = JSON.parse(read("../messages/en/auth.json"));
 
 test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
   assert.match(login, /client\.beginLogin/);
   assert.match(login, /client\.completeLogin/);
-  assert.match(login, /authenticator or a recovery code/);
-  assert.match(login, /Enter your authentication code\./);
-  assert.match(login, /6-digit authentication code/);
-  assert.match(login, /Use a recovery code/);
-  assert.match(login, /Enter a recovery code\./);
-  assert.match(login, /Back to sign in/);
+  assert.match(login, /t\(catalog, "auth\.login\.securityPolicy"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.authenticatorTitle"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.authenticationCodeLabel"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.useRecoveryCode"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.recoveryTitle"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.backToSignIn"\)/);
+  assert.match(authMessages["auth.login.securityPolicy"], /authenticator or a recovery code/);
+  assert.equal(authMessages["auth.login.authenticatorTitle"], "Enter your authentication code.");
+  assert.equal(authMessages["auth.login.authenticationCodeLabel"], "6-digit authentication code");
+  assert.equal(authMessages["auth.login.useRecoveryCode"], "Use a recovery code");
+  assert.equal(authMessages["auth.login.recoveryTitle"], "Enter a recovery code.");
+  assert.equal(authMessages["auth.login.backToSignIn"], "Back to sign in");
   assert.match(login, /replacement_recovery_code/);
   assert.match(login, /role="alert"/);
   assert.match(login, /window\.location\.assign\(safeReturnPath\(next\)\)/);
@@ -40,13 +48,18 @@ test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
 
 test("sign-up exposes only fields backed by the registration contract", () => {
   assert.match(signUp, /client\.register/);
-  assert.match(signUp, /client\.resendVerification/);
+  assert.doesNotMatch(signUp, /client\.resendVerification/);
   assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
   assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
   assert.match(signUp, /name="adult-affirmed"[\s\S]*?required/);
+  assert.match(signUp, /await client\.register/);
+  assert.match(signUp, /successMessage\(catalog, messageKey\)/);
+  assert.equal(
+    authMessages["auth.signUp.registrationSent"],
+    "If this address can be registered, verification instructions will arrive. Check your spam folder."
+  );
   assert.match(signUp, /name="privacy-accepted"[\s\S]*?required/);
   assert.match(signUp, /name="terms-accepted"[\s\S]*?required/);
-  assert.match(signUp, /result\.message/);
   assert.match(signUp, /role="status"/);
   // `terms` left this list when the Terms of Service became a document in the product
   // (`apps/ui/legal/terms-of-service.md` → `TermsOfServiceModal`); the sign-up card may
@@ -70,8 +83,11 @@ test("every public and protected entry point reaches the dedicated auth routes",
   // SYNC3: dev's 163f15c5 routes the top bar's Account entry to /settings (pinned by
   // dev's tests/render/support-topbar.test.tsx); /settings is behind the AuthGate,
   // which sends a signed-out visitor to /login (the `gate` line below).
-  assert.match(topBar, /href="\/settings"[\s\S]*?>\s*Account\s*</);
-  assert.match(settingsPage, /<AuthGate>/);
+  assert.match(topBar, /href="\/settings"[\s\S]*?>\s*\{t\(catalog, "chrome\.account"\)\}\s*</);
+  // Review F2 (REV-FIX-CATALOGS): the gate now receives the served newDebate
+  // catalogue; the route (settings behind the AuthGate) is unchanged.
+  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} \/>/);
+  assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
   assert.match(login, /useState\("\/sign-up"\)/);
@@ -87,20 +103,20 @@ test("the project home confirms a real session before exposing its debate compos
   // rather than by that copy.
   assert.match(home, /let sessionConfirmed = false/);
   assert.match(home, /sessionConfirmed = true/);
-  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer \/>/);
+  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} \/>/);
   assert.match(home, /id="start-a-debate"/);
-  assert.doesNotMatch(home, /<LibraryComposer \/>[\s\S]*?\{error \?/);
+  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} \/>[\s\S]*?\{error \?/);
 });
 
 test("the login route sends an already-authenticated browser back to its debate workspace", () => {
   // pin updated 2026-09-02: the page reads the session through readSessionCookie
   // (grammar-checked, L3-F5) instead of touching USER_TOKEN_COOKIE directly.
-  assert.match(loginPage, /readSessionCookie\(await cookies\(\)\)/);
+  assert.match(loginPage, /const cookieStore = await cookies\(\);[\s\S]*?readSessionCookie\(cookieStore\)/);
   assert.match(loginPage, /createServerContractClient/);
   assert.match(loginPage, /\.readSession\(\)/);
   assert.match(loginPage, /redirect\("\/#start-a-debate"\)/);
   assert.match(loginPage, /catch \{/);
-  assert.match(loginPage, /return <LoginFlow \/>/);
+  assert.match(loginPage, /return <LoginFlow catalog=\{catalog\} \/>/);
 });
 
 test("verification remains one canonical mailed-link path and production builds gate every auth route", () => {
@@ -143,12 +159,17 @@ test("desktop auth content is the document's 540px card", () => {
 test("auth failures use stable public copy instead of exception text", () => {
   assert.doesNotMatch(login, /failure\.message/);
   assert.doesNotMatch(signUp, /failure\.message/);
-  assert.match(login, /setError\("Sign-in could not be completed\."\)/);
-  assert.match(login, /setError\("Authenticator verification could not be completed\."\)/);
-  assert.match(login, /That recovery code was not accepted/);
-  assert.match(login, /Too many verification attempts/);
-  assert.match(signUp, /setError\("Account creation could not be completed\."\)/);
-  assert.match(signUp, /setError\("Verification instructions could not be resent\."\)/);
+  assert.match(login, /setError\(t\(catalog, "auth\.login\.signInFailed"\)\)/);
+  assert.match(login, /setError\(t\(catalog, "auth\.login\.verificationFailed"\)\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.recoveryCodeRejected"\)/);
+  assert.match(login, /t\(catalog, "auth\.login\.tooManyAttempts"\)/);
+  assert.match(signUp, /setError\(t\(catalog, "auth\.signUp\.creationFailed"\)\)/);
+  assert.doesNotMatch(signUp, /setError\(t\(catalog, "auth\.signUp\.resendFailed"\)\)/);
+  assert.equal(authMessages["auth.login.signInFailed"], "Sign-in could not be completed.");
+  assert.equal(authMessages["auth.login.verificationFailed"], "Authenticator verification could not be completed.");
+  assert.match(authMessages["auth.login.recoveryCodeRejected"], /^That recovery code was not accepted\./);
+  assert.match(authMessages["auth.login.tooManyAttempts"], /^Too many verification attempts\./);
+  assert.equal(authMessages["auth.signUp.creationFailed"], "Account creation could not be completed.");
 });
 
 test("primary and recovery emails occupy distinct autocomplete sections", () => {
@@ -164,7 +185,7 @@ test("primary and recovery emails occupy distinct autocomplete sections", () => 
 
 test("ordinary top bar exposes a neutral account entry without inventing session state", () => {
   // SYNC3: the entry is dev's /settings (163f15c5); still neutral, still no session guess.
-  assert.match(topBar, /href="\/settings"[\s\S]*?>\s*Account\s*</);
+  assert.match(topBar, /href="\/settings"[\s\S]*?>\s*\{t\(catalog, "chrome\.account"\)\}\s*</);
   assert.doesNotMatch(topBar, />\s*Log in\s*</);
   assert.doesNotMatch(topBar, /Signed in|Signed out|authenticated|useSession/);
 });

@@ -1,0 +1,332 @@
+=== toplevel ===
+/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s03-rev-sd
+=== HEAD ===
+98264a5ea837676c869725ede592ca5abcaaf5cb
+=== SPEC.md ===
+-rw-r--r--@ 1 vladmihaimiron  staff  14421 Sep 25 13:17 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/provider-env-selection/slices/S03/SPEC-v3.md
+-rw-r--r--@ 1 vladmihaimiron  staff   9888 Sep 24 13:55 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/provider-env-selection/slices/S03/SPEC.md
+=== PLAN:679 and :946 ===
+--679--
+| B4 `:32-34` | "KEK rotation is not implemented" (§10) is false; it shipped as `pnpm keys:rotate-kek` | §10 still carries the false sentence at `deploy/vps/README.md:703`; `keys:rotate-kek` exists at `package.json:27`; §3 "Changing a master key" exists at `:259` | **LEAVE EXACTLY AS IT IS** — the bullet is true |
+| B5 `:35-38` | `api.env.example` lacked the two support keys (now present); §3's layout table still lists neither `support-kek.bin` nor the support database principal | both keys present (`deploy/vps/env/api.env.example:35` and `:57`); §3's layout table `deploy/vps/README.md:148-167` lists neither | **LEAVE EXACTLY AS IT IS** — the bullet is true |
+
+Remove B1, B2 and B3. Leave B4 and B5 byte-identical.
+- **Done when:** C2-4 passes; and the span from `## Known-stale sections` to the next `\n---\n`
+  contains exactly **2** lines beginning `- `. Named members: B4's first line, B5's first line.
+- **RED when omitted:** C2-4 fails on `§11's hosted provider target example`.
+- **Catches:** removing too few or too many bullets.
+- **Does NOT catch:** B4 or B5 being edited in place rather than left. The `git diff` at `REV(S03)`
+  is what shows that, and `PROGRESS.md` records the verdict per bullet.
+
+--946--
+## 3. Cluster table — build units, one verification command each
+
+Three clusters, **sequential** (C1 → C2 → C3; C3 was added by Revision 4). All three write
+=== freeze stat ===
+ .../packets/ARCH-FIX-S01-p2.md                     |   34 +
+ .../packets/ARCH-FIX-S02-p2.md                     |   33 +
+ .../packets/ARCH-FIX-S02-p3.md                     |   34 +
+ .../packets/ARCH-FIX-S03-p4.md                     |   34 +
+ .../packets/ARCH-REV-S01-p2.md                     |   38 +
+ .../packets/ARCH-REV-S02-p2.md                     |   38 +
+ .../provider-env-selection/packets/BUILD-S01-C1.md |   36 +
+ .../provider-env-selection/packets/BUILD-S02-C1.md |   36 +
+ .../provider-env-selection/packets/BUILD-S02-C2.md |   36 +
+ .../provider-env-selection/packets/BUILD-S03-C2.md |   36 +
+ .../provider-env-selection/packets/BUILD-S03-C3.md |   36 +
+ .../provider-env-selection/packets/COMMON.md       |    2 +-
+ .../provider-env-selection/packets/REQ-FIX-p4.md   |   34 +
+ .../provider-env-selection/packets/REQ-FIX-p5.md   |   34 +
+ .../provider-env-selection/packets/REQ-FIX-p6.md   |   33 +
+ .../reports/provider-env-selection/LEDGER.md       |   30 +
+ .../agent-reports/ARCH-FIX-PES-S01-p2.md           |   81 ++
+ .../agent-reports/ARCH-FIX-PES-S02-p2.md           |   44 +
+ .../agent-reports/ARCH-FIX-PES-S02-p3.md           |   54 +
+ .../agent-reports/ARCH-FIX-PES-S03-p4.md           |  116 ++
+ .../agent-reports/ARCH-REV-PES-S01-p1.md           |   51 +
+ .../agent-reports/ARCH-REV-PES-S02-p1.md           |   44 +
+ .../agent-reports/ARCH-REV-PES-S02-p2.md           |   31 +
+ .../agent-reports/BUILD-PES-S01-C1.md              |   30 +
+ .../agent-reports/BUILD-PES-S02-C1.md              |   34 +
+ .../agent-reports/BUILD-PES-S03-C1.md              |   29 +
+ .../agent-reports/BUILD-PES-S03-C2.md              |   33 +
+ .../agent-reports/BUILD-PES-S03-C3.md              |   35 +
+ .../agent-reports/REQ-FIX-PES-p4.md                |  113 ++
+ .../agent-reports/REQ-FIX-PES-p5.md                |  121 +++
+ .../agent-reports/REQ-FIX-PES-p6.md                |  126 +++
+ .../provider-env-selection/logs/board-ids.env      |    1 +
+ .../logs/gen-archfix-packet.py                     |    2 +-
+ .../logs/gen-archfix-vruling-packet.py             |   54 +
+ .../logs/gen-archrev-packet.py                     |    2 +-
+ .../logs/gen-build-packet-slice.py                 |  131 +++
+ .../logs/gen-build-packet.py                       |   11 +-
+ .../provider-env-selection/logs/gen-rev-packet.py  |    2 +-
+ .../logs/launch-ARCH-REV-PES-S01-p2.sh             |    7 +
+ .../logs/launch-ARCH-REV-PES-S02-p2.sh             |    7 +
+ .../logs/launch-BUILD-PES-S01-C1.sh                |    7 +
+ .../logs/launch-BUILD-PES-S02-C1.sh                |    7 +
+ .../logs/launch-BUILD-PES-S02-C2.sh                |    7 +
+ .../logs/launch-BUILD-PES-S03-C2.sh                |    7 +
+ .../logs/launch-BUILD-PES-S03-C3.sh                |    7 +
+ .../provider-env-selection/logs/watchdog.zsh       |    8 +
+ .../probes/ARCH-FIX-PES-S01-p2/DECISIONS.before    |  251 +++++
+ .../probes/ARCH-FIX-PES-S01-p2/base-C1.sh          |    8 +
+ .../probes/ARCH-FIX-PES-S01-p2/base-C2.sh          |    8 +
+ .../probes/ARCH-FIX-PES-S01-p2/base-C3.sh          |    8 +
+ .../probes/ARCH-FIX-PES-S01-p2/base-C4.sh          |    8 +
+ .../ARCH-FIX-PES-S01-p2/base-all-clusters.sh       |    5 +
+ .../ARCH-FIX-PES-S01-p2/d0-typecheck-proposed.sh   |   10 +
+ .../ARCH-FIX-PES-S01-p2/d1-acceptance-dry-run.sh   |   19 +
+ .../ARCH-FIX-PES-S01-p2/d1-lsof-55432-after.txt    |    2 +
+ .../ARCH-FIX-PES-S01-p2/d1-lsof-55432-before.txt   |    2 +
+ .../probes/ARCH-FIX-PES-S01-p2/d1-rc.txt           |    7 +
+ .../probes/ARCH-FIX-PES-S01-p2/d1-stderr.txt       |    0
+ .../probes/ARCH-FIX-PES-S01-p2/d1-stdout.txt       |   14 +
+ .../probes/ARCH-FIX-PES-S01-p2/d3-exitcode.sh      |   10 +
+ .../probes/ARCH-FIX-PES-S01-p2/d5-mutants.sh       |   18 +
+ .../d6-m3-exitcode-not-exit-stderr.txt             |    0
+ .../d6-m3-exitcode-not-exit-stdout.txt             |    1 +
+ .../ARCH-FIX-PES-S01-p2/d6-proposed-stderr.txt     |    0
+ .../ARCH-FIX-PES-S01-p2/d6-proposed-stdout.txt     |    1 +
+ .../probes/ARCH-FIX-PES-S01-p2/d6-unverified.sh    |   16 +
+ .../debug/d2-role-seed-debug.ts                    |   40 +
+ .../ARCH-FIX-PES-S01-p2/debug/d3-exitcode-db.ts    |    8 +
+ .../ARCH-FIX-PES-S01-p2/debug/d3-exitcode-plain.ts |    3 +
+ .../debug/d4-role-seed-remedy.ts                   |   60 ++
+ .../probes/ARCH-FIX-PES-S01-p2/edit_lib.py         |   12 +
+ .../m1-no-role-check-lsof-55432-after.txt          |    2 +
+ .../m1-no-role-check-lsof-55432-before.txt         |    2 +
+ .../ARCH-FIX-PES-S01-p2/m1-no-role-check-rc.txt    |    7 +
+ .../m1-no-role-check-stderr.txt                    |    0
+ .../m1-no-role-check-stdout.txt                    |   14 +
+ .../hosted-provider-set-publish-cli.ts             |   58 +
+ .../m1-no-role-check/hosted-provider-set.ts        |  263 +++++
+ .../m1-no-role-check/p8-acceptance-dry-run.ts      |   93 ++
+ .../m1-no-role-check/pes-accept-publish-set.ts     |   96 ++
+ .../pes-s01-publish-set-acceptance.ts              |  211 ++++
+ .../m2-refuse-any-role-row-lsof-55432-after.txt    |    2 +
+ .../m2-refuse-any-role-row-lsof-55432-before.txt   |    2 +
+ .../m2-refuse-any-role-row-rc.txt                  |    7 +
+ .../m2-refuse-any-role-row-stderr.txt              |    0
+ .../m2-refuse-any-role-row-stdout.txt              |   14 +
+ .../hosted-provider-set-publish-cli.ts             |   58 +
+ .../m2-refuse-any-role-row/hosted-provider-set.ts  |  264 +++++
+ .../p8-acceptance-dry-run.ts                       |   93 ++
+ .../pes-accept-publish-set.ts                      |   96 ++
+ .../pes-s01-publish-set-acceptance.ts              |  211 ++++
+ .../m3-exitcode-not-exit-lsof-55432-after.txt      |    2 +
+ .../m3-exitcode-not-exit-lsof-55432-before.txt     |    2 +
+ .../m3-exitcode-not-exit-rc.txt                    |    7 +
+ .../m3-exitcode-not-exit-stderr.txt                |    0
+ .../m3-exitcode-not-exit-stdout.txt                |   14 +
+ .../hosted-provider-set-publish-cli.ts             |   58 +
+ .../m3-exitcode-not-exit/hosted-provider-set.ts    |  263 +++++
+ .../m3-exitcode-not-exit/p8-acceptance-dry-run.ts  |   93 ++
+ .../m3-exitcode-not-exit/pes-accept-publish-set.ts |   96 ++
+ .../pes-s01-publish-set-acceptance.ts              |  211 ++++
+ .../m4-two-row-seed-lsof-55432-after.txt           |    2 +
+ .../m4-two-row-seed-lsof-55432-before.txt          |    2 +
+ .../ARCH-FIX-PES-S01-p2/m4-two-row-seed-rc.txt     |    7 +
+ .../ARCH-FIX-PES-S01-p2/m4-two-row-seed-stderr.txt |    0
+ .../ARCH-FIX-PES-S01-p2/m4-two-row-seed-stdout.txt |   13 +
+ .../hosted-provider-set-publish-cli.ts             |   58 +
+ .../m4-two-row-seed/hosted-provider-set.ts         |  264 +++++
+ .../m4-two-row-seed/p8-acceptance-dry-run.ts       |   93 ++
+ .../m4-two-row-seed/pes-accept-publish-set.ts      |   96 ++
+ .../pes-s01-publish-set-acceptance.ts              |  211 ++++
+ .../proposed/hosted-provider-set-publish-cli.ts    |   58 +
+ .../proposed/hosted-provider-set.ts                |  264 +++++
+ .../proposed/p8-acceptance-dry-run.ts              |   93 ++
+ .../proposed/pes-accept-publish-set.ts             |   96 ++
+ .../proposed/pes-s01-publish-set-acceptance.ts     |  211 ++++
+ .../probes/ARCH-FIX-PES-S01-p2/trace_check.py      |   45 +
+ .../ARCH-FIX-PES-S01-p2/tsconfig.proposed.json     |   13 +
+ .../probes/ARCH-FIX-PES-S02-p2/C1-base.sh          |   19 +
+ .../probes/ARCH-FIX-PES-S02-p2/C2-C3-base.sh       |   13 +
+ .../ARCH-FIX-PES-S02-p2/PLAN-p1-as-reviewed.md     |  851 +++++++++++++++
+ .../probes/ARCH-FIX-PES-S02-p2/anchors.sh          |   12 +
+ .../probes/ARCH-FIX-PES-S02-p2/b1-lookup-shapes.sh |   14 +
+ .../probes/ARCH-FIX-PES-S02-p2/b1-lookup-shapes.ts |  104 ++
+ .../probes/ARCH-FIX-PES-S02-p2/b1-promisify.mjs    |    9 +
+ .../probes/ARCH-FIX-PES-S02-p2/b1-tsc-mutant.sh    |   15 +
+ .../probes/ARCH-FIX-PES-S02-p2/fix-detectors.py    |   43 +
+ .../probes/ARCH-FIX-PES-S02-p2/fix-detectors.sh    |    7 +
+ .../probes/ARCH-FIX-PES-S02-p2/plan-selfcheck.sh   |   28 +
+ .../probes/ARCH-FIX-PES-S02-p2/rev-C1-base.sh      |   15 +
+ .../probes/ARCH-FIX-PES-S02-p2/trace-mutant.sh     |   12 +
+ .../probes/ARCH-FIX-PES-S02-p3/C1-base.sh          |   19 +
+ .../probes/ARCH-FIX-PES-S02-p3/C2-C3-base.sh       |   13 +
+ .../probes/ARCH-FIX-PES-S02-p3/PLAN-rev2.md        |  949 +++++++++++++++++
+ .../probes/ARCH-FIX-PES-S02-p3/REV-base-step4.sh   |   10 +
+ .../probes/ARCH-FIX-PES-S02-p3/cli-block-run.sh    |   49 +
+ .../probes/ARCH-FIX-PES-S02-p3/color-warning.sh    |    5 +
+ .../ARCH-FIX-PES-S02-p3/exit-rule-detectors.py     |   46 +
+ .../ARCH-FIX-PES-S02-p3/exit-rule-detectors.sh     |   10 +
+ .../probes/ARCH-FIX-PES-S02-p3/p2-detectors.sh     |    4 +
+ .../probes/ARCH-FIX-PES-S02-p3/plan-selfcheck.sh   |   28 +
+ .../probes/ARCH-FIX-PES-S02-p3/pnpm-exit-rule.sh   |   39 +
+ .../ARCH-FIX-PES-S02-p3/selfcheck-mutants.sh       |   21 +
+ .../probes/ARCH-FIX-PES-S03-p4/DECISIONS-before.md |  184 ++++
+ .../probes/ARCH-FIX-PES-S03-p4/PLAN-at-rev3.md     |  809 ++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/READY.txt           |   58 +
+ .../probes/ARCH-FIX-PES-S03-p4/added-lines.txt     |  342 ++++++
+ .../probes/ARCH-FIX-PES-S03-p4/c1-cluster.sh       |    9 +
+ .../probes/ARCH-FIX-PES-S03-p4/c2-cluster.sh       |    9 +
+ .../probes/ARCH-FIX-PES-S03-p4/c3-block.md         |  240 +++++
+ .../probes/ARCH-FIX-PES-S03-p4/c3-cluster.sh       |    9 +
+ .../probes/ARCH-FIX-PES-S03-p4/citations.mjs       |   51 +
+ .../probes/ARCH-FIX-PES-S03-p4/claim.txt           |    8 +
+ .../probes/ARCH-FIX-PES-S03-p4/frozen-pre.sha256   |    4 +
+ .../probes/ARCH-FIX-PES-S03-p4/gate.mjs            |  270 +++++
+ .../ARCH-FIX-PES-S03-p4/gen-c3-no-note-case.ts     |   83 ++
+ .../probes/ARCH-FIX-PES-S03-p4/gen-c3.ts           |   95 ++
+ .../probes/ARCH-FIX-PES-S03-p4/gen-regressions.ts  |  184 ++++
+ .../rev3-check-reviewer-copy.mjs                   |  332 ++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/M_angle.md   |  872 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_bulletGone.md     |  864 +++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_bulletKeeps.md    |  872 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_bulletOld.md      |  873 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/M_keepold.md |  872 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_noIntegrity.md    |  872 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/M_noLive.md  |  872 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_rowAbove.md       |  872 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_rowDropped.md     |  871 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/M_rowOld.md  |  872 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_rowOutside.md     |  873 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/M_rowTail.md |  872 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_rowTwice.md       |  873 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_staleElsewhere.md |  874 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/M_swap.md    |  874 ++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/states/M_thirdMention.md   |  874 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/S0.md        |  874 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/S1.md        |  873 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/S2.md        |  873 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/S3.md        |  872 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/states/S3w.md       |  878 ++++++++++++++++
+ .../probes/ARCH-FIX-PES-S03-p4/trace-mutants.sh    |   11 +
+ .../trace-mutants/no-C35-reverse.md                | 1103 ++++++++++++++++++++
+ .../trace-mutants/no-R34b-row.md                   | 1102 +++++++++++++++++++
+ .../ARCH-FIX-PES-S03-p4/trace-reviewer-p1-copy.sh  |   40 +
+ .../probes/ARCH-FIX-PES-S03-p4/trace.sh            |   43 +
+ .../probes/ARCH-FIX-PES-S03-p4/verify-all.sh       |   17 +
+ .../probes/ARCH-REV-PES-S01-p1/base-C1.sh          |   12 +
+ .../probes/ARCH-REV-PES-S01-p1/base-C2.sh          |   10 +
+ .../probes/ARCH-REV-PES-S01-p1/base-C3.sh          |   12 +
+ .../probes/ARCH-REV-PES-S01-p1/base-C4.sh          |   10 +
+ .../probes/ARCH-REV-PES-S01-p1/lsof-notouch.txt    |   32 +
+ .../ARCH-REV-PES-S01-p1/missing-path-broken.sh     |    7 +
+ .../ARCH-REV-PES-S01-p1/p2-lsof-55432-after.txt    |    2 +
+ .../ARCH-REV-PES-S01-p1/p2-lsof-55432-before.txt   |    2 +
+ .../ARCH-REV-PES-S01-p1/p8-lsof-55432-after.txt    |    2 +
+ .../ARCH-REV-PES-S01-p1/p8-lsof-55432-before.txt   |    2 +
+ .../probes/ARCH-REV-PES-S01-p1/p8-rc.txt           |    7 +
+ .../probes/ARCH-REV-PES-S01-p1/p8-stderr.txt       |    0
+ .../probes/ARCH-REV-PES-S01-p1/p8-stdout.txt       |   12 +
+ .../ARCH-REV-PES-S01-p1/pnpm-clean-stderr.txt      |    1 +
+ .../ARCH-REV-PES-S01-p1/pnpm-clean-stdout.txt      |    1 +
+ .../probes/ARCH-REV-PES-S01-p1/pnpm-success-rc.txt |    1 +
+ .../ARCH-REV-PES-S01-p1/pnpm-success-stderr.txt    |    7 +
+ .../ARCH-REV-PES-S01-p1/pnpm-success-stdout.txt    |    1 +
+ .../probes/ARCH-REV-PES-S01-p1/pnpm-version.txt    |    1 +
+ .../ARCH-REV-PES-S01-p1/scratch/trace-parser.py    |  105 ++
+ .../probes/ARCH-REV-PES-S02-p1/C1-base.sh          |   15 +
+ .../probes/ARCH-REV-PES-S02-p1/C2-C3-absent.sh     |   11 +
+ .../scratch/pnpm-stream/fail.err                   |    3 +
+ .../scratch/pnpm-stream/package.json               |    1 +
+ .../probes/ARCH-REV-PES-S02-p2/C1-base.sh          |   17 +
+ .../probes/ARCH-REV-PES-S02-p2/C2-C3-absent.sh     |   11 +
+ .../probes/ARCH-REV-PES-S02-p2/C2-C3-broken.sh     |   15 +
+ .../probes/ARCH-REV-PES-S02-p2/b1-lookup-shapes.sh |   10 +
+ .../probes/ARCH-REV-PES-S02-p2/b1-lookup-shapes.ts |  104 ++
+ .../probes/ARCH-REV-PES-S02-p2/cli-block-run.sh    |   49 +
+ .../ARCH-REV-PES-S02-p2/exit-rule-detectors.py     |   46 +
+ .../probes/ARCH-REV-PES-S02-p2/fix-detectors.py    |   43 +
+ .../probes/ARCH-REV-PES-S02-p2/hang-resolveAll.mjs |   58 +
+ .../probes/ARCH-REV-PES-S02-p2/pnpm-exit-rule.sh   |   39 +
+ .../scratch/PLAN-anchor-mutant.md                  | 1003 ++++++++++++++++++
+ .../cli-block-run/acceptance/pes-s02-hosted-cli.ts |    9 +
+ .../cli-block-run/acceptance/pes-s02-hosted.ts     |    8 +
+ .../scratch/cli-block-run/package.json             |    1 +
+ .../scratch/color-off/package.json                 |    1 +
+ .../scratch/pnpm-exit-rule/package.json            |    1 +
+ .../probes/ARCH-REV-PES-S02-p2/trace.py            |  130 +++
+ .../probes/BUILD-PES-S01-C1/S01-00-claim.md        |   35 +
+ .../probes/BUILD-PES-S01-C1/S01-05-READY.md        |  110 ++
+ .../probes/BUILD-PES-S02-C1/READY.md               |  144 +++
+ .../probes/BUILD-PES-S02-C1/S00-claim.txt          |   20 +
+ .../BUILD-PES-S02-C1/S08-refutation-evidence.json  |  240 +++++
+ .../BUILD-PES-S02-C1/S10-PROGRESS-records.md       |   31 +
+ .../BUILD-PES-S02-C1/S11-comments-read-count.txt   |    1 +
+ .../dev-api-environment.green-snapshot.ts          |  614 +++++++++++
+ .../dev-api-process.green-snapshot.ts              |  408 ++++++++
+ .../dev-runner-process.green-snapshot.ts           |  236 +++++
+ .../BUILD-PES-S02-C1/refutation-properties.md      |    9 +
+ .../probes/REQ-FIX-PES-p4/READY.txt                |  148 +++
+ .../probes/REQ-FIX-PES-p4/S01-DECISIONS.before     |  227 ++++
+ .../probes/REQ-FIX-PES-p4/S02-DECISIONS.before     |  100 ++
+ .../probes/REQ-FIX-PES-p4/S03-DECISIONS.before     |  129 +++
+ .../probes/REQ-FIX-PES-p4/detectors_on_v4.py       |   10 +
+ .../probes/REQ-FIX-PES-p4/make_s01_v4.py           |  138 +++
+ .../probes/REQ-FIX-PES-p4/make_s02_v4.py           |   41 +
+ .../probes/REQ-FIX-PES-p4/make_s03_v2.py           |   45 +
+ .../probes/REQ-FIX-PES-p4/p3_on_v4.py              |   11 +
+ .../probes/REQ-FIX-PES-p4/p4-runs.txt              |   95 ++
+ .../probes/REQ-FIX-PES-p4/p4_checks.py             |  248 +++++
+ .../probes/REQ-FIX-PES-p4/p4_mutants.py            |   74 ++
+ .../probes/REQ-FIX-PES-p5/checks.py                |  184 ++++
+ .../probes/REQ-FIX-PES-p5/make_spec_v3.py          |   67 ++
+ .../probes/REQ-FIX-PES-p5/mutants.py               |   65 ++
+ .../probes/REQ-FIX-PES-p5/runs.txt                 |   92 ++
+ .../probes/REQ-FIX-PES-p6/checks.py                |  207 ++++
+ .../probes/REQ-FIX-PES-p6/make_spec_v5.py          |   75 ++
+ .../probes/REQ-FIX-PES-p6/mutants.py               |   68 ++
+ .../probes/REQ-FIX-PES-p6/runs.txt                 |  125 +++
+ .../review-packages/S03-p1/README.md               |   31 +
+ .../review-packages/S03-p1/commits.txt             |    3 +
+ .../review-packages/S03-p1/diff-stat.txt           |    3 +
+ .../review-packages/S03-p1/diff.patch              |  277 +++++
+ .../review-packages/S03-p1/listeners.txt           |    8 +
+ .../provider-env-selection/INSTRUCTIONS.md         |   16 +-
+ .../provider-env-selection/V-DECISIONS-PACKET.md   |   19 +
+ .../reviews/ARCH-REV-S01-p1.md                     |   88 ++
+ .../reviews/ARCH-REV-S02-p1.md                     |   64 ++
+ .../reviews/ARCH-REV-S02-p2.md                     |  102 ++
+ .../provider-env-selection/slices/S01/DECISIONS.md |  109 ++
+ .../provider-env-selection/slices/S01/PLAN.md      |  330 ++++--
+ .../provider-env-selection/slices/S01/SPEC-v4.md   |  350 +++++++
+ .../provider-env-selection/slices/S01/SPEC-v5.md   |  365 +++++++
+ .../provider-env-selection/slices/S02/DECISIONS.md |   54 +
+ .../provider-env-selection/slices/S02/PLAN.md      |  256 ++++-
+ .../provider-env-selection/slices/S02/SPEC-v4.md   |  270 +++++
+ .../provider-env-selection/slices/S03/DECISIONS.md |   88 ++
+ .../provider-env-selection/slices/S03/PLAN.md      |  340 +++++-
+ .../provider-env-selection/slices/S03/SPEC-v2.md   |  166 +++
+ .../provider-env-selection/slices/S03/SPEC-v3.md   |  194 ++++
+ 279 files changed, 40399 insertions(+), 195 deletions(-)
+=== product stat vs origin/dev ===
+ dialectical-engine/deploy/vps/README.md            |  45 +++---
+ .../unit/v9-provider-credential-files.test.ts      | 166 +++++++++++++++++++++
+ 2 files changed, 192 insertions(+), 19 deletions(-)
+=== apps packages ===
+=== capability proof origin/dev~200...origin/dev apps packages ===
+ dialectical-engine/apps/api/package.json           |    2 +-
+ dialectical-engine/apps/api/src/account-erasure.ts |    6 +-
+ dialectical-engine/apps/api/src/admission.ts       |  118 +
+ dialectical-engine/apps/api/src/boot-custody.ts    |  154 +
+ dialectical-engine/apps/api/src/client-ip.ts       |   33 +
+ .../apps/api/src/graceful-shutdown.ts              |  126 +-
+ dialectical-engine/apps/api/src/index.ts           | 1396 ++++++-
+ dialectical-engine/apps/api/src/mail-channel.ts    |   33 +-
+ dialectical-engine/apps/api/src/main.ts            |  477 ++-
+ dialectical-engine/apps/api/src/mfa.ts             |   16 +-
+ .../apps/api/src/provider-discovery.ts             |   88 +-
+ dialectical-engine/apps/api/src/publications.ts    |    8 +-
+ dialectical-engine/apps/api/src/recovery.ts        |    4 +-
+ dialectical-engine/apps/api/src/registration.ts    |   68 +-
+ .../apps/api/src/risk-signal-identity.ts           |  129 +
+ dialectical-engine/apps/api/src/sessions.ts        |  115 +-
+ dialectical-engine/apps/api/src/support/answer.ts  |  240 +-
+ .../apps/api/src/support/c3-admission.ts           |   26 +-
+ dialectical-engine/apps/api/src/support/cases.ts   |  112 +-
+ .../apps/api/src/support/classify.ts               |   56 +-
+=== architecture path empty? ===

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
@@ -11,6 +12,12 @@ function uiSource(relativePath: string): string {
     fileURLToPath(new URL(`../../apps/ui/${relativePath}`, import.meta.url)),
     "utf8"
   );
+}
+
+function englishCatalog(namespace: string): Readonly<Record<string, string>> {
+  return JSON.parse(
+    readFileSync(resolve(process.cwd(), `apps/ui/messages/en/${namespace}.json`), "utf8")
+  ) as Readonly<Record<string, string>>;
 }
 
 describe("S10 self-service erasure UI", () => {
@@ -52,26 +59,45 @@ describe("S10 self-service erasure UI", () => {
   });
 
   it("requires an exact account-deletion confirmation and targetless DELETE_ACCOUNT step-up", () => {
+    const settingsEnglish = englishCatalog("settings");
     for (const [control, settings] of [
-      [uiSource("components/AccountErasureControls.tsx"), uiSource("app/settings/page.tsx")]
+      [uiSource("components/AccountErasureControls.tsx"), uiSource("components/SettingsPageClient.tsx")]
     ]) {
       expect(settings).toContain("<AccountErasureControls");
-      expect(control).toContain('const CONFIRMATION = "DELETE MY ACCOUNT"');
+      // V 2026-09-26 ("Translate it"): the typed phrase comes from the reader's
+      // catalogue; English stays exact and byte-identical, and the API wire
+      // literal is untouched (the contract client sends it).
+      expect(control).toContain('t(catalog, "settings.erasure.confirmationPhrase")');
+      expect(control).toContain('if (locale === "en") return typed === phrase;');
+      expect(settingsEnglish["settings.erasure.confirmationPhrase"]).toBe("DELETE MY ACCOUNT");
       expect(control).toContain('action: "DELETE_ACCOUNT"');
       expect(control).not.toContain("target_run_id");
       expect(control).toContain("scheduleAccountErasure(grant.token)");
       expect(control).toContain("readAccountErasure()");
       expect(control).toContain("cancelAccountErasure(current.cancellation_ref)");
-      expect(control).toContain("seven full days");
+      expect(control).toContain('t(catalog, "settings.erasure.hint")');
+      expect(settingsEnglish["settings.erasure.hint"]).toBe(
+        "Deletion begins after seven full days. You can cancel before it begins. Schedule, cancellation, " +
+        "and completion notices are sent to every bound email or recovery email; at least one verified " +
+        "channel is required."
+      );
       expect(control).toContain("ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED");
-      expect(control).toContain("email or recovery email");
+      expect(control).toContain('t(catalog, "settings.erasure.notificationChannelRequired")');
+      expect(settingsEnglish["settings.erasure.notificationChannelRequired"]).toBe(
+        "Add and verify an email or recovery email before scheduling deletion."
+      );
       expect(control).toContain('scheduled.status === "PROCESSING"');
-      expect(control).toContain("Irreversible deletion is processing");
+      expect(control).toContain('t(catalog, "settings.erasure.processing")');
+      expect(settingsEnglish["settings.erasure.processing"]).toBe(
+        "Irreversible deletion is processing. Scheduling and cancellation are no longer available."
+      );
       expect(control).not.toMatch(/admin|operator|DSAR/i);
     }
   });
 
   it("offers deletion only for a private debate with an exact run-targeted grant", () => {
+    const publicEnglish = englishCatalog("public");
+    const debateChromeEnglish = englishCatalog("debateChrome");
     const surfaces = [
       [uiSource("components/PublicationControl.tsx"), uiSource("app/debate/[id]/DebatePageClient.tsx"),
         "onPrivateDeletion={purgePrivateDebate}"]
@@ -82,10 +108,19 @@ describe("S10 self-service erasure UI", () => {
       expect(control).toContain('action: "DELETE_PRIVATE_DEBATE"');
       expect(control).toContain("target_run_id: runId");
       expect(control).toContain("deletePrivateDebate(runId, grant.token)");
-      expect(control).toContain("permanently unreadable");
+      expect(control).toContain('t(catalog, "public.publication.deleteExplanation")');
+      expect(publicEnglish["public.publication.deleteExplanation"]).toBe(
+        "Deleting destroys the private content keys and makes encrypted debate content permanently unreadable. " +
+        "This cannot be undone. Claimed legacy plaintext is retained and will not be reported as cleaned."
+      );
       expect(control).toContain('status === "CLEANED"');
       expect(debate).toContain('privateDeletionStatus!==null');
-      expect(debate).toContain("Private content is no longer available");
+      expect(debate).toContain(
+        't(debateChromeCatalog, "debateChrome.privateDebateDeletionProcessingDetail")'
+      );
+      expect(debateChromeEnglish["debateChrome.privateDebateDeletionProcessingDetail"]).toBe(
+        "Private content is no longer available while durable key cleanup finishes."
+      );
       expect(control).toContain("LEGACY_CONTENT_RETAINED");
       expect(control).toContain("DEBATE_MUST_BE_PRIVATE");
     }

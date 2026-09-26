@@ -1,0 +1,21 @@
+{
+  "time.justNow": "अभी-अभी",
+  "time.minutes.one": "{count} मिनट पहले",
+  "time.minutes.other": "{count} मिनट पहले",
+  "time.hours.one": "{count} घंटे पहले",
+  "time.hours.other": "{count} घंटे पहले",
+  "time.yesterday": "कल",
+  "time.days.one": "{count} दिन पहले",
+  "time.days.other": "{count} दिन पहले",
+  "time.weeks.one": "{count} सप्ताह पहले",
+  "time.weeks.other": "{count} सप्ताह पहले",
+  "time.status.complete": "पूर्ण",
+  "time.status.queued": "कतार में",
+  "time.status.claimed": "ग्रहण किया गया",
+  "time.status.running": "चल रहा है",
+  "time.status.holding": "प्रदाता बहाली के लिए रोका गया",
+  "time.status.settled": "निपटाया गया",
+  "time.status.generating": "जनरेट हो रहा है",
+  "time.status.failed": "विफल",
+  "time.status.draft": "प्रारूप"
+}

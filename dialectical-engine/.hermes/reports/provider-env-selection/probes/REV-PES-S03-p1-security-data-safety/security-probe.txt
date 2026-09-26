@@ -1,0 +1,167 @@
+row_codes 17
+  ROW DEPLOYMENT_MODE_UNRESOLVED
+  ROW DEPLOYMENT_MODE_INVALID
+  ROW PROVIDER_BASE_URL_TLS_REQUIRED
+  ROW PROVIDER_TARGET_LOOPBACK_REFUSED
+  ROW PROVIDER_INLINE_CREDENTIAL_REFUSED
+  ROW PROVIDER_AUTHORIZATION_FILE_ABSENT
+  ROW PROVIDER_AUTHORIZATION_FILE_UNUSABLE
+  ROW COST_ENVELOPES_NOT_SEALED
+  ROW RUNNER_PRIMARY_PROVIDER_REF_DRIFT
+  ROW SUPPORT_MODEL_CREDENTIAL_ABSENT
+  ROW SUPPORT_MODEL_PATH_NOT_RATIFIED
+  ROW PROVIDER_DISCOVERY_TARGET_PRICE_INVALID
+  ROW PROVIDER_TARGET_PRICE_REQUIRED
+  ROW PROVIDER_TARGET_PRICE_ZERO
+  ROW COST_ENVELOPE_POLICY_UNRESOLVED
+  ROW COST_ENVELOPE_POLICY_INVALID
+  ROW SUPPORT_ADMISSION_SCOPES_NOT_SEALED
+nested ['CUSTODY_GROUP_UNRESOLVED', 'DEBATEAI_DEPLOYMENT_MODE', 'PROVIDER_CREDENTIAL_FILE_ABSENT', 'PROVIDER_CREDENTIAL_FILE_INVALID', 'PROVIDER_DISCOVERY_TARGETS_JSON', 'PROVIDER_REF', 'REGISTER_VERSION', 'SECRET_CUSTODY_INVALID', 'SUPPORT_MODEL_TARGET_JSON']
+heading='### What the hosted mode refuses, in code'
+union_size=12
+E1 n=3 ['SECRET_CUSTODY_INVALID', 'CUSTODY_GROUP_UNRESOLVED', 'PROVIDER_CREDENTIAL_FILE_INVALID']
+E2 n=1 ['PROVIDER_CREDENTIAL_FILE_ABSENT']
+E3 n=2 ['SUPPORT_MODEL_PATH_NOT_RATIFIED', 'SUPPORT_MODEL_CREDENTIAL_ABSENT']
+E4 n=2 ['PROVIDER_TARGET_PRICE_REQUIRED', 'PROVIDER_TARGET_PRICE_ZERO']
+E5 n=1 ['PROVIDER_DISCOVERY_TARGET_PRICE_INVALID']
+E6a n=1 ['COST_ENVELOPE_POLICY_INVALID']
+E6b n=1 ['COST_ENVELOPE_POLICY_UNRESOLVED']
+E7 n=2 ['SUPPORT_ADMISSION_SCOPES_NOT_SEALED', 'SUPPORT_ADMISSION_SCOPES_NOT_SEALED']
+enumerated_missing_from_refusal_span=[]
+V8_in_span:
+  RUN_COST_ENVELOPE_MONEY_REACHED count=0
+  PROVIDER_USAGE_UNREPORTED count=0
+  COST_ENVELOPE_CHARGE_UNREPRESENTABLE count=0
+  DAILY_COST_ENVELOPE_REACHED count=0
+V9_in_span:
+  PROVIDER_DISCOVERY_TARGETS_INVALID count=0
+  PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID count=0
+  PROVIDER_DISCOVERY_TARGET_DUPLICATE count=0
+  PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID count=0
+--- throw sites ---
+CODE DEPLOYMENT_MODE_UNRESOLVED hits=2 throwish=0
+  mention	packages/register/src/runtime-environment.ts:66	readonly code = "DEPLOYMENT_MODE_UNRESOLVED";
+  mention	packages/register/src/runtime-environment.ts:69	super("DEPLOYMENT_MODE_UNRESOLVED");
+CODE DEPLOYMENT_MODE_INVALID hits=2 throwish=0
+  mention	packages/register/src/runtime-environment.ts:76	readonly code = "DEPLOYMENT_MODE_INVALID";
+  mention	packages/register/src/runtime-environment.ts:79	super("DEPLOYMENT_MODE_INVALID");
+CODE PROVIDER_BASE_URL_TLS_REQUIRED hits=3 throwish=2
+  throw-line	packages/providers/src/index.ts:613	throw new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${target.providerRef}`);
+  throw-line	packages/providers/src/index.ts:646	throw new TypeError(`PROVIDER_BASE_URL_TLS_REQUIRED:${target.providerRef}`);
+CODE PROVIDER_TARGET_LOOPBACK_REFUSED hits=3 throwish=2
+  throw-window	packages/providers/src/index.ts:648	// C-I3: one code for the whole class. `PROVIDER_TARGET_LOOPBACK_REFUSED` is
+  throw-line	packages/providers/src/index.ts:652	throw new TypeError(`PROVIDER_TARGET_LOOPBACK_REFUSED:${target.providerRef}`);
+CODE PROVIDER_INLINE_CREDENTIAL_REFUSED hits=2 throwish=1
+  throw-line	packages/providers/src/index.ts:655	throw new TypeError(`PROVIDER_INLINE_CREDENTIAL_REFUSED:${target.providerRef}`);
+CODE PROVIDER_AUTHORIZATION_FILE_ABSENT hits=1 throwish=1
+  throw-line	packages/providers/src/index.ts:784	throw new TypeError(`PROVIDER_AUTHORIZATION_FILE_ABSENT:${target.providerRef}`);
+CODE PROVIDER_AUTHORIZATION_FILE_UNUSABLE hits=3 throwish=2
+  throw-window	packages/providers/src/index.ts:787	`PROVIDER_AUTHORIZATION_FILE_UNUSABLE:${target.providerRef}:${providerCredentialRefusalCode(error)}`
+  throw-window	packages/providers/src/index.ts:794	`PROVIDER_AUTHORIZATION_FILE_UNUSABLE:${target.providerRef}:PROVIDER_CREDENTIAL_FILE_INVALID`
+CODE COST_ENVELOPES_NOT_SEALED hits=3 throwish=0
+  mention	packages/register/src/runtime-environment.ts:113	* source it always parses and `COST_ENVELOPES_NOT_SEALED` is unreachable at
+  mention	packages/register/src/runtime-environment.ts:144	readonly code = "COST_ENVELOPES_NOT_SEALED";
+  mention	packages/register/src/runtime-environment.ts:147	super("COST_ENVELOPES_NOT_SEALED");
+CODE RUNNER_PRIMARY_PROVIDER_REF_DRIFT hits=2 throwish=1
+  throw-line	apps/runner/src/provider-topology.ts:76	throw new TypeError("RUNNER_PRIMARY_PROVIDER_REF_DRIFT");
+CODE SUPPORT_MODEL_CREDENTIAL_ABSENT hits=3 throwish=1
+  throw-line	apps/api/src/support/model.ts:248	throw new SupportModelError("SUPPORT_MODEL_CREDENTIAL_ABSENT");
+CODE SUPPORT_MODEL_PATH_NOT_RATIFIED hits=7 throwish=3
+  throw-line	apps/api/src/support/model.ts:133	throw new SupportModelError("SUPPORT_MODEL_PATH_NOT_RATIFIED");
+  throw-line	apps/api/src/support/model.ts:431	throw new SupportModelError("SUPPORT_MODEL_PATH_NOT_RATIFIED");
+  throw-line	apps/api/src/support/model.ts:445	throw new SupportModelError("SUPPORT_MODEL_PATH_NOT_RATIFIED");
+CODE PROVIDER_DISCOVERY_TARGET_PRICE_INVALID hits=2 throwish=2
+  throw-line	packages/providers/src/index.ts:195	throw new TypeError("PROVIDER_DISCOVERY_TARGET_PRICE_INVALID");
+  throw-line	packages/providers/src/index.ts:278	throw new TypeError("PROVIDER_DISCOVERY_TARGET_PRICE_INVALID");
+CODE PROVIDER_TARGET_PRICE_REQUIRED hits=2 throwish=2
+  throw-line	apps/runner/src/main.ts:117	throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
+  throw-line	packages/providers/src/index.ts:687	throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
+CODE PROVIDER_TARGET_PRICE_ZERO hits=1 throwish=1
+  throw-line	packages/providers/src/index.ts:700	throw new TypeError(`PROVIDER_TARGET_PRICE_ZERO:${target.providerRef}`);
+CODE COST_ENVELOPE_POLICY_UNRESOLVED hits=2 throwish=1
+  throw-window	packages/register/src/cost-envelope-policy.ts:165	"COST_ENVELOPE_POLICY_UNRESOLVED",
+CODE COST_ENVELOPE_POLICY_INVALID hits=2 throwish=1
+  throw-window	packages/register/src/cost-envelope-policy.ts:133	"COST_ENVELOPE_POLICY_INVALID",
+CODE SUPPORT_ADMISSION_SCOPES_NOT_SEALED hits=2 throwish=0
+  mention	packages/register/src/runtime-environment.ts:176	readonly code = "SUPPORT_ADMISSION_SCOPES_NOT_SEALED";
+  mention	packages/register/src/runtime-environment.ts:179	super("SUPPORT_ADMISSION_SCOPES_NOT_SEALED");
+CODE CUSTODY_GROUP_UNRESOLVED hits=4 throwish=0
+  mention	packages/crypto/src/index.ts:153	super("CUSTODY_GROUP_UNRESOLVED", "CUSTODY_GROUP_UNRESOLVED");
+  mention	packages/crypto/src/index.ts:630	* `CUSTODY_GROUP_UNRESOLVED` is thrown here, before the first key is opened.
+  mention	packages/providers/src/index.ts:735	* never see. `CUSTODY_GROUP_UNRESOLVED` stays: the group is resolved eagerly at
+  mention	packages/providers/src/index.ts:742	"CUSTODY_GROUP_UNRESOLVED",
+CODE DEBATEAI_DEPLOYMENT_MODE hits=5 throwish=2
+  throw-window	packages/register/src/runtime-environment.ts:482	environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
+  throw-window	packages/register/src/runtime-environment.ts:620	environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
+CODE PROVIDER_CREDENTIAL_FILE_ABSENT hits=3 throwish=0
+  mention	packages/crypto/src/index.ts:181	super("PROVIDER_CREDENTIAL_FILE_ABSENT", "PROVIDER_CREDENTIAL_FILE_ABSENT");
+  mention	packages/providers/src/index.ts:725	const PROVIDER_CREDENTIAL_ABSENT_CODE = "PROVIDER_CREDENTIAL_FILE_ABSENT";
+  mention	packages/providers/src/index.ts:733	* it to `PROVIDER_CREDENTIAL_FILE_ABSENT` at source, so nothing on this path can
+CODE PROVIDER_CREDENTIAL_FILE_INVALID hits=3 throwish=1
+  throw-window	packages/providers/src/index.ts:794	`PROVIDER_AUTHORIZATION_FILE_UNUSABLE:${target.providerRef}:PROVIDER_CREDENTIAL_FILE_INVALID`
+CODE PROVIDER_DISCOVERY_TARGETS_JSON hits=25 throwish=4
+  throw-window	apps/runner/src/main.ts:71	if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
+  throw-window	apps/runner/src/main.ts:75	environment.PROVIDER_DISCOVERY_TARGETS_JSON,
+  throw-window	apps/api/src/main.ts:284	if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
+  throw-window	apps/api/src/main.ts:287	return environment.PROVIDER_DISCOVERY_TARGETS_JSON;
+CODE PROVIDER_REF hits=30 throwish=7
+  throw-window	apps/runner/src/provider-topology.ts:75	if (primary.providerRef !== declared.PROVIDER_REF) {
+  throw-line	apps/runner/src/provider-topology.ts:76	throw new TypeError("RUNNER_PRIMARY_PROVIDER_REF_DRIFT");
+  throw-window	apps/runner/src/dev-provider-panel.ts:133	|| observation.providerRef === REMOVED_SCAFFOLD_PROVIDER_REF) {
+  throw-window	apps/runner/src/dev-support-model.ts:41	|| row.provider_ref !== DEVELOPMENT_SUPPORT_MODEL_PROVIDER_REF
+CODE REGISTER_VERSION hits=56 throwish=15
+  throw-line	apps/runner/src/dev-runner-policy.ts:165	throw new TypeError("DEV_RUNNER_REGISTER_VERSION_INVALID");
+  throw-window	apps/runner/src/main.ts:69	const policy = await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION);
+  throw-window	apps/runner/src/main.ts:70	const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
+  throw-window	apps/runner/src/dev-runner-process.ts:86	REGISTER_VERSION: registerVersion,
+CODE SECRET_CUSTODY_INVALID hits=19 throwish=9
+  throw-line	apps/runner/src/dev-api-environment.ts:151	throw new TypeError("DEV_API_ENVIRONMENT_SECRET_CUSTODY_INVALID");
+  throw-line	apps/runner/src/dev-api-environment.ts:160	throw new TypeError("DEV_API_ENVIRONMENT_SECRET_CUSTODY_INVALID");
+  throw-line	apps/observation-agent/src/core/custody.ts:35	throw new ObservationError(OBSERVATION_SECRET_CUSTODY_INVALID, error);
+  throw-line	apps/observation-agent/src/core/custody.ts:41	throw new ObservationError(OBSERVATION_SECRET_CUSTODY_INVALID, error);
+CODE SUPPORT_MODEL_TARGET_JSON hits=15 throwish=1
+  throw-window	apps/runner/src/dev-api-environment-cli.ts:21	const supportModelTarget = commandEnvironment.DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON;
+--- secrets ---
+FILE diff.patch
+  sk- n=0 uniq=[]
+  xai- n=0 uniq=[]
+  AIza n=0 uniq=[]
+  bearer n=0 uniq=[]
+  b64_40 n=0 uniq=[]
+  users_path n=0 uniq=[]
+  home_path n=0 uniq=[]
+  abs_cred n=5 uniq=['/etc/debateai/runner/providers/acme.header"}`,', '/etc/debateai/api/providers/acme.header`.', '/etc/debateai/runner/providers/acme.header"}`.', '/etc/debateai/api/providers/acme.header"}`.', '/etc/debateai/${service}/providers/`))']
+  mode_0700 n=0 uniq=[]
+FILE diff.added
+  sk- n=0 uniq=[]
+  xai- n=0 uniq=[]
+  AIza n=0 uniq=[]
+  bearer n=0 uniq=[]
+  b64_40 n=0 uniq=[]
+  users_path n=0 uniq=[]
+  home_path n=0 uniq=[]
+  abs_cred n=3 uniq=['/etc/debateai/runner/providers/acme.header"}`.', '/etc/debateai/api/providers/acme.header"}`.', '/etc/debateai/${service}/providers/`))']
+  mode_0700 n=0 uniq=[]
+FILE README.md
+  sk- n=1 uniq=['sk-password']
+  xai- n=0 uniq=[]
+  AIza n=0 uniq=[]
+  bearer n=0 uniq=[]
+  b64_40 n=0 uniq=[]
+  users_path n=0 uniq=[]
+  home_path n=0 uniq=[]
+  abs_cred n=79 uniq=['/etc/debateai/api.env`', '/etc/debateai/ui.env`', '/etc/debateai/runner.env`', '/etc/debateai/hatchet.env`', '/etc/debateai/api/`', '/etc/debateai/api/providers/`', '/etc/debateai/runner/`', '/etc/debateai/runner/providers/`', '/etc/debateai/postgres-tls/`', '/etc/debateai/hatchet-tls/`', '/etc/debateai/ui-edge.secret`', '/etc/debateai/backup.conf`']
+  mode_0700 n=22 uniq=['0700']
+FILE v9.test.ts
+  sk- n=0 uniq=[]
+  xai- n=0 uniq=[]
+  AIza n=0 uniq=[]
+  bearer n=15 uniq=['Bearer t10-fixture-token-0123456789";', 'Bearer one\\nBearer', 'Bearer one\\rBearer', 'Bearer one"],', 'Bearer one', 'Bearer one${String.fromCharCode(0)}two`],', 'Bearer é"],', 'Bearer ${"a".repeat(5_000)}`]', 'Bearer one"])', 'Bearer local-relay-codex-premium"', 'Bearer local-relay-claude"', 'Bearer local-relay-claude-premium"']
+  b64_40 n=0 uniq=[]
+  users_path n=0 uniq=[]
+  home_path n=1 uniq=['/home/somebody/.debateai/codex.header"']
+  abs_cred n=9 uniq=['/etc/debateai/runner/providers/vendor-a.header"', '/etc/debateai/runner/providers/vendor-a.header");', '/etc/debateai/${service}/providers/`))']
+  mode_0700 n=2 uniq=['0700']
+--- probe paragraph ---
+The paid-vendor probe spends `max_tokens: 8` per target per staleness window; the window is the `panelDiscoveryPolicy` register row's `probe_freshness_ms`, validated only as a positive integer. The development seed publishes `600000`. Hosted mode enforces no minimum, so the number an operator publishes is the whole control.
+max_tokens_in_section=1

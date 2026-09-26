@@ -1,18 +1,24 @@
+import { t, type MessageCatalog } from "../i18n/translate.js";
 import type { LiveVerdictState } from "../types.js";
 
 /**
  * V's ruling D77 of 2026-09-18: one sentence per verdict state, true of EVERY
  * way the engine can reach that state. The full reasoning is the comment above
- * STATE_SENTENCES in components/VerdictBanner.tsx, which now reads this record,
- * so the banner and the verdict story can never word a state differently.
+ * STATE_SENTENCE_KEYS in components/VerdictBanner.tsx. The banner reads those
+ * catalogue keys; the story reads the SAME keys here, so the banner and the
+ * verdict story cannot word a state differently.
  */
-export const VERDICT_STATE_SENTENCES: Readonly<Record<LiveVerdictState, string | null>> = Object.freeze({
+export const VERDICT_STATE_SENTENCE_KEYS: Readonly<Record<LiveVerdictState, string | null>> = Object.freeze({
   supported: null,
-  contested:
-    "The run did not settle this either way: the positions were too close, the judges disagreed, the leading position was not strong enough, or part of the comparison was missing.",
-  unsupported:
-    "Even the leading position here came out weak once the arguments were weighed against each other — a weak case, not a disproved one."
+  contested: "debateDrawers.verdict.contestedExplanation",
+  unsupported: "debateDrawers.verdict.unsupportedExplanation"
 });
+
+/** The D77 sentence for a verdict state, from the `debateDrawers` catalogue handed in; null for "supported". */
+export function verdictStateSentence(state: LiveVerdictState, catalog: MessageCatalog): string | null {
+  const key = VERDICT_STATE_SENTENCE_KEYS[state];
+  return key === null ? null : t(catalog, key);
+}
 
 /**
  * D77 gives "supported" no sentence because the banner's band label already

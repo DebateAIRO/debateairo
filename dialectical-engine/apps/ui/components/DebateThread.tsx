@@ -5,8 +5,20 @@ import type { Node as ContractNode } from "@debateai/contract";
 import type { DebateNode } from "@/lib/types";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
 import { ReferenceAuthorPill, ReferenceReviewLine, ReferenceScoreBadges } from "@/components/ReferenceNodeMeta";
-import { SCRUTINY_STATUS } from "@/lib/scrutiny";
-import { V3_MISSING_CAPABILITIES } from "@/lib/v3/missingCapabilities";
+import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import miscEnglish from "@/messages/en/misc.json";
+import debateChromeEnglish from "@/messages/en/debateChrome.json";
+import composeEnglish from "@/messages/en/compose.json";
+
+function localizedRoleLabel(node: DebateNode, catalog: MessageCatalog, debateChromeCatalog: MessageCatalog): string {
+  const role = roleOf(node);
+  if (role === "root") return t(catalog, "debateViews.rootClaim");
+  if (role === "pro") return t(catalog, "debateViews.pro");
+  if (role === "con") return t(catalog, "debateViews.con");
+  return roleLabel(node, debateChromeCatalog);
+}
 
 export type ThreadCallbacks = {
   onOpenNode: (nodeId: string) => void;
@@ -24,6 +36,12 @@ type DebateThreadProps = ThreadCallbacks & {
   scrutiny?: Record<string, string>;
   v3NodesById?: ReadonlyMap<string, ContractNode>;
   meta: { nodes: number; depth: number };
+  /** The interface locale's `misc` catalogue, for the model identity lines. */
+  miscCatalog?: MessageCatalog;
+  /** The interface locale's `debateChrome` catalogue: branch role labels. */
+  debateChromeCatalog?: MessageCatalog;
+  /** The interface locale's `compose` catalogue: scrutiny status, V3 score copy, model family. */
+  composeCatalog?: MessageCatalog;
 };
 
 type ThreadRow = {
@@ -61,8 +79,12 @@ export function DebateThread({
   onRegenNode,
   onToggleExpand,
   onToggleCollapse,
-  onProseSelect
+  onProseSelect,
+  miscCatalog = miscEnglish,
+  debateChromeCatalog = debateChromeEnglish,
+  composeCatalog = composeEnglish
 }: DebateThreadProps) {
+  const { catalog, locale } = useChromeI18n();
   const rows = buildRows(root, collapsed);
 
   return (
@@ -71,14 +93,14 @@ export function DebateThread({
         <div className="threadRootShell">
           <div className="threadRoot">
             <span className="referenceStanceTab root" aria-hidden />
-            <div className="nodeEyebrow">Root claim</div>
+            <div className="nodeEyebrow">{t(catalog, "debateViews.rootClaim")}</div>
             <div className="threadRootClaim">{root.claim}</div>
             <div className="nodeRootMeta">
-              <span>{meta.nodes} claims</span>
+              <span>{tPlural(catalog, "debateViews.claimCount", meta.nodes, locale)}</span>
               <span className="sep">/</span>
-              <span>depth {meta.depth}</span>
+              <span>{t(catalog, "debateViews.depthValue", { depth: meta.depth })}</span>
               <span className="sep">/</span>
-              <span>scroll down to follow each line of argument</span>
+              <span>{t(catalog, "debateViews.followArgumentLines")}</span>
             </div>
           </div>
         </div>
@@ -99,6 +121,10 @@ export function DebateThread({
             onToggleExpand={onToggleExpand}
             onToggleCollapse={onToggleCollapse}
             onProseSelect={onProseSelect}
+            catalog={catalog}
+            miscCatalog={miscCatalog}
+            debateChromeCatalog={debateChromeCatalog}
+            composeCatalog={composeCatalog}
           />
         ))}
       </div>
@@ -112,6 +138,10 @@ type ThreadRowCardProps = ThreadCallbacks & {
   collapsed: boolean;
   scrutinyStatus?: string;
   v3Node?: ContractNode;
+  catalog: MessageCatalog;
+  miscCatalog: MessageCatalog;
+  debateChromeCatalog: MessageCatalog;
+  composeCatalog: MessageCatalog;
 };
 
 function ThreadRowCard({
@@ -125,7 +155,11 @@ function ThreadRowCard({
   onRegenNode,
   onToggleExpand,
   onToggleCollapse,
-  onProseSelect
+  onProseSelect,
+  catalog,
+  miscCatalog,
+  debateChromeCatalog,
+  composeCatalog
 }: ThreadRowCardProps) {
   const { node, trail, childCount } = row;
   const role = roleOf(node);
@@ -133,7 +167,7 @@ function ThreadRowCard({
   const state = renderStateOf(node);
   const empty = state === "empty";
   const generation = node.active_generation;
-  const scrutiny = scrutinyStatus ? SCRUTINY_STATUS[scrutinyStatus] : null;
+  const scrutiny = scrutinyStatus ? scrutinyStatuses(composeCatalog)[scrutinyStatus] : null;
   const hasContinue = trail.length > 0 ? !trail[trail.length - 1] : false;
   // ancestor lanes = every ancestor except the immediate parent
   const lanes = trail.slice(0, -1);
@@ -185,20 +219,20 @@ function ThreadRowCard({
 
           <div className="threadMetaRow">
             <span className="roleBadge" style={{ color: pal.text, background: pal.bg, borderColor: pal.border }}>
-              {pal.arrow} {roleLabel(node)}
+              {pal.arrow} {localizedRoleLabel(node, catalog, debateChromeCatalog)}
             </span>
-            <ReferenceScoreBadges node={node} v3Node={v3Node} onOpenNode={onOpenNode} />
+            <ReferenceScoreBadges node={node} v3Node={v3Node} onOpenNode={onOpenNode} composeCatalog={composeCatalog} />
             <span style={{ flex: 1 }} />
-            <ReferenceAuthorPill node={node} />
+            <ReferenceAuthorPill node={node} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />
           </div>
-          <ReferenceReviewLine review={v3Node?.review} />
+          <ReferenceReviewLine review={v3Node?.review} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />
 
           {empty ? (
             <div className="nodeEmpty">
               <span className="nodeEmptyMark" aria-hidden>
                 ∅
               </span>
-              <div className="nodeEmptyText">No strong argument found.</div>
+              <div className="nodeEmptyText">{t(catalog, "debateViews.noStrongArgument")}</div>
             </div>
           ) : state === "pending" ? (
             <div className="nodePending">
@@ -227,9 +261,9 @@ function ThreadRowCard({
                   className="nodeCtrl"
                   disabled
                   aria-disabled="true"
-                  title={V3_MISSING_CAPABILITIES.nodeRegeneration}
+                  title={t(catalog, "debateViews.nodeRegenerationUnavailable")}
                 >
-                  ↻ Regenerate
+                  ↻ {t(catalog, "debateViews.regenerate")}
                 </button>
                 <span style={{ flex: 1 }} />
                 <button
@@ -241,7 +275,7 @@ function ThreadRowCard({
                     else onOpenNode(node.id);
                   }}
                 >
-                  {expanded ? "Show less" : "Read"} <span aria-hidden>{expanded ? "▴" : "▾"}</span>
+                  {t(catalog, expanded ? "debateViews.showLess" : "debateViews.read")} <span aria-hidden>{expanded ? "▴" : "▾"}</span>
                 </button>
               </div>
             </>

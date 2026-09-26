@@ -7,6 +7,10 @@ import {
   SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,SUPPORT_GUIDE_LABELS,
   type SupportActionId
 } from "@debateai/support-kb/catalog";
+import type { SupportLanguage } from "@debateai/support-kb/catalog";
+import {
+  conflatesLocalizedCaseAndEmail,hasLocalizedFinancialCapabilityClaim
+} from "./draft-screens.js";
 
 const MAX_RAW_CODE_POINTS = 8_192;
 const MAX_TEXT_CODE_POINTS = 4_000;
@@ -140,10 +144,17 @@ function actionHasRequestAuthority(
 export function bindSupportDraftAuthority(
   draft: SupportDraft,
   allowedSourceIds: readonly string[],
-  requestedActionIds: readonly (SupportActionId | string)[]
+  requestedActionIds: readonly (SupportActionId | string)[],
+  language: SupportLanguage
 ): SupportDraft | null {
   const text = authorityText(draft.text);
-  if (conflatesCaseAndEmail(text) || hasFinancialCapabilityClaim(text)) return null;
+  // en and ro keep dev's reviewed screens byte for byte; the per-locale screens
+  // (./draft-screens.ts) apply only to the 33 new interface locales.
+  const legacyLanguage = language === "en" || language === "ro";
+  if (legacyLanguage
+    ? conflatesCaseAndEmail(text) || hasFinancialCapabilityClaim(text)
+    : conflatesLocalizedCaseAndEmail(text,language)
+      || hasLocalizedFinancialCapabilityClaim(text,language)) return null;
 
   const sourceIds = [...draft.sourceIds];
   if (ACCOUNT_DETAIL_CLAIM.test(text) && !sourceIds.includes("settings-help-menus")) {
@@ -152,6 +163,13 @@ export function bindSupportDraftAuthority(
   }
 
   const requiredActions = new Set<SupportActionId>();
+  // The prose navigation screen below reads only en/ro, so in the 33 new
+  // locales every structured action needs request authority; en and ro keep
+  // dev's rule (authority for the actions a prose promise names).
+  if (!legacyLanguage) for (const id of draft.actionIds) {
+    if (!SUPPORT_ACTION_IDS.includes(id as SupportActionId)) return null;
+    requiredActions.add(id as SupportActionId);
+  }
   for (const clause of text.split(/[.!?;\n]+/u)) {
     if (!NAVIGATION_COMMITMENT.test(clause)) continue;
     for (const { actionId } of navigationMatches(clause)) requiredActions.add(actionId);

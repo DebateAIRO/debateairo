@@ -13,10 +13,10 @@ const OWN_FUNCTIONS = [
 // Verdict story (spec 2026-09-26 §7): 0063's carrier mechanism applied to
 // serve.answer_story, pinned as text so a borrowed function or a stale mirror
 // cannot pass unseen.
-describe("serve.answer_story — carrier contract (migration 0072)", () => {
+describe("serve.answer_story — carrier contract (migration 0074)", () => {
   it("is ONE migration that installs the three carrier triggers and owns every function it defines", async () => {
     const names = (await readdir(new URL("migrations/", root))).filter((name) => /^\d+_answer_story\.sql$/u.test(name));
-    expect(names).toEqual(["0072_answer_story.sql"]);
+    expect(names).toEqual(["0074_answer_story.sql"]);
     const migration = await read(`migrations/${names[0]}`);
     expect(migration).toContain("CREATE TABLE IF NOT EXISTS serve.answer_story (");
     expect(migration).toContain("  content_ciphertext jsonb,\n  content_attestation bytea,");
@@ -43,8 +43,8 @@ describe("serve.answer_story — carrier contract (migration 0072)", () => {
     for (const other of (await readdir(new URL("migrations/", root)))
       .filter((name) => name.endsWith(".sql") && name !== names[0])) {
       for (const owned of defined(await read(`migrations/${other}`))) {
-        expect({ migration: other, function: owned, alsoDefinedBy0072: (OWN_FUNCTIONS as readonly string[]).includes(owned) })
-          .toEqual({ migration: other, function: owned, alsoDefinedBy0072: false });
+        expect({ migration: other, function: owned, alsoDefinedBy0074: (OWN_FUNCTIONS as readonly string[]).includes(owned) })
+          .toEqual({ migration: other, function: owned, alsoDefinedBy0074: false });
       }
     }
   });

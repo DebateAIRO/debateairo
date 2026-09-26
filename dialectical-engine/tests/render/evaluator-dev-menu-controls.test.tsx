@@ -10,8 +10,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/api", () => ({
+  COOKIE_SESSION_MARKER: "cookie-session",
   getEvaluatorDevMenu: mocks.getEvaluatorDevMenu,
-  selectEvaluatorConsumerModel: mocks.selectEvaluatorConsumerModel
+  selectEvaluatorConsumerModel: mocks.selectEvaluatorConsumerModel,
+  validateSession: vi.fn().mockResolvedValue(undefined)
 }));
 
 import { EvaluatorDevMenu } from "../../apps/ui/components/EvaluatorDevMenu.js";

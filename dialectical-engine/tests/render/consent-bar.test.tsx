@@ -7,6 +7,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
 import { CookieBar } from "../../apps/ui/components/consent/CookieBar.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+import consentRomanian from "../../apps/ui/messages/ro/consent.json" with { type: "json" };
+import type { MessageCatalog } from "../../apps/ui/lib/i18n/translate.js";
 import {
   S01_CLOSE_MARKER,
   S01_OPEN_MARKER,
@@ -140,17 +143,20 @@ type BarHandlers = {
   onAcceptAll?: () => void;
 };
 
-function mountBar(handlers: BarHandlers = {}): HTMLElement {
+function mountBar(handlers: BarHandlers = {}, catalog: MessageCatalog = consentEnglish): HTMLElement {
   act(() => {
     root!.render(
       <CookieBar
+        catalog={catalog}
         onEssentialOnly={handlers.onEssentialOnly ?? ((): void => {})}
         onChoose={handlers.onChoose ?? ((): void => {})}
         onAcceptAll={handlers.onAcceptAll ?? ((): void => {})}
       />
     );
   });
-  const bar = document.querySelector<HTMLElement>('[role="region"][aria-label="Cookie consent"]');
+  const bar = document.querySelector<HTMLElement>(
+    `[role="region"][aria-label="${catalog["consent.bar.label"]}"]`
+  );
   expect(bar, "the bar renders as a labelled region").not.toBeNull();
   return bar!;
 }
@@ -178,6 +184,40 @@ describe("S01-C3 the cookie bar (10a)", () => {
       [...document.querySelectorAll("button")].map((button) => button.textContent?.trim()),
       "the three button labels"
     ).toEqual(BUTTONS);
+  });
+
+  it("keeps dev's SPEC §Copy bytes as the English catalogue values", () => {
+    // Localization moved the literals into `messages/en/consent.json`; the English bytes
+    // are still the codepoint-dumped SPEC §Copy strings above, key for key.
+    expect(consentEnglish["consent.bar.eyebrow"]).toBe(EYEBROW);
+    expect(consentEnglish["consent.bar.title"]).toBe(TITLE);
+    expect(consentEnglish["consent.bar.body"]).toBe(BODY);
+    expect([
+      consentEnglish["consent.action.essentialOnly"],
+      consentEnglish["consent.bar.choose"],
+      consentEnglish["consent.bar.acceptAll"]
+    ]).toEqual(BUTTONS);
+    expect(consentEnglish["consent.bar.label"]).toBe("Cookie consent");
+  });
+
+  it("renders Romanian consent copy from the catalogue into the DOM", () => {
+    mountBar({}, consentRomanian);
+
+    expect(text(".consentEyebrow"), "Romanian eyebrow").toBe(
+      consentRomanian["consent.bar.eyebrow"]
+    );
+    expect(text(".consentTitle"), "Romanian title").toBe(
+      consentRomanian["consent.bar.title"]
+    );
+    expect(text(".consentBody"), "Romanian body").toBe(consentRomanian["consent.bar.body"]);
+    expect(
+      [...document.querySelectorAll("button")].map((button) => button.textContent?.trim()),
+      "Romanian controls in DOM order"
+    ).toEqual([
+      consentRomanian["consent.action.essentialOnly"],
+      consentRomanian["consent.bar.choose"],
+      consentRomanian["consent.bar.acceptAll"]
+    ]);
   });
 
   it("is a labelled region whose focusable descendants are the three buttons in DOM order", () => {

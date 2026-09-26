@@ -1,0 +1,125 @@
+# REQ-FIX-PES-p6 run log: 2026-09-25 13:47:33 EEST
+
+## 1. checks on SPEC-v4 (must FAIL)
+$ python3 checks.py v4
+REQ-FIX-PES-p6 checks against S01 SPEC-v4.md (manifest 17 keys, builder 17 keys)
+  FAIL  V-15 seed: the rows R1.12 describes = the manifest the database requires; role rows unchanged
+          - the seed R1.12 describes lacks 15 required rows (first branchFreezeEpsilon): the database refuses it (d2: REGISTER_REQUIRED_ROW_MISSING:envelope:envelopeFormulaInputs)
+          - R1.12 does not state the seed's row count as the measured 17
+          - R1.12 does not confine the added rows to the throwaway scratch database (V-15)
+  FAIL  V-15 builder: signature quoted from the lane; input pinned = the one d4/d1 ran
+          - R1.12 does not quote buildAlgorithmRegisterRows' signature
+          - R1.12 does not cite algorithm-policy.ts:233-235
+          - R1.12 pins no builder input: two seats could seed different providerFamilyMap rows
+  FAIL  V-15 citations hold in the S01 lane; V cited by row id
+          - R1.12 does not cite migrations/0061_algorithm_publication_profiles.sql:17-28
+          - R1.12 does not cite packages/register/src/algorithm-policy.ts:233-235
+          - R1.12 does not cite V's ruling V-15 by row id
+  FAIL  supersession line names V-15/R1.12; all else byte-identical to v4
+          - line 4 does not say 'SUPERSEDES `SPEC-v4.md`'
+          - line 4 does not say 'pass 6'
+          - line 4 does not say "on V's ruling V-15"
+          - line 4 does not say 'rulings table, row V-15'
+          - line 4 does not say '**R1.12** only'
+v4: FAIL (4 failing checks)
+exit=1
+
+## 2. checks on SPEC-v5 (must PASS)
+$ python3 checks.py v5
+REQ-FIX-PES-p6 checks against S01 SPEC-v5.md (manifest 17 keys, builder 17 keys)
+  pass  V-15 seed: the rows R1.12 describes = the manifest the database requires; role rows unchanged
+  pass  V-15 builder: signature quoted from the lane; input pinned = the one d4/d1 ran
+  pass  V-15 citations hold in the S01 lane; V cited by row id
+  pass  supersession line names V-15/R1.12; all else byte-identical to v4
+v5: PASS (0 failing checks)
+exit=0
+
+## 3. mutants (failing fixtures of checks.py, on v5)
+$ python3 mutants.py
+  CAUGHT  seed keeps the builder's role rows out but drops the 'except' clause (builder rows unanchored) -> the seed R1.12 describes lacks 15 required rows (first branchFreezeEpsilon): the database refuses it (d2: REGI
+  CAUGHT  the 15 builder rows removed: back to the two-row seed d2 refuses -> the seed R1.12 describes lacks 15 required rows (first branchFreezeEpsilon): the database refuses it (d2: REGI
+  CAUGHT  row count stated as sixteen -> R1.12 does not state the seed's row count as the measured 17
+  CAUGHT  evaluator role row changed to vendor:a -> a role row R1.12 names in v4 changed: `{"kind":"EVALUATOR_ROLE_REF","providerRef":"vendo
+  CAUGHT  scratch-only confinement dropped -> R1.12 does not confine the added rows to the throwaway scratch database (V-15)
+  CAUGHT  builder input: another family ref -> R1.12's builder input differs from the one probe d4/d1 ran: deploymentSourceRef: "provider-env-selection/S01#a
+  CAUGHT  builder input: evaluator vendor:a -> R1.12's builder input differs from the one probe d4/d1 ran: deploymentSourceRef: "provider-env-selection/S01#a
+  CAUGHT  signature misquoted (return type) -> R1.12 does not quote buildAlgorithmRegisterRows' signature
+  CAUGHT  migration cite one block off -> R1.12 does not cite migrations/0061_algorithm_publication_profiles.sql:17-28
+  CAUGHT  V-15 cited by line number instead of row id -> R1.12 does not cite V's ruling V-15 by row id
+  CAUGHT  header does not name V-15 -> line 4 does not say "on V's ruling V-15"
+  CAUGHT  R1.14 edited -> R1.14 differs from SPEC-v4
+  CAUGHT  §5 acceptance edited -> section ## 5. Accept differs from SPEC-v4
+mutants: 13/13 caught
+exit=0
+
+## 4. SPEC-v4 -> SPEC-v5
+$ git diff --no-index --stat SPEC-v4.md SPEC-v5.md
+ .../slices/S01/{SPEC-v4.md => SPEC-v5.md}          | 25 +++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
+$ diff SPEC-v4.md SPEC-v5.md | hunk headers
+4c4
+6,7c6,7
+217c217
+222c222,237
+
+## 5. frozen files: sha256 now vs the pre-state snapshot taken before any write of this node
+0a1
+> 7345f214188656d62bf3e2fd39e458b640fbc54a014f15259c3450bee988e07d  /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/provider-env-selection/slices/S01/SPEC.md
+4d4
+< 7345f214188656d62bf3e2fd39e458b640fbc54a014f15259c3450bee988e07d  /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/provider-env-selection/slices/S01/SPEC.md
+$ git status --porcelain (S01 frozen files, V packet, intake)
+(end status)
+
+## 6. files this node wrote
+ M dialectical-engine/docs/missions/provider-env-selection/INSTRUCTIONS.md
+ M dialectical-engine/docs/missions/provider-env-selection/slices/S01/DECISIONS.md
+?? dialectical-engine/.hermes/reports/provider-env-selection/probes/REQ-FIX-PES-p6/
+?? dialectical-engine/docs/missions/provider-env-selection/slices/S01/SPEC-v5.md
+
+## 7. banned words (improve|better|robust|handle|appropriate)
+SPEC-v5 R1.12 (:193-242): 0
+SPEC-v5 whole: 0
+SPEC-v4 whole: 0
+
+## 8. INSTRUCTIONS.md
+      99
+27c27
+31,32c31,32
+63c63
+66c66
+27:| S01 | The hosted provider set is published by a command that declares itself hosted | `no` | `slices/S01/SPEC-v5.md` §5 acceptance, ru
+31:**The SPEC of record is the highest-numbered version:** S01 `SPEC-v5.md` (REQ-FIX pass 6), S02 `SPEC-v4.md`
+66:| per-slice SPEC / PLAN / PROGRESS / DECISIONS (record = the highest-numbered SPEC: `SPEC-v5.md` for S01, `SPEC-v4.md` for S02, `SPEC-v3.
+
+## 9. S01 DECISIONS.md append-only
+first      300 lines byte-identical to the pre-state; now 319 lines
+
+## 10. the builder signature in the S01 lane
+$ git grep -n "export function buildAlgorithmRegisterRows" ; sed -n 233,235p
+packages/register/src/algorithm-policy.ts:233:export function buildAlgorithmRegisterRows(
+export function buildAlgorithmRegisterRows(
+  input: AlgorithmRegisterRowsInput
+): readonly AlgorithmRegisterRow[] {
+
+## 11. lanes read-only, dirty 0
+pes-s01 HEAD 5b12b2e15 dirty 0
+pes-base HEAD 776359c38 dirty 0
+
+## 12. PLAN pointers into SPEC-v4 past the hunk (re-point map for ARCH; PLAN.md NOT edited)
+PLAN.md:80  SPEC-v4.md:275  ->  SPEC-v5.md:290
+PLAN.md:113  SPEC-v4.md:228  ->  SPEC-v5.md:243
+PLAN.md:114  SPEC-v4.md:233  ->  SPEC-v5.md:248
+PLAN.md:115  SPEC-v4.md:249  ->  SPEC-v5.md:264
+PLAN.md:116  SPEC-v4.md:266  ->  SPEC-v5.md:281
+PLAN.md:117  SPEC-v4.md:338  ->  SPEC-v5.md:353
+PLAN.md:589  SPEC-v4.md:275  ->  SPEC-v5.md:290
+
+## 5b. section 5 re-run order-independent (5 above differs only in line ORDER: the pre-state was listed in glob order, the post-state in the order typed)
+$ diff <(sort pre) <(sort post)
+IDENTICAL (6 files): SPEC.md SPEC-v2.md SPEC-v3.md SPEC-v4.md PLAN.md PROGRESS.md
+045ab6014643abcc0ee5c2f07e0bbde231eab85679da7498c670ba6a47378087  PLAN.md
+10fb90d649f154cf67d90f76d5422c0bf4066f86ac3c658fd8fb9bae09c10702  SPEC-v4.md
+227c771727e6dbde6f92c6ae4d24886a51d9deabb117eca8a7d193a52007948a  SPEC-v2.md
+7345f214188656d62bf3e2fd39e458b640fbc54a014f15259c3450bee988e07d  SPEC.md
+79a18b1b5de93e3e9c4854c92127527c01d12cac3669f5e18e51370676dadb99  PROGRESS.md
+80c98432d04fb27a0df9a1022423ea1406d0ff7334541663e52a29d192352599  SPEC-v3.md

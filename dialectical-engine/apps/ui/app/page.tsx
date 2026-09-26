@@ -8,6 +8,9 @@ import { LandingPage } from "@/components/landing/LandingPage";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import type { ContractClient } from "@debateai/contract";
 import type { DebateSummary } from "@/lib/types";
+import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
+import { loadNamespace } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/translate";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +22,18 @@ export default async function HomePage({
   // UI-01 (S05): the V3 answer index is asker-scoped; without a server session
   // cookie the list honestly stays empty with a sign-in hint — never an
   // anonymous global listing.
-  const token = readSessionCookie(await cookies());
-  if (token === null) return <><LandingPage /><SupportWidget /></>;
+  const cookieStore = await cookies();
+  const token = readSessionCookie(cookieStore);
+  const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
+  const locale = isLocale(requestedLocale) ? requestedLocale : "en";
+  const [homeCatalog, timeCatalog, chromeCatalog, composeCatalog] = await Promise.all([
+    loadNamespace(locale, "home"),
+    loadNamespace(locale, "time"),
+    loadNamespace(locale, "chrome"),
+    loadNamespace(locale, "compose")
+  ]);
+  const catalog = Object.freeze({ ...homeCatalog, ...chromeCatalog });
+  if (token === null) return <><LandingPage catalog={catalog} /><SupportWidget /></>;
   const requestedTab = (await searchParams).tab;
   const tab: "yours" | "public" =
     requestedTab === "yours" || requestedTab === "public"
@@ -36,17 +49,17 @@ export default async function HomePage({
   try {
     published = await createServerContractClient(fetch, undefined, userAgent, clientIp).readPublicDebates(50, 0);
   } catch {
-    publishedError = "Published debates are temporarily unavailable.";
+    publishedError = t(catalog, "home.publishedUnavailable");
   }
   if (token === null) {
-    error = "Sign in to start a debate and save it to your account.";
+    error = t(catalog, "home.signInToStart");
   } else {
     try {
       const page = await listDebatesPageServer(token, undefined, userAgent, clientIp);
       debates = page.summaries;
       sessionConfirmed = true;
     } catch {
-      error = "Your signed-in session could not be confirmed. Refresh once, or sign in again.";
+      error = t(catalog, "home.sessionUnconfirmed");
     }
   }
 
@@ -66,20 +79,19 @@ export default async function HomePage({
   return (
     <div className="screen scroll libScreen">
       <div className="libInner">
-        <p className="libEyebrow">A REASONING INSTRUMENT</p>
-        <h1 className="libTitle">What should we debate?</h1>
+        <p className="libEyebrow">{t(catalog, "home.reasoningInstrument")}</p>
+        <h1 className="libTitle">{t(catalog, "home.title")}</h1>
         <p className="libLede">
-          Post a claim. Several different AI models argue it out against each other in a structured tree — so you can
-          see how the strongest case for and against actually holds up.
+          {t(catalog, "home.lede")}
         </p>
 
         {error ? (
           <div className="error" style={{ marginTop: 18 }}>
             <p>{error}</p>
             <div className="formActions">
-              <Link className="btn" href="/login">{token === null ? "Log in" : "Sign in again"}</Link>
+              <Link className="btn" href="/login">{t(catalog, token === null ? "home.logIn" : "home.signInAgain")}</Link>
               {token === null ? (
-                <Link className="btn btnDark" href="/sign-up">Create account</Link>
+                <Link className="btn btnDark" href="/sign-up">{t(catalog, "home.createAccount")}</Link>
               ) : null}
             </div>
           </div>
@@ -88,47 +100,47 @@ export default async function HomePage({
         {/* The composer is the workspace and renders only for a confirmed
             session; an unconfirmed one gets the notice above instead. */}
         {sessionConfirmed ? (
-          <section data-support-primary-control id="start-a-debate" aria-label="Start a debate">
-            <LibraryComposer />
+          <section data-support-primary-control id="start-a-debate" aria-label={t(catalog, "home.startDebateLabel")}>
+            <LibraryComposer catalog={catalog} />
           </section>
         ) : null}
 
-        <div className="libAiDisclosure"><AiNotice /></div>
+        <div className="libAiDisclosure"><AiNotice catalog={catalog} /></div>
 
-        <div className="libTabs sectionHead" aria-label="Debate library">
+        <div className="libTabs sectionHead" aria-label={t(catalog, "chrome.debateLibrary")}>
           <Link
             aria-current={tab === "yours" ? "page" : undefined}
             href="/?tab=yours"
             className="libTab"
           >
-            Your debates
+            {t(catalog, "home.yourDebates")}
           </Link>
           <Link
             aria-current={tab === "public" ? "page" : undefined}
             href="/?tab=public"
             className="libTab"
           >
-            Public debates
+            {t(catalog, "home.publicDebates")}
           </Link>
-          <span className="libCount count">{count} TOTAL</span>
+          <span className="libCount count">{t(catalog, "home.total", { count })}</span>
         </div>
 
         {tab === "yours" ? (
           sessionConfirmed ? (
             <div className="libList recentList">
-              <DebatesBuffer debates={debates} />
+              <DebatesBuffer debates={debates} catalog={catalog} timeCatalog={timeCatalog} locale={locale} composeCatalog={composeCatalog} />
             </div>
           ) : (
-            <p className="tabEmptyHint">Sign in or create an account above to see your debates.</p>
+            <p className="tabEmptyHint">{t(catalog, "home.signInHint")}</p>
           )
         ) : (
           <>
             {publishedError ? <div className="error">{publishedError}</div> : null}
             <div className="libList recentList">
-              <PublicDebatesBuffer debates={published.items} />
+              <PublicDebatesBuffer debates={published.items} catalog={catalog} timeCatalog={timeCatalog} locale={locale} composeCatalog={composeCatalog} />
             </div>
             <p className="libPublicNote">
-              Published debates may be indexed by search engines. Copies may persist after unpublishing.
+              {t(catalog, "home.publicIndexingNotice")}
             </p>
           </>
         )}

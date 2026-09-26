@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSelectedAuthCatalog } from "@/components/AuthShell";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import {
   beginMfaEnrollment,
   confirmMfaRecoveryCode,
@@ -11,6 +13,7 @@ import {
   verifyMfaTotp
 } from "@/lib/mfaEnrollment";
 import { totpQrMatrix } from "@/lib/totpQr";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 type Provisioning = Readonly<{ secret: string; otpauthUri: string }>;
 
@@ -18,19 +21,19 @@ type Provisioning = Readonly<{ secret: string; otpauthUri: string }>;
    grouped — Copy setup key still yields the unspaced secret. */
 const groupedSecret = (secret: string) => secret.replace(/(.{4})(?=.)/g, "$1 ");
 
-function friendlyError(error: unknown): string {
-  if (!(error instanceof MfaEnrollmentHttpError)) return "The enrolment service is temporarily unavailable.";
+function friendlyError(error: unknown, catalog: MessageCatalog): string {
+  if (!(error instanceof MfaEnrollmentHttpError)) return t(catalog, "auth.enroll.serviceUnavailable");
   switch (error.code) {
-    case "MFA_TOTP_INVALID": return "That code was not accepted. Check the device clock and try the current code.";
-    case "MFA_TOTP_REPLAYED": return "That code was already used. Wait for the next code and try again.";
-    case "MFA_RATE_LIMITED": return "Too many attempts. Wait five minutes, then try again.";
-    case "MFA_RECOVERY_CONFIRMATION_INVALID": return "That recovery code does not match the newest set.";
-    case "MFA_ENROLLMENT_STATE_INVALID": return "This step is already complete. Continue to recovery codes below.";
-    default: return "This enrolment link is invalid or expired.";
+    case "MFA_TOTP_INVALID": return t(catalog, "auth.enroll.invalidTotp");
+    case "MFA_TOTP_REPLAYED": return t(catalog, "auth.enroll.replayedTotp");
+    case "MFA_RATE_LIMITED": return t(catalog, "auth.enroll.rateLimited");
+    case "MFA_RECOVERY_CONFIRMATION_INVALID": return t(catalog, "auth.enroll.recoveryMismatch");
+    case "MFA_ENROLLMENT_STATE_INVALID": return t(catalog, "auth.enroll.stateComplete");
+    default: return t(catalog, "auth.enroll.invalidLink");
   }
 }
 
-function TotpQr({ uri }: { uri: string }) {
+function TotpQr({ uri, catalog }: { uri: string; catalog: MessageCatalog }) {
   const matrix = useMemo(() => {
     try {
       return totpQrMatrix(uri);
@@ -39,7 +42,7 @@ function TotpQr({ uri }: { uri: string }) {
     }
   }, [uri]);
   if (matrix === null) {
-    return <p role="status">QR unavailable. Use the copyable setup key instead.</p>;
+    return <p role="status">{t(catalog, "auth.enroll.qrUnavailable")}</p>;
   }
   const quiet = 4;
   const size = matrix.length + quiet * 2;
@@ -52,7 +55,7 @@ function TotpQr({ uri }: { uri: string }) {
       width="170"
       height="170"
       role="img"
-      aria-label="QR code containing the one-time DebateAIRO authenticator setup key"
+      aria-label={t(catalog, "auth.enroll.qrAria")}
     >
       <rect width={size} height={size} fill="var(--qr-paper)" />
       <path d={path} fill="var(--qr-ink)" />
@@ -61,6 +64,8 @@ function TotpQr({ uri }: { uri: string }) {
 }
 
 export default function EnrollMfaPage() {
+  const { locale } = useChromeI18n();
+  const catalog = useSelectedAuthCatalog(locale);
   const initializationStarted = useRef(false);
   const [token, setToken] = useState("");
   const [provisioning, setProvisioning] = useState<Provisioning | null>(null);
@@ -102,7 +107,7 @@ export default function EnrollMfaPage() {
         setCodes(await createMfaRecoveryCodes(mailedToken));
       }
     }).catch((failure: unknown) => {
-      setError(friendlyError(failure));
+      setError(friendlyError(failure, catalog));
     }).finally(() => {
       setBusy(false);
     });
@@ -114,7 +119,7 @@ export default function EnrollMfaPage() {
     try {
       await action();
     } catch (failure) {
-      setError(friendlyError(failure));
+      setError(friendlyError(failure, catalog));
     } finally {
       setBusy(false);
     }
@@ -132,9 +137,9 @@ export default function EnrollMfaPage() {
       <main className="mfaScreen">
         <div className="mfaCard">
           <div className="mfaBody">
-            <p className="mfaEyebrow">MANDATORY MFA</p>
-            <h1 className="mfaTitle">Account protected</h1>
-            <p className="mfaLede">Your authenticator and newest set of recovery codes are active.</p>
+            <p className="mfaEyebrow">{t(catalog, "auth.enroll.mandatoryMfa")}</p>
+            <h1 className="mfaTitle">{t(catalog, "auth.enroll.accountProtected")}</h1>
+            <p className="mfaLede">{t(catalog, "auth.enroll.activeDescription")}</p>
           </div>
         </div>
       </main>
@@ -149,10 +154,10 @@ export default function EnrollMfaPage() {
     <main className="mfaScreen">
       <div className="mfaCard">
         <div className="mfaBody">
-          <p className="mfaEyebrow">MANDATORY MFA</p>
-          <h1 className="mfaTitle">Protect your account</h1>
+          <p className="mfaEyebrow">{t(catalog, "auth.enroll.mandatoryMfa")}</p>
+          <h1 className="mfaTitle">{t(catalog, "auth.enroll.protectAccount")}</h1>
           <p className="mfaLede">
-            An authenticator is required before this account can be used. No phone number or smartphone is required.
+            {t(catalog, "auth.enroll.requiredDescription")}
           </p>
 
           {error ? <div className="mfaAlert" role="alert">{error}</div> : null}
@@ -160,32 +165,32 @@ export default function EnrollMfaPage() {
           <section className="mfaStep" data-state="done" aria-labelledby="enrolment-link">
             <span className="mfaStepNum" data-state={emailDone ? "done" : "active"} aria-hidden>1</span>
             <div>
-              <h2 className="mfaStepTitle" id="enrolment-link">Verify the mailed link</h2>
+              <h2 className="mfaStepTitle" id="enrolment-link">{t(catalog, "auth.enroll.verifyMailedLink")}</h2>
               <p className="mfaStepHint">
                 {busy && token === ""
-                  ? "Verifying your email and preparing authenticator setup…"
+                  ? t(catalog, "auth.enroll.verifyingEmail")
                   : token === ""
-                    ? "Open the private link from your verification email to continue."
-                    : "Email verified. The one-time token was removed from the address bar and is not saved in this browser."}
+                    ? t(catalog, "auth.enroll.openPrivateLink")
+                    : t(catalog, "auth.enroll.emailVerified")}
               </p>
             </div>
             <span className="mfaSpacer" />
-            {emailDone ? <p className="mfaStepDone">✓ Done</p> : null}
+            {emailDone ? <p className="mfaStepDone">{t(catalog, "auth.enroll.done")}</p> : null}
           </section>
 
           <section className="mfaStep" aria-labelledby="authenticator-setup">
             <div className="mfaStepHead">
               <span className="mfaStepNum" data-state={step2State} aria-hidden>2</span>
-              <h2 className="mfaStepTitle" id="authenticator-setup">Add DebateAIRO to any authenticator</h2>
+              <h2 className="mfaStepTitle" id="authenticator-setup">{t(catalog, "auth.enroll.addToAuthenticator")}</h2>
             </div>
             {provisioning ? (
               <div className="mfaSetup">
-                <TotpQr uri={provisioning.otpauthUri} />
+                <TotpQr uri={provisioning.otpauthUri} catalog={catalog} />
                 <div className="mfaSetupBody">
                   <p className="mfaSetupHint">
-                    Scan the QR code, or copy the setup key. This secret is shown only for this setup attempt.
+                    {t(catalog, "auth.enroll.scanQr")}
                   </p>
-                  <label className="srOnly" htmlFor="totp-secret">Copyable setup key</label>
+                  <label className="srOnly" htmlFor="totp-secret">{t(catalog, "auth.enroll.copyableSetupKey")}</label>
                   <input
                     id="totp-secret"
                     className="mfaSecret"
@@ -199,11 +204,11 @@ export default function EnrollMfaPage() {
                       className="mfaGhost"
                       onClick={() => void navigator.clipboard.writeText(provisioning.secret).then(() => setCopied(true))}
                     >
-                      Copy setup key
+                      {t(catalog, "auth.enroll.copySetupKey")}
                     </button>
-                    <span className="mfaCopied" role="status">{copied ? "Copied" : ""}</span>
+                    <span className="mfaCopied" role="status">{copied ? t(catalog, "auth.enroll.copied") : ""}</span>
                   </div>
-                  <label className="mfaCodeLabel" htmlFor="totp-code">Current six-digit code</label>
+                  <label className="mfaCodeLabel" htmlFor="totp-code">{t(catalog, "auth.enroll.currentSixDigitCode")}</label>
                   <div className="mfaCodeRow">
                     <input
                       id="totp-code"
@@ -227,7 +232,7 @@ export default function EnrollMfaPage() {
                         await generateCodes();
                       })}
                     >
-                      Verify and create recovery codes
+                      {t(catalog, "auth.enroll.verifyAndCreateRecoveryCodes")}
                     </button>
                   </div>
                 </div>
@@ -235,8 +240,8 @@ export default function EnrollMfaPage() {
             ) : (
               <p className="mfaStepHint mfaStepBody">
                 {codes
-                  ? "Authenticator verified. The setup secret is not shown again."
-                  : "Waiting for the verified link before a setup secret can be issued."}
+                  ? t(catalog, "auth.enroll.authenticatorVerified")
+                  : t(catalog, "auth.enroll.waitingForVerifiedLink")}
               </p>
             )}
           </section>
@@ -244,11 +249,10 @@ export default function EnrollMfaPage() {
           <section className="mfaStep" aria-labelledby="recovery-codes">
             <div className="mfaStepHead">
               <span className="mfaStepNum" data-state={step3State} aria-hidden>3</span>
-              <h2 className="mfaStepTitle" id="recovery-codes">Save these ten recovery codes</h2>
+              <h2 className="mfaStepTitle" id="recovery-codes">{t(catalog, "auth.enroll.saveRecoveryCodes")}</h2>
             </div>
             <p className="mfaStepHint mfaStepBody">
-              Each code works once. Store them offline. Regenerating replaces this whole set; DebateAIRO cannot
-              show it again.
+              {t(catalog, "auth.enroll.recoveryCodesDescription")}
             </p>
             {codes ? (
               <>
@@ -256,17 +260,19 @@ export default function EnrollMfaPage() {
                   {codes.map((code) => <li key={code}>{code}</li>)}
                 </ul>
                 <div className="mfaCodeActions">
-                  <button type="button" className="mfaGhost" onClick={() => window.print()}>Print codes</button>
+                  <button type="button" className="mfaGhost" onClick={() => window.print()}>
+                    {t(catalog, "auth.enroll.printCodes")}
+                  </button>
                   <button type="button" className="mfaGhost" disabled={busy} onClick={() => void generateCodes()}>
-                    Replace with a new set
+                    {t(catalog, "auth.enroll.replaceCodes")}
                   </button>
                   <label className="srOnly" htmlFor="recovery-typeback">
-                    Type one code from the newest set to confirm you saved it
+                    {t(catalog, "auth.enroll.typeOneCodeLabel")}
                   </label>
                   <input
                     id="recovery-typeback"
                     className="mfaTypeback"
-                    placeholder="Type one code to confirm you saved it"
+                    placeholder={t(catalog, "auth.enroll.typeOneCodePlaceholder")}
                     value={typeback}
                     autoComplete="off"
                     spellCheck={false}
@@ -284,7 +290,7 @@ export default function EnrollMfaPage() {
                       setActive(true);
                     })}
                   >
-                    Activate account
+                    {t(catalog, "auth.enroll.activateAccount")}
                   </button>
                 </div>
               </>

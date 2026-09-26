@@ -1,0 +1,153 @@
+## 11. Providers and vendors (V-9, ruled 2026-09-22)
+
+There are **two supported deployments**, and the engine must work in both. The choice is
+configuration, never an inference from `NODE_ENV`:
+
+| | **hosted** | **local** |
+|---|---|---|
+| What it is | this commercial site | anyone running the repository on their own computer, the owners before launch included |
+| Model access | paid vendor APIs, one credential per vendor | the command-line relays, loopback model servers and, optionally, the user's own API keys |
+| Set by | `DEBATEAI_DEPLOYMENT_MODE=hosted` in `runner.env` and `api.env` | the setting absent outside production, or `DEBATEAI_DEPLOYMENT_MODE=local` |
+
+The relays are the LOCAL deployment — a supported product path, **not** development-only code.
+What this host does is refuse them, which is a different statement. Local mode's own
+instructions are `deploy/dev-auth/README.md`; they say plainly that local mode is meant for a
+computer you do not share, and why (V-30(2)).
+
+**The support chat is a provider like any other (V-30(1)).** It reads its own one-entry target,
+`SUPPORT_MODEL_TARGET_JSON` in `api.env`, through the same mode decision and the same
+credential-file contract as the debate targets: hosted refuses a relay target for support with
+the same codes listed below, and the vendor's credential is named by `authorization_file`, never
+inline. Its members are `provider_ref`, `base_url` (`https:`, path ending in `/v1`), `model` and
+`authorization_file` — the API service's own copy of the key file, from step 2 of the procedure
+below. The support model ref published in the support configuration row must equal the
+`provider_ref` written here, or the chat has no model, every answer is DEGRADED, and the log
+carries `SUPPORT_RELAY_NOT_COMPOSED:` and the ref that could not be composed.
+
+**What the support chat cannot tell you yet.** Its spend row records the tokens a vendor
+reports, but most vendors report no money at all, so the `cost_usd` column stays empty and the
+daily call cap is the only ceiling until the cost envelope (V-28) is published. A reply that
+carries no cost is logged once as `SUPPORT_MODEL_COST_UNREPORTED`, so an empty column is never
+mistaken for a call that was free.
+
+**The support chat's prompt tripwires.** Every support hand-off is sent through the same safety
+frame the debate steps use: the visitor's message travels inside a per-call boundary marker as
+evidence, and the instruction half is the engine's. Two signals are recorded on the way, and both
+are signals and never gates — nothing here refuses a call or changes an answer a visitor is
+served. A line reading `SUPPORT_PROMPT_TRIPWIRE:PROMPT_MATERIAL_INSTRUCTION_LIKE` means a visitor
+wrote something phrased as an order rather than as a question, which is common enough to be
+uninteresting on its own. `SUPPORT_PROMPT_TRIPWIRE:PROMPT_CANARY_ECHOED` and
+`SUPPORT_PROMPT_TRIPWIRE:PROMPT_FENCE_ECHOED` mean the model's answer repeated a marker it was
+told never to repeat, which is worth a look at the case. No line carries the visitor's words, the
+answer, or any part of either.
+
+`DEBATEAI_DEPLOYMENT_MODE` is read by the strict environment loader of both services, so neither
+can start without answering the question. A production unit that omits it refuses with
+`DEPLOYMENT_MODE_UNRESOLVED`; a typo refuses with `DEPLOYMENT_MODE_INVALID`.
+
+### What the hosted mode refuses, in code
+
+| Code | Meaning |
+|---|---|
+| `DEPLOYMENT_MODE_UNRESOLVED` | `NODE_ENV=production` with no `DEBATEAI_DEPLOYMENT_MODE`. |
+| `DEPLOYMENT_MODE_INVALID` | a value that is not exactly `hosted` or `local`, leading or trailing space included. |
+| `PROVIDER_BASE_URL_TLS_REQUIRED:` and the provider ref | a target whose `base_url` is not `https:`. |
+| `PROVIDER_TARGET_LOOPBACK_REFUSED:` and the provider ref | a base URL that names this machine or any address no public vendor API can live at. One code covers them all for now: the whole `127.0.0.0/8`, `0.0.0.0/8` and `169.254.0.0/16` ranges, `::`, `::1` and `fe80::/10`; the private ranges `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16`, the CGNAT range `100.64.0.0/10` and the IPv6 unique-local range `fc00::/7`; the IPv4-mapped form of any of those; **this host's own interface addresses**, read at start-up; and the names `localhost`, `localhost.localdomain`, `ip6-localhost`, `ip6-loopback` or anything under `.localhost`. A hostname that RESOLVES to one of these is still admitted — no name resolution is done — so a vendor's hostname being a genuine public endpoint remains the operator's responsibility. |
+| `PROVIDER_INLINE_CREDENTIAL_REFUSED:` and the provider ref | a credential written into `PROVIDER_DISCOVERY_TARGETS_JSON` instead of a file. |
+| `PROVIDER_AUTHORIZATION_FILE_ABSENT:` and the provider ref | nothing is provisioned at that `authorization_file` path. Provision the file; do not go looking at the one that is there, because there is not one. The reader's own code for this, if you meet it in the source, is `PROVIDER_CREDENTIAL_FILE_ABSENT`. |
+| `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:` the provider ref, then the reason | the credential file is there but cannot be used: it failed custody (`SECRET_CUSTODY_INVALID`), the custody group could not be resolved (`CUSTODY_GROUP_UNRESOLVED`), or its contents are not one printable header line (`PROVIDER_CREDENTIAL_FILE_INVALID`). Neither the path nor a byte of the credential appears in the message. |
+| `COST_ENVELOPES_NOT_SEALED` | the per-run and daily cost envelopes (V-28) are not published yet. A hosted runner refuses to claim work until they are. |
+| `RUNNER_PRIMARY_PROVIDER_REF_DRIFT` | `PROVIDER_REF` does not name the FIRST entry of `PROVIDER_DISCOVERY_TARGETS_JSON`. |
+| `SUPPORT_MODEL_CREDENTIAL_ABSENT` | the support chat's target names a vendor API and declares no credential at all — no `authorization_file`. Every row above applies to `SUPPORT_MODEL_TARGET_JSON` as well; these last two are the support chat's own. |
+| `SUPPORT_MODEL_PATH_NOT_RATIFIED` | `SUPPORT_MODEL_TARGET_JSON` is neither of the two lawful shapes: a vendor API (`https:`, path ending in `/v1`) or, in LOCAL mode only, the ratified loopback relay. A target that IS an API target but is malformed refuses with the matching `PROVIDER_DISCOVERY_*` code instead, so this one means "this is not a target". |
+
+### The credential-file contract
+
+The file holds the `authorization` header **value** verbatim — the scheme word, a space and the
+vendor's token — with at most one trailing newline, and nothing else. It is read under the same
+custody contract as every key file (§3): `0600` owned by the service user, one hard link, no
+symlink, inside a `0700` directory owned by the same user, and at most 4 KiB. The bytes are zeroed
+once the header is built, and the path never reaches a gateway, a log line or an error.
+
+A credential never travels any other way: not in `runner.env`, not on a command line, not in a
+process listing.
+
+**Two services read it, so there are two files**, exactly as the KEK has two copies (§3): the
+runner calls the vendor, and the API probes it at ask time. Each service gets its own `0600` copy
+in its own `0700` tree — one inode per principal, so neither service can replace the other's — and
+each `EnvironmentFile` names its own path in `authorization_file`. That is the trade this kit
+already made for the KEK, and it carries the same trap: **rotating a vendor key means replacing
+both files.** Replace both, then restart both units.
+
+### Adding a vendor — the procedure
+
+Adding an OpenAI-compatible vendor needs **no code**. It is four steps, and the first one is not
+optional.
+
+**1. Vet the vendor (V-9(4)).** Read the vendor's API data-use and retention terms and record the
+date you read each. Confirm the vendor is named in the published privacy notice. A vendor without
+that record cannot be published: the register builder refuses with `PROVIDER_VENDOR_NOT_VETTED`
+and the provider ref. Data-processing agreements are V's to arrange, and V names the vendor.
+
+**2. Write the two credential files.** Run these as root on the host. The header value is typed at
+the prompt, so it never appears on a command line or in shell history:
+
+```sh
+install -d -m 0700 -o debateai-runner -g debateai-runner /etc/debateai/runner/providers
+install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api/providers
+( umask 077; systemd-ask-password "Acme authorization header value" > /etc/debateai/runner/providers/acme.header )
+install -m 0600 -o debateai-api -g debateai-api \
+  /etc/debateai/runner/providers/acme.header /etc/debateai/api/providers/acme.header
+chown debateai-runner:debateai-runner /etc/debateai/runner/providers/acme.header
+chmod 0600 /etc/debateai/runner/providers/acme.header
+```
+
+The `umask` runs in a subshell so pasting this block leaves your own shell session's mask
+untouched; the `chmod` afterwards is what actually fixes the mode, so the two are belt and braces.
+
+Check both trees — the `find` printing nothing is the pass:
+
+```sh
+stat -c '%a %U %G %n' /etc/debateai/runner/providers/acme.header /etc/debateai/api/providers/acme.header
+find /etc/debateai/runner/providers -type f ! -perm 0600 -print
+find /etc/debateai/runner/providers ! -user debateai-runner -print
+find /etc/debateai/api/providers -type f ! -perm 0600 -print
+find /etc/debateai/api/providers ! -user debateai-api -print
+```
+
+**3. Add the target entry.** `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` and `api.env` is a
+JSON array; add one object to it. Its members:
+
+| Member | Value |
+|---|---|
+| `provider_ref` | the vendor's ref, identical in both files and in the register row |
+| `base_url` | the vendor's OpenAI-compatible endpoint, `https:`, path ending in `/v1`, no query and no fragment. **It must be a real public name.** The start-up check reads the literal address written here and does no name resolution, so a hostname that resolves to this machine is NOT detected — it is admitted. Checking that the vendor's hostname is a genuine public endpoint is the operator's responsibility until a resolved-address check exists. |
+| `model` | the model id to call |
+| `authorization_file` | the absolute path from step 2 — **that service's own copy**: the runner's path in `runner.env`, the API's in `api.env` |
+
+In `runner.env` the entry for the example above reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header"}`,
+and in `api.env` the same entry with `/etc/debateai/api/providers/acme.header`.
+An `authorization_header` member alongside `authorization_file` refuses with
+`PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT` rather than guessing which one is live.
+
+**4. Publish the register row at a new version.** The configured-providers row
+(`configuredProviderSet`) is **superseded, never edited**: publish a new register version carrying
+the row with one more entry — `providerRef`, `adapterKind` (`openai-compatible-http` for any
+OpenAI-compatible vendor), `maker`, and the `vetting` record from step 1. The shape is built and
+enforced by `buildConfiguredProviderSetDeploymentRow` in
+`packages/register/src/configured-provider-set.ts`, which `publishGeneral` now applies itself: that
+call takes the deployment (`"hosted"` or `"local"`) and a hosted publication carrying an unvetted
+vendor is refused there rather than at boot.
+
+**There is no hosted publish command yet.** This step is the register publication path — the same
+one the deployment's other rows go through — driven by whoever publishes a register version on
+this host; nothing in `deploy/vps/` runs it for you, and the seeder under `apps/runner/src` is the
+DEVELOPMENT one. Until a hosted command exists, expect to publish the row through that path by
+hand and to verify the new version before restarting anything. `REGISTER_VERSION` in both
+`EnvironmentFile`s then names the new version. Every `provider_ref` in step 3 must appear in this
+row and in the same order, or both services refuse at boot with
+`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`.
+
+Restart `debateai-api` and `debateai-runner` after steps 3 and 4. A vendor whose endpoint does not
+answer the health probe is reported ABSENT and simply does not join a panel; it does not stop the
+service.

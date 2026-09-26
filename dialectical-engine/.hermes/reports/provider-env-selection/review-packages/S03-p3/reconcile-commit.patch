@@ -1,0 +1,41 @@
+diff --git a/dialectical-engine/tests/unit/v9-provider-credential-files.test.ts b/dialectical-engine/tests/unit/v9-provider-credential-files.test.ts
+index 1f9491472..540a8b4b4 100644
+--- a/dialectical-engine/tests/unit/v9-provider-credential-files.test.ts
++++ b/dialectical-engine/tests/unit/v9-provider-credential-files.test.ts
+@@ -733,16 +733,15 @@ describe("S03 §11 says what the shipped code does", () => {
+ 
+   it("README's known-stale list no longer carries the bullets §11 now answers", async () => {
+     const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+-    const start = readme.indexOf("## Known-stale sections");
+-    const stale = readme.slice(start, readme.indexOf("\n---\n", start)).replace(/\s+/gu, " ");
++    // Dev retired the entire banner once its surviving items were documented.
++    // Reintroducing any obsolete §11 bullet must still fail without that heading.
++    const refreshed = readme.replace(/\s+/gu, " ");
++    expect(refreshed).not.toContain("## Known-stale sections");
+     for (const obsolete of [
+       "§11's hosted provider target example",
+       "§11's refusal-code table is incomplete",
+       "the daily call cap is the only ceiling"
+-    ]) expect(stale, obsolete).not.toContain(obsolete);
+-    for (const survivor of ["KEK rotation is not implemented", "deploy/vps/env/api.env.example"]) {
+-      expect(stale, survivor).toContain(survivor);
+-    }
++    ]) expect(refreshed, obsolete).not.toContain(obsolete);
+   });
+ });
+ 
+@@ -775,11 +774,12 @@ describe("S03 the kit names the cost-envelope refusal a hosted operator meets (V
+       readme.indexOf("### The credential-file contract")
+     ).split("\n");
+     expect(refusal.filter((line) => line.startsWith(ROW_START)), "the row, EXACT, once, in the table (C3-5)").toEqual([
+-      "| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows below. |"
++      "| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows above. |"
+     ]);
+     const rowAt = (code: string) => refusal.findIndex((line) => line.startsWith("| `" + code + "` |"));
+     for (const code of ["COST_ENVELOPE_POLICY_UNRESOLVED", "COST_ENVELOPE_POLICY_INVALID"]) {
+-      expect(rowAt(code), `${code}'s row is one of "the two rows below"`).toBeGreaterThan(rowAt("COST_ENVELOPES_NOT_SEALED"));
++      expect(rowAt(code), `${code}'s row exists`).toBeGreaterThanOrEqual(0);
++      expect(rowAt(code), `${code}'s row is one of "the two rows above"`).toBeLessThan(rowAt("COST_ENVELOPES_NOT_SEALED"));
+     }
+     for (const stale of ["are not published yet", "refuses to claim work until they are"]) {
+       expect(collapse(readme), `no "${stale}" anywhere in the README`).not.toContain(stale);

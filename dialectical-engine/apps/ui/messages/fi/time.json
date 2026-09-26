@@ -1,0 +1,21 @@
+{
+  "time.justNow": "juuri nyt",
+  "time.minutes.one": "{count} minuutti sitten",
+  "time.minutes.other": "{count} minuuttia sitten",
+  "time.hours.one": "{count} tunti sitten",
+  "time.hours.other": "{count} tuntia sitten",
+  "time.yesterday": "Eilen",
+  "time.days.one": "{count} päivä sitten",
+  "time.days.other": "{count} päivää sitten",
+  "time.weeks.one": "{count} viikko sitten",
+  "time.weeks.other": "{count} viikkoa sitten",
+  "time.status.complete": "Valmis",
+  "time.status.queued": "Jonossa",
+  "time.status.claimed": "Otettu käsittelyyn",
+  "time.status.running": "Käynnissä",
+  "time.status.holding": "Odottaa palveluntarjoajan palautumista",
+  "time.status.settled": "Ratkaistu",
+  "time.status.generating": "Luodaan",
+  "time.status.failed": "Epäonnistui",
+  "time.status.draft": "Luonnos"
+}

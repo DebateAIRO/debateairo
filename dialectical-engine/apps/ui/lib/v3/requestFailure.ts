@@ -1,4 +1,5 @@
 import { ContractHttpError } from "@debateai/contract";
+import { t,type MessageCatalog } from "../i18n/translate.js";
 
 /**
  * DL3-F7. One typed decision for what a page's error banner says, so no text a
@@ -134,7 +135,12 @@ export function classifyRequestFailure(
 /** The user-facing line for a banner. Never a sentence a server wrote. */
 export function requestFailureMessage(
   subject: RequestFailureSubject,
-  error: unknown
+  error: unknown,
+  catalog?: MessageCatalog
 ): string {
-  return classifyRequestFailure(subject, error).message;
+  const classified = classifyRequestFailure(subject,error);
+  if (catalog === undefined) return classified.message;
+  return `${t(catalog,`requestFailure.subject.${classified.subject}`)} ${
+    t(catalog,`requestFailure.kind.${classified.kind}`)
+  }`;
 }

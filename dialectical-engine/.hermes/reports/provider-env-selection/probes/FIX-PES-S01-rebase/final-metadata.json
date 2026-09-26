@@ -1,0 +1,343 @@
+{
+  "head": "17d68955f7aba06fd1694016ff13f85c0e760088",
+  "backup": "172ee164099c9cab4dde66d80be8e9e782afc899",
+  "base": "a6d6382bae10a7dc5d84cf407f576169b001c0e8",
+  "status": "clean",
+  "ports": 109,
+  "architectureSeconds": 591.72,
+  "runs": [
+    {
+      "cluster": "C1",
+      "run": 1,
+      "pairs": {
+        "tests/unit/pes-s01-operator-command-environment.test.ts": [
+          3,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/v9-deployment-mode.test.ts": [
+          201,
+          0
+        ],
+        "tests/unit/production-environment-floors.test.ts": [
+          24,
+          0
+        ],
+        "tests/unit/dl7-f7-boot-custody.test.ts": [
+          14,
+          0
+        ],
+        "tests/unit/v20-optional-primary-provider-keys.test.ts": [
+          11,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-1.log"
+    },
+    {
+      "cluster": "C1",
+      "run": 2,
+      "pairs": {
+        "tests/unit/pes-s01-operator-command-environment.test.ts": [
+          3,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/v9-deployment-mode.test.ts": [
+          201,
+          0
+        ],
+        "tests/unit/production-environment-floors.test.ts": [
+          24,
+          0
+        ],
+        "tests/unit/dl7-f7-boot-custody.test.ts": [
+          14,
+          0
+        ],
+        "tests/unit/v20-optional-primary-provider-keys.test.ts": [
+          11,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-2.log"
+    },
+    {
+      "cluster": "C1",
+      "run": 3,
+      "pairs": {
+        "tests/unit/pes-s01-operator-command-environment.test.ts": [
+          3,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/v9-deployment-mode.test.ts": [
+          201,
+          0
+        ],
+        "tests/unit/production-environment-floors.test.ts": [
+          24,
+          0
+        ],
+        "tests/unit/dl7-f7-boot-custody.test.ts": [
+          14,
+          0
+        ],
+        "tests/unit/v20-optional-primary-provider-keys.test.ts": [
+          11,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-3.log"
+    },
+    {
+      "cluster": "C2",
+      "run": 1,
+      "pairs": {
+        "tests/unit/pes-s01-hosted-provider-set.test.ts": [
+          37,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/v9-configured-provider-set-deployment.test.ts": [
+          14,
+          0
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-1.log"
+    },
+    {
+      "cluster": "C2",
+      "run": 2,
+      "pairs": {
+        "tests/unit/pes-s01-hosted-provider-set.test.ts": [
+          37,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/v9-configured-provider-set-deployment.test.ts": [
+          14,
+          0
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-2.log"
+    },
+    {
+      "cluster": "C2",
+      "run": 3,
+      "pairs": {
+        "tests/unit/pes-s01-hosted-provider-set.test.ts": [
+          37,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/v9-configured-provider-set-deployment.test.ts": [
+          14,
+          0
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-3.log"
+    },
+    {
+      "cluster": "C3",
+      "run": 1,
+      "pairs": {
+        "tests/integration/pes-s01-hosted-provider-set-publish.test.ts": [
+          16,
+          0
+        ],
+        "tests/architecture/pes-s01-hosted-publish-boundary.test.ts": [
+          4,
+          0
+        ],
+        "tests/architecture/p3-production-database-principals.test.ts": [
+          2,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/integration/dev-deployment-register.test.ts": [
+          15,
+          0
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-1.log"
+    },
+    {
+      "cluster": "C3",
+      "run": 2,
+      "pairs": {
+        "tests/integration/pes-s01-hosted-provider-set-publish.test.ts": [
+          16,
+          0
+        ],
+        "tests/architecture/pes-s01-hosted-publish-boundary.test.ts": [
+          4,
+          0
+        ],
+        "tests/architecture/p3-production-database-principals.test.ts": [
+          2,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/integration/dev-deployment-register.test.ts": [
+          15,
+          0
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-2.log"
+    },
+    {
+      "cluster": "C3",
+      "run": 3,
+      "pairs": {
+        "tests/integration/pes-s01-hosted-provider-set-publish.test.ts": [
+          16,
+          0
+        ],
+        "tests/architecture/pes-s01-hosted-publish-boundary.test.ts": [
+          4,
+          0
+        ],
+        "tests/architecture/p3-production-database-principals.test.ts": [
+          2,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/integration/dev-deployment-register.test.ts": [
+          15,
+          0
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-3.log"
+    },
+    {
+      "cluster": "C4",
+      "run": 1,
+      "pairs": {
+        "acceptance/pes-s01-publish-set-acceptance.test.ts": [
+          9,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-1.log"
+    },
+    {
+      "cluster": "C4",
+      "run": 2,
+      "pairs": {
+        "acceptance/pes-s01-publish-set-acceptance.test.ts": [
+          9,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-2.log"
+    },
+    {
+      "cluster": "C4",
+      "run": 3,
+      "pairs": {
+        "acceptance/pes-s01-publish-set-acceptance.test.ts": [
+          9,
+          0
+        ],
+        "tests/architecture": [
+          746,
+          5
+        ],
+        "tests/unit/text-control-bytes.test.ts": [
+          3,
+          0
+        ]
+      },
+      "marker": "CLUSTER_GREEN",
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-3.log"
+    }
+  ],
+  "baselineFailures": [
+    " FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker",
+    " FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant",
+    " FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role",
+    " FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role",
+    " FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 \u2014 structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge"
+  ],
+  "gitLog": "17d68955f feat(provider-env-selection/S01-C4): prove the hosted publish operator acceptance\n758a6ccee feat(provider-env-selection/S01-C3): add audited hosted publish command\nbac925b3e feat(provider-env-selection/S01-C2): publish vetted hosted sets with role preservation\nc8b0eb1dd feat(provider-env-selection/S01-C1): add frozen operator command environment reader",
+  "completedAt": "2026-09-26 10:13:59 EEST"
+}

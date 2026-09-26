@@ -64,24 +64,31 @@ describe("auth front-door parity", () => {
   // exists, so the arm is re-pointed rather than retired. The assertion texts
   // below are unchanged.
   it("pins the supported auth state machines and excludes invented affordances", async () => {
-    const [login, signUp, verify, enroll] = await Promise.all([
+    const [login, signUp, verify, enroll, englishAuth] = await Promise.all([
       read("apps/ui/components/LoginFlow.tsx"),
       read("apps/ui/components/SignUpFlow.tsx"),
       read("apps/ui/app/verify-email/page.tsx"),
-      read("apps/ui/app/enroll-mfa/page.tsx")
+      read("apps/ui/app/enroll-mfa/page.tsx"),
+      read("apps/ui/messages/en/auth.json")
     ]);
+    const englishAuthCatalog = JSON.parse(englishAuth) as Readonly<Record<string, string>>;
 
     expect(login).toMatch(/client\.beginLogin/);
     expect(login).toMatch(/client\.completeLogin/);
     expect(login).toMatch(/replacement_recovery_code/);
-    expect(login).toMatch(/Enter your authentication code\./);
-    expect(login).toMatch(/Use a recovery code/);
-    expect(login).toMatch(/Enter a recovery code\./);
-    expect(login).toMatch(/Back to sign in/);
+    for (const [key, english] of [
+      ["auth.login.authenticatorTitle", "Enter your authentication code."],
+      ["auth.login.useRecoveryCode", "Use a recovery code"],
+      ["auth.login.recoveryTitle", "Enter a recovery code."],
+      ["auth.login.backToSignIn", "Back to sign in"]
+    ] as const) {
+      expect(login).toContain(`t(catalog, "${key}")`);
+      expect(englishAuthCatalog[key], `${key} English catalogue value`).toBe(english);
+    }
     expect(login).not.toMatch(/localStorage|sessionStorage|Bearer|OAuth|forgot|remember/i);
 
     expect(signUp).toMatch(/client\.register/);
-    expect(signUp).toMatch(/client\.resendVerification/);
+    expect(signUp).not.toMatch(/client\.resendVerification/);
     expect(signUp).toMatch(/section-primary-email email/);
     expect(signUp).toMatch(/section-recovery-email email/);
     expect(signUp).not.toMatch(/localStorage|sessionStorage|Bearer|Google|Model API/i);

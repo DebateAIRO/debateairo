@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect,useRef,useState } from "react";
-import {
-  Assistant,type SupportAssistantLanguage
-} from "./Assistant.js";
-
-const WORDS = Object.freeze({
-  en: Object.freeze({ button: "Help",full: "Open full page" }),
-  ro: Object.freeze({ button: "Ajutor",full: "Deschide pagina completă" })
-});
+import { useChromeI18n } from "../../lib/i18n/I18nProvider";
+import { t } from "../../lib/i18n/translate";
+import { Assistant } from "./Assistant.js";
 
 // The panel folds back into the dock corner on the way out, and those frames need
 // it mounted, so the widget holds a "closing" state for exactly that long. Reduced
@@ -34,9 +29,9 @@ const FULL_PAGE_ARROW = <svg
 ><path d="M5 11l6-6" /><path d="M6 5h5v5" /></svg>;
 
 export function SupportWidget() {
+  const { catalog } = useChromeI18n();
   const [expanded,setExpanded] = useState(false);
   const [closing,setClosing] = useState(false);
-  const [language,setLanguage] = useState<SupportAssistantLanguage>("en");
   const root = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
   const opened = useRef(false);
@@ -71,7 +66,7 @@ export function SupportWidget() {
     if (motionWanted()) setClosing(true);
   }
 
-  const label = WORDS[language].button;
+  const label = t(catalog,"chrome.help");
   const state = expanded ? "expanded" : closing ? "closing" : "collapsed";
   return (
     <div
@@ -101,11 +96,10 @@ export function SupportWidget() {
       {expanded || closing ? (
         <section className="supportWidgetPanel scroll" data-support-widget-panel>
           <Assistant
-            onLanguageChange={setLanguage}
             onClose={close}
           />
           <a className="supportWidgetFullPage" href="/help">
-            <span>{WORDS[language].full}</span>
+            <span>{t(catalog,"support.fullPage")}</span>
             {FULL_PAGE_ARROW}
           </a>
         </section>

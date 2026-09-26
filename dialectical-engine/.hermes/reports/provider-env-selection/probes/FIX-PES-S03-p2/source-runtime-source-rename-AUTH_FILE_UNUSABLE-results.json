@@ -1,0 +1,12 @@
+[
+  {
+    "name": "sd-source-rename-AUTH_FILE_UNUSABLE",
+    "passed": 59,
+    "failed": 2,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the target set resolves its credentials once, in memory (task 10b) > names the provider and the underlying code, never the path or the credential",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-30 hosted: the support chat reaches a paid API and refuses a relay > names the provider, never the path or the credential, when the file cannot be used"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-rename-AUTH_FILE_UNUSABLE-runtime.log"
+  }
+]

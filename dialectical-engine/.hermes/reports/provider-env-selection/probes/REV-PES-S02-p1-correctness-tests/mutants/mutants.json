@@ -1,0 +1,342 @@
+[
+ {
+  "id": "C1-A-value-omitted",
+  "file": "apps/runner/src/dev-api-environment.ts",
+  "old": "    [\"DEBATEAI_DEPLOYMENT_MODE\", \"local\"]\n  ]);",
+  "new": "  ]);",
+  "suites": [
+   "tests/unit/v9-deployment-mode.test.ts"
+  ],
+  "expect": "v9 case (a) RED"
+ },
+ {
+  "id": "C1-A2-value-empty",
+  "file": "apps/runner/src/dev-api-environment.ts",
+  "old": "    [\"DEBATEAI_DEPLOYMENT_MODE\", \"local\"]\n  ]);",
+  "new": "    [\"DEBATEAI_DEPLOYMENT_MODE\", \"\"]\n  ]);",
+  "suites": [
+   "tests/unit/v9-deployment-mode.test.ts"
+  ],
+  "expect": "v9 case (a) RED"
+ },
+ {
+  "id": "C1-R-runner-absent",
+  "file": "apps/runner/src/dev-runner-process.ts",
+  "old": "    DEBATEAI_DEPLOYMENT_MODE: \"local\",\n",
+  "new": "",
+  "suites": [
+   "tests/unit/v9-deployment-mode.test.ts"
+  ],
+  "expect": "v9 case (b) RED"
+ },
+ {
+  "id": "C1-U-upgrade-never",
+  "file": "apps/runner/src/dev-api-environment.ts",
+  "old": "  const declared = existing + DECLARED_LOCAL_DEPLOYMENT_MODE_ROW;\n",
+  "new": "  const declared = existing + DECLARED_LOCAL_DEPLOYMENT_MODE_ROW; if (declared) return false;\n",
+  "suites": [
+   "tests/integration/dev-api-environment.test.ts"
+  ],
+  "expect": "env case (a) RED"
+ },
+ {
+  "id": "C1-D-upgrade-always",
+  "file": "apps/runner/src/dev-api-environment.ts",
+  "old": "  const declared = existing + DECLARED_LOCAL_DEPLOYMENT_MODE_ROW;\n",
+  "new": "  const declared = existing + DECLARED_LOCAL_DEPLOYMENT_MODE_ROW; if (declared) return true;\n",
+  "suites": [
+   "tests/integration/dev-api-environment.test.ts"
+  ],
+  "expect": "env case (b) RED"
+ },
+ {
+  "id": "C1-D2-hosted-row-admitted",
+  "file": "apps/runner/src/dev-api-environment.ts",
+  "old": "existing.includes(\"DEBATEAI_DEPLOYMENT_MODE=\")) return false;",
+  "new": "existing.includes(\"DEBATEAI_DEPLOYMENT_MODE=local\")) return false; if (existing.endsWith(\"DEBATEAI_DEPLOYMENT_MODE=hosted\\n\")) return true;",
+  "suites": [
+   "tests/integration/dev-api-environment.test.ts"
+  ],
+  "expect": "env case (b) RED"
+ },
+ {
+  "id": "C1-L-launcher-unchecked",
+  "file": "apps/runner/src/dev-api-process.ts",
+  "old": "      [\"HATCHET_TLS_STRATEGY\", \"none\"],\n      [\"DEBATEAI_DEPLOYMENT_MODE\", \"local\"]\n",
+  "new": "      [\"HATCHET_TLS_STRATEGY\", \"none\"]\n",
+  "suites": [
+   "tests/integration/dev-api-process.test.ts"
+  ],
+  "expect": "process new case RED"
+ },
+ {
+  "id": "C1-L2-launcher-demands-hosted",
+  "file": "apps/runner/src/dev-api-process.ts",
+  "old": "      [\"DEBATEAI_DEPLOYMENT_MODE\", \"local\"]\n",
+  "new": "      [\"DEBATEAI_DEPLOYMENT_MODE\", \"hosted\"]\n",
+  "suites": [
+   "tests/integration/dev-api-process.test.ts"
+  ],
+  "expect": "process new case RED (positive control half)"
+ },
+ {
+  "id": "F1-san",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "\"subjectAltName = DNS:api.localtest.me\",",
+  "new": "\"subjectAltName = DNS:api.localtest.me,DNS:evil.localtest.me\",",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "case 1 RED"
+ },
+ {
+  "id": "F2-body",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "{\"message\":{\"content\":\"OK\"}}]}');",
+  "new": "{\"message\":{\"content\":\"OK.\"}}]}');",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "case 2 RED"
+ },
+ {
+  "id": "F3-absent-admitted",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "if (request.headers.authorization === FAKE_VENDOR_AUTHORIZATION) {",
+  "new": "if ((request.headers.authorization ?? FAKE_VENDOR_AUTHORIZATION) === FAKE_VENDOR_AUTHORIZATION) {",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "case 3 RED"
+ },
+ {
+  "id": "F3b-prefix-admitted",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "if (request.headers.authorization === FAKE_VENDOR_AUTHORIZATION) {",
+  "new": "if ((request.headers.authorization ?? \"\").startsWith(\"Bearer \")) {",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "case 3 RED"
+ },
+ {
+  "id": "F3c-case-insensitive",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "if (request.headers.authorization === FAKE_VENDOR_AUTHORIZATION) {",
+  "new": "if ((request.headers.authorization ?? \"\").toLowerCase() === FAKE_VENDOR_AUTHORIZATION.toLowerCase()) {",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "SURVIVES? (no case sends a case-variant)"
+ },
+ {
+  "id": "F4-any-ca",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "  const agent = new https.Agent({ ca: [caPem], keepAlive: false });",
+  "new": "  const agent = new https.Agent({ keepAlive: false, rejectUnauthorized: false });",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "case 4 RED"
+ },
+ {
+  "id": "F5-excluded-ignored",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "if (port <= 4400 || FAKE_VENDOR_EXCLUDED_PORTS.has(port)) continue;",
+  "new": "if (port <= 4400) continue;",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "case 5 RED"
+ },
+ {
+  "id": "F5b-floor-ignored",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "if (port <= 4400 || FAKE_VENDOR_EXCLUDED_PORTS.has(port)) continue;",
+  "new": "if (FAKE_VENDOR_EXCLUDED_PORTS.has(port)) continue;",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "SURVIVES? (candidate list in case 5 has no port <=4400 outside the excluded set)"
+ },
+ {
+  "id": "F6-no-family-fallback",
+  "file": "acceptance/pes-s02-fake-vendor.ts",
+  "old": "      rejectUnauthorized: true,\n      ...(lookup === undefined ? {} : { lookup })",
+  "new": "      rejectUnauthorized: true, autoSelectFamily: false,\n      ...(lookup === undefined ? {} : { lookup })",
+  "suites": [
+   "acceptance/pes-s02-fake-vendor.test.ts"
+  ],
+  "expect": "case 6 RED"
+ },
+ {
+  "id": "H1-refusal-order",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "  Object.freeze({\n    id: \"refused-loopback\",",
+  "new": "  Object.freeze({\n    id: \"refused-loopback-x\",",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T1 RED"
+ },
+ {
+  "id": "H2-custody-path-printed",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "    emit(\"PES-S02 ADMITTED vendor:a\");",
+  "new": "    emit(`PES-S02 ADMITTED vendor:a ${credentialPath}`);",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T1/T2 RED"
+ },
+ {
+  "id": "H3-vendor-left-open",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "    try { await vendor?.close(); } catch (error) { rememberFailure(error); }",
+  "new": "",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T3 RED"
+ },
+ {
+  "id": "H4-admission-unchecked",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "      if (members.length !== 1 || members[0]?.provider_ref !== \"vendor:a\" || members[0]?.maker !== \"Acme\") stop(\"FAIL\", \"admitted\");",
+  "new": "",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T4 RED"
+ },
+ {
+  "id": "H5-message-unchecked",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "if (!(caught instanceof Error) || caught.message !== refusal.expected || stage !== refusal.stage)",
+  "new": "if (!(caught instanceof Error) || stage !== refusal.stage)",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T5 RED"
+ },
+ {
+  "id": "H6-fallback-to-127",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "      stop(\"UNVERIFIED\", `dns ${errorCode(error)}`);",
+  "new": "      addresses = [{ address: \"127.0.0.1\", family: 4 }];",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T6 RED"
+ },
+ {
+  "id": "H7-openssl-fail",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "stop(\"UNVERIFIED\", \"tls-material openssl-unavailable\");",
+  "new": "stop(\"FAIL\", \"tls-material openssl-unavailable\");",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T7 RED"
+ },
+ {
+  "id": "H8-law-scheme",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "    || /Bearer \\S/u.test(line)\n",
+  "new": "",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T8 RED"
+ },
+ {
+  "id": "X1-vendor-count-unchecked",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "    if (counts.matched !== 1 || counts.rejected !== 0) stop(\"FAIL\", \"vendor-requests\");",
+  "new": "",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "SURVIVES?"
+ },
+ {
+  "id": "X2-ipv4-loopback-unchecked",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "    if (!addresses.some(({ address }) => address === \"127.0.0.1\")) stop(\"UNVERIFIED\", \"dns no-ipv4-loopback\");",
+  "new": "",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "SURVIVES?"
+ },
+ {
+  "id": "X3-handshake-fail-as-FAIL",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "stop(\"UNVERIFIED\", `trust-seam handshake-${error.message}`);",
+  "new": "stop(\"FAIL\", `trust-seam handshake-${error.message}`);",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "SURVIVES?"
+ },
+ {
+  "id": "X4-default-fetch-accepted-ignored",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "    if (defaultFetchError === undefined) stop(\"UNVERIFIED\", \"trust-seam default-fetch-accepted\");",
+  "new": "",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "SURVIVES?"
+ },
+ {
+  "id": "X5-no-free-port-as-FAIL",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "stop(\"UNVERIFIED\", \"port none-free\");",
+  "new": "stop(\"FAIL\", \"port none-free\");",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "SURVIVES?"
+ },
+ {
+  "id": "X6-custody-layout-unchecked",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "      || entries.length !== 1 || entries[0] !== \"vendor.header\") stop(\"FAIL\", \"custody-layout\");",
+  "new": "      || entries.length !== 1 || entries[0] !== \"vendor.header\") { /* removed */ }",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "SURVIVES? (self-check)"
+ },
+ {
+  "id": "X7-custody-dir-0755",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "    await chmod(custody, 0o700);",
+  "new": "    await chmod(custody, 0o755);",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T1 RED via custody-layout"
+ },
+ {
+  "id": "X8-realpath-path-dropped",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": "forbidden.paths.push(custody, join(await realpath(scratchRoot), \"custody.d\"));",
+  "new": "forbidden.paths.push(custody);",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "SURVIVES? (defensive)"
+ },
+ {
+  "id": "X9-refusal-stage-unchecked",
+  "file": "acceptance/pes-s02-hosted.ts",
+  "old": " || stage !== refusal.stage) stop(\"FAIL\", refusal.id);",
+  "new": ") stop(\"FAIL\", refusal.id);",
+  "suites": [
+   "acceptance/pes-s02-hosted.test.ts"
+  ],
+  "expect": "T1 RED? (refusals[].stage recorded, so only if stage differs)"
+ }
+]

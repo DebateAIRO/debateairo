@@ -1,18 +1,28 @@
 import type { EvidenceIndependence, EvidenceIndependencePair, StrengthKind, UncertaintyDriver, UncertaintySource } from "./types";
+import debateChromeEnglish from "../messages/en/debateChrome.json" with { type: "json" };
+import { t, tPlural, type MessageCatalog } from "./i18n/translate.js";
 
 export type FormattedScorePercent = {
   value: number;
   label: string;
 };
 
-export function formatScorePercent(score: number): FormattedScorePercent {
+export function formatScorePercent(
+  score: number,
+  catalog: MessageCatalog = debateChromeEnglish
+): FormattedScorePercent {
   const normalized = Number.isFinite(score) ? score : 0;
   const value = Math.round(Math.min(1, Math.max(0, normalized)) * 100);
-  return { value, label: `${value} out of 100` };
+  return { value, label: t(catalog, "debateChrome.score.outOf100", { value }) };
 }
 
-export function formatScoreBadgeLabel(title: string, bandLabel: string, score: FormattedScorePercent): string {
-  return `${title} ${bandLabel}, ${score.label}`;
+export function formatScoreBadgeLabel(
+  title: string,
+  bandLabel: string,
+  score: FormattedScorePercent,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
+  return t(catalog, "debateChrome.score.badgeLabel", { title, band: bandLabel, score: score.label });
 }
 
 export type UncertaintyPillContent = {
@@ -40,23 +50,27 @@ export type UncertaintyPillContent = {
 export function formatUncertaintyPill(
   drivers: UncertaintyDriver[] | null | undefined,
   source: UncertaintySource | null | undefined,
-  uncertaintyPercent: FormattedScorePercent
+  uncertaintyPercent: FormattedScorePercent,
+  catalog: MessageCatalog = debateChromeEnglish
 ): UncertaintyPillContent {
   const safeDrivers = drivers ?? [];
   const safeSource: UncertaintySource = source ?? "heuristic";
-  const numericSuffix = `UNC ${uncertaintyPercent.value} · ${safeSource}`;
+  const numericSuffix = t(catalog, "debateChrome.score.uncertaintySuffix", {
+    value: uncertaintyPercent.value,
+    source: safeSource
+  });
 
   const pillText =
     safeDrivers.length > 0
       ? safeDrivers[0].label
       : safeSource === "heuristic"
-        ? "uncertainty unmeasured"
+        ? t(catalog, "debateChrome.score.uncertaintyUnmeasured")
         : numericSuffix;
   const driverText = safeDrivers.length > 0 ? safeDrivers.map((driver) => driver.label).join("; ") : pillText;
 
   return {
     pillText,
-    title: `${driverText} (${numericSuffix})`,
+    title: t(catalog, "debateChrome.score.uncertaintyTitle", { drivers: driverText, numeric: numericSuffix }),
   };
 }
 
@@ -78,14 +92,15 @@ export type StrengthPillContent = {
 // title-carries-detail convention formatUncertaintyPill established above.
 export function formatStrengthPill(
   strengthKind: StrengthKind | null | undefined,
-  strengthPercent: FormattedScorePercent
+  strengthPercent: FormattedScorePercent,
+  catalog: MessageCatalog = debateChromeEnglish
 ): StrengthPillContent {
   if (strengthKind !== "argument_only") {
-    return { pillText: `STR ${strengthPercent.value}` };
+    return { pillText: t(catalog, "debateChrome.score.strength", { value: strengthPercent.value }) };
   }
   return {
-    pillText: `STR ${strengthPercent.value} · argument-only`,
-    title: `Argument-only strength — evidence not weighted for this claim type (${strengthPercent.label})`,
+    pillText: t(catalog, "debateChrome.score.strengthArgumentOnly", { value: strengthPercent.value }),
+    title: t(catalog, "debateChrome.score.strengthArgumentOnlyTitle", { score: strengthPercent.label }),
   };
 }
 
@@ -106,31 +121,39 @@ export type IndependencePillContent = {
 // verified accuracy or training-corpus independence, so both the pill text
 // and the title spell that out rather than using the ambiguous word
 // "independent".
-const INDEPENDENCE_METHOD_LABELS: Record<string, string> = {
-  retrieval: "retrieved",
-  "model-claim": "model claim",
+const INDEPENDENCE_METHOD_KEYS: Record<string, string> = {
+  retrieval: "debateChrome.score.method.retrieved",
+  "model-claim": "debateChrome.score.method.modelClaim",
 };
 
-function formatIndependencePair([domain, method]: EvidenceIndependencePair): string {
-  const domainText = domain ?? "no domain";
-  const methodText = (method && INDEPENDENCE_METHOD_LABELS[method]) || method || "unknown method";
-  return `${domainText} (${methodText})`;
+function formatIndependencePair(
+  [domain, method]: EvidenceIndependencePair,
+  catalog: MessageCatalog
+): string {
+  const domainText = domain ?? t(catalog, "debateChrome.score.noDomain");
+  const methodKey = method ? INDEPENDENCE_METHOD_KEYS[method] : undefined;
+  const methodText = methodKey
+    ? t(catalog, methodKey)
+    : method || t(catalog, "debateChrome.score.unknownMethod");
+  return t(catalog, "debateChrome.score.independencePair", { domain: domainText, method: methodText });
 }
 
 export function formatIndependencePill(
-  independence: EvidenceIndependence | null | undefined
+  independence: EvidenceIndependence | null | undefined,
+  catalog: MessageCatalog = debateChromeEnglish,
+  locale = "en"
 ): IndependencePillContent | null {
   if (!independence || independence.distinct_source_count <= 0) {
     return null;
   }
   const count = independence.distinct_source_count;
-  const pairText = independence.pairs.map(formatIndependencePair).join("; ");
+  const pairText = independence.pairs.map((pair) => formatIndependencePair(pair, catalog)).join("; ");
   const title =
-    `${count} distinct source-domain/method pair${count === 1 ? "" : "s"}` +
-    (pairText ? ` (${pairText})` : "") +
-    " — measures sourcing breadth (where evidence claims to come from), not verified accuracy or training-corpus independence.";
+    tPlural(catalog, "debateChrome.score.distinctPair", count, locale, { count }) +
+    (pairText ? t(catalog, "debateChrome.score.pairDetails", { pairs: pairText }) : "") +
+    t(catalog, "debateChrome.score.independenceExplanation");
   return {
-    pillText: `sources: ${count} distinct`,
+    pillText: t(catalog, "debateChrome.score.sourcesDistinct", { count }),
     title,
   };
 }

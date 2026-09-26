@@ -1,0 +1,22 @@
+[
+  "apps/api/src/main.ts::AUTHORIZATION_DATABASE_URL",
+  "apps/api/src/main.ts::CONTENT_PROVISION_DATABASE_URL",
+  "apps/api/src/main.ts::DATABASE_URL",
+  "apps/api/src/main.ts::ERASURE_DATABASE_URL",
+  "apps/api/src/main.ts::EVALUATOR_DEV_MENU_DATABASE_URL",
+  "apps/api/src/main.ts::PUBLICATION_CLEANUP_DATABASE_URL",
+  "apps/api/src/main.ts::SUPPORT_DATABASE_URL",
+  "apps/observation-agent/src/main.ts::OBSERVATION_DATABASE_URL",
+  "apps/runner/src/dev-database-principals-cli.ts::MIGRATION_DATABASE_URL",
+  "apps/runner/src/dev-deployment-register-cli.ts::MIGRATION_DATABASE_URL",
+  "apps/runner/src/dev-provider-set-publish-cli.ts::MIGRATION_DATABASE_URL",
+  "apps/runner/src/hosted-provider-set-publish-cli.ts::MIGRATION_DATABASE_URL",
+  "apps/runner/src/hosted-register-publish-cli.ts::MIGRATION_DATABASE_URL",
+  "apps/runner/src/main.ts::DATABASE_URL",
+  "apps/runner/src/migrate-cli.ts::MIGRATION_DATABASE_URL",
+  "apps/runner/src/production-database-principals-cli.ts::MIGRATION_DATABASE_URL",
+  "apps/runner/src/rotate-kek-cli.ts::SUPPORT_DATABASE_URL",
+  "apps/scheduler/src/cli.ts::LIVENESS_DATABASE_URL",
+  "apps/scheduler/src/cli.ts::REPLAY_SELF_TEST_DATABASE_URL",
+  "apps/scheduler/src/cli.ts::SETTLEMENT_DATABASE_URL"
+]

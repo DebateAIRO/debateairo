@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
@@ -8,6 +9,7 @@ import {
   readDebateHeaderGeometry,
   shouldCollapseDebateHeaderActions
 } from "../../apps/ui/lib/debateHeaderOverflow.js";
+import { V3_MISSING_CAPABILITIES } from "../../apps/ui/lib/v3/missingCapabilities.js";
 
 /**
  * UI-01 page-wiring guards. The root suite has no DOM renderer, so these
@@ -24,6 +26,20 @@ import {
 function source(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(`../../apps/ui/${relativePath}`, import.meta.url)), "utf8");
 }
+
+function englishCatalog(namespace: string): Readonly<Record<string, string>> {
+  return JSON.parse(
+    readFileSync(resolve(process.cwd(), `apps/ui/messages/en/${namespace}.json`), "utf8")
+  ) as Readonly<Record<string, string>>;
+}
+
+const english = {
+  debateChrome: englishCatalog("debateChrome"),
+  debateViews: englishCatalog("debateViews"),
+  debateDrawers: englishCatalog("debateDrawers"),
+  misc: englishCatalog("misc"),
+  settings: englishCatalog("settings")
+} as const;
 
 function region(text: string, start: string, end: string): string {
   const startIndex = text.indexOf(start);
@@ -47,7 +63,7 @@ const USER_ASK_FIELDS = [
 const MACHINE_ASK_FIELDS = ["decisionScope", "asOf"] as const;
 
 describe("v2-ui /new collects every value the V3 ask requires", () => {
-  const newPage = source("app/new/page.tsx");
+  const newPage = source("app/new/NewDebatePageClient.tsx");
   const defaults = source("app/new/defaults.tsx");
 
   it.each(USER_ASK_FIELDS)("binds a control the asker can actually fill for $config", (field) => {
@@ -161,10 +177,14 @@ describe("v2-ui scoring copy consults the V3 absence rule before crying failure"
       copy.indexOf('if (input.scoringStatus === "unavailable")'),
       copy.indexOf('if (isStaleInputHashMismatch(input))')
     );
-    expect(unavailableBranch).toContain("v3ScoringStatusLabel(input.reason)");
+    // ADDRESS CHANGE, not a relaxation (FIX-DEBATE-CATALOGS follow-up 2, 2026-09-26): the
+    // absence reason is recognised in the reader's compose catalogue.
+    expect(unavailableBranch).toContain("v3ScoringStatusLabel(input.reason, input.composeCatalog ?? composeEnglish)");
+    const failureCopy = 't(catalog, "debateChrome.scoring.checkFailed")';
+    expect(english.debateChrome["debateChrome.scoring.checkFailed"]).toBe("Scoring check failed");
     // The V3 branch must come BEFORE the failure branch, or the label never wins.
     expect(unavailableBranch.indexOf("v3ScoringStatusLabel")).toBeLessThan(
-      unavailableBranch.indexOf("Scoring check failed")
+      unavailableBranch.indexOf(failureCopy)
     );
   });
 
@@ -177,7 +197,9 @@ describe("v2-ui scoring copy consults the V3 absence rule before crying failure"
   it("titles the scoring-insights strip through the same V3 rule (UI-02a)", () => {
     const responseCopy = source("lib/scoringResponse.ts");
     expect(responseCopy).toContain('import { v3ScoringStatusLabel } from "./v3/adapter"');
-    expect(responseCopy).toContain("const v3ScoringLabel = v3ScoringStatusLabel(reason);");
+    // ADDRESS CHANGE, not a relaxation (FIX-DEBATE-CATALOGS follow-up 2, 2026-09-26): the
+    // absence reason is recognised in the reader's compose catalogue.
+    expect(responseCopy).toContain("const v3ScoringLabel = v3ScoringStatusLabel(reason, input.composeCatalog ?? composeEnglish);");
     expect(responseCopy).toContain("title: v3ScoringLabel,");
     // The V3 branch must be reached before BOTH V2 fall-throughs, or a reason
     // mentioning a model/provider or the generic failure title wins instead.
@@ -206,7 +228,9 @@ describe("UI-02a: the node card shows V3's recorded numbers, in V2's own vocabul
   });
 
   it("resolves each card through the adapter instead of reading fields inline", () => {
-    expect(canvas).toContain("v3ScorePresentation(v3NodeScoreState(node, v3NodesById))");
+    // ADDRESS CHANGE, not a relaxation (FIX-DEBATE-CATALOGS follow-up 2, 2026-09-26): the
+    // presentation copy now reads the reader's compose catalogue.
+    expect(canvas).toContain("v3ScorePresentation(v3NodeScoreState(node, v3NodesById), composeCatalog)");
     // No hand-rolled field access: the projection owns the absence rules.
     expect(canvas).not.toContain(".base_score.");
     expect(canvas).not.toContain(".final_strength.");
@@ -263,7 +287,8 @@ describe("v2-ui /admin/workers does not probe operator deployment state", () => 
   const homePage = source("app/page.tsx");
 
   it("keeps the ordinary route honest without invoking operator APIs", () => {
-    expect(workersPage).toContain("Operator-only view");
+    expect(workersPage).toContain('t(catalog, "settings.workers.operatorOnly")');
+    expect(english.settings["settings.workers.operatorOnly"]).toBe("Operator-only view");
     expect(workersPage).not.toMatch(/backendStatus|readDeployment|contractClient|setInterval/);
     expect(homePage).not.toContain('href="/admin/workers"');
   });
@@ -271,10 +296,11 @@ describe("v2-ui /admin/workers does not probe operator deployment state", () => 
 
 describe("v2-ui /settings reports the deployment without inventing money", () => {
   const settingsPage = source("app/settings/page.tsx");
+  const settingsClient = source("components/SettingsPageClient.tsx");
 
   it("reads the deployment projection instead of a V2 settings resource", () => {
-    expect(settingsPage).toContain("getSettingsView");
-    expect(settingsPage).not.toContain("apiFetch");
+    expect(settingsClient).toContain("getSettingsView");
+    expect(settingsClient).not.toContain("apiFetch");
   });
 
   it("renders no fabricated spend or cap number (DR-115)", () => {
@@ -295,14 +321,16 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
   const drawer = source("components/NodeDetailDrawer.tsx");
   const thread = source("components/DebateThread.tsx");
   const tree = source("components/DebateTree.tsx");
-  const settings = source("app/settings/page.tsx");
+  const settings = source("components/SettingsPageClient.tsx");
 
   it("ports CanvasViewport without dropping the approved V3 score and maker inputs", () => {
     expect(canvas).toContain('import { CanvasViewport } from "@/components/CanvasViewport"');
     expect(canvas).toContain("<CanvasViewport");
-    expect(canvas).toContain("v3ScorePresentation(v3NodeScoreState(node, v3NodesById))");
+    expect(canvas).toContain("v3ScorePresentation(v3NodeScoreState(node, v3NodesById), composeCatalog)");
     expect(canvas).toContain("function V3ScoreBadges");
-    expect(canvas).toContain('<ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />');
+    // ADDRESS CHANGE, not a relaxation (FIX-DEBATE-CATALOGS, 2026-09-26): the call
+    // site now also hands over the locale's misc catalogue; maker is still pinned.
+    expect(canvas).toContain('<ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} catalog={miscCatalog} composeCatalog={composeCatalog} />');
     expect(client).toContain("v3NodesById={v3NodeById}");
   });
 
@@ -505,13 +533,55 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
   });
 
   it("kills MUT-B: re-enabling Regenerate while retaining its truthful tooltip", () => {
-    for (const [name, text] of [["canvas", canvas], ["thread", thread], ["tree", tree], ["drawer", drawer]] as const) {
-      const buttons = buttonBlocksContaining(text, "Regenerate");
+    expect(english.debateViews["debateViews.regenerate"]).toBe("Regenerate");
+    expect(english.debateViews["debateViews.nodeRegenerationUnavailable"]).toBe(
+      "V3 exposes no node-regeneration resource."
+    );
+    // DR-146: the localized tooltip stays tied to the ONE capability vocabulary,
+    // so a change to the registry text cannot leave these surfaces drifting.
+    expect(english.debateViews["debateViews.nodeRegenerationUnavailable"]).toBe(
+      V3_MISSING_CAPABILITIES.nodeRegeneration
+    );
+    expect(english.debateDrawers["debateDrawers.node.regenerate"]).toBe("Regenerate");
+    expect(english.debateDrawers["debateDrawers.node.regenerationUnavailable"]).toBe(
+      V3_MISSING_CAPABILITIES.nodeRegeneration
+    );
+    for (const [name, text, label, capability] of [
+      [
+        "canvas",
+        canvas,
+        't(catalog, "debateViews.regenerate")',
+        't(catalog, "debateViews.nodeRegenerationUnavailable")'
+      ],
+      [
+        "thread",
+        thread,
+        't(catalog, "debateViews.regenerate")',
+        't(catalog, "debateViews.nodeRegenerationUnavailable")'
+      ],
+      [
+        "tree",
+        tree,
+        't(catalog, "debateViews.regenerate")',
+        't(catalog, "debateViews.nodeRegenerationUnavailable")'
+      ],
+      [
+        // ADDRESS CHANGE, not a relaxation (FIX-DEBATE-CATALOGS follow-up 3): the
+        // drawer's tooltip read the English registry directly; it now reads its
+        // own debateDrawers key, pinned equal to the registry below, in the
+        // reader's locale.
+        "drawer",
+        drawer,
+        't(catalog, "debateDrawers.node.regenerate")',
+        't(catalog, "debateDrawers.node.regenerationUnavailable")'
+      ]
+    ] as const) {
+      const buttons = buttonBlocksContaining(text, label);
       expect(buttons.length, `${name} regenerate button count`).toBeGreaterThan(0);
       for (const button of buttons) {
         expect(button, `${name} regenerate disabled`).toMatch(/\bdisabled\b/);
         expect(button, `${name} regenerate aria-disabled`).toContain('aria-disabled="true"');
-        expect(button, `${name} regenerate capability`).toContain("V3_MISSING_CAPABILITIES.nodeRegeneration");
+        expect(button, `${name} regenerate capability`).toContain(capability);
         expect(button, `${name} regenerate has no click path`).not.toContain("onClick=");
       }
       expect(text, name).not.toContain("await regenerateNode(");
@@ -519,28 +589,50 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
   });
 
   it("keeps scoring feedback and adaptive-depth approval visible but disabled without refusal calls", () => {
-    expect(drawer).toContain("V3_MISSING_CAPABILITIES.scoringFeedback");
+    // ADDRESS CHANGE, not a relaxation (FIX-DEBATE-CATALOGS follow-up 3): the
+    // scoring-feedback capability copy moved from the English registry into a
+    // debateDrawers key whose English value is pinned to that registry.
+    const feedbackCapability = 't(catalog, "debateDrawers.node.scoringFeedbackUnavailable")';
+    expect(english.debateDrawers["debateDrawers.node.scoringFeedbackUnavailable"]).toBe(
+      V3_MISSING_CAPABILITIES.scoringFeedback
+    );
+    expect(drawer).toContain(feedbackCapability);
+    expect(drawer).not.toContain("V3_MISSING_CAPABILITIES");
     for (const label of ["{upLabel}", "{downLabel}"]) {
       const buttons = buttonBlocksContaining(drawer, label);
       expect(buttons, `${label} feedback control`).toHaveLength(1);
       expect(buttons[0]).toMatch(/\bdisabled\b/);
       expect(buttons[0]).toContain('aria-disabled="true"');
-      expect(buttons[0]).toContain("V3_MISSING_CAPABILITIES.scoringFeedback");
+      expect(buttons[0]).toContain(feedbackCapability);
       expect(buttons[0]).not.toContain("onClick=");
     }
     expect(drawer).not.toContain('onClick={() => onSubmit("up")}');
     expect(drawer).not.toContain('onClick={() => onSubmit("down")}');
-    expect(client).toContain("V3_MISSING_CAPABILITIES.adaptiveDepthApproval");
+    expect(client).toContain('t(catalog, "debateChrome.adaptiveDepth.approvalUnavailable")');
+    expect(english.debateChrome["debateChrome.adaptiveDepth.approvalUnavailable"]).toBe(
+      "V3 exposes no adaptive-depth approval resource."
+    );
+    expect(english.debateChrome["debateChrome.adaptiveDepth.approvalUnavailable"]).toBe(
+      V3_MISSING_CAPABILITIES.adaptiveDepthApproval
+    );
+    expect(english.debateChrome["debateChrome.adaptiveDepth.approveSelected"]).toBe(
+      "Approve selected expansions"
+    );
     const compactScoring = region(client, 'data-scoring-insights-compact="true"', "</ScoringErrorBoundary>");
     expect(compactScoring).toContain("<AdaptiveDepthDryRunPanel");
     expect(compactScoring).toContain("enabled={true}");
     const adaptivePanel = region(client, "function AdaptiveDepthDryRunPanel", "function AdaptiveDepthDryRunChip");
     const unavailablePanel = region(adaptivePanel, 'if (state.status === "error" || state.status === "unavailable")', "  if (!state.data) return null;");
-    const approveButtons = buttonBlocksContaining(unavailablePanel, "Approve selected expansions");
+    const approveButtons = buttonBlocksContaining(
+      unavailablePanel,
+      't(catalog, "debateChrome.adaptiveDepth.approveSelected")'
+    );
     expect(approveButtons).toHaveLength(1);
     expect(approveButtons[0]).toMatch(/\bdisabled\b/);
     expect(approveButtons[0]).toContain('aria-disabled="true"');
-    expect(approveButtons[0]).toContain("V3_MISSING_CAPABILITIES.adaptiveDepthApproval");
+    expect(approveButtons[0]).toContain(
+      't(catalog, "debateChrome.adaptiveDepth.approvalUnavailable")'
+    );
     expect(unavailablePanel).toContain("adaptiveDepthActionMessage");
     expect(client).not.toContain("await approveDebateAdaptiveDepthExpansion(");
     expect(client).not.toContain("await submitScoringFeedback(");
@@ -548,11 +640,18 @@ describe("UI-01 DR-146 rework keeps newer V2 chrome and honest V3 gaps", () => {
   });
 
   it("restores the V2 settings write affordance as disabled-not-hidden", () => {
-    const saveButtons = buttonBlocksContaining(settings, "Save changes");
+    expect(english.settings["settings.operator.saveChanges"]).toBe("Save changes");
+    expect(english.settings["settings.operator.writeUnavailable"]).toBe(
+      "V3 exposes no settings-write resource; deployment configuration is register-governed."
+    );
+    expect(english.settings["settings.operator.writeUnavailable"]).toBe(
+      V3_MISSING_CAPABILITIES.settingsWrite
+    );
+    const saveButtons = buttonBlocksContaining(settings, 't(catalog, "settings.operator.saveChanges")');
     expect(saveButtons).toHaveLength(1);
     expect(saveButtons[0]).toMatch(/\bdisabled\b/);
     expect(saveButtons[0]).toContain('aria-disabled="true"');
-    expect(saveButtons[0]).toContain("V3_MISSING_CAPABILITIES.settingsWrite");
+    expect(saveButtons[0]).toContain('t(catalog, "settings.operator.writeUnavailable")');
     expect(saveButtons[0]).not.toContain("onClick=");
     expect(settings).not.toContain("saveSettings(");
   });
@@ -564,18 +663,35 @@ describe("UI-02c B1 — both shared model renderers consume the tested house lab
 
   it("routes ModelMetaLine and ModelBadge through makerIdentityLabel", () => {
     expect(presentation).toContain('import { makerIdentityLabel } from "@/lib/makerIdentity"');
-    expect(presentation.match(/makerIdentityLabel\(\{ maker, modelId \}\)/g)).toHaveLength(2);
+    // ADDRESS CHANGE, not a relaxation (FIX-DEBATE-CATALOGS follow-up 2, 2026-09-26): the
+    // friendly family name reads the reader's compose catalogue; both renderers still route through it.
+    expect(presentation.match(/makerIdentityLabel\(\{ maker, modelId, catalog: composeCatalog \}\)/g)).toHaveLength(2);
+    expect(english.misc["misc.model.houseUnavailable"]).toBe("House unavailable");
     const metaLine = region(presentation, "export function ModelMetaLine", "export function ModelBadge");
     const badge = presentation.slice(presentation.indexOf("export function ModelBadge"));
     for (const [name, renderer] of [["ModelMetaLine", metaLine], ["ModelBadge", badge]] as const) {
-      expect(renderer.match(/makerIdentityLabel\(\{ maker, modelId \}\)/g), name).toHaveLength(1);
-      expect(renderer.match(/\{label\.text\}/g), name).toHaveLength(1);
+      expect(renderer.match(/makerIdentityLabel\(\{ maker, modelId, catalog: composeCatalog \}\)/g), name).toHaveLength(1);
+      expect(
+        renderer.match(/const visibleLabel = label\.absence \? t\(catalog, "misc\.model\.houseUnavailable"\) : label\.text;/g),
+        name
+      ).toHaveLength(1);
+      expect(renderer.match(/\{visibleLabel\}/g), name).toHaveLength(1);
     }
   });
 
   it("styles typed absence like an unavailable pill and suppresses its identity dot", () => {
-    expect(presentation).toContain('title={label.absence ? "No recorded house is available for this argument." : undefined}');
-    expect(presentation).toContain('aria-label={label.absence ? "No recorded house is available for this argument." : undefined}');
+    expect(english.misc["misc.model.noRecordedHouse"]).toBe(
+      "No recorded house is available for this argument."
+    );
+    expect(presentation.match(
+      /const absenceExplanation = t\(catalog, "misc\.model\.noRecordedHouse"\);/g
+    )).toHaveLength(2);
+    expect(presentation.match(
+      /title=\{label\.absence \? absenceExplanation : undefined\}/g
+    )).toHaveLength(2);
+    expect(presentation.match(
+      /aria-label=\{label\.absence \? absenceExplanation : undefined\}/g
+    )).toHaveLength(2);
     expect(presentation).toMatch(/\{label\.absence \? null : <span className="modelDot"/);
     expect(globals).toMatch(/\[data-maker-absence="true"\]\s*\{[\s\S]*?border:\s*1px solid var\(--line-strong\);[\s\S]*?background:\s*var\(--surface-sunken\);[\s\S]*?color:\s*var\(--muted\);/);
   });
@@ -601,12 +717,16 @@ describe("UI-02d — every non-canvas maker surface preserves its recorded maker
     // so dropping `maker` there would strip all three at once, and without
     // this line re-pointing would have been a quiet weakening.
     expect(meta).toMatch(/export function ReferenceAuthorPill\([\s\S]*?<ModelMetaLine[\s\S]*?maker=\{node\.maker\}[\s\S]*?\/>/);
-    expect(tree).toContain('<ModelBadge modelId={generation?.model_id ?? null} maker={node.maker} />');
-    expect(thread).toContain("<ReferenceAuthorPill node={node} />");
-    expect(outline).toContain('<ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} />');
-    expect(split.match(/<ReferenceAuthorPill node=\{(?:focus|node)\} \/>/g)).toHaveLength(2);
-    expect(map).toMatch(/<ModelMetaLine\s+modelId=\{readoutNode\.active_generation\?\.model_id \?\? null\}\s+maker=\{readoutNode\.maker\}\s+\/>/);
-    expect(drawer.match(/<ModelMetaLine\s+modelId=\{generation\?\.model_id \?\? null\}\s+maker=\{node\.maker\}\s+className="modelPill metaLine"\s*\/>/g)).toHaveLength(2);
+    // ADDRESS CHANGE, not a relaxation (FIX-DEBATE-CATALOGS, 2026-09-26): every
+    // site now also threads the locale's misc catalogue (a Hebrew page must not
+    // fall back to English identity copy); the maker prop is pinned exactly as before.
+    // Follow-up 2 adds the compose catalogue (model family name) at the same sites.
+    expect(tree).toContain('<ModelBadge modelId={generation?.model_id ?? null} maker={node.maker} catalog={miscCatalog} composeCatalog={composeCatalog} />');
+    expect(thread).toContain("<ReferenceAuthorPill node={node} miscCatalog={miscCatalog} composeCatalog={composeCatalog} />");
+    expect(outline).toContain('<ModelMetaLine modelId={generation?.model_id ?? null} maker={node.maker} catalog={miscCatalog} composeCatalog={composeCatalog} />');
+    expect(split.match(/<ReferenceAuthorPill node=\{(?:focus|node)\} miscCatalog=\{miscCatalog\} composeCatalog=\{composeCatalog\} \/>/g)).toHaveLength(2);
+    expect(map).toMatch(/<ModelMetaLine\s+modelId=\{readoutNode\.active_generation\?\.model_id \?\? null\}\s+maker=\{readoutNode\.maker\}\s+catalog=\{miscCatalog\}\s+composeCatalog=\{composeCatalog\}\s+\/>/);
+    expect(drawer.match(/<ModelMetaLine\s+modelId=\{generation\?\.model_id \?\? null\}\s+maker=\{node\.maker\}\s+className="modelPill metaLine"\s+catalog=\{miscCatalog\}\s+composeCatalog=\{composeCatalog\}\s*\/>/g)).toHaveLength(2);
   });
 });
 
@@ -624,7 +744,10 @@ describe("XREV-01 — node review uses the existing V2 card and drawer vocabular
   it("shows reviewer lineage, reasons, and typed absence in the existing drawer", () => {
     expect(drawer).toContain('data-node-review={v3.review?.outcome ?? "absent"}');
     expect(drawer).toContain("v3.review?.reviewer_lineage.maker ?? null");
-    expect(drawer).toContain("No completed second-maker review is recorded for this node.");
+    expect(drawer).toContain('t(catalog, "debateDrawers.node.noCompletedReview")');
+    expect(english.debateDrawers["debateDrawers.node.noCompletedReview"]).toBe(
+      "No completed second-maker review is recorded for this node."
+    );
     expect(drawer).toContain('v3.review.reasons.join(" ")');
   });
 });

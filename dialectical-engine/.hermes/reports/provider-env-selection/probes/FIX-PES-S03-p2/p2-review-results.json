@@ -1,0 +1,623 @@
+[
+  {
+    "lens": "ct",
+    "name": "p1ct-row-unique",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-row-unique.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-row-price-zero-779-781",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-row-price-zero-779-781.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-row-price-required-780",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-row-price-required-780.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-row-discovery-price-invalid-779",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-row-discovery-price-invalid-779.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-price-one-env",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's hosted target carries both price members, in the member table and in both env forms"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-price-one-env.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-daily-cap",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 29,
+    "failed": 2,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's support-chat note names the sealed-envelope refusal, not a daily cap ceiling",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README's known-stale list no longer carries the bullets \u00a711 now answers",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-daily-cap.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-cost-number",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711 states the paid-probe cost exposure in the tree's own numbers"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-cost-number.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-stale-bullet",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README's known-stale list no longer carries the bullets \u00a711 now answers"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-stale-bullet.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-r34-sentence",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's support-chat note names the refusal a hosted operator meets (R3.4)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-r34-sentence.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-row-wording",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-row-wording.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-section10-old-code",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a710's production-maker bullet names the live refusal, and two lines name COST_ENVELOPES_NOT_SEALED (R3.4b b)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-section10-old-code.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-policy-unresolved-row",
+    "before": [
+      "2 failed | 29 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-policy-unresolved-row.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-policy-invalid-row",
+    "before": [
+      "2 failed | 29 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-policy-invalid-row.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1ct-retype",
+    "before": [
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1ct-retype.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p1sd-insert-daily-row",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p1sd-insert-daily-row.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-insert-each-v8-row-RUN",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-insert-each-v8-row-RUN.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-second-table-daily",
+    "before": [
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-second-table-daily.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-second-table-daily-other-header",
+    "before": [
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-second-table-daily-other-header.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-daily-in-meaning-cell",
+    "before": [
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-daily-in-meaning-cell.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-price-rows-swapped-codes",
+    "before": [
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-price-rows-swapped-codes.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-price-zero-row-emptied-meaning",
+    "before": [
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-price-zero-row-emptied-meaning.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-price-zero-moved-to-meaning",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-price-zero-moved-to-meaning.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-src-rename-zero",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": true,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-src-rename-zero.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-src-add-code",
+    "before": [
+      "1 failed | 30 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": true,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-src-add-code.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-retype+src-rename-zero",
+    "before": [
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": true,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-retype+src-rename-zero.log"
+  },
+  {
+    "lens": "ct",
+    "name": "p2-retype+src-add-code",
+    "before": [
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": true,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/ct-p2-retype+src-add-code.log"
+  },
+  {
+    "lens": "sd",
+    "name": "p1-drop-PRICE_INVALID",
+    "before": [
+      "1 failed | 30 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-p1-drop-PRICE_INVALID.log"
+  },
+  {
+    "lens": "sd",
+    "name": "p1-drop-PRICE_REQUIRED",
+    "before": [
+      "1 failed | 30 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-p1-drop-PRICE_REQUIRED.log"
+  },
+  {
+    "lens": "sd",
+    "name": "p1-drop-PRICE_ZERO",
+    "before": [
+      "1 failed | 30 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-p1-drop-PRICE_ZERO.log"
+  },
+  {
+    "lens": "sd",
+    "name": "p1-insert-DAILY-row",
+    "before": [
+      "1 failed | 30 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-p1-insert-DAILY-row.log"
+  },
+  {
+    "lens": "sd",
+    "name": "p1-control-drop-SUPPORT_ADMISSION",
+    "before": [
+      "1 failed | 30 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/architecture/vps-deployment-baseline.test.ts > VPS baseline: runbook and environment templates > README: the Task 14 refresh \u2014 banner removed, every item it listed fixed"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-p1-control-drop-SUPPORT_ADMISSION.log"
+  },
+  {
+    "lens": "sd",
+    "name": "retype-at-head",
+    "before": [
+      "31 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-retype-at-head.log"
+  },
+  {
+    "lens": "sd",
+    "name": "source-rename-PRICE_ZERO",
+    "before": [
+      "1 failed | 30 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": true,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-rename-PRICE_ZERO.log"
+  },
+  {
+    "lens": "sd",
+    "name": "retype+source-rename-PRICE_ZERO",
+    "before": [
+      "31 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": true,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-retype+source-rename-PRICE_ZERO.log"
+  },
+  {
+    "lens": "sd",
+    "name": "source-add-13th-code",
+    "before": [
+      "1 failed | 30 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 30,
+    "failed": 1,
+    "source_fixture_only": true,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-add-13th-code.log"
+  },
+  {
+    "lens": "sd",
+    "name": "retype+source-add-13th-code",
+    "before": [
+      "31 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": true,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-retype+source-add-13th-code.log"
+  },
+  {
+    "lens": "sd",
+    "name": "v8-in-meaning-cell",
+    "before": [
+      "31 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-v8-in-meaning-cell.log"
+  },
+  {
+    "lens": "sd",
+    "name": "v8-prose-above-table",
+    "before": [
+      "31 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-v8-prose-above-table.log"
+  },
+  {
+    "lens": "sd",
+    "name": "v8-second-table-above",
+    "before": [
+      "31 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-v8-second-table-above.log"
+  },
+  {
+    "lens": "sd",
+    "name": "v8-all-four-prose-below",
+    "before": [
+      "31 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": false,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-v8-all-four-prose-below.log"
+  },
+  {
+    "lens": "sd",
+    "name": "heading-reworded",
+    "before": [
+      "3 failed | 28 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 28,
+    "failed": 3,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > lists each code the resolver can produce, read from the source",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-heading-reworded.log"
+  },
+  {
+    "lens": "sd",
+    "name": "source-rename-LOOPBACK",
+    "before": [
+      "31 passed (31)",
+      "31 passed (31)",
+      "40 failed | 161 passed (201)",
+      "1 failed | 29 passed (30)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": true,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-rename-LOOPBACK.log"
+  },
+  {
+    "lens": "sd",
+    "name": "source-rename-AUTH_FILE_UNUSABLE",
+    "before": [
+      "1 failed | 30 passed (31)",
+      "31 passed (31)",
+      "201 passed (201)"
+    ],
+    "passed": 31,
+    "failed": 0,
+    "source_fixture_only": true,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-source-rename-AUTH_FILE_UNUSABLE.log"
+  },
+  {
+    "lens": "sd",
+    "name": "origin-dev-readme",
+    "before": [
+      "8 failed | 23 passed (31)",
+      "31 passed (31)"
+    ],
+    "passed": 24,
+    "failed": 7,
+    "source_fixture_only": false,
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's hosted target carries both price members, in the member table and in both env forms",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's support-chat note names the sealed-envelope refusal, not a daily cap ceiling",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711 states the paid-probe cost exposure in the tree's own numbers",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's support-chat note names the refusal a hosted operator meets (R3.4)",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a710's production-maker bullet names the live refusal, and two lines name COST_ENVELOPES_NOT_SEALED (R3.4b b)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/sd-origin-dev-readme.log"
+  }
+]

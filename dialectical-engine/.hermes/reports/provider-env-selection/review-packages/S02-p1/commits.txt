@@ -1,0 +1,3 @@
+dfef0de94 feat(provider-env-selection/S02-C3): prove hosted admission and fail exits
+5f2134755 feat(provider-env-selection/S02-C2): prove the TLS fake vendor fixture
+c05d43a03 feat(provider-env-selection/S02-C1): declare local mode and preserve exact environment upgrades

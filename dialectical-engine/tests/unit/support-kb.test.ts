@@ -12,6 +12,10 @@ import {
   loadHelpCorpus,
   type SupportReviewManifest,
 } from "../../packages/support-kb/src/index.js";
+import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
+import {
+  loadSupportTemplates,SUPPORT_TEMPLATE_IDS,SUPPORT_TEMPLATES
+} from "../../packages/support-kb/src/templates.js";
 
 type EntryFixture = {
   id: string;
@@ -165,7 +169,181 @@ afterEach(() => {
   }
 });
 
+/**
+ * Dev's English and Romanian support templates, byte for byte: the
+ * `SUPPORT_TEMPLATES` object of `apps/api/src/support/templates.ts` on
+ * origin/dev before the localization moved them to
+ * `packages/support-kb/content/templates/{en,ro}.json` (PLAN-SUPPORT §92: a
+ * deep-equal to "today's `templates.ts` object"). Inlined, not re-read, so the
+ * pin is independent of the JSON and of the loader it checks — a change to any
+ * English or Romanian byte fails here instead of agreeing with itself.
+ */
+const DEV_SUPPORT_TEMPLATES = Object.freeze({
+  DISCLOSURE: Object.freeze({
+    en: "Hi — I'm the Dialectical Engine support assistant, an AI. I can explain how the product works and point you to the right page. I can't sign you in, change your account, or reset anything. For those, use the links I give you, or ask for a person.",
+    ro: "Bună — sunt asistentul de suport Dialectical Engine, o inteligență artificială. Pot explica cum funcționează produsul și te pot îndruma către pagina potrivită. Nu pot să te autentific, să îți modific contul sau să resetez ceva. Pentru acestea folosește linkurile pe care ți le dau sau cere să vorbești cu o persoană."
+  }),
+  NO_SOURCE: Object.freeze({
+    en: "I don't have a source for that, so I won't guess. Ask me something else about how debates work, or choose 'Talk to a human'.",
+    ro: "Nu am o sursă pentru asta, așa că nu voi ghici. Întreabă-mă altceva despre cum funcționează dezbaterile sau alege „Vorbește cu o persoană”."
+  }),
+  REFUSE_ZONE: Object.freeze({
+    en: "I can't help with sign-in, passwords, verification codes, two-factor, account recovery, email changes or account deletion — not even to check them. Those live only in your account pages: {link}. If that page doesn't work for you, choose 'Talk to a human'.",
+    ro: "Nu pot ajuta cu autentificarea, parolele, codurile de verificare, autentificarea în doi pași, recuperarea contului, schimbarea emailului sau ștergerea contului — nici măcar să le verific. Acestea se fac doar din paginile contului tău: {link}. Dacă pagina nu funcționează, alege „Vorbește cu o persoană”."
+  }),
+  REFUSE_INJECTION: Object.freeze({
+    en: "I only follow the product's own instructions, so I'll skip that request. Your message has been recorded. Ask me about the product, or choose 'Talk to a human'.",
+    ro: "Urmez doar instrucțiunile produsului, așa că voi sări peste această cerere. Mesajul tău a fost înregistrat. Întreabă-mă despre produs sau alege „Vorbește cu o persoană”."
+  }),
+  REFUSE_SAFETY: Object.freeze({
+    en: "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
+    ro: "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul."
+  }),
+  DEGRADED: Object.freeze({
+    en: "The assistant's model is unavailable right now. You can still leave a message for a person: choose 'Talk to a human'.",
+    ro: "Modelul asistentului nu este disponibil acum. Poți totuși lăsa un mesaj pentru o persoană: alege „Vorbește cu o persoană”."
+  }),
+  DISABLED: Object.freeze({
+    en: "The support assistant is switched off at the moment.",
+    ro: "Asistentul de suport este oprit momentan."
+  }),
+  RATE_LIMITED: Object.freeze({
+    en: "You've sent a lot of messages in a short time. Please wait a few minutes.",
+    ro: "Ai trimis multe mesaje într-un timp scurt. Te rugăm să aștepți câteva minute."
+  }),
+  RATING: Object.freeze({
+    en: "Did this answer your question? Yes · No · Talk to a human",
+    ro: "Ți-a răspuns la întrebare? Da · Nu · Vorbește cu o persoană"
+  }),
+  CASE_OPENED_MINIMAL: Object.freeze({
+    en: "I've saved this conversation for a person as case {token}. Keep the code; replies will appear here once a person has answered.",
+    ro: "Am salvat această conversație pentru o persoană, cazul {token}. Păstrează codul; răspunsurile vor apărea aici după ce o persoană a răspuns."
+  }),
+  CASE_OPENED: Object.freeze({
+    en: "I've opened case {token} for a person. Expected reply: within {sla} hours. Check replies at {link}. I can't promise an outcome.",
+    ro: "Am deschis cazul {token} pentru o persoană. Răspuns estimat: în {sla} ore. Vezi răspunsurile la {link}. Nu pot promite un rezultat."
+  }),
+  HUMAN_LABEL: Object.freeze({
+    en: "Support (a person)",
+    ro: "Suport (o persoană)"
+  }),
+  NOT_FOUND: Object.freeze({
+    en: "No case with that code.",
+    ro: "Nu există niciun caz cu acest cod."
+  }),
+  CLOSED_LABEL: Object.freeze({
+    en: "This case is closed. You can still reply to reopen it.",
+    ro: "Acest caz este închis. Poți răspunde pentru a-l redeschide."
+  }),
+  SUMMARY_LABEL: Object.freeze({
+    en: "Model-written summary — advisory",
+    ro: "Rezumat scris de model — orientativ"
+  }),
+  SOURCE_LINE: Object.freeze({
+    en: "Source: {title} ({id})",
+    ro: "Sursă: {title} ({id})"
+  }),
+  INCIDENT_ACTIVE: Object.freeze({
+    en: "Known incident since {started_at}: {summary_en} (published by the team). If your problem matches, no need to report it; otherwise choose 'Talk to a human'.",
+    ro: "Incident cunoscut din {started_at}: {summary_ro} (publicat de echipă). Dacă problema ta se potrivește, nu e nevoie să o raportezi; altfel alege „Vorbește cu o persoană”."
+  }),
+  NO_INCIDENT: Object.freeze({
+    en: "I have no record of a current known incident. That doesn't rule one out — if something looks broken, choose 'Talk to a human' and describe it.",
+    ro: "Nu am nicio înregistrare a unui incident cunoscut în acest moment. Asta nu exclude unul — dacă ceva pare stricat, alege „Vorbește cu o persoană” și descrie problema."
+  }),
+  INCIDENT_NOTICE: Object.freeze({
+    en: "Note: there is a known incident affecting {surface} since {started_at}.",
+    ro: "Notă: există un incident cunoscut care afectează {surface} din {started_at}."
+  }),
+  QUEUED: Object.freeze({
+    en: "Waiting for the assistant's model… you are number {n} in line.",
+    ro: "Se așteaptă modelul asistentului… ești numărul {n} la rând."
+  })
+} as const);
+
+/**
+ * Dev's two other en/ro support strings that the localization moved INTO the
+ * template set: `SHREDDED_NOTICE` (dev `apps/api/src/support/templates.ts`) and
+ * `SUPPORT_SUMMARY_REPLACEMENT` (dev `apps/api/src/support/cases.ts`), byte for byte.
+ */
+const DEV_MOVED_SUPPORT_STRINGS = Object.freeze({
+  SHREDDED_NOTICE: Object.freeze({
+    en: "This conversation was erased at the owner's request.",
+    ro: "Această conversație a fost ștearsă la cererea proprietarului."
+  }),
+  SUMMARY_REPLACED: Object.freeze({
+    en: "The advisory summary was omitted because it did not pass Support safety checks.",
+    ro: "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."
+  })
+} as const);
+
+/** The ids the localization ADDED after dev's twenty, in order. */
+const MISSION_ADDED_TEMPLATE_IDS = [
+  "SUMMARY_REPLACED", "SHREDDED_NOTICE", "INCIDENT_SURFACE_DEBATES",
+  "INCIDENT_SURFACE_PUBLISHING", "INCIDENT_SURFACE_SIGN_IN", "INCIDENT_SURFACE_WHOLE_SITE"
+] as const;
+
 describe("Help Corpus loader", () => {
+  it("loads every locale template without changing the English or Romanian bytes",() => {
+    const directory = fileURLToPath(new URL(
+      "../../packages/support-kb/content/templates/",import.meta.url
+    ));
+    const en = JSON.parse(readFileSync(join(directory,"en.json"),"utf8")) as Record<string,string>;
+    const ro = JSON.parse(readFileSync(join(directory,"ro.json"),"utf8")) as Record<string,string>;
+    const devStrings = { ...DEV_SUPPORT_TEMPLATES, ...DEV_MOVED_SUPPORT_STRINGS };
+    const devIds = Object.keys(devStrings) as (keyof typeof devStrings)[];
+    const dev = (language: "en" | "ro") => Object.fromEntries(
+      devIds.map((id) => [id,devStrings[id][language]])
+    );
+    const pick = (values: Readonly<Record<string,string>>) => Object.fromEntries(
+      devIds.map((id) => [id,values[id]])
+    );
+    // Dev's twenty ids keep their order; the localization only APPENDS.
+    expect(SUPPORT_TEMPLATE_IDS).toEqual([
+      ...Object.keys(DEV_SUPPORT_TEMPLATES),...MISSION_ADDED_TEMPLATE_IDS
+    ]);
+    expect(Object.keys(en)).toEqual(SUPPORT_TEMPLATE_IDS);
+    expect(Object.keys(ro)).toEqual(SUPPORT_TEMPLATE_IDS);
+    // The shipped JSON AND the loader's object both equal dev's bytes for every
+    // string dev had (the four INCIDENT_SURFACE_* labels had no dev template).
+    expect(pick(en)).toEqual(dev("en"));
+    expect(pick(ro)).toEqual(dev("ro"));
+    expect(pick(Object.fromEntries(SUPPORT_TEMPLATE_IDS.map((id) => [id,SUPPORT_TEMPLATES[id].en]))))
+      .toEqual(dev("en"));
+    expect(pick(Object.fromEntries(SUPPORT_TEMPLATE_IDS.map((id) => [id,SUPPORT_TEMPLATES[id].ro]))))
+      .toEqual(dev("ro"));
+    for (const locale of SUPPORT_LOCALES) {
+      const values = JSON.parse(readFileSync(
+        join(directory,`${locale}.json`),"utf8"
+      )) as Record<string,string>;
+      expect(Object.keys(values)).toEqual(SUPPORT_TEMPLATE_IDS);
+      if (locale === "en" || locale === "ro") continue;
+      // Translated locales: same ids, non-empty prose, the same {placeholders} as English,
+      // and NOT the English copy the build wave left behind before translation.
+      const placeholders = (text: string) => (text.match(/\{[a-zA-Z0-9_]+\}/g) ?? []).sort();
+      for (const id of SUPPORT_TEMPLATE_IDS) {
+        expect(values[id]!.trim().length,`${locale}/${id} is empty`).toBeGreaterThan(0);
+        expect(placeholders(values[id]!),`${locale}/${id} placeholders`).toEqual(placeholders(en[id]!));
+      }
+      expect(values,`${locale} templates are still the English copy`).not.toEqual(en);
+    }
+  });
+
+  it("fails closed with SUPPORT_TEMPLATE_MISSING when one locale key is absent",() => {
+    const source = fileURLToPath(new URL(
+      "../../packages/support-kb/content/templates/",import.meta.url
+    ));
+    const directory = fixtureDirectory();
+    for (const locale of SUPPORT_LOCALES) {
+      const values = JSON.parse(readFileSync(join(source,`${locale}.json`),"utf8")) as Record<string,string>;
+      if (locale === "ja") delete values.NO_SOURCE;
+      writeFileSync(join(directory,`${locale}.json`),`${JSON.stringify(values)}\n`);
+    }
+    expect(() => loadSupportTemplates(directory)).toThrowError(expect.objectContaining({
+      code:"SUPPORT_TEMPLATE_MISSING"
+    }));
+  });
+
   it("keeps paired public scoring and human-case draft facts aligned", () => {
     const content = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),

@@ -1,0 +1,481 @@
+{
+ "p1-drop-PRICE_INVALID": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 30 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "p1-drop-PRICE_REQUIRED": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 30 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "p1-drop-PRICE_ZERO": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 30 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "p1-insert-DAILY-row": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 30 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "p1-control-drop-SUPPORT_ADMISSION": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 30 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "retype-at-head": {
+  "v9": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "tests/unit/v9-provider-credential-files.test.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "source-rename-PRICE_ZERO": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 30 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "packages/providers/src/index.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "retype+source-rename-PRICE_ZERO": {
+  "v9": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "tests/unit/v9-provider-credential-files.test.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   },
+   "packages/providers/src/index.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "source-add-13th-code": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 30 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "packages/providers/src/index.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "retype+source-add-13th-code": {
+  "v9": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "tests/unit/v9-provider-credential-files.test.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   },
+   "packages/providers/src/index.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "v8-in-meaning-cell": {
+  "v9": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "v8-prose-above-table": {
+  "v9": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "v8-second-table-above": {
+  "v9": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "v8-all-four-prose-below": {
+  "v9": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "heading-reworded": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  3 failed | 28 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > lists each code the resolver can produce, read from the source",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > lists each code the resolver can produce, read from the source",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "source-rename-LOOPBACK": {
+  "v9": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "tests/unit/v9-deployment-mode.test.ts": {
+   "rc": 1,
+   "summary": "Tests  40 failed | 161 passed (201)",
+   "failed": [
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > cgnat-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > cgnat-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ip6-localhost-name-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ip6-loopback-name-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-cgnat-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-link-local-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-loopback-alias-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-loopback-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-private-10-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-private-192-168-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-this-network-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv6-loopback-expanded-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv4-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv4-low-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv6-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv6-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-localdomain-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-localdomain-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-subdomain-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-subdomain-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-trailing-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-uppercase-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-alias-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-decimal-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-range-end-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-shorthand-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-10-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-10-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-172-16-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-172-31-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-192-168-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > refuses every literal address this host holds",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > this-network-high-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > this-network-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ula-fc-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ula-fd-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ula-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > unspecified-ipv4-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "FAIL  tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > unspecified-ipv6-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > cgnat-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > cgnat-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ip6-localhost-name-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ip6-loopback-name-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-cgnat-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-link-local-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-loopback-alias-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-loopback-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-private-10-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-private-192-168-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv4-mapped-this-network-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ipv6-loopback-expanded-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv4-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv4-low-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv6-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > link-local-ipv6-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-localdomain-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-localdomain-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-subdomain-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-subdomain-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-trailing-dot-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > localhost-uppercase-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-alias-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-decimal-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-range-end-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > loopback-shorthand-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-10-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-10-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-172-16-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-172-31-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > private-192-168-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > refuses every literal address this host holds",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > this-network-high-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > this-network-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ula-fc-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ula-fd-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > ula-top-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > unspecified-ipv4-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1",
+    "\u00d7 tests/unit/v9-deployment-mode.test.ts > V-9 mode x provider target (task 10a) > unspecified-ipv6-https: hosted PROVIDER_TARGET_LOOPBACK_REFUSED:provider-1"
+   ]
+  },
+  "tests/unit/v30-support-provider.test.ts": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 29 passed (30)",
+   "failed": [
+    "FAIL  tests/unit/v30-support-provider.test.ts > V-30 hosted: the support chat reaches a paid API and refuses a relay > refuses a TLS relay that merely names this machine",
+    "\u00d7 tests/unit/v30-support-provider.test.ts > V-30 hosted: the support chat reaches a paid API and refuses a relay > refuses a TLS relay that merely names this machine"
+   ]
+  },
+  "restore": {
+   "packages/providers/src/index.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "source-rename-AUTH_FILE_UNUSABLE": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  1 failed | 30 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the target set resolves its credentials once, in memory (task 10b) > names the provider and the underlying code, never the path or the credential",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the target set resolves its credentials once, in memory (task 10b) > names the provider and the underlying code, never the path or the credential"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "tests/unit/v9-deployment-mode.test.ts": {
+   "rc": 0,
+   "summary": "Tests  201 passed (201)",
+   "failed": []
+  },
+  "restore": {
+   "packages/providers/src/index.ts": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ },
+ "origin-dev-readme": {
+  "v9": {
+   "rc": 1,
+   "summary": "Tests  8 failed | 23 passed (31)",
+   "failed": [
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a710's production-maker bullet names the live refusal, and two lines name COST_ENVELOPES_NOT_SEALED (R3.4b b)",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's support-chat note names the refusal a hosted operator meets (R3.4)",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711 states the paid-probe cost exposure in the tree's own numbers",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's hosted target carries both price members, in the member table and in both env forms",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's support-chat note names the sealed-envelope refusal, not a daily cap ceiling",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README's known-stale list no longer carries the bullets \u00a711 now answers",
+    "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a710's production-maker bullet names the live refusal, and two lines name COST_ENVELOPES_NOT_SEALED (R3.4b b)",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's support-chat note names the refusal a hosted operator meets (R3.4)",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711 states the paid-probe cost exposure in the tree's own numbers",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's hosted target carries both price members, in the member table and in both env forms",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's support-chat note names the sealed-envelope refusal, not a daily cap ceiling",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README's known-stale list no longer carries the bullets \u00a711 now answers",
+    "\u00d7 tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > names every start-up refusal the price and cost-envelope surfaces can raise"
+   ]
+  },
+  "baseline": {
+   "rc": 0,
+   "summary": "Tests  31 passed (31)",
+   "failed": []
+  },
+  "restore": {
+   "deploy/vps/README.md": {
+    "cmp": true,
+    "porcelain_same": true
+   }
+  }
+ }
+}

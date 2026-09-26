@@ -5,6 +5,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { contractClient } from "@/lib/api";
 import { ContractHttpError } from "@debateai/contract";
 import type { ContractClient } from "@debateai/contract";
+import publicEnglish from "@/messages/en/public.json";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 type Visibility = Readonly<{
   state: "PRIVATE" | "PUBLISHED";
@@ -16,10 +18,11 @@ type PublicationControlClient=Pick<ContractClient,
   "readRunVisibility"|"stepUp"|"publishRun"|"unpublishRun"|"deletePrivateDebate"
 >;
 
-export function PublicationControl({ runId,onPrivateDeletion,client=contractClient }: {
+export function PublicationControl({ runId,onPrivateDeletion,client=contractClient,catalog=publicEnglish }: {
   readonly runId:string;
   readonly onPrivateDeletion?:(status:PrivateDeletionStatus)=>void;
   readonly client?:PublicationControlClient;
+  readonly catalog?:MessageCatalog;
 }) {
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [action, setAction] = useState<"PUBLISH" | "UNPUBLISH" | null>(null);
@@ -39,9 +42,9 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
     let active = true;
     void client.readRunVisibility(runId)
       .then((next) => { if (active) setVisibility(next); })
-      .catch(() => { if (active) setMessage("Publication status is unavailable."); });
+      .catch(() => { if (active) setMessage(t(catalog, "public.publication.statusUnavailable")); });
     return () => { active = false; };
-  }, [client,runId]);
+  }, [catalog,client,runId]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -64,10 +67,10 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       setCode("");
       setAcknowledged(false);
       setMessage(action === "PUBLISH"
-        ? "Published. Anyone with the link can read it, and search engines may index it."
-        : "Unpublished here. Copies already taken may still exist.");
+        ? t(catalog, "public.publication.publishedSuccess")
+        : t(catalog, "public.publication.unpublishedSuccess"));
     } catch {
-      setMessage("Publication change was not authorized. Recheck your password and authenticator code.");
+      setMessage(t(catalog, "public.publication.changeUnauthorized"));
     } finally {
       setBusy(false);
     }
@@ -96,15 +99,15 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       setDeletePending(status === "PENDING");
       onPrivateDeletion?.(status);
       setMessage(status === "CLEANED"
-        ? "Private debate deleted. Its encrypted content is now a tombstone and cannot be read."
-        : "Private debate deletion is pending durable key cleanup.");
+        ? t(catalog, "public.publication.deletedCleaned")
+        : t(catalog, "public.publication.deletionPending"));
     } catch (failure) {
       if (failure instanceof ContractHttpError && failure.serverCode === "DEBATE_MUST_BE_PRIVATE") {
-        setMessage("This debate must be unpublished, with public-key cleanup complete, before private deletion.");
+        setMessage(t(catalog, "public.publication.mustBePrivate"));
       } else if (failure instanceof ContractHttpError && failure.serverCode === "LEGACY_CONTENT_RETAINED") {
-        setMessage("This claimed legacy debate contains retained plaintext and cannot be reported as cleaned.");
+        setMessage(t(catalog, "public.publication.legacyRetained"));
       } else {
-        setMessage("Private debate deletion was not authorized. Recheck your credentials.");
+        setMessage(t(catalog, "public.publication.deletionUnauthorized"));
       }
     } finally {
       setBusy(false);
@@ -113,30 +116,30 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
 
   const selected = action ?? (visibility?.state === "PUBLISHED" ? "UNPUBLISH" : "PUBLISH");
   const warning = selected === "PUBLISH"
-    ? "Publishing makes this debate readable by anyone and may allow search engines to index it. It leaves your private deletion envelope, and public copies may persist even if you later unpublish or delete your account."
-    : "Unpublishing stops future anonymous reads from DebateAI, but copies already downloaded, quoted, cached, or indexed may persist.";
+    ? t(catalog, "public.publication.publishWarning")
+    : t(catalog, "public.publication.unpublishWarning");
 
   if (deleted) {
     return (
-      <section className="card" aria-label="Deleted private debate">
-        <h2>Private debate deleted</h2>
-        <p role="status">This debate is a tombstone. Its encrypted private content is permanently unreadable.</p>
+      <section className="card" aria-label={t(catalog, "public.publication.deletedAria")}>
+        <h2>{t(catalog, "public.publication.privateDeletedHeading")}</h2>
+        <p role="status">{t(catalog, "public.publication.tombstone")}</p>
       </section>
     );
   }
 
   return (
-    <section className="card" data-support-primary-control aria-label="Publication controls">
-      <h2>Visibility</h2>
+    <section className="card" data-support-primary-control aria-label={t(catalog, "public.publication.controlsAria")}>
+      <h2>{t(catalog, "public.publication.visibility")}</h2>
       <p>
         {visibility === null
-          ? "Checking visibility…"
+          ? t(catalog, "public.publication.checking")
           : visibility.state === "PRIVATE"
-            ? "Private — only your account can read this debate."
-            : "Published — this debate has a separate permanent public snapshot."}
+            ? t(catalog, "public.publication.privateStatus")
+            : t(catalog, "public.publication.publishedStatus")}
       </p>
       {visibility?.state === "PUBLISHED" && visibility.public_ref !== null ? (
-        <p><Link href={`/public/debate/${visibility.public_ref}`}>Open the public version</Link></p>
+        <p><Link href={`/public/debate/${visibility.public_ref}`}>{t(catalog, "public.publication.openPublicVersion")}</Link></p>
       ) : null}
       {action === null ? (
         <button
@@ -148,13 +151,15 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
             setAction(visibility?.state === "PUBLISHED" ? "UNPUBLISH" : "PUBLISH");
           }}
         >
-          {visibility?.state === "PUBLISHED" ? "Unpublish…" : "Publish…"}
+          {visibility?.state === "PUBLISHED"
+            ? t(catalog, "public.publication.unpublishEllipsis")
+            : t(catalog, "public.publication.publishEllipsis")}
         </button>
       ) : (
         <form onSubmit={(event) => void submit(event)}>
           <p><strong>{warning}</strong></p>
           <label>
-            Account password
+            {t(catalog, "public.publication.accountPassword")}
             <input
               type="password"
               autoComplete="current-password"
@@ -164,7 +169,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
             />
           </label>
           <label>
-            Authenticator code
+            {t(catalog, "public.publication.authenticatorCode")}
             <input
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -181,22 +186,27 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
               onChange={(event) => setAcknowledged(event.target.checked)}
               required
             />
-            I understand and want to {selected === "PUBLISH" ? "publish" : "unpublish"} this debate.
+            {selected === "PUBLISH"
+              ? t(catalog, "public.publication.acknowledgePublish")
+              : t(catalog, "public.publication.acknowledgeUnpublish")}
           </label>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button className="button" disabled={!acknowledged || busy}>
-              {busy ? "Authorizing…" : selected === "PUBLISH" ? "Publish publicly" : "Unpublish"}
+              {busy
+                ? t(catalog, "public.publication.authorizing")
+                : selected === "PUBLISH"
+                  ? t(catalog, "public.publication.publishPublicly")
+                  : t(catalog, "public.publication.unpublish")}
             </button>
-            <button type="button" className="button" disabled={busy} onClick={() => setAction(null)}>Cancel</button>
+            <button type="button" className="button" disabled={busy} onClick={() => setAction(null)}>{t(catalog, "public.publication.cancel")}</button>
           </div>
         </form>
       )}
       {visibility?.state === "PRIVATE" ? (
         <div style={{ marginTop: 24 }}>
-          <h3>Delete this private debate</h3>
+          <h3>{t(catalog, "public.publication.deleteHeading")}</h3>
           <p>
-            Deleting destroys the private content keys and makes encrypted debate content permanently unreadable.
-            This cannot be undone. Claimed legacy plaintext is retained and will not be reported as cleaned.
+            {t(catalog, "public.publication.deleteExplanation")}
           </p>
           {!deleteOpen ? (
             <button
@@ -205,12 +215,14 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
               disabled={busy || deletePending}
               onClick={() => { setAction(null); setDeleteOpen(true); }}
             >
-              {deletePending ? "Deletion pending" : "Delete private debate…"}
+              {deletePending
+                ? t(catalog, "public.publication.deletionPendingShort")
+                : t(catalog, "public.publication.deletePrivateEllipsis")}
             </button>
           ) : (
             <form onSubmit={(event) => void deletePrivate(event)}>
               <label>
-                Account password
+                {t(catalog, "public.publication.accountPassword")}
                 <input
                   type="password"
                   autoComplete="current-password"
@@ -220,7 +232,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
                 />
               </label>
               <label>
-                Authenticator code
+                {t(catalog, "public.publication.authenticatorCode")}
                 <input
                   inputMode="numeric"
                   autoComplete="one-time-code"
@@ -237,14 +249,16 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
                   onChange={(event) => setDeleteAcknowledged(event.target.checked)}
                   required
                 />
-                I understand that this private debate cannot be recovered after key destruction.
+                {t(catalog, "public.publication.deleteAcknowledgement")}
               </label>
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                 <button className="button" disabled={busy || !deleteAcknowledged}>
-                  {busy ? "Authorizing…" : "Permanently delete private debate"}
+                  {busy
+                    ? t(catalog, "public.publication.authorizing")
+                    : t(catalog, "public.publication.permanentlyDelete")}
                 </button>
                 <button type="button" className="button" disabled={busy} onClick={() => setDeleteOpen(false)}>
-                  Cancel
+                  {t(catalog, "public.publication.cancel")}
                 </button>
               </div>
             </form>

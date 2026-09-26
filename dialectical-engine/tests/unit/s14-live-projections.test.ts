@@ -43,13 +43,14 @@ describe("S14 / W20 / W8-W15 — typed UI projections", () => {
     expect(CONDITION_MARKS).toContain("UNSERVED-MAKER-POSITION");
     // The retired `web/lib/v3Presentation` renderer and its label-text pin left
     // with their module; the shipped apps/ui renderer carries the property.
-    const labels = CONDITION_MARKS.map(conditionMarkLabel);
+    const labels = CONDITION_MARKS.map((mark) => conditionMarkLabel(mark));
     expect(labels.every((label) => label.trim().length > 0)).toBe(true);
     expect(new Set(labels).size).toBe(CONDITION_MARKS.length);
   });
 
   it("has a renderer for every one of spec section 12.3's five abstention kinds", () => {
-    expect(ABSTENTION_KINDS.map(abstentionKindLabel).every((label) => label.trim().length > 0)).toBe(true);
+    expect(ABSTENTION_KINDS.map((kind) => abstentionKindLabel(kind))
+      .every((label) => label.trim().length > 0)).toBe(true);
   });
 });
 

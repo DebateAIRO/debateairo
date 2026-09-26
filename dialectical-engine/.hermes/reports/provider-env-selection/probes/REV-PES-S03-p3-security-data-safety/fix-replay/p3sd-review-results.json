@@ -1,0 +1,42 @@
+[
+  {
+    "label": "drop-PROVIDER_DISCOVERY_TARGET_PRICE_INVALID",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-review-drop-PROVIDER_DISCOVERY_TARGET_PRICE_INVALID-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_TARGET_PRICE_REQUIRED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-review-drop-PROVIDER_TARGET_PRICE_REQUIRED-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_TARGET_PRICE_ZERO",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-review-drop-PROVIDER_TARGET_PRICE_ZERO-attempt-1.log"
+  },
+  {
+    "label": "insert-DAILY_COST_ENVELOPE_REACHED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-review-insert-DAILY_COST_ENVELOPE_REACHED-attempt-1.log"
+  },
+  {
+    "label": "control-support",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-review-control-support-attempt-1.log"
+  }
+]

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { channelBinding, mfaFactor, recoveryCode } from "../../packages/db/src/schema.js";
 import { MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue } from "../../packages/register/src/mfa-policy.js";
@@ -49,15 +50,18 @@ describe("S4 MFA architecture contract", () => {
   });
 
   it("keeps provisioning local and same-origin with no browser persistence", async () => {
-    const [page, client, qr] = await Promise.all([
+    const [page, client, qr, englishAuth] = await Promise.all([
       read("apps/ui/app/enroll-mfa/page.tsx"),
       read("apps/ui/lib/mfaEnrollment.ts"),
-      read("apps/ui/lib/totpQr.ts")
+      read("apps/ui/lib/totpQr.ts"),
+      readFile(join(process.cwd(), "apps/ui/messages/en/auth.json"), "utf8")
     ]);
+    const englishAuthCatalog = JSON.parse(englishAuth) as Readonly<Record<string, string>>;
     expect(client).toMatch(/createSameOriginFetch\(API_BASE\)/);
     expect(qr).not.toMatch(/fetch\(|https?:\/\//);
     expect(`${page}\n${client}`).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
-    expect(page).toMatch(/Copyable setup key/);
+    expect(page).toContain('t(catalog, "auth.enroll.copyableSetupKey")');
+    expect(englishAuthCatalog["auth.enroll.copyableSetupKey"]).toBe("Copyable setup key");
     expect(page).toMatch(/setProvisioning\(null\)/);
   });
 });

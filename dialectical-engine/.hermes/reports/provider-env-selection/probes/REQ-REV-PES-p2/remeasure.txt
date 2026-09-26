@@ -1,0 +1,299 @@
+REQ-REV-PES-p2 probes. Lane /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-base/dialectical-engine
+date: 2026-09-24T15:00:10+0300
+HEAD: 776359c3851289c25cb6ede3633cdce3e14adba6 dirty=0
+
+===== wc -l INSTRUCTIONS.md =====
+      99 /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/provider-env-selection/INSTRUCTIONS.md
+
+===== v1 SPEC.md frozen? diff --stat vs HEAD of those paths (empty means no uncommitted edit; commit identity below) =====
+SPEC.md blobs at 84106e07 vs worktree file:
+14d0d46e0e448f0f639e175d0c1a866290017ab8
+
+===== detectors v1 =====
+REQ-FIX-PES detectors against v1
+  FAIL  B1  hosted-set inputs determine the row
+          - no `row member | its ONE source` table in the S01 SPEC of record
+          - still claims two inputs determine the row
+          - vacuous order code still live: before publishing, printing `PES_PUBLISH_SET_ORDER_MISMATCH:` and the first ref that diffe
+          - vacuous order code still live: `PES-S01 CASE order-mismatch ` whose remainder begins `PES_PUBLISH_SET_ORDER_MISMATCH:`; a
+          - no shipped-parser self-check replaces the order code
+  FAIL  B2  S02 is vertical in every document
+          - S02:~7 still claims the S01 dependency: Depends on S01: step 5 of §5 publishes the hosted row with the command S01 ships. Until S0
+          - S02:~7 still claims the S01 dependency: Until S01 is merged into the lane, steps 1–4 and 6–9 run and step 5 is UNVERIFIED.  ## 1.
+          - INSTRUCTIONS:~34 still claims the S01 dependency: S02 depends on S01 (its acceptance step 5 publishes with S01's command). S03 is independen
+          - INSTRUCTIONS:~34 still claims the S01 dependency: publishes with S01's command). S03 is independent of both.  ## Roster and review route  |
+          - S02PLAN:~22 still claims the S01 dependency: merged into this lane, or step 5 of SPEC §5 is UNVERIFIED | SPEC header |  ## 2. SPEC → st
+  FAIL  B3  the stdout rule admits the codes the acceptance prints
+          - R2.9 forbids the WORD `authorization`, which the acceptance must print
+          - acceptance prints PROVIDER_AUTHORIZATION_FILE_ABSENT; R2.9 does not declare it lawful
+          - acceptance prints PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT; R2.9 does not declare it lawful
+  FAIL  N3,N4,N5,N7,N8,N9,N10  named sources
+          - N3: R2.5 does not quote the body provider-probe.ts:103 accepts
+          - N4: the TLS trust mechanism is not named
+          - N5: the runner environment record is not named
+          - N7: acceptance step 2 still defers the path to PLAN.md
+          - N8: no step records the lsof baseline before the run
+          - N9: R1.8 names no literal receipt prefix
+          - N10: the two parse call sites are not cited at 300 / 74
+  pass  --  no banned word in a SPEC
+  pass  --  SPEC<->PLAN trace, both directions
+v1: FAIL (4 failing checks)
+rc=1
+
+===== detectors v2 =====
+REQ-FIX-PES detectors against v2
+  pass  B1  hosted-set inputs determine the row
+  pass  B2  S02 is vertical in every document
+  pass  B3  the stdout rule admits the codes the acceptance prints
+  pass  N3,N4,N5,N7,N8,N9,N10  named sources
+  pass  --  no banned word in a SPEC
+  pass  --  SPEC<->PLAN trace, both directions
+v2: PASS (0 failing checks)
+rc=0
+
+===== replay p1 probe 4: builder callers under apps =====
+-- apps --
+(eval):31: command not found: rg
+-- packages+tests count --
+(eval):33: command not found: rg
+
+===== replay p1 probe 6: DEBATEAI_DEPLOYMENT_MODE under apps =====
+(eval):36: command not found: rg
+NO HITS under apps
+
+===== parser control flow (shipped source) =====
+export function parseProviderDiscoveryTargets(
+  source: string,
+  configuredProviders: readonly Readonly<{ providerRef: string; maker: string }>[]
+): readonly ProviderDiscoveryTarget[] {
+  if (Buffer.byteLength(source, "utf8") > MAX_PROVIDER_TARGET_CONFIG_BYTES) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+  }
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(source);
+  } catch {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+  }
+  if (!Array.isArray(decoded) || decoded.length < 1 || decoded.length > MAX_PROVIDER_TARGETS) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
+  }
+  const configuredByRef = new Map<string, string>();
+  for (const configured of configuredProviders) {
+    const providerRef = requiredProviderTargetText(
+      configured.providerRef,
+      "CONFIGURED_PROVIDER_INVALID"
+    );
+    const maker = requiredProviderTargetText(configured.maker, "CONFIGURED_PROVIDER_INVALID");
+    if (configuredByRef.has(providerRef)) throw new TypeError("CONFIGURED_PROVIDER_DUPLICATE");
+    configuredByRef.set(providerRef, maker);
+    const providerRef = requiredProviderTargetText(
+      row.provider_ref,
+      "PROVIDER_DISCOVERY_TARGET_PROVIDER_REF_INVALID"
+    );
+    if (targetsByRef.has(providerRef)) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_DUPLICATE");
+    }
+    const maker = configuredByRef.get(providerRef);
+    if (maker === undefined) throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+
+===== builder duplicate refusal =====
+  for (const provider of providers) {
+    if (typeof provider !== "object" || provider === null
+      || !namedText(provider.providerRef)
+      || !namedText(provider.adapterKind)
+      || !namedText(provider.maker)) {
+      throw new TypeError("CONFIGURED_PROVIDER_SET_INVALID");
+    }
+    if (refs.has(provider.providerRef)) throw new TypeError("CONFIGURED_PROVIDER_SET_INVALID");
+    refs.add(provider.providerRef);
+  }
+/**
+ * The superseding DEPLOYMENT version. `sealedSourceRef` is the provenance the
+ * sealed row carried; the ruling is appended to it rather than replacing it, so
+ * the row's history reads forward.
+ */
+export function buildConfiguredProviderSetDeploymentRow(
+  input: Readonly<{
+    requiredDistinctMakers: number;
+    providers: readonly VettedConfiguredProvider[];
+  }>,
+  sealedSourceRef: string
+): ConfiguredProviderSetRow {
+  assertConfiguredProviderSetShape(input.requiredDistinctMakers, input.providers);
+  for (const provider of input.providers) assertVendorVetted(provider);
+  return Object.freeze({
+    rowKey: CONFIGURED_PROVIDER_SET_ROW_KEY,
+    value: Object.freeze({
+      kind: "CONFIGURED_PROVIDER_SET" as const,
+      setVersion: CONFIGURED_PROVIDER_SET_DEPLOYMENT_VERSION,
+      requiredDistinctMakers: input.requiredDistinctMakers,
+      providers: input.providers
+    }),
+    sourceRef: `${sealedSourceRef}${CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF}`
+  });
+
+===== publishGeneral required keys =====
+/** The four members that make a publication's request identity (its sha256). */
+export interface GeneralRegisterPublicationRequest {
+  readonly publicationId: string;
+  readonly baseRegisterVersion: RegisterVersionText;
+  readonly rows: readonly RegisterPublicationRow[];
+  readonly sourceRef: string;
+}
+
+export interface GeneralRegisterPublication extends GeneralRegisterPublicationRequest {
+  /**
+   * Not part of the request hash: it is a gate on WHO may publish these rows,
+   * not a fact about the rows, and two deployments publishing identical rows
+   * must still replay identically.
+   */
+  readonly deployment: RegisterPublicationDeployment;
+}
+    async publishGeneral(input: GeneralRegisterPublication) {
+      requirePlainExact(
+        input,
+        ["publicationId", "baseRegisterVersion", "rows", "sourceRef", "deployment"],
+        "REGISTER_PUBLICATION_INPUT_INVALID"
+
+===== resolver required numbers =====
+export function createProviderDiscoveryResolver(input: Readonly<{
+  configuredProviders: readonly Readonly<{ providerRef: string; maker: string }>[];
+  targets: readonly ProviderDiscoveryTarget[];
+  probes: ProviderDiscoveryProbeStore;
+  probeFreshnessMs: number;
+  probeTimeoutMs: number;
+  fetchImplementation?: typeof fetch;
+  clock?: () => Date;
+}>): () => Promise<readonly DiscoveredPanelMember[]> {
+  if (!Number.isInteger(input.probeFreshnessMs) || input.probeFreshnessMs < 1) {
+    throw new TypeError("PROVIDER_PROBE_FRESHNESS_INVALID");
+  }
+  if (!Number.isInteger(input.probeTimeoutMs) || input.probeTimeoutMs < 1) {
+    throw new TypeError("PROVIDER_PROBE_TIMEOUT_INVALID");
+  }
+  const expectedRefs = input.configuredProviders.map((provider) => provider.providerRef);
+  if (expectedRefs.length !== input.targets.length
+    || input.targets.some((target, index) => target.providerRef !== expectedRefs[index]
+      || target.maker !== input.configuredProviders[index]?.maker)) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+  }
+  const fetchImplementation = input.fetchImplementation ?? fetch;
+  const clock = input.clock ?? (() => new Date());
+
+===== runner record start =====
+  return Object.freeze({
+    ...commandEnvironment,
+    KEK_PATH: apiEnvironment.KEK_PATH!,
+    DATABASE_URL: apiEnvironment.DATABASE_URL!,
+    RUNNER_WORKER_ID: "development:walking-skeleton",
+    REGISTER_VERSION: registerVersion,
+    REGISTER_DEPLOYMENT_RECEIPT_SHA256: apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_SHA256!,
+    REGISTER_DEPLOYMENT_RECEIPT_FILE: apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_FILE!,
+    CONTENT_ENCRYPTION_ENABLED: apiEnvironment.CONTENT_ENCRYPTION_ENABLED!,
+    USER_DEK_STORE_PATH: apiEnvironment.USER_DEK_STORE_PATH!,
+
+===== probe accept condition =====
+const MAX_PROBE_RESPONSE_BYTES = 64 * 1024;
+    if (!response.ok || Buffer.byteLength(raw, "utf8") > MAX_PROBE_RESPONSE_BYTES) {
+    if (decoded.model !== input.target.model || content !== "OK") {
+      throw new TypeError("PROVIDER_PROBE_RESPONSE_INVALID");
+    }
+
+===== custody contract =====
+### The credential-file contract
+
+The file holds the `authorization` header **value** verbatim — the scheme word, a space and the
+vendor's token — with at most one trailing newline, and nothing else. It is read under the same
+custody contract as every key file (§3): `0600` owned by the service user, one hard link, no
+symlink, inside a `0700` directory owned by the same user, and at most 4 KiB. The bytes are zeroed
+| `authorization_file` | the absolute path from step 2 — **that service's own copy**: the runner's path in `runner.env`, the API's in `api.env` |
+
+In `runner.env` the entry for the example above reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header"}`,
+and in `api.env` the same entry with `/etc/debateai/api/providers/acme.header`.
+
+===== parse call sites =====
+const declaredProviderTargets = boot.runSync("provider-targets", () => {
+  const declared = parseProviderDiscoveryTargets(
+    providerTargetsJson, deploymentMakers.configuredProviders
+  );
+  // V-9(c): the same mode decision the runner takes, over the same target set,
+  // and taken on the DECLARED targets — before any credential file is resolved.
+  assertDeploymentProviderTargets(declared, {
+    mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+  });
+---
+const declaredProviderTargets = parseProviderDiscoveryTargets(
+  environment.PROVIDER_DISCOVERY_TARGETS_JSON,
+  deploymentMakers.configuredProviders
+);
+// The mode decision is taken on what the operator DECLARED, before any credential
+// is resolved: that is what makes an inline `authorization_header` refusable in
+// hosted mode even though a resolved target legitimately carries a header.
+assertDeploymentProviderTargets(declaredProviderTargets, {
+  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+});
+
+===== receipt prefix =====
+export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_FILENAME =
+  "deployment-register-receipt.v1.json" as const;
+export const DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX =
+  "DEV_DEPLOYMENT_REGISTER_RECEIPT_V1=" as const;
+  if (!line.startsWith(DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX)
+    || line.includes("\n")) {
+    throw new TypeError("DEV_DEPLOYMENT_REGISTER_RECEIPT_OUTPUT_INVALID");
+  }
+  const fromOutput = parseReceiptJson(
+    `${line.slice(DEVELOPMENT_DEPLOYMENT_REGISTER_RECEIPT_STDOUT_PREFIX.length)}\n`
+  const receipt = createDevelopmentDeploymentRegisterMachineReceipt({
+    registerVersion: published.registerVersion,
+    rowCount: published.rowCount,
+    snapshotSha256: published.snapshotSha256
+  });
+
+===== timeout default =====
+    PROVIDER_DISCOVERY_TARGETS_JSON: z.string().min(1).optional(),
+    SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
+    PROVIDER_PROBE_TIMEOUT_MS: positiveInteger.default(5_000),
+    NODE_ENV: z.enum(["development", "test", "production"]).optional(),
+    EVALUATOR_DEV_MENU_ENABLED: z.enum(["true", "false"]).default("false"),
+
+===== banned words in SPEC-v2 (expect none) =====
+(eval):71: command not found: rg
+NO BANNED HITS
+
+===== stale-spike phrases in SPEC-v2 =====
+(eval):76: command not found: rg
+NO STALE-PHRASE HITS
+
+===== skill paths the REQ-FIX READY line names =====
+EXISTS /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/receiving-code-review/SKILL.md
+EXISTS /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/using-superpowers/SKILL.md
+EXISTS /Users/vladmihaimiron/.claude/skills/heartbeat-protocol/SKILL.md
+EXISTS /Users/vladmihaimiron/.claude/skills/heartbeat-requirements/SKILL.md
+EXISTS /Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/brainstorming/SKILL.md
+
+===== lane dirty after probes =====
+       0
+
+
+===== CORRECTION (the rg lines above are not evidence) =====
+`rg` was not on PATH inside that shell (`command not found: rg`). The lines
+"NO HITS under apps" and "NO BANNED HITS" / "NO STALE-PHRASE HITS" were the
+`|| echo` fallback, not search results. The `sed -n '232,256p;288,296p'` block
+concatenates two ranges; do not read it as one contiguous function. Re-measured
+with the editor grep and with python, below.
+
+===== builder callers under apps (python walk) =====
+NO MATCHES under apps/**/*.ts
+
+===== DEBATEAI_DEPLOYMENT_MODE under apps (python walk) =====
+NO MATCHES under apps/**/*.ts
+
+===== banned / stale in SPEC-v2 (python) =====
+docs/missions/provider-env-selection/slices/S01/SPEC-v2.md banned=0 stale=0
+docs/missions/provider-env-selection/slices/S02/SPEC-v2.md banned=0 stale=0
+
+===== banned/stale recheck with a real word-boundary =====
+docs/missions/provider-env-selection/slices/S01/SPEC-v2.md banned=0 stale=0
+docs/missions/provider-env-selection/slices/S02/SPEC-v2.md banned=0 stale=0

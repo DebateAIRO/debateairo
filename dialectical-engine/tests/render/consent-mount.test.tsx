@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
 import { CookieConsent } from "../../apps/ui/components/consent/CookieConsent.js";
 import { ConsentSettingsPanel } from "../../apps/ui/components/consent/ConsentSettingsPanel.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
 
 /**
  * **Why the card is wrapped rather than driven through the keyboard.**
@@ -54,7 +55,7 @@ vi.mock("../../apps/ui/components/consent/CookiePreferencesCard.js", async () =>
 const layoutSource = (): string =>
   readFileSync(resolve(process.cwd(), "apps/ui/app/layout.tsx"), "utf8");
 const settingsSource = (): string =>
-  readFileSync(resolve(process.cwd(), "apps/ui/app/settings/page.tsx"), "utf8");
+  readFileSync(resolve(process.cwd(), "apps/ui/components/SettingsPageClient.tsx"), "utf8");
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -397,12 +398,14 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     mountSettings();
 
     expect(document.querySelector(".setSectionTitle")?.textContent, "section title").toBe("Privacy");
+    expect(consentEnglish["consent.settings.title"]).toBe("Privacy");
     expect(document.querySelector(".setSectionHint")?.textContent, "section hint").toBe(
       "Choose what this browser stores. Asked once; change it here any time."
     );
     const opener = document.querySelector<HTMLButtonElement>("button.setBtn");
     expect(opener, "one .setBtn opener").not.toBeNull();
     expect(opener!.textContent?.trim(), "its label").toBe("Cookie preferences");
+    expect(consentEnglish["consent.settings.button"]).toBe("Cookie preferences");
     expect(card(), "no card before the button is pressed").toBeNull();
 
     act(() => opener!.click());

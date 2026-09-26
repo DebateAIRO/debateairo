@@ -20,7 +20,7 @@ import {
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * Verdict story, Task 6 — `serve.answer_story` (migration 0072) and the
+ * Verdict story, Task 6 — `serve.answer_story` (migration 0074) and the
  * repository over it: insert-once, encrypted at rest for an encrypted run,
  * owner-gated on read, benign on an erased run, append-only.
  */
@@ -520,7 +520,7 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       .rejects.toThrowError(/^TRUNCATE_REJECTED: append-only or immutable table serve\.answer_story rejects TRUNCATE$/u);
   });
 
-  it("0072 widens the spend source to STORY, and a story charge must name its run", async () => {
+  it("0074 widens the spend source to STORY, and a story charge must name its run", async () => {
     const mark = marker();
     const runId = await createLegacyStoryRun(database.pool, `story spend ${mark}`, `asker:${mark}`);
     await database.pool.query(
@@ -545,7 +545,7 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
 
   // LAST in the file: the replays recreate the triggers, so nothing after this
   // case may rely on the state the earlier cases built.
-  it("stays intact and guarded after 0072 and its neighbours are replayed over the finished chain", async () => {
+  it("stays intact and guarded after 0074 and its neighbours are replayed over the finished chain", async () => {
     const directory = new URL("../../migrations/", import.meta.url);
     const before = Number((await database.pool.query<{ count: string }>(
       "SELECT count(*)::text AS count FROM serve.answer_story"
@@ -555,8 +555,8 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       "0063_serve_answer_content_carrier.sql",
       "0066_model_spend_ledger.sql",
       "0069_remaining_content_carriers.sql",
-      "0072_answer_story.sql",
-      "0072_answer_story.sql"
+      "0074_answer_story.sql",
+      "0074_answer_story.sql"
     ]) {
       await expect(database.pool.query(await readFile(new URL(replayed, directory), "utf8")))
         .resolves.toBeDefined();

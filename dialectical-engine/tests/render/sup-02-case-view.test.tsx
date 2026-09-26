@@ -1,16 +1,69 @@
 // @vitest-environment jsdom
 
-import React from "react";
+import React,{ createContext,useContext,type ReactNode } from "react";
 import { readFile } from "node:fs/promises";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe,expect,it,vi } from "vitest";
+import type { LocaleCode } from "../../apps/ui/lib/i18n/locales.js";
+import type { MessageCatalog } from "../../apps/ui/lib/i18n/translate.js";
+
+const TestI18nContext = createContext<Readonly<{
+  locale: LocaleCode;
+  catalog: MessageCatalog;
+}> | null>(null);
+
+vi.mock("@/lib/i18n/I18nProvider", () => ({
+  I18nProvider({ locale,catalog,children }: Readonly<{
+    locale: LocaleCode;
+    catalog: MessageCatalog;
+    children: ReactNode;
+  }>) {
+    return <TestI18nContext.Provider value={{ locale,catalog }}>{children}</TestI18nContext.Provider>;
+  },
+  useChromeI18n() {
+    const context = useContext(TestI18nContext);
+    if (context === null) throw new Error("Missing test I18nProvider");
+    return context;
+  }
+}));
+
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import {
-  CaseOpened,CaseView,OwnCaseList,supportCaseClient
+  CaseLookup,CaseOpened,CaseView,OwnCaseList,supportCaseClient
 } from "../../apps/ui/components/support/CaseView.js";
 
+async function messages(locale: "en" | "ro"): Promise<Record<string,string>> {
+  return JSON.parse(await readFile(
+    `apps/ui/messages/${locale}/support.json`,"utf8"
+  )) as Record<string,string>;
+}
+
+async function templates(locale: "en" | "ro"): Promise<Record<string,string>> {
+  return JSON.parse(await readFile(
+    `packages/support-kb/content/templates/${locale}.json`,"utf8"
+  )) as Record<string,string>;
+}
+
+function localized(
+  locale: "en" | "ro",catalog: MessageCatalog,component: ReactNode
+): ReactNode {
+  return <I18nProvider locale={locale} catalog={catalog}>{component}</I18nProvider>;
+}
+
 describe("SUP-02 case browser surfaces", () => {
-  it("renders the exact acknowledgement without promising an outcome", () => {
-    const html = renderToStaticMarkup(<CaseOpened token="opaque-token" slaHours={48} language="en" />);
+  it("renders the exact acknowledgement without promising an outcome", async () => {
+    // The acknowledgement is a server template now (PLAN-SUPPORT §5); build it exactly
+    // as apps/api/src/support/index.ts openedCaseReceipt() does, from the en template
+    // file itself (the loader resolves its directory from import.meta.url, which jsdom
+    // does not provide, so the JSON is read directly — same bytes, no loader).
+    const englishTemplates = await templates("en");
+    const text = englishTemplates.CASE_OPENED!
+      .replace("{token}","opaque-token")
+      .replace("{sla}","48")
+      .replace("{link}","/help?case=opaque-token");
+    const html = renderToStaticMarkup(<CaseOpened token="opaque-token" text={text} />);
     expect(html).toContain("I&#x27;ve opened case opaque-token for a person.");
     expect(html).toContain("within 48 hours");
     // DL3-F4: the bearer rides the fragment, which never reaches a server.
@@ -20,56 +73,111 @@ describe("SUP-02 case browser surfaces", () => {
     expect(html).not.toMatch(/\b(?:will|guaranteed|resolved)\b/iu);
   });
 
-  it("attributes V replies to a person and renders reply and closed affordances", () => {
-    const html = renderToStaticMarkup(<CaseView
-      language="en"
+  it("attributes V replies to a person and renders reply and closed affordances", async () => {
+    const [englishTemplates,englishMessages] = await Promise.all([
+      templates("en"),messages("en")
+    ]);
+    const html = renderToStaticMarkup(localized("en",englishMessages,<CaseView
       token="opaque-token"
       state="CLOSED"
+      text={`${englishTemplates.HUMAN_LABEL} ${englishTemplates.CLOSED_LABEL}`}
       messages={[
         { id: "1",role: "user",text: "Thank you" },
         { id: "2",role: "V",text: "A person here." }
       ]}
-    />);
+    />));
+    expect(html).toContain(englishTemplates.HUMAN_LABEL);
+    expect(html).toContain(englishTemplates.CLOSED_LABEL);
+    expect(html).toContain(englishMessages["support.case.reply"]);
+    // Dev's English literals, pinned next to the key-based reads.
+    expect(englishTemplates.HUMAN_LABEL).toBe("Support (a person)");
+    expect(englishMessages["support.case.human"]).toBe("Support (a person)");
+    expect(englishTemplates.CLOSED_LABEL).toBe("This case is closed. You can still reply to reopen it.");
+    expect(englishMessages["support.case.closed"]).toBe("This case is closed. You can still reply to reopen it.");
     expect(html).toContain("Support (a person)");
     expect(html).toContain("This case is closed. You can still reply to reopen it.");
     expect(html).toContain("Reply to this case");
   });
 
-  it("renders unknown-token and identity-bound own-case states", () => {
-    expect(renderToStaticMarkup(<CaseView
-      language="ro" token="missing" state="NOT_FOUND" messages={[]}
-    />)).toContain("Nu există niciun caz cu acest cod.");
-    expect(renderToStaticMarkup(<OwnCaseList signedIn={false} cases={[]} language="en" />))
+  it("renders unknown-token and identity-bound own-case states", async () => {
+    const [romanianTemplates,romanianMessages,englishMessages] = await Promise.all([
+      templates("ro"),messages("ro"),messages("en")
+    ]);
+    expect(renderToStaticMarkup(localized("ro",romanianMessages,<CaseView
+      token="missing" state="NOT_FOUND" messages={[]} text={romanianTemplates.NOT_FOUND}
+    />))).toContain(romanianTemplates.NOT_FOUND);
+    expect(romanianTemplates.NOT_FOUND).toBe("Nu există niciun caz cu acest cod.");
+    expect(renderToStaticMarkup(localized("en",englishMessages,
+      <OwnCaseList signedIn={false} cases={[]} />
+    )))
       .toBe("");
-    expect(renderToStaticMarkup(<OwnCaseList
-      signedIn cases={[{ caseId: "case-a",state: "NEW",createdAt: "2026-09-07" }]} language="en"
-    />)).toContain("case-a");
+    expect(renderToStaticMarkup(localized("en",englishMessages,<OwnCaseList
+      signedIn cases={[{ caseId: "case-a",state: "NEW",createdAt: "2026-09-07" }]}
+    />))).toContain("case-a");
   });
 
-  it("renders the bilingual advisory summary as plain text and suppresses null or shredded summaries", () => {
-    const english = renderToStaticMarkup(<CaseView
-      language="en" token="opaque" state="NEW" messages={[]}
+  it("renders the bilingual advisory summary as plain text and suppresses null or shredded summaries", async () => {
+    const [englishTemplates,romanianTemplates,englishMessages,romanianMessages] = await Promise.all([
+      templates("en"),templates("ro"),messages("en"),messages("ro")
+    ]);
+    const english = renderToStaticMarkup(localized("en",englishMessages,<CaseView
+      token="opaque" state="NEW" messages={[]}
       summary={'<img src=x onerror="alert(1)"> advisory'}
-    />);
+    />));
+    expect(english).toContain(englishTemplates.SUMMARY_LABEL);
+    expect(english).toContain(`aria-label="${englishTemplates.SUMMARY_LABEL}"`);
     expect(english).toContain("Model-written summary — advisory");
     expect(english).toContain('aria-label="Model-written summary — advisory"');
+    // Dev's markup: the advisory label is a <strong>, not a heading.
+    expect(english).toContain("<strong>Model-written summary — advisory</strong>");
+    expect(english).not.toMatch(/<h[1-6][^>]*>Model-written summary/u);
     expect(english).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt; advisory");
     expect(english).not.toContain("<img");
 
-    const romanianNull = renderToStaticMarkup(<CaseView
-      language="ro" token="opaque" state="NEW" messages={[]} summary={null}
-    />);
-    expect(romanianNull).not.toContain("Rezumat scris de model — orientativ");
+    const romanianNull = renderToStaticMarkup(localized("ro",romanianMessages,<CaseView
+      token="opaque" state="NEW" messages={[]} summary={null}
+    />));
+    expect(romanianNull).not.toContain(romanianTemplates.SUMMARY_LABEL);
 
-    const shredded = renderToStaticMarkup(<CaseView
-      language="ro" token="opaque" state="SHREDDED"
+    const shredded = renderToStaticMarkup(localized("ro",romanianMessages,<CaseView
+      token="opaque" state="SHREDDED" text={romanianTemplates.SHREDDED_NOTICE}
       messages={[{ id: "secret",role: "user",text: "must not render" }]}
       summary="must not render"
-    />);
-    expect(shredded).toContain("Această conversație a fost ștearsă la cererea proprietarului.");
+    />));
+    expect(shredded).toContain(romanianTemplates.SHREDDED_NOTICE);
+    expect(romanianTemplates.SHREDDED_NOTICE).toBe("Această conversație a fost ștearsă la cererea proprietarului.");
+    expect(romanianTemplates.SUMMARY_LABEL).toBe("Rezumat scris de model — orientativ");
     expect(shredded).not.toContain("must not render");
-    expect(shredded).not.toContain("Rezumat scris de model — orientativ");
+    expect(shredded).not.toContain(romanianTemplates.SUMMARY_LABEL);
     expect(shredded).not.toContain("<form");
+  });
+
+  it("renders a case whose recorded language is not an interface locale, as dev did", async () => {
+    const token = "K".repeat(43);
+    const englishMessages = await messages("en");
+    window.history.replaceState(null,"",`/help#case=${token}`);
+    vi.stubGlobal("fetch",vi.fn(async () => new Response(JSON.stringify({
+      kind: "CASE",
+      case: { state: "WAITING_ON_V",language: "xx",summary: null },
+      messages: [{ id: "m1",role: "user",text: "Still broken" }]
+    }),{ status: 200,headers: { "content-type": "application/json" } })));
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
+    const container = document.body.appendChild(document.createElement("div"));
+    const root = createRoot(container);
+    try {
+      await act(async () => {
+        root.render(localized("en",englishMessages,<CaseLookup />));
+      });
+      await act(async () => { await Promise.resolve(); });
+      // DL3-F4: the bearer left the address before the request.
+      expect(window.location.hash).not.toContain(token);
+      expect(container.textContent).toContain("Still broken");
+      expect(container.querySelector('section[aria-label="Support case"]')).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("mounts the authenticated own-case lookup on the help page", async () => {

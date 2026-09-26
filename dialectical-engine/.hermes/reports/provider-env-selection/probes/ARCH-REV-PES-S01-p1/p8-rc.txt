@@ -1,0 +1,7 @@
+rc=0
+port=62837
+lsof-on-port rc=1 (1 = nothing listening)
+Bearer lines: 0
+stdout_lines=12
+stderr_bytes=0
+dirty=0

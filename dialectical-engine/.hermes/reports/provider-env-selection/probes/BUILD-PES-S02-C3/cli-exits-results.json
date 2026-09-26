@@ -1,0 +1,23 @@
+[
+  {
+    "case": "FAIL",
+    "expected": 1,
+    "restoredExit": 1,
+    "mutantExit": 0,
+    "verdict": "PES-S02-ACCEPT: FAIL admitted"
+  },
+  {
+    "case": "UNVERIFIED",
+    "expected": 1,
+    "restoredExit": 1,
+    "mutantExit": 0,
+    "verdict": "PES-S02-ACCEPT: UNVERIFIED tls-material openssl-unavailable"
+  },
+  {
+    "case": "thrown",
+    "expected": 1,
+    "restoredExit": 1,
+    "mutantExit": 0,
+    "verdict": "PES-S02-ACCEPT: FAIL internal"
+  }
+]

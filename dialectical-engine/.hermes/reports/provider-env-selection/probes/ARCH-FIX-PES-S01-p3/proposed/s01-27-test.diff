@@ -1,0 +1,27 @@
+--- /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/tests/architecture/p3-production-database-principals.test.ts	2026-09-24 14:10:36
++++ /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/ARCH-FIX-PES-S01-p3/proposed/p3-production-database-principals.test.ts.after	2026-09-25 16:28:46
+@@ -327,6 +327,16 @@
+             purpose: "PRODUCTION_PRINCIPAL_PROVISIONING",
+             binding: "WIRED",
+             condition: "package script db:provision-principals"
++          },
++          // provider-env-selection S01-27: the hosted provider-set publish command, an operator
++          // command run on the VPS as the JIT migrator, like db:provision-principals above.
++          {
++            component: "apps/runner:hosted-provider-set-publish-cli",
++            sourceFile: "apps/runner/src/hosted-provider-set-publish-cli.ts",
++            environmentKey: "MIGRATION_DATABASE_URL",
++            purpose: "HOSTED_PROVIDER_SET_PUBLICATION",
++            binding: "WIRED",
++            condition: "package script hosted:publish-provider-set"
+           }
+         ]);
+         continue;
+@@ -359,6 +369,7 @@
+         { component: "apps/runner:dev-deployment-register-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_REGISTER_SEED", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:seed-register" },
+         { component: "apps/runner:dev-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_PROVIDER_SET_PUBLICATION", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:publish-provider-set" },
+         { component: "apps/runner:production-database-principals-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_PRINCIPAL_PROVISIONING", binding: "WIRED", condition: "package script db:provision-principals" },
++        { component: "apps/runner:hosted-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "HOSTED_PROVIDER_SET_PUBLICATION", binding: "WIRED", condition: "package script hosted:publish-provider-set" },
+         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
+         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },
+         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },

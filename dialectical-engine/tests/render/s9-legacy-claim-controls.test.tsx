@@ -89,7 +89,7 @@ describe.each(surfaces)("S9 rendered legacy claim control — %s", (_surface, Co
 it("mounts the claim control on the settings page without a browser persistence or logging sink", async () => {
   const paths = [
     "apps/ui/components/LegacyRunClaimControls.tsx",
-    "apps/ui/app/settings/page.tsx"
+    "apps/ui/components/SettingsPageClient.tsx"
   ];
   const [control, settings] = await Promise.all(
     paths.map((path) => readFile(resolve(process.cwd(), path), "utf8"))

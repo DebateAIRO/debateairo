@@ -1,0 +1,92 @@
+# REQ-FIX-PES-p5 run log — 2026-09-25 13:21:12 EEST
+
+## 1. checks on SPEC-v2 (must FAIL)
+$ python3 checks.py v2
+REQ-FIX-PES-p5 checks against S03 SPEC-v2.md
+  FAIL  V-14 sweep: every README mention is R3.4's or R3.4b's, counted
+          - no R3.4b: the other README mentions of the code are governed by nothing
+  FAIL  V-14 end state: stated grep count = what the stated edits leave; row kept per R3.5
+          - no R3.4b end state
+  FAIL  V-14 citations hold in the S03 lane at C2's head
+          - no R3.4b to cite anything
+  pass  identity: every other requirement and §1/§2/§4/§5 byte-identical to v2
+v2: FAIL (3 failing checks)
+exit=1
+
+## 2. checks on SPEC-v3 (must PASS)
+$ python3 checks.py v3
+REQ-FIX-PES-p5 checks against S03 SPEC-v3.md
+  pass  V-14 sweep: every README mention is R3.4's or R3.4b's, counted
+  pass  V-14 end state: stated grep count = what the stated edits leave; row kept per R3.5
+  pass  V-14 citations hold in the S03 lane at C2's head
+  pass  identity: every other requirement and §1/§2/§4/§5 byte-identical to v2
+v3: PASS (0 failing checks)
+exit=0
+
+## 3. mutants (failing fixtures of checks.py on v3)
+$ python3 mutants.py
+  CAUGHT  R3.4b drops member (b), the §10 bullet -> README:700 names COST_ENVELOPES_NOT_SEALED and R3.4b does not cover it
+  CAUGHT  R3.4b drops member (a)'s line cite (:769) -> README:769 names COST_ENVELOPES_NOT_SEALED and R3.4b does not cover it
+  CAUGHT  R3.4b miscounts the README's lines -> R3.4b's count of README lines is not the measured 3
+  CAUGHT  R3.4b claims three lines remain -> the stated post-edit grep count is not the 2 the stated edits leave
+  CAUGHT  R3.4b removes the row from the table -> the stated post-edit grep count is not the 1 the stated edits leave
+  CAUGHT  R3.4b cites the table row one line off -> R3.4b does not cite deploy/vps/README.md:769
+  CAUGHT  R3.4b cites a runtime line that does not hold the unreachable claim -> R3.4b does not cite packages/register/src/runtime-environment.ts:112-115
+  CAUGHT  R3.4b points at the wrong V-packet line -> R3.4b's pointer to V's V-14 ruling does not land on that ruling
+  CAUGHT  R3.4 itself edited -> R3.4 differs from SPEC-v2
+  CAUGHT  §5 acceptance edited -> section ## 5. Acceptan differs from SPEC-v2
+mutants: 10/10 caught
+exit=0
+
+## 4. SPEC-v2 -> SPEC-v3 diff
+$ git diff --no-index --stat SPEC-v2.md SPEC-v3.md
+ .../slices/S03/{SPEC-v2.md => SPEC-v3.md}          | 44 ++++++++++++++++++----
+ 1 file changed, 36 insertions(+), 8 deletions(-)
+$ diff SPEC-v2.md SPEC-v3.md | grep hunk headers
+4c4
+6,7c6,7
+84a85,113
+162,166c191,194
+
+## 5. frozen files (git status of S03 SPEC.md, SPEC-v2.md, PLAN.md, PROGRESS.md, S01/S02 SPECs; empty = unchanged vs HEAD)
+ M dialectical-engine/docs/missions/provider-env-selection/slices/S02/DECISIONS.md
+ M dialectical-engine/docs/missions/provider-env-selection/slices/S02/PLAN.md
+(end status)
+dd70dec3f833b1493134c203047dd1f63ca708aadadcbc6e6398cb5dc5b2763f  slices/S03/SPEC.md
+8d28360d688e3560baea5853789e7b9e7f87df23bcb4639f0d3aca83cf7755d1  slices/S03/SPEC-v2.md
+032093e67508fdf3fc4652140a4a0b94a3f6736aab9f9907c48d049c922c4621  slices/S03/PLAN.md
+450e36e7688f6d76e02b730512cb96560ad1392dbf236a724fcaf14c456ff807  slices/S03/PROGRESS.md
+
+## 6. my changed/new files
+ M dialectical-engine/docs/missions/provider-env-selection/INSTRUCTIONS.md
+ M dialectical-engine/docs/missions/provider-env-selection/slices/S03/DECISIONS.md
+?? dialectical-engine/.hermes/reports/provider-env-selection/probes/REQ-FIX-PES-p5/
+?? dialectical-engine/docs/missions/provider-env-selection/slices/S03/SPEC-v3.md
+
+## 7. banned words in SPEC-v3 R3.4b (:85-113) and whole file
+R3.4b: 0 hits
+0
+(whole-file count; same as v2?) v2=0
+
+## 8. INSTRUCTIONS.md
+      99
+29:| S03 | The VPS kit's §11 says what the shipped code does, and a pin keeps it saying it | `no` | `slices/S03/SPEC-v3.md` §5 acceptance, run by V |
+32:`SPEC-v3.md` (pass 5), on V's rulings (`V-DECISIONS-PACKET.md`, rulings table). Every earlier version stays
+66:| per-slice SPEC / PLAN / PROGRESS / DECISIONS (record = the highest-numbered SPEC: `SPEC-v4.md` for S01 and S02, `SPEC-v3.md` for S03) | `slices/<S>/` |
+
+## 9. DECISIONS.md append-only: prefix of 162 lines byte-identical to pre-state (checked with cmp at append time); now
+     184
+
+## 10. lanes read-only, dirty 0
+pes-s03 HEAD ec66d5e7c dirty 0
+pes-base HEAD 776359c38 dirty 0
+
+## 11. README sweep at C2 head (S03 lane)
+$ grep -n COST_ENVELOPES_NOT_SEALED deploy/vps/README.md
+700:  `COST_ENVELOPES_NOT_SEALED`).
+737:the cost envelopes are sealed, with the code `COST_ENVELOPES_NOT_SEALED`. A reply that
+769:| `COST_ENVELOPES_NOT_SEALED` | the per-run and daily cost envelopes (V-28) are not published yet. A hosted runner refuses to claim work until they are. |
+$ grep -rl COST_ENVELOPES_NOT_SEALED deploy/
+deploy/vps/README.md
+
+note §5: the two S02 lines (DECISIONS.md, PLAN.md) are the parallel ARCH-FIX S02 seat's allowed outputs, not mine; every S03 frozen file and all of S01 show no change.

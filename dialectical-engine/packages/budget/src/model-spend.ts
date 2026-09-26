@@ -41,7 +41,7 @@ import {
 
 /**
  * Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat;
- * `STORY` is the verdict story written after a debate settled (migration 0072).
+ * `STORY` is the verdict story written after a debate settled (migration 0074).
  * A STORY charge names its run and counts toward the DAY, but never toward the
  * run's own envelope: the story can never cost the verdict (spec §8).
  */

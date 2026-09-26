@@ -1,0 +1,1 @@
+{"name":"pes-s02-exit-probe","version":"0.0.0","private":true,"scripts":{"pes:accept-hosted":"tsx --no-cache acceptance/pes-s02-hosted-cli.ts"}}

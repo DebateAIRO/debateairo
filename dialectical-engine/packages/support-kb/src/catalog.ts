@@ -1,4 +1,10 @@
-export type SupportLanguage = "en" | "ro";
+export {
+  SUPPORT_LOCALES,
+  isSupportLanguage,
+  supportLocaleNames,
+  type SupportLanguage,
+} from "./locale.js";
+export type SupportCorpusLanguage = "en" | "ro";
 export type SupportAudience = "any" | "anonymous" | "member" | "owner" | "operator";
 export type SupportAvailability =
   | "public"
@@ -41,7 +47,7 @@ export type SupportAction = Readonly<{
 
 export type SupportActionDefinition = Readonly<{
   id: SupportActionId;
-  labels: Readonly<Record<SupportLanguage, string>>;
+  labels: Readonly<Record<SupportCorpusLanguage, string>>;
   availability: SupportAvailability;
   href: string | null;
 }>;
@@ -49,13 +55,13 @@ export type SupportActionDefinition = Readonly<{
 export type SupportCapability = Readonly<{
   id: string;
   route: string;
-  labels: Readonly<Record<SupportLanguage, string>>;
+  labels: Readonly<Record<SupportCorpusLanguage, string>>;
   audience: SupportAudience;
   availability: SupportAvailability;
   disposition: SupportRouteDisposition;
   actionIds: readonly SupportActionId[];
   articleIds: readonly string[];
-  searchTerms: Readonly<Record<SupportLanguage, readonly string[]>>;
+  searchTerms: Readonly<Record<SupportCorpusLanguage, readonly string[]>>;
 }>;
 
 export type SupportGuideLabel = Readonly<{
@@ -64,7 +70,7 @@ export type SupportGuideLabel = Readonly<{
   sourceBinding: boolean;
   capabilityBinding: boolean;
   requiresNavigationIntent: boolean;
-  labels: Readonly<Record<SupportLanguage, readonly string[]>>;
+  labels: Readonly<Record<SupportCorpusLanguage, readonly string[]>>;
 }>;
 
 export type SupportSourcePolicy = Readonly<{
@@ -78,11 +84,11 @@ export type SupportSourcePolicyDefinition = SupportSourcePolicy & Readonly<{
   requiredActionIds: readonly SupportActionId[];
 }>;
 
-function labels(en: string, ro: string): Readonly<Record<SupportLanguage, string>> {
+function labels(en: string, ro: string): Readonly<Record<SupportCorpusLanguage, string>> {
   return Object.freeze({ en, ro });
 }
 
-function terms(en: readonly string[], ro: readonly string[]): Readonly<Record<SupportLanguage, readonly string[]>> {
+function terms(en: readonly string[], ro: readonly string[]): Readonly<Record<SupportCorpusLanguage, readonly string[]>> {
   return Object.freeze({ en: Object.freeze([...en]), ro: Object.freeze([...ro]) });
 }
 

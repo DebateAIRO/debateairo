@@ -1,0 +1,27 @@
+--- dev-audit
++++ union-audit
+@@ -357,6 +357,16 @@
+             binding: "WIRED",
+             condition: "package script db:provision-principals"
+           },
++          // provider-env-selection S01-27: the hosted provider-set publish command, an operator
++          // command run on the VPS as the JIT migrator, like db:provision-principals above.
++          {
++            component: "apps/runner:hosted-provider-set-publish-cli",
++            sourceFile: "apps/runner/src/hosted-provider-set-publish-cli.ts",
++            environmentKey: "MIGRATION_DATABASE_URL",
++            purpose: "HOSTED_PROVIDER_SET_PUBLICATION",
++            binding: "WIRED",
++            condition: "package script hosted:publish-provider-set"
++          },
+           // Task 14b: the hosted register publication. The migrator is the only
+           // principal that can execute register.publish_register_version since
+           // 0065 revoked it from debateai_runtime; no new privilege is granted.
+@@ -397,6 +407,7 @@
+         { component: "apps/runner:dev-deployment-register-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_REGISTER_SEED", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:seed-register" },
+         { component: "apps/runner:dev-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "DEVELOPMENT_PROVIDER_SET_PUBLICATION", binding: "DEVELOPMENT_ONLY", condition: "package script dev:auth:publish-provider-set" },
+         { component: "apps/runner:production-database-principals-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_PRINCIPAL_PROVISIONING", binding: "WIRED", condition: "package script db:provision-principals" },
++        { component: "apps/runner:hosted-provider-set-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "HOSTED_PROVIDER_SET_PUBLICATION", binding: "WIRED", condition: "package script hosted:publish-provider-set" },
+         { component: "apps/runner:hosted-register-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_REGISTER_PUBLICATION", binding: "WIRED", condition: "package script register:publish-hosted" },
+         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
+         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },

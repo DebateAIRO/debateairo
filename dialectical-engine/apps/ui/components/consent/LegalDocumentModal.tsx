@@ -4,13 +4,17 @@ import * as React from "react";
 
 import type { LegalDocument } from "../../lib/legalDocument";
 import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
+import { t } from "@/lib/i18n/translate";
+import { useConsentCatalog } from "./useConsentCatalog";
 
 /**
  * The ONE legal-document modal (design 10c), shared by the Privacy Policy and the Terms of
  * Service. Standalone and prop-driven: it owns no consent state, reads and writes no storage,
  * and holds no legal prose of its own — every string it shows comes from the `document` it is
  * given, which `apps/ui/scripts/generate-legal-data.mjs` produces from the drafts under
- * `apps/ui/legal/`. Its modal semantics come from the ONE shared helper `./modalSemantics`.
+ * `apps/ui/legal/`, and its chrome copy (close, questions, gate hint, acknowledge) from the
+ * `consent` catalogue of the interface locale. Its modal semantics come from the ONE shared
+ * helper `./modalSemantics`.
  *
  * `PrivacyPolicyModal` and `TermsOfServiceModal` are thin twins over this component: same
  * chrome, same scroll-to-end gate, same classes, different data and different DOM ids.
@@ -32,8 +36,6 @@ export type LegalDocumentModalProps = LegalModalProps & { document: LegalDocumen
  */
 const ACCENT_PROPERTY = "--accent";
 
-const GATE_HINT = "Scroll to the end of the policy to continue.";
-
 /**
  * The scroll-to-end criterion's slack, in pixels (`SPEC.md` R15). DERIVED, not conventional: the
  * body text is 11.5px at `line-height: 1.65` ≈ 19px per line, so 8px is under half a line — the
@@ -54,6 +56,7 @@ export function LegalDocumentModal({
   const closeRef = React.useRef<HTMLElement | null>(null);
   const bodyRef = React.useRef<HTMLDivElement | null>(null);
   const [reachedEnd, setReachedEnd] = React.useState(false);
+  const catalog = useConsentCatalog();
 
   // The trap, initial placement on the close control, return on close, backdrop close and the
   // Esc STACK — all of it from the ONE shared helper. This component installs no keydown
@@ -140,7 +143,7 @@ export function LegalDocumentModal({
             <button
               type="button"
               className="policyClose"
-              aria-label="Close"
+              aria-label={t(catalog, "consent.policy.close")}
               onClick={onClose}
               ref={(node) => {
                 closeRef.current = node;
@@ -210,7 +213,8 @@ export function LegalDocumentModal({
           </div>
           <div className="policyFoot">
             <span className="policyContact">
-              {"Questions: "}
+              {t(catalog, "consent.policy.questions")}
+              {" "}
               <span className="policyMail">{document.contact}</span>
             </span>
             <span className="policyFootSpacer" />
@@ -222,7 +226,7 @@ export function LegalDocumentModal({
                     the repo's visually-hidden treatment. */}
                 {!gateOpen ? (
                   <span id={document.gateHintId} className="policyGateHint">
-                    {GATE_HINT}
+                    {t(catalog, "consent.policy.gateHint")}
                   </span>
                 ) : null}
                 <button
@@ -233,12 +237,12 @@ export function LegalDocumentModal({
                   aria-describedby={!gateOpen ? document.gateHintId : undefined}
                   onClick={acknowledge}
                 >
-                  {"I have read it"}
+                  {t(catalog, "consent.policy.acknowledge")}
                 </button>
               </>
             ) : (
               <button type="button" className="policyPrimary" onClick={onClose}>
-                {"Close"}
+                {t(catalog, "consent.policy.close")}
               </button>
             )}
           </div>

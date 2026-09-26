@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SupportConfigurationPort, SupportConfigurationState } from "@debateai/register";
 import type { LoadedHelpCorpus } from "@debateai/support-kb";
+import { isSupportLanguage,type SupportLanguage } from "@debateai/support-kb/catalog";
 import { clientIpNetworkScope,normalizeClientIp } from "../client-ip.js";
 import { SupportC3AdmissionWindow } from "./c3-admission.js";
 import type { SupportAnswerPort } from "./answer.js";
@@ -20,7 +21,7 @@ import {
   type SupportSessionPort,
   type SupportSessionRecord
 } from "./session.js";
-import { SHREDDED_NOTICE,supportTemplate,type SupportLanguage } from "./templates.js";
+import { supportTemplate } from "./templates.js";
 import { recoverySecurityGuidance,type SupportSecurityRecoveryKind } from "./security-guidance.js";
 
 export const SUPPORT_ROUTE_PATHS = Object.freeze([
@@ -92,7 +93,7 @@ export type SupportRoutePolicy = (route: SupportRoutePath) => Readonly<{
 }>;
 
 function languageFrom(value: unknown): SupportLanguage | null {
-  return value === "en" || value === "ro" ? value : null;
+  return isSupportLanguage(value) ? value : null;
 }
 
 function capabilityFrom(request: FastifyRequest): string | null {
@@ -219,7 +220,7 @@ function rateLimited(reply: FastifyReply, language: SupportLanguage) {
 
 function shredded(reply: FastifyReply,language: SupportLanguage) {
   return reply.send({
-    kind: "SHREDDED",outcome: "SHREDDED",text: SHREDDED_NOTICE[language]
+    kind: "SHREDDED",outcome: "SHREDDED",text: supportTemplate("SHREDDED_NOTICE",language)
   });
 }
 
@@ -414,7 +415,9 @@ export function installSupportRoutes(
         return reply.status(404).send({ error: "NOT_FOUND" });
       }
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
-        return reply.send({ kind: "SHREDDED",text: SHREDDED_NOTICE[found.language] });
+        return reply.send({
+          kind: "SHREDDED",text: supportTemplate("SHREDDED_NOTICE",found.language)
+        });
       }
       return reply.send({ kind: "READABLE",session: publicSession(found) });
     }

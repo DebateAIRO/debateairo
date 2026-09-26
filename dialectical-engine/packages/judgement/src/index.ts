@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { CLAIM_TYPES, REVIEW_OUTCOMES, TypedDomainError, isRunLevelSpendStop, type ReviewOutcome, type WayOfKnowing } from "@debateai/kernel";
+import {
+  argumentLanguageDirective,
+  CLAIM_TYPES,
+  REVIEW_OUTCOMES,
+  TypedDomainError,
+  isRunLevelSpendStop,
+  type ReviewOutcome,
+  type WayOfKnowing
+} from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -9,6 +17,7 @@ import {
   schemaFailureLocator,
   type CallBound,
   type FramedPrompt,
+  type PromptContract,
   type ProviderGateway
 } from "@debateai/providers";
 import {
@@ -187,12 +196,25 @@ export type JudgeLeg =
       readonly otherMakersPosition: string;
     };
 
+function promptContractInArgumentLanguage(
+  contract: PromptContract,
+  argumentLanguageName: string | undefined
+): PromptContract {
+  return Object.freeze({
+    ...contract,
+    instruction: `${contract.instruction} ${argumentLanguageDirective(
+      argumentLanguageName ?? "the same language as the question"
+    )}`
+  });
+}
+
 export interface JudgeInput {
   readonly runId: string | null;
   readonly subjectItemId: string;
   readonly callSiteKey: string;
   /** THE QUESTION ALONE. Never a directive, never another model's statement. */
   readonly questionLine: string;
+  readonly argumentLanguageName?: string;
   /** Which authoring leg this is. Selects the code-owned directive. */
   readonly leg: JudgeLeg;
   readonly providerRef: string;
@@ -226,6 +248,7 @@ export interface JudgeSubjectInput {
   readonly subjectItemId: string;
   readonly callSiteKey: string;
   readonly questionLine: string;
+  readonly argumentLanguageName?: string;
   readonly statement: string;
   readonly authorMaker: string;
   readonly providerRef: string;
@@ -329,7 +352,10 @@ export class Judge {
     const classificationLine = input.questionLine;
     const codeClaim = classifyClaimText(classificationLine);
     const framed = buildFramedPrompt({
-      contract: judgePromptContract(input.leg.kind, codeClaim.claimType === "unknown" ? "unknown" : "resolved"),
+      contract: promptContractInArgumentLanguage(
+        judgePromptContract(input.leg.kind, codeClaim.claimType === "unknown" ? "unknown" : "resolved"),
+        input.argumentLanguageName
+      ),
       material: judgeLegMaterial(input.leg, input.questionLine)
     });
     const packet = framed.packet;
@@ -343,6 +369,7 @@ export class Judge {
         lane: "served",
         bound: input.bound,
         contractHash: input.contractHash,
+        argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
         providerRef: input.providerRef,
         packet,
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
@@ -414,7 +441,10 @@ export class Judge {
   async review(input: NodeReviewInput): Promise<ReviewedNode> {
     const schema = nodeReviewArtifactSchema(input.edges.length);
     const framed = buildFramedPrompt({
-      contract: reviewPromptContract(input.edges.length),
+      contract: promptContractInArgumentLanguage(
+        reviewPromptContract(input.edges.length),
+        input.argumentLanguageName
+      ),
       material: [
         { name: "question_line", content: input.questionLine },
         { name: "statement", content: input.statement },
@@ -439,6 +469,7 @@ export class Judge {
         lane: "served",
         bound: input.bound,
         contractHash: input.contractHash,
+        argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
         providerRef: input.providerRef,
         packet,
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),
@@ -496,7 +527,7 @@ export class Judge {
    */
   async assess(input: PanelAssessmentInput): Promise<PanelAssessment> {
     const framed = buildFramedPrompt({
-      contract: PANEL_PROMPT_CONTRACT,
+      contract: promptContractInArgumentLanguage(PANEL_PROMPT_CONTRACT, input.argumentLanguageName),
       material: [
         { name: "question_line", content: input.questionLine },
         { name: "statement", content: input.statement }
@@ -513,6 +544,7 @@ export class Judge {
         lane: "served",
         bound: input.bound,
         contractHash: input.contractHash,
+        argumentLanguageName: input.argumentLanguageName ?? "the same language as the question",
         providerRef: input.providerRef,
         packet,
         buildRepairPacket: (rejected) => buildContentRepairPacket(framed, rejected),

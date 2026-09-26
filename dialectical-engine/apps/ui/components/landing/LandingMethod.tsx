@@ -1,9 +1,11 @@
 import type { JSX } from "react";
-import { METHOD_STEPS } from "./cards";
+import { methodSteps } from "./cards";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's editorial split: a sticky left rail against a numbered
    ledger on the right. */
-export function LandingMethod(): JSX.Element {
+export function LandingMethod({ catalog }: { catalog: MessageCatalog }): JSX.Element {
+  const steps = methodSteps(catalog);
   return (
     <section
       id="method"
@@ -13,18 +15,18 @@ export function LandingMethod(): JSX.Element {
     >
       <div className="lpMethodGrid">
         <div className="lpMethodRail">
-          <p className="lpEyebrow">Method</p>
+          <p className="lpEyebrow">{t(catalog, "chrome.method")}</p>
           <h2 id="landing-method-title" className="lpDisplay lpMethodTitle">
-            Four steps, then you do it again tomorrow.
+            {t(catalog, "home.methodTitle")}
           </h2>
           <p className="lpMethodLede">
-            The arena is built for repetition, not for a performance you prepare for once.
+            {t(catalog, "home.methodLede")}
           </p>
         </div>
         <div className="lpMethodLedgerWrap">
-          <p className="lpLedgerLabel">THE METHOD</p>
+          <p className="lpLedgerLabel">{t(catalog, "home.methodLabel")}</p>
           <ol className="lpLedger">
-            {METHOD_STEPS.map((step) => (
+            {steps.map((step) => (
               <li key={step.number} className="lpLedgerRow">
                 <span className="lpLedgerNo" data-stance={step.stance}>
                   {step.number}

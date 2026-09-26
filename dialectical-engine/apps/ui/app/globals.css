@@ -6390,25 +6390,6 @@ a:focus-visible {
    Turn 8, "8a Sign up", "8b MFA enrolment", "8c Recovery code".
    ============================================================ */
 
-/* 8a — the email field carries its verification control inline. */
-.authEmailRow { display: flex; gap: 8px; }
-.authEmailRow input { flex: 1; }
-.authVerifyEmail {
-  align-self: stretch;
-  display: grid;
-  place-items: center;
-  padding: 0 14px;
-  border: 1px solid var(--gold-border);
-  border-radius: 9px;
-  background: var(--gold-bg);
-  color: var(--gold-text);
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.authVerifyEmail:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* Sign-up stacks its password rules; sign-in wraps them on one line. */
 .authRules[data-stack="true"] { flex-direction: column; gap: 3px; }

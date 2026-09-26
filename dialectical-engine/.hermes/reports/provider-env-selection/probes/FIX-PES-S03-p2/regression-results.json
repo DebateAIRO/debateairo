@@ -1,0 +1,82 @@
+[
+  {
+    "label": "row-unique",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-row-unique-attempt-1.log"
+  },
+  {
+    "label": "row-price-zero",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-row-price-zero-attempt-1.log"
+  },
+  {
+    "label": "price-one-env",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-price-one-env-attempt-1.log"
+  },
+  {
+    "label": "daily-cap",
+    "passed": 29,
+    "failed": 2,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-daily-cap-attempt-1.log"
+  },
+  {
+    "label": "cost-number",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-cost-number-attempt-1.log"
+  },
+  {
+    "label": "stale-bullet",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-stale-bullet-attempt-1.log"
+  },
+  {
+    "label": "r34-sentence",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-r34-sentence-attempt-1.log"
+  },
+  {
+    "label": "row-wording",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-row-wording-attempt-1.log"
+  },
+  {
+    "label": "section10-old-code",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-section10-old-code-attempt-1.log"
+  },
+  {
+    "label": "retype",
+    "passed": 31,
+    "failed": 0,
+    "expected_killed": false,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/regression-retype-attempt-1.log"
+  }
+]

@@ -1,5 +1,8 @@
 import type { ScoringStatus } from "./types";
 import { v3ScoringStatusLabel } from "./v3/adapter";
+import debateChromeEnglish from "../messages/en/debateChrome.json" with { type: "json" };
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import { t, type MessageCatalog } from "./i18n/translate.js";
 
 export type ScoringStatusCopyInput = {
   enabled: boolean;
@@ -13,48 +16,53 @@ export type ScoringStatusCopyInput = {
   checkedAt?: string | null;
   provider?: string | null;
   model?: string | null;
+  /** The reader's `compose` catalogue: V3's absence reason is recognised in the reader's locale. */
+  composeCatalog?: MessageCatalog;
 };
 
-export function formatScoringStatusCopy(input: ScoringStatusCopyInput): string {
-  if (!input.enabled) return withMetadata("Scores unchecked", input);
+export function formatScoringStatusCopy(
+  input: ScoringStatusCopyInput,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
+  if (!input.enabled) return withMetadata(t(catalog, "debateChrome.scoring.scoresUnchecked"), input, catalog);
   if (input.refreshStatus === "starting" || input.refreshStatus === "polling" || input.scoringStatus === "loading") {
-    return withMetadata("Checking scores with Codex", input);
+    return withMetadata(t(catalog, "debateChrome.scoring.checkingWithCodex"), input, catalog);
   }
   if (input.scoringStatus === "error") {
-    return withMetadata(appendDetail("Scoring check failed", input.error), input);
+    return withMetadata(appendDetail(t(catalog, "debateChrome.scoring.checkFailed"), input.error, catalog), input, catalog);
   }
   if (input.scoringStatus === "unavailable") {
     if (isMissingJudgeOutputReason(input.reason)) {
-      return withMetadata("Scoring pending", input);
+      return withMetadata(t(catalog, "debateChrome.scoring.pending"), input, catalog);
     }
     // UI-01 (DR-115): V3 runs no per-node scoring check at all, so its typed
     // absence gets the V3 layer's own label. Narrow and additive — every other
     // unavailable reason keeps V2's original copy. The full reason keeps its
     // home in the scoring-insights strip, which has room for it.
-    const v3Label = v3ScoringStatusLabel(input.reason);
+    const v3Label = v3ScoringStatusLabel(input.reason, input.composeCatalog ?? composeEnglish);
     if (v3Label !== null) {
-      return withMetadata(v3Label, input);
+      return withMetadata(t(catalog, "debateChrome.scoring.graphScoredNoV2Endpoint"), input, catalog);
     }
-    return withMetadata(appendDetail("Scoring check failed", input.reason), input);
+    return withMetadata(appendDetail(t(catalog, "debateChrome.scoring.checkFailed"), input.reason, catalog), input, catalog);
   }
   if (isStaleInputHashMismatch(input)) {
-    return withMetadata("Scores may be stale", input);
+    return withMetadata(t(catalog, "debateChrome.scoring.mayBeStale"), input, catalog);
   }
-  const cacheLabel = formatCacheLabel(input);
-  if (cacheLabel) return withMetadata(cacheLabel, input);
+  const cacheLabel = formatCacheLabel(input, catalog);
+  if (cacheLabel) return withMetadata(cacheLabel, input, catalog);
   if (input.scoringStatus === "loaded" && input.responseStatus === "partial") {
-    return withMetadata("Scores partially checked", input);
+    return withMetadata(t(catalog, "debateChrome.scoring.partiallyChecked"), input, catalog);
   }
-  if (input.scoringStatus === "loaded") return withMetadata("Scores checked", input);
-  return withMetadata("Scores unchecked", input);
+  if (input.scoringStatus === "loaded") return withMetadata(t(catalog, "debateChrome.scoring.checked"), input, catalog);
+  return withMetadata(t(catalog, "debateChrome.scoring.scoresUnchecked"), input, catalog);
 }
 
-export function formatScoringConfidenceCopy(): string {
-  return "Model-assisted reasoning aid, not a truth verdict.";
+export function formatScoringConfidenceCopy(catalog: MessageCatalog = debateChromeEnglish): string {
+  return t(catalog, "debateChrome.scoring.confidenceDisclaimer");
 }
 
-function appendDetail(label: string, detail?: string | null): string {
-  return detail ? `${label}: ${detail}` : label;
+function appendDetail(label: string, detail: string | null | undefined, catalog: MessageCatalog): string {
+  return detail ? t(catalog, "debateChrome.scoring.detail", { label, detail }) : label;
 }
 
 function isMissingJudgeOutputReason(reason?: string | null): boolean {
@@ -65,22 +73,33 @@ function isStaleInputHashMismatch(input: ScoringStatusCopyInput): boolean {
   return input.scoringStatus === "loaded" && input.staleReason === "input_hash_mismatch";
 }
 
-function formatCacheLabel(input: ScoringStatusCopyInput): string {
+function formatCacheLabel(input: ScoringStatusCopyInput, catalog: MessageCatalog): string {
   if (input.scoringStatus !== "loaded" || typeof input.cacheHit !== "boolean") return "";
-  if (input.cacheHit) return "Cached scores";
-  if (input.responseStatus === "partial") return "Fresh scores partially checked";
-  return "Fresh scores";
+  if (input.cacheHit) return t(catalog, "debateChrome.scoring.cachedScores");
+  if (input.responseStatus === "partial") return t(catalog, "debateChrome.scoring.freshScoresPartiallyChecked");
+  return t(catalog, "debateChrome.scoring.freshScores");
 }
 
-function withMetadata(label: string, input: ScoringStatusCopyInput): string {
-  const parts = [formatProviderLabel(input.provider, input.model), formatCheckedAtLabel(input.checkedAt)].filter(Boolean);
-  return parts.length > 0 ? `${label} - ${parts.join(" - ")}` : label;
+function withMetadata(label: string, input: ScoringStatusCopyInput, catalog: MessageCatalog): string {
+  const parts = [
+    formatProviderLabel(input.provider, input.model, catalog),
+    formatCheckedAtLabel(input.checkedAt, catalog)
+  ].filter(Boolean);
+  return parts.length > 0
+    ? t(catalog, "debateChrome.scoring.metadata", { label, metadata: parts.join(" - ") })
+    : label;
 }
 
-function formatProviderLabel(provider?: string | null, model?: string | null): string {
+function formatProviderLabel(
+  provider: string | null | undefined,
+  model: string | null | undefined,
+  catalog: MessageCatalog
+): string {
   const safeProvider = sanitizeMetadataLabel(provider);
   const safeModel = sanitizeMetadataLabel(model);
-  if (safeProvider && safeModel) return `${safeProvider}/${safeModel}`;
+  if (safeProvider && safeModel) {
+    return t(catalog, "debateChrome.scoring.providerModel", { provider: safeProvider, model: safeModel });
+  }
   return safeProvider || safeModel;
 }
 
@@ -101,9 +120,9 @@ function looksSecret(value: string): boolean {
   );
 }
 
-function formatCheckedAtLabel(checkedAt?: string | null): string {
+function formatCheckedAtLabel(checkedAt: string | null | undefined, catalog: MessageCatalog): string {
   const formatted = formatCheckedAt(checkedAt);
-  return formatted ? `Last checked ${formatted}` : "";
+  return formatted ? t(catalog, "debateChrome.scoring.lastChecked", { time: formatted }) : "";
 }
 
 function formatCheckedAt(checkedAt?: string | null): string {

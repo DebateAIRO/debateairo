@@ -1,5 +1,7 @@
 import { analyzeSupportCredentialText } from "./support-credentials.js";
 
+export * from "./argument-language.js";
+
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 
 export type RunId = Brand<string, "RunId">;

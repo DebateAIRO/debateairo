@@ -28,53 +28,53 @@ export type ConsentDecision = {
 /** One category as the preferences card renders it. `id` is the decision member it governs. */
 export type CookieCategory = {
   id: "essential" | "quality" | "analytics";
-  name: string;
-  tag: string;
-  description: string;
-  detail: string;
+  nameKey: string;
+  tagKey: string;
+  descriptionKey: string;
+  detailKey: string;
+  detailVars: Readonly<Record<string, string | number>>;
   locked: boolean;
   defaultOn: boolean;
 };
 
 /**
- * The three category records, verbatim from the design (`design-data.js:87-91`,
- * decoded per SPEC §Copy, which is the authority). Every string the two consent
- * surfaces show lives here and nowhere else (S01-R28): no copy string is inlined
- * in a component, so a ruling on the cookie names is a one-line data edit.
+ * The three category records preserve the design's ordering and behavior
+ * (`design-data.js:87-91`, decoded per SPEC §Copy). Their semantic message keys
+ * point to the consent catalogue, so no copy string is inlined in a component.
  *
  * The three `detail` lines name five cookies this product does not set — it sets
  * `__Host-debateai-session` and `__Host-debateai-csrf` (`apps/api/src/index.ts:169-170`).
- * They are pinned verbatim because the SPEC requires it, and routed to V as
- * contested row Q7-01; V's ruling changes these three strings and nothing else.
+ * The protected cookie identifiers remain interpolation values because they
+ * must not be translated.
  */
 export const COOKIE_CATEGORIES: readonly CookieCategory[] = [
   {
     id: "essential",
-    name: "Essential",
-    tag: "ALWAYS ON",
-    description:
-      "Session, MFA state and the device record that lets you spot a login you do not recognise.",
-    detail: "de_session · de_mfa · de_device — 30 days",
+    nameKey: "consent.category.essential.name",
+    tagKey: "consent.category.alwaysOn",
+    descriptionKey: "consent.category.essential.description",
+    detailKey: "consent.category.essential.detail",
+    detailVars: { cookies: "de_session · de_mfa · de_device" },
     locked: true,
     defaultOn: true
   },
   {
     id: "quality",
-    name: "Model quality telemetry",
-    tag: "OPTIONAL",
-    description:
-      "Which arguments you challenge or flag, used to tune judge panels. Never tied to your debates’ text.",
-    detail: "de_quality — 90 days · first-party",
+    nameKey: "consent.category.quality.name",
+    tagKey: "consent.category.optional",
+    descriptionKey: "consent.category.quality.description",
+    detailKey: "consent.category.optional.detail",
+    detailVars: { cookie: "de_quality" },
     locked: false,
     defaultOn: true
   },
   {
     id: "analytics",
-    name: "Product analytics",
-    tag: "OPTIONAL",
-    description:
-      "Aggregate page and feature usage. No cross-site tracking, no advertising, never sold.",
-    detail: "de_analytics — 90 days · first-party",
+    nameKey: "consent.category.analytics.name",
+    tagKey: "consent.category.optional",
+    descriptionKey: "consent.category.analytics.description",
+    detailKey: "consent.category.optional.detail",
+    detailVars: { cookie: "de_analytics" },
     locked: false,
     defaultOn: false
   }

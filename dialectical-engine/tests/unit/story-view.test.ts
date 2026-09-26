@@ -17,7 +17,14 @@ import {
   storyLabelWords,
   toStoryView
 } from "../../apps/ui/lib/v3/storyView.js";
-import { STORY_SUPPORTED_SENTENCE, VERDICT_STATE_SENTENCES } from "../../apps/ui/lib/v3/verdictStateSentences.js";
+import { STORY_SUPPORTED_SENTENCE } from "../../apps/ui/lib/v3/verdictStateSentences.js";
+import debateDrawersEnglish from "../../apps/ui/messages/en/debateDrawers.json" with { type: "json" };
+
+// The banner's own D77 sentences (components/VerdictBanner.tsx reads these keys).
+const BANNER_SENTENCE = {
+  contested: debateDrawersEnglish["debateDrawers.verdict.contestedExplanation"],
+  unsupported: debateDrawersEnglish["debateDrawers.verdict.unsupportedExplanation"]
+} as const;
 
 /** The rule the story checks use for a point number (packages/story validate.ts STORY_SHORT_POINT_NUMBER). */
 const POINT_NUMBER = /\bP[1-9][0-9]*\b/u;
@@ -96,7 +103,7 @@ describe("toStoryView (spec §10)", () => {
     expect(view.status).toBe("READY");
     expect(view.labelWords).toBe("Contested");
     expect(view.verdictState).toBe("contested");
-    expect(view.labelSentence).toBe(VERDICT_STATE_SENTENCES.contested);
+    expect(view.labelSentence).toBe(BANNER_SENTENCE.contested);
     expect(view.confidenceWords).toBe("Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued");
     expect(view.headline).toBe("Mutarea poate merita, dar nu dintr-odată: totul depinde de lucrul hibrid.");
     expect(view.paths.map((path) => [path.positionRef, path.fateWords])).toEqual([
@@ -175,8 +182,8 @@ describe("toStoryView (spec §10)", () => {
     expect(storyLabelWords("UNSUPPORTED")).toBe("Unsupported");
     expect(storyLabelWords(null)).toBe("No verdict");
     expect(storyLabelSentence("SUPPORTED")).toBe(STORY_SUPPORTED_SENTENCE);
-    expect(storyLabelSentence("UNSUPPORTED")).toBe(VERDICT_STATE_SENTENCES.unsupported);
-    expect(storyLabelSentence("CONTESTED")).toBe(VERDICT_STATE_SENTENCES.contested);
+    expect(storyLabelSentence("UNSUPPORTED")).toBe(BANNER_SENTENCE.unsupported);
+    expect(storyLabelSentence("CONTESTED")).toBe(BANNER_SENTENCE.contested);
     expect(storyLabelSentence(null)).toContain("without a verdict");
     expect(storyConfidenceWords(null)).toBeNull();
     expect(storyConfidenceWords("FULL")).toBe("Confidence: full, because none of the checks that can lower it found a reason to");

@@ -1,0 +1,17 @@
+{
+  "time.justNow": "刚刚",
+  "time.minutes.other": "{count} 分钟前",
+  "time.hours.other": "{count} 小时前",
+  "time.yesterday": "昨天",
+  "time.days.other": "{count} 天前",
+  "time.weeks.other": "{count} 周前",
+  "time.status.complete": "已完成",
+  "time.status.queued": "已排队",
+  "time.status.claimed": "已认领",
+  "time.status.running": "运行中",
+  "time.status.holding": "服务商恢复暂停",
+  "time.status.settled": "已结算",
+  "time.status.generating": "生成中",
+  "time.status.failed": "失败",
+  "time.status.draft": "草稿"
+}

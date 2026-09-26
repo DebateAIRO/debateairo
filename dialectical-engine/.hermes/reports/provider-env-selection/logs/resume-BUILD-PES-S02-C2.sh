@@ -1,0 +1,5 @@
+#!/bin/zsh
+cd /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s02/dialectical-engine || exit 9
+export PATH="/opt/homebrew/bin:$PATH" LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+echo "resume $(date '+%F %T') HEAD=$(git rev-parse --short HEAD) dirty=$(git status --porcelain | wc -l | tr -d ' ')"
+exec /Applications/ChatGPT.app/Contents/Resources/codex exec -c model='"gpt-6-astra"' -c sandbox_mode='"danger-full-access"' resume 01a0d83b-bf46-78a2-aaa8-74eede719bbf "The orchestrator corrected your packet (your finding 5 was right). Re-read /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/planning/provider-env-selection/packets/BUILD-S02-C2.md line 10 (inputs) and the new PACKET CORRECTED comment on t_393814e2 (~/.local/bin/hermes kanban --board provider-env-selection show t_393814e2 --json), then continue the cluster from your measured START: S02-S12..S02-S15 tests-first, three GREEN runs, one commit, self-report updated, READY posted on t_393814e2 and printed as your final output. Same contract as before." </dev/null

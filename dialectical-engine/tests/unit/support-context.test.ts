@@ -1,10 +1,12 @@
 import { readdirSync,readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import jaChrome from "../../apps/ui/messages/ja/chrome.json" with { type: "json" };
 
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext as buildContext } from "../../packages/support-kb/src/context.js";
 import { loadHelpCorpus,type HelpCorpusEntry } from "../../packages/support-kb/src/index.js";
+import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
 import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
 
 type ContextInput = Parameters<typeof buildContext>[0];
@@ -58,6 +60,21 @@ function productionReviewedCorpus() {
     requireReviewedRecovery:true
   });
 }
+
+const TOPIC_SOURCE_IDS = {
+  "support.topic.gettingStarted.prompt": [
+    "getting-started-debate", "risk-tier-choice", "budget-tier-choice",
+  ],
+  "support.topic.reading.prompt": ["guide-how-it-works"],
+  "support.topic.scores.prompt": [],
+  "support.topic.publishing.prompt": [
+    "unpublish-a-debate", "delete-a-private-debate", "public-answer-disclosure",
+  ],
+  "support.topic.account.prompt": ["settings-help-menus", "account-settings"],
+  "support.topic.privacy.prompt": [
+    "app-navigation", "settings-help-menus", "support-cases",
+  ],
+} as const;
 
 describe("Support knowledge context", () => {
   const entries = [
@@ -482,6 +499,143 @@ describe("Support knowledge context", () => {
     });
     expect(result.sourceIds.length).toBeGreaterThan(0);
     expect(result.requestedActionIds).toEqual(expectedActionIds);
+    if (expectedActionIds.includes("help")) {
+      const [action] = resolveSupportActions(result.requestedActionIds,{ signedIn:false,language });
+      // Scope audit B6: en/ro keep dev's reviewed catalog labels.
+      expect(action?.label).toBe(language === "ro" ? "Centrul de ajutor" : "Help desk");
+      expect(result.text).toContain(language === "ro" ? "Centrul de ajutor" : "Help desk");
+    }
+  });
+
+  it("uses the Japanese Settings catalogue label without treating arbitrary kana as navigation",() => {
+    const corpus = productionReviewedCorpus();
+    const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{
+      signedIn:true,language:"ja"
+    }).map(({ id }) => id);
+    const localized = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,availableActionIds,
+      language:"ja",query:`${jaChrome["chrome.settings"]} はどこですか？`,
+      historyText:"",maxCodePoints:24_000
+    });
+    expect(localized.sourceIds.length).toBeGreaterThan(0);
+    expect(localized.requestedActionIds).toEqual(["settings"]);
+    expect(localized.text).toContain(jaChrome["chrome.settings"]);
+    expect(localized.text).not.toContain("actions=Settings");
+    const english = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,availableActionIds,
+      language:"en",query:"Where is Settings?",historyText:"",maxCodePoints:24_000
+    });
+    expect(localized.requestedActionIds).toEqual(english.requestedActionIds);
+
+    const kanaOnly = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,availableActionIds,
+      language:"ja",query:"かなだけ",historyText:"",maxCodePoints:24_000
+    });
+    expect(kanaOnly.sourceIds).toEqual([]);
+    expect(kanaOnly.requestedActionIds).toEqual([]);
+  });
+
+  it("binds every exact localized topic prompt to the English prompt's pinned source ids", () => {
+    // Regression: stale generated prompts made localized topic chips return NO_SOURCE or wrong articles.
+    // The binding serves only the 33 new interface locales; en/ro keep dev's retrieval (pinned below).
+    const corpus = productionReviewedCorpus();
+    for (const locale of SUPPORT_LOCALES.filter((code) => code !== "en" && code !== "ro")) {
+      const catalogue = JSON.parse(readFileSync(resolve(
+        process.cwd(), "apps/ui/messages", locale, "support.json",
+      ), "utf8")) as Record<string, string>;
+      for (const [key, sourceIds] of Object.entries(TOPIC_SOURCE_IDS)) {
+        const result = buildSupportKnowledgeContext({
+          entries: corpus.entries,
+          capabilities: SUPPORT_CAPABILITIES,
+          availableActionIds: SUPPORT_ACTION_IDS,
+          language: locale,
+          query: catalogue[key]!,
+          historyText: "",
+          maxCodePoints: 24_000,
+        });
+        expect.soft(result.sourceIds, `${locale}:${key}:count`).toHaveLength(sourceIds.length);
+        expect.soft(result.sourceIds, `${locale}:${key}:ids`).toEqual(
+          expect.arrayContaining([...sourceIds]),
+        );
+      }
+    }
+  });
+
+  it.each([
+    // Measured through origin/dev's context.ts on this corpus (orchestrator rule 1,
+    // 2026-09-25): an en/ro topic-chip prompt gets dev's retrieval, no source-id binding.
+    ["en","support.topic.gettingStarted.prompt",["getting-started-debate","risk-tier-choice","budget-tier-choice"],[],["start-debate"]],
+    ["en","support.topic.reading.prompt",["guide-how-it-works"],[],[]],
+    ["en","support.topic.scores.prompt",["ai-transparency"],[],[]],
+    ["en","support.topic.publishing.prompt",["unpublish-a-debate","delete-a-private-debate","public-answer-disclosure"],[],[]],
+    ["en","support.topic.account.prompt",["settings-help-menus","account-settings","privacy-consent"],["settings-help-menus"],["active-sessions"]],
+    ["en","support.topic.privacy.prompt",["app-navigation","settings-help-menus","support-cases"],[],[]],
+    ["ro","support.topic.gettingStarted.prompt",["getting-started-debate","account-access"],[],[]],
+    ["ro","support.topic.reading.prompt",[],[],[]],
+    ["ro","support.topic.scores.prompt",[],[],[]],
+    ["ro","support.topic.publishing.prompt",["public-answer-disclosure","view-public-debate","browse-public-debates"],[],[]],
+    ["ro","support.topic.account.prompt",["settings-help-menus","account-settings","privacy-consent"],["settings-help-menus"],["active-sessions"]],
+    ["ro","support.topic.privacy.prompt",["support-status-limits","app-navigation","settings-help-menus"],[],[]],
+  ] as const)("keeps dev's %s retrieval for the %s topic-chip prompt",(
+    language,key,sourceIds,recoverySourceIds,requestedActionIds
+  ) => {
+    const catalogue = JSON.parse(readFileSync(resolve(
+      process.cwd(), "apps/ui/messages", language, "support.json",
+    ), "utf8")) as Record<string, string>;
+    const result = buildSupportKnowledgeContext({
+      entries:productionReviewedCorpus().entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query:catalogue[key]!,
+      historyText:"",maxCodePoints:24_000
+    });
+    expect({
+      sourceIds:result.sourceIds,recoverySourceIds:result.recoverySourceIds,
+      requestedActionIds:result.requestedActionIds
+    }).toEqual({ sourceIds,recoverySourceIds,requestedActionIds });
+  });
+
+  it.each([
+    ["en" as const,"Where can I find account deletion controls?","settings-help-menus","delete-a-private-debate"],
+    ["ro" as const,"Unde găsesc opțiunile de ștergere a contului?","settings-help-menus","delete-a-private-debate"],
+    ["ro" as const,"Unde gasesc optiunile de stergere a contului?","settings-help-menus","delete-a-private-debate"],
+    ["en" as const,"Where can I learn how a debate works?","guide-how-it-works","app-navigation"],
+    ["ro" as const,"Unde pot afla cum funcționează o dezbatere?","guide-how-it-works","app-navigation"],
+    ["ro" as const,"Unde pot afla cum functioneaza o dezbatere?","guide-how-it-works","app-navigation"],
+  ])("puts exact reviewed %s guidance ahead of a lexical fallback collision: %s",(
+    language,query,expectedPrimary,wrongPrimary
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const availableActionIds = resolveSupportActions(SUPPORT_ACTION_IDS,{
+      signedIn:false,language
+    }).map(({ id }) => id);
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds,language,query,historyText:"",maxCodePoints:24_000
+    });
+
+    expect(result.sourceIds).toContain(expectedPrimary);
+    expect(result.recoverySourceIds).toEqual([expectedPrimary]);
+    expect(result.recoverySourceIds).not.toContain(wrongPrimary);
+    expect(result.requestedActionIds).toEqual([]);
+  });
+
+  it.each([
+    ["en" as const,"How do I delete a private debate?","delete-a-private-debate"],
+    ["ro" as const,"Cum șterg o dezbatere privată?","delete-a-private-debate"],
+    ["en" as const,"Where can I read the Method section?","app-navigation"],
+    ["ro" as const,"Unde pot citi secțiunea Metodă?","app-navigation"],
+  ])("keeps the neighboring %s intent distinct after guide-source prioritization: %s",(
+    language,query,expectedPrimary
+  ) => {
+    const corpus = productionReviewedCorpus();
+    const result = buildSupportKnowledgeContext({
+      entries:corpus.entries,capabilities:SUPPORT_CAPABILITIES,
+      availableActionIds:SUPPORT_ACTION_IDS,language,query,historyText:"",maxCodePoints:24_000
+    });
+
+    expect(result.sourceIds).toContain(expectedPrimary);
+    if (result.recoverySourceIds.length > 0) {
+      expect(result.recoverySourceIds).toEqual([expectedPrimary]);
+    }
   });
 
   it.each([

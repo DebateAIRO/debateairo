@@ -1,8 +1,9 @@
 import type { Answer, AnswerStory } from "@debateai/contract";
+import debateDrawersEnglish from "../../messages/en/debateDrawers.json" with { type: "json" };
 import type { LiveVerdictState } from "../types.js";
 import { liveVerdictState } from "./labels.js";
 import { STORY_FATE_WORDS, countStoryPositions, type StoryFateValue } from "./storyWords.js";
-import { STORY_SUPPORTED_SENTENCE, VERDICT_STATE_SENTENCES } from "./verdictStateSentences.js";
+import { STORY_SUPPORTED_SENTENCE, verdictStateSentence } from "./verdictStateSentences.js";
 
 /**
  * The owner page's story strip (spec 2026-09-26 §10), as plain data. The label
@@ -63,7 +64,10 @@ export function storyLabelWords(label: Answer["verdict_state"]): string {
 
 export function storyLabelSentence(label: Answer["verdict_state"]): string {
   if (label === null) return "This debate ended without a verdict, so there is no label to explain.";
-  return VERDICT_STATE_SENTENCES[liveVerdictState(label)] ?? STORY_SUPPORTED_SENTENCE;
+  // TODO(story localization): the story view is English for now, so it reads the
+  // banner's sentence from the English catalogue; the localization task passes
+  // the interface locale's debateDrawers catalogue here.
+  return verdictStateSentence(liveVerdictState(label), debateDrawersEnglish) ?? STORY_SUPPORTED_SENTENCE;
 }
 
 /**

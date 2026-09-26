@@ -26,9 +26,12 @@ vi.mock("@/lib/api", () => ({
   contractClient: { readSession: mocks.readSession }
 }));
 
-import NewDebatePage from "../../apps/ui/app/new/page.js";
+import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
+import homeCatalog from "../../apps/ui/messages/en/home.json" with { type: "json" };
+import chromeCatalog from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+import newDebateCatalog from "../../apps/ui/messages/en/newDebate.json" with { type: "json" };
 
-const pageSource = readFileSync("apps/ui/app/new/page.tsx", "utf8");
+const pageSource = readFileSync("apps/ui/app/new/NewDebatePageClient.tsx", "utf8");
 
 async function settle(): Promise<void> {
   await act(async () => {
@@ -72,7 +75,9 @@ describe("S01 /new plan tier", () => {
   });
 
   async function renderPage(): Promise<void> {
-    await act(async () => root!.render(<NewDebatePage />));
+    await act(async () => root!.render(
+      <NewDebatePage catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />
+    ));
     await settle();
   }
 
@@ -224,8 +229,12 @@ describe("S01 /new plan tier", () => {
       }
     }));
     try {
-      const { default: PageWithProbeRoster } = await import("../../apps/ui/app/new/page.js");
-      await act(async () => root!.render(<PageWithProbeRoster />));
+      const { default: PageWithProbeRoster } = await import(
+        "../../apps/ui/app/new/NewDebatePageClient.js"
+      );
+      await act(async () => root!.render(
+        <PageWithProbeRoster catalog={newDebateCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />
+      ));
       await settle();
       expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
         dot.style.getPropertyValue("--dot")

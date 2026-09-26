@@ -119,6 +119,8 @@ export const run = core.table("run", {
   tierProvenanceRef: text("tier_provenance_ref").notNull(),
   compositionBudgetTier: text("composition_budget_tier").notNull(),
   planTier: text("plan_tier"),
+  argumentLanguageTag: text("argument_language_tag").notNull().default("und"),
+  argumentLanguageName: text("argument_language_name").notNull().default("the same language as the question"),
   depthParams: jsonb("depth_params").notNull(),
   agentCount: integer("agent_count").notNull(),
   discoveredPanel: jsonb("discovered_panel").notNull(),
@@ -538,7 +540,7 @@ export const answer = serve.table("answer", {
   contentAttestation: bytea("content_attestation")
 });
 
-/** Verdict story (migration 0072): one insert-once, encrypted story per served answer version. */
+/** Verdict story (migration 0074): one insert-once, encrypted story per served answer version. */
 export const answerStory = serve.table("answer_story", {
   storyId: uuid("story_id").primaryKey(),
   runId: uuid("run_id").notNull(),

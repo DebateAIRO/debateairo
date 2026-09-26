@@ -6,6 +6,7 @@ import {
   type SupportActionId,
   type SupportLanguage,
 } from "./catalog.js";
+import { SUPPORT_UI_LABELS } from "./ui-labels.js";
 
 export type SupportNavigationContext = Readonly<{
   signedIn: boolean;
@@ -91,9 +92,17 @@ export function resolveSupportActions(
     if (definition === undefined || !isApplicable(definition, context)) continue;
     const href = hrefFor(definition, context);
     if (href === null || !isSafeHref(href)) continue;
+    // en and ro keep dev's reviewed catalog labels; the 33 new interface
+    // locales name the control the reader sees (generated UI catalogue), which
+    // has no forgot-password label.
+    const language = context.language;
+    const label = language === "en" || language === "ro"
+      ? definition.labels[language]
+      : definition.id === "forgot-password" ? null : SUPPORT_UI_LABELS[language][definition.id];
+    if (label === null) continue;
     resolved.push(Object.freeze({
       id: definition.id,
-      label: definition.labels[context.language],
+      label,
       href,
     }));
   }

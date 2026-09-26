@@ -1,0 +1,6 @@
+- 2026-09-24 14:12 EEST · REQ READY: SPEC.md frozen (ui: no), PLAN scaffold, DECISIONS by the REQ seat; slice ticket created; REQ-REV (blind, grok-4.7) next, then ARCH(S02).
+- 2026-09-24 14:36 EEST · REQ-REV p1 = REWORK (S02): SPEC-v2 by REQ-FIX (same REQ-PES session), then REQ-REV pass 2 (scoped), then ARCH.
+- 2026-09-24 14:58 EEST · REQ-FIX READY: SPEC-v2.md is the SPEC of record (v1 frozen); REQ-REV pass 2 (scoped) next, then ARCH(S02).
+- 2026-09-24 15:08 EEST · REQ-REV p2 REWORK: B2 (step 5 prints the 0700 directory R2.9 (iii) forbids) → REQ-FIX p3 t_690beb44; N1 (resolver integers), N2 (substring clause) assigned to the same node.
+- 2026-09-24 19:53 EEST · REQ-FIX p3 READY: SPEC-v3 is the SPEC of record (SPEC.md and SPEC-v2.md frozen). B2 closed: the credential sits in <scratch>/custody.d, so the SCRATCH-DIR line names no forbidden path; N1 integers 600000/5000; N2 exact token. → REQ-REV pass 3 t_94301ea0 (last pass; a REWORK there is a V row).
+- 2026-09-25 08:39 EEST · REQ-REV p3 PASS: requirements closed; SPEC-v3 is the SPEC of record → ARCH S02 t_b4187218 (READY; independent of S01 since REQ-FIX p2 — the board title is stale).

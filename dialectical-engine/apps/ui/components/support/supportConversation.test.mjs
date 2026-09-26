@@ -266,7 +266,7 @@ test("DL1-F5c: the retired key and any payload the reader refuses are erased, no
 
   // (b) Under the current key: a shape the reader refuses, and unparsable JSON.
   for (const raw of [
-    JSON.stringify({ language: "de", identityBound: false, messages: [CASE_ACKNOWLEDGEMENT] }),
+    JSON.stringify({ language: "xx", identityBound: false, messages: [CASE_ACKNOWLEDGEMENT] }),
     `{"language":"en","messages":[${JSON.stringify(CASE_ACKNOWLEDGEMENT)}`
   ]) {
     const refused = memoryStorage({ [KEY]: raw });
@@ -291,7 +291,7 @@ test("DL1-F5c: the assistant holds the case bearer in memory and stores a token-
   );
   assert.match(
     source,
-    /CASE_OPENED_NOTICE/u,
+    /t\(catalog,"support\.caseOpenedNotice"\)/u,
     "and the transcript keeps a token-free notice for when the bearer is gone"
   );
 });

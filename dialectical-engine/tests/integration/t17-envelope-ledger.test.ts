@@ -15,6 +15,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { withRequestDerivedBearings } from "../support/reviewBearings.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
+import { argumentLanguageDirective } from "@debateai/kernel";
 
 /**
  * T17 · the DoD's maximum-path LEDGER-COUNT test (codex r1 B1).
@@ -187,7 +188,25 @@ const COMPOSITION = JSON.stringify({ segments: [
 
 type RequestKind = "PANEL" | "REVIEW" | "JUDGE" | "CONFORMANCE" | "R9" | "COMPOSE" | "EVALUATOR";
 
-function classify(body: string): RequestKind {
+/**
+ * S-LANG (as `tests/integration/database.test.ts` does): every packet's
+ * instruction now ends with the argument-language directive, which NAMES the
+ * machine-consumed identifiers it protects (`fatalFlags[].type`,
+ * `served_number_refs`, …). Those bare identifiers are exactly what `classify`
+ * keys on, so the directive — whatever language it names — is removed from the
+ * body before any branch reads it, and the discriminators keep measuring the
+ * CONTRACT, never the directive. The directive has no character JSON escapes,
+ * so it appears in the raw body byte-for-byte.
+ */
+const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
+  argumentLanguageDirective("\u0000")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace("\u0000", "[^.]+?"),
+  "gu"
+);
+
+function classify(rawBody: string): RequestKind {
+  const body = rawBody.replace(ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN, "");
   // W7 / V-BLIND-CONTEXT: the panel and review keys are STRUCTURAL — keys of the
   // organ's own JSON contract — never prose. The sentences they replaced
   // ("Assess an existing debate node authored by another maker", "Review an

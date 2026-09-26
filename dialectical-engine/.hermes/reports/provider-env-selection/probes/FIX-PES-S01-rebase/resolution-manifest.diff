@@ -1,0 +1,17 @@
+--- dev-manifest
++++ union-manifest
+@@ -337,6 +337,14 @@
+           "condition": "package script db:provision-principals"
+         },
+         {
++          "component": "apps/runner:hosted-provider-set-publish-cli",
++          "sourceFile": "apps/runner/src/hosted-provider-set-publish-cli.ts",
++          "environmentKey": "MIGRATION_DATABASE_URL",
++          "purpose": "HOSTED_PROVIDER_SET_PUBLICATION",
++          "binding": "WIRED",
++          "condition": "package script hosted:publish-provider-set"
++        },
++        {
+           "component": "apps/runner:hosted-register-publish-cli",
+           "sourceFile": "apps/runner/src/hosted-register-publish-cli.ts",
+           "environmentKey": "MIGRATION_DATABASE_URL",

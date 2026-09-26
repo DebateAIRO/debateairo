@@ -1,6 +1,6 @@
 import { describe,expect,it } from "vitest";
 import {
-  bindSupportDraftAuthority,
+  bindSupportDraftAuthority as bindSupportDraftAuthorityForLocale,
   diagnoseSupportDraft,
   parseSupportCaseSummaryDraft,
   parseSupportDraft,
@@ -10,6 +10,18 @@ import {
 import {
   SUPPORT_ACTION_CATALOG,SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,SUPPORT_GUIDE_LABELS
 } from "../../packages/support-kb/src/catalog.js";
+import type { SupportLanguage } from "../../packages/support-kb/src/locale.js";
+
+function bindSupportDraftAuthority(
+  draft: Parameters<typeof bindSupportDraftAuthorityForLocale>[0],
+  allowedSourceIds: Parameters<typeof bindSupportDraftAuthorityForLocale>[1],
+  requestedActionIds: Parameters<typeof bindSupportDraftAuthorityForLocale>[2],
+  language: SupportLanguage = "en"
+) {
+  return bindSupportDraftAuthorityForLocale(
+    draft,allowedSourceIds,requestedActionIds,language
+  );
+}
 
 function raw(text: string, overrides: Readonly<Record<string,unknown>> = {}): string {
   return JSON.stringify({
@@ -197,6 +209,47 @@ describe("CP1 support model response policy", () => {
     }),["app-navigation"],["home"])).toMatchObject({ code:"ACTION_MEMBERSHIP_INVALID" });
   });
 
+  it("requires request-local source authority for every structured action in the 33 new locales", () => {
+    // The prose navigation screen reads only en/ro, so a new locale binds every
+    // structured action to request authority (B7: new locales only).
+    const valid = {
+      kind: "answer" as const,
+      text: "ホームを開くことができます。",
+      sourceIds: ["app-navigation"],
+      actionIds: ["home"],
+    };
+    expect(bindSupportDraftAuthority(valid,["app-navigation"],["home"],"ja")).toEqual(valid);
+    expect(bindSupportDraftAuthority({
+      ...valid,
+      sourceIds: ["support-status-limits"],
+    },["app-navigation","support-status-limits"],["home"],"ja")).toBeNull();
+    expect(bindSupportDraftAuthority(valid,["app-navigation"],[],"ja")).toBeNull();
+    expect(bindSupportDraftAuthority({
+      ...valid,
+      sourceIds: ["account-access"],
+      actionIds: ["forgot-password"],
+    },["account-access"],["forgot-password"],"ja")).toBeNull();
+  });
+
+  it.each(["en","ro"] as const)(
+    "keeps dev's %s rule: only an action a prose navigation promise names needs request authority",
+    (language) => {
+      const unpromised = {
+        kind: "answer" as const,
+        text: language === "en" ? "The start page lists public debates." : "Pagina de start listează dezbaterile publice.",
+        sourceIds: ["app-navigation"],
+        actionIds: ["home"],
+      };
+      expect(bindSupportDraftAuthority(unpromised,["app-navigation"],[],language)).toEqual(unpromised);
+      const promised = {
+        ...unpromised,
+        text: language === "en" ? "Support can guide you to Home." : "Asistența poate ghida către Acasă.",
+      };
+      expect(bindSupportDraftAuthority(promised,["app-navigation"],[],language)).toBeNull();
+      expect(bindSupportDraftAuthority(promised,["app-navigation"],["home"],language)).toEqual(promised);
+    }
+  );
+
   it("rejects case-email conflation while preserving the separate mail workflow", () => {
     expect(bindSupportDraftAuthority({
       kind:"answer",text:"A human case is created through escalation or the support-email flow.",
@@ -317,6 +370,19 @@ describe("CP1 support model response policy", () => {
     expect(validateSupportDraft(
       parsed!,["getting-started-debate"],["start-debate"]
     )).toEqual(parsed);
+  });
+
+  it("accepts localized text only when the machine envelope stays in English",() => {
+    expect(parseSupportDraft(JSON.stringify({
+      kind:"answer",text:"最初のディベートを開始できます。",
+      sourceIds:["getting-started-debate"],actionIds:[]
+    }))).toEqual({
+      kind:"answer",text:"最初のディベートを開始できます。",
+      sourceIds:["getting-started-debate"],actionIds:[]
+    });
+    for (const kind of ["回答","răspuns"]) expect(parseSupportDraft(JSON.stringify({
+      kind,text:"Grounded text.",sourceIds:["getting-started-debate"],actionIds:[]
+    }))).toBeNull();
   });
 
   it.each([

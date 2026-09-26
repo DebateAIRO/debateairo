@@ -1,11 +1,13 @@
 import type { InvestigationAction, ManualInvestigationStatus, RecommendedInvestigation } from "@/lib/types";
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import { t, type MessageCatalog } from "./i18n/translate.js";
 
-const ACTION_LABELS: Record<InvestigationAction, string> = {
-  ask_user: "Ask user",
-  challenge: "Challenge",
-  decompose: "Decompose",
-  find_evidence: "Find evidence",
-  support: "Support"
+const ACTION_KEYS: Record<InvestigationAction, string> = {
+  ask_user: "compose.recommendation.action.askUser",
+  challenge: "compose.recommendation.action.challenge",
+  decompose: "compose.recommendation.action.decompose",
+  find_evidence: "compose.recommendation.action.findEvidence",
+  support: "compose.recommendation.action.support"
 };
 
 export function selectTopRecommendation(
@@ -50,8 +52,12 @@ function sortUsableRecommendations(
   });
 }
 
-export function formatRecommendationAction(action: InvestigationAction): string {
-  return ACTION_LABELS[action] ?? action;
+export function formatRecommendationAction(
+  action: InvestigationAction,
+  catalog: MessageCatalog = composeEnglish
+): string {
+  const key = ACTION_KEYS[action];
+  return key === undefined ? action : t(catalog, key);
 }
 
 export function recommendationTargetClaimId(recommendation: RecommendedInvestigation): string | null {
@@ -67,28 +73,29 @@ export type ManualInvestigationActionState = {
 
 export function manualInvestigationActionState(
   action: InvestigationAction,
-  options: { runFlowWired: boolean }
+  options: { runFlowWired: boolean },
+  catalog: MessageCatalog = composeEnglish
 ): ManualInvestigationActionState {
   if (action === "ask_user") {
     return {
       status: "unavailable",
       disabled: true,
-      label: "Manual investigation unavailable",
-      reason: "No existing backend orchestration path is wired for ask_user."
+      label: t(catalog, "compose.recommendation.manual.unavailable"),
+      reason: t(catalog, "compose.recommendation.manual.askUserUnavailable", { action })
     };
   }
   if (!options.runFlowWired) {
     return {
       status: "unavailable",
       disabled: true,
-      label: "Manual investigation unavailable",
-      reason: "Manual investigation controls are not wired in this drawer yet."
+      label: t(catalog, "compose.recommendation.manual.unavailable"),
+      reason: t(catalog, "compose.recommendation.manual.controlsUnavailable")
     };
   }
   return {
     status: "queued",
     disabled: false,
-    label: "Start manual investigation",
+    label: t(catalog, "compose.recommendation.manual.start"),
     reason: null
   };
 }

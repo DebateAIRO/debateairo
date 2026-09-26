@@ -1,0 +1,18 @@
+### The credential-file contract
+
+The file holds the `authorization` header **value** verbatim — the scheme word, a space and the
+vendor's token — with at most one trailing newline, and nothing else. It is read under the same
+custody contract as every key file (§3): `0600` owned by the service user, one hard link, no
+symlink, inside a `0700` directory owned by the same user, and at most 4 KiB. The bytes are zeroed
+once the header is built, and the path never reaches a gateway, a log line or an error.
+
+A credential never travels any other way: not in `runner.env`, not on a command line, not in a
+process listing.
+
+**Two services read it, so there are two files**, exactly as the KEK has two copies (§3): the
+runner calls the vendor, and the API probes it at ask time. Each service gets its own `0600` copy
+in its own `0700` tree — one inode per principal, so neither service can replace the other's — and
+each `EnvironmentFile` names its own path in `authorization_file`. That is the trade this kit
+already made for the KEK, and it carries the same trap: **rotating a vendor key means replacing
+both files.** Replace both, then restart both units.
+

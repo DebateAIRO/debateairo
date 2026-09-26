@@ -1,0 +1,112 @@
+# REQ-FIX-PES pass 3 — checker runs (t_690beb44). Every line below is the runs' own output, except the
+# three '#   ' lines in §4, which quote the FIRST p3_mutants run from the session record (the replay
+# under them re-executes that miss).
+# Lane read: .worktrees/pes-base/dialectical-engine @ 776359c3 (dirty files: 0)
+# Generated 2026-09-24 19:45:25 EEST
+
+## 1. p3_checks.py v2 — the SPEC of record the lens reviewed; MUST FAIL
+REQ-FIX-PES pass-3 checkers against v2
+  FAIL  B1  targets-rejected & every case: printed code == shipped chain's code
+          - case targets-rejected: the SPEC says `PES_PUBLISH_SET_TARGETS_REJECTED:PROVIDER_DISCOVERY_TARGET_DUPLICATE`, the shipped chain prints `CONFIGURED_PROVIDER_SET_INVALID`
+  FAIL  B1  base row exists in the acceptance database (N4 pass test)
+          - the acceptance database is seeded from nothing the SPEC names, so the base `configuredProviderSet` row R1.2 reads `requiredDistinctMakers` and `sealedSourceRef` from does not exist in it
+  FAIL  B2  one layout satisfies R2.8, R2.9(iii), step 5 and step 7
+          - step 5's line prints <scratch>, the credential's 0700 directory, which R2.9 (iii) forbids
+  FAIL  --  R2.7 refusal fixtures determinate (sweep member)
+          - a lawful reading (http://127.0.0.1:4455/v1) prints `PROVIDER_BASE_URL_TLS_REQUIRED:vendor:a`, step 5 requires `PROVIDER_TARGET_LOOPBACK_REFUSED:`
+  FAIL  N1  resolver integers named and constructible
+          - the resolver R2.8 composes, with the integers it names, throws `PROVIDER_PROBE_FRESHNESS_INVALID`
+  FAIL  N2  R2.9(i) forbids no required line
+          - R2.9 (i) forbids a line step 5-8 require: `PES-S02 SCRATCH-DIR /tmp/pes-s02-abc`
+  FAIL  N3  PLAN R1.9 cell agrees with SPEC R1.9
+          - PLAN's R1.9 cell still reads `path, anywhere`
+v2: FAIL (7 failing checks)
+rc=1
+
+## 2. N3 on SPEC-v3 with the PLAN still at its pass-2 text (0e625a59) — the state before the PLAN edit; MUST FAIL
+  FAIL  N3
+          - PLAN's R1.9 cell forbids the path everywhere while the SPEC admits it on the two PES_HOSTED_TARGETS_*_V1= lines: `| R1.9 | no credential value and no credential path, anywhere | | |`
+          - PLAN's R1.9 cell still reads `path, anywhere`
+
+## 3. p3_checks.py v3 — the rework; MUST PASS
+REQ-FIX-PES pass-3 checkers against v3
+  pass  B1  targets-rejected & every case: printed code == shipped chain's code
+  pass  B1  base row exists in the acceptance database (N4 pass test)
+  pass  B2  one layout satisfies R2.8, R2.9(iii), step 5 and step 7
+  pass  --  R2.7 refusal fixtures determinate (sweep member)
+  pass  N1  resolver integers named and constructible
+  pass  N2  R2.9(i) forbids no required line
+  pass  N3  PLAN R1.9 cell agrees with SPEC R1.9
+v3: PASS (0 failing checks)
+rc=0
+
+## 4. p3_mutants.py — v3 with one defect re-introduced per line; every line MUST read CAUGHT
+# The FIRST run of this file (before the fix below) read, from the session record:
+#   MISSED  the uniqueness rule is dropped from the roster gate
+#   mutants: 12/13 caught
+#   rc=1
+# Replay of that miss (p3_mutant3_replay.py), which separates its two causes:
+  MISSED  first mutant (only 'is unique' rewritten), first detection (keyword)
+  MISSED  first mutant, sentence detection  [rule still stated: an EQUIVALENT mutant]
+  CAUGHT  full mutant (rule sentence + repeat clause deleted), first detection -> case roster-invalid: the SPEC says `PES_PUBLISH_ROSTER_INVALID:vendor:a`, the shipped chain prints `
+  CAUGHT  full mutant, sentence detection -> case roster-invalid: the SPEC says `PES_PUBLISH_ROSTER_INVALID:vendor:a`, the shipped chain prints `
+  MISSED  rule sentence deleted, repeat clause KEPT, first detection
+  CAUGHT  rule sentence deleted, repeat clause KEPT, sentence detection -> case roster-invalid: the SPEC says `PES_PUBLISH_ROSTER_INVALID:vendor:a`, the shipped chain prints `
+# Fix: the mutant now deletes every statement of the rule; the detection reads the rule SENTENCE
+# (p3_checks.UNIQUE_RULE), and a 14th mutant keeps the repeat clause to prove the detection is not a keyword.
+  CAUGHT  roster-invalid expects the parser's DUPLICATE code -> case roster-invalid: the SPEC says `PROVIDER_DISCOVERY_TARGET_DUPLICATE`, the shipped chain prints `PES_PUBLIS
+  CAUGHT  unvetted expects a shape error -> case unvetted: the SPEC says `PES_PUBLISH_ROSTER_INVALID:vendor:a`, the shipped chain prints `PROVIDER_VENDOR_
+  CAUGHT  the uniqueness rule is deleted from the roster gate -> case roster-invalid: the SPEC says `PES_PUBLISH_ROSTER_INVALID:vendor:a`, the shipped chain prints `CONFIGURED
+  CAUGHT  the uniqueness rule sentence is deleted, the repeat clause stays -> case roster-invalid: the SPEC says `PES_PUBLISH_ROSTER_INVALID:vendor:a`, the shipped chain prints `CONFIGURED
+  CAUGHT  targets-rejected fixture made valid again (base_url ends /v1) -> case targets-rejected: the SPEC says `PES_PUBLISH_SET_TARGETS_REJECTED:PROVIDER_DISCOVERY_TARGET_BASE_URL_INVA
+  CAUGHT  not-hosted expects the wrong mode -> case not-hosted: the SPEC says `PES_PUBLISH_SET_NOT_HOSTED:hosted`, the shipped chain prints `PES_PUBLISH_SET_
+  CAUGHT  the seed is imported at a version the cases do not use -> the publishing case's REGISTER_VERSION is not the seed version 5
+  CAUGHT  the published rowCount disagrees with the seed -> the published case's rowCount is not the seed's measured 32 rows
+  CAUGHT  step 7 greps <scratch>/credential again -> step 7 greps `<scratch>/credential`, which is not the credential's path
+  CAUGHT  R2.8 puts the credential where step 7 does not grep (<scratch>/sub/) -> step 7 greps `<scratch>/custody.d`, which is not the credential's path
+  CAUGHT  the loopback fixture is http again -> a lawful reading (http://127.0.0.1:4455/v1) prints `PROVIDER_BASE_URL_TLS_REQUIRED:vendor:a`, step 5 requires 
+  CAUGHT  probeTimeoutMs is 1 -> probeTimeoutMs 1 is not the loader default 5_000
+  CAUGHT  probeFreshnessMs is dropped -> the resolver R2.8 composes, with the integers it names, throws `PROVIDER_PROBE_FRESHNESS_INVALID`
+  CAUGHT  R2.9 (i) is the substring rule again -> R2.9 (i) forbids a line step 5-8 require: `PES-S02 SCRATCH-DIR /tmp/pes-s02-abc`
+mutants: 14/14 caught
+rc=0
+
+## 5. The pass-2 detectors (detectors.py, unchanged) — v1 MUST FAIL, the pass-3 documents MUST PASS
+REQ-FIX-PES detectors against v1
+  FAIL  B1  hosted-set inputs determine the row
+          - no `row member | its ONE source` table in the S01 SPEC of record
+          - still claims two inputs determine the row
+          - vacuous order code still live: before publishing, printing `PES_PUBLISH_SET_ORDER_MISMATCH:` and the first ref that diffe
+          - vacuous order code still live: `PES-S01 CASE order-mismatch ` whose remainder begins `PES_PUBLISH_SET_ORDER_MISMATCH:`; a
+          - no shipped-parser self-check replaces the order code
+  FAIL  B2  S02 is vertical in every document
+          - S02:~7 still claims the S01 dependency: Depends on S01: step 5 of §5 publishes the hosted row with the command S01 ships. Until S0
+          - S02:~7 still claims the S01 dependency: Until S01 is merged into the lane, steps 1–4 and 6–9 run and step 5 is UNVERIFIED.  ## 1.
+          - INSTRUCTIONS:~34 still claims the S01 dependency: S02 depends on S01 (its acceptance step 5 publishes with S01's command). S03 is independen
+          - INSTRUCTIONS:~34 still claims the S01 dependency: publishes with S01's command). S03 is independent of both.  ## Roster and review route  |
+          - S02PLAN:~22 still claims the S01 dependency: merged into this lane, or step 5 of SPEC §5 is UNVERIFIED | SPEC header |  ## 2. SPEC → st
+  FAIL  B3  the stdout rule admits the codes the acceptance prints
+          - R2.9 forbids the WORD `authorization`, which the acceptance must print
+          - acceptance prints PROVIDER_AUTHORIZATION_FILE_ABSENT; R2.9 does not declare it lawful
+          - acceptance prints PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT; R2.9 does not declare it lawful
+  FAIL  N3,N4,N5,N7,N8,N9,N10  named sources
+          - N3: R2.5 does not quote the body provider-probe.ts:103 accepts
+          - N4: the TLS trust mechanism is not named
+          - N5: the runner environment record is not named
+          - N7: acceptance step 2 still defers the path to PLAN.md
+          - N8: no step records the lsof baseline before the run
+          - N9: R1.8 names no literal receipt prefix
+          - N10: the two parse call sites are not cited at 300 / 74
+  pass  --  no banned word in a SPEC
+  pass  --  SPEC<->PLAN trace, both directions
+v1: FAIL (4 failing checks)
+rc=1
+REQ-FIX-PES pass-2 detectors (detectors.py, unchanged) against the pass-3 documents
+  pass  B1  hosted-set inputs determine the row
+  pass  B2  S02 is vertical in every document
+  pass  B3  the stdout rule admits the codes the acceptance prints
+  pass  N3,N4,N5,N7,N8,N9,N10  named sources
+  pass  --  no banned word in a SPEC
+  pass  --  SPEC<->PLAN trace, both directions
+v3: PASS (0 failing checks)
+rc=0

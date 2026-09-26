@@ -1,0 +1,302 @@
+[
+  {
+    "id": "M01",
+    "test": 1,
+    "property": "material filenames",
+    "from": "\"openssl.cnf\"",
+    "to": "\"fixture.cnf\"",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M02",
+    "test": 1,
+    "property": "SAN and hostname",
+    "from": "subjectAltName = DNS:api.localtest.me",
+    "to": "subjectAltName = DNS:other.localtest.me",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=1 failed=5 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M03",
+    "test": 1,
+    "property": "CA designation",
+    "from": "basicConstraints = critical,CA:TRUE",
+    "to": "basicConstraints = critical,CA:FALSE",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M04",
+    "test": 2,
+    "property": "base URL",
+    "from": "baseUrl: `https://${FAKE_VENDOR_HOST}:${input.port}/v1`",
+    "to": "baseUrl: `https://${FAKE_VENDOR_HOST}:${input.port}/v2`",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=3 failed=3 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M05",
+    "test": 2,
+    "property": "success status",
+    "from": "response.writeHead(200,",
+    "to": "response.writeHead(201,",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=4 failed=2 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M06",
+    "test": 2,
+    "property": "model response",
+    "from": "\"model\":\"fake-model\",\"choices\"",
+    "to": "\"model\":\"other-model\",\"choices\"",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M07",
+    "test": 2,
+    "property": "OK response",
+    "from": "\"content\":\"OK\"",
+    "to": "\"content\":\"NO\"",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M08",
+    "test": 2,
+    "property": "matched count",
+    "from": "matched += 1;",
+    "to": "matched += 2;",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M09",
+    "test": 3,
+    "property": "absent authorization",
+    "from": "request.headers.authorization === FAKE_VENDOR_AUTHORIZATION)",
+    "to": "request.headers.authorization === FAKE_VENDOR_AUTHORIZATION || request.headers.authorization === undefined)",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M10",
+    "test": 3,
+    "property": "wrong authorization",
+    "from": "request.headers.authorization === FAKE_VENDOR_AUTHORIZATION)",
+    "to": "request.headers.authorization === FAKE_VENDOR_AUTHORIZATION || request.headers.authorization === \"Bearer not-the-fixture-literal\")",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M11",
+    "test": 3,
+    "property": "denial status",
+    "from": "response.writeHead(401,",
+    "to": "response.writeHead(400,",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M12",
+    "test": 3,
+    "property": "denial body",
+    "from": "\"error\":\"unauthorized\"",
+    "to": "\"error\":\"denied\"",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M13",
+    "test": 3,
+    "property": "other route",
+    "from": "response.writeHead(404);",
+    "to": "response.writeHead(405);",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M14",
+    "test": 3,
+    "property": "rejected count",
+    "from": "rejected += 1;",
+    "to": "rejected += 2;",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M15",
+    "test": 4,
+    "property": "wrong CA refusal",
+    "from": "      rejectUnauthorized: true,\n      ...(lookup",
+    "to": "      rejectUnauthorized: false,\n      ...(lookup",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M16",
+    "test": 4,
+    "property": "handshake CA",
+    "from": "ca: [input.caPem],",
+    "to": "ca: [],",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M17",
+    "test": 4,
+    "property": "handshake result",
+    "from": "resolve(\"authorized\");",
+    "to": "resolve(\"denied\" as \"authorized\");",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M18",
+    "test": 4,
+    "property": "TLS counts",
+    "from": "server.on(\"tlsClientError\", () => undefined);",
+    "to": "server.on(\"tlsClientError\", () => undefined);\n  server.on(\"secureConnection\", () => { matched += 1; });",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=4 failed=2 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M19",
+    "test": 5,
+    "property": "excluded ports",
+    "from": "if (port <= 4400 || FAKE_VENDOR_EXCLUDED_PORTS.has(port)) continue;",
+    "to": "if (port <= 4400) continue;",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M20",
+    "test": 5,
+    "property": "occupied candidates",
+    "from": "if (listening(port) === false) {",
+    "to": "if (listening(port) === true) {",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=1 failed=5 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M21",
+    "test": 5,
+    "property": "lsof evidence",
+    "from": "-sTCP:LISTEN rc=1 lines=0",
+    "to": "-sTCP:LISTEN rc=0 lines=1",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M22",
+    "test": 5,
+    "property": "listening state",
+    "from": "if (result.status === 0) return true;",
+    "to": "if (result.status === 0) return false;",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M23",
+    "test": 6,
+    "property": "IPv6-first fallback",
+    "from": "      agent,\n      signal:",
+    "to": "      agent,\n      autoSelectFamily: false,\n      signal:",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M24",
+    "test": 5,
+    "property": "close releases port",
+    "from": "await new Promise<void>((resolve, reject) => {\n        server.close((error) => error ? reject(error) : resolve());\n      });",
+    "to": "setTimeout(() => server.close(), 1000);",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "N01",
+    "test": 0,
+    "property": "success body must not affect cases 1,3,4,5,6",
+    "from": "\"content\":\"OK\"",
+    "to": "\"content\":\"NO\"",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "N02",
+    "test": 0,
+    "property": "denial body must not affect success case 2",
+    "from": "\"error\":\"unauthorized\"",
+    "to": "\"error\":\"denied\"",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M25",
+    "test": 4,
+    "property": "zero HTTP counts after TLS-only checks",
+    "from": "counts: () => ({ matched, rejected }),",
+    "to": "counts: () => ({ matched: matched + 1, rejected }),",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=3 failed=3 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M26",
+    "test": 5,
+    "property": "excluded ports never inspected",
+    "from": "if (port <= 4400 || FAKE_VENDOR_EXCLUDED_PORTS.has(port)) continue;",
+    "to": "if (port <= 4400 || FAKE_VENDOR_EXCLUDED_PORTS.has(port)) { listening(port); continue; }",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "M27",
+    "test": 4,
+    "property": "negative control fails for the exact trust reason",
+    "from": "https.createServer({ key: input.keyPem, cert: input.certPem },",
+    "to": "https.createServer({ key: input.keyPem, cert: input.certPem, maxVersion: \"TLSv1.2\", ciphers: \"ECDHE-ECDSA-AES256-GCM-SHA384\" },",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=2 failed=4 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  },
+  {
+    "id": "N03",
+    "test": 0,
+    "property": "after extra refutations, unrelated success-body change leaves cases 1,3,4,5,6 green",
+    "from": "\"content\":\"OK\"",
+    "to": "\"content\":\"NO\"",
+    "red": "acceptance/pes-s02-fake-vendor.test.ts rc=1 passed=5 failed=1 (expect 6/0)\nCLUSTER_RED\n",
+    "green": "acceptance/pes-s02-fake-vendor.test.ts rc=0 passed=6 failed=0 (expect 6/0)\nCLUSTER_GREEN\n",
+    "status": "?? dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts\n?? dialectical-engine/acceptance/pes-s02-fake-vendor.ts\n"
+  }
+]

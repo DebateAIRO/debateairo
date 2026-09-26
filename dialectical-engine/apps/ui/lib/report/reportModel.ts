@@ -1,6 +1,7 @@
 import { CONDITION_MARKS } from "@debateai/kernel";
 import type { Answer, AnswerStory, ConditionMark, Edge, MakerLineage } from "@debateai/contract";
-import { AI_NOTICE } from "../aiDisclosure.js";
+import debateChromeEnglish from "../../messages/en/debateChrome.json" with { type: "json" };
+import { t } from "../i18n/translate.js";
 import { contractNodesById, v3ScorePercentage, wayOfKnowingLabel } from "../v3/adapter.js";
 import { conditionMarkLabel } from "../v3/labels.js";
 import { storyConfidenceWords, storyLabelSentence, storyLabelWords } from "../v3/storyView.js";
@@ -586,7 +587,7 @@ function appendixEntry(point: NumberedPoint, node: Answer["nodes"][number], stan
   const frozen = node.condition_marks.includes("BRANCH-FROZEN-LOW-LEVERAGE");
   const author = lineageWords(node.maker_lineage);
   const setAside = point.node.stopping_reason_human ?? (frozen ? conditionMarkLabel("BRANCH-FROZEN-LOW-LEVERAGE") : null);
-  const marks = node.condition_marks.filter((mark) => mark !== "BRANCH-FROZEN-LOW-LEVERAGE").map(conditionMarkLabel);
+  const marks = node.condition_marks.filter((mark) => mark !== "BRANCH-FROZEN-LOW-LEVERAGE").map((mark) => conditionMarkLabel(mark));
   return {
     number: point.number,
     anchor: pointAnchor(point.number),
@@ -632,7 +633,8 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
       models,
       modelsLine: models.length === 0 ? "Models that took part: not recorded" : `Models that took part: ${models.join(", ")}`,
       disclosure: [
-        AI_NOTICE.debate,
+        // The debate page's own AI notice, in English: the report is not localized yet.
+        t(debateChromeEnglish, "debateChrome.aiNotice"),
         "The story in this report was written by an AI storyteller and checked by a second AI model. The label comes from the scores, not from the story."
       ]
     },

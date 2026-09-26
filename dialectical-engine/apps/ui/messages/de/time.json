@@ -1,0 +1,21 @@
+{
+  "time.justNow": "gerade eben",
+  "time.minutes.one": "vor {count} Minute",
+  "time.minutes.other": "vor {count} Minuten",
+  "time.hours.one": "vor {count} Stunde",
+  "time.hours.other": "vor {count} Stunden",
+  "time.yesterday": "Gestern",
+  "time.days.one": "vor {count} Tag",
+  "time.days.other": "vor {count} Tagen",
+  "time.weeks.one": "vor {count} Woche",
+  "time.weeks.other": "vor {count} Wochen",
+  "time.status.complete": "Abgeschlossen",
+  "time.status.queued": "Eingereiht",
+  "time.status.claimed": "Übernommen",
+  "time.status.running": "Läuft",
+  "time.status.holding": "Warten auf Anbieterwiederherstellung",
+  "time.status.settled": "Erledigt",
+  "time.status.generating": "Wird erzeugt",
+  "time.status.failed": "Fehlgeschlagen",
+  "time.status.draft": "Entwurf"
+}

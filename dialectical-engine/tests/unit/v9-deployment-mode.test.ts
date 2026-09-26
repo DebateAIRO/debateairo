@@ -19,6 +19,20 @@ import {
   validRunnerEnvironmentFixture
 } from "../support/apiEnvironmentFixture.js";
 
+import { rm } from "node:fs/promises";
+import { afterEach, vi } from "vitest";
+import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "../../apps/runner/src/dev-api-environment.js";
+import {
+  startDevelopmentRunnerProcess,
+  type DevelopmentRunnerChild,
+  type DevelopmentRunnerProcessOperations
+} from "../../apps/runner/src/dev-runner-process.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
+import {
+  createDevApiEnvironmentAssemblyFixture,
+  assembleDevApiEnvironmentFixture
+} from "../support/devApiEnvironmentAssembly.js";
+
 /**
  * V-9(c) / task 10a. The engine has TWO supported deployments and the choice is
  * made in configuration, never guessed from `NODE_ENV`:
@@ -472,6 +486,80 @@ describe("V-9 both shipped roots take the mode decision (task 10a)", () => {
     for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).toContain("assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE)");
+    }
+  });
+});
+
+describe("S02 — the development stack names its deployment mode", () => {
+  const roots: string[] = [];
+
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  });
+
+  it("declares DEBATEAI_DEPLOYMENT_MODE=local in the API environment the development stack assembles", async () => {
+    const fixture = await createDevApiEnvironmentAssemblyFixture();
+    roots.push(fixture.repositoryRoot);
+    vi.stubEnv("DEBATEAI_DEV_CUSTODY_ROOT", fixture.custodyRoot);
+    expect(DEVELOPMENT_API_ENVIRONMENT_KEYS).toContain("DEBATEAI_DEPLOYMENT_MODE");
+    await assembleDevApiEnvironmentFixture(fixture.repositoryRoot);
+    const rows = (await readFile(fixture.outputFilePath, "utf8")).trimEnd().split("\n")
+      .filter((row) => row.startsWith("DEBATEAI_DEPLOYMENT_MODE="));
+    expect(rows).toEqual(["DEBATEAI_DEPLOYMENT_MODE=local"]);
+  });
+
+  it("declares DEBATEAI_DEPLOYMENT_MODE=local in the runner environment the development stack composes", async () => {
+    const captured: Readonly<Record<string, string>>[] = [];
+    let resolveExit!: (value: Readonly<{ code: number | null; signal: NodeJS.Signals | null }>) => void;
+    const exited: DevelopmentRunnerChild["exited"] = new Promise((resolve) => {
+      resolveExit = resolve;
+    });
+    const child: DevelopmentRunnerChild = {
+      ready: Promise.resolve({
+        kind: "DEBATEAI_RUNNER_READY",
+        worker: "debateai-dev-runner",
+        registerVersion: "424242"
+      }),
+      exited,
+      async terminate() {
+        resolveExit({ code: 0, signal: null });
+      }
+    };
+    const operations: DevelopmentRunnerProcessOperations = {
+      async loadApiEnvironment() {
+        return Object.freeze({
+          PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
+          REGISTER_VERSION: "424242",
+          REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
+          REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
+          KEK_PATH: "/private/dev/kek.bin",
+          DATABASE_URL: "postgresql://runtime:opaque@127.0.0.1:55432/debateai",
+          CONTENT_ENCRYPTION_ENABLED: "true",
+          USER_DEK_STORE_PATH: "/private/dev/user-deks",
+          HATCHET_CLIENT_TOKEN: "opaque-token",
+          HATCHET_HOST_PORT: "127.0.0.1:7077",
+          HATCHET_API_URL: "http://127.0.0.1:8888",
+          HATCHET_TENANT_ID: "00000000-0000-4000-8000-000000000001",
+          HATCHET_WORKFLOW_NAME: "debateai-dev",
+          HATCHET_TLS_STRATEGY: "none"
+        });
+      },
+      startRunner(values) {
+        captured.push(values);
+        return child;
+      }
+    };
+    const runner = await startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace",
+      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
+      operations
+    });
+    try {
+      expect(captured).toHaveLength(1);
+      expect(captured[0]!.DEBATEAI_DEPLOYMENT_MODE).toBe("local");
+    } finally {
+      await runner.stop();
     }
   });
 });

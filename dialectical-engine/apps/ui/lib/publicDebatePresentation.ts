@@ -1,4 +1,6 @@
 import type { PublicDebate } from "@debateai/contract";
+import publicEnglish from "../messages/en/public.json" with { type: "json" };
+import { t, type MessageCatalog } from "./i18n/translate.js";
 
 type PublicNode = NonNullable<PublicDebate["answer"]["nodes"]>[number];
 type Side = "pro" | "con";
@@ -65,7 +67,10 @@ function strongest(
   };
 }
 
-export function buildPublicDebatePresentation(debate: PublicDebate): PublicDebatePresentation {
+export function buildPublicDebatePresentation(
+  debate: PublicDebate,
+  catalog: MessageCatalog = publicEnglish
+): PublicDebatePresentation {
   const nodes = debate.answer.nodes ?? [];
   const sides = new Map<string, Side>();
   for (const edge of debate.answer.edges ?? []) {
@@ -98,10 +103,15 @@ export function buildPublicDebatePresentation(debate: PublicDebate): PublicDebat
     proPercent: supportMeasured ? Math.round(proWeight / (proWeight + conWeight) * 100) : 50,
     supportMeasured,
     metrics: {
-      support: `${proNodes.length} pro · ${conNodes.length} con`,
+      support: t(catalog, "public.metrics.support", {
+        proCount: proNodes.length,
+        conCount: conNodes.length
+      }),
       reviewed: `${reviewed.length} / ${nodes.length}`,
       judged: `${judged} / ${nodes.length}`,
-      convergence: reviewed.length === 0 ? "Not measured" : `${agreed} / ${reviewed.length} agreed`
+      convergence: reviewed.length === 0
+        ? t(catalog, "public.metrics.convergenceNotMeasured")
+        : t(catalog, "public.metrics.convergenceAgreed", { agreed, reviewed: reviewed.length })
     }
   };
 }

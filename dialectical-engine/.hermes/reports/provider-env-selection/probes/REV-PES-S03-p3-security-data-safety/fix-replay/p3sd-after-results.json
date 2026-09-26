@@ -1,0 +1,100 @@
+[
+  {
+    "name": "missing-COST_ENVELOPE_POLICY_UNRESOLVED",
+    "rc": 1,
+    "detector_matched": true,
+    "lines": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-missing-COST_ENVELOPE_POLICY_UNRESOLVED.log"
+  },
+  {
+    "name": "below-COST_ENVELOPE_POLICY_UNRESOLVED",
+    "rc": 1,
+    "detector_matched": true,
+    "lines": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-below-COST_ENVELOPE_POLICY_UNRESOLVED.log"
+  },
+  {
+    "name": "missing-COST_ENVELOPE_POLICY_INVALID",
+    "rc": 1,
+    "detector_matched": true,
+    "lines": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-missing-COST_ENVELOPE_POLICY_INVALID.log"
+  },
+  {
+    "name": "below-COST_ENVELOPE_POLICY_INVALID",
+    "rc": 1,
+    "detector_matched": true,
+    "lines": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14) > README \u00a711's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)",
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-below-COST_ENVELOPE_POLICY_INVALID.log"
+  },
+  {
+    "name": "stale-0",
+    "rc": 1,
+    "detector_matched": true,
+    "lines": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README's known-stale list no longer carries the bullets \u00a711 now answers",
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-stale-0.log"
+  },
+  {
+    "name": "stale-1",
+    "rc": 1,
+    "detector_matched": true,
+    "lines": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README's known-stale list no longer carries the bullets \u00a711 now answers",
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-stale-1.log"
+  },
+  {
+    "name": "stale-2",
+    "rc": 1,
+    "detector_matched": true,
+    "lines": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README's known-stale list no longer carries the bullets \u00a711 now answers",
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-stale-2.log"
+  },
+  {
+    "name": "stale-banner",
+    "rc": 1,
+    "detector_matched": true,
+    "lines": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README's known-stale list no longer carries the bullets \u00a711 now answers",
+      "Test Files  1 failed (1)",
+      "Tests  1 failed | 30 skipped (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-stale-banner.log"
+  },
+  {
+    "name": "neighbor",
+    "rc": 0,
+    "detector_matched": true,
+    "lines": [
+      "Test Files  1 passed (1)",
+      "Tests  31 passed (31)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/REV-PES-S03-p3-security-data-safety/fix-replay/p3sd-after-neighbor.log"
+  }
+]

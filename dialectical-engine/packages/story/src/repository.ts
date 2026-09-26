@@ -22,7 +22,7 @@ import {
 import { TypedDomainError, exhaustive } from "@debateai/kernel";
 
 /**
- * THE STORY ROW (migration 0072, spec §7). Insert-once per answer version, and
+ * THE STORY ROW (migration 0074, spec §7). Insert-once per answer version, and
  * a content carrier. The story JSON, the reservation, the verdict basis and the
  * point numbers are sealed together for an encrypted run and stored as plaintext for a legacy
  * one, exactly as `serve.answer`'s answer form is. The readable columns hold

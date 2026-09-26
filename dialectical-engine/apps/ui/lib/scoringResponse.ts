@@ -18,6 +18,8 @@ import {
 } from "./observability/suspiciousScoring";
 import { toArgumentClaimStatus } from "./debateTreeUtils";
 import { v3ScoringStatusLabel } from "./v3/adapter";
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import type { MessageCatalog } from "./i18n/translate.js";
 
 export type IndexedScoringResponse = {
   scoringByNodeId: Map<string, NodeScoringPayload>;
@@ -96,6 +98,8 @@ export type ScoringVisibilityInput = {
   refreshStatus: "idle" | "starting" | "error";
   response: DebateScoringResponse | null;
   error?: string | null;
+  /** The reader's `compose` catalogue: V3's absence reason is recognised in the reader's locale. */
+  composeCatalog?: MessageCatalog;
 };
 
 const severityRank: Record<Severity, number> = {
@@ -265,7 +269,7 @@ export function formatScoringVisibilityState(input: ScoringVisibilityInput): Sco
   // unavailable" asserted something false. Narrow and additive — the V3 layer
   // owns the judgement of whether the reason is its own, and every other
   // unavailable reason keeps V2's original copy below.
-  const v3ScoringLabel = v3ScoringStatusLabel(reason);
+  const v3ScoringLabel = v3ScoringStatusLabel(reason, input.composeCatalog ?? composeEnglish);
   if (input.scoringStatus === "unavailable" && v3ScoringLabel !== null) {
     return {
       kind: "unavailable",

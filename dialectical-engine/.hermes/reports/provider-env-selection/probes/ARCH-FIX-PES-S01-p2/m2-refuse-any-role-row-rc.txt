@@ -1,0 +1,7 @@
+rc=1
+port=51750
+lsof-on-port rc=1 (1 = nothing listening)
+stdout lines: 14
+Bearer lines in stdout+stderr: 0
+55432 same: yes
+lane dirty after: 0

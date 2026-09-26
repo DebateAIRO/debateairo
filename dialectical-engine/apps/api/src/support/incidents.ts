@@ -163,8 +163,7 @@ export function formatIncidentAnswer(
     outcome: "ANSWER_INCIDENT",
     text: supportTemplate("INCIDENT_ACTIVE",language)
       .replace("{started_at}",active.startedAt.toISOString())
-      .replace(language === "ro" ? "{summary_ro}" : "{summary_en}",
-        language === "ro" ? active.summaryRo : active.summaryEn)
+      .replace("{summary}",language === "ro" ? active.summaryRo : active.summaryEn)
   });
 }
 
@@ -181,8 +180,17 @@ export function applyIncidentNotice(
   const active = incidents.find((incident) => incident.endedAt === null
     && touches(incident.affectedSurface,intentSurface));
   if (active === undefined) return reply;
+  // en and ro keep dev's bytes (the raw surface enum); only the 33 new
+  // interface locales render a localized surface label.
+  const surface = language === "en" || language === "ro" ? active.affectedSurface
+    : supportTemplate(({
+      debates: "INCIDENT_SURFACE_DEBATES",
+      publishing: "INCIDENT_SURFACE_PUBLISHING",
+      "sign-in": "INCIDENT_SURFACE_SIGN_IN",
+      "whole-site": "INCIDENT_SURFACE_WHOLE_SITE"
+    } as const)[active.affectedSurface],language);
   const notice = supportTemplate("INCIDENT_NOTICE",language)
-    .replace("{surface}",active.affectedSurface)
+    .replace("{surface}",surface)
     .replace("{started_at}",active.startedAt.toISOString());
   return `${notice}\n\n${reply}`;
 }

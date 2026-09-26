@@ -1,4 +1,5 @@
 import { TypedDomainError } from "@debateai/kernel";
+import type { SupportLanguage } from "@debateai/support-kb/catalog";
 import {
   assertDeploymentProviderTargets,
   assertFramedPrompt,
@@ -83,7 +84,7 @@ export type SupportModelUsage = Readonly<{
 export interface SupportModelPort {
   complete(input: Readonly<{
     packet: PromptPacket;
-    language: "en" | "ro";
+    language: SupportLanguage;
     signal?: AbortSignal;
   }>): Promise<Readonly<{ text: string;usage?: SupportModelUsage }>>;
 }

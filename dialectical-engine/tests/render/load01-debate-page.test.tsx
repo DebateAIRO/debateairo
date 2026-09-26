@@ -17,7 +17,11 @@ vi.mock("@/lib/serverApi", async (importOriginal) => ({
   getDebateServer: mocks.getDebateServer
 }));
 vi.mock("@/components/AuthGate", () => ({
-  AuthGate: ({ children }: { children: (token: string) => React.ReactNode }) => children("token:test")
+  AuthGate: ({ children }: { children: (token: string) => React.ReactNode }) => children("t".repeat(43))
+}));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => ({ value: "t".repeat(43) }) }),
+  headers: async () => new Headers({ "user-agent": "vitest-render-browser" })
 }));
 
 const queuedRun = {

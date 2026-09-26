@@ -1,0 +1,2 @@
+silent rc=0
+typecheck rc=1

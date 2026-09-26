@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { COOKIE_SESSION_MARKER, createDebate, validateSession } from "@/lib/api";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The claim field rests at one line and grows with what is typed. */
 function grow(field: HTMLTextAreaElement | null): void {
@@ -12,7 +13,7 @@ function grow(field: HTMLTextAreaElement | null): void {
   field.style.height = `${field.scrollHeight + border}px`;
 }
 
-export function LibraryComposer() {
+export function LibraryComposer({ catalog }: { catalog: MessageCatalog }) {
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,7 +45,7 @@ export function LibraryComposer() {
         <textarea
           id="library-claim"
           className="libComposerInput"
-          aria-label="Debate claim"
+          aria-label={t(catalog, "home.debateClaim")}
           ref={grow}
           rows={1}
           value={topic}
@@ -58,13 +59,13 @@ export function LibraryComposer() {
               void start();
             }
           }}
-          placeholder="Type a debatable claim or question…"
+          placeholder={t(catalog, "home.claimPlaceholder")}
         />
         <div className="libComposerFoot">
-          <p className="libComposerHint">Models argue · you judge</p>
+          <p className="libComposerHint">{t(catalog, "home.composerHint")}</p>
           <span className="libComposerSpacer" aria-hidden />
           <button type="button" className="libStart" onClick={start} disabled={!ready || busy}>
-            {busy ? "Starting…" : "Start debate"} <span aria-hidden>→</span>
+            {t(catalog, busy ? "home.starting" : "home.startDebate")} <span aria-hidden>→</span>
           </button>
         </div>
         {error ? <div className="error" style={{ marginTop: 12 }}>{error}</div> : null}

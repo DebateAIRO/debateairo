@@ -2,6 +2,8 @@ import { ContractHttpError, createContractClient, type Answer, type ContractClie
 import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../trusted-client-ip.mjs";
 import type { DebateDetail, DebateSummary } from "./types.js";
 import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.js";
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import type { MessageCatalog } from "./i18n/translate.js";
 
 /**
  * UI-01 (DR-145): V2's SSR data access, swapped onto V3's typed contract
@@ -120,7 +122,8 @@ export async function getDebateServer(
   token: string,
   client?: ContractClient,
   userAgent?: string,
-  clientIp?: string
+  clientIp?: string,
+  catalog: MessageCatalog = composeEnglish
 ): Promise<GetDebateServerResult> {
   const resolvedClient = client ?? createServerContractClient(fetch, token, userAgent, clientIp);
   let answer: Answer;
@@ -154,5 +157,5 @@ export async function getDebateServer(
       return { ok: false, kind: "pending", message: runFailure instanceof Error ? runFailure.message : "Unable to load run" };
     }
   }
-  return { ok: true, debate: debateDetailFromAnswer(answer), answer };
+  return { ok: true, debate: debateDetailFromAnswer(answer, catalog), answer };
 }

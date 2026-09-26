@@ -1,0 +1,5 @@
+9f29022f3 fix(provider-env-selection/S03): reconcile §11 with origin/dev a6d6382ba (V-18)
+1b37e4d43 fix(provider-env-selection/S03): pin exact refusal table rows
+d152d11ba feat(provider-env-selection/S03-C3): pin live cost-envelope refusals across the VPS kit
+b57c45ca5 feat(provider-env-selection/S03-C2): pin hosted target examples and probe cost guidance
+e6d059552 feat(provider-env-selection/S03-C1): pin startup refusals and document their guards

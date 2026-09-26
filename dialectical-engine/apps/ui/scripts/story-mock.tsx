@@ -6,9 +6,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { AnswerStory } from "@debateai/contract";
 import { AiNotice } from "../components/AiNotice";
 import { StoryPanel } from "../components/StoryPanel";
-import { AI_NOTICE } from "../lib/aiDisclosure";
+import { t } from "../lib/i18n/translate";
 import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, storyFixture } from "../lib/v3/storyFixture";
 import { toStoryView } from "../lib/v3/storyView";
+import debateChromeEnglish from "../messages/en/debateChrome.json" with { type: "json" };
 
 /**
  * The owner's look-first mock (spec 2026-09-26 §10). Renders the REAL
@@ -111,7 +112,7 @@ function PreviewPage({ status }: { status: AnswerStory["status"] }): JSX.Element
           <div className="debateTopClaim"><span className="debateTopTitle">{STORY_FIXTURE_ANSWER.question_line}</span></div>
         </div>
       </header>
-      <div className="debateAiDisclosure"><AiNotice body={AI_NOTICE.debate} /></div>
+      <div className="debateAiDisclosure"><AiNotice body={t(debateChromeEnglish, "debateChrome.aiNotice")} /></div>
       <StoryPanel view={toStoryView(STORY_FIXTURE_ANSWER, storyFixture(status), STORY_FIXTURE_DEBATE_ID)} />
       <div className="debateMain mockMain">
         <p>The debate&apos;s argument views (tree, thread, split and map) stay here, below the story.</p>

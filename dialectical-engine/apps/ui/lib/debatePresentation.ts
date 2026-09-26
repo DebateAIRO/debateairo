@@ -1,8 +1,17 @@
 import type { ArgumentClaimView, DebateNode } from "./types";
 import { toArgumentClaimStatus } from "./debateTreeUtils";
+import debateChromeEnglish from "../messages/en/debateChrome.json" with { type: "json" };
+import { t, type MessageCatalog } from "./i18n/translate.js";
 
-export function formatDialecticalSupport(value: number, semanticsVersion: string): string {
-  return `Dialectical support under semantics version ${semanticsVersion}: ${value}`;
+export function formatDialecticalSupport(
+  value: number,
+  semanticsVersion: string,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
+  return t(catalog, "debateChrome.presentation.dialecticalSupport", {
+    version: semanticsVersion,
+    value
+  });
 }
 
 export type Role = "root" | "pro" | "con" | "pov";
@@ -14,7 +23,6 @@ export type RolePalette = {
   border: string;
   line: string;
   arrow: string;
-  label: string;
 };
 
 export const ROLE_PALETTES: Record<Exclude<Role, "root">, RolePalette> = {
@@ -23,29 +31,23 @@ export const ROLE_PALETTES: Record<Exclude<Role, "root">, RolePalette> = {
     bg: "var(--pro-bg)",
     border: "var(--pro-border)",
     line: "var(--pro-line)",
-    arrow: "↑",
-    label: "Pro"
+    arrow: "↑"
   },
   con: {
     text: "var(--con-text)",
     bg: "var(--con-bg)",
     border: "var(--con-border)",
     line: "var(--con-line)",
-    arrow: "↓",
-    label: "Con"
+    arrow: "↓"
   },
   pov: {
     text: "var(--text-3)",
     bg: "var(--surface-sunken)",
     border: "var(--line-strong)",
     line: "var(--line-strong)",
-    arrow: "◆",
-    label: "Lens"
+    arrow: "◆"
   }
 };
-
-/** Generic fallback label for a lens/branch whose type yields no readable name. */
-export const LENS_FALLBACK_LABEL = "Lens";
 
 /**
  * Human labels for the four legacy POV lenses. These keep their curated names;
@@ -53,11 +55,11 @@ export const LENS_FALLBACK_LABEL = "Lens";
  * NOT an exhaustive list of allowed lenses -- the backend dynamic engine may
  * emit arbitrary lens node types.
  */
-const LEGACY_LENS_LABELS: Record<string, string> = {
-  SCIENTIFIC_POV: "Scientific",
-  STATISTICAL_POV: "Statistical",
-  ETHICAL_POV: "Ethical",
-  PRACTICAL_POV: "Practical"
+const LEGACY_LENS_KEYS: Record<string, string> = {
+  SCIENTIFIC_POV: "debateChrome.presentation.lens.scientific",
+  STATISTICAL_POV: "debateChrome.presentation.lens.statistical",
+  ETHICAL_POV: "debateChrome.presentation.lens.ethical",
+  PRACTICAL_POV: "debateChrome.presentation.lens.practical"
 };
 
 /**
@@ -66,13 +68,16 @@ const LEGACY_LENS_LABELS: Record<string, string> = {
  * strips a trailing "_POV", splits on separators, and title-cases. Returns the
  * generic fallback only when nothing meaningful can be derived (blank/unknown).
  */
-export function lensLabelFromNodeType(nodeType: string | null | undefined): string {
+export function lensLabelFromNodeType(
+  nodeType: string | null | undefined,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
   const raw = (nodeType ?? "").trim();
-  if (!raw) return LENS_FALLBACK_LABEL;
-  const known = LEGACY_LENS_LABELS[raw.toUpperCase()];
-  if (known) return known;
+  if (!raw) return t(catalog, "debateChrome.presentation.lens");
+  const knownKey = LEGACY_LENS_KEYS[raw.toUpperCase()];
+  if (knownKey) return t(catalog, knownKey);
   const cleaned = raw.replace(/_POV$/i, "").replace(/[_-]+/g, " ").trim();
-  if (!cleaned) return LENS_FALLBACK_LABEL;
+  if (!cleaned) return t(catalog, "debateChrome.presentation.lens");
   return cleaned
     .split(/\s+/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -85,10 +90,13 @@ export function lensLabelFromNodeType(nodeType: string | null | undefined): stri
  * Keeps arbitrary N-branch debates rendering without the four legacy POV
  * literals baked in.
  */
-export function branchLabelOf(node: Pick<DebateNode, "node_type" | "label" | "lens">): string {
+export function branchLabelOf(
+  node: Pick<DebateNode, "node_type" | "label" | "lens">,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
   const provided = (node.label ?? node.lens ?? "").trim();
   if (provided) return provided;
-  return lensLabelFromNodeType(node.node_type);
+  return lensLabelFromNodeType(node.node_type, catalog);
 }
 
 export function roleOf(node: DebateNode): Role {
@@ -98,12 +106,12 @@ export function roleOf(node: DebateNode): Role {
   return "pov";
 }
 
-export function roleLabel(node: DebateNode): string {
+export function roleLabel(node: DebateNode, catalog: MessageCatalog = debateChromeEnglish): string {
   const role = roleOf(node);
-  if (role === "pov") return branchLabelOf(node);
-  if (role === "pro") return "Pro";
-  if (role === "con") return "Con";
-  return "Root claim";
+  if (role === "pov") return branchLabelOf(node, catalog);
+  if (role === "pro") return t(catalog, "debateChrome.presentation.pro");
+  if (role === "con") return t(catalog, "debateChrome.presentation.con");
+  return t(catalog, "debateChrome.presentation.rootClaim");
 }
 
 export function renderStateOf(node: DebateNode): ClaimRenderState {
@@ -320,7 +328,10 @@ export function treeDepth(root: DebateNode | null): number {
  * one side more than the other) gets a plain Pro/Con/Even label instead, but
  * `source` still honestly reads "structural" either way.
  */
-export function computeLean(root: DebateNode | null): { pct: number; label: string; source: "structural" } | null {
+export function computeLean(
+  root: DebateNode | null,
+  catalog: MessageCatalog = debateChromeEnglish
+): { pct: number; label: string; source: "structural" } | null {
   if (!root) return null;
   let pro = 0;
   let con = 0;
@@ -337,7 +348,13 @@ export function computeLean(root: DebateNode | null): { pct: number; label: stri
   const total = pro + con;
   if (total === 0) return null;
   const pct = Math.round((pro / total) * 100);
-  const label = pro === con ? "Even (structural)" : pct >= 55 ? "Pro" : pct <= 45 ? "Con" : "Even";
+  const label = pro === con
+    ? t(catalog, "debateChrome.presentation.leanEvenStructural")
+    : pct >= 55
+      ? t(catalog, "debateChrome.presentation.pro")
+      : pct <= 45
+        ? t(catalog, "debateChrome.presentation.con")
+        : t(catalog, "debateChrome.presentation.leanEven");
   return { pct, label, source: "structural" };
 }
 
@@ -382,9 +399,12 @@ export function claimRenderStateOf(view: ArgumentClaimView): ArgumentClaimRender
 /**
  * Role label for an ArgumentClaimView — domain language over internal node_type values.
  */
-export function claimRoleLabel(view: ArgumentClaimView): string {
-  if (view.claimRole === "ROOT_CLAIM") return "Root claim";
-  if (view.claimRole === "PRO") return "Pro";
-  if (view.claimRole === "CON") return "Con";
-  return lensLabelFromNodeType(view.claimRole);
+export function claimRoleLabel(
+  view: ArgumentClaimView,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
+  if (view.claimRole === "ROOT_CLAIM") return t(catalog, "debateChrome.presentation.rootClaim");
+  if (view.claimRole === "PRO") return t(catalog, "debateChrome.presentation.pro");
+  if (view.claimRole === "CON") return t(catalog, "debateChrome.presentation.con");
+  return lensLabelFromNodeType(view.claimRole, catalog);
 }

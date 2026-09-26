@@ -1,0 +1,95 @@
+# REQ-FIX-PES-p4 runs · 2026-09-25 13:02:13 EEST · lane 776359c38 dirty=0
+## 1. p4_checks old (S01 v3, S02 v3, S03 v1) — MUST FAIL
+REQ-FIX-PES-p4 checks against old: {'S01': 'S01/SPEC-v3.md', 'S02': 'S02/SPEC-v3.md', 'S03': 'S03/SPEC.md'}
+  FAIL  V-10  S01 refuses a set dropping a role row's provider; §5 case agrees with the rule
+          - no requirement refuses a set that drops a role row's provider with a PES_PUBLISH_ code
+  FAIL  V-12/13 one exit rule, executed through the SPEC's own command
+          - S01 PASS: step 2's command shows no `exit=0` (printed '$ tsx acceptance/x.ts\nOWN line\nPES-S01-ACCEPT: PASS')
+          - S01 PASS: step 6's PASS sentence does not state `exit=0` alone
+          - S01 FAIL: step 6's rule reads `[ELIFECYCLE] Command failed with exit code 1.` as the verdict
+          - S01 FAIL: step 2's command shows no `exit=1` (printed '$ tsx acceptance/x.ts\nOWN line\nPES-S01-ACCEPT: FAIL case-x\n[ELIFECYCLE] Command failed with exit code 1.')
+          - S01 FAIL: step 6's FAIL sentence does not state `exit=1` alone
+          - S01 UNVERIFIED: step 6's rule reads `[ELIFECYCLE] Command failed with exit code 1.` as the verdict
+          - S01 UNVERIFIED: step 2's command shows no `exit=1` (printed '$ tsx acceptance/x.ts\nPES-S01-ACCEPT: UNVERIFIED step-x err\n[ELIFECYCLE] Command failed with exit code 1.')
+          - S01 UNVERIFIED: step 6's UNVERIFIED sentence does not state `exit=1` alone
+          - S01: step 6 states no UNVERIFIED verdict
+          - S02 PASS: step 4's command shows no `exit=0` (printed '$ tsx acceptance/x.ts\nOWN line\nPES-S02-ACCEPT: PASS')
+          - S02 PASS: step 8's PASS sentence does not state `exit=0` alone
+          - S02 FAIL: step 8's rule reads `[ELIFECYCLE] Command failed with exit code 1.` as the verdict
+          - S02 FAIL: step 4's command shows no `exit=1` (printed '$ tsx acceptance/x.ts\nOWN line\nPES-S02-ACCEPT: FAIL case-x\n[ELIFECYCLE] Command failed with exit code 1.')
+          - S02 FAIL: step 8's FAIL sentence does not state `exit=1` alone
+          - S02 UNVERIFIED: step 8's rule reads `[ELIFECYCLE] Command failed with exit code 1.` as the verdict
+          - S02 UNVERIFIED: step 4's command shows no `exit=1` (printed '$ tsx acceptance/x.ts\nPES-S02-ACCEPT: UNVERIFIED step-x err\n[ELIFECYCLE] Command failed with exit code 1.')
+          - S02 UNVERIFIED: step 8's UNVERIFIED sentence does not state `exit=1` alone
+          - S02: step 8 states no UNVERIFIED verdict
+          - S01 step 3 says 'the first line', which is pnpm's `$ tsx …` echo, not SCRATCH-DB
+  FAIL  V-11  S03 R3.4 names the live codes; its citations hold in the lane
+          - R3.4 does not name `COST_ENVELOPE_POLICY_UNRESOLVED` as what a hosted operator meets
+          - R3.4 does not name `COST_ENVELOPE_POLICY_INVALID` as what a hosted operator meets
+          - R3.4 does not call `COST_ENVELOPES_NOT_SEALED` a build-integrity check
+          - R3.4 still states `COST_ENVELOPES_NOT_SEALED` as the start-up refusal
+old: FAIL (3 failing checks)
+rc=1
+## 2. p4_checks new (S01 v4, S02 v4, S03 v2) — MUST PASS
+REQ-FIX-PES-p4 checks against new: {'S01': 'S01/SPEC-v4.md', 'S02': 'S02/SPEC-v4.md', 'S03': 'S03/SPEC-v2.md'}
+  pass  V-10  S01 refuses a set dropping a role row's provider; §5 case agrees with the rule
+  pass  V-12/13 one exit rule, executed through the SPEC's own command
+  pass  V-11  S03 R3.4 names the live codes; its citations hold in the lane
+new: PASS (0 failing checks)
+rc=0
+## 3. p4_mutants — every line MUST read CAUGHT
+  CAUGHT  V-10 case expects the synthesizer key -> case role-provider-dropped: the table says `PES_PUBLISH_ROLE_PROVIDER_DROPPED:synthesizerRoleRef`, R1.14 applied to its 
+  CAUGHT  V-10 seed keeps both providers (evaluator names vendor:a) -> case role-provider-dropped: the table says `PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef`, R1.14 applied to its se
+  CAUGHT  V-10 role rows checked AFTER the publication -> R1.3's order does not place R1.14 before the publication: {1: 'the mode, R1.5', 2: 'the roster gate, R1.2', 3: 'the base
+  CAUGHT  V-10 seeded row has a kind the shipped schema refuses -> seeded synthesizerRoleRef {'kind': 'SYNTHESIZER_ROLE', 'providerRef': 'vendor:a', 'provisional': True} is not the shape 
+  CAUGHT  V-10 seeded row carries an extra key -> seeded evaluatorRoleRef {'kind': 'EVALUATOR_ROLE_REF', 'providerRef': 'vendor:z', 'provisional': True, 'note': 'x'} is n
+  CAUGHT  V-10 no statement of the no-role-rows path -> R1.14 does not say what a base with no role rows does
+  CAUGHT  V-10 both seeded rows name the dropped provider (cannot tell the rule from 'refuse on any row') -> the case cannot tell the rule from 'refuse whenever a role row exists'
+  CAUGHT  exit: S02 step 4 back to the tee form -> S02 PASS: step 4's command shows no `exit=0` (printed '$ tsx acceptance/x.ts\nOWN line\nPES-S02-ACCEPT: PASS')
+  CAUGHT  exit: S02 step 4 tee form WITH an echo (the pipe reports tee's code) -> S02 FAIL: step 4's command shows no `exit=1` (printed '$ tsx acceptance/x.ts\nOWN line\nPES-S02-ACCEPT: FAIL case-x\n[EL
+  CAUGHT  exit: S01 step 6 drops the [ELIFECYCLE] clause -> S01 FAIL: step 6's rule reads `[ELIFECYCLE] Command failed with exit code 1.` as the verdict
+  CAUGHT  exit: S02 UNVERIFIED exits 0 -> S02 UNVERIFIED: step 8's UNVERIFIED sentence does not state `exit=1` alone
+  CAUGHT  exit: S01 step 3 reads 'the first line' again -> S01 step 3 says 'the first line', which is pnpm's `$ tsx …` echo, not SCRATCH-DB
+  CAUGHT  V-11 R3.4 drops COST_ENVELOPE_POLICY_UNRESOLVED -> R3.4 does not name `COST_ENVELOPE_POLICY_UNRESOLVED` as what a hosted operator meets
+  CAUGHT  V-11 R3.4 cites a line that does not hold the claim -> R3.4 does not cite packages/register/src/runtime-environment.ts:112-115
+  CAUGHT  V-11 R3.4 back to the v1 sentence -> R3.4 still states `COST_ENVELOPES_NOT_SEALED` as the start-up refusal
+mutants: 15/15 caught
+rc=0
+## 4. pass-3 checks (p3_checks.py, unchanged) on S01/S02 SPEC-v4 (the header line says v3: the wrapper swaps the file, not the label)
+REQ-FIX-PES pass-3 checkers against v3
+  pass  B1  targets-rejected & every case: printed code == shipped chain's code
+  pass  B1  base row exists in the acceptance database (N4 pass test)
+  pass  B2  one layout satisfies R2.8, R2.9(iii), step 5 and step 7
+  pass  --  R2.7 refusal fixtures determinate (sweep member)
+  pass  N1  resolver integers named and constructible
+  pass  N2  R2.9(i) forbids no required line
+  pass  N3  PLAN R1.9 cell agrees with SPEC R1.9
+v3: PASS (0 failing checks)
+rc=0
+## 5. pass-2 detectors (detectors.py, unchanged) on SPEC-v4 + INSTRUCTIONS + PLANs as they stand
+  pass  B1  hosted-set inputs determine the row
+  pass  B2  S02 is vertical in every document
+  pass  B3  the stdout rule admits the codes the acceptance prints
+  pass  N3,N4,N5,N7,N8,N9,N10  named sources
+  pass  --  no banned word in a SPEC
+  FAIL  --  SPEC<->PLAN trace, both directions
+          - S01: requirement R1.14 has no PLAN trace row
+v4: FAIL (1 failing checks)
+rc=1
+## 6. earlier SPEC versions + frozen hashes (pre-state recorded at 12:48)
+S01/SPEC-v2.md: OK
+S01/SPEC-v3.md: OK
+S01/SPEC.md: OK
+S02/SPEC-v2.md: OK
+S02/SPEC-v3.md: OK
+S02/SPEC.md: OK
+S03/SPEC.md: OK
+shasum: WARNING: 1 computed checksum did NOT match
+## 7. diff stats old → new
+S01/SPEC-v3.md → S01/SPEC-v4.md:  1 file changed, 62 insertions(+), 19 deletions(-) · hunks: 4c4 6,7c6,7 129c129 196c196 214c214,226 220a233,248 252c280 258c286,287 267a297 270c300,302 275,276c307,312 284c320,321 287,288c324,330 298,302c340,345 
+S02/SPEC-v3.md → S02/SPEC-v4.md:  1 file changed, 19 insertions(+), 8 deletions(-) · hunks: 4c4 6,7c6,7 231c231,234 250,251c253,259 258,259c266,270 
+S03/SPEC.md → S03/SPEC-v2.md:  1 file changed, 21 insertions(+), 5 deletions(-) · hunks: 1a2 2a4 4,5c6,7 71,73c73,83 150a161,166 
+## 8. banned words in the new SPECs
+grep rc=1 (1 = no hit)
+## 9. INSTRUCTIONS
+      99

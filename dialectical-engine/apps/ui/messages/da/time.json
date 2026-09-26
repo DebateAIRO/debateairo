@@ -1,0 +1,21 @@
+{
+  "time.justNow": "lige nu",
+  "time.minutes.one": "{count} minut siden",
+  "time.minutes.other": "{count} minutter siden",
+  "time.hours.one": "{count} time siden",
+  "time.hours.other": "{count} timer siden",
+  "time.yesterday": "I går",
+  "time.days.one": "{count} dag siden",
+  "time.days.other": "{count} dage siden",
+  "time.weeks.one": "{count} uge siden",
+  "time.weeks.other": "{count} uger siden",
+  "time.status.complete": "Komplet",
+  "time.status.queued": "I kø",
+  "time.status.claimed": "Overtaget",
+  "time.status.running": "Kører",
+  "time.status.holding": "Afventer genoprettelse hos udbyderen",
+  "time.status.settled": "Afgjort",
+  "time.status.generating": "Genererer",
+  "time.status.failed": "Mislykkedes",
+  "time.status.draft": "Udkast"
+}

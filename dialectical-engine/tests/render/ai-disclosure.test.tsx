@@ -12,10 +12,13 @@ import AiTransparencyPage from "../../apps/ui/app/ai-transparency/page.js";
 import { Assistant, type SupportAssistantClient } from "../../apps/ui/components/support/Assistant.js";
 import { debateDetailFromAnswer } from "../../apps/ui/lib/v3/adapter.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { type: "json" };
 
 describe("AI disclosure at the point of use", () => {
-  it("makes the linked explanation available without signing in", () => {
-    const html = renderToStaticMarkup(<AiTransparencyPage />);
+  it("makes the linked explanation available without signing in", async () => {
+    const html = renderToStaticMarkup(await AiTransparencyPage());
+    expect(html).toContain(settingsEnglish["settings.transparency.title"]);
+    expect(settingsEnglish["settings.transparency.title"]).toBe("How we label AI content");
     expect(html).toContain("How we label AI content");
     expect(html).toContain("ai_disclosure");
     expect(html).toContain('href="/help"');
@@ -81,6 +84,10 @@ describe("AI disclosure at the point of use", () => {
     const conversation = container.querySelector('[aria-label="Support conversation"]')!;
     expect(notice?.textContent).toContain("This conversation is with an AI support agent.");
     expect(notice?.textContent).toContain("can be wrong");
+    // Dev's exact support-banner sentence (AI_NOTICE.banner); localization keeps the English bytes.
+    expect(notice?.textContent).toContain(
+      "Replies are AI-generated, machine-readably marked, and can be wrong. Ask for a human at any point."
+    );
     expect(notice!.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
@@ -106,6 +113,9 @@ describe("AI disclosure at the point of use", () => {
       expect(generated?.textContent).toContain("A generated reply");
       expect(container.querySelector('[data-role="user"]')?.closest('[data-ai-generated="true"]')).toBeNull();
       expect(container.querySelector(".supportCitation")?.textContent).toContain("AI ·");
+      // Dev's citation copy, byte for byte.
+      expect(container.querySelector(".supportCitation")?.textContent).toContain("AI · DOCS · PRODUCT GUIDE");
+      expect(container.querySelector(".supportCitation a")?.textContent).toBe("View source →");
     } finally {
       await act(async () => root.unmount());
       container.remove();

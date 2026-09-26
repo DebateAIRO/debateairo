@@ -1,0 +1,266 @@
+C1 run 1 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-1.log
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/pes-s01-operator-command-environment.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  201 passed (201)
+tests/unit/v9-deployment-mode.test.ts rc=0 passed=201 failed=0 (expect 201/0)
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+tests/unit/production-environment-floors.test.ts rc=0 passed=24 failed=0 (expect 24/0)
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+tests/unit/dl7-f7-boot-custody.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+tests/unit/v20-optional-primary-provider-keys.test.ts rc=0 passed=11 failed=0 (expect 11/0)
+CLUSTER_GREEN
+
+C1 run 2 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-2.log
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/pes-s01-operator-command-environment.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  201 passed (201)
+tests/unit/v9-deployment-mode.test.ts rc=0 passed=201 failed=0 (expect 201/0)
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+tests/unit/production-environment-floors.test.ts rc=0 passed=24 failed=0 (expect 24/0)
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+tests/unit/dl7-f7-boot-custody.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+tests/unit/v20-optional-primary-provider-keys.test.ts rc=0 passed=11 failed=0 (expect 11/0)
+CLUSTER_GREEN
+
+C1 run 3 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-3.log
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/pes-s01-operator-command-environment.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  201 passed (201)
+tests/unit/v9-deployment-mode.test.ts rc=0 passed=201 failed=0 (expect 201/0)
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+tests/unit/production-environment-floors.test.ts rc=0 passed=24 failed=0 (expect 24/0)
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+tests/unit/dl7-f7-boot-custody.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+tests/unit/v20-optional-primary-provider-keys.test.ts rc=0 passed=11 failed=0 (expect 11/0)
+CLUSTER_GREEN
+
+C2 run 1 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-1.log
+ Test Files  1 passed (1)
+      Tests  37 passed (37)
+tests/unit/pes-s01-hosted-provider-set.test.ts rc=0 passed=37 failed=0 (expect 37/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+tests/unit/v9-configured-provider-set-deployment.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+
+C2 run 2 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-2.log
+ Test Files  1 passed (1)
+      Tests  37 passed (37)
+tests/unit/pes-s01-hosted-provider-set.test.ts rc=0 passed=37 failed=0 (expect 37/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+tests/unit/v9-configured-provider-set-deployment.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+
+C2 run 3 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-3.log
+ Test Files  1 passed (1)
+      Tests  37 passed (37)
+tests/unit/pes-s01-hosted-provider-set.test.ts rc=0 passed=37 failed=0 (expect 37/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+tests/unit/v9-configured-provider-set-deployment.test.ts rc=0 passed=14 failed=0 (expect 14/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+
+C3 run 1 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-1.log
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+tests/integration/pes-s01-hosted-provider-set-publish.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+tests/architecture/pes-s01-hosted-publish-boundary.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+tests/architecture/p3-production-database-principals.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+tests/integration/dev-deployment-register.test.ts rc=0 passed=15 failed=0 (expect 15/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+
+C3 run 2 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-2.log
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+tests/integration/pes-s01-hosted-provider-set-publish.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+tests/architecture/pes-s01-hosted-publish-boundary.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+tests/architecture/p3-production-database-principals.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+tests/integration/dev-deployment-register.test.ts rc=0 passed=15 failed=0 (expect 15/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+
+C3 run 3 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-3.log
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+tests/integration/pes-s01-hosted-provider-set-publish.test.ts rc=0 passed=16 failed=0 (expect 16/0)
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+tests/architecture/pes-s01-hosted-publish-boundary.test.ts rc=0 passed=4 failed=0 (expect 4/0)
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+tests/architecture/p3-production-database-principals.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+tests/integration/dev-deployment-register.test.ts rc=0 passed=15 failed=0 (expect 15/0)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+
+C4 run 1 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-1.log
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+acceptance/pes-s01-publish-set-acceptance.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+
+C4 run 2 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-2.log
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+acceptance/pes-s01-publish-set-acceptance.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN
+
+C4 run 3 — /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-3.log
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+acceptance/pes-s01-publish-set-acceptance.test.ts rc=0 passed=9 failed=0 (expect 9/0)
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+ Test Files  4 failed | 104 passed (108)
+      Tests  5 failed | 746 passed (751)
+tests/architecture rc=1 passed=746 failed=5 (expect 746/5)
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+tests/unit/text-control-bytes.test.ts rc=0 passed=3 failed=0 (expect 3/0)
+CLUSTER_GREEN

@@ -10,6 +10,12 @@ const ownerHonesty = readFileSync(
   resolve(process.cwd(), "apps/ui/components/AnswerHonestyDrawer.tsx"),
   "utf8"
 );
+const chromeEnglish = JSON.parse(
+  readFileSync(resolve(process.cwd(), "apps/ui/messages/en/chrome.json"), "utf8")
+) as Readonly<Record<string, string>>;
+const miscEnglish = JSON.parse(
+  readFileSync(resolve(process.cwd(), "apps/ui/messages/en/misc.json"), "utf8")
+) as Readonly<Record<string, string>>;
 
 function between(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
@@ -21,6 +27,16 @@ function between(source: string, start: string, end: string): string {
 
 function occurrences(source: string, token: string): number {
   return source.split(token).length - 1;
+}
+
+function expectLocalizedAriaLabel(
+  source: string,
+  key: string,
+  english: string,
+  count: number
+): void {
+  expect(chromeEnglish[key], `${key} English catalogue value`).toBe(english);
+  expect(occurrences(source, `aria-label={t(chromeCatalog, "${key}")}`)).toBe(count);
 }
 
 describe("S02 owner/public affordance drift pins", () => {
@@ -40,28 +56,29 @@ describe("S02 owner/public affordance drift pins", () => {
     // `publicMode &&` and the owner gets an Overview tab with no publicOverview
     // behind it, which falls through every view branch and renders blank. That
     // is exactly the kind of silent divergence this file exists to catch.
-    expect(occurrences(topBar, 'role="group" aria-label="View"')).toBe(1);
+    expect(chromeEnglish["chrome.view"], "chrome.view English catalogue value").toBe("View");
+    expect(occurrences(topBar, 'role="group" aria-label={t(chromeCatalog, "chrome.view")}')).toBe(1);
     expect(occurrences(topBar, "aria-pressed={view ===")).toBe(5);
     expect(occurrences(topBar, 'aria-pressed={view === "overview"}')).toBe(1);
     expect(occurrences(topBar, "{publicMode && publicOverview ? (")).toBe(1);
     // READ — public page reuses the same typed-absence scoring diagnostics drawer.
-    expect(occurrences(topBar, 'aria-label="Open scoring diagnostics"')).toBe(1);
+    expectLocalizedAriaLabel(topBar, "chrome.openScoringDiagnostics", "Open scoring diagnostics", 1);
     // READ — library navigation remains available on the public page.
-    expect(occurrences(topBar, 'aria-label="Library"')).toBe(2);
+    expectLocalizedAriaLabel(topBar, "chrome.library", "Library", 2);
     // MUTATION — replay-generation stays owner-only.
-    expect(occurrences(topBar, 'aria-label="Replay"')).toBe(2);
+    expectLocalizedAriaLabel(topBar, "chrome.replay", "Replay", 2);
     // MUTATION-CAPABLE OWNER SURFACE — workspace stays off the public envelope route.
-    expect(occurrences(topBar, 'aria-label="Workspace"')).toBe(2);
+    expectLocalizedAriaLabel(topBar, "chrome.workspace", "Workspace", 2);
     // READ — public page supplies its public-envelope honesty counterpart.
-    expect(occurrences(topBar, 'aria-label="Honesty"')).toBe(2);
+    expectLocalizedAriaLabel(topBar, "chrome.honesty", "Honesty", 2);
     // READ — public page supplies its public-envelope export counterpart.
-    expect(occurrences(topBar, 'aria-label="Export"')).toBe(2);
+    expectLocalizedAriaLabel(topBar, "chrome.export", "Export", 2);
     // READ — explanatory copy is covered by the public disclosure/honesty surfaces.
-    expect(occurrences(topBar, 'aria-label="How it works"')).toBe(2);
+    expectLocalizedAriaLabel(topBar, "chrome.howItWorks", "How it works", 2);
     // MUTATION-CAPABLE OWNER ACCOUNT SURFACE — settings stays owner-only.
-    expect(occurrences(topBar, 'aria-label="Settings"')).toBe(2);
+    expectLocalizedAriaLabel(topBar, "chrome.settings", "Settings", 2);
     // READ/STRUCTURAL — owner overflow itself contains the duplicated responsive actions.
-    expect(occurrences(topBar, 'aria-label="More debate actions"')).toBe(1);
+    expectLocalizedAriaLabel(topBar, "chrome.moreDebateActions", "More debate actions", 1);
     // MUTATION — challenge callbacks stay owner-only. The owner and public routes
     // are now one component, so the split is no longer "which page renders the
     // prop" but "does publicMode withhold it". Both handler surfaces are pinned:
@@ -85,52 +102,57 @@ describe("S02 owner/public affordance drift pins", () => {
   });
 
   it("pins and classifies every owner honesty section", () => {
-    const sections = [...ownerHonesty.matchAll(/<section className="wsSection" aria-label="([^"]+)"/g)]
+    const sections = [...ownerHonesty.matchAll(
+      /<section className="wsSection" aria-label=\{t\(catalog, "([^"]+)"\)\}/g
+    )]
       .map((match) => match[1]);
     const expectedSections = [
       // PUBLIC DRAWER — rendered from the public answer state.
-      "Answer state",
+      ["misc.answerHonesty.answerState", "Answer state"],
       // PUBLIC DRAWER — rendered from verdict/confidence fields.
-      "Verdict",
+      ["misc.answerHonesty.verdict", "Verdict"],
       // NODE DRAWER — public contract nodes retain condition marks.
-      "Condition marks",
+      ["misc.answerHonesty.conditionMarks", "Condition marks"],
       // NODE DRAWER — public contract nodes retain redacted abstention records.
-      "Abstention",
+      ["misc.answerHonesty.abstention", "Abstention"],
       // NODE DRAWER — public contract nodes retain relevant-as-of state.
-      "Per-item freshness",
+      ["misc.answerHonesty.perItemFreshness", "Per-item freshness"],
       // TYPED ABSENCE — named explicitly as not included in the public snapshot.
-      "Cost envelope",
+      ["misc.answerHonesty.costEnvelope", "Cost envelope"],
       // TREE SURFACE — public edges are projected into the shared reading views.
-      "Graph edges",
+      ["misc.answerHonesty.graphEdges", "Graph edges"],
       // NODE DRAWER — public nodes retain labeled numbers with owner pointers redacted.
-      "Numbers and replay",
+      ["misc.answerHonesty.numbersAndReplay", "Numbers and replay"],
       // PUBLIC DRAWER — rendered when present.
-      "Badges",
+      ["misc.answerHonesty.badges", "Badges"],
       // PUBLIC DRAWER — rendered when present.
-      "Residual objections",
+      ["misc.answerHonesty.residualObjections", "Residual objections"],
       // PUBLIC DRAWER — rendered directly.
-      "What would reverse this",
+      ["misc.answerHonesty.whatWouldReverseThis", "What would reverse this"],
       // N/A — value hinges are not in the public envelope.
-      "Value hinges",
+      ["misc.answerHonesty.valueHinges", "Value hinges"],
       // N/A — shadow suppressions are not in the public envelope.
-      "Shadow suppressions",
+      ["misc.answerHonesty.shadowSuppressions", "Shadow suppressions"],
       // N/A — answer lineage is not in the public envelope.
-      "Builds on a previous answer",
+      ["misc.answerHonesty.buildsOnPreviousAnswer", "Builds on a previous answer"],
       // TYPED ABSENCE — owner-only and named explicitly.
-      "Authorized inspection",
+      ["misc.answerHonesty.authorizedInspection", "Authorized inspection"],
       // TYPED ABSENCE — named explicitly as not included.
-      "Execution ledger digest",
+      ["misc.answerHonesty.executionLedgerDigest", "Execution ledger digest"],
       // N/A — live cycle refusal records are not publication fields.
-      "Cycle refusals",
+      ["misc.answerHonesty.cycleRefusals", "Cycle refusals"],
       // N/A — investigation recording is a mutation and stays owner-only.
-      "Investigate deeper",
+      ["misc.answerHonesty.investigateDeeper", "Investigate deeper"],
       // N/A — immutable public snapshots have no live event stream.
-      "Live honesty events",
+      ["misc.answerHonesty.liveHonestyEvents", "Live honesty events"],
       // PUBLIC PAGE — represented by the public-envelope export affordance.
-      "Export"
-    ];
+      ["misc.answerHonesty.export", "Export"]
+    ] as const;
 
-    expect(sections).toEqual(expectedSections);
+    expect(sections).toEqual(expectedSections.map(([key]) => key));
+    for (const [key, english] of expectedSections) {
+      expect(miscEnglish[key], `${key} English catalogue value`).toBe(english);
+    }
     expect(sections).toHaveLength(20);
   });
 });

@@ -13,6 +13,7 @@ import {
 import { CookieBar } from "./CookieBar";
 import { CookiePreferencesCard, type ConsentChoice } from "./CookiePreferencesCard";
 import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
+import { useConsentCatalog } from "./useConsentCatalog";
 
 /**
  * The ONE consent state machine (cluster S01-C5).
@@ -56,6 +57,7 @@ const togglesFor = (stored: ConsentDecision | null): ConsentToggles =>
   stored === null ? DEFAULT_TOGGLES : { quality: stored.quality, analytics: stored.analytics };
 
 export function CookieConsent() {
+  const catalog = useConsentCatalog();
   /** Undefined until the effect below has read storage — the R06 gate. */
   const [surface, setSurface] = useState<Surface | undefined>(undefined);
 
@@ -222,6 +224,7 @@ export function CookieConsent() {
       <>
         <CookiePreferencesCard
           key={opens}
+          catalog={catalog}
           initial={initial}
           onSave={(choice: ConsentChoice): void =>
             settle(decisionFor("save-choices", { quality: choice.quality, analytics: choice.analytics }))
@@ -240,6 +243,7 @@ export function CookieConsent() {
 
   return (
     <CookieBar
+      catalog={catalog}
       onEssentialOnly={(): void => settle(decisionFor("essential-only"))}
       onChoose={openCard}
       onAcceptAll={(): void => settle(decisionFor("accept-all"))}

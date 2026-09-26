@@ -401,9 +401,15 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // DL7-F9 (Task 14): the threshold operator principal; the daemon loses INSERT on the
         // policy that rules it. 0069 and 0070 are reserved for V-6. A new prefix, no pair.
         "0071_observation_threshold_operator.sql",
+        // Turn 12 localization: the debate's argument language (redefines
+        // core.create_encrypted_run from 0067) and the support interface locale.
+        // New prefixes after 0071, no pair.
+        "0072_argument_language.sql",
+        "0073_support_interface_locale.sql",
         // Verdict story (spec 2026-09-26 §7): serve.answer_story and the STORY spend
-        // source. The next free prefix after 0071; 0070 stays reserved. No pair.
-        "0072_answer_story.sql"
+        // source. Written as 0072 on the feature branch; renamed to the next free
+        // prefix after dev's 0072/0073 when origin/dev merged in. No pair.
+        "0074_answer_story.sql"
       ]);
   });
 });

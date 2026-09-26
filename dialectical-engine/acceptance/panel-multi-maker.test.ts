@@ -11,6 +11,11 @@ import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { bearingsForRequest } from "../tests/support/reviewBearings.js";
 import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
+import { argumentLanguageDirective } from "@debateai/kernel";
+import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
+import { PANEL_PROMPT_CONTRACT, judgePromptContract, reviewPromptContract } from "@debateai/judgement";
+import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
+import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
 
 /**
  * T3 / S2-2 — the ACCEPTANCE-path receipt for the wired judge panel.
@@ -96,6 +101,48 @@ function judgementBody(statement: string, scores: DoubleScores): string {
 }
 
 /**
+ * S-LANG (as `tests/integration/database.test.ts` and `t17-envelope-ledger.test.ts`
+ * do): every packet's instruction now ends with the argument-language directive,
+ * which NAMES the machine-consumed identifiers it protects (`fatalFlags[].type`,
+ * `served_number_refs`, …). Those bare identifiers are exactly what the
+ * discriminators below key on, so the directive — whatever language it names —
+ * is removed from the body before any branch reads it. The directive has no
+ * character JSON escapes, so it appears in the raw body byte-for-byte.
+ */
+const ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN = new RegExp(
+  argumentLanguageDirective("\u0000")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace("\u0000", "[^.]+?"),
+  "gu"
+);
+
+type RequestClass = "PANEL" | "REVIEW" | "EVALUATOR" | "COMPOSE" | "JUDGE" | "HEALTH" | "UNCLASSIFIED";
+
+/**
+ * Signals are chosen to survive JSON escaping of the rendered packet: a
+ * quoted fragment appears as \" in the wire body and would never match.
+ *
+ * W7 / V-BLIND-CONTEXT: they are also STRUCTURAL now — keys of each
+ * organ's JSON contract rather than sentences of its prompt. The prose
+ * these replace was changed by a ruling, both branches went dead, and the
+ * panel silently ran with one member. Measured on the shipped prompts:
+ * `edge_bearings` is the review prompt alone, while every assessment key
+ * is in the JUDGE prompt too (judge embeds the whole assessment schema),
+ * so the panel is the assessment WITHOUT the judge's `restatement_text` —
+ * a negative pinned by `tests/unit/t03-judge-panel.test.ts`.
+ */
+function classifyRequest(rawBody: string): RequestClass {
+  const body = rawBody.replace(ARGUMENT_LANGUAGE_DIRECTIVE_PATTERN, "");
+  if (body.includes("fatalFlags") && !body.includes("restatement_text")) return "PANEL";
+  if (body.includes("edge_bearings")) return "REVIEW";
+  if (isEvaluatorPacket(body)) return "EVALUATOR";
+  if (body.includes("served_number_refs")) return "COMPOSE";
+  if (body.includes("restatement_text")) return "JUDGE";
+  if (body.includes("discovery health probe")) return "HEALTH";
+  return "UNCLASSIFIED";
+}
+
+/**
  * A GENERATIVE double: it classifies each request by the contract the runner
  * renders and answers in kind. Fixed FIFO queues would have to be re-sized by
  * hand for every extra panel leg; classifying is what keeps this honest.
@@ -114,19 +161,10 @@ async function startProviderDouble(input: {
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
       calls += 1;
-      // Signals are chosen to survive JSON escaping of the rendered packet: a
-      // quoted fragment appears as \" in the wire body and would never match.
-      //
-      // W7 / V-BLIND-CONTEXT: they are also STRUCTURAL now — keys of each
-      // organ's JSON contract rather than sentences of its prompt. The prose
-      // these replace was changed by a ruling, both branches went dead, and the
-      // panel silently ran with one member. Measured on the shipped prompts:
-      // `edge_bearings` is the review prompt alone, while every assessment key
-      // is in the JUDGE prompt too (judge embeds the whole assessment schema),
-      // so the panel is the assessment WITHOUT the judge's `restatement_text` —
-      // a negative pinned by `tests/unit/t03-judge-panel.test.ts`.
+      // Classification: `classifyRequest` (directive-stripped, structural keys).
+      const requestClass = classifyRequest(body);
       let content: string;
-      if (body.includes("fatalFlags") && !body.includes("restatement_text")) {
+      if (requestClass === "PANEL") {
         assessCalls += 1;
         if (failAssess) {
           // A member that answers with prose is a PARSE_FAILURE, not a
@@ -136,7 +174,7 @@ async function startProviderDouble(input: {
         } else {
           content = JSON.stringify(assessmentBody(input.scores));
         }
-      } else if (body.includes("edge_bearings")) {
+      } else if (requestClass === "REVIEW") {
         // T5/S3-1: one bearing per edge THIS call offered, read off the wire.
         // This double does not assess bearings, so every offered edge comes
         // back cannot-assess (null) and stays UNKNOWN — which is why T3's panel
@@ -146,7 +184,7 @@ async function startProviderDouble(input: {
           reasons: [`${input.label} review ${calls}`],
           edge_bearings: bearingsForRequest(body)
         });
-      } else if (isEvaluatorPacket(body)) {
+      } else if (requestClass === "EVALUATOR") {
         // F-SEALEDROWS-B: T9 replaced the retired `{conforms,findings}` and
         // `{pass}` branches that stood here with ONE evaluator verdict. Both
         // retired branches were dead: measured before this repair, the
@@ -155,7 +193,7 @@ async function startProviderDouble(input: {
         // The discriminator is the SHIPPED prompt (see
         // `test-fixtures/evaluator-double.ts`), so it cannot go stale silently.
         content = evaluatorSatisfied();
-      } else if (body.includes("served_number_refs")) {
+      } else if (requestClass === "COMPOSE") {
         content = JSON.stringify({
           segments: [
             {
@@ -167,9 +205,9 @@ async function startProviderDouble(input: {
             { segment_id: "segment:next", text: "Seek a third independent lineage.", node_refs: [], served_number_refs: [] }
           ]
         });
-      } else if (body.includes("restatement_text")) {
+      } else if (requestClass === "JUDGE") {
         content = judgementBody(`${input.label} position ${calls}.`, input.scores);
-      } else if (body.includes("discovery health probe")) {
+      } else if (requestClass === "HEALTH") {
         content = "panel-health-probe";
       } else {
         // Never guess: an unclassified call names itself so a fixture gap can
@@ -494,5 +532,43 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
       secondProvider.failAssessCalls(false);
       await runtime.api.close();
     }
+  });
+});
+
+describe("S-LANG — the panel provider double classifies a packet the same with or without the argument-language directive", () => {
+  // This file's end-to-end rows are red on clean origin/dev for dev's own
+  // reason (the ask is refused 400 MALFORMED_REQUEST before any provider call),
+  // so the double's routing is proven HERE, on real framed packets of every
+  // shipped contract it serves, built exactly as the gateway sends them.
+  const CONTRACTS: readonly (readonly [RequestClass, PromptContract])[] = [
+    ["PANEL", PANEL_PROMPT_CONTRACT],
+    ["REVIEW", reviewPromptContract(1)],
+    ["JUDGE", judgePromptContract("primary-root", "unknown")],
+    ["COMPOSE", SYNTHESIZER_PROMPT_CONTRACT],
+    ["EVALUATOR", EVALUATOR_PROMPT_CONTRACT]
+  ];
+  const LANGUAGES = ["English", "Romanian", "română", "the same language as the question"] as const;
+  const wireBody = (contract: PromptContract, directive: string | null): string => JSON.stringify({
+    model: "test-layer/model",
+    max_tokens: 1,
+    messages: buildFramedPrompt({
+      contract: directive === null ? contract : { ...contract, instruction: `${contract.instruction} ${directive}` },
+      material: [{ name: "question_line", content: "Should the proposal stand?" }]
+    }).packet.messages
+  });
+
+  it.each(CONTRACTS)("classifies a %s packet identically with and without the directive", (expected, contract) => {
+    expect(classifyRequest(wireBody(contract, null))).toBe(expected);
+    for (const language of LANGUAGES) {
+      const body = wireBody(contract, argumentLanguageDirective(language));
+      expect(body, `${language}: the directive is on the wire`).toContain(argumentLanguageDirective(language));
+      expect(classifyRequest(body), language).toBe(expected);
+    }
+  });
+
+  it("is not vacuous: unstripped, the directive alone would route a REVIEW packet to the PANEL branch", () => {
+    const body = wireBody(reviewPromptContract(1), argumentLanguageDirective("Romanian"));
+    expect(body.includes("fatalFlags") && !body.includes("restatement_text")).toBe(true);
+    expect(classifyRequest(body)).toBe("REVIEW");
   });
 });

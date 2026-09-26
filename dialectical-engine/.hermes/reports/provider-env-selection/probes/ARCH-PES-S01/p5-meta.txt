@@ -1,0 +1,2 @@
+tsx=/Users/vladmihaimiron/Documents/DebateAIRO/.worktrees/i18n-turn12/dialectical-engine/node_modules/.pnpm/tsx@4.23.11/node_modules/tsx/dist/loader.mjs node=v26.9.0
+rc=0

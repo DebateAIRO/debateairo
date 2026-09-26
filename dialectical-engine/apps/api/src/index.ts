@@ -59,7 +59,7 @@ import {
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
-import { TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
+import { detectArgumentLanguage, TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import { STORY_UNREADABLE, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
@@ -2616,6 +2616,7 @@ export class PostgresAskApplication implements AskApplication {
       ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
       : Object.freeze({ ownerRef: principal.ownerRef, legacyAskerId: null });
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
+    const argumentLanguage = detectArgumentLanguage(ask.question_line);
     let runId:string;
     try {
       const admissionPool=principal.kind === "server"
@@ -2626,6 +2627,8 @@ export class PostgresAskApplication implements AskApplication {
         );
         return this.#runs.startRun({
           questionLine: ask.question_line,
+          argumentLanguageTag: argumentLanguage.tag,
+          argumentLanguageName: argumentLanguage.nameEn,
           principal,
           sessionId: session.session_id,
           callerScope: session.caller_scope,

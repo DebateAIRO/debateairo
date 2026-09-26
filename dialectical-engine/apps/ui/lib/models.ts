@@ -1,3 +1,6 @@
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import { t, type MessageCatalog } from "./i18n/translate.js";
+
 export type ModelMeta = {
   key: string;
   name: string;
@@ -35,15 +38,17 @@ export function modelKey(modelId: string): string {
 }
 
 /** Friendly display name for a model id, preserving any size/variant suffix. */
-export function modelMeta(modelId: string): ModelMeta {
+export function modelMeta(modelId: string, catalog: MessageCatalog = composeEnglish): ModelMeta {
   const key = modelKey(modelId);
   const dot = DOTS[key] ?? DOTS.default!;
   if (key === "default") {
-    return { key, name: modelId || "Model", dot };
+    return { key, name: modelId || t(catalog, "compose.model.fallbackName"), dot };
   }
   const base = NAMES[key]!;
   const isLocal = (modelId || "").toLowerCase().includes("local") || (modelId || "").toLowerCase().includes("qwen");
-  const name = key === "qwen" || isLocal ? `${base}·local` : base;
+  const name = key === "qwen" || isLocal
+    ? t(catalog, "compose.model.localName", { name: base })
+    : base;
   return { key, name, dot };
 }
 

@@ -1,0 +1,342 @@
+> **Revision 4** — ARCH-FIX(S03) pass 4 (ticket `t_26ccd655`, seat ARCH-FIX-PES-S03-p4). This pass
+> comes from V's rulings, not from a review verdict:
+> - V-11, "Yes, name real codes", amends R3.4.
+> - V-14, "Yes, reword all three", adds R3.4b.
+> 
+> `docs/missions/provider-env-selection/V-DECISIONS-PACKET.md` holds them in "V's rulings", rows V-11
+> and V-14. The SPEC of record is now `SPEC-v3.md`. C1 and C2 are BUILT on
+> `slice/provider-env-selection-s03` (`604b15158`, `ec66d5e7c`), and their step blocks are left as
+> the record of that build.
+> 
+> Changed:
+> - **NEW cluster S03-C3**, steps C3-1 … C3-7, starting from `ec66d5e7c`. It has three RED cases
+>   (C3-1, C3-2, C3-3), then the note, the row and the §10 bullet (C3-4, C3-5, C3-6), then GREEN
+>   three runs (C3-7).
+> - **C2-7**: one appended line marks its sentence as superseded by C3-4. Its text is otherwise
+>   unchanged.
+> - **§2**: the trace follows SPEC-v3 and gains R3.4b. R3.4, R3.8 and R3.9 gain C3 steps.
+> - **§3**: a new `S03-C3` row. The C1 and C2 rows are re-run at `ec66d5e7c`. The pairs paragraph
+>   and the mutant class are extended.
+> - **§4**: `v9` goes to 31/31, and R3.4b's grep is added.
+> - **§5**: the single-writer line now names C3, and the write surface names §10's bullet.
+> 
+> Probes: `.hermes/reports/provider-env-selection/probes/ARCH-FIX-PES-S03-p4/`.
+> 
+> | R3.4 | the support-chat ceiling sentence; since SPEC-v3 (V-11), the two live codes and the build-integrity check | C2-2, C2-7, C3-1, C3-4, C3-7 | S03-C2, S03-C3 |
+> | R3.4b | every other README mention of `COST_ENVELOPES_NOT_SEALED` says what R3.4 says: the §11 row kept and re-worded, §10's bullet re-worded, exactly two lines (V-14) | C3-2, C3-3, C3-5, C3-6, C3-7 | S03-C3 |
+> | R3.8 | `vps-deployment-baseline.test.ts` GREEN; any changed assertion named | C1-4, C2-10, C3-7 | all three |
+> | R3.9 | no angle-bracket placeholder in a §11 shell block | C1-4, C2-6, C2-8, C2-10, C3-7 | all three |
+> C1-1 → R3.3, R3.5 · C1-2 → R3.3 · C1-3 → R3.3 · C1-4 → R3.5, R3.8, R3.9 · C2-1 → R3.1, R3.2 · C2-2 → R3.4 · C2-3 → R3.6 · C2-4 → R3.7 · C2-5 → R3.1 · C2-6 → R3.2, R3.9 · C2-7 → R3.4 · C2-8 → R3.6, R3.9 · C2-9 → R3.7 · C2-10 → R3.8, R3.9 · C3-1 → R3.4 · C3-2 → R3.4b · C3-3 → R3.4b · C3-4 → R3.4 · C3-5 → R3.4b · C3-6 → R3.4b · C3-7 → R3.4, R3.4b, R3.8, R3.9
+> Forward: every one of R3.1–R3.9 and R3.4b appears in at least one step id above. **Gaps: zero, both ways.**
+> Revision 4: the trace is against `SPEC-v3.md`, where the requirements start at R3.1 `:58` · R3.2 `:62` ·
+> R3.3 `:65` · R3.4 `:72-83` · R3.4b `:85-112` · R3.5 `:114` · R3.6 `:122` · R3.7 `:130` · R3.8 `:137` ·
+> R3.9 `:143`. R3.1–R3.3 and R3.5–R3.9 are byte-identical to `SPEC.md` (`SPEC-v3.md:4`), so a
+> `SPEC.md:<n>` citation in C1's or C2's block still reads the same words. It sits at the older line
+> number. Parser of record: `probes/ARCH-FIX-PES-S03-p4/trace.sh`.
+> - **Revision 4:** V ruled V-11 and R3.4 was amended (`SPEC-v3.md:72-83`). The sentence above is what
+>   C2 BUILT at `ec66d5e7c`. C3-4 replaces it, and this block is the record of the build, not an
+>   instruction.
+> 
+> #### Cluster S03-C3 — the cost-envelope refusal a hosted operator meets, everywhere the README names it (V-11, V-14)
+> 
+> Added by Revision 4, for SPEC-v3's R3.4 (V-11) and R3.4b (V-14). C1 and C2 are BUILT
+> (`604b15158`, `ec66d5e7c`), and their blocks above are the record of what was built. This cluster is
+> a fix ON TOP of C2.
+> 
+> **START frame.** The lane `.worktrees/pes-s03/dialectical-engine` is at `ec66d5e7c`. Measured there
+> by this node:
+> - `grep -n COST_ENVELOPES_NOT_SEALED deploy/vps/README.md` prints three lines:
+>   - `:700` is the end of §10's bullet `:692-700`.
+>   - `:737` is inside §11's support-chat note `:734-739`.
+>   - `:769` is §11's refusal-table row.
+> - `v9` is `28/0`, and `baseline` is `31/0`.
+> - C2's command prints `CLUSTER_GREEN` (`probes/ARCH-FIX-PES-S03-p4/c2-cluster.log`).
+> 
+> A BUILD seat re-measures these before its first edit. Every criterion below is a string anchor, so a
+> moved line number is provenance and not a dependency.
+> 
+> **Write surface.**
+> - `tests/unit/v9-provider-credential-files.test.ts`: one new `describe` block, appended after the
+>   `describe("S03 §11 says what the shipped code does")` block, which is the last block of the file.
+>   No existing line of the file changes.
+> - `deploy/vps/README.md`, exactly three regions:
+>   - (i) the paragraph at the string `**What the support chat cannot tell you yet.**` (§11);
+>   - (ii) the one table line starting `` | `COST_ENVELOPES_NOT_SEALED` | `` (§11's refusal table);
+>   - (iii) the bullet starting `- **The production maker path is now ruled` (§10).
+> - No other region, and no file under `apps/` or `packages/`.
+> 
+> C3 runs after C2 and writes the same two files, so the single-writer rule holds by sequence.
+> 
+> **The three cases, as code.** C3-1, C3-2 and C3-3 each add ONE `it(` from this block. C3-1 creates
+> the `describe` wrapper and its four helpers (`kit`, `collapse`, `supportNote`, `ROW_START`), and the
+> two later steps add their `it(` inside it. A seat copies the text; the strings are EXACT.
+> 
+> ```ts
+> describe("S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14)", () => {
+>   const kit = () => readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+>   const collapse = (text: string) => text.replace(/\s+/gu, " ");
+>   const supportNote = (readme: string) => readme
+>     .slice(readme.indexOf("## 11. Providers and vendors"))
+>     .split(/\n[ \t]*\n/u)
+>     .find((block) => block.includes("SUPPORT_MODEL_COST_UNREPORTED")) ?? "";
+>   const ROW_START = "| `COST_ENVELOPES_NOT_SEALED` |";
+> 
+>   it("README §11's support-chat note names the refusal a hosted operator meets (R3.4)", async () => {
+>     const note = collapse(supportNote(await kit()));
+>     expect(note, "the overruled sentence is gone (C3-4)").not.toContain(
+>       "refuses to start until the cost envelopes are sealed"
+>     );
+>     expect(note, "R3.4 first part, EXACT (C3-4)").toContain(
+>       "A hosted deployment reads the `costEnvelopePolicy` row in force at its own `REGISTER_VERSION` and refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with `COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed."
+>     );
+>     expect(note, "R3.4 second part, EXACT (C3-4)").toContain(
+>       "`COST_ENVELOPES_NOT_SEALED` is a check on the integrity of the build: it fires only when the envelope row this build ships was removed, emptied or made invalid, and the shipped source never reaches it at runtime."
+>     );
+>   });
+> 
+>   it("README §11's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)", async () => {
+>     const readme = await kit();
+>     const refusal = readme.slice(
+>       readme.indexOf("### What the hosted mode refuses, in code"),
+>       readme.indexOf("### The credential-file contract")
+>     ).split("\n");
+>     expect(refusal.filter((line) => line.startsWith(ROW_START)), "the row, EXACT, once, in the table (C3-5)").toEqual([
+>       "| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows below. |"
+>     ]);
+>     const rowAt = (code: string) => refusal.findIndex((line) => line.startsWith("| `" + code + "` |"));
+>     for (const code of ["COST_ENVELOPE_POLICY_UNRESOLVED", "COST_ENVELOPE_POLICY_INVALID"]) {
+>       expect(rowAt(code), `${code}'s row is one of "the two rows below"`).toBeGreaterThan(rowAt("COST_ENVELOPES_NOT_SEALED"));
+>     }
+>     for (const stale of ["are not published yet", "refuses to claim work until they are"]) {
+>       expect(collapse(readme), `no "${stale}" anywhere in the README`).not.toContain(stale);
+>     }
+>   });
+> 
+>   it("README §10's production-maker bullet names the live refusal, and two lines name COST_ENVELOPES_NOT_SEALED (R3.4b b)", async () => {
+>     const readme = await kit();
+>     const start = readme.indexOf("- **The production maker path is now ruled");
+>     expect(start, "§10's bullet exists").toBeGreaterThanOrEqual(0);
+>     const bullet = readme.slice(start, readme.indexOf("\n- ", start + 1));
+>     expect([...bullet.matchAll(/`([A-Z][A-Z0-9_]{4,})`/gu)].map((match) => match[1]), "the bullet names these two codes and no other (C3-6)")
+>       .toEqual(["COST_ENVELOPE_POLICY_UNRESOLVED", "COST_ENVELOPE_POLICY_INVALID"]);
+>     expect(collapse(bullet), "R3.4b (b), EXACT (C3-6)").toContain(
+>       "Until V-28's cost-envelope policy is sealed at the register version a hosted deployment runs, that deployment refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`."
+>     );
+>     const mentions = readme.split("\n").filter((line) => line.includes("COST_ENVELOPES_NOT_SEALED"));
+>     expect(mentions, "exactly two README lines name COST_ENVELOPES_NOT_SEALED (R3.4b)").toHaveLength(2);
+>     expect(mentions.filter((line) => line.startsWith(ROW_START)), "one of them is the table row").toHaveLength(1);
+>     const noteLines = supportNote(readme).split("\n");
+>     expect(mentions.filter((line) => noteLines.includes(line)), "the other is inside the support-chat note").toHaveLength(1);
+>   });
+> });
+> ```
+> 
+> The three document texts below are the same strings the cases pin. The gate
+> `probes/ARCH-FIX-PES-S03-p4/gate.mjs` reads the case code and the `text` blocks OUT OF THIS FILE.
+> It builds each step's README state from the lane's README at `ec66d5e7c`, then runs the extracted
+> cases on every state and on every mutant (§3).
+> 
+> **C3-1 · RED — the support-note case (R3.4).** Append the `describe` wrapper with its four helpers
+> and the FIRST `it(` above: `README §11's support-chat note names the refusal a hosted operator meets (R3.4)`.
+> - **Done when:** `v9` reads `passed=28 failed=1`, the failing case is this one with the message
+>   `the overruled sentence is gone (C3-4)`, and the C3 command prints `CLUSTER_RED`. `baseline` stays
+>   `31/0`.
+> - **Capable of failing:** at `ec66d5e7c` the note carries the overruled sentence at
+>   `deploy/vps/README.md:736-737`, so the negative assertion fails first (gate state `S0`). Each
+>   EXACT assertion is watched failing on its own mutant (`M_keepold`, `M_noLive`, `M_noIntegrity`).
+> - **Catches:** the overruled sentence left in place beside the new ones. Either of R3.4's two parts
+>   missing or worded otherwise.
+> - **Does NOT catch:** a THIRD sentence added to the note that contradicts the two, for example "and a
+>   hosted runner refuses to claim work until the envelopes are published". The case pins presence,
+>   not the note's full text. `REV(S03)` reads the diff of region (i).
+> 
+> **C3-2 · RED — the refusal-row case (R3.4b (a)).** Add the SECOND `it(` above:
+> `README §11's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)`.
+> - **Done when:** `v9` reads `passed=28 failed=2`, and this case fails with
+>   `the row, EXACT, once, in the table (C3-5)`. `CLUSTER_RED`.
+> - **Capable of failing:** the row at `:769` still says "are not published yet" (gate state `S0`).
+> - **Catches:**
+>   - the row dropped from the table (V-14 read as "remove");
+>   - the row moved out of the refusal span;
+>   - the row duplicated;
+>   - the old Meaning text kept, whole or in part;
+>   - the two old phrases re-appearing anywhere else in the README;
+>   - either live-code row moved above it, which would make "the two rows below" false.
+> - **Does NOT catch:** nothing in the row's own text. The row is pinned EXACT, as ONE line, because a
+>   Markdown table row cannot wrap.
+> 
+> **C3-3 · RED — the §10 bullet and end-state case (R3.4b (b)).** Add the THIRD `it(` above:
+> `README §10's production-maker bullet names the live refusal, and two lines name COST_ENVELOPES_NOT_SEALED (R3.4b b)`.
+> - **Done when:** `v9` reads `passed=28 failed=3`, and this case fails with
+>   `the bullet names these two codes and no other (C3-6)`. `CLUSTER_RED`. These are the three RED
+>   events of this cluster, all written before any document step.
+> - **Capable of failing:** at `ec66d5e7c` the bullet's only code is `COST_ENVELOPES_NOT_SEALED`
+>   (`:700`), and the README has three lines naming it (gate state `S0`).
+> - **Catches:**
+>   - the bullet keeping `COST_ENVELOPES_NOT_SEALED` beside the two live codes;
+>   - the bullet deleted instead of re-worded;
+>   - a third mention added anywhere, the known-stale list included;
+>   - the support note losing its mention while the row keeps its own.
+> - **Does NOT catch:** a second mention of the code on the SAME line as a counted one. The count is
+>   per line, as SPEC-v3's `grep -n` is (`SPEC-v3.md:104-105`). A swap that keeps the count at 2, where
+>   the note loses its mention and a new line elsewhere gains one, IS caught: the two `filter`
+>   assertions require one line to be the row and one to be inside the note (gate mutant `M_swap`).
+> **C3-4 · the support-chat note (R3.4, V-11).** In the paragraph at the string
+> `**What the support chat cannot tell you yet.**`, replace this one sentence (it spans
+> `deploy/vps/README.md:736-737` at `ec66d5e7c`):
+> 
+> ```text
+> A hosted deployment refuses to start until the cost envelopes are sealed, with the code `COST_ENVELOPES_NOT_SEALED`.
+> ```
+> 
+> with these two sentences:
+> 
+> ```text
+> A hosted deployment reads the `costEnvelopePolicy` row in force at its own `REGISTER_VERSION` and refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with `COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed. `COST_ENVELOPES_NOT_SEALED` is a check on the integrity of the build: it fires only when the envelope row this build ships was removed, emptied or made invalid, and the shipped source never reaches it at runtime.
+> ```
+> 
+> Hard-wrap at about 100 columns like the paragraph around it; C3-1 collapses whitespace. Every other
+> sentence of the paragraph stays byte-identical, including the one before (ending `(V-28).`) and the
+> one after (naming `SUPPORT_MODEL_COST_UNREPORTED`).
+> 
+> The source of each claim, measured in the lane at `ec66d5e7c`:
+> - `COST_ENVELOPE_POLICY_UNRESOLVED`: the throw at `packages/register/src/cost-envelope-policy.ts:163-166`
+>   (`row === undefined`).
+> - `COST_ENVELOPE_POLICY_INVALID`: the throw at `:131-134`, reached through `readCostEnvelopePolicy`'s
+>   `return` at `:169`.
+> - Both roots read the row in hosted mode: `apps/api/src/main.ts:241-242`, under the `hosted` test at
+>   `:238`, and `apps/runner/src/main.ts:111`.
+> - "a check on the integrity of the build", "removed, emptied", "unreachable at runtime":
+>   `packages/register/src/runtime-environment.ts:106` and `:112-115`.
+> - The live gate is named at `:118-124`.
+> 
+> - **Done when:** C3-1's case passes, and `v9` reads `passed=29 failed=2`. C2-2's case
+>   (`README §11's support-chat note names the sealed-envelope refusal, not a daily cap ceiling`)
+>   still passes, because the note still names `COST_ENVELOPES_NOT_SEALED` and still has no
+>   daily-cap sentence.
+> - **RED when omitted:** C3-1 fails with `R3.4 first part, EXACT (C3-4)`.
+> 
+> **C3-5 · the refusal-table row (R3.4b (a), V-14).** Replace the whole line that starts
+> `` | `COST_ENVELOPES_NOT_SEALED` | `` (`deploy/vps/README.md:769` at `ec66d5e7c`) with this one line,
+> in the same position:
+> 
+> ```text
+> | `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows below. |
+> ```
+> 
+> The row stays in the table, because R3.5's class includes this code
+> (`packages/register/src/runtime-environment.ts:143-147`). It also keeps
+> `tests/architecture/vps-deployment-baseline.test.ts:359` true.
+> 
+> - **Done when:** C3-2's case passes, and `v9` reads `passed=30 failed=1`. The refusal span still
+>   holds exactly **19** table lines, C1-2's count: the command at C1-2's criterion still prints `19`,
+>   because this step replaces a line and adds none. The row carries no `<…>` and no "before … hosted
+>   rule" (C1-1's assertions (1) and (1b)).
+> - **RED when omitted:** C3-2 fails with `the row, EXACT, once, in the table (C3-5)`.
+> 
+> **C3-6 · the §10 bullet (R3.4b (b), V-14).** In the bullet starting
+> `- **The production maker path is now ruled` (`deploy/vps/README.md:692-700` at `ec66d5e7c`),
+> replace this text (it spans `:698-700`):
+> 
+> ```text
+> envelopes are V-28's (until they are sealed, a hosted runner refuses to start with `COST_ENVELOPES_NOT_SEALED`).
+> ```
+> 
+> with:
+> 
+> ```text
+> envelopes are V-28's. Until V-28's cost-envelope policy is sealed at the register version a hosted deployment runs, that deployment refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`.
+> ```
+> 
+> Indent the continuation lines two spaces, like the bullet's other lines. Every other sentence of the
+> bullet stays byte-identical.
+> 
+> - **Done when:**
+>   - C3-3's case passes, `v9` reads `passed=31 failed=0`, and the C3 command prints `CLUSTER_GREEN`.
+>   - `/usr/bin/grep -n COST_ENVELOPES_NOT_SEALED deploy/vps/README.md` prints exactly **2** lines:
+>     one inside the note of region (i), and the row of C3-5.
+> - **RED when omitted:** C3-3 fails with `the bullet names these two codes and no other (C3-6)`.
+> 
+> **C3-7 · the cluster goes GREEN, three runs.**
+> - **Done when:**
+>   - `LOG=<abs> run-suites.sh tests/unit/v9-provider-credential-files.test.ts:31:0 tests/architecture/vps-deployment-baseline.test.ts:31:0`
+>     prints `CLUSTER_GREEN` on **three** consecutive runs, and the worst run wins.
+>   - `pnpm typecheck`'s per-file delta is **zero**.
+>   - `git diff --stat origin/dev...HEAD -- apps packages` (cwd = the lane's `dialectical-engine/`)
+>     prints nothing.
+>   - `git diff --stat ec66d5e7c..HEAD` names exactly `deploy/vps/README.md` and
+>     `tests/unit/v9-provider-credential-files.test.ts`.
+> - **R3.8 duty:** `tests/architecture/vps-deployment-baseline.test.ts` is not written, and its
+>   assertions are re-run by this command against the edited README. The one closest to the edits is
+>   `:359`, which requires `COST_ENVELOPES_NOT_SEALED` somewhere in the README. C3-5 keeps the code in
+>   the row, and C3-4 keeps it in the note.
+> - **Catches:** any baseline README assertion broken by regions (i)–(iii), and any of C1's or C2's 28
+>   cases broken by them. C1-1's (1), (1b) and (2), C2-2 and C2-4 are the ones that read these
+>   regions.
+> - **Does NOT catch:** `tests/unit/v30-support-provider.test.ts:550-555`, which also reads §11, for
+>   the support chat's own start-up codes. It is not in the command. None of regions (i)–(iii) holds
+>   one of those codes, and the gate ran that case on the final state
+>   (`probes/ARCH-FIX-PES-S03-p4/gate.log`, "regressions").
+> 
+> Three clusters, **sequential** (C1 → C2 → C3; C3 was added by Revision 4). All three write
+> `deploy/vps/README.md` and `tests/unit/v9-provider-credential-files.test.ts`. The single-writer rule
+> is per file, so they never run at once. No cluster is reviewed on its own. `REV(S03)` reviews the
+> slice once, after all three are green.
+> | **S03-C1** | C1-1 … C1-4 | `tests/unit/v9-provider-credential-files.test.ts` · `deploy/vps/README.md` between `### What the hosted mode refuses, in code` and `### The credential-file contract` | `LOG=<abs> zsh .claude/skills/heartbeat-orchestrator/scripts/run-suites.sh tests/unit/v9-provider-credential-files.test.ts:24:0 tests/architecture/vps-deployment-baseline.test.ts:31:0` | **C1-1** — the widened pin, failing on `PROVIDER_TARGET_PRICE_REQUIRED` | **`CLUSTER_RED`** — `v9 rc=0 passed=23 failed=0 (expect 24/0)`, `baseline rc=0 passed=31 failed=0 (expect 31/0)`. Not BROKEN: both files exist and both printed a summary line. Log: `probes/ARCH-PES-S03/c1-after-pair-at-base.log`. **Re-run for Revision 2, command unchanged:** the same three lines, `CLUSTER_RED` — `probes/ARCH-FIX-PES-S03-p2/c1-cluster.log`. **Re-run for Revision 3, command unchanged:** the same three lines, `CLUSTER_RED` — `probes/ARCH-FIX-PES-S03-p3/c1-cluster.log` **Re-run for Revision 4 at the lane's HEAD `ec66d5e7c` (C1 and C2 built), command unchanged:** `CLUSTER_RED` — `v9 rc=0 passed=28 failed=0 (expect 24/0)`, `baseline rc=0 passed=31 failed=0 (expect 31/0)`. The pair `24:0` is C1's own boundary, which BUILD passed at `604b15158`. C2's four cases have since taken `v9` to 28, so this RED is expected. Log: `probes/ARCH-FIX-PES-S03-p4/c1-cluster.log` |
+> | **S03-C2** | C2-1 … C2-10 | `tests/unit/v9-provider-credential-files.test.ts` · `deploy/vps/README.md` **everywhere except** C1's block | `LOG=<abs> zsh .claude/skills/heartbeat-orchestrator/scripts/run-suites.sh tests/unit/v9-provider-credential-files.test.ts:28:0 tests/architecture/vps-deployment-baseline.test.ts:31:0` | **C2-1, C2-2, C2-3, C2-4** — the four new cases, written before any document step | **`CLUSTER_RED`** — `v9 rc=0 passed=23 failed=0 (expect 28/0)`, `baseline rc=0 passed=31 failed=0 (expect 31/0)`. Not BROKEN. Log: `probes/ARCH-PES-S03/c2-after-pair-at-base.log`. **Re-run for Revision 2, command unchanged:** the same three lines, `CLUSTER_RED` — `probes/ARCH-FIX-PES-S03-p2/c2-cluster.log`. **Re-run for Revision 3, command unchanged:** the same three lines, `CLUSTER_RED` — `probes/ARCH-FIX-PES-S03-p3/c2-cluster.log` **Re-run for Revision 4 at `ec66d5e7c`, command unchanged:** **`CLUSTER_GREEN`** — `v9 rc=0 passed=28 failed=0 (expect 28/0)`, `baseline rc=0 passed=31 failed=0 (expect 31/0)`: C2 is built. Log: `probes/ARCH-FIX-PES-S03-p4/c2-cluster.log` |
+> | **S03-C3** | C3-1 … C3-7 | `tests/unit/v9-provider-credential-files.test.ts` (one appended `describe`) · `deploy/vps/README.md` regions (i) the support-chat note, (ii) the `` `COST_ENVELOPES_NOT_SEALED` `` table row, (iii) §10's production-maker bullet — nothing else | `LOG=<abs> zsh .claude/skills/heartbeat-orchestrator/scripts/run-suites.sh tests/unit/v9-provider-credential-files.test.ts:31:0 tests/architecture/vps-deployment-baseline.test.ts:31:0` | **C3-1, C3-2, C3-3** — the three new cases, written before any document step | **START = `ec66d5e7c`, measured by Revision 4:** **`CLUSTER_RED`** — `v9 rc=0 passed=28 failed=0 (expect 31/0)`, `baseline rc=0 passed=31 failed=0 (expect 31/0)`. It is not BROKEN: both files exist, both printed a summary line, and C2's command at the same HEAD prints `CLUSTER_GREEN`. Log: `probes/ARCH-FIX-PES-S03-p4/c3-cluster.log`. The in-step pairs `28/1 → 28/2 → 28/3 → 29/2 → 30/1 → 31/0` were derived by running the three cases on each step's README state (`probes/ARCH-FIX-PES-S03-p4/gate.log`). |
+> C1-1's one case, so no expected pair moved. Revision 4 moves no C1 or C2 pair. It adds C3's
+> `v9:31:0`, and C3's START is C2's GREEN at `ec66d5e7c` rather than the intake base.
+> **Why the pairs are the discriminator.** Every cluster names the same two suites; the expected pair
+> **28** (four added cases) and so requires C1's 24 to have happened. C3 (Revision 4) takes `v9` from
+> 28 to **31** (three added cases) and so requires C2's 28. `baseline` is **31/0 in every
+> row and after the slice** — it is never edited, which is what makes SPEC §5 step 2 pass as frozen.
+> C3's command (Revision 4) detects any README state where:
+> - the note keeps the overruled sentence, or lacks either of R3.4's two EXACT sentences;
+> - the `COST_ENVELOPES_NOT_SEALED` row is dropped, moved out of the table, duplicated or worded
+>   otherwise than EXACT, or sits below a live-code row;
+> - "are not published yet" or "refuses to claim work until they are" survives anywhere;
+> - §10's bullet names any code but the two live ones, lacks R3.4b (b)'s EXACT sentence, or is deleted;
+> - the README has other than two lines naming `COST_ENVELOPES_NOT_SEALED`, or those two lines are
+>   not one row and one note line.
+> 
+> Each clause is a gate mutant that was watched failing (`probes/ARCH-FIX-PES-S03-p4/gate.log`).
+> 
+> and both were run. The same holds for C3 at `ec66d5e7c`.
+> - `tests/unit/v9-provider-credential-files.test.ts` — **31/31** (base 23/23, +1 from C1-1, +4 from
+>   C2-1…C2-4, +3 from C3-1…C3-3; Revision 4)
+> - `/usr/bin/grep -n COST_ENVELOPES_NOT_SEALED deploy/vps/README.md` — exactly **2** lines: one inside
+>   §11's support-chat note, and §11's refusal-table row (R3.4b; C3-6's criterion). At `ec66d5e7c` it
+>   printed 3 (`:700`, `:737`, `:769`).
+> - every literal done-when command of C1-2, C2-5, C2-6, C2-8 and C3-6, run against the BUILT README,
+>   prints what its step states. Revision 2 ran each one at its own step boundary on a simulated correct
+> | 2 | v9 23/23, baseline 31/31 | v9 **31/31** (Revision 4; 28/28 before C3), baseline **31/31** — its base pair exactly, as the frozen step requires, because no case is added to that file and no assertion in it changes |
+> (and, since Revision 4, one bullet of §10) and two test files. No module gains or loses a responsibility, no domain term is introduced, no
+> **Single-writer:** C1, C2 and C3 all write both of those files, so they run in sequence, never
+> concurrently. C3's three README regions include one bullet of §10, which R3.4b (b) names. Nothing
+> else in this slice shares a file.
+> 
+> ## Revision 4 — ARCH-FIX-PES-S03-p4 (ARCH-FIX(S03) pass 4, ticket `t_26ccd655`), from V's rulings V-11 and V-14 via `SPEC-v3.md` — APPEND-ONLY; nothing above is rewritten
+> 
+> The plan now follows `SPEC-v3.md` (R3.4 `:72-83`, R3.4b `:85-112`). V's rulings are cited by row id,
+> per the V packet's "## Pointer note". Every measurement below lives under
+> `.hermes/reports/provider-env-selection/probes/ARCH-FIX-PES-S03-p4/`. Each checker was watched
+> failing before its pass is quoted:
+> - `gate-selftest.log`, with one planted false expectation;
+> - 16 README mutants in `gate.log`;
+> - `trace-mutants.log`, three mutant plans;
+> - `citations-selftest.log`, every citation shifted by +3.
+> 
+> | date | question | choice | reason | who ruled |
+> |---|---|---|---|---|
+> | 2026-09-25 | Where do R3.4 (V-11) and R3.4b (V-14) land, given that C1 and C2 are built (`604b15158`, `ec66d5e7c`)? | In ONE new cluster, S03-C3 (C3-1 … C3-7), whose START is `ec66d5e7c`. C1's and C2's step blocks stay as the record of the build. C2-7 gains one line pointing at C3-4. REJECTED: rewriting C2-7 in place. That would make the PLAN describe a C2 that was never built, and the packet forbids it (charge 3). | The build happened. A fix is a new cluster with its own RED, not an edit to history. | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | New cases, or an edit to C2-2's built case? | Three NEW cases in a new `describe`, which takes `v9` from 28 to 31. C2-2's case stays byte-identical. It is still true after C3, because the note keeps `COST_ENVELOPES_NOT_SEALED` and has no daily-cap sentence (`gate.log`, "regressions", 7/0 on S3). REJECTED: re-writing C2-2's assertions. The pair would stay `28:0`, which equals C2's pair, and C2's command is GREEN at START (`c2-cluster.log`). C3's command would then have no RED event, and the pair could not tell "C3 done" from "C3 not started". | The pair is the discriminator (PLAN §3). Only added cases move it. | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | One case for R3.4b, or two? | Two: (a) the row (C3-2) and (b) the bullet plus the two-line end state (C3-3). REJECTED: one case. The count of 2 is reached only once the bullet is done, so the row step (C3-5) would have no criterion true at its own boundary. | PLAN §2b's rule is that each step's criterion is satisfiable at that step's boundary. Measured pairs: `28/1 → 28/2 → 28/3 → 29/2 → 30/1 → 31/0` (`gate.log`). | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | Token checks, or EXACT pins? | EXACT pins for all three texts: the note's two sentences, the row line and the bullet sentence. Whitespace is collapsed for the prose, and the row is one line, since a table row cannot wrap. Each pinned string is checked equal to the `text` block its document step writes (`gate.log`, "the plan's copies agree"). | Revision 3's B1 showed that a token check passes a false sentence that carries the tokens. The same mistake is not repeated here. | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | The wording of R3.4's two parts in the note | "A hosted deployment reads the `costEnvelopePolicy` row in force at its own `REGISTER_VERSION` and refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with `COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed. `COST_ENVELOPES_NOT_SEALED` is a check on the integrity of the build: it fires only when the envelope row this build ships was removed, emptied or made invalid, and the shipped source never reaches it at runtime." | This is SPEC-v3 R3.4's own two facts, in its own words. Each claim is opened at its line in the lane (`citations.log`): `cost-envelope-policy.ts:163-166` and `:131-134`, reached at `:169`; `apps/api/src/main.ts:241-242` under `:238`; `apps/runner/src/main.ts:111`; `runtime-environment.ts:106` and `:112-115`. | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | The row's Meaning cell names the live rows as "the two rows below" | Kept, and pinned by an order assertion: each live-code row must sit below this one (gate mutant `M_rowAbove` fails). REJECTED: citing README line numbers inside the README, since they would drift on the next edit. | SPEC-v3 R3.4b (a) asks the cell to point the operator at the live rows. A pointer the test holds true costs one assertion. | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | §10's bullet: re-word the parenthesis, or end the sentence and add one? | Add one. "…envelopes are V-28's. Until V-28's cost-envelope policy is sealed at the register version a hosted deployment runs, that deployment refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`." REJECTED: keeping the parenthesis, which reads "V-28's (until V-28's …". | SPEC-v3 R3.4b (b)'s words are kept verbatim from "until" on. C3-3 pins them and requires that the bullet name no other code. | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | REQ-FIX p5's PLAN-step list (t_7b7c43d6 READY), checked member by member | **Applied:** §2 trace row R3.4 plus a new R3.4b row; reverse trace; C2-7 (a pointer line, not a rewrite); §3 cluster table plus the pair arithmetic; §4 verification list. **Checked, no change:** C2-2's `:480` requirement stays true (above); C2-9 (the known-stale list has no envelope bullet); C1-2's span count stays 19 (`gate.log`, C1-2 command on S0/S3/S3w); C2-10's note on `:359` is true of C2, and C3-7 states the post-C3 fact. **Missed by the list, and applied here:** §3's opening "Two clusters, sequential" → three; §3's "Why the pairs are the discriminator" (C3's 28 → 31); §4's acceptance-table row for §5 step 2 (`v9` 31/31); §5's single-writer line and write surface (C3, and one §10 bullet); the §3 mutant class for C3. | Charge 2: "a step it missed is yours to name". | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | The V-11 class inside the PLAN: every line that states `COST_ENVELOPES_NOT_SEALED` as the start-up refusal | 3 lines found by `grep -n COST_ENVELOPES_NOT_SEALED PLAN.md` outside C3. **C2-2** (`README §11's support-chat note names the sealed-envelope refusal…`): its assertion stays true, and its title describes the C2 build; it is left. **C2-7**: the pointer line added. **C2-10**'s R3.8 note ("C2-7 ADDS a second occurrence…"): true of C2 and left, with C3-7 carrying R3.8 after C3. In the README the class has 3 members (`:700`, `:737`, `:769` at `ec66d5e7c`), and C3 closes all 3. | The class is a sentence presenting `COST_ENVELOPES_NOT_SEALED` as what a hosted operator meets. | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | The reviewer's p3 check (`ARCH-REV-PES-S03-p3/rev3-check.mjs`), re-run as a copy on Revision 4 | 3 PROBLEM lines, none against the plan. (1) and (2): "base message is PASS" and "SELFTEST_BROKEN base passed". The check reads the lane's README as its base, and the lane now carries C1's build (`ec66d5e7c`), so C1-1 passes it. (3) The `runtime-environment.ts:112` word miss is the one the reviewer's own log already notes as not a plan miss. Every C1 section agrees with the reviewer's run: fence equals pin, 224 bytes; the order ban holds; the trace has zero gaps; zero banned words. | Recorded so that the next reviewer does not re-derive it. | ARCH-FIX-PES-S03-p4 |
+> | 2026-09-25 | The reviewer's trace parser (`ARCH-REV-PES-S03-p1/trace.sh`), re-run as a copy | It prints zero gaps, but it is BLIND to this revision: it reads `SPEC.md` and steps `C[12]` only (9 requirements, 14 steps). The adapted parser `trace.sh` reads `SPEC-v3.md`, `C[123]` and `R3.4b`: 10 requirements, 21 steps, `TRACE_OK`. It fails on the Revision 3 plan (R3.4b has no step), on a plan without the R3.4b row, and on a plan without `C3-5 → R3.4b` (`trace-mutants.log`). | A parser that has only ever passed is a decoration (packet §3). | ARCH-FIX-PES-S03-p4 |

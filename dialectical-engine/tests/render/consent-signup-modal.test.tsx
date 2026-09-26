@@ -78,9 +78,8 @@ async function settle(): Promise<void> {
 
 async function mount(client?: {
   register: ReturnType<typeof vi.fn>;
-  resendVerification: ReturnType<typeof vi.fn>;
 }): Promise<void> {
-  const stub = client ?? { register: vi.fn(), resendVerification: vi.fn() };
+  const stub = client ?? { register: vi.fn() };
   await act(async () => {
     root!.render((<SignUpFlow client={stub} />) as ReactNode);
   });

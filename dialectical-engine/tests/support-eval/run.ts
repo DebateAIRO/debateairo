@@ -7,6 +7,7 @@ import { assertFramedPrompt,type PromptPacket } from "@debateai/providers";
 import {
   createHelpCorpusSnapshotLookup,loadHelpCorpus
 } from "../../packages/support-kb/src/index.js";
+import type { SupportLanguage } from "../../packages/support-kb/src/catalog.js";
 import { buildApi,type AskApplication } from "../../apps/api/src/index.js";
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
 import { createSupportKeyPort } from "../../apps/api/src/support/keys.js";
@@ -356,7 +357,7 @@ function outputReferences(system: string,key: "sourceIds"|"actionIds"): readonly
  */
 export function createDeterministicStructuralCompletion(input: Readonly<{
   packet:PromptPacket;
-  language:"en"|"ro";
+  language:SupportLanguage;
 }>): Readonly<{ text:string }> {
   assertFramedPrompt(input.packet);
   const system = input.packet.messages[0]?.content ?? "";

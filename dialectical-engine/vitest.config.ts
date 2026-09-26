@@ -3,6 +3,11 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: { alias: [
+    { find: "server-only", replacement: resolve(import.meta.dirname, "tests/render/stubs/server-only.ts") },
+    {
+      find: /^(?:@\/|(?:\.\.\/)+)lib\/i18n\/I18nProvider$/,
+      replacement: resolve(import.meta.dirname, "tests/render/stubs/i18n-provider.tsx")
+    },
     { find: "next/headers", replacement: resolve(import.meta.dirname, "tests/render/stubs/next-headers.ts") },
     { find: "next/navigation", replacement: resolve(import.meta.dirname, "tests/render/stubs/next-navigation.ts") },
     { find: "@", replacement: resolve(import.meta.dirname, "apps/ui") },

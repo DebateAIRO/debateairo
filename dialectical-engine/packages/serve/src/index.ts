@@ -3104,6 +3104,10 @@ export class ServeRepository {
     readonly ownership: RunOwnershipInput;
     readonly userInput: string | null;
   }): Promise<InvestigationAccepted | null> {
+    // S-LANG follow-up policy: this write does not change the run's stored
+    // language. user_input stops at RECORDED today and is not model-prompted.
+    // If a later path sends it to a model, detect that utterance for that call
+    // only; never translate or relabel sibling nodes already stored on the run.
     const access = normalizeRunOwnership(input.ownership);
     const candidate = (await this.pool.query<{ answer_version: number; run_id: string }>(
       `SELECT answer.answer_version,answer.run_id

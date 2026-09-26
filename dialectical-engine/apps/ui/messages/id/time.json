@@ -1,0 +1,17 @@
+{
+  "time.justNow": "baru saja",
+  "time.minutes.other": "{count} menit lalu",
+  "time.hours.other": "{count} jam lalu",
+  "time.yesterday": "Kemarin",
+  "time.days.other": "{count} hari lalu",
+  "time.weeks.other": "{count} minggu lalu",
+  "time.status.complete": "Selesai",
+  "time.status.queued": "Dalam antrean",
+  "time.status.claimed": "Telah diambil",
+  "time.status.running": "Sedang berjalan",
+  "time.status.holding": "Ditahan untuk pemulihan penyedia",
+  "time.status.settled": "Dituntaskan",
+  "time.status.generating": "Sedang dibuat",
+  "time.status.failed": "Gagal",
+  "time.status.draft": "Draf"
+}

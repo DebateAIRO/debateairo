@@ -1,0 +1,88 @@
+[
+  {
+    "mutant": "drop-upper-bound",
+    "v9_passed": 32,
+    "v9_total": 33,
+    "baseline": "43/43",
+    "v30": "30/30",
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > README \u00a711's PRICE_INVALID Meaning states the complete price domain (V-22)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p3/drop-upper-bound.log"
+  },
+  {
+    "mutant": "drop-lower-bound",
+    "v9_passed": 32,
+    "v9_total": 33,
+    "baseline": "43/43",
+    "v30": "30/30",
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > README \u00a711's PRICE_INVALID Meaning states the complete price domain (V-22)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p3/drop-lower-bound.log"
+  },
+  {
+    "mutant": "drop-integer-condition",
+    "v9_passed": 32,
+    "v9_total": 33,
+    "baseline": "43/43",
+    "v30": "30/30",
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > README \u00a711's PRICE_INVALID Meaning states the complete price domain (V-22)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p3/drop-integer-condition.log"
+  },
+  {
+    "mutant": "drop-one-member-condition",
+    "v9_passed": 32,
+    "v9_total": 33,
+    "baseline": "43/43",
+    "v30": "30/30",
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > V-9 the kit names every refusal the credential path can emit > README \u00a711's PRICE_INVALID Meaning states the complete price domain (V-22)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p3/drop-one-member-condition.log"
+  },
+  {
+    "mutant": "hosted-window-60000",
+    "v9_passed": 32,
+    "v9_total": 33,
+    "baseline": "43/43",
+    "v30": "30/30",
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's probe-cost paragraph names the hosted publisher's fixed window (V-23)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p3/hosted-window-60000.log"
+  },
+  {
+    "mutant": "drop-no-file-member",
+    "v9_passed": 32,
+    "v9_total": 33,
+    "baseline": "43/43",
+    "v30": "30/30",
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's probe-cost paragraph names the hosted publisher's fixed window (V-23)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p3/drop-no-file-member.log"
+  },
+  {
+    "mutant": "drop-code-change",
+    "v9_passed": 32,
+    "v9_total": 33,
+    "baseline": "43/43",
+    "v30": "30/30",
+    "failures": [
+      "FAIL  tests/unit/v9-provider-credential-files.test.ts > S03 \u00a711 says what the shipped code does > README \u00a711's probe-cost paragraph names the hosted publisher's fixed window (V-23)"
+    ],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p3/drop-code-change.log"
+  },
+  {
+    "mutant": "harmless-spacing",
+    "v9_passed": 33,
+    "v9_total": 33,
+    "baseline": "43/43",
+    "v30": "30/30",
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p3/harmless-spacing.log"
+  }
+]

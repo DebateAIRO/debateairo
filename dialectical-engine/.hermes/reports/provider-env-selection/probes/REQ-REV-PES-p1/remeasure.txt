@@ -1,0 +1,29 @@
+REQ-REV-PES-p1 probes. Lane: /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-base/dialectical-engine @ 776359c3851289c25cb6ede3633cdce3e14adba6. No listener. No connection to :55432. No pnpm install. No suite re-run.
+
+1. git -C /Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine diff --stat c3ade5f1..84106e07 -- docs/missions/provider-env-selection
+   15 files, +911/-62. Includes 00-intake.md and V-DECISIONS-PACKET.md (orchestrator, per ticket comment 1) plus INSTRUCTIONS.md and slices/**.
+   Intake diff deletes ## 6, ## 7, ## 8, ## 9 while regenerating the §5b pairs (F1). Pre-image headings confirmed via git show c3ade5f1:dialectical-engine/docs/missions/provider-env-selection/00-intake.md.
+
+2. wc -l INSTRUCTIONS.md → 91.
+
+3. python3 socket.getaddrinfo("api.localtest.me", 443) → 127.0.0.1 and ::1. 2026-09-24.
+
+4. grep buildConfiguredProviderSetDeploymentRow under apps/**/*.ts → no caller.
+   Call sites are the definition (packages/register/src/configured-provider-set.ts:177) and tests/unit/v9-configured-provider-set-deployment.test.ts only.
+
+5. grep '"production:' under apps and packages → no hit.
+
+6. grep DEBATEAI_DEPLOYMENT_MODE under apps → no hit.
+   DEVELOPMENT_API_ENVIRONMENT_KEYS (apps/runner/src/dev-api-environment.ts:36-78) does not list it.
+
+7. grep hosted under acceptance → no hit.
+
+8. grep PROVIDER_INLINE_CREDENTIAL_REFUSED under tests:
+   tests/unit/v9-deployment-mode.test.ts:142 (table cell hosted inline → that code)
+   tests/unit/v30-support-provider.test.ts:128
+   tests/architecture/vps-deployment-baseline.test.ts:358 (README text pin)
+   tests/unit/v9-provider-credential-files.test.ts:110 body does not assert that code.
+
+9. grep input_price_micros_per_million and the six price/envelope codes in deploy/vps/README.md → hits only at lines 20-26 (the known-stale notice), not in the §11 table or the worked example.
+
+10. cmp ~/.claude/skills/heartbeat-protocol/SKILL.md and heartbeat-requirements/SKILL.md against the repo copies → IDENTICAL. Author READY line names those home paths plus using-superpowers and brainstorming under superpowers 6.4.1. Requirements floor is present. Not a fabrication finding.
