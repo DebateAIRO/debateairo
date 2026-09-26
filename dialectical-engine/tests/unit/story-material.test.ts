@@ -536,23 +536,35 @@ describe("verdict story — the shrink ladder, step by step", () => {
     expect(full.compressionStep).toBe(0);
     expect(characters(pointFor(full, id(26)).best_case)).toBe(600);
 
-    // Step 1: judge texts OUTSIDE the top-10 leverage are cut to 240; the top 10 keep theirs.
+    // Step 1: judge texts of points OUTSIDE the top-10 leverage are cut to 240; the top 10
+    // keep theirs, and so do the positions (no leverage here), whose paths the story is built on.
     const step1 = built(at(full.material.bytes - 1));
     expect(step1.compressionStep).toBe(1);
     expect(characters(pointFor(step1, id(12)).best_case)).toBe(600);
-    for (const nodeId of [id(13), id(26), id(1)]) {
+    for (const nodeId of [id(13), id(26)]) {
       const point = pointFor(step1, nodeId);
       expect(characters(point.best_case)).toBe(240);
       expect(point.best_case?.endsWith("…")).toBe(true);
       expect(characters(point.objection)).toBe(240);
       expect(characters(point.review_reasons?.[0])).toBe(240);
     }
+    for (const nodeId of [id(1), id(2)]) {
+      const position = pointFor(step1, nodeId);
+      expect(characters(position.best_case)).toBe(600);
+      expect(characters(position.objection)).toBe(600);
+      expect(characters(position.review_reasons?.[0])).toBe(500);
+    }
 
-    // Step 2: every judge text is cut to 240.
+    // Step 2: every judge text is cut to 240, the positions' included.
     const step2 = built(at(step1.material.bytes - 1));
     expect(step2.compressionStep).toBe(2);
     expect(characters(pointFor(step2, id(3)).best_case)).toBe(240);
     expect(characters(pointFor(step2, id(3)).claim)).toBe(700);
+    const cutPosition = pointFor(step2, id(1));
+    expect(characters(cutPosition.best_case)).toBe(240);
+    expect(cutPosition.best_case?.endsWith("…")).toBe(true);
+    expect(characters(cutPosition.objection)).toBe(240);
+    expect(characters(cutPosition.review_reasons?.[0])).toBe(240);
 
     // Steps 3 to 5: claims follow the digest ladder, 480, 240, 120, in points and positions alike.
     let previous = step2;
@@ -752,6 +764,14 @@ describe("verdict story — large debates against the tier budgets", () => {
     const counted = result.material.omitted.reduce((total, entry) => total + entry.supports + entry.attacks, 0);
     expect(shown + counted).toBe(195);
     expect(result.material.omitted.map((entry) => entry.position_ref)).toEqual(["P1", "P2", "P3"]);
+    // The positions take none of the top-20 slots: the 3 positions, then the 12 level-1
+    // points and the 8 strongest level-2 points, all 20 of them the top 20 and all of
+    // them keeping their judge texts. Had the positions been ranked, 3 slots would go
+    // to them: 20 shown, and 17 points with judge texts.
+    expect(shown).toBe(23);
+    const points = result.material.points.filter((point) => point.position !== true);
+    expect(points).toHaveLength(20);
+    expect(points.filter((point) => point.best_case !== undefined)).toHaveLength(20);
     const visible = new Set(result.material.points.map((point) => point.id));
     expect([...result.index.nodeIds].sort()).toEqual([...visible].sort());
     for (const point of result.material.points) {

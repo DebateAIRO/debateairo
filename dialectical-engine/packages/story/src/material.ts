@@ -156,7 +156,7 @@ export type StoryMaterialResult =
 
 /** How many hinge references the material names (spec §5.2); positions are never hinges. */
 const STORY_HINGE_COUNT = 5;
-/** Ladder step 1 spares the judge texts of this many highest-leverage points (positions are not ranked). */
+/** Ladder step 1 spares the judge texts of this many highest-leverage points (positions are not ranked; step 1 spares them apart). */
 const STORY_TOP_LEVERAGE = 10;
 /** Ladder steps 6 and 7 spare this many highest-leverage points (positions are not ranked). */
 const STORY_KEPT_LEVERAGE = 20;
@@ -164,8 +164,9 @@ const STORY_KEPT_LEVERAGE = 20;
 /**
  * The shrink ladder, verbatim from spec §5.2, one `compressionStep` per row.
  * Step 0 cuts nothing, and every later step keeps every earlier cut.
- *   1    spec 1: judge texts outside the top-10 leverage are cut to 240 characters
- *   2    spec 2: every judge text is cut to 240 characters
+ *   1    spec 1: judge texts outside the top-10 leverage are cut to 240 characters (the
+ *        positions keep theirs, as at step 6)
+ *   2    spec 2: every judge text is cut to 240 characters, the positions' included
  *   3-5  spec 3: claims are cut to 480, then 240, then 120 characters
  *   6    spec 4: points outside the top-20 leverage lose their judge texts and review
  *        reasons (the positions keep theirs: the story's path chapters are built on them)
@@ -470,7 +471,9 @@ export function buildStoryMaterial(input: {
     }));
     const points = nodesInRefOrder.filter((node) => visible.has(node.nodeId)).map((node): StoryMaterialPoint => {
       const judgeDropped = step.dropJudgeOutsideKept && !keptLeverage.has(node.nodeId) && !positionIds.has(node.nodeId);
-      const judgeChars = step.judgeChars ?? (topLeverage.has(node.nodeId) ? null : step.outsideTopJudgeChars);
+      // Step 1 spares the top-10 points and the positions; step 2 cuts every judge text.
+      const judgeChars = step.judgeChars
+        ?? (topLeverage.has(node.nodeId) || positionIds.has(node.nodeId) ? null : step.outsideTopJudgeChars);
       const enriched = enrichment.get(node.nodeId);
       const bestCase = judgeDropped ? null : enriched?.judgeBestCase ?? null;
       const objection = judgeDropped ? null : enriched?.judgeObjection ?? node.criticSummary;
