@@ -37,7 +37,7 @@ The scores, the thresholds and the hinges were computed by code. The claims, the
 ## Rules for every story
 
 1. Only the material. Every fact, argument, number and source you mention must be in the material. Add no outside knowledge, no new arguments and no statistics. When the person would need something the debate did not examine, name it as a gap ("the debate did not look at...") and do not fill it.
-2. Every claim traceable. Each paragraph, path line, change text and reviewer's note lists in node_refs every point it rests on. Cite a point only for what it actually says. You may name a point in the text by its reference, such as P3, so the reader can find it in the report's appendix, but do so sparingly: the text should read as prose, not as a list of numbers.
+2. Every claim traceable. Each paragraph, path line, change text and reviewer's note lists in node_refs every point it rests on. Cite a point only for what it actually says. In the long version you may name a point in the text by its reference, such as P3, so the reader can find it in the report's appendix, but do so sparingly: the text should read as prose, not as a list of numbers. The short version and the reviewer's note never name one (see below).
 3. Fair to the losing paths. State each losing position in its strongest form, using its best case, then say plainly and accurately why it did not hold up. Never mock, caricature or wave it away.
 4. No overstatement. Match your certainty to the scores and the label. A point known by REASONING is an argument, not a finding: say "argued", not "shown". A score is not a probability: never turn 0.62 into "62% likely". Keep the debate's own hedges.
 5. Numbers sparingly. Use a score only when it helps the reader, say what it means ("scored 0.62 out of 1 once the objections were counted"), and round to two decimals. Invent no number.
@@ -63,7 +63,7 @@ Take each fate from these thresholds even when it looks at odds with the label. 
 
 ## The short version
 
-The short version is shown on the site, where there is no appendix, so a point number such as P3 would mean nothing to the reader there. Never mention a point number in the headline, the summary, a path line or the change text; say in words what the point argues. Point numbers belong only in the long version. The node_refs arrays still list the points each entry rests on.
+The short version is shown on the site, where there is no appendix, so a point number such as P3 would mean nothing to the reader there. Never mention a point number in the headline, the summary, a path line or the change text; say in words what the point argues. Point numbers belong only in the long version; the reviewer's note follows the same rule as the short version. The node_refs arrays still list the points each entry rests on.
 
 - headline: the answer in one line, true to the label. No teaser and no question.
 - summary: one paragraph with your reading of what was asked, the answer, and the main reason for it.
@@ -76,7 +76,7 @@ Use the sections of the shape you chose, in order, as the titles of long.section
 
 ## The reviewer's note
 
-reviewer_note is null unless you believe the numbers missed something that matters. For example: the verdict hangs on a hinge point known only by reasoning; the judges strongly disagreed about a point that decided the outcome; a path an informed reader would expect was never explored; or the question rests on a doubtful premise. The note says what may have been missed and what that means for how much weight to give the label. It never states a different verdict as the answer ("the real answer is..."), and the main story must stand without it. Most stories need no note.
+reviewer_note is null unless you believe the numbers missed something that matters. For example: the verdict hangs on a hinge point known only by reasoning; the judges strongly disagreed about a point that decided the outcome; a path an informed reader would expect was never explored; or the question rests on a doubtful premise. The note says what may have been missed and what that means for how much weight to give the label. It never states a different verdict as the answer ("the real answer is..."), and the main story must stand without it. The note is shown on the site with the short version, where there is no appendix, so it never mentions a point number such as P3: say in words which point you mean, and list it in node_refs. Most stories need no note.
 
 ## A second draft
 

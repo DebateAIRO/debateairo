@@ -158,7 +158,7 @@ describe("verdict story — the story classifier", () => {
     expect(result.parseError).not.toMatch(/Fund the|dleh|cost objection|really|leans on|worth its cost|ridership/u);
   });
 
-  describe("no point numbers in the short version (it is shown where there is no appendix)", () => {
+  describe("no point numbers in the texts the site shows (there is no appendix there)", () => {
     it.each([
       ["the headline", (body: StoryBody): void => {
         body.short.headline = "Fund the extension: P3 carries it.";
@@ -171,22 +171,30 @@ describe("verdict story — the story classifier", () => {
       }, "short.paths.1.line"],
       ["the change text", (body: StoryBody): void => {
         body.short.change.text = "A measured drop in ridership would move P3.";
-      }, "short.change.text"]
+      }, "short.change.text"],
+      ["the reviewer's note", (body: StoryBody): void => {
+        body.reviewer_note = paragraph("The verdict leans on P3, which was only argued.", ["P3"]);
+      }, "reviewer_note.text"]
     ])("refuses a point number in %s, at its own path, without echoing the text", (_name, mutate, path) => {
       const body = story();
       mutate(body);
       const result = classifyStoryContent(JSON.stringify(body), INDEX);
       expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path });
       expect(result.parseError).toContain("STORY_SHORT_POINT_NUMBER");
-      expect(result.parseError).not.toMatch(/carries it|mainly on|cost objection|ridership/u);
+      expect(result.parseError).not.toMatch(/carries it|mainly on|cost objection|ridership|leans on/u);
       expect(() => parseStoryBody(JSON.stringify(body), INDEX))
         .toThrowError(expect.objectContaining({ code: "STORY_CONTENT_INVALID" }));
     });
 
-    it("still accepts a point number in the long version and in the reviewer's note", () => {
+    it("still accepts a point number in the long version", () => {
       const body = story();
       body.long.sections[2]!.paragraphs[0]!.text = "Funding held up, mainly on P3 and P14.";
-      body.reviewer_note = paragraph("The verdict leans on P3, which was only argued.", ["P3"]);
+      expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    });
+
+    it("still lets the reviewer's note cite points in its node_refs, naming them in words", () => {
+      const body = story();
+      body.reviewer_note = paragraph("The verdict leans on the savings point, which was only argued.", ["P3"]);
       expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
     });
 

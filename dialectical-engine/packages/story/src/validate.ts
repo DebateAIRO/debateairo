@@ -17,9 +17,9 @@ import type { ContentClassification } from "@debateai/providers";
  * The story's TEXT is not inspected for markup: it is plain-text data, and the
  * site and the PDF never render it as anything else. It is inspected for
  * control and bidirectional-override characters, which can hide or reorder
- * what a reader sees however the text is rendered. The short version's texts
- * are also refused a point number: they are shown on the public page, where
- * there is no appendix to look a number up in.
+ * what a reader sees however the text is rendered. The texts the site shows
+ * (the short version's and the reviewer's note) are also refused a point
+ * number: the owner's and the public page have no appendix to look one up in.
  */
 
 /** What the material offers a story to cite. Built by `buildStoryMaterial`. */
@@ -41,11 +41,11 @@ export interface StoryMaterialIndex {
 const STORY_TEXT_FORBIDDEN = /[\u0000-\u0008\u000B-\u001F\u202A-\u202E\u2066-\u2069]/u;
 
 /**
- * A point number (P1, P14) standing as a word of its own. Refused in the short
- * version's texts (headline, summary, each path line, the change text), which
- * the public page shows without the appendix that numbers the points; the long
- * version, the reviewer's note and every node_refs array may still use them.
- * "P0", "PS" and "MP3" are not point numbers.
+ * A point number (P1, P14) standing as a word of its own. Refused in the texts
+ * the site shows without the appendix that numbers the points: the short
+ * version's (headline, summary, each path line, the change text) and the
+ * reviewer's note's. The long version and every node_refs array may still use
+ * them. "P0", "PS" and "MP3" are not point numbers.
  */
 const STORY_SHORT_POINT_NUMBER = /\bP[1-9][0-9]*\b/u;
 
@@ -112,7 +112,8 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
   const text = (value: string, at: readonly (string | number)[]): void => {
     if (STORY_TEXT_FORBIDDEN.test(value)) issue(at, "STORY_TEXT_CONTROL_CHARACTER");
   };
-  const shortText = (value: string, at: readonly (string | number)[]): void => {
+  /** A text the site shows: checked like every text, and refused a point number. */
+  const siteText = (value: string, at: readonly (string | number)[]): void => {
     text(value, at);
     if (STORY_SHORT_POINT_NUMBER.test(value)) issue(at, "STORY_SHORT_POINT_NUMBER");
   };
@@ -123,8 +124,8 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
   };
 
   if (!index.shapeIds.has(body.shape_id)) issue(["shape_id"], "STORY_UNKNOWN_SHAPE");
-  shortText(body.short.headline, ["short", "headline"]);
-  shortText(body.short.summary, ["short", "summary"]);
+  siteText(body.short.headline, ["short", "headline"]);
+  siteText(body.short.summary, ["short", "summary"]);
 
   // Past the cap, only the strongest positions may be paths. Under it, every position is among them.
   const strongest = new Set(index.positionOrder.slice(0, index.pathCap));
@@ -142,7 +143,7 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
       issue(["short", "paths", position, "position_ref"], "STORY_PATH_NOT_AMONG_STRONGEST");
     }
     covered.add(path.position_ref);
-    shortText(path.line, ["short", "paths", position, "line"]);
+    siteText(path.line, ["short", "paths", position, "line"]);
     citations(path.node_refs, ["short", "paths", position]);
   });
   // Every position once while they fit under the cap; exactly the cap beyond it.
@@ -151,7 +152,7 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
     issue(["short", "paths"], "STORY_POSITION_COVERAGE");
   }
 
-  shortText(body.short.change.text, ["short", "change", "text"]);
+  siteText(body.short.change.text, ["short", "change", "text"]);
   citations(body.short.change.node_refs, ["short", "change"]);
   body.long.sections.forEach((section, sectionIndex) => {
     text(section.title, ["long", "sections", sectionIndex, "title"]);
@@ -162,7 +163,7 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
     });
   });
   if (body.reviewer_note !== null) {
-    text(body.reviewer_note.text, ["reviewer_note", "text"]);
+    siteText(body.reviewer_note.text, ["reviewer_note", "text"]);
     citations(body.reviewer_note.node_refs, ["reviewer_note"]);
   }
   return issues.slice(0, STORY_ISSUE_LIMIT);
