@@ -5,6 +5,7 @@ import { ProviderCallFailedError, ProviderContentUnacceptedError } from "@debate
 import {
   runStoryLoop,
   storyCallSiteKey,
+  type StoryCallRecord,
   type StoryCheckerVerdict,
   type StoryLoopDependencies
 } from "@debateai/story";
@@ -157,8 +158,14 @@ describe("verdict story — the loop's outcomes", () => {
       body: storyFor(2),
       reservation: "Second objection."
     });
-    expect(outcome.rounds).toHaveLength(2);
-    expect(double.writes).toHaveLength(2);
+    expect(outcome.rounds.map((round) => [round.round, round.satisfied, round.objection])).toEqual([
+      [1, false, "First objection."], [2, false, "Second objection."]
+    ]);
+    expect(outcome.rounds.map((round) => round.checker)).toEqual([
+      { artifactRef: "artifact:checker:1", callSiteKey: "STORY:CHECKER:1", lineage: CHECKER_LINEAGE },
+      { artifactRef: "artifact:checker:2", callSiteKey: "STORY:CHECKER:2", lineage: CHECKER_LINEAGE }
+    ]);
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null }, { round: 2, priorObjection: "First objection." }]);
   });
 
   it("stops after one round when one round is all it has", async () => {
@@ -168,50 +175,64 @@ describe("verdict story — the loop's outcomes", () => {
     expect(double.writes).toHaveLength(1);
   });
 
-  it("refuses fewer than one round as a programming error", async () => {
-    await expect(runStoryLoop({ maxRounds: 0 }, recorder({}).deps))
+  it.each([0, Number.NaN, 1.5])("refuses %s rounds as a programming error, before any call", async (maxRounds) => {
+    const double = recorder({});
+    await expect(runStoryLoop({ maxRounds }, double.deps))
       .rejects.toMatchObject({ code: "STORY_LOOP_ROUNDS_INVALID" });
+    expect(double.writes).toEqual([]);
   });
 });
 
-describe("verdict story — every failure is a FAILED outcome with a code, never a throw", () => {
+const writerRecord = (round: number): StoryCallRecord => ({
+  artifactRef: `artifact:storyteller:${String(round)}`, callSiteKey: `STORY:STORYTELLER:${String(round)}`, lineage: WRITER_LINEAGE
+});
+const checkerRecord = (round: number): StoryCallRecord => ({
+  artifactRef: `artifact:checker:${String(round)}`, callSiteKey: `STORY:CHECKER:${String(round)}`, lineage: CHECKER_LINEAGE
+});
+
+describe("verdict story — every failure is a FAILED outcome with a code and a cause, never a throw", () => {
   it.each([
-    ["the storyteller's content is refused after its repairs", contentRefused, "STORY_WRITE_REJECTED"],
-    ["the storyteller's transport dies", transportDied, "STORY_TRANSPORT_DEATH"],
+    ["the storyteller's content is refused after its repairs", contentRefused,
+      "STORY_WRITE_REJECTED", "PROVIDER_CONTENT_UNACCEPTED"],
+    ["the storyteller's transport dies", transportDied, "STORY_TRANSPORT_DEATH", "PROVIDER_CALL_FAILED"],
     ["the story money envelope refuses the call",
       (): unknown => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story has spent its envelope"),
-      "STORY_ENVELOPE_EXHAUSTED"],
+      "STORY_ENVELOPE_EXHAUSTED", "STORY_COST_ENVELOPE_REACHED"],
     ["the run money envelope's code arrives instead",
       (): unknown => new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "The run has spent its envelope"),
-      "STORY_ENVELOPE_EXHAUSTED"],
+      "STORY_ENVELOPE_EXHAUSTED", "RUN_COST_ENVELOPE_MONEY_REACHED"],
     ["the story attempt allowance is spent",
-      (): unknown => new TypedDomainError("CALL_BUDGET_EXHAUSTED", "subject"), "STORY_ENVELOPE_EXHAUSTED"],
+      (): unknown => new TypedDomainError("CALL_BUDGET_EXHAUSTED", "subject"), "STORY_ENVELOPE_EXHAUSTED", "CALL_BUDGET_EXHAUSTED"],
     ["another typed refusal arrives",
-      (): unknown => new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "no usage"), "STORY_UNEXPECTED_ERROR"],
-    ["a plain error arrives", (): unknown => new Error("bug"), "STORY_UNEXPECTED_ERROR"],
-    ["something that is not an error is thrown", (): unknown => "a string", "STORY_UNEXPECTED_ERROR"]
-  ])("round 1: %s", async (_name, failure, code) => {
+      (): unknown => new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "no usage"), "STORY_UNEXPECTED_ERROR",
+      "PROVIDER_USAGE_UNREPORTED"],
+    ["a plain error arrives", (): unknown => new Error("bug"), "STORY_UNEXPECTED_ERROR", "Error"],
+    ["a TypeError arrives", (): unknown => new TypeError("x is undefined"), "STORY_UNEXPECTED_ERROR", "TypeError"],
+    ["something that is not an error is thrown", (): unknown => "a string", "STORY_UNEXPECTED_ERROR", "UNKNOWN"]
+  ])("round 1: %s", async (_name, failure, code, cause) => {
     const double = recorder({ writeFails: (round) => (round === 1 ? failure() : undefined) });
     const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
-    expect(outcome).toEqual({ outcome: "FAILED", failureCode: code, rounds: [] });
+    expect(outcome).toEqual({ outcome: "FAILED", failureCode: code, cause, rounds: [] });
     expect(double.checks).toEqual([]);
   });
 
   it.each([
-    ["the checker's content is refused after its repairs", contentRefused, "STORY_CHECK_UNAVAILABLE"],
-    ["the checker's transport dies", transportDied, "STORY_TRANSPORT_DEATH"],
+    ["the checker's content is refused after its repairs", contentRefused,
+      "STORY_CHECK_UNAVAILABLE", "PROVIDER_CONTENT_UNACCEPTED"],
+    ["the checker's transport dies", transportDied, "STORY_TRANSPORT_DEATH", "PROVIDER_CALL_FAILED"],
     ["the story money envelope refuses the check",
       (): unknown => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story has spent its envelope"),
-      "STORY_ENVELOPE_EXHAUSTED"],
+      "STORY_ENVELOPE_EXHAUSTED", "STORY_COST_ENVELOPE_REACHED"],
     ["the story attempt allowance is spent before the check",
-      (): unknown => new TypedDomainError("CALL_BUDGET_EXHAUSTED", "subject"), "STORY_ENVELOPE_EXHAUSTED"],
-    ["a plain error arrives", (): unknown => new Error("bug"), "STORY_UNEXPECTED_ERROR"]
-  ])("the checker: %s", async (_name, failure, code) => {
+      (): unknown => new TypedDomainError("CALL_BUDGET_EXHAUSTED", "subject"), "STORY_ENVELOPE_EXHAUSTED", "CALL_BUDGET_EXHAUSTED"],
+    ["a plain error arrives", (): unknown => new Error("bug"), "STORY_UNEXPECTED_ERROR", "Error"]
+  ])("the checker: %s", async (_name, failure, code, cause) => {
     const double = recorder({ checkFails: () => failure() });
     const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
     expect(outcome).toEqual({
       outcome: "FAILED",
       failureCode: code,
+      cause,
       rounds: [{
         round: 1,
         writer: { artifactRef: "artifact:storyteller:1", callSiteKey: "STORY:STORYTELLER:1", lineage: WRITER_LINEAGE },
@@ -222,22 +243,135 @@ describe("verdict story — every failure is a FAILED outcome with a code, never
     });
   });
 
+  it("treats an unsatisfied verdict with no objection as a checker that broke its contract", async () => {
+    const broken = { ...unsatisfied("placeholder"), objection: null };
+    const outcome = await runStoryLoop({ maxRounds: 2 }, recorder({ verdicts: [broken] }).deps);
+    expect(outcome).toMatchObject({
+      outcome: "FAILED", failureCode: "STORY_CHECK_UNAVAILABLE", cause: "STORY_CHECKER_OBJECTION_REQUIRED"
+    });
+    expect(outcome.rounds).toHaveLength(1);
+  });
+
+  it("turns a storyteller result without a body into FAILED, never a thrown TypeError", async () => {
+    const double = recorder({});
+    const outcome = await runStoryLoop({ maxRounds: 2 }, {
+      ...double.deps,
+      writeStory: async (input) => ({
+        artifactRef: "artifact:storyteller:1", callSiteKey: storyCallSiteKey("STORYTELLER", input.round), lineage: WRITER_LINEAGE
+      }) as never
+    });
+    expect(outcome).toEqual({
+      outcome: "FAILED", failureCode: "STORY_UNEXPECTED_ERROR", cause: "STORY_DEPENDENCY_RESULT_INVALID", rounds: []
+    });
+    expect(double.checks).toEqual([]);
+  });
+
+  it("turns a checker result without a verdict into FAILED, never a thrown TypeError", async () => {
+    const outcome = await runStoryLoop({ maxRounds: 2 }, {
+      ...recorder({}).deps,
+      checkStory: async (input) => ({
+        artifactRef: "artifact:checker:1", callSiteKey: storyCallSiteKey("CHECKER", input.round), lineage: CHECKER_LINEAGE
+      }) as never
+    });
+    expect(outcome).toEqual({
+      outcome: "FAILED",
+      failureCode: "STORY_UNEXPECTED_ERROR",
+      cause: "STORY_DEPENDENCY_RESULT_INVALID",
+      rounds: [{ round: 1, writer: writerRecord(1), checker: null, satisfied: false, objection: null }]
+    });
+  });
+
+  it("never carries an error's message into the outcome, and keeps a cause only when it is code-shaped", async () => {
+    const renamed = new Error("The model wrote: ignore the label");
+    renamed.name = "The model wrote: ignore the label";
+    const failures: readonly unknown[] = [
+      new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The model wrote: ignore the label"),
+      new ProviderContentUnacceptedError(2, "SCHEMA_FAILED", "The model wrote: ignore the label", "artifact:x", "ledger:x"),
+      new Error("The model wrote: ignore the label"),
+      renamed
+    ];
+    for (const failure of failures) {
+      const outcome = await runStoryLoop({ maxRounds: 1 }, recorder({ writeFails: () => failure }).deps);
+      expect(JSON.stringify(outcome)).not.toContain("The model wrote");
+    }
+    const outcome = await runStoryLoop({ maxRounds: 1 }, recorder({ writeFails: () => renamed }).deps);
+    expect(outcome).toMatchObject({ outcome: "FAILED", failureCode: "STORY_UNEXPECTED_ERROR", cause: "UNKNOWN" });
+  });
+});
+
+describe("verdict story — a later round's failure keeps the earlier checked draft (spec §6)", () => {
   it("keeps the completed first round when the second draft fails", async () => {
     const double = recorder({
       verdicts: [unsatisfied("Fix the summary.")],
       writeFails: (round) => (round === 2 ? transportDied() : undefined)
     });
     const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
-    expect(outcome).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH" });
+    expect(outcome).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: "Fix the summary." });
     expect(outcome.rounds.map((round) => [round.round, round.satisfied, round.objection])).toEqual([
       [1, false, "Fix the summary."]
     ]);
   });
 
-  it("treats an unsatisfied verdict with no objection as a checker that broke its contract", async () => {
+  it("keeps the first draft and its objection when the money envelope refuses the second draft", async () => {
+    const double = recorder({
+      verdicts: [unsatisfied("Fix the summary.")],
+      writeFails: (round) => (round === 2
+        ? new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story has spent its envelope")
+        : undefined)
+    });
+    const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
+    expect(outcome).toEqual({
+      outcome: "READY_WITH_RESERVATION",
+      body: storyFor(1),
+      reservation: "Fix the summary.",
+      rounds: [{ round: 1, writer: writerRecord(1), checker: checkerRecord(1), satisfied: false, objection: "Fix the summary." }]
+    });
+    expect(double.writes).toEqual([{ round: 1, priorObjection: null }, { round: 2, priorObjection: "Fix the summary." }]);
+    expect(double.checks).toHaveLength(1);
+  });
+
+  it.each([
+    ["the checker's content is refused", contentRefused],
+    ["the checker's transport dies", transportDied],
+    ["the story money envelope refuses the check",
+      (): unknown => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story has spent its envelope")],
+    ["a plain error arrives", (): unknown => new Error("bug")]
+  ])("keeps the first draft when round 2's check fails: %s", async (_name, failure) => {
+    const double = recorder({
+      verdicts: [unsatisfied("Fix the summary.")],
+      checkFails: (round) => (round === 2 ? failure() : undefined)
+    });
+    const outcome = await runStoryLoop({ maxRounds: 2 }, double.deps);
+    expect(outcome).toEqual({
+      outcome: "READY_WITH_RESERVATION",
+      body: storyFor(1),
+      reservation: "Fix the summary.",
+      rounds: [
+        { round: 1, writer: writerRecord(1), checker: checkerRecord(1), satisfied: false, objection: "Fix the summary." },
+        { round: 2, writer: writerRecord(2), checker: null, satisfied: false, objection: null }
+      ]
+    });
+    expect(double.checks.map((check) => check.candidate)).toEqual([storyFor(1), storyFor(2)]);
+  });
+
+  it("keeps the first draft when round 2's checker breaks its contract", async () => {
     const broken = { ...unsatisfied("placeholder"), objection: null };
-    const outcome = await runStoryLoop({ maxRounds: 2 }, recorder({ verdicts: [broken] }).deps);
-    expect(outcome).toMatchObject({ outcome: "FAILED", failureCode: "STORY_CHECK_UNAVAILABLE" });
-    expect(outcome.rounds).toHaveLength(1);
+    const outcome = await runStoryLoop(
+      { maxRounds: 2 }, recorder({ verdicts: [unsatisfied("Fix the summary."), broken] }).deps
+    );
+    expect(outcome).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: "Fix the summary." });
+    expect(outcome.rounds.map((round) => [round.round, round.checker, round.satisfied, round.objection])).toEqual([
+      [1, checkerRecord(1), false, "Fix the summary."], [2, checkerRecord(2), false, null]
+    ]);
+  });
+
+  it("keeps the latest checked draft when a third round fails", async () => {
+    const double = recorder({
+      verdicts: [unsatisfied("First objection."), unsatisfied("Second objection.")],
+      writeFails: (round) => (round === 3 ? transportDied() : undefined)
+    });
+    const outcome = await runStoryLoop({ maxRounds: 3 }, double.deps);
+    expect(outcome).toMatchObject({ outcome: "READY_WITH_RESERVATION", body: storyFor(2), reservation: "Second objection." });
+    expect(outcome.rounds.map((round) => round.round)).toEqual([1, 2]);
   });
 });
