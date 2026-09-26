@@ -67,6 +67,9 @@ export interface ReportAppendixEntry {
   readonly review: string;
   readonly setAside: string | null;
   readonly marks: readonly string[];
+  /** The printed lines for the two optional facts, "Set aside: …" and "Marks: …", or null. */
+  readonly setAsideLine: string | null;
+  readonly marksLine: string | null;
 }
 
 export interface ReportRule {
@@ -84,6 +87,8 @@ export interface ReportRow {
 
 export interface ReportModel {
   readonly documentTitle: string;
+  /** Every page's footer; `pageWords` holds {page} and {pages}, filled in as each page is laid out. */
+  readonly footer: Readonly<{ text: string; pageWords: string }>;
   readonly cover: Readonly<{
     eyebrow: string;
     question: string;
@@ -92,6 +97,7 @@ export interface ReportModel {
     confidenceWords: string | null;
     generatedLine: string;
     models: readonly string[];
+    modelsLine: string;
     disclosure: readonly string[];
   }>;
   readonly inShort: Readonly<{
@@ -111,11 +117,16 @@ export interface ReportModel {
   readonly computation: Readonly<{
     title: string;
     intro: string;
+    tableHead: Readonly<{ rule: string; when: string; label: string }>;
     rules: readonly ReportRule[];
+    /** The words that mark the rule that decided this debate. */
+    appliedWords: string;
+    numbersTitle: string | null;
     numbers: readonly ReportRow[];
     decision: string;
     explanation: string;
     marks: readonly string[];
+    marksLine: string | null;
   }>;
   readonly appendix: Readonly<{ title: string; intro: string; entries: readonly ReportAppendixEntry[] }>;
   readonly about: Readonly<{ title: string; rows: readonly ReportRow[] }>;
@@ -157,6 +168,36 @@ function paragraph(text: string, nodeRefs: readonly string[], numbers: ReadonlyM
   return { spans };
 }
 
+/**
+ * Words with no space to break at, such as a web address a model copied into its text. The PDF never
+ * splits an ordinary word (the story is in the question's language, so no hyphenation), but a word
+ * longer than `longerThan` characters would run off the page. It may break after / ? & = - _ . and at
+ * least every `pieceLength` characters (spec 2026-09-26 §10). The text itself is never changed.
+ */
+export const REPORT_WORD_BREAK = Object.freeze({ longerThan: 30, pieceLength: 20 });
+const BREAK_AFTER = new Set(["/", "?", "&", "=", "-", "_", "."]);
+const GRAPHEMES = new Intl.Segmenter("und", { granularity: "grapheme" });
+
+/** The pieces a word may break between, in order (joined, they are the word). One piece when it is short enough. */
+export function reportWordPieces(word: string): string[] {
+  const characters = Array.from(GRAPHEMES.segment(word), (part) => part.segment);
+  if (characters.length <= REPORT_WORD_BREAK.longerThan) return [word];
+  const pieces: string[] = [];
+  let piece = "";
+  let length = 0;
+  for (const character of characters) {
+    piece += character;
+    length += 1;
+    if (BREAK_AFTER.has(character) || length === REPORT_WORD_BREAK.pieceLength) {
+      pieces.push(piece);
+      piece = "";
+      length = 0;
+    }
+  }
+  if (piece.length > 0) pieces.push(piece);
+  return pieces;
+}
+
 function formatUtc(date: Date): string {
   const iso = date.toISOString();
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
@@ -192,6 +233,16 @@ function uniqueModels(answer: Answer): string[] {
   return models;
 }
 
+const COMPUTATION_WORDS = Object.freeze({
+  tableHead: Object.freeze({ rule: "Rule", when: "When", label: "Label" }),
+  appliedWords: "This debate",
+  numbersTitle: "This debate's numbers"
+});
+
+function marksLine(marks: readonly string[]): string | null {
+  return marks.length === 0 ? null : `Marks: ${marks.join("; ")}`;
+}
+
 const COMPUTATION_INTRO =
   "The label is not written by the AI. Code computes it from the final scores of the positions, which run from 0 to 1. The winner is the position with the highest final score, the margin is how far it is ahead of the runner-up, and the judges' disagreement is how much the AI judges differed when they scored the winner. The rules below are checked in order, and the first one that matches decides.";
 
@@ -207,7 +258,16 @@ function disagreementBelowLimit(basis: VerdictBasis): string {
     : `judges' disagreement ${score(basis.disagreement)} < ${limit}`;
 }
 
+/** A no-break space on both sides of < > ≤ ≥ →, so a comparison is never split across two lines. */
+function keepComparisonsTogether(line: string): string {
+  return line.replace(/ ([<>≤≥→]) /gu, "\u00A0$1\u00A0");
+}
+
 function decisionLine(basis: VerdictBasis): string {
+  return keepComparisonsTogether(decisionWords(basis));
+}
+
+function decisionWords(basis: VerdictBasis): string {
   const t = basis.thresholds;
   const label = storyLabelWords(basis.label);
   const winner = score(basis.winner_strength);
@@ -237,6 +297,24 @@ function decisionLine(basis: VerdictBasis): string {
   return `Rule ${basis.rung + 1} decided (${basis.trigger}) → ${label}`;
 }
 
+/**
+ * "ahead of the runner-up by 0.06, more than the tie margin of 0.05 (…)": exactly what the rule checks.
+ * A margin just above the tie margin is not "clearly" ahead, so the words never say so.
+ */
+function aheadWords(basis: VerdictBasis): string {
+  const gamma = score(basis.thresholds.gamma);
+  const margin = basis.margin === null ? "a margin that was not measured" : score(basis.margin);
+  return `ahead of the runner-up by ${margin}, more than the tie margin of ${gamma} (a lead of ${gamma} or less counts as a tie)`;
+}
+
+/** "the judges' disagreement, 0.12, stayed below the limit of 0.25", or the limit alone when it was not measured. */
+function agreementWords(basis: VerdictBasis): string {
+  const limit = score(basis.thresholds.disagreement);
+  return basis.disagreement === null
+    ? `the judges' disagreement stayed below the limit of ${limit}`
+    : `the judges' disagreement, ${score(basis.disagreement)}, stayed below the limit of ${limit}`;
+}
+
 /** The decision in plain words, for the rule that actually decided; every number comes from the basis. */
 function explanation(basis: VerdictBasis): string {
   const t = basis.thresholds;
@@ -257,11 +335,11 @@ function explanation(basis: VerdictBasis): string {
     case "MARGIN_WITHIN_GAMMA":
       return `The leading position was ahead by only ${basis.margin === null ? "an unmeasured margin" : score(basis.margin)}, which is ${score(t.gamma)} or less: too close to pick a winner. So ${rule} applies and the label is ${label}.`;
     case "DISAGREEMENT_AT_THRESHOLD":
-      return `The leading position was clearly ahead, but the judges disagreed about it ${basis.disagreement === null ? "at least as much as" : `by ${score(basis.disagreement)}, reaching`} the limit of ${score(t.disagreement)}. When the judges disagree that much the engine does not call the question settled, so ${rule} applies and the label is ${label}.`;
+      return `The leading position was ${aheadWords(basis)}, but the judges disagreed about it ${basis.disagreement === null ? "at least as much as" : `by ${score(basis.disagreement)}, reaching`} the limit of ${score(t.disagreement)}. When the judges disagree that much the engine does not call the question settled, so ${rule} applies and the label is ${label}.`;
     case "AT_OR_ABOVE_HIGH_CUT":
-      return `The leading position scored ${winner}, at or above ${score(t.high_cut)}. It was clearly ahead of the runner-up, and the judges broadly agreed, so ${rule} applies and the label is ${label}.`;
+      return `The leading position scored ${winner}, at or above ${score(t.high_cut)}. It was ${aheadWords(basis)}, and ${agreementWords(basis)}. So ${rule} applies and the label is ${label}.`;
     case "MID_BAND":
-      return `The leading position was clearly ahead and the judges broadly agreed, but its score of ${winner} did not reach ${score(t.high_cut)}, the score needed for ${storyLabelWords("SUPPORTED")}. So ${rule} applies and the label is ${label}.`;
+      return `The leading position was ${aheadWords(basis)}, and ${agreementWords(basis)}. But its score of ${winner} did not reach ${score(t.high_cut)}, the score needed for ${storyLabelWords("SUPPORTED")}. So ${rule} applies and the label is ${label}.`;
     default:
       return storyLabelSentence(basis.label);
   }
@@ -272,11 +350,15 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
     return {
       title: REPORT_TITLES.computation,
       intro: COMPUTATION_INTRO,
+      tableHead: COMPUTATION_WORDS.tableHead,
       rules: [],
+      appliedWords: COMPUTATION_WORDS.appliedWords,
+      numbersTitle: null,
       numbers: [],
       decision: "The numbers behind this verdict were not stored with the story.",
       explanation: "",
-      marks: []
+      marks: [],
+      marksLine: null
     };
   }
   const t = basis.thresholds;
@@ -288,9 +370,13 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
     { condition: `The winner scores ${score(t.high_cut)} or more`, result: "SUPPORTED" },
     { condition: `Anything else: the winner scores at least ${score(t.low_cut)} but less than ${score(t.high_cut)}`, result: "CONTESTED" }
   ] as const;
+  const marks = basis.marks.map(markWords);
   return {
     title: REPORT_TITLES.computation,
     intro: COMPUTATION_INTRO,
+    tableHead: COMPUTATION_WORDS.tableHead,
+    appliedWords: COMPUTATION_WORDS.appliedWords,
+    numbersTitle: COMPUTATION_WORDS.numbersTitle,
     rules: conditions.map((rule, rung) => ({
       number: String(rung + 1),
       condition: rule.condition,
@@ -321,7 +407,8 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
     ],
     decision: decisionLine(basis),
     explanation: explanation(basis),
-    marks: basis.marks.map(markWords)
+    marks,
+    marksLine: marksLine(marks)
   };
 }
 
@@ -373,6 +460,8 @@ function appendixEntry(point: NumberedPoint, node: Answer["nodes"][number], stan
   const final = node.final_strength === null ? null : v3ScorePercentage(node.final_strength.value).text;
   const frozen = node.condition_marks.includes("BRANCH-FROZEN-LOW-LEVERAGE");
   const author = lineageWords(node.maker_lineage);
+  const setAside = point.node.stopping_reason_human ?? (frozen ? conditionMarkLabel("BRANCH-FROZEN-LOW-LEVERAGE") : null);
+  const marks = node.condition_marks.filter((mark) => mark !== "BRANCH-FROZEN-LOW-LEVERAGE").map(conditionMarkLabel);
   return {
     number: point.number,
     anchor: pointAnchor(point.number),
@@ -387,8 +476,10 @@ function appendixEntry(point: NumberedPoint, node: Answer["nodes"][number], stan
           `Reviewer (${lineageWords(node.review.reviewer_lineage) ?? "model not recorded"}) ${REVIEW_WORDS[node.review.outcome]}.`,
           ...node.review.reasons
         ].join(" "),
-    setAside: point.node.stopping_reason_human ?? (frozen ? conditionMarkLabel("BRANCH-FROZEN-LOW-LEVERAGE") : null),
-    marks: node.condition_marks.filter((mark) => mark !== "BRANCH-FROZEN-LOW-LEVERAGE").map(conditionMarkLabel)
+    setAside,
+    marks,
+    setAsideLine: setAside === null ? null : `Set aside: ${setAside}`,
+    marksLine: marksLine(marks)
   };
 }
 
@@ -402,8 +493,10 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
   const contractNodes = contractNodesById(answer);
   const models = uniqueModels(answer);
   const basis = story.verdict_basis;
+  const computed = computation(basis, numbers);
   return {
     documentTitle: `Debate report: ${answer.question_line}`,
+    footer: { text: "DebateAI · AI-generated report", pageWords: "Page {page} of {pages}" },
     cover: {
       eyebrow: "DebateAI · Debate report",
       question: answer.question_line,
@@ -412,6 +505,7 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
       confidenceWords: storyConfidenceWords(answer.confidence_band),
       generatedLine: `Generated ${formatUtc(generatedAt)}`,
       models,
+      modelsLine: models.length === 0 ? "Models that took part: not recorded" : `Models that took part: ${models.join(", ")}`,
       disclosure: [
         AI_NOTICE.debate,
         "The story in this report was written by an AI storyteller and checked by a second AI model. The label comes from the scores, not from the story."
@@ -445,7 +539,7 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
     reservation: story.status === "READY_WITH_RESERVATION" && story.reservation !== null
       ? { title: REPORT_TITLES.reservation, paragraph: paragraph(story.reservation, [], numbers) }
       : null,
-    computation: computation(basis, numbers),
+    computation: computed,
     appendix: {
       title: REPORT_TITLES.appendix,
       intro: "Every point the debate produced, under the numbers the story uses: the positions first, then the points under them. Each entry's first line says which point it supports or challenges. Each point has two scores: the judges' score for the point alone, and its score after the arguments for and against it were weighed.",
@@ -467,7 +561,13 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
         { label: "Story shape", value: story.shape === null ? "Not recorded" : `${story.shape.title} (${story.shape.id})` },
         { label: "Shape pack version", value: story.pack === null ? "Not recorded" : story.pack.version },
         { label: "Shape pack fingerprint", value: story.pack === null ? "Not recorded" : fingerprintWords(story.pack.fingerprint) },
-        { label: "Label rule", value: basis === null ? "Not recorded" : `Rule ${basis.rung + 1} (${basis.trigger})` }
+        // The rule's number on the computation page and the label it gives, never the engine's trigger name.
+        {
+          label: "Label rule",
+          value: basis === null
+            ? "Not recorded"
+            : `Rule ${basis.rung + 1} of ${computed.rules.length}, which gives ${storyLabelWords(basis.label)}`
+        }
       ]
     }
   };

@@ -195,9 +195,12 @@ describe("toStoryView (spec §10)", () => {
       .toEqual(["supported", "contested", "unsupported", null]);
   });
 
-  it("says SUPPORTED in plain words, with no engine term", () => {
-    expect(STORY_SUPPORTED_SENTENCE).toContain("clearly ahead of the other positions");
-    expect(STORY_SUPPORTED_SENTENCE).not.toMatch(/tie margin|gamma|threshold/u);
+  it("says SUPPORTED in plain words: exactly what rung 3 checks, with no engine term and no overclaim", () => {
+    expect(STORY_SUPPORTED_SENTENCE).toBe(
+      "The leading position came out strong, stayed ahead of the other positions by more than the tie margin (a smaller lead counts as a tie), and the judges broadly agreed."
+    );
+    // "Clearly ahead" overclaimed: rung 3 only needs the margin to beat the tie margin, which 0.06 against 0.05 does.
+    expect(STORY_SUPPORTED_SENTENCE).not.toMatch(/clearly|gamma|threshold/u);
   });
 });
 

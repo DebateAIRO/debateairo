@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { Font, renderToBuffer } from "@react-pdf/renderer";
 import type { Answer, AnswerStory } from "@debateai/contract";
 import { REPORT_FONT_SANS, REPORT_FONT_SERIF, ReportDocument } from "./ReportDocument.js";
+import { reportWordPieces } from "./reportModel.js";
 
 /**
  * The vendored OFL fonts (apps/ui/assets/fonts, with each family's OFL.txt).
@@ -29,6 +30,19 @@ export function resolveReportFontDirectory(cwd: string = process.cwd()): string 
   throw new Error("REPORT_FONTS_UNRESOLVED: the report fonts are not under assets/fonts or apps/ui/assets/fonts");
 }
 
+/**
+ * The report's line-break rule, registered as react-pdf's hyphenation callback. An ordinary word is never
+ * split: the story is in the question's language, so English hyphenation would be wrong. A word longer
+ * than REPORT_WORD_BREAK.longerThan (a web address a model copied, say) may break between the pieces
+ * reportWordPieces cuts. The pieces come back with an empty string between each two. @react-pdf/textkit
+ * 7.0.1 turns an empty syllable into a zero-width space it may break at and prints nothing there, while a
+ * break between two plain syllables would print a hyphen. Not one character is added to the text, so a
+ * copied address stays exactly as the model wrote it.
+ */
+export function reportHyphenation(word: string): string[] {
+  return reportWordPieces(word).flatMap((piece, index) => (index === 0 ? [piece] : ["", piece]));
+}
+
 let registeredFontDirectory: string | null = null;
 
 function registerReportFonts(directory: string): void {
@@ -45,8 +59,7 @@ function registerReportFonts(directory: string): void {
       { src: join(directory, REPORT_FONT_FILES.sansBold), fontWeight: 700 }
     ]
   });
-  // The default hyphenation is English. The story is in the question's language, so words are never split.
-  Font.registerHyphenationCallback((word) => [word]);
+  Font.registerHyphenationCallback(reportHyphenation);
   registeredFontDirectory = directory;
 }
 

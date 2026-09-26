@@ -30,6 +30,10 @@ const LINK = "#3D5A80";
 
 const FATE_COLUMN = 86;
 const BODY = 10.5;
+// textkit's own infinity (linebreak.infinity in @react-pdf/textkit 7.0.1): a penalty this high is never a
+// line break. Every run boundary in story text (a word, then a [Pn] citation or an in-text P5 link) is a
+// hyphenation point to textkit, and a break there would print a stray "-"; at this penalty it never breaks.
+const NEVER_BREAK_BETWEEN_RUNS = 10000;
 
 const styles = StyleSheet.create({
   // No lineHeight here: a Page-level lineHeight together with the fixed page-number footer (a `render` Text)
@@ -65,7 +69,7 @@ const styles = StyleSheet.create({
   headline: { fontWeight: 700, fontSize: 13.5, lineHeight: 1.4, color: STRONG, marginBottom: 8 },
   paragraph: { fontSize: BODY, lineHeight: 1.6, marginBottom: 9 },
   cite: { color: LINK, fontSize: 8.5, textDecoration: "none" },
-  mention: { color: LINK, textDecoration: "none" },
+  mention: { color: LINK, textDecoration: "underline" },
   pathRow: { flexDirection: "row", marginBottom: 7 },
   fate: { width: FATE_COLUMN, fontWeight: 700, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.6, color: MUTED, paddingTop: 2.5 },
   pathLine: { flex: 1, fontSize: BODY, lineHeight: 1.5 },
@@ -115,11 +119,12 @@ const styles = StyleSheet.create({
 function StoryText({ paragraph, variant }: { paragraph: ReportParagraph; variant: "paragraph" | "pathLine" | "box" }): JSX.Element {
   const style = variant === "pathLine" ? styles.pathLine : variant === "box" ? styles.boxText : styles.paragraph;
   return (
-    <Text style={style}>
+    <Text style={style} hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}>
       {paragraph.spans.map((span, index) => {
         if (span.kind === "text") return <Text key={index}>{span.text}</Text>;
         if (span.kind === "mention") return <Link key={index} src={`#${span.anchor}`} style={styles.mention}>{span.label}</Link>;
-        return <Link key={index} src={`#${span.anchor}`} style={styles.cite}>{` [${span.label}]`}</Link>;
+        // A no-break space before each marker keeps "[P5]" with the word before it and with the marker before it.
+        return <Link key={index} src={`#${span.anchor}`} style={styles.cite}>{`\u00A0[${span.label}]`}</Link>;
       })}
     </Text>
   );
@@ -135,7 +140,8 @@ function KeepWithNext({ ahead, style, id, children }: {
   id?: string;
   children: JSX.Element;
 }): JSX.Element {
-  return <View wrap={false} minPresenceAhead={ahead} style={style} id={id}>{children}</View>;
+  // An id only where there is one: react-pdf names a destination for any node that has the prop, even undefined.
+  return <View wrap={false} minPresenceAhead={ahead} style={style} {...(id === undefined ? {} : { id })}>{children}</View>;
 }
 
 function Heading({ title, first = false }: { title: string; first?: boolean }): JSX.Element {
@@ -154,11 +160,15 @@ function Subheading({ text }: { text: string }): JSX.Element {
   );
 }
 
-function Footer(): JSX.Element {
+function Footer({ footer }: { footer: ReportModel["footer"] }): JSX.Element {
   return (
     <>
-      <Text style={styles.footerLeft} fixed>DebateAI · AI-generated report</Text>
-      <Text style={styles.footerRight} fixed render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+      <Text style={styles.footerLeft} fixed>{footer.text}</Text>
+      <Text
+        style={styles.footerRight}
+        fixed
+        render={({ pageNumber, totalPages }) => footer.pageWords.replace("{page}", String(pageNumber)).replace("{pages}", String(totalPages))}
+      />
     </>
   );
 }
@@ -175,9 +185,7 @@ function CoverAndShort({ model }: { model: ReportModel }): JSX.Element {
       {cover.confidenceWords === null ? null : <Text style={styles.confidence}>{cover.confidenceWords}</Text>}
       <Text style={styles.sentence}>{cover.labelSentence}</Text>
       <Text style={styles.meta}>{cover.generatedLine}</Text>
-      <Text style={styles.meta}>
-        {cover.models.length === 0 ? "Models that took part: not recorded" : `Models that took part: ${cover.models.join(", ")}`}
-      </Text>
+      <Text style={styles.meta}>{cover.modelsLine}</Text>
       <View style={styles.disclosure}>
         {cover.disclosure.map((line, index) => (
           <Text key={index} style={index === 0 ? styles.disclosureLine : [styles.disclosureLine, styles.disclosureGap]}>{line}</Text>
@@ -239,9 +247,9 @@ function Computation({ model }: { model: ReportModel }): JSX.Element {
       <Text style={styles.paragraph}>{computation.intro}</Text>
       {computation.rules.length === 0 ? null : (
         <View style={styles.ruleHead}>
-          <Text style={[styles.ruleNumber, styles.ruleHeadText]}>Rule</Text>
-          <Text style={[styles.ruleCondition, styles.ruleHeadText]}>When</Text>
-          <Text style={[styles.ruleResult, styles.ruleHeadText]}>Label</Text>
+          <Text style={[styles.ruleNumber, styles.ruleHeadText]}>{computation.tableHead.rule}</Text>
+          <Text style={[styles.ruleCondition, styles.ruleHeadText]}>{computation.tableHead.when}</Text>
+          <Text style={[styles.ruleResult, styles.ruleHeadText]}>{computation.tableHead.label}</Text>
           <Text style={[styles.ruleMarker, styles.ruleHeadText]}>{" "}</Text>
         </View>
       )}
@@ -250,10 +258,10 @@ function Computation({ model }: { model: ReportModel }): JSX.Element {
           <Text style={styles.ruleNumber}>{rule.number}</Text>
           <Text style={styles.ruleCondition}>{rule.condition}</Text>
           <Text style={styles.ruleResult}>{rule.result}</Text>
-          <Text style={styles.ruleMarker}>{rule.applied ? "This debate" : ""}</Text>
+          <Text style={styles.ruleMarker}>{rule.applied ? computation.appliedWords : ""}</Text>
         </View>
       ))}
-      {computation.numbers.length === 0 ? null : <Subheading text="This debate's numbers" />}
+      {computation.numbersTitle === null ? null : <Subheading text={computation.numbersTitle} />}
       {computation.numbers.map((row, index) => (
         <View key={index} style={styles.numberRow} wrap={false}>
           <Text style={styles.numberLabel}>{row.label}</Text>
@@ -262,7 +270,7 @@ function Computation({ model }: { model: ReportModel }): JSX.Element {
       ))}
       <Text style={styles.decision} wrap={false}>{computation.decision}</Text>
       {computation.explanation.length === 0 ? null : <Text style={styles.paragraph}>{computation.explanation}</Text>}
-      {computation.marks.length === 0 ? null : <Text style={styles.meta}>{`Marks: ${computation.marks.join("; ")}`}</Text>}
+      {computation.marksLine === null ? null : <Text style={styles.meta}>{computation.marksLine}</Text>}
     </>
   );
 }
@@ -284,8 +292,8 @@ function Appendix({ model }: { model: ReportModel }): JSX.Element {
           <Text style={styles.entryMeta}>{`${entry.scores} · ${entry.wayOfKnowing}`}</Text>
           <Text style={styles.entryMeta}>{entry.author}</Text>
           <Text style={styles.entryMeta}>{entry.review}</Text>
-          {entry.setAside === null ? null : <Text style={styles.entryMeta}>{`Set aside: ${entry.setAside}`}</Text>}
-          {entry.marks.length === 0 ? null : <Text style={styles.entryMeta}>{`Marks: ${entry.marks.join("; ")}`}</Text>}
+          {entry.setAsideLine === null ? null : <Text style={styles.entryMeta}>{entry.setAsideLine}</Text>}
+          {entry.marksLine === null ? null : <Text style={styles.entryMeta}>{entry.marksLine}</Text>}
         </Fragment>
       ))}
     </>
@@ -311,23 +319,23 @@ export function ReportDocumentView({ model }: { model: ReportModel }): JSX.Eleme
     <Document title={model.documentTitle} author="DebateAI" subject="AI-generated debate report" creator="DebateAI" producer="DebateAI" keywords="AI-generated">
       <Page size="A4" style={styles.page} bookmark={model.inShort.title}>
         <CoverAndShort model={model} />
-        <Footer />
+        <Footer footer={model.footer} />
       </Page>
       <Page size="A4" style={styles.page} bookmark={model.storyTitle}>
         <LongStory model={model} />
-        <Footer />
+        <Footer footer={model.footer} />
       </Page>
       <Page size="A4" style={styles.page} bookmark={model.computation.title}>
         <Computation model={model} />
-        <Footer />
+        <Footer footer={model.footer} />
       </Page>
       <Page size="A4" style={styles.page} bookmark={model.appendix.title}>
         <Appendix model={model} />
-        <Footer />
+        <Footer footer={model.footer} />
       </Page>
       <Page size="A4" style={styles.page} bookmark={model.about.title}>
         <About model={model} />
-        <Footer />
+        <Footer footer={model.footer} />
       </Page>
     </Document>
   );

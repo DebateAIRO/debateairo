@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PLAN_TIER_ROSTERS, type Answer, type AnswerStory } from "@debateai/contract";
 import { numberPoints } from "../../apps/ui/lib/report/pointNumbers.js";
-import { REPORT_TITLES, buildReportModel, type ReportModel, type ReportSpan } from "../../apps/ui/lib/report/reportModel.js";
+import { REPORT_TITLES, buildReportModel, reportWordPieces, type ReportModel, type ReportSpan } from "../../apps/ui/lib/report/reportModel.js";
 import {
   STORY_FIXTURE_ANSWER,
   STORY_FIXTURE_POINT_NUMBERS,
@@ -32,6 +32,15 @@ function spanText(spans: readonly ReportSpan[]): string {
   return spans.map((span) => (span.kind === "text" ? span.text : span.label)).join("");
 }
 
+/** The decision line keeps each comparison on one line: a no-break space on both sides of < > ≤ ≥ →. */
+function nb(line: string): string {
+  return line.replace(/ ([<>≤≥→]) /gu, "\u00A0$1\u00A0");
+}
+
+/** A 150-character address, the kind a model may copy into its text: no space to break at. */
+const LONG_URL =
+  "https://www.exemplu-imobiliare.ro/anunturi/inchiriere/cluj-napoca/apartamente-3-camere/zorilor?pret_min=2500&pret_max=4200&sortare=pret&pagina=12&id=9";
+
 function allSpans(model: ReportModel): ReportSpan[] {
   return [
     ...model.inShort.paths.flatMap((path) => path.line.spans),
@@ -40,6 +49,60 @@ function allSpans(model: ReportModel): ReportSpan[] {
     ...(model.reviewerNote === null ? [] : model.reviewerNote.paragraph.spans),
     ...(model.reservation === null ? [] : model.reservation.paragraph.spans)
   ];
+}
+
+/**
+ * The top-level entries of the first `StyleSheet.create({ ... })` in `source`, name to body text, read by
+ * brackets rather than by line, so a style written across several lines is still one entry. Comments
+ * are dropped and strings are skipped, so neither can be mistaken for a style.
+ */
+function styleEntries(source: string): Map<string, string> {
+  const open = source.indexOf("StyleSheet.create({");
+  if (open < 0) throw new Error("no StyleSheet.create({ in the source");
+  const entries = new Map<string, string>();
+  let depth = 0;
+  let entry = "";
+  const finish = () => {
+    const text = entry.trim();
+    entry = "";
+    if (text.length === 0) return;
+    const colon = text.indexOf(":");
+    entries.set(text.slice(0, colon).trim(), text.slice(colon + 1).trim());
+  };
+  for (let index = open + "StyleSheet.create(".length; index < source.length; index += 1) {
+    const char = source[index]!;
+    if (char === "/" && source[index + 1] === "/") {
+      index = source.indexOf("\n", index) - 1;
+      continue;
+    }
+    if (char === "/" && source[index + 1] === "*") {
+      index = source.indexOf("*/", index) + 1;
+      continue;
+    }
+    if (char === "\"" || char === "'" || char === "`") {
+      const close = source.indexOf(char, index + 1);
+      if (depth >= 1) entry += source.slice(index, close + 1);
+      index = close;
+      continue;
+    }
+    if (char === "{") {
+      depth += 1;
+      if (depth === 1) continue;
+    }
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        finish();
+        break;
+      }
+    }
+    if (depth === 1 && char === ",") {
+      finish();
+      continue;
+    }
+    if (depth >= 1) entry += char;
+  }
+  return entries;
 }
 
 function answerWithPoints(roots: number, childrenPerRoot: number): Answer {
@@ -178,8 +241,13 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
       { label: "Label", value: "Contested" }
     ]);
     expect(model.computation.decision)
-      .toBe("winner 0.64 is between 0.35 and 0.70, margin 0.06 > 0.05, judges' disagreement 0.12 < 0.25 → Contested");
-    expect(model.computation.explanation).toContain("did not reach 0.70");
+      .toBe(nb("winner 0.64 is between 0.35 and 0.70, margin 0.06 > 0.05, judges' disagreement 0.12 < 0.25 → Contested"));
+    // A comparison never splits across lines.
+    expect(model.computation.decision).not.toMatch(/ [<>≤≥→]|[<>≤≥→] /u);
+    // It says what the rule checked, not that the winner was "clearly" ahead: 0.06 is only just above 0.05.
+    expect(model.computation.explanation).toBe(
+      "The leading position was ahead of the runner-up by 0.06, more than the tie margin of 0.05 (a lead of 0.05 or less counts as a tie), and the judges' disagreement, 0.12, stayed below the limit of 0.25. But its score of 0.64 did not reach 0.70, the score needed for Supported. So rule 5 applies and the label is Contested."
+    );
   });
 
   it("reads every threshold from the verdict basis, never from the page", () => {
@@ -199,7 +267,10 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
       "Anything else: the winner scores at least 0.40 but less than 0.80"
     ]);
     expect(computed.rules.map((rule) => rule.applied)).toEqual([false, false, false, true, false]);
-    expect(computed.decision).toBe("winner 0.86 ≥ 0.80, margin 0.34 > 0.08, judges' disagreement 0.09 < 0.30 → Supported");
+    expect(computed.decision).toBe(nb("winner 0.86 ≥ 0.80, margin 0.34 > 0.08, judges' disagreement 0.09 < 0.30 → Supported"));
+    expect(computed.explanation).toBe(
+      "The leading position scored 0.86, at or above 0.80. It was ahead of the runner-up by 0.34, more than the tie margin of 0.08 (a lead of 0.08 or less counts as a tie), and the judges' disagreement, 0.09, stayed below the limit of 0.30. So rule 4 applies and the label is Supported."
+    );
     expect(computed.numbers[3]).toEqual({ label: "Judges' disagreement", value: "0.09 (the limit is 0.30)" });
     expect(JSON.stringify(computed)).not.toMatch(/0\.05|0\.25|0\.35|0\.70/);
   });
@@ -213,19 +284,22 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     const disagreed = buildReportModel(STORY_FIXTURE_ANSWER, story, GENERATED);
     expect(disagreed.computation.rules.map((rule) => rule.applied)).toEqual([false, false, true, false, false]);
     expect(disagreed.computation.decision)
-      .toBe("margin 0.17 > 0.05, but the judges disagreed by 0.31 ≥ 0.25 → Contested");
-    expect(disagreed.computation.explanation).toContain("disagreed");
+      .toBe(nb("margin 0.17 > 0.05, but the judges disagreed by 0.31 ≥ 0.25 → Contested"));
+    expect(disagreed.computation.explanation).toBe(
+      "The leading position was ahead of the runner-up by 0.17, more than the tie margin of 0.05 (a lead of 0.05 or less counts as a tie), but the judges disagreed about it by 0.31, reaching the limit of 0.25. When the judges disagree that much the engine does not call the question settled, so rule 3 applies and the label is Contested."
+    );
+    expect(disagreed.computation.explanation).not.toContain("clearly");
   });
 
   it("words a too-close margin and a weak winner plainly", () => {
     const close = storyFixture("READY");
     close.verdict_basis = { ...close.verdict_basis!, rung: 2, trigger: "MARGIN_WITHIN_GAMMA", winner_strength: 0.62, runner_up_strength: 0.58, margin: 0.04 };
     expect(buildReportModel(STORY_FIXTURE_ANSWER, close, GENERATED).computation.decision)
-      .toBe("winner 0.62, runner-up 0.58, margin 0.04 ≤ 0.05 → Contested");
+      .toBe(nb("winner 0.62, runner-up 0.58, margin 0.04 ≤ 0.05 → Contested"));
     const weak = storyFixture("READY");
     weak.verdict_basis = { ...weak.verdict_basis!, label: "UNSUPPORTED", rung: 1, trigger: "BELOW_LOW_CUT", winner_strength: 0.3 };
     const computed = buildReportModel(STORY_FIXTURE_ANSWER, weak, GENERATED).computation;
-    expect(computed.decision).toBe("winner 0.30 < 0.35 → Unsupported");
+    expect(computed.decision).toBe(nb("winner 0.30 < 0.35 → Unsupported"));
     expect(computed.explanation).toContain("not a disproved one");
   });
 
@@ -240,7 +314,7 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     };
     const single = buildReportModel(STORY_FIXTURE_ANSWER, story, GENERATED);
     expect(single.computation.rules[0]!.applied).toBe(true);
-    expect(single.computation.decision).toBe("Only one position was argued, so there is no margin to measure → Contested");
+    expect(single.computation.decision).toBe(nb("Only one position was argued, so there is no margin to measure → Contested"));
     expect(single.computation.explanation).toContain("Only one position was argued in this debate");
     expect(single.computation.explanation).toContain("cannot call it settled");
     expect(single.computation.numbers[1]).toEqual({ label: "Runner-up", value: "None. Only one position was put forward." });
@@ -248,7 +322,8 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     expect(single.computation.numbers[3]).toEqual({ label: "Judges' disagreement", value: "Not measured. The limit is 0.25." });
     expect(single.computation.marks).toEqual(["Verdict basis incomplete — no rival position or no second judge to compare"]);
     expect(JSON.stringify(single.computation)).not.toMatch(/null|NaN|undefined/);
-    expect(new Map(single.about.rows.map((row) => [row.label, row.value])).get("Label rule")).toBe("Rule 1 (BASIS_INCOMPLETE)");
+    expect(single.computation.marksLine).toBe("Marks: Verdict basis incomplete — no rival position or no second judge to compare");
+    expect(new Map(single.about.rows.map((row) => [row.label, row.value])).get("Label rule")).toBe("Rule 1 of 5, which gives Contested");
   });
 
   it("says plainly when the numbers behind the verdict were not stored", () => {
@@ -257,6 +332,7 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     expect(computed.rules).toEqual([]);
     expect(computed.numbers).toEqual([]);
     expect(computed.decision).toBe("The numbers behind this verdict were not stored with the story.");
+    expect(computed.numbersTitle).toBeNull();
   });
 
   it("describes every point in the appendix, in number order: stance, claim, scores, way of knowing, author, review, set-aside", () => {
@@ -308,11 +384,33 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     expect(rows.get("Shape pack version")).toBe("2026-09-26.1");
     expect(rows.get("Story written")).toBe("2026-09-26 09:31 UTC");
     expect(rows.get("Report generated")).toBe("2026-09-26 12:00 UTC");
-    expect(rows.get("Label rule")).toBe("Rule 5 (MID_BAND)");
+    // Plain words: the rule's number on the computation page and what it gives, never the engine's trigger name.
+    expect(rows.get("Label rule")).toBe("Rule 5 of 5, which gives Contested");
+    expect(model.about.rows.map((row) => row.value).join(" ")).not.toMatch(/MID_BAND|BASIS_INCOMPLETE|_/u);
     // Grouped in eights so the 64 characters wrap at a space instead of running off the page.
     expect(rows.get("Shape pack fingerprint"))
       .toBe("e4a5f9d6 b9cb4e63 10c15b2c c06830fe 09b7b477 239e6e22 29102c40 6f318c32");
     expect(rows.get("Shape pack fingerprint")!.replaceAll(" ", "")).toBe(storyFixture("READY").pack!.fingerprint);
+  });
+
+  it("holds every fixed string the PDF prints, so the view writes none of its own", () => {
+    expect(model.footer).toEqual({ text: "DebateAI · AI-generated report", pageWords: "Page {page} of {pages}" });
+    expect(model.cover.modelsLine).toBe(`Models that took part: ${OPENAI}, ${ANTHROPIC}, ${XAI}`);
+    expect(model.computation.tableHead).toEqual({ rule: "Rule", when: "When", label: "Label" });
+    expect(model.computation.numbersTitle).toBe("This debate's numbers");
+    expect(model.computation.appliedWords).toBe("This debate");
+    expect(model.computation.marksLine).toBeNull();
+    const byNumber = new Map(model.appendix.entries.map((entry) => [entry.number, entry]));
+    expect(byNumber.get("P8")?.setAsideLine).toBe("Set aside: Branch not expanded: it could not move the answer");
+    expect(byNumber.get("P8")?.marksLine).toBeNull();
+    expect(byNumber.get("P1")?.setAsideLine).toBeNull();
+    const marked = storyFixtureNode({
+      id: "n-marked", claim: "Un punct marcat.", way: "REASONING", base: 0.3, final: 0.3,
+      maker: null, review: null, locator: null, marks: ["STALE", "UNDER-REVIEW"]
+    });
+    const unrecorded = buildReportModel({ ...STORY_FIXTURE_ANSWER, nodes: [marked], edges: [] }, storyFixture("READY"), GENERATED);
+    expect(unrecorded.cover.modelsLine).toBe("Models that took part: not recorded");
+    expect(unrecorded.appendix.entries[0]?.marksLine).toBe("Marks: Stale; Under review");
   });
 
   it("keeps the Romanian text intact", () => {
@@ -338,28 +436,93 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
   });
 });
 
+describe("long unbroken words (reportWordPieces, used as the PDF's line-break rule)", () => {
+  const graphemes = (text: string) => [...new Intl.Segmenter("und", { granularity: "grapheme" }).segment(text)].length;
+
+  it("keeps every ordinary word whole, Romanian included", () => {
+    for (const word of ["Chiriile", "încrederea", "două-trei", "0.25\u00A0→\u00A0Contested", "ș".repeat(30)]) {
+      expect(reportWordPieces(word)).toEqual([word]);
+    }
+  });
+
+  it("cuts a 150-character address after / ? & = - _ . and at least every 20 characters, losing nothing", () => {
+    expect(LONG_URL).toHaveLength(150);
+    const pieces = reportWordPieces(LONG_URL);
+    expect(pieces.join("")).toBe(LONG_URL);
+    expect(pieces.length).toBeGreaterThan(7);
+    for (const piece of pieces) expect(graphemes(piece)).toBeLessThanOrEqual(20);
+    expect(pieces.slice(0, 4)).toEqual(["https:/", "/", "www.", "exemplu-"]);
+    // A word with no break character is cut every 20 characters, never inside a letter with its accent.
+    expect(reportWordPieces("ș".repeat(45))).toEqual(["ș".repeat(20), "ș".repeat(20), "ș".repeat(5)]);
+  });
+
+  it("gives a long address in a story paragraph and in an appendix claim its break points", () => {
+    const story = storyFixture("READY");
+    story.story!.long.sections[0]!.paragraphs[0]!.text = `Anunțurile sunt aici: ${LONG_URL} și arată chirii mai mari.`;
+    const answer: Answer = {
+      ...STORY_FIXTURE_ANSWER,
+      nodes: STORY_FIXTURE_ANSWER.nodes.map((node) => node.node_id === "n-yes-rent" ? { ...node, claim: `Vezi ${LONG_URL}` } : node)
+    };
+    const built = buildReportModel(answer, story, GENERATED);
+    const longest = (text: string) => text.split(/\s+/u).reduce((a, b) => (b.length > a.length ? b : a), "");
+    const paragraph = spanText(built.sections[0]!.paragraphs[0]!.spans);
+    const claim = built.appendix.entries.find((entry) => entry.number === "P5")!.claim;
+    for (const text of [paragraph, claim]) {
+      const pieces = reportWordPieces(longest(text));
+      expect(pieces.length).toBeGreaterThan(7);
+      expect(Math.max(...pieces.map(graphemes))).toBeLessThanOrEqual(20);
+    }
+    // The model's text itself is untouched: nothing invisible is added, so a copied address still works.
+    expect(paragraph).toContain(LONG_URL);
+    expect(claim).toBe(`Vezi ${LONG_URL}`);
+  });
+});
+
 describe("the PDF's text styles (apps/ui/lib/report/ReportDocument.tsx)", () => {
   const source = readFileSync(resolve(process.cwd(), "apps/ui/lib/report/ReportDocument.tsx"), "utf8");
-  // One style per line inside StyleSheet.create: "  name: { ... },".
-  const styles = source.split("\n").filter((line) => /^ {2}[A-Za-z]+: \{.*\},?$/u.test(line));
+  const styles = styleEntries(source);
+  const lineHeightWithoutFontSize = (entries: ReadonlyMap<string, string>) =>
+    [...entries].filter(([, body]) => /\blineHeight\s*:/u.test(body) && !/\bfontSize\s*:/u.test(body)).map(([name]) => name);
+
+  it("reads the style object itself, whatever the line layout (control)", () => {
+    const sample = [
+      "const styles = StyleSheet.create({",
+      "  // lineHeight in a comment is not a style",
+      "  one: { fontSize: 9, lineHeight: 1.4 },",
+      "  two: {",
+      "    color: \"#000\",",
+      "    lineHeight: 1.5",
+      "  },",
+      "  three: { label: \"a, b: { c }\" }",
+      "});"
+    ].join("\n");
+    const entries = styleEntries(sample);
+    expect([...entries.keys()]).toEqual(["one", "two", "three"]);
+    expect(lineHeightWithoutFontSize(entries)).toEqual(["two"]);
+  });
 
   it("sets no line height on the page, only on text styles", () => {
     // A Page-level lineHeight next to the page-number footer crashed 4.9.0 past ~15 pages (measured 2026-09-26).
-    const page = styles.filter((line) => line.startsWith("  page: "));
-    expect(page).toHaveLength(1);
-    expect(page[0]).not.toContain("lineHeight");
+    expect(styles.get("page")).toBeDefined();
+    expect(styles.get("page")).not.toMatch(/\blineHeight\s*:/u);
   });
 
   it("gives every style that sets a line height its own font size", () => {
     // react-pdf resolves a unitless lineHeight against the fontSize of the SAME style (18 when absent),
     // so a bare lineHeight of 1.6 spaced 10.5pt body text 29pt apart (measured 2026-09-26).
-    const withLineHeight = styles.filter((line) => line.includes("lineHeight"));
-    expect(withLineHeight.length).toBeGreaterThan(10);
-    expect(withLineHeight.filter((line) => !line.includes("fontSize"))).toEqual([]);
+    expect(styles.size).toBeGreaterThan(40);
+    expect([...styles.values()].filter((body) => /\blineHeight\s*:/u.test(body)).length).toBeGreaterThan(10);
+    expect(lineHeightWithoutFontSize(styles)).toEqual([]);
   });
 
   it("uses the serif family for the fixed headings only", () => {
-    expect(styles.filter((line) => line.includes("REPORT_FONT_SERIF")).map((line) => line.trim().split(":")[0])).toEqual(["heading"]);
+    expect([...styles].filter(([, body]) => body.includes("REPORT_FONT_SERIF")).map(([name]) => name)).toEqual(["heading"]);
     expect(source.match(/style=\{styles\.heading\}/gu)).toHaveLength(1);
+  });
+
+  it("underlines a point number the text names, and keeps each [Pn] citation with the word before it", () => {
+    expect(styles.get("mention")).toMatch(/textDecoration:\s*"underline"/u);
+    // A no-break space before each citation marker, so "[P5]" never starts a line on its own.
+    expect(source).toContain("`\\u00A0[${span.label}]`");
   });
 });

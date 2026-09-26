@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import type { Answer, AnswerStory } from "@debateai/contract";
-import { renderReportPdf, resolveReportFontDirectory } from "../../apps/ui/lib/report/renderReport.js";
+import { renderReportPdf, reportHyphenation, resolveReportFontDirectory } from "../../apps/ui/lib/report/renderReport.js";
 import {
   STORY_FIXTURE_ANSWER,
   storyFixture,
@@ -77,6 +77,8 @@ describe("renderReportPdf (spec §10)", () => {
     // Every link is internal (a named destination in the appendix); no link leaves the file.
     expect(raw).not.toMatch(/\/URI\s*\(/);
     for (let point = 1; point <= 8; point += 1) expect(raw).toContain(`(point-P${point})`);
+    // Only the appendix entries are destinations: nothing without an id adds one.
+    expect(raw).not.toContain("(undefined)");
     // The outline (bookmarks) lists the report's fixed parts.
     expect([...raw.matchAll(/\/Title \(([^)]*)\)/g)].map((match) => match[1])).toEqual([
       "In short", "The full story", "How this verdict was computed", "Appendix: every point", "About this report"
@@ -84,6 +86,28 @@ describe("renderReportPdf (spec §10)", () => {
     const maps = inflatedStreams(pdf);
     // ș ț ă î â are mapped in the embedded fonts' ToUnicode tables: they print and copy as themselves.
     for (const codePoint of ["0219", "021b", "0103", "00ee", "00e2"]) expect(maps).toContain(`<${codePoint}>`);
+  }, 60_000);
+
+  it("breaks a 150-character address in a story paragraph and in an appendix claim instead of running off the page", async () => {
+    const url =
+      "https://www.exemplu-imobiliare.ro/anunturi/inchiriere/cluj-napoca/apartamente-3-camere/zorilor?pret_min=2500&pret_max=4200&sortare=pret&pagina=12&id=9";
+    expect(url).toHaveLength(150);
+    const story = storyFixture("READY_WITH_RESERVATION");
+    story.story!.long.sections[0]!.paragraphs[0]!.text = `Anunțurile sunt aici: ${url} și arată chirii mai mari.`;
+    const answer: Answer = {
+      ...STORY_FIXTURE_ANSWER,
+      nodes: STORY_FIXTURE_ANSWER.nodes.map((node) => node.node_id === "n-yes-rent" ? { ...node, claim: `Vezi ${url}` } : node)
+    };
+    const pdf = await renderReportPdf({ answer, story, generatedAt: new Date("2026-09-26T12:00:00.000Z") });
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.toString("latin1")).not.toContain("(undefined)");
+    // The rule the renderer registers: ordinary words stay whole; the address gets zero-width break
+    // points (empty syllables) between pieces of at most 20 characters, and not one character is added.
+    expect(reportHyphenation("Anunțurile")).toEqual(["Anunțurile"]);
+    const parts = reportHyphenation(url);
+    expect(parts.join("")).toBe(url);
+    expect(parts.filter((part) => part === "").length).toBeGreaterThan(7);
+    expect(Math.max(...parts.map((part) => part.length))).toBeLessThanOrEqual(20);
   }, 60_000);
 
   it("renders a 150-point appendix across many pages", async () => {

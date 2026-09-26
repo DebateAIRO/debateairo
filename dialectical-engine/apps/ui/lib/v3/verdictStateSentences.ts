@@ -19,9 +19,10 @@ export const VERDICT_STATE_SENTENCES: Readonly<Record<LiveVerdictState, string |
  * says it. The story panel always shows a sentence under its label, so it uses
  * this one, in plain words. It is true of the only rung that yields SUPPORTED
  * (packages/serve deriveVerdictLabel rung 3): the winner reached the high cut
- * ("came out strong"), its margin was above the tie margin gamma ("clearly
- * ahead of the other positions"), and the judges' disagreement was below the
- * threshold ("the judges broadly agreed").
+ * ("came out strong"), its margin was above the tie margin gamma ("stayed ahead
+ * of the other positions by more than the tie margin", with the tie margin said
+ * in plain words; a margin just above it is not "clearly" ahead), and the
+ * judges' disagreement was below the threshold ("the judges broadly agreed").
  */
 export const STORY_SUPPORTED_SENTENCE =
-  "The leading position came out strong, stayed clearly ahead of the other positions, and the judges broadly agreed.";
+  "The leading position came out strong, stayed ahead of the other positions by more than the tie margin (a smaller lead counts as a tie), and the judges broadly agreed.";
