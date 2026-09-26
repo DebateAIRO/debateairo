@@ -138,6 +138,8 @@ async function sealFor(runId: string, storyId: string, mark: string): Promise<{
 /**
  * A direct INSERT that bypasses the repository and its content lease, so the
  * row meets serve.answer_story's triggers with exactly the carrier columns given.
+ * Its default outcome is READY_WITH_RESERVATION, the outcome `storyContent`'s
+ * payload (a body AND a reservation) belongs to.
  */
 function insertRawStory(row: {
   readonly storyId: string;
@@ -146,6 +148,8 @@ function insertRawStory(row: {
   readonly content: unknown;
   readonly envelope: unknown;
   readonly attestation: Buffer | null;
+  readonly outcome?: string;
+  readonly failureCode?: string | null;
 }) {
   return database.pool.query(
     `INSERT INTO serve.answer_story (
@@ -153,11 +157,12 @@ function insertRawStory(row: {
        pack_version, pack_fingerprint, storyteller_lineage, checker_lineage, rounds,
        artifact_refs, content, content_ciphertext, content_attestation
      ) VALUES (
-       $1,$2,$3,1,'READY',NULL,'general','2026-09-26.1',$4,NULL,NULL,1,'[]'::jsonb,$5::jsonb,$6::jsonb,$7
+       $1,$2,$3,1,$8,$9,'general','2026-09-26.1',$4,NULL,NULL,1,'[]'::jsonb,$5::jsonb,$6::jsonb,$7
      )`,
     [
       row.storyId, row.runId, row.answerId, "f".repeat(64), JSON.stringify(row.content),
-      row.envelope === null ? null : JSON.stringify(row.envelope), row.attestation
+      row.envelope === null ? null : JSON.stringify(row.envelope), row.attestation,
+      row.outcome ?? "READY_WITH_RESERVATION", row.failureCode ?? null
     ]
   );
 }
@@ -314,16 +319,29 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       .rejects.toThrowError(/ANSWER_STORY_RUN_MISMATCH/u);
   });
 
-  it("refuses an incoherent outcome", async () => {
+  it("refuses an incoherent outcome: typed in the repository, and by the table's own CHECK", async () => {
     const mark = marker();
     const runId = await createLegacyStoryRun(database.pool, `story incoherent ${mark}`, `asker:${mark}`);
     const answerId = await answerFor(runId, mark);
     const repository = new StoryRepository(database.pool);
+    const refused = { name: "TypedDomainError", code: "STORY_RECORD_INVALID" };
+    // The repository refuses both before anything is sealed or sent.
     await expect(repository.insert({ ...readyRecord(runId, answerId, mark), failureCode: "STORY_WRITE_REJECTED" }))
-      .rejects.toThrowError(/answer_story_outcome_is_coherent/u);
+      .rejects.toMatchObject(refused);
     await expect(repository.insert({
-      ...readyRecord(runId, answerId, mark), outcome: "FAILED", failureCode: null
+      ...readyRecord(runId, answerId, mark), outcome: "FAILED", failureCode: null, body: null, reservation: null
+    })).rejects.toMatchObject(refused);
+    expect(await storyCount(answerId)).toBe("0");
+    // A writer that skips the repository still meets the table's CHECK.
+    await expect(insertRawStory({
+      storyId: randomUUID(), runId, answerId, content: storyContent(mark), envelope: null, attestation: null,
+      failureCode: "STORY_WRITE_REJECTED"
     })).rejects.toThrowError(/answer_story_outcome_is_coherent/u);
+    await expect(insertRawStory({
+      storyId: randomUUID(), runId, answerId, content: storyContent(mark), envelope: null, attestation: null,
+      outcome: "FAILED", failureCode: null
+    })).rejects.toThrowError(/answer_story_outcome_is_coherent/u);
+    expect(await storyCount(answerId)).toBe("0");
   });
 
   it("refuses a malformed record BEFORE sealing it: a typed STORY_RECORD_INVALID, and no row", async () => {
@@ -341,9 +359,41 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       ...readyRecord(runId, answerId, mark),
       body: { ...bodyWith(mark), shape_id: "Not A Shape" } as StoryBody
     })).rejects.toMatchObject(refused);
+    // The outcome invariants. READY_WITH_RESERVATION needs a non-empty reservation…
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), reservation: null }))
+      .rejects.toMatchObject(refused);
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), reservation: "   " }))
+      .rejects.toMatchObject(refused);
+    // …READY carries a body and no reservation…
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), outcome: "READY" }))
+      .rejects.toMatchObject(refused);
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), outcome: "READY", body: null, reservation: null }))
+      .rejects.toMatchObject(refused);
+    // …and FAILED carries neither a body nor a reservation.
+    await expect(repository.insert({
+      ...readyRecord(runId, answerId, mark), outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", reservation: null
+    })).rejects.toMatchObject(refused);
+    await expect(repository.insert({
+      ...readyRecord(runId, answerId, mark), outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", body: null
+    })).rejects.toMatchObject(refused);
     expect(await storyCount(answerId)).toBe("0");
     // Positive control: the same answer takes a well-formed story.
     await expect(repository.insert(readyRecord(runId, answerId, mark))).resolves.toBe("INSERTED");
+  });
+
+  it("reads a stored row that breaks the outcome invariants as STORY_ROW_INVALID", async () => {
+    const mark = marker();
+    const askerId = `asker:${mark}`;
+    const runId = await createLegacyStoryRun(database.pool, `story row invariants ${mark}`, askerId);
+    const answerId = await answerFor(runId, mark);
+    // Written past the repository: a READY row whose content carries a reservation.
+    await insertRawStory({
+      storyId: randomUUID(), runId, answerId, content: storyContent(mark), envelope: null, attestation: null,
+      outcome: "READY"
+    });
+    await expect(new StoryRepository(database.pool).readForAnswer({
+      answerId, answerVersion: null, ownership: { legacyAskerId: askerId }
+    })).rejects.toMatchObject({ name: "TypedDomainError", code: "STORY_ROW_INVALID" });
   });
 
   it("the attestation guard binds an envelope to its own story row: forged or copied, it is CONTENT_ATTESTATION_INVALID", async () => {

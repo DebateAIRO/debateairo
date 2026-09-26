@@ -100,6 +100,41 @@ function storyRowInvalid(detail: string): TypedDomainError {
   return new TypedDomainError("STORY_ROW_INVALID", `The stored story does not match its declared shape: ${detail}`);
 }
 
+/**
+ * THE OUTCOME INVARIANTS (controller ruling, 2026-09-26): what each outcome
+ * carries. READY: a body and no reservation. READY_WITH_RESERVATION: a body and
+ * a non-empty reservation. FAILED: no body, no reservation, and a failure code.
+ * Only FAILED carries a failure code. The body and reservation are sealed, so
+ * the table's CHECK cannot see them: the repository holds this rule on the way
+ * in and on the way out. Returns the broken rule, or null.
+ */
+function outcomeViolation(
+  outcome: string,
+  failureCode: string | null,
+  body: StoryBody | null,
+  reservation: string | null
+): string | null {
+  switch (outcome) {
+    case "READY":
+      if (body === null) return "READY needs a body";
+      if (reservation !== null) return "READY carries no reservation";
+      break;
+    case "READY_WITH_RESERVATION":
+      if (body === null) return "READY_WITH_RESERVATION needs a body";
+      if (reservation === null || reservation.trim() === "") {
+        return "READY_WITH_RESERVATION needs a non-empty reservation";
+      }
+      break;
+    case "FAILED":
+      if (body !== null) return "FAILED carries no body";
+      if (reservation !== null) return "FAILED carries no reservation";
+      return failureCode === null ? "FAILED needs a failure code" : null;
+    default:
+      return "outcome";
+  }
+  return failureCode === null ? null : `${outcome} carries no failure code`;
+}
+
 function lineageOf(value: unknown, column: string): MakerLineage | null {
   if (value === null) return null;
   const parsed = MakerLineageSchema.safeParse(value);
@@ -133,6 +168,13 @@ export class StoryRepository {
       );
     }
     const content: StoredStoryContent = parsed.data;
+    const violation = outcomeViolation(record.outcome, record.failureCode, content.body, content.reservation);
+    if (violation !== null) {
+      throw new TypedDomainError(
+        "STORY_RECORD_INVALID",
+        `The story record breaks its outcome's invariants: ${violation}`
+      );
+    }
     try {
       return await withRunContentLease(this.pool, [record.runId], async () => {
         const sealed = await encryptAttestedContentForRun(
@@ -224,6 +266,10 @@ export class StoryRepository {
         if (!content.success) throw storyRowInvalid("content");
         const outcome = StoryOutcomeSchema.safeParse(row.outcome);
         if (!outcome.success) throw storyRowInvalid("outcome");
+        const violation = outcomeViolation(
+          outcome.data, row.failure_code, content.data.body, content.data.reservation
+        );
+        if (violation !== null) throw storyRowInvalid(violation);
         const artifactRefs = z.array(z.string()).safeParse(row.artifact_refs);
         if (!artifactRefs.success) throw storyRowInvalid("artifact_refs");
         const stored: StoredStory = {
