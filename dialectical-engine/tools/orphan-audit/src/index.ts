@@ -13,6 +13,9 @@ const rows: readonly Row[] = [
   ["propagation", "packages/propagation", ["kernel", "published-arithmetic"]],
   ["battery-decision", "packages/battery/decision", ["kernel"]],
   ["contract", "packages/contract", ["kernel"]],
+  // Model-scorecard design (2026-09-26): the scorecard format, its parser and the pure
+  // per-role picker. Kernel only, so register, api and runner can all import it.
+  ["scorecard", "packages/scorecard", ["kernel"]],
   ["db", "packages/db", ["kernel", "crypto"]],
   ["register", "packages/register", ["kernel", "db", "contract"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
