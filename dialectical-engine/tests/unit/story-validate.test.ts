@@ -320,12 +320,25 @@ describe("verdict story — the story classifier", () => {
       ["a longer decimal that only starts like a score", "Inflation ran at 0.643 last quarter."],
       ["a number the material does not hold", "The tram runs every 0.25 hours at peak."],
       ["a threshold's inexact one-decimal form", "Roughly 0,3 of the budget is fixed."],
-      ["a range that only looks like one, the point read literally", "Children aged 0-7 ride free, and 0 64 is a bus line."]
+      ["a range that only looks like one, the point read literally", "Children aged 0-7 ride free, and 0 64 is a bus line."],
+      // A percentage is the debate's own figure, even when its digits match a
+      // threshold: an interest rate of 0,35% a month, a fee of 0.64 %.
+      ["a small percentage that shares a threshold's digits", "The loan costs 0,35% a month, and the fee is 0.64 % of the sum."]
     ])("accepts %s", (_name, text) => {
       const body = story();
       body.long.sections[2]!.paragraphs[0]!.text = text;
       body.short.summary = text;
       expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    });
+
+    it("still refuses a score followed by other punctuation, or by a percent sign further on", () => {
+      for (const text of ["It led at 0,64, clearly.", "It led (0.64).", "0,64 of the way; 5% more needed."]) {
+        const body = story();
+        body.short.summary = text;
+        const result = classifyStoryContent(JSON.stringify(body), INDEX);
+        expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "short.summary" });
+        expect(result.parseError).toContain("STORY_TEXT_SCORE_VALUE");
+      }
     });
 
     it("accepts every text when the material holds no score at all", () => {

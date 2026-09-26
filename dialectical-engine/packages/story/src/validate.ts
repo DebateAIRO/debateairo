@@ -38,7 +38,8 @@ export interface StoryMaterialIndex {
    * Every score and threshold of the material as a story might print it: two
    * decimals with "." and with "," (0.64, 0,64), and a threshold's one-decimal
    * form when that form is exact (0.7, 0,7). A text holding one as a whole
-   * token (no digit on either side) is refused, STORY_TEXT_SCORE_VALUE.
+   * token (no digit on either side, and no percent sign after it) is refused,
+   * STORY_TEXT_SCORE_VALUE.
    */
   readonly scoreTexts: ReadonlySet<string>;
 }
@@ -65,7 +66,10 @@ const STORY_SCORE_TEXT = /^[0-9]+[.,][0-9]+$/u;
 /**
  * One pattern for all the material's score texts, each standing as a whole
  * token: no digit, in any script, right before or right after it. "10,640 lei"
- * therefore never matches 0,64, and "35%" never matches 0.35. Null when the
+ * therefore never matches 0,64, and "35%" never matches 0.35. A percentage is
+ * the debate's own figure, never a score (scores are not percentages), so a
+ * match followed by a percent sign, with or without a space, is not refused:
+ * "0,35% a month" is an interest rate, whatever the low cut is. Null when the
  * material holds no score at all.
  */
 function storyScorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
@@ -76,7 +80,7 @@ function storyScorePattern(scoreTexts: ReadonlySet<string>): RegExp | null {
   const alternatives = [...scoreTexts]
     .sort((left, right) => right.length - left.length || (left < right ? -1 : left > right ? 1 : 0))
     .map((text) => text.replace(".", "\\."));
-  return new RegExp(`(?<!\\p{Nd})(?:${alternatives.join("|")})(?!\\p{Nd})`, "u");
+  return new RegExp(`(?<!\\p{Nd})(?:${alternatives.join("|")})(?!\\p{Nd})(?![\\p{Zs}]?%)`, "u");
 }
 
 export const StoryCheckerVerdictSchema = z.object({
