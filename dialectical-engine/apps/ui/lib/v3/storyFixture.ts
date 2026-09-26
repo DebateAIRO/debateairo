@@ -269,12 +269,12 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
   shape_id: "personal-choice",
   short: {
     headline: "Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.",
-    summary: "Ne-ați întrebat dacă merită să vă mutați cu familia din București la Cluj pentru un salariu mai mare. Merită, dar în doi pași: începeți noul job lucrând parțial de acasă, iar familia vi se alătură după ce copiii termină anul școlar. Mutarea imediată ar fi aproape la fel de bună, fiindcă oferta este cu aproximativ 35% mai mare, după impozite, dar chiriile din Cluj îi taie din avantaj, iar copiii ar schimba școala în mijlocul anului.",
+    summary: "Ne-ați întrebat dacă merită să vă mutați cu familia din București la Cluj pentru un salariu mai mare. Merită, dar în doi pași: începeți noul job lucrând parțial de acasă, iar familia vi se alătură după ce copiii termină anul școlar. Mutarea imediată ar fi aproape la fel de bună: aduce același câștig de salariu, de aproximativ 35% după impozite, dar chiriile din Cluj îi taie din avantaj, iar copiii ar schimba școala în mijlocul anului.",
     confidence: "Cât de siguri suntem: destul de siguri, dar totul depinde de un lucru pe care nu îl știm încă: dacă angajatorul acceptă lucrul hibrid.",
     paths: [
       {
         position_ref: "n-hybrid", fate: "PARTLY_HELD",
-        line: "Mutare treptată, cu lucru hibrid: cea mai bună variantă, dacă angajatorul o acceptă, pentru că vă aduce salariul mai mare fără să-i scoată pe copii din școală la jumătatea anului.",
+        line: "Mutare treptată, cu lucru hibrid: cea mai bună variantă, dacă angajatorul acceptă lucrul hibrid, pentru că vă aduce salariul mai mare fără să-i scoată pe copii din școală la jumătatea anului.",
         node_refs: ["n-hybrid", "n-hybrid-school"]
       },
       {
@@ -289,14 +289,14 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
       }
     ],
     change: {
-      text: "Răspunsul s-ar schimba dacă angajatorul refuză lucrul hibrid. Iar dacă găsiți în Cluj o locuință la un preț apropiat de cel de acum, mutarea imediată devine la fel de bună.",
+      text: "Răspunsul s-ar schimba dacă angajatorul ar refuza lucrul hibrid. Iar dacă găsiți în Cluj o locuință la un preț apropiat de cel de acum, mutarea imediată devine la fel de bună.",
       node_refs: ["n-hybrid", "n-yes-rent"]
     }
   },
   why: {
     reasons: [
       {
-        text: "Câștigul de salariu este real și verificat: oferta este cu aproximativ 35% mai mare decât salariul de acum, după impozite. El vine în fiecare lună, pe când mutarea se plătește o singură dată, așa că nu are rost să renunțați la el.",
+        text: "Câștigul de salariu este real și verificat: oferta este cu aproximativ 35% mai mare decât salariul de acum, după impozite. Vine în fiecare lună, pe când mutarea se plătește o singură dată, așa că nu are rost să renunțați la el.",
         node_refs: ["n-yes-pay", "n-not-now-once"]
       },
       {
@@ -304,7 +304,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
         node_refs: ["n-hybrid", "n-hybrid-school"]
       },
       {
-        text: "Chiriile pentru trei camere sunt în Cluj cu circa 30% mai mari decât în cartierul de acum. De aceea mutarea imediată aduce mai puțin decât pare: are argumente bune și este aproape la fel de bună, dar nu mai bună.",
+        text: "În Cluj, chiriile pentru trei camere sunt cu circa 30% mai mari decât în cartierul de acum. De aceea mutarea imediată aduce mai puțin decât pare: are argumente bune și este aproape la fel de bună.",
         node_refs: ["n-yes", "n-yes-rent"]
       }
     ]
@@ -321,7 +321,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
       {
         title: "Răspunsul nostru pe scurt",
         paragraphs: [{
-          text: "Vă recomandăm să vă mutați în doi pași. Câștigul de salariu îl aveți de la prima lună, lucrând parțial de acasă, iar familia se mută abia când se încheie anul școlar, așa că nimeni nu trebuie să schimbe totul deodată. Alegerea e strânsă, pentru că și mutarea imediată are argumente bune.",
+          text: "Vă recomandăm să vă mutați în doi pași. Câștigul de salariu îl aveți de la prima lună, lucrând parțial de acasă, iar familia se mută abia când se încheie anul școlar, așa că nimeni nu trebuie să schimbe totul deodată. Mutarea imediată nu rămâne mult în urmă.",
           node_refs: ["n-hybrid", "n-yes"]
         }]
       },
@@ -341,7 +341,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
             node_refs: ["n-not-now", "n-not-now-once"]
           },
           {
-            text: "Am lăsat deoparte o singură obiecție: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Se baza pe o sursă slabă și, chiar luată în serios, nu ar fi schimbat răspunsul, așa că dezbaterea nu a mai urmărit-o. Asta nu înseamnă că obiecția e greșită; răspunsul angajatorului o lămurește.",
+            text: "Am lăsat deoparte o singură obiecție: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Se baza pe o sursă slabă, iar răspunsul nostru ține deja cont de această întrebare: depinde oricum de acceptul angajatorului. Asta nu înseamnă că obiecția e greșită; răspunsul angajatorului o lămurește.",
             node_refs: ["n-hybrid-forum"]
           }
         ]
@@ -361,7 +361,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
             node_refs: ["n-hybrid-school"]
           },
           {
-            text: "Cele mai multe argumente de aici sunt raționamente, nu date verificate. Doar două lucruri au fost verificate în surse: oferta de salariu și nivelul chiriilor. De aceea ne-am baza pe răspuns abia după ce aflați dacă angajatorul acceptă lucrul hibrid.",
+            text: "Cele mai multe argumente de aici sunt raționamente, nu date verificate. Doar două lucruri au fost verificate în surse: oferta de salariu și nivelul chiriilor. Ne-am baza pe răspuns abia după ce aflați dacă angajatorul acceptă lucrul hibrid.",
             node_refs: ["n-yes-pay", "n-yes-rent"]
           }
         ]

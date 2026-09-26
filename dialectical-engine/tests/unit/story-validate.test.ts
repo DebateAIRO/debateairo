@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { STORY_BODY_LIMITS, type StoryBody } from "@debateai/contract";
 import { schemaFailureLocator, type ContentClassification } from "@debateai/providers";
 import {
+  STORY_ENGINE_TOKENS,
   classifyCheckerContent,
   classifyStoryContent,
   parseCheckerVerdict,
@@ -353,6 +354,69 @@ describe("verdict story — the story classifier", () => {
         expect(() => classifyStoryContent(content, { ...INDEX, scoreTexts: new Set(["0.64", bad]) }))
           .toThrowError(expect.objectContaining({ code: "STORY_SCORE_TEXTS_INVALID" }));
       }
+    });
+  });
+
+  describe("no code token of the material in any text (fix round 2: STORY_TEXT_ENGINE_TOKEN)", () => {
+    it("holds the labels, the fates, the ways of knowing and the material's underscore keys", () => {
+      for (const token of [
+        "SUPPORTED", "CONTESTED", "UNSUPPORTED", "HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE",
+        "LOOKED_UP", "RAN", "REASONING",
+        "known_by", "rule_in_words", "confidence_band", "judge_spread", "high_cut", "low_cut", "tie_margin"
+      ]) {
+        expect([token, STORY_ENGINE_TOKENS.includes(token)]).toEqual([token, true]);
+      }
+      // Only code's shapes: all capitals and underscores, or a key with an underscore.
+      for (const token of STORY_ENGINE_TOKENS) expect(token).toMatch(/^(?:[A-Z_]+|[a-z]+(?:_[a-z]+)+)$/u);
+    });
+
+    it.each([
+      ["a label in the headline", (body: StoryBody): void => { body.short.headline = "Fund it: SUPPORTED."; }, "short.headline"],
+      ["a fate in a path line", (body: StoryBody): void => { body.short.paths[0]!.line = "Funding HELD_UP under scrutiny."; }, "short.paths.0.line"],
+      ["a way of knowing in a paragraph", (body: StoryBody): void => {
+        body.long.sections[2]!.paragraphs[0]!.text = "The savings point is REASONING only.";
+      }, "long.sections.2.paragraphs.0.text"],
+      ["RAN as a whole capital token in the summary", (body: StoryBody): void => {
+        body.short.summary = "The fare model was RAN, so it is a finding.";
+      }, "short.summary"],
+      ["a material key in a reason", (body: StoryBody): void => { body.why.reasons[0]!.text = "Its known_by was a source."; }, "why.reasons.0.text"],
+      ["a material key in the change text", (body: StoryBody): void => {
+        body.short.change.text = "See rule_in_words for what would change it.";
+      }, "short.change.text"],
+      ["a material key in the confidence sentence", (body: StoryBody): void => {
+        body.short.confidence = "Fairly sure: the confidence_band is FULL.";
+      }, "short.confidence"],
+      ["a threshold key in a section title", (body: StoryBody): void => { body.long.sections[1]!.title = "Inside the tie_margin"; }, "long.sections.1.title"],
+      ["a label in the reviewer's note", (body: StoryBody): void => {
+        body.reviewer_note = paragraph("A CONTESTED label hides how close it was.", ["P3"]);
+      }, "reviewer_note.text"]
+    ])("refuses %s, at its own path, without echoing the text", (_name, mutate, path) => {
+      const body = story();
+      mutate(body);
+      const result = classifyStoryContent(JSON.stringify(body), INDEX);
+      expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path });
+      expect(result.parseError).toContain("STORY_TEXT_ENGINE_TOKEN");
+      expect(result.parseError).not.toMatch(/Fund it|scrutiny|savings|fare model|what would|Fairly sure|Inside|hides/u);
+    });
+
+    it.each([
+      ["the same words in ordinary case", "The plan ran well, fell short once, is supported by the figures and was contested by the council."],
+      ["a capitalised first word", "Supported by the council, the plan went ahead. Reasoning alone cannot settle it."],
+      ["longer words that start like a token", "RANDOM checks and FELLOWS agreed; the UNSUPPORTEDLY loud claim fell."],
+      ["longer words that end like a token", "The project OVERRAN, and MISREASONING, not the budget, was to blame."],
+      ["the key's words written apart", "Known by a source, set aside for now, the tie margin of the vote was small."],
+      ["a token glued to a letter or digit", "The HELD_UPx code and REASONING2 are not tokens here."]
+    ])("accepts %s", (_name, text) => {
+      const body = story();
+      body.short.summary = text;
+      body.long.sections[2]!.paragraphs[0]!.text = text;
+      expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    });
+
+    it("never refuses the story's own fate codes, which are data, not text", () => {
+      const body = story();
+      body.short.paths[0]!.fate = "SET_ASIDE";
+      expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
     });
   });
 

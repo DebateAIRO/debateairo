@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { StoryBodySchema, StoryFateSchema } from "@debateai/contract";
+import { StoryBodySchema, StoryFateSchema, StoryVerdictBasisSchema, WayOfKnowingSchema } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   STORY_PACK_LIMITS,
@@ -267,6 +267,45 @@ describe("verdict story — the shipped pack", () => {
     expect(pack.checker).toContain("candidate_story");
   });
 
+  /**
+   * THE OWNERS' RULES FOR THE SHIPPED PACK (spec §14.1, the owners' look gate):
+   * the story talks to the person, never about the engine. This test holds the
+   * shipped pack to that rule, and the lists below ARE the owners' reading of
+   * it: named constants the owners amend when they change the rule, never
+   * code's. Only engine-only phrases are listed: a bare judge, margin, band,
+   * threshold, score, leverage or hinge has a real meaning in a legal or money
+   * question, and stays allowed.
+   */
+  it("the owners' rules for the shipped pack", () => {
+    const owners = (rule: string, detail: string): string =>
+      `Owners' rule (spec §14.1) broken: ${rule}: ${detail}. The list this checks belongs to the owners; amend it in tests/unit/story-pack.test.ts when the rule changes.`;
+    const codeTokens = [...StoryVerdictBasisSchema.shape.label.options, ...StoryFateSchema.options, ...WayOfKnowingSchema.options];
+    for (const shape of pack.shapes) {
+      for (const title of shape.sections) {
+        for (const token of codeTokens) {
+          expect(new RegExp(`(?<![\\p{L}_])${token}(?![\\p{L}_])`, "u").test(title), owners(
+            "a section title names none of the material's codes", `${shape.id} "${title}" names ${token}`
+          )).toBe(false);
+        }
+        for (const word of OWNERS_TITLE_WORDS_BANNED) {
+          expect(new RegExp(`\\b${word}\\b`, "iu").test(title), owners(
+            "a section title names none of the engine's words", `${shape.id} "${title}" names "${word}"`
+          )).toBe(false);
+        }
+      }
+      for (const phrase of OWNERS_GUIDANCE_PHRASES_BANNED) {
+        expect(phrase.test(shape.guidance), owners(
+          "shape guidance steers toward none of the engine-only phrases", `${shape.id} matches ${String(phrase)}`
+        )).toBe(false);
+      }
+    }
+    for (const [id, note] of Object.entries(OWNERS_ADVICE_NOTES)) {
+      expect(note.test(pack.shapes.find((shape) => shape.id === id)?.guidance ?? ""), owners(
+        "the health, money and legal shapes each say plainly that the story is not professional advice", `${id} lacks ${String(note)}`
+      )).toBe(true);
+    }
+  });
+
   it("keeps each file under the 24 KB file limit and the whole instruction under 48 KB (controller ruling, R1 fix round 1)", () => {
     expect(STORY_PACK_LIMITS.maxFileBytes).toBe(24 * 1024);
     expect(STORY_PACK_LIMITS.maxInstructionBytes).toBe(48 * 1024);
@@ -274,6 +313,20 @@ describe("verdict story — the shipped pack", () => {
       expect(readFileSync(join(SHIPPED_DIR, file)).byteLength).toBeLessThanOrEqual(STORY_PACK_LIMITS.maxFileBytes);
     }
   });
+});
+
+/** The owners' rule (spec §14.1): words a section title never uses. The owners amend this list. */
+const OWNERS_TITLE_WORDS_BANNED: readonly string[] = Object.freeze(["verdict", "score", "judge", "evaluator"]);
+/** The owners' rule (spec §14.1): engine-only phrases shape guidance never uses. The owners amend this list. */
+const OWNERS_GUIDANCE_PHRASES_BANNED: readonly RegExp[] = Object.freeze([
+  /how it (scored|finished)/iu, /runner-up/iu, /high cut/iu, /low cut/iu, /evaluator/iu, /checker/iu,
+  /reviewers?/iu, /\brung\b/iu, /the engine/iu, /assessments were (most )?divided/iu, /judges (disagreed|were divided)/iu
+]);
+/** The owners' rule: these shapes each carry a plain not-professional-advice note. The owners amend this list. */
+const OWNERS_ADVICE_NOTES: Readonly<Record<string, RegExp>> = Object.freeze({
+  health: /\bnot medical advice\b/iu,
+  "money-decision": /\bnot financial\b[^.]*\badvice\b/iu,
+  legal: /\bnot legal advice\b/iu
 });
 
 function built(result: StoryMaterialResult): Extract<StoryMaterialResult, { kind: "OK" }> {

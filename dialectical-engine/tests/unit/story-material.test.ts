@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { STORY_BODY_LIMITS, type StoryBody, type StoryVerdictBasis } from "@debateai/contract";
 import { assertFramedPrompt, buildFramedPrompt, type FramedMaterialField } from "@debateai/providers";
 import {
+  STORY_ENGINE_TOKENS,
   buildStoryMaterial,
   classifyStoryContent,
   pointNumbersFrom,
@@ -466,10 +467,11 @@ describe("verdict story — the score values a story may never print", () => {
 
   describe("the person's own figures are never refused (I-1)", () => {
     // The high cut is 0.7, so 0.70 and 0,70 are score texts, until the debate itself talks about 0,70 lei/kWh.
+    // The claim goes onto point:c of the overrides' own nodes when they bring any (fix round 2, N-1).
     const priced = (claim: string, overrides: Partial<StoryRunSnapshot> = {}): BuiltMaterial => built(buildStoryMaterial({
       snapshot: snapshot({
         ...overrides,
-        nodes: snapshot().nodes.map((entry) => entry.nodeId === "point:c" ? { ...entry, claim } : entry)
+        nodes: (overrides.nodes ?? snapshot().nodes).map((entry) => entry.nodeId === "point:c" ? { ...entry, claim } : entry)
       }),
       enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES
     }));
@@ -506,17 +508,31 @@ describe("verdict story — the score values a story may never print", () => {
       }
     });
 
+    const LOW_SCORE_REASON = "HIDDEN-LOW-SCORE: Recorded strength 0.45 is at or below the ruled hidden-node threshold";
+
     it("does not count a whole-token lookalike, a percentage, or the engine's own texts as the person's figure", () => {
       // A longer number, a percentage (already never refused), the served statement
-      // (written from a digest that carries the scores) and a set-aside reason (code's
-      // words, which can quote a score: "Recorded strength 0.45 ...") exempt nothing.
+      // (written from a digest that carries the scores), a point's exclusion reason and
+      // a set-aside branch's reason (code's words, which can quote a score) exempt nothing.
       const own = priced("It costs 10,70 lei, or 0,705 of the budget, and 0,70% a year.", {
         servedStatement: ["The leading answer scored 0.45 and 0,70."],
-        nodes: snapshot().nodes.map((entry) => entry.nodeId === "point:e"
-          ? { ...entry, excludedReason: "HIDDEN-LOW-SCORE: Recorded strength 0.45 is at or below the ruled hidden-node threshold" }
-          : entry.nodeId === "point:c" ? { ...entry, claim: "It costs 10,70 lei, or 0,705 of the budget, and 0,70% a year." } : entry)
+        nodes: snapshot().nodes.map((entry) => entry.nodeId === "point:e" ? { ...entry, excludedReason: LOW_SCORE_REASON } : entry),
+        setAside: [{ nodeId: "point:e", reason: "Frozen at 0,45, below the branch-freeze threshold of 0.70." }]
       });
+      // The engine's texts really reach the material, so the check below is not vacuous.
+      expect(pointFor(own, "point:e").set_aside).toBe(LOW_SCORE_REASON);
+      expect(own.material.setAside).toEqual([{ id: refFor(own, "point:e"), reason: "Frozen at 0,45, below the branch-freeze threshold of 0.70." }]);
+      expect(own.material.servedStatement).toEqual(["The leading answer scored 0.45 and 0,70."]);
+      expect(pointFor(own, "point:c").claim).toBe("It costs 10,70 lei, or 0,705 of the budget, and 0,70% a year.");
       for (const kept of ["0,70", "0.70", "0.45", "0,45"]) expect(own.index.scoreTexts.has(kept)).toBe(true);
+    });
+
+    it("positive control: the same engine text inside a claim does free the figure", () => {
+      const own = priced(LOW_SCORE_REASON);
+      expect(pointFor(own, "point:c").claim).toBe(LOW_SCORE_REASON);
+      expect(own.index.scoreTexts.has("0.45")).toBe(false);
+      expect(own.index.scoreTexts.has("0,45")).toBe(false);
+      expect(own.index.scoreTexts.has("0.61")).toBe(true);
     });
   });
 
@@ -529,6 +545,30 @@ describe("verdict story — the score values a story may never print", () => {
     expect(half.index.scoreTexts.has("0.58")).toBe(true);
     expect(half.index.scoreTexts.has("0,58")).toBe(true);
     expect(half.index.scoreTexts.has("0.57")).toBe(false);
+  });
+
+  it("names in STORY_ENGINE_TOKENS every underscore key and field the material really carries (fix round 2)", () => {
+    // Derived, not listed: walk a material with every optional key present, and
+    // the last ladder step's (it adds omitted counts), plus the prior objection.
+    const seen = new Set<string>();
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) { value.forEach(walk); return; }
+      if (typeof value !== "object" || value === null) return;
+      for (const [key, inner] of Object.entries(value)) { seen.add(key); walk(inner); }
+    };
+    const shrunk = atLastStep((budgetBytes) => buildStoryMaterial({ snapshot: snapshot(), enrichment: ENRICHMENT, budgetBytes, shapeIds: SHAPES }));
+    for (const material of [result.material, shrunk.material]) {
+      for (const field of toStoryPromptMaterial(material, "An objection.")) {
+        seen.add(field.name);
+        walk(JSON.parse(field.content) as unknown);
+      }
+    }
+    const underscored = [...seen].filter((key) => key.includes("_")).sort();
+    expect(underscored).toEqual(expect.arrayContaining([
+      "best_case", "confidence_band", "high_cut", "judge_spread", "known_by", "low_cut", "position_ref",
+      "prior_objection", "review_reasons", "rule_in_words", "served_statement", "set_aside", "tie_margin"
+    ]));
+    expect(underscored.filter((key) => !STORY_ENGINE_TOKENS.includes(key))).toEqual([]);
   });
 
   it("refuses, through the classifier, a story that prints one of them", () => {

@@ -151,6 +151,43 @@ export interface StoryMaterial {
   readonly bytes: number;
 }
 
+/**
+ * Every key the material's JSON can carry, object by object, and every field
+ * name the models read. Each list is typed against its interface, so a key
+ * added there (or dropped) fails to compile until it is listed here, and a test
+ * walks a real material to prove the lists cover what the models see. The
+ * story checks refuse the underscore keys as words of a story
+ * (validate.ts, STORY_TEXT_ENGINE_TOKEN).
+ */
+type StoryKeyList<T> = { readonly [K in keyof Required<T>]: true };
+const STORY_POINT_KEYS: StoryKeyList<StoryMaterialPoint> = {
+  id: true, position: true, supports: true, attacks: true, claim: true, known_by: true, base: true, final: true,
+  set_aside: true, best_case: true, objection: true, review: true, review_reasons: true, author: true,
+  judge_spread: true, leverage: true
+};
+const STORY_POSITION_KEYS: StoryKeyList<StoryMaterialPosition> = { id: true, claim: true, author: true, final: true, won: true };
+const STORY_VERDICT_KEYS: StoryKeyList<StoryMaterialVerdict> = {
+  label: true, rule_in_words: true, rung: true, trigger: true, winner_id: true, winner_final: true, runner_up_id: true,
+  runner_up_final: true, margin: true, disagreement: true, thresholds: true, confidence_band: true, marks: true,
+  positions_argued: true
+};
+const STORY_THRESHOLD_KEYS: StoryKeyList<StoryMaterialVerdict["thresholds"]> = {
+  tie_margin: true, low_cut: true, high_cut: true, disagreement: true
+};
+const STORY_OMITTED_KEYS: StoryKeyList<StoryMaterialOmitted> = { position_ref: true, supports: true, attacks: true };
+const STORY_SET_ASIDE_KEYS: StoryKeyList<StoryMaterial["setAside"][number]> = { id: true, reason: true };
+/** The fenced field names (`storyCoreFields`, plus the second draft's `prior_objection`). */
+const STORY_MATERIAL_FIELD_NAMES = Object.freeze([
+  "question", "verdict", "served_statement", "positions", "points", "hinges", "set_aside", "omitted", "prior_objection"
+]);
+
+/** Every key and field name of the material, each once. */
+export const STORY_MATERIAL_KEYS: readonly string[] = Object.freeze([...new Set([
+  ...Object.keys(STORY_POINT_KEYS), ...Object.keys(STORY_POSITION_KEYS), ...Object.keys(STORY_VERDICT_KEYS),
+  ...Object.keys(STORY_THRESHOLD_KEYS), ...Object.keys(STORY_OMITTED_KEYS), ...Object.keys(STORY_SET_ASIDE_KEYS),
+  ...STORY_MATERIAL_FIELD_NAMES
+])]);
+
 export type StoryMaterialResult =
   | {
     readonly kind: "OK";

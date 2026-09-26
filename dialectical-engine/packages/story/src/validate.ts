@@ -1,7 +1,15 @@
 import { z } from "zod";
-import { STORY_BODY_LIMITS, StoryBodySchema, type StoryBody } from "@debateai/contract";
+import {
+  STORY_BODY_LIMITS,
+  StoryBodySchema,
+  StoryFateSchema,
+  StoryVerdictBasisSchema,
+  WayOfKnowingSchema,
+  type StoryBody
+} from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ContentClassification } from "@debateai/providers";
+import { STORY_MATERIAL_KEYS } from "./material.js";
 
 /**
  * THE DETERMINISTIC CHECKS (spec §5.3), run as each story call's content
@@ -21,8 +29,8 @@ import type { ContentClassification } from "@debateai/providers";
  * (the short version's, the confidence sentence among them, and the reviewer's
  * note) are also refused a point number: the owner's and the public page have
  * no appendix to look one up in. And no text may print a score or a threshold
- * of the material (spec §14.1): the story speaks to the person about their
- * question, never in the engine's numbers.
+ * of the material, or one of its code tokens (spec §14.1): the story speaks to
+ * the person about their question, never in the engine's numbers or codes.
  */
 
 /** What the material offers a story to cite. Built by `buildStoryMaterial`. */
@@ -60,6 +68,32 @@ const STORY_TEXT_FORBIDDEN = /[\u0000-\u0008\u000B-\u001F\u202A-\u202E\u2066-\u2
  * them. "P0", "PS" and "MP3" are not point numbers.
  */
 const STORY_SHORT_POINT_NUMBER = /\bP[1-9][0-9]*\b/u;
+
+/**
+ * The material's code tokens (fix round 2 ruling): the verdict labels, the
+ * fates, the ways of knowing, and every material key or field name with an
+ * underscore (known_by, rule_in_words, confidence_band, tie_margin ...), which
+ * no language uses as a word. Derived from the contract's enums and the
+ * material's own key lists, never typed out again here.
+ */
+export const STORY_ENGINE_TOKENS: readonly string[] = Object.freeze([...new Set([
+  ...StoryVerdictBasisSchema.shape.label.options,
+  ...StoryFateSchema.options,
+  ...WayOfKnowingSchema.options,
+  ...STORY_MATERIAL_KEYS.filter((key) => key.includes("_"))
+])]);
+
+/**
+ * A code token standing as a whole, case-sensitive token: no letter, digit or
+ * underscore right before or after it. Language-independent, and it never
+ * refuses an ordinary word: "ran", "fell" and "supported" are not "RAN",
+ * "FELL" and "SUPPORTED", and "RANDOM" is not "RAN". The tokens are letters and
+ * underscores only, so none needs escaping.
+ */
+const STORY_ENGINE_TOKEN = new RegExp(
+  `(?<![\\p{L}\\p{N}_])(?:${[...STORY_ENGINE_TOKENS].sort((left, right) => right.length - left.length).join("|")})(?![\\p{L}\\p{N}_])`,
+  "u"
+);
 
 /** What a score text is: digits, a point or a comma, digits. Anything else is code's mistake. */
 const STORY_SCORE_TEXT = /^[0-9]+[.,][0-9]+$/u;
@@ -154,10 +188,11 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
     issues.push(Object.freeze({ code: "custom", path: Object.freeze([...path]), message }));
   };
   const scores = storyScorePattern(index.scoreTexts);
-  /** Every text a person reads: no hidden or reordering characters, and none of the material's scores. */
+  /** Every text a person reads: no hidden or reordering characters, none of the material's scores, none of its codes. */
   const text = (value: string, at: readonly (string | number)[]): void => {
     if (STORY_TEXT_FORBIDDEN.test(value)) issue(at, "STORY_TEXT_CONTROL_CHARACTER");
     if (scores !== null && scores.test(value)) issue(at, "STORY_TEXT_SCORE_VALUE");
+    if (STORY_ENGINE_TOKEN.test(value)) issue(at, "STORY_TEXT_ENGINE_TOKEN");
   };
   /** A text the site shows: checked like every text, and refused a point number. */
   const siteText = (value: string, at: readonly (string | number)[]): void => {

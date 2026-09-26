@@ -11,7 +11,7 @@ Never put any of these in the story:
 - the words of the debate's own workings, in any language: judge, evaluator, checker, reviewer, runner-up, margin, band, rung, leverage, hinge, high cut, low cut, "the run", "the engine", "the rule", "set aside at step", and the material's codes and keys, such as SUPPORTED, CONTESTED, UNSUPPORTED, HELD_UP, PARTLY_HELD, FELL, SET_ASIDE, LOOKED_UP, RAN, REASONING, known_by, rule_in_words, confidence_band or judge_spread;
 - the names of the AI models, or an id of any kind.
 
-Code refuses a story that prints one of the material's scores or thresholds as a number; keeping out everything else on this list is up to you.
+Code refuses a score or a threshold printed at two decimals or exactly as the material prints it, unless the question or the debate's own points state the same figure, and it refuses the material's codes and its keys that hold an underscore, such as SUPPORTED, HELD_UP or known_by. Any other form of a score (another rounding, words, a percentage) and everything else on this list are yours to keep out.
 
 What belongs to the question itself stays: figures the debate worked out about the question, such as a monthly cost a point calculated, a salary, a price, a date, or a percentage a point argues ("the offer is about 35% higher"); ordinary words such as objection, claim, question or point; and the subject's own words, such as the judge in a court case or the threshold of a tax.
 
