@@ -441,6 +441,8 @@ packages/register/src/support-config.ts
 packages/serve/src/index.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
+packages/story/src/index.ts
+packages/story/src/pack.ts
 packages/support-kb/src/catalog.ts
 packages/support-kb/src/context.ts
 packages/support-kb/src/index.ts
