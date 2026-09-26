@@ -95,6 +95,7 @@ The scorecard is a single JSON document. Its schema is published in the public r
 | `modelId` | The exact, pinned model id. Never a "latest" alias. |
 | `thinkingLevel` | The vendor's own level name, or `DEFAULT_ONLY` when the level cannot be set. |
 | `accessRoutes` | API and/or named subscription tools. |
+| `contextWindowTokens` | Optional. When present, the picker never assigns the candidate to a role whose typical input would not fit. |
 | `apiPrice` | Input and output price per million tokens, with the date and source. This is informational, for local users; see "Prices" below. |
 
 **Per role, per candidate**
@@ -233,7 +234,12 @@ Guardrails:
 
 ### 2.10 New subscription connections
 
-Relays for the **Gemini** command-line tool and for **GLM (Z.ai)**, following the existing relay pattern:
+The owner's tools, confirmed 2026-09-26:
+
+- **Google:** the command-line tool is named **`agy`**.
+- **Z.AI (GLM):** reached through the **`pi`** command. The Z.AI key is already configured inside `pi`, running GLM 5.3 Flash at high effort with a **16k-token context window**. The GLM candidate therefore carries `contextWindowTokens: 16000`. The picker, and the replay tool, must skip a candidate for any moment or role whose prompt would not fit its window, and record why.
+
+Relays for `agy` and `pi`, following the existing relay pattern:
 - tools off;
 - prompt passed by stdin or file rather than argv;
 - the program-header guard;
