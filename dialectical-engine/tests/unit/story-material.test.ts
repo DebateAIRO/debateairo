@@ -571,6 +571,55 @@ describe("verdict story — the score values a story may never print", () => {
     expect(underscored.filter((key) => !STORY_ENGINE_TOKENS.includes(key))).toEqual([]);
   });
 
+  describe("the question's own words are never refused as engine tokens (fix round 3 ruling)", () => {
+    const openRan = (overrides: Partial<StoryRunSnapshot>): BuiltMaterial => built(buildStoryMaterial({
+      snapshot: snapshot(overrides), enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES
+    }));
+    const storyUsing = (text: string): string => {
+      const story = storyWithPaths(["P1", "P2"]);
+      story.short.summary = text;
+      return JSON.stringify(story);
+    };
+
+    it("holds every engine token when neither the question nor a claim uses one", () => {
+      expect([...result.index.engineTokens].sort()).toEqual([...STORY_ENGINE_TOKENS].sort());
+    });
+
+    it("leaves out RAN when the question itself says Open RAN, and the story may repeat it", () => {
+      const own = openRan({ questionLine: "Should the operator move its towers to Open RAN?" });
+      expect(own.index.engineTokens.has("RAN")).toBe(false);
+      expect(own.index.engineTokens.has("SUPPORTED")).toBe(true);
+      expect(classifyStoryContent(storyUsing("Moving to Open RAN is worth it."), own.index))
+        .toEqual({ parseStatus: "PARSED", parseError: null });
+      // Only the story using it: refused.
+      expect(classifyStoryContent(storyUsing("Moving to Open RAN is worth it."), result.index).parseError)
+        .toContain("STORY_TEXT_ENGINE_TOKEN");
+    });
+
+    it("leaves out a token a claim quotes, UNSUPPORTED from a technical question", () => {
+      const own = openRan({
+        nodes: snapshot().nodes.map((entry) => entry.nodeId === "point:c"
+          ? { ...entry, claim: "The driver reports UNSUPPORTED for the old card, so it must be replaced." }
+          : entry)
+      });
+      expect(own.index.engineTokens.has("UNSUPPORTED")).toBe(false);
+      expect(classifyStoryContent(storyUsing("The old card shows UNSUPPORTED, so replace it."), own.index))
+        .toEqual({ parseStatus: "PARSED", parseError: null });
+    });
+
+    it("counts only a whole, case-sensitive token of the question: ran, RANDOM and a judge's text free nothing", () => {
+      const own = openRan({ questionLine: "We ran a RANDOM test; should we switch?" });
+      expect(own.index.engineTokens.has("RAN")).toBe(true);
+      // The judges' texts are models' words about the arguments, not the question's own.
+      const judged = built(buildStoryMaterial({
+        snapshot: snapshot(),
+        enrichment: new Map([["position:a", { ...ENRICHMENT.get("position:a")!, judgeObjection: "Known by REASONING only." }]]),
+        budgetBytes: LOW_BUDGET, shapeIds: SHAPES
+      }));
+      expect(judged.index.engineTokens.has("REASONING")).toBe(true);
+    });
+  });
+
   it("refuses, through the classifier, a story that prints one of them", () => {
     const story = storyWithPaths(["P1", "P2"]);
     story.long.sections[0]!.paragraphs[0]!.text = "Funding finished at 0,61.";

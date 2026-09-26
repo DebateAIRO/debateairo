@@ -32,7 +32,8 @@ const INDEX: StoryMaterialIndex = {
   positionOrder: ["P1", "P2"],
   shapeIds: new Set(["general", "health"]),
   pathCap: 8,
-  scoreTexts: SCORE_TEXTS
+  scoreTexts: SCORE_TEXTS,
+  engineTokens: new Set(STORY_ENGINE_TOKENS)
 };
 
 function paragraph(text: string, refs: readonly string[] = ["P3"]): { text: string; node_refs: string[] } {
@@ -413,6 +414,28 @@ describe("verdict story — the story classifier", () => {
       expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
     });
 
+    it("refuses only the tokens the index holds: one the question itself uses is left out of it (fix round 3)", () => {
+      const withoutRan = new Set(STORY_ENGINE_TOKENS.filter((token) => token !== "RAN"));
+      const body = story();
+      body.short.summary = "Open RAN lets the operator mix vendors, so the plan holds.";
+      expect(classifyStoryContent(JSON.stringify(body), { ...INDEX, engineTokens: withoutRan }))
+        .toEqual({ parseStatus: "PARSED", parseError: null });
+      // The same text against the full set is refused: the exemption comes from the index alone.
+      expect(refused(classifyStoryContent(JSON.stringify(body), INDEX))).toEqual({ code: "SCHEMA_FAILED", path: "short.summary" });
+      // And every other token still is.
+      body.short.summary = "Open RAN is SUPPORTED.";
+      expect(classifyStoryContent(JSON.stringify(body), { ...INDEX, engineTokens: withoutRan }).parseError)
+        .toContain("STORY_TEXT_ENGINE_TOKEN");
+    });
+
+    it("throws for engine tokens that are not code tokens: an empty one would refuse every text", () => {
+      const content = JSON.stringify(story());
+      for (const bad of ["", "RAN|FELL", "set aside", "ran"]) {
+        expect(() => classifyStoryContent(content, { ...INDEX, engineTokens: new Set(["SUPPORTED", bad]) }))
+          .toThrowError(expect.objectContaining({ code: "STORY_ENGINE_TOKENS_INVALID" }));
+      }
+    });
+
     it("never refuses the story's own fate codes, which are data, not text", () => {
       const body = story();
       body.short.paths[0]!.fate = "SET_ASIDE";
@@ -435,7 +458,8 @@ describe("verdict story — the story classifier", () => {
       positionOrder: positions,
       shapeIds: new Set(["general"]),
       pathCap: 8,
-      scoreTexts: SCORE_TEXTS
+      scoreTexts: SCORE_TEXTS,
+      engineTokens: new Set(STORY_ENGINE_TOKENS)
     };
     function withPaths(ids: readonly string[]): string {
       const body = story();

@@ -18,7 +18,6 @@ export {
   storyContractInArgumentLanguage
 } from "./contracts.js";
 export {
-  STORY_ENGINE_TOKENS,
   StoryCheckerVerdictSchema,
   classifyCheckerContent,
   classifyStoryContent,
@@ -28,6 +27,7 @@ export {
   type StoryMaterialIndex
 } from "./validate.js";
 export {
+  STORY_ENGINE_TOKENS,
   buildStoryMaterial,
   pointNumbersFrom,
   restoreStoryRefs,

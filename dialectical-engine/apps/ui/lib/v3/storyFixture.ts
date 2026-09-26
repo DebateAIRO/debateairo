@@ -269,7 +269,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
   shape_id: "personal-choice",
   short: {
     headline: "Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.",
-    summary: "Ne-ați întrebat dacă merită să vă mutați cu familia din București la Cluj pentru un salariu mai mare. Merită, dar în doi pași: începeți noul job lucrând parțial de acasă, iar familia vi se alătură după ce copiii termină anul școlar. Mutarea imediată ar fi aproape la fel de bună: aduce același câștig de salariu, de aproximativ 35% după impozite, dar chiriile din Cluj îi taie din avantaj, iar copiii ar schimba școala în mijlocul anului.",
+    summary: "Ne-ați întrebat dacă merită să vă mutați cu familia din București la Cluj pentru un salariu mai mare. Merită, dar în doi pași: începeți noul loc de muncă lucrând parțial de acasă, iar familia vi se alătură după ce copiii termină anul școlar. Mutarea imediată ar fi aproape la fel de bună: aduce același câștig de salariu, de aproximativ 35% după impozite, dar chiriile din Cluj îi taie din avantaj, iar copiii ar schimba școala în mijlocul anului.",
     confidence: "Cât de siguri suntem: destul de siguri, dar totul depinde de un lucru pe care nu îl știm încă: dacă angajatorul acceptă lucrul hibrid.",
     paths: [
       {
@@ -304,7 +304,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
         node_refs: ["n-hybrid", "n-hybrid-school"]
       },
       {
-        text: "În Cluj, chiriile pentru trei camere sunt cu circa 30% mai mari decât în cartierul de acum. De aceea mutarea imediată aduce mai puțin decât pare: are argumente bune și este aproape la fel de bună.",
+        text: "În Cluj, chiriile pentru trei camere sunt cu circa 30% mai mari decât în cartierul de acum. De aceea mutarea imediată aduce mai puțin decât pare: are argumente bune, dar este doar aproape la fel de bună.",
         node_refs: ["n-yes", "n-yes-rent"]
       }
     ]
@@ -321,7 +321,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
       {
         title: "Răspunsul nostru pe scurt",
         paragraphs: [{
-          text: "Vă recomandăm să vă mutați în doi pași. Câștigul de salariu îl aveți de la prima lună, lucrând parțial de acasă, iar familia se mută abia când se încheie anul școlar, așa că nimeni nu trebuie să schimbe totul deodată. Mutarea imediată nu rămâne mult în urmă.",
+          text: "Vă recomandăm să vă mutați în doi pași. Câștigul de salariu îl aveți de la prima lună, lucrând parțial de acasă, iar familia se mută abia când se încheie anul școlar, așa că nimeni nu trebuie să schimbe totul deodată. Mutarea imediată nu rămâne mult în urmă și ar fi varianta de rezervă dacă angajatorul ar refuza lucrul hibrid.",
           node_refs: ["n-hybrid", "n-yes"]
         }]
       },
@@ -329,7 +329,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
         title: "Variantele cântărite",
         paragraphs: [
           {
-            text: "Mutarea treptată, cu lucru hibrid. Începeți noul job lucrând parțial de acasă, iar familia vi se alătură după încheierea anului școlar. Cel mai puternic argument pentru ea este că o schimbare de școală la jumătatea anului i-ar putea costa mult pe copii. Varianta ține doar dacă angajatorul acceptă lucrul hibrid, iar argumentul despre școală nu a putut fi verificat, așa că este cea mai bună dintre variante, nu una sigură.",
+            text: "Mutarea treptată, cu lucru hibrid. Începeți noul loc de muncă lucrând parțial de acasă, iar familia vi se alătură după încheierea anului școlar. Cel mai puternic argument pentru ea este că o schimbare de școală la jumătatea anului i-ar putea costa mult pe copii. Varianta ține doar dacă angajatorul acceptă lucrul hibrid, iar argumentul despre școală nu a putut fi verificat, așa că este cea mai bună dintre variante, nu una sigură.",
             node_refs: ["n-hybrid", "n-hybrid-school"]
           },
           {
@@ -341,7 +341,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
             node_refs: ["n-not-now", "n-not-now-once"]
           },
           {
-            text: "Am lăsat deoparte o singură obiecție: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Se baza pe o sursă slabă, iar răspunsul nostru ține deja cont de această întrebare: depinde oricum de acceptul angajatorului. Asta nu înseamnă că obiecția e greșită; răspunsul angajatorului o lămurește.",
+            text: "Am lăsat deoparte o singură obiecție: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Sursa era slabă, iar răspunsul nostru ține deja cont de acest risc: depinde oricum de acceptul angajatorului. Asta nu înseamnă că obiecția e greșită; răspunsul angajatorului o va lămuri.",
             node_refs: ["n-hybrid-forum"]
           }
         ]
@@ -376,8 +376,8 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
     ]
   },
   reviewer_note: {
-    text: "Dezbaterea a tratat chiria din Cluj ca pe un cost fix. În realitate, ați putea alege un cartier mai ieftin, iar atunci mutarea imediată ar deveni mai atractivă. Nota aceasta nu schimbă răspunsul nostru.",
-    node_refs: ["n-yes-rent"]
+    text: "Dezbaterea a comparat salariul și chiriile, dar nu și celelalte costuri ale vieții în Cluj, cum ar fi transportul sau cumpărăturile de zi cu zi. Dacă acestea sunt mult mai mari decât în București, câștigul scade pentru ambele variante de mutare. Nota aceasta nu schimbă răspunsul nostru.",
+    node_refs: ["n-yes-pay", "n-yes-rent"]
   }
 };
 
@@ -390,7 +390,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
  * (the story checks refuse one there).
  */
 const FIXTURE_RESERVATION =
-  "Rezumatul prezintă diferența de chirie din Cluj (P5, circa 30%) ca pe un fapt sigur, deși cifra vine dintr-o singură comparație de anunțuri.";
+  "Rezumatul prezintă ca sigur faptul că chiriile din Cluj îi taie din avantaj mutării imediate, deși diferența de chirie (P5, circa 30%) vine dintr-o singură comparație de anunțuri.";
 
 /**
  * The point numbers this sample's stored story carries (node id to Pn): the

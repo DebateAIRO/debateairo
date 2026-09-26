@@ -1,15 +1,7 @@
 import { z } from "zod";
-import {
-  STORY_BODY_LIMITS,
-  StoryBodySchema,
-  StoryFateSchema,
-  StoryVerdictBasisSchema,
-  WayOfKnowingSchema,
-  type StoryBody
-} from "@debateai/contract";
+import { STORY_BODY_LIMITS, StoryBodySchema, type StoryBody } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ContentClassification } from "@debateai/providers";
-import { STORY_MATERIAL_KEYS } from "./material.js";
 
 /**
  * THE DETERMINISTIC CHECKS (spec §5.3), run as each story call's content
@@ -51,6 +43,13 @@ export interface StoryMaterialIndex {
    * STORY_TEXT_SCORE_VALUE.
    */
   readonly scoreTexts: ReadonlySet<string>;
+  /**
+   * The material's code tokens a story may not use (`STORY_ENGINE_TOKENS`),
+   * less any the question or a claim itself uses as a whole token: "Open RAN"
+   * in the question is the person's word, and the story may repeat it. A text
+   * holding one as a whole, case-sensitive token is refused, STORY_TEXT_ENGINE_TOKEN.
+   */
+  readonly engineTokens: ReadonlySet<string>;
 }
 
 /**
@@ -70,30 +69,26 @@ const STORY_TEXT_FORBIDDEN = /[\u0000-\u0008\u000B-\u001F\u202A-\u202E\u2066-\u2
 const STORY_SHORT_POINT_NUMBER = /\bP[1-9][0-9]*\b/u;
 
 /**
- * The material's code tokens (fix round 2 ruling): the verdict labels, the
- * fates, the ways of knowing, and every material key or field name with an
- * underscore (known_by, rule_in_words, confidence_band, tie_margin ...), which
- * no language uses as a word. Derived from the contract's enums and the
- * material's own key lists, never typed out again here.
+ * What an engine token is: an all-capitals code (SUPPORTED, HELD_UP) or a
+ * lowercase key with an underscore (known_by), as code's enums and keys are.
+ * A lowercase word on its own ("ran") is never one: it would refuse ordinary
+ * text. Anything else is code's mistake.
  */
-export const STORY_ENGINE_TOKENS: readonly string[] = Object.freeze([...new Set([
-  ...StoryVerdictBasisSchema.shape.label.options,
-  ...StoryFateSchema.options,
-  ...WayOfKnowingSchema.options,
-  ...STORY_MATERIAL_KEYS.filter((key) => key.includes("_"))
-])]);
+const STORY_ENGINE_TOKEN_TEXT = /^(?:[A-Z]+(?:_[A-Z]+)*|[a-z]+(?:_[a-z]+)+)$/u;
 
 /**
- * A code token standing as a whole, case-sensitive token: no letter, digit or
- * underscore right before or after it. Language-independent, and it never
- * refuses an ordinary word: "ran", "fell" and "supported" are not "RAN",
- * "FELL" and "SUPPORTED", and "RANDOM" is not "RAN". The tokens are letters and
- * underscores only, so none needs escaping.
+ * One pattern for the index's engine tokens, each as a whole, case-sensitive
+ * token: no letter, digit or underscore right before or after it.
+ * Language-independent, and it never refuses an ordinary word: "ran", "fell"
+ * and "supported" are not "RAN", "FELL" and "SUPPORTED", and "RANDOM" is not
+ * "RAN". The tokens are letters and underscores only (checked on the index),
+ * so none needs escaping. Null when there is none to refuse.
  */
-const STORY_ENGINE_TOKEN = new RegExp(
-  `(?<![\\p{L}\\p{N}_])(?:${[...STORY_ENGINE_TOKENS].sort((left, right) => right.length - left.length).join("|")})(?![\\p{L}\\p{N}_])`,
-  "u"
-);
+function storyEngineTokenPattern(tokens: ReadonlySet<string>): RegExp | null {
+  if (tokens.size === 0) return null;
+  const alternatives = [...tokens].sort((left, right) => right.length - left.length || (left < right ? -1 : left > right ? 1 : 0));
+  return new RegExp(`(?<![\\p{L}\\p{N}_])(?:${alternatives.join("|")})(?![\\p{L}\\p{N}_])`, "u");
+}
 
 /** What a score text is: digits, a point or a comma, digits. Anything else is code's mistake. */
 const STORY_SCORE_TEXT = /^[0-9]+[.,][0-9]+$/u;
@@ -180,6 +175,12 @@ function assertStoryMaterialIndex(index: StoryMaterialIndex): void {
       "scoreTexts must hold only printed decimals such as 0.64 or 0,64"
     );
   }
+  if ([...index.engineTokens].some((token) => !STORY_ENGINE_TOKEN_TEXT.test(token))) {
+    throw new TypedDomainError(
+      "STORY_ENGINE_TOKENS_INVALID",
+      "engineTokens must hold only code tokens such as SUPPORTED or known_by"
+    );
+  }
 }
 
 function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonly StoryIssue[] {
@@ -188,11 +189,12 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
     issues.push(Object.freeze({ code: "custom", path: Object.freeze([...path]), message }));
   };
   const scores = storyScorePattern(index.scoreTexts);
+  const engineTokens = storyEngineTokenPattern(index.engineTokens);
   /** Every text a person reads: no hidden or reordering characters, none of the material's scores, none of its codes. */
   const text = (value: string, at: readonly (string | number)[]): void => {
     if (STORY_TEXT_FORBIDDEN.test(value)) issue(at, "STORY_TEXT_CONTROL_CHARACTER");
     if (scores !== null && scores.test(value)) issue(at, "STORY_TEXT_SCORE_VALUE");
-    if (STORY_ENGINE_TOKEN.test(value)) issue(at, "STORY_TEXT_ENGINE_TOKEN");
+    if (engineTokens !== null && engineTokens.test(value)) issue(at, "STORY_TEXT_ENGINE_TOKEN");
   };
   /** A text the site shows: checked like every text, and refused a point number. */
   const siteText = (value: string, at: readonly (string | number)[]): void => {
@@ -271,8 +273,9 @@ function decodeStoryJson(content: string): { readonly ok: true; readonly value: 
 /**
  * The storyteller's content classifier: the JSON form, then the text
  * characters and score values, every reference and the coverage. Throws
- * `STORY_PATH_CAP_INVALID`, `STORY_POSITION_ORDER_INVALID` or
- * `STORY_SCORE_TEXTS_INVALID` for an index code built wrongly.
+ * `STORY_PATH_CAP_INVALID`, `STORY_POSITION_ORDER_INVALID`,
+ * `STORY_SCORE_TEXTS_INVALID` or `STORY_ENGINE_TOKENS_INVALID` for an index
+ * code built wrongly.
  */
 export function classifyStoryContent(content: string, index: StoryMaterialIndex): ContentClassification {
   assertStoryMaterialIndex(index);

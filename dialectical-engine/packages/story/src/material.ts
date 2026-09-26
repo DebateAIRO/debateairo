@@ -1,4 +1,12 @@
-import { STORY_BODY_LIMITS, type StoryBody, type StoryParagraph, type StoryVerdictBasis } from "@debateai/contract";
+import {
+  STORY_BODY_LIMITS,
+  StoryFateSchema,
+  StoryVerdictBasisSchema,
+  WayOfKnowingSchema,
+  type StoryBody,
+  type StoryParagraph,
+  type StoryVerdictBasis
+} from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import type { FramedMaterialField } from "@debateai/providers";
 import type { StoryMaterialIndex } from "./validate.js";
@@ -188,6 +196,21 @@ export const STORY_MATERIAL_KEYS: readonly string[] = Object.freeze([...new Set(
   ...STORY_MATERIAL_FIELD_NAMES
 ])]);
 
+/**
+ * The material's code tokens (fix round 2 ruling): the verdict labels, the
+ * fates, the ways of knowing, and every material key or field name with an
+ * underscore (known_by, rule_in_words, confidence_band, tie_margin ...), which
+ * no language uses as a word. Derived from the contract's enums and the key
+ * lists above, never typed out again. Each material's index refuses these,
+ * less any its question or a claim uses itself (`storyEngineTokens`).
+ */
+export const STORY_ENGINE_TOKENS: readonly string[] = Object.freeze([...new Set([
+  ...StoryVerdictBasisSchema.shape.label.options,
+  ...StoryFateSchema.options,
+  ...WayOfKnowingSchema.options,
+  ...STORY_MATERIAL_KEYS.filter((key) => key.includes("_"))
+])]);
+
 export type StoryMaterialResult =
   | {
     readonly kind: "OK";
@@ -301,6 +324,24 @@ function storyStatedFigures(texts: readonly string[]): ReadonlySet<string> {
  * written from a digest that carries the scores, the others are code's words,
  * which can quote a score ("Recorded strength 0.21 ...").
  */
+/**
+ * The engine tokens this material's story may not use: every one, less those
+ * the question or a claim itself uses as a whole, case-sensitive token (fix
+ * round 3 ruling, mirroring the person's own figures). "Open RAN" in the
+ * question, or a claim quoting a driver's "UNSUPPORTED", is the person's word,
+ * and the story may repeat it. Only the question and the claims count: the
+ * judges' and reviewers' texts are models' words about the arguments.
+ */
+function storyEngineTokens(material: StoryMaterial): ReadonlySet<string> {
+  const own = [
+    material.question,
+    ...material.positions.map((position) => position.claim),
+    ...material.points.map((point) => point.claim)
+  ].join("\n");
+  return new Set(STORY_ENGINE_TOKENS.filter((token) =>
+    !new RegExp(`(?<![\\p{L}\\p{N}_])${token}(?![\\p{L}\\p{N}_])`, "u").test(own)));
+}
+
 function storyScoreTexts(material: StoryMaterial): ReadonlySet<string> {
   const stated = storyStatedFigures([
     material.question,
@@ -686,7 +727,8 @@ export function buildStoryMaterial(input: {
           shapeIds: input.shapeIds,
           // The site shows at most this many path lines (spec §5.3); one cap, shared with the schema.
           pathCap: STORY_BODY_LIMITS.maxPaths,
-          scoreTexts: storyScoreTexts(material)
+          scoreTexts: storyScoreTexts(material),
+          engineTokens: storyEngineTokens(material)
         }),
         refMap,
         compressionStep: step
