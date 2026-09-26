@@ -297,8 +297,9 @@ interface ComparedTexts {
 
 function comparedTexts(basis: VerdictBasis): ComparedTexts {
   const t = basis.thresholds;
-  // The winner, the runner-up and the margin share one precision, so the table's subtraction adds up;
-  // the winner is compared with both cuts (between them, in the middle band), the margin with the tie margin.
+  // The winner, the runner-up and the margin are printed at one shared precision (each rounded on its own,
+  // so a printed subtraction can still be off by one in the last digit); the winner is compared with both
+  // cuts (between them, in the middle band), the margin with the tie margin.
   const scores = sharedDecimals([
     [basis.winner_strength, t.low_cut],
     [basis.winner_strength, t.high_cut],
@@ -482,8 +483,12 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
     { condition: `Anything else: the winner scores at least ${score(t.low_cut)} but less than ${score(t.high_cut)}`, result: "CONTESTED" }
   ] as const;
   const marks = basis.marks.map(markWords);
-  // The numbers beside the rule table print at the same precision as the decision line and the explanation.
+  // The numbers beside the rule table print at the same precision as the decision line and the explanation,
+  // and word a near miss the same way, so a row never shows a value identical to its threshold.
   const shown = comparedTexts(basis);
+  const nearCut = shown.near.highCut !== null
+    ? { side: shown.near.highCut, threshold: shown.highCut }
+    : shown.near.lowCut !== null ? { side: shown.near.lowCut, threshold: shown.lowCut } : null;
   return {
     title: REPORT_TITLES.computation,
     intro: COMPUTATION_INTRO,
@@ -497,7 +502,12 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
       applied: basis.rung === rung
     })),
     numbers: [
-      { label: "Winner (the leading position)", value: withPoint(numbers.get(basis.winner_node_id), shown.winner) },
+      {
+        label: "Winner (the leading position)",
+        value: nearCut === null
+          ? withPoint(numbers.get(basis.winner_node_id), shown.winner)
+          : nearWords(withPoint(numbers.get(basis.winner_node_id), shown.winner), nearCut.side, nearCut.threshold)
+      },
       {
         label: "Runner-up",
         value: basis.runner_up_node_id === null
@@ -507,14 +517,16 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
       {
         label: "Margin (how far the winner is ahead)",
         value: shown.margin !== null
-          ? shown.margin
+          ? shown.near.gamma === null ? shown.margin : nearWords(shown.margin, shown.near.gamma, `the tie margin of ${shown.gamma}`)
           : basis.runner_up_node_id === null ? "Not measured. There was no runner-up." : "Not measured."
       },
       {
         label: "Judges' disagreement",
         value: shown.disagreement === null
           ? `Not measured. The limit is ${shown.limit}.`
-          : `${shown.disagreement} (the limit is ${shown.limit})`
+          : shown.near.limit === null
+            ? `${shown.disagreement} (the limit is ${shown.limit})`
+            : nearWords(shown.disagreement, shown.near.limit, `the limit of ${shown.limit}`)
       },
       { label: "Label", value: storyLabelWords(basis.label) }
     ],

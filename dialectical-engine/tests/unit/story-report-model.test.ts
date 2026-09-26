@@ -357,6 +357,10 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     expect(marginAbove.explanation).toBe(
       "The leading position was ahead of the runner-up by 0.05, just above the tie margin of 0.05 (by less than 0.0001; a lead of 0.05 or less counts as a tie), and the judges' disagreement, 0.12, stayed below the limit of 0.25. But its score of 0.64 did not reach 0.70, the score needed for Supported. So rule 5 applies and the label is Contested."
     );
+    // The numbers table beside the shaded rule says it the same way.
+    expect(marginAbove.numbers[2]).toEqual({
+      label: "Margin (how far the winner is ahead)", value: "0.05, just above the tie margin of 0.05 (by less than 0.0001)"
+    });
     // 0.30 − 0.25 = 0.04999999999999999: just below the tie margin counts as a tie (rule 3).
     const marginBelow = near({ rung: 2, trigger: "MARGIN_WITHIN_GAMMA", runner_up_strength: 0.59, margin: 0.3 - 0.25 });
     expect(marginBelow.decision).toBe(nb("winner 0.64, runner-up 0.59, margin 0.05, just below the tie margin of 0.05 (by less than 0.0001) → Contested"));
@@ -371,6 +375,9 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     expect(disagreementBelow.explanation).toContain(
       "and the judges' disagreement, 0.25, was just below the limit of 0.25 (by less than 0.0001). But its score of 0.64 did not reach 0.70"
     );
+    expect(disagreementBelow.numbers[3]).toEqual({
+      label: "Judges' disagreement", value: "0.25, just below the limit of 0.25 (by less than 0.0001)"
+    });
     // 0.55 − 0.30 = 0.25000000000000006: past the limit, so the judges' disagreement decided (rule 3).
     const disagreementAbove = near({ rung: 2, trigger: "DISAGREEMENT_AT_THRESHOLD", margin: 0.17, disagreement: 0.55 - 0.3 });
     expect(disagreementAbove.decision)
@@ -381,6 +388,53 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     for (const computed of [marginAbove, marginBelow, disagreementBelow, disagreementAbove]) {
       // No comparison sign between two numbers that print alike, at any precision.
       expect(`${computed.decision} ${computed.explanation}`).not.toMatch(/(\d\.\d+)\u00A0[<>≤≥]\u00A0\1(?!\d)|0\.0500|0\.2500/u);
+      expect(computed.numbers.map((row) => row.value).join(" | ")).not.toMatch(/(\d\.\d+) \(the limit is \1\)/u);
+    }
+  });
+
+  it("words a near miss at either cut the same way in the decision line, the explanation and the numbers table", () => {
+    const near = (basis: Partial<NonNullable<AnswerStory["verdict_basis"]>>) => {
+      const story = storyFixture("READY");
+      story.verdict_basis = { ...story.verdict_basis!, ...basis };
+      return buildReportModel(STORY_FIXTURE_ANSWER, story, GENERATED).computation;
+    };
+    // 0.69 − 0.34 = 0.3499999999999999: just below the low cut, so rule 2 (Unsupported).
+    const belowLow = near({ label: "UNSUPPORTED", rung: 1, trigger: "BELOW_LOW_CUT", winner_strength: 0.69 - 0.34 });
+    expect(belowLow.decision).toBe(nb("winner 0.35, just below 0.35 (by less than 0.0001) → Unsupported"));
+    expect(belowLow.explanation).toBe(
+      "Even the leading position scored 0.35, just below 0.35 (by less than 0.0001), so rule 2 applies and the label is Unsupported: a weak case, not a disproved one."
+    );
+    expect(belowLow.numbers[0]).toEqual({
+      label: "Winner (the leading position)", value: "0.35 (P3), just below 0.35 (by less than 0.0001)"
+    });
+    // 0.02 + 0.68 = 0.7000000000000001: just above the high cut, so rule 4 (Supported).
+    const aboveHigh = near({
+      label: "SUPPORTED", rung: 3, trigger: "AT_OR_ABOVE_HIGH_CUT", winner_strength: 0.02 + 0.68, margin: 0.2, disagreement: 0.09
+    });
+    expect(aboveHigh.decision)
+      .toBe(nb("winner 0.70, just above 0.70 (by less than 0.0001), margin 0.20 > 0.05, judges' disagreement 0.09 < 0.25 → Supported"));
+    expect(aboveHigh.explanation).toBe(
+      "The leading position scored 0.70, just above 0.70 (by less than 0.0001). It was ahead of the runner-up by 0.20, more than the tie margin of 0.05 (a lead of 0.05 or less counts as a tie), and the judges' disagreement, 0.09, stayed below the limit of 0.25. So rule 4 applies and the label is Supported."
+    );
+    expect(aboveHigh.numbers[0]?.value).toBe("0.70 (P3), just above 0.70 (by less than 0.0001)");
+    // 0.12 + 0.95 − 0.37 = 0.6999999999999998: just below the high cut, the middle band (rule 5).
+    const belowHigh = near({ winner_strength: 0.12 + 0.95 - 0.37 });
+    expect(belowHigh.decision)
+      .toBe(nb("winner 0.70, just below 0.70 (by less than 0.0001), margin 0.06 > 0.05, judges' disagreement 0.12 < 0.25 → Contested"));
+    expect(belowHigh.explanation).toBe(
+      "The leading position was ahead of the runner-up by 0.06, more than the tie margin of 0.05 (a lead of 0.05 or less counts as a tie), and the judges' disagreement, 0.12, stayed below the limit of 0.25. But its score of 0.70 was just below 0.70 (by less than 0.0001), the score needed for Supported. So rule 5 applies and the label is Contested."
+    );
+    expect(belowHigh.numbers[0]?.value).toBe("0.70 (P3), just below 0.70 (by less than 0.0001)");
+    // 0.01 + 0.34 = 0.35000000000000003: just above the low cut, still the middle band (rule 5).
+    const aboveLow = near({ winner_strength: 0.01 + 0.34 });
+    expect(aboveLow.decision)
+      .toBe(nb("winner 0.35, just above 0.35 (by less than 0.0001), margin 0.06 > 0.05, judges' disagreement 0.12 < 0.25 → Contested"));
+    expect(aboveLow.explanation).toBe(
+      "The leading position was ahead of the runner-up by 0.06, more than the tie margin of 0.05 (a lead of 0.05 or less counts as a tie), and the judges' disagreement, 0.12, stayed below the limit of 0.25. But its score of 0.35 did not reach 0.70, the score needed for Supported. So rule 5 applies and the label is Contested."
+    );
+    expect(aboveLow.numbers[0]?.value).toBe("0.35 (P3), just above 0.35 (by less than 0.0001)");
+    for (const computed of [belowLow, aboveHigh, belowHigh, aboveLow]) {
+      expect(`${computed.decision} ${computed.explanation}`).not.toMatch(/(\d\.\d+)\u00A0[<>≤≥]\u00A0\1(?!\d)|0\.3500|0\.7000/u);
     }
   });
 
