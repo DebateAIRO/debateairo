@@ -444,6 +444,7 @@ packages/serve/src/index.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
 packages/story/src/contracts.ts
+packages/story/src/enrichment.ts
 packages/story/src/index.ts
 packages/story/src/loop.ts
 packages/story/src/material.ts

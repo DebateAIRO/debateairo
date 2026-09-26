@@ -56,3 +56,4 @@ export {
   type StoredStory,
   type StoryRecordInput
 } from "./repository.js";
+export { readStoryEnrichment } from "./enrichment.js";

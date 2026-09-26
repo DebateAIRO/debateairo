@@ -205,6 +205,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/memory/src/index.ts",
       "packages/serve/src/index.ts",
       "packages/settlement/src/index.ts",
+      // Verdict story: the enrichment reader decrypts the judge's raw artifact and
+      // the review reasons inside withRunContentLease, borrowed from the runner's hook.
+      "packages/story/src/enrichment.ts",
       // Verdict story (0072): the story repository seals and reads serve.answer_story
       // inside withRunContentLease, borrowed when the runner's hook already holds it.
       "packages/story/src/repository.ts",
