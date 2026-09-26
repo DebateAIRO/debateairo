@@ -1,5 +1,10 @@
 import { CONDITION_MARKS } from "@debateai/kernel";
 import type { Answer, AnswerStory, ConditionMark, Edge, MakerLineage } from "@debateai/contract";
+// TODO(story localization): the PDF report is English only for now. Every
+// catalogue-taking helper below is handed the ENGLISH catalogue explicitly (dev's
+// catalogThreading guard forbids a silent English default); the localization
+// task passes the reader's catalogues instead.
+import composeEnglish from "../../messages/en/compose.json" with { type: "json" };
 import debateChromeEnglish from "../../messages/en/debateChrome.json" with { type: "json" };
 import { t } from "../i18n/translate.js";
 import { contractNodesById, v3ScorePercentage, wayOfKnowingLabel } from "../v3/adapter.js";
@@ -218,7 +223,7 @@ function fingerprintWords(fingerprint: string): string {
 }
 
 function markWords(mark: string): string {
-  return (CONDITION_MARKS as readonly string[]).includes(mark) ? conditionMarkLabel(mark as ConditionMark) : mark;
+  return (CONDITION_MARKS as readonly string[]).includes(mark) ? conditionMarkLabel(mark as ConditionMark, debateChromeEnglish) : mark;
 }
 
 function uniqueModels(answer: Answer): string[] {
@@ -582,19 +587,19 @@ function stanceWords(point: NumberedPoint, answer: Answer, numbers: ReadonlyMap<
 }
 
 function appendixEntry(point: NumberedPoint, node: Answer["nodes"][number], stance: string): ReportAppendixEntry {
-  const base = v3ScorePercentage(node.base_score.value).text;
-  const final = node.final_strength === null ? null : v3ScorePercentage(node.final_strength.value).text;
+  const base = v3ScorePercentage(node.base_score.value, composeEnglish).text;
+  const final = node.final_strength === null ? null : v3ScorePercentage(node.final_strength.value, composeEnglish).text;
   const frozen = node.condition_marks.includes("BRANCH-FROZEN-LOW-LEVERAGE");
   const author = lineageWords(node.maker_lineage);
-  const setAside = point.node.stopping_reason_human ?? (frozen ? conditionMarkLabel("BRANCH-FROZEN-LOW-LEVERAGE") : null);
-  const marks = node.condition_marks.filter((mark) => mark !== "BRANCH-FROZEN-LOW-LEVERAGE").map((mark) => conditionMarkLabel(mark));
+  const setAside = point.node.stopping_reason_human ?? (frozen ? conditionMarkLabel("BRANCH-FROZEN-LOW-LEVERAGE", debateChromeEnglish) : null);
+  const marks = node.condition_marks.filter((mark) => mark !== "BRANCH-FROZEN-LOW-LEVERAGE").map((mark) => conditionMarkLabel(mark, debateChromeEnglish));
   return {
     number: point.number,
     anchor: pointAnchor(point.number),
     stance,
     claim: node.claim,
     scores: final === null ? `${base} alone · final score withheld` : `${base} alone → ${final} after weighing`,
-    wayOfKnowing: `How it is known: ${wayOfKnowingLabel(node.way_of_knowing)}`,
+    wayOfKnowing: `How it is known: ${wayOfKnowingLabel(node.way_of_knowing, composeEnglish)}`,
     author: author === null ? "Author model not recorded" : `Written by ${author}`,
     review: node.review === null
       ? "No cross-model review recorded."
@@ -633,7 +638,7 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
       models,
       modelsLine: models.length === 0 ? "Models that took part: not recorded" : `Models that took part: ${models.join(", ")}`,
       disclosure: [
-        // The debate page's own AI notice, in English: the report is not localized yet.
+        // The debate page's own AI notice, in English (see the TODO at the imports).
         t(debateChromeEnglish, "debateChrome.aiNotice"),
         "The story in this report was written by an AI storyteller and checked by a second AI model. The label comes from the scores, not from the story."
       ]

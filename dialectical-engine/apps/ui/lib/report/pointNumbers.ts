@@ -1,5 +1,6 @@
 import type { Answer, AnswerStory } from "@debateai/contract";
 import type { DebateNode } from "../types.js";
+import composeEnglish from "../../messages/en/compose.json" with { type: "json" };
 import { debateDetailFromAnswer } from "../v3/adapter.js";
 
 /**
@@ -19,7 +20,9 @@ export interface NumberedPoint {
 }
 
 function positionsFirstOrder(answer: Answer): readonly DebateNode[] {
-  const positions = debateDetailFromAnswer(answer).tree?.children ?? [];
+  // Only the tree's ORDER is used here, never its words; the English catalogue is
+  // passed because the helper takes one (TODO(story localization): the reader's).
+  const positions = debateDetailFromAnswer(answer, composeEnglish).tree?.children ?? [];
   const rest: DebateNode[] = [];
   const visit = (node: DebateNode): void => {
     for (const child of node.children) {
