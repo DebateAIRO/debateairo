@@ -1,0 +1,205 @@
+import { describe, expect, it } from "vitest";
+import type { StoryBody } from "@debateai/contract";
+import { schemaFailureLocator, type ContentClassification } from "@debateai/providers";
+import {
+  classifyCheckerContent,
+  classifyStoryContent,
+  parseCheckerVerdict,
+  parseStoryBody,
+  type StoryMaterialIndex
+} from "@debateai/story";
+
+/**
+ * Verdict story, Task 2 — the deterministic checks that run as the
+ * storyteller's content classifier (spec §5.3). A refusal must reach the
+ * repair packet as a CODE and a machine PATH, never as the model's own words.
+ */
+
+/** The material names points by short references (Task 3); the index holds exactly those. */
+const INDEX: StoryMaterialIndex = {
+  nodeIds: new Set(["P1", "P2", "P3", "P4"]),
+  positionIds: new Set(["P1", "P2"]),
+  shapeIds: new Set(["general", "health"]),
+  pathCap: 8
+};
+
+function paragraph(text: string, refs: readonly string[] = ["P3"]): { text: string; node_refs: string[] } {
+  return { text, node_refs: [...refs] };
+}
+
+function story(): StoryBody {
+  return {
+    shape_id: "general",
+    short: {
+      headline: "The debate backs funding the extension, on the city's own figures.",
+      summary: "Our reading of your question: whether the extension is worth its cost. It is, on the figures argued.",
+      paths: [
+        { position_ref: "P1", fate: "HELD_UP", line: "Fund it: the savings argument held up.", node_refs: ["P1", "P3"] },
+        { position_ref: "P2", fate: "FELL", line: "Do not fund it: the cost objection was answered.", node_refs: ["P2", "P4"] }
+      ],
+      change: paragraph("A measured drop in ridership would move the savings point.")
+    },
+    long: {
+      sections: [
+        { title: "What you are really trying to decide", paragraphs: [paragraph("Our reading of your question: ...", [])] },
+        { title: "The verdict in one paragraph", paragraphs: [paragraph("The debate supports funding it.", ["P1"])] },
+        { title: "The paths explored", paragraphs: [paragraph("Funding held up.", ["P1", "P3"])] }
+      ]
+    },
+    reviewer_note: null
+  };
+}
+
+function refused(result: ContentClassification): { code: string; path: string } {
+  if (result.parseStatus === "PARSED") throw new Error("expected the classifier to refuse the content");
+  return { ...schemaFailureLocator(result) };
+}
+
+describe("verdict story — the story classifier", () => {
+  it("accepts a well-formed story and parses it unchanged", () => {
+    const content = JSON.stringify(story());
+    expect(classifyStoryContent(content, INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    expect(parseStoryBody(content, INDEX)).toEqual(story());
+  });
+
+  it("refuses text that is not JSON as PARSE_FAILED", () => {
+    expect(classifyStoryContent("Here is the story: {", INDEX).parseStatus).toBe("PARSE_FAILED");
+  });
+
+  it("refuses a headline over 160 characters with a code and the member's path", () => {
+    const body = story();
+    body.short.headline = "h".repeat(161);
+    expect(refused(classifyStoryContent(JSON.stringify(body), INDEX))).toEqual({ code: "SCHEMA_FAILED", path: "short.headline" });
+  });
+
+  it("refuses a member the form does not have", () => {
+    expect(classifyStoryContent(JSON.stringify({ ...story(), notes: "extra" }), INDEX).parseStatus).toBe("SCHEMA_FAILED");
+  });
+
+  it("refuses a citation of a point the debate does not have, by path, without echoing it", () => {
+    const body = story();
+    body.long.sections[1]!.paragraphs[0]!.node_refs = ["P1", "node:invented-by-the-model"];
+    const result = classifyStoryContent(JSON.stringify(body), INDEX);
+    expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path: "long.sections.1.paragraphs.0.node_refs.1" });
+    expect(result.parseError).not.toContain("invented-by-the-model");
+    expect(() => parseStoryBody(JSON.stringify(body), INDEX))
+      .toThrowError(expect.objectContaining({ code: "STORY_CONTENT_INVALID" }));
+  });
+
+  it("accepts markup and links as plain text: the story is data, never rendered", () => {
+    const body = story();
+    const text = "<script>alert(1)</script> See [the council report](https://example.com/report) for more.";
+    body.long.sections[2]!.paragraphs[0]!.text = text;
+    body.short.headline = "<b>Fund it</b>";
+    const content = JSON.stringify(body);
+    expect(classifyStoryContent(content, INDEX).parseStatus).toBe("PARSED");
+    const parsed = parseStoryBody(content, INDEX);
+    expect(parsed.long.sections[2]!.paragraphs[0]!.text).toBe(text);
+    expect(parsed.short.headline).toBe("<b>Fund it</b>");
+  });
+
+  it.each([
+    ["a path whose position_ref is not a position", (body: StoryBody): void => {
+      body.short.paths[1]!.position_ref = "P3";
+    }, "short.paths.1.position_ref"],
+    ["the same position twice", (body: StoryBody): void => {
+      body.short.paths[1]!.position_ref = "P1";
+    }, "short.paths.1.position_ref"],
+    ["a position left out", (body: StoryBody): void => {
+      body.short.paths = [body.short.paths[0]!];
+    }, "short.paths"],
+    ["a shape that is not offered", (body: StoryBody): void => {
+      body.shape_id = "legal";
+    }, "shape_id"],
+    ["an unknown citation in the change text", (body: StoryBody): void => {
+      body.short.change.node_refs = ["node:elsewhere"];
+    }, "short.change.node_refs.0"],
+    ["an unknown citation in a path line", (body: StoryBody): void => {
+      body.short.paths[0]!.node_refs = ["P1", "node:elsewhere"];
+    }, "short.paths.0.node_refs.1"],
+    ["an unknown citation in the reviewer's note", (body: StoryBody): void => {
+      body.reviewer_note = paragraph("The verdict leans on one argued point.", ["node:elsewhere"]);
+    }, "reviewer_note.node_refs.0"]
+  ])("refuses %s", (_name, mutate, path) => {
+    const body = story();
+    mutate(body);
+    expect(refused(classifyStoryContent(JSON.stringify(body), INDEX))).toEqual({ code: "SCHEMA_FAILED", path });
+  });
+
+  describe("more positions than the site shows (the 8-path cap)", () => {
+    const positions = Array.from({ length: 9 }, (_, index) => `P${String(index + 1)}`);
+    const wide: StoryMaterialIndex = {
+      nodeIds: new Set(positions),
+      positionIds: new Set(positions),
+      shapeIds: new Set(["general"]),
+      pathCap: 8
+    };
+    function withPaths(count: number): string {
+      const body = story();
+      body.short.paths = positions.slice(0, count).map((id) => ({
+        position_ref: id, fate: "PARTLY_HELD" as const, line: `Position ${id}.`, node_refs: [id]
+      }));
+      body.short.change.node_refs = [];
+      body.long.sections.forEach((section) => section.paragraphs.forEach((entry) => { entry.node_refs = []; }));
+      return JSON.stringify(body);
+    }
+
+    it("accepts exactly 8 entries for 9 positions", () => {
+      expect(classifyStoryContent(withPaths(8), wide).parseStatus).toBe("PARSED");
+    });
+
+    it("refuses 7 entries for 9 positions", () => {
+      expect(refused(classifyStoryContent(withPaths(7), wide))).toEqual({ code: "SCHEMA_FAILED", path: "short.paths" });
+    });
+
+    it("refuses 9 entries: the form caps the paths at 8", () => {
+      expect(refused(classifyStoryContent(withPaths(9), wide))).toEqual({ code: "SCHEMA_FAILED", path: "short.paths" });
+    });
+  });
+});
+
+const SATISFIED = {
+  satisfied: true,
+  objection: null,
+  criteria: {
+    faithful_to_material: true,
+    agrees_with_label: true,
+    fair_to_losing_paths: true,
+    no_overstatement: true,
+    citations_correct: true,
+    reviewer_note_separate: true,
+    goal_marked_as_reading: true
+  }
+};
+
+describe("verdict story — the checker classifier", () => {
+  it("accepts a satisfied verdict and an unsatisfied one with its objection", () => {
+    expect(classifyCheckerContent(JSON.stringify(SATISFIED))).toEqual({ parseStatus: "PARSED", parseError: null });
+    const unsatisfied = {
+      ...SATISFIED,
+      satisfied: false,
+      objection: "The summary calls the answer settled; the label says the debate did not settle it.",
+      criteria: { ...SATISFIED.criteria, agrees_with_label: false }
+    };
+    expect(parseCheckerVerdict(JSON.stringify(unsatisfied))).toEqual(unsatisfied);
+  });
+
+  it("refuses an unsatisfied verdict that gives no objection, at the objection's path", () => {
+    const content = JSON.stringify({ ...SATISFIED, satisfied: false });
+    expect(refused(classifyCheckerContent(content))).toEqual({ code: "SCHEMA_FAILED", path: "objection" });
+  });
+
+  it("refuses a verdict that leaves out a criterion", () => {
+    const { goal_marked_as_reading: _left, ...criteria } = SATISFIED.criteria;
+    expect(refused(classifyCheckerContent(JSON.stringify({ ...SATISFIED, criteria })))).toEqual({
+      code: "SCHEMA_FAILED", path: "criteria.goal_marked_as_reading"
+    });
+  });
+
+  it("refuses an extra member and text that is not JSON", () => {
+    expect(classifyCheckerContent(JSON.stringify({ ...SATISFIED, score: 9 })).parseStatus).toBe("SCHEMA_FAILED");
+    expect(classifyCheckerContent("Looks fine to me.").parseStatus).toBe("PARSE_FAILED");
+    expect(() => parseCheckerVerdict("Looks fine to me."))
+      .toThrowError(expect.objectContaining({ code: "STORY_CHECKER_CONTENT_INVALID" }));
+  });
+});

@@ -365,6 +365,7 @@ packages/contract/src/client.ts
 packages/contract/src/generate.ts
 packages/contract/src/index.ts
 packages/contract/src/plan-tiers.ts
+packages/contract/src/story.ts
 packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
 packages/crypto/src/argon2-worker.ts
@@ -441,8 +442,10 @@ packages/register/src/support-config.ts
 packages/serve/src/index.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
+packages/story/src/contracts.ts
 packages/story/src/index.ts
 packages/story/src/pack.ts
+packages/story/src/validate.ts
 packages/support-kb/src/catalog.ts
 packages/support-kb/src/context.ts
 packages/support-kb/src/index.ts
