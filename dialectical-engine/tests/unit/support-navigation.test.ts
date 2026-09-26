@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,8 +9,74 @@ import {
   type SupportActionId,
 } from "../../packages/support-kb/src/catalog.js";
 import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
+import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
+import { SUPPORT_UI_LABELS } from "../../packages/support-kb/src/ui-labels.js";
+
+const LABEL_SOURCES = {
+  home: ["chrome","chrome.brandHome"],"start-debate": ["home","home.startDebateLabel"],
+  "sign-in": ["chrome","chrome.account"],"sign-up": ["auth","auth.login.createOne"],
+  help: ["chrome","chrome.help"],"support-status": ["support","support.serviceStatus"],
+  method: ["chrome","chrome.howItWorks"],"sample-transcript": ["chrome","chrome.transcripts"],
+  settings: ["chrome","chrome.settings"],"active-sessions": ["settings","settings.sessions.title"],
+  "privacy-preferences": ["consent","consent.settings.title"],
+  "claim-legacy": ["settings","settings.legacy.title"],
+  "delete-account": ["settings","settings.erasure.title"],
+  "public-catalog": ["home","home.publicDebates"],"your-debates": ["home","home.yourDebates"],
+  "owner-debate": ["support","support.action.openYourDebate"],
+  "public-debate": ["support","support.action.openPublicDebate"]
+} as const;
 
 describe("Support navigation", () => {
+  it("keeps the committed UI-label artifact current with a fresh isolated generation", () => {
+    // Regression: editing a locale catalogue without regenerating all three tables must fail this gate.
+    const temporaryRoot = mkdtempSync(resolve(tmpdir(), "support-ui-labels-"));
+    const packageRoot = resolve(temporaryRoot, "packages/support-kb");
+    try {
+      mkdirSync(resolve(packageRoot, "scripts"), { recursive: true });
+      mkdirSync(resolve(packageRoot, "src"), { recursive: true });
+      mkdirSync(resolve(temporaryRoot, "apps/ui"), { recursive: true });
+      copyFileSync(
+        resolve(process.cwd(), "packages/support-kb/scripts/generate-ui-labels.mjs"),
+        resolve(packageRoot, "scripts/generate-ui-labels.mjs"),
+      );
+      symlinkSync(
+        resolve(process.cwd(), "apps/ui/messages"),
+        resolve(temporaryRoot, "apps/ui/messages"),
+        "dir",
+      );
+
+      execFileSync(process.execPath, [resolve(packageRoot, "scripts/generate-ui-labels.mjs")]);
+
+      expect(readFileSync(resolve(process.cwd(), "packages/support-kb/src/ui-labels.ts"), "utf8"))
+        .toBe(readFileSync(resolve(packageRoot, "src/ui-labels.ts"), "utf8"));
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps every generated action label byte-equal to its UI catalogue source",() => {
+    for (const locale of SUPPORT_LOCALES) for (const [id,[namespace,key]] of Object.entries(LABEL_SOURCES)) {
+      const catalogue = JSON.parse(readFileSync(resolve(
+        process.cwd(),"apps/ui/messages",locale,`${namespace}.json`
+      ),"utf8")) as Record<string,string>;
+      expect(SUPPORT_UI_LABELS[locale][id as keyof typeof LABEL_SOURCES]).toBe(catalogue[key]);
+    }
+  });
+
+  it("labels a new interface locale's actions from the generated UI catalogue only", () => {
+    // Scope audit B6: en/ro keep dev's reviewed catalog labels (pinned below);
+    // the 33 new locales name the control the reader sees in their catalogue.
+    for (const language of SUPPORT_LOCALES.filter((code) => code !== "en" && code !== "ro")) {
+      const actions = resolveSupportActions(SUPPORT_ACTION_IDS, { signedIn: false, language });
+      expect(actions.map(({ id }) => id)).toEqual([
+        "home","start-debate","sign-in","sign-up","help","support-status","method","sample-transcript"
+      ]);
+      for (const action of actions) {
+        expect(action.label).toBe(SUPPORT_UI_LABELS[language][action.id as keyof typeof LABEL_SOURCES]);
+      }
+    }
+  });
+
   it("resolves only public first-party actions for a signed-out visitor", () => {
     // Property: authentication and resource authority are required before privileged destinations resolve.
     const actions = resolveSupportActions(SUPPORT_ACTION_IDS, { signedIn: false, language: "en" });

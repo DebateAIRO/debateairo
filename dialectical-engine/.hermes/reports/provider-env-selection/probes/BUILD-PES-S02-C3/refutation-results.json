@@ -1,0 +1,373 @@
+[
+  {
+    "id": "01-refusal-stage",
+    "property": "stage tracked through real guard chain",
+    "old": "stage = \"deployment\";",
+    "new": "stage = \"priced\";",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-01-refusal-stage-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > passes end to end and prints the exact lines of SPEC-v4 \u00a75 steps 5, 6 and 8",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the first case that did not hold when the vendor rejects the provisioned credential",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the refusal case whose message differs from the table"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-01-refusal-stage-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "02-output-order",
+    "property": "exact provider admission output",
+    "old": "emit(\"PES-S02 ADMITTED vendor:a\");",
+    "new": "emit(\"PES-S02 ADMITTED vendor:b\");",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-02-output-order-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > passes end to end and prints the exact lines of SPEC-v4 \u00a75 steps 5, 6 and 8"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-02-output-order-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "03-output-token",
+    "property": "every output line excludes token",
+    "old": "lines.push(line);",
+    "new": "lines.push(line); lines.push(FAKE_VENDOR_AUTHORIZATION.slice(\"Bearer \".length));",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-03-output-token-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > passes end to end and prints the exact lines of SPEC-v4 \u00a75 steps 5, 6 and 8",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > never prints the token, a scheme-prefixed credential or a path at or beneath the custody directory",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the first case that did not hold when the vendor rejects the provisioned credential",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the refusal case whose message differs from the table",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED with the resolver's own error and never falls back",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED when the run-time certificate cannot be built"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-03-output-token-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "04-output-scheme",
+    "property": "every output line excludes credential scheme",
+    "old": "lines.push(line);",
+    "new": "lines.push(line); lines.push(\"Bearer synthetic-mutant\");",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-04-output-scheme-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > passes end to end and prints the exact lines of SPEC-v4 \u00a75 steps 5, 6 and 8",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > never prints the token, a scheme-prefixed credential or a path at or beneath the custody directory",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the first case that did not hold when the vendor rejects the provisioned credential",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the refusal case whose message differs from the table",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED with the resolver's own error and never falls back",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED when the run-time certificate cannot be built"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-04-output-scheme-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "05-output-custody",
+    "property": "every output line excludes custody descendants",
+    "old": "lines.push(line);",
+    "new": "lines.push(line); if (scratchRoot) lines.push(join(scratchRoot, \"custody.d\", \"vendor.header\"));",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-05-output-custody-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > passes end to end and prints the exact lines of SPEC-v4 \u00a75 steps 5, 6 and 8",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > never prints the token, a scheme-prefixed credential or a path at or beneath the custody directory",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the first case that did not hold when the vendor rejects the provisioned credential",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the refusal case whose message differs from the table",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED with the resolver's own error and never falls back",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED when the run-time certificate cannot be built"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-05-output-custody-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "06-scratch-removal",
+    "property": "all outcomes remove scratch before return",
+    "old": "await rm(scratchRoot, { recursive: true, force: true });",
+    "new": "await Promise.resolve();",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-06-scratch-removal-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > passes end to end and prints the exact lines of SPEC-v4 \u00a75 steps 5, 6 and 8",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > removes the scratch root and releases the port before it returns",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the first case that did not hold when the vendor rejects the provisioned credential",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the refusal case whose message differs from the table",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED with the resolver's own error and never falls back",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED when the run-time certificate cannot be built"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-06-scratch-removal-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "07-admission-check",
+    "property": "wrong credential cannot print admitted",
+    "old": "if (members.length !== 1 || members[0]?.provider_ref !== \"vendor:a\" || members[0]?.maker !== \"Acme\")",
+    "new": "if (false)",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-07-admission-check-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the first case that did not hold when the vendor rejects the provisioned credential"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-07-admission-check-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "08-refusal-equality",
+    "property": "first mismatched refusal stops the run",
+    "old": "caught.message !== refusal.expected",
+    "new": "false",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-08-refusal-equality-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the refusal case whose message differs from the table"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-08-refusal-equality-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "09-dns-error",
+    "property": "resolver own error classified UNVERIFIED",
+    "old": "stop(\"UNVERIFIED\", `dns ${errorCode(error)}`);",
+    "new": "stop(\"FAIL\", `dns ${errorCode(error)}`);",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-09-dns-error-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED with the resolver's own error and never falls back"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-09-dns-error-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "10-dns-nonloopback",
+    "property": "non-loopback DNS gets its own verdict",
+    "old": "stop(\"UNVERIFIED\", \"dns non-loopback\");",
+    "new": "stop(\"UNVERIFIED\", \"dns no-ipv4-loopback\");",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-10-dns-nonloopback-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED with the resolver's own error and never falls back"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-10-dns-nonloopback-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "11-tls-material",
+    "property": "unavailable certificate tool classified UNVERIFIED",
+    "old": "stop(\"UNVERIFIED\", \"tls-material openssl-unavailable\");",
+    "new": "stop(\"FAIL\", \"internal\");",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-11-tls-material-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED when the run-time certificate cannot be built"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-11-tls-material-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "12-law-token",
+    "property": "stdout predicate token arm",
+    "old": "forbidden.tokens.some((token) => line.includes(token))",
+    "new": "false",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-12-law-token-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > flags every line the stdout law forbids and passes the lawful refusal codes"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-12-law-token-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "13-law-scheme",
+    "property": "stdout predicate scheme arm",
+    "old": "/Bearer \\S/u.test(line)",
+    "new": "false",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-13-law-scheme-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > flags every line the stdout law forbids and passes the lawful refusal codes"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-13-law-scheme-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "14-law-directory",
+    "property": "stdout predicate includes custody directory itself",
+    "old": "line.includes(path)",
+    "new": "line.includes(path + \"/\")",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-14-law-directory-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > flags every line the stdout law forbids and passes the lawful refusal codes"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-14-law-directory-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "15-law-descendant",
+    "property": "stdout predicate includes custody descendants",
+    "old": "line.includes(path)",
+    "new": "line === path",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-15-law-descendant-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > flags every line the stdout law forbids and passes the lawful refusal codes"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-15-law-descendant-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "16-law-codes",
+    "property": "lawful refusal codes are admitted",
+    "old": "return forbidden.tokens.some",
+    "new": "return line.includes(\"AUTHORIZATION\") || forbidden.tokens.some",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-16-law-codes-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > passes end to end and prints the exact lines of SPEC-v4 \u00a75 steps 5, 6 and 8",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the first case that did not hold when the vendor rejects the provisioned credential",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > flags every line the stdout law forbids and passes the lawful refusal codes"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-16-law-codes-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "17-listener-release",
+    "property": "listener is closed before return",
+    "old": "await vendor?.close();",
+    "new": "if (vendor) { const activeVendor = vendor; setTimeout(() => { void activeVendor.close(); }, 1000); }",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-17-listener-release-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > removes the scratch root and releases the port before it returns"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-17-listener-release-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  },
+  {
+    "id": "18-scratch-prefix",
+    "property": "scratch basename has no custody",
+    "old": "mkdtemp(join(tmpdir(), \"pes-s02-\"))",
+    "new": "mkdtemp(join(tmpdir(), \"pes-s02-custody-\"))",
+    "red": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-mutant-18-scratch-prefix-attempt-1.log",
+      "marker": "CLUSTER_RED",
+      "failures": [
+        " FAIL  acceptance/pes-s02-hosted.test.ts > passes end to end and prints the exact lines of SPEC-v4 \u00a75 steps 5, 6 and 8",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > never prints the token, a scheme-prefixed credential or a path at or beneath the custody directory",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the first case that did not hold when the vendor rejects the provisioned credential",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > names the refusal case whose message differs from the table",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED with the resolver's own error and never falls back",
+        " FAIL  acceptance/pes-s02-hosted.test.ts > reports UNVERIFIED when the run-time certificate cannot be built"
+      ]
+    },
+    "green": {
+      "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/BUILD-PES-S02-C3/S02-S18-restore-18-scratch-prefix-attempt-1.log",
+      "marker": "CLUSTER_GREEN",
+      "failures": []
+    },
+    "restore": " M dialectical-engine/package.json\n?? dialectical-engine/acceptance/pes-s02-hosted-cli.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.test.ts\n?? dialectical-engine/acceptance/pes-s02-hosted.ts\n"
+  }
+]

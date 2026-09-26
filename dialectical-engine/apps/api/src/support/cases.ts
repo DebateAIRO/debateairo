@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
+import {
+  isSupportLanguage,
+  supportLocaleNames,
+  type SupportLanguage,
+} from "@debateai/support-kb/catalog";
 import type { PromptPacket } from "@debateai/providers";
 import type { SupportKeyPort } from "./keys.js";
 import { buildSupportDraftSummaryPrompt } from "./prompt.js";
@@ -7,7 +12,7 @@ import { redactSupportMessage } from "./session.js";
 import {
   parseSupportCaseSummaryDraft,screenSupportModelText
 } from "./response-policy.js";
-import { SHREDDED_NOTICE,type SupportLanguage } from "./templates.js";
+import { supportTemplate } from "./templates.js";
 
 export type SupportCasePredicate = "E1" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8";
 export type SupportCaseState = "NEW" | "WAITING_ON_V" | "WAITING_ON_USER" | "CLOSED";
@@ -56,11 +61,6 @@ export const SUPPORT_SUMMARY_PROMPT =
   + "Do not state or guess who the user is, whether they are the account owner, "
   + "or whether their request is legitimate.";
 
-const SUPPORT_SUMMARY_REPLACEMENT: Readonly<Record<SupportLanguage,string>> = Object.freeze({
-  en: "The advisory summary was omitted because it did not pass Support safety checks.",
-  ro: "Rezumatul consultativ a fost omis deoarece nu a trecut verificările de siguranță ale Asistenței."
-});
-
 export type SupportCaseSummaryRecord = Readonly<{
   caseId: string;
   status: "DONE" | "TIMED_OUT";
@@ -86,6 +86,23 @@ function boundedSummary(text: string): string | null {
   const firstEighty = words.slice(0,80);
   const boundary = firstEighty.findLastIndex((word) => /[.!?]$/u.test(word));
   return boundary < 0 ? null : firstEighty.slice(0,boundary + 1).join(" ");
+}
+
+function storedSupportLanguage(value: unknown): SupportLanguage {
+  if (!isSupportLanguage(value)) throw new SupportCaseError("SUPPORT_LANGUAGE_INVALID");
+  return value;
+}
+
+/**
+ * The instruction the advisory-summary packet carries. en and ro send dev's
+ * reviewed `SUPPORT_SUMMARY_PROMPT` bytes unchanged (the prompt-text pins are
+ * the bytes that reach the packet); only the 33 new interface locales name the
+ * prose language.
+ */
+function supportSummaryInstruction(language: SupportLanguage): string {
+  if (language === "en" || language === "ro") return SUPPORT_SUMMARY_PROMPT;
+  const { english,native } = supportLocaleNames(language);
+  return `${SUPPORT_SUMMARY_PROMPT} Write text in ${english} (${native}). kind stays case_summary.`;
 }
 
 export function createAdvisorySummaryService(input: Readonly<{
@@ -121,7 +138,7 @@ export function createAdvisorySummaryService(input: Readonly<{
         // SYNC3 / R1: the JSON-draft contract, whose locked form states the
         // shape `parseSupportCaseSummaryDraft` enforces below.
         packet: buildSupportDraftSummaryPrompt({
-          instruction: SUPPORT_SUMMARY_PROMPT,
+          instruction: supportSummaryInstruction(request.language),
           transcript: request.transcript
         }).packet,
         language: request.language,signal
@@ -142,7 +159,7 @@ export function createAdvisorySummaryService(input: Readonly<{
         ? parseSupportCaseSummaryDraft(result.text) : null;
       const candidate = draft === null ? null : boundedSummary(draft.text);
       const summary = timedOut ? null
-        : candidate ?? SUPPORT_SUMMARY_REPLACEMENT[request.language];
+        : candidate ?? supportTemplate("SUMMARY_REPLACED",request.language);
       if (timedOut) {
         try {
           await input.persist({
@@ -373,6 +390,7 @@ export function createSupportCaseAccessService(input: Readonly<{
   }
 
   async function read(row: Readonly<Record<string,unknown>>): Promise<SupportCaseViewRecord> {
+    const language = storedSupportLanguage(row.language);
     return withDataKey(row,(dataKey) => {
       const caseId = String(row.case_id);
       const transcriptCiphertext = encryptedBytes(row.transcript_snapshot_ciphertext);
@@ -431,14 +449,12 @@ export function createSupportCaseAccessService(input: Readonly<{
             const opened = summaryPlaintext.toString("utf8");
             const bounded = boundedSummary(opened);
             summary = bounded !== null && screenSupportModelText(bounded)
-              ? bounded : SUPPORT_SUMMARY_REPLACEMENT[
-                row.language === "ro" ? "ro" : "en"
-              ];
+              ? bounded : supportTemplate("SUMMARY_REPLACED",language);
           }
         } finally { summaryCiphertext?.fill(0); }
         return Object.freeze({
           kind: "READABLE",caseId,
-          language: row.language as SupportLanguage,state: row.state as SupportCaseState,
+          language,state: row.state as SupportCaseState,
           slaHours: Number(row.sla_hours),messages: Object.freeze(messages),summary,
           nextCursor: encodeCaseCursor(row.case_message_next_cursor)
         });
@@ -452,12 +468,15 @@ export function createSupportCaseAccessService(input: Readonly<{
 
   return Object.freeze({
     listOwn: async (identityOwnerRef) => Object.freeze(
-      (await input.repository.listOwnCases(identityOwnerRef)).map((row) => Object.freeze({
-        caseId: String(row.case_id),
-        state: String(row.state) as SupportCaseState,
-        language: row.language === "ro" ? "ro" : "en",
-        createdAt: new Date(String(row.created_at))
-      }))
+      (await input.repository.listOwnCases(identityOwnerRef)).map((row) => {
+        const language = storedSupportLanguage(row.language);
+        return Object.freeze({
+          caseId: String(row.case_id),
+          state: String(row.state) as SupportCaseState,
+          language,
+          createdAt: new Date(String(row.created_at))
+        });
+      })
     ),
     readByToken: async (tokenSha256,pagination) => {
       const cursor = decodeCaseCursor(pagination?.cursor);
@@ -469,13 +488,13 @@ export function createSupportCaseAccessService(input: Readonly<{
       if (tokenRefused(row,pagination?.at ?? clock(),pagination?.callerOwnerRef ?? null)) {
         return null;
       }
+      const language = storedSupportLanguage(row.language);
       if (shreddedRow(row)) {
-        const language = row.language === "ro" ? "ro" : "en";
         return Object.freeze({
           kind: "SHREDDED",caseId: String(row.case_id),language,
           state: row.state as SupportCaseState,slaHours: Number(row.sla_hours),
           messages: Object.freeze([]),summary: null,nextCursor: null,
-          notice: SHREDDED_NOTICE[language]
+          notice: supportTemplate("SHREDDED_NOTICE",language)
         });
       }
       return read(row);
@@ -491,9 +510,9 @@ export function createSupportCaseAccessService(input: Readonly<{
       const row = await input.repository.readCaseEncrypted({ tokenSha256: request.tokenSha256 });
       if (row === null) return null;
       if (tokenRefused(row,request.at,request.callerOwnerRef ?? null)) return null;
-      const language = row.language === "ro" ? "ro" : "en";
+      const language = storedSupportLanguage(row.language);
       if (shreddedRow(row)) return Object.freeze({
-        kind: "SHREDDED" as const,notice: SHREDDED_NOTICE[language]
+        kind: "SHREDDED" as const,notice: supportTemplate("SHREDDED_NOTICE",language)
       });
       const prepared = redactSupportMessage(request.text);
       const plaintext = Buffer.from(prepared.text,"utf8");
@@ -514,7 +533,7 @@ export function createSupportCaseAccessService(input: Readonly<{
           throw new SupportCaseError("SUPPORT_CASE_MESSAGE_LIMIT");
         }
         if (appended === "SHREDDED") return Object.freeze({
-          kind: "SHREDDED" as const,notice: SHREDDED_NOTICE[language]
+          kind: "SHREDDED" as const,notice: supportTemplate("SHREDDED_NOTICE",language)
         });
         return appended;
       } finally { plaintext.fill(0);ciphertext?.fill(0); }
@@ -543,6 +562,7 @@ export class SupportCaseError extends TypedDomainError {
     | "SUPPORT_SUMMARY_INVALID"
     | "SUPPORT_SUMMARY_SEAL_FAILED"
     | "SUPPORT_SUMMARY_PERSIST_FAILED"
+    | "SUPPORT_LANGUAGE_INVALID"
   ) {
     super(code,code);
     this.name = "SupportCaseError";

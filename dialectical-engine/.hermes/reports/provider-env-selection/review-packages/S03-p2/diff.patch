@@ -1,0 +1,326 @@
+diff --git a/dialectical-engine/deploy/vps/README.md b/dialectical-engine/deploy/vps/README.md
+index 43525a6ad..ed38113a9 100644
+--- a/dialectical-engine/deploy/vps/README.md
++++ b/dialectical-engine/deploy/vps/README.md
+@@ -16,19 +16,6 @@ Audit corrections folded in: `L2-F3` (backups must carry custody, secrets escrow
+ Measured against the tree at this commit. Each is stale in a way that would stop
+ a first provision, so read this list before following the section:
+ 
+-- **§11's hosted provider target example** does not carry
+-  `input_price_micros_per_million` / `output_price_micros_per_million`, which
+-  both services now REQUIRE in hosted mode: provisioned exactly as printed,
+-  each unit refuses at boot with `PROVIDER_TARGET_PRICE_REQUIRED:` and the
+-  provider ref.
+-- **§11's refusal-code table is incomplete.** Six codes this tree can emit are
+-  missing from it: `PROVIDER_TARGET_PRICE_REQUIRED`, `PROVIDER_TARGET_PRICE_ZERO`,
+-  `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`, `COST_ENVELOPE_POLICY_UNRESOLVED`,
+-  `COST_ENVELOPE_POLICY_INVALID` and `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`.
+-- **"the daily call cap is the only ceiling" (§11, the support-chat note) is out
+-  of date** as a statement of what the code does: a hosted deployment refuses to
+-  start until the cost envelopes are sealed. (§10's own envelope bullet is
+-  accurate — it already names `COST_ENVELOPES_NOT_SEALED`.)
+ - **"KEK rotation is not implemented" (§10, "What is deliberately absent") is
+   false.** It shipped as `pnpm keys:rotate-kek`; §3 "Changing a master key" is
+   the procedure.
+@@ -709,8 +696,9 @@ Record each drill: date, artefact, `core.run` count, chain totals, and the decry
+   **local** deployment — a supported product path for anyone running the repository on their own
+   computer — which this host refuses in code. What remains open is only the vendor list and the
+   spend ceiling: V names the vendors when the accounts exist, and the per-run and daily cost
+-  envelopes are V-28's (until they are sealed, a hosted runner refuses to start with
+-  `COST_ENVELOPES_NOT_SEALED`).
++  envelopes are V-28's. Until V-28's cost-envelope policy is sealed at the register version a
++  hosted deployment runs, that deployment refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED`
++  or `COST_ENVELOPE_POLICY_INVALID`.
+ - Six P3-01 principals are `REQUIRED_NOT_WIRED` (`evaluator-worker`, `evaluator-api`,
+   `evaluator-reader`, `obs-writer`, `obs-listener`, `obs-watchdog`). The provisioner reconciles all
+   sixteen and expects a credential for each; either wire them or provision them with `VALID UNTIL`
+@@ -746,7 +734,13 @@ carries `SUPPORT_RELAY_NOT_COMPOSED:` and the ref that could not be composed.
+ 
+ **What the support chat cannot tell you yet.** Its spend row records the tokens a vendor
+ reports, but most vendors report no money at all, so the `cost_usd` column stays empty and the
+-daily call cap is the only ceiling until the cost envelope (V-28) is published. A reply that
++deployment still needs sealed cost envelopes (V-28). A hosted deployment reads the `costEnvelopePolicy`
++row in force at its own `REGISTER_VERSION` and refuses to start with
++`COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with
++`COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed.
++`COST_ENVELOPES_NOT_SEALED` is a check on the integrity of the build: it fires only when the
++envelope row this build ships was removed, emptied or made invalid, and the shipped source
++never reaches it at runtime. A reply that
+ carries no cost is logged once as `SUPPORT_MODEL_COST_UNREPORTED`, so an empty column is never
+ mistaken for a call that was free.
+ 
+@@ -765,6 +759,8 @@ answer, or any part of either.
+ can start without answering the question. A production unit that omits it refuses with
+ `DEPLOYMENT_MODE_UNRESOLVED`; a typo refuses with `DEPLOYMENT_MODE_INVALID`.
+ 
++The paid-vendor probe spends `max_tokens: 8` per target per staleness window; the window is the `panelDiscoveryPolicy` register row's `probe_freshness_ms`, validated only as a positive integer. The development seed publishes `600000`. Hosted mode enforces no minimum, so the number an operator publishes is the whole control.
++
+ ### What the hosted mode refuses, in code
+ 
+ | Code | Meaning |
+@@ -776,10 +772,18 @@ can start without answering the question. A production unit that omits it refuse
+ | `PROVIDER_INLINE_CREDENTIAL_REFUSED:` and the provider ref | a credential written into `PROVIDER_DISCOVERY_TARGETS_JSON` instead of a file. |
+ | `PROVIDER_AUTHORIZATION_FILE_ABSENT:` and the provider ref | nothing is provisioned at that `authorization_file` path. Provision the file; do not go looking at the one that is there, because there is not one. The reader's own code for this, if you meet it in the source, is `PROVIDER_CREDENTIAL_FILE_ABSENT`. |
+ | `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:` the provider ref, then the reason | the credential file is there but cannot be used: it failed custody (`SECRET_CUSTODY_INVALID`), the custody group could not be resolved (`CUSTODY_GROUP_UNRESOLVED`), or its contents are not one printable header line (`PROVIDER_CREDENTIAL_FILE_INVALID`). Neither the path nor a byte of the credential appears in the message. |
+-| `COST_ENVELOPES_NOT_SEALED` | the per-run and daily cost envelopes (V-28) are not published yet. A hosted runner refuses to claim work until they are. |
++| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows below. |
+ | `RUNNER_PRIMARY_PROVIDER_REF_DRIFT` | `PROVIDER_REF` does not name the FIRST entry of `PROVIDER_DISCOVERY_TARGETS_JSON`. |
+ | `SUPPORT_MODEL_CREDENTIAL_ABSENT` | the support chat's target names a vendor API and declares no credential at all — no `authorization_file`. Every row above applies to `SUPPORT_MODEL_TARGET_JSON` as well; these last two are the support chat's own. |
+ | `SUPPORT_MODEL_PATH_NOT_RATIFIED` | `SUPPORT_MODEL_TARGET_JSON` is neither of the two lawful shapes: a vendor API (`https:`, path ending in `/v1`) or, in LOCAL mode only, the ratified loopback relay. A target that IS an API target but is malformed refuses with the matching `PROVIDER_DISCOVERY_*` code instead, so this one means "this is not a target". |
++| `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` | one price member is declared without the other, or a declared amount is not an integer from 0 through `Number.MAX_SAFE_INTEGER`. |
++| `PROVIDER_TARGET_PRICE_REQUIRED:` and the provider ref | hosted mode, and a debate target declares no price pair. |
++| `PROVIDER_TARGET_PRICE_ZERO:` and the provider ref | hosted mode, and a declared input or output price is below 1 micro-unit per million tokens. |
++| `COST_ENVELOPE_POLICY_UNRESOLVED` | no `costEnvelopePolicy` row exists at the resolved `REGISTER_VERSION`. |
++| `COST_ENVELOPE_POLICY_INVALID` | the `costEnvelopePolicy` row exists but does not parse, or its `source_ref` is blank. |
++| `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` | hosted mode, and the `admissionPolicy` row in force at the resolved `REGISTER_VERSION` lacks at least one of the three support budgets: `support_reads`, `support_sessions`, `support_model_calls`. |
++
++`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two.
+ 
+ ### The credential-file contract
+ 
+@@ -843,10 +847,13 @@ JSON array; add one object to it. Its members:
+ | `provider_ref` | the vendor's ref, identical in both files and in the register row |
+ | `base_url` | the vendor's OpenAI-compatible endpoint, `https:`, path ending in `/v1`, no query and no fragment. **It must be a real public name.** The start-up check reads the literal address written here and does no name resolution, so a hostname that resolves to this machine is NOT detected — it is admitted. Checking that the vendor's hostname is a genuine public endpoint is the operator's responsibility until a resolved-address check exists. |
+ | `model` | the model id to call |
++| `input_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million input tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
++| `output_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million output tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
+ | `authorization_file` | the absolute path from step 2 — **that service's own copy**: the runner's path in `runner.env`, the API's in `api.env` |
+ 
+-In `runner.env` the entry for the example above reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header"}`,
+-and in `api.env` the same entry with `/etc/debateai/api/providers/acme.header`.
++In `runner.env` the entry for the example above reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000,"authorization_file":"/etc/debateai/runner/providers/acme.header"}`.
++In `api.env` it reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000,"authorization_file":"/etc/debateai/api/providers/acme.header"}`.
++The two illustrative amounts represent the vendor's own published rate in micro-USD per million tokens; replace them per vendor.
+ An `authorization_header` member alongside `authorization_file` refuses with
+ `PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT` rather than guessing which one is live.
+ 
+diff --git a/dialectical-engine/tests/unit/v9-provider-credential-files.test.ts b/dialectical-engine/tests/unit/v9-provider-credential-files.test.ts
+index 6761e163c..1f9491472 100644
+--- a/dialectical-engine/tests/unit/v9-provider-credential-files.test.ts
++++ b/dialectical-engine/tests/unit/v9-provider-credential-files.test.ts
+@@ -394,6 +394,96 @@ describe("V-9 the local dev stack refuses a credential file it cannot honour", (
+  * the codes are read OUT OF THE SOURCE and every one of them must appear in §11.
+  */
+ describe("V-9 the kit names every refusal the credential path can emit", () => {
++  const refusalTableRows = (readme: string): string[] => {
++    const refusal = readme.slice(
++      readme.indexOf("### What the hosted mode refuses, in code"),
++      readme.indexOf("### The credential-file contract")
++    ).split("\n");
++    const header = refusal.findIndex((line) => /^\s*\|\s*Code\s*\|\s*Meaning\s*\|\s*$/u.test(line));
++    if (header < 0 || !/^\s*\|[ \t:-]+\|[ \t:-]+\|\s*$/u.test(refusal[header + 1] ?? "")) return [];
++    const body = refusal.slice(header + 2);
++    const end = body.findIndex((line) => !/^\s*\|/u.test(line));
++    return body.slice(0, end < 0 ? body.length : end);
++  };
++
++  it("names every start-up refusal the price and cost-envelope surfaces can raise", async () => {
++    const read = (path: string) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
++    const providers = await read("packages/providers/src/index.ts");
++    const support = await read("apps/api/src/support/model.ts");
++    const envelope = await read("packages/register/src/cost-envelope-policy.ts");
++    const runtime = await read("packages/register/src/runtime-environment.ts");
++    // slices/S03/PLAN.md §1b, rows E1…E7 in order. Anchors are strings, never line numbers.
++    const anchors: ReadonlyArray<readonly [string, string, string]> = [
++      [providers, "const PROVIDER_CREDENTIAL_REFUSAL_CODES", "] as const);"],
++      [providers, "const PROVIDER_CREDENTIAL_ABSENT_CODE = ", ";"],
++      [support, "export const SUPPORT_MODEL_STARTUP_REFUSAL_CODES", "] as const);"],
++      [providers, "export function assertPricedProviderTargets", "\n}"],
++      [providers, "function providerTargetPriceAmount", "\n}"],
++      [envelope, "export function costEnvelopePolicyFromValue", "\n}"],
++      [envelope, "export async function readCostEnvelopePolicy", "\n}"],
++      [runtime, "export class SupportAdmissionScopesNotSealedError", "\n}"]
++    ];
++    const union = new Set<string>();
++    for (const [source, from, until] of anchors) {
++      const start = source.indexOf(from);
++      expect(start, from).toBeGreaterThanOrEqual(0);
++      const body = source.slice(start, source.indexOf(until, start + from.length) + until.length);
++      const codes = [...body.matchAll(/[`"]([A-Z][A-Z0-9_]{4,})(?=[:`"])/gu)].map((match) => match[1]!);
++      expect(codes.length, from).toBeGreaterThan(0);
++      for (const code of codes) union.add(code);
++    }
++    expect(union.size).toBe(12);
++    const readme = await read("deploy/vps/README.md");
++    const refusal = readme.slice(
++      readme.indexOf("### What the hosted mode refuses, in code"),
++      readme.indexOf("### The credential-file contract")
++    );
++    // (1) ARCH-REV p1 N4 — the house style of C1-2's rows has a guard of its own.
++    expect(refusal, "no angle-bracket placeholder in §11's refusal table").not.toMatch(/<[a-z-]+>/u);
++    // (1b) ARCH-REV p2 B1 — hosted boot runs rules before the parse (C1-3), so this order claim is false.
++    expect(refusal, "no 'before any hosted rule' order claim in §11's refusal span").not.toMatch(
++      /\bbefore (?:any|every|all|the) hosted rules?\b/iu
++    );
++    // (2) R3.5 — source-derived codes belong to the refusal table, including nested reasons.
++    const tableRows = refusalTableRows(readme);
++    for (const code of union) expect(tableRows.join("\n"), code).toContain(code);
++    // R3.3 / V-8 — independently pin the operator table's first-column contract.
++    // Prose mentions cannot replace rows; extra, duplicate and run-time rows also fail.
++    const rowCodes = tableRows.map((row) => {
++      const firstColumn = row.split("|")[1] ?? "";
++      const codes = [...firstColumn.matchAll(/`([A-Z][A-Z0-9_]*):?`/gu)].map((match) => match[1]!);
++      return codes.length === 1 ? codes[0] : null;
++    });
++    expect(rowCodes.sort(), "exact start-up refusal codes in the table's first column").toEqual([
++      "DEPLOYMENT_MODE_UNRESOLVED",
++      "DEPLOYMENT_MODE_INVALID",
++      "PROVIDER_BASE_URL_TLS_REQUIRED",
++      "PROVIDER_TARGET_LOOPBACK_REFUSED",
++      "PROVIDER_INLINE_CREDENTIAL_REFUSED",
++      "PROVIDER_AUTHORIZATION_FILE_ABSENT",
++      "PROVIDER_AUTHORIZATION_FILE_UNUSABLE",
++      "COST_ENVELOPES_NOT_SEALED",
++      "RUNNER_PRIMARY_PROVIDER_REF_DRIFT",
++      "SUPPORT_MODEL_CREDENTIAL_ABSENT",
++      "SUPPORT_MODEL_PATH_NOT_RATIFIED",
++      "PROVIDER_DISCOVERY_TARGET_PRICE_INVALID",
++      "PROVIDER_TARGET_PRICE_REQUIRED",
++      "PROVIDER_TARGET_PRICE_ZERO",
++      "COST_ENVELOPE_POLICY_UNRESOLVED",
++      "COST_ENVELOPE_POLICY_INVALID",
++      "SUPPORT_ADMISSION_SCOPES_NOT_SEALED"
++    ].sort());
++    // (3) ARCH-REV p1 N1, p2 B1 — C1-3's EXACT sentence, BELOW the table only, whitespace collapsed.
++    const lines = refusal.split("\n");
++    const belowTable = lines
++      .slice(lines.map((line) => line.startsWith("|")).lastIndexOf(true) + 1)
++      .join(" ")
++      .replace(/\s+/gu, " ");
++    expect(belowTable, "guard-order sentence below the table, EXACT (C1-3)").toContain(
++      "`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two."
++    );
++  });
++
+   it("lists each code the resolver can produce, read from the source", async () => {
+     const providers = await readFile(
+       new URL("../../packages/providers/src/index.ts", import.meta.url), "utf8"
+@@ -410,8 +500,9 @@ describe("V-9 the kit names every refusal the credential path can emit", () => {
+       new URL("../../deploy/vps/README.md", import.meta.url), "utf8"
+     );
+     const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
++    const table = refusalTableRows(readme).join("\n");
+     for (const code of [...codes, absent!, "PROVIDER_AUTHORIZATION_FILE_ABSENT"]) {
+-      expect(section, code).toContain(code);
++      expect(table, code).toContain(code);
+     }
+     // ...and it may no longer promise a code the credential reader cannot emit.
+     expect(codes).not.toContain("KEK_UNRESOLVED");
+@@ -598,3 +689,117 @@ describe("V-9 a new OpenAI-compatible vendor needs no code (task 10c)", () => {
+       .toThrowError(new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH"));
+   });
+ });
++
++describe("S03 §11 says what the shipped code does", () => {
++  it("README §11's hosted target carries both price members, in the member table and in both env forms", async () => {
++    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
++    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
++    const memberStart = section.indexOf("| Member | Value |");
++    const members = section.slice(memberStart, section.indexOf("\n\n", memberStart));
++    for (const member of ["input_price_micros_per_million", "output_price_micros_per_million"]) {
++      expect(members, member).toContain(member);
++    }
++    const examples = section.split("\n").filter((line) =>
++      /"input_price_micros_per_million":\s*\d+/u.test(line));
++    expect(examples, "two distinct priced env forms").toHaveLength(2);
++    for (const service of ["runner", "api"]) {
++      const example = examples.find((line) => line.includes(`/etc/debateai/${service}/providers/`)) ?? "";
++      expect(example, `${service} input price`).toMatch(/"input_price_micros_per_million":\s*\d+/u);
++      expect(example, `${service} output price`).toMatch(/"output_price_micros_per_million":\s*\d+/u);
++    }
++  });
++
++  it("README §11's support-chat note names the sealed-envelope refusal, not a daily cap ceiling", async () => {
++    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
++    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
++    expect(section.replace(/\s+/gu, " ")).not.toMatch(/the daily call cap is the only ceiling/u);
++    const paragraph = section.split(/\n[ \t]*\n/u)
++      .find((block) => block.includes("SUPPORT_MODEL_COST_UNREPORTED")) ?? "";
++    expect(paragraph).toContain("COST_ENVELOPES_NOT_SEALED");
++  });
++
++  it("README §11 states the paid-probe cost exposure in the tree's own numbers", async () => {
++    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
++    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"));
++    expect(section.match(/max_tokens/gu) ?? [], "max_tokens appears once in §11").toHaveLength(1);
++    const paragraph = section.split(/\n[ \t]*\n/u).find((block) => block.includes("max_tokens")) ?? "";
++    for (const token of ["probe_freshness_ms", "panelDiscoveryPolicy"]) expect(paragraph, token).toContain(token);
++    expect(paragraph, "the seed's 600000").toMatch(/\b600_?000\b/u);
++    const withoutSpecPhrase = paragraph.replace(/no recommended value/giu, "");
++    for (const word of [/\brecommend\w*/iu, /\bsuggest\w*/iu, /\bshould be\b/iu]) {
++      expect(withoutSpecPhrase, `no recommended value: ${word}`).not.toMatch(word);
++    }
++  });
++
++  it("README's known-stale list no longer carries the bullets §11 now answers", async () => {
++    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
++    const start = readme.indexOf("## Known-stale sections");
++    const stale = readme.slice(start, readme.indexOf("\n---\n", start)).replace(/\s+/gu, " ");
++    for (const obsolete of [
++      "§11's hosted provider target example",
++      "§11's refusal-code table is incomplete",
++      "the daily call cap is the only ceiling"
++    ]) expect(stale, obsolete).not.toContain(obsolete);
++    for (const survivor of ["KEK rotation is not implemented", "deploy/vps/env/api.env.example"]) {
++      expect(stale, survivor).toContain(survivor);
++    }
++  });
++});
++
++describe("S03 the kit names the cost-envelope refusal a hosted operator meets (V-11, V-14)", () => {
++  const kit = () => readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
++  const collapse = (text: string) => text.replace(/\s+/gu, " ");
++  const supportNote = (readme: string) => readme
++    .slice(readme.indexOf("## 11. Providers and vendors"))
++    .split(/\n[ \t]*\n/u)
++    .find((block) => block.includes("SUPPORT_MODEL_COST_UNREPORTED")) ?? "";
++  const ROW_START = "| `COST_ENVELOPES_NOT_SEALED` |";
++
++  it("README §11's support-chat note names the refusal a hosted operator meets (R3.4)", async () => {
++    const note = collapse(supportNote(await kit()));
++    expect(note, "the overruled sentence is gone (C3-4)").not.toContain(
++      "refuses to start until the cost envelopes are sealed"
++    );
++    expect(note, "R3.4 first part, EXACT (C3-4)").toContain(
++      "A hosted deployment reads the `costEnvelopePolicy` row in force at its own `REGISTER_VERSION` and refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with `COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed."
++    );
++    expect(note, "R3.4 second part, EXACT (C3-4)").toContain(
++      "`COST_ENVELOPES_NOT_SEALED` is a check on the integrity of the build: it fires only when the envelope row this build ships was removed, emptied or made invalid, and the shipped source never reaches it at runtime."
++    );
++  });
++
++  it("README §11's refusal row for COST_ENVELOPES_NOT_SEALED calls it a build-integrity check (R3.4b a)", async () => {
++    const readme = await kit();
++    const refusal = readme.slice(
++      readme.indexOf("### What the hosted mode refuses, in code"),
++      readme.indexOf("### The credential-file contract")
++    ).split("\n");
++    expect(refusal.filter((line) => line.startsWith(ROW_START)), "the row, EXACT, once, in the table (C3-5)").toEqual([
++      "| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows below. |"
++    ]);
++    const rowAt = (code: string) => refusal.findIndex((line) => line.startsWith("| `" + code + "` |"));
++    for (const code of ["COST_ENVELOPE_POLICY_UNRESOLVED", "COST_ENVELOPE_POLICY_INVALID"]) {
++      expect(rowAt(code), `${code}'s row is one of "the two rows below"`).toBeGreaterThan(rowAt("COST_ENVELOPES_NOT_SEALED"));
++    }
++    for (const stale of ["are not published yet", "refuses to claim work until they are"]) {
++      expect(collapse(readme), `no "${stale}" anywhere in the README`).not.toContain(stale);
++    }
++  });
++
++  it("README §10's production-maker bullet names the live refusal, and two lines name COST_ENVELOPES_NOT_SEALED (R3.4b b)", async () => {
++    const readme = await kit();
++    const start = readme.indexOf("- **The production maker path is now ruled");
++    expect(start, "§10's bullet exists").toBeGreaterThanOrEqual(0);
++    const bullet = readme.slice(start, readme.indexOf("\n- ", start + 1));
++    expect([...bullet.matchAll(/`([A-Z][A-Z0-9_]{4,})`/gu)].map((match) => match[1]), "the bullet names these two codes and no other (C3-6)")
++      .toEqual(["COST_ENVELOPE_POLICY_UNRESOLVED", "COST_ENVELOPE_POLICY_INVALID"]);
++    expect(collapse(bullet), "R3.4b (b), EXACT (C3-6)").toContain(
++      "Until V-28's cost-envelope policy is sealed at the register version a hosted deployment runs, that deployment refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`."
++    );
++    const mentions = readme.split("\n").filter((line) => line.includes("COST_ENVELOPES_NOT_SEALED"));
++    expect(mentions, "exactly two README lines name COST_ENVELOPES_NOT_SEALED (R3.4b)").toHaveLength(2);
++    expect(mentions.filter((line) => line.startsWith(ROW_START)), "one of them is the table row").toHaveLength(1);
++    const noteLines = supportNote(readme).split("\n");
++    expect(mentions.filter((line) => noteLines.includes(line)), "the other is inside the support-chat note").toHaveLength(1);
++  });
++});

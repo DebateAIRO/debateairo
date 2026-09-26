@@ -1,0 +1,17 @@
+{
+  "time.justNow": "たった今",
+  "time.minutes.other": "{count}分前",
+  "time.hours.other": "{count}時間前",
+  "time.yesterday": "昨日",
+  "time.days.other": "{count}日前",
+  "time.weeks.other": "{count}週間前",
+  "time.status.complete": "完了",
+  "time.status.queued": "待機中",
+  "time.status.claimed": "取得済み",
+  "time.status.running": "実行中",
+  "time.status.holding": "プロバイダー復旧のため保留中",
+  "time.status.settled": "確定済み",
+  "time.status.generating": "生成中",
+  "time.status.failed": "失敗",
+  "time.status.draft": "下書き"
+}

@@ -77,7 +77,7 @@ describe("rendered auth flow integration", () => {
       <LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />
     );
     const signUpHtml = renderToStaticMarkup(
-      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+      <SignUpFlow client={{ register: vi.fn() }} />
     );
     const cases = [
       { route: "/login", html: loginHtml },
@@ -205,7 +205,7 @@ describe("rendered auth flow integration", () => {
     await act(async () => root!.render(
       <>
         <TopBar />
-        <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+        <SignUpFlow client={{ register: vi.fn() }} />
       </>
     ));
     expect(document.querySelector('.authTopBar a[href="/"]')).not.toBeNull();
@@ -295,7 +295,7 @@ describe("rendered auth flow integration", () => {
   it("forwards sign-up next to login only when the parameter is present", async () => {
     window.history.replaceState({}, "", "/sign-up?next=%2Fnew");
     await act(async () => root!.render(
-      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+      <SignUpFlow client={{ register: vi.fn() }} />
     ));
     await settle();
 
@@ -306,21 +306,22 @@ describe("rendered auth flow integration", () => {
   it("keeps the sign-up login link query-free when next is absent", async () => {
     window.history.replaceState({}, "", "/sign-up");
     await act(async () => root!.render(
-      <SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />
+      <SignUpFlow client={{ register: vi.fn() }} />
     ));
     await settle();
 
     expect(document.querySelector('.authPanelFooter a')?.getAttribute("href")).toBe("/login");
   });
 
-  it("renders the non-enumerating registration state and resends only to the submitted email", async () => {
+  it("renders the non-enumerating registration state", async () => {
     const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
-    const resendVerification = vi.fn().mockResolvedValue({ message: RESEND_MESSAGE });
-    await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+    await act(async () => root!.render(<SignUpFlow client={{ register }} />));
 
     field("email").value = " person@example.test ";
+    field("confirm-email").value = " person@example.test ";
     field("recovery-email").value = " recovery@example.test ";
     field("password").value = "correct horse battery staple";
+    field("confirm-password").value = "correct horse battery staple";
     field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;
@@ -335,9 +336,6 @@ describe("rendered auth flow integration", () => {
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
     expect(document.body.textContent).toContain("No account status is revealed here.");
 
-    await click("Verify email");
-    expect(resendVerification).toHaveBeenCalledWith("person@example.test");
-    expect(document.body.textContent).toContain(RESEND_MESSAGE);
     expect(document.body.textContent).not.toMatch(/Google|forgot|keep me signed|model API key/i);
   });
 
@@ -439,14 +437,15 @@ describe("rendered auth flow integration", () => {
     const register = vi.fn().mockRejectedValue(
       new Error("ContractHttpError: duplicate account person@example.test")
     );
-    const resendVerification = vi.fn();
-    await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
+    await act(async () => root!.render(<SignUpFlow client={{ register }} />));
 
     expect(field("email").autocomplete).toBe("section-primary-email email");
     expect(field("recovery-email").autocomplete).toBe("section-recovery-email email");
     field("email").value = "person@example.test";
+    field("confirm-email").value = "person@example.test";
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "password";
+    field("confirm-password").value = "password";
     field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;
@@ -457,27 +456,7 @@ describe("rendered auth flow integration", () => {
     expect(document.body.textContent).not.toMatch(/ContractHttpError|duplicate account/);
   });
 
-  it("keeps resend failures generic without changing the non-enumerating success message", async () => {
-    const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
-    const resendVerification = vi.fn().mockRejectedValue(
-      new Error("network ECONNREFUSED api.internal")
-    );
-    await act(async () => root!.render(<SignUpFlow client={{ register, resendVerification }} />));
 
-    field("email").value = "person@example.test";
-    field("recovery-email").value = "recovery@example.test";
-    field("password").value = "password";
-    field("adult-affirmed").checked = true;
-    field("privacy-accepted").checked = true;
-    field("terms-accepted").checked = true;
-    await submit();
-    expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
-
-    await click("Verify email");
-    expect(document.querySelector('[role="alert"]')?.textContent)
-      .toBe("Verification instructions could not be resent.");
-    expect(document.body.textContent).not.toMatch(/ECONNREFUSED|api\.internal/);
-  });
 
   // S02-S31 (SPEC.md S02-R18): a bare `new Event("submit")` bypasses HTML constraint
   // validation, so `required` gates nothing against a scripted submit. The handler
@@ -487,13 +466,15 @@ describe("rendered auth flow integration", () => {
     const registerWithoutPrivacy = vi.fn();
     await act(async () =>
       root!.render(
-        <SignUpFlow client={{ register: registerWithoutPrivacy, resendVerification: vi.fn() }} />
+        <SignUpFlow client={{ register: registerWithoutPrivacy }} />
       )
     );
 
     field("email").value = "person@example.test";
+    field("confirm-email").value = "person@example.test";
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "correct horse battery staple";
+    field("confirm-password").value = "correct horse battery staple";
     field("adult-affirmed").checked = true;
     await submit();
 
@@ -508,13 +489,15 @@ describe("rendered auth flow integration", () => {
     const registerWithoutAdult = vi.fn();
     await act(async () =>
       root!.render(
-        <SignUpFlow client={{ register: registerWithoutAdult, resendVerification: vi.fn() }} />
+        <SignUpFlow client={{ register: registerWithoutAdult }} />
       )
     );
 
     field("email").value = "person@example.test";
+    field("confirm-email").value = "person@example.test";
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "correct horse battery staple";
+    field("confirm-password").value = "correct horse battery staple";
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;
     await submit();

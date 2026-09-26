@@ -27,6 +27,8 @@ import {
   workersFromDeployment,
   type SettingsView
 } from "./v3/adapter.js";
+import composeEnglish from "../messages/en/compose.json" with { type: "json" };
+import type { MessageCatalog } from "./i18n/translate.js";
 
 /**
  * UI-01 (DR-145): V2's browser data access, swapped onto V3's typed contract
@@ -134,10 +136,14 @@ export type DebateBundleReadOptions = Readonly<{
   answerExpected?: boolean;
   /** A served answer already rendered by SSR is authoritative over a lagging projection. */
   currentAnswer?: Answer | null;
+  /** The reader's `compose` catalogue: the projected detail's labels follow the interface locale. */
+  catalog?: MessageCatalog;
+  /** The reader's locale, for the projection's plural forms. */
+  locale?: string;
 }>;
 
-function servedDebateBundle(answer: Answer): DebateBundle {
-  return { kind: "served", answer, detail: debateDetailFromAnswer(answer), run: null };
+function servedDebateBundle(answer: Answer, catalog: MessageCatalog): DebateBundle {
+  return { kind: "served", answer, detail: debateDetailFromAnswer(answer, catalog), run: null };
 }
 
 /**
@@ -151,6 +157,7 @@ export async function getDebateBundle(
   client: ContractClient = contractClient,
   options: DebateBundleReadOptions = {}
 ): Promise<DebateBundle> {
+  const catalog = options.catalog ?? composeEnglish;
   let run: RunProjection | null = null;
   try {
     run = await client.readRun(id);
@@ -160,25 +167,29 @@ export async function getDebateBundle(
   if (run !== null) {
     if (run.state === "SETTLED" || options.answerExpected) {
       try {
-        return servedDebateBundle(await client.readRunAnswer(id));
+        return servedDebateBundle(await client.readRunAnswer(id), catalog);
       } catch (failure) {
         // The projection and answer are committed by separate bounded writes.
         // Treat a momentary answer miss as finalizing, never as a user error.
         if (!isNotFound(failure)) throw failure;
-        if (options.currentAnswer) return servedDebateBundle(options.currentAnswer);
+        if (options.currentAnswer) return servedDebateBundle(options.currentAnswer, catalog);
       }
     }
-    if (options.currentAnswer) return servedDebateBundle(options.currentAnswer);
+    if (options.currentAnswer) return servedDebateBundle(options.currentAnswer, catalog);
     if (run.state === "FAILED") {
-      return { kind: "failed", answer: null, detail: debateDetailFromRunProjection(run), run };
+      return { kind: "failed", answer: null, detail: debateDetailFromRunProjection(run, catalog, options.locale), run };
     }
-    return { kind: "loading", answer: null, detail: debateDetailFromRunProjection(run), run };
+    return { kind: "loading", answer: null, detail: debateDetailFromRunProjection(run, catalog, options.locale), run };
   }
-  return servedDebateBundle(await client.readAnswer(id));
+  return servedDebateBundle(await client.readAnswer(id), catalog);
 }
 
-export async function getDebate(id: string, client: ContractClient = contractClient): Promise<DebateDetail> {
-  const bundle = await getDebateBundle(id, requireToken(), client);
+export async function getDebate(
+  id: string,
+  client: ContractClient = contractClient,
+  catalog: MessageCatalog = composeEnglish
+): Promise<DebateDetail> {
+  const bundle = await getDebateBundle(id, requireToken(), client, { catalog });
   return bundle.detail;
 }
 
@@ -187,12 +198,18 @@ export async function getDebate(id: string, client: ContractClient = contractCli
  * surfaces receive their own "unavailable" state with an honest reason —
  * never a fabricated score payload, never a masked network call.
  */
-export function getDebateScoring(id: string): Promise<DebateScoringResponse> {
-  return Promise.resolve(scoringUnavailable(id));
+export function getDebateScoring(
+  id: string,
+  catalog: MessageCatalog = composeEnglish
+): Promise<DebateScoringResponse> {
+  return Promise.resolve(scoringUnavailable(id, catalog));
 }
 
-export function getDebateAdaptiveDepthDryRun(id: string): Promise<DebateAdaptiveDepthDryRunResponse> {
-  return Promise.resolve(adaptiveDepthUnavailable(id));
+export function getDebateAdaptiveDepthDryRun(
+  id: string,
+  catalog: MessageCatalog = composeEnglish
+): Promise<DebateAdaptiveDepthDryRunResponse> {
+  return Promise.resolve(adaptiveDepthUnavailable(id, catalog));
 }
 
 export function approveDebateAdaptiveDepthExpansion(

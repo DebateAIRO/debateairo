@@ -788,6 +788,7 @@ export {
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
   assertProductionFloors,
+  readOperatorCommandEnvironment,
   readSealedCostEnvelopeStatus,
   resolveDeploymentMode,
   CostEnvelopesNotSealedError,

@@ -7,6 +7,7 @@ import {
   type CookieCategory
 } from "../../lib/consent";
 import { backdropCloseHandler, useModalSurface } from "./modalSemantics";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /**
  * 10b — the per-category preferences card.
@@ -39,6 +40,7 @@ export type ConsentChoice = {
 };
 
 export type CookiePreferencesCardProps = {
+  catalog: MessageCatalog;
   /**
    * The two operable toggles as the card opens: a valid stored decision's
    * booleans, or R17's defaults when nothing valid is stored. Which of the two
@@ -85,6 +87,7 @@ export type CookiePreferencesCardProps = {
 };
 
 export function CookiePreferencesCard({
+  catalog,
   initial,
   onSave,
   onEssentialOnly,
@@ -158,11 +161,11 @@ export function CookiePreferencesCard({
       >
         <div className="consentCardCore">
           <span className="consentTab" aria-hidden="true" />
-          <div className="consentEyebrow">CHOOSE WHAT TO STORE</div>
+          <div className="consentEyebrow">{t(catalog, "consent.preferences.eyebrow")}</div>
           <div className="consentCardTitle" id={titleId}>
-            Cookie preferences
+            {t(catalog, "consent.preferences.title")}
           </div>
-          <div className="consentLede">Asked once. Revisit any time from Settings → Privacy.</div>
+          <div className="consentLede">{t(catalog, "consent.preferences.lede")}</div>
           <div className="consentCatList">
             {COOKIE_CATEGORIES.map((category) => {
               const on = stateOf(category.id);
@@ -170,18 +173,22 @@ export function CookiePreferencesCard({
                 <div className="consentCatRow" key={category.id}>
                   <div className="consentCatMain">
                     <div className="consentCatHead">
-                      <span className="consentCatName">{category.name}</span>
-                      <span className={`consentTag consentTag-${category.id}`}>{category.tag}</span>
+                      <span className="consentCatName">{t(catalog, category.nameKey)}</span>
+                      <span className={`consentTag consentTag-${category.id}`}>
+                        {t(catalog, category.tagKey)}
+                      </span>
                     </div>
-                    <div className="consentCatDesc">{category.description}</div>
-                    <div className="consentCatDetail">{category.detail}</div>
+                    <div className="consentCatDesc">{t(catalog, category.descriptionKey)}</div>
+                    <div className="consentCatDetail">
+                      {t(catalog, category.detailKey, category.detailVars)}
+                    </div>
                   </div>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={on}
                     aria-disabled={category.locked || undefined}
-                    aria-label={category.name}
+                    aria-label={t(catalog, category.nameKey)}
                     className="consentSwitch"
                     ref={
                       category.id === firstOperableId
@@ -213,11 +220,11 @@ export function CookiePreferencesCard({
           </div>
           <div className="consentCardFooter">
             <button type="button" className="consentLink" onClick={onRequestPolicy}>
-              Privacy notice
+              {t(catalog, "consent.preferences.privacyNotice")}
             </button>
             <span className="consentFooterGap" />
             <button type="button" className="consentGhost" onClick={onEssentialOnly}>
-              Essential only
+              {t(catalog, "consent.action.essentialOnly")}
             </button>
             <button
               type="button"
@@ -226,7 +233,7 @@ export function CookiePreferencesCard({
                 onSave({ essential: true, quality: toggles.quality, analytics: toggles.analytics })
               }
             >
-              Save choices
+              {t(catalog, "consent.preferences.saveChoices")}
             </button>
           </div>
         </div>

@@ -7,6 +7,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY, COOKIE_CATEGORIES } from "../../apps/ui/lib/consent.js";
 import { CookiePreferencesCard } from "../../apps/ui/components/consent/CookiePreferencesCard.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+import { t } from "../../apps/ui/lib/i18n/translate.js";
 
 // The acceptance command is pinned to the lane root, so source fixtures resolve
 // from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
@@ -25,6 +27,30 @@ const EYEBROW = "CHOOSE WHAT TO STORE";
 const TITLE = "Cookie preferences";
 const LEDE = "Asked once. Revisit any time from Settings → Privacy.";
 const FOOTER = ["Privacy notice", "Essential only", "Save choices"];
+/**
+ * Dev's twelve category strings, by row ([name, tag, description, detail]) — the bytes dev's
+ * `COOKIE_CATEGORIES` carried before localization moved them into `messages/en/consent.json`.
+ */
+const DEV_CATEGORY_STRINGS = [
+  [
+    "Essential",
+    "ALWAYS ON",
+    "Session, MFA state and the device record that lets you spot a login you do not recognise.",
+    "de_session · de_mfa · de_device — 30 days"
+  ],
+  [
+    "Model quality telemetry",
+    "OPTIONAL",
+    "Which arguments you challenge or flag, used to tune judge panels. Never tied to your debates’ text.",
+    "de_quality — 90 days · first-party"
+  ],
+  [
+    "Product analytics",
+    "OPTIONAL",
+    "Aggregate page and feature usage. No cross-site tracking, no advertising, never sold.",
+    "de_analytics — 90 days · first-party"
+  ]
+];
 /** Every string the card renders that is NOT one of the twelve category strings. */
 const CARD_CHROME = [EYEBROW, TITLE, LEDE, ...FOOTER];
 
@@ -126,6 +152,7 @@ function mountCard(handlers: CardHandlers = {}): HTMLElement {
   act(() => {
     root!.render(
       <CookiePreferencesCard
+        catalog={consentEnglish}
         initial={handlers.initial ?? DEFAULTS}
         onSave={handlers.onSave ?? ((): void => {})}
         onEssentialOnly={handlers.onEssentialOnly ?? ((): void => {})}
@@ -180,12 +207,22 @@ describe("S01-C4 the cookie preferences card (10b)", () => {
       "the twelve strings, by row, in the design's order"
     ).toEqual(
       COOKIE_CATEGORIES.map((category) => [
-        category.name,
-        category.tag,
-        category.description,
-        category.detail
+        t(consentEnglish, category.nameKey),
+        t(consentEnglish, category.tagKey),
+        t(consentEnglish, category.descriptionKey),
+        t(consentEnglish, category.detailKey, category.detailVars)
       ])
     );
+    // ...and the rendered English is dev's bytes, pinned literally.
+    expect(
+      rows.map((row) => [
+        row.querySelector(".consentCatName")?.textContent,
+        row.querySelector(".consentTag")?.textContent,
+        row.querySelector(".consentCatDesc")?.textContent,
+        row.querySelector(".consentCatDetail")?.textContent
+      ]),
+      "dev's twelve category strings"
+    ).toEqual(DEV_CATEGORY_STRINGS);
 
     // The containment arm: a category string INLINED in the component appears
     // either as a quoted literal or as a JSX text node, i.e. bounded by a quote
@@ -194,10 +231,10 @@ describe("S01-C4 the cookie preferences card (10b)", () => {
     // which is a category string.
     const source = cardSource();
     for (const value of COOKIE_CATEGORIES.flatMap((category) => [
-      category.name,
-      category.tag,
-      category.description,
-      category.detail
+      t(consentEnglish, category.nameKey),
+      t(consentEnglish, category.tagKey),
+      t(consentEnglish, category.descriptionKey),
+      t(consentEnglish, category.detailKey, category.detailVars)
     ])) {
       const inlined = new RegExp(`["'>]\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*["'<]`);
       expect(inlined.test(source), `"${value}" is inlined in CookiePreferencesCard.tsx`).toBe(false);

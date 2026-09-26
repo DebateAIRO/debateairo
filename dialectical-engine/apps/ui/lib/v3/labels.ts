@@ -1,11 +1,16 @@
 import type { AbstentionKind, Answer, ConditionMark, StalenessState } from "@debateai/contract";
+import debateChromeEnglish from "../../messages/en/debateChrome.json" with { type: "json" };
+import { t, type MessageCatalog } from "../i18n/translate.js";
 import type { LiveVerdictState } from "../types.js";
 
-export function riskTierSourceLabel(source: Answer["tier_source"]): string {
+export function riskTierSourceLabel(
+  source: Answer["tier_source"],
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
   switch (source) {
-    case "ASKER": return "chosen by the asker";
-    case "MACHINE_DEFAULT": return "machine default from the deployment floor";
-    case "DEPLOYMENT_POLICY": return "raised by deployment policy";
+    case "ASKER": return t(catalog, "debateChrome.riskTier.chosenByAsker");
+    case "MACHINE_DEFAULT": return t(catalog, "debateChrome.riskTier.machineDefault");
+    case "DEPLOYMENT_POLICY": return t(catalog, "debateChrome.riskTier.deploymentPolicy");
   }
 }
 
@@ -16,45 +21,48 @@ export function riskTierSourceLabel(source: Answer["tier_source"]): string {
  * kernel vocabulary — a new mark fails typecheck here, never silently
  * renders unnamed.
  */
-export function conditionMarkLabel(mark: ConditionMark): string {
+export function conditionMarkLabel(
+  mark: ConditionMark,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
   switch (mark) {
-    case "UNINSTRUMENTED": return "Checking record incomplete";
-    case "UNFALSIFIED-AFTER-ROTATION": return "Not falsified after model rotation";
-    case "SKIPPED-BY-BUDGET": return "Enrichment skipped by budget";
-    case "ENVELOPE_EXHAUSTED": return "Run envelope exhausted";
-    case "LEVERAGE_UNRESOLVED": return "Leverage unresolved";
-    case "BRANCH-FROZEN-LOW-LEVERAGE": return "Branch not expanded: it could not move the answer";
-    case "DEGRADED-DIVERSITY": return "Model diversity degraded";
-    case "SINGLE-LINEAGE": return "Single model lineage";
-    case "CRITIQUE-UNAVAILABLE": return "Independent critique unavailable";
-    case "PANEL-PARTIAL": return "Some judges could not assess this point";
-    case "PANEL-DEGRADED-SINGLE-VOICE": return "Only the author's own assessment survived";
-    case "AMBIGUOUS_ATTRIBUTION": return "Attribution ambiguous";
-    case "STALE": return "Stale";
-    case "UNDER-REVIEW": return "Under review";
-    case "UNDER-EXPLORED": return "Under-explored";
-    case "UNRESOLVED-TYPE-FALLBACK": return "Question type unresolved; fallback served";
-    case "DEFECT": return "Defect: components-only answer";
-    case "UNPRICED": return "Abstention cell unpriced";
-    case "UNADJUDICATED": return "No adverse evidence found";
-    case "UNCOVERED-SCOPE": return "Scope not fully covered";
-    case "UNSERVED-MAKER-POSITION": return "Another maker's position was not served";
-    case "NON-COMPARABLE": return "Results are not compute-matched";
-    case "NOT_SAMPLED": return "Not sampled";
-    case "OFF-SUBJECT-DOWNGRADE": return "Off-subject evidence downgraded";
-    case "WAY-OF-KNOWING-DOWNGRADED": return "Claimed lookup had no locator";
-    case "AMENDED-SEARCH": return "Search amended during run";
-    case "MISSING-NUMBER": return "Number removed after replay failure";
-    case "OWED-CHECK-UNEXECUTED": return "Owed check not executed at completion";
-    case "SYNTHESIS-OBJECTION-STANDING": return "An evaluator objection is still standing on this statement";
-    case "DIGEST-COMPRESSED": return "Node summaries shortened to fit the composition budget";
-    case "DIGEST-CANNOT-EXIST": return "No digest could be built within the composition budget";
-    case "PROTECTED-CORE-GUARD-RETIRED": return "Run stopped on budget; the restatement check no longer gated it";
-    case "HIDDEN-UNJUDGEABLE": return "Hidden: could not be judged — show hidden to read it";
-    case "DERIVED-STANDING-UNREVIEWED": return "Stands on its judged arguments — its own cross-house review is missing";
-    case "HIDDEN-LOW-SCORE": return "Hidden: scored below the shown threshold";
-    case "UNAUTHORED-BRANCH-HALTED": return "Expansion stopped here — nothing was written to hide or show";
-    case "LABEL-BASIS-INCOMPLETE": return "Verdict basis incomplete — no rival position or no second judge to compare";
+    case "UNINSTRUMENTED": return t(catalog, "debateChrome.condition.uninstrumented");
+    case "UNFALSIFIED-AFTER-ROTATION": return t(catalog, "debateChrome.condition.unfalsifiedAfterRotation");
+    case "SKIPPED-BY-BUDGET": return t(catalog, "debateChrome.condition.skippedByBudget");
+    case "ENVELOPE_EXHAUSTED": return t(catalog, "debateChrome.condition.envelopeExhausted");
+    case "LEVERAGE_UNRESOLVED": return t(catalog, "debateChrome.condition.leverageUnresolved");
+    case "BRANCH-FROZEN-LOW-LEVERAGE": return t(catalog, "debateChrome.condition.branchFrozenLowLeverage");
+    case "DEGRADED-DIVERSITY": return t(catalog, "debateChrome.condition.degradedDiversity");
+    case "SINGLE-LINEAGE": return t(catalog, "debateChrome.condition.singleLineage");
+    case "CRITIQUE-UNAVAILABLE": return t(catalog, "debateChrome.condition.critiqueUnavailable");
+    case "PANEL-PARTIAL": return t(catalog, "debateChrome.condition.panelPartial");
+    case "PANEL-DEGRADED-SINGLE-VOICE": return t(catalog, "debateChrome.condition.panelDegradedSingleVoice");
+    case "AMBIGUOUS_ATTRIBUTION": return t(catalog, "debateChrome.condition.ambiguousAttribution");
+    case "STALE": return t(catalog, "debateChrome.condition.stale");
+    case "UNDER-REVIEW": return t(catalog, "debateChrome.condition.underReview");
+    case "UNDER-EXPLORED": return t(catalog, "debateChrome.condition.underExplored");
+    case "UNRESOLVED-TYPE-FALLBACK": return t(catalog, "debateChrome.condition.unresolvedTypeFallback");
+    case "DEFECT": return t(catalog, "debateChrome.condition.defect");
+    case "UNPRICED": return t(catalog, "debateChrome.condition.unpriced");
+    case "UNADJUDICATED": return t(catalog, "debateChrome.condition.unadjudicated");
+    case "UNCOVERED-SCOPE": return t(catalog, "debateChrome.condition.uncoveredScope");
+    case "UNSERVED-MAKER-POSITION": return t(catalog, "debateChrome.condition.unservedMakerPosition");
+    case "NON-COMPARABLE": return t(catalog, "debateChrome.condition.nonComparable");
+    case "NOT_SAMPLED": return t(catalog, "debateChrome.condition.notSampled");
+    case "OFF-SUBJECT-DOWNGRADE": return t(catalog, "debateChrome.condition.offSubjectDowngrade");
+    case "WAY-OF-KNOWING-DOWNGRADED": return t(catalog, "debateChrome.condition.wayOfKnowingDowngraded");
+    case "AMENDED-SEARCH": return t(catalog, "debateChrome.condition.amendedSearch");
+    case "MISSING-NUMBER": return t(catalog, "debateChrome.condition.missingNumber");
+    case "OWED-CHECK-UNEXECUTED": return t(catalog, "debateChrome.condition.owedCheckUnexecuted");
+    case "SYNTHESIS-OBJECTION-STANDING": return t(catalog, "debateChrome.condition.synthesisObjectionStanding");
+    case "DIGEST-COMPRESSED": return t(catalog, "debateChrome.condition.digestCompressed");
+    case "DIGEST-CANNOT-EXIST": return t(catalog, "debateChrome.condition.digestCannotExist");
+    case "PROTECTED-CORE-GUARD-RETIRED": return t(catalog, "debateChrome.condition.protectedCoreGuardRetired");
+    case "HIDDEN-UNJUDGEABLE": return t(catalog, "debateChrome.condition.hiddenUnjudgeable");
+    case "DERIVED-STANDING-UNREVIEWED": return t(catalog, "debateChrome.condition.derivedStandingUnreviewed");
+    case "HIDDEN-LOW-SCORE": return t(catalog, "debateChrome.condition.hiddenLowScore");
+    case "UNAUTHORED-BRANCH-HALTED": return t(catalog, "debateChrome.condition.unauthoredBranchHalted");
+    case "LABEL-BASIS-INCOMPLETE": return t(catalog, "debateChrome.condition.labelBasisIncomplete");
   }
 }
 
@@ -78,13 +86,16 @@ export function liveVerdictState(
   }
 }
 
-export function abstentionKindLabel(kind: AbstentionKind): string {
+export function abstentionKindLabel(
+  kind: AbstentionKind,
+  catalog: MessageCatalog = debateChromeEnglish
+): string {
   switch (kind) {
-    case "not searched": return "Not searched";
-    case "searched and found nothing": return "Searched and found nothing";
-    case "measured and inconclusive": return "Measured, but inconclusive";
-    case "not runnable": return "Not runnable";
-    case "a value choice": return "A value choice";
+    case "not searched": return t(catalog, "debateChrome.abstention.notSearched");
+    case "searched and found nothing": return t(catalog, "debateChrome.abstention.searchedFoundNothing");
+    case "measured and inconclusive": return t(catalog, "debateChrome.abstention.measuredInconclusive");
+    case "not runnable": return t(catalog, "debateChrome.abstention.notRunnable");
+    case "a value choice": return t(catalog, "debateChrome.abstention.valueChoice");
   }
 }
 

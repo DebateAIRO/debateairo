@@ -1,0 +1,3 @@
+V-22 property: the primary §11 PRICE_INVALID row has one Meaning cell that states the one-member-only refusal and the complete integer range 0 through Number.MAX_SAFE_INTEGER. Omitting integer-ness, either bound, or the pair condition must fail this case even when another README cell still names the missing condition.
+V-23 property: the §11 paid-probe paragraph states, in its hosted-publisher sentence, the command, code-owned panelDiscoveryPolicy row, probe_freshness_ms=600000, no file member to change it, and need for a code change. A seed-value mention elsewhere cannot substitute for that sentence.
+Neighbour: spacing inside the row cell and wrapping the added sentence preserve both claims and must pass.

@@ -3,10 +3,13 @@
 import type { JSX } from "react";
 import { useEffect, useState, type MouseEvent } from "react";
 import { transitionDocumentMode, type Mode } from "./modeTransition";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { t } from "@/lib/i18n/translate";
 
 export type { Mode } from "./modeTransition";
 
 export function ModeToggle({ compact = false }: { compact?: boolean } = {}): JSX.Element {
+  const { catalog } = useChromeI18n();
   const [mode, setMode] = useState<Mode>("terracotta");
 
   useEffect(() => {
@@ -35,10 +38,11 @@ export function ModeToggle({ compact = false }: { compact?: boolean } = {}): JSX
       className={`modeToggle${compact ? " compact" : ""}`}
       data-mode-toggle
       aria-pressed={chamber}
-      aria-label={chamber ? "Switch to Terracotta mode" : "Switch to Chamber mode"}
+      aria-label={t(catalog, chamber ? "chrome.switchToLight" : "chrome.switchToDark")}
       onClick={toggleMode}
     >
-      {compact ? (chamber ? "☀" : "☾") : chamber ? "☀ Terracotta" : "☾ Chamber"}
+      {/* The sun/moon glyph is the whole visible control (V 2026-09-26): no theme name is shown. */}
+      {chamber ? "☀" : "☾"}
     </button>
   );
 }

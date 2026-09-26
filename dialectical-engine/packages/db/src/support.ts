@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
+import type { SupportLanguage } from "../../support-kb/src/locale.js";
 
 export type SupportRepositoryRecord = Readonly<{
   sessionId: string;
   identityOwnerRef: string | null;
-  language: "en" | "ro";
+  language: SupportLanguage;
   state: "OPEN" | "LOCKED" | "CLOSED";
   kbVersion: string;
   createdAt: Date;
@@ -44,7 +45,7 @@ export type SupportCaseRecord = Readonly<{
   caseId: string;
   sessionId: string;
   identityOwnerRef: string | null;
-  language: "en" | "ro";
+  language: SupportLanguage;
   createdAt: Date;
   triggerPredicate: "E1" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8";
   toolCalls: readonly Readonly<{ name: string;at: Date;outcome: string }>[];
@@ -98,7 +99,7 @@ export type SupportMessageWrite = Readonly<{
   role: SupportMessageRole;
   contentCiphertext: Uint8Array;
   outcome: SupportMessageOutcome;
-  language: "en" | "ro";
+  language: SupportLanguage;
   detectedLanguage: "en" | "ro";
   overrideLanguage: "en" | "ro" | null;
   redacted: boolean;
@@ -121,7 +122,7 @@ type SupportMessageRow = Readonly<{
   role: SupportMessageRole;
   content_ciphertext: Buffer;
   outcome: SupportMessageOutcome;
-  language: "en" | "ro";
+  language: SupportLanguage;
   detected_language: "en" | "ro";
   override_language: "en" | "ro" | null;
   redacted: boolean;
@@ -162,7 +163,7 @@ function messageRecord(row: SupportMessageRow): SupportMessageRead {
 type SupportSessionRow = Readonly<{
   session_id: string;
   identity_owner_ref: string | null;
-  language: "en" | "ro";
+  language: SupportLanguage;
   state: "OPEN" | "LOCKED" | "CLOSED";
   kb_version: string;
   created_at: Date;
@@ -239,7 +240,7 @@ export class PostgresSupportSessionRepository {
     sessionId: string;
     tokenSha256: string;
     identityOwnerRef: string | null;
-    language: "en" | "ro";
+    language: SupportLanguage;
     kbVersion: string;
     createdAt: Date;
   }>): Promise<SupportRepositoryRecord> {
@@ -649,7 +650,7 @@ export class PostgresSupportCaseRepository {
   async createCaseOnce(input: Readonly<{
     sessionId: string;
     identityOwnerRef: string | null;
-    language: "en" | "ro";
+    language: SupportLanguage;
     createdAt: Date;
     triggerPredicate: SupportCaseRecord["triggerPredicate"];
     triggerGeneration: string;
@@ -691,7 +692,7 @@ export class PostgresSupportCaseRepository {
         }
         const prior = (await client.query<{
           case_id: string;session_id: string;identity_owner_ref: string | null;
-          language: "en" | "ro";created_at: Date;
+          language: SupportLanguage;created_at: Date;
           trigger_predicate: SupportCaseRecord["triggerPredicate"];
           tool_calls: SupportCaseRecord["toolCalls"];kb_version: string;
           sla_hours: number;state: SupportCaseRecord["state"];
@@ -754,7 +755,7 @@ export class PostgresSupportCaseRepository {
     tokenSha256: string;
     sessionId: string;
     identityOwnerRef?: string | null;
-    language: "en" | "ro";
+    language: SupportLanguage;
     createdAt: Date;
     triggerPredicate?: "E1" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8";
     toolCalls?: readonly Readonly<{ name: string;at: Date;outcome: string }>[];
@@ -839,7 +840,7 @@ export class PostgresSupportCaseRepository {
         case_id: string;
         session_id: string;
         identity_owner_ref: string | null;
-        language: "en" | "ro";
+        language: SupportLanguage;
         created_at: Date;
         trigger_predicate: SupportCaseRecord["triggerPredicate"];
         tool_calls: SupportCaseRecord["toolCalls"];

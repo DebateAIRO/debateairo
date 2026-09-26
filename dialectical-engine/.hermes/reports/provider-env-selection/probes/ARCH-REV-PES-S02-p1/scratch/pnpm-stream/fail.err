@@ -1,0 +1,3 @@
+(node:36263) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[2m$ node -e "console.log(String.fromCharCode(70,65,73,76)); process.exit(1)"[22m

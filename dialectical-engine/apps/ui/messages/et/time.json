@@ -1,0 +1,21 @@
+{
+  "time.justNow": "just praegu",
+  "time.minutes.one": "{count} minut tagasi",
+  "time.minutes.other": "{count} minutit tagasi",
+  "time.hours.one": "{count} tund tagasi",
+  "time.hours.other": "{count} tundi tagasi",
+  "time.yesterday": "eile",
+  "time.days.one": "{count} päev tagasi",
+  "time.days.other": "{count} päeva tagasi",
+  "time.weeks.one": "{count} nädal tagasi",
+  "time.weeks.other": "{count} nädalat tagasi",
+  "time.status.complete": "Lõpetatud",
+  "time.status.queued": "Järjekorras",
+  "time.status.claimed": "Üle võetud",
+  "time.status.running": "Käimas",
+  "time.status.holding": "Pakkuja taastamise ootel",
+  "time.status.settled": "Lahendatud",
+  "time.status.generating": "Genereerimine",
+  "time.status.failed": "Ebaõnnestunud",
+  "time.status.draft": "Mustand"
+}

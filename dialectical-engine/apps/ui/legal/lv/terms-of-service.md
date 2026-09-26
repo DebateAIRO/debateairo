@@ -1,0 +1,310 @@
+# DebateAI — Pakalpojuma noteikumi
+
+<!-- legal-chrome
+summaryTitle: Īsumā
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.0 · SPĒKĀ NO [DATE]
+title: Kam jūs piekrītat
+lede: Līgums starp jums un DebateAIRO S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
+endMarker: NOTEIKUMU BEIGAS · v2.0
+bodyLabel: Pakalpojuma noteikumu teksts
+annexTitle: A pielikums — Reģionālie noteikumi
+jumps:
+01 KAS MĒS ESAM
+03 PIEKRIŠANA
+05 KAS TAS IR
+06 JŪSU KONTS
+07 PIEŅEMAMA LIETOŠANA
+08 JŪSU SATURS
+09 PUBLICĒŠANA
+10 ZIŅOŠANA
+15 ATBILDĪBA
+18 PIEMĒROJAMIE TIESĪBU AKTI
+-->
+
+2026-09-21 · @Someone
+
+**v2.0 projekts juridiskā konsultanta pārskatīšanai — vēl nav spēkā. Tā nav juridiska konsultācija.** Kvadrātiekavas apzīmē to, ko varat aizpildīt vai izlemt tikai jūs. Šī versija aizstāj 20. septembra projektu: tajā attiecībā uz publicētām debatēm pēc konta slēgšanas ir pieņemts B variants, pēc *Sky Österreich* sprieduma veidotais atteikuma modelis, mūsu atbildībai pret patērētājiem nav noteikts ierobežojums, kā arī ir iekļauta teritoriālās darbības jomas klauzula un reģionāls pielikums. Vispārīgā daļa attiecas uz visiem; A pielikums attiecas tikai uz 2. sadaļā uzskaitītajiem reģioniem. Lietotājs lasa vienu dokumentu.
+
+**Version 2.0 · Effective \[date\] · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+
+**In short.** Jums jābūt vismaz 18 gadus vecam. DebateAI veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz \[abuse@dezbatere.ro\] neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
+
+## 1. Kas mēs esam un kā ar mums sazināties
+
+DebateAI darbību nodrošina **DebateAIRO S.R.L.**, Rumānijā reģistrēts uzņēmums.
+
+|  |  |
+| --- | --- |
+| Juridiskā adrese | \[street, number, sector, postal code\], Bukareste, Rumānija |
+| Komercreģistra numurs | \[J40/…/…\] |
+| Vienotais reģistrācijas kods (CUI) | \[…] · PVN: \[RO… / not VAT-registered\] |
+| Pamatkapitāls | \[RON …\] |
+| Vispārīga saziņa | \[hello@dezbatere.ro\] |
+| Juridiski paziņojumi | \[legal@dezbatere.ro\] |
+| Privātums un datu aizsardzība | privacy@dezbatere.ro |
+| Ziņošana par nelikumīgu saturu | \[abuse@dezbatere.ro\] — skatiet 10. sadaļu |
+| Iestāžu kontaktpunkts | \[dsa@dezbatere.ro\] — rumāņu un angļu valodā |
+| Pārstāvji citās valstīs | Norādīti A pielikumā attiecībā uz reģioniem, kuros esam tādus iecēluši |
+
+Šī informācija ir arī pastāvīgi redzama vietnē \[dezbatere.ro/legal\]. Jūs vienmēr varat sazināties ar cilvēku, ne tikai ar mūsu asistentu; 10. sadaļā paskaidrots, kā to izdarīt.
+
+## 2. Kur mēs piedāvājam DebateAI
+
+Mēs piedāvājam DebateAI personām, kuras dzīvo **\[the European Union and the European Economic Area\]** \[and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea\]. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu.
+
+## 3. Piekrišana šiem Noteikumiem
+
+Jūs piekrītat šiem Noteikumiem, atzīmējot izvēles rūtiņu **„Esmu izlasījis(-usi) un piekrītu Pakalpojuma noteikumiem”** un noklikšķinot uz **Izveidot kontu**. Tādējādi starp jums un DebateAIRO S.R.L. tiek noslēgts līgums. Noteikumos ietverti pieņemamas lietošanas noteikumi 7. sadaļā, publicēšanas noteikumi 9. sadaļā, atbildības noteikumi 15. sadaļā, piemērojamo tiesību aktu un strīdu noteikumi 18. sadaļā un, ja dzīvojat Amerikas Savienotajās Valstīs, šķīrējtiesas līgums A pielikuma A.3 sadaļā. Mēs glabājam informāciju par to, kurai versijai un kad piekritāt, kā paskaidrots mūsu Privātuma politikā.
+
+Mūsu **Privātuma politikā** vietnē \[dezbatere.ro/privacy\] paskaidrots, kā mēs rīkojamies ar personas datiem. Tā ir informācija, kas mums jums jāsniedz, nevis līgums, kuram jūs piekrītat, un nekas šajos Noteikumos to nepārvērš par piekrišanu apstrādei. Mūsu **Sīkdatņu politika** vietnē \[dezbatere.ro/cookies\] un mūsu **MI pakalpojumu sniedzēju reģistrs** vietnē \[dezbatere.ro/providers\] ar atsauci ir šo Noteikumu sastāvdaļa.
+
+Pirms elektroniski noslēdzat ar mums līgumu, saskarne parāda veicamās darbības, ļauj pirms iesniegšanas pārskatīt un izlabot ievadīto informāciju un informē par valodām, kurās līgumu var noslēgt. Šie Noteikumi ir pieejami formā, ko varat saglabāt un izdrukāt, mēs pa e-pastu nosūtām jums versiju, kurai piekritāt, un jūs jebkurā laikā varat pieprasīt kopiju. Nekas šajos Noteikumos neierobežo tādas jūsu tiesības saskaņā ar Rumānijas vai ES patērētāju tiesībām vai jūsu dzīvesvietas valsts tiesībām, kuras nevar ierobežot ar līgumu.
+
+## 4. Kas drīkst lietot DebateAI
+
+Lai izveidotu kontu, jums jābūt **vismaz 18 gadus vecam**, un reģistrējoties jūs to apliecināt. DebateAI nav paredzēts bērniem, un mēs apzināti to nesniedzam personām, kas jaunākas par 18 gadiem. Ja uzzinām, ka konts pieder personai, kas jaunāka par 18 gadiem, mēs to slēdzam. Dažos reģionos ar apliecinājumu vien nepietiek; A pielikumā norādīts, kas attiecīgajā vietā ir piemērojams.
+
+Jums jābūt rīcībspējīgam, lai noslēgtu šo līgumu. Ja DebateAI lietojat kādas organizācijas vārdā, jūs apliecināt, ka esat pilnvarots uzņemties saistības tās vārdā, un tad „jūs” nozīmē šo organizāciju.
+
+Ikviens drīkst lasīt publicētas debates. Lasīšanai konts nav vajadzīgs, taču tā ir pakalpojuma lietošana, un uz to attiecas 7., 15., 16. un 18. sadaļa.
+
+## 5. Ko DebateAI dara un kas tas nav
+
+Jūs iesniedzat jautājumu vai apgalvojumu. DebateAI to nosūta vairākiem trešo personu MI modeļiem, kas ap to izveido argumentu grafu: apgalvojumus, pretargumentus, kritiku, atsauces uz pierādījumiem, vērtējumus un spriedumu ar ticamības pakāpi. Varat apstrīdēt atsevišķus apgalvojumus, lūgt jautājumu izpētīt sīkāk un izlemt, vai rezultātu publicēt.
+
+**Visu debašu saturu ģenerē MI.** Argumentus, kritiku, atsauces uz pierādījumiem, vērtējumus, spriedumus un atbalsta asistenta atbildes ģenerē mašīna. Tie var būt nepareizi, nepilnīgi, novecojuši vai pārliecinoši kļūdaini, un tajos var izpausties modeļu aizspriedumi. Neviena persona tos nepārskata, pirms tie tiek parādīti jums vai publicēti, un neviena vārdā nosaukta persona neuzņemas par tiem redakcionālu atbildību. Ģenerētais saturs produktā, publicētajās lapās un eksportētajos materiālos ir marķēts kā MI ģenerēts.
+
+**DebateAI nav konsultācija.** Tā nav juridiska, medicīniska, finanšu, nodokļu, psiholoģiska, drošības vai cita profesionāla konsultācija, un spriedums nav fakta konstatējums. Neizmantojiet debates kā pamatu lēmumam, kas ir būtisks jūsu veselībai, drošībai, naudai, tiesiskajam stāvoklim vai citu personu labklājībai, nepārbaudot pirmavotus un attiecīgā gadījumā nekonsultējoties ar kvalificētu speciālistu. Augsta ticamības pakāpe nozīmē, ka modeļi, pamatojoties uz apskatīto materiālu, uzskatīja interpretāciju par labi nostiprinātu; tas negarantē tās patiesumu.
+
+**Ko mēs apņemamies.** Mēs sniegsim pakalpojumu ar pienācīgu rūpību un prasmi un atbilstoši mūsu publicētajam aprakstam. Ja tiesību akti jums piešķir garantiju, ka pakalpojums atbilst tā aprakstam un ir piemērots parastajam nolūkam, šī garantija ir spēkā un nekas šajos Noteikumos to neatceļ. Mēs neapsolām, ka konkrēts rezultāts būs precīzs: tā ir ģenerētā satura īpašība, nevis pakalpojuma darbības rādītājs.
+
+**Modeļi mainās.** Mēs varam pievienot, noņemt vai aizstāt izmantotos MI modeļus un mainīt veidu, kā dzinējs veido atbildi. 14. sadaļā paskaidrots, kad izmaiņas jums piešķir tiesības.
+
+## 6. Jūsu konts
+
+Jūs reģistrējaties, izmantojot e-pasta adresi, paroli, atkopšanas e-pasta adresi un divfaktoru autentifikāciju, kas ir obligāta. Jūs izvēlaties **pseidonīmu**, kas tiek rādīts pie visa, ko publicējat; pēc iestatīšanas pseidonīmu nevar mainīt. Glabājiet drošībā savu paroli, autentifikācijas lietotni un atkopšanas kodus. Jūs atbildat par darbībām savā kontā, izņemot gadījumus, kad tās radušās mūsu vainas dēļ.
+
+Jums drīkst būt viens konts, ja vien neesam vienojušies citādi. Nekopīgojiet, nepārdodiet un nenododiet to citai personai.
+
+Ja zaudējat piekļuvi, konta atkopšana notiek saskaņā ar produktā publicēto procesu, kurā ietverti gaidīšanas periodi, kas paredzēti, lai apgrūtinātu konta pārņemšanu. Mēs varam noraidīt atkopšanas pieprasījumu, ja nevaram pamatoti konstatēt, ka tas nāk no jums.
+
+Jebkurā laikā varat slēgt kontu sadaļā **Iestatījumi → Konts**. Slēgšana stājas spēkā pēc **7 dienu** labvēlības perioda, kura laikā varat to atcelt, un mēs jūs informējam visos jūsu reģistrētajos saziņas kanālos. 11. sadaļā paskaidrots, ko slēgšana dzēš un ko tā nedzēš.
+
+## 7. Pieņemama lietošana
+
+Šie noteikumi attiecas uz jūsu iesniegto saturu, pakalpojuma lietošanu un publicēto saturu.
+
+**Neiesniedziet citu personu datus.** Jautājiet par problēmām, argumentiem un sabiedriski nozīmīgiem jautājumiem, nevis par identificējamām privātpersonām. Neiekļaujiet vārdus, kontaktinformāciju, identifikācijas numurus, attēlus, veselības, finanšu vai citus datus, kas identificē personu, un neizmantojiet DebateAI, lai izveidotu lietu, profilu vai dosjē par kādu personu. Jautājumi par publiskām personām, kas darbojas publiskā statusā, ir pieņemami; jautājumi, kas vērsti pret privātpersonu, nav pieņemami. Ja tomēr iesniedzat šādus datus, jūs par tiem atbildat, un mēs varam saturu noņemt.
+
+**Jūsu sensitīvā informācija.** Jūsu uzdotie jautājumi var skart jūsu veselību, pārliecību, politiskos uzskatus vai citas sensitīvas tēmas. Reģistrējoties jūs piekritāt šādas informācijas apstrādei. Ja dzīvojat vietā, kur veselības datiem ir īpaši noteikumi, A pielikumā var būt norāde uz atsevišķu paziņojumu.
+
+**Neiesniedziet un nepublicējiet nelikumīgu saturu**, tostarp saturu, kas ir neslavu ceļošs, mudina uz vardarbību vai naidu, aizskar vai draud, ir bez piekrišanas kopīgoti intīmi attēli, pārkāpj intelektuālā īpašuma tiesības vai konfidencialitāti, izpauž komercnoslēpumus, ir materiāls, kurā atspoguļota bērnu seksuāla izmantošana, vai pārkāpj sankcijas vai eksporta kontroli.
+
+**Neizmantojiet DebateAI maldināšanai.** Neuzdodiet ģenerēto rezultātu par cilvēka rakstītu, ja tas maldinātu, nenoņemiet MI ģenerēta satura marķējumu un neizmantojiet to šķietamas vienprātības, viltotu pierādījumu vai citas personas atdarināšanas radīšanai.
+
+**Neuzbrūciet pakalpojumam.** Nav atļauta automatizēta piekļuve, publicēto debašu izgūšana, pārmeklēšana vai masveida ieguve, pārsniedzot mūsu robotu failā atļauto; nav atļauts apiet pieprasījumu biežuma ierobežojumus, autentifikāciju vai publicēšanas kontroli; mēģināt iegūt uzvednes vai sistēmas norādījumus; izmantot uzvedņu injekciju, lai panāktu, ka dzinējs ignorē ierobežojumus; veikt zondēšanu vai slodzes testēšanu bez mūsu rakstiskas atļaujas.
+
+**Nepārdodiet un nepārzīmolojiet** pakalpojumu un neizmantojiet to konkurējoša dzinēja izveidei, tostarp izmantojot rezultātus kā apmācības datus, bez mūsu rakstiskas vienošanās.
+
+**Neizmantojiet DebateAI lēmumiem par personas** veselību, drošību, likumiskajām tiesībām, nodarbinātību, kredītu, mājokli vai imigrācijas statusu. Tas nav šim nolūkam izveidots, un tā rezultāti nav drošs pamats šādiem lēmumiem.
+
+**Vietējie tiesību akti publicēšanas vietā.** Jūs atbildat par to, lai viss jūsu publicētais atbilstu tās valsts tiesību aktiem, kurā atrodaties. Dažos reģionos mēs varam ierobežot noteiktu tēmu publicēšanu.
+
+Ja neesat pārliecināts, vai kaut kas ir atļauts, pirms publicēšanas jautājiet mums.
+
+## 8. Jūsu saturs un MI pakalpojumu sniedzēji, kas to apstrādā
+
+**Jūsu saturs paliek jūsu īpašums.** Jūs saglabājat visas tiesības, kas jums ir uz iesniegtajiem jautājumiem, apgalvojumiem, piezīmēm un iebildumiem. Jūs piešķirat mums neekskluzīvu, visā pasaulē spēkā esošu bezatlīdzības licenci mitināt, glabāt, reproducēt, pielāgot un apstrādāt šo saturu pakalpojuma darbības nodrošināšanai: debašu norisei, to glabāšanai, lai jūs tās varētu atkārtoti atvērt un atskaņot, atbalsta sniegšanai, mūsu juridisko pienākumu izpildei un — tikai tad, ja izvēlaties publicēt, — 9. sadaļā minētajiem nolūkiem. Šī licence beidzas, kad saturs ir dzēsts, izņemot 9. sadaļā vai tiesību aktos noteiktos gadījumus.
+
+**Mēs neapmācām modeļus ar jūsu saturu.** Mēs neapmācām modeļus ar jūsu saturu, un mūsu līgumi ar MI pakalpojumu sniedzējiem izslēdz iespēju tiem izmantot jūsu saturu savu modeļu apmācīšanai vai uzlabošanai. \[Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.\]
+
+**Kā jūsu saturs nonāk pie MI pakalpojumu sniedzējiem.** Lai īstenotu debates, mēs nosūtām tekstu vienam vai vairākiem ārējiem modeļu pakalpojumu sniedzējiem. Pakalpojumu sniedzējs saņem jūsu jautājumu, jūsu iestatītās vadības piezīmes un apgalvojumus, ko dzinējs debašu laikā izveido, — tādēļ pakalpojumu sniedzējs redz tekstu, kas atvasināts no jūsu ievadītā un veidots ap to, ne tikai jūsu sākotnējos vārdus. Tas nekad nesaņem jūsu e-pasta adresi, konta identifikatorus, sesiju ierakstus vai maksājumu informāciju.
+
+**Kuri pakalpojumu sniedzēji un kur.** Mūsu **MI pakalpojumu sniedzēju reģistrs** vietnē \[dezbatere.ro/providers\] ir šo Noteikumu sastāvdaļa. Tajā par katru iespējamo pakalpojumu sniedzēju norādīts: tā juridiskā persona un valsts; ko un kādēļ tas saņem; kur tas veic apstrādi; tā glabāšanas noteikumi; vai mūsu izmantotajam galapunktam ir ieslēgts datu neglabāšanas režīms; vai saskaņā ar mūsu līgumu tas drīkst izmantot ievaddatus apmācībai; mūsu izmantotais nosūtīšanas mehānisms; un datums, kad pēdējoreiz pārbaudījām katru ierakstu. Pakalpojumu sniedzēji var atrasties ārpus jūsu valsts un Eiropas Ekonomikas zonas. Mūsu Privātuma politikā paskaidroti aizsardzības pasākumi.
+
+**Trīs atšķirīgas lietas.** „Netiek izmantots modeļu apmācīšanai”, „ierobežotu laiku tiek glabāts drošības, ļaunprātīgas izmantošanas novēršanas vai juridisku iemeslu dēļ” un „datu neglabāšanas režīms — pēc apstrādes netiek saglabāts” ir atšķirīgas lietas. Ja pakalpojumu sniedzējs uzvednes glabā ierobežotu laiku, Reģistrā ir norādīts, cik ilgi un kādēļ. Ja ir ieslēgts datu neglabāšanas režīms, Reģistrā norādīts gan tas, gan attiecīgās funkcijas. Mēs neapgalvosim, ka saturs netiek glabāts, ja tas tiek glabāts.
+
+**Rezultāti.** Attiecībās starp jums un mums jūs drīkstat savu debašu rezultātu izmantot jebkuram likumīgam nolūkam, un mēs nepretendējam uz īpašumtiesībām uz ģenerēto tekstu. Ņemiet vērā, ka daudzās jurisdikcijās ģenerēto rezultātu autortiesības var neaizsargāt; ka līdzīgs rezultāts var tikt ģenerēts citiem lietotājiem; ka rezultāti var reproducēt trešo personu materiālus vai tiem līdzināties; un ka uz atsevišķiem avotu materiāliem, ko izgūst MI pakalpojumu sniedzējs, var attiekties atkārtotas izmantošanas ierobežojumi. Pirms paļaujaties uz rezultātiem vai tos pārpublicējat, jums tie jāpārbauda.
+
+## 9. Debašu publicēšana
+
+Debates **pēc noklusējuma ir privātas**. Nekas no jūsu izveidotā nav redzams citām personām, ja vien to nepublicējat.
+
+**Ko dara publicēšana.** Publicēšana ir apzināta darbība, ko apstiprina atsevišķi. Kad publicējat, mēs izveidojam fiksētu debašu momentuzņēmumu un ļaujam ikvienam to lasīt bez konta. \[Search engines may index it. / Published debates are not indexed by search engines unless you choose to allow it.\] Momentuzņēmumā redzams jūsu **pseidonīms**, jūsu jautājums tādā formā, kādā to uzrakstījāt, argumentu koks, vērtējumi, spriedums un ticamības pakāpe, kā arī redzams marķējums, ka saturu ģenerējis MI. Tajā nav redzama jūsu e-pasta adrese, sesiju ieraksti vai konta vēsture.
+
+**Praksē publicēšana faktiski ir neatgriezeniska.** Kad debates kļūst publiskas, citas personas tās var lasīt, citēt, uzņemt to ekrānuzņēmumus, arhivēt un saglabāt kešatmiņā. Publikācijas atcelšana noņem tās no DebateAI un iznīcina mūsu kopijas atslēgu, taču nevar sasniegt kopijas, kas jau atrodas citviet. Nepublicējiet neko tādu, ko nevēlētos pastāvīgi saistīt ar savu pseidonīmu.
+
+**Publicētās debates, kad slēdzat kontu.** Kad jūsu konts tiek slēgts, mēs noņemam visas jūsu publicētās debates no publiskas piekļuves **bez nepamatotas kavēšanās un jebkurā gadījumā 30 dienu laikā**, ja vien tiesību akti neprasa rīkoties ātrāk vai saglabāt konkrētu vienumu. Kopijas, ko citas personas izveidojušas pirms noņemšanas, nav mūsu kontrolē. Ja vēlaties, lai debates pēc jūsu aiziešanas paliktu pieejamas, vispirms tās lejupielādējiet. \[This is Option B from the earlier drafts, as recommended in the second-opinion review. It is a product change to implement, not a description of the current system, which keeps published snapshots readable after erasure.\]
+
+**Mēs vienmēr varam noņemt publicētu saturu.** Mēs varam noņemt publicētas debates vai ierobežot piekļuvi tām, ja to prasa tiesību akti, ja to uzdod tiesa vai kompetenta iestāde vai ja tās pārkāpj šos Noteikumus vai ir nelikumīgas. Nekas šajā sadaļā neliedz mums rīkoties pēc derīga paziņojuma saskaņā ar 10. sadaļu, un nekas tajā nav solījums, ka publicētas debates paliks pieejamas.
+
+**Publicēta satura licence.** Publicējot jūs piešķirat mums neekskluzīvu, visā pasaulē spēkā esošu bezatlīdzības licenci mitināt, glabāt, reproducēt, attēlot un padarīt momentuzņēmumu publiski pieejamu, kā arī ļaut citiem to lasīt un citēt tik ilgi, kamēr tas ir publicēts. Šī licence pastāv, lai mēs varētu nodrošināt publisko lapu darbību; tā neļauj mums pārdot jūsu saturu vai licencēt to citas personas produktam.
+
+**Ja debates ir par jums.** Ja publicētās debatēs ir jūsu personas dati vai tās ceļ jums neslavu vai citādi ir nelikumīgas, varat lūgt tās noņemt neatkarīgi no tā, vai jums ir konts, izmantojot 10. sadaļā noteikto kārtību vai rakstot uz privacy@dezbatere.ro. Mēs rīkojamies pēc pamatotiem pieprasījumiem un neprasām jums reģistrēties, lai tādu iesniegtu.
+
+## 10. Ziņošana par saturu, moderēšana un sūdzības
+
+**Ikviens var ziņot par saturu.** Konts nav vajadzīgs. Rakstiet uz \[abuse@dezbatere.ro\] vai izmantojiet vadīklu **Ziņot** pie jebkurām publicētām debatēm. Lai mēs varētu rīkoties, norādiet: kādēļ uzskatāt, ka saturs ir nelikumīgs vai pārkāpj šos Noteikumus, pietiekami detalizēti, lai varētu saprast prasījumu; precīzu atrašanās vietu — pilnu URL un, ja iespējams, fragmentu; savu vārdu un e-pasta adresi (tas nav nepieciešams ziņojumiem par materiālu, kurā atspoguļota bērnu seksuāla izmantošana); un apliecinājumu, ka labticīgi uzskatāt savu ziņojumu par precīzu un pilnīgu.
+
+Mēs bez nepamatotas kavēšanās apstiprinām katra ziņojuma saņemšanu. Mēs izskatām ziņojumus savlaicīgi, rūpīgi, nepatvaļīgi un objektīvi, paziņojam jums savu lēmumu un izskaidrojam, kā to apstrīdēt. Ja ziņojuma apstrādei vai lēmuma pieņemšanai izmantojam automatizētus līdzekļus, mēs to norādām. Pēc derīga pieprasījuma par bez piekrišanas kopīgotiem intīmiem attēliem mēs rīkojamies **48 stundu laikā**.
+
+**Divu veidu automatizēti lēmumi, kas tiek nošķirti.**
+
+- **Lēmumi dzinēja iekšienē.** Dzinējs pieņem mašīnas lēmumus par *argumentiem*: tas var atteikties atbildēt uz jautājumu, noslēgt debates gala stāvoklī — piemēram, ja jautājums balstīts uz nepatiesu pieņēmumu vai ir vērtību jautājums, nevis empīrisks jautājums — ierobežot ticamības pakāpi, ja nebija pieejama neatkarīga kritika, vai atzīmēt atbildi kā defektīvu, ja ģenerētais teksts neizturēja atbilstības pārbaudi. Tā ir paredzētā produkta darbība; tā jums ir redzama debatēs, un tie nav lēmumi par jums.
+- **Moderēšanas lēmumi par saturu un kontiem.** Publicētu debašu noņemšana vai piekļuves ierobežošana, kā arī konta darbības apturēšana vai konta slēgšana ir lēmums, ko pieņemam saskaņā ar šiem Noteikumiem vai tiesību aktiem. Katrā šādā lēmumā, kas ietekmē jūsu kontu, piedalās persona. Šādu lēmumu pamati ir aprakstīti 11. sadaļā.
+
+**Pamatojums.** Ikreiz, kad noņemam jūsu saturu vai ierobežojam tā redzamību vai apturam vai izbeidzam jūsu konta darbību, mēs sniedzam pamatojumu: ko izdarījām un kāds ir darbības apjoms, faktus, uz kuriem balstījāmies, un vai tie iegūti no ziņojuma vai mūsu pašu pārbaudēm, vai tika izmantoti automatizēti līdzekļi, juridisko vai līgumisko pamatu un kā varat lēmumu apstrīdēt.
+
+**Sūdzība par lēmumu.** Ja nepiekrītat moderēšanas lēmumam, atbildiet uz pamatojumu vai **sešu mēnešu** laikā rakstiet uz \[appeals@dezbatere.ro\]. Lēmumu pārskata persona, kura nepiedalījās sākotnējā lēmuma pieņemšanā, un mēs jums paziņojam iznākumu un tā pamatojumu. Tas neietekmē jūsu tiesības vērsties tiesā vai izmantot alternatīvu strīdu izšķiršanu saskaņā ar 18. sadaļu. Sūdzību kārtība attiecas arī uz sūdzībām, ka neesam rīkojušies pēc ziņojuma, saturs noņemts nepamatoti, konts ierobežots nepamatoti vai automatizēts rīks nepamatoti ietekmējis jūsu saturu.
+
+**Saziņa ar cilvēku.** Mūsu atbalsta asistents ir MI sistēma un par to informē. Jūs jebkurā laikā varat lūgt sazināties ar cilvēku, un katrā atbalsta sarunā tiek piedāvāta šāda iespēja. Saziņā ar jums mēs nepaļaujamies tikai uz automatizētiem rīkiem.
+
+**Nopietns dzīvības vai drošības apdraudējums.** Ja uzzinām informāciju, kas liecina par noziedzīgu nodarījumu, kurš apdraud kādas personas dzīvību vai drošību, mēs informējam kompetentās iestādes.
+
+## 11. Darbības apturēšana un izbeigšana
+
+**No jūsu puses.** Jebkurā laikā slēdziet savu kontu sadaļā Iestatījumi, kā aprakstīts 6. sadaļā. Jums nav jānorāda iemesls.
+
+**No mūsu puses.** Mēs varam apturēt vai slēgt jūsu kontu vai noņemt vai ierobežot jūsu saturu, ja: jūs būtiski pārkāpjat šos Noteikumus, jo īpaši 7. sadaļu; jūsu saturs ir nelikumīgs vai tiesību akti, tiesa vai iestāde prasa mums rīkoties; jūsu lietošana apdraud pakalpojuma drošību, integritāti vai pieejamību vai citu personu tiesības; jūsu konts nav bijis aktīvs \[24 months\] un esam jūs par to brīdinājuši; vai mēs pārtraucam sniegt pakalpojumu vispār vai jūsu valstī.
+
+Izņemot gadījumus, kad pārkāpums ir nopietns, tiesību akti prasa tūlītēju rīcību vai kavēšanās radītu kaitējumu, mēs informējam jūs par problēmu un dodam saprātīgu iespēju to novērst, pirms apturam vai slēdzam kontu. Mēs vienmēr sniedzam pamatojumu saskaņā ar 10. sadaļu, un jūs varat apstrīdēt lēmumu.
+
+Ja pilnībā slēdzam pakalpojumu vai pārtraucam to sniegt jūsu valstī, mēs paziņojam vismaz **30 dienu iepriekš**, atmaksājam iepriekš samaksāto summu par laiku pēc slēgšanas un vispirms nodrošinām iespēju eksportēt debates.
+
+**Slēgšanas sekas.** Kad konts tiek slēgts, mēs iznīcinām jūsu konta datu un privāto debašu šifrēšanas atslēgas, tādējādi padarot tos neatgriezeniski nenolasāmus, dzēšam jūsu konta ierakstu un noņemam publicētās debates no publiskas piekļuves, kā aprakstīts 9. sadaļā. Dažas lietas saglabājas, un jums jāzina, kuras: ieraksti mūsu audita un drošības žurnālos, kuriem datus var tikai pievienot un kurus glabājam savu juridisko un drošības pienākumu izpildei; ieraksti, kas mums jāglabā saskaņā ar tiesību aktiem, tostarp piekrišanas un akceptēšanas ieraksti; un neliels skaits vecāku debašu, kas ir senākas par mūsu šifrēšanas shēmu un kuru ierakstu dzēšanas iespējas ir ierobežotākas — mēs jums paziņosim, ja tas attiecas uz jūsu kontu. Privātuma politikā tas viss aprakstīts datu aizsardzības kontekstā un izskaidrotas jūsu tiesības uz dzēšanu.
+
+8. sadaļa (attiecībā uz jau publicētu saturu), kā arī 15., 16. un 18. sadaļa paliek spēkā pēc līguma izbeigšanas.
+
+## 12. Maksas plāni
+
+&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+
+DebateAI piedāvā bezmaksas plānu. Ir pieejams maksas **Premium** plāns \[is / will be\], kas nodrošina piekļuvi pilnam modeļu klāstam un ļauj jums pašam iestatīt debašu parametrus.
+
+**Pirms maksājuma veikšanas** tieši virs maksājuma pogas mēs parādām: plānu; kopējo cenu ar piemērojamiem nodokļiem; norēķinu periodu; to, ka plāns tiek automātiski atjaunots līdz atcelšanai; datumu, kad beidzas bezmaksas izmēģinājums, un pēc tam iekasējamo summu; un atcelšanas kārtību. Jūs apstiprināt atjaunošanas noteikumus, atzīmējot atsevišķu izvēles rūtiņu. Uz pogas ir teksts **Abonēt un maksāt** (rumāņu valodā *Comandă cu obligație de plată*). Mēs nosūtām jums apstiprinājumu pastāvīgā informācijas nesējā, kurā ietverta tā pati informācija, šie Noteikumi un atteikuma veidlapa.
+
+**Atgādinājumi.** Mēs jums nosūtām e-pasta ziņojumu vismaz \[5\] dienas pirms bezmaksas izmēģinājuma pārvēršanas maksas plānā; vismaz reizi gadā attiecībā uz plāniem, kas turpinās; un 30 līdz 45 dienas pirms jebkādas divpadsmit mēnešu vai ilgāka termiņa atjaunošanas. Katrā atgādinājumā ir norādīti cena, datums un atcelšanas saite.
+
+**Atcelšana.** Abonementu varat atcelt jebkurā laikā sadaļā **Iestatījumi → Abonements** ar vienu apstiprinājuma klikšķi vai atcelšanas lapā \[dezbatere.ro/cancel\], kurā nav jāpierakstās. Atcelšana stājas spēkā pašreizējā norēķinu perioda beigās, un līdz tam jūs saglabājat piekļuvi. Mēs nepadarīsim atcelšanu sarežģītāku par abonēšanu.
+
+**Cenas izmaiņas** stājas spēkā tikai atjaunošanas brīdī. Mēs vismaz **30 dienu iepriekš** pa e-pastu paziņojam jauno cenu un nosūtām atcelšanas saiti. Ja jūsu valsts tiesību akti prasa nepārprotamu piekrišanu cenas izmaiņām, mēs to lūdzam; citādi, ja neko nedarāt, jaunā cena tiek piemērota no nākamās atjaunošanas. A pielikumā norādīti reģionālie noteikumi.
+
+**Neizdevušies maksājumi.** Ja maksājums neizdodas, mēs atkārtojam mēģinājumus \[7\] dienas un pirms jūsu konta pazemināšanas uz bezmaksas plānu brīdinām jūs pa e-pastu. Mēs nedzēšam jūsu debates neizdevušās apmaksas dēļ.
+
+**Nodokļi un maksājuma saņēmējs.** Cenās \[include / exclude\] PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. \[If a merchant of record is used: Your purchase is processed by \[Paddle / …\], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.\]
+
+**Maksājumu apstrīdēšana.** Ja apstrīdat maksājumu pie savas kartes izdevēja, mēs varam apturēt maksas funkcijas, kamēr strīds tiek atrisināts. Par to mēs neiekasējam maksu.
+
+**Vispirms likumā noteiktās tiesības.** Ja pakalpojums neatbilst mūsu solītajam, jums ir tiesības panākt tā atbilstību vai saņemt samērīgu cenas samazinājumu vai atmaksu, kā noteikts tiesību aktos. Papildus tam \[state your discretionary refund policy\]. Abu plānu lietošanas ierobežojumi ir publicēti produktā; mēs jūs brīdinām, pirms tos pastiprinām tādā veidā, kas jūs būtiski ietekmē.
+
+## 13. Jūsu atteikuma tiesības
+
+Ja dzīvojat ES, EEZ vai Apvienotajā Karalistē, varat **14 dienu** laikā pēc maksas abonementa noformēšanas atteikties no tā, nenorādot iemeslu. Izmantojiet lapu **Atteikties no līguma** vietnē \[dezbatere.ro/withdraw\], apstiprinājuma e-pastā pieejamo parauga veidlapu vai rakstiet uz \[support@dezbatere.ro\]; mēs apstiprināsim saņemšanu pastāvīgā informācijas nesējā.
+
+Ja lūdzāt mums sākt sniegt pakalpojumu nekavējoties — norēķinu laikā atzīmējot izvēles rūtiņu — un pēc tam atsakāties, jūs maksājat par līdz atteikuma dienai sniegto pakalpojuma daļu, ko aprēķina proporcionāli norēķinu perioda cenai, un mēs atmaksājam atlikušo summu. **Lietojot pakalpojumu 14 dienu laikā, jūs nezaudējat atteikuma tiesības.**
+
+Ja dzīvojat citviet, A pielikumā norādītas jūsu reģionā piemērojamās atteikuma vai pārdomu perioda tiesības, ja tādas ir, un citos gadījumos mūsu atmaksas politika. Jūsu valstī likumā noteiktajām tiesībām vienmēr ir priekšroka.
+
+## 14. Pakalpojuma un šo Noteikumu izmaiņas
+
+**Pakalpojuma izmaiņas.** Mēs nepārtraukti attīstām DebateAI, un kārtējie uzlabojumi, labojumi un modeļu klāsta izmaiņas notiek bez iepriekšēja paziņojuma. Ja veicam izmaiņas, kas pārsniedz pakalpojuma darbības uzturēšanu atbilstoši aprakstam, mēs to darām tikai kāda no šiem iemesliem dēļ: lai izpildītu juridisku vai regulatīvu prasību; reaģētu uz drošības vai ļaunprātīgas izmantošanas problēmu; jo modeļa pakalpojumu sniedzējs maina, ierobežo vai atsauc modeli vai funkciju, no kuras esam atkarīgi; lai pielāgotos tehniskai videi, kuru nekontrolējam; vai lai pievienotu, uzlabotu vai izbeigtu funkciju tādā veidā, kas jums nerada izmaksas.
+
+Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu **30 dienu laikā** pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu.
+
+**Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot DebateAI pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē \[dezbatere.ro/terms/versions\].
+
+## 15. Atbildība
+
+**Ko mēs neierobežojam.** Nekas šajos Noteikumos neizslēdz un neierobežo mūsu atbildību par nāvi vai miesas bojājumiem, ko izraisījusi mūsu nolaidība, par krāpšanu vai krāpniecisku sagrozīšanu, par rupju neuzmanību vai tīšu pārkāpumu vai par jebko citu, ko likumīgi nevar ierobežot. Ja esat patērētājs, nekas šeit neatceļ jūsu likumā noteiktās tiesības, tostarp tiesības panākt neatbilstoša pakalpojuma atbilstību vai saņemt cenas samazinājumu vai atmaksu, vai jebkādu garantiju, kas piemērojama saskaņā ar jūsu dzīvesvietas valsts tiesību aktiem.
+
+**Ģenerētais saturs.** Pakalpojums sagatavo materiālu jūsu vērtējumam, nevis secinājumus, pēc kuriem varat rīkoties bez pārbaudes, un 5. sadaļā tas ir skaidri norādīts. Ievērojot iepriekšējo rindkopu, mēs neatbildam par lēmumiem, kurus pieņemat, pamatojoties uz ģenerētajiem argumentiem, vērtējumiem vai spriedumiem, ja neesat veicis 5. sadaļā aprakstītos saprātīgos pārbaudes pasākumus.
+
+**Jūsu saturs un lietošana.** Jūs atbildat par iesniegto un publicēto, tostarp par tiesībām to iesniegt un 7. sadaļas ievērošanu.
+
+**Notikumi ārpus mūsu kontroles.** Mēs nepārkāpjam līgumu, ja kaut kas ārpus mūsu saprātīgas kontroles liedz mums to izpildīt. Trešās personas modeļa pakalpojumu sniedzēja kļūme vai pakalpojuma atsaukšana automātiski nav šāds notikums; ja tās dēļ pakalpojums kļūst nepieejams, piemēro 14. sadaļu, un jūs varat izbeigt līgumu un saņemt tajā aprakstīto atmaksu.
+
+&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
+
+## 16. Intelektuālais īpašums
+
+Pats pakalpojums — programmatūra, dzinējs, vērtēšanas metode, saskarne, nosaukumi DebateAI un DebateAIRO un mūsu logotipi — pieder mums vai mūsu licences devējiem. Šie Noteikumi piešķir jums atļauju lietot pakalpojumu, nevis īpašumtiesības uz to.
+
+Jūs drīkstat citēt publicētas debates un ievietot saites uz tām, norādot DebateAI kā avotu un pievienojot saiti uz sākotnējo lapu. Publiskā kopuma masveida kopēšana, sistemātiska reproducēšana un publicēto debašu izmantošana kā apmācības dati bez mūsu rakstiskas vienošanās nav atļautas.
+
+8. sadaļa attiecas uz jūsu saturu un ģenerēto rezultātu statusu. Ja uzskatāt, ka kaut kas pakalpojumā DebateAI pārkāpj jūsu intelektuālā īpašuma tiesības, izmantojiet 10. sadaļā noteikto ziņošanas kārtību. \[If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is \[name, address, email\], registered with the US Copyright Office; we terminate the accounts of repeat infringers.\]
+
+## 17. Personas dati
+
+Tas, kā mēs rīkojamies ar personas datiem, ir noteikts **Privātuma politikā** vietnē \[dezbatere.ro/privacy\]. Tajā paskaidrots, ko vācam, katra nolūka juridiskais pamats, cik ilgi glabājam datus, kas tos saņem, kāda nosūtīšana notiek un kā īstenot savas tiesības. Arī šeit jānorāda trīs aspekti. 7. sadaļā lūdzam neiekļaut jautājumā citu personu datus; ja tos tomēr iekļaujat, jūs par to atbildat, un mēs varam saturu noņemt. Ja pakalpojumā DebateAI publicētās debatēs ir jūsu personas dati, varat lūgt mums tos noņemt bez konta (9. sadaļa). Turklāt mēs glabājam ierakstu par jūsu piekrišanu šiem Noteikumiem — versiju, laiku un sesijas tehnisko informāciju — kā līguma pierādījumu, kā paskaidrots Privātuma politikā.
+
+## 18. Piemērojamie tiesību akti un strīdu izskatīšanas vieta
+
+**Piemērojamie tiesību akti.** Šiem Noteikumiem un jebkuram no tiem vai to priekšmeta izrietošam strīdam vai prasījumam, tostarp ārpuslīgumiskiem prasījumiem, piemēro Rumānijas tiesību aktus.
+
+**Jūsu vietējā aizsardzība netiek ietekmēta.** Ja esat patērētājs, Rumānijas tiesību aktu izvēle neatņem jums aizsardzību, ko sniedz jūsu pastāvīgās dzīvesvietas valsts obligātie patērētāju aizsardzības noteikumi — piemēram, noteikumi par netaisnīgiem līguma noteikumiem, atteikuma un atcelšanas tiesībām vai garantijām —, ja šie noteikumi ir piemērojami neatkarīgi no šīs izvēles, tostarp saskaņā ar Regulas (EK) Nr. 593/2008 6. panta 2. punktu, ja dzīvojat ES, vai līdzvērtīgiem Apvienotās Karalistes noteikumiem. Uz šiem noteikumiem varat atsaukties papildus Rumānijas tiesību aktiem.
+
+**Tiesas, ja dzīvojat ES, EEZ vai Apvienotajā Karalistē.** Jūs varat celt prasību pret mums Rumānijas tiesās vai savas dzīvesvietas valsts tiesās. Mēs varam celt prasību pret jums tikai jūsu dzīvesvietas valsts tiesās.
+
+**Patērētāji citviet.** Ja dzīvojat ārpus ES, EEZ un Apvienotās Karalistes, nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar savas valsts tiesību aktiem celt prasību tās tiesās vai tādas tiesības saskaņā ar šiem tiesību aktiem, no kurām nevar atteikties, — tostarp, ja dzīvojat Austrālijā vai Jaunzēlandē, jūsu patērētāja garantiju tiesības; ja dzīvojat Brazīlijā, *Código de Defesa do Consumidor*; un, ja dzīvojat Amerikas Savienotajās Valstīs, jūsu štata patērētāju aizsardzības tiesību aktus.
+
+**Amerikas Savienoto Valstu iedzīvotāji.** A pielikuma A.3 sadaļā ietverts šķīrējtiesas līgums un atteikšanās no kolektīvas prasības, ko reglamentē Federal Arbitration Act. Tas attiecas tikai uz Amerikas Savienoto Valstu iedzīvotājiem un tikai tiktāl, cik tas ir izpildāms. Tas neattiecas uz patērētājiem ES, EEZ vai Apvienotajā Karalistē.
+
+**Pirms vēršanās tiesā.** Sazinieties ar mums pa \[legal@dezbatere.ro\]; lielāko daļu jautājumu var atrisināt, un mūsu mērķis ir atbildēt \[5\] darbdienu laikā. Ja esat patērētājs Rumānijā vai ES, varat izmantot alternatīvu strīdu izšķiršanu ar \[the ANPC – named SAL entity, website\] starpniecību; mēs \[do / do not\] apņemamies piedalīties šajā procedūrā. Sūdzības par moderēšanas lēmumiem izskata saskaņā ar 10. sadaļu, kas ir atsevišķa kārtība.
+
+## 19. Citi noteikumi
+
+**Tiesību nodošana.** Jūs nedrīkstat nodot savas tiesības saskaņā ar šiem Noteikumiem. Mēs drīkstam nodot savas tiesības uzņēmumam, kas pārņem pakalpojumu, ar nosacījumu, ka jūsu tiesības netiek samazinātas; mēs jums par to paziņosim, un jūs varēsiet slēgt savu kontu.
+
+**Atsevišķu noteikumu spēkā esība.** Ja kādu šo Noteikumu normu atzīst par neizpildāmu, šo normu nepiemēro, bet pārējie Noteikumi paliek spēkā.
+
+**Neatteikšanās no tiesībām.** Ja neīstenojam noteikumu nekavējoties, mēs nezaudējam tiesības to īstenot vēlāk.
+
+**Pilnīga vienošanās.** Šie Noteikumi kopā ar Sīkdatņu politiku un MI pakalpojumu sniedzēju reģistru ir visa mūsu savstarpējā vienošanās par pakalpojumu. Privātuma politikā sniegtās saistības mums ir saistošas. Nekas šajā rindkopā neizslēdz atbildību par krāpniecisku sagrozīšanu.
+
+**Valoda.** Šie Noteikumi ir publicēti angļu valodā \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+
+**Kontaktinformācija.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukareste, Rumānija.
+
+## Annex A — Reģionālie noteikumi
+
+Katrs ieraksts ir piemērojams tikai tad, ja tā reģions ir norādīts 2. sadaļā, un tajā norādītas tikai atšķirības no vispārīgās daļas. Ja ieraksts ir pretrunā vispārīgajai daļai, attiecīgā reģiona personām piemēro ierakstu.
+
+### A.1 Eiropas Savienība un Eiropas Ekonomikas zona
+
+Šo Noteikumu vispārīgā daļa ir sagatavota jums. Papildus: jūs varat celt prasību savas dzīvesvietas valsts tiesās; piemēro 13. sadaļā noteiktās atteikuma tiesības; alternatīva strīdu izšķiršana ir pieejama ar \[the ANPC – named entity, website\] starpniecību. **Vācija:** atcelšanas poga vietnē \[dezbatere.ro/cancel\] ļauj izbeigt abonementu bez pierakstīšanās; abonementa noteikumi, atjaunošanas periodi un paziņošanas termiņi atbilst BGB §309(9) \[state them\]. **Francija:** abonementu varat izbeigt tiešsaistē trīs darbībās vietnē \[URL\]; jums ir pieejams \[the mediator named at URL\]. **Itālija:** klauzulām par atbildību (15), darbības apturēšanu (11), izmaiņām (14) un piemērojamajiem tiesību aktiem (18) ir vajadzīgs jūsu īpašs apstiprinājums, ko sniedzat, reģistrācijas laikā atsevišķi to apstiprinot. **Nīderlande:** pirms līguma noslēgšanas šie Noteikumi tiek sniegti saglabājamā formā. **Polija:** poļu valodas versija ir pieejama vietnē \[URL\].
+
+### A.2 Apvienotā Karaliste *(tikai tad, ja norādīta 2. sadaļā)*
+
+Mūsu pārstāvis Apvienotajā Karalistē saskaņā ar UK GDPR 27. pantu ir \[name, address, email\]. Jums piemēro Consumer Rights Act 2015, un nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar to; no \[January 2027\] maksas plāniem piemēro Digital Markets, Competition and Consumers Act 2024 abonementu noteikumus, tostarp pārdomu periodu pēc atjaunošanas un pēc bezmaksas izmēģinājuma. **Kā mēs aizsargājam lietotājus no nelikumīga satura:** \[terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report\]. **Mūsu izmantotā proaktīvā tehnoloģija:** \[describe, or "none"\]. **Vecuma pārbaude:** \[describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023\]. 10. sadaļā noteiktā sūdzību procedūra pieņem sūdzības par nelikumīgu saturu, nepamatotu jūsu satura noņemšanu, jūsu konta ierobežojumiem, automatizētu rīku lietošanu, kas ietekmē jūsu saturu, un jebkādu vecuma novērtējumu, kas jūs nepamatoti bloķē. Tā ir pieejama arī satura skartajām personām, kuras nav lietotāji.
+
+### A.3 Amerikas Savienotās Valstis *(tikai tad, ja norādītas 2. sadaļā)*
+
+**Šķīrējtiesas līgums un atteikšanās no kolektīvas prasības.** Ja dzīvojat Amerikas Savienotajās Valstīs, jūs un DebateAIRO vienojaties jebkuru no šiem Noteikumiem vai pakalpojuma izrietošu strīdu izšķirt saistošā individuālā šķīrējtiesā, ko pārvalda \[the American Arbitration Association / JAMS\] saskaņā ar tās patērētāju noteikumiem, nevis tiesā, izņemot to, ka ikviena puse var celt individuālu prasību maza apmēra prasību tiesā. **Jūs varat atteikties**, nosūtot e-pasta ziņojumu uz \[address\] 30 dienu laikā pēc pirmās piekrišanas šiem Noteikumiem. Šo līgumu reglamentē Federal Arbitration Act. Mēs sedzam šķīrējtiesas iesniegšanas nodevas. Kolektīvas, kopīgas un pārstāvības prasības tiek izslēgtas tiktāl, cik to atļauj tiesību akti. Šī sadaļa attiecas tikai uz nākotni un neattiecas uz prasījumiem, kas radušies pirms tās pieņemšanas.
+
+**Paziņojumi un noņemšana.** Par bez piekrišanas kopīgotiem intīmiem attēliem var ziņot vietnē \[URL\] bez konta, un pēc derīga pieprasījuma tie tiek noņemti 48 stundu laikā. Autortiesību sūdzības tiek nosūtītas mūsu 16. sadaļā norādītajai pilnvarotajai personai.
+
+**Štatu īpašie noteikumi.** *Kalifornija:* piemēro 12. sadaļā noteiktos automātiskās atjaunošanas noteikumus; jūs jebkurā laikā varat atcelt abonementu tiešsaistē; mēs glabājam jūsu piekrišanu atjaunošanas noteikumiem vismaz trīs gadus. *Ņujorka:* varat atcelt abonementu 14 dienu laikā pēc jebkura maksājuma par paaugstinātu cenu un saņemt proporcionālu atmaksu. *Teksasa un Nebraska:* mēs nepārdodam sensitīvus personas datus; ja tas kādreiz mainīsies, vispirms saņemsim jūsu piekrišanu \[statutory notice language\]. *Vašingtona:* mūsu Patērētāju veselības datu privātuma paziņojums vietnē \[URL\] attiecas uz informāciju par veselību. *Kolorādo:* nekas pakalpojumā nepieņem par jums lēmumus ar būtiskām sekām.
+
+### A.4 Kanāda un Kvebeka *(tikai tad, ja norādītas)*
+
+Mūsu privātuma speciālists ir \[name, email\]. **Kvebeka:** šie Noteikumi franču valodā ir pieejami vietnē \[URL\], un franču valodas versija jums tika parādīta pirmā; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem.
+
+### A.5 Austrālija un Jaunzēlande *(tikai tad, ja norādītas)*
+
+**Mūsu pakalpojumiem ir garantijas, ko nevar izslēgt saskaņā ar Austrālijas Patērētāju tiesību aktiem.** Būtisku pakalpojuma trūkumu gadījumā jums ir tiesības atcelt līgumu un saņemt atmaksu par neizmantoto daļu vai kompensāciju par pakalpojuma vērtības samazinājumu; jums ir tiesības arī uz kompensāciju par citiem saprātīgi paredzamiem zaudējumiem vai kaitējumu. Ja trūkums nav būtisks, jums ir tiesības saprātīgā laikā saņemt pakalpojuma problēmu novēršanu un, ja tas netiek izdarīts, atcelt līgumu un saņemt atmaksu. Ciktāl to atļauj 64A sadaļa, mūsu atbildība par garantijas pārkāpumu aprobežojas ar atkārtotu pakalpojuma sniegšanu vai ar tās izmaksu segšanu. Maksas plānam nav cita pārdomu perioda kā vien 12. sadaļā jums piešķirtais; mūsu atmaksas politika ir \[…\]. **Jaunzēlande:** piemēro Consumer Guarantees Act 1993, un nekas šajos Noteikumos to neizslēdz; par kaitīgu digitālo saziņu var ziņot mums saskaņā ar 10. sadaļu vai organizācijai Netsafe.
+
+### A.6 Latīņamerika *(pielikums spāņu valodā; tikai tad, ja norādīta)*
+
+&#91;Published in Spanish.\] Piekrišana ir apstrādes pamats, ja nav līguma nepieciešamības; reģistrējoties jūs nepārprotami piekrītat to sensitīvo datu apstrādei, kurus izvēlaties iekļaut. Jūsu ARCO tiesības var īstenot, rakstot uz \[address\], un atbildes tiek sniegtas \[Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719\] laikā. *Meksika:* pilnais *aviso de privacidad* ir pieejams vietnē \[URL\]; atteikums \[5\] dienu laikā. *Argentīna:* \[AAIP legend\]; izmantojiet *botón de arrepentimiento* vietnē \[URL\] 10 dienu laikā. *Kolumbija:* *política de tratamiento* ir pieejama vietnē \[URL\]; atteikums 5 dienu laikā. *Čīle* (no 2026. gada 1. decembra): Aģentūras kontaktinformācija ir \[…\]; jūs varat atcelt abonementu tādā pašā veidā, kādā to noformējāt; digitālajiem pakalpojumiem atteikuma tiesības nepiemēro.
+
+### A.7 Persijas līča valstis — Apvienotie Arābu Emirāti un Saūda Arābija *(tikai tad, ja norādītas)*
+
+Ja apstrādājam jūsu datus citiem nolūkiem, nevis pakalpojuma sniegšanai, mēs to darām ar jūsu piekrišanu, kuru varat atsaukt. Jūsu dati tiek apstrādāti ārpus \[UAE / Kingdom of Saudi Arabia\], tostarp Eiropas Savienībā un Amerikas Savienotajās Valstīs, saskaņā ar \[SDAIA standard contractual clauses / the mechanism in the Register\]. Jūs atbildat par to, lai viss jūsu publicētais atbilstu tās valsts tiesību aktiem, kurā atrodaties, tostarp tiesību aktiem par reliģiju, sabiedrisko kārtību un tikumību; mēs varam ierobežot debašu publicēšanu par šādām tēmām jūsu reģionā.
+
+### A.8 Āzijas un Klusā okeāna reģions *(tikai norādīto reģionu rindas)*
+
+*Singapūra:* mūsu datu aizsardzības speciālists ir \[name, email\]; nosūtīšana balstās uz līgumiskiem aizsardzības pasākumiem, kas pielīdzināmi PDPA; maksas plānam nav likumā noteikta pārdomu perioda, un mūsu atmaksas politika ir \[…\]. *Japāna:* Specified Commercial Transactions Act paredzētā informācija ir pieejama vietnē \[URL\]; tiešsaistes abonementiem nav vispārēja pārdomu perioda, un mūsu atmaksas politika ir \[…\]; jūsu saturs var tikt nosūtīts pakalpojumu sniedzējiem šādās valstīs: \[named countries\], un jūs tam piekrītat, reģistrācijas laikā sniedzot piekrišanu. *Dienvidkoreja:* piekrišanas neobligātai apstrādei un tirgvedībai tiek iegūtas atsevišķi no pakalpojuma darbībai nepieciešamajiem elementiem; mūsu privātuma speciālists ir \[name\]; saskaņā ar E-Commerce Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; pirms katra regulāra cenas paaugstinājuma vai bezmaksas plāna pārvēršanas maksas plānā mēs no jauna saņemam jūsu piekrišanu; ja to prasa AI Basic Act, mēs jūs iepriekš informējam, ka pakalpojuma pamatā ir MI, un marķējam rezultātus. *Indija* (kad stājas spēkā DPDP noteikumi): piemēro piekrišanas paziņojumu vietnē \[URL\]; lietotājiem, kas jaunāki par 18 gadiem, nepieciešama pārbaudāma vecāku piekrišana. *Taizeme:* mūsu pārstāvis Taizemē ir \[name\] \[if appointed\]. *Filipīnas:* mūsu uzņēmuma identifikācijas informācija un tiesiskās aizsardzības mehānisms saskaņā ar Internet Transactions Act ir pieejami vietnē \[URL\]; sūdzības var iesniegt National Privacy Commission.
+
+### A.9 Rezervēts
+
+Katrā no šīm valstīm — Turcijā, Brazīlijā un Indonēzijā — ir vajadzīgs pielikums vietējā valodā, pārstāvis vai reģistrācija un dokumentu iesniegšana. Šīs valstis šeit nav aplūkotas un neietilpst 2. sadaļā, kamēr tās netiek apzināti pievienotas. Ķīnā, Vjetnamā un Krievijā pakalpojums netiek piedāvāts.

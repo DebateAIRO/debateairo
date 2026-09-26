@@ -337,6 +337,40 @@ describe("DEV-09 private local API environment", () => {
       .toContain(`SUPPORT_MODEL_TARGET_JSON=${TEST_SUPPORT_MODEL_TARGET}\n`);
   });
 
+  it("atomically adds the declared local deployment mode to the exact environment assembled before it", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
+    expect(current.endsWith(`\n${ROW}`)).toBe(true);
+    const v1 = current.slice(0, -ROW.length);
+    const v2 = v1.replace("PROVIDER_PROBE_TIMEOUT_MS=180000\n", "PROVIDER_PROBE_TIMEOUT_MS=5000\n");
+    expect(v2).not.toBe(v1);
+    for (const previous of [v1, v2]) {
+      await writeFile(test.outputFilePath, previous, { mode: 0o600 });
+      await expect(assemble(test.repositoryRoot))
+        .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
+      expect(await readFile(test.outputFilePath, "utf8")).toBe(current);
+    }
+  });
+
+  it("refuses to add the declared deployment mode over an environment that drifts elsewhere or names another mode", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
+    const previous = current.slice(0, -ROW.length);
+    const w1 = previous.replace("API_PORT=8790\n", "API_PORT=8791\n");
+    const w2 = previous + "DEBATEAI_DEPLOYMENT_MODE=hosted\n";
+    expect(w1).not.toBe(previous);
+    expect(w2).not.toBe(previous);
+    for (const drifted of [w1, w2]) {
+      await writeFile(test.outputFilePath, drifted, { mode: 0o600 });
+      await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+      expect(await readFile(test.outputFilePath, "utf8")).toBe(drifted);
+    }
+  });
+
   it("rejects an earlier environment that drops a required field", async () => {
     const test = await fixture();
     await assemble(test.repositoryRoot);

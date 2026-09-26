@@ -42,7 +42,7 @@ function createAccountButton(): HTMLButtonElement {
 
 async function mount(): Promise<void> {
   await act(async () =>
-    root!.render(<SignUpFlow client={{ register: vi.fn(), resendVerification: vi.fn() }} />)
+    root!.render(<SignUpFlow client={{ register: vi.fn() }} />)
   );
 }
 

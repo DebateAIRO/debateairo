@@ -1,0 +1,33 @@
+# BUILD-PES-S03-C2 case file
+
+> treat it like a murder case. I want to get a nice report on what can be done better. What we must upgrade. what repeatedly costed us tokens. how we can make the coding more efficient. How can we turn this into a one prompt machine even better.
+
+Seat BUILD-PES-S03-C2, BUILD(S03-C2), ticket t_bbf6c6bb, session 01a0d7ca-43ff-7f02-837c-0e65c0c2ff1a. START date: 2026-09-25 12:00:02 EEST; post-commit measurement: 12:12:03 EEST. Commit ec66d5e7c6ed77242c1e0d513b2de77596deadae on slice/provider-env-selection-s03. About 12 minutes from the measured START to the post-commit boundary check. Exact token billing per finding is UNVERIFIED; estimates below are explicitly estimates.
+
+## Cause and evidence
+
+The operator examples had not followed the shipped price and envelope checks. Four new tests were written and observed RED before any README edit. The price table and both env examples now declare prices, the support note names the frozen SPEC's seal code, the paid-probe paragraph states the measured exposure, and three obsolete bullets are removed. Final runs are 28/28 and 31/31 three times; typecheck retains the same single TS2835 diagnostic at apps/ui/lib/v3/answerExport.ts(2,38). The pre-C2 test bytes, C1 refusal block, and surviving two bullets are byte-identical.
+
+## Upgrades ranked by estimated tokens saved
+
+1. **Apply the summary-only capture rule to log reads as well as execution.** I violated its intended output discipline by printing several full captured logs; some batched reading also exceeded the tool output cap and had to be read again in smaller parts. The commands had correctly captured output first, but I then reintroduced passing-case noise. Estimated unnecessary transcript cost: 10,000–20,000 tokens and 1–2 minutes; exact amount UNVERIFIED. Three oversized read outputs were truncated; subsequent bounded reads recovered required material. VERDICT: extract failing titles, summary lines, markers and diagnostics from existing logs / CONFIDENCE high / STRONGEST COUNTER: full log inspection still matters when the summary conceals collection or teardown errors. Keep the full file addressable and expand only the relevant failure span.
+
+2. **Run every prose assertion against actual wrapped source before freezing its claimed RED reason.** PLAN.md:479-483 predicts the raw negative regex fails at base. README.md:748-749 at START splits “the daily” from “call cap” with a newline, so the regex passed and the missing seal code supplied the failure instead. c2-2-red-attempt-1.log establishes that; attempt-2 establishes the normalized negative actually fails. I normalized whitespace in the support assertion and the stale-list assertion, retaining the specified phrase and section scope. Price and cost tests continued to follow their stated boundaries. Price: one extra cluster run, about 1–2 seconds of test time plus roughly 1 minute investigation/reporting; estimated 1,000–2,000 tokens. VERDICT: freeze the failure assertion and message from the real base, with soft-wrap variants / CONFIDENCE high / STRONGEST COUNTER: literal source matching is intentional for shell/JSON examples; normalize prose only.
+
+3. **Make the runner emit a compact mutation receipt.** The worker requires per-assertion refutation plus a neighboring escape. I ran 23 independent mutants, six neighboring/faithful variants, and 29 restored GREEN runs through the repository runner. No custom runner file was written. These are useful receipts, but repeating full cluster summaries and identical status lines consumes context. Price: 58 cluster executions (roughly two minutes wall time), estimated 5,000–10,000 transcript tokens. VERDICT: let the existing runner produce an indexed receipt with one summary per run and stable per-run log links / CONFIDENCE medium / STRONGEST COUNTER: batching must still restore after each mutant and preserve each assertion's own failure, never infer it from a composite mutant.
+
+4. **Record moving refs separately from immutable lane bases.** At 12:10:59, origin/dev was ce713875fa4f8a46be96731409070dea11e0376d, while the merge base remained 776359c3851289c25cb6ede3633cdce3e14adba6. The capability proof printed 265 changed files, versus the historical plan's 258. The empty product diff remains sound. Price: two read-only git probes, under one minute, estimated 500 tokens. VERDICT: capture HEAD, origin/dev, and their merge base together / CONFIDENCE high / STRONGEST COUNTER: immutable SHAs alone suffice for the lane, but acceptance explicitly names origin/dev.
+
+## What I nearly got wrong
+
+A RED suite did not prove the intended negative assertion was RED: C2-2 initially failed its second assertion. I caught the exact failure and corrected the whitespace seam before the README changed. I also could have reused the original double-quote-only extractor at test line 457 for template-literal codes; C1's widened pin was preserved, and the eight source anchors were measured independently. I preserved the two stale-list survivors byte-for-byte, rather than rewriting nearby prose.
+
+## Dead ends and packet ambiguity
+
+- `rg` is unavailable in this environment; the single failed lookup was replaced with /usr/bin/grep. No installation was attempted.
+- Large multi-file reads caused truncation instead of reducing work. Keep required reads bounded; do not concatenate long skills, plans, decisions and test logs into one output.
+- BUILD-S03-C2.md charge 6 and PLAN.md:705-707 claim no listener, but the mandatory existing credential suite calls server.listen(0, "127.0.0.1") at tests/unit/v9-provider-credential-files.test.ts:569 and closes it at :583. I ran the explicitly required suite, created no additional service, and left no test process running. The packet should distinguish a service listener from its required ephemeral fixture. This is a packet fact correction, not an implementation change.
+- V-11 already records the build-seal versus live policy distinction. I did not reinterpret its default or create another decision row; C2-7 follows the frozen sentence.
+- The packet requires naming differences but its worker skill also says to stop if a packet is wrong. For the raw-regex mismatch I made the bounded test correction and immediately recorded it on the ticket, without changing product scope. State this routine correction rule explicitly in future packets.
+
+No push, merge, install, database work, real credential use, desktop action, or mission-document edit. Only the two allowed lane files were staged; final status is empty. Full-project and four inherited RED-suite reruns are UNVERIFIED: this packet prescribes the two-file verification boundary and forbids unrelated services/database activity.

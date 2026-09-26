@@ -1,0 +1,218 @@
+[
+  {
+    "label": "drop-DEPLOYMENT_MODE_UNRESOLVED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-DEPLOYMENT_MODE_UNRESOLVED-attempt-1.log"
+  },
+  {
+    "label": "drop-DEPLOYMENT_MODE_INVALID",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-DEPLOYMENT_MODE_INVALID-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_BASE_URL_TLS_REQUIRED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-PROVIDER_BASE_URL_TLS_REQUIRED-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_TARGET_LOOPBACK_REFUSED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-PROVIDER_TARGET_LOOPBACK_REFUSED-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_INLINE_CREDENTIAL_REFUSED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-PROVIDER_INLINE_CREDENTIAL_REFUSED-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_AUTHORIZATION_FILE_ABSENT",
+    "passed": 29,
+    "failed": 2,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-PROVIDER_AUTHORIZATION_FILE_ABSENT-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_AUTHORIZATION_FILE_UNUSABLE",
+    "passed": 29,
+    "failed": 2,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-PROVIDER_AUTHORIZATION_FILE_UNUSABLE-attempt-1.log"
+  },
+  {
+    "label": "drop-COST_ENVELOPES_NOT_SEALED",
+    "passed": 28,
+    "failed": 3,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-COST_ENVELOPES_NOT_SEALED-attempt-1.log"
+  },
+  {
+    "label": "drop-RUNNER_PRIMARY_PROVIDER_REF_DRIFT",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-RUNNER_PRIMARY_PROVIDER_REF_DRIFT-attempt-1.log"
+  },
+  {
+    "label": "drop-SUPPORT_MODEL_CREDENTIAL_ABSENT",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-SUPPORT_MODEL_CREDENTIAL_ABSENT-attempt-1.log"
+  },
+  {
+    "label": "drop-SUPPORT_MODEL_PATH_NOT_RATIFIED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-SUPPORT_MODEL_PATH_NOT_RATIFIED-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_DISCOVERY_TARGET_PRICE_INVALID",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-PROVIDER_DISCOVERY_TARGET_PRICE_INVALID-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_TARGET_PRICE_REQUIRED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-PROVIDER_TARGET_PRICE_REQUIRED-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_TARGET_PRICE_ZERO",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-PROVIDER_TARGET_PRICE_ZERO-attempt-1.log"
+  },
+  {
+    "label": "drop-COST_ENVELOPE_POLICY_UNRESOLVED",
+    "passed": 29,
+    "failed": 2,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-COST_ENVELOPE_POLICY_UNRESOLVED-attempt-1.log"
+  },
+  {
+    "label": "drop-COST_ENVELOPE_POLICY_INVALID",
+    "passed": 29,
+    "failed": 2,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-COST_ENVELOPE_POLICY_INVALID-attempt-1.log"
+  },
+  {
+    "label": "drop-SUPPORT_ADMISSION_SCOPES_NOT_SEALED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-drop-SUPPORT_ADMISSION_SCOPES_NOT_SEALED-attempt-1.log"
+  },
+  {
+    "label": "insert-RUN_COST_ENVELOPE_MONEY_REACHED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-insert-RUN_COST_ENVELOPE_MONEY_REACHED-attempt-1.log"
+  },
+  {
+    "label": "insert-PROVIDER_USAGE_UNREPORTED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-insert-PROVIDER_USAGE_UNREPORTED-attempt-1.log"
+  },
+  {
+    "label": "insert-COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-insert-COST_ENVELOPE_CHARGE_UNREPRESENTABLE-attempt-1.log"
+  },
+  {
+    "label": "insert-DAILY_COST_ENVELOPE_REACHED",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-insert-DAILY_COST_ENVELOPE_REACHED-attempt-1.log"
+  },
+  {
+    "label": "duplicate-row",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-duplicate-row-attempt-1.log"
+  },
+  {
+    "label": "move-to-meaning",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-move-to-meaning-attempt-1.log"
+  },
+  {
+    "label": "move-to-prose",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-move-to-prose-attempt-1.log"
+  },
+  {
+    "label": "second-code-in-cell",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-second-code-in-cell-attempt-1.log"
+  },
+  {
+    "label": "nested-credential-outside-table",
+    "passed": 29,
+    "failed": 2,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-nested-credential-outside-table-attempt-1.log"
+  },
+  {
+    "label": "all-credentials-outside-table",
+    "passed": 29,
+    "failed": 2,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/class-all-credentials-outside-table-attempt-1.log"
+  }
+]

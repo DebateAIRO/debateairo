@@ -66,6 +66,7 @@ export interface RejectedProviderContent {
 }
 
 export interface ProviderCallRequest {
+  readonly argumentLanguageName?: string;
   readonly runId: string | null;
   readonly subjectItemId: string;
   readonly callSiteKey: string;
@@ -1301,7 +1302,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // W10/2: the bound this attempt actually asked for. Without it the
             // ledger cannot tell a raised retry from a repeat of the attempt
             // that was just cut off.
-            token_ceiling: attemptTokenCeiling
+            token_ceiling: attemptTokenCeiling,
+            argument_language_name: request.argumentLanguageName ?? null
           },
           parseStatus: classifiedContent.parseStatus,
           parseError: classifiedContent.parseError,

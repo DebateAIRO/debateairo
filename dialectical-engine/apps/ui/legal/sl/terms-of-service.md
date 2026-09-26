@@ -1,0 +1,310 @@
+# DebateAI — Pogoji uporabe
+
+<!-- legal-chrome
+summaryTitle: Na kratko
+eyebrow: POGOJI UPORABE · v2.0 · VELJAVNI OD [DATE]
+title: S čim soglašate
+lede: Pogodba med vami in družbo DebateAIRO S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
+endMarker: KONEC POGOJEV · v2.0
+bodyLabel: Besedilo Pogojev uporabe
+annexTitle: Priloga A — Regionalni pogoji
+jumps:
+01 KDO SMO
+03 SPREJETJE
+05 KAJ JE DEBATEAI
+06 VAŠ RAČUN
+07 DOPUSTNA UPORABA
+08 VAŠA VSEBINA
+09 OBJAVA
+10 PRIJAVA
+15 ODGOVORNOST
+18 PRAVO, KI SE UPORABLJA
+-->
+
+2026-09-21 · @Someone
+
+**Osnutek v2.0 za pravni pregled — še ne velja. To ni pravni nasvet.** Oglati oklepaji označujejo, kaj lahko izpolnite ali določite samo vi. Ta različica nadomešča osnutek z dne 20. septembra: za objavljene razprave po zaprtju računa sprejema možnost B, model odstopa po zadevi *Sky Österreich*, ne določa omejitve odgovornosti do potrošnikov ter vključuje določbo o ozemeljskem področju uporabe in regionalno prilogo. Splošni del velja za vse; Priloga A velja samo za regije, navedene v razdelku 2. Uporabnik prebere en dokument.
+
+**Version 2.0 · Effective \[date\] · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+
+**In short.** Stari morate biti najmanj 18 let. DebateAI z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na \[abuse@dezbatere.ro\], ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
+
+## 1. Kdo smo in kako lahko stopite v stik z nami
+
+Storitev DebateAI upravlja **DebateAIRO S.R.L.**, družba, registrirana v Romuniji.
+
+|  |  |
+| --- | --- |
+| Registrirani sedež | \[street, number, sector, postal code\], Bukarešta, Romunija |
+| Številka v poslovnem registru | \[J40/…/…\] |
+| Enotna registrska številka (CUI) | \[…\] · DDV: \[RO… / not VAT-registered\] |
+| Osnovni kapital | \[RON …\] |
+| Splošni kontakt | \[hello@dezbatere.ro\] |
+| Pravna obvestila | \[legal@dezbatere.ro\] |
+| Zasebnost in varstvo podatkov | privacy@dezbatere.ro |
+| Prijava nezakonite vsebine | \[abuse@dezbatere.ro\] — glejte razdelek 10 |
+| Kontaktna točka za organe | \[dsa@dezbatere.ro\] — v romunščini in angleščini |
+| Predstavniki v drugih državah | Navedeni so v Prilogi A za regije, v katerih smo jih imenovali |
+
+Ti podatki so trajno prikazani tudi na spletnem mestu \[dezbatere.ro/legal\]. Vedno lahko stopite v stik z osebo, ne samo z našim pomočnikom; v razdelku 10 je pojasnjeno, kako.
+
+## 2. Kje ponujamo DebateAI
+
+DebateAI ponujamo osebam, ki živijo v **\[the European Union and the European Economic Area\]** \[and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea\]. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev.
+
+## 3. Sprejetje teh Pogojev
+
+Te Pogoje sprejmete tako, da označite polje **»Prebral/-a sem in se strinjam s pogoji uporabe.«** ter kliknete **Ustvari račun**. S tem med vami in družbo DebateAIRO S.R.L. nastane pogodba. Pogoji vključujejo pravila dopustne uporabe iz razdelka 7, pravila objavljanja iz razdelka 9, določbe o odgovornosti iz razdelka 15, določbe o pravu, ki se uporablja, in sporih iz razdelka 18 ter, če živite v Združenih državah Amerike, arbitražni sporazum iz Priloge A.3. Hranimo zapis o tem, katero različico ste sprejeli in kdaj, kot je pojasnjeno v našem Pravilniku o zasebnosti.
+
+Naš **Pravilnik o zasebnosti** na \[dezbatere.ro/privacy\] pojasnjuje, kako ravnamo z osebnimi podatki. To so informacije, ki vam jih moramo zagotoviti, in ne pogodba, s katero soglašate, nič v teh Pogojih pa jih ne spremeni v privolitev za obdelavo. Naš **Pravilnik o piškotkih** na \[dezbatere.ro/cookies\] in naš **Register ponudnikov umetne inteligence** na \[dezbatere.ro/providers\] sta s sklicevanjem vključena v te Pogoje.
+
+Preden z nami elektronsko sklenete katero koli pogodbo, vam vmesnik prikaže potrebne korake, omogoči pregled in popravek vnesenih podatkov pred oddajo ter vas obvesti o jezikih, v katerih je mogoče skleniti pogodbo. Ti Pogoji so na voljo v obliki, ki jo lahko shranite in natisnete, sprejeto različico vam pošljemo po e-pošti, izvod pa lahko zahtevate kadar koli. Nič v teh Pogojih ne omejuje pravic, ki jih imate po romunskem pravu ali pravu EU o varstvu potrošnikov oziroma po pravu države, v kateri živite, in ki jih ni mogoče omejiti s pogodbo.
+
+## 4. Kdo sme uporabljati DebateAI
+
+Za ustvarjanje računa morate biti **stari najmanj 18 let**, kar potrdite ob registraciji. DebateAI ni namenjen otrokom in ga zavestno ne zagotavljamo osebam, mlajšim od 18 let. Če izvemo, da račun pripada osebi, mlajši od 18 let, ga zapremo. Nekatere regije zahtevajo več kot samo potrditev; Priloga A določa, kaj velja v posamezni regiji.
+
+Imeti morate poslovno sposobnost za sklenitev te pogodbe. Če DebateAI uporabljate v imenu organizacije, potrjujete, da ste jo pooblaščeni zavezati, in »vi« v tem primeru pomeni to organizacijo.
+
+Objavljeno razpravo lahko prebere vsakdo. Za branje račun ni potreben, vendar gre za uporabo storitve, zato zanj veljajo razdelki 7, 15, 16 in 18.
+
+## 5. Kaj DebateAI počne in kaj ni
+
+Pošljete vprašanje ali trditev. DebateAI jo posreduje več modelom umetne inteligence tretjih oseb, ki okoli nje oblikujejo graf argumentov: trditve, nasprotne trditve, kritike, sklice na dokaze, ocene in razsodbo s pasom gotovosti. Posamezne trditve lahko izpodbijate, zahtevate nadaljnjo preučitev določene točke in se odločite, ali boste rezultat objavili.
+
+**Vse v razpravi ustvari umetna inteligenca.** Argumenti, kritike, sklici na dokaze, ocene, razsodbe in odgovori pomočnika za podporo so strojno ustvarjeni. Lahko so napačni, nepopolni, zastareli ali samozavestno zmotni in lahko odražajo pristranskosti modelov. Preden so prikazani vam ali objavljeni, jih ne pregleda nobena oseba, prav tako zanje nobena imenovana oseba ne prevzema uredniške odgovornosti. Ustvarjena vsebina je v izdelku, na objavljenih straneh in v izvoženih datotekah označena kot vsebina, ustvarjena z umetno inteligenco.
+
+**DebateAI ni nasvet.** Ne pomeni pravnega, zdravstvenega, finančnega, davčnega, psihološkega, varnostnega ali drugega strokovnega nasveta, razsodba pa ni ugotovitev dejstva. Razprave ne uporabljajte kot podlage za odločitev, ki je pomembna za vaše zdravje, varnost, denar, pravni položaj ali dobrobit drugih, ne da bi preverili primarne vire in se po potrebi posvetovali z usposobljenim strokovnjakom. Visok pas gotovosti pomeni, da so modeli na podlagi gradiva, ki so ga obravnavali, presodili, da je razlaga dobro uveljavljena; ne zagotavlja njene resničnosti.
+
+**K čemu se zavezujemo.** Storitev bomo zagotavljali z razumno skrbnostjo in strokovnostjo ter skladno z opisom, ki ga objavimo. Kadar vam zakon zagotavlja jamstvo, da storitev ustreza opisu in je primerna za običajni namen, to jamstvo velja in ga nič v teh Pogojih ne odpravlja. Ne obljubljamo pa, da je kateri koli posamezni rezultat točen: to je lastnost ustvarjene vsebine, ne vprašanje, ali storitev deluje.
+
+**Modeli se spreminjajo.** Modele umetne inteligence, ki jih uporabljamo, lahko dodamo, odstranimo ali zamenjamo ter spremenimo način, kako sistem sestavlja odgovor. Razdelek 14 pojasnjuje, kdaj vam sprememba daje pravice.
+
+## 6. Vaš račun
+
+Registrirate se z e-poštnim naslovom, geslom, e-poštnim naslovom za obnovitev in obveznim dvostopenjskim preverjanjem pristnosti. Izberete **psevdonim**, torej ime, prikazano ob vsem, kar objavite; ko je psevdonim določen, ga ni mogoče spremeniti. Varujte geslo, aplikacijo za preverjanje pristnosti in obnovitvene kode. Odgovorni ste za dejavnosti v svojem računu, razen kadar so posledica naše opustitve.
+
+Imate lahko en račun, razen če se dogovorimo drugače. Računa ne smete deliti, prodajati ali prenašati.
+
+Če izgubite dostop, obnovitev računa poteka po postopku, objavljenem v izdelku, ki vključuje čakalna obdobja, namenjena oteževanju prevzema računa. Zahtevo za obnovitev lahko zavrnemo, kadar ne moremo razumno ugotoviti, da prihaja od vas.
+
+Račun lahko kadar koli zaprete v meniju **Nastavitve → Račun**. Zaprtje začne učinkovati po **7-dnevnem** obdobju odloga, v katerem ga lahko prekličete, o njem pa vas obvestimo po vsakem od vaših registriranih kanalov. Razdelek 11 pojasnjuje, kaj se ob zaprtju izbriše in kaj ne.
+
+## 7. Dopustna uporaba
+
+Ta pravila veljajo za vsebino, ki jo pošljete in objavite, ter za način uporabe storitve.
+
+**Ne pošiljajte osebnih podatkov drugih ljudi.** Sprašujte o temah, argumentih in javnih vprašanjih, ne pa o določljivih zasebnikih. Ne vključujte imen, kontaktnih podatkov, identifikacijskih številk, slik, zdravstvenih, finančnih ali drugih podatkov, ki določajo osebo, in ne uporabljajte DebateAI za izdelavo primera, profila ali dosjeja o osebi. Vprašanja o javnih osebah, ki delujejo v svoji javni vlogi, so dopustna; vprašanja, usmerjena proti zasebniku, niso. Če take podatke vendarle pošljete, ste zanje odgovorni in vsebino lahko odstranimo.
+
+**Vaši občutljivi podatki.** Vprašanja, ki jih zastavite, se lahko nanašajo na vaše zdravje, prepričanja, politična stališča ali druge občutljive zadeve. V to ste privolili ob registraciji. Če živite nekje, kjer veljajo posebna pravila za zdravstvene podatke, vas lahko Priloga A napoti na ločeno obvestilo.
+
+**Ne pošiljajte ali objavljajte nezakonite vsebine**, vključno z vsebino, ki je obrekljiva, spodbuja nasilje ali sovraštvo, nadleguje ali grozi, predstavlja intimne posnetke, objavljene brez privolitve, krši pravice intelektualne lastnine ali zaupnost, razkriva poslovne skrivnosti, pomeni gradivo s spolno zlorabo otrok ali krši sankcije oziroma nadzor izvoza.
+
+**Ne uporabljajte DebateAI za zavajanje.** Ustvarjenega rezultata ne predstavljajte kot človeško delo, kadar bi bilo to zavajajoče, ne odstranjujte oznake, da ga je ustvarila umetna inteligenca, in ga ne uporabljajte za ustvarjanje navideznega soglasja, lažnih dokazov ali lažnega predstavljanja.
+
+**Ne napadajte storitve.** Prepovedani so avtomatiziran dostop, avtomatizirano zajemanje ali pregledovanje spletnih strani ter množično pridobivanje objavljenih razprav, ki presega dovoljenja v naši datoteki robots; izogibanje omejitvam hitrosti, preverjanju pristnosti ali nadzoru objav; poskusi pridobivanja pozivov ali sistemskih navodil; vbrizgavanje pozivov, namenjeno temu, da bi sistem prezrl svoje omejitve; ter preizkušanje ali obremenitveno testiranje brez našega pisnega dovoljenja.
+
+**Ne preprodajajte storitve in je ne ponujajte pod svojo blagovno znamko** ter je brez našega pisnega soglasja ne uporabljajte za izdelavo konkurenčnega sistema, vključno z uporabo rezultatov kot podatkov za učenje.
+
+**Ne uporabljajte DebateAI za odločitve o** zdravju, varnosti, zakonskih pravicah, zaposlitvi, posojilih, nastanitvi ali priseljenskem statusu osebe. Za to ni zasnovan in njegovi rezultati niso varna podlaga za take odločitve.
+
+**Lokalno pravo v kraju objave.** Odgovorni ste za zagotovitev, da je vse, kar objavite, skladno s pravom države, v kateri ste. V nekaterih regijah lahko omejimo objavljanje določenih tem.
+
+Če niste prepričani, ali je nekaj dovoljeno, nas vprašajte, preden to objavite.
+
+## 8. Vaša vsebina in ponudniki umetne inteligence, ki jo obdelujejo
+
+**Vaša vsebina ostane vaša.** Ohranite vse pravice, ki jih imate na vprašanjih, trditvah, opombah in izpodbijanjih, ki jih pošljete. Podeljujete nam neizključno, svetovno in brezplačno licenco za gostovanje, shranjevanje, razmnoževanje, prilagajanje ter obdelavo te vsebine za namene delovanja storitve: izvajanje razprave, njeno shranjevanje, da jo lahko znova odprete in si ogledate njeno ponovitev, zagotavljanje podpore, izpolnjevanje naših pravnih obveznosti in — samo če se odločite za objavo — namene iz razdelka 9. Ta licenca preneha z izbrisom vsebine, razen če razdelek 9 ali zakon zahteva drugače.
+
+**Na vaši vsebini ne učimo modelov.** Na vaši vsebini ne učimo modelov, naše pogodbe s ponudniki umetne inteligence pa izključujejo uporabo vaše vsebine za učenje ali izboljševanje njihovih modelov. \[Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.\]
+
+**Kako vaša vsebina doseže ponudnike umetne inteligence.** Za izvedbo razprave pošljemo besedilo enemu ali več zunanjim ponudnikom modelov. Ponudnik prejme vaše vprašanje, usmerjevalne opombe, ki jih nastavite, in izjave, ki jih sistem sestavi med razpravo — ponudnik torej vidi besedilo, izpeljano iz tega, kar ste vnesli, in zgrajeno okoli tega, ne samo vaših izvirnih besed. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu.
+
+**Kateri ponudniki in kje.** Naš **Register ponudnikov umetne inteligence** na \[dezbatere.ro/providers\] je del teh Pogojev. Za vsakega ponudnika, ki ga lahko uporabimo, navaja: njegovo pravno osebo in državo; kaj prejme in zakaj; kje obdeluje podatke; njegove pogoje hrambe; ali je za končno točko, ki jo uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; in datum zadnjega preverjanja vsakega vnosa. Ponudniki so lahko zunaj vaše države in zunaj Evropskega gospodarskega prostora. Naš Pravilnik o zasebnosti pojasnjuje zaščitne ukrepe.
+
+**Tri različne stvari.** »Ne uporablja se za učenje modelov«, »hrani se omejeno obdobje iz varnostnih razlogov, zaradi preprečevanja zlorab ali iz pravnih razlogov« in »ničelna hramba podatkov — po obdelavi se ne shrani« niso isto. Če ponudnik pozive hrani omejeno obdobje, Register navaja, kako dolgo in zakaj. Če je vključena ničelna hramba podatkov, je to navedeno v Registru skupaj s funkcijami, za katere velja. Ne bomo vam trdili, da se vsebina ne hrani, kadar to ni res.
+
+**Rezultati.** V razmerju med vami in nami lahko rezultate svojih razprav uporabljate za kateri koli zakonit namen, mi pa ne uveljavljamo lastništva ustvarjenega besedila. Upoštevajte, da ustvarjenega rezultata v številnih pravnih redih morda ni mogoče avtorskopravno zaščititi; da se lahko podoben rezultat ustvari za druge uporabnike; da lahko rezultati reproducirajo gradivo tretjih oseb ali so mu podobni; ter da za nekatera izvorna gradiva, ki jih pridobi ponudnik umetne inteligence, lahko veljajo omejitve ponovne uporabe. Preden se zanesete na rezultate ali jih ponovno objavite, ste odgovorni za preverjanje.
+
+## 9. Objava razprave
+
+Razprave so **privzeto zasebne**. Nič, kar ustvarite, ni vidno drugim, razen če to objavite.
+
+**Kaj povzroči objava.** Objava je namerno dejanje, ki ga potrdite ločeno. Ko objavite, ustvarimo nespremenljiv posnetek razprave in omogočimo, da ga brez računa prebere vsakdo. \[Search engines may index it. / Published debates are not indexed by search engines unless you choose to allow it.\] Posnetek prikazuje vaš **psevdonim**, vaše vprašanje, kot ste ga zapisali, drevo argumentov, ocene, razsodbo in pas gotovosti ter ima vidno oznako, da je vsebino ustvarila umetna inteligenca. Ne prikazuje vašega e-poštnega naslova, zapisov o sejah ali zgodovine računa.
+
+**Objava je v praksi dejansko nepovratna.** Ko razprava postane javna, jo lahko drugi berejo, citirajo, zajamejo v posnetek zaslona, arhivirajo in shranijo v predpomnilnik. Umik objave jo odstrani iz DebateAI in uniči ključ do našega izvoda, vendar ne more doseči izvodov, ki že obstajajo drugje. Ne objavljajte ničesar, za kar ne bi želeli, da je trajno povezano z vašim psevdonimom.
+
+**Objavljene razprave ob zaprtju računa.** Ko je vaš račun zaprt, vsako razpravo, ki ste jo objavili, odstranimo iz javnega dostopa **brez nepotrebnega odlašanja in vsekakor v 30 dneh**, razen če zakon zahteva hitrejše ukrepanje ali hrambo določene vsebine. Izvodi, ki so jih drugi ustvarili pred odstranitvijo, so zunaj našega nadzora. Če želite, da razprava po vašem odhodu ostane dostopna, jo najprej prenesite. \[This is Option B from the earlier drafts, as recommended in the second-opinion review. It is a product change to implement, not a description of the current system, which keeps published snapshots readable after erasure.\]
+
+**Objavljeno vsebino lahko vedno odstranimo.** Objavljeno razpravo lahko odstranimo ali omejimo dostop do nje, kadar to zahteva zakon, odredi sodišče ali pristojni organ oziroma kadar krši te Pogoje ali je nezakonita. Nič v tem razdelku nam ne preprečuje ukrepanja na podlagi veljavnega obvestila po razdelku 10 in nič v njem ne pomeni obljube, da bo objavljena razprava ostala dostopna.
+
+**Licenca za objavljeno vsebino.** Z objavo nam podelite neizključno, svetovno in brezplačno licenco za gostovanje, shranjevanje, razmnoževanje, prikazovanje in javno dajanje posnetka na voljo ter omogočanje drugim, da ga berejo in citirajo, dokler ostane objavljen. Ta licenca obstaja zato, da lahko upravljamo javne strani; ne dovoljuje nam prodaje vaše vsebine ali njenega licenciranja za izdelek nekoga drugega.
+
+**Če se razprava nanaša na vas.** Če objavljena razprava vsebuje vaše osebne podatke, je obrekljiva ali drugače nezakonita, lahko zahtevate njeno odstranitev ne glede na to, ali imate račun, prek razdelka 10 ali na privacy@dezbatere.ro. Ukrepamo na podlagi utemeljenih zahtev in za njihovo vložitev od vas ne zahtevamo registracije.
+
+## 10. Prijava vsebine, moderiranje in pritožbe
+
+**Vsebino lahko prijavi vsakdo.** Računa ne potrebujete. Pišite na \[abuse@dezbatere.ro\] ali uporabite kontrolnik **Prijavi** pri kateri koli objavljeni razpravi. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna.
+
+Vsako prijavo potrdimo brez nepotrebnega odlašanja. Prijave obravnavamo pravočasno, skrbno, nearbitrarno in objektivno, obvestimo vas o svoji odločitvi ter vam povemo, kako jo lahko izpodbijate. Če za obdelavo prijave ali odločitev o njej uporabljamo avtomatizirana sredstva, to navedemo. Na prijave intimnih posnetkov, objavljenih brez privolitve, ukrepamo **v 48 urah** od veljavne zahteve.
+
+**Dve vrsti avtomatiziranih odločitev, ki ju ločujemo.**
+
+- **Odločitve znotraj sistema.** Sistem strojno odloča o *argumentih*: lahko zavrne odgovor na vprašanje, se ustavi na končni poti — na primer, kadar vprašanje temelji na napačni predpostavki ali gre za vrednostno in ne empirično vprašanje — omeji pas gotovosti, kadar neodvisna kritika ni bila na voljo, ali odgovor označi kot pomanjkljiv, kadar ustvarjeno besedilo ni uspešno prestalo preverjanja skladnosti. Tako izdelek deluje po svoji zasnovi; odločitve so vam vidne v razpravi in niso odločitve o vas.
+- **Odločitve o moderiranju vsebine in računov.** Odstranitev ali omejitev objavljene razprave oziroma začasna onemogočitev ali zaprtje računa je odločitev, ki jo sprejmemo na podlagi teh Pogojev ali zakona. Pri vsaki taki odločitvi, ki vpliva na vaš račun, sodeluje oseba. Razlogi so opisani v razdelku 11.
+
+**Obrazložitev.** Kadar koli odstranimo ali omejimo vidnost vaše vsebine oziroma začasno onemogočimo ali ukinemo vaš račun, vam zagotovimo obrazložitev: kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, in ali izvirajo iz prijave ali naših preverjanj, ali so bila uporabljena avtomatizirana sredstva, pravna ali pogodbena podlaga ter način izpodbijanja odločitve.
+
+**Pritožba zoper odločitev.** Če se z odločitvijo o moderiranju ne strinjate, odgovorite na obrazložitev ali v **šestih mesecih** pišite na \[appeals@dezbatere.ro\]. Odločitev pregleda oseba, ki pri prvotni odločitvi ni sodelovala, mi pa vas o izidu obvestimo skupaj z razlogi. To ne vpliva na vašo pravico do sodnega postopka ali uporabe alternativnega reševanja sporov po razdelku 18. Pritožbeni postopek sprejema tudi pritožbe, da nismo ukrepali na podlagi prijave, da je bila vsebina neupravičeno odstranjena, da je bil račun neupravičeno omejen ali da je avtomatizirano orodje neupravičeno vplivalo na vašo vsebino.
+
+**Stik z osebo.** Naš pomočnik za podporo je sistem umetne inteligence in je kot tak označen. Kadar koli lahko zahtevate pogovor z osebo in vsak pogovor s podporo ponuja to možnost. Pri sporazumevanju z vami se ne zanašamo samo na avtomatizirana orodja.
+
+**Resno tveganje za življenje ali varnost.** Če izvemo za informacije, ki kažejo na kaznivo dejanje, povezano z grožnjo življenju ali varnosti osebe, obvestimo pristojne organe.
+
+## 11. Začasna onemogočitev in prenehanje
+
+**Z vaše strani.** Račun lahko kadar koli zaprete v Nastavitvah, kot je opisano v razdelku 6. Razloga ne potrebujete.
+
+**Z naše strani.** Vaš račun lahko začasno onemogočimo ali zapremo oziroma odstranimo ali omejimo vašo vsebino, kadar: bistveno kršite te Pogoje, zlasti razdelek 7; je vaša vsebina nezakonita ali zakon, sodišče ali organ od nas zahteva ukrepanje; vaša uporaba ogroža varnost, celovitost ali razpoložljivost storitve ali pravice drugih; vaš račun ni bil dejaven \[24 months\] in smo vas o tem obvestili; ali prenehamo zagotavljati storitev oziroma jo prenehamo zagotavljati v vaši državi.
+
+Razen kadar je kršitev resna, zakon zahteva takojšnje ukrepanje ali bi odlašanje povzročilo škodo, vam pojasnimo težavo in damo razumno možnost, da jo odpravite, preden račun začasno onemogočimo ali zapremo. Vedno vam zagotovimo obrazložitev po razdelku 10, odločitev pa lahko izpodbijate.
+
+Če storitev v celoti ukinemo ali jo umaknemo iz vaše države, vas obvestimo najmanj **30 dni vnaprej**, vrnemo vse vnaprej plačane zneske za obdobje po ukinitvi in vam pred tem omogočimo izvoz razprav.
+
+**Posledice zaprtja.** Ko je račun zaprt, uničimo šifrirne ključe za podatke vašega računa in zasebne razprave, zaradi česar postanejo trajno neberljivi, izbrišemo zapis računa ter odstranimo vaše objavljene razprave iz javnega dostopa, kot je opisano v razdelku 9. Nekatere stvari se ohranijo in vedeti morate, katere: vnosi v naših revizijskih in varnostnih dnevnikih, ki omogočajo samo dodajanje in se hranijo zaradi izpolnjevanja naših pravnih in varnostnih obveznosti; zapisi, ki jih moramo hraniti po zakonu, vključno z zapisi o sprejetju in privolitvah; ter zapisi majhnega števila starejših razprav iz časa pred našo shemo šifriranja, pri katerih je brisanje bolj omejeno — če to velja za vaš račun, vas o tem obvestimo. Pravilnik o zasebnosti vse to opisuje z vidika varstva podatkov in pojasnjuje vašo pravico do izbrisa.
+
+Razdelki 8 (glede že objavljene vsebine), 15, 16 in 18 ostanejo v veljavi tudi po prenehanju.
+
+## 12. Plačljivi paketi
+
+&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+
+DebateAI ponuja brezplačen paket. Plačljivi paket **Premium** \[is / will be\] na voljo in odklene celoten nabor modelov ter vam omogoči, da sami nastavite parametre razprave.
+
+**Pred plačilom** vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše **Naroči in plačaj** (v romunščini *Comandă cu obligație de plată*). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop.
+
+**Opomniki.** E-poštno sporočilo vam pošljemo najmanj \[5\] dni pred pretvorbo brezplačnega preskusnega obdobja v plačljivi paket; najmanj enkrat letno pri trajajočih paketih; ter od 30 do 45 dni pred vsakim podaljšanjem za obdobje dvanajstih mesecev ali več. Vsak opomnik vključuje ceno, datum in povezavo za preklic.
+
+**Preklic.** Naročnino lahko kadar koli prekličete v meniju **Nastavitve → Naročnina** z enim potrditvenim klikom ali na strani za preklic na \[dezbatere.ro/cancel\], za katero se vam ni treba prijaviti. Preklic začne učinkovati ob koncu tekočega obračunskega obdobja, dostop pa obdržite do takrat. Preklica ne bomo otežili bolj, kot je bila otežena sklenitev naročnine.
+
+**Spremembe cen** začnejo učinkovati šele ob podaljšanju. Po e-pošti vas obvestimo najmanj **30 dni vnaprej** ter vključimo novo ceno in povezavo za preklic. Kadar pravo vaše države zahteva izrecno soglasje k spremembi cene, ga zahtevamo; sicer se nova cena, če ne storite ničesar, uporablja od naslednjega podaljšanja. Regionalna pravila so navedena v Prilogi A.
+
+**Neuspela plačila.** Če plačilo ne uspe, ga ponovno poskušamo izvesti \[7\] dni in vas po e-pošti opozorimo, preden vaš račun prestavimo na brezplačni paket. Vaših razprav zaradi neuspelega plačila ne izbrišemo.
+
+**Davki in prejemnik plačila.** Cene \[include / exclude\] DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. \[If a merchant of record is used: Your purchase is processed by \[Paddle / …\], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.\]
+
+**Povratne bremenitve.** Če bremenitev izpodbijate pri izdajatelju kartice, lahko plačljive funkcije začasno onemogočimo, dokler spor ni rešen. Za to ne zaračunavamo pristojbin.
+
+**Najprej zakonske pravice.** Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega velja \[state your discretionary refund policy\]. Omejitve uporabe za oba paketa so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo.
+
+## 13. Vaša pravica do odstopa
+
+Če živite v EU, EGP ali Združenem kraljestvu, lahko od plačljive naročnine odstopite v **14 dneh** po sklenitvi brez navedbe razloga. Uporabite stran **Odstop od pogodbe** na \[dezbatere.ro/withdraw\], vzorčni obrazec v potrditvenem e-poštnem sporočilu ali pišite na \[support@dezbatere.ro\]; prejem potrdimo na trajnem nosilcu.
+
+Če ste nas z označitvijo polja ob plačilu prosili, naj storitev začnemo izvajati takoj, in nato odstopite, plačate del storitve, zagotovljen do dneva odstopa, ki se izračuna sorazmerno s ceno za obračunsko obdobje, preostanek pa vam vrnemo. **Z uporabo storitve v 14-dnevnem obdobju ne izgubite pravice do odstopa.**
+
+Če živite drugje, Priloga A določa pravico do odstopa ali obdobje za premislek, ki velja v vaši regiji, če obstaja, sicer pa naš pravilnik o vračilih. Zakonske pravice v vaši državi imajo vedno prednost.
+
+## 14. Spremembe storitve in teh Pogojev
+
+**Spremembe storitve.** DebateAI nenehno razvijamo, zato običajne izboljšave, popravki in spremembe nabora modelov potekajo brez obvestila. Kadar uvedemo spremembo, ki presega ohranjanje delovanja storitve, kot je opisana, to storimo samo iz enega od naslednjih razlogov: zaradi skladnosti s pravno ali regulativno zahtevo; zaradi odziva na težavo z varnostjo ali zlorabo; ker ponudnik modela spremeni, omeji ali umakne model ali funkcijo, od katere smo odvisni; zaradi prilagoditve tehničnemu okolju, ki ga ne obvladujemo; ali zaradi dodajanja, izboljšanja ali ukinitve funkcije na način, ki vam ne povzroči stroškov.
+
+Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
+
+**Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba DebateAI po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na \[dezbatere.ro/terms/versions\].
+
+## 15. Odgovornost
+
+**Česa ne omejujemo.** Nič v teh Pogojih ne izključuje ali omejuje naše odgovornosti za smrt ali telesno poškodbo, povzročeno iz naše malomarnosti, za goljufijo ali goljufivo zavajanje, za hudo malomarnost ali naklepno ravnanje ali za kar koli drugega, česar po zakonu ni mogoče omejiti. Če ste potrošnik, nič v tem dokumentu ne odpravlja vaših zakonskih pravic, vključno s pravico zahtevati vzpostavitev skladnosti neskladne storitve, znižanje cene ali vračilo oziroma katero koli jamstvo, ki velja po pravu države, v kateri živite.
+
+**Ustvarjena vsebina.** Storitev ustvarja gradivo, ki ga morate presoditi, ne pa sklepov, na podlagi katerih lahko ukrepate brez preverjanja, kar je jasno navedeno v razdelku 5. Ob upoštevanju prejšnjega odstavka ne odgovarjamo za odločitve, ki jih sprejmete na podlagi ustvarjenih argumentov, ocen ali razsodb, če niste izvedli razumnih korakov za njihovo preverjanje, opisanih v razdelku 5.
+
+**Vaša vsebina in vaša uporaba.** Odgovorni ste za vse, kar pošljete in objavite, vključno s tem, da imate pravico to poslati in da ravnate skladno z razdelkom 7.
+
+**Dogodki zunaj našega nadzora.** Pogodbe ne kršimo, kadar nam njeno izpolnjevanje prepreči nekaj zunaj našega razumnega nadzora. Neuspeh ali umik ponudnika modela tretje osebe samodejno ne pomeni takega dogodka; če storitev zaradi tega postane nedostopna, se uporablja razdelek 14, vi pa lahko pogodbo odpoveste in prejmete vračilo, kot je tam opisano.
+
+&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
+
+## 16. Intelektualna lastnina
+
+Sama storitev — programska oprema, sistem, način ocenjevanja, vmesnik, imeni DebateAI in DebateAIRO ter naši logotipi — pripada nam ali našim dajalcem licenc. Ti Pogoji vam dajejo dovoljenje za uporabo storitve, ne pa lastništva nad njo.
+
+Objavljene razprave lahko citirate in nanje dodajate povezave, če navedete DebateAI kot vir in vključite povezavo do izvirne strani. Množično kopiranje, sistematično razmnoževanje javne zbirke in uporaba objavljenih razprav kot podatkov za učenje brez našega pisnega soglasja niso dovoljeni.
+
+Razdelek 8 ureja vašo vsebino in status ustvarjenih rezultatov. Če menite, da nekaj na DebateAI krši vašo intelektualno lastnino, uporabite način prijave iz razdelka 10. \[If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is \[name, address, email\], registered with the US Copyright Office; we terminate the accounts of repeat infringers.\]
+
+## 17. Osebni podatki
+
+Način ravnanja z osebnimi podatki je opisan v **Pravilniku o zasebnosti** na \[dezbatere.ro/privacy\]. V njem je pojasnjeno, kaj zbiramo, pravna podlaga za vsak namen, kako dolgo podatke hranimo, kdo jih prejema, kateri prenosi se izvajajo in kako lahko uveljavljate svoje pravice. Sem spadajo tudi tri točke. Razdelek 7 vas poziva, da v vprašanja ne vključujete osebnih podatkov drugih ljudi; če to storite, ste zanje odgovorni in vsebino lahko odstranimo. Če razprava, objavljena na DebateAI, vsebuje vaše osebne podatke, lahko od nas zahtevate, da jo odstranimo, ne da bi imeli račun (razdelek 9). Hranimo tudi zapis o vašem sprejetju teh Pogojev — različico, čas in tehnične podatke seje — kot dokaz pogodbe, kot je pojasnjeno v Pravilniku o zasebnosti.
+
+## 18. Pravo, ki se uporablja, in pristojnost za spore
+
+**Pravo, ki se uporablja.** Za te Pogoje ter vse spore ali zahtevke, ki izhajajo iz njih ali njihove vsebine, vključno z nepogodbenimi zahtevki, se uporablja pravo Romunije.
+
+**Vaše lokalno varstvo ostaja nespremenjeno.** Če ste potrošnik, vam izbira romunskega prava ne odvzema varstva po obveznih pravilih o varstvu potrošnikov v državi vašega običajnega prebivališča — na primer pravilih o nepoštenih pogojih, pravicah do odstopa in preklica ali jamstvih — kadar se ta pravila uporabljajo ne glede na to izbiro, tudi po členu 6(2) Uredbe (ES) št. 593/2008, če živite v EU, ali po enakovrednih pravilih Združenega kraljestva. Na ta pravila se lahko sklicujete poleg romunskega prava.
+
+**Sodišča, če živite v EU, EGP ali Združenem kraljestvu.** Postopek proti nam lahko začnete na sodiščih v Romuniji ali na sodiščih države, v kateri živite. Mi lahko postopek proti vam začnemo samo na sodiščih države, v kateri živite.
+
+**Potrošniki drugje.** Če živite zunaj EU, EGP in Združenega kraljestva, nič v teh Pogojih ne omejuje pravice, ki jo imate po pravu svoje države, da vložite zahtevek pri njenih sodiščih, ali katere koli pravice po tem pravu, ki se ji ni mogoče odpovedati — vključno s pravicami iz jamstev za potrošnike, če živite v Avstraliji ali Novi Zelandiji; zakonikom Código de Defesa do Consumidor, če živite v Braziliji; in zakoni o varstvu potrošnikov vaše zvezne države, če živite v Združenih državah Amerike.
+
+**Prebivalci Združenih držav Amerike.** Priloga A.3 vsebuje arbitražni sporazum in odpoved skupinski tožbi, ki ju ureja zvezni zakon o arbitraži. Velja samo za prebivalce Združenih držav Amerike in samo tam, kjer je izvršljiv. Ne velja za potrošnike v EU, EGP ali Združenem kraljestvu.
+
+**Pred sodnim postopkom.** Obrnite se na nas na \[legal@dezbatere.ro\]; večino težav je mogoče odpraviti, odgovoriti pa si prizadevamo v \[5\] delovnih dneh. Če ste potrošnik v Romuniji ali EU, lahko uporabite alternativno reševanje sporov prek \[the ANPC – named SAL entity, website\]; k sodelovanju v tem postopku se \[do / do not\] zavezujemo. Pritožbe zoper odločitve o moderiranju sledijo razdelku 10, ki je ločen postopek.
+
+## 19. Drugi pogoji
+
+**Prenos.** Svojih pravic iz teh Pogojev ne smete prenesti. Mi lahko svoje pravice prenesemo na družbo, ki prevzame storitev, če se vaše pravice ne zmanjšajo; če se to zgodi, vas o tem obvestimo, vi pa lahko zaprete račun.
+
+**Ločljivost.** Če se ugotovi, da katere koli določbe teh Pogojev ni mogoče izvršiti, se ta določba ne uporablja, preostali Pogoji pa ostanejo v veljavi.
+
+**Brez odpovedi pravicam.** Če pogoja ne uveljavimo takoj, s tem ne izgubimo pravice, da ga uveljavimo pozneje.
+
+**Celoten dogovor.** Ti Pogoji skupaj s Pravilnikom o piškotkih in Registrom ponudnikov umetne inteligence pomenijo celoten dogovor med nami o storitvi. Zaveze, ki jih sprejmemo v Pravilniku o zasebnosti, so za nas zavezujoče. Nič v tem odstavku ne izključuje odgovornosti za goljufivo zavajanje.
+
+**Jezik.** Ti Pogoji so objavljeni v angleščini \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+
+**Kontakt.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukarešta, Romunija.
+
+## Annex A — Regionalni pogoji
+
+Vsak vnos velja samo, če je njegova regija navedena v razdelku 2, in navaja samo razlike od splošnega dela. Če sta vnos in splošni del v nasprotju, za osebe v tej regiji velja vnos.
+
+### A.1 Evropska unija in Evropski gospodarski prostor
+
+Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek \[the ANPC – named entity, website\]. **Nemčija:** gumb za preklic na \[dezbatere.ro/cancel\] vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB \[state them\]. **Francija:** naročnino lahko v treh korakih prek spleta prekinete na \[URL\]; na voljo vam je \[the mediator named at URL\]. **Italija:** določbe o odgovornosti (15), začasni onemogočitvi (11), spremembah (14) in pravu, ki se uporablja (18), zahtevajo vašo posebno odobritev, ki jo podate z ločeno potrditvijo ob registraciji. **Nizozemska:** ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. **Poljska:** poljska različica je na \[URL\].
+
+### A.2 Združeno kraljestvo *(samo če je navedeno v razdelku 2)*
+
+Naš predstavnik v Združenem kraljestvu po členu 27 UK GDPR je \[name, address, email\]. Za vas velja zakon Consumer Rights Act 2015 in nič v teh Pogojih ne omejuje vaših pravic po njem; od \[January 2027\] za plačljive pakete veljajo pravila o naročninah iz zakona Digital Markets, Competition and Consumers Act 2024, vključno z obdobjem za premislek po podaljšanjih in brezplačnih preskusnih obdobjih. **Kako uporabnike varujemo pred nezakonito vsebino:** \[terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report\]. **Proaktivna tehnologija, ki jo uporabljamo:** \[describe, or "none"\]. **Preverjanje starosti:** \[describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023\]. Pritožbeni postopek iz razdelka 10 sprejema pritožbe glede nezakonite vsebine, neupravičene odstranitve vaše vsebine, omejitev vašega računa, uporabe avtomatiziranih orodij, ki vplivajo na vašo vsebino, in vsake ocene starosti, ki vas neupravičeno blokira. Na voljo je osebam, na katere vpliva vsebina in ki niso uporabniki.
+
+### A.3 Združene države Amerike *(samo če so navedene v razdelku 2)*
+
+**Arbitražni sporazum in odpoved skupinski tožbi.** Če živite v Združenih državah Amerike, se vi in DebateAIRO strinjate, da boste vsak spor, ki izhaja iz teh Pogojev ali storitve, namesto na sodišču reševali z zavezujočo posamično arbitražo, ki jo vodi \[the American Arbitration Association / JAMS\] po svojih pravilih za potrošnike, pri čemer lahko vsak od naju vloži posamični zahtevek pri sodišču za spore majhne vrednosti. **Sodelovanje lahko zavrnete** tako, da v 30 dneh od prvega sprejetja teh Pogojev pošljete e-poštno sporočilo na \[address\]. Ta sporazum ureja zvezni zakon o arbitraži. Plačamo pristojbine za vložitev arbitražnega postopka. Skupinske, kolektivne in zastopniške tožbe so izključene v obsegu, ki ga dovoljuje zakon. Ta razdelek velja samo za naprej in ne velja za zahtevke, ki so nastali, preden ste ga sprejeli.
+
+**Obvestila in odstranitve.** Intimne posnetke brez privolitve je mogoče brez računa prijaviti na \[URL\], odstranijo pa se v 48 urah od veljavne zahteve. Pritožbe glede avtorskih pravic se naslovijo na našega imenovanega zastopnika iz razdelka 16.
+
+**Posebnosti zveznih držav.** *Kalifornija:* veljajo pogoji samodejnega podaljšanja iz razdelka 12; prek spleta lahko kadar koli prekličete; vašo privolitev v pogoje podaljšanja hranimo najmanj tri leta. *New York:* v 14 dneh od vsake bremenitve po zvišani ceni lahko prekličete in prejmete sorazmerno vračilo. *Teksas in Nebraska:* občutljivih osebnih podatkov ne prodajamo; če bi se to kdaj spremenilo, bi najprej pridobili vašo privolitev \[statutory notice language\]. *Washington:* za zdravstvene podatke velja naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na \[URL\]. *Kolorado:* nič v storitvi ne sprejema odločitev z znatnimi posledicami za vas.
+
+### A.4 Kanada in Quebec *(samo če sta navedena)*
+
+Naša oseba, odgovorna za zasebnost, je \[name, email\]. **Quebec:** ti Pogoji so na voljo v francoščini na \[URL\], francoska različica pa vam je bila predstavljena najprej; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja.
+
+### A.5 Avstralija in Nova Zelandija *(samo če sta navedeni)*
+
+**Za naše storitve veljajo jamstva, ki jih po avstralskem pravu varstva potrošnikov ni mogoče izključiti.** Pri večjih napakah storitve imate pravico do preklica in vračila za neizkoriščeni del ali do nadomestila za zmanjšano vrednost; prav tako imate pravico do nadomestila za vse druge razumno predvidljive izgube ali škodo. Če napaka ni večja, imate pravico, da se težave s storitvijo odpravijo v razumnem času, če se to ne zgodi, pa do preklica in vračila. V obsegu, ki ga dovoljuje člen 64A, je naša odgovornost za kršitev jamstva omejena na ponovno zagotovitev storitve ali plačilo stroškov ponovne zagotovitve. Za plačljivi paket poleg tega, kar vam zagotavlja razdelek 12, ne velja pravica do obdobja za premislek; naš pravilnik o vračilih je \[…\]. **Nova Zelandija:** velja zakon Consumer Guarantees Act 1993 in nič v teh Pogojih ga ne izključuje; škodljive digitalne komunikacije lahko prijavite nam po razdelku 10 ali organizaciji Netsafe.
+
+### A.6 Latinska Amerika *(priloga v španščini; samo če je navedena)*
+
+&#91;Published in Spanish.\] Privolitev je podlaga za obdelavo, kadar pogodba obdelave ne zahteva; ob registraciji izrecno privolite v obdelavo vseh občutljivih podatkov, ki se jih odločite vključiti. Svoje pravice ARCO lahko uveljavljate na \[address\], odgovore pa prejmete v \[Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719\]. *Mehika:* celotno *aviso de privacidad* je na \[URL\]; odstop je mogoč v \[5\] dneh. *Argentina:* \[AAIP legend\]; uporabite *botón de arrepentimiento* na \[URL\] v 10 dneh. *Kolumbija:* *política de tratamiento* je na \[URL\]; odstop je mogoč v 5 dneh. *Čile* (od 1. decembra 2026): kontakt agencije je \[…\]; prekličete lahko na enak način, kot ste se naročili; pravica do odstopa za digitalne storitve ne velja.
+
+### A.7 Zaliv — Združeni arabski emirati in Saudova Arabija *(samo če sta navedena)*
+
+Kadar vaše podatke obdelujemo za namene, ki niso zagotavljanje storitve, to počnemo z vašo privolitvijo, ki jo lahko prekličete. Vaši podatki se obdelujejo zunaj \[UAE / Kingdom of Saudi Arabia\], tudi v Evropski uniji in Združenih državah Amerike, na podlagi \[SDAIA standard contractual clauses / the mechanism in the Register\]. Odgovorni ste za zagotovitev, da je vse, kar objavite, skladno s pravom države, v kateri ste, vključno z zakoni o veri, javnem redu in morali; v vaši regiji lahko omejimo objavljanje razprav o takih temah.
+
+### A.8 Azijsko-pacifiška regija *(samo vrstice za navedene regije)*
+
+*Singapur:* naša pooblaščena oseba za varstvo podatkov je \[name, email\]; prenosi temeljijo na pogodbenih zaščitnih ukrepih, primerljivih s PDPA; za plačljivi paket ne velja zakonsko obdobje za premislek, naš pravilnik o vračilih pa je \[…\]. *Japonska:* zakonsko razkritje po zakonu Specified Commercial Transactions Act je na \[URL\]; za spletne naročnine ne velja splošno obdobje za premislek, naš pravilnik o vračilih pa je \[…\]; vaša vsebina se lahko prenese ponudnikom v \[named countries\], s čimer ob registraciji soglašate. *Južna Koreja:* privolitve za neobvezno obdelavo in trženje se zbirajo ločeno od postavk, potrebnih za izvajanje storitve; naša oseba, odgovorna za zasebnost, je \[name\]; od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine ob upoštevanju zakona E-Commerce Act; pred vsakim ponavljajočim se zvišanjem cene ali prehodom z brezplačnega na plačljivi paket pridobimo vašo novo privolitev; kadar to zahteva zakon AI Basic Act, vas vnaprej obvestimo, da storitev temelji na umetni inteligenci, in označimo rezultate. *Indija* (ko se začnejo uporabljati pravila DPDP): velja obvestilo o privolitvi na \[URL\]; uporabniki, mlajši od 18 let, potrebujejo preverljivo privolitev staršev. *Tajska:* naš predstavnik na Tajskem je \[name\] \[if appointed\]. *Filipini:* naši poslovni identifikacijski podatki in mehanizem pravnega varstva po zakonu Internet Transactions Act so na \[URL\]; pritožbe se lahko vložijo pri nacionalni komisiji za zasebnost.
+
+### A.9 Pridržano
+
+Turčija, Brazilija in Indonezija zahtevajo prilogo v lokalnem jeziku, predstavnika ali registracijo ter vložitve. Določbe zanje tukaj niso pripravljene, te države pa niso vključene v razdelek 2, dokler jih izrecno ne dodamo. Storitve ne ponujamo na Kitajskem, v Vietnamu ali Rusiji.

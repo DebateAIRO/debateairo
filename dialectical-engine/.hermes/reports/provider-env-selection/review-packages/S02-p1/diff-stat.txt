@@ -1,0 +1,14 @@
+ .../acceptance/pes-s02-fake-vendor.test.ts         | 152 ++++++++++
+ .../acceptance/pes-s02-fake-vendor.ts              | 185 ++++++++++++
+ .../acceptance/pes-s02-hosted-cli.ts               |   9 +
+ .../acceptance/pes-s02-hosted.test.ts              | 138 +++++++++
+ dialectical-engine/acceptance/pes-s02-hosted.ts    | 312 +++++++++++++++++++++
+ .../apps/runner/src/dev-api-environment.ts         |  23 +-
+ .../apps/runner/src/dev-api-process.ts             |   3 +-
+ .../apps/runner/src/dev-runner-process.ts          |   1 +
+ dialectical-engine/package.json                    |   3 +-
+ .../tests/integration/dev-api-environment.test.ts  |  34 +++
+ .../tests/integration/dev-api-process.test.ts      |  47 +++-
+ .../tests/support/devApiEnvironmentAssembly.ts     |  89 ++++++
+ .../tests/unit/v9-deployment-mode.test.ts          |  88 ++++++
+ 13 files changed, 1079 insertions(+), 5 deletions(-)

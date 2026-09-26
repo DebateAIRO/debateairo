@@ -102,7 +102,7 @@ const activate = (b: HTMLButtonElement): void => {
 
 /** BOTH slices mounted in ONE document, the way `layout.tsx:45-49` composes them. */
 async function mountBoth(): Promise<void> {
-  const client = { register: vi.fn(), resendVerification: vi.fn() };
+  const client = { register: vi.fn() };
   await act(async () => {
     root!.render(
       <div className="appShell">

@@ -1,0 +1,26 @@
+{
+  "extends": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/tsconfig.json",
+  "compilerOptions": {
+    "types": [
+      "node"
+    ],
+    "typeRoots": [
+      "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/node_modules/@types"
+    ],
+    "paths": {
+      "@debateai/db": [
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/packages/db/src/index.ts"
+      ],
+      "@debateai/register": [
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/packages/register/src/index.ts"
+      ],
+      "@debateai/providers": [
+        "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/packages/providers/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "proposed-copy/*.ts",
+    "scratch/*.ts"
+  ]
+}

@@ -84,6 +84,70 @@ describe("FX-LG-16 / P12 — contract parsing and deterministic reduction", () =
     expect(parseJudgeAssessment(JSON.stringify({ steelman: {} }))).toMatchObject({ kind: "SCHEMA_FAILURE" });
   });
 
+  it("rejects a localized fatal flag type before reduction can silently miss its cap", () => {
+    const localized = {
+      ...assessment(),
+      fallacy: {
+        severity: 0.9,
+        fatalFlags: [{
+          type: "NESUSȚINUT",
+          severity: 0.9,
+          description: "Saltul nu are sprijin."
+        }]
+      }
+    };
+    expect(parseJudgeAssessment(JSON.stringify(localized))).toMatchObject({ kind: "SCHEMA_FAILURE" });
+  });
+
+  it("preserves an ASCII hyphenated fatal flag and matches its register cap by exact type", () => {
+    const parsed = parseJudgeAssessment(JSON.stringify({
+      ...assessment(),
+      fallacy: {
+        severity: 0.9,
+        fatalFlags: [{
+          type: "UNSUPPORTED-LEAP",
+          severity: 0.9,
+          description: "The inference is unsupported."
+        }]
+      }
+    }));
+    expect(parsed).toMatchObject({
+      kind: "PARSED",
+      assessment: { fallacy: { fatalFlags: [{ type: "UNSUPPORTED-LEAP" }] } }
+    });
+    if (parsed.kind !== "PARSED") return;
+    const reduceWithCap = (whenFatalType: string) => reduceAssessment({
+      claimType: "empirical",
+      assessment: parsed.assessment,
+      compositionRow: {
+        ...compositionRow,
+        value: {
+          ...compositionRow.value,
+          entries: {
+            empirical: {
+              ...compositionRow.value.entries.empirical,
+              caps: [{
+                whenFatalType,
+                to: 0.25,
+                why: "test-layer hyphenated fatal cap",
+                by: "test-layer:hyphenated-cap-row"
+              }]
+            }
+          }
+        }
+      },
+      reducerVersion: "test-layer:reducer-v1"
+    });
+    expect(reduceWithCap("UNSUPPORTED-LEAP")).toMatchObject({
+      kind: "REDUCED",
+      tau: 0.25,
+      caps: [{ toWhat: 0.25, byWhat: "test-layer:hyphenated-cap-row" }]
+    });
+    // Scope audit B4: dev matches a cap to a fatal flag by exact equality; the
+    // mission does not case-fold (a language-independent scoring change).
+    expect(reduceWithCap("unsupported-leap")).toMatchObject({ kind: "REDUCED", caps: [] });
+  });
+
   it("reads the composition from a register-row shape and emits branch, ordered caps, drivers and typed holes", () => {
     const withFatal: JudgeAssessment = {
       ...assessment(),

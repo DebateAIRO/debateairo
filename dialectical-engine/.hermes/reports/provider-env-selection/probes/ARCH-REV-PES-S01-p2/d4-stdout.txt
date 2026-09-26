@@ -1,0 +1,12 @@
+ALGORITHM_REGISTER_ROW_KEYS count=17
+required_row manifest count=17 equals ALGORITHM_REGISTER_ROW_KEYS as a set: true
+seed v4 rows=32
+hosted publish on 4: PES_HOSTED_PROVIDER_SET_RECEIPT_V1={"registerVersion":"5","rowCount":32,"snapshotSha256":"579690d7a51248ea486632c347c32ee0dbd99814206f1a5c05d85c7d405931c9"}
+role seed (evaluator vendor:z) on 5: version=6 rowCount=49 deployment=undefined
+(i) hosted publish on 6: THROWS PES_PUBLISH_ROLE_PROVIDER_DROPPED:evaluatorRoleRef
+(i) versions before=3 after=3
+control seed (evaluator vendor:a) on 5: version=7 rowCount=49
+(ii) hosted publish on 7: PES_HOSTED_PROVIDER_SET_RECEIPT_V1={"registerVersion":"8","rowCount":49,"snapshotSha256":"9df43beeeed506b9b91f5372868eb526c3ff69ea9b6755184914ca73d6f06c06"}
+(ii) role rows byte-equal 7->8: true; rows 49->49
+profiles: [{"v":"2","profile":"acceptance"},{"v":"6","profile":"algorithm"},{"v":"7","profile":"algorithm"},{"v":"8","profile":"algorithm"}]
+stopped

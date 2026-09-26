@@ -30,6 +30,8 @@
     "dev:auth:generate-secrets": "tsx apps/runner/src/dev-secret-files-cli.ts",
     "dev:auth:seed-register": "tsx apps/runner/src/dev-deployment-register-cli.ts",
     "dev:auth:publish-provider-set": "tsx apps/runner/src/dev-provider-set-publish-cli.ts",
+    "hosted:publish-provider-set": "tsx apps/runner/src/hosted-provider-set-publish-cli.ts",
+    "pes:accept-publish-set": "tsx acceptance/pes-accept-publish-set.ts",
     "dev:auth:generate-tls": "node deploy/dev-auth/create-local-certificate.mjs",
     "dev:auth:tls-front-door": "node deploy/dev-auth/tls-front-door.mjs",
     "dev:auth:data-plane": "tsx apps/runner/src/dev-auth-data-plane-cli.ts",
@@ -54,7 +56,8 @@
     "job:settlement-watch": "tsx apps/scheduler/src/cli.ts settlement-watch",
     "job:review-catch-up": "tsx acceptance/review-catch-up.ts",
     "replay:ceremony": "tsx apps/replay/src/cli.ts",
-    "eval:roles": "tsx acceptance/eval-harness-cli.ts"
+    "eval:roles": "tsx acceptance/eval-harness-cli.ts",
+    "pes:accept-hosted": "tsx --no-cache acceptance/pes-s02-hosted-cli.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

@@ -2,14 +2,14 @@
 
 import * as React from "react";
 
-import { TERMS_OF_SERVICE } from "../../lib/termsOfService";
 import { LegalDocumentModal } from "./LegalDocumentModal";
+import { useLegalDocument } from "./useLegalDocument";
 
 /**
  * The Terms of Service modal: the privacy policy modal's twin (design 10c), the shared
  * `LegalDocumentModal` over the Terms data. It owns no consent state, reads and writes no
  * storage, and holds no legal prose of its own — every string it shows comes from
- * `apps/ui/lib/termsOfService.ts`, which is generated from `apps/ui/legal/terms-of-service.md`.
+ * `apps/ui/lib/termsOfService.ts`, which is generated from `apps/ui/legal/en/terms-of-service.md`.
  *
  * The prop type is the privacy modal's, member for member, so the sign-up card drives both
  * gates with one pattern.
@@ -34,5 +34,5 @@ type _PropKeysAreExact = Expect<
 >;
 
 export function TermsOfServiceModal(props: TermsOfServiceModalProps): React.ReactElement | null {
-  return <LegalDocumentModal document={TERMS_OF_SERVICE} {...props} />;
+  return <LegalDocumentModal document={useLegalDocument("terms")} {...props} />;
 }

@@ -1,0 +1,8 @@
+# S2 auth
+
+# S2 debate chrome and views
+
+# S2 debate drawers and public
+# S2 settings, consent, and support
+
+# Remaining already-ticketed interface surfaces

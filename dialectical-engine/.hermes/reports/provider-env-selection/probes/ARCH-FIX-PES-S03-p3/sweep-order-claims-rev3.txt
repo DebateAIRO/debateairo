@@ -1,0 +1,33 @@
+6:  check three tokens. A new assertion (1b) forbids the order claim "before … hosted rule" anywhere in
+48:## 1. START frame — measured before the first step, never assumed
+161:| `PROVIDER_DISCOVERY_TARGETS_INVALID`, `PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID`, `PROVIDER_DISCOVERY_TARGET_DUPLICATE`, `PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID` | parse-time throws in `packages/providers/src/index.ts` | R3.3 names six codes; `deploy/vps/README.md:782` already says a malformed API target refuses with the matching `PROVIDER_DISCOVERY_*` code | **row V-9**, default applied |
+192:C1-4 does: its command re-runs `tests/architecture/vps-deployment-baseline.test.ts:378` after C1's §11
+245:    const body = source.slice(start, source.indexOf(until, start + from.length) + until.length);
+259:  // (1b) ARCH-REV p2 B1 — hosted boot runs rules before the parse (C1-3), so this order claim is false.
+260:  expect(refusal, "no 'before any hosted rule' order claim in §11's refusal span").not.toMatch(
+272:    "`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two."
+305:     ``| `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` | mutant — raised while the targets are parsed, before any hosted rule runs |``
+308:     `no 'before any hosted rule' order claim in §11's refusal span`.
+316:  - the order claim "before … hosted rule" anywhere in the refusal span, row cells included (1b)
+329:`### What the hosted mode refuses, in code`. One row per code, in this order, appended after the
+336:| `` `PROVIDER_TARGET_PRICE_REQUIRED:` `` and the provider ref | hosted mode, and a debate target declares no price pair at all | `packages/providers/src/index.ts:687` (and again at `apps/runner/src/main.ts:117`, which cannot be reached while `:687` stands — its own comment `:103-107` says so) |
+378:`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two.
+384:  before `assertPricedProviderTargets` (`:312`, `:87`).
+390:- A price of `0` is well-formed at parse and refuses later, at `:700`. No price at all refuses at
+393:The sentence says nothing about the rules that run BEFORE the parse, because they differ by service
+397:  before `:300`.
+398:- **Runner:** it seals the envelopes at `apps/runner/src/main.ts:38`, before `:74`, and reads the
+399:  policy only after it, at `:111`.
+402:- that the code comes before every hosted rule
+403:- that a malformed price "refuses with the first code". In the API,
+446:C2's line anchors are re-measured after C1 lands (TOOLING-TRAPS `:3076` — a cluster's base moves
+534:`| Member | Value |`, after the `model` row and before the `authorization_file` row. Their first cells
+540:refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` (`:278`).
+567:`/etc/debateai/api/providers/acme.header`. One sentence after them states that the two amounts are
+584:  input_price_micros_per_million` returns 3" was true only after C2-9 removes bullet B1 (`:20`); at
+598:states what `packages/register/src/runtime-environment.ts:157-158` does, called right after the
+600:refuses to start until the cost envelopes are sealed, with the code `COST_ENVELOPES_NOT_SEALED` that
+677:| **S03-C1** | C1-1 … C1-4 | `tests/unit/v9-provider-credential-files.test.ts` · `deploy/vps/README.md` between `### What the hosted mode refuses, in code` and `### The credential-file contract` | `LOG=<abs> zsh .claude/skills/heartbeat-orchestrator/scripts/run-suites.sh tests/unit/v9-provider-credential-files.test.ts:24:0 tests/architecture/vps-deployment-baseline.test.ts:31:0` | **C1-1** — the widened pin, failing on `PROVIDER_TARGET_PRICE_REQUIRED` | **`CLUSTER_RED`** — `v9 rc=0 passed=23 failed=0 (expect 24/0)`, `baseline rc=0 passed=31 failed=0 (expect 31/0)`. Not BROKEN: both files exist and both printed a summary line. Log: `probes/ARCH-PES-S03/c1-after-pair-at-base.log`. **Re-run for Revision 2, command unchanged:** the same three lines, `CLUSTER_RED` — `probes/ARCH-FIX-PES-S03-p2/c1-cluster.log`. **Re-run for Revision 3, command unchanged:** the same three lines, `CLUSTER_RED` — `probes/ARCH-FIX-PES-S03-p3/c1-cluster.log` |
+678:| **S03-C2** | C2-1 … C2-10 | `tests/unit/v9-provider-credential-files.test.ts` · `deploy/vps/README.md` **everywhere except** C1's block | `LOG=<abs> zsh .claude/skills/heartbeat-orchestrator/scripts/run-suites.sh tests/unit/v9-provider-credential-files.test.ts:28:0 tests/architecture/vps-deployment-baseline.test.ts:31:0` | **C2-1, C2-2, C2-3, C2-4** — the four new cases, written before any document step | **`CLUSTER_RED`** — `v9 rc=0 passed=23 failed=0 (expect 28/0)`, `baseline rc=0 passed=31 failed=0 (expect 31/0)`. Not BROKEN. Log: `probes/ARCH-PES-S03/c2-after-pair-at-base.log`. **Re-run for Revision 2, command unchanged:** the same three lines, `CLUSTER_RED` — `probes/ARCH-FIX-PES-S03-p2/c2-cluster.log`. **Re-run for Revision 3, command unchanged:** the same three lines, `CLUSTER_RED` — `probes/ARCH-FIX-PES-S03-p3/c2-cluster.log` |
+734:  START frame's capability proof, before accepting the empty output.
+753:| 5 | 5 bullets in the `14,40p` window | 2 lines beginning `- ` (B4, B5) and no line carrying `hosted provider target example` or `refusal-code table is incomplete`. Once C2-9 removes 13 lines, the fixed window also covers original lines 42–53 (the `## 1. Topology` heading, its first sentence, the top of its diagram). Measured: none of them begins with `- `, so the count stays 2 (`oracles.log`, "S7 §5 step 5") |

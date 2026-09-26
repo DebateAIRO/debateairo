@@ -1,0 +1,42 @@
+[
+  {
+    "label": "drop-PROVIDER_DISCOVERY_TARGET_PRICE_INVALID",
+    "passed": 31,
+    "failed": 0,
+    "expected_killed": true,
+    "matched": false,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/before-drop-PROVIDER_DISCOVERY_TARGET_PRICE_INVALID-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_TARGET_PRICE_REQUIRED",
+    "passed": 31,
+    "failed": 0,
+    "expected_killed": true,
+    "matched": false,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/before-drop-PROVIDER_TARGET_PRICE_REQUIRED-attempt-1.log"
+  },
+  {
+    "label": "drop-PROVIDER_TARGET_PRICE_ZERO",
+    "passed": 31,
+    "failed": 0,
+    "expected_killed": true,
+    "matched": false,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/before-drop-PROVIDER_TARGET_PRICE_ZERO-attempt-1.log"
+  },
+  {
+    "label": "insert-DAILY_COST_ENVELOPE_REACHED",
+    "passed": 31,
+    "failed": 0,
+    "expected_killed": true,
+    "matched": false,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/before-insert-DAILY_COST_ENVELOPE_REACHED-attempt-1.log"
+  },
+  {
+    "label": "control-support",
+    "passed": 30,
+    "failed": 1,
+    "expected_killed": true,
+    "matched": true,
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p1/before-control-support-attempt-1.log"
+  }
+]

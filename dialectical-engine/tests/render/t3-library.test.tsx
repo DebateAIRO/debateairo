@@ -26,7 +26,7 @@ type JSDOMModule = {
 };
 
 const routeMocks = vi.hoisted(() => ({
-  sessionCookie: "t3-c1-session" as string | null,
+  sessionCookie: "t".repeat(43) as string | null,
   readPublicDebates: vi.fn(async () => ({ items: [] as PublicDebateSummary[], total: 0 })),
   listDebatesPageServer: vi.fn(async () => ({ summaries: [] as DebateSummary[], shown: 0, total: 0 }))
 }));
@@ -81,7 +81,7 @@ async function renderRoute(
 }
 
 async function renderSignedInRoute(): Promise<Document> {
-  return renderRoute("t3-c1-session");
+  return renderRoute("t".repeat(43));
 }
 
 async function syntheticShell(hasLanding: boolean): Promise<Document> {
@@ -99,7 +99,7 @@ describe("chrome", () => {
 
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    routeMocks.sessionCookie = "t3-c1-session";
+    routeMocks.sessionCookie = "t".repeat(43);
     routeMocks.readPublicDebates.mockClear();
     routeMocks.listDebatesPageServer.mockClear();
     setPathname("/");
@@ -181,7 +181,7 @@ describe("chrome", () => {
     const accessibleName = toggle?.getAttribute("aria-label") ?? toggle?.textContent?.trim() ?? "";
 
     expect(toggle, "authTopBar mode toggle").not.toBeNull();
-    expect(accessibleName).toMatch(/Switch to (Chamber|Terracotta) mode/);
+    expect(accessibleName).toMatch(/Switch to (dark|light) mode/);
     expect(toggle?.hasAttribute("aria-disabled")).toBe(false);
   });
 
@@ -217,14 +217,14 @@ describe("chrome", () => {
   it("keeps the TopBar mode toggle visible in the real signed-in document", async () => {
     // PROPERTY (T3-C1-4 P2): the same real route harness keeps signed-in
     // global chrome and its accessibly named mode control visible.
-    const rendered = await renderRoute("t3-c1-session");
+    const rendered = await renderRoute("t".repeat(43));
     const topBar = rendered.querySelector<HTMLElement>(".topBar");
     const toggle = topBar?.querySelector<HTMLElement>("[data-mode-toggle]") ?? null;
     const accessibleName = toggle?.getAttribute("aria-label") ?? toggle?.textContent?.trim() ?? "";
 
     expect(rendered.defaultView!.getComputedStyle(topBar!).display).toBe("flex");
     expect(toggle, "real signed-in TopBar mode toggle").not.toBeNull();
-    expect(accessibleName).toMatch(/Switch to (Chamber|Terracotta) mode/);
+    expect(accessibleName).toMatch(/Switch to (dark|light) mode/);
     expect(rendered.defaultView!.getComputedStyle(toggle!).display).not.toBe("none");
   });
 
@@ -312,7 +312,7 @@ describe("lists", () => {
     "Published debates may be indexed by search engines. Copies may persist after unpublishing.";
 
   beforeEach(() => {
-    routeMocks.sessionCookie = "t3-c2-session";
+    routeMocks.sessionCookie = "t".repeat(43);
     routeMocks.listDebatesPageServer.mockReset().mockResolvedValue({
       summaries: yourDebates,
       shown: yourDebates.length,
@@ -336,7 +336,7 @@ describe("lists", () => {
   it("renders recased native selectors and a live count for the four Your debates rows", async () => {
     // PROPERTY (T3-C2-1/T3-C2-4): the Your debates selector uses the
     // approved casing and its chip is the number of rows actually rendered.
-    const rendered = await renderRoute("t3-c2-session", "yours");
+    const rendered = await renderRoute("t".repeat(43), "yours");
     const labels = [...rendered.querySelectorAll('.sectionHead[aria-label="Debate library"] a')]
       .map((link) => link.textContent?.trim());
 
@@ -347,7 +347,7 @@ describe("lists", () => {
   it("renders a live count for the three Public debates rows", async () => {
     // PROPERTY (T3-C2-4): the Public debates chip follows the rendered public
     // rows, even when the API's aggregate total is larger than this page.
-    const rendered = await renderRoute("t3-c2-session", "public");
+    const rendered = await renderRoute("t".repeat(43), "public");
 
     expectLiveCount(rendered, "3 TOTAL");
   });
@@ -355,8 +355,8 @@ describe("lists", () => {
   it("keeps Your and Public membership distinct", async () => {
     // PROPERTY (T3-C2-2): switching the routed selector changes the rendered
     // membership instead of showing one hard-coded list under both labels.
-    const yours = await renderRoute("t3-c2-session", "yours");
-    const publicList = await renderRoute("t3-c2-session", "public");
+    const yours = await renderRoute("t".repeat(43), "yours");
+    const publicList = await renderRoute("t".repeat(43), "public");
 
     expect(yours.body.textContent).toContain("Should cities price road congestion?");
     expect(yours.body.textContent).not.toContain("Should public algorithms publish their evaluation sets?");
@@ -368,7 +368,7 @@ describe("lists", () => {
     // PROPERTY (T3-C2-3): every row in both routed lists has a shell wrapper
     // and one direct core body, using the shared T1 bezel vocabulary.
     for (const selected of ["yours", "public"] as const) {
-      const rendered = await renderRoute("t3-c2-session", selected);
+      const rendered = await renderRoute("t".repeat(43), selected);
       const rows = [...rendered.querySelectorAll<HTMLElement>('[data-library-row][data-bezel="shell"]')];
 
       expect(rows.length).toBe(selected === "yours" ? 4 : 3);
@@ -386,8 +386,8 @@ describe("lists", () => {
   it("renders the public search-indexing disclosure once under the list and never on Yours", async () => {
     // PROPERTY (T3-C2-4): indexing persistence is a public-list disclosure,
     // not per-row copy and not content shown on the private list.
-    const yours = await renderRoute("t3-c2-session", "yours");
-    const publicList = await renderRoute("t3-c2-session", "public");
+    const yours = await renderRoute("t".repeat(43), "yours");
+    const publicList = await renderRoute("t".repeat(43), "public");
     const publicMatches = [...publicList.querySelectorAll("p")]
       .filter((paragraph) => paragraph.textContent?.trim() === disclosure);
     const yoursMatches = [...yours.querySelectorAll("p")]

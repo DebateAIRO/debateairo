@@ -23,8 +23,8 @@ import {
   saveSettings
 } from "../../apps/ui/lib/api.js";
 import {
-  SCORING_ABSENCE_REASON,
-  V3_SCORING_STATUS_LABEL,
+  scoringAbsenceReason,
+  v3ScoringStatus,
   contractNodesById,
   debateDetailFromAnswer,
   debateDetailFromRunProjection,
@@ -42,6 +42,13 @@ import {
   v3ScoringStatusLabel,
   wayOfKnowingLabel
 } from "../../apps/ui/lib/v3/adapter.js";
+import composeEnglish from "../../apps/ui/messages/en/compose.json" with { type: "json" };
+
+// FIX-DEBATE-CATALOGS follow-up 2: the V3 scoring copy is a catalogue-taking
+// function now (a module constant could only ever be English); these rows
+// read its English values exactly as they read the constants before.
+const SCORING_ABSENCE_REASON = scoringAbsenceReason(composeEnglish);
+const V3_SCORING_STATUS_LABEL = v3ScoringStatus(composeEnglish);
 import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel } from "../../apps/ui/lib/v3/labels.js";
 import { getDebateServer, listDebatesPageServer } from "../../apps/ui/lib/serverApi.js";
 import { statusLabel } from "../../apps/ui/lib/format.js";

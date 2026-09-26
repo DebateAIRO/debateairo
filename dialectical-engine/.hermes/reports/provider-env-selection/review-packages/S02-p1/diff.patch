@@ -1,0 +1,1229 @@
+diff --git a/dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts b/dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts
+new file mode 100644
+index 000000000..3974acc51
+--- /dev/null
++++ b/dialectical-engine/acceptance/pes-s02-fake-vendor.test.ts
+@@ -0,0 +1,152 @@
++import type { LookupAddress, LookupOptions } from "node:dns";
++import type { LookupFunction } from "node:net";
++import { X509Certificate } from "node:crypto";
++import { mkdtemp, readdir, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { afterEach, it, expect } from "vitest";
++import {
++  FAKE_VENDOR_AUTHORIZATION,
++  FAKE_VENDOR_PORT_CANDIDATES,
++  createFixtureCertificate,
++  createTrustingFetch,
++  isPortListening,
++  pickFreePort,
++  startFakeVendor,
++  verifySeamHandshake,
++  type FakeVendor
++} from "./pes-s02-fake-vendor.js";
++
++function callbackLookup(answer: readonly LookupAddress[] | NodeJS.ErrnoException): LookupFunction {
++  return (hostname, options: LookupOptions, callback) => {
++    if (answer instanceof Error) { callback(answer, ""); return; }
++    if (hostname !== "api.localtest.me") {
++      callback(Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), { code: "ENOTFOUND" }), "");
++      return;
++    }
++    if (options.all === true) callback(null, [...answer]);
++    else callback(null, answer[0]!.address, answer[0]!.family);
++  };
++}
++const lookupStub = callbackLookup([{ address: "127.0.0.1", family: 4 }]);
++
++const directories: string[] = [];
++const vendors = new Set<FakeVendor>();
++const clients: ReturnType<typeof createTrustingFetch>[] = [];
++
++afterEach(async () => {
++  for (const client of clients.splice(0)) client.destroy();
++  try {
++    await Promise.all([...vendors].map((vendor) => vendor.close()));
++  } finally {
++    vendors.clear();
++    await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
++  }
++});
++
++async function certificate() {
++  const directory = await mkdtemp(join(tmpdir(), "pes-s02-fake-vendor-"));
++  directories.push(directory);
++  return { directory, ...createFixtureCertificate(directory, "/usr/bin/openssl") };
++}
++
++async function fixture() {
++  const material = await certificate();
++  const selected = pickFreePort(FAKE_VENDOR_PORT_CANDIDATES, isPortListening);
++  const vendor = await startFakeVendor({ port: selected.port, ...material });
++  vendors.add(vendor);
++  return { ...material, ...selected, vendor };
++}
++
++function trustingFetch(certPem: string, lookup: LookupFunction = lookupStub) {
++  const client = createTrustingFetch(certPem, lookup);
++  clients.push(client);
++  return client.fetch;
++}
++
++// Property: runtime TLS material stays in its given directory and certifies the fixture hostname as a CA.
++// Breaks: rename a material file, change the SAN, or remove CA:TRUE.
++it("generates a run-time certificate for api.localtest.me inside the directory it is given", async () => {
++  const { directory, certPem } = await certificate();
++  expect((await readdir(directory)).sort()).toEqual(["cert.pem", "key.pem", "openssl.cnf"]);
++  const cert = new X509Certificate(certPem);
++  expect(cert.subjectAltName).toBe("DNS:api.localtest.me");
++  expect(cert.ca).toBe(true);
++  expect(cert.checkHost("api.localtest.me")).toBe("api.localtest.me");
++});
++
++// Property: the exact credential yields the probe's exact successful body and one matched request.
++// Breaks: change the URL, success status/body, or matched counter.
++it("answers the exact credential literal with the body the shipped probe accepts", async () => {
++  const { vendor, port, certPem } = await fixture();
++  expect(vendor.baseUrl).toBe(`https://api.localtest.me:${port}/v1`);
++  const response = await trustingFetch(certPem)(`${vendor.baseUrl}/chat/completions`, {
++    method: "POST",
++    headers: { "content-type": "application/json", authorization: FAKE_VENDOR_AUTHORIZATION },
++    body: '{"model":"fake-model","max_tokens":8,"messages":[]}'
++  });
++  expect(response.status).toBe(200);
++  expect(await response.text()).toBe('{"model":"fake-model","choices":[{"message":{"content":"OK"}}]}');
++  expect(vendor.counts()).toEqual({ matched: 1, rejected: 0 });
++});
++
++// Property: absent and wrong credentials are denied without a credential in the body; other routes are absent.
++// Breaks: admit either bad credential, change the denial body/status, route GET /models, or drop rejected counts.
++it("answers 401 to an absent or a wrong authorization and names no credential", async () => {
++  const { vendor, certPem } = await fixture();
++  const request = trustingFetch(certPem);
++  const absent = await request(`${vendor.baseUrl}/chat/completions`, { method: "POST" });
++  expect(absent.status).toBe(401);
++  const wrong = await request(`${vendor.baseUrl}/chat/completions`, {
++    method: "POST", headers: { authorization: "Bearer not-the-fixture-literal" }
++  });
++  expect(wrong.status).toBe(401);
++  expect(await wrong.text()).toBe('{"error":"unauthorized"}');
++  expect((await request(`${vendor.baseUrl}/models`)).status).toBe(404);
++  expect(vendor.counts()).toEqual({ matched: 0, rejected: 3 });
++});
++
++// Property: global trust and a different CA reject; the fixture CA authorizes a handshake without an HTTP request.
++// Breaks: relax verification, use the wrong handshake CA, change the handshake result, or count TLS as HTTP.
++it("is trusted only through the fetch built with its own certificate", async () => {
++  const { vendor, port, certPem } = await fixture();
++  await expect(fetch(`https://127.0.0.1:${port}/v1/chat/completions`, { method: "POST" }))
++    .rejects.toMatchObject({ cause: { code: "DEPTH_ZERO_SELF_SIGNED_CERT" } });
++  const other = await certificate();
++  await expect(trustingFetch(other.certPem)(`${vendor.baseUrl}/chat/completions`, { method: "POST" }))
++    .rejects.toThrow();
++  await expect(verifySeamHandshake({ port, caPem: certPem, lookup: lookupStub })).resolves.toBe("authorized");
++  expect(vendor.counts()).toEqual({ matched: 0, rejected: 0 });
++});
++
++// Property: excluded ports are not inspected, occupied candidates are skipped, and closing releases a measured listener.
++// Breaks: inspect an excluded port, select an occupied one, misreport lsof evidence/state, or omit server close.
++it("measures its port free with lsof before binding and skips every excluded port", async () => {
++  const calls: number[] = [];
++  const selected = pickFreePort([3000, 4455, 4310, 4460, 4461], (p) => { calls.push(p); return p === 4460; });
++  expect(selected.port).toBe(4461);
++  expect(calls).toEqual([4460, 4461]);
++  const { keyPem, certPem } = await certificate();
++  const { port, evidence } = pickFreePort(FAKE_VENDOR_PORT_CANDIDATES, isPortListening);
++  expect(isPortListening(port)).toBe(false);
++  expect(evidence).toBe(`lsof -nP -iTCP:${port} -sTCP:LISTEN rc=1 lines=0`);
++  const vendor = await startFakeVendor({ port, keyPem, certPem });
++  vendors.add(vendor);
++  expect(isPortListening(port)).toBe(true);
++  await vendor.close();
++  vendors.delete(vendor);
++  expect(isPortListening(port)).toBe(false);
++});
++
++// Property: the callback lookup can return IPv6 first while the fixture listens on IPv4.
++// Break: disable the request's automatic address-family fallback.
++it("reaches the fixture when the resolver answers ::1 before 127.0.0.1", async () => {
++  const { vendor, certPem } = await fixture();
++  const thatLookup = callbackLookup([{ address: "::1", family: 6 }, { address: "127.0.0.1", family: 4 }]);
++  const response = await trustingFetch(certPem, thatLookup)(`${vendor.baseUrl}/chat/completions`, {
++    method: "POST",
++    headers: { "content-type": "application/json", authorization: FAKE_VENDOR_AUTHORIZATION },
++    body: '{"model":"fake-model","max_tokens":8,"messages":[]}'
++  });
++  expect(response.status).toBe(200);
++});
+diff --git a/dialectical-engine/acceptance/pes-s02-fake-vendor.ts b/dialectical-engine/acceptance/pes-s02-fake-vendor.ts
+new file mode 100644
+index 000000000..9501c6783
+--- /dev/null
++++ b/dialectical-engine/acceptance/pes-s02-fake-vendor.ts
+@@ -0,0 +1,185 @@
++import type { LookupFunction } from "node:net";
++import { spawnSync } from "node:child_process";
++import { readFileSync, writeFileSync } from "node:fs";
++import * as https from "node:https";
++import { join } from "node:path";
++import * as tls from "node:tls";
++
++export const FAKE_VENDOR_AUTHORIZATION = "Bearer pes-s02-fake-vendor-token";
++export const FAKE_VENDOR_HOST = "api.localtest.me";
++export const FAKE_VENDOR_MODEL = "fake-model";
++export const FAKE_VENDOR_EXCLUDED_PORTS: ReadonlySet<number> = new Set([
++  3000, 3001, 8790, 4310, 8791, 8792, 8793, 8795, 8796, 55432, 4455
++]);
++export const FAKE_VENDOR_PORT_CANDIDATES: readonly number[] = Array.from({ length: 40 }, (_, i) => 4460 + i);
++
++export type FakeVendor = Readonly<{
++  baseUrl: string;
++  counts(): Readonly<{ matched: number; rejected: number }>;
++  close(): Promise<void>;
++}>;
++
++export function isPortListening(port: number): boolean {
++  const result = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" });
++  if (result.status === 1 && result.stdout === "") return false;
++  if (result.status === 0) return true;
++  throw new Error("PES_S02_LSOF_UNAVAILABLE");
++}
++
++export function pickFreePort(
++  candidates: readonly number[],
++  listening: (port: number) => boolean
++): Readonly<{ port: number; evidence: string }> {
++  for (const port of candidates) {
++    if (port <= 4400 || FAKE_VENDOR_EXCLUDED_PORTS.has(port)) continue;
++    if (listening(port) === false) {
++      return { port, evidence: `lsof -nP -iTCP:${port} -sTCP:LISTEN rc=1 lines=0` };
++    }
++  }
++  throw new Error("PES_S02_NO_FREE_PORT");
++}
++
++export function createFixtureCertificate(
++  directory: string,
++  opensslExecutable: string
++): Readonly<{ keyPem: string; certPem: string }> {
++  writeFileSync(join(directory, "openssl.cnf"), [
++    "[req]",
++    "distinguished_name = dn",
++    "x509_extensions = ext",
++    "prompt = no",
++    "[dn]",
++    "CN = api.localtest.me",
++    "[ext]",
++    "subjectAltName = DNS:api.localtest.me",
++    "basicConstraints = critical,CA:TRUE"
++  ].join("\n") + "\n");
++  const result = spawnSync(opensslExecutable, [
++    "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
++    "-keyout", join(directory, "key.pem"), "-out", join(directory, "cert.pem"),
++    "-config", join(directory, "openssl.cnf")
++  ], { stdio: ["ignore", "ignore", "pipe"] });
++  if (result.error && "code" in result.error && result.error.code === "ENOENT") {
++    throw new Error("PES_S02_OPENSSL_UNAVAILABLE");
++  }
++  if (result.status !== 0) throw new Error(`PES_S02_OPENSSL_RC_${result.status}`);
++  return {
++    keyPem: readFileSync(join(directory, "key.pem"), "utf8"),
++    certPem: readFileSync(join(directory, "cert.pem"), "utf8")
++  };
++}
++
++export async function startFakeVendor(
++  input: Readonly<{ port: number; keyPem: string; certPem: string }>
++): Promise<FakeVendor> {
++  let matched = 0;
++  let rejected = 0;
++  const server = https.createServer({ key: input.keyPem, cert: input.certPem }, (request, response) => {
++    request.on("end", () => {
++      if (request.method === "POST" && request.url === "/v1/chat/completions") {
++        if (request.headers.authorization === FAKE_VENDOR_AUTHORIZATION) {
++          matched += 1;
++          response.writeHead(200, { "content-type": "application/json" });
++          response.end('{"model":"fake-model","choices":[{"message":{"content":"OK"}}]}');
++        } else {
++          rejected += 1;
++          response.writeHead(401, { "content-type": "application/json" });
++          response.end('{"error":"unauthorized"}');
++        }
++      } else {
++        rejected += 1;
++        response.writeHead(404);
++        response.end();
++      }
++    });
++    request.resume();
++  });
++  server.on("tlsClientError", () => undefined);
++  await new Promise<void>((resolve, reject) => {
++    const onError = (error: NodeJS.ErrnoException) => {
++      reject(error.code === "EADDRINUSE" ? new Error("PES_S02_PORT_BIND_RACED") : error);
++    };
++    server.once("error", onError);
++    server.listen(input.port, "127.0.0.1", () => {
++      server.removeListener("error", onError);
++      resolve();
++    });
++  });
++  return {
++    baseUrl: `https://${FAKE_VENDOR_HOST}:${input.port}/v1`,
++    counts: () => ({ matched, rejected }),
++    close: async () => {
++      server.closeAllConnections();
++      await new Promise<void>((resolve, reject) => {
++        server.close((error) => error ? reject(error) : resolve());
++      });
++    }
++  };
++}
++
++export function createTrustingFetch(
++  caPem: string,
++  lookup?: LookupFunction
++): Readonly<{ fetch: typeof fetch; destroy(): void }> {
++  const agent = new https.Agent({ ca: [caPem], keepAlive: false });
++  const trustingFetch: typeof fetch = (input, init) => new Promise<Response>((resolve, reject) => {
++    const url = input instanceof Request ? input.url : input;
++    const headers = Object.fromEntries(new Headers(init?.headers));
++    const request = https.request(url, {
++      method: init?.method ?? "GET",
++      headers,
++      agent,
++      signal: init?.signal ?? undefined,
++      rejectUnauthorized: true,
++      ...(lookup === undefined ? {} : { lookup })
++    }, (response) => {
++      const chunks: Buffer[] = [];
++      response.on("data", (chunk: Buffer) => chunks.push(chunk));
++      response.on("error", reject);
++      response.on("end", () => {
++        const responseHeaders = new Headers();
++        for (const [name, value] of Object.entries(response.headers)) {
++          if (Array.isArray(value)) {
++            for (const item of value) responseHeaders.append(name, item);
++          } else if (value !== undefined) responseHeaders.set(name, value);
++        }
++        resolve(new Response(Buffer.concat(chunks), {
++          status: response.statusCode!,
++          statusText: response.statusMessage!,
++          headers: responseHeaders
++        }));
++      });
++    });
++    request.on("error", reject);
++    if (typeof init?.body === "string") request.write(init.body);
++    request.end();
++  });
++  return { fetch: trustingFetch, destroy: () => agent.destroy() };
++}
++
++export async function verifySeamHandshake(
++  input: Readonly<{ port: number; caPem: string; lookup?: LookupFunction }>
++): Promise<"authorized"> {
++  return new Promise((resolve, reject) => {
++    const socket = tls.connect({
++      host: FAKE_VENDOR_HOST,
++      port: input.port,
++      ca: [input.caPem],
++      servername: FAKE_VENDOR_HOST,
++      rejectUnauthorized: true,
++      ...(input.lookup ? { lookup: input.lookup } : {})
++    });
++    socket.once("secureConnect", () => {
++      if (socket.authorized === true) {
++        socket.end();
++        resolve("authorized");
++      } else {
++        socket.destroy();
++        reject(new Error(String(socket.authorizationError)));
++      }
++    });
++    socket.once("error", (error: NodeJS.ErrnoException) => {
++      reject(new Error(error.code ?? error.message));
++    });
++  });
++}
+diff --git a/dialectical-engine/acceptance/pes-s02-hosted-cli.ts b/dialectical-engine/acceptance/pes-s02-hosted-cli.ts
+new file mode 100644
+index 000000000..73db71533
+--- /dev/null
++++ b/dialectical-engine/acceptance/pes-s02-hosted-cli.ts
+@@ -0,0 +1,9 @@
++import { runHostedAcceptance } from "./pes-s02-hosted.js";
++
++try {
++  const result = await runHostedAcceptance({ emit: (line) => { process.stdout.write(`${line}\n`); } });
++  process.exitCode = result.outcome === "PASS" ? 0 : 1;
++} catch {
++  process.stdout.write("PES-S02-ACCEPT: FAIL internal\n");
++  process.exitCode = 1;
++}
+diff --git a/dialectical-engine/acceptance/pes-s02-hosted.test.ts b/dialectical-engine/acceptance/pes-s02-hosted.test.ts
+new file mode 100644
+index 000000000..ff7a18ff2
+--- /dev/null
++++ b/dialectical-engine/acceptance/pes-s02-hosted.test.ts
+@@ -0,0 +1,138 @@
++import type { LookupAddress, LookupOptions } from "node:dns";
++import type { LookupFunction } from "node:net";
++import { rm, stat } from "node:fs/promises";
++import { basename } from "node:path";
++import { afterAll, expect, it } from "vitest";
++import { FAKE_VENDOR_AUTHORIZATION, isPortListening } from "./pes-s02-fake-vendor.js";
++import {
++  PES_S02_REFUSAL_CASES,
++  runHostedAcceptance,
++  violatesStdoutLaw,
++  type HostedAcceptanceDeps,
++  type HostedAcceptanceResult
++} from "./pes-s02-hosted.js";
++
++function callbackLookup(answer: readonly LookupAddress[] | NodeJS.ErrnoException): LookupFunction {
++  return (hostname, options: LookupOptions, callback) => {
++    if (answer instanceof Error) { callback(answer, ""); return; }
++    if (hostname !== "api.localtest.me") {
++      callback(Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), { code: "ENOTFOUND" }), "");
++      return;
++    }
++    if (options.all === true) callback(null, [...answer]);
++    else callback(null, answer[0]!.address, answer[0]!.family);
++  };
++}
++const lookupStub = callbackLookup([{ address: "127.0.0.1", family: 4 }]);
++const token = FAKE_VENDOR_AUTHORIZATION.slice("Bearer ".length);
++const roots: string[] = [];
++
++async function run(deps: Partial<HostedAcceptanceDeps> = {}): Promise<HostedAcceptanceResult> {
++  const result = await runHostedAcceptance({ lookup: lookupStub, ...deps });
++  if (result.scratchRoot !== null) roots.push(result.scratchRoot);
++  return result;
++}
++let passingRun: Promise<HostedAcceptanceResult> | undefined;
++const pass = () => passingRun ??= run();
++afterAll(async () => {
++  for (const root of roots) await rm(root, { recursive: true, force: true });
++});
++
++it("passes end to end and prints the exact lines of SPEC-v4 §5 steps 5, 6 and 8", async () => {
++  const result = await pass();
++  expect(result.outcome).toBe("PASS");
++  expect(result.lines).toEqual([
++    `PES-S02 SCRATCH-DIR ${result.scratchRoot}`,
++    "PES-S02 DNS api.localtest.me 127.0.0.1",
++    `PES-S02 PORT-FREE ${result.port} lsof -nP -iTCP:${result.port} -sTCP:LISTEN rc=1 lines=0`,
++    `PES-S02 FAKE-VENDOR https://api.localtest.me:${result.port}/v1`,
++    "PES-S02 TRUST seam-handshake=authorized default-fetch=DEPTH_ZERO_SELF_SIGNED_CERT",
++    "PES-S02 REFUSED PROVIDER_TARGET_LOOPBACK_REFUSED:vendor:a",
++    "PES-S02 REFUSED PROVIDER_INLINE_CREDENTIAL_REFUSED:vendor:a",
++    "PES-S02 REFUSED PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT",
++    "PES-S02 REFUSED PROVIDER_AUTHORIZATION_FILE_ABSENT:vendor:a",
++    "PES-S02 REFUSED PROVIDER_TARGET_PRICE_REQUIRED:vendor:a",
++    "PES-S02 ADMITTED vendor:a",
++    "PES-S02 VENDOR-REQUESTS 1 matched 0 rejected",
++    "PES-S02-ACCEPT: PASS"
++  ]);
++  expect(result.refusals).toEqual([
++    { id: "refused-loopback", message: "PROVIDER_TARGET_LOOPBACK_REFUSED:vendor:a", stage: "deployment" },
++    { id: "refused-inline", message: "PROVIDER_INLINE_CREDENTIAL_REFUSED:vendor:a", stage: "deployment" },
++    { id: "refused-conflict", message: "PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT", stage: "parse" },
++    { id: "refused-absent", message: "PROVIDER_AUTHORIZATION_FILE_ABSENT:vendor:a", stage: "credentials" },
++    { id: "refused-price", message: "PROVIDER_TARGET_PRICE_REQUIRED:vendor:a", stage: "priced" }
++  ]);
++});
++
++it("never prints the token, a scheme-prefixed credential or a path at or beneath the custody directory", async () => {
++  const result = await pass();
++  for (const line of result.lines) {
++    expect(line.includes(token)).toBe(false);
++    expect(/Bearer \S/u.test(line)).toBe(false);
++    expect(line.includes(`${result.scratchRoot}/custody.d`)).toBe(false);
++  }
++  expect(result.lines[0]).toBe(`PES-S02 SCRATCH-DIR ${result.scratchRoot}`);
++  expect(basename(result.scratchRoot!)).toMatch(/^pes-s02-/u);
++  expect(basename(result.scratchRoot!)).not.toContain("custody");
++});
++
++it("removes the scratch root and releases the port before it returns", async () => {
++  const result = await pass();
++  await expect(stat(result.scratchRoot!)).rejects.toMatchObject({ code: "ENOENT" });
++  expect(isPortListening(result.port!)).toBe(false);
++});
++
++it("names the first case that did not hold when the vendor rejects the provisioned credential", async () => {
++  const result = await run({ credentialLiteral: "Bearer pes-s02-not-the-vendor-literal" });
++  expect(result.outcome).toBe("FAIL");
++  expect(result.lines.at(-1)).toBe("PES-S02-ACCEPT: FAIL admitted");
++  expect(result.lines.some((line) => line.startsWith("PES-S02 ADMITTED "))).toBe(false);
++  expect(result.lines.filter((line) => line.startsWith("PES-S02 REFUSED "))).toHaveLength(5);
++  await expect(stat(result.scratchRoot!)).rejects.toMatchObject({ code: "ENOENT" });
++});
++
++it("names the refusal case whose message differs from the table", async () => {
++  const result = await run({ refusalCases: PES_S02_REFUSAL_CASES.map((row) => row.id === "refused-conflict"
++    ? { ...row, expected: "PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT:vendor:a" } : row) });
++  expect(result.outcome).toBe("FAIL");
++  expect(result.lines.at(-1)).toBe("PES-S02-ACCEPT: FAIL refused-conflict");
++  expect(result.lines.filter((line) => line.startsWith("PES-S02 REFUSED "))).toHaveLength(2);
++  await expect(stat(result.scratchRoot!)).rejects.toMatchObject({ code: "ENOENT" });
++});
++
++it("reports UNVERIFIED with the resolver's own error and never falls back", async () => {
++  for (const [lookup, verdict] of [
++    [callbackLookup(Object.assign(new Error("getaddrinfo ENOTFOUND api.localtest.me"), { code: "ENOTFOUND" })),
++      "PES-S02-ACCEPT: UNVERIFIED dns ENOTFOUND"],
++    [callbackLookup([{ address: "192.0.2.10", family: 4 }]),
++      "PES-S02-ACCEPT: UNVERIFIED dns non-loopback"]
++  ] as const) {
++    const result = await run({ lookup });
++    expect(result.outcome).toBe("UNVERIFIED");
++    expect(result.lines).toEqual([`PES-S02 SCRATCH-DIR ${result.scratchRoot}`, verdict]);
++    await expect(stat(result.scratchRoot!)).rejects.toMatchObject({ code: "ENOENT" });
++  }
++});
++
++it("reports UNVERIFIED when the run-time certificate cannot be built", async () => {
++  const result = await run({ opensslExecutable: "/nonexistent/openssl" });
++  expect(result.outcome).toBe("UNVERIFIED");
++  expect(result.lines.at(-1)).toBe("PES-S02-ACCEPT: UNVERIFIED tls-material openssl-unavailable");
++  expect(result.lines).toHaveLength(2);
++  await expect(stat(result.scratchRoot!)).rejects.toMatchObject({ code: "ENOENT" });
++});
++
++it("flags every line the stdout law forbids and passes the lawful refusal codes", () => {
++  const forbidden = { tokens: [token], paths: ["/x/pes-s02-y/custody.d"] };
++  for (const line of [
++    `a ${token} b`, "x Bearer abc", "/x/pes-s02-y/custody.d", "/x/pes-s02-y/custody.d/vendor.header"
++  ]) expect(violatesStdoutLaw(line, forbidden)).toBe(true);
++  for (const line of [
++    "PES-S02 SCRATCH-DIR /x/pes-s02-y",
++    "PES-S02 REFUSED PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT",
++    "PES-S02 REFUSED PROVIDER_AUTHORIZATION_FILE_ABSENT:vendor:a",
++    "PES-S02 REFUSED PROVIDER_INLINE_CREDENTIAL_REFUSED:vendor:a",
++    "PES-S02 REFUSED PROVIDER_AUTHORIZATION_FILE_UNUSABLE:vendor:a"
++  ]) expect(violatesStdoutLaw(line, forbidden)).toBe(false);
++});
+diff --git a/dialectical-engine/acceptance/pes-s02-hosted.ts b/dialectical-engine/acceptance/pes-s02-hosted.ts
+new file mode 100644
+index 000000000..27d25a146
+--- /dev/null
++++ b/dialectical-engine/acceptance/pes-s02-hosted.ts
+@@ -0,0 +1,312 @@
++import { lookup } from "node:dns";
++import type { LookupAddress } from "node:dns";
++import { isIP, type LookupFunction } from "node:net";
++import { chmod, lstat, mkdir, mkdtemp, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { basename, join } from "node:path";
++import { readCustodyAuthorizationHeader } from "@debateai/crypto";
++import { resolveDeploymentMode } from "@debateai/register";
++import type { ProviderProbeRecord } from "@debateai/db";
++import {
++  parseProviderDiscoveryTargets,
++  assertDeploymentProviderTargets,
++  assertPricedProviderTargets,
++  resolveProviderTargetCredentials,
++  createProviderDiscoveryResolver,
++  type ProviderDiscoveryProbeStore
++} from "../apps/api/src/provider-discovery.js";
++import {
++  FAKE_VENDOR_AUTHORIZATION,
++  FAKE_VENDOR_HOST,
++  FAKE_VENDOR_PORT_CANDIDATES,
++  isPortListening,
++  pickFreePort,
++  createFixtureCertificate,
++  startFakeVendor,
++  createTrustingFetch,
++  verifySeamHandshake,
++  type FakeVendor
++} from "./pes-s02-fake-vendor.js";
++
++export const PES_S02_CONFIGURED_PROVIDERS = Object.freeze([Object.freeze({ providerRef: "vendor:a", maker: "Acme" })]);
++
++export type RefusalCase = Readonly<{
++  id: string;
++  target: string;
++  expected: string;
++  stage: "parse" | "deployment" | "priced" | "credentials";
++}>;
++
++export const PES_S02_REFUSAL_CASES: readonly RefusalCase[] = Object.freeze([
++  Object.freeze({
++    id: "refused-loopback",
++    target: "{\"provider_ref\":\"vendor:a\",\"base_url\":\"https://127.0.0.1:4455/v1\",\"model\":\"fake-model\",\"authorization_file\":\"/SCRATCH/custody.d/vendor.header\",\"input_price_micros_per_million\":1000,\"output_price_micros_per_million\":2000}",
++    expected: "PROVIDER_TARGET_LOOPBACK_REFUSED:vendor:a",
++    stage: "deployment",
++  }),
++  Object.freeze({
++    id: "refused-inline",
++    target: "{\"provider_ref\":\"vendor:a\",\"base_url\":\"https://api.localtest.me:4455/v1\",\"model\":\"fake-model\",\"authorization_header\":\"Bearer inline-not-provisioned\",\"input_price_micros_per_million\":1000,\"output_price_micros_per_million\":2000}",
++    expected: "PROVIDER_INLINE_CREDENTIAL_REFUSED:vendor:a",
++    stage: "deployment",
++  }),
++  Object.freeze({
++    id: "refused-conflict",
++    target: "{\"provider_ref\":\"vendor:a\",\"base_url\":\"https://api.localtest.me:4455/v1\",\"model\":\"fake-model\",\"authorization_file\":\"/SCRATCH/custody.d/vendor.header\",\"authorization_header\":\"Bearer inline-not-provisioned\",\"input_price_micros_per_million\":1000,\"output_price_micros_per_million\":2000}",
++    expected: "PROVIDER_DISCOVERY_AUTHORIZATION_CONFLICT",
++    stage: "parse",
++  }),
++  Object.freeze({
++    id: "refused-absent",
++    target: "{\"provider_ref\":\"vendor:a\",\"base_url\":\"https://api.localtest.me:4455/v1\",\"model\":\"fake-model\",\"authorization_file\":\"/SCRATCH/custody.d/absent.header\",\"input_price_micros_per_million\":1000,\"output_price_micros_per_million\":2000}",
++    expected: "PROVIDER_AUTHORIZATION_FILE_ABSENT:vendor:a",
++    stage: "credentials",
++  }),
++  Object.freeze({
++    id: "refused-price",
++    target: "{\"provider_ref\":\"vendor:a\",\"base_url\":\"https://api.localtest.me:4455/v1\",\"model\":\"fake-model\",\"authorization_file\":\"/SCRATCH/custody.d/vendor.header\"}",
++    expected: "PROVIDER_TARGET_PRICE_REQUIRED:vendor:a",
++    stage: "priced",
++  }),
++]);
++
++export type HostedAcceptanceDeps = {
++  emit(line: string): void;
++  lookup: LookupFunction;
++  opensslExecutable: string;
++  portCandidates: readonly number[];
++  isPortListening(port: number): boolean;
++  credentialLiteral: string;
++  refusalCases: readonly RefusalCase[];
++};
++
++export type HostedAcceptanceResult = {
++  outcome: "PASS" | "FAIL" | "UNVERIFIED";
++  lines: readonly string[];
++  scratchRoot: string | null;
++  port: number | null;
++  refusals: readonly Readonly<{ id: string; message: string; stage: string }>[];
++};
++
++export function violatesStdoutLaw(
++  line: string,
++  forbidden: Readonly<{ tokens: readonly string[]; paths: readonly string[] }>
++): boolean {
++  return forbidden.tokens.some((token) => line.includes(token))
++    || /Bearer \S/u.test(line)
++    || forbidden.paths.some((path) => line.includes(path));
++}
++
++function resolveAll(lookup: LookupFunction, hostname: string): Promise<LookupAddress[]> {
++  return new Promise((resolve, reject) => {
++    lookup(hostname, { all: true }, (error, answer) => {
++      if (error) reject(error);
++      else resolve(answer as LookupAddress[]);
++    });
++  });
++}
++
++class AcceptanceStop extends Error {
++  constructor(readonly outcome: "FAIL" | "UNVERIFIED", readonly detail: string) {
++    super(detail);
++  }
++}
++
++function stop(outcome: "FAIL" | "UNVERIFIED", detail: string): never {
++  throw new AcceptanceStop(outcome, detail);
++}
++
++function errorCode(error: unknown): string {
++  const code = (error as { code?: unknown } | null)?.code;
++  if (typeof code !== "string") throw error;
++  return code;
++}
++
++export async function runHostedAcceptance(
++  overrides: Partial<HostedAcceptanceDeps> = {}
++): Promise<HostedAcceptanceResult> {
++  const deps: HostedAcceptanceDeps = {
++    emit: () => undefined,
++    lookup,
++    opensslExecutable: "/usr/bin/openssl",
++    portCandidates: FAKE_VENDOR_PORT_CANDIDATES,
++    isPortListening,
++    credentialLiteral: FAKE_VENDOR_AUTHORIZATION,
++    refusalCases: PES_S02_REFUSAL_CASES,
++    ...overrides
++  };
++  const lines: string[] = [];
++  const refusals: { id: string; message: string; stage: string }[] = [];
++  const forbidden = {
++    tokens: [FAKE_VENDOR_AUTHORIZATION.slice("Bearer ".length), deps.credentialLiteral.slice("Bearer ".length)],
++    paths: [] as string[]
++  };
++  let scratchRoot: string | null = null;
++  let port: number | null = null;
++  let vendor: FakeVendor | undefined;
++  let trusting: ReturnType<typeof createTrustingFetch> | undefined;
++  let failure: AcceptanceStop | undefined;
++  const emit = (line: string) => {
++    if (violatesStdoutLaw(line, forbidden)) stop("FAIL", "stdout-law");
++    deps.emit(line);
++    lines.push(line);
++  };
++  const rememberFailure = (error: unknown) => {
++    failure ??= error instanceof AcceptanceStop ? error : new AcceptanceStop("FAIL", "internal");
++  };
++  try {
++    scratchRoot = await mkdtemp(join(tmpdir(), "pes-s02-"));
++    if (!basename(scratchRoot).startsWith("pes-s02-") || basename(scratchRoot).includes("custody")
++      || !/^[A-Za-z0-9/._-]+$/u.test(scratchRoot)) stop("FAIL", "scratch-root");
++    const custody = join(scratchRoot, "custody.d");
++    forbidden.paths.push(custody, join(await realpath(scratchRoot), "custody.d"));
++    emit(`PES-S02 SCRATCH-DIR ${scratchRoot}`);
++
++    const tlsDirectory = join(scratchRoot, "tls");
++    await mkdir(tlsDirectory, { mode: 0o700 });
++    let certificate: ReturnType<typeof createFixtureCertificate>;
++    try {
++      certificate = createFixtureCertificate(tlsDirectory, deps.opensslExecutable);
++    } catch (error) {
++      if (error instanceof Error && error.message === "PES_S02_OPENSSL_UNAVAILABLE") {
++        stop("UNVERIFIED", "tls-material openssl-unavailable");
++      }
++      if (error instanceof Error && /^PES_S02_OPENSSL_RC_\d+$/u.test(error.message)) {
++        stop("UNVERIFIED", `tls-material openssl-rc-${error.message.slice("PES_S02_OPENSSL_RC_".length)}`);
++      }
++      throw error;
++    }
++    let addresses: LookupAddress[];
++    try {
++      addresses = await resolveAll(deps.lookup, FAKE_VENDOR_HOST);
++    } catch (error) {
++      stop("UNVERIFIED", `dns ${errorCode(error)}`);
++    }
++    if (addresses.some(({ address }) => address !== "::1" && !(isIP(address) === 4 && address.startsWith("127.")))) {
++      stop("UNVERIFIED", "dns non-loopback");
++    }
++    if (!addresses.some(({ address }) => address === "127.0.0.1")) stop("UNVERIFIED", "dns no-ipv4-loopback");
++    emit(`PES-S02 DNS ${FAKE_VENDOR_HOST} ${addresses.map((a) => a.address).join(",")}`);
++
++    let evidence: string;
++    try {
++      ({ port, evidence } = pickFreePort(deps.portCandidates, deps.isPortListening));
++    } catch (error) {
++      if (error instanceof Error && error.message === "PES_S02_LSOF_UNAVAILABLE") stop("UNVERIFIED", "port lsof-unavailable");
++      if (error instanceof Error && error.message === "PES_S02_NO_FREE_PORT") stop("UNVERIFIED", "port none-free");
++      throw error;
++    }
++    emit(`PES-S02 PORT-FREE ${port} ${evidence}`);
++    try {
++      vendor = await startFakeVendor({ port, ...certificate });
++    } catch (error) {
++      if (error instanceof Error && error.message === "PES_S02_PORT_BIND_RACED") stop("UNVERIFIED", "port bind-raced");
++      throw error;
++    }
++    emit(`PES-S02 FAKE-VENDOR ${vendor.baseUrl}`);
++    try {
++      await verifySeamHandshake({ port, caPem: certificate.certPem, lookup: deps.lookup });
++    } catch (error) {
++      if (!(error instanceof Error) || !/^[A-Z0-9_]+$/u.test(error.message)) throw error;
++      stop("UNVERIFIED", `trust-seam handshake-${error.message}`);
++    }
++    let defaultFetchError: unknown;
++    try {
++      await fetch(`https://127.0.0.1:${port}/v1/chat/completions`, { method: "POST" });
++    } catch (error) {
++      defaultFetchError = error;
++    }
++    if (defaultFetchError === undefined) stop("UNVERIFIED", "trust-seam default-fetch-accepted");
++    const defaultCode = errorCode((defaultFetchError as Error).cause);
++    if (defaultCode !== "DEPTH_ZERO_SELF_SIGNED_CERT") stop("UNVERIFIED", `trust-seam default-fetch-${defaultCode}`);
++    trusting = createTrustingFetch(certificate.certPem, deps.lookup);
++    emit("PES-S02 TRUST seam-handshake=authorized default-fetch=DEPTH_ZERO_SELF_SIGNED_CERT");
++
++    await mkdir(custody, { mode: 0o700 });
++    await chmod(custody, 0o700);
++    const credentialPath = join(custody, "vendor.header");
++    await writeFile(credentialPath, deps.credentialLiteral + "\n", { mode: 0o600 });
++    await chmod(credentialPath, 0o600);
++    const directory = await lstat(custody);
++    const credential = await lstat(credentialPath);
++    const entries = await readdir(custody);
++    if ((directory.mode & 0o777) !== 0o700 || directory.uid !== process.getuid!()
++      || (credential.mode & 0o777) !== 0o600 || credential.nlink !== 1 || credential.isSymbolicLink()
++      || entries.length !== 1 || entries[0] !== "vendor.header") stop("FAIL", "custody-layout");
++
++    const mode = resolveDeploymentMode("hosted", "production");
++    let stage: RefusalCase["stage"] = "parse";
++    const chain = (source: string) => {
++      stage = "parse";
++      const declared = parseProviderDiscoveryTargets(source, PES_S02_CONFIGURED_PROVIDERS);
++      stage = "deployment";
++      assertDeploymentProviderTargets(declared, { mode, nodeEnv: "production" });
++      stage = "priced";
++      assertPricedProviderTargets(declared, mode);
++      stage = "credentials";
++      return resolveProviderTargetCredentials(declared, readCustodyAuthorizationHeader);
++    };
++    for (const refusal of deps.refusalCases) {
++      let caught: unknown;
++      try {
++        chain(`[${refusal.target.replaceAll("/SCRATCH", scratchRoot)}]`);
++      } catch (error) {
++        caught = error;
++      }
++      if (!(caught instanceof Error) || caught.message !== refusal.expected || stage !== refusal.stage) stop("FAIL", refusal.id);
++      refusals.push({ id: refusal.id, message: caught.message, stage });
++      emit(`PES-S02 REFUSED ${caught.message}`);
++    }
++    try {
++      const targets = chain(JSON.stringify([{
++        provider_ref: "vendor:a",
++        base_url: `https://api.localtest.me:${port}/v1`,
++        model: "fake-model",
++        authorization_file: credentialPath,
++        input_price_micros_per_million: 1000,
++        output_price_micros_per_million: 2000
++      }]));
++      const recorded: ProviderProbeRecord[] = [];
++      const probes: ProviderDiscoveryProbeStore = {
++        readLatest: async (refs) => recorded.filter((r) => refs.includes(r.providerRef)),
++        record: async (o) => { recorded.push(o); }
++      };
++      const resolve = createProviderDiscoveryResolver({
++        configuredProviders: PES_S02_CONFIGURED_PROVIDERS, targets, probes,
++        probeFreshnessMs: 600000, probeTimeoutMs: 5000,
++        fetchImplementation: trusting.fetch, clock: () => new Date()
++      });
++      const members = await resolve();
++      if (members.length !== 1 || members[0]?.provider_ref !== "vendor:a" || members[0]?.maker !== "Acme") stop("FAIL", "admitted");
++    } catch {
++      stop("FAIL", "admitted");
++    }
++    emit("PES-S02 ADMITTED vendor:a");
++    const counts = vendor.counts();
++    emit(`PES-S02 VENDOR-REQUESTS ${counts.matched} matched ${counts.rejected} rejected`);
++    if (counts.matched !== 1 || counts.rejected !== 0) stop("FAIL", "vendor-requests");
++  } catch (error) {
++    rememberFailure(error);
++  } finally {
++    try { trusting?.destroy(); } catch (error) { rememberFailure(error); }
++    try { await vendor?.close(); } catch (error) { rememberFailure(error); }
++    try {
++      if (scratchRoot !== null) await rm(scratchRoot, { recursive: true, force: true });
++    } catch (error) { rememberFailure(error); }
++  }
++  if (scratchRoot !== null) {
++    try {
++      await stat(scratchRoot);
++      failure ??= new AcceptanceStop("FAIL", "scratch-removed");
++    } catch (error) {
++      if ((error as NodeJS.ErrnoException).code !== "ENOENT") failure ??= new AcceptanceStop("FAIL", "scratch-removed");
++    }
++  }
++  try {
++    emit(failure ? `PES-S02-ACCEPT: ${failure.outcome} ${failure.detail}` : "PES-S02-ACCEPT: PASS");
++  } catch (error) {
++    failure = error instanceof AcceptanceStop ? error : new AcceptanceStop("FAIL", "internal");
++    try { emit(`PES-S02-ACCEPT: ${failure.outcome} ${failure.detail}`); } catch { /* An unusable emitter cannot be recovered here. */ }
++  }
++  return { outcome: failure?.outcome ?? "PASS", lines, scratchRoot, port, refusals };
++}
+diff --git a/dialectical-engine/apps/runner/src/dev-api-environment.ts b/dialectical-engine/apps/runner/src/dev-api-environment.ts
+index 94861e825..d6b093d34 100644
+--- a/dialectical-engine/apps/runner/src/dev-api-environment.ts
++++ b/dialectical-engine/apps/runner/src/dev-api-environment.ts
+@@ -74,7 +74,8 @@ export const DEVELOPMENT_API_ENVIRONMENT_KEYS = Object.freeze([
+   "HATCHET_TENANT_ID",
+   "HATCHET_WORKFLOW_NAME",
+   "HATCHET_TLS_STRATEGY",
+-  "DEBATEAI_DEV_MAIL_CAPTURE_DIR"
++  "DEBATEAI_DEV_MAIL_CAPTURE_DIR",
++  "DEBATEAI_DEPLOYMENT_MODE"
+ ] as const);
+ 
+ export type DevelopmentApiEnvironmentReceipt = Readonly<{
+@@ -447,6 +448,22 @@ function isExactLegacyEnvironmentWithoutSupportModelTarget(
+   }
+ }
+ 
++const DECLARED_LOCAL_DEPLOYMENT_MODE_ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
++
++function isExactEnvironmentWithoutDeclaredDeploymentMode(
++  existing: string,
++  expected: string,
++  profile: DevelopmentAuthStackProfile
++): boolean {
++  if (!existing.endsWith("\n") || existing.includes("DEBATEAI_DEPLOYMENT_MODE=")) return false;
++  const declared = existing + DECLARED_LOCAL_DEPLOYMENT_MODE_ROW;
++  return declared === expected
++    || isExactProviderRuntimeRefresh(declared, expected, profile)
++    || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(declared, expected, profile)
++    || isExactPublishedRegisterRefresh(declared, expected, profile)
++    || isExactLegacyEnvironmentWithoutSupportModelTarget(declared, expected, profile);
++}
++
+ export async function assembleDevelopmentApiEnvironment(
+   input: AssembleDevelopmentApiEnvironmentInput
+ ): Promise<DevelopmentApiEnvironmentReceipt> {
+@@ -526,7 +543,8 @@ export async function assembleDevelopmentApiEnvironment(
+     ["HATCHET_TENANT_ID", tenantId],
+     ["HATCHET_WORKFLOW_NAME", "debateai-dev"],
+     ["HATCHET_TLS_STRATEGY", "none"],
+-    ["DEBATEAI_DEV_MAIL_CAPTURE_DIR", join(custodyRoot, "mail")]
++    ["DEBATEAI_DEV_MAIL_CAPTURE_DIR", join(custodyRoot, "mail")],
++    ["DEBATEAI_DEPLOYMENT_MODE", "local"]
+   ]);
+   const source = environmentSource(values);
+   const reused = await publishExactFile(
+@@ -537,6 +555,7 @@ export async function assembleDevelopmentApiEnvironment(
+       || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source, profile)
+       || isExactPublishedRegisterRefresh(existing, source, profile)
+       || isExactLegacyEnvironmentWithoutSupportModelTarget(existing, source, profile)
++      || isExactEnvironmentWithoutDeclaredDeploymentMode(existing, source, profile)
+   );
+   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
+ }
+diff --git a/dialectical-engine/apps/runner/src/dev-api-process.ts b/dialectical-engine/apps/runner/src/dev-api-process.ts
+index a3f6c8cf6..003acd740 100644
+--- a/dialectical-engine/apps/runner/src/dev-api-process.ts
++++ b/dialectical-engine/apps/runner/src/dev-api-process.ts
+@@ -210,7 +210,8 @@ function validateExactEnvironment(
+       ["HATCHET_HOST_PORT", `127.0.0.1:${profile.hatchetGrpcPort}`],
+       ["HATCHET_API_URL", `http://127.0.0.1:${profile.hatchetApiPort}`],
+       ["HATCHET_WORKFLOW_NAME", "debateai-dev"],
+-      ["HATCHET_TLS_STRATEGY", "none"]
++      ["HATCHET_TLS_STRATEGY", "none"],
++      ["DEBATEAI_DEPLOYMENT_MODE", "local"]
+     ]);
+     for (const [key, expected] of exact) {
+       if (values[key] !== expected) {
+diff --git a/dialectical-engine/apps/runner/src/dev-runner-process.ts b/dialectical-engine/apps/runner/src/dev-runner-process.ts
+index 96a69e35c..365193f1c 100644
+--- a/dialectical-engine/apps/runner/src/dev-runner-process.ts
++++ b/dialectical-engine/apps/runner/src/dev-runner-process.ts
+@@ -83,6 +83,7 @@ function createRunnerEnvironment(
+     KEK_PATH: apiEnvironment.KEK_PATH!,
+     DATABASE_URL: apiEnvironment.DATABASE_URL!,
+     RUNNER_WORKER_ID: "development:walking-skeleton",
++    DEBATEAI_DEPLOYMENT_MODE: "local",
+     REGISTER_VERSION: registerVersion,
+     REGISTER_DEPLOYMENT_RECEIPT_SHA256: apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_SHA256!,
+     REGISTER_DEPLOYMENT_RECEIPT_FILE: apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_FILE!,
+diff --git a/dialectical-engine/package.json b/dialectical-engine/package.json
+index 04b67978d..a1f22d0dc 100644
+--- a/dialectical-engine/package.json
++++ b/dialectical-engine/package.json
+@@ -53,7 +53,8 @@
+     "job:settlement-watch": "tsx apps/scheduler/src/cli.ts settlement-watch",
+     "job:review-catch-up": "tsx acceptance/review-catch-up.ts",
+     "replay:ceremony": "tsx apps/replay/src/cli.ts",
+-    "eval:roles": "tsx acceptance/eval-harness-cli.ts"
++    "eval:roles": "tsx acceptance/eval-harness-cli.ts",
++    "pes:accept-hosted": "tsx --no-cache acceptance/pes-s02-hosted-cli.ts"
+   },
+   "dependencies": {
+     "drizzle-orm": "0.45.2",
+diff --git a/dialectical-engine/tests/integration/dev-api-environment.test.ts b/dialectical-engine/tests/integration/dev-api-environment.test.ts
+index ee26f60ad..43b492c67 100644
+--- a/dialectical-engine/tests/integration/dev-api-environment.test.ts
++++ b/dialectical-engine/tests/integration/dev-api-environment.test.ts
+@@ -337,6 +337,40 @@ describe("DEV-09 private local API environment", () => {
+       .toContain(`SUPPORT_MODEL_TARGET_JSON=${TEST_SUPPORT_MODEL_TARGET}\n`);
+   });
+ 
++  it("atomically adds the declared local deployment mode to the exact environment assembled before it", async () => {
++    const test = await fixture();
++    await assemble(test.repositoryRoot);
++    const current = await readFile(test.outputFilePath, "utf8");
++    const ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
++    expect(current.endsWith(`\n${ROW}`)).toBe(true);
++    const v1 = current.slice(0, -ROW.length);
++    const v2 = v1.replace("PROVIDER_PROBE_TIMEOUT_MS=180000\n", "PROVIDER_PROBE_TIMEOUT_MS=5000\n");
++    expect(v2).not.toBe(v1);
++    for (const previous of [v1, v2]) {
++      await writeFile(test.outputFilePath, previous, { mode: 0o600 });
++      await expect(assemble(test.repositoryRoot))
++        .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
++      expect(await readFile(test.outputFilePath, "utf8")).toBe(current);
++    }
++  });
++
++  it("refuses to add the declared deployment mode over an environment that drifts elsewhere or names another mode", async () => {
++    const test = await fixture();
++    await assemble(test.repositoryRoot);
++    const current = await readFile(test.outputFilePath, "utf8");
++    const ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
++    const previous = current.slice(0, -ROW.length);
++    const w1 = previous.replace("API_PORT=8790\n", "API_PORT=8791\n");
++    const w2 = previous + "DEBATEAI_DEPLOYMENT_MODE=hosted\n";
++    expect(w1).not.toBe(previous);
++    expect(w2).not.toBe(previous);
++    for (const drifted of [w1, w2]) {
++      await writeFile(test.outputFilePath, drifted, { mode: 0o600 });
++      await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
++      expect(await readFile(test.outputFilePath, "utf8")).toBe(drifted);
++    }
++  });
++
+   it("rejects an earlier environment that drops a required field", async () => {
+     const test = await fixture();
+     await assemble(test.repositoryRoot);
+diff --git a/dialectical-engine/tests/integration/dev-api-process.test.ts b/dialectical-engine/tests/integration/dev-api-process.test.ts
+index e24eac166..42c28d515 100644
+--- a/dialectical-engine/tests/integration/dev-api-process.test.ts
++++ b/dialectical-engine/tests/integration/dev-api-process.test.ts
+@@ -85,7 +85,8 @@ function environment(
+     HATCHET_TENANT_ID: "11111111-1111-4111-8111-111111111111",
+     HATCHET_WORKFLOW_NAME: "debateai-dev",
+     HATCHET_TLS_STRATEGY: "none",
+-    DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(custodyRoot, "mail")
++    DEBATEAI_DEV_MAIL_CAPTURE_DIR: join(custodyRoot, "mail"),
++    DEBATEAI_DEPLOYMENT_MODE: "local"
+   });
+ }
+ 
+@@ -228,6 +229,50 @@ describe("DEV-10B production API host process", () => {
+     await apiProcess.stop();
+   });
+ 
++  it("refuses an environment that names a deployment mode other than local before process start", async () => {
++    const profile = SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE;
++    const test = await fixture(profile);
++    const source = await readFile(test.envPath, "utf8");
++    const hosted = source.replace(
++      "\nDEBATEAI_DEPLOYMENT_MODE=local\n",
++      "\nDEBATEAI_DEPLOYMENT_MODE=hosted\n"
++    );
++    expect(hosted).not.toBe(source);
++    await writeFile(test.envPath, hosted, { mode: 0o600 });
++    const runtime = operations([
++      null,
++      { statusCode: 401, contentType: "application/json", body: '{"error":"SESSION_REQUIRED"}' }
++    ]);
++    await expect(startDevelopmentApiProcess({
++      repositoryRoot: test.root,
++      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
++      operations: runtime,
++      profile
++    })).rejects.toThrow("DEV_API_PROCESS_ENVIRONMENT_INVALID");
++    expect(runtime.startApi).not.toHaveBeenCalled();
++
++    await writeFile(test.envPath, source, { mode: 0o600 });
++    const localRuntime = operations([
++      null,
++      { statusCode: 401, contentType: "application/json", body: '{"error":"SESSION_REQUIRED"}' }
++    ]);
++    const apiProcess = await startDevelopmentApiProcess({
++      repositoryRoot: test.root,
++      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
++      operations: localRuntime,
++      profile
++    });
++    try {
++      expect(apiProcess.receipt.port).toBe(8890);
++      expect(localRuntime.startApi).toHaveBeenCalledTimes(1);
++      expect(localRuntime.startApi).toHaveBeenCalledWith(expect.objectContaining({
++        DEBATEAI_DEPLOYMENT_MODE: "local"
++      }));
++    } finally {
++      await apiProcess.stop();
++    }
++  });
++
+   it("rejects unsafe or aliased environment custody before process start", async () => {
+     const unsafe = await fixture();
+     await chmod(unsafe.envPath, 0o644);
+diff --git a/dialectical-engine/tests/support/devApiEnvironmentAssembly.ts b/dialectical-engine/tests/support/devApiEnvironmentAssembly.ts
+new file mode 100644
+index 000000000..b2ab7f32d
+--- /dev/null
++++ b/dialectical-engine/tests/support/devApiEnvironmentAssembly.ts
+@@ -0,0 +1,89 @@
++import { Buffer } from "node:buffer";
++import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { DEVELOPMENT_DATABASE_PRINCIPALS } from "../../apps/runner/src/dev-database-principals.js";
++import {
++  assembleDevelopmentApiEnvironment,
++  type DevelopmentApiEnvironmentReceipt
++} from "../../apps/runner/src/dev-api-environment.js";
++import {
++  createDevelopmentDeploymentRegisterMachineReceipt,
++  readDevelopmentDeploymentRegisterReceipt,
++  writeDevelopmentDeploymentRegisterReceipt
++} from "../../apps/runner/src/dev-deployment-register.js";
++import { parseRegisterVersionText } from "../../packages/register/src/index.js";
++import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "./developmentProviderPanel.js";
++
++const TEST_SUPPORT_MODEL_TARGET = JSON.stringify({
++  provider_ref: "development:hermes-glm-5.3-flash",
++  base_url: "http://127.0.0.1:8794/v1",
++  model: "z-ai/glm-5.3-flash",
++  authorization_header: "Bearer support-test"
++});
++
++function testToken(tenantId = "11111111-1111-4111-8111-111111111111"): string {
++  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
++  return `${encode({ alg: "EdDSA", typ: "JWT" })}.${encode({
++    sub: tenantId,
++    server_url: "http://localhost:8888",
++    grpc_broadcast_address: "localhost:7077"
++  })}.test-signature`;
++}
++
++export async function createDevApiEnvironmentAssemblyFixture(): Promise<Readonly<{
++  repositoryRoot: string;
++  custodyRoot: string;
++  outputFilePath: string;
++}>> {
++  const repositoryRoot = await mkdtemp(join(tmpdir(), "debateai-s02-dev-api-env-"));
++  const custodyRoot = join(repositoryRoot, ".local", "dev-auth");
++  await mkdir(join(custodyRoot, "secrets"), { recursive: true, mode: 0o700 });
++  await mkdir(join(custodyRoot, "audit-keys"), { mode: 0o700 });
++  await mkdir(join(custodyRoot, "user-deks"), { mode: 0o700 });
++  await mkdir(join(custodyRoot, "publication-keys"), { mode: 0o700 });
++  await mkdir(join(custodyRoot, "mail"), { mode: 0o700 });
++  await Promise.all([
++    writeFile(join(custodyRoot, "secrets", "kek.bin"), Buffer.alloc(32, 1), { mode: 0o600 }),
++    writeFile(join(custodyRoot, "secrets", "support-kek.bin"), Buffer.alloc(32, 5), { mode: 0o600 }),
++    writeFile(join(custodyRoot, "secrets", "corpus-kek.bin"), Buffer.alloc(32, 4), { mode: 0o600 }),
++    writeFile(join(custodyRoot, "secrets", "blind-index-key.bin"), Buffer.alloc(32, 2), { mode: 0o600 }),
++    writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 3), { mode: 0o600 })
++  ]);
++  const databaseCredentials = DEVELOPMENT_DATABASE_PRINCIPALS.map((principal, index) =>
++    `${principal.environmentKey}=postgresql://${principal.roleName}:dev-password-${index}-abcdefghijklmnopqrstuvwxyz@127.0.0.1:55432/debateai`
++  ).join("\n") + "\n";
++  const databaseCredentialFilePath = join(custodyRoot, "database-principals.env");
++  const hatchetCredentialFilePath = join(custodyRoot, "hatchet.env");
++  await writeFile(databaseCredentialFilePath, databaseCredentials, { mode: 0o600 });
++  await writeFile(
++    hatchetCredentialFilePath,
++    `HATCHET_CLIENT_TOKEN=${testToken()}\n`,
++    { mode: 0o600 }
++  );
++  await writeDevelopmentDeploymentRegisterReceipt(
++    repositoryRoot,
++    createDevelopmentDeploymentRegisterMachineReceipt({
++      registerVersion: parseRegisterVersionText("424242"),
++      rowCount: 32,
++      snapshotSha256: "a".repeat(64)
++    })
++  );
++  return {
++    repositoryRoot,
++    custodyRoot,
++    outputFilePath: join(custodyRoot, "api.env")
++  };
++}
++
++export async function assembleDevApiEnvironmentFixture(
++  repositoryRoot: string
++): Promise<DevelopmentApiEnvironmentReceipt> {
++  return assembleDevelopmentApiEnvironment({
++    repositoryRoot,
++    providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
++    registerReceipt: await readDevelopmentDeploymentRegisterReceipt(repositoryRoot),
++    supportModelTarget: TEST_SUPPORT_MODEL_TARGET
++  });
++}
++
+diff --git a/dialectical-engine/tests/unit/v9-deployment-mode.test.ts b/dialectical-engine/tests/unit/v9-deployment-mode.test.ts
+index 721620e52..feb26117c 100644
+--- a/dialectical-engine/tests/unit/v9-deployment-mode.test.ts
++++ b/dialectical-engine/tests/unit/v9-deployment-mode.test.ts
+@@ -19,6 +19,20 @@ import {
+   validRunnerEnvironmentFixture
+ } from "../support/apiEnvironmentFixture.js";
+ 
++import { rm } from "node:fs/promises";
++import { afterEach, vi } from "vitest";
++import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "../../apps/runner/src/dev-api-environment.js";
++import {
++  startDevelopmentRunnerProcess,
++  type DevelopmentRunnerChild,
++  type DevelopmentRunnerProcessOperations
++} from "../../apps/runner/src/dev-runner-process.js";
++import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
++import {
++  createDevApiEnvironmentAssemblyFixture,
++  assembleDevApiEnvironmentFixture
++} from "../support/devApiEnvironmentAssembly.js";
++
+ /**
+  * V-9(c) / task 10a. The engine has TWO supported deployments and the choice is
+  * made in configuration, never guessed from `NODE_ENV`:
+@@ -475,3 +489,77 @@ describe("V-9 both shipped roots take the mode decision (task 10a)", () => {
+     }
+   });
+ });
++
++describe("S02 — the development stack names its deployment mode", () => {
++  const roots: string[] = [];
++
++  afterEach(async () => {
++    vi.unstubAllEnvs();
++    await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
++  });
++
++  it("declares DEBATEAI_DEPLOYMENT_MODE=local in the API environment the development stack assembles", async () => {
++    const fixture = await createDevApiEnvironmentAssemblyFixture();
++    roots.push(fixture.repositoryRoot);
++    vi.stubEnv("DEBATEAI_DEV_CUSTODY_ROOT", fixture.custodyRoot);
++    expect(DEVELOPMENT_API_ENVIRONMENT_KEYS).toContain("DEBATEAI_DEPLOYMENT_MODE");
++    await assembleDevApiEnvironmentFixture(fixture.repositoryRoot);
++    const rows = (await readFile(fixture.outputFilePath, "utf8")).trimEnd().split("\n")
++      .filter((row) => row.startsWith("DEBATEAI_DEPLOYMENT_MODE="));
++    expect(rows).toEqual(["DEBATEAI_DEPLOYMENT_MODE=local"]);
++  });
++
++  it("declares DEBATEAI_DEPLOYMENT_MODE=local in the runner environment the development stack composes", async () => {
++    const captured: Readonly<Record<string, string>>[] = [];
++    let resolveExit!: (value: Readonly<{ code: number | null; signal: NodeJS.Signals | null }>) => void;
++    const exited: DevelopmentRunnerChild["exited"] = new Promise((resolve) => {
++      resolveExit = resolve;
++    });
++    const child: DevelopmentRunnerChild = {
++      ready: Promise.resolve({
++        kind: "DEBATEAI_RUNNER_READY",
++        worker: "debateai-dev-runner",
++        registerVersion: "424242"
++      }),
++      exited,
++      async terminate() {
++        resolveExit({ code: 0, signal: null });
++      }
++    };
++    const operations: DevelopmentRunnerProcessOperations = {
++      async loadApiEnvironment() {
++        return Object.freeze({
++          PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
++          REGISTER_VERSION: "424242",
++          REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
++          REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
++          KEK_PATH: "/private/dev/kek.bin",
++          DATABASE_URL: "postgresql://runtime:opaque@127.0.0.1:55432/debateai",
++          CONTENT_ENCRYPTION_ENABLED: "true",
++          USER_DEK_STORE_PATH: "/private/dev/user-deks",
++          HATCHET_CLIENT_TOKEN: "opaque-token",
++          HATCHET_HOST_PORT: "127.0.0.1:7077",
++          HATCHET_API_URL: "http://127.0.0.1:8888",
++          HATCHET_TENANT_ID: "00000000-0000-4000-8000-000000000001",
++          HATCHET_WORKFLOW_NAME: "debateai-dev",
++          HATCHET_TLS_STRATEGY: "none"
++        });
++      },
++      startRunner(values) {
++        captured.push(values);
++        return child;
++      }
++    };
++    const runner = await startDevelopmentRunnerProcess({
++      repositoryRoot: "/workspace",
++      commandEnvironment: Object.freeze({ PATH: "/usr/bin" }),
++      operations
++    });
++    try {
++      expect(captured).toHaveLength(1);
++      expect(captured[0]!.DEBATEAI_DEPLOYMENT_MODE).toBe("local");
++    } finally {
++      await runner.stop();
++    }
++  });
++});

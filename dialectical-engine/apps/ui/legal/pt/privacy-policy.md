@@ -1,0 +1,214 @@
+# DebateAI — Política de Privacidade
+
+<!-- legal-chrome
+summaryTitle: Em resumo
+eyebrow: POLÍTICA DE PRIVACIDADE · v3.0 · EM VIGOR DESDE [DATE]
+title: O que armazenamos e porquê
+lede: Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.
+endMarker: FIM DA POLÍTICA · GDPR (EU) 2016/679 · v3.0
+bodyLabel: Texto da Política de Privacidade
+annexTitle: Anexo B — Termos regionais de privacidade
+jumps:
+01 RESPONSÁVEL
+02 O QUE RECOLHEMOS
+04 FUNDAMENTO JURÍDICO
+05 MODELOS E TRANSFERÊNCIAS
+06 PUBLICAÇÃO
+07 CONSERVAÇÃO
+10 OS SEUS DIREITOS NOS TERMOS DO RGPD
+13 COOKIES
+-->
+
+2026-09-21 · @Someone
+
+**Projeto v3.0 para revisão jurídica — substitui a versão v2.1 disponibilizada (`apps/ui/lib/privacyPolicy.ts`). Não constitui aconselhamento jurídico.** Esta versão descreve o que o código efetivamente faz e corrige as cinco declarações da versão v2.1 que o código contrariava: dados de sessão, períodos de conservação, análise, exportação e o que acontece aos debates publicados após a eliminação. Os parênteses retos assinalam o que só V. Ex.ª pode preencher; \[pending\] assinala uma funcionalidade descrita pela política que ainda não foi criada e que tem de existir antes da publicação da política.
+
+**Version 3.0 · Effective \[date\] · Versões anteriores em dezbatere.ro/privacy/versions · Responsável pelo tratamento: DebateAIRO S.R.L., Bucareste**
+
+**In short.** Recolhemos o que é necessário para uma conta e o que decide escrever. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo; não são utilizadas para treinar modelos. Os debates são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados e retira do ar os debates que publicou. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem pedir a remoção sem terem uma conta.
+
+## 1. Quem é responsável pelos seus dados
+
+O responsável pelo tratamento dos seus dados pessoais é a **DebateAIRO S.R.L.**, \[address\], Bucareste, Roménia, Registo Comercial \[J40/…\], CUI \[…\]. Escreva para **privacy@dezbatere.ro** sobre qualquer assunto abrangido por esta política; respondemos no prazo de um mês. Não nomeámos um encarregado da proteção de dados porque a lei não nos obriga a fazê-lo; este endereço é acompanhado por \[role\]. Quando tivermos nomeado um representante ou responsável pela privacidade para um determinado país, o Anexo B identifica essa pessoa.
+
+## 2. O que recolhemos e de onde provém
+
+Recolhemos apenas o que é necessário para o funcionamento de uma conta, o que decide fornecer-nos e o que a lei nos obriga a conservar.
+
+| Categoria | O quê, exatamente | Fonte |
+| --- | --- | --- |
+| **Conta** | Endereço de correio eletrónico e endereço de correio eletrónico de recuperação (armazenados de forma cifrada, com um índice baseado numa chave para podermos encontrar a conta sem ler o endereço); palavra-passe (armazenada como hash, nunca em texto simples); o seu segredo de autenticação de dois fatores (cifrado); dez códigos de recuperação (armazenados como hashes); o seu pseudónimo; o momento em que confirmou ter pelo menos 18 anos | O utilizador, no registo |
+| **Sessões e segurança** | Um token de sessão armazenado como hash; um hash baseado numa chave da cadeia user-agent do seu navegador, utilizado para detetar quando uma sessão passa para outro navegador; carimbos de data e hora da criação, última utilização e expiração. **Não** armazenamos o seu endereço IP, nome do dispositivo ou dados do navegador juntamente com uma sessão, e a lista de sessões apresentada nas Definições mostra apenas carimbos de data e hora | O seu navegador |
+| **Registo de auditoria de segurança** | Um registo exclusivamente aditivo de acontecimentos relevantes para a segurança — registo, verificação, tentativas de início de sessão, recuperação, publicação e eliminação. O endereço IP e o user-agent de cada acontecimento são armazenados apenas como resumos unidirecionais baseados numa chave (Argon2id), pelo que não podem ser novamente lidos, mas podem ser comparados dentro de um período. Os sinais de risco de início de sessão e recuperação são armazenados de forma cifrada durante 90 dias | O seu navegador, no momento de cada acontecimento |
+| **Conteúdo do debate** | A pergunta que escreve; as anotações de orientação que define; as alegações, críticas, referências de prova, pontuações e vereditos que o motor gera; um registo literal do que cada fornecedor de IA devolveu; consultas de pesquisa e referências das fontes. Tudo isto é armazenado de forma cifrada com uma chave específica da sua conta | O utilizador e os modelos de IA que trabalham na sua pergunta |
+| **Apoio** | Mensagens que troca com o assistente de apoio ou com uma pessoa, armazenadas de forma cifrada; o idioma utilizado; se autorizou o assistente a ver o estado (nunca o conteúdo) dos seus debates; as classificações que atribui. Se uma mensagem acionar os controlos de abuso, conservamos um hash da mensagem e um hash do endereço IP de onde foi enviada | O utilizador |
+| **Registos de aceitação e consentimento** | A versão e o hash do conteúdo dos Termos que aceitou e da política que lhe foi apresentada; o momento; o ecrã e o mecanismo utilizados; o seu idioma; o seu endereço IP e user-agent nesse momento; cada consentimento que deu ou retirou e quando | O seu navegador, no registo e sempre que altera uma escolha |
+| **Pagamentos** \[pending — once a paid plan exists\] | Plano, preço, período de faturação, referências das transações, elementos comprovativos da localização fiscal. Os dados do cartão são detidos pelo nosso prestador de serviços de pagamento, nunca por nós | O utilizador e o prestador de serviços de pagamento |
+| **Pessoas que não são nossos utilizadores** | Dados pessoais de outras pessoas que inclua numa pergunta ou que o motor gere ao responder-lhe. Pedimos que não o faça; a secção 11 explica o que fazemos quando, ainda assim, isso acontece | O utilizador, indiretamente |
+
+**Não** recolhemos dados analíticos nem telemetria sobre a forma como utiliza o produto e não instalamos cookies para esse fim. Se isso mudar, esta política e a Política de Cookies serão alteradas primeiro, e ser-lhe-á pedido o seu consentimento.
+
+## 3. Informações sensíveis
+
+Um motor de debate convida a perguntas sobre política, religião, saúde, sexualidade e crenças. Estas são categorias especiais de dados nos termos do artigo 9.º do RGPD e podem surgir nas suas perguntas, quer tenhamos ou não intenção de as recolher.
+
+**Sobre si.** Ao registar-se, presta consentimento explícito, numa frase separada, para tratarmos as informações sensíveis que decida incluir nas suas próprias perguntas, com a finalidade de executar os seus debates. Pode retirá-lo a qualquer momento, não incluindo essas informações ou eliminando um debate. Aquilo que publica sobre si são dados que decidiu tornar públicos.
+
+**Sobre outras pessoas.** Nenhuma condição legal nos permite tratar dados sensíveis de um terceiro que mencione numa pergunta, e nenhum dos nossos fornecedores de IA dispõe igualmente de tal condição. É por isso que os Termos o proíbem, que minimizamos o que enviamos e que removemos rapidamente esse conteúdo mediante pedido — secção 11.
+
+**Informações de saúde.** Alguns países tratam os dados relacionados com a saúde, incluindo inferências, ao abrigo de legislação específica. Se residir em \[the State of Washington\], aplica-se uma \[Consumer Health Data Privacy Notice\] separada.
+
+## 4. Por que razão utilizamos os seus dados e com que fundamento
+
+Cada finalidade tem um único fundamento jurídico ao abrigo do artigo 6.º, n.º 1, do RGPD, e não reutilizamos dados recolhidos para uma finalidade noutra finalidade.
+
+| Finalidade | Dados | Fundamento |
+| --- | --- | --- |
+| Criar e gerir a sua conta, autenticá-lo e executar e armazenar os seus debates para que os possa reabrir e reproduzir | Conta, sessões, conteúdo do debate | **Contrato** — Art. 6(1)(b) |
+| Enviar a sua pergunta e as alegações do motor aos fornecedores de IA para gerar um debate | Conteúdo do debate | **Contrato** — Art. 6(1)(b) |
+| Manter o serviço seguro, detetar abusos, permitir-lhe identificar um início de sessão que não efetuou e manter um registo de auditoria | Sessões, registo de auditoria de segurança, hashes de abuso do apoio | **Interesses legítimos** — Art. 6(1)(f): os nossos e os seus num serviço seguro. Pode opor-se; secção 10 |
+| Provar que aceitou os Termos e que deu ou retirou um consentimento | Registos de aceitação e consentimento | **Obrigação jurídica** — Art. 6(1)(c), o nosso dever de demonstrar o consentimento nos termos do Art. 7(1) — e interesses legítimos em comprovar o contrato |
+| Responder a pedidos de apoio | Apoio | **Contrato** — Art. 6(1)(b) |
+| Tratar informações sensíveis que inclua sobre si | Conteúdo do debate | **Consentimento explícito** — Art. 9(2)(a), prestado separadamente no registo |
+| Publicar um debate que decida publicar | Conteúdo do debate, pseudónimo | **Contrato** — Art. 6(1)(b), segundo as suas instruções; para dados sensíveis sobre si, Art. 9(2)(e) — dados que tornou manifestamente públicos |
+| Enviar-lhe novidades sobre o produto | Endereço de correio eletrónico | **Consentimento** — Art. 6(1)(a), uma caixa não assinalada; retire-o a qualquer momento a partir de qualquer mensagem de correio eletrónico ou das Definições |
+| Cumprir obrigações fiscais, contabilísticas e jurídicas \[pending paid plans\] | Pagamentos, registos de aceitação | **Obrigação jurídica** — Art. 6(1)(c) |
+| Tratar pedidos jurídicos, denúncias de conteúdo ilegal e as nossas obrigações enquanto serviço de alojamento | O que for relevante para o pedido | **Obrigação jurídica** — Art. 6(1)(c) — e interesses legítimos |
+
+Não elaboramos perfis a seu respeito, não utilizamos os seus dados para publicidade e não os vendemos. Não utilizamos o seu conteúdo para treinar modelos e não permitimos que os nossos fornecedores o façam — secção 5.
+
+## 5. Fornecedores de IA e transferências internacionais
+
+**O que é enviado.** Para executar um debate, enviamos texto para um ou mais fornecedores externos de IA: a sua pergunta, as anotações de orientação que definiu e as alegações que o motor compõe à medida que o debate se desenvolve. Por conseguinte, um fornecedor vê texto derivado e desenvolvido a partir do que escreveu. Nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta ou sessão, o seu endereço IP ou os seus dados de pagamento.
+
+**Quais são os fornecedores.** Estão indicados no nosso **Registo de Fornecedores de IA** em \[dezbatere.ro/providers\], que faz parte desta política. Para cada fornecedor, o Registo indica a respetiva entidade jurídica e o país de estabelecimento; o que recebe e para que finalidade; os países ou regiões onde efetua o tratamento; as condições de conservação e se a conservação zero de dados está ativa para o ponto terminal e as funcionalidades que utilizamos; se pode utilizar os dados de entrada para treino ao abrigo do nosso contrato; o mecanismo de transferência em que nos baseamos; e a data em que verificámos pela última vez cada entrada. Os fornecedores podem mudar; o Registo tem controlo de versões e a alteração é nele assinalada.
+
+**O treino e a conservação são coisas diferentes.** Os nossos contratos com os fornecedores excluem a utilização do seu conteúdo para treinar ou melhorar os respetivos modelos. \[Publish only once verified per route.\] Alguns fornecedores conservam comandos e respostas por um período limitado para fins de segurança, prevenção de abusos ou cumprimento das suas próprias obrigações jurídicas; o Registo indica durante quanto tempo e porquê. Quando a conservação zero de dados está ativa, o Registo indica-o e identifica as funcionalidades abrangidas. Não descreveremos o conteúdo como não conservado quando este for efetivamente conservado.
+
+**Transferências para fora do EEE.** Os fornecedores estabelecidos nos Estados Unidos recebem dados ao abrigo de um dos mecanismos previstos no capítulo V do RGPD: o Quadro de Privacidade de Dados UE–EUA, quando a entidade contratante específica está certificada para estes dados, ou as cláusulas contratuais-tipo da Comissão Europeia (Módulo Dois, responsável pelo tratamento para subcontratante), apoiadas por uma avaliação dos riscos da transferência e medidas suplementares. O Registo identifica o mecanismo aplicável a cada fornecedor. Pode obter uma cópia das cláusulas em que nos baseamos escrevendo para privacy@dezbatere.ro. Se um mecanismo em que nos baseamos for invalidado, passamos para outro antes de continuar as transferências e informamo-lo.
+
+**Outros destinatários.** O nosso fornecedor de alojamento \[Hetzner, Germany — region …\]; o nosso fornecedor de distribuição de conteúdos e transporte \[Cloudflare\]; o nosso retransmissor de correio eletrónico \[…\]; \[our payment provider, once a paid plan exists\]. Cada um atua de acordo com as nossas instruções documentadas, ao abrigo de um acordo de tratamento de dados com as garantias exigidas pelo artigo 28.º, e consta do Registo com a sua localização e mecanismo de transferência. Não permitimos que qualquer subcontratante utilize os seus dados para fins próprios. Quando um fornecedor o pretenda fazer, é um responsável pelo tratamento por direito próprio e não lhe enviamos os seus dados.
+
+**Autoridades públicas.** Divulgamos dados pessoais a tribunais, reguladores ou autoridades policiais quando a lei o exige e informamo-lo, salvo se a lei nos impedir de o fazer.
+
+## 6. Publicação e visibilidade
+
+Os debates são privados até que os publique. A publicação é uma ação deliberada e confirmada separadamente. Um debate publicado mostra o seu **pseudónimo**, a sua pergunta tal como a escreveu, a árvore de argumentos, as pontuações, o veredito e a faixa de confiança, e apresenta uma indicação visível de que o conteúdo foi gerado por IA. Nunca mostra o seu endereço de correio eletrónico, os registos das suas sessões ou o histórico da sua conta. \[Published debates are / are not\] indexados por motores de pesquisa \[unless you choose\].
+
+Cancelar a publicação remove o debate da DebateAI e destrói a chave da nossa cópia pública. As cópias já feitas por leitores, motores de pesquisa ou arquivos estão fora do nosso controlo e não podemos recolhê-las.
+
+Quando elimina a conta, removemos do acesso público todos os debates que publicou, sem demora injustificada e no prazo máximo de 30 dias, salvo se a lei nos obrigar a conservar um elemento específico. \[Option B — a product change; see the Terms, section 9.\]
+
+## 7. Durante quanto tempo conservamos os dados
+
+| Dados | Durante quanto tempo | Depois |
+| --- | --- | --- |
+| Conta | Enquanto a conta existir, acrescido de um período de tolerância de 7 dias após pedir o respetivo encerramento | As chaves são destruídas; o registo é eliminado |
+| Registos de sessão | 14 dias após a última utilização ou 90 dias após a criação, consoante o que ocorrer primeiro | São eliminados |
+| Ligações de verificação do correio eletrónico | 24 horas | São eliminadas |
+| Sinais de risco de início de sessão e recuperação | 90 dias, impostos pela base de dados | São purgados |
+| Registo de auditoria de segurança | Durante a vida útil do serviço | Exclusivamente aditivo; os endereços IP e os user-agent são resumos unidirecionais e não podem ser novamente lidos |
+| Conteúdo do debate (privado) | Enquanto a conta existir | As chaves são destruídas no encerramento, tornando o conteúdo ilegível |
+| Conteúdo do debate (publicado) | Enquanto estiver publicado e a conta existir | É removido do acesso público quando a publicação é cancelada ou a conta encerrada; as chaves são destruídas |
+| Registos de respostas dos fornecedores e referências de pesquisa | O mesmo período que o debate a que pertencem | O mesmo |
+| Conversas e casos de apoio | \[Until closed plus 12 months\] | As chaves são destruídas |
+| Registos de aceitação e consentimento | Vida útil da conta acrescida de 6 anos — o prazo de prescrição mais longo que nos é aplicável | São eliminados |
+| Registos de pagamento \[pending\] | 10 anos, conforme exigido pela legislação contabilística romena | São eliminados |
+| Cópias de segurança \[pending\] | \[… days\] após a eliminação da cópia ativa | São substituídas |
+
+**O que a eliminação efetivamente faz.** Os seus debates e os dados da sua conta são cifrados com chaves específicas da sua conta e de cada debate. A eliminação da conta destrói essas chaves, após o que os registos cifrados não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. Descrevemo-lo como eliminação porque esse é o seu efeito, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber três coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; e as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação.
+
+&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
+
+## 8. Decisões automatizadas e definição de perfis
+
+As pontuações, as marcas de condição e os vereditos num debate são avaliações automatizadas de **argumentos, não de pessoas**. Não produzem efeitos jurídicos sobre si nem o afetam de forma igualmente significativa. Não tomamos qualquer decisão a seu respeito que se baseie exclusivamente no tratamento automatizado e produza efeitos jurídicos ou igualmente significativos, e não definimos perfis a seu respeito.
+
+Se alguma vez automatizarmos uma decisão sobre a sua conta — suspendê-la ou recusar a publicação de um debate — uma pessoa analisará essa decisão antes de esta produzir efeitos ou a pedido do utilizador; o utilizador poderá apresentar o seu ponto de vista e contestá-la. Os Termos descrevem o procedimento.
+
+## 9. Segurança e o que acontece se algo correr mal
+
+As palavras-passe são sujeitas a hash com Argon2id. A autenticação de dois fatores é obrigatória. O seu endereço de correio eletrónico, os seus debates, as suas conversas de apoio e os seus segredos de autenticação são cifrados em repouso com chaves específicas da sua conta, e as chaves dos debates publicados são mantidas separadamente das chaves dos debates privados. O acesso aos dados de produção é registado. Os endereços IP e os dados do navegador no nosso registo de segurança são armazenados apenas como resumos unidirecionais.
+
+Se ocorrer uma violação de dados pessoais, notificamos a autoridade de controlo romena no prazo de 72 horas quando a lei o exigir e informamo-lo diretamente, sem demora injustificada, quando for provável que a violação represente um risco elevado para os seus direitos e liberdades. O Anexo B indica as regras de notificação aplicáveis noutras regiões onde prestamos o serviço.
+
+## 10. Os seus direitos e como os exercer
+
+Pode exercer qualquer um destes direitos gratuitamente escrevendo para **privacy@dezbatere.ro**, ou em **Definições → Privacidade** quando existir um controlo. Respondemos no prazo de um mês; se um pedido for complexo, poderemos necessitar de um máximo de dois meses adicionais e explicar-lhe-emos o motivo. Poderemos pedir-lhe que confirme a sua identidade através da sua conta.
+
+| Direito | O que significa neste contexto |
+| --- | --- |
+| **Acesso** (Art. 15) | Uma cópia dos dados pessoais que detemos a seu respeito e estas informações. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Retificação** (Art. 16) | Corrija o seu endereço de correio eletrónico ou o endereço de recuperação nas Definições. O seu pseudónimo não pode ser alterado, pelas razões indicadas nos Termos; pode encerrar a conta e abrir uma nova |
+| **Apagamento** (Art. 17) | Elimine um debate privado a qualquer momento a partir da página do debate. Encerre a sua conta nas Definições; a secção 7 explica exatamente o que isso faz. Peça-nos que removamos um debate publicado que contenha os seus dados, seja ou não o seu autor |
+| **Limitação** (Art. 18) | Peça-nos que suspendamos o tratamento de determinados dados enquanto é resolvido um litígio relativo a esses dados |
+| **Oposição** (Art. 21) | Oponha-se ao tratamento baseado em interesses legítimos — o tratamento de segurança e auditoria da secção 4 — e cessaremos esse tratamento, salvo se demonstrarmos motivos imperiosos. Oponha-se ao marketing a qualquer momento, e cessá-lo-emos |
+| **Portabilidade** (Art. 20) | Os seus debates e dados da conta num formato de uso corrente e de leitura automática. \[Pending: same export as Access.\] O conteúdo não pessoal que criou, como as suas perguntas, é-lhe devolvido mediante pedido quando o contrato terminar |
+| **Retirada do consentimento** (Art. 7(3)) | Retire o consentimento para marketing a partir de qualquer mensagem de correio eletrónico ou das Definições; retire o consentimento para dados sensíveis não incluindo esses dados ou eliminando um debate. A retirada não afeta o tratamento que já ocorreu |
+| **Reclamação** | À autoridade de controlo romena, a **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bucareste, <anspdcp@dataprotection.ro>, ou à autoridade do país onde reside. Preferimos que nos contacte primeiro |
+
+Nunca cobramos por um pedido nem lhe damos um tratamento menos favorável por o apresentar.
+
+## 11. Pessoas mencionadas em debates que não são nossos utilizadores
+
+Se alguém fizer à DebateAI uma pergunta que o mencione, poderemos deter dados pessoais a seu respeito embora nunca tenha utilizado o serviço. Os Termos proíbem os utilizadores de o fazer e minimizamos o que enviamos aos fornecedores de IA, mas acontece.
+
+Esta secção constitui a informação que lhe devemos ao abrigo do artigo 14.º do RGPD. Os dados são aquilo que o utilizador escreveu e aquilo que o motor gerou como resposta; a fonte é esse utilizador; as finalidades e o fundamento jurídico são os indicados na secção 4; os destinatários são os fornecedores de IA constantes do Registo; a conservação segue a secção 7. Tem todos os direitos previstos na secção 10 e, em especial, pode pedir-nos que removamos um debate publicado ou privado que contenha os seus dados e que lhe comuniquemos o que detemos. Não necessita de uma conta para o fazer. Escreva para **privacy@dezbatere.ro** ou utilize o controlo **Denunciar** em qualquer debate publicado, e daremos seguimento a pedidos fundamentados sem demora injustificada. Não podemos notificá-lo individualmente quando isto acontece, porque não sabemos quem é nem como contactá-lo; este aviso público e o meio de remoção são as medidas que adotamos em alternativa.
+
+O mesmo se aplica às informações sensíveis a seu respeito — política, saúde, religião — que constem da pergunta de outra pessoa. Nenhuma condição legal nos permite continuar a tratá-las após a sua oposição, e não o faremos.
+
+## 12. Crianças
+
+A DebateAI destina-se a adultos. Confirma que tem pelo menos 18 anos ao registar-se, e não tratamos conscientemente os dados de qualquer pessoa com menos de 18 anos. Se soubermos que uma conta pertence a alguém com menos de 18 anos, encerramo-la e eliminamos os dados conforme descrito na secção 7. Alguns países consideram que uma confirmação é insuficiente ou exigem mais; o Anexo B indica o que é aplicável em cada local, e os Termos explicam o que fazemos a esse respeito.
+
+## 13. Cookies
+
+Instalamos dois cookies, ambos estritamente necessários: um mantém a sua sessão iniciada e outro protege os formulários contra falsificação. Não instalamos cookies de análise, publicidade ou rastreio. A **Política de Cookies** em \[dezbatere.ro/cookies\] enumera-os com as respetivas durações, explica como a sua escolha é armazenada e será alterada antes de ser adicionado qualquer outro cookie. Quando a lei da sua região trata alguns cookies de forma diferente — por exemplo, a regra de recusa do Reino Unido para dados analíticos — a Política de Cookies explica-o.
+
+## 14. Alterações a esta política
+
+Quando alteramos esta política, publicamos a nova versão com um resumo das alterações e uma nova data de produção de efeitos, e mantemos as versões anteriores em \[dezbatere.ro/privacy/versions\]. Se uma alteração acrescentar uma nova finalidade ou um novo destinatário, informamo-lo antes do início do novo tratamento, por correio eletrónico e no produto, e damos-lhe tempo para se opor. Quando uma nova finalidade depender do seu consentimento — por exemplo, se alguma vez pretendêssemos utilizar conteúdo para melhorar modelos — pedimos esse consentimento de forma separada e específica; nunca tratamos a aceitação de Termos atualizados como consentimento para novo tratamento. Para esclarecimentos que nada alterem no que fazemos, limitamo-nos a publicar a nova versão.
+
+Esta política foi atualizada pela última vez em \[date\]. A versão 3.0 substituiu a versão 2.1, que descrevia os dados de sessão, os períodos de conservação, a análise, a exportação e o efeito da eliminação nos debates publicados de formas que já não refletiam o serviço.
+
+## Annex B — Termos regionais de privacidade
+
+Cada entrada só se aplica se a respetiva região estiver indicada na secção 2 dos Termos e refere apenas o que difere do corpo desta política.
+
+### B.1 União Europeia e Espaço Económico Europeu
+
+O corpo desta política foi redigido para si. A nossa autoridade de controlo é a **ANSPDCP** romena; também pode apresentar uma reclamação à autoridade do país onde reside. Utilizadores romenos: esta política está disponível em romeno em \[URL\].
+
+### B.2 Reino Unido *(apenas se indicado)*
+
+O nosso representante no Reino Unido ao abrigo do artigo 27.º do RGPD do Reino Unido é **\[name, address, email\]**; pode contactá-lo sobre qualquer assunto abrangido por esta política. A autoridade de controlo é o **Information Commissioner's Office**, [ico.org.uk](https://ico.org.uk). Pode reclamar junto de nós utilizando o formulário em \[URL\], e acusaremos a receção no prazo de 30 dias. As transferências dos seus dados do Reino Unido para fornecedores de IA nos Estados Unidos assentam em \[the UK Extension to the EU–US Data Privacy Framework, where the provider is certified / the UK International Data Transfer Addendum to the EU standard contractual clauses\], apoiadas por uma avaliação dos riscos da transferência. Os cookies de análise, se alguma vez os instalarmos, estariam sujeitos a recusa, e não a consentimento, no Reino Unido; atualmente, não instalamos nenhum. Se tiver menos de 18 anos e aceder ao serviço apesar da nossa regra etária, as normas do Código das Crianças do ICO aplicam-se à forma como tratamos os seus dados.
+
+### B.3 Estados Unidos *(apenas se indicado)*
+
+**Aviso no momento da recolha.** A tabela da secção 2 indica cada categoria de informações pessoais que recolhemos, a respetiva finalidade e durante quanto tempo as conservamos (secção 7). Recolhemos estas categorias de informações pessoais *sensíveis* apenas quando as inclui nas suas próprias perguntas: \[health, religious or philosophical beliefs, sexual orientation, union membership, political views\], e utilizamo-las apenas para executar os seus debates. **Não vendemos nem partilhamos informações pessoais, e não o fizemos nos doze meses anteriores.** Não utilizamos informações pessoais sensíveis para qualquer finalidade além da prestação do serviço que solicita. **Sinais de preferência de recusa:** respeitamos os sinais de Global Privacy Control como um pedido de recusa da venda ou partilha, algo que, de qualquer forma, não fazemos. **Os seus direitos:** conhecer, eliminar, corrigir, recusar, limitar a utilização de informações pessoais sensíveis e não ser discriminado por os exercer; apresente um pedido em privacy@dezbatere.ro ou \[toll-free number / form\]. **Incentivos financeiros:** não oferecemos nenhum; os planos gratuitos e pagos não diferem na forma como tratamos os seus dados. A **conservação** é descrita na secção 7. Este aviso é atualizado pelo menos a cada doze meses; última atualização em \[date\].
+
+*Washington:* o nosso **Aviso de Privacidade de Dados de Saúde dos Consumidores**, disponível em \[URL\], é um documento separado aplicável a qualquer informação relacionada com a saúde, incluindo inferências. *Texas e Nebraska:* não vendemos dados pessoais sensíveis; se isso alguma vez mudasse, obteríamos primeiro o seu consentimento \[statutory language\]. *Colorado, Connecticut, Virgínia e outros estados com leis abrangentes de privacidade:* os direitos acima aplicam-se quando a lei nos for aplicável; recorra de um pedido recusado escrevendo para \[appeals@dezbatere.ro\].
+
+### B.4 Canadá e Quebec *(apenas se indicado)*
+
+O nosso responsável pela privacidade é **\[name, email\]**. Continuamos responsáveis pelas informações pessoais que transferimos para fornecedores de IA fora do Canadá e utilizamos contratos para exigir uma proteção comparável; esses fornecedores podem estar sujeitos às leis dos países onde operam, incluindo o acesso lícito pelas autoridades. As mensagens de marketing são enviadas apenas com o seu consentimento expresso ao abrigo da CASL. **Quebeque:** antes de comunicar informações pessoais para fora do Quebeque, efetuamos uma avaliação do impacto na privacidade; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir-nos que desindexemos ou deixemos de divulgar informações pessoais a seu respeito; pode solicitar os seus dados num formato estruturado e de uso corrente; a secção 8 descreve o nosso tratamento automatizado.
+
+### B.5 Austrália e Nova Zelândia *(apenas se indicado)*
+
+**Austrália.** Os destinatários estrangeiros das suas informações pessoais são os fornecedores de IA e os subcontratantes indicados no Registo, localizados em \[the United States and the European Union\]; tomamos medidas razoáveis para garantir que as tratam em conformidade com os Princípios Australianos de Privacidade. **Decisões automatizadas:** a partir de 10 de dezembro de 2026, esta política identifica os tipos de decisões tomadas por programas informáticos que afetam significativamente os seus direitos ou interesses — não há nenhuma; as pontuações e os vereditos dizem respeito a argumentos, não a si — e as informações pessoais neles utilizadas. Podem ser apresentadas reclamações ao **Office of the Australian Information Commissioner**. **Nova Zelândia.** O nosso responsável pela privacidade é \[name\]. Quando recolhemos indiretamente informações pessoais a seu respeito — porque outro utilizador as incluiu numa pergunta — esta política e a secção 11 constituem o aviso que prestamos. Divulgamos informações aos fornecedores de IA constantes do Registo na qualidade de nossos agentes, ao abrigo de contratos que exigem garantias comparáveis. Podem ser apresentadas reclamações ao **Office of the Privacy Commissioner**.
+
+### B.6 América Latina *(anexo em língua espanhola; apenas se indicado)*
+
+&#91;Published in Spanish.\] O consentimento é o fundamento do tratamento quando não exista necessidade contratual. Os direitos ARCO — acesso, retificação, cancelamento e oposição — podem ser exercidos em privacy@dezbatere.ro, com respostas no prazo de \[per country\]. *México:* o *aviso de privacidad* completo com os elementos obrigatórios encontra-se em \[URL\]. *Argentina:* \[AAIP mandatory legend\]; os dados estão registados junto de \[…\]. *Colômbia:* a nossa *política de tratamiento de datos* encontra-se em \[URL\]; a autoridade é a SIC. *Chile* (a partir de 1 de dezembro de 2026): o contacto da Agência é \[…\]; a secção 8 explica o nosso tratamento automatizado.
+
+### B.7 Golfo — EAU e Arábia Saudita *(apenas se indicado)*
+
+Quando tratamos os seus dados para finalidades diferentes da prestação do serviço, baseamo-nos no seu consentimento, que pode retirar. Os seus dados saem de \[UAE / Kingdom of Saudi Arabia\] e são tratados na União Europeia e nos Estados Unidos ao abrigo de \[SDAIA standard contractual clauses / the mechanism in the Register\]. O marketing só é enviado com o seu consentimento. Não inclua dados pessoais sensíveis nas suas perguntas.
+
+### B.8 Ásia-Pacífico *(apenas as linhas relativas às regiões indicadas)*
+
+*Singapura:* o nosso Encarregado da Proteção de Dados é **\[name, email\]**; as transferências assentam em obrigações contratuais que proporcionam proteção comparável à PDPA; notificamos a PDPC de violações sujeitas a notificação no prazo de 3 dias. *Japão:* utilizamos as suas informações pessoais para as finalidades indicadas na secção 4 e para nenhuma outra; o seu conteúdo é transferido para fornecedores em \[named countries — e.g. the United States\], cujos regimes de privacidade e garantias são descritos no Registo, e o utilizador consente nessa transferência no momento do registo. *Coreia do Sul:* o nosso Responsável pela Privacidade é **\[name\]**; os elementos, o destino, o momento, o destinatário, a finalidade e a conservação das transferências para o estrangeiro constam do Registo; as opiniões políticas incluídas nas suas perguntas são informações sensíveis e tratamo-las apenas para executar os seus debates; os consentimentos para tratamento opcional são recolhidos separadamente. *Índia* (quando as regras DPDP forem aplicáveis): aplica-se o aviso de consentimento autónomo disponível em \[URL\]; os pedidos são respondidos no prazo de 90 dias; os utilizadores com menos de 18 anos necessitam de consentimento parental verificável. *Filipinas:* o nosso Encarregado da Proteção de Dados é \[name\]; as reclamações podem ser apresentadas à National Privacy Commission; a secção 8 descreve o tratamento automatizado. *Tailândia:* o nosso representante é \[name\] \[if appointed\].
+
+### B.9 Reservado
+
+A Turquia, o Brasil e a Indonésia exigem, cada um, um aviso no idioma local, um representante ou registo e formalidades, e esses documentos não estão aqui redigidos. A China, o Vietname e a Rússia não são abrangidos pela oferta.

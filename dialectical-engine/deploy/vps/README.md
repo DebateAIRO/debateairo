@@ -920,7 +920,9 @@ master-key rotation, because the rotation changes what is in escrow.
   **local** deployment — a supported product path for anyone running the repository on their own
   computer — which this host refuses in code. What remains open is the vendor list and the real
   spend ceilings: V names the vendors when the accounts exist, and the cost envelopes in force are
-  the TEMPORARY ones of §11 until V seals measured values.
+  the TEMPORARY ones of §11 until V seals measured values. Until V-28's cost-envelope policy is
+  sealed at the register version a hosted deployment runs, that deployment refuses to start with
+  `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`.
 - Six P3-01 principals are `REQUIRED_NOT_WIRED` (`evaluator-worker`, `evaluator-api`,
   `evaluator-reader`, `obs-writer`, `obs-listener`, `obs-watchdog`, re-counted 2026-09-25). The
   provisioner reconciles all eighteen and provisions these six with `VALID UNTIL '-infinity'`
@@ -991,12 +993,16 @@ below. The support model ref published in the support configuration row must equ
 carries `SUPPORT_RELAY_NOT_COMPOSED:` and the ref that could not be composed.
 
 **What the support chat cannot tell you yet.** Its spend row records the tokens a vendor
-reports, but most vendors report no money at all, so the `cost_usd` column stays empty. A reply
-that carries no cost is logged once as `SUPPORT_MODEL_COST_UNREPORTED`, so an empty column is
-never mistaken for a call that was free. The cost envelopes below bound DEBATE spend, and a hosted
-deployment refuses to start until they are sealed; the support chat's spend is NOT counted in
-them yet, so for the support chat its own daily call cap and per-visitor share are still the only
-ceilings (go-live checklist line 2).
+reports, but most vendors report no money at all, so the `cost_usd` column stays empty and the
+deployment still needs sealed cost envelopes (V-28). A hosted deployment reads the `costEnvelopePolicy`
+row in force at its own `REGISTER_VERSION` and refuses to start with
+`COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with
+`COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed.
+`COST_ENVELOPES_NOT_SEALED` is a check on the integrity of the build: it fires only when the
+envelope row this build ships was removed, emptied or made invalid, and the shipped source
+never reaches it at runtime. A reply that
+carries no cost is logged once as `SUPPORT_MODEL_COST_UNREPORTED`, so an empty column is never
+mistaken for a call that was free. The cost envelopes below bound DEBATE spend; the support chat's spend is NOT counted in them yet, so for the support chat its own daily call cap and per-visitor share are still the only ceilings (go-live checklist line 2).
 
 **The support chat's prompt tripwires.** Every support hand-off is sent through the same safety
 frame the debate steps use: the visitor's message travels inside a per-call boundary marker as
@@ -1013,6 +1019,8 @@ answer, or any part of either.
 can start without answering the question. A production unit that omits it refuses with
 `DEPLOYMENT_MODE_UNRESOLVED`; a typo refuses with `DEPLOYMENT_MODE_INVALID`.
 
+The paid-vendor probe spends `max_tokens: 8` per target per staleness window; the window is the `panelDiscoveryPolicy` register row's `probe_freshness_ms`, validated only as a positive integer. The development seed publishes `600000`. Hosted mode enforces no minimum, so the number an operator publishes is the whole control. The hosted publish command (`pnpm register:publish-hosted`) publishes the code-owned `panelDiscoveryPolicy` row with `probe_freshness_ms` set to `600000`, and its file has no member to change it; a different window needs a code change.
+
 ### What the hosted mode refuses, in code
 
 | Code | Meaning |
@@ -1026,14 +1034,16 @@ can start without answering the question. A production unit that omits it refuse
 | `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:` the provider ref, then the reason | the credential file is there but cannot be used: it failed custody (`SECRET_CUSTODY_INVALID`), the custody group could not be resolved (`CUSTODY_GROUP_UNRESOLVED`), or its contents are not one printable header line (`PROVIDER_CREDENTIAL_FILE_INVALID`). Neither the path nor a byte of the credential appears in the message. |
 | `COST_ENVELOPE_POLICY_UNRESOLVED` | the register version in force (`REGISTER_VERSION`) carries no `costEnvelopePolicy` row — the one an operator actually meets, by pinning a version published before the envelopes existed. Both services refuse. |
 | `COST_ENVELOPE_POLICY_INVALID` | that row exists but is malformed. |
-| `COST_ENVELOPES_NOT_SEALED` | this BUILD ships no envelope row at all — a packaging fault, checked before the database is opened. With a correctly packaged build it cannot fire. |
+| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows above. |
 | `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` | the API only: the `admissionPolicy` row in force lacks any of the support chat's three budgets (`support_reads`, `support_sessions`, `support_model_calls`). Local mode runs without them; hosted does not. |
 | `PROVIDER_TARGET_PRICE_REQUIRED:` and the provider ref | a debate target declares no price. Both `input_price_micros_per_million` and `output_price_micros_per_million` are required in hosted mode. |
 | `PROVIDER_TARGET_PRICE_ZERO:` and the provider ref | a declared price of zero, which would bound nothing. The floor is 1. |
-| `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` | a price that is not a whole, non-negative number, or only one of the two price members. |
+| `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` | a price that is not an integer from 0 through `Number.MAX_SAFE_INTEGER`, or only one of the two price members. |
 | `RUNNER_PRIMARY_PROVIDER_REF_DRIFT` | `PROVIDER_REF` does not name the FIRST entry of `PROVIDER_DISCOVERY_TARGETS_JSON`. |
 | `SUPPORT_MODEL_CREDENTIAL_ABSENT` | the support chat's target names a vendor API and declares no credential at all — no `authorization_file`. Every row above applies to `SUPPORT_MODEL_TARGET_JSON` as well; these last two are the support chat's own. |
 | `SUPPORT_MODEL_PATH_NOT_RATIFIED` | `SUPPORT_MODEL_TARGET_JSON` is neither of the two lawful shapes: a vendor API (`https:`, path ending in `/v1`) or, in LOCAL mode only, the ratified loopback relay. A target that IS an API target but is malformed refuses with the matching `PROVIDER_DISCOVERY_*` code instead, so this one means "this is not a target". |
+
+`PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two.
 
 ### The credential-file contract
 
@@ -1097,11 +1107,11 @@ JSON array; add one object to it. Its members:
 | `base_url` | the vendor's OpenAI-compatible endpoint, `https:`, path ending in `/v1`, no query and no fragment. **It must be a real public name.** The start-up check reads the literal address written here and does no name resolution, so a hostname that resolves to this machine is NOT detected — it is admitted. Checking that the vendor's hostname is a genuine public endpoint is the operator's responsibility until a resolved-address check exists. |
 | `model` | the model id to call |
 | `authorization_file` | the absolute path from step 2 — **that service's own copy**: the runner's path in `runner.env`, the API's in `api.env` |
-| `input_price_micros_per_million` | the vendor's price for input tokens, in whole USD micro-units per million tokens — the unit vendors publish in, so 3.00 USD per million is `3000000`. **Required in hosted mode** (V-28) |
-| `output_price_micros_per_million` | the same for output tokens. Both or neither, never zero |
+| `input_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million input tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
+| `output_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million output tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
 
 For a vendor whose short name was `acme`, the `runner.env` entry reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000}`,
-and in `api.env` the same entry with `/etc/debateai/api/providers/acme.header`. The prices are the
+and in `api.env` it reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/api/providers/acme.header","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000}`. The prices are the
 vendor's published list prices on the day you add it; when the vendor changes them, change both
 files and restart both units, or the envelopes count at the old price.
 An `authorization_header` member alongside `authorization_file` refuses with

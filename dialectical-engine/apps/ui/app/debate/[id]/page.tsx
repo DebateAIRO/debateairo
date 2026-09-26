@@ -5,6 +5,9 @@ import DebatePageGate from "./DebatePageGate";
 import { getDebateServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
+import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
+import { loadNamespace } from "@/lib/i18n/server";
+import { t } from "@/lib/i18n/translate";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +20,28 @@ export default async function DebatePage({
 }) {
   const { id } = await params;
   const starting = (await searchParams).starting === "1";
+  const cookieStore = await cookies();
+  const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
+  const locale = isLocale(requestedLocale) ? requestedLocale : "en";
+  const [
+    timeCatalog,
+    debateChromeCatalog,
+    debateDrawersCatalog,
+    miscCatalog,
+    publicCatalog,
+    composeCatalog,
+    homeCatalog,
+    newDebateCatalog
+  ] = await Promise.all([
+    loadNamespace(locale, "time"),
+    loadNamespace(locale, "debateChrome"),
+    loadNamespace(locale, "debateDrawers"),
+    loadNamespace(locale, "misc"),
+    loadNamespace(locale, "public"),
+    loadNamespace(locale, "compose"),
+    loadNamespace(locale, "home"),
+    loadNamespace(locale, "newDebate")
+  ]);
 
   // The accepted ask already owns a durable run id. Do not make the client
   // transition wait behind the runner's private-content lease: mount the
@@ -31,10 +56,18 @@ export default async function DebatePage({
         initialAnswer={null}
         initialError={null}
         initialPending
+        timeCatalog={timeCatalog}
+        debateChromeCatalog={debateChromeCatalog}
+        debateDrawersCatalog={debateDrawersCatalog}
+        miscCatalog={miscCatalog}
+        publicCatalog={publicCatalog}
+        composeCatalog={composeCatalog}
+        homeCatalog={homeCatalog}
+        newDebateCatalog={newDebateCatalog}
       />
     );
   }
-  const token = readSessionCookie(await cookies());
+  const token = readSessionCookie(cookieStore);
   const userAgent = (await headers()).get("user-agent") ?? undefined;
 
   // SSR reads the asker-scoped projection with the identity cookie (S05).
@@ -46,17 +79,26 @@ export default async function DebatePage({
   let initialError: string | null = null;
 
   if (token !== null) {
-    const result = await getDebateServer(id, token, undefined, userAgent, readTrustedClientIp(await headers()));
+    const result = await getDebateServer(
+      id,
+      token,
+      undefined,
+      userAgent,
+      readTrustedClientIp(await headers()),
+      composeCatalog
+    );
     if (result.ok) {
       initialDebate = result.debate;
       initialAnswer = result.answer;
       initialPending = false;
     } else if (result.kind === "loading") {
-      initialDebate = debateDetailFromRunProjection(result.run);
+      initialDebate = debateDetailFromRunProjection(result.run, composeCatalog, locale);
       initialPending = true;
     } else if (result.kind === "failed") {
-      initialDebate = debateDetailFromRunProjection(result.run);
-      initialError = `Debate generation failed: ${result.reason}`;
+      initialDebate = debateDetailFromRunProjection(result.run, composeCatalog, locale);
+      initialError = t(debateChromeCatalog, "debateChrome.error.debateGenerationFailed", {
+        reason: result.reason
+      });
       initialPending = false;
     } else if (result.kind === "not_found") {
       notFound();
@@ -70,6 +112,14 @@ export default async function DebatePage({
       initialAnswer={initialAnswer}
       initialError={initialError}
       initialPending={initialPending}
+      timeCatalog={timeCatalog}
+      debateChromeCatalog={debateChromeCatalog}
+      debateDrawersCatalog={debateDrawersCatalog}
+      miscCatalog={miscCatalog}
+      publicCatalog={publicCatalog}
+      composeCatalog={composeCatalog}
+      homeCatalog={homeCatalog}
+      newDebateCatalog={newDebateCatalog}
     />
   );
 }

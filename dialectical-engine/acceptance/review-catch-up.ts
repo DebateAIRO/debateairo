@@ -124,6 +124,7 @@ async function main(): Promise<void> {
       fromVersion: source.answerVersion,
       workItemId: source.workItemId,
       questionLine: run.questionLine,
+      argumentLanguageName: run.argumentLanguageName,
       invocationId: randomUUID(),
       pinnedPanel: run.discoveredPanel.map((member) => ({
         maker: member.maker, providerRef: member.provider_ref

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "control-control-extended",
+    "total": 262,
+    "passed": 262,
+    "failed": 0,
+    "failures": [],
+    "log": "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S03-p2/control-control-extended-runtime.log"
+  }
+]

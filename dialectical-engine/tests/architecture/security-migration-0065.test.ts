@@ -400,7 +400,12 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0069_remaining_content_carriers.sql",
         // DL7-F9 (Task 14): the threshold operator principal; the daemon loses INSERT on the
         // policy that rules it. 0069 and 0070 are reserved for V-6. A new prefix, no pair.
-        "0071_observation_threshold_operator.sql"
+        "0071_observation_threshold_operator.sql",
+        // Turn 12 localization: the debate's argument language (redefines
+        // core.create_encrypted_run from 0067) and the support interface locale.
+        // New prefixes after 0071, no pair.
+        "0072_argument_language.sql",
+        "0073_support_interface_locale.sql"
       ]);
   });
 });

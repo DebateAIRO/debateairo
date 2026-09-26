@@ -1,0 +1,52 @@
+BUILT_IN_ADAPTER_KINDS	["openai-compatible-http","vllm-openai-compatible-http"]
+DEPLOYMENT_SOURCE_REF	 + V-9 ruled 2026-09-22 (V, chat): versioned configuredProviderSet row carrying each vendor's V-9(4) vetting record, superseding the sealed row without altering it
+resolveDeploymentMode("hosted",undefined)	OK "hosted"
+resolveDeploymentMode("local",undefined)	OK "local"
+resolveDeploymentMode(undefined,undefined)	OK "local"
+resolveDeploymentMode(undefined,"production")	THROW DEPLOYMENT_MODE_UNRESOLVED
+resolveDeploymentMode("HOSTED",undefined)	THROW DEPLOYMENT_MODE_INVALID
+resolveDeploymentMode(" hosted",undefined)	THROW DEPLOYMENT_MODE_INVALID
+resolveDeploymentMode("","production")	THROW DEPLOYMENT_MODE_UNRESOLVED
+parseRegisterVersionText("4")	OK "4"
+parseRegisterVersionText("999")	OK "999"
+parseRegisterVersionText("abc")	THROW REGISTER_VERSION_TEXT_INVALID
+parseRegisterVersionText("0")	THROW REGISTER_VERSION_TEXT_INVALID
+parseRegisterVersionText("")	THROW REGISTER_VERSION_TEXT_INVALID
+parseRegisterVersionText(undefined)	THROW REGISTER_VERSION_TEXT_INVALID
+published.sourceRef	DEV-01-local-auth-topology.md#ordered-bootstrap:DEV-05 + V-9 ruled 2026-09-22 (V, chat): versioned configuredProviderSet row carrying each vendor's V-9(4) vetting record, superseding the sealed row without altering it
+published.valueJsonText	{"kind":"CONFIGURED_PROVIDER_SET","providers":[{"adapterKind":"openai-compatible-http","maker":"Acme","providerRef":"vendor:a","vetting":{"dataUseTermsReviewedOn":"2026-09-01","namedInPrivacyNotice":true,"retentionTermsReviewedOn":"2026-09-01"}}],"requiredDistinctMakers":1,"setVersion":2}
+build unvetted (named_in_privacy_notice=false)	THROW PROVIDER_VENDOR_NOT_VETTED:vendor:a
+build vetting {}	THROW PROVIDER_VENDOR_NOT_VETTED:vendor:a
+build vetting missing retention	THROW PROVIDER_VENDOR_NOT_VETTED:vendor:a
+build date 2026-9-1	THROW PROVIDER_VENDOR_NOT_VETTED:vendor:a
+build [E,E] (gate-skipped)	THROW CONFIGURED_PROVIDER_SET_INVALID
+build maker empty	THROW CONFIGURED_PROVIDER_SET_INVALID
+build maker padded	THROW CONFIGURED_PROVIDER_SET_INVALID
+build provider_ref number	THROW CONFIGURED_PROVIDER_SET_INVALID
+build requiredDistinctMakers 0	THROW CONFIGURED_PROVIDER_SET_INVALID
+build unvetted + maker empty (shape first?)	THROW CONFIGURED_PROVIDER_SET_INVALID
+derived.runner	[{"provider_ref":"vendor:a","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header","input_price_micros_per_million":1000,"output_price_micros_per_million":2000}]
+derived.api	[{"provider_ref":"vendor:a","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/api/providers/acme.header","input_price_micros_per_million":1000,"output_price_micros_per_million":2000}]
+parse runner	OK 1
+parse api	OK 1
+parse targets-rejected /v2	THROW PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID
+parse http base_url	OK 1
+parse price as string	THROW PROVIDER_DISCOVERY_TARGET_PRICE_INVALID
+parse relative authorization_file	THROW PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID
+parse empty model	THROW PROVIDER_DISCOVERY_TARGET_MODEL_INVALID
+hostedId(4,0x64)	f46205a2-12c8-4dad-a14a-abb2b836354e
+devId(4,0x64)	e5e29eff-627c-4507-b9d5-e131a69c35de
+seed.count	32
+seed.configuredProviderSet.sourceRef	DEV-01-local-auth-topology.md#ordered-bootstrap:DEV-05
+seed.configuredProviderSet.valueJsonText	{"kind":"CONFIGURED_PROVIDER_SET","providers":[{"adapterKind":"openai-compatible-http","maker":"OpenAI","providerRef":"development:codex-cli"},{"adapterKind":"openai-compatible-http","maker":"Anthropic","providerRef":"development:claude-cli"},{"adapterKind":"openai-compatible-http","maker":"xAI","providerRef":"development:grok-cli"}],"requiredDistinctMakers":1}
+seed.requiredDistinctMakers	1
+seed.hasSupportActivation	false
+published.snapshotSha256(seed v4 + built row)	579690d7a51248ea486632c347c32ee0dbd99814206f1a5c05d85c7d405931c9
+published.publicationId(base 4)	2a1ff6e9-7bfe-4bc8-b7d9-36e786ab80b4
+published.rows.count	32
+strip(v1 base)	DEV-01-local-auth-topology.md#ordered-bootstrap:DEV-05
+strip(v2 base) === v1 base	true
+rebuild from v2 base sourceRef ends with ONE suffix	1
+assertHostedConfiguredProviderSetVetted(built)	OK "passes or not exported"
+JSON.parse(broken roster) message	THROW Expected ',' or '}' after property value in JSON at position 88 (line 1 column 89)
+JSON.parse(unquoted path) message	THROW Unexpected token '/', ..."ion_file":/etc/debat"... is not valid JSON

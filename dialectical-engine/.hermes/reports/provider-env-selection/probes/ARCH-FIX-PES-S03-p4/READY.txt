@@ -1,0 +1,58 @@
+READY
+1 SKILLS LOADED: superpowers:using-superpowers (~/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/using-superpowers) · heartbeat-protocol (~/.claude/skills/heartbeat-protocol) · heartbeat-architecture (~/.claude/skills/heartbeat-architecture) · superpowers:receiving-code-review (…/superpowers/6.4.1/skills/receiving-code-review) · superpowers:brainstorming (…/superpowers/6.4.1/skills/brainstorming) · superpowers:writing-plans (…/superpowers/6.4.1/skills/writing-plans). All six were loaded at THIS node through the Skill tool, in packet line-4 order, before any other action.
+2 Node ARCH-FIX(S03) pass 4 (V-ruled: V-11 → R3.4, V-14 → R3.4b; SPEC-v3 of record) · ticket t_26ccd655 · seat ARCH-FIX-PES-S03-p4 · subagent adbd71f6a2f5bad4c (parent session 2c3aeba2, for b40ffbd3) · model claude-opus-5-5 · CLAIM 13:26:12 EEST.
+3 Artifacts:
+  - docs/missions/provider-env-selection/slices/S03/PLAN.md, revised in place (809 → 1103 lines):
+    - Revision 4 at :3-25.
+    - `#### Cluster S03-C3` at PLAN.md:704, with steps C3-1 :803, C3-2 :817, C3-3 :832, C3-4 :849, C3-5 :884, C3-6 :902 and C3-7 :925.
+    - `| **S03-C3** |` §3 row at PLAN.md:957.
+  - DECISIONS.md: append-only (184 → 209 lines; the first 184 are byte-identical per cmp); 11 rows under "Revision 4".
+  - Probes: .hermes/reports/provider-env-selection/probes/ARCH-FIX-PES-S03-p4/ (gate.mjs, trace.sh, trace-mutants.sh, citations.mjs, c1/c2/c3-cluster.sh, verify-all.sh plus logs).
+4 Verification, verbatim from verify-all.log (2026-09-25 13:40:43 EEST, lane HEAD ec66d5e7c, dirty 0 at start and end):
+  - gate: "rc=0  GATE_OK — 0 expectation(s) not met" (63 checks). The same run with SELFTEST: "rc=1  GATE_FAIL — 1 expectation(s) not met".
+    - Measured on C3's own ```ts code and ```text blocks, extracted from PLAN.md and run on README states built from the lane's README.
+    - Step ladder: S0 28/3 → S1 29/2 → S2 30/1 → S3 31/0. A hard-wrapped variant S3w is also 31/0.
+    - S0 fails each of the three cases with its own message.
+    - All 16 mutants FAIL, each with the message naming its defect: kept overruled sentence, missing part 1, reworded part 2, old row, dropped row, row tail, duplicated row, row outside the span, live row above, stale phrase elsewhere, bullet keeping the code, deleted bullet, undone bullet, third mention, swap, angle bracket.
+    - Regressions: the lane's C1-1, C2's four cases, baseline's README case and v30's support-code case are 7/0 on S0, S3 and S3w. C1-2's span count is 19 on S0, S3 and S3w. `grep -c COST_ENVELOPES_NOT_SEALED` is 3 on S0 and 2 on S3 and S3w.
+    - The pinned strings equal the step text blocks, 4 of 4.
+  - trace.sh (the reviewer's ARCH-REV-PES-S03-p1 parser, adapted to SPEC-v3 / C[123] / R3.4b): "TRACE_OK", 10 reqs and 21 steps, zero gaps both ways.
+    - trace-mutants: 3 of 3 print TRACE_FAIL (Revision 3 plan → "req with no step R3.4b"; no R3.4b row; no "C3-5 → R3.4b").
+    - The reviewer's parser run as-is prints zero gaps but reads SPEC.md and C[12] only, so it is blind to this revision.
+  - citations: "rc=0  CITES_OK — 0 of 37 citations do not hold", each `path:line` of the revision opened in the LANE. SELFTEST (+3 shift): "rc=1  CITES_FAIL — 36 of 37".
+  - Cluster commands as they stand, run in the lane at ec66d5e7c from .sh files:
+    - C1: "v9 … passed=28 failed=0 (expect 24/0)" / "baseline … passed=31 failed=0 (expect 31/0)" → CLUSTER_RED. Expected: 24:0 is C1's own boundary, and C2 is built.
+    - C2: "(expect 28/0)" / "(expect 31/0)" → CLUSTER_GREEN.
+    - C3 (NEW, `…run-suites.sh tests/unit/v9-provider-credential-files.test.ts:31:0 tests/architecture/vps-deployment-baseline.test.ts:31:0`): "passed=28 failed=0 (expect 31/0)" / "passed=31 failed=0 (expect 31/0)" → CLUSTER_RED (TDD-red, not BROKEN, since C2's GREEN at the same HEAD). Recorded at PLAN.md:957.
+  - Frozen files: `shasum -c` OK for SPEC.md, SPEC-v2.md, SPEC-v3.md and PROGRESS.md.
+  - Banned words in the 342 added lines: 0.
+5 Findings:
+  V-11 → R3.4: APPLIED.
+  - C3-4 (PLAN.md:849-883) writes "A hosted deployment reads the `costEnvelopePolicy` row in force at its own `REGISTER_VERSION` and refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` when that version sealed none, or with `COST_ENVELOPE_POLICY_INVALID` when the row it sealed is malformed. `COST_ENVELOPES_NOT_SEALED` is a check on the integrity of the build: it fires only when the envelope row this build ships was removed, emptied or made invalid, and the shipped source never reaches it at runtime."
+  - C3-1 (PLAN.md:803) pins it EXACT, plus the absence of the overruled sentence.
+  - C2-7 gains one pointer line (PLAN.md:640-642): "The sentence above is what C2 BUILT at `ec66d5e7c`. C3-4 replaces it, and this block is the record of the build, not an instruction."
+  V-14 → R3.4b: APPLIED.
+  - (a) C3-5 (PLAN.md:884-901) replaces the row with "| `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows below. |". The row is kept, which holds R3.5's class and baseline :359. C3-2 (:817) pins it EXACT, once, in the span, and requires the two live rows to sit below it.
+  - (b) C3-6 (PLAN.md:902-924) writes "Until V-28's cost-envelope policy is sealed at the register version a hosted deployment runs, that deployment refuses to start with `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`." C3-3 (:832) requires that the bullet name exactly those two codes, that exactly 2 README lines name COST_ENVELOPES_NOT_SEALED, and that those two lines are one row line and one note line.
+  - Trace: R3.4 and R3.4b rows at PLAN.md:203-204; reverse trace :213; SPEC-v3 line map :215-219.
+  Class sweep, member by member:
+  - README: 3 members at ec66d5e7c (:700, :737, :769). C3-6, C3-4 and C3-5 close all 3. `grep -rl` over deploy/ finds no other file.
+  - PLAN: 3 lines outside C3.
+    - C2-2 :508-510: still true, left.
+    - C2-7 :632-635: pointer added.
+    - C2-10 :698: true of C2, left; C3-7 carries R3.8.
+  - REQ-FIX p5's PLAN-step list: every item checked. Five items it missed were applied: §3 opener :948, §3 discriminator paragraph, §4 step-2 row :1045, §5 single-writer :1070, §3 mutant class :984.
+  CONTESTED: none. No V-ROW: NEW.
+  Named, not fixed:
+  - PLAN §5 :1054-1055 "one runbook section … and two test files" disagrees with the "TWO files" write surface (README + one test file). This is a pre-existing pass-1 wording.
+  - C2-2's built test title still says "names the sealed-envelope refusal". Its assertion stays true; the title belongs to C2's build.
+  Packet defects:
+  - Charge 3 "Do NOT rewrite C1/C2's blocks" sits beside the V packet's V-11 effect "C2-7 + a fix cluster". I resolved it with one pointer line.
+  - "pass: 4 of 3" reads as a cap breach.
+  - Charge 4 "at base" is ambiguous once clusters are built. I ran at lane HEAD ec66d5e7c.
+6 UNVERIFIED:
+  - C3's cases have not run under real vitest. They ran under a Node 26 type-stripping shim on simulated README states, because the lane is read-only; BUILD C3-1 is the first real run.
+  - `pnpm typecheck` has not run on the C3 case code.
+  - The reviewer's rev3-check copy prints 3 PROBLEMs, none against the plan. Two come from the lane now carrying C1's build, so its "base" passes C1-1. The third is the reviewer's own noted `:112` false positive. Recorded in DECISIONS.
+7 Self-report: .hermes/reports/provider-env-selection/agent-reports/ARCH-FIX-PES-S03-p4.md (1,288 words, filed before this READY)
+8 comments read through: 2

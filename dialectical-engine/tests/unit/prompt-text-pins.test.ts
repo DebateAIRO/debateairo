@@ -34,7 +34,12 @@ import {
   supportAnswerInstruction,
   supportDraftAnswerInstruction
 } from "../../apps/api/src/support/answer.js";
-import { SUPPORT_SUMMARY_PROMPT } from "../../apps/api/src/support/cases.js";
+import {
+  SUPPORT_SUMMARY_PROMPT,
+  createAdvisorySummaryService
+} from "../../apps/api/src/support/cases.js";
+import type { PromptPacket } from "@debateai/providers";
+import { framedInstruction } from "../support/framed-packet.js";
 import {
   SUPPORT_DRAFT_RULES,
   parseSupportCaseSummaryDraft,
@@ -298,6 +303,44 @@ describe("FW-B — the support chat's instruction slot is the text that already 
     expect(supportDraftAnswerPromptContract(draft).instruction).toBe(draft);
     expect(supportDraftSummaryPromptContract(SUPPORT_SUMMARY_PROMPT).instruction)
       .toBe(SUPPORT_SUMMARY_PROMPT);
+  });
+
+  /**
+   * Scope audit B3: the constant is not enough — pin the instruction bytes the
+   * advisory-summary SERVICE actually puts in the packet. en and ro send dev's
+   * directive unchanged; only the 33 new locales get the language suffix.
+   */
+  async function summaryPacketInstruction(language: "en" | "ro" | "ja"): Promise<string> {
+    const packets: PromptPacket[] = [];
+    const service = createAdvisorySummaryService({
+      complete: async ({ packet }) => {
+        packets.push(packet);
+        return JSON.stringify({
+          kind: "case_summary", text: "The user cannot sign in.", sourceIds: [], actionIds: []
+        });
+      },
+      seal: async () => new Uint8Array([1]),
+      persist: async () => undefined,
+      clock: () => new Date("2026-09-25T00:00:01.000Z")
+    });
+    await service.summarize({
+      caseId: "case-id", language, transcript: "USER> I cannot sign in.",
+      createdAt: new Date("2026-09-25T00:00:00.000Z")
+    });
+    expect(packets).toHaveLength(1);
+    return framedInstruction(packets[0]!);
+  }
+
+  it.each(["en", "ro"] as const)(
+    "sends dev's case-summary directive bytes unchanged in the %s packet", async (language) => {
+      expect(await summaryPacketInstruction(language)).toBe(SUPPORT_SUMMARY_PROMPT);
+    }
+  );
+
+  it("names the prose language only for a new interface locale's case-summary packet", async () => {
+    expect(await summaryPacketInstruction("ja")).toBe(
+      `${SUPPORT_SUMMARY_PROMPT} Write text in Japanese (日本語). kind stays case_summary.`
+    );
   });
 });
 

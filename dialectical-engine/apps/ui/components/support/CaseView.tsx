@@ -1,43 +1,19 @@
 "use client";
 
 import { useCallback,useEffect,useState,type FormEvent } from "react";
-import type { SupportAssistantLanguage } from "./Assistant";
+import { useChromeI18n } from "../../lib/i18n/I18nProvider";
+import { t } from "../../lib/i18n/translate";
 import { consumeSupportCaseTokenFromUrl,supportCaseLink } from "./caseLink.js";
 import { supportPost } from "./http.js";
 
-const COPY = Object.freeze({
-  en: Object.freeze({
-    opened: "I've opened case {token} for a person. Expected reply: within {sla} hours. Check replies at {link}. I can't promise an outcome.",
-    human: "Support (a person)",
-    missing: "No case with that code.",
-    closed: "This case is closed. You can still reply to reopen it.",
-    reply: "Reply to this case",
-    summary: "Model-written summary — advisory",
-    shredded: "This conversation was erased at the owner's request."
-  }),
-  ro: Object.freeze({
-    opened: "Am deschis cazul {token} pentru o persoană. Răspuns estimat: în {sla} ore. Vezi răspunsurile la {link}. Nu pot promite un rezultat.",
-    human: "Suport (o persoană)",
-    missing: "Nu există niciun caz cu acest cod.",
-    closed: "Acest caz este închis. Poți răspunde pentru a-l redeschide.",
-    reply: "Răspunde la acest caz",
-    summary: "Rezumat scris de model — orientativ",
-    shredded: "Această conversație a fost ștearsă la cererea proprietarului."
-  })
-});
-
-export function CaseOpened({ token,slaHours,language }: Readonly<{
+export function CaseOpened({ token,text }: Readonly<{
   token: string;
-  slaHours: number;
-  language: SupportAssistantLanguage;
+  text: string;
 }>) {
   // DL3-F4: the fragment, so the bearer never reaches a server or a proxy log.
   const link = supportCaseLink(token);
-  const text = COPY[language].opened
-    .replace("{token}",token)
-    .replace("{sla}",String(slaHours))
-    .replace("{link}",link);
-  return <p>{text} <a href={link}>{link}</a></p>;
+  const safeText = text.replace(`/help?case=${token}`,link);
+  return <p>{safeText} <a href={link}>{link}</a></p>;
 }
 
 export type SupportCaseViewMessage = Readonly<{
@@ -46,34 +22,39 @@ export type SupportCaseViewMessage = Readonly<{
   text: string;
 }>;
 
-export function CaseView({ language,state,messages,summary = null,onReply }: Readonly<{
+export function CaseView({ state,messages,summary = null,text = null,onReply }: Readonly<{
   token: string;
-  language: SupportAssistantLanguage;
   state: "NEW" | "WAITING_ON_V" | "WAITING_ON_USER" | "CLOSED" | "NOT_FOUND" | "SHREDDED";
   messages: readonly SupportCaseViewMessage[];
   summary?: string | null;
+  text?: string | null;
   onReply?: (text: string) => void;
 }>) {
-  if (state === "NOT_FOUND") return <p>{COPY[language].missing}</p>;
-  if (state === "SHREDDED") return <p>{COPY[language].shredded}</p>;
-  return <section aria-label="Support case">
-    <p>State: {state}</p>
-    {summary === null ? null : <aside aria-label={COPY[language].summary}>
-      <strong>{COPY[language].summary}</strong>
+  const { catalog } = useChromeI18n();
+  if (state === "NOT_FOUND") return <p>{text ?? t(catalog,"support.case.missing")}</p>;
+  if (state === "SHREDDED") return <p>{text ?? t(catalog,"support.case.shredded")}</p>;
+  const summaryAdvisory = t(catalog,"support.summaryAdvisory");
+  return <section aria-label={t(catalog,"support.case.region")}>
+    <p>{t(catalog,"support.case.state")}: {state}</p>
+    {summary === null ? null : <aside aria-label={summaryAdvisory}>
+      <strong>{summaryAdvisory}</strong>
       <p>{summary}</p>
     </aside>}
     {messages.map((message) => <article key={message.id} data-role={message.role}>
-      <strong>{message.role === "V" ? COPY[language].human : message.role.toUpperCase()}</strong>
+      <strong>{message.role === "V" ? t(catalog,"support.case.human") : message.role.toUpperCase()}</strong>
       <p>{message.text}</p>
     </article>)}
-    {state === "CLOSED" ? <p>{COPY[language].closed}</p> : null}
+    {text === null ? null : <p>{text}</p>}
+    {state === "CLOSED" ? <p>{t(catalog,"support.case.closed")}</p> : null}
     <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const field = event.currentTarget.elements.namedItem("reply");
       if (field instanceof HTMLTextAreaElement && field.value.trim() !== "") {
         onReply?.(field.value);
       }
-    }}><label>{COPY[language].reply}<textarea name="reply" /></label><button type="submit">Send</button></form>
+    }}><label>{t(catalog,"support.case.reply")}<textarea name="reply" /></label>
+      <button type="submit">{t(catalog,"support.send")}</button>
+    </form>
   </section>;
 }
 
@@ -90,8 +71,8 @@ export const supportCaseClient = Object.freeze({
 
 export function CaseLookup() {
   const [record,setRecord] = useState<Readonly<{
-    token: string;language: SupportAssistantLanguage;state: Parameters<typeof CaseView>[0]["state"];
-    messages: readonly SupportCaseViewMessage[];summary: string | null;
+    token: string;state: Parameters<typeof CaseView>[0]["state"];
+    messages: readonly SupportCaseViewMessage[];summary: string | null;text: string | null;
   }> | null>(null);
 
   const load = useCallback(async (token: string): Promise<void> => {
@@ -99,18 +80,19 @@ export function CaseLookup() {
       headers: { "x-support-case-token": token }
     });
     const body = response.ok ? await response.json() as Record<string,unknown> : null;
-    if (body === null) {
-      setRecord({ token,language: "en",state: "NOT_FOUND",messages: [],summary: null });
+    if (body === null || body.case === undefined || typeof body.case !== "object" || body.case === null) {
+      setRecord({ token,state: "NOT_FOUND",messages: [],summary: null,text: null });
       return;
     }
     const opened = body.case as Record<string,unknown>;
     setRecord({
-      token,language: opened.language === "ro" ? "ro" : "en",
+      token,
       state: body.kind === "SHREDDED"
         ? "SHREDDED" : String(opened.state) as Parameters<typeof CaseView>[0]["state"],
       messages: body.kind === "SHREDDED" ? [] : body.messages as readonly SupportCaseViewMessage[],
       summary: body.kind === "SHREDDED" || typeof opened.summary !== "string"
-        ? null : opened.summary
+        ? null : opened.summary,
+      text: typeof body.text === "string" ? body.text : null
     });
   },[]);
 
@@ -131,13 +113,13 @@ export function CaseLookup() {
   }} />;
 }
 
-export function OwnCaseList({ signedIn,cases,language }: Readonly<{
+export function OwnCaseList({ signedIn,cases }: Readonly<{
   signedIn: boolean;
   cases: readonly Readonly<{ caseId: string;state: string;createdAt: string }>[];
-  language: SupportAssistantLanguage;
 }>) {
+  const { catalog } = useChromeI18n();
   if (!signedIn) return null;
-  return <section aria-label={language === "en" ? "Your support cases" : "Cazurile tale de suport"}>
+  return <section aria-label={t(catalog,"support.case.yours")}>
     <ul>{cases.map((item) => <li key={item.caseId}>
       {item.caseId} {item.state} {item.createdAt}
     </li>)}</ul>
@@ -163,5 +145,5 @@ export function OwnCaseLookup() {
         }));
       });
   },[]);
-  return <OwnCaseList signedIn={cases !== null} cases={cases ?? []} language="en" />;
+  return <OwnCaseList signedIn={cases !== null} cases={cases ?? []} />;
 }

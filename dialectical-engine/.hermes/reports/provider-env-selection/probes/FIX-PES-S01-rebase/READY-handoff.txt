@@ -1,0 +1,121 @@
+SKILLS LOADED: [using-superpowers/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/using-superpowers/SKILL.md) · [heartbeat-protocol/SKILL.md](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-protocol/SKILL.md) · [heartbeat-worker/SKILL.md](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.claude/skills/heartbeat-worker/SKILL.md) · [test-driven-development/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/test-driven-development/SKILL.md) · [verification-before-completion/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/verification-before-completion/SKILL.md) · [systematic-debugging/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/systematic-debugging/SKILL.md) · [receiving-code-review/SKILL.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/receiving-code-review/SKILL.md) · [using-superpowers/references/codex-tools.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/using-superpowers/references/codex-tools.md) · [test-driven-development/writing-good-tests.md](/Users/vladmihaimiron/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/skills/test-driven-development/writing-good-tests.md)
+
+2. **READY — FIX(S01), pass 1, t_f55704e5; seat FIX-PES-S01-rebase.** Session `01a0d870-9285-7002-ac49-7815cf8d4d98`; rollout `/Users/vladmihaimiron/.codex/sessions/2026/09/25/rollout-2026-09-25T15-00-51-01a0d870-9285-7002-ac49-7815cf8d4d98.jsonl`.
+3. Branch `slice/provider-env-selection-s01`, new HEAD **`17d68955f7aba06fd1694016ff13f85c0e760088`**, rebased onto **`a6d6382bae10a7dc5d84cf407f576169b001c0e8`**. Clean status; four replayed commits; no follow-up commit. Backup `slice/provider-env-selection-s01-pre-rebase` remains `172ee164099c9cab4dde66d80be8e9e782afc899`.
+4. **C1–C4 each CLUSTER_GREEN ×3; all 12 runs green; worst GREEN.** Acceptance once: exit 0, final line `PES-S01-ACCEPT: PASS`. Typecheck: exit 0, zero diagnostics, delta 0 against dev.
+5. One reproduced conflict stop, resolved by union: [manifest:340](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json:340) and [audit:363](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.worktrees/pes-s01/dialectical-engine/tests/architecture/p3-production-database-principals.test.ts:363). No new product finding or blocking packet defect. The five inherited architecture failures are named below.
+6. **UNVERIFIED:** independent REV(S01), V's personal acceptance and real-provider execution; outside this FIX seat. No fetch, push, merge or backup-branch mutation.
+7. Self-report filed first: [FIX-PES-S01-rebase.md](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/agent-reports/FIX-PES-S01-rebase.md).
+8. comments read through: **3**.
+
+**Conflict record.** START on **2026-09-26 09:46:52 EEST**: HEAD `172ee164099c9cab4dde66d80be8e9e782afc899`, dirty 0; backup equal. `git rebase a6d6382ba` replayed C1/C2, stopped at C3, then replayed C4 after resolution.
+
+| Stopped commit | File | Recorded hunks | Resolution |
+|---|---|---:|---|
+| `c90177f6ccf6d83d0ba9473f02035f93855a9b3e` — C3 | P3-01-production-database-principals.json | 1 | Keep all dev bytes; insert S01's object before dev's hosted entry |
+| Same stop | p3-production-database-principals.test.ts | 2 | Keep all dev bytes; insert S01's migration-owner expectation and sorted-inventory row |
+
+Before editing, saved the [stop record](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/conflict-1.json), [every conflict hunk](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/conflict-1-hunks.diff), complete marker files and all three index stages under `conflict-1-file-{1,2}-stage-{1,2,3}.txt`. [Initial rebase log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/rebase-attempt-1.log); [continuation log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/rebase-continue-attempt-1.log). These were the only conflicts. Package scripts auto-merged.
+
+**Union proof.** Removing only S01's additions from either resolved file reproduces the entire corresponding dev file byte for byte. Manifest: **8 additions/0 deletions**; audit: **11/0**. JSON parses. Executable connection pairs: **dev 19 → union 20**, adding exactly `apps/runner/src/hosted-provider-set-publish-cli.ts::MIGRATION_DATABASE_URL`.
+
+The added object remains under `migration-admin`, purpose `HOSTED_PROVIDER_SET_PUBLICATION`, binding `WIRED`, condition `package script hosted:publish-provider-set`. Dev's separate `hosted-register-publish-cli` declaration remains unchanged. No policy adjustment or V-ROW was required. Evidence: [union proof](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/union-proof-attempt-1.log), [manifest diff](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/resolution-manifest.diff), [audit diff](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/resolution-audit.diff).
+
+**Pair changes — passed/total.** All pairs below were measured in each of the three runs.
+
+| Cluster | Suite | Before rebase → rebased |
+|---|---|---|
+| C1–C4 | tests/architecture | **723/729 → 746/751**; failures **6 → 5** |
+| C1 | pes-s01-operator-command-environment | 3/3 → 3/3 |
+| C1 | v9-deployment-mode | 201/201 → 201/201 |
+| C1 | production-environment-floors | 24/24 → 24/24 |
+| C1 | dl7-f7-boot-custody | 14/14 → 14/14 |
+| C1 | v20-optional-primary-provider-keys | 11/11 → 11/11 |
+| C2 | pes-s01-hosted-provider-set | 37/37 → 37/37 |
+| C2 | v9-configured-provider-set-deployment | 14/14 → 14/14 |
+| C2–C4 | text-control-bytes | 3/3 → 3/3 |
+| C3 | pes-s01-hosted-provider-set-publish | 16/16 → 16/16 |
+| C3 | pes-s01-hosted-publish-boundary | 4/4 → 4/4 |
+| C3 | p3-production-database-principals | 2/2 → 2/2 |
+| C3 | dev-deployment-register | 15/15 → 15/15 |
+| C4 | pes-s01-publish-set-acceptance | 9/9 → 9/9 |
+
+Architecture's new pair is **dev 742 passed/5 failed + S01's four boundary cases = 746/5**. The before column uses the completed old slice's 723/6; PLAN's older C1/C2 literal 719/6 predates C3's four cases. The rebased runs match the five dev-baseline failure names exactly; every other pair is unchanged.
+
+**Three-run table — architecture's 746/751 includes those five inherited failures.**
+
+| Cluster · run | Marker | Every pair, passed/total | Log |
+|---|---|---|---|
+| C1 · 1 | CLUSTER_GREEN | operator 3/3; architecture 746/751; mode 201/201; floors 24/24; custody 14/14; optional keys 11/11 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-1.log) |
+| C1 · 2 | CLUSTER_GREEN | operator 3/3; architecture 746/751; mode 201/201; floors 24/24; custody 14/14; optional keys 11/11 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-2.log) |
+| C1 · 3 | CLUSTER_GREEN | operator 3/3; architecture 746/751; mode 201/201; floors 24/24; custody 14/14; optional keys 11/11 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C1-run-3.log) |
+| C2 · 1 | CLUSTER_GREEN | hosted set 37/37; architecture 746/751; configured set 14/14; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-1.log) |
+| C2 · 2 | CLUSTER_GREEN | hosted set 37/37; architecture 746/751; configured set 14/14; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-2.log) |
+| C2 · 3 | CLUSTER_GREEN | hosted set 37/37; architecture 746/751; configured set 14/14; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C2-run-3.log) |
+| C3 · 1 | CLUSTER_GREEN | operator integration 16/16; boundary 4/4; p3 audit 2/2; architecture 746/751; dev deployment 15/15; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-1.log) |
+| C3 · 2 | CLUSTER_GREEN | operator integration 16/16; boundary 4/4; p3 audit 2/2; architecture 746/751; dev deployment 15/15; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-2.log) |
+| C3 · 3 | CLUSTER_GREEN | operator integration 16/16; boundary 4/4; p3 audit 2/2; architecture 746/751; dev deployment 15/15; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C3-run-3.log) |
+| C4 · 1 | CLUSTER_GREEN | acceptance 9/9; architecture 746/751; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-1.log) |
+| C4 · 2 | CLUSTER_GREEN | acceptance 9/9; architecture 746/751; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-2.log) |
+| C4 · 3 | CLUSTER_GREEN | acceptance 9/9; architecture 746/751; text 3/3 | [log](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/C4-run-3.log) |
+
+[All 12 verbatim frames](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/all-cluster-frames.txt) are extracted from the captured logs. [Final verification](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/final-verification-attempt-1.log) checks every pair, marker and failure-name set.
+
+The following five failures are **pre-existing at a6d6382ba, verified 2026-09-26**, and are the exact names in every architecture run:
+
+```text
+ FAIL  tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
+ FAIL  tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas agreed review mark binds its agreed review verdict role
+ FAIL  tests/architecture/role-token-map.test.ts > R2-C1 design-derived role to token-family oracle > DebateCanvas disputed review mark binds its disputed review verdict role
+ FAIL  tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
+```
+
+**Refutation evidence.** Property: the principal audit requires S01's exact connection declaration in addition to every unchanged dev declaration.
+
+| Probe | Change | Audit result | Restoration |
+|---|---|---|---|
+| M01 | Remove only S01's manifest object; retain the resolved audit | 0/2, CLUSTER_RED; inventory and executable-pair cases fail | 2/2, CLUSTER_GREEN |
+| N01 | Reverse only S01 object's JSON member order, retaining values | 2/2, CLUSTER_GREEN | 2/2, CLUSTER_GREEN |
+
+M01 RED, verbatim:
+
+```text
+ FAIL  tests/architecture/p3-production-database-principals.test.ts > P3-01 production database-principal manifest > defines the exact capability, ownership, service, and connection-purpose inventory
+ FAIL  tests/architecture/p3-production-database-principals.test.ts > P3-01 production database-principal manifest > maps the manifest to current migrations and executable connection seams without inventing completion
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+tests/architecture/p3-production-database-principals.test.ts rc=1 passed=0 failed=2 (expect 2/0)
+CLUSTER_RED
+```
+
+Restoration, verbatim:
+
+```text
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+tests/architecture/p3-production-database-principals.test.ts rc=0 passed=2 failed=0 (expect 2/0)
+CLUSTER_GREEN
+```
+
+Logs: [M01 RED](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/M01-RED-attempt-1.log), [M01 restore](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/M01-restore-GREEN-attempt-1.log), [N01 neighbour](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/N01-neighbour-attempt-1.log), [N01 restore](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/N01-restore-GREEN-attempt-1.log). Source diffs and each restore's porcelain output are saved as `M01-source-diff.log`, `N01-source-diff.log`, `M01-restore-status.log` and `N01-restore-status.log`. Both restores preceded explicit staging; the two conflict paths therefore still showed `UU` in the index until their per-file `git add --`. Final status is empty.
+
+**Acceptance and scope.**
+
+- [One-off acceptance](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/acceptance-attempt-1.log): exit 0; last line `PES-S01-ACCEPT: PASS`; scratch port **58339** closed; no Bearer output; live database listener metadata identical before/after ([check](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/acceptance-check-attempt-1.log)).
+- [Typecheck](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/typecheck-attempt-1.log): exit 0, no diagnostic; dev baseline is also zero.
+- R1.6 import graph and R1.13 isolation pass in all three boundary runs. Explicit roster-key greps find only the S01 CLI under apps/packages and no boot-file/env-example hit.
+- All dev package content is preserved, with exactly the two S01 scripts added (**2/0**). Dev's hosted-register-publish files and development publisher files have empty diffs with positive pathspec matches.
+- All ten slice-added files are byte-identical to the pre-rebase head. No pinned-line change was needed. `git diff --stat a6d6382ba..HEAD` lists exactly **15 S01 paths, 1580 additions** ([boundary proof](/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/provider-env-selection/probes/FIX-PES-S01-rebase/boundaries-attempt-1.log)).
+- All **109 recorded scratch ports** are above 4400, outside NO-TOUCH and have no listener at final cleanup. No real key, live database connection, install, stash or desktop action.
+
+`git log --oneline a6d6382ba..HEAD`, verbatim:
+
+```text
+17d68955f feat(provider-env-selection/S01-C4): prove the hosted publish operator acceptance
+758a6ccee feat(provider-env-selection/S01-C3): add audited hosted publish command
+bac925b3e feat(provider-env-selection/S01-C2): publish vetted hosted sets with role preservation
+c8b0eb1dd feat(provider-env-selection/S01-C1): add frozen operator command environment reader
+```
+
+No follow-up commit, no new V-ROW, no push. The backup branch remains unchanged.
