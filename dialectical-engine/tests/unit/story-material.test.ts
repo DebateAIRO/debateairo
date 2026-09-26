@@ -154,14 +154,18 @@ function pointFor(result: BuiltMaterial, nodeId: string): StoryMaterialPoint {
   return found;
 }
 
-/** A well-formed story whose short paths are `positionRefs`, in that order, citing only positions. */
+/**
+ * A well-formed story whose short paths are `positionRefs`, in that order,
+ * citing only positions. Its lines name no point number: the short version
+ * never does (Task 11 fix round 1).
+ */
 function storyWithPaths(positionRefs: readonly string[]): StoryBody {
   return {
     shape_id: "general",
     short: {
       headline: "The debate leans one way.",
       summary: "Our reading of your question.",
-      paths: positionRefs.map((ref) => ({ position_ref: ref, fate: "PARTLY_HELD" as const, line: `${ref} partly held.`, node_refs: [ref] })),
+      paths: positionRefs.map((ref) => ({ position_ref: ref, fate: "PARTLY_HELD" as const, line: "This position partly held.", node_refs: [ref] })),
       change: { text: "A count would change it.", node_refs: [] }
     },
     long: {

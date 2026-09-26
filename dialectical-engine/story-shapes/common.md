@@ -63,6 +63,8 @@ Take each fate from these thresholds even when it looks at odds with the label. 
 
 ## The short version
 
+The short version is shown on the site, where there is no appendix, so a point number such as P3 would mean nothing to the reader there. Never mention a point number in the headline, the summary, a path line or the change text; say in words what the point argues. Point numbers belong only in the long version. The node_refs arrays still list the points each entry rests on.
+
 - headline: the answer in one line, true to the label. No teaser and no question.
 - summary: one paragraph with your reading of what was asked, the answer, and the main reason for it.
 - paths: one line per position, each position exactly once: what it claimed, and why it held up or fell. When there are more than 8 positions, write lines for the first 8 in positions (the highest scores); the site adds "and N more".

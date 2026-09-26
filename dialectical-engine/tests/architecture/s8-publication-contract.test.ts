@@ -122,19 +122,38 @@ describe("Accounts S8 publication architecture", () => {
   });
 
   it("exposes a dedicated strict public contract and no anonymous owner-only carriers", async () => {
-    const [contract, api] = await Promise.all([
+    const [contract, story, api] = await Promise.all([
       read("packages/contract/src/index.ts"),
+      read("packages/contract/src/story.ts"),
       read("apps/api/src/index.ts")
     ]);
     const schema = contract.slice(
       contract.indexOf("export const PublicDebateSchema"),
       contract.indexOf("export type PublicDebate =")
     );
-    expect(schema).toContain(".strict()");
-    for (const forbidden of [
+    const ownerOnly = [
       "asker_id", "owner_ref", "user_id", "run_ref", "answer_id", "memory_disclosure",
       "ledger_digest_handle", "inspection_handle", "cost_envelope", "tier_provenance_ref"
-    ]) expect(schema).not.toContain(forbidden);
+    ];
+    expect(schema).toContain(".strict()");
+    for (const forbidden of ownerOnly) expect(schema).not.toContain(forbidden);
+    // Verdict story (Task 11): the snapshot's short story is its own strict
+    // schema in story.ts, so the same guard reads it there. It names exactly
+    // the short version and the reviewer's note; the checker's reservation, the
+    // point numbers, the verdict basis, the lineages and the pack stay owner-only.
+    expect(schema).toContain("story_short: PublicStoryShortSchema.optional()");
+    const storyStart = story.indexOf("export const PublicStoryShortSchema");
+    const storyEnd = story.indexOf("export type PublicStoryShort =");
+    expect(storyStart).toBeGreaterThan(-1);
+    expect(storyEnd).toBeGreaterThan(storyStart);
+    const storySchema = story.slice(storyStart, storyEnd);
+    expect(storySchema).toContain(".strict()");
+    expect([...storySchema.matchAll(/^\s*([a-z_]+):/gmu)].map((match) => match[1]))
+      .toEqual(["headline", "summary", "paths", "change", "reviewer_note"]);
+    for (const forbidden of [
+      ...ownerOnly, "answer_version", "reservation", "point_numbers", "verdict_basis", "storyteller",
+      "checker", "lineage", "pack", "fingerprint", "shape_id", "long", "rounds", "written_at"
+    ]) expect(storySchema).not.toContain(forbidden);
     expect(api).toContain('GET /v1/public/debates/{id}');
     expect(api).not.toContain('GET /v1/public/debates/{id}/inspection');
     expect(api).not.toContain('GET /v1/public/debates/{id}/ledger-digest');

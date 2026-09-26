@@ -15,7 +15,9 @@ import {
  * the public overview maps its snapshot's `story_short` to this, and the
  * owner's StoryPanel passes its view. Every string but the fixed English copy
  * was written by a model. `morePaths` is how many positions the short version
- * left out (0 or more).
+ * left out (0 or more). `reservation` is the checker's reservation, for the
+ * owner's panel only: it names points by numbers only the owner's appendix
+ * explains, so the public page never passes one.
  */
 export interface StoryShortContent {
   readonly headline: string | null;
@@ -24,7 +26,7 @@ export interface StoryShortContent {
   readonly morePaths: number;
   readonly change: string | null;
   readonly reviewerNote: string | null;
-  readonly reservation: string | null;
+  readonly reservation?: string | null;
 }
 
 /**
@@ -45,6 +47,7 @@ export function StoryShortBlocks({
   headlineAs?: "p" | "h2";
 }): JSX.Element {
   const more = morePathsWords(story.morePaths);
+  const reservation = story.reservation ?? null;
   const Headline = headlineAs;
   return (
     <div className={className} data-ai-generated="true">
@@ -69,10 +72,10 @@ export function StoryShortBlocks({
           <p className="storyBoxNote">{STORY_REVIEWER_NOTE_CAVEAT}</p>
         </div>
       )}
-      {story.reservation === null ? null : (
+      {reservation === null ? null : (
         <div className="storyBox" data-box="reservation">
           <span className="storyBoxTitle">{STORY_RESERVATION_TITLE}</span>
-          <p>{STORY_RESERVATION_LEAD} {story.reservation}</p>
+          <p>{STORY_RESERVATION_LEAD} {reservation}</p>
         </div>
       )}
     </div>

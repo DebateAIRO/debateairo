@@ -158,6 +158,50 @@ describe("verdict story — the story classifier", () => {
     expect(result.parseError).not.toMatch(/Fund the|dleh|cost objection|really|leans on|worth its cost|ridership/u);
   });
 
+  describe("no point numbers in the short version (it is shown where there is no appendix)", () => {
+    it.each([
+      ["the headline", (body: StoryBody): void => {
+        body.short.headline = "Fund the extension: P3 carries it.";
+      }, "short.headline"],
+      ["the summary", (body: StoryBody): void => {
+        body.short.summary = "Our reading of your question: whether the extension is worth its cost. It is, mainly on P3.";
+      }, "short.summary"],
+      ["a path line", (body: StoryBody): void => {
+        body.short.paths[1]!.line = "Do not fund it: the cost objection (P3) was answered.";
+      }, "short.paths.1.line"],
+      ["the change text", (body: StoryBody): void => {
+        body.short.change.text = "A measured drop in ridership would move P3.";
+      }, "short.change.text"]
+    ])("refuses a point number in %s, at its own path, without echoing the text", (_name, mutate, path) => {
+      const body = story();
+      mutate(body);
+      const result = classifyStoryContent(JSON.stringify(body), INDEX);
+      expect(refused(result)).toEqual({ code: "SCHEMA_FAILED", path });
+      expect(result.parseError).toContain("STORY_SHORT_POINT_NUMBER");
+      expect(result.parseError).not.toMatch(/carries it|mainly on|cost objection|ridership/u);
+      expect(() => parseStoryBody(JSON.stringify(body), INDEX))
+        .toThrowError(expect.objectContaining({ code: "STORY_CONTENT_INVALID" }));
+    });
+
+    it("still accepts a point number in the long version and in the reviewer's note", () => {
+      const body = story();
+      body.long.sections[2]!.paragraphs[0]!.text = "Funding held up, mainly on P3 and P14.";
+      body.reviewer_note = paragraph("The verdict leans on P3, which was only argued.", ["P3"]);
+      expect(classifyStoryContent(JSON.stringify(body), INDEX)).toEqual({ parseStatus: "PARSED", parseError: null });
+    });
+
+    it.each([
+      ["PS", "Fund it. PS: the savings held up."],
+      ["P0", "Fund it: P0 is not a point number."],
+      ["a letter glued to it", "Fund it, even with the MP3 archive and the P3a annex."],
+      ["a lowercase p", "Fund it: p3 is not how a point is named."]
+    ])("does not refuse %s in a short text", (_name, headline) => {
+      const body = story();
+      body.short.headline = headline;
+      expect(classifyStoryContent(JSON.stringify(body), INDEX).parseStatus).toBe("PARSED");
+    });
+  });
+
   it("accepts line feeds and tabs inside a text", () => {
     const body = story();
     body.long.sections[2]!.paragraphs[0]!.text = "Funding held up.\n\tThe savings point was never answered.";
@@ -177,7 +221,8 @@ describe("verdict story — the story classifier", () => {
     function withPaths(ids: readonly string[]): string {
       const body = story();
       body.short.paths = ids.map((id) => ({
-        position_ref: id, fate: "PARTLY_HELD" as const, line: `Position ${id}.`, node_refs: [id]
+        // The short version never names a point number (Task 11 fix round 1), so the line does not either.
+        position_ref: id, fate: "PARTLY_HELD" as const, line: "One of the positions argued.", node_refs: [id]
       }));
       body.short.change.node_refs = [];
       body.long.sections.forEach((section) => section.paragraphs.forEach((entry) => { entry.node_refs = []; }));

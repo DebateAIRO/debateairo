@@ -32,8 +32,10 @@ export function morePathsWords(count: number): string | null {
  * material uses (a maker root, pre-flight ruling 2026-09-26): a node with no
  * outgoing edge of any kind. A point that argues about another point, or that
  * undercuts an arrow (an EDGE-targeting edge), is not a position; neither is a
- * point whose edge names a point missing from the snapshot. A self-loop points
- * at no other point, so it does not by itself unmake a position.
+ * point whose edge names a point missing from the snapshot. A self-referencing
+ * edge (a NODE edge from a point to itself) is not an argument about another
+ * point, so it does not by itself unmake a position (controller ruling,
+ * confirmed in Task 11 fix round 1).
  *
  * This is deliberately NOT the tree's rule (apps/ui/lib/v3/adapter.ts
  * projectGraph), which puts an undercutter at the top of the tree because it
@@ -45,6 +47,7 @@ export function countStoryPositions(
 ): number {
   const arguing = new Set<string>();
   for (const edge of edges) {
+    // A self-referencing edge is not an argument about another point.
     if (edge.target_kind === "NODE" && edge.target_ref === edge.from_node_ref) continue;
     arguing.add(edge.from_node_ref);
   }

@@ -28,14 +28,27 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * the real database. The story is sealed by StoryRepository for an ENCRYPTED
  * run; publishing reads it back through the owner-scoped repository reader,
  * copies the short story into the encrypted public snapshot, and the anonymous
- * public read carries it. A FAILED story publishes no short story.
+ * public read carries it. The checker's reservation never crosses, and a
+ * FAILED story publishes no short story.
  */
+
+const RESERVATION = "P7, the rent figure, comes from a single source.";
+type StoredOutcome = "READY" | "READY_WITH_RESERVATION" | "FAILED";
 
 const source = Object.freeze({ ip: "192.0.2.11", userAgent: "Story Publication Browser", requestId: "request:story-publication" });
 const fakeAuditHasher = Object.freeze({
   hashSourceIp: async () => "11".repeat(32),
   hashUserAgent: async () => "22".repeat(32)
 }) as unknown as AuditContextHasher;
+
+/** The five public fields of STORY_TEST_BODY: the short version and the reviewer's note. */
+const PUBLIC_SHORT = Object.freeze({
+  headline: STORY_TEST_BODY.short.headline,
+  summary: STORY_TEST_BODY.short.summary,
+  paths: STORY_TEST_BODY.short.paths,
+  change: STORY_TEST_BODY.short.change,
+  reviewer_note: STORY_TEST_BODY.reviewer_note
+});
 
 let database: TestDatabase;
 let owner: StoryEncryptedOwner | undefined;
@@ -79,8 +92,8 @@ async function publishGrant(runId: string): Promise<string> {
   return token;
 }
 
-function storyRecord(runId: string, answerId: string, outcome: "READY" | "FAILED"): StoryRecordInput {
-  const ready = outcome === "READY";
+function storyRecord(runId: string, answerId: string, outcome: StoredOutcome): StoryRecordInput {
+  const ready = outcome !== "FAILED";
   return {
     runId,
     answerId,
@@ -97,14 +110,14 @@ function storyRecord(runId: string, answerId: string, outcome: "READY" | "FAILED
     rounds: ready ? 1 : 2,
     artifactRefs: [randomUUID()],
     body: ready ? STORY_TEST_BODY : null,
-    reservation: null,
+    reservation: outcome === "READY_WITH_RESERVATION" ? RESERVATION : null,
     verdictBasis: ready ? STORY_TEST_BASIS : null,
     pointNumbers: ready ? { "node:position": "P1", "node:defeater": "P2" } : null
   };
 }
 
 /** One owner's run with a settled answer and a stored story of the given outcome. */
-async function storiedRun(outcome: "READY" | "FAILED"): Promise<{ runId: string; answerId: string }> {
+async function storiedRun(outcome: StoredOutcome): Promise<{ runId: string; answerId: string }> {
   const marker = `${outcome.toLowerCase()}-${randomUUID()}`;
   const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story publication ${marker}`);
   const { answerId } = await persistTerminalRun({
@@ -158,18 +171,19 @@ describe("publishing copies story_short over the real database (spec §11)", () 
     const { runId, answerId } = await storiedRun("READY");
     const publicRef = await publish(runId, answerId);
     const debate = await application.readPublicDebate(publicRef);
-    expect(debate?.story_short).toEqual({
-      headline: STORY_TEST_BODY.short.headline,
-      summary: STORY_TEST_BODY.short.summary,
-      paths: STORY_TEST_BODY.short.paths,
-      change: STORY_TEST_BODY.short.change,
-      reviewer_note: null,
-      reservation: null
-    });
+    expect(debate?.story_short).toEqual(PUBLIC_SHORT);
     const text = JSON.stringify(debate);
     expect(text).not.toContain("model-a");
     expect(text).not.toContain("e".repeat(64));
     expect(text).not.toContain(STORY_TEST_BODY.long.sections[0]!.title);
+  });
+
+  it("copies a READY_WITH_RESERVATION story without the checker's reservation", async () => {
+    const { runId, answerId } = await storiedRun("READY_WITH_RESERVATION");
+    const publicRef = await publish(runId, answerId);
+    const debate = await application.readPublicDebate(publicRef);
+    expect(debate?.story_short).toEqual(PUBLIC_SHORT);
+    expect(JSON.stringify(debate)).not.toContain("the rent figure");
   });
 
   it("publishes no short story when the stored story FAILED, and keeps today's summary", async () => {

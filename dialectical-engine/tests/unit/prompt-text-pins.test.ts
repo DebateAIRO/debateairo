@@ -479,7 +479,7 @@ describe("VERDICT STORY — the storyteller's and the checker's answer forms", (
   },
   "reviewer_note": null | { "text": non-empty string of at most 1200 characters, "node_refs": [id, ...] }
 }
-short.paths has one entry per position in the positions field, each position exactly once, and at most 8 entries: when there are more than 8 positions it has exactly 8, for the first 8 positions listed. long.sections has 3 to 12 entries and each has 1 to 12 paragraphs. Every node_refs array has at most 40 entries, each copied exactly from an id in the points field, and each position_ref is copied exactly from an id in the positions field. A text may name a point by its id, such as P3, but sparingly, and every point a text rests on must be listed in that entry's node_refs.`);
+short.paths has one entry per position in the positions field, each position exactly once, and at most 8 entries: when there are more than 8 positions it has exactly 8, for the first 8 positions listed. long.sections has 3 to 12 entries and each has 1 to 12 paragraphs. Every node_refs array has at most 40 entries, each copied exactly from an id in the points field, and each position_ref is copied exactly from an id in the positions field. A text may name a point by its id, such as P3, but sparingly, and every point a text rests on must be listed in that entry's node_refs. The texts of short (the headline, the summary, each path line and the change text) never mention a point number such as P3: they are shown on the site, where there is no appendix.`);
   });
 
   it("pins the checker's answer form byte for byte", () => {

@@ -17,6 +17,7 @@ import {
   PostgresPublicationRepository,
   type AuthSourceContext
 } from "@debateai/db";
+import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
@@ -110,27 +111,56 @@ const NO_PUBLICATION_STORIES: PublicationStoryReader = Object.freeze({
   readStoryShort: async () => null
 });
 
+/** A diagnostic the log may carry: an identifier-shaped code or class name, never free text. */
+const STORY_READ_DIAGNOSTIC_SHAPE = /^[A-Za-z][A-Za-z0-9_]{0,63}$/u;
+
+/**
+ * What a failed publish-time story read logs: the error's typed code, or its
+ * class name, and never its message, which may carry a query, an id or story
+ * text. Anything that is not identifier-shaped logs as UNEXPECTED_ERROR.
+ */
+function storyReadDiagnostic(error: unknown): string {
+  const candidate = error instanceof TypedDomainError
+    ? error.code
+    : error instanceof Error ? error.name : null;
+  return candidate !== null && STORY_READ_DIAGNOSTIC_SHAPE.test(candidate) ? candidate : "UNEXPECTED_ERROR";
+}
+
+/** The API's operational log line (one JSON object), as the story route writes it. */
+function logStoryNotPublished(requestId: string, diagnostic: string): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.publication.story_not_published",
+    requestId,
+    diagnostic
+  })));
+}
+
 /**
  * A story that cannot be read never blocks publishing: the snapshot keeps
  * today's summary. A reader that throws, or answers with anything the public
- * schema refuses, publishes no story rather than failing the snapshot's parse.
+ * schema refuses, publishes no story rather than failing the snapshot's parse,
+ * and the log records only a bounded diagnostic.
  */
 async function readPublishableStory(
   stories: PublicationStoryReader,
-  input: Readonly<{ answer: Answer; authenticated: AuthenticatedSession }>
+  input: Readonly<{ answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
 ): Promise<PublicStoryShort | null> {
+  let story: PublicStoryShort | null;
   try {
-    const story = await stories.readStoryShort({
+    story = await stories.readStoryShort({
       answerId: input.answer.answer_id,
       answerVersion: input.answer.answer_version,
       ownerRef: input.authenticated.ownerRef
     });
-    if (story === null) return null;
-    const parsed = PublicStoryShortSchema.safeParse(story);
-    return parsed.success ? parsed.data : null;
-  } catch {
+  } catch (error) {
+    logStoryNotPublished(input.source.requestId, storyReadDiagnostic(error));
     return null;
   }
+  if (story === null) return null;
+  const parsed = PublicStoryShortSchema.safeParse(story);
+  if (parsed.success) return parsed.data;
+  logStoryNotPublished(input.source.requestId, "STORY_PUBLIC_SHORT_REFUSED");
+  return null;
 }
 
 export interface PublicationApplication {

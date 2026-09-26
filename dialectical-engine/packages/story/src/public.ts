@@ -3,9 +3,10 @@ import type { StoredStory } from "./repository.js";
 
 /**
  * The short story a public snapshot may carry (spec §10). Only a READY or
- * READY_WITH_RESERVATION story with a body is published; the checker's
- * reservation travels only with READY_WITH_RESERVATION. Nothing owner-only
- * crosses: no lineage, no point numbers, no verdict basis, no pack.
+ * READY_WITH_RESERVATION story with a body is published. Nothing owner-only
+ * crosses: not the checker's reservation (it names points by numbers only the
+ * owner's appendix explains), no lineage, no point numbers, no verdict basis,
+ * no pack.
  */
 export function toPublicStoryShort(stored: StoredStory): PublicStoryShort | null {
   const ready = stored.outcome === "READY" || stored.outcome === "READY_WITH_RESERVATION";
@@ -15,7 +16,6 @@ export function toPublicStoryShort(stored: StoredStory): PublicStoryShort | null
     summary: stored.body.short.summary,
     paths: stored.body.short.paths,
     change: stored.body.short.change,
-    reviewer_note: stored.body.reviewer_note,
-    reservation: stored.outcome === "READY_WITH_RESERVATION" ? stored.reservation : null
+    reviewer_note: stored.body.reviewer_note
   });
 }

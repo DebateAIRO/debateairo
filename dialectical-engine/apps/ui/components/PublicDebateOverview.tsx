@@ -86,7 +86,8 @@ function ArgumentCard({
 /**
  * The snapshot's short story (spec 2026-09-26 §10) in the shape the shared
  * blocks take. The positions the short version left out are counted from the
- * published tree; a snapshot without a tree counts none.
+ * published tree; a snapshot without a tree counts none. A public snapshot
+ * carries no checker's reservation, so none is passed.
  */
 function publicStoryContent(story: PublicStoryShort, answer: PublicDebate["answer"]): StoryShortContent {
   return {
@@ -95,8 +96,7 @@ function publicStoryContent(story: PublicStoryShort, answer: PublicDebate["answe
     paths: story.paths.map((path) => ({ fate: path.fate, line: path.line, positionRef: path.position_ref })),
     morePaths: Math.max(0, countStoryPositions(answer.nodes ?? [], answer.edges ?? []) - story.paths.length),
     change: story.change.text,
-    reviewerNote: story.reviewer_note === null ? null : story.reviewer_note.text,
-    reservation: story.reservation
+    reviewerNote: story.reviewer_note === null ? null : story.reviewer_note.text
   };
 }
 

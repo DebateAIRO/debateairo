@@ -17,7 +17,9 @@ import type { ContentClassification } from "@debateai/providers";
  * The story's TEXT is not inspected for markup: it is plain-text data, and the
  * site and the PDF never render it as anything else. It is inspected for
  * control and bidirectional-override characters, which can hide or reorder
- * what a reader sees however the text is rendered.
+ * what a reader sees however the text is rendered. The short version's texts
+ * are also refused a point number: they are shown on the public page, where
+ * there is no appendix to look a number up in.
  */
 
 /** What the material offers a story to cite. Built by `buildStoryMaterial`. */
@@ -37,6 +39,15 @@ export interface StoryMaterialIndex {
  * refused in every model text a person reads, the story's and the checker's objection.
  */
 const STORY_TEXT_FORBIDDEN = /[\u0000-\u0008\u000B-\u001F\u202A-\u202E\u2066-\u2069]/u;
+
+/**
+ * A point number (P1, P14) standing as a word of its own. Refused in the short
+ * version's texts (headline, summary, each path line, the change text), which
+ * the public page shows without the appendix that numbers the points; the long
+ * version, the reviewer's note and every node_refs array may still use them.
+ * "P0", "PS" and "MP3" are not point numbers.
+ */
+const STORY_SHORT_POINT_NUMBER = /\bP[1-9][0-9]*\b/u;
 
 export const StoryCheckerVerdictSchema = z.object({
   satisfied: z.boolean(),
@@ -101,6 +112,10 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
   const text = (value: string, at: readonly (string | number)[]): void => {
     if (STORY_TEXT_FORBIDDEN.test(value)) issue(at, "STORY_TEXT_CONTROL_CHARACTER");
   };
+  const shortText = (value: string, at: readonly (string | number)[]): void => {
+    text(value, at);
+    if (STORY_SHORT_POINT_NUMBER.test(value)) issue(at, "STORY_SHORT_POINT_NUMBER");
+  };
   const citations = (refs: readonly string[], at: readonly (string | number)[]): void => {
     refs.forEach((ref, position) => {
       if (!index.nodeIds.has(ref)) issue([...at, "node_refs", position], "STORY_UNKNOWN_NODE_REF");
@@ -108,8 +123,8 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
   };
 
   if (!index.shapeIds.has(body.shape_id)) issue(["shape_id"], "STORY_UNKNOWN_SHAPE");
-  text(body.short.headline, ["short", "headline"]);
-  text(body.short.summary, ["short", "summary"]);
+  shortText(body.short.headline, ["short", "headline"]);
+  shortText(body.short.summary, ["short", "summary"]);
 
   // Past the cap, only the strongest positions may be paths. Under it, every position is among them.
   const strongest = new Set(index.positionOrder.slice(0, index.pathCap));
@@ -127,7 +142,7 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
       issue(["short", "paths", position, "position_ref"], "STORY_PATH_NOT_AMONG_STRONGEST");
     }
     covered.add(path.position_ref);
-    text(path.line, ["short", "paths", position, "line"]);
+    shortText(path.line, ["short", "paths", position, "line"]);
     citations(path.node_refs, ["short", "paths", position]);
   });
   // Every position once while they fit under the cap; exactly the cap beyond it.
@@ -136,7 +151,7 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
     issue(["short", "paths"], "STORY_POSITION_COVERAGE");
   }
 
-  text(body.short.change.text, ["short", "change", "text"]);
+  shortText(body.short.change.text, ["short", "change", "text"]);
   citations(body.short.change.node_refs, ["short", "change"]);
   body.long.sections.forEach((section, sectionIndex) => {
     text(section.title, ["long", "sections", sectionIndex, "title"]);

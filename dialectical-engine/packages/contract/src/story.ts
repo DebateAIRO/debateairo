@@ -120,16 +120,24 @@ const StoryShortShape = StoryBodySchema.shape.short.shape;
 
 /**
  * The short story a public snapshot carries (spec 2026-09-26 §10): the short
- * fields of a READY or READY_WITH_RESERVATION story, the reviewer's note, and
- * the checker's reservation. The long story and the PDF stay owner-only, and so
- * do the lineages, the point numbers, the verdict basis and the pack.
+ * fields of a READY or READY_WITH_RESERVATION story and the reviewer's note.
+ * Everything else stays owner-only: the long story, the PDF, the checker's
+ * reservation (it names points by numbers only the owner's appendix explains),
+ * the lineages, the point numbers, the verdict basis and the pack.
+ *
+ * LIMITS: every member below IS the StoryBodySchema member, so the public
+ * limits mirror the body's short fields and reviewer's note exactly
+ * (tests/unit/story-public-short.test.ts pins them equal). A published
+ * snapshot is immutable ciphertext that is parsed on every public read, so
+ * tightening a limit later, here or in StoryBodySchema itself, makes every
+ * older snapshot that no longer fits fail to parse, and its public page
+ * answers 404.
  */
 export const PublicStoryShortSchema = z.object({
   headline: StoryShortShape.headline,
   summary: StoryShortShape.summary,
   paths: StoryShortShape.paths,
   change: StoryShortShape.change,
-  reviewer_note: StoryBodySchema.shape.reviewer_note,
-  reservation: z.string().nullable()
+  reviewer_note: StoryBodySchema.shape.reviewer_note
 }).strict();
 export type PublicStoryShort = z.infer<typeof PublicStoryShortSchema>;

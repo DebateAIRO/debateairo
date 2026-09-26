@@ -34,8 +34,7 @@ const STORY: PublicStoryShort = {
     { position_ref: "n-not-now", fate: "FELL", line: "Nu acum: a căzut.", node_refs: ["n-not-now"] }
   ],
   change: { text: "Răspunsul s-ar schimba dacă angajatorul refuză lucrul hibrid.", node_refs: ["n-hybrid"] },
-  reviewer_note: { text: "Chiria poate fi mai mică într-un cartier mai ieftin.", node_refs: [] },
-  reservation: "Cifra de 30% vine dintr-o singură sursă."
+  reviewer_note: { text: "Chiria poate fi mai mică într-un cartier mai ieftin.", node_refs: [] }
 };
 
 let root: Root | null = null;
@@ -75,7 +74,6 @@ describe("public page short story (spec §10)", () => {
     expect(text).toContain("What would change the answer:");
     expect(text).toContain("Reviewer's note");
     expect(text).toContain("It does not change the verdict.");
-    expect(text).toContain("Our checker still had a reservation: Cifra de 30% vine dintr-o singură sursă.");
     expect(text).not.toContain("The old two-paragraph summary.");
     expect(verdict.querySelector('.publicStory[data-ai-generated="true"]')).not.toBeNull();
   });
@@ -88,8 +86,15 @@ describe("public page short story (spec §10)", () => {
     expect(container.querySelector(".publicStory")).toBeNull();
   });
 
-  it("leaves out the note and the reservation boxes when the story has none", async () => {
-    const container = await render({ ...STORY, reviewer_note: null, reservation: null });
+  it("leaves out the note box when the story has none, and never shows a checker's reservation", async () => {
+    const withNote = await render(STORY);
+    expect(withNote.querySelector('.storyBox[data-box="note"]')).not.toBeNull();
+    expect(withNote.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
+    expect(withNote.textContent).not.toContain("Our checker still had a reservation");
+    await act(async () => root!.unmount());
+    root = null;
+    document.body.replaceChildren();
+    const container = await render({ ...STORY, reviewer_note: null });
     expect(container.querySelector('.storyBox[data-box="note"]')).toBeNull();
     expect(container.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
   });
@@ -108,14 +113,31 @@ describe("shared short-story blocks (StoryShortBlocks)", () => {
     paths: [{ fate: "SET_ASIDE", line: "Wait a year: set aside.", positionRef: "node:wait" }],
     morePaths: 2,
     change: "A cheaper flat would change it.",
-    reviewerNote: null,
-    reservation: null
+    reviewerNote: null
   };
 
   it("counts the positions the short version left out", async () => {
     const container = await mount(<StoryShortBlocks story={CONTENT} className="ownerStory" />);
     expect(container.querySelector(".storyPathMore")?.textContent).toBe("and 2 more positions");
     expect(container.querySelector('.storyFate[data-fate="SET_ASIDE"]')?.textContent).toBe("Set aside");
+  });
+
+  it("shows the checker's reservation only when the surface passes one (the owner's panel)", async () => {
+    const container = await mount(
+      <StoryShortBlocks story={{ ...CONTENT, reservation: "P7 comes from one source." }} className="ownerStory" />
+    );
+    expect(container.querySelector('.storyBox[data-box="reservation"]')?.textContent)
+      .toBe("Our checker's reservationOur checker still had a reservation: P7 comes from one source.");
+  });
+
+  it("shows no reservation box for a null or absent reservation", async () => {
+    const container = await mount(
+      <>
+        <StoryShortBlocks story={CONTENT} className="absentReservation" />
+        <StoryShortBlocks story={{ ...CONTENT, reservation: null }} className="nullReservation" />
+      </>
+    );
+    expect(container.querySelectorAll(".storyBox")).toHaveLength(0);
   });
 
   it("makes the headline a heading when the surface asks for one, and omits the blocks it lacks", async () => {
