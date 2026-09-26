@@ -250,12 +250,57 @@ function withPoint(point: string | undefined, value: string): string {
   return point === undefined ? value : `${value} (${point})`;
 }
 
+/**
+ * score() rounds to two decimals, so an engine-legal margin of 0.052 against a tie margin of 0.05 would
+ * read "0.05 > 0.05", and a winner of 0.698 "did not reach 0.70" while printed as 0.70. Rounding must
+ * never contradict a comparison: each value and the threshold it is compared with are printed with the
+ * same number of decimals, the fewest from `fewest` to `most` that keep a real difference visible.
+ * Equal values stay at `fewest`; a difference past the last decimal is not chased further.
+ */
+const COMPARE_DECIMALS = Object.freeze({ fewest: 2, most: 4 });
+
+function comparedDecimals(value: number, threshold: number): number {
+  for (let decimals = COMPARE_DECIMALS.fewest; decimals < COMPARE_DECIMALS.most; decimals += 1) {
+    if (value === threshold || value.toFixed(decimals) !== threshold.toFixed(decimals)) return decimals;
+  }
+  return COMPARE_DECIMALS.most;
+}
+
+/** The basis's compared numbers as the verdict page prints them (the decision line, the explanation, the numbers). */
+interface ComparedTexts {
+  readonly winner: string;
+  readonly lowCut: string;
+  readonly highCut: string;
+  readonly margin: string | null;
+  readonly gamma: string;
+  readonly disagreement: string | null;
+  readonly limit: string;
+}
+
+function comparedTexts(basis: VerdictBasis): ComparedTexts {
+  const t = basis.thresholds;
+  // The winner is compared with both cuts (between them, in the middle band), so all three share one precision.
+  const winner = Math.max(comparedDecimals(basis.winner_strength, t.low_cut), comparedDecimals(basis.winner_strength, t.high_cut));
+  const margin = basis.margin === null ? COMPARE_DECIMALS.fewest : comparedDecimals(basis.margin, t.gamma);
+  const disagreement = basis.disagreement === null
+    ? COMPARE_DECIMALS.fewest
+    : comparedDecimals(basis.disagreement, t.disagreement);
+  return {
+    winner: basis.winner_strength.toFixed(winner),
+    lowCut: t.low_cut.toFixed(winner),
+    highCut: t.high_cut.toFixed(winner),
+    margin: basis.margin === null ? null : basis.margin.toFixed(margin),
+    gamma: t.gamma.toFixed(margin),
+    disagreement: basis.disagreement === null ? null : basis.disagreement.toFixed(disagreement),
+    limit: t.disagreement.toFixed(disagreement)
+  };
+}
+
 /** "judges' disagreement 0.12 < 0.25", or the limit alone when the disagreement was not measured. */
-function disagreementBelowLimit(basis: VerdictBasis): string {
-  const limit = score(basis.thresholds.disagreement);
-  return basis.disagreement === null
-    ? `judges' disagreement below ${limit}`
-    : `judges' disagreement ${score(basis.disagreement)} < ${limit}`;
+function disagreementBelowLimit(shown: ComparedTexts): string {
+  return shown.disagreement === null
+    ? `judges' disagreement below ${shown.limit}`
+    : `judges' disagreement ${shown.disagreement} < ${shown.limit}`;
 }
 
 /** A no-break space on both sides of < > ≤ ≥ →, so a comparison is never split across two lines. */
@@ -268,31 +313,31 @@ function decisionLine(basis: VerdictBasis): string {
 }
 
 function decisionWords(basis: VerdictBasis): string {
-  const t = basis.thresholds;
+  const shown = comparedTexts(basis);
   const label = storyLabelWords(basis.label);
-  const winner = score(basis.winner_strength);
-  const margin = basis.margin === null ? "not measured" : score(basis.margin);
+  const winner = shown.winner;
+  const margin = shown.margin ?? "not measured";
   const runner = basis.runner_up_strength === null ? "not scored" : score(basis.runner_up_strength);
   if (basis.trigger === "BASIS_INCOMPLETE") {
     if (basis.runner_up_node_id === null) return `Only one position was argued, so there is no margin to measure → ${label}`;
     if (basis.margin === null) return `The margin over the runner-up could not be measured → ${label}`;
     return `The judges' disagreement could not be measured → ${label}`;
   }
-  if (basis.trigger === "BELOW_LOW_CUT") return `winner ${winner} < ${score(t.low_cut)} → ${label}`;
+  if (basis.trigger === "BELOW_LOW_CUT") return `winner ${winner} < ${shown.lowCut} → ${label}`;
   if (basis.trigger === "MARGIN_WITHIN_GAMMA") {
-    return `winner ${winner}, runner-up ${runner}, margin ${margin} ≤ ${score(t.gamma)} → ${label}`;
+    return `winner ${score(basis.winner_strength)}, runner-up ${runner}, margin ${margin} ≤ ${shown.gamma} → ${label}`;
   }
   if (basis.trigger === "DISAGREEMENT_AT_THRESHOLD") {
-    const disagreed = basis.disagreement === null
-      ? `the judges' disagreement reached the limit of ${score(t.disagreement)}`
-      : `the judges disagreed by ${score(basis.disagreement)} ≥ ${score(t.disagreement)}`;
-    return `margin ${margin} > ${score(t.gamma)}, but ${disagreed} → ${label}`;
+    const disagreed = shown.disagreement === null
+      ? `the judges' disagreement reached the limit of ${shown.limit}`
+      : `the judges disagreed by ${shown.disagreement} ≥ ${shown.limit}`;
+    return `margin ${margin} > ${shown.gamma}, but ${disagreed} → ${label}`;
   }
   if (basis.trigger === "AT_OR_ABOVE_HIGH_CUT") {
-    return `winner ${winner} ≥ ${score(t.high_cut)}, margin ${margin} > ${score(t.gamma)}, ${disagreementBelowLimit(basis)} → ${label}`;
+    return `winner ${winner} ≥ ${shown.highCut}, margin ${margin} > ${shown.gamma}, ${disagreementBelowLimit(shown)} → ${label}`;
   }
   if (basis.trigger === "MID_BAND") {
-    return `winner ${winner} is between ${score(t.low_cut)} and ${score(t.high_cut)}, margin ${margin} > ${score(t.gamma)}, ${disagreementBelowLimit(basis)} → ${label}`;
+    return `winner ${winner} is between ${shown.lowCut} and ${shown.highCut}, margin ${margin} > ${shown.gamma}, ${disagreementBelowLimit(shown)} → ${label}`;
   }
   return `Rule ${basis.rung + 1} decided (${basis.trigger}) → ${label}`;
 }
@@ -301,26 +346,24 @@ function decisionWords(basis: VerdictBasis): string {
  * "ahead of the runner-up by 0.06, more than the tie margin of 0.05 (…)": exactly what the rule checks.
  * A margin just above the tie margin is not "clearly" ahead, so the words never say so.
  */
-function aheadWords(basis: VerdictBasis): string {
-  const gamma = score(basis.thresholds.gamma);
-  const margin = basis.margin === null ? "a margin that was not measured" : score(basis.margin);
-  return `ahead of the runner-up by ${margin}, more than the tie margin of ${gamma} (a lead of ${gamma} or less counts as a tie)`;
+function aheadWords(shown: ComparedTexts): string {
+  const margin = shown.margin ?? "a margin that was not measured";
+  return `ahead of the runner-up by ${margin}, more than the tie margin of ${shown.gamma} (a lead of ${shown.gamma} or less counts as a tie)`;
 }
 
 /** "the judges' disagreement, 0.12, stayed below the limit of 0.25", or the limit alone when it was not measured. */
-function agreementWords(basis: VerdictBasis): string {
-  const limit = score(basis.thresholds.disagreement);
-  return basis.disagreement === null
-    ? `the judges' disagreement stayed below the limit of ${limit}`
-    : `the judges' disagreement, ${score(basis.disagreement)}, stayed below the limit of ${limit}`;
+function agreementWords(shown: ComparedTexts): string {
+  return shown.disagreement === null
+    ? `the judges' disagreement stayed below the limit of ${shown.limit}`
+    : `the judges' disagreement, ${shown.disagreement}, stayed below the limit of ${shown.limit}`;
 }
 
 /** The decision in plain words, for the rule that actually decided; every number comes from the basis. */
 function explanation(basis: VerdictBasis): string {
-  const t = basis.thresholds;
+  const shown = comparedTexts(basis);
   const label = storyLabelWords(basis.label);
   const rule = `rule ${basis.rung + 1}`;
-  const winner = score(basis.winner_strength);
+  const winner = shown.winner;
   switch (basis.trigger) {
     case "BASIS_INCOMPLETE":
       if (basis.runner_up_node_id === null) {
@@ -331,15 +374,15 @@ function explanation(basis: VerdictBasis): string {
       }
       return `The judges' disagreement about the leading position could not be measured, for example because only one judge's score survived. Without it the engine cannot call the question settled, so ${rule} applies and the label is ${label}.`;
     case "BELOW_LOW_CUT":
-      return `Even the leading position scored ${winner}, below ${score(t.low_cut)}, so ${rule} applies and the label is ${label}: a weak case, not a disproved one.`;
+      return `Even the leading position scored ${winner}, below ${shown.lowCut}, so ${rule} applies and the label is ${label}: a weak case, not a disproved one.`;
     case "MARGIN_WITHIN_GAMMA":
-      return `The leading position was ahead by only ${basis.margin === null ? "an unmeasured margin" : score(basis.margin)}, which is ${score(t.gamma)} or less: too close to pick a winner. So ${rule} applies and the label is ${label}.`;
+      return `The leading position was ahead by only ${shown.margin ?? "an unmeasured margin"}, which is ${shown.gamma} or less: too close to pick a winner. So ${rule} applies and the label is ${label}.`;
     case "DISAGREEMENT_AT_THRESHOLD":
-      return `The leading position was ${aheadWords(basis)}, but the judges disagreed about it ${basis.disagreement === null ? "at least as much as" : `by ${score(basis.disagreement)}, reaching`} the limit of ${score(t.disagreement)}. When the judges disagree that much the engine does not call the question settled, so ${rule} applies and the label is ${label}.`;
+      return `The leading position was ${aheadWords(shown)}, but the judges disagreed about it ${shown.disagreement === null ? "at least as much as" : `by ${shown.disagreement}, reaching`} the limit of ${shown.limit}. When the judges disagree that much the engine does not call the question settled, so ${rule} applies and the label is ${label}.`;
     case "AT_OR_ABOVE_HIGH_CUT":
-      return `The leading position scored ${winner}, at or above ${score(t.high_cut)}. It was ${aheadWords(basis)}, and ${agreementWords(basis)}. So ${rule} applies and the label is ${label}.`;
+      return `The leading position scored ${winner}, at or above ${shown.highCut}. It was ${aheadWords(shown)}, and ${agreementWords(shown)}. So ${rule} applies and the label is ${label}.`;
     case "MID_BAND":
-      return `The leading position was ${aheadWords(basis)}, and ${agreementWords(basis)}. But its score of ${winner} did not reach ${score(t.high_cut)}, the score needed for ${storyLabelWords("SUPPORTED")}. So ${rule} applies and the label is ${label}.`;
+      return `The leading position was ${aheadWords(shown)}, and ${agreementWords(shown)}. But its score of ${winner} did not reach ${shown.highCut}, the score needed for ${storyLabelWords("SUPPORTED")}. So ${rule} applies and the label is ${label}.`;
     default:
       return storyLabelSentence(basis.label);
   }
@@ -371,6 +414,8 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
     { condition: `Anything else: the winner scores at least ${score(t.low_cut)} but less than ${score(t.high_cut)}`, result: "CONTESTED" }
   ] as const;
   const marks = basis.marks.map(markWords);
+  // The numbers beside the rule table use the same precision as the decision line, so they never disagree.
+  const shown = comparedTexts(basis);
   return {
     title: REPORT_TITLES.computation,
     intro: COMPUTATION_INTRO,
@@ -384,7 +429,7 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
       applied: basis.rung === rung
     })),
     numbers: [
-      { label: "Winner (the leading position)", value: withPoint(numbers.get(basis.winner_node_id), score(basis.winner_strength)) },
+      { label: "Winner (the leading position)", value: withPoint(numbers.get(basis.winner_node_id), shown.winner) },
       {
         label: "Runner-up",
         value: basis.runner_up_node_id === null
@@ -393,15 +438,15 @@ function computation(basis: VerdictBasis | null, numbers: ReadonlyMap<string, st
       },
       {
         label: "Margin (how far the winner is ahead)",
-        value: basis.margin !== null
-          ? score(basis.margin)
+        value: shown.margin !== null
+          ? shown.margin
           : basis.runner_up_node_id === null ? "Not measured. There was no runner-up." : "Not measured."
       },
       {
         label: "Judges' disagreement",
-        value: basis.disagreement === null
-          ? `Not measured. The limit is ${score(t.disagreement)}.`
-          : `${score(basis.disagreement)} (the limit is ${score(t.disagreement)})`
+        value: shown.disagreement === null
+          ? `Not measured. The limit is ${shown.limit}.`
+          : `${shown.disagreement} (the limit is ${shown.limit})`
       },
       { label: "Label", value: storyLabelWords(basis.label) }
     ],

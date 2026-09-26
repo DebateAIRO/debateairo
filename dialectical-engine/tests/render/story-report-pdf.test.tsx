@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import type { Answer, AnswerStory } from "@debateai/contract";
+// The same module instance renderReport.ts loads (pnpm keeps react-pdf under apps/ui only).
+import { Font } from "../../apps/ui/node_modules/@react-pdf/renderer";
 import { renderReportPdf, reportHyphenation, resolveReportFontDirectory } from "../../apps/ui/lib/report/renderReport.js";
 import {
   STORY_FIXTURE_ANSWER,
@@ -101,6 +103,8 @@ describe("renderReportPdf (spec §10)", () => {
     const pdf = await renderReportPdf({ answer, story, generatedAt: new Date("2026-09-26T12:00:00.000Z") });
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.toString("latin1")).not.toContain("(undefined)");
+    // The renderer registered exactly this rule, so it is the one the PDF above was laid out with.
+    expect(Font.getHyphenationCallback()).toBe(reportHyphenation);
     // The rule the renderer registers: ordinary words stay whole; the address gets zero-width break
     // points (empty syllables) between pieces of at most 20 characters, and not one character is added.
     expect(reportHyphenation("Anunțurile")).toEqual(["Anunțurile"]);

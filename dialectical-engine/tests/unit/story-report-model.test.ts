@@ -303,6 +303,39 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
     expect(computed.explanation).toContain("not a disproved one");
   });
 
+  it("never lets rounding contradict a comparison: a value and its threshold get extra decimals, up to 4, when two would print them alike", () => {
+    const story = storyFixture("READY");
+    story.verdict_basis = {
+      ...story.verdict_basis!, rung: 4, trigger: "MID_BAND",
+      winner_strength: 0.698, runner_up_strength: 0.646, margin: 0.052, disagreement: 0.248,
+      thresholds: { gamma: 0.05, high_cut: 0.7, low_cut: 0.35, disagreement: 0.25 }
+    };
+    const edge = buildReportModel(STORY_FIXTURE_ANSWER, story, GENERATED).computation;
+    expect(edge.decision)
+      .toBe(nb("winner 0.698 is between 0.350 and 0.700, margin 0.052 > 0.050, judges' disagreement 0.248 < 0.250 → Contested"));
+    expect(edge.explanation).toBe(
+      "The leading position was ahead of the runner-up by 0.052, more than the tie margin of 0.050 (a lead of 0.050 or less counts as a tie), and the judges' disagreement, 0.248, stayed below the limit of 0.250. But its score of 0.698 did not reach 0.700, the score needed for Supported. So rule 5 applies and the label is Contested."
+    );
+    // The numbers beside the rule table say the same, so "Winner 0.70" never sits next to "0.70 or more".
+    expect(edge.numbers.slice(0, 4)).toEqual([
+      { label: "Winner (the leading position)", value: "0.698 (P3)" },
+      { label: "Runner-up", value: "0.65 (P1)" },
+      { label: "Margin (how far the winner is ahead)", value: "0.052" },
+      { label: "Judges' disagreement", value: "0.248 (the limit is 0.250)" }
+    ]);
+    // Equal values stay at two decimals, and a difference past the fourth decimal is not chased further.
+    const below = storyFixture("READY");
+    below.verdict_basis = { ...below.verdict_basis!, label: "UNSUPPORTED", rung: 1, trigger: "BELOW_LOW_CUT", winner_strength: 0.349 };
+    expect(buildReportModel(STORY_FIXTURE_ANSWER, below, GENERATED).computation.decision).toBe(nb("winner 0.349 < 0.350 → Unsupported"));
+    const atLimit = storyFixture("READY");
+    atLimit.verdict_basis = { ...atLimit.verdict_basis!, rung: 2, trigger: "DISAGREEMENT_AT_THRESHOLD", margin: 0.17, disagreement: 0.25 };
+    expect(buildReportModel(STORY_FIXTURE_ANSWER, atLimit, GENERATED).computation.decision)
+      .toBe(nb("margin 0.17 > 0.05, but the judges disagreed by 0.25 ≥ 0.25 → Contested"));
+    const tiny = storyFixture("READY");
+    tiny.verdict_basis = { ...tiny.verdict_basis!, margin: 0.0500001 };
+    expect(buildReportModel(STORY_FIXTURE_ANSWER, tiny, GENERATED).computation.decision).toContain("margin 0.0500\u00A0>\u00A00.0500");
+  });
+
   it("words the single-position case plainly, with no missing number printed", () => {
     const story = storyFixture("READY");
     story.verdict_basis = {
@@ -524,5 +557,13 @@ describe("the PDF's text styles (apps/ui/lib/report/ReportDocument.tsx)", () => 
     expect(styles.get("mention")).toMatch(/textDecoration:\s*"underline"/u);
     // A no-break space before each citation marker, so "[P5]" never starts a line on its own.
     expect(source).toContain("`\\u00A0[${span.label}]`");
+  });
+
+  it("never lets story text break between runs (where textkit would print a stray hyphen)", () => {
+    // textkit 7.0.1 treats every run boundary (a word, then a [Pn] marker or an underlined P5) as a
+    // hyphenation point; at its own infinity, 10000, a penalty is never a line break.
+    expect(source).toMatch(/^const NEVER_BREAK_BETWEEN_RUNS = 10000;$/mu);
+    expect(source).toMatch(/<Text style=\{style\} hyphenationPenalty=\{NEVER_BREAK_BETWEEN_RUNS\}>/u);
+    expect(source.match(/hyphenationPenalty=/gu)).toHaveLength(1);
   });
 });
