@@ -482,3 +482,57 @@ with the gate.
 2. **Hosted story cap:** **$0.05 per story**, provisional, adjusted from real costs (see §8 for
    what it implies); counted in the $2 daily cap.
 3. **Public pages get the short story only in v1; the PDF is owner-only:** **agreed.**
+
+## 14. Look-gate revision (owner, 2026-09-26/27)
+
+The owner reviewed the panel mock and the sample PDF and asked for these changes. Where this section and an earlier section disagree, this section wins.
+
+### 14.1 The story talks to the person, never about the engine
+- **What the story leaves out.** Story text never shows scores, thresholds, limits, internal ids, or engine vocabulary: judge, evaluator, checker, reviewer, runner-up, margin, band, rung, "the run", "the engine", "set aside at step…".
+- **What goes in their place.** The content behind those words stays; it is said as a person would say it. A point the debate could not check becomes: what we could not confirm, why, and what to do about it. A set-aside path becomes: what was left out of the conclusion and why (for example, a weak source).
+- **Point references.** `[Pn]` references stay in the PDF wherever they are relevant, because they back the arguments. The site's short texts still carry no point numbers, because the site has no appendix.
+- **A deterministic check refuses score values.** Code knows every score and threshold in the material. Any story text containing one of them, printed with two decimals using "." or "," (for example 0.64 or 0,64), is refused with a code and path repair, `STORY_TEXT_SCORE_VALUE`.
+- **New checker criterion.** `speaks_to_the_person` is false whenever the story uses engine vocabulary or talks about the machinery instead of the question.
+- **Language directive.** The storyteller's prompt carries the run's argument-language directive (dev's `argumentLanguageDirective`), so the story comes out in the question's language.
+- **Style examples.** The owner picked these phrasings in round 1. They go into `common.md` as examples of the tone, not as templates.
+  - a1: „Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar. E o decizie strânsă, pentru că și mutarea imediată are argumente bune, dar varianta treptată vă păstrează câștigul de salariu fără să-i mutați pe copii la jumătatea anului."
+  - b1: „Cât de siguri suntem: destul de siguri, dar totul depinde de un lucru pe care nu îl știm: dacă angajatorul acceptă lucrul hibrid." b3: „Ne-am baza pe acest răspuns, cu o rezervă: dacă găsiți în Cluj o locuință la un preț apropiat, mutarea imediată devine la fel de bună."
+  - c1: „Nu am putut confirma cât de ușor le-ar fi copiilor să schimbe școala, pentru că dezbaterea nu a avut informații despre asta. Merită să întrebați direct școlile din Cluj." c3: „Partea despre școală nu a putut fi verificată. Dacă mutarea la mijlocul anului e o problemă pentru copii, varianta treptată devine și mai potrivită."
+  - d (all three accepted), for example: „Am lăsat deoparte o singură obiecție, pentru că se baza pe o sursă slabă: un comentariu anonim de pe un forum care spunea că angajatorul refuză des lucrul hibrid."
+
+### 14.2 The user always gets an answer
+- **The headline and summary answer the question.** They always state our best answer plainly, including when the label is Contested or Unsupported. "The run did not settle this either way" is removed everywhere.
+- **The label is shown in human words.** The arithmetic label stays the engine's honesty signal, shown as:
+
+  | Engine label | Words the user sees |
+  |---|---|
+  | SUPPORTED | "Clear answer" |
+  | CONTESTED | "Close call" |
+  | UNSUPPORTED | "Best guess, weak evidence" |
+
+  These words are catalogue keys in all 35 locales.
+- **A new `short.confidence` field.** One sentence, written by the storyteller, in the question's language. It says how sure we are in human terms, anchored in this debate: what the answer depends on, or what we would rely on it for (see b1/b3).
+  - It must not claim more certainty than the arithmetic band allows; the checker checks this.
+  - It replaces the generic confidence line on the site and in the PDF.
+- **A new `why` field replaces the "How this verdict was computed" page.** Its shape is `{ reasons: StoryParagraph[1..3], change: StoryParagraph }`: the two or three reasons that decided the answer, and what would change it. The PDF renders it as "Why this answer". The rule table is removed from the PDF.
+- **The checker's reservation text stays internal.** It is stored for the owner; users never see it. On the site and in the PDF it is replaced by a gentle catalogue line: "Parts of this summary could not be fully double-checked."
+- **"About this report" keeps only what a reader can use.** It shows the question, when the report was generated, when the story was written, and which models wrote and checked it. It drops the answer id, pack version, fingerprint, rounds, shape id and label rule.
+- **The story has a small money margin and a fallback.** It may spend up to 20% over its cap: 50,000 × 1.2 = 60,000 µUSD. If even that cannot pay for a call, the story uses the cheapest claim-eligible model that fits, instead of failing. This is part of the engine money rule in §14.4.
+
+### 14.3 Language
+- **Fixed text follows the question's language.** Every fixed string in the story panel, the public short story and the PDF is a catalogue key, with real translations in all 35 locales. The strings are rendered in the question's language: dev's `core.run.argument_language_tag`, exposed through the contract. When that tag is `und`, the interface locale is used.
+- **Offer to switch.** When the question's language differs from the interface locale, the page offers a one-click switch: "This debate is in Romanian. Show the page in Romanian?". If the user declines, the story panel and the PDF stay entirely in the question's language, including headings, labels and buttons. The rest of the site stays in the interface language.
+- **Translation process.** Same as PR #21: AI translator seats work offline, and every locale is checked for exact key sets, plurals, placeholders and non-empty values.
+- **Pending owner decision.** PDFs in non-Latin scripts (bg, ru, uk, el, he, ar, hi, zh, ja, ko) need script fonts, and ar/he need right-to-left layout.
+
+### 14.4 The engine always serves a verdict (pending the owner's yes on the design)
+- **Rule (owner, 2026-09-26).** There is no scenario without a final verdict unless there is a technical problem.
+- **Proposed design:**
+  - a serve reserve set aside at claim time;
+  - up to 20% overrun for the serve phase only, sealed as a new `costEnvelopePolicy` version;
+  - a money stop while the debate is being argued continues into the serve phase instead of stopping;
+  - a cheaper-model fallback for the synthesizer and evaluator, disclosed;
+  - earlier drafts are kept;
+  - deep debates get a compact, shrinking digest like the story's;
+  - a last-resort floor that serves the arithmetic label with a short code-built sentence.
+- **Superseded decisions.** This amends V-28 ("end cleanly at the limit") and closes V-ROLE-1 as "disclosed failover for cost".
