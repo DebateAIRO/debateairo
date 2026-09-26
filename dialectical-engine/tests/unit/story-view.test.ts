@@ -118,7 +118,7 @@ describe("toStoryView (spec §10)", () => {
     expect(view.pdfHref).not.toBeNull();
   });
 
-  it("picks out the first point number the reservation names, for the note beside the PDF link", () => {
+  it("picks out the first point number the reservation names, for the note inside the reservation box", () => {
     const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY_WITH_RESERVATION"), STORY_FIXTURE_DEBATE_ID);
     expect(view.reservationPointNumber).toBe("P5");
     const withReservation = (reservation: string): AnswerStory => ({ ...storyFixture("READY_WITH_RESERVATION"), reservation });
@@ -179,7 +179,7 @@ describe("toStoryView (spec §10)", () => {
     expect(storyLabelSentence("CONTESTED")).toBe(VERDICT_STATE_SENTENCES.contested);
     expect(storyLabelSentence(null)).toContain("without a verdict");
     expect(storyConfidenceWords(null)).toBeNull();
-    expect(storyConfidenceWords("FULL")).toBe("Confidence: full, because none of the checks that can lower it applied");
+    expect(storyConfidenceWords("FULL")).toBe("Confidence: full, because none of the checks that can lower it found a reason to");
     expect(storyConfidenceWords("CAPPED")).toBe("Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued");
     // CAPPED is reached by several rules (the evidence mix, a one-model run, a
     // one-voice panel, a disputed review), so the words give examples and name

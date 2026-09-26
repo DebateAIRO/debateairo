@@ -87,7 +87,7 @@ export function storyLabelSentence(label: Answer["verdict_state"]): string {
  */
 export function storyConfidenceWords(band: string | null): string | null {
   if (band === null) return null;
-  if (band === "FULL") return "Confidence: full, because none of the checks that can lower it applied";
+  if (band === "FULL") return "Confidence: full, because none of the checks that can lower it found a reason to";
   if (band === "CAPPED") {
     return "Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued";
   }

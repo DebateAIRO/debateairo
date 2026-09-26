@@ -348,9 +348,11 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
 
 /**
  * The checker's reservation. It names a point by its number (P5, the rent
- * comparison), as the checker is told to: it is shown only on the owner's
- * panel, beside the PDF whose appendix explains the numbers. The short texts
- * above never name a point number (the story checks refuse one there).
+ * comparison), as the checker is told to. Only the owner sees it: on the
+ * owner's panel, where a note inside the reservation box says such numbers
+ * refer to the numbered points in the full report (PDF), and in that report,
+ * whose appendix lists them. The short texts above never name a point number
+ * (the story checks refuse one there).
  */
 const FIXTURE_RESERVATION =
   "Rezumatul prezintă diferența de chirie din Cluj (P5, circa 30%) ca pe un fapt sigur, deși cifra vine dintr-o singură comparație de anunțuri.";
