@@ -10,12 +10,14 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node scripts/run-node-tests.mjs",
-    "story:mock": "TSX_TSCONFIG_PATH=tsconfig.scripts.json node --import tsx scripts/story-mock.tsx"
+    "story:mock": "TSX_TSCONFIG_PATH=tsconfig.scripts.json node --import tsx scripts/story-mock.tsx",
+    "story:sample-pdf": "TSX_TSCONFIG_PATH=tsconfig.scripts.json node --import tsx scripts/story-sample-pdf.ts"
   },
   "dependencies": {
     "@debateai/contract": "workspace:*",
     "@debateai/kernel": "workspace:*",
     "@debateai/support-kb": "workspace:*",
+    "@react-pdf/renderer": "4.9.0",
     "next": "15.5.25",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -24,6 +26,7 @@
     "@types/node": "26.2.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
+    "fontkit": "2.0.4",
     "typescript": "5.9.3"
   }
 }
