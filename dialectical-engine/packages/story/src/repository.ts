@@ -19,7 +19,7 @@ import {
   type Pool,
   type RunOwnershipAccess
 } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, exhaustive } from "@debateai/kernel";
 
 /**
  * THE STORY ROW (migration 0072, spec §7). Insert-once per answer version, and
@@ -106,7 +106,10 @@ function storyRowInvalid(detail: string): TypedDomainError {
  * a non-empty reservation. FAILED: no body, no reservation, and a failure code.
  * Only FAILED carries a failure code. The body and reservation are sealed, so
  * the table's CHECK cannot see them: the repository holds this rule on the way
- * in and on the way out. Returns the broken rule, or null.
+ * in and on the way out. Returns the broken rule, or null. An outcome outside
+ * the closed vocabulary is itself the broken rule ("outcome"); the switch then
+ * runs over the narrowed member and ends in `exhaustive`, so a fourth outcome
+ * added to the contract fails to compile here instead of passing unchecked.
  */
 function outcomeViolation(
   outcome: string,
@@ -114,7 +117,10 @@ function outcomeViolation(
   body: StoryBody | null,
   reservation: string | null
 ): string | null {
-  switch (outcome) {
+  const known = StoryOutcomeSchema.safeParse(outcome);
+  if (!known.success) return "outcome";
+  const member = known.data;
+  switch (member) {
     case "READY":
       if (body === null) return "READY needs a body";
       if (reservation !== null) return "READY carries no reservation";
@@ -130,7 +136,7 @@ function outcomeViolation(
       if (reservation !== null) return "FAILED carries no reservation";
       return failureCode === null ? "FAILED needs a failure code" : null;
     default:
-      return "outcome";
+      return exhaustive(member);
   }
   return failureCode === null ? null : `${outcome} carries no failure code`;
 }
