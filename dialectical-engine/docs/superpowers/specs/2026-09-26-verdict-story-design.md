@@ -261,7 +261,7 @@ answer), and `goal_marked_as_reading`.
 - Not satisfied and rounds remain → next round with `prior_objection`.
 - Rounds exhausted, last candidate passes the deterministic checks → `READY_WITH_RESERVATION`,
   storing the objection. The site and PDF show it as "Our checker still had a reservation: …".
-- Otherwise → `FAILED`/`STORY_CHECK_FAILED`.
+- A candidate that never passes the deterministic checks fails inside its own call → `FAILED`/`STORY_WRITE_REJECTED`. The other failure codes are `STORY_CHECK_UNAVAILABLE`, `STORY_TRANSPORT_DEATH`, `STORY_ENVELOPE_EXHAUSTED` and `STORY_UNEXPECTED_ERROR` (see the plan's Task 4).
 
 `storyLoopMaxRounds` is provisional at 2.
 
@@ -294,7 +294,7 @@ typical story should take a few minutes.
 
 ## 8. Budgets (the story can never cost the verdict)
 
-- **Its own gateway wrapper**, `createStoryProviderGateway`, next to the run wrapper. It keeps
+- **Its own scope inside the existing gateway wrapper** (`createPostgresProviderGateway`; a request is a story request only when its lane is `"story"` and its call site starts with `STORY:`, and a mismatch is refused). It keeps
   the content lease and the raw-artifact, ledger and usage recording, but:
   - Its attempt allowance is its own: `storyLoopMaxRounds × 2 call sites × attempts` from the
     call-bound rows, counted over `STORY:` call sites only. The run's
@@ -453,8 +453,7 @@ with the gate.
 
 **PDF:**
 - A fixture story renders.
-- The extracted text contains every section title, `[P1]`, and a Romanian sample ("ș ț ă î â")
-  intact.
+- The report model contains every section title and `[P1]`; the embedded fonts' character maps cover a Romanian sample ("ș ț ă î â"). Extracting text from the PDF itself is waived (it would need a PDF-parser dependency); the owner views the sample PDF at the look gate.
 - The appendix lists every node.
 
 ## 12. Out of scope (follow-ups)

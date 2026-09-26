@@ -51,6 +51,7 @@
 - Migrations: the next file is `migrations/0072_answer_story.sql`. It must be idempotent, must never `CREATE OR REPLACE` a function another migration defines, and must never edit an applied migration.
 - New dependency policy: exact version pins; `minimumReleaseAge` 7 days (pick a version published at least 7 days ago); `strictDepBuilds` (add any install-script package to `allowBuilds` explicitly); a clean `pnpm audit --audit-level=moderate`.
 - User-facing site copy is English, plain words. The story itself is in the question's language.
+- "Expected: PASS" on any suite means no failures other than rows already listed in `tests/ci-known-red.txt` (for example the F31 row in `scaffold.test.ts`, and rows in `role-token-map` and `v2ui-pages`). A new failure outside that list is a real failure.
 - Integration suites are NOT in the CI gate; run each task's integration test explicitly, and run the full list in Task 16.
 - Every commit message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Commit only to the feature branch; never push.
 
@@ -263,6 +264,9 @@ All are additive; no name from the Interface Contract is renamed.
 ---
 
 ### Task 1: The `@debateai/story` package and the first shape pack
+
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - Test `names every rule the loader documents` (Step 1) asserts the test's own refusal table against a literal set. Keep it, retitle it to "every documented rule has a refusal row", and keep the per-row loader assertions as the real proof.
 
 **Files:**
 - Create: `packages/story/package.json`
@@ -602,7 +606,7 @@ Expected: FAIL. The suite cannot load because `@debateai/story` does not resolve
 Create `packages/story/package.json`. Its dependencies cover Tasks 1-4; `@debateai/budget` is for Task 4, and declaring it now means the lockfile changes only once:
 
 ```json
-{"name":"@debateai/story","version":"0.1.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@debateai/kernel":"workspace:*","@debateai/contract":"workspace:*","@debateai/providers":"workspace:*","zod":"4.4.3"}}
+{"name":"@debateai/story","version":"0.1.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@debateai/kernel":"workspace:*","@debateai/contract":"workspace:*","@debateai/providers":"workspace:*","@debateai/budget":"workspace:*","zod":"4.4.3"}}
 ```
 
 In the root `package.json`, replace:
@@ -5111,7 +5115,7 @@ export {
 pnpm exec vitest run tests/unit/story-policy.test.ts
 ```
 
-Expected: PASS, 13 tests.
+Expected: PASS, 12 tests.
 
 - [ ] **Step 5: Write the failing publication tests**
 
@@ -5461,6 +5465,9 @@ EOF
 ```
 
 ### Task 6: Migration 0072 and the story repository
+
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - The append-only test must assert the `reject_mutation` refusal message (the trigger's own error text), not a bare `rejects.toThrowError()`, so a permission or syntax error cannot pass as "append-only".
 
 **Files:**
 - Create: `migrations/0072_answer_story.sql`
@@ -5855,7 +5862,7 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
     const runId = await createLegacyStoryRun(database.pool, `story incoherent ${mark}`, `asker:${mark}`);
     const answerId = await answerFor(runId, mark);
     const repository = new StoryRepository(database.pool);
-    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), failureCode: "STORY_CHECK_FAILED" }))
+    await expect(repository.insert({ ...readyRecord(runId, answerId, mark), failureCode: "STORY_WRITE_REJECTED" }))
       .rejects.toThrowError(/answer_story_outcome_is_coherent/u);
     await expect(repository.insert({
       ...readyRecord(runId, answerId, mark), outcome: "FAILED", failureCode: null
@@ -6639,6 +6646,10 @@ EOF
 ```
 
 ### Task 7: Keep the story's allowance apart from the run's
+
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - No verbatim duplication: `storySeam` and `providerSeam` share one private helper for the run-id guard, the price guard, the charge recording and `assertUsageReported`. They differ only in which spent total they read, which ceiling they compare with, which refusal they throw, and which `spendSource` they record.
+> - Spec deviation, accepted: the story scope lives inside `createPostgresProviderGateway` (the lane + `STORY:` pairing), not in a separate `createStoryProviderGateway`. Why: one wrapper per provider target keeps the lease, ledger and usage recording in one place, and the separate allowance the spec asks for is kept by the scope checks. The spec's §8 is amended to say so.
 
 **Files:**
 - Modify: `packages/budget/src/cost-envelope.ts:413-421` (the story refusal after `runCostEnvelopeReached`)
@@ -7911,6 +7922,9 @@ EOF
 
 ### Task 8: The enrichment reader
 
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - The empty-input test titled "…without touching the database" must prove it: pass a pool whose `query` throws or is a spy, and assert it was never called.
+
 **Files:**
 - Create: `packages/story/src/enrichment.ts`
 - Modify: `packages/story/src/index.ts` (append one export block)
@@ -8350,6 +8364,10 @@ EOF
 ```
 
 ### Task 9: StoryWriter, the runner hook and the wiring
+
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - `writeStory` and `checkStory` build their `ProviderCallRequest` through one shared helper, not two 11-member literals.
+> - Spec §11 requires an integration case: **the story envelope is exhausted → the answer is intact**. Add it to `tests/integration/story-end-to-end.test.ts`: a hosted-style story seam with a ceiling below one call's projection leads to a `FAILED` row with `STORY_ENVELOPE_EXHAUSTED`, and the served answer and its label are unchanged.
 
 **Files:**
 - Create: `packages/story/src/writer.ts`
@@ -10182,6 +10200,10 @@ EOF
 
 ### Task 10: Owner story route
 
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - The waiting-window test must not check its own literals. It derives the worst case from the sealed bounds: `readStoryPolicy(buildStoryRegisterRows({ synthesizerRoleRef: "a", evaluatorRoleRef: "b", sourceRef: "t", hosted: false }), 1)` gives rounds × (storyteller attempts × deadline + checker attempts × deadline), and the test asserts that `STORY_WAITING_WINDOW_MS` is at least that.
+> - Spec §11 requires an integration case over the real database: the owner reads the story through the API, and a different owner gets the closed 404 `STORY_NOT_FOUND`. Add it as `tests/integration/story-api.test.ts`, following `tests/integration/s7-authorization-database*` (or the nearest existing database-backed API test), with the story written through `StoryRepository`.
+
 **Files:**
 - Create: `packages/contract/src/lineage.ts` (MakerLineageSchema moves here so `story.ts` can use it without an import cycle)
 - Create: `packages/story/src/status.ts`
@@ -10196,14 +10218,13 @@ EOF
 - Modify: `apps/api/src/index.ts` (:4-7 contract imports, :61 package imports, :76 type import, :1100 policy row, :1277 ApiOptions, :2150-2155 mount after ledger-digest)
 - Modify: `apps/api/src/main.ts` (:57 imports, :444 before `publicationCipher`, :686-727 `buildApi` call)
 - Modify: `apps/api/package.json` (dependency `@debateai/story`)
-- Modify: `tools/orphan-audit/src/index.ts:37` (apps/api edge row gains `story`)
 - Modify: `tests/unit/s7-authorization.test.ts` (:59 matrix row, :338 and :366 closed-404 lists)
 - Modify: `tests/support/shipped-corpus.manifest.txt` (three new shipped paths, checked by `tests/unit/s1-1-depth-contract.test.ts`)
 
 **Repository guards this task meets:**
 - `auditSourceRules` (`tools/orphan-audit/src/index.ts:661`) scans `packages/`, `apps/` and `tools/` minus `apps/ui` (`withoutUiSurface`, :154-157). It refuses the literal text `process.env` and `export const X = <number>;`. `status.ts` exports its window as a frozen object in the `STORY_PACK_LIMITS` style (Task 1). The contract name `STORY_WAITING_WINDOW_MS` is kept as a typed alias read from that object. `apps/api/src/stories.ts` reads no environment.
 - `tests/unit/s1-1-depth-contract.test.ts` scans every `.ts/.tsx/.mts/.mjs` under `packages/`, `apps/` (apps/ui included) and `web/`, and compares the set with `tests/support/shipped-corpus.manifest.txt` by name.
-- The new `apps/api -> story` edge sits inside an existing row of `tools/orphan-audit/src/index.ts`. So `tests/architecture/scaffold.test.ts` needs no edit: its row count (Task 1 set it) is unchanged, and its `violations` assertion goes green only because the row now declares `story`.
+- The new `apps/api -> story` edge is already declared on the `apps/api` row of `tools/orphan-audit/src/index.ts` (Task 1 Step 7). So neither that file nor `tests/architecture/scaffold.test.ts` needs an edit here.
 
 **Interfaces:**
 - Consumes (Task 2, `packages/contract/src/story.ts`): `StoryStatusSchema`, `StoryVerdictBasisSchema` (with `disagreement: z.number().nullable()`), `StoryBodySchema`, `type StoryBody`, `type StoryVerdictBasis`. Task 2's `story.ts` imports only `zod` and must NEVER import `./index.js`: `index.ts` imports `story.ts`, so a back-import is an ES-module cycle whose top-level schema reads hit the temporal dead zone.
@@ -10425,12 +10446,12 @@ describe("verdict story status (spec §7)", () => {
   it("exposes nothing from a row it does not report as ready", () => {
     const response = AnswerStorySchema.parse(buildAnswerStory({
       answerId: STORY_TEST_ANSWER_ID, answerVersion: 2,
-      stored: storedStoryRecord({ outcome: "FAILED", failureCode: "STORY_CHECK_FAILED", body: null }),
-      derived: { status: "UNAVAILABLE", unavailableReason: "STORY_CHECK_FAILED" }
+      stored: storedStoryRecord({ outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", body: null }),
+      derived: { status: "UNAVAILABLE", unavailableReason: "STORY_WRITE_REJECTED" }
     }));
     expect(response).toEqual({
       answer_id: STORY_TEST_ANSWER_ID, answer_version: 2, status: "UNAVAILABLE",
-      unavailable_reason: "STORY_CHECK_FAILED", shape: null, pack: null, written_at: null,
+      unavailable_reason: "STORY_WRITE_REJECTED", shape: null, pack: null, written_at: null,
       storyteller: null, checker: null, rounds: null, reservation: null, verdict_basis: null,
       point_numbers: null, story: null
     });
@@ -10970,17 +10991,7 @@ with:
 "@debateai/settlement":"workspace:*","@debateai/story":"workspace:*",
 ```
 
-In `tools/orphan-audit/src/index.ts:37` replace:
-
-```ts
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers", "support-kb"]],
-```
-
-with:
-
-```ts
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers", "support-kb", "story"]],
-```
+The `apps/api` row of `tools/orphan-audit/src/index.ts` already declares `story` (Task 1 Step 7 added it), so it needs no edit here.
 
 Run: `pnpm install`
 Expected: the lockfile gains the `@debateai/story` link for `apps/api`; no build-script or cooldown error.
@@ -11222,7 +11233,7 @@ Expected: no errors.
 - [ ] **Step 19: Commit**
 
 ```bash
-git add packages/contract/src/lineage.ts packages/contract/src/index.ts packages/contract/src/story.ts packages/contract/src/client.ts packages/story/src/status.ts packages/story/src/index.ts apps/api/src/stories.ts apps/api/src/index.ts apps/api/src/main.ts apps/api/package.json pnpm-lock.yaml tools/orphan-audit/src/index.ts tests/support/storyApiFixtures.ts tests/support/shipped-corpus.manifest.txt tests/unit/story-status.test.ts tests/unit/story-api.test.ts tests/unit/s7-authorization.test.ts
+git add packages/contract/src/lineage.ts packages/contract/src/index.ts packages/contract/src/story.ts packages/contract/src/client.ts packages/story/src/status.ts packages/story/src/index.ts apps/api/src/stories.ts apps/api/src/index.ts apps/api/src/main.ts apps/api/package.json pnpm-lock.yaml tests/support/storyApiFixtures.ts tests/support/shipped-corpus.manifest.txt tests/unit/story-status.test.ts tests/unit/story-api.test.ts tests/unit/s7-authorization.test.ts
 git commit -m "$(cat <<'EOF'
 feat(story): owner story route with the waiting-window status
 
@@ -11239,6 +11250,11 @@ EOF
 ---
 
 ### Task 11: Public short story
+
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - "Position" means what Task 3 means: a node with **no outgoing edge of any kind** (a maker root). An undercutter whose only edge targets an edge is not a position. `countStoryPositions` uses that rule, and the test expectation that counted the undercutter changes from 3 to 2.
+> - No duplicated JSX: the short-story blocks (headline, summary, path list, change line, reviewer's note box, reservation box) live in one shared component, `apps/ui/components/StoryShortBlocks.tsx`, created in this task and rendered by `PublicDebateOverview`. Task 12's `StoryPanel` renders the same component. Add the new file to the shipped-corpus manifest.
+> - Spec §11 requires an integration case: **publishing copies `story_short`** over the real database. Add it to the existing s8 publication integration suite, or as `tests/integration/story-publication.test.ts`: store a READY story, publish, read the public snapshot, and assert that `story_short` is present; a FAILED story leaves it absent.
 
 **Files:**
 - Create: `packages/story/src/public.ts`
@@ -11396,7 +11412,7 @@ describe("toPublicStoryShort", () => {
   });
 
   it("publishes nothing for a FAILED story", () => {
-    expect(toPublicStoryShort(storedStoryRecord({ outcome: "FAILED", failureCode: "STORY_CHECK_FAILED", body: null }))).toBeNull();
+    expect(toPublicStoryShort(storedStoryRecord({ outcome: "FAILED", failureCode: "STORY_WRITE_REJECTED", body: null }))).toBeNull();
   });
 });
 
@@ -12196,6 +12212,10 @@ EOF
 ---
 
 ### Task 12: StoryPanel, its view model, and the owner's mock
+
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - `StoryPanel` renders the short story through `StoryShortBlocks` (created in Task 11), not a second copy of the JSX.
+> - The fixture's `point_numbers` comment must not claim "the material's order". It says these are the stored story's canonical point numbers (Task 3 puts positions strongest first). Tree-order numbering in `pointNumbers.ts` is only a fallback for an answer without a stored story.
 
 **Files:**
 - Create: `apps/ui/lib/v3/verdictStateSentences.ts`
@@ -13578,6 +13598,11 @@ EOF
 
 ### Task 13: The PDF document, fonts and dependency, then the OWNER LOOK GATE
 
+> **Pre-flight rulings (controller, 2026-09-26) — binding for this task; they amend the steps below:**
+> - Reword the `pointNumbers.ts` comment the same way (fallback only; a stored story always carries `point_numbers`).
+> - Spec §11's "extracted PDF text" assertion is WAIVED. With embedded subset fonts the page text is glyph ids, and extracting it needs a PDF-parser dependency. It is covered instead by the report-model tests, the ToUnicode character-map checks, the 150-point render test, and the owner viewing the sample PDF at the look gate.
+> - The implementer does Steps 1–18 and then STOPS, reporting the two absolute artifact paths Step 18 printed. Steps 19–20 (sending the files to the owner, waiting, recording the answer) are the controller's.
+
 **Files:**
 - Create: `apps/ui/assets/fonts/fraunces/Fraunces9pt-Regular.ttf`, `apps/ui/assets/fonts/fraunces/Fraunces9pt-SemiBold.ttf`, `apps/ui/assets/fonts/fraunces/OFL.txt`
 - Create: `apps/ui/assets/fonts/plus-jakarta-sans/PlusJakartaSans-Regular.ttf`, `apps/ui/assets/fonts/plus-jakarta-sans/PlusJakartaSans-Italic.ttf`, `apps/ui/assets/fonts/plus-jakarta-sans/PlusJakartaSans-Bold.ttf`, `apps/ui/assets/fonts/plus-jakarta-sans/OFL.txt`
@@ -14913,10 +14938,10 @@ EOF
 - [ ] **Step 18: OWNER LOOK GATE: produce both artifacts**
 
 ```bash
-mkdir -p /private/tmp/claude-501/verdict-story/mock
-pnpm --filter dialectical-engine-v2ui run story:mock /private/tmp/claude-501/verdict-story/mock/story-panel-mock.html
-pnpm --filter dialectical-engine-v2ui run story:sample-pdf /private/tmp/claude-501/verdict-story/mock/story-report-sample.pdf
-ls -la /private/tmp/claude-501/verdict-story/mock
+out="$(mktemp -d)"
+pnpm --filter dialectical-engine-v2ui run story:mock "$out/story-panel-mock.html"
+pnpm --filter dialectical-engine-v2ui run story:sample-pdf "$out/story-report-sample.pdf"
+ls -la "$out"
 ```
 
 Expected: the two lines `STORY_MOCK_WRITTEN=…/story-panel-mock.html` and `STORY_SAMPLE_PDF_WRITTEN=…/story-report-sample.pdf bytes=…`, and both files listed. The mock is about 7 MB, because each of its 9 previews carries the fonts inline so it opens with no network.
@@ -14925,8 +14950,8 @@ Expected: the two lines `STORY_MOCK_WRITTEN=…/story-panel-mock.html` and `STOR
 
 Send the owner a short plain-words message with both absolute file links, for example:
 
-- The story strip on the debate page, in its four states, at desktop and phone width, and in dark mode: `/private/tmp/claude-501/verdict-story/mock/story-panel-mock.html` (open it in a browser).
-- The full report you would download, from a sample Romanian debate: `/private/tmp/claude-501/verdict-story/mock/story-report-sample.pdf`.
+- The story strip on the debate page, in its four states, at desktop and phone width, and in dark mode: the absolute `story-panel-mock.html` path Step 18 printed (open it in a browser).
+- The full report you would download, from a sample Romanian debate: the absolute `story-report-sample.pdf` path Step 18 printed.
 - Ask: "Does this look right? Reply 'approved', or tell me what to change."
 
 Then STOP. Do not start Task 14 or Task 15 until the owner replies. If the owner asks for changes, make them in the Task 12 or Task 13 files, re-run Steps 16 and 18, commit, send the new files, and wait again.
@@ -15920,8 +15945,8 @@ Expected: success, and the front-door route check prints `AUTH_PRODUCTION_ROUTES
 Run: `pnpm audit --audit-level=moderate`
 Expected: no moderate or higher advisory.
 
-Run: `git diff --name-only --diff-filter=d origin/dev...HEAD | xargs git grep -n '/Users/' --`
-Expected: no output (xargs exits 123 because `git grep` found nothing; that is the pass).
+Run: `git diff --name-only --relative --diff-filter=d origin/dev...HEAD -- . ':(exclude)docs' | xargs -r git grep -n '/Users/' --`
+Expected: no output (the plan and spec under `docs/` quote the pattern and are excluded; `-r` keeps an empty list from grepping the whole tree).
 
 - [ ] **Step 8: Write the owner's plain summary**
 
