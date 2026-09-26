@@ -1,11 +1,18 @@
 import { z } from "zod";
-import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
 export const AskTierSourceSchema = z.enum(["ASKER", "MACHINE_DEFAULT"]);
 export const CompositionBudgetTierSchema = z.enum(["low", "medium", "high"]);
+/**
+ * Model-scorecard design, the model-strength control (owner ruling R2): Economy, Balanced or
+ * Best, minted in @debateai/kernel. OPTIONAL on the ask, because "absent" must stay
+ * distinguishable: the default is the active scorecard's pickerSettings.defaultStrength, or
+ * BALANCED when there is none.
+ */
+export const ModelStrengthSchema = z.enum(MODEL_STRENGTHS);
 export const WayOfKnowingSchema = z.enum(["LOOKED_UP", "RAN", "REASONING"]);
 export const CheckStatusSchema = z.enum(["PASS", "FAIL", "NOT_SAMPLED"]);
 export const StalenessStateSchema = z.enum(["FRESH", "UNDER_REVIEW", "STALE", "ARCHIVED_REVIVED"]);
@@ -142,13 +149,19 @@ export const AskRequestSchema = z.object({
   as_of: z.iso.datetime(),
   steering_presets: z.array(z.string().trim().min(1)),
   plan_tier: PlanTierSchema,
+  model_strength: ModelStrengthSchema.optional(),
   steering_annotations: z.array(z.string().min(1))
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
 export const AskAcceptedSchema = z.object({
   run_ref: z.string().min(1),
-  status: z.literal("QUEUED")
+  status: z.literal("QUEUED"),
+  // Model-scorecard design, cost estimate before a run: the strength the picker applied, and
+  // whether the per-run money ceiling stepped it down. Optional, so an accepted ask without
+  // them reads exactly as before.
+  model_strength_applied: ModelStrengthSchema.optional(),
+  model_strength_stepped_down: z.boolean().optional()
 }).strict();
 export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
 

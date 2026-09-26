@@ -394,6 +394,7 @@ packages/graph/src/index.ts
 packages/judgement/src/index.ts
 packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
+packages/kernel/src/debate-roles.ts
 packages/kernel/src/index.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts

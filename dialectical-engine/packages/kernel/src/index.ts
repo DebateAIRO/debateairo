@@ -420,6 +420,7 @@ export function isRunLevelSpendStop(error: unknown): boolean {
     && (RUN_LEVEL_SPEND_STOP_CODES as readonly string[]).includes(code);
 }
 
+export * from "./debate-roles.js";
 export * from "./support-credentials.js";
 export * from "./support-text-views.js";
 
