@@ -5525,6 +5525,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "STOPPING_ROOT_STRENGTH_UNRESOLVED",
   "STOPPING_ROUND_COUNT_INVALID",
   "STORED_RESULT_MISSING",
+  "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
   "STRENGTH_LINEAGE_UNRESOLVED",
   "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
   "STRUCTURAL_CEILING_COMPOSITIONSEGMENTCAP_INVALID",
@@ -6178,6 +6179,13 @@ export function declareHatchetWalkingSkeletonTask(input: {
   });
 }
 
+/**
+ * Verdict story: the call-site namespace the story allowance accepts and the
+ * run allowance refuses (spec 2026-09-26 §8). `packages/story` mints the keys
+ * (`storyCallSiteKey`); this file only recognises the prefix.
+ */
+const STORY_CALL_SITE_PREFIX = "STORY:";
+
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction">
@@ -6190,13 +6198,21 @@ export function createPostgresProviderGateway(
        * value. Absent = no money bound, which is local mode byte-for-byte.
        */
       readonly buildCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
+      /**
+       * Verdict story (spec §8): the STORY's own money bound, built per call
+       * from the leased run exactly as the run's is. A story call on a metered
+       * gateway (one with `buildCostEnvelopeSeam`) that has no story seam is
+       * refused, so a story can never spend unbounded where the debate cannot.
+       */
+      readonly buildStoryCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
+  const { buildStoryCostEnvelopeSeam, ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
-    ...gatewayOptions,
+    ...httpOptions,
     assertNoOpenWriteTransaction,
     persistRawArtifact: (artifact) => ledger.appendRawArtifact(artifact),
     appendLedgerEntry: async (entry) => (await ledger.append(entry)).ledgerEntryId
@@ -6207,6 +6223,25 @@ export function createPostgresProviderGateway(
         throw new TypedDomainError(
           "PROVIDER_RUN_REQUIRED",
           "Every provider content operation must be bound to one leased run"
+        );
+      }
+      /**
+       * Verdict story — THE STORY SCOPE, decided before anything is read. The
+       * lane and the call-site namespace must agree: a story lane on a debate
+       * call site would hide a debate call in the story's allowance, and a
+       * STORY: call site on a debate lane would bill a story to the run.
+       */
+      const storyScope = request.lane === "story";
+      if (storyScope !== request.callSiteKey.startsWith(STORY_CALL_SITE_PREFIX)) {
+        throw new TypedDomainError(
+          "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
+          "A story call and the STORY: call-site namespace must agree"
+        );
+      }
+      if (storyScope && buildStoryCostEnvelopeSeam === undefined && buildCostEnvelopeSeam !== undefined) {
+        throw new TypedDomainError(
+          "STORY_ENVELOPE_MISSING",
+          "A metered deployment makes no story call without the story's own money bound"
         );
       }
       // S06 gateway seam, restored with the task binding above (e8d99d33,
@@ -6240,7 +6275,11 @@ export function createPostgresProviderGateway(
         }
       }
       return withRunContentLease(pool,[leasedRunId],async () => {
-      if (!authenticatedEvaluatorScope) {
+      // Verdict story: the story's attempts are its own. Each STORY: call site
+      // is bounded by its sealed call bound (the per-site count below), and the
+      // rounds by `storyLoopMaxRounds`; the RUN's ceiling is never consulted,
+      // so a debate that used every attempt still gets its story.
+      if (!authenticatedEvaluatorScope && !storyScope) {
         await budget.assertModelAttemptAllowed(leasedRunId);
       }
       const consumed = await ledger.countModelAttempts({
@@ -6261,7 +6300,7 @@ export function createPostgresProviderGateway(
           // retry loop (B26c's hook, wired here), not only once per call; the refusal is the
           // run's own RUN_COST_ENVELOPE_EXHAUSTED and no ledger row is written for it. The
           // run id is the leased one the S06 seam bound above, not a re-read of the request.
-          ...(authenticatedEvaluatorScope ? {} : {
+          ...(authenticatedEvaluatorScope || storyScope ? {} : {
             assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId)
           }),
           /**
@@ -6272,10 +6311,17 @@ export function createPostgresProviderGateway(
            * the same paid vendor with the same money, so exempting them from the
            * money ceiling would leave a hole the size of the evaluator leg. The run
            * id is the leased one, for the same reason as the attempt hook above.
+           *
+           * Verdict story: a story call is bound by the STORY's seam instead —
+           * its own ceiling, summed over STORY charges only.
            */
-          ...(buildCostEnvelopeSeam === undefined ? {} : {
-            costEnvelope: buildCostEnvelopeSeam(leasedRunId)
-          })
+          ...(storyScope
+            ? (buildStoryCostEnvelopeSeam === undefined ? {} : {
+              costEnvelope: buildStoryCostEnvelopeSeam(leasedRunId)
+            })
+            : (buildCostEnvelopeSeam === undefined ? {} : {
+              costEnvelope: buildCostEnvelopeSeam(leasedRunId)
+            }))
         });
       } catch (error) {
         capture?.emit(captureFailureEnvelope({

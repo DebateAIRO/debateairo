@@ -62,11 +62,15 @@ function fakeStore(seed: readonly ModelSpendEntry[] = []) {
     .filter((row) => row.chargedOn === day)
     .reduce((total, row) => total + row.chargeMicros, 0);
   const spentByRun = (runId: string) => rows
-    .filter((row) => row.runId === runId)
+    .filter((row) => row.runId === runId && row.spendSource !== "STORY")
+    .reduce((total, row) => total + row.chargeMicros, 0);
+  const storySpentByRun = (runId: string) => rows
+    .filter((row) => row.runId === runId && row.spendSource === "STORY")
     .reduce((total, row) => total + row.chargeMicros, 0);
   const store: ModelSpendStore = {
     recordSpend: async (entry) => { rows.push(entry); },
     readRunSpentMicros: async (runId) => spentByRun(runId),
+    readRunStorySpentMicros: async (runId) => storySpentByRun(runId),
     readDaySpentMicros: async (day) => spentOn(day),
     admitNewRun: async (input) => {
       const run = queue.then(async () => {

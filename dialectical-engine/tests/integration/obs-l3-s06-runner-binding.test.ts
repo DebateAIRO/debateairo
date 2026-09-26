@@ -515,8 +515,9 @@ export async function resolve(specifier, context, nextResolve) {
       // missing here. INT3 (the Task 11 merge) brought \`readCostEnvelopePolicy\`
       // onto the same line — the hosted start-up's fail-closed read of the
       // sealed money ceilings — and this case went RED at link time again
-      // until the stub caught up.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {}",
+      // until the stub caught up. The verdict story (Task 7) added
+      // \`readStoryPolicyFromRegister\`, the optional story rows' boot read.
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {

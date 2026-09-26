@@ -22,6 +22,7 @@ export {
   PROJECTED_INPUT_BYTES_PER_TOKEN,
   PROVIDER_USAGE_UNREPORTED,
   RUN_COST_ENVELOPE_MONEY_REACHED,
+  STORY_COST_ENVELOPE_REACHED,
   chargeMicrosForUsage,
   chargeableUsage,
   costEnvelopeDay,
@@ -33,6 +34,7 @@ export {
   readReportedUsage,
   readUsageCounters,
   runCostEnvelopeReached,
+  storyCostEnvelopeReached,
   type DailyCostEnvelopeDecision,
   type ProviderTargetPrice,
   type ReportedUsage,
@@ -446,6 +448,7 @@ export class BudgetRepository {
       `SELECT count(*)::text AS count
        FROM ledger.ledger_entry
        WHERE run_id = $1 AND action_kind = 'MODEL_CALL'
+         AND call_site_key NOT LIKE 'STORY:%'
          AND NOT evaluator.ledger_entry_is_authenticated_scope(ledger_entry_id)`,
       [runId]
     );

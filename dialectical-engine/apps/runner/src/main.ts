@@ -10,10 +10,12 @@ import {
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
+import { TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
   loadRunnerEnvironment,
-  readCostEnvelopePolicy
+  readCostEnvelopePolicy,
+  readStoryPolicyFromRegister
 } from "@debateai/register";
 import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -67,6 +69,24 @@ if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   ));
 }
 const policy = await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION);
+/**
+ * VERDICT STORY (spec 2026-09-26 §9): the story's register rows are OPTIONAL.
+ * A register that never sealed them — every version before this feature,
+ * acceptance v3 included — reads as `null`, and each story is then written as
+ * FAILED/STORY_NOT_CONFIGURED without a model call. A PARTLY sealed or
+ * malformed family is logged by code and treated the same way: the story can
+ * never stop this runner from claiming a debate.
+ */
+const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
+  .catch((error: unknown) => {
+    console.warn(JSON.stringify({
+      kind: "DEBATEAI_STORY",
+      event: "STORY_POLICY_UNREADABLE",
+      code: error instanceof TypedDomainError ? error.code : "UNTYPED"
+    }));
+    return null;
+  });
+const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
 const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
 if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
@@ -108,7 +128,11 @@ const hatchet = new Hatchet({
 const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
   ? new CostEnvelopeGuard({
       store: new PostgresModelSpendStore(pool),
-      policy: await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+      policy: {
+        ...(await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)),
+        // Verdict story: the story's OWN ceiling, when the register sealed one.
+        ...(storyCeilingMicros === null ? {} : { perStoryCeilingMicros: storyCeilingMicros })
+      }
     })
   : undefined;
 const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
@@ -128,6 +152,14 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       // to report usage: a call that cannot be billed cannot be bounded.
       buildCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.providerSeam({
         runId, price, requireReportedUsage: true
+      }),
+      // Verdict story (spec §8): the story's calls spend its OWN envelope. With
+      // no sealed story ceiling there is no story seam, and the gateway refuses
+      // a metered story call (STORY_ENVELOPE_MISSING) rather than run it unbounded.
+      ...(storyCeilingMicros === null ? {} : {
+        buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({
+          runId, price, requireReportedUsage: true
+        })
       })
     })
   });

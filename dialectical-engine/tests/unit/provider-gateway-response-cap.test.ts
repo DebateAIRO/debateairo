@@ -77,6 +77,7 @@ function meteredGatewayWith(
   const store: ModelSpendStore = {
     recordSpend: async (entry) => { rows.push(entry); },
     readRunSpentMicros: async () => 0,
+    readRunStorySpentMicros: async () => 0,
     readDaySpentMicros: async () => 0,
     admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
   };

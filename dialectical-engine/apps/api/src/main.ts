@@ -31,6 +31,7 @@ import {
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
+  readStoryPolicyFromRegister,
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
@@ -238,8 +239,18 @@ await boot.run("support-admission-scopes", async () => {
 const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
   ? new CostEnvelopeGuard({
       store: new PostgresModelSpendStore(pool),
-      policy: await boot.run("cost-envelope-policy",
-        () => readCostEnvelopePolicy(pool, environment.REGISTER_VERSION))
+      policy: await boot.run("cost-envelope-policy", async () => {
+        const runPolicy = await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION);
+        // Verdict story (spec §8): an admitted run may also write its story,
+        // whose spend counts toward the day, so the day reserves the story's own
+        // ceiling beside the run's. The rows are OPTIONAL: a register without
+        // them, or with a malformed family, reserves the run's ceiling alone.
+        const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
+          .catch(() => null);
+        return storyPolicy === null || storyPolicy.perStoryCeilingMicros === null
+          ? runPolicy
+          : { ...runPolicy, perStoryCeilingMicros: storyPolicy.perStoryCeilingMicros };
+      })
     })
   : undefined;
 await boot.run("product-role-policy", () => readProductRolePolicy(pool, environment.REGISTER_VERSION));

@@ -13,7 +13,14 @@ export const MODEL_ROLES = [
   "JUDGE", "COMPOSER", "CONFORMANCE", "CLASSIFIER", "SYNTHESIZER", "EVALUATOR"
 ] as const;
 export type TypedRole = typeof MODEL_ROLES[number];
-export type Lane = "served" | "uniform-panel" | "critic-exempt" | "evaluator";
+/**
+ * `story` (verdict story, spec §8): the post-settle storyteller and checker
+ * calls. The runner's gateway pairs it with the `STORY:` call-site namespace,
+ * and a story call spends the story's own allowance, never the run's. A lane is
+ * never persisted: `migrations/0015_s12.sql`'s `lane` CHECK belongs to
+ * `scorecard.routing_decision`, the settlement router's own record.
+ */
+export type Lane = "served" | "uniform-panel" | "critic-exempt" | "evaluator" | "story";
 
 export interface CallBound {
   readonly maxAttempts: number;

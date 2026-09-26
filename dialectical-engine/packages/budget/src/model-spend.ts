@@ -34,11 +34,18 @@ import {
   providerUsageUnreported,
   readReportedUsage,
   runCostEnvelopeReached,
-  type ProviderTargetPrice
+  storyCostEnvelopeReached,
+  type ProviderTargetPrice,
+  type RunCostEnvelopeDecision
 } from "./cost-envelope.js";
 
-/** Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat. */
-export type ModelSpendSource = "RUN" | "SUPPORT";
+/**
+ * Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat;
+ * `STORY` is the verdict story written after a debate settled (migration 0072).
+ * A STORY charge names its run and counts toward the DAY, but never toward the
+ * run's own envelope: the story can never cost the verdict (spec §8).
+ */
+export type ModelSpendSource = "RUN" | "SUPPORT" | "STORY";
 
 export interface ModelSpendEntry {
   readonly spendId: string;
@@ -60,8 +67,13 @@ export interface ModelSpendEntry {
  */
 export interface ModelSpendStore {
   recordSpend(entry: ModelSpendEntry): Promise<void>;
-  /** Everything this ONE run has been charged, across every vendor it touched. */
+  /**
+   * Everything this ONE run's DEBATE has been charged, across every vendor it
+   * touched. STORY charges are excluded: the story has its own envelope.
+   */
   readRunSpentMicros(runId: string): Promise<number>;
+  /** Everything this run's verdict STORY has been charged (spend source STORY only). */
+  readRunStorySpentMicros(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
   /**
@@ -107,7 +119,16 @@ export interface ProviderCostSeam {
 
 export interface CostEnvelopeGuardInput {
   readonly store: ModelSpendStore;
-  readonly policy: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number }>;
+  readonly policy: Readonly<{
+    perRunCeilingMicros: number;
+    dailyCeilingMicros: number;
+    /**
+     * Verdict story: the story's OWN money ceiling, from the optional
+     * `storyCostEnvelopePolicy` row. Absent means no story seam can be built,
+     * and the daily admission reserves the run's ceiling alone, as before.
+     */
+    perStoryCeilingMicros?: number;
+  }>;
   /** Seam for "now", so the day boundary is testable without waiting for midnight. */
   readonly clock?: () => Date;
   /**
@@ -156,6 +177,17 @@ export interface CostEnvelopeGuardInput {
 
 export const DEFAULT_RESERVATION_TTL_MS = 1_800_000 as const;
 
+/** The two spend sources a gateway money seam charges (the support chat keeps its own accounting). */
+type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY">;
+
+/** What a metered seam spends against: see `CostEnvelopeGuard.#envelopeFor`. */
+interface MeteredEnvelope {
+  readonly spendSource: MeteredSpendSource;
+  readonly ceilingMicros: number;
+  readSpentMicros(runId: string): Promise<number>;
+  refusal(decision: Extract<RunCostEnvelopeDecision, { kind: "WOULD_CROSS" }>): TypedDomainError;
+}
+
 export interface ProviderSeamInput {
   readonly runId: string;
   readonly price: ProviderTargetPrice;
@@ -176,7 +208,7 @@ export interface ProviderSeamInput {
  */
 export class CostEnvelopeGuard {
   readonly #store: ModelSpendStore;
-  readonly #policy: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number }>;
+  readonly #policy: CostEnvelopeGuardInput["policy"];
   readonly #clock: () => Date;
   readonly #reservationTtlMs: number;
 
@@ -186,6 +218,10 @@ export class CostEnvelopeGuard {
     }
     this.#store = input.store;
     this.#policy = input.policy;
+    const storyCeiling = input.policy.perStoryCeilingMicros;
+    if (storyCeiling !== undefined && (!Number.isSafeInteger(storyCeiling) || storyCeiling < 1)) {
+      throw new TypeError("STORY_ENVELOPE_POLICY_INVALID");
+    }
     this.#clock = input.clock ?? (() => new Date());
     const ttl = input.reservationTtlMs ?? DEFAULT_RESERVATION_TTL_MS;
     if (!Number.isInteger(ttl) || ttl < 1) throw new TypeError("COST_ENVELOPE_RESERVATION_TTL_INVALID");
@@ -202,9 +238,34 @@ export class CostEnvelopeGuard {
    * finishes, which is V-28(2) in as many words.
    */
   providerSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "RUN");
+  }
+
+  /**
+   * VERDICT STORY — THE STORY'S OWN MONEY SEAM (spec §8), in the shape the
+   * gateway consumes. The per-run seam's rules, built by the same body, with
+   * the four differences `#envelopeFor` names and no others: it sums STORY
+   * charges only, compares them with `perStoryCeilingMicros`, refuses with
+   * STORY_COST_ENVELOPE_REACHED, and charges STORY rows. So a debate that has
+   * spent its whole envelope does not stop its story, and a story can never
+   * spend the debate's envelope. With no sealed story ceiling there is no
+   * story seam at all (STORY_ENVELOPE_MISSING).
+   */
+  storySeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "STORY");
+  }
+
+  /**
+   * THE ONE BODY OF BOTH MONEY SEAMS. The run-id guard, the price guard, the
+   * charge and the hosted usage requirement are the same rules for a debate
+   * call and a story call, so they are written once; only the envelope
+   * (`#envelopeFor`) differs.
+   */
+  #meteredSeam(input: ProviderSeamInput, spendSource: MeteredSpendSource): ProviderCostSeam {
     if (typeof input?.runId !== "string" || input.runId.trim() === "") {
       throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
     }
+    const envelope = this.#envelopeFor(spendSource);
     /**
      * C2 (review round 2), the second layer. `assertPricedProviderTargets`
      * refuses a zero-priced target at boot; this refuses to BUILD a metered
@@ -226,11 +287,11 @@ export class CostEnvelopeGuard {
     return {
       assertCallAllowed: async (projection) => {
         const decision = decideRunCostEnvelope({
-          spentMicros: await this.#store.readRunSpentMicros(input.runId),
+          spentMicros: await envelope.readSpentMicros(input.runId),
           projectedMicros: projectedCallCeilingMicros(input.price, projection),
-          ceilingMicros: this.#policy.perRunCeilingMicros
+          ceilingMicros: envelope.ceilingMicros
         });
-        if (decision.kind === "WOULD_CROSS") throw runCostEnvelopeReached(decision);
+        if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
       },
       // I4: charging never refuses. Nothing is written for a call whose vendor
       // said nothing at all about usage — a zero row would read as "this call
@@ -265,7 +326,7 @@ export class CostEnvelopeGuard {
         }
         await this.#store.recordSpend(Object.freeze({
           spendId: randomUUID(),
-          spendSource: "RUN",
+          spendSource: envelope.spendSource,
           runId: input.runId,
           providerRef: observed.providerRef,
           chargedOn: costEnvelopeDay(this.#clock()),
@@ -284,6 +345,36 @@ export class CostEnvelopeGuard {
   }
 
   /**
+   * Which envelope a metered seam spends — the ONLY four things the run's seam
+   * and the story's seam do differently: the spent total they read, the
+   * ceiling they compare it with, the refusal they raise, and the spend source
+   * they charge.
+   */
+  #envelopeFor(spendSource: MeteredSpendSource): MeteredEnvelope {
+    if (spendSource === "RUN") {
+      return Object.freeze({
+        spendSource: "RUN",
+        ceilingMicros: this.#policy.perRunCeilingMicros,
+        readSpentMicros: (runId: string) => this.#store.readRunSpentMicros(runId),
+        refusal: runCostEnvelopeReached
+      });
+    }
+    const ceilingMicros = this.#policy.perStoryCeilingMicros;
+    if (ceilingMicros === undefined) {
+      throw new TypedDomainError(
+        "STORY_ENVELOPE_MISSING",
+        "A metered story seam needs the sealed storyCostEnvelopePolicy row"
+      );
+    }
+    return Object.freeze({
+      spendSource: "STORY",
+      ceilingMicros,
+      readSpentMicros: (runId: string) => this.#store.readRunStorySpentMicros(runId),
+      refusal: storyCostEnvelopeReached
+    });
+  }
+
+  /**
    * THE DAILY GUARD, asked when a NEW run is requested and at no other time.
    *
    * It is deliberately not consulted per call: V-28(2) stops the next run, not
@@ -294,7 +385,9 @@ export class CostEnvelopeGuard {
     const now = this.#clock();
     const outcome = await this.#store.admitNewRun({
       day: costEnvelopeDay(now),
-      reservedMicros: this.#policy.perRunCeilingMicros,
+      // Verdict story: an admitted run may also write its story, whose spend
+      // counts toward the day, so the day reserves both ceilings at once.
+      reservedMicros: this.#policy.perRunCeilingMicros + (this.#policy.perStoryCeilingMicros ?? 0),
       now,
       expiresAt: new Date(now.getTime() + this.#reservationTtlMs),
       // ONE definition of the ceiling, passed in rather than restated in SQL.
@@ -325,8 +418,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   constructor(private readonly pool: Pool) {}
 
   async recordSpend(entry: ModelSpendEntry): Promise<void> {
-    if (entry.spendSource === "RUN" && entry.runId === null) {
-      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run charge must name its run");
+    if ((entry.spendSource === "RUN" || entry.spendSource === "STORY") && entry.runId === null) {
+      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run or story charge must name its run");
     }
     await this.pool.query(
       `INSERT INTO ledger.model_spend (
@@ -342,7 +435,17 @@ export class PostgresModelSpendStore implements ModelSpendStore {
 
   async readRunSpentMicros(runId: string): Promise<number> {
     const result = await this.pool.query<{ total: string }>(
-      "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE run_id = $1",
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source <> 'STORY'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readRunStorySpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'STORY'`,
       [runId]
     );
     return this.#total(result.rows[0]?.total);
