@@ -49,11 +49,12 @@ if (!siteCss.includes("/* === verdict-story === */") || !siteCss.includes("/* ==
   throw new Error("STORY_MOCK_CSS_MISSING: the verdict-story block is not in app/globals.css");
 }
 
+// Only the faces the panel uses: the sans at 400 and 700 (the browser draws the panel's 600 with the
+// 700 face) and the display serif's 600 for the headline. Every preview carries its own copy, so each
+// extra face would be paid ten times over. JetBrains Mono is not vendored; the system monospace stands in.
 const FONT_FACES = [
-  { family: "Fraunces", weight: 400, style: "normal", file: "assets/fonts/fraunces/Fraunces9pt-Regular.ttf" },
   { family: "Fraunces", weight: 600, style: "normal", file: "assets/fonts/fraunces/Fraunces9pt-SemiBold.ttf" },
   { family: "Plus Jakarta Sans", weight: 400, style: "normal", file: "assets/fonts/plus-jakarta-sans/PlusJakartaSans-Regular.ttf" },
-  { family: "Plus Jakarta Sans", weight: 400, style: "italic", file: "assets/fonts/plus-jakarta-sans/PlusJakartaSans-Italic.ttf" },
   { family: "Plus Jakarta Sans", weight: 700, style: "normal", file: "assets/fonts/plus-jakarta-sans/PlusJakartaSans-Bold.ttf" }
 ] as const;
 

@@ -28,6 +28,12 @@ describe("the owner's story mock (look first, then wire)", () => {
     expect(html).toContain("Ar trebui să ne mutăm cu familia din București la Cluj");
     expect(html).toContain("Point numbers like P5 refer to the numbered points in the full report (PDF).");
     expect(html).not.toMatch(/<script|https?:\/\//);
+    // The vendored fonts are inlined, but only the three faces the panel uses (Plus Jakarta Sans 400 and
+    // 700, Fraunces 600), once in the page and once in each of the 10 previews.
+    expect(html).not.toContain("fonts are not bundled yet");
+    expect(html.match(/@font-face \{/g)).toHaveLength(33);
+    expect(html.match(/data:font\/ttf;base64,/g)).toHaveLength(33);
+    expect(html.match(/font-style: italic; font-weight: \d+; src: url\(data:/g)).toBeNull();
   }, 125_000);
 
   it("fails loudly without an output path", () => {
