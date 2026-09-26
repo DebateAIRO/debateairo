@@ -20,7 +20,7 @@
  * further migration.
  */
 import { randomUUID } from "node:crypto";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, exhaustive } from "@debateai/kernel";
 import type { Pool } from "pg";
 import {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
@@ -351,27 +351,32 @@ export class CostEnvelopeGuard {
    * they charge.
    */
   #envelopeFor(spendSource: MeteredSpendSource): MeteredEnvelope {
-    if (spendSource === "RUN") {
-      return Object.freeze({
-        spendSource: "RUN",
-        ceilingMicros: this.#policy.perRunCeilingMicros,
-        readSpentMicros: (runId: string) => this.#store.readRunSpentMicros(runId),
-        refusal: runCostEnvelopeReached
-      });
+    switch (spendSource) {
+      case "RUN":
+        return Object.freeze({
+          spendSource: "RUN",
+          ceilingMicros: this.#policy.perRunCeilingMicros,
+          readSpentMicros: (runId: string) => this.#store.readRunSpentMicros(runId),
+          refusal: runCostEnvelopeReached
+        });
+      case "STORY": {
+        const ceilingMicros = this.#policy.perStoryCeilingMicros;
+        if (ceilingMicros === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered story seam needs the sealed storyCostEnvelopePolicy row"
+          );
+        }
+        return Object.freeze({
+          spendSource: "STORY",
+          ceilingMicros,
+          readSpentMicros: (runId: string) => this.#store.readRunStorySpentMicros(runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      default:
+        return exhaustive(spendSource);
     }
-    const ceilingMicros = this.#policy.perStoryCeilingMicros;
-    if (ceilingMicros === undefined) {
-      throw new TypedDomainError(
-        "STORY_ENVELOPE_MISSING",
-        "A metered story seam needs the sealed storyCostEnvelopePolicy row"
-      );
-    }
-    return Object.freeze({
-      spendSource: "STORY",
-      ceilingMicros,
-      readSpentMicros: (runId: string) => this.#store.readRunStorySpentMicros(runId),
-      refusal: storyCostEnvelopeReached
-    });
   }
 
   /**

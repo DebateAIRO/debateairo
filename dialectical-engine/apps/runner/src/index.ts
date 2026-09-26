@@ -6182,9 +6182,21 @@ export function declareHatchetWalkingSkeletonTask(input: {
 /**
  * Verdict story: the call-site namespace the story allowance accepts and the
  * run allowance refuses (spec 2026-09-26 §8). `packages/story` mints the keys
- * (`storyCallSiteKey`); this file only recognises the prefix.
+ * (`storyCallSiteKey`). A story call site is EXACTLY `STORY:STORYTELLER:{round}`
+ * or `STORY:CHECKER:{round}`, the round 1 to 8 (the `storyLoopMaxRounds` schema
+ * cap, packages/register/src/story-policy.ts), and each carries its own role:
+ * the storyteller is a SYNTHESIZER call and the checker an EVALUATOR call.
+ * Anything else under the prefix is not a story call at all.
  */
 const STORY_CALL_SITE_PREFIX = "STORY:";
+const STORY_CALL_SITE = /^STORY:(STORYTELLER|CHECKER):[1-8]$/u;
+
+/** The role a well-formed story call site must carry, or null for any other key. */
+function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | null {
+  const site = STORY_CALL_SITE.exec(callSiteKey);
+  if (site === null) return null;
+  return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
+}
 
 export function createPostgresProviderGateway(
   pool: Pool,
@@ -6229,10 +6241,14 @@ export function createPostgresProviderGateway(
        * Verdict story — THE STORY SCOPE, decided before anything is read. The
        * lane and the call-site namespace must agree: a story lane on a debate
        * call site would hide a debate call in the story's allowance, and a
-       * STORY: call site on a debate lane would bill a story to the run.
+       * STORY: call site on a debate lane would bill a story to the run. A
+       * story call must also name one of the story's own call sites, with the
+       * role that site carries (`storyCallSiteRole`), so the story lane cannot
+       * be used for a free-form or out-of-range call.
        */
       const storyScope = request.lane === "story";
-      if (storyScope !== request.callSiteKey.startsWith(STORY_CALL_SITE_PREFIX)) {
+      if ((storyScope || request.callSiteKey.startsWith(STORY_CALL_SITE_PREFIX))
+        && (!storyScope || storyCallSiteRole(request.callSiteKey) !== request.role)) {
         throw new TypedDomainError(
           "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
           "A story call and the STORY: call-site namespace must agree"

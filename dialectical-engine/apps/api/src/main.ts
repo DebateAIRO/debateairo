@@ -18,7 +18,7 @@ import {
 } from "@debateai/crypto";
 import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
-import type { RiskTier } from "@debateai/kernel";
+import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   assertHostedCostEnvelopesSealed,
@@ -245,8 +245,16 @@ const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
         // whose spend counts toward the day, so the day reserves the story's own
         // ceiling beside the run's. The rows are OPTIONAL: a register without
         // them, or with a malformed family, reserves the run's ceiling alone.
+        // An unreadable family is logged by code, as the runner logs it.
         const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
-          .catch(() => null);
+          .catch((error: unknown) => {
+            console.warn(JSON.stringify({
+              kind: "DEBATEAI_STORY",
+              event: "STORY_POLICY_UNREADABLE",
+              code: error instanceof TypedDomainError ? error.code : "UNTYPED"
+            }));
+            return null;
+          });
         return storyPolicy === null || storyPolicy.perStoryCeilingMicros === null
           ? runPolicy
           : { ...runPolicy, perStoryCeilingMicros: storyPolicy.perStoryCeilingMicros };

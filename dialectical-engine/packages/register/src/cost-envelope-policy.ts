@@ -10,15 +10,24 @@ import type { Pool } from "pg";
  *  - `per_run_ceiling_micros` — what ONE debate may spend across every vendor
  *    it touches. The gateway sums vendor-reported usage times the price
  *    configured with each target and refuses the call that would cross it.
- *  - `daily_ceiling_micros` — what every DEBATE RUN together may spend in a UTC
- *    day, across every vendor they touch. When it is reached no new run starts
- *    until the next day; runs already under way finish.
+ *  - `daily_ceiling_micros` — what every DEBATE RUN, and the VERDICT STORY
+ *    written after each one settles, may spend together in a UTC day, across
+ *    every vendor they touch. When it is reached no new run starts until the
+ *    next day; runs already under way finish.
+ *
+ * THE VERDICT STORY IS THE SECOND COUNTED SURFACE (spec 2026-09-26 §8). Each
+ * story is capped on its own by the optional `storyCostEnvelopePolicy` row
+ * (`perStoryCeilingMicros`, packages/register/src/story-policy.ts), never by
+ * the run's ceiling, and its charges are `STORY` rows that name their run. The
+ * day's total counts them, and a new run's admission reserves the story's
+ * ceiling together with the run's.
  *
  * WHAT THE DAILY CEILING DOES NOT COUNT TODAY (C-I8, and say it here rather
  * than in a document the operator reads second). The ceiling is enforced over
- * `ledger.model_spend`, and the only shipped writer of that table is the debate
- * runs' provider seam, which writes `RUN` rows. Two paid surfaces are therefore
- * OUTSIDE it:
+ * `ledger.model_spend`, and the only shipped writer of that table is the
+ * provider gateway's money seam (packages/budget/src/model-spend.ts), which
+ * writes `RUN` rows for debate calls and `STORY` rows for story calls. Two
+ * paid surfaces are therefore OUTSIDE it:
  *
  *  - the SUPPORT CHAT. In hosted mode it calls a paid vendor of its own and is
  *    bounded by a call cap (`support_daily_call_cap`) and its own per-message

@@ -155,6 +155,7 @@ function gatewayOver(queries: string[], seams: {
     }),
     connect: vi.fn(async () => ({
       query: vi.fn(async (sql: string, values?: readonly unknown[]) => {
+        queries.push(sql);
         if (sql.includes("pg_try_advisory_lock")) return { rows: [{ acquired: true }] };
         if (sql.includes("run_private_content_is_live")) return {
           rows: [{ run_id: String((values?.[0] as readonly string[])[0]), live: true }]
@@ -235,6 +236,86 @@ describe("the runner's gateway keeps the story lane and the STORY: namespace tog
     await expect(gatewayOver(queries, { run: () => NOOP_SEAM }).call(request({})))
       .rejects.toMatchObject({ code: "STORY_ENVELOPE_MISSING" });
     expect(queries).toEqual([]);
+  });
+});
+
+/**
+ * Task 7 review, I-2: the story lane accepts EXACTLY the story's own call
+ * sites — `STORY:STORYTELLER:{1..8}` as a SYNTHESIZER call and
+ * `STORY:CHECKER:{1..8}` as an EVALUATOR call — and nothing else under the
+ * prefix. Every refusal is taken before anything is read.
+ */
+describe("the runner's gateway accepts only the story's own call sites, each with its own role", () => {
+  const refused: ReadonlyArray<readonly [string, Partial<ProviderCallRequest>]> = [
+    ["a checker call site asked as a SYNTHESIZER", { callSiteKey: "STORY:CHECKER:1", role: "SYNTHESIZER" }],
+    ["a storyteller call site asked as an EVALUATOR", { callSiteKey: "STORY:STORYTELLER:1", role: "EVALUATOR" }],
+    ["a storyteller call site asked as a JUDGE", { callSiteKey: "STORY:STORYTELLER:1", role: "JUDGE" }],
+    ["round 0", { callSiteKey: "STORY:STORYTELLER:0" }],
+    ["round 9, past the rounds schema cap of 8", { callSiteKey: "STORY:STORYTELLER:9" }],
+    ["a two-digit round", { callSiteKey: "STORY:CHECKER:10", role: "EVALUATOR" }],
+    ["a free-form STORY: key", { callSiteKey: "STORY:X" }],
+    ["a storyteller key with a suffix", { callSiteKey: "STORY:STORYTELLER:1:extra" }],
+    ["a lower-case role segment", { callSiteKey: "STORY:storyteller:1" }]
+  ];
+  for (const [name, overrides] of refused) {
+    it(`refuses ${name}, before anything is read`, async () => {
+      const queries: string[] = [];
+      const storySeam = vi.fn(() => NOOP_SEAM);
+      await expect(gatewayOver(queries, { run: () => NOOP_SEAM, story: storySeam }).call(request(overrides)))
+        .rejects.toMatchObject({ code: "STORY_PROVIDER_SCOPE_UNAUTHORIZED" });
+      expect(queries).toEqual([]);
+      expect(storySeam).not.toHaveBeenCalled();
+    });
+  }
+
+  it("accepts the last lawful round of the checker as an EVALUATOR call (the refusals above are not vacuous)", async () => {
+    const queries: string[] = [];
+    const storySeam = vi.fn(() => NOOP_SEAM);
+    await expect(gatewayOver(queries, { run: () => NOOP_SEAM, story: storySeam }).call(request({
+      callSiteKey: "STORY:CHECKER:8",
+      role: "EVALUATOR",
+      packet: { messages: [{ role: "user", content: "unframed on purpose" }] }
+    }))).rejects.toMatchObject({ code: "PROMPT_FRAME_ABSENT" });
+    expect(storySeam).toHaveBeenCalledWith("run:story-scope");
+  });
+});
+
+/**
+ * Task 7 review, M-3: a FRAMED story call passes the door and reaches the
+ * gateway's attempt loop. There the per-attempt hook (`assertAttemptAllowed`)
+ * would run first, and on this spent run the RUN's ceiling would refuse with
+ * RUN_COST_ENVELOPE_EXHAUSTED. Instead the story seam's money check, which runs
+ * right after the hook, is reached, and its own refusal comes back through
+ * `http.call`. That refusal is taken before the attempt, outside the loop's
+ * `try`, so no ledger row or raw artifact is written.
+ */
+describe("a story call inside the gateway's attempt loop", () => {
+  it("skips the run's per-attempt hook, meets the story seam's refusal, and writes no ledger row", async () => {
+    const queries: string[] = [];
+    const { spendStore, rows } = store({ run: 0, story: 50_000 });
+    const storyGuard = guard(spendStore, 50_000);
+    const moneyChecks = vi.fn();
+    const storySeam = vi.fn((runId: string): ProviderCostEnvelopeSeam => {
+      const seam = storyGuard.storySeam({ runId, price: PRICE, requireReportedUsage: true });
+      return {
+        ...seam,
+        assertCallAllowed: (projection) => {
+          moneyChecks(projection);
+          return seam.assertCallAllowed(projection);
+        }
+      };
+    });
+    const runSeam = vi.fn(() => NOOP_SEAM);
+    await expect(gatewayOver(queries, { run: runSeam, story: storySeam }).call(request({})))
+      .rejects.toMatchObject({ code: "STORY_COST_ENVELOPE_REACHED" });
+    // The attempt loop was reached, once: the money check sits right after the hook.
+    expect(moneyChecks).toHaveBeenCalledTimes(1);
+    // The run's pinned ceiling was read neither before the loop nor inside it.
+    expect(queries.some((sql) => sql.includes("SELECT envelope_basis"))).toBe(false);
+    expect(runSeam).not.toHaveBeenCalled();
+    // Nothing was written: no ledger entry, no raw artifact, no sequence, no charge.
+    expect(queries.filter((sql) => /\bINSERT\b|allocate_sequence|\bBEGIN\b/u.test(sql))).toEqual([]);
+    expect(rows).toEqual([]);
   });
 });
 
