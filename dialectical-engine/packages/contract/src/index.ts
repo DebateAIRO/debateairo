@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
-export * from "./story.js";
+import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
+import { AnswerStorySchema } from "./story.js"; export * from "./story.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -441,14 +442,6 @@ export const AnswerIndexSchema = z.object({
 }).strict();
 export type AnswerIndex = z.infer<typeof AnswerIndexSchema>;
 
-export const MakerLineageSchema = z.object({
-  maker: z.string().min(1),
-  model_id: z.string().min(1),
-  transport: z.string().min(1),
-  provider_ref: z.string().min(1)
-}).strict();
-export type MakerLineage = z.infer<typeof MakerLineageSchema>;
-
 export const NodeReviewSchema = z.object({
   outcome: z.enum(["agree", "dispute", "cannot-assess"]),
   reasons: z.array(z.string().trim().min(1)).min(1),
@@ -744,6 +737,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/answers/{id}/inspection",
     "GET /v1/answers/{id}/nodes/{nodeId}",
     "GET /v1/answers/{id}/ledger-digest",
+    "GET /v1/answers/{id}/story",
     "POST /v1/answers/{id}/investigations/{gapRef}",
     "POST /v1/answers/{id}/memory-link/unlink",
     "GET /v1/runs/{id}",
@@ -767,6 +761,7 @@ export const contractInventory = Object.freeze({
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
-    InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema
+    InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
+    AnswerStorySchema
   })
 });

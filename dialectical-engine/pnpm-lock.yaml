@@ -178,6 +178,9 @@ importers:
       '@debateai/settlement':
         specifier: workspace:*
         version: link:../../packages/settlement
+      '@debateai/story':
+        specifier: workspace:*
+        version: link:../../packages/story
       '@debateai/support-kb':
         specifier: workspace:*
         version: link:../../packages/support-kb

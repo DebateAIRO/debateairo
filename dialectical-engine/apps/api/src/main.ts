@@ -56,6 +56,8 @@ import { createSupportCaseMaterial, createSupportCaseService, createSupportMessa
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
+import { RepositoryAnswerStoryApplication } from "./stories.js";
+import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
 import {
@@ -460,6 +462,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
 },undefined,contentProvisionPool,Object.freeze({
   server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
 }));
+// Verdict story (spec 2026-09-26 §10): the owner reads stories through the
+// API's runtime pool; decryption uses the content encryption configured above.
+const storyRepository = new StoryRepository(pool);
 const publicationCipher = environment.PUBLICATION_ENABLED === "true"
   ? boot.runSync("publication-key-store", () => new PublicationCipher(new FilePublicationKeyStore(
       environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
@@ -704,6 +709,7 @@ const supportAnswers = createSupportAnswerService({
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
 const api = buildApi({
   application,
+  stories: new RepositoryAnswerStoryApplication(storyRepository),
   accountErasure:erasureApplication,
   registration,
   recovery,

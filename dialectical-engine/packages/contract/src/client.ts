@@ -4,6 +4,7 @@ import {
   AccountErasureStatusSchema,
   AnswerSchema,
   AnswerIndexSchema,
+  AnswerStorySchema,
   AskAcceptedSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
@@ -24,6 +25,7 @@ import {
   StepUpResponseSchema,
   type Answer,
   type AnswerIndex,
+  type AnswerStory,
   type AskAccepted,
   type AskRequest,
   type Deployment,
@@ -297,6 +299,7 @@ export interface ContractClient {
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
+  readAnswerStory(answerId: string): Promise<AnswerStory>;
   readNode(answerId: string, nodeId: string): Promise<Node>;
   recordInvestigation(answerId: string, gapRef: string, input: InvestigationRequest): Promise<InvestigationAccepted>;
   unlinkMemory(answerId: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
@@ -517,6 +520,7 @@ export function createContractClient(
     readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),
     readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),
+    readAnswerStory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/story`, AnswerStorySchema),
     readNode: (answerId: string, nodeId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, NodeSchema),
     recordInvestigation: (answerId: string, gapRef: string, input: InvestigationRequest) => request(`/v1/answers/${encodeURIComponent(answerId)}/investigations/${encodeURIComponent(gapRef)}`, InvestigationAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     unlinkMemory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/memory-link/unlink`, UnlinkSchema, { method: "POST" }),

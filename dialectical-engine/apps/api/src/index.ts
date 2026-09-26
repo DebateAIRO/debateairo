@@ -7,6 +7,7 @@ import {
   AccountErasureStatusSchema,
   AnswerSchema,
   AnswerIndexSchema,
+  AnswerStorySchema,
   AskAcceptedSchema,
   AskRequestSchema,
   DeploymentSchema,
@@ -32,6 +33,7 @@ import {
   UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
+  type AnswerStory,
   type AskAccepted,
   type AskRequest,
   type Deployment,
@@ -59,6 +61,7 @@ import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serv
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
 import { TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
+import { STORY_UNREADABLE, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
 import type {
   EvaluatorConsumerSelectionResult,
@@ -74,6 +77,7 @@ import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admi
 import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
+import type { AnswerStoryApplication } from "./stories.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { RecoveryApplication } from "./recovery.js";
@@ -562,6 +566,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "STOPPING_ROUND_COUNT_INVALID",
   "STORED_RESULT_MISSING",
   "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
+  "STORY_ROW_INVALID",
   "STRENGTH_LINEAGE_UNRESOLVED",
   "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
   "STRUCTURAL_CEILING_COMPOSITIONSEGMENTCAP_INVALID",
@@ -1099,6 +1104,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/answers/{id}/inspection", auth: "user", resource: "run-owner", action: "read-inspection" },
   { route: "GET /v1/answers/{id}/nodes/{nodeId}", auth: "user", resource: "run-owner", action: "read-node" },
   { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
+  { route: "GET /v1/answers/{id}/story", auth: "user", resource: "run-owner", action: "read-story" },
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
@@ -1276,6 +1282,14 @@ export interface ApiOptions {
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly publications?: PublicationApplication;
+  /**
+   * Verdict story (spec 2026-09-26 §10). Optional like `publications`: the
+   * many test compositions of AskApplication do not supply it, and the route
+   * answers its closed 404 when it is absent.
+   */
+  readonly stories?: AnswerStoryApplication;
+  /** The clock the story route measures its waiting window with; tests pin it. */
+  readonly storyClock?: () => Date;
   readonly accountErasure?: AccountErasureApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
   readonly allowedOrigin?: string;
@@ -2153,6 +2167,59 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!answerId.success) return reply.status(404).send({ error: "LEDGER_DIGEST_NOT_FOUND" });
     const digest = await options.application.readLedgerDigest(answerId.data, request.session, ownershipFor(request));
     return digest === null ? reply.status(404).send({ error: "LEDGER_DIGEST_NOT_FOUND" }) : reply.send(ExecutionLedgerDigestSchema.parse(digest));
+  });
+
+  // Verdict story (spec 2026-09-26 §10). Mounted outside the guarded
+  // registration zone. "Not yours", "malformed" and "not composed" share one
+  // closed 404. The answer read is the ownership gate and supplies the
+  // version, the verdict presence and the creation time (relevant_as_of is
+  // the answer row's insert time) the waiting window is measured from.
+  api.get<{ Params: { id: string } }>("/v1/answers/:id/story", routePolicy("GET /v1/answers/{id}/story"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    const stories = options.stories;
+    if (!answerId.success || stories === undefined) {
+      return reply.status(404).send({ error: "STORY_NOT_FOUND" });
+    }
+    const ownership = ownershipFor(request);
+    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
+    if (answer === null) return reply.status(404).send({ error: "STORY_NOT_FOUND" });
+    let body: AnswerStory;
+    try {
+      const stored = await stories.readStory({
+        answerId: answer.answer_id,
+        answerVersion: answer.answer_version,
+        ownership
+      });
+      const derived = deriveStoryStatus({
+        stored,
+        answerHasVerdict: answer.verdict_state !== null,
+        answerCreatedAt: new Date(answer.relevant_as_of),
+        now: options.storyClock?.() ?? new Date()
+      });
+      body = AnswerStorySchema.parse(buildAnswerStory({
+        answerId: answer.answer_id,
+        answerVersion: answer.answer_version,
+        stored,
+        derived
+      }));
+    } catch (error) {
+      // The answer IS the caller's, so the failure is a status, never a 500:
+      // a fixed reason in the body, and only the bounded diagnostic (a typed
+      // code or a class category, never the message) in the log.
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.story.unreadable",
+        requestId: request.id,
+        route: request.routeOptions.url,
+        diagnostic: apiOperationalErrorDiagnostic(error)
+      })));
+      body = AnswerStorySchema.parse(buildAnswerStory({
+        answerId: answer.answer_id,
+        answerVersion: answer.answer_version,
+        stored: null,
+        derived: STORY_UNREADABLE
+      }));
+    }
+    return reply.send(body);
   });
 
   api.get<{ Params: { id: string; nodeId: string } }>("/v1/answers/:id/nodes/:nodeId", routePolicy("GET /v1/answers/{id}/nodes/{nodeId}"), async (request, reply) => {

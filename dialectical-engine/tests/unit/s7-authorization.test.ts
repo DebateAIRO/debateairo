@@ -9,6 +9,8 @@ import {
   RETIRED_DEV_HEADER,TEST_APP_ORIGIN,testHttpIdentity,
   testSessionApplication,testSessionHeaders
 } from "../support/httpSession.js";
+import type { AnswerStoryApplication } from "../../apps/api/src/stories.js";
+import { storedStoryRecord } from "../support/storyApiFixtures.js";
 
 const OWNED_RUN_ID = "11111111-1111-4111-8111-111111111111";
 const ANSWER_ID = "22222222-2222-4222-8222-222222222222";
@@ -57,6 +59,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/answers/{id}/inspection", auth: "user", resource: "run-owner", action: "read-inspection" },
   { route: "GET /v1/answers/{id}/nodes/{nodeId}", auth: "user", resource: "run-owner", action: "read-node" },
   { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
+  { route: "GET /v1/answers/{id}/story", auth: "user", resource: "run-owner", action: "read-story" },
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
@@ -130,6 +133,20 @@ function buildRoleApi(application: AskApplication = fixtureApplication()) {
 }
 
 const USER_IDENTITY=testHttpIdentity("s7-user");
+
+/**
+ * Verdict story: a composed reader that WOULD serve a READY story. The denied
+ * and malformed rows below then reach the route's own gates instead of its
+ * "not composed" 404, and any read past those gates turns them red.
+ */
+function servingStories(reads: unknown[]): AnswerStoryApplication {
+  return {
+    readStory: async (input) => {
+      reads.push(input);
+      return storedStoryRecord();
+    }
+  };
+}
 const USER_HEADERS=testSessionHeaders(USER_IDENTITY);
 const USER_MUTATION_HEADERS=testSessionHeaders(USER_IDENTITY,true);
 
@@ -336,6 +353,7 @@ describe("S7 deny-by-default authorization", () => {
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}`, error: "ANSWER_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/inspection`, error: "INSPECTION_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/ledger-digest`, error: "LEDGER_DIGEST_NOT_FOUND" },
+    { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/story`, error: "STORY_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/nodes/${NODE_ID}`, error: "NODE_NOT_FOUND" },
     {
       method: "POST" as const, url: `/v1/answers/${ANSWER_ID}/investigations/gap:test`,
@@ -349,14 +367,17 @@ describe("S7 deny-by-default authorization", () => {
     const application = fixtureApplication();
     application.unlinkMemoryLink = async () => null;
     const foreignIdentity=testHttpIdentity("s7-foreign");
+    const storyReads: unknown[] = [];
     const api = buildApi({
-      application,sessions:testSessionApplication([foreignIdentity]),allowedOrigin:TEST_APP_ORIGIN
+      application,sessions:testSessionApplication([foreignIdentity]),allowedOrigin:TEST_APP_ORIGIN,
+      stories: servingStories(storyReads)
     });
     const foreign = await api.inject({
       ...route, headers:testSessionHeaders(foreignIdentity,route.method==="POST")
     });
     expect(foreign.statusCode).toBe(404);
     expect(foreign.json()).toEqual({ error: route.error });
+    expect(storyReads).toEqual([]);
     await api.close();
   });
 
@@ -364,6 +385,7 @@ describe("S7 deny-by-default authorization", () => {
     { method: "GET" as const, url: "/v1/answers/not-a-uuid", error: "ANSWER_NOT_FOUND" },
     { method: "GET" as const, url: "/v1/answers/not-a-uuid/inspection", error: "INSPECTION_NOT_FOUND" },
     { method: "GET" as const, url: "/v1/answers/not-a-uuid/ledger-digest", error: "LEDGER_DIGEST_NOT_FOUND" },
+    { method: "GET" as const, url: "/v1/answers/not-a-uuid/story", error: "STORY_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/nodes/not-a-uuid`, error: "NODE_NOT_FOUND" },
     {
       method: "POST" as const, url: "/v1/answers/not-a-uuid/investigations/gap:test",
@@ -374,12 +396,18 @@ describe("S7 deny-by-default authorization", () => {
     { method: "GET" as const, url: "/v1/runs/not-a-uuid/answer", error: "ANSWER_NOT_SERVED" },
     { method: "GET" as const, url: "/v1/runs/not-a-uuid/events", error: "RUN_NOT_FOUND" }
   ])("maps malformed resource IDs on $method $url to the closed 404 face", async (route) => {
-    const api = buildRoleApi();
+    const storyReads: unknown[] = [];
+    const api = buildApi({
+      application: fixtureApplication(),
+      sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN,
+      stories: servingStories(storyReads)
+    });
     const response = await api.inject({
       ...route, headers: route.method==="POST" ? USER_MUTATION_HEADERS : USER_HEADERS
     });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: route.error });
+    expect(storyReads).toEqual([]);
     await api.close();
   });
 

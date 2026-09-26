@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MakerLineageSchema } from "./lineage.js";
 
 /**
  * THE VERDICT STORY (spec §5.3, §7) — the shapes the storyteller answers in and
@@ -85,3 +86,32 @@ export const StoryVerdictBasisSchema = z.object({
   marks: z.array(z.string())
 }).strict();
 export type StoryVerdictBasis = z.infer<typeof StoryVerdictBasisSchema>;
+
+/**
+ * GET /v1/answers/{id}/story (spec 2026-09-26 §10). `status` is WRITING while
+ * the runner may still be writing, the stored outcome once a row exists, and
+ * UNAVAILABLE otherwise (a FAILED row, no verdict, an unreadable row, or the
+ * waiting window passed). Everything but the ids and the status is null unless
+ * the story is READY or READY_WITH_RESERVATION. `point_numbers` maps each node
+ * id to the story's canonical point number (P1…Pn), the numbers the story text
+ * and the checker may cite and the PDF appendix uses. `rounds` is the number of
+ * write-and-check rounds the story took; the PDF's "About this report" page
+ * prints it.
+ */
+export const AnswerStorySchema = z.object({
+  answer_id: z.string(),
+  answer_version: z.number().int().positive(),
+  status: StoryStatusSchema,
+  unavailable_reason: z.string().nullable(),
+  shape: z.object({ id: z.string(), title: z.string() }).strict().nullable(),
+  pack: z.object({ version: z.string(), fingerprint: z.string() }).strict().nullable(),
+  written_at: z.string().nullable(),
+  storyteller: MakerLineageSchema.nullable(),
+  checker: MakerLineageSchema.nullable(),
+  rounds: z.number().int().nonnegative().nullable(),
+  reservation: z.string().nullable(),
+  verdict_basis: StoryVerdictBasisSchema.nullable(),
+  point_numbers: z.record(z.string(), z.string().regex(/^P[1-9][0-9]*$/)).nullable(),
+  story: StoryBodySchema.nullable()
+}).strict();
+export type AnswerStory = z.infer<typeof AnswerStorySchema>;
