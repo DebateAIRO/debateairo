@@ -1,6 +1,6 @@
 {
   "pack_id": "verdict-story",
-  "version": "2026-09-26.1",
+  "version": "2026-09-27.1",
   "default_shape": "general",
   "shapes": ["general", "health", "money-decision", "legal", "factual", "personal-choice"]
 }

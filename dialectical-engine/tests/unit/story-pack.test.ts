@@ -7,6 +7,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   STORY_PACK_LIMITS,
   STORY_SHAPES_DIR_ENV_KEY,
+  StoryCheckerVerdictSchema,
   assembleStorytellerInstruction,
   loadStoryPack,
   resolveStoryPackDir
@@ -109,7 +110,7 @@ const tooBigInstruction: PackFiles = {
 const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles])[] = [
   ["FILE_MISSING", "checker.md is absent", { "checker.md": null }],
   ["FILE_MISSING", "a listed shape has no file", { "shapes/beta.md": null }],
-  ["FILE_TOO_LARGE", "a file is over 12 KB", { "common.md": "x".repeat(STORY_PACK_LIMITS.maxFileBytes + 1) }],
+  ["FILE_TOO_LARGE", "a file is over the file limit (16 KB)", { "common.md": "x".repeat(STORY_PACK_LIMITS.maxFileBytes + 1) }],
   ["NOT_UTF8", "a file is not UTF-8", { "common.md": Uint8Array.from([0x43, 0xff, 0xfe, 0x0a]) }],
   ["CONTROL_CHARACTER", "a file holds a bell character", { "checker.md": "Checker\u0007 instructions.\n" }],
   ["CONTROL_CHARACTER", "a file has Windows line endings", { "common.md": "Common\r\ninstructions.\r\n" }],
@@ -228,6 +229,52 @@ describe("verdict story — the shipped pack", () => {
     expect(pack.checker).toContain("goal_marked_as_reading");
     for (const id of ["health", "money-decision", "legal"]) {
       expect(pack.shapes.find((shape) => shape.id === id)?.guidance).toMatch(/this is not (medical|financial|legal)\b/u);
+    }
+  });
+
+  it("tells the storyteller the look gate's rules (R1, spec §14.1-§14.2)", () => {
+    // Smoke checks, not pins: the owners may reword all of this.
+    for (const rule of [
+      "short.confidence", "why.reasons", "Our answer always comes first",
+      "Never write that the debate did not settle the question",
+      "the words of the debate's own workings", "code refuses a story that prints one",
+      "what we could not confirm", "Something left out was not proven wrong",
+      "Examples of the tone", "never templates to copy"
+    ]) {
+      expect(pack.common).toContain(rule);
+    }
+    // The owners' own picks (a1, b1, b3, c1, c3, d), in Romanian, as tone examples.
+    for (const example of [
+      "„Răspunsul nostru: mutați-vă treptat", "„Cât de siguri suntem: destul de siguri",
+      "„Ne-am baza pe acest răspuns, cu o rezervă", "„Nu am putut confirma cât de ușor",
+      "„Partea despre școală nu a putut fi verificată", "„Am lăsat deoparte o singură obiecție"
+    ]) {
+      expect(pack.common).toContain(example);
+    }
+  });
+
+  it("tells the checker every criterion its verdict carries, speaks_to_the_person and the confidence ladder among them", () => {
+    for (const criterion of Object.keys(StoryCheckerVerdictSchema.shape.criteria.shape)) {
+      expect(pack.checker).toContain(`${criterion}:`);
+    }
+    expect(pack.checker).toContain("The confidence sentence is never surer than this ladder allows");
+    // The reservation is internal now: the checker is not told a reader sees it.
+    expect(pack.checker).toContain("the person who asked never sees it");
+    expect(pack.checker).not.toContain("the person reads your objection");
+  });
+
+  it("steers no shape toward the engine's words: no scores, judges, reviewers, runner-up or cuts", () => {
+    for (const shape of pack.shapes) {
+      expect(shape.guidance).not.toMatch(/how it (scored|finished)|\bthe judges\b|\breviewers?\b|runner-up|high cut|low cut/u);
+      expect(shape.sections.join(" ")).not.toMatch(/\bverdict\b/u);
+    }
+  });
+
+  it("keeps each file under the raised 16 KB file limit and the whole instruction under 48 KB (controller ruling, R1)", () => {
+    expect(STORY_PACK_LIMITS.maxFileBytes).toBe(16 * 1024);
+    expect(STORY_PACK_LIMITS.maxInstructionBytes).toBe(48 * 1024);
+    for (const file of ["common.md", "checker.md", "pack.json", ...pack.shapes.map((shape) => `shapes/${shape.id}.md`)]) {
+      expect(readFileSync(join(SHIPPED_DIR, file)).byteLength).toBeLessThanOrEqual(STORY_PACK_LIMITS.maxFileBytes);
     }
   });
 });
