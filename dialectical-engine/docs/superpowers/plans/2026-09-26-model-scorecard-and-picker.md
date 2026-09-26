@@ -51,9 +51,12 @@ Every task's requirements include these.
 - **New shipped source files** go into `tests/support/shipped-corpus.manifest.txt` (not `acceptance/`). UI node tests go into `apps/ui/scripts/node-test-manifest.json`.
 - **Typechecks:** `pnpm run typecheck`, `pnpm exec tsc --noEmit -p acceptance/tsconfig.json`, and `pnpm --filter dialectical-engine-v2ui typecheck` for UI tasks.
 - **CI gate:** `pnpm run test:ci-gate`, which must print `new=0 known=8 stale=0` at the end of every phase.
+- **Lint (pre-flight fix F15).** `pnpm run lint` is `audit:architecture && audit:source`, and it exits 1 TODAY on six known entries, which `tests/architecture/scaffold.test.ts` pins. Never chain another check behind it with `&&`: that check would never run. Every task runs the two audits as separate commands and checks the lists instead:
+  - `pnpm run audit:architecture` → exit 1; its `violations` are exactly `apps/api -> obs-capture is not a declared edge`, `apps/runner -> obs-capture is not a declared edge` and `apps/scheduler -> obs-capture is not a declared edge` (dev's F31 debt). Nothing else.
+  - `pnpm run audit:source` → exit 1; its `blocking` entries are exactly `packages/obs-capture/install/api.ts reads the process environment outside the register loader` and the same line for `runner.ts` and `scheduler.ts`. Nothing else.
 - **Depth oracle:** after any new numeric shape in shipped code (Tasks A3, A14, A20.1), run the S1-1 depth oracle named in those tasks.
 - **Commits:** `git commit … -- <explicit paths>`, only after `git diff --cached --name-only` shows exactly the task's paths. Trailer: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. **No pushes.** The owner authorises every push in words.
-- **Prompts and relays.** New relays never pass a prompt on argv, and tools stay off. Relays never run in the HOSTED deployment, and the moment tools refuse there. Every relay makes lean calls (D8, Task A12b): an empty private working directory, the leanest measured flags, and `RELAY_MINIMAL_SYSTEM_PROMPT` in place of a CLI's own system prompt; the engine's own messages are never changed.
+- **Prompts and relays.** New relays never pass a prompt on argv, and tools stay off. Relays never run in the HOSTED deployment, and the moment tools refuse there. Every DEBATE relay (claude, codex, grok, agy, pi) makes lean calls (D8, Task A12b; the Support relay `hermes` is out of scope): an empty private working directory, the leanest measured flags, and `RELAY_MINIMAL_SYSTEM_PROMPT` in place of a CLI's own system prompt; the engine's own messages are never changed.
 - **"WHO READS THIS STRING."** When you change any literal, grep every reader across `tests`, `acceptance`, `apps` and `packages`, and update them in the same task.
 - **Privacy.** Moment files, replay results and the relay endpoints file are written 0600 and hold private debate text or relay bearers. They are never committed to this repository.
 - **The evaluator method stays private.** Nothing in this repository may describe how scorecards are produced: no test sets, traps, checklists or scoring.
@@ -80,9 +83,13 @@ These were applied to the tasks below. Executors do not need to redo them.
 
 - **R1: one context-window rule.**
   - The gateway (A7b), the relays (A8) and the replay tool (A18c) all refuse a prompt when ⌈UTF-8 bytes ÷ 2⌉ + the answer bound exceeds the declared window, through `estimateWindowTokens` in providers and `exceedsContextWindow` in relay-core.
+  - "UTF-8 bytes" means the same count on both sides (pre-flight fix F1): the sum of `Buffer.byteLength(message.content, "utf8")` over the request's messages. The relay counts the parsed `messages`' contents, never the bytes of its JSON transcript (quotes, escapes and newlines would make it stricter than the gateway). A8 pins the agreement on a Romanian, quote- and newline-heavy packet.
+  - If a relay still refuses (a 413 `CLI_RELAY_CONTEXT_WINDOW_EXCEEDED`, or a 400 `CLI_RELAY_THINKING_LEVEL_UNSUPPORTED`), the gateway maps it to `PROVIDER_CONTEXT_WINDOW_EXCEEDED` / `PROVIDER_THINKING_LEVEL_UNSUPPORTED`, next to the 429 usage-cap check (A7b). Neither is retried, and neither is a transport failure, so neither moves a seat to its backup.
   - The lighter `estimatePromptTokens` (⌈characters ÷ 4⌉) is used ONLY for size estimates (`promptTokensEstimate`, typical calls), never for the wall.
   - Reason: a Romanian prompt must never pass the gateway and then be refused by `pi`.
+  - The picker (A3) applies the same wall to a role's typical call: input + output + thinking tokens against the smaller window (pre-flight fix F29).
 - **R2: the role assignment is read through a free function,** `readRunRoleAssignment(executor, runId)`, and written through `insertRunRoleAssignment(executor, input)`. Both come from `@debateai/db` (A6). There is no `RunRepository` method.
+  - **One exception (pre-flight ruling F20):** the served answer's projection (`ServeRepository.readAnswerProjection`, A21.1) reads the pinned row with one inline subselect inside its own single SELECT, beside the envelope subselects that statement already carries, instead of a second query per answer read (no N+1 when answers are read in turn). It reads the same columns and validates the same way (`RoleAssignmentSchema`, `ModelStrengthSchema`).
 - **R3: root scripts.** `relays:serve` (A12), `moment:export` (A18b) and `moment:replay` (A18c) are added in that order after `eval:roles`. Each task anchors its edit on the previous line.
 - **R4: dev targets are declared in one place.** The dev targets' `thinking_*` and `context_window_tokens` declarations are written once, by A12. A7a only teaches the parser.
 - **R5: the prompt fingerprint is computed by the runner composition, not by providers.** It uses `canonicalPromptFingerprint` from `@debateai/scorecard`, through A7c's `persistCallPrompt` callback. This avoids a dependency loop.
@@ -94,23 +101,24 @@ Each can be reversed.
 - **D1.** The `pi` relay pins model `glm-5.3-flash`: the owner confirmed GLM 5.3 Flash on 2026-09-26, and `pi` reports `model: "glm-5.3-flash"` (provider `zai`) for it, while pi's own default answers as `glm-5.3` (M5, Appendix B). pi's catalog gives `glm-5.3-flash` a 1M-token context window (131.1K max output), so the relay declares `PI_GLM_CONTEXT_WINDOW_TOKENS = 1_000_000`; the "16k" mentioned earlier is not its window. The id is a start-up argument.
 - **D2.** `agy` defaults to `gemini-3.8-flash` at level `high`, and `pi` to level `high`. Both are start-up arguments.
 - **D3.** On content-encrypted runs, a backup switch is disclosed by the `BACKUP-MODEL-USED` mark and its records, but not by a progress-stream event. Migration 0069 fixes the allowed event shapes for encrypted runs, and they cannot be redefined.
-- **D4.** Every run's call-count ceiling now leaves room for one backup per seat call (formula DR-184-v5). The ceiling is a runaway guard, not a target: a run without runner-ups never uses the room, and in hosted mode the money limit still binds. For example, M=2 at depth 1 goes from 106 to 196.
+- **D4 (reworded by pre-flight ruling F17).** A run whose pinned assignment has at least one runner-up gets a call-count ceiling that leaves room for one backup per seat call (formula DR-184-v5). For example, M=2 at depth 1 goes from 106 to 196 for such a run. Every other run (no scorecard, the roster path, or an assignment with no runner-up) keeps DR-184-v4 exactly, as the owner ruled on 2026-09-05 ("seal the true number, no padding"). Admission decides it: it passes `backupSequencesProvisioned` (0 or 1) into the ceiling computation, and the receipt names the formula it was minted with (`DR-184-v4` or `DR-184-v5`). The receipt's shape does not change. The ceiling is a runaway guard, not a target, and in hosted mode the money limit still binds.
 - **D5.** The answer checker *prefers* a different vendor from the answer writer, matching today's default derivation. This is a soft preference, like the judges' "not a debating vendor" preference.
 - **D6.** A backup takes over only on an outage (after the normal retries) or a usage cap (immediately). A wrong-format answer is retried as today and never switches the model.
 - **D7.** Only runs admitted after migration 0072 can be exported as moments, because older runs never recorded their prompts. Moments carry `language: null`; the private evaluator supplies the language from its own question list.
 - **D8. Lean calls (owner ruling 2026-09-26, Task A12b).** A relayed call carries what a plain API call would, and nothing the owner's computer adds on its own, because extra input costs money.
   - **Stripped.** Every relay runs its CLI in an EMPTY private working directory (a 0700 workspace opened when the relay starts and removed when it stops), so no project file (`CLAUDE.md`, `AGENTS.md` …) is ever read. Each CLI's own system prompt is replaced by one fixed neutral sentence, `RELAY_MINIMAL_SYSTEM_PROMPT` ("Follow the instructions in the user message exactly."): claude `--system-prompt`, codex a 0600 `model_instructions_file`, grok `--system-prompt-override`, pi `--system-prompt`. codex also disables its 18 measured extras (not `code_mode_host`), agy turns slash commands off (it has no system-prompt flag), pi drops its prompt templates. claude never gets `--bare`: it would also disable the subscription login.
+  - **Scope (pre-flight ruling F23).** Lean calls cover the five DEBATE relays: claude, codex, grok, agy and pi. The Support relay `hermes` (`acceptance/hermes-relay.ts`) is out of scope: it plays no debate role and no scorecard evaluates it, so it keeps today's handshake and prompt, and its CLI overhead is paid on Support calls only.
   - **Unchanged.** The engine's own system and user messages stay in the prompt transcript exactly as today, so every tool is asked the same thing.
-  - **Irreducible** (measured M5, one-line prompt, per call): grok ~18k tokens, agy ~13k, codex ~6.9k, claude ~0.7k, pi ~0.08k. Results are measured WITH it and the evaluator report discloses it. Money estimates never use CLI-reported input; they use our own `promptTokensEstimate`, which is what an API call would cost. Each relay logs its own overhead once at start (`RELAY OVERHEAD …`), as information, never as a gate.
+  - **Irreducible** (measured M5, one-line prompt, per call): grok ~18k tokens, agy ~13k, codex ~6.9k, claude ~0.7k, pi ~0.08k. Results are measured WITH it and the evaluator report discloses it. Money estimates never use CLI-reported input; they use our own `promptTokensEstimate`, which is what an API call would cost. Each relay logs its own overhead once at start (`RELAY OVERHEAD …`), as information, never as a gate; the relay host repeats each line with the candidate's providerRef, so candidates of one maker can be told apart (pre-flight fix F37).
   - **Hosted API calls have none:** the hosted site calls vendor APIs directly, with no CLI in between.
 
 ## Review Focus
 
 These are the conditions most likely to bite a real user, with where each is pinned.
 
-1. **A Romanian prompt close to a declared context window** (`pi`/GLM declares 1M tokens since D1; a scorecard candidate may declare far less). The gateway and the relay must agree and refuse it before sending, never truncate silently. Pinned by A7b's `estimateWindowTokens` test (R1), A8's window tests and A18c's `CONTEXT_TOO_LARGE` test.
-2. **The main and the runner-up of one seat both fail or both hit caps.** Exactly one switch, then today's behaviour: the member is dropped with the usual disclosure, or the synthesis is served components-only. Never a switching loop. Pinned by A16a ("rethrows the runner-up's own failure when both fail, after exactly one switch") and A16c ("keeps today's behaviour when the runner-up fails too").
-3. **A fresh install or old runs with no scorecard and no pinned assignment.** Byte-identical to today. Pinned by A15b/A15d (the legacy seat book), A20.2 (the roster path unchanged) and A21.3 (the drawer without "Models used").
+1. **A Romanian prompt close to a declared context window** (`pi`/GLM declares 1M tokens since D1; a scorecard candidate may declare far less). The gateway and the relay must agree and refuse it before sending, never truncate silently. Both count the same thing: the UTF-8 bytes of the messages' contents (R1, pre-flight fix F1). If a relay refuses anyway, the gateway maps the relay's 413/400 to its own typed, non-retried refusal, never to a transport failure that would move the seat to its backup. Pinned by A7b's `estimateWindowTokens` test and its "a relay's own refusals" rows (R1), A8's window tests including "agrees with the gateway's wall to the token on a Romanian, quote- and newline-heavy packet (R1)", and A18c's `CONTEXT_TOO_LARGE` test.
+2. **The main and the runner-up of one seat both fail or both hit caps.** Exactly one switch, then today's behaviour: the member is dropped with the usual disclosure, or the synthesis is served components-only. Never a switching loop. A usage cap reaches every caller as a `ProviderCallFailedError` whose `cause` is `PROVIDER_USAGE_CAP`, never retried (pre-flight ruling F11), so a seat WITHOUT a runner-up (every legacy run) halts that member exactly as a relay failure does today, instead of ending the run. Pinned by A7b ("stops at the relay's usage cap without retrying, and still retries a bare 429"), A16a ("rethrows the runner-up's own failure when both fail, after exactly one switch", and "keeps today's behaviour at a usage cap without a runner-up: the wrapped cap leaves unchanged (F11)") and A16c ("keeps today's behaviour when the runner-up fails too").
+3. **A fresh install or old runs with no scorecard and no pinned assignment.** Byte-identical to today. Pinned by A15b/A15d (the legacy seat book), A14 and A20.2 (the roster path unchanged, its attempt ceiling still `DR-184-v4` exactly — pre-flight ruling F17) and A21.3 (the drawer without "Models used").
 4. **The hosted site given a scorecard whose candidates are subscription-only.** No relay is ever seated in hosted mode, and every role falls back to today's rule. Pinned by A3 ("in HOSTED mode seats only candidates with an API route").
 5. **A vendor's tool silently changes the model behind a name,** as grok moved from 4.6 to 4.7 this week.
    - Relays whose tools report the answering model refuse a changed identity (existing `PROVIDER_MODEL_IDENTITY_CHANGED`).
@@ -147,14 +155,18 @@ task: `pnpm install --frozen-lockfile && pnpm run generate:contract` (M3: the wo
    seat of another maker; when the scorecard's seats cannot, that role falls back. **Callers must pass
    `seatDemand.JUDGE ≥ 2` and `seatDemand.REVIEWER ≥ 2` whenever `seatDemand.POSITION ≥ 2`** (today's
    panel is every debater, so today's numbers already satisfy this).
-9. The context-window check compares the role's TYPICAL INPUT tokens with the smaller of the candidate's
-   and the target's windows (spec §Part 1 wording: "typical input would not fit").
+9. The context-window check compares the role's TYPICAL CALL — input + output + thinking tokens
+   (`inputTokens + outputTokens + (thinkingTokens ?? 0)`) — with the smaller of the candidate's and the target's
+   windows. This is the gateway's R1 wall (prompt + answer bound) applied to the typical call, so a seated
+   candidate is not then refused on every call (pre-flight ruling F29; spec erratum to §Part 1 "typical input").
 10. FALLBACK seats: the first target of each maker, in `reachable` order, up to the demand (identical to
     today whenever the discovered panel has distinct makers, which the plan rosters guarantee).
     `ANSWER_WRITER` fallback = the first reachable target; `ANSWER_CHECKER` fallback = the first
     reachable target of another maker than the writer (mirrors `deriveSynthesisRoleRefs`,
-    `apps/runner/src/dev-deployment-register.ts:409-418`). **Open for the runner task:** whether a FALLBACK
-    synthesis seat defers to the sealed register refs (today's behaviour) instead.
+    `apps/runner/src/dev-deployment-register.ts:409-418`). **Settled by pre-flight ruling F18:** on an assigned
+    run the runner treats a FALLBACK `ANSWER_WRITER`/`ANSWER_CHECKER` seat as "not covered" and uses the sealed
+    register refs, exactly as today (A15d, `buildAssignedRunSeatBook`); the picker's FALLBACK synthesis seat is
+    an estimate input only.
 11. **Extension beyond the contract's fairness list (flagged):** `ANSWER_CHECKER` *prefers* a maker other
     than the answer writer's (soft, like the JUDGE preference). A simulation of the example scorecard at
     BALANCED seated the SAME candidate as writer and checker without it; today's default derivation
@@ -163,7 +175,10 @@ task: `pnpm install --frozen-lockfile && pnpm run generate:contract` (M3: the wo
     maker against the author's and use `backupFor` (or another seat) when it collides.
 13. Estimate: the runner-up is weighted by `diversityShare`; a seat that is called but has no scorecard
     entry (FALLBACK) or no usable price makes that total `null`; `null` never steps down and adds the
-    note `ESTIMATE_UNAVAILABLE`. Money only in HOSTED; seconds in both modes. Both rounded UP.
+    note `ESTIMATE_UNAVAILABLE`. Money only in HOSTED; seconds in both modes. Both rounded UP. A
+    `CROSS_EXCHANGE` call whose candidate has no `CROSS_EXCHANGE` entry is priced from its `POSITION` entry,
+    because CROSS_EXCHANGE seats are POSITION's seats (note 7; pre-flight fix F28): otherwise one missing
+    entry would turn the whole estimate `null` and disable the hosted step-down.
 14. `NUMBER_SHAPE` walks the RAW value, unknown fields included (they are stripped from the parsed
     scorecard but a register row seals the file as published).
 15. The published JSON Schemas are rendered with `z.toJSONSchema(schema, { io: "input" })`, so a plain
@@ -726,6 +741,16 @@ describe("parseScorecard — refuse whole, never throw, never half-apply", () =>
     expect(result.scorecard.candidates[0]).not.toHaveProperty("futureTag");
   });
 
+  it("reads an omitted contextWindowTokens or qualityByLanguage as null (both optional in the file)", () => {
+    const result = parseScorecard(exampleWith((value) => {
+      delete (value.candidates[0]! as Record<string, unknown>).contextWindowTokens;
+      delete (value.roles.POSITION[0]! as Record<string, unknown>).qualityByLanguage;
+    }), TEST_ENGINE_VERSION);
+    if (result.state !== "VALID") throw new Error(`refused: ${result.detail}`);
+    expect(result.scorecard.candidates[0]!.contextWindowTokens).toBeNull();
+    expect(result.scorecard.roles.POSITION[0]!.qualityByLanguage).toBeNull();
+  });
+
   const SCHEMA_INVALID: readonly { readonly name: string; readonly edit: (value: EditableScorecard) => void }[] = [
     { name: "a missing pickerSettings", edit: (value) => { delete (value as Record<string, unknown>).pickerSettings; } },
     { name: "another kind of file", edit: (value) => { (value as Record<string, unknown>).kind = "DEBATEAI_MOMENT"; } },
@@ -735,6 +760,8 @@ describe("parseScorecard — refuse whole, never throw, never half-apply", () =>
     { name: "a quality band whose low is above its score", edit: (value) => { value.roles.POSITION[0]!.quality.low = 89; } },
     { name: "the same candidate listed twice", edit: (value) => { value.candidates.push(structuredClone(value.candidates[0]!)); } },
     { name: "a thinking level that is not a level name", edit: (value) => { value.candidates[0]!.thinkingLevel = "very high"; } },
+    { name: "a thinking level the gateway and the ledger refuse (capitalised)", edit: (value) => { value.candidates[0]!.thinkingLevel = "High"; } },
+    { name: "a scorecard version the ledger's integer column cannot hold", edit: (value) => { value.scorecardVersion = 2_147_483_648; } },
     { name: "a diversity share above one half", edit: (value) => { value.pickerSettings.diversityShare = 0.6; } },
     { name: "a candidate with no access route", edit: (value) => { value.candidates[0]!.accessRoutes = []; } },
     {
@@ -851,7 +878,9 @@ describe("the published JSON Schemas are rendered from the zod schemas, never ha
   });
 
   it("ships no schema file the generator does not write", () => {
-    expect(readdirSync(SCHEMA_DIRECTORY).sort()).toEqual(Object.keys(PUBLISHED_JSON_SCHEMA_FILES).sort());
+    // Only *.schema.json files count: an editor or Finder file (.DS_Store) is not a shipped schema.
+    const shipped = readdirSync(SCHEMA_DIRECTORY).filter((name) => name.endsWith(".schema.json"));
+    expect(shipped.sort()).toEqual(Object.keys(PUBLISHED_JSON_SCHEMA_FILES).sort());
   });
 
   it("describes the file an author writes: every field required, unknown future fields allowed", () => {
@@ -964,12 +993,18 @@ export const ScorecardCandidateSchema = z.object({
       context.addIssue({ code: "custom", message: "a candidate pins a model version, never a latest alias" });
     }
   }),
-  /** The vendor's own level name, or DEFAULT_ONLY when the level cannot be set (ruling R7). */
-  thinkingLevel: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/u),
+  /**
+   * The vendor's own level name, or DEFAULT_ONLY when the level cannot be set (ruling R7). The
+   * same token the gateway (`THINKING_LEVEL_TOKEN`) and 0072's `ledger_entry_thinking_level_token`
+   * accept, so a VALID scorecard never names a level that could not be seated or recorded
+   * (pre-flight fix F36).
+   */
+  thinkingLevel: z.string().regex(/^(?:[a-z][a-z0-9_-]{0,31}|DEFAULT_ONLY)$/u),
   accessRoutes: z.array(AccessRouteSchema).min(1),
   /** Informational, for local users; hosted money always uses the operator's configured prices. */
   apiPrice: ApiPriceSchema.nullable(),
-  contextWindowTokens: z.number().int().min(1).nullable()
+  /** Optional in the file (spec Part 1); an omitted window reads as null, "no window declared". */
+  contextWindowTokens: z.number().int().min(1).nullable().default(null)
 });
 
 const TypicalCallSchema = z.object({
@@ -989,10 +1024,11 @@ export const ScorecardRoleEntrySchema = z.object({
   candidateId: identifierText,
   tier: z.enum(TIERS),
   quality: QualityBandSchema,
+  /** Optional in the file (spec Part 1: present only when measured per language); omitted reads as null. */
   qualityByLanguage: z.object({
     ro: QualityBandSchema.optional(),
     en: QualityBandSchema.optional()
-  }).nullable(),
+  }).nullable().default(null),
   typicalCall: TypicalCallSchema,
   tags: z.array(TagSchema),
   promptVersion: nonBlankText,
@@ -1020,7 +1056,8 @@ export const PickerSettingsSchema = z.object({
 export const ScorecardSchema = z.object({
   kind: z.literal("DEBATEAI_SCORECARD"),
   formatVersion: z.literal(1),
-  scorecardVersion: z.number().int().min(1),
+  /** Pinned in 0072's int4 `ledger_entry.scorecard_version`, so it must fit a PostgreSQL integer. */
+  scorecardVersion: z.number().int().min(1).max(2_147_483_647),
   createdAt: isoDateText,
   testSetVersion: nonBlankText,
   engineCompatibility: z.object({
@@ -1308,7 +1345,15 @@ Expected: PASS, except the pre-existing known-red scaffold row "dev's F31 debt" 
 Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/architecture/dependency-floors.test.ts tests/architecture/no-machine-paths.test.ts`
 Expected: PASS (depth oracle; the roster scans read the new `.json` files; the lockfile floors).
 
-Run: `pnpm run lint && pnpm run audit:text-bytes`
+Run: `pnpm run audit:architecture`
+Expected: exit 1, and its `violations` list only the three known F31 obs-capture edges (Global Constraints,
+"Lint"). The new `scorecard` row adds no violation.
+
+Run: `pnpm run audit:source`
+Expected: exit 1, and its `blocking` list only the three known obs-capture environment reads (Global Constraints,
+"Lint").
+
+Run: `pnpm run audit:text-bytes`
 Expected: exit 0.
 
 Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
@@ -1923,6 +1968,29 @@ describe("pickRoleAssignment — reachability", () => {
     ]));
   });
 
+  it("counts the typical call's output and thinking tokens against the window, as the gateway's wall does (F29)", () => {
+    const z1 = testCandidate("z1", "Z.AI", { contextWindowTokens: 16_000 });
+    const a1 = testCandidate("a1", "Anthropic");
+    const writerEntry = (thinkingTokens: number): ScorecardRoleEntry => ({
+      ...testEntry("z1", 99, 10),
+      typicalCall: { inputTokens: 12_000, outputTokens: 3000, thinkingTokens, seconds: 10 }
+    });
+    const pick = (entry: ScorecardRoleEntry) => assignedOutcome(pickRoleAssignment(testPickerInput({
+      scorecard: testScorecard([z1, a1], { ANSWER_WRITER: [entry, testEntry("a1", 70, 10)] }),
+      reachable: [targetFor(z1), targetFor(a1)],
+      seatDemand: roleNumbers({ ANSWER_WRITER: 1 }),
+      strength: "BEST"
+    })));
+    // 12 000 in + 3000 out + 1001 thinking = 16 001 > 16 000: skipped, although the input alone fits.
+    const skipped = pick(writerEntry(1001));
+    expect(mainIds(skipped.assignment.roles.ANSWER_WRITER)).toEqual(["a1"]);
+    expect(skipped.notes).toContain("CONTEXT_WINDOW_SKIP:ANSWER_WRITER:z1");
+    // Exactly the window fits.
+    const fitting = pick(writerEntry(1000));
+    expect(mainIds(fitting.assignment.roles.ANSWER_WRITER)).toEqual(["z1"]);
+    expect(fitting.notes).not.toContain("CONTEXT_WINDOW_SKIP:ANSWER_WRITER:z1");
+  });
+
   it("refuses NO_REACHABLE_CANDIDATE when nothing can take a demanded seat", () => {
     const outcome = pickRoleAssignment(testPickerInput({ scorecard: null, reachable: [], seatDemand: roleNumbers({ POSITION: 2 }) }));
     expect(outcome).toMatchObject({ state: "REFUSED", reason: "NO_REACHABLE_CANDIDATE" });
@@ -2290,7 +2358,8 @@ function violationsOf(input: PickerInput, outcome: Extract<PickerOutcome, { stat
           found.push(`HOSTED seats subscription-only ${candidate.candidateId}`);
         }
         const windows = [candidate.contextWindowTokens, target?.contextWindowTokens ?? null].filter((size): size is number => size !== null);
-        if (windows.length > 0 && entry.typicalCall.inputTokens > Math.min(...windows)) {
+        const typicalCallTokens = entry.typicalCall.inputTokens + entry.typicalCall.outputTokens + (entry.typicalCall.thinkingTokens ?? 0);
+        if (windows.length > 0 && typicalCallTokens > Math.min(...windows)) {
           found.push(`${role} seats ${candidate.candidateId} past its context window`);
         }
       }
@@ -2445,6 +2514,15 @@ describe("estimateRunCost", () => {
     })).toEqual({ mode: "HOSTED", moneyMicros: 700, seconds: 70 });
   });
 
+  it("prices a CROSS_EXCHANGE call from the candidate's POSITION entry when it has no CROSS_EXCHANGE entry (F28)", () => {
+    // This scorecard lists no CROSS_EXCHANGE entry at all; CROSS_EXCHANGE seats are POSITION's seats (R5).
+    expect(estimateRunCost({ assignment: assignmentWith({ CROSS_EXCHANGE: position }), expectedCallsByRole: roleNumbers({ CROSS_EXCHANGE: 8 }), scorecard, prices, mode: "HOSTED" }))
+      .toEqual({ mode: "HOSTED", moneyMicros: 700, seconds: 70 });
+    // Any other role keeps the rule: no entry for the role, no figure.
+    expect(estimateRunCost({ assignment: assignmentWith({ SUPPORT_ATTACK: position }), expectedCallsByRole: roleNumbers({ SUPPORT_ATTACK: 8 }), scorecard, prices, mode: "HOSTED" }))
+      .toEqual({ mode: "HOSTED", moneyMicros: null, seconds: null });
+  });
+
   it("rounds each total up to a whole micro and a whole second", () => {
     const judge: readonly RoleSeat[] = [{ seatIndex: 0, main: candidate("d", "xAI"), runnerUp: null, diversityShare: 0, source: "SCORECARD" }];
     expect(estimateRunCost({ assignment: assignmentWith({ JUDGE: judge }), expectedCallsByRole: roleNumbers({ JUDGE: 1 }), scorecard, prices, mode: "HOSTED" }))
@@ -2498,12 +2576,25 @@ function roleEntryFor(scorecard: Scorecard | null, role: DebateRole, candidateId
 }
 
 /**
+ * The entry a seated call is priced from. CROSS_EXCHANGE seats are POSITION's seats (R5), so a
+ * CROSS_EXCHANGE call whose candidate has no CROSS_EXCHANGE entry is priced from its POSITION entry
+ * (pre-flight fix F28): one missing entry must not turn the whole estimate null and disable the
+ * hosted step-down.
+ */
+function seatEntryFor(scorecard: Scorecard | null, role: DebateRole, candidateId: string | null): ScorecardRoleEntry | null {
+  const entry = roleEntryFor(scorecard, role, candidateId);
+  if (entry !== null || role !== "CROSS_EXCHANGE") return entry;
+  return roleEntryFor(scorecard, "POSITION", candidateId);
+}
+
+/**
  * Design §2.6: the expected cost of a run before it starts. For every role that is called,
  * its expected calls are shared equally among its seats, and each seat's calls are shared
  * between the main and the runner-up by `diversityShare`. HOSTED money = calls × the typical
  * call × the operator-configured price of the seated route; seconds use `typicalCall.seconds`
  * in both modes. A called seat without a scorecard entry (a FALLBACK seat) or, in HOSTED, without
- * a usable price makes that total null: the picker then cannot step down, and says so. Totals
+ * a usable price makes that total null: the picker then cannot step down, and says so. A
+ * CROSS_EXCHANGE call falls back to the candidate's POSITION entry (`seatEntryFor`). Totals
  * are rounded UP.
  */
 export function estimateRunCost(input: Readonly<{
@@ -2527,7 +2618,7 @@ export function estimateRunCost(input: Readonly<{
       for (const member of members) {
         if (member.weight === 0) continue;
         const calledTimes = callsPerSeat * member.weight;
-        const entry = roleEntryFor(input.scorecard, role, member.candidate.candidateId);
+        const entry = seatEntryFor(input.scorecard, role, member.candidate.candidateId);
         if (entry === null) {
           money = null;
           seconds = null;
@@ -2561,7 +2652,7 @@ import {
   type DebateRole,
   type ModelStrength
 } from "@debateai/kernel";
-import type { PickerSettings, Scorecard, ScorecardCandidate } from "./schema.js";
+import type { PickerSettings, Scorecard, ScorecardCandidate, ScorecardRoleEntry } from "./schema.js";
 import { estimateRunCost, typicalCallMicros } from "./estimate.js";
 
 /**
@@ -2578,7 +2669,7 @@ import { estimateRunCost, typicalCallMicros } from "./estimate.js";
  *   STEPPED_DOWN:<from>-><to>                 the money estimate was over the per-run ceiling
  *   ROLE_FALLBACK:<role>:NO_ELIGIBLE_CANDIDATE | MAKER_COVERAGE
  *   SEATS_SHORT:<role>:<filled>/<asked>       fewer eligible makers or routes than seats
- *   CONTEXT_WINDOW_SKIP:<role>:<candidateId>  the role's typical input does not fit the window
+ *   CONTEXT_WINDOW_SKIP:<role>:<candidateId>  the role's typical call (input + output + thinking) does not fit the window
  *   ECONOMY_CAP_UNMET:<role>                  nothing was under the cap; the cheapest sits
  *   PRICE_UNUSABLE:<providerRef>              a hosted route without a usable price
  *   ESTIMATE_UNAVAILABLE                      a called seat has no typical call or no price
@@ -2781,6 +2872,16 @@ function matchTarget(reachable: readonly ReachableTarget[], candidate: Scorecard
     && (candidate.thinkingLevel === THINKING_LEVEL_DEFAULT_ONLY || target.thinkingLevels.includes(candidate.thinkingLevel))) ?? null;
 }
 
+/**
+ * R1 applied to a typical call (pre-flight ruling F29): the gateway refuses a prompt when the prompt
+ * PLUS the answer bound exceeds the window, so the picker counts the typical call's input, output
+ * and thinking tokens together. Comparing the input alone would seat a candidate the gateway then
+ * refuses on every call (PROVIDER_CONTEXT_WINDOW_EXCEEDED is not a backup trigger).
+ */
+function typicalCallWindowTokens(typicalCall: ScorecardRoleEntry["typicalCall"]): number {
+  return typicalCall.inputTokens + typicalCall.outputTokens + (typicalCall.thinkingTokens ?? 0);
+}
+
 function smallestWindow(left: number | null, right: number | null): number | null {
   if (left === null) return right;
   if (right === null) return left;
@@ -2815,7 +2916,8 @@ function seatDemandOf(input: PickerInput, role: DebateRole): number {
 /**
  * Every scorecard candidate that may sit in `role`: listed for it, not AVOID or UNTESTED,
  * reachable at its own thinking level, on an API route in HOSTED mode (relays never run
- * hosted), and whose typical input fits the smaller of its own and its route's window.
+ * hosted), and whose typical call (input + output + thinking tokens) fits the smaller of its own
+ * and its route's window.
  * Entries are walked in candidateId order so the notes do not depend on the file's order.
  */
 function eligiblePool(input: PickerInput, scorecard: Scorecard, role: DebateRole, notes: string[]): Ranked[] {
@@ -2830,7 +2932,7 @@ function eligiblePool(input: PickerInput, scorecard: Scorecard, role: DebateRole
     const target = matchTarget(input.reachable, candidate);
     if (target === null) continue;
     const contextWindow = smallestWindow(candidate.contextWindowTokens, target.contextWindowTokens);
-    if (contextWindow !== null && entry.typicalCall.inputTokens > contextWindow) {
+    if (contextWindow !== null && typicalCallWindowTokens(entry.typicalCall) > contextWindow) {
       notes.push(`CONTEXT_WINDOW_SKIP:${role}:${candidate.candidateId}`);
       continue;
     }
@@ -3139,7 +3241,13 @@ Step 3 before touching any floor, and never lower a floor below 10.
 Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
 Expected: PASS, except the known-red "dev's F31 debt" row.
 
-Run: `pnpm run lint && pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
+Run: `pnpm run audit:architecture`
+Expected: exit 1, and its `violations` list only the three known F31 obs-capture edges (Global Constraints, "Lint").
+
+Run: `pnpm run audit:source`
+Expected: exit 1, and its `blocking` list only the three known obs-capture environment reads (Global Constraints, "Lint").
+
+Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
 Expected: exit 0.
 
 Run: `pnpm run test:ci-gate`
@@ -3565,7 +3673,13 @@ Expected: PASS (the drift test now checks three files and that no other file is 
 Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts tests/architecture/tier01-roster.test.ts tests/architecture/tiers-s02-rosters.test.ts`
 Expected: PASS, except the known-red "dev's F31 debt" row.
 
-Run: `pnpm run lint && pnpm run audit:text-bytes && pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
+Run: `pnpm run audit:architecture`
+Expected: exit 1, and its `violations` list only the three known F31 obs-capture edges (Global Constraints, "Lint").
+
+Run: `pnpm run audit:source`
+Expected: exit 1, and its `blocking` list only the three known obs-capture environment reads (Global Constraints, "Lint").
+
+Run: `pnpm run audit:text-bytes && pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
 Expected: exit 0.
 
 Run: `pnpm run test:ci-gate`
@@ -3602,7 +3716,7 @@ All paths are relative to `dialectical-engine/` in the worktree `/Users/stefanno
    - An attempt that is never sent writes no prompt: a money refusal, an oversize packet or a window refusal.
    - For an **encrypted run**, `prompt_fingerprint` is NULL and the fingerprint rides inside the envelope together with the text. A readable digest of private content is the locator 0040 replaced with random bytes on `ledger_entry.input_hash`.
    - `readCallPrompt` returns both values decrypted.
-4. **Token estimates (assembler reconciliation R1):** `estimatePromptTokens(messages) = ceil(Σ content.length / 4)` sizes estimates only (the replay tool's `promptTokensEstimate`, scorecard typical calls). The context-window WALL uses `estimateWindowTokens(messages) = ceil(Σ UTF-8 bytes / 2)`, the SAME conservative rule the relays use (`acceptance/relay-core.ts` `exceedsContextWindow`), so the gateway and a relay never disagree about a Romanian prompt.
+4. **Token estimates (assembler reconciliation R1):** `estimatePromptTokens(messages) = ceil(Σ content.length / 4)` sizes estimates only (the replay tool's `promptTokensEstimate`, scorecard typical calls). The context-window WALL uses `estimateWindowTokens(messages) = ceil(Σ UTF-8 bytes of each message's content / 2)`, the SAME conservative rule the relays use (`acceptance/relay-core.ts` `exceedsContextWindow` counts the same message contents, never its JSON transcript: pre-flight fix F1), so the gateway and a relay never disagree about a Romanian prompt.
    - The context-window wall is `estimate + this attempt's max_tokens > contextWindowTokens`.
    - It is refused pre-send with a FAILED ledger row, and not retried.
 5. **Where `canonicalPromptFingerprint` lives.** `providers` may import only `kernel`, `register` and `ledger` (`tools/orphan-audit/src/index.ts:19`). The brief's fallback does not work either:
@@ -3638,7 +3752,7 @@ All paths are relative to `dialectical-engine/` in the worktree `/Users/stefanno
   - `CallPromptRecordInput`;
   - `estimatePromptTokens(messages)`, for the replay tool's `promptTokensEstimate`;
   - `estimateWindowTokens(messages)`, the window wall shared with the relays (R1);
-  - `CLI_RELAY_USAGE_CAP`, for the relay fragment;
+  - `CLI_RELAY_USAGE_CAP`, `CLI_RELAY_CONTEXT_WINDOW_EXCEEDED`, `CLI_RELAY_THINKING_LEVEL_UNSUPPORTED`, the relay markers the gateway reads (F1);
   - `ProviderLedgerInput` gains `modelRole`, `candidateId`, `scorecardVersion`, `thinkingLevel`;
   - `RawArtifactInput` gains `thinkingTokens`;
   - the `recordCall` observed type gains `attemptId?`.
@@ -3654,7 +3768,8 @@ All paths are relative to `dialectical-engine/` in the worktree `/Users/stefanno
 - **Semantics:**
   - `PROVIDER_THINKING_LEVEL_CHANGED` fires only when a level was **requested** and the relay echoed a different one.
   - With no level requested, the relay's echoed level is recorded as the level used, else `DEFAULT_ONLY`.
-  - `PROVIDER_USAGE_CAP` needs HTTP 429 **and** `x_cli_relay_error === "CLI_RELAY_USAGE_CAP"`. A bare 429 is still a retried transport failure.
+  - `PROVIDER_USAGE_CAP` needs HTTP 429 **and** `x_cli_relay_error === "CLI_RELAY_USAGE_CAP"`. A bare 429 is still a retried transport failure. The cap is never retried and reaches the caller as a `ProviderCallFailedError` whose `cause` is the `PROVIDER_USAGE_CAP` `TypedDomainError` (pre-flight ruling F11), so every existing caller that halts a member on a relay failure keeps doing so.
+  - A relay's own refusals map the same way, next to the cap check and never retried (pre-flight fix F1): 413 with `x_cli_relay_error === "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED"` → `PROVIDER_CONTEXT_WINDOW_EXCEEDED`, and 400 with `x_cli_relay_error === "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED"` → `PROVIDER_THINKING_LEVEL_UNSUPPORTED`, both thrown unwrapped like the gateway's own pre-send refusals.
 - **Test fixture:** `tests/support/contentRunFixture.ts` provides `startContentRunFixture`.
 
 **Existing tests these tasks deliberately change**
@@ -3703,7 +3818,7 @@ All paths are relative to `dialectical-engine/` in the worktree `/Users/stefanno
   - `acceptance/review-catch-up.ts:82`
   - `apps/runner/src/dev-provider-panel.ts`
 
-  The relay fragment adds them, with `providerTargetGatewayControls` or explicit `thinking` / `contextWindowTokens`.
+  The dev panel gets its declarations in A12 (R4). The three acceptance roots deliberately stay without thinking controls in this plan (pre-flight erratum F36): the acceptance runtime seats only `DEFAULT_ONLY` candidates, because A20.4 composes its picker with `targets: []`.
 - The runner fragment sets `modelRole`, `candidateId`, `scorecardVersion` and `thinkingLevel` on requests, and maps `PROVIDER_USAGE_CAP` to the backup switch.
 
 ---
@@ -4781,7 +4896,7 @@ Run: `pnpm exec vitest run tests/architecture/model-scorecard-0072-contract.test
 Expected: PASS (3 files).
 
 Run: `pnpm exec vitest run tests/architecture/v6-remaining-content-carriers-contract.test.ts tests/architecture/s6-content-encryption-contract.test.ts tests/architecture/security-migration-0056.test.ts tests/architecture/scaffold.test.ts tests/architecture/s10-carrier-erasure-red.test.ts`
-Expected: PASS. Every CREATE TABLE and ADD CONSTRAINT is replay-guarded; no function is redefined; both new tables carry the TRUNCATE guard.
+Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16). Every CREATE TABLE and ADD CONSTRAINT is replay-guarded; no function is redefined; both new tables carry the TRUNCATE guard.
 
 - [ ] **Step 8: Run the database integration suites that replay migrations (CI skips `tests/integration`)**
 
@@ -5803,7 +5918,7 @@ Expected: PASS.
 Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
 Expected: exit 0.
 Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
-Expected: PASS. The new `MAX_TARGET_THINKING_LEVELS = 16` is not exported, so the source rule against exported numeric literals holds.
+Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16). The new `MAX_TARGET_THINKING_LEVELS = 16` is not exported, so the source rule against exported numeric literals holds.
 Run: `pnpm run test:ci-gate`
 Expected: `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
@@ -5834,7 +5949,8 @@ git commit -m "feat(providers): targets declare thinking levels and a context wi
   - `ProviderCallRequest.thinkingLevel?: string`
   - `ProviderCallResult.{thinkingLevel?: string; reasoningTokens?: number | null}`
   - `PROVIDER_THINKING_LEVEL_UNSUPPORTED`, `PROVIDER_THINKING_LEVEL_CHANGED`, `PROVIDER_CONTEXT_WINDOW_EXCEEDED`, `PROVIDER_USAGE_CAP`
-  - `CLI_RELAY_USAGE_CAP = "CLI_RELAY_USAGE_CAP"`
+  - `CLI_RELAY_USAGE_CAP = "CLI_RELAY_USAGE_CAP"`, and (pre-flight fix F1) `CLI_RELAY_CONTEXT_WINDOW_EXCEEDED`, `CLI_RELAY_THINKING_LEVEL_UNSUPPORTED`: the relay's 413/400 markers, mapped to `PROVIDER_CONTEXT_WINDOW_EXCEEDED` / `PROVIDER_THINKING_LEVEL_UNSUPPORTED` (unwrapped, not retried)
+  - Semantics (pre-flight ruling F11): a usage cap is not retried and leaves as `ProviderCallFailedError` (`attempts` = the attempt that met it) whose `cause` is the `PROVIDER_USAGE_CAP` `TypedDomainError`
   - `estimatePromptTokens(messages: PromptPacket["messages"]): number`
   - `estimateWindowTokens(messages: PromptPacket["messages"]): number` (R1)
   - `reportedReasoningTokens(rawUsage: unknown): number | null`
@@ -5847,6 +5963,8 @@ Create `tests/unit/model-scorecard-gateway-thinking.test.ts`:
 ```ts
 import { describe, expect, it } from "vitest";
 import {
+  CLI_RELAY_CONTEXT_WINDOW_EXCEEDED,
+  CLI_RELAY_THINKING_LEVEL_UNSUPPORTED,
   CLI_RELAY_USAGE_CAP,
   OpenAICompatibleProviderGateway,
   PROVIDER_CONTEXT_WINDOW_EXCEEDED,
@@ -5997,7 +6115,11 @@ describe("model scorecard — the context window and the usage cap", () => {
     const capped = gatewayWith(() => new Response(JSON.stringify({
       error: CLI_RELAY_USAGE_CAP, x_cli_relay_error: CLI_RELAY_USAGE_CAP
     }), { status: 429 }));
-    await expect(capped.gateway.call(request())).rejects.toMatchObject({ code: PROVIDER_USAGE_CAP });
+    // Pre-flight ruling F11: today's PROVIDER_CALL_FAILED, with the cap as its cause, after ONE attempt.
+    const cap = await capped.gateway.call(request()).catch((error: unknown) => error);
+    expect(cap).toBeInstanceOf(ProviderCallFailedError);
+    expect(cap).toMatchObject({ code: "PROVIDER_CALL_FAILED", attempts: 1, lastOutcome: "FAILED" });
+    expect((cap as ProviderCallFailedError).cause).toMatchObject({ code: PROVIDER_USAGE_CAP });
     expect(capped.bodies).toHaveLength(1);
     expect(capped.ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
 
@@ -6005,6 +6127,29 @@ describe("model scorecard — the context window and the usage cap", () => {
     const failure = await limited.gateway.call(request()).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(ProviderCallFailedError);
     expect(limited.bodies).toHaveLength(3);
+  });
+});
+
+describe("model scorecard — a relay's own refusals (R1, pre-flight fix F1)", () => {
+  it.each([
+    { status: 413, marker: CLI_RELAY_CONTEXT_WINDOW_EXCEEDED, code: PROVIDER_CONTEXT_WINDOW_EXCEEDED },
+    { status: 400, marker: CLI_RELAY_THINKING_LEVEL_UNSUPPORTED, code: PROVIDER_THINKING_LEVEL_UNSUPPORTED }
+  ])("maps the relay's $status $marker to $code: one FAILED row, no retry, never a transport failure", async ({ status, marker, code }) => {
+    const refused = gatewayWith(() => new Response(JSON.stringify({ error: marker, x_cli_relay_error: marker }), { status }));
+    const failure = await refused.gateway.call(request()).catch((error: unknown) => error);
+    expect(failure).not.toBeInstanceOf(ProviderCallFailedError);
+    expect(failure).toMatchObject({ code });
+    expect(refused.bodies).toHaveLength(1);
+    expect(refused.ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+
+  it("still retries a bare 413 or 400 without the relay's marker, as today", async () => {
+    for (const status of [413, 400]) {
+      const plain = gatewayWith(() => new Response(JSON.stringify({ error: "vendor_refusal" }), { status }));
+      const failure = await plain.gateway.call(request()).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(ProviderCallFailedError);
+      expect(plain.bodies).toHaveLength(3);
+    }
   });
 });
 
@@ -6085,8 +6230,14 @@ Immediately after the `export const THINKING_LEVEL_TOKEN = /^[a-z][a-z0-9_-]{0,3
 /**
  * Model scorecard — the typed refusals of the thinking level, the context
  * window and a subscription's usage cap. Each is deterministic, so none is
- * retried (see the short-circuit list in `call`), and each reaches the runner
- * unwrapped so the seat's backup rule can read it (ruling R4).
+ * retried (see the short-circuit list and the cap stop in `call`).
+ *  · The level and window refusals reach the caller UNWRAPPED: they are the
+ *    engine's own refusals, never a transport failure, so they never move a
+ *    seat to its backup (ruling R4).
+ *  · The usage cap reaches the caller as today's `ProviderCallFailedError`, with
+ *    the cap as its `cause` (pre-flight ruling F11): every caller that halts a
+ *    member on a relay failure keeps doing so, and the seat caller reads the cap
+ *    off `cause` to switch at once (ruling R4).
  */
 export const PROVIDER_THINKING_LEVEL_UNSUPPORTED = "PROVIDER_THINKING_LEVEL_UNSUPPORTED" as const;
 export const PROVIDER_THINKING_LEVEL_CHANGED = "PROVIDER_THINKING_LEVEL_CHANGED" as const;
@@ -6094,6 +6245,9 @@ export const PROVIDER_CONTEXT_WINDOW_EXCEEDED = "PROVIDER_CONTEXT_WINDOW_EXCEEDE
 export const PROVIDER_USAGE_CAP = "PROVIDER_USAGE_CAP" as const;
 /** The relay's own marker on its 429 (`acceptance/relay-core.ts`), carried in `x_cli_relay_error`. */
 export const CLI_RELAY_USAGE_CAP = "CLI_RELAY_USAGE_CAP" as const;
+/** The relay's markers on its 413 and 400 refusals (A8), carried in `x_cli_relay_error` (R1, pre-flight fix F1). */
+export const CLI_RELAY_CONTEXT_WINDOW_EXCEEDED = "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED" as const;
+export const CLI_RELAY_THINKING_LEVEL_UNSUPPORTED = "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED" as const;
 ```
 
 Insert after line 94 (`  readonly costEnvelope?: ProviderCostEnvelopeSeam;`), inside `ProviderCallRequest`:
@@ -6153,10 +6307,10 @@ Insert after line 960 (`const MAX_USAGE_COUNTER = 2 ** 31 - 1;`):
  * rounded up, summed over every message's content. It is the common rule of
  * thumb for English on BPE vocabularies, simple and deterministic on purpose,
  * not a tokenizer. It UNDER-counts dense text (JSON, Romanian diacritics,
- * code), which is why the window wall adds the attempt's whole answer bound on
- * top. It sizes the pre-send window check and the replay tool's
- * `promptTokensEstimate`; it never prices money (that is `@debateai/budget`'s
- * byte projection).
+ * code), which is why it is NEVER the window wall (R1: the wall is
+ * `estimateWindowTokens` below). It sizes estimates only — the replay tool's
+ * `promptTokensEstimate` and the relays' informational overhead line — and it
+ * never prices money (that is `@debateai/budget`'s byte projection).
  */
 const PROMPT_CHARACTERS_PER_TOKEN = 4;
 
@@ -6333,14 +6487,35 @@ with:
         /**
          * Model scorecard R4: a subscription tool at its usage cap answers 429
          * with the relay's typed marker. The cap is still there one backoff
-         * later, so this is NOT retried: it short-circuits below and the
-         * runner's backup takes the seat. A bare 429 (a vendor's rate limit)
-         * stays a retried transport failure, exactly as before.
+         * later, so this is NOT retried: the loop stops below and the caller
+         * sees PROVIDER_CALL_FAILED with the cap as its `cause` (pre-flight
+         * ruling F11), which the runner's seat caller turns into an immediate
+         * switch. A bare 429 (a vendor's rate limit) stays a retried transport
+         * failure, exactly as before.
          */
         if (response.status === 429 && relayErrorCode(decoded) === CLI_RELAY_USAGE_CAP) {
           throw new TypedDomainError(
             PROVIDER_USAGE_CAP,
             `${request.providerRef} reported that its subscription usage cap is reached`
+          );
+        }
+        /**
+         * R1 (pre-flight fix F1): a relay refuses a window or a level with its
+         * own typed marker (A8). Both are the gateway's own refusals under
+         * another name, the same one backoff later, so they short-circuit
+         * below, unwrapped — never a retried transport failure, never a reason
+         * to move a seat to its backup.
+         */
+        if (response.status === 413 && relayErrorCode(decoded) === CLI_RELAY_CONTEXT_WINDOW_EXCEEDED) {
+          throw new TypedDomainError(
+            PROVIDER_CONTEXT_WINDOW_EXCEEDED,
+            `${request.providerRef} refused the prompt: it does not fit the relay's declared context window`
+          );
+        }
+        if (response.status === 400 && relayErrorCode(decoded) === CLI_RELAY_THINKING_LEVEL_UNSUPPORTED) {
+          throw new TypedDomainError(
+            PROVIDER_THINKING_LEVEL_UNSUPPORTED,
+            `${request.providerRef} refused the requested thinking level`
           );
         }
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
@@ -6409,13 +6584,35 @@ with:
           && (error.code.startsWith("PROMPT_FRAME_")
             || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED"
             || error.code === "PROVIDER_USAGE_INVALID"
-            // Model scorecard: a level run at another level, a prompt that
-            // cannot fit the declared window and a subscription at its cap are
-            // each the same one backoff later.
+            // Model scorecard: a level run at another level, a level or a
+            // prompt the relay refused, and a prompt that cannot fit the
+            // declared window are each the same one backoff later (R1, F1).
             || error.code === PROVIDER_THINKING_LEVEL_CHANGED
+            || error.code === PROVIDER_THINKING_LEVEL_UNSUPPORTED
             || error.code === PROVIDER_CONTEXT_WINDOW_EXCEEDED
-            || error.code === PROVIDER_USAGE_CAP
             || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code));
+```
+
+Replace the `if (shortCircuit) throw error;` line that follows the FAILED ledger row (it is unique in the file):
+
+```ts
+        if (shortCircuit) throw error;
+```
+
+with:
+
+```ts
+        if (shortCircuit) throw error;
+        /**
+         * Model scorecard R4 + pre-flight ruling F11: a usage cap is still there
+         * one backoff later, so the loop stops on the attempt that met it — after
+         * its FAILED row, like an oversized packet — and the caller gets today's
+         * PROVIDER_CALL_FAILED with the cap as its `cause`. Wrapped, so a seat
+         * with no runner-up (every legacy run) halts the member exactly as a
+         * relay failure does today; the seat caller reads the cap off `cause`
+         * and switches to the runner-up at once (A16a).
+         */
+        if (error instanceof TypedDomainError && error.code === PROVIDER_USAGE_CAP) break;
 ```
 
 - [ ] **Step 6: Add the four codes to both diagnostic alphabets**
@@ -6442,7 +6639,7 @@ with, in both files:
   "PROVIDER_USAGE_UNREPORTED",
 ```
 
-"WHO READS THIS STRING" check: `grep -rn "PROVIDER_THINKING_LEVEL_\|PROVIDER_CONTEXT_WINDOW_EXCEEDED\|PROVIDER_USAGE_CAP\|CLI_RELAY_USAGE_CAP" packages apps acceptance tests`. It must show only:
+"WHO READS THIS STRING" check: `grep -rn "PROVIDER_THINKING_LEVEL_\|PROVIDER_CONTEXT_WINDOW_EXCEEDED\|PROVIDER_USAGE_CAP\|CLI_RELAY_USAGE_CAP\|CLI_RELAY_CONTEXT_WINDOW_EXCEEDED\|CLI_RELAY_THINKING_LEVEL_UNSUPPORTED" packages apps acceptance tests`. It must show only:
 - the providers definitions;
 - the two `KNOWN_DOMAIN_CODES` lists;
 - `tests/unit/api-operational-error.test.ts`;
@@ -6464,7 +6661,7 @@ Expected: PASS.
 Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
 Expected: exit 0.
 Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
-Expected: PASS. `PROMPT_CHARACTERS_PER_TOKEN` is not exported.
+Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16). `PROMPT_CHARACTERS_PER_TOKEN` is not exported.
 Run: `pnpm run test:ci-gate`
 Expected: `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
@@ -6489,6 +6686,9 @@ git commit -m "feat(providers): thinking level on the wire; typed refusals for u
   - the helpers block added in A7b;
   - `call()`.
 - Modify: `apps/runner/src/index.ts:4-12, 92, 6181-6202`
+- Modify: `apps/runner/package.json` (the runner → scorecard edge; always needed, the engine lacks it — pre-flight fix F14)
+- Modify: `tools/orphan-audit/src/index.ts:38` (the `apps/runner` row allows `scorecard`)
+- Modify: `pnpm-lock.yaml` (regenerated by `pnpm install --offline`: a workspace link only)
 - Modify: `tests/integration/obs-l3-s06-runner-binding.test.ts:360-363`
 - Test: `tests/unit/model-scorecard-gateway-records.test.ts`
 - Test: `tests/integration/model-scorecard-gateway-records.test.ts`
@@ -6508,25 +6708,31 @@ git commit -m "feat(providers): thinking level on the wire; typed refusals for u
   - `export interface CallPromptRecordInput { runId: string; attemptId: string; promptText: string; messages: PromptPacket["messages"] }`
   - `OpenAICompatibleGatewayOptions.persistCallPrompt?: (prompt: CallPromptRecordInput) => Promise<void>`
   - `createPostgresProviderGateway` writes every attempt's prompt to `ledger.call_prompt` with `canonicalPromptFingerprint(messages)`
+  - Semantics (pre-flight fix F13): a `persistCallPrompt` failure leaves `call()` unwrapped, before anything is sent, with no ledger row and no retry
   - TypeError `PROVIDER_CALL_RECORD_INVALID`
+  - The runner → scorecard dependency edge (`apps/runner/package.json`, the `apps/runner` orphan-audit row), which A15b and later runner tasks rely on
 
 - [ ] **Step 1: Confirm the scorecard fingerprint and the runner edge**
 
 Run: `grep -n "export function canonicalPromptFingerprint" packages/scorecard/src/moment.ts`
 Expected: one line. If absent, STOP: the scorecard moment task of the preceding fragment must land first.
 
-Run: `grep -n '"@debateai/scorecard"' package.json apps/runner/package.json`, then `grep -n '\["apps/runner", "apps/runner"' tools/orphan-audit/src/index.ts`.
+Run: `grep -n '"@debateai/scorecard"' package.json apps/runner/package.json`
+Expected: `package.json` lists `@debateai/scorecard` (A2); `apps/runner/package.json` does NOT yet (the engine at the
+plan's base has no runner → scorecard edge, so the steps below always run — pre-flight fix F14).
 
-Expected:
-- `package.json` lists `@debateai/scorecard`.
-- `apps/runner/package.json` lists it.
-- The `apps/runner` row contains `"scorecard"`.
-
-If the runner manifest or the row lacks it:
-1. Add `"@debateai/scorecard": "workspace:*"` to `apps/runner/package.json` `dependencies`, after `"@debateai/support-kb": "workspace:*",`.
-2. Append `"scorecard"` to the `apps/runner` row's allowed list in `tools/orphan-audit/src/index.ts`, after `"support-kb"`.
+Add the runner edge (always):
+1. In `apps/runner/package.json`, replace `    "@debateai/support-kb": "workspace:*",` with:
+   ```json
+       "@debateai/support-kb": "workspace:*",
+       "@debateai/scorecard": "workspace:*",
+   ```
+2. In `tools/orphan-audit/src/index.ts`, in the `apps/runner` row (line 38), replace `"contract", "support-kb"]],` (unique
+   in the file) with `"contract", "support-kb", "scorecard"]],`.
 3. Run `pnpm install --offline`. This is a workspace link only, so nothing is downloaded. If pnpm reports it needs the network, STOP: **OWNER GO NEEDED: download**.
-4. Include `apps/runner/package.json`, `tools/orphan-audit/src/index.ts` and `pnpm-lock.yaml` in this task's commit.
+4. Run `git diff --stat -- pnpm-lock.yaml`, then `git diff -- pnpm-lock.yaml`.
+   Expected: only the `apps/runner` importer changes, gaining `'@debateai/scorecard'` with `specifier: workspace:*` and
+   `version: link:../../packages/scorecard`. Any other importer or package entry changing: STOP and report.
 
 The contract already names the runner as an importer of scorecard, and the edge count in `scaffold.test.ts` counts rows, not edges.
 
@@ -6560,7 +6766,7 @@ const RELAY = { thinking: { parameter: "x_thinking_level" as const, levels: ["lo
 
 function recordingGateway(
   respond: (attempt: number) => Response,
-  extra: Pick<OpenAICompatibleGatewayOptions, "thinking" | "contextWindowTokens"> = {}
+  extra: Pick<OpenAICompatibleGatewayOptions, "thinking" | "contextWindowTokens" | "persistCallPrompt"> = {}
 ) {
   const events: string[] = [];
   const bodies: string[] = [];
@@ -6700,6 +6906,20 @@ describe("model scorecard — the prompt record", () => {
     await expect(walled.gateway.call(request())).rejects.toMatchObject({ code: PROVIDER_CONTEXT_WINDOW_EXCEEDED });
     expect(walled.prompts).toEqual([]);
     expect(walled.bodies).toEqual([]);
+  });
+
+  it("stops unsent when the prompt cannot be recorded: no ledger row, no retry, the write error unwrapped (F13)", async () => {
+    // Nothing reached a vendor, so this is not a transport failure: it must never
+    // become PROVIDER_CALL_FAILED, which a seat would read as a reason to switch.
+    const refusal = new Error("call_prompt write refused");
+    const { gateway, bodies, ledger } = recordingGateway(() => completion("ok"), {
+      persistCallPrompt: async () => { throw refusal; }
+    });
+    const failure = await gateway.call(request()).catch((error: unknown) => error);
+    expect(failure).toBe(refusal);
+    expect(failure).not.toBeInstanceOf(ProviderCallFailedError);
+    expect(bodies).toEqual([]);
+    expect(ledger).toEqual([]);
   });
 
   it("the runner's gateway factory writes each prompt through the carrier with the scorecard's fingerprint", async () => {
@@ -7008,6 +7228,9 @@ with:
       // Model scorecard §2.2: the level this attempt ran at, as far as it got. A
       // failure before any body arrived records the level that was sent.
       let attemptThinkingLevel: string = thinking.sent;
+      // Pre-flight fix F13: set when the prompt could not be recorded, so the
+      // catch below lets that failure leave unsent, unledgered and unretried.
+      let promptRecordFailed = false;
 ```
 
 Immediately after the context-window block added in A7b (ending with the `PROVIDER_CONTEXT_WINDOW_EXCEEDED` throw's closing `}`), and before `const response = await fetcher(`, insert:
@@ -7018,13 +7241,32 @@ Immediately after the context-window block added in A7b (ending with the `PROVID
         // ledger shows as sent — a transport failure included — has its prompt
         // on record. A call with no run records none (the support chat).
         if (request.runId !== null && this.#options.persistCallPrompt !== undefined) {
-          await this.#options.persistCallPrompt({
-            runId: request.runId,
-            attemptId,
-            promptText: JSON.stringify(attemptPacket.messages),
-            messages: attemptPacket.messages
-          });
+          try {
+            await this.#options.persistCallPrompt({
+              runId: request.runId,
+              attemptId,
+              promptText: JSON.stringify(attemptPacket.messages),
+              messages: attemptPacket.messages
+            });
+          } catch (promptError) {
+            promptRecordFailed = true;
+            throw promptError;
+          }
         }
+```
+
+Immediately before the `const shortCircuit = error instanceof TypedDomainError` line of the `catch (error)` block (A7b's
+short-circuit list; the line is unique in the file), insert:
+
+```ts
+        /**
+         * Pre-flight fix F13: the prompt record could not be written (a database
+         * or erasure-barrier refusal), so this attempt was never sent and no
+         * vendor was asked. It is neither a FAILED model call nor a transport
+         * failure: no ledger row, no retry, and the error leaves unwrapped, so
+         * a seat never reads it as a reason to switch to its backup.
+         */
+        if (promptRecordFailed) throw error;
 ```
 
 Immediately after the `const reasoningTokens = reportedReasoningTokens(rawUsage);` line added in A7b, insert:
@@ -7227,19 +7469,20 @@ Expected: PASS for each. These drive the shipped factory with a real run, so eve
 Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
 Expected: exit 0.
 Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
-Expected: PASS.
+Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16). The `apps/runner` row's new
+`scorecard` edge adds no violation.
 Run: `pnpm run test:ci-gate`
 Expected: `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add packages/providers/src/index.ts apps/runner/src/index.ts tests/integration/obs-l3-s06-runner-binding.test.ts tests/unit/model-scorecard-gateway-records.test.ts tests/integration/model-scorecard-gateway-records.test.ts
+git add packages/providers/src/index.ts apps/runner/src/index.ts apps/runner/package.json tools/orphan-audit/src/index.ts pnpm-lock.yaml tests/integration/obs-l3-s06-runner-binding.test.ts tests/unit/model-scorecard-gateway-records.test.ts tests/integration/model-scorecard-gateway-records.test.ts
 git diff --cached --name-only
-git commit -m "feat(providers): record role, candidate, version, level, thinking tokens and the encrypted prompt of every call" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- packages/providers/src/index.ts apps/runner/src/index.ts tests/integration/obs-l3-s06-runner-binding.test.ts tests/unit/model-scorecard-gateway-records.test.ts tests/integration/model-scorecard-gateway-records.test.ts
+git commit -m "feat(providers): record role, candidate, version, level, thinking tokens and the encrypted prompt of every call" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- packages/providers/src/index.ts apps/runner/src/index.ts apps/runner/package.json tools/orphan-audit/src/index.ts pnpm-lock.yaml tests/integration/obs-l3-s06-runner-binding.test.ts tests/unit/model-scorecard-gateway-records.test.ts tests/integration/model-scorecard-gateway-records.test.ts
 ```
-
-If Step 1 added the runner edge, also add and commit `apps/runner/package.json`, `tools/orphan-audit/src/index.ts` and `pnpm-lock.yaml` in the same command.
+Expected `git diff --cached --name-only`: exactly the eight paths above (pre-flight fix F14: the runner edge is always
+part of this commit).
 
 ---
 
@@ -7546,9 +7789,9 @@ git commit -m "feat(budget): model_spend rows name the attempt they paid for" -m
 
 ## Risks this fragment could not close
 
-1. **The chars/4 estimate under-counts** JSON, Romanian text and code. A small declared window can still overflow on a prompt this check admits (the pi/GLM relay declares 1 000 000 since D1; a scorecard candidate may declare far less). It is mitigated by adding the whole answer bound, and by the relay's own window refusal (relay fragment). A candidate's `contextWindowTokens` in the scorecard is what keeps a small-window model off near-wall roles.
+1. **The window wall is a conservative floor, not a tokenizer** (R1, updated by pre-flight erratum F36). The wall counts ⌈UTF-8 content bytes ÷ 2⌉ plus the whole answer bound, the same count at the gateway and at every relay (F1), so a Romanian prompt is refused before it is sent rather than truncated. A tokenizer that packs fewer than two bytes per token could still exceed a very small declared window; the chars/4 `estimatePromptTokens` never decides the wall. A candidate's `contextWindowTokens` in the scorecard is what keeps a small-window model off near-wall roles (the picker counts the typical call's input, output and thinking tokens, F29).
 2. **Hosted vendor levels are unverified.** Some OpenAI reasoning models reject `max_tokens` when `reasoning_effort` is sent (M1 §2.5). No hosted target should declare `thinking_parameter: "reasoning_effort"` until each vendor is checked.
-3. **`candidateId` must be one token**, matching `^[A-Za-z0-9_.:@/+-]{1,128}$`, or every call on that seat is refused pre-send with `PROVIDER_CALL_RECORD_INVALID`. The scorecard schema (preceding fragment) should enforce the same pattern on `ScorecardCandidateSchema.candidateId`.
+3. **`candidateId` must be one token**, matching `^[A-Za-z0-9_.:@/+-]{1,128}$`, or every call on that seat is refused pre-send with `PROVIDER_CALL_RECORD_INVALID`. Closed (pre-flight erratum F36): the scorecard schema (A2) already enforces a subset of it on `ScorecardCandidateSchema.candidateId` (`^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$`), and its `thinkingLevel` now matches the gateway's level token or `DEFAULT_ONLY`.
 4. **The dormant evaluator-worker role has no INSERT on `ledger.call_prompt`.** Evaluator-lane calls go through the runner's gateway (the runtime role), so this matters only if the evaluator ever gets its own gateway process.
 5. **An encrypted run's fingerprint is inside the envelope.** The moment-export tool (another fragment) must use `readCallPrompt`, not a plain SELECT, to obtain `recorded.promptFingerprint`.
 
@@ -7576,8 +7819,9 @@ Line numbers are at `19551cd8`, so they drift once earlier edits land. Two rules
 
 **Contract extensions (each also listed under its task's Produces)**
 
-1. **The `x_thinking_level` echo means the level that was ASKED.** When a request carries no `x_thinking_level`, the relay echoes `DEFAULT_ONLY`. It does this even when the adapter ran its CLI at an explicit default, as agy and pi always do (`--model …-high`, `--thinking high`). DEFAULT_ONLY therefore means "no level asked; the connection ran at its own default". This keeps the gateway rule "an echo that differs from what was sent → `PROVIDER_THINKING_LEVEL_CHANGED`" correct without special cases.
-   - **Deliberate divergence from M1 §5.4**, which said pi reports `high` when nothing is asked. That would make every unasked pi or agy call fail a strict gateway compare.
+1. **The `x_thinking_level` echo means the level that was ASKED.** When a request carries no `x_thinking_level`, the relay echoes `DEFAULT_ONLY`. It does this even when the adapter ran its CLI at an explicit default, as agy and pi always do (`--model …-high`, `--thinking high`). DEFAULT_ONLY therefore means "no level asked; the connection ran at its own default".
+   - Why (rationale corrected by pre-flight erratum F36): the gateway compares the echo only when a level WAS asked (A7b: `PROVIDER_THINKING_LEVEL_CHANGED` fires only then). When none was asked, it RECORDS the echo as the level the call ran at. Echoing `DEFAULT_ONLY` keeps that record honest: the ledger never claims that the scorecard chose a level for a call that asked none.
+   - **Deliberate divergence from M1 §5.4**, which said pi reports `high` when nothing is asked. That would record `high` on unasked calls, indistinguishable in the ledger from a call whose scorecard candidate asked for `high`.
 2. Relay refusal bodies carry `{error:<code>, x_cli_relay_error:<code>}` on the new 400 (`CLI_RELAY_THINKING_LEVEL_UNSUPPORTED`) and 413 (`CLI_RELAY_CONTEXT_WINDOW_EXCEEDED`). The 429 body is `{error:<maker cap code, e.g. CLAUDE_CLI_USAGE_CAP>, x_cli_relay_error:"CLI_RELAY_USAGE_CAP"}`. The contract names `x_cli_relay_error` only on the 429.
 3. The relay request schema now refuses a malformed `x_thinking_level` as `400 MALFORMED_REQUEST`. The accepted form is one token matching `/^[a-z][a-z0-9_-]{0,31}$/`, so `"DEFAULT_ONLY"` is also refused; the gateway never sends it.
 4. `relay-core` now keeps up to 64 KiB of a child's stderr in memory, for the usage-cap classifier only. Before this it was discarded.
@@ -7604,7 +7848,7 @@ Line numbers are at `19551cd8`, so they drift once earlier edits land. Two rules
 - `tests/support/developmentProviderPanel.ts`: two unavailable rows are added.
 - `tests/unit/v9-provider-credential-files.test.ts:334-367`: the roster fixture grows to seven rows.
 - `tests/integration/dev-deployment-register.test.ts:450-457` and `tests/integration/dev-api-environment.test.ts:245-276`: the seven-provider set.
-- `tests/integration/dev-provider-panel.test.ts:17-22`: **already red before this plan.** It expects 3 targets and 2 healthy refs, but the fixture already had 5 slots. It is corrected to the roster because A12 changes the fixture it reads.
+- `tests/integration/dev-provider-panel.test.ts:1-23` (imports and the first `it`, whose pins are lines 17-22): **already red before this plan.** It expects 3 targets and 2 healthy refs, but the fixture already had 5 slots. It is corrected to the roster because A12 changes the fixture it reads.
 - `tests/architecture/dev-real-provider-only.test.ts:36-45`: the intent is rewritten per the owner's §2.10 ruling. GLM now debates through pi, and Hermes stays Support-only.
 - A12b (lean calls, D8) changes these argv pins on purpose: `acceptance/claude-relay.test.ts:264-275`, `acceptance/grok-relay.test.ts:228-237` and `:573-576`, `acceptance/model-shim.test.ts:269-277` and `:312-321`, `acceptance/adversarial-corpus.test.ts:615-628` (CLAUDE-ARGV-01) and `:654-663` (GROK-ARGV-01), A9's codex "declares the seven measured levels" list, and A10's two pure `agyArguments` lists. The task names each one.
 
@@ -7654,6 +7898,7 @@ import { resolveGrokBinary } from "./grok-relay.js";
 import { resolveHermesBinary } from "./hermes-relay.js";
 import { resolveCodexBinary } from "./model-shim.js";
 import { afterEach, describe, expect, it } from "vitest";
+import { estimateWindowTokens } from "@debateai/providers";
 import {
   CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES,
   CLI_RELAY_STDOUT_MAX_BYTES,
@@ -7669,6 +7914,9 @@ import {
   type CliRelayHandle
 } from "./relay-core.js";
 ```
+
+(`estimateWindowTokens` is the gateway's own wall from A7b; the relay's agreement test below reads it, so the two
+rules cannot drift apart unseen — R1, pre-flight fix F1.)
 
 Append at the end of the file, after `:779`. None of these probes is named `script`, `fixtureScript` or `probeScript`. `fake-cli-environment.test.ts` reads the first `const script = [` region of this file, and that region must stay the P4-10 one.
 
@@ -7914,14 +8162,31 @@ describe("§2.2 thinking level at the relay", () => {
   });
 });
 
+describe("pre-flight fix F37: a CLI's own length stop reaches the gateway as a truncation", () => {
+  it("answers 200 with finish_reason \"length\" when the adapter reports it, and \"stop\" otherwise", async () => {
+    for (const [finishReason, expected] of [["length", "length"], [undefined, "stop"]] as const) {
+      const handle = await startFixtureRelay(fixtureAdapter(`finish-${expected}-fixture`, {
+        parseCompletion: (stdout: string) => ({
+          content: stdout,
+          model: "fixture-model",
+          usage: null,
+          ...(finishReason === undefined ? {} : { finishReason })
+        })
+      }), 'process.stdout.write("OK");');
+      const response = await postRelay(handle, userTurn("Finish probe."));
+      expect(response.status).toBe(200);
+      const body = await response.json() as { readonly choices: readonly { readonly finish_reason: string }[] };
+      expect(body.choices[0]?.finish_reason).toBe(expected);
+    }
+  });
+});
+
 describe("§2.10 declared context window at the relay", () => {
   const WINDOW = 1_000;
   const MAX_TOKENS = 100;
-  // ceil(bytes / 2) + max_tokens <= window  ⇔  bytes <= 2 × (window − max_tokens)
-  const fitting = (): string => "a".repeat(
-    2 * (WINDOW - MAX_TOKENS)
-      - Buffer.byteLength(renderPromptTranscript([{ role: "user", content: "" }]), "utf8")
-  );
+  // ceil(content bytes / 2) + max_tokens <= window  ⇔  content bytes <= 2 × (window − max_tokens).
+  // R1 (pre-flight fix F1): the message CONTENT is counted, exactly as the gateway counts it.
+  const fitting = (): string => "a".repeat(2 * (WINDOW - MAX_TOKENS));
 
   it("answers 413 before spawning when the prompt plus the output bound cannot fit, and admits the exact boundary", async () => {
     const { marker, probe } = await spawnMarker();
@@ -7941,6 +8206,34 @@ describe("§2.10 declared context window at the relay", () => {
     const boundary = await postRelay(handle, userTurn(fitting(), { max_tokens: MAX_TOKENS }));
     expect(boundary.status).toBe(200);
     expect(existsSync(marker)).toBe(true);
+  });
+
+  it("agrees with the gateway's wall to the token on a Romanian, quote- and newline-heavy packet (R1)", async () => {
+    const handle = await startFixtureRelay(
+      fixtureAdapter("window-agreement-fixture", { contextWindowTokens: WINDOW }),
+      'process.stdout.write("OK");'
+    );
+    // Each line is 22 content bytes, and far more once escaped into the JSON transcript
+    // (two quotes, a backslash and a newline each gain a byte, plus the envelope): a relay
+    // that counted the transcript would refuse what the gateway sends.
+    const line = 'Țară "ăîșțâ"\\n\n';
+    const messages = [
+      { role: "system", content: line.repeat(20) },
+      { role: "user", content: line.repeat(20) }
+    ] as const;
+    expect(estimateWindowTokens(messages)).toBe(440);
+    const gatewayBound = WINDOW - estimateWindowTokens(messages);
+    const post = (maxTokens: number): Promise<Response> =>
+      postRelay(handle, { model: "fixture-model", messages, max_tokens: maxTokens });
+
+    // The largest bound the gateway sends is admitted; one more token is refused by both.
+    expect((await post(gatewayBound)).status).toBe(200);
+    const over = await post(gatewayBound + 1);
+    expect(over.status).toBe(413);
+    expect(await over.json()).toEqual({
+      error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED",
+      x_cli_relay_error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED"
+    });
   });
 
   it("counts max_tokens only when it is a positive integer", async () => {
@@ -8128,6 +8421,14 @@ export interface CliCompletion {
   readonly model: string;
   /** Observed CLI-reported usage only. Missing telemetry is represented by null. */
   readonly usage: CliUsage | null;
+  /**
+   * Pre-flight fix F37: "length" when the CLI reports that it stopped at its
+   * output bound. The relay then answers 200 with `finish_reason: "length"`,
+   * so the gateway's existing truncation path handles it (LENGTH_EXCEEDED,
+   * re-sent under a raised bound) — never a relay failure, never a reason to
+   * move a seat to its backup. Absent ⇒ "stop".
+   */
+  readonly finishReason?: "length";
   /**
    * §2.2: the level the REQUEST asked for, which the CLI was run at. Absent ⇒
    * DEFAULT_ONLY: no level was asked and the connection ran at its own default
@@ -8449,9 +8750,14 @@ function sendRelayRefusal(response: ServerResponse, status: 400 | 413, code: str
   sendJson(response, status, { error: code, x_cli_relay_error: code });
 }
 
-/** §2.10: the gateway's floor (2 bytes per token) plus the caller's own output bound. */
+/**
+ * §2.10 and R1 (pre-flight fix F1): the gateway's floor (2 bytes per token) over the SAME bytes the
+ * gateway's `estimateWindowTokens` counts — each message's content, UTF-8 — plus the caller's own
+ * output bound. Never the bytes of the JSON transcript: its envelope, escaped quotes and newlines
+ * would make the relay stricter than the gateway, which would then send a prompt the relay refuses.
+ */
 function exceedsContextWindow(
-  prompt: string,
+  messages: readonly { readonly content: string }[],
   maxTokens: unknown,
   contextWindowTokens: number | undefined
 ): boolean {
@@ -8459,8 +8765,9 @@ function exceedsContextWindow(
   const outputBound = typeof maxTokens === "number" && Number.isSafeInteger(maxTokens) && maxTokens > 0
     ? maxTokens
     : 0;
-  return Math.ceil(Buffer.byteLength(prompt, "utf8") / CONTEXT_WINDOW_BYTES_PER_TOKEN) + outputBound
-    > contextWindowTokens;
+  let contentBytes = 0;
+  for (const message of messages) contentBytes += Buffer.byteLength(message.content, "utf8");
+  return Math.ceil(contentBytes / CONTEXT_WINDOW_BYTES_PER_TOKEN) + outputBound > contextWindowTokens;
 }
 
 /** An adapter's own declarations are checked once, at start, never per call. */
@@ -8495,7 +8802,7 @@ and replace `:550-574` (the `try { … } catch (error) { … }` block inside the
         return;
       }
       const prompt = renderPromptTranscript(parsed.messages);
-      if (exceedsContextWindow(prompt, parsed.max_tokens, options.adapter.contextWindowTokens)) {
+      if (exceedsContextWindow(parsed.messages, parsed.max_tokens, options.adapter.contextWindowTokens)) {
         sendRelayRefusal(response, 413, CLI_RELAY_CONTEXT_WINDOW_EXCEEDED);
         return;
       }
@@ -8522,7 +8829,11 @@ and replace `:550-574` (the `try { … } catch (error) { … }` block inside the
             completion_tokens_details: { reasoning_tokens: completion.usage.reasoningTokens }
           })
         },
-        choices: [{ index: 0, message: { role: "assistant", content: completion.content }, finish_reason: "stop" }]
+        choices: [{
+          index: 0,
+          message: { role: "assistant", content: completion.content },
+          finish_reason: completion.finishReason ?? "stop"
+        }]
       });
     } catch (error) {
       if (error instanceof CliRelayFailure) {
@@ -9502,7 +9813,22 @@ node -e 'const fs=require("node:fs");for(const l of fs.readFileSync("b1.ndjson",
 agy -p 'Reply with exactly the word: ok' --output-format json --mode plan --sandbox --model gemini-3.8-flash-low < /dev/null > c1.json 2> c1.err; echo "c1 exit=$?"
 ```
 
-- If `c1` passes the A criteria, agy cannot take a prompt off argv. §2.10 forbids argv, so STOP. Do not build A10, and drop the agy slot from A12 (Steps 1–7 then list six slots). **OWNER DECISION NEEDED.**
+- If `c1` passes the A criteria, agy answers a prompt on argv but took neither stdin form above. The A and B commands
+  passed a bare `--print`; if agy's `--print` (or `-p`) takes the prompt as its VALUE, A may have failed for that reason
+  alone (pre-flight fix F32). Before deciding anything, read what agy documents:
+
+  ```bash
+  agy --help 2>&1 | grep -n -E -- '(^|[[:space:]])(-p|--print|--input-format|--prompt)([[:space:],=]|$)|stdin'
+  ```
+
+  Report the printed lines.
+  - If they document a stdin form not tried above (for example `-p -`, or `--print` reading stdin when given no value
+    in another position), re-run the A command with exactly that documented form. The prompt stays on stdin, never on
+    argv. If it passes the A criteria, STOP and report the exact working command line: the owner amends `agyArguments`
+    and `AGY_STDIN_FORMAT` in Step 3 to that form before A10 continues. No flag is guessed in the code.
+  - If they document no other stdin form, or the retry fails too, agy cannot take a prompt off argv. §2.10 forbids
+    argv, so STOP. Do not build A10, and drop the agy slot from A12 (Steps 1–7 then list six slots; A12b then leans
+    only the relays that exist). **OWNER DECISION NEEDED.**
 - If `c1` fails too, the `--model gemini-3.8-flash-low` id is the problem. Run `agy models`, report its list and the first line of `c1.err`, then STOP.
 
 Afterwards `cd` back. You may remove `"$probe_dir"`. Nothing from it enters the repository.
@@ -10531,9 +10857,11 @@ const model = process.env.FAKE_PI_WRONG_MODEL === "1" || prompt.includes("WRONG_
 // W6 (SECURITY): the echo below is a PROJECTION over this allow-list, never
 // `process.env`. Every key is here because an acceptance assertion reads it:
 //   asserted PRESENT — pi-relay.test.ts exact-set toEqual (HOME, LANG, LOGNAME,
-//   OLDPWD, PATH, PI_TELEMETRY, PWD, TMPDIR, USER, ZAI_API_KEY);
+//   OLDPWD, PATH, PI_TELEMETRY, PWD, TMPDIR, USER);
 //   asserted ABSENT  — pi-relay.test.ts (DATABASE_URL, GLM_API_KEY,
-//   OPENAI_API_KEY, UNRELATED_SECRET).
+//   OPENAI_API_KEY, UNRELATED_SECRET, ZAI_API_KEY: the relay never passes the
+//   Z.AI key, F37); ZAI_API_KEY stays listed for fake-cli-environment.test.ts,
+//   which runs this fake directly with the key set.
 const ECHOED_ENVIRONMENT_KEYS = [
   "HOME",
   "LANG",
@@ -10632,6 +10960,8 @@ if (process.env.FAKE_PI_ALWAYS_FAIL === "1") {
   process.stdout.write("not json\n");
 } else if (prompt.includes("STOP_ERROR_CLI")) {
   emitRun(assistant("", { content: [], stopReason: "error", errorMessage: "redacted" }));
+} else if (prompt.includes("LENGTH_STOP_CLI")) {
+  emitRun(assistant("a partial answer", { stopReason: "length", rawStopReason: "length" }));
 } else if (prompt.includes("acceptance transport handshake")) {
   emitRun(assistant("OK"));
 } else {
@@ -10869,6 +11199,18 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
     });
   });
 
+  it("relays pi's length stop as a truncation: 200, finish_reason \"length\", the partial text (F37)", async () => {
+    const relay = await start();
+
+    const response = await post(relay, "LENGTH_STOP_CLI");
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      readonly choices: readonly { readonly message: { readonly content: string }; readonly finish_reason: string }[];
+    };
+    expect(body.choices[0]?.finish_reason).toBe("length");
+    expect(body.choices[0]?.message.content).toBe("a partial answer");
+  });
+
   it("refuses an answer from another model, a non-stop ending, unparseable output and a CLI failure", async () => {
     const relay = await start();
 
@@ -10886,7 +11228,7 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
     }
   });
 
-  it("admits pi's Z.AI locators and PI_TELEMETRY=0, and nothing else", async () => {
+  it("admits pi's locators and PI_TELEMETRY=0, never ZAI_API_KEY (pi reads its own stored key), and nothing else", async () => {
     const environmentKeys = [
       "HOME", "PATH", "TMPDIR", "LANG", "USER", "LOGNAME", "ZAI_API_KEY", "PI_CODING_AGENT_DIR",
       "GLM_API_KEY", "OPENAI_API_KEY", "DATABASE_URL", "UNRELATED_SECRET",
@@ -10924,14 +11266,13 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
         PI_TELEMETRY: "0",
         PWD: expect.stringMatching(/[/\\]relay-z-ai-[^/\\]+$/u),
         TMPDIR: "/tmp",
-        USER: "pi-login-user",
-        ZAI_API_KEY: digestOf("zai-test-sentinel")
+        USER: "pi-login-user"
       });
-      for (const key of ["GLM_API_KEY", "OPENAI_API_KEY", "DATABASE_URL", "UNRELATED_SECRET"]) {
+      for (const key of ["GLM_API_KEY", "OPENAI_API_KEY", "DATABASE_URL", "UNRELATED_SECRET", "ZAI_API_KEY"]) {
         expect(echo.environment[key]).toBeUndefined();
       }
       expect(echo.environmentKeyNames.filter((key) => key !== "__CF_USER_TEXT_ENCODING")).toEqual([
-        "HOME", "LANG", "LOGNAME", "OLDPWD", "PATH", "PI_TELEMETRY", "PWD", "TMPDIR", "USER", "ZAI_API_KEY"
+        "HOME", "LANG", "LOGNAME", "OLDPWD", "PATH", "PI_TELEMETRY", "PWD", "TMPDIR", "USER"
       ]);
     } finally {
       for (const key of environmentKeys) {
@@ -11126,13 +11467,16 @@ In `acceptance/fake-cli-environment.test.ts`:
     const directory = await scratchDirectory("w6-pi-prompt-");
     const promptFile = join(directory, "prompt.txt");
     await writeFile(promptFile, "W6 allow-list probe", { mode: 0o600 });
+    // Pre-flight fix F37: run in the scratch directory. The fake echoes its cwd listing in four events,
+    // and the default cwd (the system tmpdir) can hold enough entries to pass the 1 MiB stdout buffer.
     const stdout = await emit(
       [fixturePath("fake-pi-cli.mjs"), "--print", "--mode", "json", "--model", "glm-5.3-flash", `@${promptFile}`],
       {
         HOME: "/tmp/w6-pi-home",
         PATH: "/usr/bin:/bin",
         ZAI_API_KEY: CREDENTIAL_CANARY_VALUE
-      }
+      },
+      directory
     );
     const events = stdout.trim().split("\n").map((line) => JSON.parse(line) as {
       readonly type: string;
@@ -11186,7 +11530,10 @@ import {
  * message.provider ("zai"), message.model ("glm-5.3-flash" for the owner's
  * model, M5; pi's own default answers as "glm-5.3"), message.usage {input,
  * output, cacheRead, cacheWrite, reasoning, totalTokens, cost{…, total}} and
- * message.stopReason ("stop").
+ * message.stopReason ("stop"; "length" is relayed as a truncation, F37).
+ *
+ * CREDENTIAL. pi reads the Z.AI key it keeps itself (under HOME). The relay
+ * never hands `ZAI_API_KEY` to the child (pre-flight ruling F37).
  *
  * PROMPT. Never argv (§2.10): the transcript is an `@file` the shared core
  * writes with mode 0600 and deletes after the call. What IS on argv is fixed
@@ -11230,6 +11577,8 @@ export const PI_RELAY_SYSTEM_PROMPT =
 /** Fixed engine text: the one sentence after the `@file`. */
 export const PI_ATTACHED_PROMPT_MESSAGE = "Answer the request in the attached file." as const;
 const PI_MODEL_PIN_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+/** pi's `message.stopReason` when the model stopped at its output bound (pre-flight fix F37). */
+const PI_STOP_REASON_LENGTH = "length";
 
 const piUsageSchema = z.object({
   input: z.number().int().nonnegative().optional(),
@@ -11286,7 +11635,13 @@ export function parsePiEvents(stdout: string, pinnedModel: string): CliCompletio
   if (!isRecord(last)) throw new CliRelayFailure("FAILED", "PI_CLI_OUTPUT_INVALID");
   const message = piAssistantMessageSchema.safeParse(last.message);
   if (!message.success) throw new CliRelayFailure("FAILED", "PI_CLI_OUTPUT_INVALID");
-  if (message.data.stopReason !== "stop") throw new CliRelayFailure("FAILED", "PI_CLI_STOP_REASON_REFUSED");
+  // Pre-flight fix F37: pi stopping at its output bound is a TRUNCATION, not a relay
+  // failure. The answer goes back with finish_reason "length" (A8), so the gateway's
+  // existing length path handles it and a seat is never moved to its backup for it.
+  const stoppedAtLength = message.data.stopReason === PI_STOP_REASON_LENGTH;
+  if (message.data.stopReason !== "stop" && !stoppedAtLength) {
+    throw new CliRelayFailure("FAILED", "PI_CLI_STOP_REASON_REFUSED");
+  }
   // DR-115: the lineage is what pi REPORTS, and it must be the pinned one.
   if (message.data.provider !== PI_ZAI_PROVIDER || message.data.model !== pinnedModel) {
     throw new CliRelayFailure("FAILED", "PI_CLI_MODEL_MISMATCH");
@@ -11295,12 +11650,14 @@ export function parsePiEvents(stdout: string, pinnedModel: string): CliCompletio
     .flatMap((part) => part.type === "text" && typeof part.text === "string" ? [part.text] : [])
     .join("")
     .trim();
-  if (content.length === 0) throw new CliRelayFailure("FAILED", "PI_CLI_OUTPUT_INVALID");
+  // A length stop may carry no text at all (the bound spent on thinking): still a truncation.
+  if (content.length === 0 && !stoppedAtLength) throw new CliRelayFailure("FAILED", "PI_CLI_OUTPUT_INVALID");
   // Lenient: an unreadable usage block is "not reported", never a refused answer.
   const usage = piUsageSchema.safeParse(message.data.usage);
   return Object.freeze({
     content,
     model: message.data.model,
+    ...(stoppedAtLength ? { finishReason: "length" as const } : {}),
     usage: usage.success
       ? buildCliUsage({
         promptTokens: usage.data.input,
@@ -11316,10 +11673,12 @@ export function parsePiEvents(stdout: string, pinnedModel: string): CliCompletio
 function createPiAdapter(model: string, defaultThinkingLevel: string): CliRelayAdapter {
   return Object.freeze({
     maker: ZAI_MAKER,
-    // pi reads the Z.AI key it keeps under HOME (a common key). ZAI_API_KEY is
-    // the variable form and PI_CODING_AGENT_DIR the locator of a moved agent
-    // directory (pi --help, M1 §4); USER/LOGNAME are non-secret login locators.
-    authEnvironmentKeys: Object.freeze(["ZAI_API_KEY", "PI_CODING_AGENT_DIR", "USER", "LOGNAME"]),
+    // pi reads the Z.AI key it keeps under HOME. Pre-flight ruling F37: the relay
+    // never passes ZAI_API_KEY through, so a key in the relay's own environment
+    // can never override the owner's stored one. PI_CODING_AGENT_DIR locates a
+    // moved agent directory (pi --help, M1 §4); USER/LOGNAME are non-secret
+    // login locators.
+    authEnvironmentKeys: Object.freeze(["PI_CODING_AGENT_DIR", "USER", "LOGNAME"]),
     testEnvironmentKeys: Object.freeze(["FAKE_PI_ALWAYS_FAIL", "FAKE_PI_WRONG_MODEL"]),
     failureCode: "PI_CLI_FAILED",
     timeoutCode: "PI_CLI_TIMEOUT",
@@ -11443,7 +11802,7 @@ This task has three red-to-green cycles, and each cycle ends in its own commit:
   - `tests/unit/v9-provider-credential-files.test.ts:334-368`
   - `tests/integration/dev-deployment-register.test.ts:450-457`
   - `tests/integration/dev-api-environment.test.ts:270-276`
-  - `tests/integration/dev-provider-panel.test.ts:1-22`
+  - `tests/integration/dev-provider-panel.test.ts:1-23`
   - `tests/architecture/dev-real-provider-only.test.ts`
   - `acceptance/relay-host.test.ts` (create)
   - `acceptance/relay-core.test.ts` (the no-shell scan)
@@ -11714,7 +12073,7 @@ In `tests/integration/dev-api-environment.test.ts`, replace `:270-276` (the grok
     ]);
 ```
 
-In `tests/integration/dev-provider-panel.test.ts`, which was already red before this plan (it expects 3 targets and 2 healthy refs against the 5-slot fixture), replace `:1-22`:
+In `tests/integration/dev-provider-panel.test.ts`, which was already red before this plan (it expects 3 targets and 2 healthy refs against the 5-slot fixture), replace `:1-23` — through the first `it`'s closing `  });` on line 23, because the new block below ends with its own `  });` (pre-flight fix F5; replacing only `:1-22` would leave a second `  });` and a file that does not parse):
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -11953,8 +12312,12 @@ Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts`
 Expected: PASS. No shipped file is added, and the two port tuples hold no cell in the 1–5 range.
 - If it FAILS on `apps/runner/src/dev-auth-stack-profile.ts`, STOP and report the printed classification. Do not rewrite the manifest or any oracle pin without owner review.
 
-Run: `pnpm run lint`
-Expected: exit 0. No `process.env` read and no numeric export is added under `apps/`.
+Run: `pnpm run audit:architecture`
+Expected: exit 1, and its `violations` list only the three known F31 obs-capture edges (Global Constraints, "Lint").
+
+Run: `pnpm run audit:source`
+Expected: exit 1, and its `blocking` list only the three known obs-capture environment reads (Global Constraints, "Lint"). No new `process.env` read and no numeric export is added under `apps/` (pre-flight fix F15: `pnpm run lint` exits 1
+today on those known entries, so it is not the check).
 
 Run: `pnpm run test:ci-gate`
 Expected: `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
@@ -12159,7 +12522,13 @@ Expected: PASS.
 Run: `pnpm exec vitest run tests/integration/dev-api-environment.test.ts tests/integration/dev-provider-panel.test.ts`
 Expected: PASS.
 
-Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run lint && pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts && pnpm run test:ci-gate`
+Run: `pnpm run audit:architecture`
+Expected: exit 1, and its `violations` list only the three known F31 obs-capture edges (Global Constraints, "Lint").
+
+Run: `pnpm run audit:source`
+Expected: exit 1, and its `blocking` list only the three known obs-capture environment reads (Global Constraints, "Lint").
+
+Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts && pnpm run test:ci-gate`
 Expected: every command exits 0, and the gate prints `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
 - [ ] **Step 12: Commit**
@@ -12860,7 +13229,13 @@ Expected: PASS.
 Run: `pnpm exec vitest run acceptance/relay-core.test.ts acceptance/claude-relay.test.ts acceptance/grok-relay.test.ts acceptance/model-shim.test.ts acceptance/hermes-relay.test.ts acceptance/agy-relay.test.ts acceptance/pi-relay.test.ts acceptance/relay-host.test.ts acceptance/fake-cli-environment.test.ts acceptance/adversarial-corpus.test.ts acceptance/boot-relays.test.ts`
 Expected: PASS.
 
-Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run lint && pnpm run test:ci-gate`
+Run: `pnpm run audit:architecture`
+Expected: exit 1, and its `violations` list only the three known F31 obs-capture edges (Global Constraints, "Lint").
+
+Run: `pnpm run audit:source`
+Expected: exit 1, and its `blocking` list only the three known obs-capture environment reads (Global Constraints, "Lint").
+
+Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run test:ci-gate`
 Expected: every command exits 0, and the gate prints `CI_KNOWN_RED_GATE new=0 known=8 stale=0`. `tests/unit/confirmation-run-commands.test.ts` still passes, because no script name starts with `acceptance`.
 
 - [ ] **Step 18: Commit**
@@ -12929,7 +13304,8 @@ removed at STOP. Both hold after this task:
   - `CliRelayAdapter.readsInstructionsFile?: boolean`, `CliInvocation.instructionsFile?: string`, `CliCompletion.reportedInputTokens?: number`.
   - `invokeCli(command, adapter, prompt, timeoutMs, options?: { thinkingLevel?: string; workspace?: RelayWorkspace })`.
   - `CliRelayServerOptions.workspace?: RelayWorkspace`: the server owns it and removes it at `close()`; absent ⇒ the server opens its own.
-  - `interface HarnessOverhead { maker: string; reportedInputTokens: number | null; promptTokensEstimate: number; overheadTokens: number | null }`, `measureHarnessOverhead(maker, prompt, handshake)`, `harnessOverheadLine(overhead)`, `reportHarnessOverhead(maker, prompt, handshake, write?)`.
+  - `interface HarnessOverhead { maker: string; reportedInputTokens: number | null; promptTokensEstimate: number; overheadTokens: number | null }`, `measureHarnessOverhead(maker, prompt, handshake)`, `harnessOverheadLine(overhead, providerRef?)`, `reportHarnessOverhead(maker, prompt, handshake, write?)`.
+  - the relay host prints one attributed line per started relay, `RELAY OVERHEAD <maker> <providerRef> …`, just before `RELAYS SERVING` (pre-flight fix F37).
 - Produces, from the relays:
   - every relay handle gains `harnessOverhead: HarnessOverhead` (claude, codex, grok, agy, pi);
   - `ClaudePreflightOptions.workspace?: RelayWorkspace` (a relay lends its own; a standalone preflight opens and removes one);
@@ -12940,6 +13316,9 @@ removed at STOP. Both hold after this task:
 - Produces, test support (`acceptance/test-fixtures/lean-call-probe.ts`): `leanCwdReportSnippet(logPath)`, `LeanCwdReport`, `loggedWorkspaces(logPath)`, `expectLeanWorkingDirectory(report, makerSlug, logPath)`.
 - **The overhead line.** Printed once per relay start, on stdout beside `RELAY DEGRADED`:
   `RELAY OVERHEAD <maker> reported=<n|none> own=<m> overhead=<n−m|unknown>`.
+  - The relay host repeats it for each relay it started, attributed to the candidate: `RELAY OVERHEAD <maker> <providerRef> reported=… own=… overhead=…` (pre-flight fix F37), so two candidates of one maker are told apart.
+  - **Scope (pre-flight ruling F23):** the five DEBATE relays (claude, codex, grok, agy, pi). The Support relay `hermes` keeps today's handshake and prompt; its served calls already run in its server's workspace.
+  - **A dropped slot (pre-flight fix F37):** if A10 or A11 Step 0 ended with the owner dropping agy or pi, skip every A12b edit, test and Step 11 candidate for that relay, and name the skipped relay in the commit message; the other relays are unchanged.
   - `own` is a LOCAL count: the characters of the exact handshake prompt handed to the CLI, ÷ 4, rounded up. It is the same rule as `@debateai/providers`' `estimatePromptTokens`, and a test pins that the two agree. Relay-core restates the rule so it takes no dependency on providers.
   - `reported` is the CLI's own input count for the handshake (`usage.promptTokens`). Claude Code counts cached input apart from it (M5: 2 input + 685 cache-creation), so the Claude relay also reports `reportedInputTokens` = input + cache-creation + cache-read, and that is what the line uses.
   - Informational only: nothing about it can refuse a start, and it never prices anything.
@@ -12958,10 +13337,16 @@ with:
 import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 ```
 
-Insert directly after `import { afterEach, describe, expect, it } from "vitest";`:
+Replace the `@debateai/providers` import A8 added (pre-flight fix F1):
 
 ```ts
-import { estimatePromptTokens } from "@debateai/providers";
+import { estimateWindowTokens } from "@debateai/providers";
+```
+
+with:
+
+```ts
+import { estimatePromptTokens, estimateWindowTokens } from "@debateai/providers";
 ```
 
 Replace the `./relay-core.js` import block (as left by A8):
@@ -13201,6 +13586,9 @@ describe("D8 harness overhead, measured once at start and only reported", () => 
 
     expect(lines).toEqual(["RELAY OVERHEAD Fixture reported=700 own=11 overhead=689"]);
     expect(harnessOverheadLine(overhead)).toBe(lines[0]);
+    // F37: the relay host's attributed form names the candidate.
+    expect(harnessOverheadLine(overhead, "local:fixture"))
+      .toBe("RELAY OVERHEAD Fixture local:fixture reported=700 own=11 overhead=689");
     expect(harnessOverheadLine(measureHarnessOverhead("Fixture", "", unreported)))
       .toBe("RELAY OVERHEAD Fixture reported=none own=0 overhead=unknown");
     expect(() => reportHarnessOverhead("Fixture", PROMPT, unreported, () => { throw new Error("EPIPE"); }))
@@ -13395,8 +13783,15 @@ export function measureHarnessOverhead(
   });
 }
 
-export function harnessOverheadLine(overhead: HarnessOverhead): string {
-  return `RELAY OVERHEAD ${overhead.maker} reported=${overhead.reportedInputTokens ?? "none"}`
+/**
+ * `providerRef` (pre-flight fix F37): a relay does not know which candidate it
+ * serves, so its own line names the maker only. The relay host, which does,
+ * prints the same figures once more with the candidate's providerRef, so two
+ * candidates of one maker (two claude models, say) can be told apart.
+ */
+export function harnessOverheadLine(overhead: HarnessOverhead, providerRef?: string): string {
+  return `RELAY OVERHEAD ${overhead.maker}${providerRef === undefined ? "" : ` ${providerRef}`}`
+    + ` reported=${overhead.reportedInputTokens ?? "none"}`
     + ` own=${overhead.promptTokensEstimate} overhead=${overhead.overheadTokens ?? "unknown"}`;
 }
 
@@ -14511,6 +14906,49 @@ describe("D8 lean calls — pi (Task A12b)", () => {
 
 **`acceptance/relay-host.test.ts`** (as left by A12)
 
+The host now prints one attributed overhead line per started relay before `RELAYS SERVING` (pre-flight fix F37). In
+"starts one relay per candidate and writes a 0600 endpoints file the replay tool can use as is", replace:
+
+```ts
+    expect(emitted).toEqual([`RELAYS SERVING 5 ${endpointsPath}`]);
+```
+
+with:
+
+```ts
+    expect(emitted.at(-1)).toBe(`RELAYS SERVING 5 ${endpointsPath}`);
+    // F37: one overhead line per relay, attributed to its candidate, in candidate order.
+    expect(emitted.slice(0, -1).map((line) => line.split(" ").slice(0, 4).join(" "))).toEqual([
+      "RELAY OVERHEAD Anthropic local:claude",
+      "RELAY OVERHEAD OpenAI local:codex",
+      "RELAY OVERHEAD xAI local:grok",
+      "RELAY OVERHEAD Google local:agy",
+      "RELAY OVERHEAD Z.AI local:pi-glm"
+    ]);
+```
+
+In "serves the candidates that started and names each one that did not", replace:
+
+```ts
+    expect(emitted).toEqual([
+      "RELAY ABSENT local:claude RELAY_HOST_MODEL_MISMATCH",
+      "RELAY ABSENT local:grok RELAY_HOST_THINKING_LEVEL_UNSUPPORTED",
+      `RELAYS SERVING 1 ${endpointsPath}`
+    ]);
+```
+
+with:
+
+```ts
+    expect(emitted.filter((line) => !line.startsWith("RELAY OVERHEAD "))).toEqual([
+      "RELAY ABSENT local:claude RELAY_HOST_MODEL_MISMATCH",
+      "RELAY ABSENT local:grok RELAY_HOST_THINKING_LEVEL_UNSUPPORTED",
+      `RELAYS SERVING 1 ${endpointsPath}`
+    ]);
+    expect(emitted.filter((line) => line.startsWith("RELAY OVERHEAD ")).map((line) => line.split(" ").slice(0, 4).join(" ")))
+      .toEqual(["RELAY OVERHEAD Z.AI local:pi-glm"]);
+```
+
 Append at the end of the file:
 
 ```ts
@@ -14571,7 +15009,8 @@ Expected: FAIL. Among the failures:
 - `expected undefined to be defined` for the codex instructions setting, and `CODEX_DISABLED_FEATURES` is undefined;
 - the grok selection test finds no `-m`, and `"grok 4.7"` still starts;
 - agy lacks `--disable-slash-commands`, and pi lacks `--no-prompt-templates` and still sends its long system text;
-- the relay host refuses the grok candidate as `RELAY_HOST_CANDIDATES_INVALID` (its strict schema does not know `modelSelection` yet).
+- the relay host refuses the grok candidate as `RELAY_HOST_CANDIDATES_INVALID` (its strict schema does not know `modelSelection` yet);
+- the relay host prints no attributed overhead line yet: `expected [] to deeply equal [ 'RELAY OVERHEAD Anthropic local:claude', … ]` (pre-flight fix F37).
 
 The relay-host "refuses modelSelection on any other tool" test already passes (the strict schema refuses any
 unknown key); it stays as the pin that only `grok` may carry the key.
@@ -15743,6 +16182,70 @@ with:
 
 **`acceptance/relay-host.ts`** (as left by A12)
 
+Replace the `./relay-core.js` import:
+
+```ts
+import {
+  CLI_RELAY_THINKING_LEVEL_TOKEN,
+  type CliRelayHandle,
+  type CommandSpec
+} from "./relay-core.js";
+```
+
+with:
+
+```ts
+import {
+  CLI_RELAY_THINKING_LEVEL_TOKEN,
+  harnessOverheadLine,
+  type CliRelayHandle,
+  type CommandSpec,
+  type HarnessOverhead
+} from "./relay-core.js";
+```
+
+Replace `StartedRelay`:
+
+```ts
+type StartedRelay = CliRelayHandle & Readonly<{
+  model: string;
+  maker: string;
+  thinkingLevels: readonly string[];
+  contextWindowTokens?: number;
+}>;
+```
+
+with:
+
+```ts
+type StartedRelay = CliRelayHandle & Readonly<{
+  model: string;
+  maker: string;
+  thinkingLevels: readonly string[];
+  contextWindowTokens?: number;
+  /** D8: what the relay measured around its handshake (every relay handle carries it since A12b). */
+  harnessOverhead?: HarnessOverhead;
+}>;
+```
+
+In `serveRelayHost`, replace:
+
+```ts
+  emit(`RELAYS SERVING ${endpoints.length} ${endpointsPath}`);
+```
+
+with:
+
+```ts
+  // Pre-flight fix F37: each relay printed its overhead by maker; the host knows
+  // which CANDIDATE each relay serves, so it prints the figures once more,
+  // attributed to the candidate's providerRef.
+  for (const { candidate, relay } of started) {
+    if (relay.harnessOverhead !== undefined) emit(harnessOverheadLine(relay.harnessOverhead, candidate.providerRef));
+  }
+  emit(`RELAYS SERVING ${endpoints.length} ${endpointsPath}`);
+```
+
 Replace `candidateSchema`:
 
 ```ts
@@ -15867,7 +16370,9 @@ has no system-prompt flag and gets `--disable-slash-commands`. The engine's own
 messages are untouched. What a CLI still adds is measured once, after the
 handshake, and printed as `RELAY OVERHEAD <maker> reported=<n> own=<m> overhead=<n−m>`
 (`own` is the handshake prompt's characters ÷ 4, rounded up): information, never a
-gate, and never a price. grok selects a model by a short id and reports a longer one:
+gate, and never a price. `relays:serve` prints each line once more with the
+candidate's providerRef after the maker. The Support relay (`hermes`) is out of
+scope: it plays no debate role, so it keeps its own handshake and prompt. grok selects a model by a short id and reports a longer one:
 `startGrokRelay`'s `model` option, and a relay-host `grok` candidate's
 `modelSelection`, is what `-m` gets (e.g. `grok-4.7`), while the relay still reports
 what grok answers as (e.g. `grok-4.7-build`).
@@ -15885,8 +16390,14 @@ Expected: PASS. The dev panel imports these relays; their handles only gained a 
 Run: `grep -n '"--bare"' acceptance/claude-relay.ts`
 Expected: no output. The flag is named only in a comment, never passed.
 
-Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run lint && pnpm run test:ci-gate`
-Expected: every command exits 0, and the gate prints `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
+Run: `pnpm run audit:architecture`
+Expected: exit 1, and its `violations` list only the three known F31 obs-capture edges (Global Constraints, "Lint").
+
+Run: `pnpm run audit:source`
+Expected: exit 1, and its `blocking` list only the three known obs-capture environment reads (Global Constraints, "Lint").
+
+Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run test:ci-gate`
+Expected: every command exits 0, and the gate prints `CI_KNOWN_RED_GATE new=0 known=8 stale=0` (the Phase-3 gate).
 
 - [ ] **Step 10: Commit**
 
@@ -15910,7 +16421,8 @@ printf '%s\n' '{"candidates":[{"providerRef":"local:claude","tool":"claude","mod
 pnpm run relays:serve -- --candidates "$check_dir/candidates.json" --endpoints "$check_dir/endpoints.json"
 ```
 
-When `RELAYS SERVING 5 …` appears, press Ctrl-C. Read the five `RELAY OVERHEAD` lines above it.
+When `RELAYS SERVING 5 …` appears, press Ctrl-C. Read the five attributed `RELAY OVERHEAD <maker> <providerRef> …`
+lines the host prints just above it (each relay also printed its own maker-only line earlier, with the same figures).
 - **Pass:** five relays served, and each `overhead=` value is under its ceiling: Anthropic 1,500; OpenAI 10,000;
   xAI 20,000; Google 15,000; Z.AI 400. The ceilings sit between M5's lean and default figures (D8, Appendix B), so a
   pass shows the lean flags took effect where M5 found a gain (claude, codex, pi).
@@ -15955,9 +16467,12 @@ own test cycle and can be rejected on its own. They run in the order written.
 2. **Providers** (contract): `ProviderCallRequest` has optional `modelRole`, `thinkingLevel`, `candidateId`,
    `scorecardVersion`; the gateway writes them to `ledger.ledger_entry.model_role / thinking_level / candidate_id /
    scorecard_version`; `ProviderCallResult` has optional `thinkingLevel` and `reasoningTokens`. A relay usage cap reaches
-   the caller as an **unwrapped, not-retried** `TypedDomainError` with code `PROVIDER_USAGE_CAP` (the same short-circuit
-   the gateway already uses for `PROVIDER_MODEL_IDENTITY_CHANGED`); the code is in both `KNOWN_DOMAIN_CODES` lists.
-   `seatFailureCause` also accepts the cap as the `cause` of a `ProviderCallFailedError`, so either wiring works.
+   the caller as a **not-retried** `ProviderCallFailedError` whose `cause` is the `TypedDomainError`
+   `PROVIDER_USAGE_CAP` (pre-flight ruling F11: wrapped, so a seat without a runner-up halts the member exactly as a
+   relay failure does today); the code is in both `KNOWN_DOMAIN_CODES` lists. `seatFailureCause` reads the cap off that
+   `cause` (and still accepts a bare cap). A relay's 413/400 refusal reaches the caller UNWRAPPED as
+   `PROVIDER_CONTEXT_WINDOW_EXCEEDED` / `PROVIDER_THINKING_LEVEL_UNSUPPORTED` (R1, pre-flight fix F1): never a
+   `ProviderCallFailedError`, so never a backup trigger.
    The OpenAI-compatible gateway options gain `thinking?: { parameter, levels }` and `contextWindowTokens?` (M1 §2.2).
 3. **Migration 0072 / db** (contract R8, as the migration fragment writes it): `core.run_role_assignment(run_id,
    assignment, strength, stepped_down, created_at)` and the free function
@@ -15966,8 +16481,9 @@ own test cycle and can be rejected on its own. They run in the order written.
    content_ciphertext, content_attestation, recorded_at)` written once per SENT attempt (keyed by the ledger row's
    `attempt_id`), read decrypted by `readCallPrompt(pool, attemptId)` → `{ runId, attemptId, promptText,
    promptFingerprint } | null`, where `promptText` = `JSON.stringify(packet.messages)` and `promptFingerprint` =
-   `canonicalPromptFingerprint(messages)`. `@debateai/providers` exports `estimatePromptTokens(messages)` (the
-   gateway's own window estimate, ⌈characters / 4⌉) for the replay tool's `promptTokensEstimate`.
+   `canonicalPromptFingerprint(messages)`. `@debateai/providers` exports `estimatePromptTokens(messages)` (a size
+   estimate, ⌈characters / 4⌉) for the replay tool's `promptTokensEstimate`; the window WALL is `estimateWindowTokens`
+   (⌈UTF-8 content bytes / 2⌉ + the answer bound, R1; stale wording corrected by pre-flight erratum F36).
 4. **Scorecard** (contract + the scorecard fragment's A4): `@debateai/scorecard` exports `RoleAssignment`,
    `RoleAssignmentSchema`, `RoleSeat`, `SeatCandidate`, `selectSeatCandidate`, `diversityOrdinalForRun`,
    `MomentFileSchema` (it re-checks `momentId`), `MomentFile`, `MomentBuilder` (`{family, inputs: unknown}`),
@@ -15994,7 +16510,10 @@ own test cycle and can be rejected on its own. They run in the order written.
   `backupModelUsedRecords`, `effectiveSynthesisCollapse`, `withEffectiveDegradedDiversity`, `backupSwitchEventValue`;
   plus `buildSynthesisRolePrompt` (contract) and `classifySynthesisRoleContent`.
 - New typed error code `RUN_ROLE_ASSIGNMENT_INVALID` (both `KNOWN_DOMAIN_CODES` lists + the api test).
-- `StructuralCeilingInput` is unchanged; the formula becomes `DR-184-v5` (receipt shape unchanged).
+- `StructuralCeilingInput` gains an optional `backupSequencesProvisioned?: 0 | 1` (pre-flight ruling F17): absent or
+  0 mints `DR-184-v4` exactly as today; 1 mints `DR-184-v5`. Admission passes it (A20.2, through
+  `RunCreationSettings.resolveEnvelopeBasis`'s new required `backupSequencesProvisioned` input); the receipt's shape is
+  unchanged and it names the formula it was minted with.
 - `acceptance/moment-tools.ts` (shared by both tools): the five families' input schemas, `TypedMomentBuilder`,
   `parseMomentBuilder`, `builderFromRecordedPacket`, `graderContextOf`, `currentContractHash`, `invokeMomentBuilder`,
   `captureMomentPacket`, `replayOutcomeOf`, `assertMomentToolRuntime`, `writePrivateJsonFile`.
@@ -16010,17 +16529,23 @@ own test cycle and can be rejected on its own. They run in the order written.
   `MOMENT_PACKET_CAPTURED` (internal), `MOMENT_PACKET_UNCAPTURED`, `MOMENT_USAGE`, `MOMENT_FILE_INVALID`,
   `MOMENT_CONTENT_KEYS_UNRESOLVED`, `MOMENT_DATABASE_URL_REQUIRED`, `MOMENT_REPLAY_ENDPOINTS_INVALID`,
   `MOMENT_REPLAY_ENDPOINTS_EXPOSED`, `MOMENT_REPLAY_ENDPOINT_UNKNOWN`, `MOMENT_REPLAY_JOBS_INVALID`,
-  `MOMENT_REPLAY_RESULTS_UNREADABLE`, `MOMENT_REPLAY_RESULTS_EXPOSED`. The synthesis replay also raises the runner's
+  `MOMENT_REPLAY_RESULTS_UNREADABLE`, `MOMENT_REPLAY_RESULTS_EXPOSED`, `MOMENT_REPLAY_USAGE_CAP` (pre-flight ruling
+  F25). The synthesis replay also raises the runner's
   existing `EVALUATOR_CONTRACT_ERROR` when an accepted verdict does not parse.
 
 ### Tests that exist today and are deliberately changed
 
-- `tests/unit/t17-envelope.test.ts`, `tests/unit/dr181-ceiling.test.ts`, `tests/unit/dr184-review-resilience.test.ts`,
-  `tests/unit/register-s09.test.ts`, `acceptance/runtime-policy.test.ts`, `tests/integration/t17-envelope-ledger.test.ts`
-  — the refitted ceiling (A14).
+- `tests/unit/t17-envelope.test.ts` — its enumeration helpers take the backup provision, and one describe block pins
+  `DR-184-v5` (A14; pre-flight ruling F17). Every existing `DR-184-v4` pin there, and in `dr181-ceiling`,
+  `dr184-review-resilience`, `register-s09`, `acceptance/runtime-policy.test.ts`'s value pin and
+  `tests/integration/t17-envelope-ledger.test.ts`, stays UNCHANGED: a run without a runner-up keeps v4 exactly.
 - `tests/unit/t03-judge-panel.test.ts` — new actorRef cases (A15c; existing cases unchanged).
 - `tests/unit/dr174-resilience.test.ts:216`, `tests/unit/s14-live-projections.test.ts:41`,
-  `acceptance/grok-relay.test.ts:687` — `CONDITION_MARKS` length 37 → 38 (A16b). The five `slice(-4)` pins
+  `acceptance/grok-relay.test.ts:687` — `CONDITION_MARKS` length 37 → 38 (A16b).
+- `tests/unit/obs-l2-s02-registry.test.ts:424` — `CONDITION_MARK_SEVERITY` (derived from `CONDITION_MARKS`) length
+  37 → 38 (A16b; pre-flight fix F8).
+- `tests/architecture/s10-carrier-erasure-red.test.ts:219-227` — the pinned list of files that call a provider gains
+  `apps/runner/src/run-seats.ts` (A15b; pre-flight fix F7). The five `slice(-4)` pins
   (`t4-way-of-knowing:166`, `t03-judge-panel:168`, `dr174-resilience:247`, `t11-verdict-label:323`,
   `t07-adaptive-stopping:587`) are re-run and stay green UNCHANGED: the mark is inserted mid-list, which is the point of R6.
 - `tests/unit/prompt-surface-guard.test.ts`, `tests/architecture/t09-synthesis-entrypoint.test.ts` (A17).
@@ -16044,10 +16569,10 @@ own test cycle and can be rejected on its own. They run in the order written.
    a pinned assignment the root key is `JUDGE:seat:<main|runnerUp>`, so that fact reads 0. It feeds
    `facts.ledger.judgeCallCount`, which no battery predicate reads (`packages/battery/src/terminal.ts`); the
    `COMPOSER:%` and `POST_COMPOSE_R9:%` counts the predicates do read keep working. 0049 is not redefined.
-4. **Ceiling padding:** `DR-184-v5` provisions one backup sequence at every seat call for every run. A run with no
-   runner-up never spends it, so its ceiling is a cover (M=2, depth 1: 196 against the 106 it can spend) rather than
-   the exact number V sealed on 2026-09-05. Keeping legacy runs exact needs a new admission input
-   (e.g. `backupSequencesProvisioned`), which is admission's call; this fragment does not add one.
+4. **Ceiling padding — settled by pre-flight ruling F17.** `DR-184-v5` provisions one backup sequence at every seat
+   call, but ONLY for a run whose pinned assignment has at least one runner-up: admission passes
+   `backupSequencesProvisioned` 1 then, and 0 otherwise (A20.2). Every other run keeps `DR-184-v4` exactly (M=2,
+   depth 1: 106, the number V sealed on 2026-09-05, no padding). The receipt names the formula it was minted with.
 5. **Resume:** the preflight still reads ONE exhausted site per contract hash (as today). A seat-keyed site whose main
    exhausted but whose runner-up answered can be halted on a re-claim; it is disclosed, never served wrong. Seat-keyed
    ROOT and synthesis sites stay terminal on a re-claim, because the ledger cannot tell a transport exhaustion from a
@@ -16435,44 +16960,75 @@ git commit -m "feat(roles): name the debate role on every model call" -m "Co-Aut
 
 ---
 
-### Task A14: Refit the structural attempt ceiling so one backup per seat call fits (DR-184-v5)
+### Task A14: Provision one backup per seat call when the run has a runner-up (DR-184-v5 beside DR-184-v4)
 
-**The formula.** Let `j = judgeMaxAttempts`, `f = finalRetryAttempts`, `o = organMaxAttempts`, and `A, P, R, S` the
-v4 site counts (author, panel, reviewer, serve — all unchanged). Then
+**Pre-flight ruling F17 (binding).** The owner ruled on 2026-09-05 to seal the TRUE maximum, with no padding. That
+ruling stands for every run that cannot use a backup. So the refit is a switch, not a new constant formula:
+admission passes `backupSequencesProvisioned` (0 or 1) into the ceiling computation. It passes 1 only when the pinned
+role assignment gives at least one seat a runner-up (A20.2). Absent or 0 mints `DR-184-v4` exactly as today; 1 mints
+`DR-184-v5`. The receipt names the formula it was minted with, and its shape does not change.
+
+**The formula.** Let `j = judgeMaxAttempts`, `f = finalRetryAttempts`, `o = organMaxAttempts`,
+`b = backupSequencesProvisioned` (0 or 1), and `A, P, R, S` the v4 site counts (author, panel, reviewer, serve — all
+unchanged). Then
 
 ```
-cooldown_site = 2j + f     (was j + f)
-panel_member  = 2j         (was j)
-serve site    = 2o         (was o; disclosed as per_site_attempts.organ)
-max_model_attempts = (A + R)·(2j + f) + P·2j + S·2o
+cooldown_site = j + f + b·j     (b = 0: v4's j + f)
+panel_member  = j + b·j         (b = 0: v4's j)
+serve site    = o + b·o         (b = 0: v4's o; disclosed as per_site_attempts.organ)
+max_model_attempts = (A + R)·cooldown_site + P·panel_member + S·serve_site
+formula_version    = "DR-184-v5" when b = 1, else "DR-184-v4"
 ```
 
-**Why it is enough** (and why it is exact for a run where every seat has a runner-up and every main fails):
-a seat call switches at most once — the failed candidate is marked down for the rest of the run and a seat has two
-candidates; each candidate is called under its own key (`:seat:main` / `:seat:runnerUp`), so the gateway's cumulative
-per-key count caps each key at the `maxAttempts` the caller passes. At a cooldown-wrapped site sequence 1 reaches the
-main (`j`) then the backup (`j`); the post-cooldown sequence passes `j + f` and reaches exactly ONE key (the up one, or
-the selected one when both are down), whose remainder is `f`. The panel and serve legs are not cooldown-wrapped: `2j`
-and `2o`. The 80-20 split moves a call between the two candidates and never adds one. The runner (A15d) never calls
-more than `panel_size − 1` judges per node and refuses an assignment that seats more than `panel_size` debaters, so
-`A, P, R, S` stay v4's. The receipt keeps v4's exact shape (the run head parses it strictly).
+**Why one backup sequence is enough** (and why it is exact for a run where every seat has a runner-up and every main
+fails): a seat call switches at most once — the failed candidate is marked down for the rest of the run and a seat has
+two candidates; each candidate is called under its own key (`:seat:main` / `:seat:runnerUp`), so the gateway's
+cumulative per-key count caps each key at the `maxAttempts` the caller passes. At a cooldown-wrapped site sequence 1
+reaches the main (`j`) then the backup (`j`); the post-cooldown sequence passes `j + f` and reaches exactly ONE key (the
+up one, or the selected one when both are down), whose remainder is `f`. The panel and serve legs are not
+cooldown-wrapped: `2j` and `2o`. The 80-20 split moves a call between the two candidates and never adds one. The runner
+(A15d) never calls more than `panel_size − 1` judges per node and refuses an assignment that seats more than
+`panel_size` debaters, so `A, P, R, S` stay v4's. The receipt keeps v4's exact shape (the run head parses it strictly).
 
 **Files:**
-- Modify: `packages/register/src/index.ts:303-307` (doc), `:341-399` (formula, receipt, version)
-- Modify: `tests/unit/t17-envelope.test.ts:114-126, 149-151, 171-176, 210-222, 234, 265, 373, 415, 438`
-- Modify: `tests/unit/dr181-ceiling.test.ts:24-34`
-- Modify: `tests/unit/dr184-review-resilience.test.ts:108-139`
-- Modify: `tests/unit/register-s09.test.ts:24`
-- Modify: `acceptance/runtime-policy.test.ts:141-145`
-- Modify: `tests/integration/t17-envelope-ledger.test.ts:96, 750-756, 785, 856-857`
-- Test: `tests/unit/s1-1-depth-contract.test.ts` (run only)
+- Modify: `packages/register/src/index.ts:192-196` (`StructuralCeilingInput`: one optional member), `:201`
+  (`STRUCTURAL_CEILING_MEMBERS`' type), `:303-307` (doc), `:319` (validation, before the depth check), `:341-342`
+  (formula), `:366-380` (sum and receipt), `:399` (version)
+- Modify: `apps/api/src/index.ts:564-565` and `apps/runner/src/index.ts:5528-5529` (the twin `KNOWN_DOMAIN_CODES`
+  blocks: `STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID`)
+- Modify: `tests/unit/api-operational-error.test.ts:411-412` (`EXPECTED_DOMAIN_CODES`)
+- Modify: `tests/unit/t17-envelope.test.ts:94-97` (enumeration signature), `:114-126` (cooldown and panel sites),
+  `:149-151` (serve sites), `:155-158` (`enumerateMaximumPathAttempts`), and one describe block appended at the end
+- Test: `tests/unit/t17-envelope.test.ts`; re-run UNCHANGED: `tests/unit/dr181-ceiling.test.ts`,
+  `tests/unit/dr184-review-resilience.test.ts`, `tests/unit/register-s09.test.ts`, `tests/unit/budget-s09.test.ts`,
+  `acceptance/runtime-policy.test.ts`, `tests/integration/t17-envelope-ledger.test.ts`, `tests/unit/s1-1-depth-contract.test.ts`
 
 **Interfaces:**
 - Consumes: `StructuralCeilingInput`, `SERVE_LEG` (unchanged).
-- Produces: `computeStructuralCeilingBasis` minting `formula_version: "DR-184-v5"` with the per-site values above; no new receipt field.
+- Produces:
+  - `StructuralCeilingInput.backupSequencesProvisioned?: 0 | 1` — absent or 0 ⇒ `DR-184-v4` byte-for-byte as today;
+    1 ⇒ `DR-184-v5` with the per-site values above; anything else ⇒ `TypedDomainError`
+    `STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID` (in both `KNOWN_DOMAIN_CODES` lists and the api test).
+  - No new receipt field: `formula_version` names the formula (`DR-184-v4` | `DR-184-v5`).
+- For A20.2/A20.4: admission threads the value through `RunCreationSettings.resolveEnvelopeBasis` into this input.
 
-- [ ] **Step 1: Write the failing tests** (the unit grid and every pin, deliberately)
+- [ ] **Step 1: Write the failing tests**
 
+`tests/unit/t17-envelope.test.ts:94-97` — old:
+```ts
+function enumerateMaximumPathSites(
+  panelSize: number,
+  depth: number
+): readonly { readonly kind: SiteKind; readonly worstCaseAttempts: number }[] {
+```
+new:
+```ts
+function enumerateMaximumPathSites(
+  panelSize: number,
+  depth: number,
+  backupSequences: 0 | 1 = 0
+): readonly { readonly kind: SiteKind; readonly worstCaseAttempts: number }[] {
+```
 `tests/unit/t17-envelope.test.ts:114-126` — old:
 ```ts
   /**
@@ -16496,14 +17052,14 @@ new:
    * site's two sequences share ONE allowance — never two fresh ones.
    * Measured at 4 in tests/integration/t17-envelope-ledger.test.ts.
    *
-   * A14 (DR-184-v5): every seat call may be answered by its backup ONCE, and the
-   * backup has its OWN key (`:seat:runnerUp`), so it draws its own allowance:
-   * sequence 1 spends the main's `judgeMaxAttempts`, then the backup's, and the
-   * post-cooldown sequence reaches ONE key whose remainder is the final retry.
-   * The retraction above still stands for ONE key; 2·judge + final is reached
-   * now only through TWO. The panel and serve legs add one sequence each.
+   * A14 (DR-184-v5, only for a run with a runner-up — pre-flight ruling F17):
+   * every seat call may be answered by its backup ONCE, under the backup's OWN
+   * key (`:seat:runnerUp`), so it draws its own allowance: sequence 1 spends the
+   * main's `judgeMaxAttempts`, then the backup's, and the post-cooldown sequence
+   * reaches ONE key whose remainder is the final retry. The retraction above
+   * still stands for ONE key. The panel and serve legs add one sequence each.
    */
-  const backupSequence = BOUNDS.judgeMaxAttempts;
+  const backupSequence = BOUNDS.judgeMaxAttempts * backupSequences;
   const cooldownSite = BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts + backupSequence;
   for (const _nodeId of materializedNodeIds) {
     sites.push({ kind: "AUTHOR", worstCaseAttempts: cooldownSite });
@@ -16513,7 +17069,7 @@ new:
       sites.push({ kind: "PANEL", worstCaseAttempts: BOUNDS.judgeMaxAttempts + backupSequence });
     }
 ```
-`tests/unit/t17-envelope.test.ts` — in the same function, old:
+`tests/unit/t17-envelope.test.ts:149-151` — old:
 ```ts
   for (let site = 0; site < serveSiteKeys.length; site += 1) {
     sites.push({ kind: "SERVE", worstCaseAttempts: BOUNDS.organMaxAttempts });
@@ -16522,47 +17078,63 @@ new:
 new:
 ```ts
   for (let site = 0; site < serveSiteKeys.length; site += 1) {
-    // A14: the synthesis seat's main, then its backup.
-    sites.push({ kind: "SERVE", worstCaseAttempts: BOUNDS.organMaxAttempts + BOUNDS.organMaxAttempts });
+    // A14: with a runner-up, the synthesis seat's main, then its backup.
+    sites.push({ kind: "SERVE", worstCaseAttempts: BOUNDS.organMaxAttempts + BOUNDS.organMaxAttempts * backupSequences });
   }
 ```
-`tests/unit/t17-envelope.test.ts:171-176` — old:
+`tests/unit/t17-envelope.test.ts:155-158` — old:
 ```ts
-  it("is not the DR-184-v2 undercount: M=2 depth=1 needs 106 attempts, not 88", () => {
-    const DR_184_V2_UNDERCOUNT = 88;
-    expect(enumerateMaximumPathAttempts(2, 1)).toBe(106);
-    expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts).toBe(106);
+function enumerateMaximumPathAttempts(panelSize: number, depth: number): number {
+  return enumerateMaximumPathSites(panelSize, depth)
+    .reduce((total, site) => total + site.worstCaseAttempts, 0);
+}
 ```
 new:
 ```ts
-  it("is not the DR-184-v2 undercount: M=2 depth=1 needs 196 attempts with a backup at every seat, not 88", () => {
-    const DR_184_V2_UNDERCOUNT = 88;
+function enumerateMaximumPathAttempts(panelSize: number, depth: number, backupSequences: 0 | 1 = 0): number {
+  return enumerateMaximumPathSites(panelSize, depth, backupSequences)
+    .reduce((total, site) => total + site.worstCaseAttempts, 0);
+}
+```
+Every existing call passes no third argument, so every existing `DR-184-v4` pin in this file stays exactly as it is.
+
+Append at the end of `tests/unit/t17-envelope.test.ts`:
+```ts
+/**
+ * A14 — DR-184-v5 BESIDE DR-184-v4 (model scorecard; pre-flight ruling F17).
+ *
+ * V ruled on 2026-09-05 to seal the TRUE maximum, with no padding. A run whose
+ * pinned assignment has no runner-up can never spend a backup sequence, so it
+ * keeps DR-184-v4 exactly; admission passes `backupSequencesProvisioned: 1`
+ * only when some seat has a runner-up, and the receipt names which formula
+ * minted it. Both receipts parse to the SAME shape at the run head.
+ */
+describe("A14 · one backup sequence per seat call, only when admission provisions it", () => {
+  const withBackup = (panelSize: number, depth: number) => ({ ...ceilingInput(panelSize, depth), backupSequencesProvisioned: 1 as const });
+  const withoutBackup = (panelSize: number, depth: number) => ({ ...ceilingInput(panelSize, depth), backupSequencesProvisioned: 0 as const });
+
+  it("mints DR-184-v4 exactly when no backup is provisioned — absent or 0 — and DR-184-v5 when one is", () => {
+    const absent = computeStructuralCeilingBasis(ceilingInput(2, 1));
+    const zero = computeStructuralCeilingBasis(withoutBackup(2, 1));
+    const one = computeStructuralCeilingBasis(withBackup(2, 1));
+    expect(zero).toEqual(absent);
+    expect(absent).toMatchObject({ max_model_attempts: 106, formula_version: "DR-184-v4" });
     // DR-184-v4's 106 plus one backup sequence at 24 judge sites (8 author,
     // 8 review, 8 panel; 3 attempts each) and 6 serve sites (3 each): 106 + 90.
-    expect(enumerateMaximumPathAttempts(2, 1)).toBe(196);
-    expect(computeStructuralCeilingBasis(ceilingInput(2, 1)).max_model_attempts).toBe(196);
-```
-`tests/unit/t17-envelope.test.ts:210-222` — old:
-```ts
-  it("pins the recomputed grid and the bumped formula version", () => {
-    const expected = [
-      [22, 22, 22, 22, 22],
-      [106, 194, 370, 722, 1426],
-      [228, 396, 732, 1404, 2748],
-      [426, 698, 1242, 2330, 4506]
-    ];
-    for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
+    expect(one).toMatchObject({ max_model_attempts: 196, formula_version: "DR-184-v5" });
+    expect(enumerateMaximumPathAttempts(2, 1, 1)).toBe(196);
+  });
+
+  it("EQUALS the enumerated maximum path with a backup at every seat call, M=1..8, depth=1..5", () => {
+    for (let panelSize = 1; panelSize <= 8; panelSize += 1) {
       for (let depth = 1; depth <= 5; depth += 1) {
-        const basis = computeStructuralCeilingBasis(ceilingInput(panelSize, depth));
-        expect(basis.max_model_attempts).toBe(expected[panelSize - 1]![depth - 1]);
-        expect(basis.formula_version).toBe("DR-184-v4");
-```
-new:
-```ts
-  it("pins the recomputed grid and the bumped formula version", () => {
-    // A14 (DR-184-v5): each v4 cell doubled, less one final retry per author
-    // and review site — the backup sequence adds a judge allowance, never a
-    // second final retry.
+        expect({ panelSize, depth, attempts: computeStructuralCeilingBasis(withBackup(panelSize, depth)).max_model_attempts })
+          .toEqual({ panelSize, depth, attempts: enumerateMaximumPathAttempts(panelSize, depth, 1) });
+      }
+    }
+  });
+
+  it("pins the DR-184-v5 grid: each v4 cell doubled, less one final retry per author and review site", () => {
     const expected = [
       [43, 43, 43, 43, 43],
       [196, 356, 676, 1316, 2596],
@@ -16571,210 +17143,96 @@ new:
     ];
     for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
       for (let depth = 1; depth <= 5; depth += 1) {
-        const basis = computeStructuralCeilingBasis(ceilingInput(panelSize, depth));
+        const basis = computeStructuralCeilingBasis(withBackup(panelSize, depth));
         expect(basis.max_model_attempts).toBe(expected[panelSize - 1]![depth - 1]);
         expect(basis.formula_version).toBe("DR-184-v5");
-```
-`tests/unit/t17-envelope.test.ts:234` — old:
-```ts
-    expect(basis.per_site_attempts).toEqual({ judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 });
-```
-new:
-```ts
-    // A14: `judge` stays the sequence bound; the other three are PER SITE, backup included.
-    expect(basis.per_site_attempts).toEqual({ judge: 3, organ: 6, panel_member: 6, cooldown_site: 7 });
-```
-`tests/unit/t17-envelope.test.ts:265` — old: `      maxModelAttempts: 106,` new: `      maxModelAttempts: 196,`
-`tests/unit/t17-envelope.test.ts:373` — old:
-```ts
-    expect(parseCostEnvelopeBasis(basis())).toMatchObject({ panelSize: 2, maxModelAttempts: 106 });
-```
-new:
-```ts
-    expect(parseCostEnvelopeBasis(basis())).toMatchObject({ panelSize: 2, maxModelAttempts: 196 });
-```
-`tests/unit/t17-envelope.test.ts:415` — old:
-```ts
-      envelopeBasis: { max_model_attempts: 106, formula_version: "DR-184-v4" }
-```
-new:
-```ts
-      envelopeBasis: { max_model_attempts: 196, formula_version: "DR-184-v5" }
-```
-`tests/unit/t17-envelope.test.ts:438` — old:
-```ts
-      .resolves.toMatchObject({ envelopeBasis: { depth: 5, formula_version: "DR-184-v4" } });
-```
-new:
-```ts
-      .resolves.toMatchObject({ envelopeBasis: { depth: 5, formula_version: "DR-184-v5" } });
+      }
+    }
+  });
+
+  it("discloses the v5 per-site attempts in v4's receipt shape, with v4's call sites", () => {
+    const v4 = computeStructuralCeilingBasis(withoutBackup(2, 1));
+    const v5 = computeStructuralCeilingBasis(withBackup(2, 1));
+    // `judge` stays the sequence bound; the other three are PER SITE, backup included.
+    expect(v5.per_site_attempts).toEqual({ judge: 3, organ: 6, panel_member: 6, cooldown_site: 7 });
+    expect(v4.per_site_attempts).toEqual({ judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 });
+    expect(v5.call_sites).toEqual(v4.call_sites);
+    expect(Object.keys(v5).sort()).toEqual(Object.keys(v4).sort());
+  });
+
+  it("round-trips both receipts through the run-head schema to the same shape", () => {
+    const v4 = parseCostEnvelopeBasis(computeStructuralCeilingBasis(withoutBackup(2, 1)));
+    const v5 = parseCostEnvelopeBasis(computeStructuralCeilingBasis(withBackup(2, 1)));
+    expect(v4).toMatchObject({ maxModelAttempts: 106, panelSize: 2, depth: 1, wire: { formula_version: "DR-184-v4" } });
+    expect(v5).toMatchObject({ maxModelAttempts: 196, panelSize: 2, depth: 1, wire: { formula_version: "DR-184-v5" } });
+    expect(Object.keys(v5).sort()).toEqual(Object.keys(v4).sort());
+  });
+
+  it.each([2, -1, 0.5])("refuses a backup provision of %s: a switch, never a count", (value) => {
+    expect(() => computeStructuralCeilingBasis({ ...ceilingInput(2, 1), backupSequencesProvisioned: value } as never))
+      .toThrowError(expect.objectContaining({
+        name: "TypedDomainError",
+        code: "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID"
+      }));
+  });
+});
 ```
 
-`tests/unit/dr181-ceiling.test.ts:24-34` — old:
+In `tests/unit/api-operational-error.test.ts` (lines 411-412, `EXPECTED_DOMAIN_CODES`), replace:
 ```ts
-        const panelCalls = panelSize === 1 ? 0 : (panelSize - 1) * authored;
-        // Cumulative per call-site key: sequence 2 only gets the final retry.
-        const cooldownSite = 3 + 1;
-        // F-T17T9-3: the serve leg is the shipped synthesis loop alone — one
-        // site per role per round. The composition chain T9 retired used to
-        // bind this leg at `maxRecompose * (1 + segmentCap) + 1` = 7 sites;
-        // the runner wires none of those organs now, so it bills nothing.
-        const fixedSites = 3 + 3;
-        const independentWorstCase = (authored + reviews) * cooldownSite
-          + panelCalls * 3
-          + fixedSites * 3;
+  "STRENGTH_LINEAGE_UNRESOLVED",
+  "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
 ```
-new:
+with:
 ```ts
-        const panelCalls = panelSize === 1 ? 0 : (panelSize - 1) * authored;
-        // Cumulative per call-site key: sequence 2 only gets the final retry.
-        // A14 (DR-184-v5): a backup is a SECOND key, so it adds one more
-        // judge sequence (3) at every author/review site.
-        const cooldownSite = 3 + 1 + 3;
-        // F-T17T9-3: the serve leg is the shipped synthesis loop alone — one
-        // site per role per round. The composition chain T9 retired used to
-        // bind this leg at `maxRecompose * (1 + segmentCap) + 1` = 7 sites;
-        // the runner wires none of those organs now, so it bills nothing.
-        const fixedSites = 3 + 3;
-        // A14: panel and serve sites each gain the backup's own sequence.
-        const independentWorstCase = (authored + reviews) * cooldownSite
-          + panelCalls * (3 + 3)
-          + fixedSites * (3 + 3);
-```
-
-`tests/unit/dr184-review-resilience.test.ts:108-139` — old:
-```ts
-  it("T5 pins the corrected per-site final-retry ceiling and formula version", () => {
-    // T17 (DR-184-v4): the grid moves for measured reasons — the panel leg
-    // v2 counted at zero, the post-compose organ v2 billed once per recompose
-    // round instead of once per run, and F-T17T9-3 dropped the retired
-    // composition arm from the serve leg entirely (every cell falls by exactly
-    // one serve site x 3 organ attempts). Per-site attempts are unchanged.
-    const expected = [
-      [22, 22, 22, 22, 22],
-      [106, 194, 370, 722, 1426],
-      [228, 396, 732, 1404, 2748],
-      [426, 698, 1242, 2330, 4506]
-    ];
-```
-new:
-```ts
-  it("T5 pins the corrected per-site final-retry ceiling and formula version", () => {
-    // T17 (DR-184-v4): the grid moves for measured reasons — the panel leg
-    // v2 counted at zero, the post-compose organ v2 billed once per recompose
-    // round instead of once per run, and F-T17T9-3 dropped the retired
-    // composition arm from the serve leg entirely (every cell falls by exactly
-    // one serve site x 3 organ attempts).
-    // A14 (DR-184-v5): one backup sequence per seat call — the final retry is
-    // still reached through one key, so it is NOT doubled.
-    const expected = [
-      [43, 43, 43, 43, 43],
-      [196, 356, 676, 1316, 2596],
-      [426, 738, 1362, 2610, 5106],
-      [804, 1316, 2340, 4388, 8484]
-    ];
-```
-and in the same test, old:
-```ts
-        expect(basis.formula_version).toBe("DR-184-v4");
-```
-new:
-```ts
-        expect(basis.formula_version).toBe("DR-184-v5");
-```
-
-`tests/unit/register-s09.test.ts:24` — old:
-```ts
-    })).toMatchObject({ kind: "COMPUTED_STRUCTURAL_CEILING", max_model_attempts: 106, panel_size: 2, depth: 1 });
-```
-new:
-```ts
-    })).toMatchObject({ kind: "COMPUTED_STRUCTURAL_CEILING", max_model_attempts: 196, panel_size: 2, depth: 1 });
-```
-
-`acceptance/runtime-policy.test.ts:141-145` — old:
-```ts
-    }, 2, 1)).toMatchObject({
-      max_model_attempts: 106,
-      per_site_attempts: { judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 },
-      call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 },
-      formula_version: "DR-184-v4"
-    });
-```
-new:
-```ts
-    }, 2, 1)).toMatchObject({
-      max_model_attempts: 196,
-      per_site_attempts: { judge: 3, organ: 6, panel_member: 6, cooldown_site: 7 },
-      call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 },
-      formula_version: "DR-184-v5"
-    });
-```
-
-`tests/integration/t17-envelope-ledger.test.ts:96` — old:
-```ts
-const PANEL_SIZE = 2;
-```
-new:
-```ts
-const PANEL_SIZE = 2;
-/**
- * A14 (DR-184-v5): the ceiling provisions ONE backup sequence at every seat
- * call. This run pins no role assignment, so no seat has a runner-up and the
- * allowance is provisioned but unspent — one extra judge sequence per author,
- * review and panel site, one extra organ sequence per serve site.
- */
-const LEGACY_RUN_UNSPENT_BACKUP_ALLOWANCE =
-  (MATERIALIZED_NODES + MATERIALIZED_NODES + MATERIALIZED_NODES) * JUDGE_MAX_ATTEMPTS
-  + SERVE_SITES * ORGAN_MAX_ATTEMPTS;
-```
-`tests/integration/t17-envelope-ledger.test.ts:750-756` — old:
-```ts
-      // The ceiling is TIGHT, and now truthfully so: V ruled on 2026-09-05 to
-      // seal the true number rather than keep the retired chain's extra serve
-      // site as padding, so the maximum path spends the ceiling EXACTLY. Before
-      // that ruling this line read 109 against an observed 106 and the word
-      // "tight" was false by three attempts (F-T17T9-3, P5).
-      expect(ceiling).toBe(106);
-      expect(ceiling).toBe(observed);
-```
-new:
-```ts
-      // The ceiling is TIGHT for this run's topology plus exactly the backup
-      // allowance this run cannot spend (A14, DR-184-v5): no runner-up exists
-      // on a run without a pinned assignment. V's 2026-09-05 ruling (seal the
-      // true number, no padding) is why the difference is pinned EXACTLY here
-      // rather than left as an inequality.
-      expect(LEGACY_RUN_UNSPENT_BACKUP_ALLOWANCE).toBe(90);
-      expect(ceiling).toBe(196);
-      expect(ceiling).toBe(observed + LEGACY_RUN_UNSPENT_BACKUP_ALLOWANCE);
-```
-`tests/integration/t17-envelope-ledger.test.ts:785` — old:
-```ts
-      expect(observed).toBe(ceiling);
-```
-new:
-```ts
-      // J28's equality boundary itself stays pinned in tests/unit/budget-s09.test.ts.
-      expect(observed + LEGACY_RUN_UNSPENT_BACKUP_ALLOWANCE).toBe(ceiling);
-```
-`tests/integration/t17-envelope-ledger.test.ts:856-857` — old:
-```ts
-    expect(PRE_SERVE_ATTEMPTS + SERVE_SITES * ATTEMPTS_PER_SERVE_SITE)
-      .toBe(ceilingBasis.max_model_attempts);
-```
-new:
-```ts
-    expect(PRE_SERVE_ATTEMPTS + SERVE_SITES * ATTEMPTS_PER_SERVE_SITE + LEGACY_RUN_UNSPENT_BACKUP_ALLOWANCE)
-      .toBe(ceilingBasis.max_model_attempts);
+  "STRENGTH_LINEAGE_UNRESOLVED",
+  "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID",
+  "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
-Run: `pnpm exec vitest run tests/unit/t17-envelope.test.ts tests/unit/dr181-ceiling.test.ts tests/unit/dr184-review-resilience.test.ts tests/unit/register-s09.test.ts`
-Expected: FAIL — e.g. `expected 106 to be 196` and `expected 'DR-184-v4' to be 'DR-184-v5'`; dr181 fails with `expected 106 to be greater than or equal to 196`.
+Run: `pnpm exec vitest run tests/unit/t17-envelope.test.ts tests/unit/api-operational-error.test.ts`
+Expected: FAIL — only the new A14 block and the code list. `expected 106 to be 196` and
+`expected 'DR-184-v4' to be 'DR-184-v5'` (the provision is ignored), the refusal cases resolve instead of throwing, and
+`api-operational-error` reports `STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID` missing from
+`KNOWN_DOMAIN_CODES`. Every pre-existing `t17-envelope` case PASSes (no third argument, so v4).
 
-- [ ] **Step 3: Write minimal implementation** in `packages/register/src/index.ts`
+- [ ] **Step 3: Write minimal implementation** in `packages/register/src/index.ts`, then the new code in both `KNOWN_DOMAIN_CODES` lists
 
+`:192-196` — old (the end of `StructuralCeilingInput` and the doc that follows it):
+```ts
+  readonly maxDepth: number;
+}
+
+/**
+ * The DECLARED members, checked by name. Iterating `Object.entries(input)`
+```
+new:
+```ts
+  readonly maxDepth: number;
+  /**
+   * A14 · DR-184-v5 (model scorecard; pre-flight ruling F17) — whether each
+   * seat call is provisioned ONE backup sequence: 1 only when the run's pinned
+   * role assignment gives at least one seat a runner-up, else 0. Admission
+   * decides it (`evaluateAskAdmission`). Absent means 0 — DR-184-v4 exactly,
+   * the number V sealed on 2026-09-05 without padding — which is the right
+   * value for every caller that predates the scorecard: no runner-up can exist
+   * without a pinned assignment. Checked below: exactly 0 or 1, never a count.
+   */
+  readonly backupSequencesProvisioned?: 0 | 1;
+}
+
+/**
+ * The DECLARED members, checked by name. Iterating `Object.entries(input)`
+```
+`:201` — old:
+```ts
+const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Object.freeze([
+```
+new (the optional switch is checked on its own, below, because 0 is a legal value there):
+```ts
+const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned">[] = Object.freeze([
+```
 `:303-307` — old:
 ```ts
  * Repair attempts are NOT a separate term: `buildRepairPacket` is consumed
@@ -16789,12 +17247,13 @@ new:
  * inside the per-site attempt loop (packages/providers/src/index.ts:326-427),
  * so a repair is one of the `maxAttempts` the site already provisions.
  *
- * A14 · DR-184-v5 (model scorecard; owner ruling R4, 2026-09-26) — ONE BACKUP
- * SEQUENCE PER SEAT CALL. A seat whose main candidate fails its call (transport
- * exhausted after the normal retries, or a subscription usage cap) is answered
- * by its runner-up, under the runner-up's OWN call-site key
- * (`…:seat:runnerUp`), so the gateway's cumulative per-key count gives it a
- * fresh allowance that v4 never provisioned. Why one sequence is ENOUGH:
+ * A14 · DR-184-v5 (model scorecard; owner ruling R4, 2026-09-26; pre-flight
+ * ruling F17) — ONE BACKUP SEQUENCE PER SEAT CALL, ONLY WHEN PROVISIONED. A
+ * seat whose main candidate fails its call (transport exhausted after the
+ * normal retries, or a subscription usage cap) is answered by its runner-up,
+ * under the runner-up's OWN call-site key (`…:seat:runnerUp`), so the
+ * gateway's cumulative per-key count gives it a fresh allowance that v4 never
+ * provisioned. Why one sequence is ENOUGH:
  *  · a seat call switches at most once — the failed candidate is marked down
  *    for the rest of the run, a seat has two candidates, and once both are down
  *    the selected one is retried under its own, already-spent key;
@@ -16808,13 +17267,30 @@ new:
  *  · the runner calls at most `panelSize - 1` judges per node and refuses an
  *    assignment that seats more than `panelSize` debaters, so the four site
  *    counts are v4's.
- * A run without a runner-up never spends the extra sequence; its ceiling is a
- * cover by exactly that allowance. The receipt keeps v4's shape (the run head
- * parses it strictly): `per_site_attempts.judge` stays the sequence bound,
- * `organ` is the serve site's allowance, and `panel_member` and `cooldown_site`
- * are per site.
+ * A run with no runner-up can never spend that sequence, so admission passes
+ * `backupSequencesProvisioned: 0` for it and the ceiling stays DR-184-v4, the
+ * TRUE maximum V ruled on 2026-09-05 to seal without padding. The receipt keeps
+ * v4's shape (the run head parses it strictly) and names its formula:
+ * `per_site_attempts.judge` stays the sequence bound, `organ` is the serve
+ * site's allowance, and `panel_member` and `cooldown_site` are per site.
  */
 export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Readonly<Record<string, unknown>> & {
+```
+`:319` — old (the first line of the sealed-maximum check; the line is unique in the file):
+```ts
+  if (input.depth > input.maxDepth) {
+```
+new:
+```ts
+  // A14 (pre-flight ruling F17): the backup provision is a switch, never a count.
+  const backupSequences = input.backupSequencesProvisioned ?? 0;
+  if (backupSequences !== 0 && backupSequences !== 1) {
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID",
+      "The structural ceiling input backupSequencesProvisioned must be 0 or 1"
+    );
+  }
+  if (input.depth > input.maxDepth) {
 ```
 `:341-342` — old:
 ```ts
@@ -16823,9 +17299,9 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
 ```
 new:
 ```ts
-  // A14 (DR-184-v5): one backup sequence per seat call — see the doc comment.
-  const backupJudgeSequence = input.judgeMaxAttempts;
-  const backupOrganSequence = input.organMaxAttempts;
+  // A14 (DR-184-v5 when provisioned): one backup sequence per seat call — see the doc comment.
+  const backupJudgeSequence = input.judgeMaxAttempts * backupSequences;
+  const backupOrganSequence = input.organMaxAttempts * backupSequences;
   const cooldownSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts + backupJudgeSequence;
   const panelMemberAttempts = input.judgeMaxAttempts + backupJudgeSequence;
   const serveSiteAttempts = input.organMaxAttempts + backupOrganSequence;
@@ -16865,17 +17341,32 @@ new:
       cooldown_site: cooldownSiteAttempts
     }),
 ```
-`:399` — old: `    formula_version: "DR-184-v4",` new: `    formula_version: "DR-184-v5",`
+`:399` — old: `    formula_version: "DR-184-v4",` new: `    formula_version: backupSequences === 1 ? "DR-184-v5" : "DR-184-v4",`
 
-- [ ] **Step 4: Run tests to verify they pass**
-Run: `pnpm exec vitest run tests/unit/t17-envelope.test.ts tests/unit/dr181-ceiling.test.ts tests/unit/dr184-review-resilience.test.ts tests/unit/register-s09.test.ts tests/unit/budget-s09.test.ts acceptance/runtime-policy.test.ts`
-Expected: PASS.
+The new typed code, in BOTH twin `KNOWN_DOMAIN_CODES` blocks: `apps/api/src/index.ts` (lines 564-565) and
+`apps/runner/src/index.ts` (lines 5528-5529) — the same old text in both — replace:
+```ts
+  "STRENGTH_LINEAGE_UNRESOLVED",
+  "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
+```
+with:
+```ts
+  "STRENGTH_LINEAGE_UNRESOLVED",
+  "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID",
+  "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
+```
+
+- [ ] **Step 4: Run tests to verify they pass, and that every v4 pin is untouched**
+Run: `pnpm exec vitest run tests/unit/t17-envelope.test.ts tests/unit/api-operational-error.test.ts tests/unit/dev-runner-reconciliation.test.ts tests/unit/dr181-ceiling.test.ts tests/unit/dr184-review-resilience.test.ts tests/unit/register-s09.test.ts tests/unit/budget-s09.test.ts acceptance/runtime-policy.test.ts`
+Expected: PASS, with no edit to `dr181-ceiling`, `dr184-review-resilience`, `register-s09`, `budget-s09` or
+`acceptance/runtime-policy.test.ts`: they pass no provision, so they still mint and pin `DR-184-v4` (106 at M=2, depth 1).
 Run: `pnpm exec vitest run tests/integration/t17-envelope-ledger.test.ts`
-Expected: PASS (observed 106, ceiling 196, allowance 90; T17B still reaches its components-only terminal).
+Expected: PASS, unchanged: the legacy run has no runner-up, so observed = ceiling = 106 (the 2026-09-05 "tight, no
+padding" pin holds exactly).
 
 - [ ] **Step 5: Run the S1-1 depth oracle** (a shipped numeric shape changed)
 Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/unit/depth-oracle-r0.smoke.test.ts`
-Expected: PASS with `{ added: [], missing: [] }` corpus drift (no shipped file was added). If a row names `packages/register/src/index.ts`, read the printed site: the only new lines are the doc paragraph and five scalar `const`s; a comment line that mentions the tree's depth together with a bare five would be the cause — reword that line and re-run. Never run `SHIPPED_CORPUS_MANIFEST_UPDATE=1` for this task.
+Expected: PASS with `{ added: [], missing: [] }` corpus drift (no shipped file was added). If a row names `packages/register/src/index.ts`, read the printed site: the only new lines are the doc paragraphs, the `0 | 1` member, the switch check and five scalar `const`s; a comment line that mentions the tree's depth together with a bare five would be the cause — reword that line and re-run. Never run `SHIPPED_CORPUS_MANIFEST_UPDATE=1` for this task.
 
 - [ ] **Step 6: Typecheck and gate**
 Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run test:ci-gate`
@@ -16883,10 +17374,11 @@ Expected: exit 0; `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
 - [ ] **Step 7: Commit**
 ```bash
-git add packages/register/src/index.ts tests/unit/t17-envelope.test.ts tests/unit/dr181-ceiling.test.ts tests/unit/dr184-review-resilience.test.ts tests/unit/register-s09.test.ts acceptance/runtime-policy.test.ts tests/integration/t17-envelope-ledger.test.ts
+git add packages/register/src/index.ts apps/api/src/index.ts apps/runner/src/index.ts tests/unit/api-operational-error.test.ts tests/unit/t17-envelope.test.ts
 git diff --cached --name-only
-git commit -m "feat(register): provision one backup sequence per seat call (DR-184-v5)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- packages/register/src/index.ts tests/unit/t17-envelope.test.ts tests/unit/dr181-ceiling.test.ts tests/unit/dr184-review-resilience.test.ts tests/unit/register-s09.test.ts acceptance/runtime-policy.test.ts tests/integration/t17-envelope-ledger.test.ts
+git commit -m "feat(register): provision one backup sequence per seat call when admission asks (DR-184-v5 beside v4)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- packages/register/src/index.ts apps/api/src/index.ts apps/runner/src/index.ts tests/unit/api-operational-error.test.ts tests/unit/t17-envelope.test.ts
 ```
+Expected `git diff --cached --name-only`: exactly the five paths above.
 
 ---
 ### Task A15a: Seat-aware call-site keys (`:seat:main|runnerUp`) and the synthesis-round verifier
@@ -17231,16 +17723,18 @@ git commit -m "feat(serve): seat-aware call-site keys and round verification" -m
 - Create: `apps/runner/src/run-seats.ts`
 - Modify: `apps/runner/src/index.ts:130` (re-export, above the `SYNTHESIS_ROLES` doc comment)
 - Modify: `tests/support/shipped-corpus.manifest.txt:200` (insert `apps/runner/src/run-seats.ts` after `apps/runner/src/rotate-kek.ts`)
-- Modify (only if Step 1 says so): `apps/runner/package.json`, `tools/orphan-audit/src/index.ts:38`, `pnpm-lock.yaml`
+- Modify: `tests/architecture/s10-carrier-erasure-red.test.ts:223-227` (the pinned list of files that call a provider
+  gains `apps/runner/src/run-seats.ts` — pre-flight fix F7)
 - Create: `tests/unit/a15-run-seats.test.ts`
 
 **Interfaces:**
 - Consumes: `RoleAssignment`, `RoleSeat`, `SeatCandidate` (`@debateai/scorecard`); `seatCallSiteKey` (A15a); `ProviderCallRequest.thinkingLevel/candidateId/scorecardVersion` (providers fragment); `Judge` (`@debateai/judgement`).
 - Produces (all re-exported by `@debateai/runner`): `SeatSlot`, `ConfiguredSeatMaker`, `SeatMember`, `RunSeat`, `RunSeatBook`, `RouteHealth`, `BackupSwitchCause`, `BackupSwitchRecord`, `AssignedRunSeatBook`, `SeatCall<T>`, `SeatAnswer<T>`, `SeatPlanOptions`, `SeatCaller`, `stampCandidateGateway(provider, candidate, scorecardVersion)`, `buildLegacyRunSeatBook(debaters)`, `buildAssignedRunSeatBook({ assignment, configured, routeHealth })`, `legacySynthesisSeat(role, maker)`, `roleAssignmentSeatProblem(assignment): string | null`, `createSeatCaller({ assigned }): SeatCaller` (`plan`, `callSeat`, `answered`). A16a gives `callSeat` the R3/R4 behaviour.
 
-- [ ] **Step 1: Measure the scorecard dependency of the runner package**
+- [ ] **Step 1: Check the scorecard dependency of the runner package** (a check only: A7c added the edge — pre-flight fix F14)
 Run: `grep -n '"@debateai/scorecard"' apps/runner/package.json; grep -n '\["apps/runner", "apps/runner"' tools/orphan-audit/src/index.ts`
-Expected: the first prints one line and the orphan-audit row for `apps/runner` contains `"scorecard"`. If the manifest line is missing, add `"@debateai/scorecard": "workspace:*",` after `"@debateai/support-kb": "workspace:*",` in `apps/runner/package.json`; if the row lacks it, change `"contract", "support-kb"]]` at the end of the `apps/runner` row to `"contract", "support-kb", "scorecard"]]`; then run `pnpm install --offline` (workspace link only, no download) and include `apps/runner/package.json`, `tools/orphan-audit/src/index.ts` and `pnpm-lock.yaml` in this task's commit.
+Expected: the first prints one line and the orphan-audit row for `apps/runner` contains `"scorecard"`. If either is
+missing, STOP: A7c has not landed (its Step 1 adds both, with the lockfile).
 
 - [ ] **Step 2: Write the failing test** — create `tests/unit/a15-run-seats.test.ts`:
 ```ts
@@ -17249,6 +17743,7 @@ import { Judge } from "@debateai/judgement";
 import type { DebateRole } from "@debateai/kernel";
 import type { ProviderCallRequest, ProviderCallResult, ProviderGateway } from "@debateai/providers";
 import type { RoleAssignment, RoleSeat, SeatCandidate } from "@debateai/scorecard";
+import { framedFixturePacket } from "../support/framed-packet.js";
 import {
   buildAssignedRunSeatBook,
   buildLegacyRunSeatBook,
@@ -17288,7 +17783,8 @@ function candidate(label: string, thinkingLevel = "DEFAULT_ONLY"): SeatCandidate
 function seat(seatIndex: number, main: string, runnerUp: string | null = null): RoleSeat {
   return {
     seatIndex, main: candidate(main), runnerUp: runnerUp === null ? null : candidate(runnerUp),
-    diversityShare: 0.2, source: "SCORECARD"
+    // RoleAssignmentSchema's law: no runner-up, no share (pre-flight fix F2).
+    diversityShare: runnerUp === null ? 0 : 0.2, source: "SCORECARD"
   };
 }
 
@@ -17360,7 +17856,8 @@ describe("A15 · an assigned book comes from the pinned assignment", () => {
 
     await book.position[0]!.main.provider.call({
       runId: null, subjectItemId: "work:a15", callSiteKey: "JUDGE:seat:main", role: "JUDGE", lane: "served",
-      bound: BOUND, contractHash: "c".repeat(64), providerRef: "provider:a", packet: { messages: [] }
+      // A framed fixture packet, never a hand-built one (packet-read-through-the-frame; pre-flight fix F6).
+      bound: BOUND, contractHash: "c".repeat(64), providerRef: "provider:a", packet: framedFixturePacket("a15")
     });
     expect(requests.map(({ thinkingLevel, candidateId, scorecardVersion }) => ({ thinkingLevel, candidateId, scorecardVersion })))
       .toEqual([{ thinkingLevel: "high", candidateId: "candidate:a", scorecardVersion: 7 }]);
@@ -17400,6 +17897,22 @@ describe("A15 · an assigned book comes from the pinned assignment", () => {
     expect(book.position.map((entry) => entry.main.providerRef)).toEqual(["provider:b"]);
     expect(claimSwitches).toEqual([]);
     expect(droppedPositionSeats.map((entry) => entry.failureCode)).toEqual(["CLAIM_PROVIDER_ABSENT"]);
+  });
+
+  it("leaves a FALLBACK synthesis seat to the sealed register refs, as today (pre-flight ruling F18)", () => {
+    // A FALLBACK seat names no candidate and no runner-up (RoleAssignmentSchema).
+    const fallback = (label: string): RoleSeat => ({ ...seat(0, label), main: { ...candidate(label), candidateId: null }, source: "FALLBACK" });
+    const { book, unavailableSynthesis } = buildAssignedRunSeatBook({
+      assignment: assignment({
+        POSITION: [seat(0, "a"), seat(1, "b")], ANSWER_WRITER: [fallback("a")], ANSWER_CHECKER: [fallback("x")]
+      }),
+      configured: routes("a", "b"),
+      routeHealth: health({ a: "HEALTHY", b: "HEALTHY" })
+    });
+    // Null is the legacy book's value: the runner then resolves the sealed role ref (J8), as today.
+    expect(book.answerWriter).toBeNull();
+    expect(book.answerChecker).toBeNull();
+    expect(unavailableSynthesis).toEqual([]);
   });
 
   it("keeps today's rule for a role the assignment left without a seat", () => {
@@ -17549,7 +18062,11 @@ export interface RunSeatBook {
   readonly crossExchange: readonly RunSeat[];
   readonly judge: readonly RunSeat[];
   readonly reviewer: readonly RunSeat[];
-  /** Null on the legacy book: the sealed register role ref decides, as today (J8). */
+  /**
+   * Null on the legacy book, and on an assigned book whose synthesis seat is a
+   * FALLBACK one (pre-flight ruling F18): the sealed register role ref decides,
+   * as today (J8).
+   */
   readonly answerWriter: RunSeat | null;
   readonly answerChecker: RunSeat | null;
 }
@@ -17766,7 +18283,10 @@ export function buildAssignedRunSeatBook(input: {
   }[] = [];
   const single = (role: "ANSWER_WRITER" | "ANSWER_CHECKER"): RunSeat | null => {
     const pinned = seatsOf(assignment, role)[0];
-    if (pinned === undefined) return null;
+    // Pre-flight ruling F18: a FALLBACK synthesis seat means the scorecard does
+    // not cover the role, so the sealed register refs decide, exactly as today
+    // (J8) — null, like the legacy book — never the picker's first-reachable guess.
+    if (pinned === undefined || pinned.source === "FALLBACK") return null;
     const resolved = resolve(role, pinned, 0, () => true);
     if (resolved.kind === "SEATED") return resolved.seat;
     unavailableSynthesis.push(Object.freeze({ role, candidate: pinned.main, failureCode: resolved.failureCode }));
@@ -17890,9 +18410,32 @@ apps/runner/src/run-seats.ts
 apps/runner/src/runner-startup-reconciliation.ts
 ```
 
+In `tests/architecture/s10-carrier-erasure-red.test.ts:223-227` (pre-flight fix F7: `stampCandidateGateway` forwards
+a leased caller's request through `provider.call(`, so `run-seats.ts` joins the pinned list; it opens no lease of its own
+and is only ever called from `apps/runner/src/index.ts`'s leased runner), replace:
+```ts
+    expect(providerFiles).toEqual([
+      "apps/runner/src/index.ts",
+      "packages/evaluator/src/index.ts",
+      "packages/judgement/src/index.ts"
+    ]);
+```
+with:
+```ts
+    expect(providerFiles).toEqual([
+      "apps/runner/src/index.ts",
+      // Model scorecard A15: the seat caller's candidate stamp forwards the leased runner's request.
+      "apps/runner/src/run-seats.ts",
+      "packages/evaluator/src/index.ts",
+      "packages/judgement/src/index.ts"
+    ]);
+```
+
 - [ ] **Step 5: Run tests to verify they pass**
-Run: `pnpm exec vitest run tests/unit/a15-run-seats.test.ts tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
-Expected: PASS (the depth oracle's corpus row sees the new shipped file listed; the source-rule audit finds no `switch`, no numeric export, no `process.env` in `run-seats.ts`).
+Run: `pnpm exec vitest run tests/unit/a15-run-seats.test.ts tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts tests/architecture/s10-carrier-erasure-red.test.ts tests/architecture/packet-read-through-the-frame.test.ts`
+Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16). The depth oracle's corpus row
+sees the new shipped file listed; the source-rule audit finds no `switch`, no numeric export, no `process.env` in
+`run-seats.ts`; the s10 pin lists `run-seats.ts` (F7); the packet rule finds no hand-built packet in the new test (F6).
 
 - [ ] **Step 6: Typecheck**
 Run: `pnpm run typecheck`
@@ -17900,11 +18443,11 @@ Expected: exit 0.
 
 - [ ] **Step 7: Commit**
 ```bash
-git add apps/runner/src/run-seats.ts apps/runner/src/index.ts tests/support/shipped-corpus.manifest.txt tests/unit/a15-run-seats.test.ts
+git add apps/runner/src/run-seats.ts apps/runner/src/index.ts tests/support/shipped-corpus.manifest.txt tests/unit/a15-run-seats.test.ts tests/architecture/s10-carrier-erasure-red.test.ts
 git diff --cached --name-only
-git commit -m "feat(runner): run seat book and seat caller" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- apps/runner/src/run-seats.ts apps/runner/src/index.ts tests/support/shipped-corpus.manifest.txt tests/unit/a15-run-seats.test.ts
+git commit -m "feat(runner): run seat book and seat caller" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- apps/runner/src/run-seats.ts apps/runner/src/index.ts tests/support/shipped-corpus.manifest.txt tests/unit/a15-run-seats.test.ts tests/architecture/s10-carrier-erasure-red.test.ts
 ```
-(Add `apps/runner/package.json tools/orphan-audit/src/index.ts pnpm-lock.yaml` to both lists when Step 1 edited them.)
+Expected `git diff --cached --name-only`: exactly the five paths above.
 
 ---
 
@@ -18062,7 +18605,7 @@ git commit -m "feat(judgement): panel entries name the route that answered" -m "
 ### Task A15d: The runner fills every seat from the pinned assignment (or today's rule), with fairness per call
 
 **Files:**
-- Modify: `apps/runner/src/index.ts` — imports (`:97-123`), `callSynthesisRole` (`:1506-1532`), claim phase (`:2782-2941`), `runNodePanel` members and family discount (`:3034-3097`), resume preflight (`:3218-3227`), root 0 (`:3251-3274`, `:3388-3389`), `AuthoredDebateNode` (`:3356-3357`), `authorPosition` (`:3416-3475`, `:3584-3585`), root callers (`:3609-3610`, `:3644-3645`), reviews (`:3683-3730`), legs (`:3869-3870`), cross-root (`:3914-3930`), synthesis resolver (`:4407-4424`), serve-chain controls (`:4680-4684`), `synthesize`/`evaluate` closures (`:4693-4815`), `KNOWN_DOMAIN_CODES` (`:5480`)
+- Modify: `apps/runner/src/index.ts` — imports (the `@debateai/db` block `:4-13` as left by A7c, and `:97-123`), `callSynthesisRole` (`:1506-1532`), claim phase (`:2782-2941`), `runNodePanel` members and family discount (`:3034-3097`), resume preflight (`:3218-3227`), root 0 (`:3251-3274`, `:3388-3389`), `AuthoredDebateNode` (`:3356-3357`), `authorPosition` (`:3416-3475`, `:3584-3585`), root callers (`:3609-3610`, `:3644-3645`), reviews (`:3683-3730`), legs (`:3869-3870`), cross-root (`:3914-3930`), synthesis resolver (`:4407-4424`), serve-chain controls (`:4680-4684`), `synthesize`/`evaluate` closures (`:4693-4815`), `KNOWN_DOMAIN_CODES` (`:5480`)
 - Modify: `apps/api/src/index.ts:516` (`KNOWN_DOMAIN_CODES`)
 - Modify: `tests/unit/api-operational-error.test.ts:363` (`EXPECTED_DOMAIN_CODES`)
 - Modify: `tests/integration/database.test.ts` (kernel import; append a seat-scenario helper and one `describe`)
@@ -18130,12 +18673,21 @@ function seatCandidateOf(route: SeatRoute) {
   };
 }
 
-function pinnedSeat(seatIndex: number, main: SeatRoute, runnerUp: SeatRoute | null = null) {
+function pinnedSeat(
+  seatIndex: number,
+  main: SeatRoute,
+  runnerUp: SeatRoute | null = null,
+  // RoleAssignmentSchema's law: no runner-up, no share (pre-flight fix F2). A
+  // share of 0.2 on a seat without a runner-up is refused as
+  // RUN_ROLE_ASSIGNMENT_INVALID before any seat is filled. A seat WITH a
+  // runner-up may pass 0: the runner-up is then its backup only.
+  diversityShare: number = runnerUp === null ? 0 : 0.2
+) {
   return {
     seatIndex,
     main: seatCandidateOf(main),
     runnerUp: runnerUp === null ? null : seatCandidateOf(runnerUp),
-    diversityShare: 0.2,
+    diversityShare,
     source: "SCORECARD" as const
   };
 }
@@ -18332,21 +18884,24 @@ describe("A15 · a pinned role assignment seats the run", () => {
 ```
 
 - [ ] **Step 4: Run tests to verify they fail**
-Run: `pnpm exec vitest run tests/integration/database.test.ts -t "A15" tests/unit/api-operational-error.test.ts`
+Run (two commands, because `-t` filters every file it runs and no api test title names A15 — pre-flight fix F27):
+`pnpm exec vitest run tests/integration/database.test.ts -t "A15"`, then
+`pnpm exec vitest run tests/unit/api-operational-error.test.ts`
 Expected: FAIL — the seated run records bare keys (`expected [ …'JUDGE'… ] to equal []`), the unseatable run completes instead of refusing, and the operational-error test reports `RUN_ROLE_ASSIGNMENT_INVALID` missing from `KNOWN_DOMAIN_CODES`.
 
 - [ ] **Step 5: Write the implementation** in `apps/runner/src/index.ts`
 
-E1 — imports. In the `@debateai/db` import block (`:4-12`), old:
+E1 — imports. In the `@debateai/db` import block (`:4-13` as left by A7c, which added `insertCallPrompt`; pre-flight
+fix F3), old:
 ```ts
-  RunRepository,
   assertNoOpenWriteTransaction,
+  insertCallPrompt,
   withRunContentLease,
 ```
 new:
 ```ts
-  RunRepository,
   assertNoOpenWriteTransaction,
+  insertCallPrompt,
   readRunRoleAssignment,
   withRunContentLease,
 ```
@@ -19395,8 +19950,10 @@ new:
 `apps/api/src/index.ts:516-517` — the same replacement in its `KNOWN_DOMAIN_CODES`.
 
 - [ ] **Step 6: Run the new tests to verify they pass**
-Run: `pnpm exec vitest run tests/integration/database.test.ts -t "A15" tests/unit/api-operational-error.test.ts tests/unit/dev-runner-reconciliation.test.ts`
-Expected: PASS.
+Run: `pnpm exec vitest run tests/integration/database.test.ts -t "A15"`
+Expected: PASS (both A15 cases; the seat scenario seats every role, pre-flight fix F2).
+Run: `pnpm exec vitest run tests/unit/api-operational-error.test.ts tests/unit/dev-runner-reconciliation.test.ts`
+Expected: PASS (no `-t` filter, so every case runs — pre-flight fix F27).
 
 - [ ] **Step 7: Prove the legacy path is today's behaviour — the existing runner suites stay green unchanged**
 Run: `pnpm exec vitest run tests/unit/pro01-runner-tree.test.ts tests/unit/xrev01-node-review.test.ts tests/unit/t03-judge-panel.test.ts tests/unit/dr184-catch-up.test.ts tests/unit/dr174-resilience.test.ts tests/unit/v28-run-body-budget-stop.test.ts tests/unit/prompt-surface-guard.test.ts tests/unit/a13-model-role.test.ts tests/architecture/t09-synthesis-entrypoint.test.ts tests/architecture/v28-serve-decision-wiring.test.ts`
@@ -19482,7 +20039,8 @@ function candidate(label: string): SeatCandidate {
   return { candidateId: `candidate:${label}`, providerRef: `provider:${label}`, maker: `maker:${label}`, modelId: `model:${label}`, thinkingLevel: "DEFAULT_ONLY" };
 }
 
-function pinned(seatIndex: number, main: string, runnerUp: string | null, diversityShare = 0.2): RoleSeat {
+// RoleAssignmentSchema's law: no runner-up, no share (pre-flight fix F2).
+function pinned(seatIndex: number, main: string, runnerUp: string | null, diversityShare = runnerUp === null ? 0 : 0.2): RoleSeat {
   return { seatIndex, main: candidate(main), runnerUp: runnerUp === null ? null : candidate(runnerUp), diversityShare, source: "SCORECARD" };
 }
 
@@ -19548,6 +20106,8 @@ describe("A16 · R4 — which failures move a seat to its runner-up", () => {
     ["an unsupported thinking level", new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "level")],
     ["a context window the prompt cannot fit", new TypedDomainError("PROVIDER_CONTEXT_WINDOW_EXCEEDED", "window")],
     ["a changed model identity", new TypedDomainError("PROVIDER_MODEL_IDENTITY_CHANGED", "model")],
+    ["an oversized packet, which is as large on any route (pre-flight fix F12)",
+      new ProviderCallFailedError(new TypedDomainError("PROVIDER_PACKET_TOO_LARGE", "big"), 1, "FAILED", "ledger:big")],
     ["an exhausted per-site allowance", new TypedDomainError("CALL_BUDGET_EXHAUSTED", "site")],
     ["a plain error", new Error("boom")]
   ] as const)("never switches on %s", (_label, error) => {
@@ -19630,6 +20190,46 @@ describe("A16 · callSeat — backup", () => {
     await expect(caller.callSeat({ seat: legacy, callSiteKey: "JUDGE", call: async () => { throw failure; } }))
       .rejects.toBe(failure);
     expect(caller.switches()).toEqual([]);
+  });
+
+  it("keeps today's behaviour at a usage cap without a runner-up: the wrapped cap leaves unchanged (F11)", async () => {
+    // The gateway delivers a cap as PROVIDER_CALL_FAILED with the cap as its cause (A7b, pre-flight
+    // ruling F11), so a legacy caller's existing ProviderCallFailedError handling halts the member,
+    // exactly as a relay failure does today, instead of ending the run.
+    const capped = new ProviderCallFailedError(usageCap(), 1, "FAILED", "ledger:cap");
+    const legacy = buildLegacyRunSeatBook([configured("a")]).position[0]!;
+    const caller = createSeatCaller({ assigned: false });
+    await expect(caller.callSeat({ seat: legacy, callSiteKey: "JUDGE", call: async () => { throw capped; } }))
+      .rejects.toBe(capped);
+    expect(caller.switches()).toEqual([]);
+  });
+
+  it("records the switch on the first call that skips a main downed while its runner-up was barred (F12)", async () => {
+    const seat = judgeSeat();
+    const events: string[] = [];
+    const failure = transportFailure();
+    const script = scripted({
+      "provider:a": () => { throw failure; },
+      "provider:b": () => { events.push("backup-called"); return "b"; }
+    });
+    const caller = createSeatCaller({
+      assigned: true,
+      onSwitch: async (record) => { events.push(`switch:${record.fromProviderRef}->${record.toProviderRef}`); }
+    });
+    // Call 1: the fairness rule bars the runner-up, so the main's failure leaves unchanged and nothing switches.
+    await expect(caller.callSeat({
+      seat, callSiteKey: "k1", eligible: (member) => member.providerRef !== "provider:b", call: script.call
+    })).rejects.toBe(failure);
+    expect(caller.switches()).toEqual([]);
+    // Call 2: the main is down, so the runner-up answers — that IS the switch, recorded before it answers.
+    await expect(caller.callSeat({ seat, callSiteKey: "k2", call: script.call })).resolves.toMatchObject({ value: "b" });
+    expect(events).toEqual(["switch:provider:a->provider:b", "backup-called"]);
+    expect(caller.switches()).toEqual([{
+      role: "JUDGE", seatIndex: 0, fromProviderRef: "provider:a", fromCandidateId: "candidate:a",
+      toProviderRef: "provider:b", toCandidateId: "candidate:b", cause: "TRANSPORT_FAILURE",
+      callSiteKey: "k1:seat:main"
+    } satisfies BackupSwitchRecord]);
+    expect(script.calls).toEqual(["provider:a@k1:seat:main", "provider:b@k2:seat:runnerUp"]);
   });
 
   it("rethrows the runner-up's own failure when both fail, after exactly one switch", async () => {
@@ -19865,6 +20465,8 @@ export interface SeatCallerOptions {
 }
 
 const PROVIDER_USAGE_CAP = "PROVIDER_USAGE_CAP";
+/** The gateway's own oversized-packet refusal (`packages/providers/src/index.ts`), carried as a failure's cause. */
+const PROVIDER_PACKET_TOO_LARGE = "PROVIDER_PACKET_TOO_LARGE";
 
 function isUsageCap(error: unknown): boolean {
   return error instanceof TypedDomainError && error.code === PROVIDER_USAGE_CAP;
@@ -19880,15 +20482,23 @@ function isUsageCap(error: unknown): boolean {
  * repair loop, then refused as today); a run-wide spend or attempt stop (the
  * RUN's, never a seat's — V-28); anything else, including a changed model
  * identity, an unsupported thinking level or a context window a prompt cannot
- * fit. `Judge.assess` wraps every provider failure as a `PanelMemberFailure`;
- * the wrapped failure is its `cause` and is classified the same way.
+ * fit, or an oversized packet (pre-flight fix F12). `Judge.assess` wraps every
+ * provider failure as a `PanelMemberFailure`; the wrapped failure is its
+ * `cause` and is classified the same way. Since pre-flight ruling F11 the
+ * gateway delivers a usage cap as the `cause` of a `ProviderCallFailedError`;
+ * a bare cap is still recognised.
  */
 export function seatFailureCause(error: unknown): BackupSwitchCause | null {
   const underlying = error instanceof PanelMemberFailure ? error.cause : error;
   if (underlying === undefined || isRunLevelSpendStop(underlying)) return null;
   if (isUsageCap(underlying)) return "USAGE_CAP";
   if (underlying instanceof ProviderCallFailedError) {
-    return isUsageCap(underlying.cause) ? "USAGE_CAP" : "TRANSPORT_FAILURE";
+    if (isUsageCap(underlying.cause)) return "USAGE_CAP";
+    // Pre-flight fix F12: an oversized packet also ends as PROVIDER_CALL_FAILED,
+    // but it is deterministic — the gateway's packet cap is the same on every
+    // route — so it is never a reason to switch.
+    if (underlying.cause instanceof TypedDomainError && underlying.cause.code === PROVIDER_PACKET_TOO_LARGE) return null;
+    return "TRANSPORT_FAILURE";
   }
   return null;
 }
@@ -19915,6 +20525,9 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
   const ordinals = new Map<string, Map<string, number>>();
   const counters = new Map<string, number>();
   const down = new Set<string>();
+  // Pre-flight fix F12: why each downed slot went down, and which slots a switch record already names.
+  const downFailures = new Map<string, Readonly<{ cause: BackupSwitchCause; callSiteKey: string }>>();
+  const switchedFrom = new Set<string>();
   const always = (): boolean => true;
   const seatId = (seat: RunSeat): string => `${seat.role}#${String(seat.pinnedSeatIndex)}`;
   const slotId = (seat: RunSeat, member: SeatMember): string => `${seatId(seat)}#${member.pinnedAs}`;
@@ -19965,26 +20578,45 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
         answeredRefs.set(input.seat.role, [...(answeredRefs.get(input.seat.role) ?? []), member.providerRef]);
         return Object.freeze({ value, member, callSiteKey });
       };
+      const recordSwitch = async (
+        from: SeatMember,
+        to: SeatMember,
+        cause: BackupSwitchCause,
+        failedKey: string
+      ): Promise<void> => {
+        const record: BackupSwitchRecord = Object.freeze({
+          role: input.seat.role,
+          seatIndex: input.seat.pinnedSeatIndex,
+          fromProviderRef: from.providerRef,
+          fromCandidateId: from.candidate?.candidateId ?? null,
+          toProviderRef: to.providerRef,
+          toCandidateId: to.candidate?.candidateId ?? null,
+          cause,
+          callSiteKey: failedKey
+        });
+        switchRecords.push(record);
+        switchedFrom.add(slotId(input.seat, from));
+        await options.onSwitch?.(record);
+      };
+      // Pre-flight fix F12: a member marked down on a call its other member could
+      // not take (a fairness rule barred it) has no switch record yet. The first
+      // call that skips it IS the switch: record and announce it before the other
+      // member answers, so no backup ever answers undisclosed.
+      const skipped = members[0];
+      if (skipped !== undefined && skipped !== first && !switchedFrom.has(slotId(input.seat, skipped))) {
+        const downed = downFailures.get(slotId(input.seat, skipped));
+        if (downed !== undefined) await recordSwitch(skipped, first, downed.cause, downed.callSiteKey);
+      }
       try {
         return await answer(first);
       } catch (error) {
         const cause = seatFailureCause(error);
         if (cause === null) throw error;
         down.add(slotId(input.seat, first));
+        downFailures.set(slotId(input.seat, first), Object.freeze({ cause, callSiteKey: keyOf(input, first) }));
         const second = members.find((member) => member !== first && !down.has(slotId(input.seat, member)));
         if (second === undefined) throw error;
-        const record: BackupSwitchRecord = Object.freeze({
-          role: input.seat.role,
-          seatIndex: input.seat.pinnedSeatIndex,
-          fromProviderRef: first.providerRef,
-          fromCandidateId: first.candidate?.candidateId ?? null,
-          toProviderRef: second.providerRef,
-          toCandidateId: second.candidate?.candidateId ?? null,
-          cause,
-          callSiteKey: keyOf(input, first)
-        });
-        switchRecords.push(record);
-        await options.onSwitch?.(record);
+        await recordSwitch(first, second, cause, keyOf(input, first));
         return answer(second);
       }
     },
@@ -19999,8 +20631,10 @@ Run: `pnpm exec vitest run tests/unit/a16-seat-backup.test.ts tests/unit/a15-run
 Expected: PASS.
 
 - [ ] **Step 5: Typecheck and depth oracle** (a shipped file changed)
-Run: `pnpm run typecheck && pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
-Expected: exit 0 / PASS.
+Run: `pnpm run typecheck`
+Expected: exit 0.
+Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
+Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16).
 
 - [ ] **Step 6: Commit**
 ```bash
@@ -20017,6 +20651,7 @@ git commit -m "feat(runner): 80-20 seat split and backup on transport failure or
 - Modify: `packages/serve/src/index.ts:606` (constant), `:1588` (`ConditionMarkRecord.mark` union), `:1649-1651` (`REQUIRED_CONDITION_MARK_RECORDS`)
 - Modify: `apps/ui/lib/v3/labels.ts:27` (label)
 - Modify: `tests/unit/dr174-resilience.test.ts:207-216`, `tests/unit/s14-live-projections.test.ts:32-41`, `acceptance/grok-relay.test.ts:687` (length 37 → 38)
+- Modify: `tests/unit/obs-l2-s02-registry.test.ts:424` (`CONDITION_MARK_SEVERITY` is derived from `CONDITION_MARKS`: 37 → 38 — pre-flight fix F8)
 - Create: `tests/unit/a16-backup-model-used-mark.test.ts`
 
 **Interfaces:**
@@ -20184,9 +20819,19 @@ new:
     // Model scorecard A16 minted BACKUP-MODEL-USED mid-list: 37 -> 38.
     expect(kernel.CONDITION_MARKS).toHaveLength(38);
 ```
+`tests/unit/obs-l2-s02-registry.test.ts:424` (pre-flight fix F8: the DR-176 severity map is derived from
+`CONDITION_MARKS`, so it grows with the vocabulary) — old:
+```ts
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(37);
+```
+new:
+```ts
+    // Model scorecard A16 minted BACKUP-MODEL-USED mid-list: 37 -> 38.
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(38);
+```
 
 - [ ] **Step 4: Run tests to verify they pass** (and that the five positional pins stay green UNCHANGED)
-Run: `pnpm exec vitest run tests/unit/a16-backup-model-used-mark.test.ts tests/unit/dr174-resilience.test.ts tests/unit/s14-live-projections.test.ts tests/unit/v2ui-data-layer.test.ts tests/unit/t4-way-of-knowing.test.ts tests/unit/t03-judge-panel.test.ts tests/unit/t11-verdict-label.test.ts tests/unit/t07-adaptive-stopping.test.ts tests/unit/w2-degraded-diversity-mark.test.ts acceptance/grok-relay.test.ts`
+Run: `pnpm exec vitest run tests/unit/a16-backup-model-used-mark.test.ts tests/unit/dr174-resilience.test.ts tests/unit/s14-live-projections.test.ts tests/unit/obs-l2-s02-registry.test.ts tests/unit/v2ui-data-layer.test.ts tests/unit/t4-way-of-knowing.test.ts tests/unit/t03-judge-panel.test.ts tests/unit/t11-verdict-label.test.ts tests/unit/t07-adaptive-stopping.test.ts tests/unit/w2-degraded-diversity-mark.test.ts acceptance/grok-relay.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Typecheck (root, acceptance, UI) and regenerate the contract**
@@ -20195,9 +20840,9 @@ Expected: exit 0 (the UI switch is exhaustive over the kernel vocabulary, so a m
 
 - [ ] **Step 6: Commit**
 ```bash
-git add packages/kernel/src/index.ts packages/serve/src/index.ts apps/ui/lib/v3/labels.ts tests/unit/dr174-resilience.test.ts tests/unit/s14-live-projections.test.ts acceptance/grok-relay.test.ts tests/unit/a16-backup-model-used-mark.test.ts
+git add packages/kernel/src/index.ts packages/serve/src/index.ts apps/ui/lib/v3/labels.ts tests/unit/dr174-resilience.test.ts tests/unit/s14-live-projections.test.ts tests/unit/obs-l2-s02-registry.test.ts acceptance/grok-relay.test.ts tests/unit/a16-backup-model-used-mark.test.ts
 git diff --cached --name-only
-git commit -m "feat(marks): BACKUP-MODEL-USED beside DEGRADED-DIVERSITY" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- packages/kernel/src/index.ts packages/serve/src/index.ts apps/ui/lib/v3/labels.ts tests/unit/dr174-resilience.test.ts tests/unit/s14-live-projections.test.ts acceptance/grok-relay.test.ts tests/unit/a16-backup-model-used-mark.test.ts
+git commit -m "feat(marks): BACKUP-MODEL-USED beside DEGRADED-DIVERSITY" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- packages/kernel/src/index.ts packages/serve/src/index.ts apps/ui/lib/v3/labels.ts tests/unit/dr174-resilience.test.ts tests/unit/s14-live-projections.test.ts tests/unit/obs-l2-s02-registry.test.ts acceptance/grok-relay.test.ts tests/unit/a16-backup-model-used-mark.test.ts
 ```
 
 ---
@@ -20207,16 +20852,18 @@ git commit -m "feat(marks): BACKUP-MODEL-USED beside DEGRADED-DIVERSITY" -m "Co-
 **Files:**
 - Modify: `packages/db/src/index.ts:1112` (new value type), `:1150` (new `RunRepository` method after `recordRunLifecycleEvent`)
 - Modify: `apps/runner/src/run-seats.ts` (imports; four helpers appended)
-- Modify: `apps/runner/src/index.ts` — imports; `callSynthesisRole` (usage cap); the seat caller and `synthesisOrdinal` from A15d E7; pattern-B disclosure before `serve.persist` (`:4977`)
+- Modify: `apps/runner/src/index.ts` — imports; `callSynthesisRole` (usage cap); the seat caller and `synthesisOrdinal` from A15d E7, plus `positionOrdinal`; the two root seat calls from A15d (E11 and `authorPosition`) gain their per-run ordinal (pre-flight ruling F35); pattern-B disclosure before `serve.persist` (`:4977`)
 - Create: `tests/unit/a16-backup-disclosure.test.ts`
 - Modify: `tests/integration/database.test.ts` (append one `describe`), `tests/integration/v6-remaining-content-carriers.test.ts` (append one `it` inside the V-6 `describe`)
 
 **Interfaces:**
 - Consumes: `diversityOrdinalForRun(runId)` (`@debateai/scorecard`); A16a `createSeatCaller` options; A16b `BACKUP_MODEL_USED_MARK`; `DEGRADED_DIVERSITY_MARK`, `SYNTHESIS_ROLE_NAMES`, `ServeGateResult` (`@debateai/serve`).
 - Produces: `RunBackupSwitchLifecycleValue`; `RunRepository.recordBackupSwitchEvent({ runId, value }): Promise<"RECORDED" | "WITHHELD_ENCRYPTED_RUN">`; `backupModelUsedRecords(switches, servedRootNodeId)`, `effectiveSynthesisCollapse(writerRefs, checkerRefs)`, `withEffectiveDegradedDiversity(result, identity)`, `backupSwitchEventValue(record)`.
+- Semantics (pre-flight ruling F35): a POSITION root's seat call carries the ordinal `diversityOrdinalForRun(runId + "#POSITION#" + seatIndex)` (the assignment's seatIndex, `pinnedSeatIndex`), so each root seat with a runner-up is written by it in about one debate in five; legs and cross-exchanges keep the call index (the cross-exchange follows the root's answerer, R5).
 
 - [ ] **Step 1: Write the failing unit test** — create `tests/unit/a16-backup-disclosure.test.ts`:
 ```ts
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   assertRequiredConditionMarkRecords,
@@ -20290,6 +20937,17 @@ describe("A16 · DEGRADED-DIVERSITY from the writer and checker that ACTUALLY an
       .toEqual(["DEGRADED-DIVERSITY", "SINGLE-LINEAGE"]);
   });
 });
+
+describe("A16 · a POSITION root takes its own per-run 80-20 ordinal (pre-flight ruling F35)", () => {
+  it("passes diversityOrdinalForRun(runId#POSITION#seat) on every root call, and on no leg or cross-exchange", async () => {
+    const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    expect(source).toContain("diversityOrdinalForRun(`${run.runId}#POSITION#${String(seat.pinnedSeatIndex)}`)");
+    expect(source).toContain("ordinal: positionOrdinal(primarySeat),");
+    expect(source).toContain('...(input.seat.role === "POSITION" ? { ordinal: positionOrdinal(input.seat) } : {}),');
+    // Exactly the two root call sites use it.
+    expect(source.split("positionOrdinal(")).toHaveLength(3);
+  });
+});
 ```
 
 - [ ] **Step 2: Write the failing integration tests**
@@ -20297,10 +20955,13 @@ describe("A16 · DEGRADED-DIVERSITY from the writer and checker that ACTUALLY an
 Append at the end of `tests/integration/database.test.ts`:
 ```ts
 describe("A16 · a seat whose main fails is answered by its runner-up, and the answer says so", () => {
+  // Share 0 on POSITION seat 0 (and its aligned CROSS_EXCHANGE seat): the runner-up is the BACKUP only, so root 0
+  // always tries the main first. With a share, pre-flight ruling F35 gives each root a per-run ordinal, and about
+  // one run in five would start root 0 on the runner-up — a random run id would make these scenarios flaky.
   const assignment = pinnedAssignment({
-    POSITION: [pinnedSeat(0, "primary", "third"), pinnedSeat(1, "secondary")],
+    POSITION: [pinnedSeat(0, "primary", "third", 0), pinnedSeat(1, "secondary")],
     SUPPORT_ATTACK: [pinnedSeat(0, "third"), pinnedSeat(1, "secondary")],
-    CROSS_EXCHANGE: [pinnedSeat(0, "primary", "third"), pinnedSeat(1, "secondary")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary", "third", 0), pinnedSeat(1, "secondary")],
     JUDGE: [pinnedSeat(0, "secondary"), pinnedSeat(1, "third")],
     REVIEWER: [pinnedSeat(0, "secondary"), pinnedSeat(1, "third")],
     ANSWER_WRITER: [pinnedSeat(0, "secondary")],
@@ -20413,7 +21074,7 @@ Append inside the `describe("V-6 — the remaining readable debate text is encry
 
 - [ ] **Step 3: Run tests to verify they fail**
 Run: `pnpm exec vitest run tests/unit/a16-backup-disclosure.test.ts`
-Expected: FAIL with "backupModelUsedRecords is not a function".
+Expected: FAIL with "backupModelUsedRecords is not a function", and the F35 source pin finds no `positionOrdinal`.
 Run: `pnpm exec vitest run tests/integration/database.test.ts -t "A16" tests/integration/v6-remaining-content-carriers.test.ts -t "A16"`
 Expected: FAIL — no `BACKUP-MODEL-USED` on the answer, no event, and `runs.recordBackupSwitchEvent is not a function`.
 
@@ -20537,7 +21198,7 @@ export function backupModelUsedRecords(
   })));
 }
 
-/** A16: the progress-stream value for one switch (see `RunRepository.recordBackupSwitchEvent`). */
+/** A16: the progress-stream value for one switch; see `RunRepository.recordBackupSwitchEvent`. */
 export function backupSwitchEventValue(record: BackupSwitchRecord): RunBackupSwitchLifecycleValue {
   return Object.freeze({
     state: "BACKUP_MODEL_ENGAGED" as const,
@@ -20637,7 +21298,9 @@ new:
     }
     // A16: a usage cap that reached a synthesis role through BOTH members of its
     // seat (or a seat without a runner-up) is a dead transport for the serve
-    // chain — the components-only TRANSPORT_DEATH class — never a crash.
+    // chain — the components-only TRANSPORT_DEATH class — never a crash. The
+    // gateway wraps a cap as ProviderCallFailedError (pre-flight ruling F11), so
+    // the branch above takes it; this one keeps a bare cap from a double safe.
     if (error instanceof TypedDomainError && error.code === "PROVIDER_USAGE_CAP") {
       throw new TypedDomainError(
         "SYNTHESIS_TRANSPORT_DEATH",
@@ -20681,6 +21344,49 @@ new:
     // split would flip identities mid-debate; one ordinal per RUN makes a whole
     // debate use either the main or the runner-up.
     const synthesisOrdinal = diversityOrdinalForRun(run.runId);
+    // Pre-flight ruling F35: a POSITION seat is called ONCE per run (its root),
+    // so its call index is always 0 and its runner-up would never write. Each
+    // seat takes its own per-run ordinal instead — about one debate in five per
+    // seat is written by the runner-up (R3) — and the cross-exchange follows
+    // whoever wrote the root (R5, A15d). The seat is named by the assignment's
+    // own seatIndex (`pinnedSeatIndex`), so a dropped seat never shifts another.
+    const positionOrdinal = (seat: RunSeat): number =>
+      diversityOrdinalForRun(`${run.runId}#POSITION#${String(seat.pinnedSeatIndex)}`);
+```
+
+`apps/runner/src/index.ts` — the primary root's seat call (as left by A15d E11), old:
+```ts
+      attempt: (maxAttempts) => seatCaller.callSeat({
+        seat: primarySeat,
+        callSiteKey: "JUDGE",
+        eligible: (member) => positionMakerIsFree(primarySeat, member),
+```
+new:
+```ts
+      attempt: (maxAttempts) => seatCaller.callSeat({
+        seat: primarySeat,
+        callSiteKey: "JUDGE",
+        // F35: the root's per-run, per-seat 80-20 ordinal.
+        ordinal: positionOrdinal(primarySeat),
+        eligible: (member) => positionMakerIsFree(primarySeat, member),
+```
+
+`apps/runner/src/index.ts` — `authorPosition`'s seat call (as left by A15d), old:
+```ts
+        attempt: (maxAttempts) => seatCaller.callSeat({
+          seat: input.seat,
+          callSiteKey: input.callSiteKey,
+          eligible: (member) => input.seat.role !== "POSITION" || positionMakerIsFree(input.seat, member),
+```
+new:
+```ts
+        attempt: (maxAttempts) => seatCaller.callSeat({
+          seat: input.seat,
+          callSiteKey: input.callSiteKey,
+          // F35: a root (POSITION) takes its per-run, per-seat ordinal; a leg or a
+          // cross-exchange keeps the call index within its seat.
+          ...(input.seat.role === "POSITION" ? { ordinal: positionOrdinal(input.seat) } : {}),
+          eligible: (member) => input.seat.role !== "POSITION" || positionMakerIsFree(input.seat, member),
 ```
 
 `apps/runner/src/index.ts:4977` — old:
@@ -20720,8 +21426,12 @@ Run (quiet machine): `pnpm exec vitest run tests/integration/database.test.ts te
 Expected: PASS — including the two A16 cases, the A15 case, and every legacy case unchanged.
 
 - [ ] **Step 6: Typecheck, depth oracle, gate**
-Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts && pnpm run test:ci-gate`
-Expected: exit 0 / PASS; `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
+Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
+Expected: exit 0.
+Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
+Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16). The "enforces purity, … exhaustive-switch …" row stays green: no appended comment in `run-seats.ts` spells `switch (` (pre-flight fix F9).
+Run: `pnpm run test:ci-gate`
+Expected: `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
 - [ ] **Step 7: Commit**
 ```bash
@@ -21011,7 +21721,7 @@ git commit -m "refactor(runner): export the synthesis prompt builder for replay"
 
 **Interfaces:**
 - Consumes: `MomentBuilder`, `MomentBuilderFamily`, `MomentFile`, `ReplayOutcome` (`@debateai/scorecard`, scorecard fragment A4); `Judge`, `judgeLegModelRole` (A13), `PanelMemberFailure` (with A16a's `cause`), `JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT`, `JudgeLeg` (`@debateai/judgement`); `buildSynthesisRolePrompt`, `classifySynthesisRoleContent` (A17), `EVALUATOR_PROMPT_CONTRACT`, `evaluatorVerdictSchema`, `parseComposerOutput` (`@debateai/runner`); `seatBaseCallSiteKey` (A15a), `SYNTHESIZER_PROMPT_CONTRACT`, `buildSynthesizerRequest`, `buildEvaluatorRequest`, `SynthesisDigest`, `SynthesisLoopControls`, `SynthesizerRequest`, `EvaluatorRequest` (`@debateai/serve`); `readPromptFrame`, `buildFramedRepairPrompt`, `schemaFailureLocator`, `promptContractFingerprintText`, `ProviderCallFailedError`, `PROVIDER_USAGE_CAP`, `PROVIDER_CONTEXT_WINDOW_EXCEEDED` (`@debateai/providers`, gateway fragment); `resolveDeploymentMode` (`@debateai/register`).
-- Produces (extensions, acceptance only): `momentFamilyOf(role)`, `JudgeJudgeInputsSchema`, `JudgeReviewInputsSchema`, `JudgeAssessInputsSchema`, `SynthesisWriterInputsSchema`, `SynthesisCheckerInputsSchema`, `TypedMomentBuilder`, `parseMomentBuilder(builder)`, `builderFromRecordedPacket(role, callSiteKey, packet)`, `graderContextOf(question, builder)`, `currentContractHash(family)`, `MomentCall`, `invokeMomentBuilder(builder, gateway, call)`, `captureMomentPacket(builder)`, `replayOutcomeOf(error)`, `assertMomentToolRuntime(env)`, `writePrivateJsonFile(path, value)`. The moment id is NOT computed here: both tools use the scorecard's `momentIdFor`, which `MomentFileSchema` re-checks.
+- Produces (extensions, acceptance only): `momentFamilyOf(role)`, `JudgeJudgeInputsSchema`, `JudgeReviewInputsSchema`, `JudgeAssessInputsSchema`, `SynthesisWriterInputsSchema`, `SynthesisCheckerInputsSchema`, `TypedMomentBuilder`, `parseMomentBuilder(builder)`, `builderFromRecordedPacket(role, callSiteKey, packet)`, `graderContextOf(question, builder)`, `currentContractHash(family)`, `MomentCall`, `invokeMomentBuilder(builder, gateway, call)`, `captureMomentPacket(builder)`, `replayOutcomeOf(error)`, `assertMomentToolRuntime(env)`, `writePrivateJsonFile(path, value)`, `replyContentOf(rawText): string` (pre-flight fix F4: the answer inside a recorded or replayed HTTP body). The moment id is NOT computed here: both tools use the scorecard's `momentIdFor`, which `MomentFileSchema` re-checks.
 
 - [ ] **Step 1: Measure what this task consumes from other fragments**
 Run: `grep -n "export function momentIdFor\|export function canonicalPromptFingerprint\|export const MomentBuilderSchema\|export const REPLAY_OUTCOMES" packages/scorecard/src/moment.ts`
@@ -21050,7 +21760,8 @@ import {
   graderContextOf,
   momentFamilyOf,
   parseMomentBuilder,
-  replayOutcomeOf
+  replayOutcomeOf,
+  replyContentOf
 } from "../../acceptance/moment-tools.js";
 
 /**
@@ -21194,6 +21905,17 @@ describe("A18 · contract hashes, grader context, outcomes and runtime", () => {
     expect(replayOutcomeOf(new PanelMemberFailure("TIMEOUT", "PROVIDER_CALL_FAILED:TIMED_OUT"))).toBe("TIMED_OUT");
     expect(replayOutcomeOf(new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "level"))).toBe("FAILED");
     expect(replayOutcomeOf(new Error("boom"))).toBe("FAILED");
+  });
+
+  it("reads the answer inside a completion body, and keeps any other text as it is (pre-flight fix F4)", () => {
+    const completion = JSON.stringify({
+      id: "chatcmpl-1", model: "m", choices: [{ index: 0, message: { role: "assistant", content: "the answer" }, finish_reason: "stop" }]
+    });
+    expect(replyContentOf(completion)).toBe("the answer");
+    expect(replyContentOf("a plain-text answer")).toBe("a plain-text answer");
+    for (const other of [JSON.stringify({ error: "refused" }), JSON.stringify({ choices: [] }), "[]"]) {
+      expect(replyContentOf(other)).toBe(other);
+    }
   });
 
   it("refuses a hosted deployment, and a production process that did not say which it is", () => {
@@ -21720,6 +22442,28 @@ export async function writePrivateJsonFile(path: string, value: unknown): Promis
     throw error;
   }
 }
+
+const completionBodySchema = z.object({
+  choices: z.array(z.object({ message: z.object({ content: z.string() }).passthrough() }).passthrough()).min(1)
+}).passthrough();
+
+/**
+ * Pre-flight fix F4 — THE ANSWER INSIDE A BODY. A gateway artifact's raw text is
+ * the whole HTTP body the vendor sent (the completion envelope), not the answer.
+ * A moment's `recorded.replyText` and a replay's `replyText` are the answer:
+ * `choices[0].message.content` when the body parses as a completion. Any other
+ * text (a plain-text answer, a refusal body) is kept exactly as it is.
+ */
+export function replyContentOf(rawText: string): string {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(rawText);
+  } catch {
+    return rawText;
+  }
+  const completion = completionBodySchema.safeParse(decoded);
+  return completion.success ? completion.data.choices[0]!.message.content : rawText;
+}
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
@@ -21748,7 +22492,7 @@ git commit -m "feat(acceptance): moment toolkit over the live prompt builders" -
 
 **Interfaces:**
 - Consumes: A18a; `MomentFileSchema`, `MomentFile`, `momentIdFor`, `canonicalPromptFingerprint` (`@debateai/scorecard`); `readCallPrompt`, `createPool`, `configureContentEncryption`, `decryptContentForRun`, `RunRepository`, `CryptoEnvelope` (`@debateai/db`; `readCallPrompt` from the migration fragment); `configureCustodyGroup`, `loadKekRing`, `FileUserDekStore`, `FileRunContentKeyStore`, `ContentCipher` (`@debateai/crypto`); `isDebateRole`, `debateRoleFromCallSiteKey` (`@debateai/kernel`).
-- Produces: `MomentCallRow`, `MomentSource`, `createPostgresMomentSource(pool)`, `exportMoment(source, input)`, `exportRunMoments(source, input)`, `configureMomentContentAccess(pool, env)`, `parseExportArguments(argv)`, `main(argv, environment?)`; script `moment:export`; codes `MOMENT_CALL_NOT_FOUND`, `MOMENT_INPUTS_NOT_RECORDED`, `MOMENT_ROLE_UNRESOLVED`, `MOMENT_RECORDED_PROMPT_UNREADABLE`, `MOMENT_FINGERPRINT_INCONSISTENT`, `MOMENT_CONTENT_KEYS_UNRESOLVED`, `MOMENT_DATABASE_URL_REQUIRED`, `MOMENT_USAGE`.
+- Produces: `MomentCallRow`, `MomentSource`, `createPostgresMomentSource(pool)`, `exportMoment(source, input)`, `exportRunMoments(source, input)`, `configureMomentContentAccess(pool, env)`, `parseExportArguments(argv)`, `momentFileNameFor(moment)` (`<momentId>.<first 12 hex of sha256(callSiteKey)>.moment.json`, pre-flight fix F26), `main(argv, environment?)`; script `moment:export`; codes `MOMENT_CALL_NOT_FOUND`, `MOMENT_INPUTS_NOT_RECORDED`, `MOMENT_ROLE_UNRESOLVED`, `MOMENT_RECORDED_PROMPT_UNREADABLE`, `MOMENT_FINGERPRINT_INCONSISTENT`, `MOMENT_CONTENT_KEYS_UNRESOLVED`, `MOMENT_DATABASE_URL_REQUIRED`, `MOMENT_USAGE`.
 
 What one moment is (each rule is a test below):
 - The moment of a call-site key is its FIRST sent attempt with a prompt record. That record is the initial packet: a repair packet has more than two messages and is refused. A later cooldown sequence under the same key sends the same packet.
@@ -21765,6 +22509,7 @@ Expected: `"eval:roles": "tsx acceptance/eval-harness-cli.ts",` followed by `"re
 
 - [ ] **Step 2: Write the failing test** — create `tests/unit/a18-export-moment.test.ts`:
 ```ts
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21776,6 +22521,7 @@ import {
   exportMoment,
   exportRunMoments,
   main,
+  momentFileNameFor,
   parseExportArguments,
   type MomentCallRow,
   type MomentSource
@@ -21949,6 +22695,15 @@ describe("A18 · the moment:export command line", () => {
       .rejects.toMatchObject({ code: "MOMENT_DATABASE_URL_REQUIRED" });
   });
 
+  it("names --all files by moment AND call site, so identical prompts at two sites never overwrite each other (F26)", () => {
+    const momentId = "a".repeat(64);
+    const siteTag = (key: string) => createHash("sha256").update(key, "utf8").digest("hex").slice(0, 12);
+    const at = (callSiteKey: string) => momentFileNameFor({ momentId, source: { callSiteKey } });
+    expect(at("JUDGE:seat:main")).toBe(`${momentId}.${siteTag("JUDGE:seat:main")}.moment.json`);
+    expect(at("JUDGE:review:n1:seat:main")).not.toBe(at("JUDGE:seat:main"));
+    expect(at("JUDGE:seat:main")).toMatch(/^[0-9a-f]{64}\.[0-9a-f]{12}\.moment\.json$/u);
+  });
+
   it("writes moment files owner-only", async () => {
     scratch = await mkdtemp(join(tmpdir(), "a18-export-"));
     const path = join(scratch, "one.moment.json");
@@ -21965,6 +22720,7 @@ Expected: FAIL with "Failed to load url ../../acceptance/export-moment.js".
 
 - [ ] **Step 4: Write minimal implementation** — create `acceptance/export-moment.ts`:
 ```ts
+import { createHash } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -21993,6 +22749,7 @@ import {
   builderFromRecordedPacket,
   captureMomentPacket,
   graderContextOf,
+  replyContentOf,
   writePrivateJsonFile
 } from "./moment-tools.js";
 
@@ -22079,9 +22836,10 @@ export function createPostgresMomentSource(pool: Pool): MomentSource {
         [runId, rawArtifactId]
       )).rows[0];
       if (artifact === undefined) throw new TypedDomainError("MOMENT_CALL_NOT_FOUND", `artifact ${rawArtifactId}`);
-      return (await decryptContentForRun<{ rawText: string }>(
+      // Pre-flight fix F4: the artifact holds the whole HTTP body; the moment records the ANSWER.
+      return replyContentOf((await decryptContentForRun<{ rawText: string }>(
         pool, runId, "ledger.raw_artifact", rawArtifactId, artifact.content_ciphertext, { rawText: artifact.raw_text }
-      )).rawText;
+      )).rawText);
     }
   });
 }
@@ -22273,6 +23031,18 @@ export function parseExportArguments(argv: readonly string[]): ExportArguments {
   return Object.freeze({ runId, target: Object.freeze({ kind: "ONE" as const, callSiteKey: callSiteKey!, outPath: outPath! }), engineCommit });
 }
 
+/**
+ * Pre-flight fix F26: an `--all` file is named by its moment AND its call site.
+ * `momentId` hashes the role, the contract and the builder's inputs, not the
+ * call site, so two sites that sent the same prompt share a moment id; naming
+ * files by the id alone let the second overwrite the first while the summary
+ * still counted both.
+ */
+export function momentFileNameFor(moment: Readonly<{ momentId: string; source: Readonly<{ callSiteKey: string }> }>): string {
+  const siteTag = createHash("sha256").update(moment.source.callSiteKey, "utf8").digest("hex").slice(0, 12);
+  return `${moment.momentId}.${siteTag}.moment.json`;
+}
+
 export async function main(
   argv: readonly string[],
   environment: Readonly<Record<string, string | undefined>> = process.env,
@@ -22302,7 +23072,7 @@ export async function main(
     await mkdir(outDir, { recursive: true, mode: 0o700 });
     const exported = await exportRunMoments(source, { runId: args.runId, exportedAt, engineCommit: args.engineCommit });
     for (const moment of exported.moments) {
-      await writePrivateJsonFile(join(outDir, `${moment.momentId}.moment.json`), moment);
+      await writePrivateJsonFile(join(outDir, momentFileNameFor(moment)), moment);
       emit(`MOMENT ${moment.role} ${moment.momentId} ${moment.source.callSiteKey}`);
     }
     for (const skip of exported.skipped) emit(`MOMENT SKIPPED ${skip.callSiteKey} ${skip.code}`);
@@ -22358,7 +23128,7 @@ git commit -m "feat(acceptance): moment:export writes recorded calls as moment f
 
 **Interfaces:**
 - Consumes: A18a; `MomentFileSchema`, `ReplayResultSchema`, `ReplayResult`, `ReplayOutcome`, `canonicalPromptFingerprint` (`@debateai/scorecard`); `OpenAICompatibleProviderGateway` with the gateway fragment's `thinking` / `contextWindowTokens` options, `estimatePromptTokens`, `estimateWindowTokens` (R1), `RawArtifactInput` (with `thinkingTokens`), `ProviderCallRequest.thinkingLevel` (`@debateai/providers`); the relay host's endpoints file (relay fragment A12).
-- Produces: `ReplayEndpointsFileSchema`, `ReplayEndpoint`, `ReplayJobSchema`, `ReplayJob`, `readReplayEndpoints(path)`, `readReplayJobs(path)`, `readMomentFile(path)`, `readCompletedReplayKeys(outPath)`, `replayJobKey(momentId, providerRef, thinkingLevel)`, `ReplayMomentInput`, `replayMoment(input)`, `ReplayMomentsOptions`, `replayMoments(options)`, `parseReplayArguments(argv)`, `main(argv, environment?)`; script `moment:replay`; codes `MOMENT_REPLAY_ENDPOINTS_INVALID`, `MOMENT_REPLAY_ENDPOINTS_EXPOSED`, `MOMENT_REPLAY_ENDPOINT_UNKNOWN`, `MOMENT_REPLAY_JOBS_INVALID`, `MOMENT_REPLAY_RESULTS_UNREADABLE`, `MOMENT_REPLAY_RESULTS_EXPOSED`, `MOMENT_FILE_INVALID`. Extension to the contract's command line: a required `--bound <maxAttempts>,<tokenCeiling>,<deadlineMs>`, because no call records its bound and the tool invents none.
+- Produces: `ReplayEndpointsFileSchema`, `ReplayEndpoint`, `ReplayJobSchema`, `ReplayJob`, `readReplayEndpoints(path)`, `readReplayJobs(path)`, `readMomentFile(path)`, `readCompletedReplayKeys(outPath)`, `replayJobKey(momentId, providerRef, thinkingLevel)`, `ReplayMomentInput`, `replayMoment(input)`, `ReplayMomentsOptions`, `replayMoments(options)`, `parseReplayArguments(argv)`, `main(argv, environment?)`; script `moment:replay`; codes `MOMENT_REPLAY_ENDPOINTS_INVALID`, `MOMENT_REPLAY_ENDPOINTS_EXPOSED`, `MOMENT_REPLAY_ENDPOINT_UNKNOWN`, `MOMENT_REPLAY_JOBS_INVALID`, `MOMENT_REPLAY_RESULTS_UNREADABLE`, `MOMENT_REPLAY_RESULTS_EXPOSED`, `MOMENT_FILE_INVALID`, `MOMENT_REPLAY_USAGE_CAP` (pre-flight ruling F25). Extension to the contract's command line: a required `--bound <maxAttempts>,<tokenCeiling>,<deadlineMs>`, because no call records its bound and the tool invents none (Appendix A names it since pre-flight fix F24).
 
 How one job runs (each rule is a test below):
 - The prompt is built OFFLINE first, by the live builder. Its fingerprint is compared with the moment's recorded one (`fingerprintMatchesRecorded`: `null` when the moment recorded no call). Its size is `promptTokensEstimate`, which is the gateway's own `estimatePromptTokens`.
@@ -22366,6 +23136,8 @@ How one job runs (each rule is a test below):
 - The call goes through the real `OpenAICompatibleProviderGateway` with in-memory sinks: no ledger, no database. It uses the relay's `x_thinking_level` member and the job's level, and the live repair loop. So a replay fails or is refused exactly where a run would.
 - The packet actually sent must fingerprint like the offline one, or the batch stops (`MOMENT_FINGERPRINT_INCONSISTENT`); that would be a bug in the engine, not a candidate's fault.
 - Resumable: results already in the out file (keyed by moment id, route and level) are skipped. A torn last line from a crash is cut off, and its job reruns.
+- A `USAGE_CAP` or `TIMED_OUT` result is not "done" (pre-flight ruling F25): it describes a moment in time, not the candidate, so a resumed batch asks that job again and appends its new result (the LAST result of a key is the one that counts). A `USAGE_CAP` also stops the batch right after its result is written (`MOMENT_REPLAY_USAGE_CAP <providerRef>`): a capped subscription answers nothing more for now.
+- One batch replays one role family: `--bound` is a single per-call bound, and families differ in their bounds (the evaluator runs one batch per family).
 - Every job's route is checked against the endpoints file before the first call. The endpoints file holds bearers, so it must be owner-only. A plain-http endpoint must be a loopback address.
 
 - [ ] **Step 1: Write the failing test** — create `tests/unit/a18-replay-moment.test.ts`:
@@ -22579,6 +23351,23 @@ describe("A18 · replayMoments, a batch from files", () => {
     expect(await results()).toHaveLength(2);
   });
 
+  it("stops the batch at a usage cap, and a resumed batch asks a capped job again (F25)", async () => {
+    const laid = await lay([ENDPOINT], JOBS);
+    const capped = fetchDouble(() => new Response(
+      JSON.stringify({ error: "CLI_RELAY_USAGE_CAP", x_cli_relay_error: "CLI_RELAY_USAGE_CAP" }), { status: 429 }
+    ));
+    await expect(replayMoments(laid.options(capped.fetchImplementation)))
+      .rejects.toMatchObject({ code: "MOMENT_REPLAY_USAGE_CAP" });
+    // The capped job's result is written; the second job was never asked.
+    expect((await results()).map((result) => [result.candidate.thinkingLevel, result.outcome])).toEqual([["low", "USAGE_CAP"]]);
+    expect(capped.log.urls).toHaveLength(1);
+    // A cap is not an answer: the rerun asks the capped job again, then the rest.
+    const relay = fetchDouble(() => completion(JSON.stringify(ASSESSMENT), null));
+    await expect(replayMoments(laid.options(relay.fetchImplementation))).resolves.toEqual({ replayed: 2, alreadyDone: 0 });
+    expect((await results()).map((result) => [result.candidate.thinkingLevel, result.outcome]))
+      .toEqual([["low", "USAGE_CAP"], ["low", "OK"], ["high", "OK"]]);
+  });
+
   it("refuses an exposed endpoints file, an unknown route and a remote plain-http endpoint before any call", async () => {
     const relay = fetchDouble(() => completion(JSON.stringify(ASSESSMENT)));
     const exposed = await lay([ENDPOINT], JOBS);
@@ -22659,7 +23448,8 @@ import {
   currentContractHash,
   invokeMomentBuilder,
   parseMomentBuilder,
-  replayOutcomeOf
+  replayOutcomeOf,
+  replyContentOf
 } from "./moment-tools.js";
 
 /**
@@ -22671,8 +23461,10 @@ import {
  * to one candidate (a route of the endpoints file `relays:serve` writes, at one
  * thinking level) and appends one replay result per job. It writes nothing to
  * any database: the gateway's ledger and artifact sinks are in memory. It is
- * resumable (a job already in the out file is skipped) and refuses a hosted
- * deployment before it reads anything.
+ * resumable (a job whose result in the out file is final is skipped; a
+ * USAGE_CAP or TIMED_OUT result is asked again, and a cap stops the batch —
+ * pre-flight ruling F25) and refuses a hosted deployment before it reads
+ * anything.
  */
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -22798,10 +23590,15 @@ export async function readCompletedReplayKeys(outPath: string): Promise<Set<stri
     } catch {
       throw new TypedDomainError("MOMENT_REPLAY_RESULTS_UNREADABLE", `${outPath}:${String(index + 1)}`);
     }
+    // Pre-flight ruling F25: a cap or a timeout is not an answer; the job is asked again.
+    if (RETRYABLE_REPLAY_OUTCOMES.has(result.outcome)) continue;
     done.add(replayJobKey(result.momentId, result.candidate.providerRef, result.candidate.thinkingLevel));
   }
   return done;
 }
+
+/** Outcomes that describe a moment in time, not the candidate: never "done" (pre-flight ruling F25). */
+const RETRYABLE_REPLAY_OUTCOMES: ReadonlySet<ReplayOutcome> = new Set<ReplayOutcome>(["USAGE_CAP", "TIMED_OUT"]);
 
 function usageCounter(usage: unknown, key: string): number | null {
   if (typeof usage !== "object" || usage === null || Array.isArray(usage)) return null;
@@ -22923,7 +23720,8 @@ export async function replayMoment(input: ReplayMomentInput): Promise<ReplayResu
   return ReplayResultSchema.parse({
     ...fixed,
     outcome,
-    replyText: last?.rawText ?? null,
+    // Pre-flight fix F4: the answer, not the vendor's HTTP envelope.
+    replyText: last === undefined ? null : replyContentOf(last.rawText),
     parsed: outcome === "OK" ? parsed : null,
     usage: usageOf(last),
     seconds,
@@ -22984,6 +23782,15 @@ export async function replayMoments(options: ReplayMomentsOptions): Promise<{ re
     done.add(key);
     replayed += 1;
     emit(`REPLAYED ${moment.momentId} ${job.providerRef} ${job.thinkingLevel} ${result.outcome}`);
+    // Pre-flight ruling F25: a subscription at its cap answers nothing more for now, so the
+    // batch stops here, its result written; a rerun resumes and asks this job again.
+    if (result.outcome === "USAGE_CAP") {
+      emit(`MOMENT_REPLAY_USAGE_CAP ${job.providerRef}`);
+      throw new TypedDomainError(
+        "MOMENT_REPLAY_USAGE_CAP",
+        `${job.providerRef} reached its subscription usage cap; the batch stops here and a rerun resumes where it stopped`
+      );
+    }
   }
   emit(`REPLAY DONE replayed=${String(replayed)} already=${String(alreadyDone)}`);
   return Object.freeze({ replayed, alreadyDone });
@@ -23309,6 +24116,8 @@ Run every command from `dialectical-engine/`.
   - `describeModelScorecard`
 - Constants: `ASK_MODEL_REFUSALS` and `ASK_MODEL_ASSIGNMENT_INVALID`.
 - `RunCreationSettings.modelPicker?` and `AskAdmission.modelAssignment?`.
+- `RunCreationSettings.resolveEnvelopeBasis` input gains a required `backupSequencesProvisioned: 0 | 1` (pre-flight
+  ruling F17); `computeAcceptanceStructuralCeiling` takes it as an optional fourth argument (default 0).
 - New typed codes:
   - `ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL`
   - `ASK_MODEL_CANDIDATE_UNAVAILABLE`
@@ -23349,6 +24158,8 @@ Run every command from `dialectical-engine/`.
   - A20b changes S01-25, S01-26 and the probe roster.
 - `tests/unit/tier01-ask-wire.test.ts` (A21.2): two new cases.
 - `tests/unit/v2ui-banner-copy.test.ts`: one new case in A21.3; A20b changes a sample server string.
+- `acceptance/runtime-policy.test.ts:108-111` (A20.4, pre-flight ruling F17): its two source pins on
+  `acceptance/main.ts` follow the threaded backup provision; its value pin (106, `DR-184-v4`) is unchanged.
 - A20b only (the roster id change):
   - `tests/unit/tiers-s02-admission.test.ts`
   - `tests/architecture/tier01-roster.test.ts`
@@ -23417,6 +24228,9 @@ as every other boot reader. A scorecard state must not hide a database outage.
    `panel`, `reviewer` and `serve_leg.synthesis_loop_sites` by name.
    - P4's refit (`P4-runner-replay.md`, DR-184-v5) keeps the four call-site counts and their meaning. Only the
      per-site attempts change, so the mapping holds.
+   - Pre-flight ruling F17: admission (A20.2) passes `backupSequencesProvisioned` into the ceiling. The planned
+     basis (which only sizes the expected calls) is asked with 0; the admitted basis is re-asked with 1 only when the
+     picker's assignment has a runner-up somewhere, so every other run keeps `DR-184-v4` exactly.
    - The A20.1 unit test pins the mapping for four shapes. A later refit that renames or re-means a count turns that
      test red.
    - Cross-fragment mismatch for the assembler: P4's notes speak of `RunRepository.readRunRoleAssignment(runId)`, but P2
@@ -23586,7 +24400,15 @@ describe("A19 · the bundled public file (local mode)", () => {
   });
 
   it("refuses a file the register could not hold, and one the engine refuses", async () => {
-    for (const contents of ["not json", "{\"kind\":1,\"kind\":2}", "{\"balancedMargin\":1e-7}"]) {
+    // Pre-flight fix F33: both defects ride on a VALID scorecard, so only the register's
+    // canonical parser can refuse them — plain JSON.parse keeps the last duplicate key,
+    // and an exponent number would reach parseScorecard as NUMBER_SHAPE, not SCHEMA_INVALID.
+    const valid = JSON.stringify(await compatible());
+    const duplicateKey = `{"scorecardVersion":1,${valid.slice(1)}`;
+    const exponent = JSON.stringify({ ...await compatible(), futureWeight: 1e-7 });
+    expect(exponent).toContain('"futureWeight":1e-7');
+    await expect(readBundledModelScorecard(ENGINE, await fileHolding(valid))).resolves.toMatchObject({ state: "VALID" });
+    for (const contents of ["not json", duplicateKey, exponent]) {
       await expect(readBundledModelScorecard(ENGINE, await fileHolding(contents)))
         .resolves.toMatchObject({ state: "REFUSED", reason: "SCHEMA_INVALID" });
     }
@@ -23865,7 +24687,8 @@ version behind the website's.
 2. Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts`
    Expected: PASS.
 3. Run: `pnpm exec vitest run tests/architecture/scaffold.test.ts`
-   Expected: PASS. The manifest-based edge audit accepts register → scorecard.
+   Expected: PASS, except the known-red row "dev's F31 debt" (pre-flight fix F16). The manifest-based edge audit
+   accepts register → scorecard.
 4. Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
    Expected: both exit 0.
 5. Run: `pnpm run test:ci-gate`
@@ -24755,8 +25578,10 @@ describe("A19 · the hosted model scorecard on PostgreSQL", () => {
     const bytes = Buffer.byteLength(JSON.stringify(big), "utf8");
     expect(bytes).toBeGreaterThan(64 * 1_024);
     const operations = createPostgresHostedRegisterOperations(database.pool);
+    // Pre-flight fix F34: plan first, so the clock times the SEAL alone, not the planning.
+    const plan = await planWith(big);
     const started = performance.now();
-    const published = await publishHostedRegister({ plan: await planWith(big), operations });
+    const published = await publishHostedRegister({ plan, operations });
     const elapsedMs = Math.round(performance.now() - started);
     console.info(`A19_SCORECARD_SEAL bytes=${bytes} elapsed_ms=${elapsedMs}`);
     expect(published.outcome).toBe("CREATED");
@@ -24812,7 +25637,9 @@ pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json 
 - [ ] **Step 7: Run the audit, typecheck and gate checks**
 
 1. Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts tests/architecture/register-support-publication.test.ts tests/architecture/vps-deployment-baseline.test.ts`
-   Expected: PASS. No new shipped file was added, so the corpus manifest does not change.
+   Expected: PASS, except the two known-red rows these files carry (pre-flight fix F16): scaffold's "dev's F31 debt"
+   and register-support-publication's "dev's 6a05a0d0 expectation" (both listed in `tests/ci-known-red.txt`). No new
+   shipped file was added, so the corpus manifest does not change.
 2. Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json`
    Expected: both exit 0.
 3. Run: `pnpm run test:ci-gate`
@@ -24913,6 +25740,7 @@ import {
   seatDemandForDebaters,
   targetPricesOf
 } from "@debateai/api";
+import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import type { ProviderDiscoveryTarget } from "@debateai/providers";
 import { computeStructuralCeilingBasis } from "@debateai/register";
@@ -25018,9 +25846,9 @@ describe("A20 · reachable targets keep today's order", () => {
       member("vendor:a2", "OpenAI", "gpt-5.6-sol"),
       member("development:pi-glm-cli", "Z.AI", "glm-5.3-flash")
     ];
-    const reachable = reachableInTodaysOrder(
-      discovered, ["gpt-5.6-sol", "claude-opus-5", "grok-4.6-build"], askTargetFacts(TARGETS)
-    );
+    // The premium roster, read from the contract (pre-flight ruling F22): this row holds before and
+    // after A20b moves its grok id, because vendor:x comes third either way.
+    const reachable = reachableInTodaysOrder(discovered, PLAN_TIER_ROSTERS.premium, askTargetFacts(TARGETS));
     // The first target serving a roster id is the one today's filter seats; the second stays reachable after it.
     expect(reachable.map((target) => target.providerRef))
       .toEqual(["vendor:a", "vendor:b", "vendor:x", "vendor:a2", "development:pi-glm-cli"]);
@@ -25346,7 +26174,8 @@ Expected: PASS, 11 tests.
    `git diff tests/support/shipped-corpus.manifest.txt`.
    Expected: exactly one added line, `apps/api/src/ask-model-picker.ts`.
 2. Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts tests/architecture/tiers-s02-rosters.test.ts`
-   Expected: PASS. The new file names no roster id and holds no plan-tier ternary.
+   Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16). The new file names no
+   roster id and holds no plan-tier ternary.
 3. Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run test:ci-gate`
    Expected: both typechecks exit 0, then `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
@@ -25367,8 +26196,9 @@ whichever are unchanged from both commands.
 - Modify: `apps/api/src/index.ts`:
   - `:59` imports;
   - `:188-…` `KNOWN_DOMAIN_CODES`;
+  - `:2391-2395` `RunCreationSettings.resolveEnvelopeBasis`'s input gains `backupSequencesProvisioned` (pre-flight ruling F17);
   - `:2400-2402` the end of `RunCreationSettings`;
-  - `:2415-2497` `evaluateAskAdmission`.
+  - `:2415-2497` `evaluateAskAdmission` (the roster path passes `backupSequencesProvisioned: 0`).
 - Modify: `apps/runner/src/index.ts:5164-5165` (the twin `KNOWN_DOMAIN_CODES` block)
 - Modify: `tests/unit/api-operational-error.test.ts:45-46` (`EXPECTED_DOMAIN_CODES`)
 - Test: `tests/unit/model-picker-admission.test.ts`
@@ -25382,6 +26212,11 @@ whichever are unchanged from both commands.
   - `RunCreationSettings.modelPicker?: AskModelPickerSettings`
   - `type AskAdmission = { risk; envelopeBasis; discoveredPanel; criticUnavailableCap; modelAssignment?: AdmittedModelAssignment }`
   - `evaluateAskAdmission(settings, ask): Promise<AskAdmission>`
+  - `RunCreationSettings.resolveEnvelopeBasis` input gains a required `backupSequencesProvisioned: 0 | 1` (pre-flight
+    ruling F17): 0 on the roster path and for an assignment without a runner-up, 1 when any seat has one. Every
+    implementation passes it to `computeStructuralCeilingBasis` (A14); A20.4 wires the API and acceptance compositions.
+  - Semantics (pre-flight fix F19): an assignment `RoleAssignmentSchema` refuses is never pinned; admission throws
+    `ASK_MODEL_ASSIGNMENT_INVALID` (a 500, not an `AskRefusal`).
   - typed codes `ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL`, `ASK_MODEL_CANDIDATE_UNAVAILABLE` and `ASK_MODEL_ASSIGNMENT_INVALID`
     in both `KNOWN_DOMAIN_CODES` lists
 
@@ -25424,7 +26259,12 @@ vi.mock("@debateai/scorecard", async (importOriginal) => ({
   }
 }));
 
-import { evaluateAskAdmission, type AskModelPickerSettings, type RunCreationSettings } from "@debateai/api";
+import {
+  evaluateAskAdmission,
+  type AskModelPickerSettings,
+  type AskTargetFacts,
+  type RunCreationSettings
+} from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError, type ModelStrength } from "@debateai/kernel";
@@ -25488,6 +26328,8 @@ function settingsWith(input: Readonly<{
   panel?: readonly DiscoveredPanelMember[];
   modelPicker?: AskModelPickerSettings;
   panelSizes?: number[];
+  /** Pre-flight ruling F17: every backup provision admission asked the ceiling for, in order. */
+  backups?: (0 | 1)[];
   discoveries?: { count: number };
   assertDailyCostEnvelope?: () => Promise<void>;
 }>): RunCreationSettings {
@@ -25501,9 +26343,12 @@ function settingsWith(input: Readonly<{
       if (input.discoveries !== undefined) input.discoveries.count += 1;
       return input.panel ?? LOCAL_PANEL;
     },
-    resolveEnvelopeBasis: async ({ depthParams, panelSize }) => {
+    resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned }) => {
       input.panelSizes?.push(panelSize);
-      return computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth) });
+      input.backups?.push(backupSequencesProvisioned);
+      return computeStructuralCeilingBasis({
+        ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned
+      });
     },
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
       effectiveRiskTier, tierSource, tierProvenanceRef
@@ -25519,7 +26364,8 @@ function valid(overrides: Partial<AskModelPickerSettings> = {}): AskModelPickerS
   return {
     scorecard: Object.freeze({ state: "VALID" as const, scorecard: SCORECARD, sourceRef: "test:a20-scorecard" }),
     mode: "LOCAL",
-    targetFacts: new Map([
+    // Typed, so the two entries' `contextWindowTokens` (null and 1_000_000) unify (pre-flight fix F10).
+    targetFacts: new Map<string, AskTargetFacts>([
       ["development:claude-premium-cli", Object.freeze({
         thinkingLevels: Object.freeze(["low", "high", "max"]), contextWindowTokens: null, price: null
       })],
@@ -25701,6 +26547,48 @@ describe("A20 · with a VALID scorecard the picker replaces the roster filter", 
   });
 });
 
+/** The same outcome with a runner-up on its first JUDGE seat: the one difference pre-flight ruling F17 reads. */
+function withJudgeRunnerUp(outcome: PickerOutcome, runnerUp: SeatCandidate): PickerOutcome {
+  if (outcome.state !== "ASSIGNED") return outcome;
+  return Object.freeze({
+    ...outcome,
+    assignment: Object.freeze({
+      ...outcome.assignment,
+      roles: Object.freeze({
+        ...outcome.assignment.roles,
+        JUDGE: Object.freeze(outcome.assignment.roles.JUDGE.map((judge, index) => index === 0
+          ? Object.freeze({ ...judge, runnerUp, diversityShare: 0.2 })
+          : judge))
+      })
+    })
+  });
+}
+
+describe("A20 · the attempt ceiling provisions a backup only when a seat has a runner-up (pre-flight ruling F17)", () => {
+  it("the roster path pins no assignment, so its ceiling is DR-184-v4 exactly", async () => {
+    const backups: (0 | 1)[] = [];
+    const result = await evaluateAskAdmission(settingsWith({ backups }), ask("free"));
+    expect(backups).toEqual([0]);
+    expect(result.envelopeBasis).toMatchObject({ formula_version: "DR-184-v4", max_model_attempts: 106 });
+  });
+
+  it("keeps DR-184-v4 for an assignment without a runner-up, and re-sizes to DR-184-v5 for one with a runner-up", async () => {
+    const debaters = [candidate(at("development:codex-cli")), candidate(at("development:claude-cli"))];
+    picker.outcome = assigned(debaters);
+    const plain: (0 | 1)[] = [];
+    const withoutBackup = await evaluateAskAdmission(settingsWith({ modelPicker: valid(), backups: plain }), ask("free"));
+    expect(plain).toEqual([0]);
+    expect(withoutBackup.envelopeBasis).toMatchObject({ formula_version: "DR-184-v4", max_model_attempts: 106 });
+
+    picker.outcome = withJudgeRunnerUp(assigned(debaters), candidate(at("development:grok-cli")));
+    const backed: (0 | 1)[] = [];
+    const withBackup = await evaluateAskAdmission(settingsWith({ modelPicker: valid(), backups: backed }), ask("free"));
+    // The planned basis sizes the expected calls only; the admitted one provisions the backup.
+    expect(backed).toEqual([0, 1]);
+    expect(withBackup.envelopeBasis).toMatchObject({ formula_version: "DR-184-v5", max_model_attempts: 196, panel_size: 2 });
+  });
+});
+
 describe("A20 · refusals", () => {
   it("refuses 'even Economy does not fit' with a constant message that names no money", async () => {
     picker.outcome = Object.freeze({
@@ -25750,6 +26638,23 @@ describe("A20 · refusals", () => {
     expect(error).toMatchObject({ code: "ASK_MODEL_ASSIGNMENT_INVALID" });
     expect(error).not.toMatchObject({ name: "AskRefusal" });
   });
+
+  it("never pins an assignment the pinned-assignment schema refuses: an engine fault (pre-flight fix F19)", async () => {
+    const outcome = assigned([candidate(at("development:codex-cli")), candidate(at("development:claude-cli"))]);
+    if (outcome.state !== "ASSIGNED") throw new Error("the fixture must be assigned");
+    // A checker seat that carries seatIndex 1 in a one-seat role: RoleAssignmentSchema refuses it.
+    picker.outcome = Object.freeze({
+      ...outcome,
+      assignment: Object.freeze({
+        ...outcome.assignment,
+        roles: Object.freeze({ ...outcome.assignment.roles, ANSWER_CHECKER: Object.freeze([{ ...outcome.assignment.roles.ANSWER_CHECKER[0]!, seatIndex: 1 }]) })
+      })
+    });
+    const error = await evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("free"))
+      .catch((failure: unknown) => failure);
+    expect(error).toMatchObject({ code: "ASK_MODEL_ASSIGNMENT_INVALID" });
+    expect(error).not.toMatchObject({ name: "AskRefusal" });
+  });
 });
 
 describe("A20 · the grok roster drift (pre-existing; A20b fixes it with the owner's OK)", () => {
@@ -25781,6 +26686,8 @@ Expected: FAIL.
 - The three "today's roster path" rows and the PRE-EXISTING drift row PASS already: they pin current behaviour.
 - Every "VALID scorecard" and "refusals" row FAILs. The picker is never called (`picker.calls` stays empty), so
   `lastInput()` is `undefined` or `toMatchObject` fails on the roster result.
+- The two F17 rows FAIL too: admission does not yet pass `backupSequencesProvisioned`, so `backups` records
+  `[undefined]` instead of `[0]` (pre-flight ruling F17).
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -25789,7 +26696,7 @@ All edits below are in `apps/api/src/index.ts` unless a file is named.
 (a) Imports. After the `export { … } from "./ask-model-picker.js";` block added in A20.1, add:
 
 ```ts
-import { pickRoleAssignment, type Scorecard } from "@debateai/scorecard";
+import { RoleAssignmentSchema, pickRoleAssignment, type RoleAssignment, type Scorecard } from "@debateai/scorecard";
 import {
   ASK_MODEL_ASSIGNMENT_INVALID,
   ASK_MODEL_REFUSALS,
@@ -25822,6 +26729,33 @@ with:
 ```
 
 Make the same replacement in `tests/unit/api-operational-error.test.ts` (`EXPECTED_DOMAIN_CODES`, lines 45-46).
+
+(c0) The envelope input (pre-flight ruling F17). Replace:
+
+```ts
+  readonly resolveEnvelopeBasis: (input: {
+    readonly depthParams: Readonly<Record<string, unknown>>;
+    readonly riskTier: RiskTier;
+    readonly panelSize: number;
+  }) => Promise<Readonly<Record<string, unknown>>>;
+```
+
+with:
+
+```ts
+  readonly resolveEnvelopeBasis: (input: {
+    readonly depthParams: Readonly<Record<string, unknown>>;
+    readonly riskTier: RiskTier;
+    readonly panelSize: number;
+    /**
+     * A14/A20 (pre-flight ruling F17): 1 only when the run's pinned role
+     * assignment gives a seat a runner-up (DR-184-v5), else 0 (DR-184-v4, the
+     * number V ruled on 2026-09-05 to seal without padding). Admission decides
+     * it; the composition passes it to `computeStructuralCeilingBasis`.
+     */
+    readonly backupSequencesProvisioned: 0 | 1;
+  }) => Promise<Readonly<Record<string, unknown>>>;
+```
 
 (c) `RunCreationSettings`. Replace:
 
@@ -25876,6 +26810,11 @@ export async function evaluateAskAdmission(
 with:
 
 ```ts
+/** Pre-flight ruling F17: 1 when any seat of the assignment has a runner-up — the only runs a backup can serve. */
+function backupSequencesFor(assignment: RoleAssignment): 0 | 1 {
+  return Object.values(assignment.roles).some((seats) => seats.some((seat) => seat.runnerUp !== null)) ? 1 : 0;
+}
+
 function makerAvailabilityFor(panel: readonly DiscoveredPanelMember[]) {
   const makers = Object.freeze([...new Set(panel.map((member) => member.maker))]);
   return Object.freeze({
@@ -25916,18 +26855,24 @@ async function admitWithScorecard(input: Readonly<{
       ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE.code, ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE.message
     ));
   }
-  const resolveBasis = async (panelSize: number): Promise<Readonly<Record<string, unknown>>> => {
+  const resolveBasis = async (
+    panelSize: number,
+    backupSequencesProvisioned: 0 | 1
+  ): Promise<Readonly<Record<string, unknown>>> => {
     try {
       return await settings.resolveEnvelopeBasis({
         depthParams: ask.depth_params,
         riskTier: risk.effectiveRiskTier,
-        panelSize
+        panelSize,
+        backupSequencesProvisioned
       });
     } catch (error) {
       return markAskRefusal(error);
     }
   };
-  const plannedBasis = await resolveBasis(plannedDebaters);
+  // The planned basis sizes the picker's expected calls only. Its call-site
+  // counts do not depend on the backup provision, so it is asked without one.
+  const plannedBasis = await resolveBasis(plannedDebaters, 0);
   const hostedPlanTier = picker.mode === "HOSTED" ? ask.plan_tier : null;
   const outcome = pickRoleAssignment({
     scorecard: input.scorecard,
@@ -25944,6 +26889,16 @@ async function admitWithScorecard(input: Readonly<{
     picker.log?.(`MODEL_PICKER refused reason=${outcome.reason} detail=${outcome.detail}`);
     const refusal = ASK_MODEL_REFUSALS[outcome.reason];
     markAskRefusal(new TypedDomainError(refusal.code, refusal.message));
+  }
+  // Pre-flight fix F19: the assignment is pinned append-only, and the runner and
+  // the answer index read it back through RoleAssignmentSchema. One the schema
+  // refuses must never be pinned: it is an engine fault (a 500), not an ask refusal.
+  const checked = RoleAssignmentSchema.safeParse(outcome.assignment);
+  if (!checked.success) {
+    throw new TypedDomainError(
+      ASK_MODEL_ASSIGNMENT_INVALID,
+      `The picker produced an assignment the pinned-assignment schema refuses: ${checked.error.issues[0]?.message ?? "invalid"}`
+    );
   }
   for (const note of outcome.notes) picker.log?.(`MODEL_PICKER note ${note}`);
   picker.log?.(`MODEL_PICKER assigned strength=${outcome.appliedStrength} stepped_down=${String(outcome.steppedDown)}`
@@ -25965,7 +26920,13 @@ async function admitWithScorecard(input: Readonly<{
   } catch (error) {
     markAskRefusal(error);
   }
-  const envelopeBasis = debaters.length === plannedDebaters ? plannedBasis : await resolveBasis(debaters.length);
+  // Pre-flight ruling F17: a backup sequence is provisioned only when some seat
+  // has a runner-up; any other run keeps DR-184-v4 exactly (no padding, V's
+  // 2026-09-05 ruling). The receipt names the formula it was minted with.
+  const backupSequencesProvisioned = backupSequencesFor(outcome.assignment);
+  const envelopeBasis = debaters.length === plannedDebaters && backupSequencesProvisioned === 0
+    ? plannedBasis
+    : await resolveBasis(debaters.length, backupSequencesProvisioned);
   return {
     risk,
     envelopeBasis,
@@ -26008,6 +26969,28 @@ with:
   }
 ```
 
+(e2) The roster path pins no assignment, so no runner-up exists (pre-flight ruling F17). Replace:
+
+```ts
+    envelopeBasis = await settings.resolveEnvelopeBasis({
+      depthParams: ask.depth_params,
+      riskTier: risk.effectiveRiskTier,
+      panelSize: filteredPanel.length
+    });
+```
+
+with:
+
+```ts
+    envelopeBasis = await settings.resolveEnvelopeBasis({
+      depthParams: ask.depth_params,
+      riskTier: risk.effectiveRiskTier,
+      panelSize: filteredPanel.length,
+      // F17: no pinned assignment, so no runner-up: DR-184-v4 exactly, as today.
+      backupSequencesProvisioned: 0
+    });
+```
+
 (f) The roster path uses the shared helper; its behaviour is identical. Replace:
 
 ```ts
@@ -26031,7 +27014,7 @@ with:
 - [ ] **Step 4: Run the tests to verify they pass, and that the roster path did not move**
 
 1. Run: `pnpm exec vitest run tests/unit/model-picker-admission.test.ts`
-   Expected: PASS, 15 tests.
+   Expected: PASS, 18 tests (15, plus the two F17 rows and the F19 row).
 2. Run: `pnpm exec vitest run tests/unit/tiers-s02-admission.test.ts tests/unit/t17-envelope.test.ts tests/unit/v28-envelope-wiring.test.ts tests/unit/tiers-s02-wire.test.ts tests/unit/api-operational-error.test.ts tests/unit/api.test.ts`
    Expected: PASS, with no edit to any of these files except the three codes in `api-operational-error.test.ts`. This
    run is the proof that the no-scorecard path is exactly today's.
@@ -26039,8 +27022,9 @@ with:
 - [ ] **Step 5: Run the audit, typecheck and gate checks**
 
 1. Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts tests/architecture/tiers-s02-rosters.test.ts tests/architecture/tier01-roster.test.ts`
-   Expected: PASS. `tiers-s02-rosters` "keeps plan-tier model selection out of if and case branches" stays green,
-   because `hostedPlanTier` is its own statement and names no roster.
+   Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16). `tiers-s02-rosters`
+   "keeps plan-tier model selection out of if and case branches" stays green, because `hostedPlanTier` is its own
+   statement and names no roster.
 2. Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run test:ci-gate`
    Expected: both typechecks exit 0, then `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
@@ -26214,7 +27198,8 @@ function assigned(): Extract<PickerOutcome, { state: "ASSIGNED" }> {
     strength: "BALANCED",
     roles: Object.freeze({
       POSITION: seats, SUPPORT_ATTACK: seats, CROSS_EXCHANGE: seats, JUDGE: seats, REVIEWER: seats,
-      ANSWER_WRITER: Object.freeze([seats[0]!]), ANSWER_CHECKER: Object.freeze([seats[1]!])
+      // A single-seat role's one seat is seat 0 (RoleAssignmentSchema); admission refuses to pin anything else (F19).
+      ANSWER_WRITER: Object.freeze([seats[0]!]), ANSWER_CHECKER: Object.freeze([Object.freeze({ ...seats[1]!, seatIndex: 0 })])
     })
   });
   return Object.freeze({
@@ -26427,7 +27412,12 @@ git commit -m "feat(api): pin the role assignment at run creation and report the
   - `:5-7` and `:33-35` imports;
   - `:395-405` the input type;
   - `:409` the scorecard read;
-  - `:599-601` the settings.
+  - `:447` the claim window's worst case (pre-flight ruling F17);
+  - `:599-601` the settings;
+  - `:659-660` `resolveEnvelopeBasis` threads the backup provision (F17).
+- Modify: `apps/api/src/main.ts:416-428` (`resolveEnvelopeBasis` threads the backup provision — F17)
+- Modify: `acceptance/runtime-policy.ts:183-192` (`computeAcceptanceStructuralCeiling` takes the backup provision — F17)
+- Modify: `acceptance/runtime-policy.test.ts:108-111` (its two source pins on `acceptance/main.ts` follow — F17)
 - Test: `tests/unit/model-picker-composition.test.ts`
 
 **Interfaces:**
@@ -26436,6 +27426,9 @@ git commit -m "feat(api): pin the role assignment at run creation and report the
   - `askModelPickerSettings` and `describeModelScorecard` (A20.1);
   - `RunCreationSettings.modelPicker` (A20.2).
 - Produces:
+  - `computeAcceptanceStructuralCeiling(policy, panelSize, depth, backupSequencesProvisioned = 0)` (pre-flight ruling F17);
+  - both compositions pass admission's `backupSequencesProvisioned` into the ceiling; the acceptance claim window is
+    sized for the worst case, a backup at every seat call;
   - the API boot stage `"model-scorecard"`;
   - the stderr line `MODEL_SCORECARD state=… source=register|bundled-file …` (A22 reads it);
   - `createAcceptanceRuntime` input `modelScorecard?: ModelScorecardReadResult`. It defaults to the bundled file, exactly
@@ -26466,6 +27459,8 @@ describe("A20 · the picker is composed where runs are created", () => {
     expect(source).toContain("modelPicker: askModelPickerSettings({");
     expect(source).toContain("perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,");
     expect(source.indexOf('boot.run("model-scorecard"')).toBeLessThan(source.indexOf("new PostgresAskApplication("));
+    // Pre-flight ruling F17: admission's backup provision reaches the ceiling.
+    expect(source).toContain("backupSequencesProvisioned: input.backupSequencesProvisioned");
   });
 
   it("composes the same picker in the acceptance runtime, reading the bundled file unless a test injects one", async () => {
@@ -26474,6 +27469,10 @@ describe("A20 · the picker is composed where runs are created", () => {
     expect(source).toContain("input.modelScorecard ?? await readBundledModelScorecard(await readEngineVersion())");
     expect(source).toContain("modelPicker: askModelPickerSettings({");
     expect(source).toContain('deploymentMode: "local",');
+    // Pre-flight ruling F17: admission's backup provision reaches the acceptance ceiling too.
+    expect(source).toContain(
+      "computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth), basis.backupSequencesProvisioned)"
+    );
   });
 });
 ```
@@ -26636,9 +27635,99 @@ with:
     resolveDiscoveredPanel: async () => {
 ```
 
+(g) `apps/api/src/main.ts`, the ceiling (pre-flight ruling F17). Replace:
+
+```ts
+    maxDepth: envelopeFormulaInputs.maxDepth
+  }),
+```
+
+with:
+
+```ts
+    maxDepth: envelopeFormulaInputs.maxDepth,
+    // A14/A20 (F17): DR-184-v5 only when the pinned assignment has a runner-up.
+    backupSequencesProvisioned: input.backupSequencesProvisioned
+  }),
+```
+
+(h) `acceptance/runtime-policy.ts`. Replace:
+
+```ts
+  panelSize: number,
+  depth: number
+): ReturnType<typeof computeStructuralCeilingBasis> {
+  return computeStructuralCeilingBasis({
+    panelSize,
+    depth,
+```
+
+with:
+
+```ts
+  panelSize: number,
+  depth: number,
+  // A14/A20 (pre-flight ruling F17): 1 only for a run whose pinned assignment has a runner-up.
+  backupSequencesProvisioned: 0 | 1 = 0
+): ReturnType<typeof computeStructuralCeilingBasis> {
+  return computeStructuralCeilingBasis({
+    panelSize,
+    depth,
+    backupSequencesProvisioned,
+```
+
+(i) `acceptance/main.ts`, admission's ceiling. Replace:
+
+```ts
+      computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth)),
+```
+
+with:
+
+```ts
+      computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth), basis.backupSequencesProvisioned),
+```
+
+(j) `acceptance/main.ts`, the claim window. It is sized from the worst case of any run, and a run with a pinned
+runner-up may now spend a backup sequence at every seat call (pre-flight ruling F17). Replace:
+
+```ts
+  const maximumRunAttempts = computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5)
+```
+
+with:
+
+```ts
+  const maximumRunAttempts = computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5, 1)
+```
+
+(k) `acceptance/runtime-policy.test.ts:108-111` ("WHO READS THIS STRING": its source pins read the two lines (i) and (j)
+change). Replace:
+
+```ts
+    expect(mainSource).toContain("computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5)");
+    expect(mainSource).toContain(
+      "computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth))"
+    );
+```
+
+with:
+
+```ts
+    // Model scorecard A20.4 (pre-flight ruling F17): the claim window covers a backup at every seat call, and
+    // admission threads its backup provision into the run's ceiling.
+    expect(mainSource).toContain("computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5, 1)");
+    expect(mainSource).toContain(
+      "computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth), basis.backupSequencesProvisioned)"
+    );
+```
+
+Its value pin (`computeAcceptanceStructuralCeiling({…}, 2, 1)` → 106, `DR-184-v4`) stays unchanged: no fourth
+argument means no backup provision.
+
 - [ ] **Step 4: Run the tests to verify they pass, including the boot-ledger and wiring pins**
 
-Run: `pnpm exec vitest run tests/unit/model-picker-composition.test.ts tests/unit/dl7-f7-boot-custody.test.ts tests/unit/v28-envelope-wiring.test.ts tests/unit/api-provider-discovery.test.ts tests/unit/pol01-policy.test.ts tests/architecture/t16-algorithm-register-rows.test.ts`
+Run: `pnpm exec vitest run tests/unit/model-picker-composition.test.ts tests/unit/dl7-f7-boot-custody.test.ts tests/unit/v28-envelope-wiring.test.ts tests/unit/api-provider-discovery.test.ts tests/unit/pol01-policy.test.ts tests/architecture/t16-algorithm-register-rows.test.ts acceptance/runtime-policy.test.ts`
 Expected: PASS.
 - `dl7-f7` "leaves no await in the API boot outside boot.run or startup.run" stays green. Both new awaits sit inside
   `boot.run(` statements.
@@ -26646,8 +27735,11 @@ Expected: PASS.
 
 - [ ] **Step 5: Run the typecheck and gate checks**
 
-Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts && pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run test:ci-gate`
-Expected: PASS; both typechecks exit 0; `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
+Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
+Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16: chained with `&&`, that row
+would stop the checks below).
+Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm run test:ci-gate`
+Expected: both typechecks exit 0; `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
 The acceptance suites (`acceptance/*.test.ts`) are not in CI. While `scorecards/current.json` is absent they take the
 roster path. Run one to be sure: `pnpm exec vitest run acceptance/panel-multi-maker.test.ts`. Expected: PASS, as before
@@ -26656,9 +27748,9 @@ this task.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/api/src/main.ts acceptance/main.ts tests/unit/model-picker-composition.test.ts
+git add apps/api/src/main.ts acceptance/main.ts acceptance/runtime-policy.ts acceptance/runtime-policy.test.ts tests/unit/model-picker-composition.test.ts
 git diff --cached --name-only
-git commit -m "feat(api): compose the model picker in the API entrypoint and the acceptance runtime (A20)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- apps/api/src/main.ts acceptance/main.ts tests/unit/model-picker-composition.test.ts
+git commit -m "feat(api): compose the model picker in the API entrypoint and the acceptance runtime (A20)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- apps/api/src/main.ts acceptance/main.ts acceptance/runtime-policy.ts acceptance/runtime-policy.test.ts tests/unit/model-picker-composition.test.ts
 ```
 
 ### Task A20b: Align the premium roster's grok id with what the grok CLI answers (OWNER APPROVED 2026-09-26)
@@ -27184,7 +28276,9 @@ Replace:
        FROM serve.answer AS answer
 ```
 
-with:
+with (the one R2 exception, pre-flight ruling F20: the pinned row rides this projection's own single SELECT, beside its
+envelope subselects, rather than a second query per answer read through `readRunRoleAssignment`; it reads the same
+columns, and `projectModelAssignment` validates them with the same `RoleAssignmentSchema`):
 
 ```ts
               run.as_of, answer.relevant_as_of,
@@ -27277,7 +28371,7 @@ with:
    `git diff tests/support/shipped-corpus.manifest.txt`.
    Expected: exactly one added line, `packages/serve/src/model-assignment.ts`.
 2. Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts tests/architecture/scaffold.test.ts`
-   Expected: PASS.
+   Expected: PASS, except the known-red scaffold row "dev's F31 debt" (pre-flight fix F16).
 3. Run: `pnpm run typecheck && pnpm exec tsc --noEmit -p acceptance/tsconfig.json && pnpm --filter dialectical-engine-v2ui typecheck && pnpm run test:ci-gate`
    Expected: all three typechecks exit 0, then `CI_KNOWN_RED_GATE new=0 known=8 stale=0`.
 
@@ -27877,8 +28971,8 @@ git commit -m "feat(ui): model-strength control beside tree depth, sent only whe
 - Modify: `apps/ui/lib/modelStrength.ts` (role labels, headline, seat line)
 - Modify: `apps/ui/lib/modelStrength.test.mjs` (three rows)
 - Modify: `apps/ui/components/AnswerHonestyDrawer.tsx:7` (import), `:196-205` (new section after "Cost envelope")
-- Modify: `apps/ui/lib/v3/labels.ts:27` (one case)
 - Modify: `apps/ui/lib/v3/requestFailure.ts:47-51`, `:74-78`, `:89-99`
+- (No `apps/ui/lib/v3/labels.ts` edit: A16b already added the `BACKUP-MODEL-USED` label — pre-flight fix F21.)
 - Modify: `tests/unit/v2ui-banner-copy.test.ts` (one row before "leaves no contract error text…")
 - Test: `tests/render/model-assignment-drawer.test.tsx`
 
@@ -27893,13 +28987,14 @@ git commit -m "feat(ui): model-strength control beside tree depth, sent only whe
   - `modelAssignmentHeadline(assignment: AnswerModelAssignment): string`
   - `modelSeatLine(seat): string`
   - `RequestFailureKind` gains `"MODEL_BUDGET_TOO_SMALL"` and `"MODEL_UNAVAILABLE"`
-  - `conditionMarkLabel("BACKUP-MODEL-USED")` = `"A backup model answered for a role whose main model failed"`
+  - (Consumes, not produces: A16b's `conditionMarkLabel("BACKUP-MODEL-USED")` = `"A backup model answered for a role whose main model failed"` — pre-flight fix F21.)
 
 - [ ] **Step 0: Check the preconditions**
 
 Run: `grep -n '"BACKUP-MODEL-USED"' packages/kernel/src/index.ts && grep -n "export const AnswerModelAssignmentSchema" packages/contract/src/index.ts`
-Expected: the mark on the line after `"DEGRADED-DIVERSITY",`, and one schema line. If either is missing, STOP. Without
-the mark, the exhaustive label switch cannot name it; without A21.1, the drawer has no data.
+Expected: one line for the mark — after `"DEGRADED-DIVERSITY",` and the comment A16b placed above the mark (pre-flight
+fix F21) — and one schema line. If either is missing, STOP. Without the mark (and A16b's label), the drawer cannot name
+it; without A21.1, the drawer has no data.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -27921,7 +29016,7 @@ test("A21: the headline says the strength, a step-down, and the scorecard versio
   );
   assert.equal(
     modelAssignmentHeadline({ strength: "BALANCED", stepped_down: true, scorecard_version: null, roles: [] }),
-    "Model strength Balanced, one step below the strength asked for, to fit the limits of this deployment · no scorecard"
+    "Model strength Balanced, below the strength asked for, to fit the limits of this deployment · no scorecard"
   );
 });
 
@@ -27999,7 +29094,7 @@ describe("A21 · the honesty drawer names the models behind each debate job", ()
     const html = drawerHtml({ model_assignment: ASSIGNMENT });
     expect(html).toContain('aria-label="Models used"');
     expect(html).toContain(
-      "Model strength Balanced, one step below the strength asked for, to fit the limits of this deployment · scorecard version 4"
+      "Model strength Balanced, below the strength asked for, to fit the limits of this deployment · scorecard version 4"
     );
     expect(html).toContain("Opening positions");
     expect(html).toContain("Answer writer");
@@ -28057,7 +29152,8 @@ with:
 Run: `pnpm exec vitest run tests/render/model-assignment-drawer.test.tsx tests/unit/v2ui-banner-copy.test.ts`
 Expected: FAIL.
 - The drawer has no "Models used" section.
-- The chip shows the raw mark: `conditionMarkLabel` returns `undefined` for it, and the UI typecheck would also fail.
+- (The `BACKUP-MODEL-USED` chip already shows A16b's label, so a drawer row that checks only that label may pass
+  already; the rows above are the red ones — pre-flight fix F21.)
 - The banner row reports `UNREADABLE` instead of the new kinds.
 
 Run: `pnpm --filter dialectical-engine-v2ui test`
@@ -28112,8 +29208,10 @@ export function modelAssignmentHeadline(assignment: AnswerModelAssignment): stri
   const scorecard = assignment.scorecard_version === null
     ? "no scorecard"
     : `scorecard version ${assignment.scorecard_version}`;
+  // Pre-flight fix F30: never "one step" — the picker may step down more than one
+  // notch, or a hosted plan cap may apply; the line says only what is always true.
   return assignment.stepped_down
-    ? `Model strength ${strength}, one step below the strength asked for, to fit the limits of this deployment · ${scorecard}`
+    ? `Model strength ${strength}, below the strength asked for, to fit the limits of this deployment · ${scorecard}`
     : `Model strength ${strength} · ${scorecard}`;
 }
 
@@ -28181,12 +29279,9 @@ with:
           </section>
 ```
 
-(c) `apps/ui/lib/v3/labels.ts`. Replace `    case "DEGRADED-DIVERSITY": return "Model diversity degraded";` with:
-
-```ts
-    case "DEGRADED-DIVERSITY": return "Model diversity degraded";
-    case "BACKUP-MODEL-USED": return "A backup model answered for a role whose main model failed";
-```
+(c) No `apps/ui/lib/v3/labels.ts` edit (pre-flight fix F21): A16b already added
+`case "BACKUP-MODEL-USED": return "A backup model answered for a role whose main model failed";` right after the
+`DEGRADED-DIVERSITY` case. Re-applying that replacement would add a second, unreachable case.
 
 (d) `apps/ui/lib/v3/requestFailure.ts`.
 
@@ -28284,15 +29379,18 @@ function kindOf(error: unknown): RequestFailureKind {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/ui/lib/modelStrength.ts apps/ui/lib/modelStrength.test.mjs apps/ui/components/AnswerHonestyDrawer.tsx apps/ui/lib/v3/labels.ts apps/ui/lib/v3/requestFailure.ts tests/render/model-assignment-drawer.test.tsx tests/unit/v2ui-banner-copy.test.ts
+git add apps/ui/lib/modelStrength.ts apps/ui/lib/modelStrength.test.mjs apps/ui/components/AnswerHonestyDrawer.tsx apps/ui/lib/v3/requestFailure.ts tests/render/model-assignment-drawer.test.tsx tests/unit/v2ui-banner-copy.test.ts
 git diff --cached --name-only
-git commit -m "feat(ui): honesty drawer names the models behind each debate job; backup mark and strength refusals in plain words (A21)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- apps/ui/lib/modelStrength.ts apps/ui/lib/modelStrength.test.mjs apps/ui/components/AnswerHonestyDrawer.tsx apps/ui/lib/v3/labels.ts apps/ui/lib/v3/requestFailure.ts tests/render/model-assignment-drawer.test.tsx tests/unit/v2ui-banner-copy.test.ts
+git commit -m "feat(ui): honesty drawer names the models behind each debate job; backup mark and strength refusals in plain words (A21)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- apps/ui/lib/modelStrength.ts apps/ui/lib/modelStrength.test.mjs apps/ui/components/AnswerHonestyDrawer.tsx apps/ui/lib/v3/requestFailure.ts tests/render/model-assignment-drawer.test.tsx tests/unit/v2ui-banner-copy.test.ts
 ```
+Expected `git diff --cached --name-only`: exactly the six paths above (pre-flight fix F21: no `labels.ts`).
 
 ### Task A22: End-to-end check, run by the owner (no code)
 
 **Files:** none are committed.
-- Variant B below places a trial `scorecards/current.json` and removes it at the end. It must never be committed.
+- Both variants below place a `scorecards/current.json` in this public checkout and remove it at the end (pre-flight
+  fix F31). It must never be committed: in Variant A it is the owners' newest, unpublished scorecard (spec owner
+  decision 4), in Variant B a made-up trial file.
 
 **Interfaces:**
 - Consumes everything above.
@@ -28323,7 +29421,9 @@ Pick one variant.
 
 - **Variant A: real selection.** Copy your owners' approved scorecard (the private evaluator's output) to
   `scorecards/current.json` in this checkout. Its candidates must use the model ids your relays report. This plan
-  cannot know where the private repository keeps the file.
+  cannot know where the private repository keeps the file. This copy is the owners' newest scorecard in the PUBLIC
+  engine's tree: the untracked check below and the clean-up in Step 7 apply to it exactly as to Variant B (pre-flight
+  fix F31).
 - **Variant B: plumbing only.** This uses the example scorecard. Its candidates are made up, so every seat is a FALLBACK
   seat and all three strengths pin the same models. It still proves that the pinning, the drawer and the per-call
   columns work. It writes the example with this engine's version and refuses to overwrite an existing file:
@@ -28332,13 +29432,14 @@ Pick one variant.
 node -e 'const fs=require("node:fs");const v=JSON.parse(fs.readFileSync("package.json","utf8")).version;const s=JSON.parse(fs.readFileSync("packages/scorecard/fixtures/example-scorecard.json","utf8"));s.engineCompatibility={minEngineVersion:v,maxEngineVersion:null};fs.writeFileSync("scorecards/current.json",JSON.stringify(s,null,2)+"\n",{flag:"wx"})'
 ```
 
-Then check that git sees it only as an untracked file:
+Then, for either variant, check that git sees it only as an untracked file:
 
 ```sh
 git status --short scorecards
 ```
 
-Expected: one line, `?? scorecards/current.json` (untracked). Never `git add` it.
+Expected: one line, `?? scorecards/current.json` (untracked). Never `git add` it, in either variant (pre-flight fix
+F31).
 
 - [ ] **Step 2: Check the sign-ins**
 
@@ -28393,7 +29494,7 @@ Repeat with **Balanced**, then with **Best**. Wait until all three debates have 
 
 Open each finished debate, click **Honesty** (◈) and find the section **Models used**. Check that:
 - The first line reads `Model strength <your choice> · scorecard version <n>`. If the strength was stepped down, it
-  reads `Model strength <one lower>, one step below the strength asked for, …`. In local mode there is no money ceiling,
+  reads `Model strength <a lower one>, below the strength asked for, …`. In local mode there is no money ceiling,
   so a step-down is not expected.
 - Each debate job is listed with one line per seat: the model, its maker, its thinking level, and its backup with "about
   N% of the calls".
@@ -28441,7 +29542,7 @@ SQL
 ```
 
 Check each part of the output:
-- **First table:** exactly one row. `strength` is the strength you chose (or one lower with `stepped_down` = `t`), and
+- **First table:** exactly one row. `strength` is the strength you chose (or a lower one with `stepped_down` = `t`), and
   `scorecard_version` is your file's version.
 - **Second table:**
   - every row has a `model_role` and a `thinking_level` (`DEFAULT_ONLY` or a level such as `high`);
@@ -28455,8 +29556,9 @@ Check each part of the output:
 
 - [ ] **Step 7: Stop the stack and clean up**
 
-In terminal 1, press Ctrl-C once and wait: the stack stops its services in reverse order. Variant B only: remove the
-trial file, then confirm nothing is left.
+In terminal 1, press Ctrl-C once and wait: the stack stops its services in reverse order. Then, in BOTH variants (pre-flight
+fix F31: in Variant A the file is the owners' newest scorecard), remove `scorecards/current.json` and confirm nothing
+is left.
 
 ```sh
 rm scorecards/current.json
@@ -28505,6 +29607,8 @@ This file is BINDING. Every plan fragment must use exactly these names, paths an
   - The runner-up is ALSO the backup.
   - If no candidate qualifies, `runnerUp` is `null`: no split, and no backup beyond today's behaviour.
 - **R4. Backup triggers:** transport failure after the normal retries, or a subscription usage cap (switch immediately). A wrong-format or schema failure is retried as today and NEVER triggers a switch. A run-wide spend stop NEVER triggers a switch.
+  - **Delivery (pre-flight ruling F11):** the gateway never retries a usage cap and delivers it as `ProviderCallFailedError` whose `cause` is the `PROVIDER_USAGE_CAP` `TypedDomainError`. The seat caller reads the cap off `cause` and switches at once; a seat without a runner-up (every legacy run) halts the member exactly as a relay failure does today.
+  - **Never a trigger (pre-flight fixes F1, F12, F13):** a relay's 413/400 refusal (mapped to `PROVIDER_CONTEXT_WINDOW_EXCEEDED` / `PROVIDER_THINKING_LEVEL_UNSUPPORTED`), an oversized packet, and a prompt record that could not be written.
 - **R5. Seats.**
   - `CROSS_EXCHANGE` for a position is written by the same seat member that wrote that `POSITION`.
   - `SUPPORT_ATTACK` legs come from the `SUPPORT_ATTACK` seats, rotating as today: `(rootIndex + round) % seatCount`.
@@ -28578,15 +29682,15 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
   - `vendor`
   - `maker`
   - `modelId`
-  - `thinkingLevel` (a string; `DEFAULT_ONLY` allowed)
+  - `thinkingLevel`: one lower-case token `^[a-z][a-z0-9_-]{0,31}$`, or `DEFAULT_ONLY` — the gateway's and the ledger's own token (pre-flight erratum F36)
   - `accessRoutes`: `{kind:"API"}` | `{kind:"SUBSCRIPTION", tool: "claude"|"codex"|"grok"|"agy"|"pi"}`, as an array of at least one
   - `apiPrice`: `{inputMicrosPerMTok:int, outputMicrosPerMTok:int, asOf:string, source:string}` or null
-  - `contextWindowTokens`: int or null
+  - `contextWindowTokens`: int or null; may be omitted from the file, and then reads as null (pre-flight erratum F36)
 - `ScorecardRoleEntrySchema` fields:
   - `candidateId`
   - `tier`
   - `quality`: `{score:number, low:number, high:number}`, each number an integer or with at most 6 decimals (see NUMBER_SHAPE)
-  - `qualityByLanguage`: `{ro?:{score,low,high}, en?:{score,low,high}}` or null
+  - `qualityByLanguage`: `{ro?:{score,low,high}, en?:{score,low,high}}` or null; may be omitted from the file, and then reads as null (pre-flight erratum F36)
   - `typicalCall`: `{inputTokens:int, outputTokens:int, thinkingTokens:int|null, seconds:number}`
   - `tags`: `{code:string, strength:"STRONG"|"WEAK", text:string}[]`
   - `promptVersion`: string
@@ -28602,7 +29706,7 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
 - `ScorecardSchema` fields:
   - `kind: "DEBATEAI_SCORECARD"`
   - `formatVersion: 1`
-  - `scorecardVersion`: int ≥ 1
+  - `scorecardVersion`: int in 1..2147483647 (it is pinned in an int4 ledger column; pre-flight erratum F36)
   - `createdAt`
   - `testSetVersion`
   - `engineCompatibility`: `{minEngineVersion:string, maxEngineVersion:string|null}`
@@ -28647,12 +29751,15 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
   - `via = RUNNER_UP` iff `seat.runnerUp !== null && seat.diversityShare > 0 && ordinal % period === period - 1`.
 - `diversityOrdinalForRun(runId: string): number`: a stable non-negative integer from sha256(runId). Used as the ordinal for single-call-per-run roles (ANSWER_WRITER, ANSWER_CHECKER), so a whole debate uses one of the two.
 - `backupFor(seat: RoleSeat, used: "MAIN"|"RUNNER_UP"): SeatCandidate|null` returns the other one.
+- A candidate may sit in a role only when its typical call — input + output + thinking tokens — fits the smaller of its own and its route's context window: the gateway's R1 wall applied to the typical call (pre-flight ruling F29).
+- A POSITION root takes the per-run ordinal `diversityOrdinalForRun(runId + "#POSITION#" + seatIndex)`, so each root seat's runner-up writes about one debate in five (pre-flight ruling F35).
 
 **`src/estimate.ts`**
 
 - `estimateRunCost(input: {assignment, expectedCallsByRole, scorecard, prices, mode}): CostEstimate`
 - Hosted: Σ over role × seat of expected calls × (inputTokens × inPrice + outputTokens × outPrice) / 1e6. Thinking tokens are billed as output.
 - Local: the same shape using `typicalCall.seconds`.
+- A `CROSS_EXCHANGE` call whose candidate has no `CROSS_EXCHANGE` entry is priced from its `POSITION` entry (CROSS_EXCHANGE seats are POSITION's seats; pre-flight fix F28).
 
 **`src/moment.ts`**
 
@@ -28696,8 +29803,9 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
 - New typed errors, each added to both `KNOWN_DOMAIN_CODES` lists and to `tests/unit/api-operational-error.test.ts`:
   - `PROVIDER_THINKING_LEVEL_UNSUPPORTED`
   - `PROVIDER_THINKING_LEVEL_CHANGED` (the relay echoed a different `x_thinking_level`)
-  - `PROVIDER_CONTEXT_WINDOW_EXCEEDED` (pre-send estimate over the window; not retried)
-  - `PROVIDER_USAGE_CAP` (the relay answered 429 with `x_cli_relay_error:"CLI_RELAY_USAGE_CAP"`)
+  - `PROVIDER_CONTEXT_WINDOW_EXCEEDED` (pre-send estimate over the window, or a relay's 413 `CLI_RELAY_CONTEXT_WINDOW_EXCEEDED`; not retried, thrown unwrapped — pre-flight fix F1)
+  - `PROVIDER_USAGE_CAP` (the relay answered 429 with `x_cli_relay_error:"CLI_RELAY_USAGE_CAP"`; not retried, delivered as the `cause` of `ProviderCallFailedError` — pre-flight ruling F11)
+  - `PROVIDER_THINKING_LEVEL_UNSUPPORTED` is also what a relay's 400 `CLI_RELAY_THINKING_LEVEL_UNSUPPORTED` maps to (unwrapped, not retried — F1)
 - `reportedReasoningTokens(rawUsage: unknown): number|null` reads `completion_tokens_details.reasoning_tokens`.
 - The call result gains `thinkingLevel?: string` and `reasoningTokens?: number|null`.
 - `recordCall` (budget) gains `attemptId`.
@@ -28709,6 +29817,8 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
   - `thinkingLevels`, `defaultThinkingLevel`, `contextWindowTokens`
   - the usage-cap classification → 429 `CLI_RELAY_USAGE_CAP`
   - it echoes `x_thinking_level`, and `completion_tokens_details.reasoning_tokens` when known.
+  - its window check counts the UTF-8 bytes of the request's message contents, exactly as `estimateWindowTokens` does (R1, pre-flight fix F1).
+  - a CLI's own length stop is answered 200 with `finish_reason: "length"` (`CliCompletion.finishReason`), a truncation for the gateway, never a relay failure (pre-flight fix F37).
 - **New `acceptance/agy-relay.ts`**
   - Exports `startAgyRelay`, `resolveAgyBinary`, `ACCEPTANCE_AGY_BINARY`, `GOOGLE_MAKER = "Google"`.
   - The model id is pinned via `--model`, and the level comes from the id suffix. `--mode plan --sandbox` is always passed; `--dangerously-skip-permissions` never is.
@@ -28717,31 +29827,35 @@ Seat-aware keys (Task P4) append `:seat:<main|runnerUp>`. The parser must ignore
   - Exports `startPiRelay`, `resolvePiBinary`, `ZAI_MAKER = "Z.AI"`, `PI_GLM_CONTEXT_WINDOW_TOKENS = 1_000_000` (pi's catalog for `glm-5.3-flash`: 1M context, 131.1K max output).
   - Passes `--mode json --no-tools --no-session --no-extensions --no-skills --no-context-files --system-prompt <engine system text> --thinking <level>`; since A12b also `--no-prompt-templates`, and the system text is `RELAY_MINIMAL_SYSTEM_PROMPT`.
   - The prompt goes through an `@file` written with mode 0600 and removed after the call.
-  - `PI_TELEMETRY=0`.
+  - `PI_TELEMETRY=0`. The relay never passes `ZAI_API_KEY` to the child: pi reads its own stored key (pre-flight ruling F37).
+  - pi's `stopReason: "length"` is relayed as a truncation (`finish_reason: "length"`), never as a failure (F37).
 - **Existing relays gain level flags:**
   - claude: `--effort`
   - codex: `-c model_reasoning_effort="<l>"`
   - grok: `--reasoning-effort`
 - **Lean calls (owner ruling 2026-09-26, D8, Task A12b):**
   - `relay-core.ts` exports `RELAY_MINIMAL_SYSTEM_PROMPT = "Follow the instructions in the user message exactly."`, the only system text a relay gives a CLI (never debate text).
-  - Every relay opens ONE private 0700 workspace at start (before its handshake) and removes it at stop; every call runs in a fresh EMPTY directory inside it.
+  - Scope (pre-flight ruling F23): the five DEBATE relays — claude, codex, grok, agy and pi. The Support relay `hermes` is out of scope (no debate role, never evaluated).
+  - Every debate relay opens ONE private 0700 workspace at start (before its handshake) and removes it at stop; every call runs in a fresh EMPTY directory inside it.
   - Flags: claude `--system-prompt <minimal>` (never `--bare`); codex `-c model_instructions_file="<0600 file in the workspace>"` plus one `--disable` per M5 feature (not `code_mode_host`); grok `--system-prompt-override <minimal>`, and `-m <selection>` when a model is selected (`-m grok-4.7` answers as `grok-4.7-build`); agy `--disable-slash-commands`; pi `--no-prompt-templates` and `--system-prompt <minimal>`.
-  - The engine's own messages stay in the transcript unchanged. Each relay logs its harness overhead once at start; informational, never a gate.
+  - The engine's own messages stay in the transcript unchanged. Each relay logs its harness overhead once at start; informational, never a gate. `relays:serve` repeats each line with the candidate's providerRef: `RELAY OVERHEAD <maker> <providerRef> …` (pre-flight fix F37).
 - **New `acceptance/relay-host.ts` + script `relays:serve`**
   - Starts one relay per entry of a candidates file `{candidates:[{providerRef, tool, modelId, thinkingLevels}]}`; since A12b a `grok` entry may add `modelSelection` (the id `-m` selects).
   - Writes an endpoints file (mode 0600): `{relays:[{providerRef, maker, tool, modelId, baseUrl, bearerToken, thinkingLevels, contextWindowTokens}]}`.
   - Runs until SIGTERM.
-- **New `acceptance/export-moment.ts` + script `moment:export`**: `--run <runId> --call-site-key <key> --out <file>`, or `--run <runId> --all --out-dir <dir>`.
-- **New `acceptance/replay-moment.ts` + script `moment:replay`**: `--endpoints <file> --jobs <jobs.jsonl> --out <results.jsonl>`. Each job is `{momentFile, providerRef, thinkingLevel}`.
+- **New `acceptance/export-moment.ts` + script `moment:export`**: `--run <runId> --call-site-key <key> --out <file>`, or `--run <runId> --all --out-dir <dir>`. With `--all`, each file is `<momentId>.<first 12 hex of sha256(callSiteKey)>.moment.json`, so two call sites that sent the same prompt never overwrite each other (pre-flight fix F26).
+- **New `acceptance/replay-moment.ts` + script `moment:replay`**: `--endpoints <file> --jobs <jobs.jsonl> --out <results.jsonl> --bound <maxAttempts>,<tokenCeiling>,<deadlineMs>`. Each job is `{momentFile, providerRef, thinkingLevel}`.
+  - `--bound` is required: no call records its bound, and the tool invents none. One batch = one role family, because `--bound` is one per-call bound and families differ (pre-flight fix F24).
   - It writes nothing to any database and calls the SAME builders as the runner.
-  - It is resumable: jobs already in the out file are skipped.
+  - It is resumable: jobs whose result in the out file is final are skipped. A `USAGE_CAP` or `TIMED_OUT` result is not final and is asked again on a rerun; a `USAGE_CAP` also stops the batch (`MOMENT_REPLAY_USAGE_CAP`) right after its result is written (pre-flight ruling F25).
 - **Both tools refuse in the HOSTED production runtime** (the runtime-environment guard).
 
 ##### Runner
 
 - `RunSeatBook`, built from the pinned `RoleAssignment`, or from `configuredMakers` when there is none, so behaviour is then identical to today.
 - `callSeat()` applies R3 and R4 and records `BackupSwitchRecord` plus a lifecycle event.
-- The attempt ceiling formula (`packages/register/src/index.ts` `computeStructuralCeilingBasis`) is refitted so that backups fit. The depth oracle is re-run.
+- The attempt ceiling formula (`packages/register/src/index.ts` `computeStructuralCeilingBasis`) takes `backupSequencesProvisioned` (0 or 1) from admission: 1 — `DR-184-v5`, one backup sequence per seat call — only when the pinned assignment has a runner-up; otherwise `DR-184-v4` exactly, as the owner ruled on 2026-09-05 (no padding). The receipt's shape is unchanged and names its formula (pre-flight ruling F17). The depth oracle is re-run.
+- On an assigned run, a FALLBACK `ANSWER_WRITER`/`ANSWER_CHECKER` seat defers to the sealed register refs, exactly as today (pre-flight ruling F18).
 - Synthesis roles are exported as `buildSynthesisRolePrompt` so replay can call them.
 
 ##### Register

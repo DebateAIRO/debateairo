@@ -80,7 +80,7 @@ The scorecard is a single JSON document. Its schema is published in the public r
 
 | Field | Contents |
 |---|---|
-| `scorecardVersion` | An integer that only ever increases. |
+| `scorecardVersion` | An integer that only ever increases, from 1 to 2 147 483 647 (it is stored in a PostgreSQL integer column; erratum E4). |
 | `createdAt` | Date of creation. |
 | `testSetVersion` | The frozen test set it was measured on. An opaque label; the test set itself is private. |
 | `engineCompatibility` | The range of engine versions this scorecard fits. |
@@ -93,9 +93,9 @@ The scorecard is a single JSON document. Its schema is published in the public r
 | `candidateId` | Identifier. |
 | `vendor` | The vendor. |
 | `modelId` | The exact, pinned model id. Never a "latest" alias. |
-| `thinkingLevel` | The vendor's own level name, or `DEFAULT_ONLY` when the level cannot be set. |
+| `thinkingLevel` | The vendor's own level name as one lower-case token (a letter, then up to 31 letters, digits, `_` or `-`), or `DEFAULT_ONLY` when the level cannot be set (erratum E3). |
 | `accessRoutes` | API and/or named subscription tools. |
-| `contextWindowTokens` | Optional. When present, the picker never assigns the candidate to a role whose typical input would not fit. |
+| `contextWindowTokens` | Optional; omitted means "no window declared" (erratum E2). When present, the picker never assigns the candidate to a role whose typical call — input, output and thinking tokens together — would not fit: the same wall the gateway applies to every call (erratum E5). |
 | `apiPrice` | Input and output price per million tokens, with the date and source. This is informational, for local users; see "Prices" below. |
 
 **Per role, per candidate**
@@ -104,7 +104,7 @@ The scorecard is a single JSON document. Its schema is published in the public r
 |---|---|
 | `tier` | `TOP`, `GOOD_VALUE`, `AVOID` or `UNTESTED`. |
 | `quality` | A score from 0 to 100 with a range (low, high). |
-| `qualityByLanguage` | Present only when the languages differ. |
+| `qualityByLanguage` | Optional: present only when the languages differ; omitted means none (erratum E2). |
 | `typicalCall` | Input tokens, output tokens, thinking tokens and seconds. |
 | `tags` | Each tag has a `code`, an evidence strength (`STRONG` or `WEAK`) and a one-line plain description. |
 | `promptVersion` | `standard` until piece 4 exists. |
@@ -198,7 +198,7 @@ This replaces the `PLAN_TIER_ROSTERS` filter in ask admission (`apps/api/src/ind
 ### 2.7 The runner uses the assignment, with a backup
 
 - The runner fills seats from the pinned assignment instead of "every roster model does every job".
-- If a main candidate fails its call attempts, or hits a subscription usage cap, the runner switches that seat to its backup. The served answer carries the mark `BACKUP_MODEL_USED`, next to the existing marks such as `DEGRADED-DIVERSITY`.
+- If a main candidate fails its call attempts, or hits a subscription usage cap, the runner switches that seat to its backup. The served answer carries the mark `BACKUP-MODEL-USED` (erratum E1), next to the existing marks such as `DEGRADED-DIVERSITY`.
 - If the backup also fails, today's behaviour applies: panel members are dropped with a record, and the synthesis roles refuse.
 
 ### 2.8 Scorecard loading
@@ -245,7 +245,7 @@ Relays for `agy` and `pi`, following the existing relay pattern:
 - the program-header guard;
 - deduced binaries.
 
-**Lean calls (owner ruling, 2026-09-26).** A call must carry only what the question needs, as a plain API call would, and nothing pre-loaded from the owner's computer, because extra input costs money. Every relay, old and new, therefore runs its tool in an empty private folder, with the leanest options measured for that tool, and replaces the tool's own system prompt with one fixed neutral sentence wherever the tool allows it; the engine's own messages are sent unchanged. What a tool still adds on its own (measured per call: grok about 18k tokens, agy about 13k, codex about 6.9k, Claude Code about 0.7k, pi about 0.08k) is logged once when each relay starts and disclosed in evaluator reports. Cost estimates never count it, and hosted API calls have none.
+**Lean calls (owner ruling, 2026-09-26).** A call must carry only what the question needs, as a plain API call would, and nothing pre-loaded from the owner's computer, because extra input costs money. Every debate relay, old and new (claude, codex, grok, agy and pi; the Support relay `hermes` is out of scope, erratum E6), therefore runs its tool in an empty private folder, with the leanest options measured for that tool, and replaces the tool's own system prompt with one fixed neutral sentence wherever the tool allows it; the engine's own messages are sent unchanged. What a tool still adds on its own (measured per call: grok about 18k tokens, agy about 13k, codex about 6.9k, Claude Code about 0.7k, pi about 0.08k) is logged once when each relay starts and disclosed in evaluator reports. Cost estimates never count it, and hosted API calls have none.
 
 Local mode needs them anyway ([two deployment modes](../../missions/2026-09-01-security-hardening/V-DECISIONS-PACKET.md), ruling V-9c).
 
@@ -257,7 +257,7 @@ Local mode needs them anyway ([two deployment modes](../../missions/2026-09-01-s
 | Scorecard invalid or incompatible | Refused. Keep the current one, or fall back to today's behaviour, with the reason logged. |
 | Candidate unreachable at admission | Skipped. The next candidate by the strength rule is chosen. |
 | No reachable candidate for a role | That role uses today's rule, with a warning. |
-| Main candidate fails or hits a cap mid-run | Backup takes over; the answer is marked `BACKUP_MODEL_USED`. |
+| Main candidate fails or hits a cap mid-run | Backup takes over; the answer is marked `BACKUP-MODEL-USED` (erratum E1). |
 | Backup fails too | Today's behaviour: drop with a record for panel seats, refuse for the synthesis roles. |
 | Estimate over the money ceiling | Step down one strength notch and tell the user; refuse if Economy does not fit either. |
 | Replay tool run in hosted production | Refuses. |
@@ -298,3 +298,14 @@ All engine tests use stand-in providers. No real model calls and no subscription
 - Which thinking levels each connection can set (Claude Code, Codex, Grok, Gemini and GLM tools; each vendor API).
 - Whether the engine knows a debate's language. If not, the picker uses the combined quality score.
 - **Hosted example hazard.** The hosted example vendors in `deploy/vps/register/hosted-register.example.json` use placeholder model ids that match no roster entry. Once the picker replaces the rosters, the example must list real candidate ids.
+
+## Errata (pre-flight scan of the implementation plan, 2026-09-27)
+
+These correct the text above to match the binding plan and the owner's rulings. Nothing here changes a decision.
+
+- **E1.** The mark is spelled `BACKUP-MODEL-USED`, following the house convention of `DEGRADED-DIVERSITY` (plan Appendix A, R6). `BACKUP_MODEL_USED` was a typo.
+- **E2.** `contextWindowTokens` and `qualityByLanguage` may be omitted from a scorecard file; an omitted one reads as null ("no window declared", "no per-language score").
+- **E3.** A candidate's `thinkingLevel` is one lower-case token or `DEFAULT_ONLY`, the same token the gateway sends and the ledger records, so a valid scorecard never names a level that cannot be seated.
+- **E4.** `scorecardVersion` fits a PostgreSQL integer (at most 2 147 483 647), because every call records it.
+- **E5.** The picker's window check counts a role's whole typical call (input, output and thinking tokens), because the gateway refuses a prompt whose size plus its answer bound exceeds the window, and a relay counts the same bytes as the gateway.
+- **E6.** Lean calls cover the five debate relays. The Support relay (`hermes`) plays no debate role and no scorecard evaluates it, so it keeps today's handshake and prompt.
