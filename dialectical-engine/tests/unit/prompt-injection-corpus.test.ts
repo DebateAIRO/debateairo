@@ -41,6 +41,18 @@ import {
   buildSupportDraftSummaryPrompt
 } from "../../apps/api/src/support/prompt.js";
 import { wirePacket } from "../support/framed-packet.js";
+import type { StoryBody } from "@debateai/contract";
+import {
+  buildStoryCheckerContract,
+  buildStoryMaterial,
+  buildStorytellerContract,
+  loadStoryPack,
+  resolveStoryPackDir,
+  toCheckerPromptMaterial,
+  toStoryPromptMaterial,
+  type StoryMaterial,
+  type StoryRunSnapshot
+} from "@debateai/story";
 
 /**
  * V-11 ADDENDUM, LAYER 4 — THE PERMANENT INJECTION SUITE.
@@ -308,6 +320,73 @@ function digestWith(statement: string): SynthesisDigest {
 }
 
 /**
+ * VERDICT STORY — the storyteller's and the checker's hand-offs. The story
+ * material is written by the asker and by models end to end, so the rows below
+ * drive each field a payload can arrive in: the asker's question, a maker's
+ * point, the checker's objection on a second draft, and the storyteller's own
+ * story as the checker reads it. The pack is the SHIPPED pack, read from the
+ * repository the way the runner reads it.
+ */
+const STORY_PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
+const STORY_SHAPE_IDS: ReadonlySet<string> = new Set(STORY_PACK.shapes.map((shape) => shape.id));
+
+function storyMaterialWith(input: { readonly question: string; readonly pointClaim: string }): StoryMaterial {
+  const point = (nodeId: string, claim: string, isPosition: boolean) => ({
+    nodeId, claim, isPosition, wayOfKnowing: "REASONING" as const, baseScore: 0.5, finalStrength: 0.5,
+    excludedReason: null, authorModel: "model:fixture", panelDispersion: 0.1, criticSummary: null
+  });
+  const snapshot: StoryRunSnapshot = {
+    runId: "run:injection-corpus",
+    workItemId: "work:injection-corpus",
+    answerId: "answer:injection-corpus",
+    answerVersion: 1,
+    questionLine: input.question,
+    compositionBudgetTier: "low",
+    verdictBasis: {
+      label: "CONTESTED", rung: 4, trigger: "MID_BAND", winner_node_id: "position:a", winner_strength: 0.61,
+      runner_up_node_id: "position:b", runner_up_strength: 0.4, margin: 0.21, disagreement: 0.1,
+      thresholds: { gamma: 0.05, high_cut: 0.7, low_cut: 0.35, disagreement: 0.25 }, confidence_band: null, marks: []
+    },
+    servedStatement: ["The debate leans towards funding the extension."],
+    nodes: [
+      point("position:a", "The city should fund the extension.", true),
+      point("position:b", "The city should not fund the extension.", true),
+      point("point:c", input.pointClaim, false)
+    ],
+    arrows: [{ sourceNodeId: "point:c", targetNodeId: "position:a", polarity: "support" }],
+    sensitivity: [{ removedNodeId: "point:c", leverage: 0.2 }],
+    setAside: []
+  };
+  const result = buildStoryMaterial({ snapshot, enrichment: new Map(), budgetBytes: 40_000, shapeIds: STORY_SHAPE_IDS });
+  if (result.kind !== "OK") throw new Error("the corpus story material must fit the low budget");
+  return result.material;
+}
+
+function storyCandidateWith(paragraph: string): StoryBody {
+  const section = (title: string, text: string) => ({ title, paragraphs: [{ text, node_refs: ["P3"] }] });
+  return {
+    shape_id: "general",
+    short: {
+      headline: "The debate leans towards funding the extension.",
+      summary: "Our reading of your question: whether the extension is worth its cost.",
+      paths: [
+        { position_ref: "P1", fate: "PARTLY_HELD", line: "Funding partly held.", node_refs: ["P1"] },
+        { position_ref: "P2", fate: "PARTLY_HELD", line: "Not funding partly held.", node_refs: ["P2"] }
+      ],
+      change: { text: "A ridership count would change it.", node_refs: ["P3"] }
+    },
+    long: {
+      sections: [
+        section("What you are really trying to decide", "Our reading of your question."),
+        section("The verdict in one paragraph", paragraph),
+        section("The paths explored", "Both paths partly held.")
+      ]
+    },
+    reviewer_note: null
+  };
+}
+
+/**
  * ONE ROW PER HAND-OFF where model-written or visitor-written text enters a
  * prompt. `render` returns the packets a call really produces, with `attack`
  * substituted for the piece of material that hand-off receives from another
@@ -541,6 +620,41 @@ const HAND_OFFS = [
       });
       return posted;
     }
+  },
+  {
+    name: "story:storyteller (question — the asker's text)",
+    payloadIn: "question",
+    render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
+      contract: buildStorytellerContract(STORY_PACK),
+      material: toStoryPromptMaterial(storyMaterialWith({ question: attack, pointClaim: CLEAN_STATEMENT }), null)
+    }).packet]
+  },
+  {
+    name: "story:storyteller (points — a maker's claim)",
+    payloadIn: "points",
+    render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
+      contract: buildStorytellerContract(STORY_PACK),
+      material: toStoryPromptMaterial(storyMaterialWith({ question: QUESTION, pointClaim: attack }), null)
+    }).packet]
+  },
+  {
+    name: "story:storyteller RETRY (prior_objection — the checker's own words)",
+    payloadIn: "prior_objection",
+    render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
+      contract: buildStorytellerContract(STORY_PACK),
+      material: toStoryPromptMaterial(storyMaterialWith({ question: QUESTION, pointClaim: CLEAN_STATEMENT }), attack)
+    }).packet]
+  },
+  {
+    name: "story:checker (candidate_story — the storyteller's output)",
+    payloadIn: "candidate_story",
+    render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
+      contract: buildStoryCheckerContract(STORY_PACK),
+      material: toCheckerPromptMaterial(
+        storyMaterialWith({ question: QUESTION, pointClaim: CLEAN_STATEMENT }),
+        storyCandidateWith(attack)
+      )
+    }).packet]
   }
 ] as const;
 
@@ -594,11 +708,15 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     //
     // FW-B: 14 -> 17 and 11 -> 13 distinct fields, with the support chat's three
     // (the answer, the case summary and the packet as the relay receives it).
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(17);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(13);
+    // Verdict story: 17 -> 21 and 13 -> 16, with the storyteller's three rows
+    // (question, points, prior_objection) and the checker's one (candidate_story).
+    // prior_objection is not new: the synthesizer's retry row already names it.
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(21);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(16);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("story:"))).toHaveLength(4);
   });
 
   it("drives the support contracts the API actually sends (SYNC3 / R1: the v2 JSON drafts)", async () => {
@@ -726,7 +844,7 @@ describe("V-11 layer 5 — the corpus is what the tripwire scan is calibrated ag
     // `ro-fence-forgery` (a forged boundary marker with a Romanian
     // end-of-evidence line). `ro-fake-system` is `flagged: TRUE` and was never
     // one of them. Every one of the four is CONTAINED by layer 1, which the
-    // rows above measured for all seventeen hand-offs. The scan is a flag on a
+    // rows above measured for all twenty-one hand-offs. The scan is a flag on a
     // step, never a filter, and this row exists so the difference cannot be
     // forgotten.
     const unflagged = INJECTION_CORPUS.filter((attack) => !attack.flagged);

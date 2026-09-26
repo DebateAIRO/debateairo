@@ -1,0 +1,610 @@
+import { STORY_BODY_LIMITS, type StoryBody, type StoryParagraph, type StoryVerdictBasis } from "@debateai/contract";
+import { TypedDomainError } from "@debateai/kernel";
+import type { FramedMaterialField } from "@debateai/providers";
+import type { StoryMaterialIndex } from "./validate.js";
+
+/**
+ * THE STORY MATERIAL (spec §5.2) — everything the storyteller and the checker
+ * read, built from the finished run and the database enrichment, and shrunk to
+ * the tier's byte budget by the spec's fixed ladder.
+ *
+ * The models never see a node id. Every node, before any shrinking, gets a
+ * short reference `P1` to `Pn`: the positions first (strongest first), then
+ * each position's tree depth-first, following the arrows in their recorded
+ * order. These are the story's canonical point numbers: the report's appendix
+ * and the site use the same ones (`pointNumbersFrom`), so a story that names
+ * "P3" in its prose points at appendix entry P3. `refMap` maps each reference
+ * back to its node id, and `restoreStoryRefs` turns the story's citations
+ * into node ids before it is stored.
+ *
+ * Everything in the material that a model or the asker wrote is EVIDENCE: it
+ * travels only inside the fence, one named field per piece, as JSON.
+ */
+
+export interface StorySnapshotNode {
+  readonly nodeId: string;
+  readonly claim: string;
+  readonly isPosition: boolean;
+  readonly wayOfKnowing: "LOOKED_UP" | "RAN" | "REASONING";
+  readonly baseScore: number | null;
+  readonly finalStrength: number | null;
+  readonly excludedReason: string | null;
+  readonly authorModel: string | null;
+  readonly panelDispersion: number | null;
+  readonly criticSummary: string | null;
+}
+
+/** An arrow onto an EDGE has `targetNodeId: null`; the story material drops it. */
+export interface StorySnapshotArrow {
+  readonly sourceNodeId: string;
+  readonly targetNodeId: string | null;
+  readonly polarity: "support" | "attack";
+}
+
+export interface StoryRunSnapshot {
+  readonly runId: string;
+  readonly workItemId: string;
+  readonly answerId: string;
+  readonly answerVersion: number;
+  readonly questionLine: string;
+  readonly compositionBudgetTier: "low" | "medium" | "high";
+  readonly verdictBasis: StoryVerdictBasis;
+  readonly servedStatement: readonly string[];
+  readonly nodes: readonly StorySnapshotNode[];
+  readonly arrows: readonly StorySnapshotArrow[];
+  readonly sensitivity: readonly { readonly removedNodeId: string; readonly leverage: number }[];
+  readonly setAside: readonly { readonly nodeId: string; readonly reason: string }[];
+}
+
+export interface StoryNodeEnrichment {
+  readonly judgeBestCase: string | null;
+  readonly judgeObjection: string | null;
+  readonly reviewOutcome: "agree" | "dispute" | "cannot-assess" | null;
+  readonly reviewReasons: readonly string[];
+  readonly dispersion: number | null;
+}
+
+/**
+ * The JSON the models read. The keys are the vocabulary `story-shapes/common.md`
+ * explains to the storyteller; a key is left out when nothing was recorded, or
+ * when the ladder dropped it to fit the budget.
+ */
+export interface StoryMaterialPosition {
+  readonly id: string;
+  readonly claim: string;
+  readonly author?: string;
+  readonly final?: number;
+  readonly won: boolean;
+}
+
+export interface StoryMaterialPoint {
+  readonly id: string;
+  readonly position?: true;
+  readonly supports?: readonly string[];
+  readonly attacks?: readonly string[];
+  readonly claim: string;
+  readonly known_by: "LOOKED_UP" | "RAN" | "REASONING";
+  readonly base?: number;
+  readonly final?: number;
+  readonly set_aside?: string;
+  readonly best_case?: string;
+  readonly objection?: string;
+  readonly review?: "agree" | "dispute" | "cannot-assess";
+  readonly review_reasons?: readonly string[];
+  readonly author?: string;
+  readonly judge_spread?: number;
+  readonly leverage?: number;
+}
+
+/**
+ * Points the last ladder step left out, counted per position by the polarity
+ * of the arrow that reached them. `position_ref` is null for points that reach
+ * no position (for example a point that argues about a relation between two
+ * points rather than about a point).
+ */
+export interface StoryMaterialOmitted {
+  readonly position_ref: string | null;
+  readonly supports: number;
+  readonly attacks: number;
+}
+
+export interface StoryMaterialVerdict {
+  readonly label: StoryVerdictBasis["label"];
+  readonly rule_in_words: string;
+  readonly rung: number;
+  readonly trigger: string;
+  readonly winner_id: string | null;
+  readonly winner_final: number;
+  readonly runner_up_id: string | null;
+  readonly runner_up_final: number | null;
+  readonly margin: number | null;
+  readonly disagreement: number | null;
+  readonly thresholds: {
+    readonly tie_margin: number;
+    readonly low_cut: number;
+    readonly high_cut: number;
+    readonly disagreement: number;
+  };
+  readonly confidence_band: string | null;
+  readonly marks: readonly string[];
+  readonly positions_argued: number;
+}
+
+export interface StoryMaterial {
+  readonly question: string;
+  readonly verdict: StoryMaterialVerdict;
+  readonly servedStatement: readonly string[];
+  readonly positions: readonly StoryMaterialPosition[];
+  readonly points: readonly StoryMaterialPoint[];
+  readonly hinges: readonly string[];
+  readonly setAside: readonly { readonly id: string; readonly reason: string }[];
+  readonly omitted: readonly StoryMaterialOmitted[];
+  /** UTF-8 bytes of every field's content (question through omitted). */
+  readonly bytes: number;
+}
+
+export type StoryMaterialResult =
+  | {
+    readonly kind: "OK";
+    readonly material: StoryMaterial;
+    readonly index: StoryMaterialIndex;
+    readonly refMap: ReadonlyMap<string, string>;
+    readonly compressionStep: number;
+  }
+  | { readonly kind: "TOO_LARGE"; readonly bytes: number; readonly budgetBytes: number };
+
+/** How many hinge references the material names (spec §5.2). */
+const STORY_HINGE_COUNT = 5;
+/** Ladder step 1 spares the judge texts of this many highest-leverage points. */
+const STORY_TOP_LEVERAGE = 10;
+/** Ladder steps 6 and 7 spare this many highest-leverage points. */
+const STORY_KEPT_LEVERAGE = 20;
+
+/**
+ * The shrink ladder, verbatim from spec §5.2, one `compressionStep` per row.
+ * Step 0 cuts nothing, and every later step keeps every earlier cut.
+ *   1    spec 1: judge texts outside the top-10 leverage are cut to 240 characters
+ *   2    spec 2: every judge text is cut to 240 characters
+ *   3-5  spec 3: claims are cut to 480, then 240, then 120 characters
+ *   6    spec 4: points outside the top-20 leverage lose their judge texts and review
+ *        reasons (the positions keep theirs: the story's path chapters are built on them)
+ *   7    spec 5: only the positions, their direct children, and the top-20 points with the
+ *        chain up to a position keep an entry; the rest become `omitted` counts
+ * A judge text is a point's best case, its strongest objection, and each review reason.
+ */
+interface StoryShrinkStep {
+  readonly outsideTopJudgeChars: number | null;
+  readonly judgeChars: number | null;
+  readonly claimChars: number | null;
+  readonly dropJudgeOutsideKept: boolean;
+  readonly keepOnlySpine: boolean;
+}
+const STORY_SHRINK_LADDER: readonly StoryShrinkStep[] = Object.freeze([
+  { outsideTopJudgeChars: null, judgeChars: null, claimChars: null, dropJudgeOutsideKept: false, keepOnlySpine: false },
+  { outsideTopJudgeChars: 240, judgeChars: null, claimChars: null, dropJudgeOutsideKept: false, keepOnlySpine: false },
+  { outsideTopJudgeChars: 240, judgeChars: 240, claimChars: null, dropJudgeOutsideKept: false, keepOnlySpine: false },
+  { outsideTopJudgeChars: 240, judgeChars: 240, claimChars: 480, dropJudgeOutsideKept: false, keepOnlySpine: false },
+  { outsideTopJudgeChars: 240, judgeChars: 240, claimChars: 240, dropJudgeOutsideKept: false, keepOnlySpine: false },
+  { outsideTopJudgeChars: 240, judgeChars: 240, claimChars: 120, dropJudgeOutsideKept: false, keepOnlySpine: false },
+  { outsideTopJudgeChars: 240, judgeChars: 240, claimChars: 120, dropJudgeOutsideKept: true, keepOnlySpine: false },
+  { outsideTopJudgeChars: 240, judgeChars: 240, claimChars: 120, dropJudgeOutsideKept: true, keepOnlySpine: true }
+]);
+
+function storyCompareIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/** Cut to `limit` characters (code points), the last one an ellipsis. */
+function storyClip(text: string, limit: number | null): string {
+  if (limit === null) return text;
+  const characters = Array.from(text);
+  return characters.length <= limit ? text : `${characters.slice(0, limit - 1).join("")}…`;
+}
+
+/** Scores travel at four decimals: exact enough to explain a rung, short enough for the budget. */
+function storyNumber(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function storyNumberWords(value: number | null): string {
+  return value === null ? "not measured" : String(storyNumber(value));
+}
+
+/** The rung and trigger `deriveVerdictLabel` recorded, in plain words. */
+function storyRuleInWords(basis: StoryVerdictBasis, positionsArgued: number): string {
+  const winner = storyNumberWords(basis.winner_strength);
+  const low = storyNumberWords(basis.thresholds.low_cut);
+  const high = storyNumberWords(basis.thresholds.high_cut);
+  const sentences: string[] = [];
+  if (positionsArgued <= 1 || basis.runner_up_node_id === null) {
+    sentences.push("Only one position was argued, so there is no runner-up and no margin between positions.");
+  }
+  if (basis.trigger === "BASIS_INCOMPLETE") {
+    const missing = [
+      ...(basis.margin === null ? ["the margin over a runner-up"] : []),
+      ...(basis.disagreement === null ? ["the judges' disagreement about the strongest position"] : [])
+    ];
+    sentences.push(
+      "The label is CONTESTED because part of what the rule needs could not be measured "
+        + `(${missing.length === 0 ? "part of its basis" : missing.join(" and ")}), `
+        + "and without it the rule cannot call the answer supported or unsupported."
+    );
+  } else if (basis.trigger === "BELOW_LOW_CUT") {
+    sentences.push(`The label is UNSUPPORTED because the strongest position finished at ${winner}, below the low cut of ${low}.`);
+  } else if (basis.trigger === "MARGIN_WITHIN_GAMMA") {
+    sentences.push(
+      `The label is CONTESTED because the strongest position (${winner}) led the runner-up `
+        + `(${storyNumberWords(basis.runner_up_strength)}) by only ${storyNumberWords(basis.margin)}, `
+        + `within the tie margin of ${storyNumberWords(basis.thresholds.gamma)}.`
+    );
+  } else if (basis.trigger === "DISAGREEMENT_AT_THRESHOLD") {
+    sentences.push(
+      "The label is CONTESTED because the judges' disagreement about the strongest position "
+        + `(${storyNumberWords(basis.disagreement)}) reached the disagreement threshold of `
+        + `${storyNumberWords(basis.thresholds.disagreement)}.`
+    );
+  } else if (basis.trigger === "AT_OR_ABOVE_HIGH_CUT") {
+    sentences.push(
+      `The label is SUPPORTED because the strongest position finished at ${winner}, at or above the high cut of ${high}, `
+        + "with a clear lead over any runner-up and judges who largely agreed."
+    );
+  } else if (basis.trigger === "MID_BAND") {
+    sentences.push(
+      `The label is CONTESTED because the strongest position finished at ${winner}, between the low cut of ${low} `
+        + `and the high cut of ${high}: better than unsupported, not strong enough to be supported.`
+    );
+  } else {
+    sentences.push(`The label is ${basis.label}; the rule that decided is recorded as ${basis.trigger}.`);
+  }
+  return sentences.join(" ");
+}
+
+function storyLeverageByNode(snapshot: StoryRunSnapshot, nodeIds: ReadonlySet<string>): ReadonlyMap<string, number> {
+  const leverage = new Map<string, number>();
+  for (const record of snapshot.sensitivity) {
+    if (!nodeIds.has(record.removedNodeId) || !Number.isFinite(record.leverage)) continue;
+    leverage.set(record.removedNodeId, Math.max(leverage.get(record.removedNodeId) ?? record.leverage, record.leverage));
+  }
+  return leverage;
+}
+
+interface StoryTreeEntry {
+  readonly parent: string;
+  readonly polarity: "support" | "attack";
+  readonly root: string;
+}
+
+interface StoryTree {
+  /** node id -> short reference, `P1` onwards. */
+  readonly refOf: ReadonlyMap<string, string>;
+  /** Every node a position reaches: the node it was reached through, the arrow's polarity, the position. */
+  readonly tree: ReadonlyMap<string, StoryTreeEntry>;
+  /** node id -> the node ids it supports and attacks (node-to-node arrows only, first recorded first). */
+  readonly links: ReadonlyMap<string, { readonly supports: readonly string[]; readonly attacks: readonly string[] }>;
+}
+
+/**
+ * Short references: the positions first, in the order the material lists them,
+ * then each position's tree depth-first, children in the order their arrows
+ * were recorded; nodes no position reaches come last, in snapshot order.
+ */
+function storyTreeOf(
+  snapshot: StoryRunSnapshot,
+  positionNodes: readonly StorySnapshotNode[],
+  nodeIds: ReadonlySet<string>
+): StoryTree {
+  const children = new Map<string, { readonly source: string; readonly polarity: "support" | "attack" }[]>();
+  const links = new Map<string, { readonly supports: string[]; readonly attacks: string[] }>();
+  for (const arrow of snapshot.arrows) {
+    // An arrow onto an edge, or onto a node outside this debate, links no two points of it.
+    if (arrow.targetNodeId === null || !nodeIds.has(arrow.sourceNodeId) || !nodeIds.has(arrow.targetNodeId)) continue;
+    const link = links.get(arrow.sourceNodeId) ?? { supports: [], attacks: [] };
+    const list = arrow.polarity === "support" ? link.supports : link.attacks;
+    if (list.includes(arrow.targetNodeId)) continue;
+    list.push(arrow.targetNodeId);
+    links.set(arrow.sourceNodeId, link);
+    const below = children.get(arrow.targetNodeId) ?? [];
+    below.push({ source: arrow.sourceNodeId, polarity: arrow.polarity });
+    children.set(arrow.targetNodeId, below);
+  }
+
+  const refOf = new Map<string, string>();
+  const tree = new Map<string, StoryTreeEntry>();
+  const assign = (nodeId: string): void => {
+    refOf.set(nodeId, `P${String(refOf.size + 1)}`);
+  };
+  for (const position of positionNodes) assign(position.nodeId);
+  for (const position of positionNodes) {
+    const stack = [...(children.get(position.nodeId) ?? [])].reverse()
+      .map((child) => ({ ...child, parent: position.nodeId }));
+    while (stack.length > 0) {
+      const next = stack.pop();
+      if (next === undefined || refOf.has(next.source)) continue;
+      assign(next.source);
+      tree.set(next.source, { parent: next.parent, polarity: next.polarity, root: position.nodeId });
+      const below = children.get(next.source) ?? [];
+      for (let index = below.length - 1; index >= 0; index -= 1) {
+        const child = below[index];
+        if (child !== undefined) stack.push({ ...child, parent: next.source });
+      }
+    }
+  }
+  for (const node of snapshot.nodes) {
+    if (!refOf.has(node.nodeId)) assign(node.nodeId);
+  }
+  return { refOf, tree, links };
+}
+
+type StoryMaterialCore = Omit<StoryMaterial, "bytes">;
+
+function storyCoreFields(core: StoryMaterialCore): FramedMaterialField[] {
+  return [
+    { name: "question", content: JSON.stringify(core.question) },
+    { name: "verdict", content: JSON.stringify(core.verdict) },
+    { name: "served_statement", content: JSON.stringify(core.servedStatement) },
+    { name: "positions", content: JSON.stringify(core.positions) },
+    { name: "points", content: JSON.stringify(core.points) },
+    { name: "hinges", content: JSON.stringify(core.hinges) },
+    { name: "set_aside", content: JSON.stringify(core.setAside) },
+    { name: "omitted", content: JSON.stringify(core.omitted) }
+  ];
+}
+
+function storyFieldBytes(fields: readonly FramedMaterialField[]): number {
+  return fields.reduce((total, field) => total + Buffer.byteLength(field.content, "utf8"), 0);
+}
+
+/**
+ * Build the material, shrinking it by the ladder until it fits `budgetBytes`.
+ * `compressionStep` is the ladder step that fitted (0 = nothing was cut).
+ * Throws only on an input no finished run can produce: no position at all, or
+ * a budget that is not a positive integer.
+ */
+export function buildStoryMaterial(input: {
+  readonly snapshot: StoryRunSnapshot;
+  readonly enrichment: ReadonlyMap<string, StoryNodeEnrichment>;
+  readonly budgetBytes: number;
+  readonly shapeIds: ReadonlySet<string>;
+}): StoryMaterialResult {
+  const { snapshot, enrichment, budgetBytes } = input;
+  if (!Number.isInteger(budgetBytes) || budgetBytes <= 0) {
+    throw new TypedDomainError("STORY_MATERIAL_BUDGET_INVALID", `A material budget is a positive whole number of bytes, not ${String(budgetBytes)}`);
+  }
+  const nodeIds = new Set(snapshot.nodes.map((node) => node.nodeId));
+  const positionNodes = snapshot.nodes
+    .filter((node) => node.isPosition)
+    .sort((left, right) => (right.finalStrength ?? -Infinity) - (left.finalStrength ?? -Infinity)
+      || storyCompareIds(left.nodeId, right.nodeId));
+  if (positionNodes.length === 0) {
+    throw new TypedDomainError("STORY_MATERIAL_NO_POSITION", `Run ${snapshot.runId} has no opening position to tell`);
+  }
+  const positionIds = new Set(positionNodes.map((node) => node.nodeId));
+  const { refOf, tree, links } = storyTreeOf(snapshot, positionNodes, nodeIds);
+  // Every node of the snapshot has a reference; nothing else is ever passed here.
+  const ref = (nodeId: string): string => refOf.get(nodeId) ?? "P0";
+  const refMap: ReadonlyMap<string, string> = new Map([...refOf.entries()].map(([nodeId, short]) => [short, nodeId]));
+  const nodesInRefOrder = [...snapshot.nodes]
+    .sort((left, right) => Number(ref(left.nodeId).slice(1)) - Number(ref(right.nodeId).slice(1)));
+
+  const leverage = storyLeverageByNode(snapshot, nodeIds);
+  const byLeverage = [...leverage.entries()]
+    .sort((left, right) => right[1] - left[1] || storyCompareIds(left[0], right[0]))
+    .map(([nodeId]) => nodeId);
+  const topLeverage = new Set(byLeverage.slice(0, STORY_TOP_LEVERAGE));
+  const keptLeverage = new Set(byLeverage.slice(0, STORY_KEPT_LEVERAGE));
+  const hinges = Object.freeze(byLeverage.slice(0, STORY_HINGE_COUNT).map(ref));
+
+  // Ladder step 7 keeps the spine: the positions, every point that argues with a
+  // position directly, and the top-20 points with the chain that carries each up
+  // to its position. A point with no arrow at all has no position to be counted
+  // under, so it keeps its entry too.
+  const spine = new Set<string>(positionIds);
+  for (const [source, link] of links) {
+    if ([...link.supports, ...link.attacks].some((target) => positionIds.has(target))) spine.add(source);
+  }
+  for (const nodeId of keptLeverage) {
+    let cursor: string | undefined = nodeId;
+    while (cursor !== undefined && !spine.has(cursor)) {
+      spine.add(cursor);
+      cursor = tree.get(cursor)?.parent;
+    }
+  }
+  const arrowSources = new Set(snapshot.arrows.map((arrow) => arrow.sourceNodeId));
+  for (const node of snapshot.nodes) {
+    if (!arrowSources.has(node.nodeId)) spine.add(node.nodeId);
+  }
+
+  const basis = snapshot.verdictBasis;
+  const verdict: StoryMaterialVerdict = Object.freeze({
+    label: basis.label,
+    rule_in_words: storyRuleInWords(basis, positionNodes.length),
+    rung: basis.rung,
+    trigger: basis.trigger,
+    winner_id: refOf.get(basis.winner_node_id) ?? null,
+    winner_final: storyNumber(basis.winner_strength),
+    runner_up_id: basis.runner_up_node_id === null ? null : refOf.get(basis.runner_up_node_id) ?? null,
+    runner_up_final: basis.runner_up_strength === null ? null : storyNumber(basis.runner_up_strength),
+    margin: basis.margin === null ? null : storyNumber(basis.margin),
+    disagreement: basis.disagreement === null ? null : storyNumber(basis.disagreement),
+    thresholds: Object.freeze({
+      tie_margin: basis.thresholds.gamma,
+      low_cut: basis.thresholds.low_cut,
+      high_cut: basis.thresholds.high_cut,
+      disagreement: basis.thresholds.disagreement
+    }),
+    confidence_band: basis.confidence_band,
+    marks: Object.freeze([...basis.marks]),
+    positions_argued: positionNodes.length
+  });
+
+  const materialAt = (step: StoryShrinkStep): { readonly material: StoryMaterial; readonly visible: ReadonlySet<string> } => {
+    const visible = new Set(nodesInRefOrder
+      .filter((node) => !step.keepOnlySpine || spine.has(node.nodeId))
+      .map((node) => node.nodeId));
+    const positions = positionNodes.map((node): StoryMaterialPosition => Object.freeze({
+      id: ref(node.nodeId),
+      claim: storyClip(node.claim, step.claimChars),
+      ...(node.authorModel === null ? {} : { author: node.authorModel }),
+      ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
+      won: node.nodeId === basis.winner_node_id
+    }));
+    const points = nodesInRefOrder.filter((node) => visible.has(node.nodeId)).map((node): StoryMaterialPoint => {
+      const judgeDropped = step.dropJudgeOutsideKept && !keptLeverage.has(node.nodeId) && !positionIds.has(node.nodeId);
+      const judgeChars = step.judgeChars ?? (topLeverage.has(node.nodeId) ? null : step.outsideTopJudgeChars);
+      const enriched = enrichment.get(node.nodeId);
+      const bestCase = judgeDropped ? null : enriched?.judgeBestCase ?? null;
+      const objection = judgeDropped ? null : enriched?.judgeObjection ?? node.criticSummary;
+      const reviewOutcome = enriched?.reviewOutcome ?? null;
+      const reviewReasons = judgeDropped ? [] : enriched?.reviewReasons ?? [];
+      const spread = enriched?.dispersion ?? node.panelDispersion;
+      const link = links.get(node.nodeId);
+      const supports = (link?.supports ?? []).filter((target) => visible.has(target)).map(ref);
+      const attacks = (link?.attacks ?? []).filter((target) => visible.has(target)).map(ref);
+      const nodeLeverage = leverage.get(node.nodeId);
+      return Object.freeze({
+        id: ref(node.nodeId),
+        ...(positionIds.has(node.nodeId) ? { position: true as const } : {}),
+        ...(supports.length === 0 ? {} : { supports: Object.freeze(supports) }),
+        ...(attacks.length === 0 ? {} : { attacks: Object.freeze(attacks) }),
+        claim: storyClip(node.claim, step.claimChars),
+        known_by: node.wayOfKnowing,
+        ...(node.baseScore === null ? {} : { base: storyNumber(node.baseScore) }),
+        ...(node.finalStrength === null ? {} : { final: storyNumber(node.finalStrength) }),
+        ...(node.excludedReason === null ? {} : { set_aside: node.excludedReason }),
+        ...(bestCase === null ? {} : { best_case: storyClip(bestCase, judgeChars) }),
+        ...(objection === null ? {} : { objection: storyClip(objection, judgeChars) }),
+        ...(reviewOutcome === null ? {} : { review: reviewOutcome }),
+        ...(reviewReasons.length === 0 ? {} : { review_reasons: Object.freeze(reviewReasons.map((reason) => storyClip(reason, judgeChars))) }),
+        ...(node.authorModel === null ? {} : { author: node.authorModel }),
+        ...(spread === null ? {} : { judge_spread: storyNumber(spread) }),
+        ...(nodeLeverage === undefined ? {} : { leverage: storyNumber(nodeLeverage) })
+      });
+    });
+
+    const omittedCounts = new Map<string | null, { supports: number; attacks: number }>();
+    for (const node of nodesInRefOrder) {
+      if (visible.has(node.nodeId)) continue;
+      const entry = tree.get(node.nodeId);
+      // Only points with an arrow can be left out, so the fallback is never taken.
+      const polarity = entry?.polarity
+        ?? snapshot.arrows.find((arrow) => arrow.sourceNodeId === node.nodeId)?.polarity
+        ?? "support";
+      const key = entry === undefined ? null : ref(entry.root);
+      const counts = omittedCounts.get(key) ?? { supports: 0, attacks: 0 };
+      if (polarity === "support") counts.supports += 1;
+      else counts.attacks += 1;
+      omittedCounts.set(key, counts);
+    }
+    const omittedKeys: (string | null)[] = [
+      ...positionNodes.map((node) => ref(node.nodeId)).filter((key) => omittedCounts.has(key)),
+      ...(omittedCounts.has(null) ? [null] : [])
+    ];
+    const omitted = omittedKeys.map((key): StoryMaterialOmitted => {
+      const counts = omittedCounts.get(key) ?? { supports: 0, attacks: 0 };
+      return Object.freeze({ position_ref: key, supports: counts.supports, attacks: counts.attacks });
+    });
+
+    const core: StoryMaterialCore = {
+      question: snapshot.questionLine,
+      verdict,
+      servedStatement: Object.freeze([...snapshot.servedStatement]),
+      positions: Object.freeze(positions),
+      points: Object.freeze(points),
+      hinges,
+      setAside: Object.freeze(snapshot.setAside
+        .filter((entry) => visible.has(entry.nodeId))
+        .map((entry) => Object.freeze({ id: ref(entry.nodeId), reason: entry.reason }))),
+      omitted: Object.freeze(omitted)
+    };
+    return { material: Object.freeze({ ...core, bytes: storyFieldBytes(storyCoreFields(core)) }), visible };
+  };
+
+  // The positions' references, strongest first: the order they were numbered and
+  // listed in, and the order the checks read "the strongest `pathCap`" from.
+  const positionOrder: readonly string[] = Object.freeze(positionNodes.map((node) => ref(node.nodeId)));
+  let lastBytes = 0;
+  for (const [step, shrink] of STORY_SHRINK_LADDER.entries()) {
+    const { material, visible } = materialAt(shrink);
+    if (material.bytes <= budgetBytes) {
+      return Object.freeze({
+        kind: "OK",
+        material,
+        index: Object.freeze({
+          nodeIds: new Set([...visible].map(ref)),
+          positionIds: new Set(positionOrder),
+          positionOrder,
+          shapeIds: input.shapeIds,
+          // The site shows at most this many path lines (spec §5.3); one cap, shared with the schema.
+          pathCap: STORY_BODY_LIMITS.maxPaths
+        }),
+        refMap,
+        compressionStep: step
+      });
+    }
+    lastBytes = material.bytes;
+  }
+  return Object.freeze({ kind: "TOO_LARGE", bytes: lastBytes, budgetBytes });
+}
+
+/**
+ * The canonical point numbers, node id -> `Pn`: what the report's appendix and
+ * the site print, so a "P3" in a story's prose finds its point.
+ */
+export function pointNumbersFrom(refMap: ReadonlyMap<string, string>): Readonly<Record<string, string>> {
+  return Object.freeze(Object.fromEntries([...refMap.entries()].map(([short, nodeId]) => [nodeId, short])));
+}
+
+/**
+ * The story with every cited reference (`position_ref`, `node_refs`) turned
+ * back into its node id, for storage. The prose is left exactly as written: a
+ * "P3" in a sentence stays "P3", which `pointNumbersFrom` resolves. A reference the material never offered is a programming error (the
+ * classifier refuses unknown references before a story gets here), so it
+ * throws, and names no model text.
+ */
+export function restoreStoryRefs(body: StoryBody, refMap: ReadonlyMap<string, string>): StoryBody {
+  const restore = (short: string): string => {
+    const nodeId = refMap.get(short);
+    if (nodeId === undefined) {
+      throw new TypedDomainError("STORY_REF_UNMAPPED", "The story cites a reference the material never offered");
+    }
+    return nodeId;
+  };
+  const paragraph = (entry: StoryParagraph): StoryParagraph => ({
+    text: entry.text,
+    node_refs: entry.node_refs.map(restore)
+  });
+  return {
+    shape_id: body.shape_id,
+    short: {
+      headline: body.short.headline,
+      summary: body.short.summary,
+      paths: body.short.paths.map((path) => ({
+        position_ref: restore(path.position_ref),
+        fate: path.fate,
+        line: path.line,
+        node_refs: path.node_refs.map(restore)
+      })),
+      change: paragraph(body.short.change)
+    },
+    long: {
+      sections: body.long.sections.map((section) => ({
+        title: section.title,
+        paragraphs: section.paragraphs.map(paragraph)
+      }))
+    },
+    reviewer_note: body.reviewer_note === null ? null : paragraph(body.reviewer_note)
+  };
+}
+
+/** The storyteller's fenced fields; `prior_objection` rides only on a second draft. */
+export function toStoryPromptMaterial(material: StoryMaterial, priorObjection: string | null): readonly FramedMaterialField[] {
+  const fields = storyCoreFields(material);
+  if (priorObjection !== null) fields.push({ name: "prior_objection", content: JSON.stringify(priorObjection) });
+  return Object.freeze(fields.map((field) => Object.freeze(field)));
+}
+
+/** The checker's fenced fields: the same material, plus the story it is checking. */
+export function toCheckerPromptMaterial(material: StoryMaterial, candidate: StoryBody): readonly FramedMaterialField[] {
+  const fields = [...storyCoreFields(material), { name: "candidate_story", content: JSON.stringify(candidate) }];
+  return Object.freeze(fields.map((field) => Object.freeze(field)));
+}

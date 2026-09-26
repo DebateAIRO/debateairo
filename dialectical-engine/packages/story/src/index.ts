@@ -25,3 +25,20 @@ export {
   type StoryCheckerVerdict,
   type StoryMaterialIndex
 } from "./validate.js";
+export {
+  buildStoryMaterial,
+  pointNumbersFrom,
+  restoreStoryRefs,
+  toCheckerPromptMaterial,
+  toStoryPromptMaterial,
+  type StoryMaterial,
+  type StoryMaterialOmitted,
+  type StoryMaterialPoint,
+  type StoryMaterialPosition,
+  type StoryMaterialResult,
+  type StoryMaterialVerdict,
+  type StoryNodeEnrichment,
+  type StoryRunSnapshot,
+  type StorySnapshotArrow,
+  type StorySnapshotNode
+} from "./material.js";
