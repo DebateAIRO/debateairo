@@ -8548,11 +8548,15 @@ a:focus-visible {
   padding: 10px 20px;
   cursor: pointer;
   list-style: none;
-  user-select: none;
 }
 .storyPanelSummary::-webkit-details-marker { display: none; }
+/* Hide/Show is decoration: the details element already exposes whether it is
+   open, so the alternative text after the slash keeps the word out of the
+   summary's accessible name. A browser without that syntax keeps the plain
+   declaration before it. */
 .storyPanelSummary::after {
   content: "Hide";
+  content: "Hide" / "";
   margin-left: auto;
   padding: 2px 10px;
   border: 1px solid var(--line-2);
@@ -8562,7 +8566,7 @@ a:focus-visible {
   font-weight: 600;
 }
 .storyPanelSummary:hover::after { border-color: var(--line-strong); color: var(--text); }
-.storyPanelDetails:not([open]) .storyPanelSummary::after { content: "Show"; }
+.storyPanelDetails:not([open]) .storyPanelSummary::after { content: "Show"; content: "Show" / ""; }
 .storyPanelSummary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .storyPanelEyebrow {
   color: var(--text-3);
@@ -8594,6 +8598,7 @@ a:focus-visible {
   color: var(--muted);
   font-family: var(--font-mono);
   font-size: 10px;
+  line-height: 1.5;
 }
 /* A soft shade at the top or bottom edge shows that more text is there to
    scroll to; the local covers hide it at either end. */
@@ -8654,7 +8659,7 @@ a:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
-  margin: 2px 0 0;
+  margin: 0;
 }
 .storyPanelDownload {
   display: inline-flex;

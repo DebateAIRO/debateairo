@@ -36,9 +36,10 @@ function StoryBodyView({ view }: { view: StoryView }): JSX.Element {
       </>
     );
   }
+  // The download comes first, above the story, so it shows without scrolling
+  // the bounded body, on a phone too.
   return (
     <>
-      <StoryShortBlocks story={view} className="storyPanelStory" headlineAs="h2" />
       {view.pdfHref === null ? null : (
         <p className="storyPanelActions">
           <a className="storyPanelDownload" href={view.pdfHref}>{DOWNLOAD_COPY}</a>
@@ -47,6 +48,7 @@ function StoryBodyView({ view }: { view: StoryView }): JSX.Element {
           )}
         </p>
       )}
+      <StoryShortBlocks story={view} className="storyPanelStory" headlineAs="h2" />
     </>
   );
 }
@@ -65,7 +67,7 @@ export function StoryPanel({ view }: { view: StoryView }): JSX.Element {
       <details className="storyPanelDetails" open>
         <summary className="storyPanelSummary">
           <span className="storyPanelEyebrow">{PANEL_TITLE}</span>
-          <span className="storyPanelLabel" data-verdict={view.labelWords.toLowerCase()}>{view.labelWords}</span>
+          <span className="storyPanelLabel" data-verdict={view.verdictState ?? "none"}>{view.labelWords}</span>
           {view.confidenceWords === null ? null : <span className="storyPanelConfidence">{view.confidenceWords}</span>}
         </summary>
         <div className="storyPanelBody">

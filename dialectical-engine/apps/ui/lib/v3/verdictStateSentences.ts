@@ -17,9 +17,11 @@ export const VERDICT_STATE_SENTENCES: Readonly<Record<LiveVerdictState, string |
 /**
  * D77 gives "supported" no sentence because the banner's band label already
  * says it. The story panel always shows a sentence under its label, so it uses
- * this one. It is true of the only rung that yields SUPPORTED (packages/serve
- * deriveVerdictLabel rung 3): the winner reached the high cut, its margin was
- * above the tie margin, and the judges' disagreement was below the threshold.
+ * this one, in plain words. It is true of the only rung that yields SUPPORTED
+ * (packages/serve deriveVerdictLabel rung 3): the winner reached the high cut
+ * ("came out strong"), its margin was above the tie margin gamma ("clearly
+ * ahead of the other positions"), and the judges' disagreement was below the
+ * threshold ("the judges broadly agreed").
  */
 export const STORY_SUPPORTED_SENTENCE =
-  "The leading position came out strong, stayed ahead of the others by more than the tie margin, and the judges broadly agreed.";
+  "The leading position came out strong, stayed clearly ahead of the other positions, and the judges broadly agreed.";

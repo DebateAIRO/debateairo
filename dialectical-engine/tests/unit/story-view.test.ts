@@ -95,8 +95,9 @@ describe("toStoryView (spec §10)", () => {
     const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID);
     expect(view.status).toBe("READY");
     expect(view.labelWords).toBe("Contested");
+    expect(view.verdictState).toBe("contested");
     expect(view.labelSentence).toBe(VERDICT_STATE_SENTENCES.contested);
-    expect(view.confidenceWords).toBe("Confidence: limited by the kind of evidence");
+    expect(view.confidenceWords).toBe("Confidence: capped, because too little of what the answer rests on was looked up in sources");
     expect(view.headline).toBe("Mutarea poate merita, dar nu dintr-odată: totul depinde de lucrul hibrid.");
     expect(view.paths.map((path) => [path.positionRef, path.fateWords])).toEqual([
       ["n-hybrid", "Held up"], ["n-yes", "Partly held"], ["n-not-now", "Fell"]
@@ -178,8 +179,21 @@ describe("toStoryView (spec §10)", () => {
     expect(storyLabelSentence("CONTESTED")).toBe(VERDICT_STATE_SENTENCES.contested);
     expect(storyLabelSentence(null)).toContain("without a verdict");
     expect(storyConfidenceWords(null)).toBeNull();
-    expect(storyConfidenceWords("FULL")).toBe("Confidence: not limited by the kind of evidence");
+    expect(storyConfidenceWords("FULL")).toBe("Confidence: full, because most of what the answer rests on was looked up in sources");
+    expect(storyConfidenceWords("CAPPED")).toBe("Confidence: capped, because too little of what the answer rests on was looked up in sources");
     expect(storyConfidenceWords("MODERATE")).toBe("Confidence: moderate");
+  });
+
+  it("keys the label's colour off the arithmetic state, never off the label's words", () => {
+    const state = (label: Answer["verdict_state"]) =>
+      toStoryView({ ...STORY_FIXTURE_ANSWER, verdict_state: label }, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID).verdictState;
+    expect([state("SUPPORTED"), state("CONTESTED"), state("UNSUPPORTED"), state(null)])
+      .toEqual(["supported", "contested", "unsupported", null]);
+  });
+
+  it("says SUPPORTED in plain words, with no engine term", () => {
+    expect(STORY_SUPPORTED_SENTENCE).toContain("clearly ahead of the other positions");
+    expect(STORY_SUPPORTED_SENTENCE).not.toMatch(/tie margin|gamma|threshold/u);
   });
 });
 
@@ -203,6 +217,12 @@ describe("story strip layout contract (globals.css)", () => {
   it("is never hidden at the tablet or phone breakpoints", () => {
     expect(block).not.toMatch(/\.storyPanel(?:Body|Details)?\s*\{[^}]*display:\s*none/);
     expect(css).not.toMatch(/section\.storyPanel\s*\{[^}]*display:\s*none/);
+  });
+
+  it("lets the reader select the summary text, and keeps Hide/Show out of its accessible name", () => {
+    expect(block).not.toMatch(/user-select:\s*none/u);
+    expect(block).toMatch(/\.storyPanelSummary::after \{[^}]*content: "Hide" \/ "";/u);
+    expect(block).toMatch(/\.storyPanelDetails:not\(\[open\]\) \.storyPanelSummary::after \{[^}]*content: "Show" \/ "";/u);
   });
 
   it("uses only design tokens for colour", () => {

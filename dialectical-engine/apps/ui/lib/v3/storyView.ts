@@ -1,4 +1,5 @@
 import type { Answer, AnswerStory } from "@debateai/contract";
+import type { LiveVerdictState } from "../types.js";
 import { liveVerdictState } from "./labels.js";
 import { STORY_FATE_WORDS, countStoryPositions, type StoryFateValue } from "./storyWords.js";
 import { STORY_SUPPORTED_SENTENCE, VERDICT_STATE_SENTENCES } from "./verdictStateSentences.js";
@@ -17,6 +18,8 @@ export interface StoryPathView {
 
 export interface StoryView {
   readonly status: AnswerStory["status"];
+  /** The arithmetic verdict state the label's colour is keyed off; null when the debate has no verdict. */
+  readonly verdictState: LiveVerdictState | null;
   readonly labelWords: string;
   readonly labelSentence: string;
   readonly confidenceWords: string | null;
@@ -65,13 +68,18 @@ export function storyLabelSentence(label: Answer["verdict_state"]): string {
 
 /**
  * The confidence band is the engine's own vocabulary (ENGINE_BAND_ORDER:
- * CAPPED, FULL). CAPPED means the mix of looked-up, run and reasoning-only
- * support held the band down; FULL means it did not.
+ * CAPPED, FULL). The band ceiling (packages/serve deriveBandCeiling, the
+ * wayOfKnowingCeiling register row) counts how each point the served answer
+ * cites is known: looked up in a source, run, or reasoning only. When
+ * reasoning-only points make up at least the row's share (half, in the seeded
+ * rows), or no cited point could be traced at all, the band is held down to
+ * CAPPED; otherwise it stays FULL, so most cited points were looked up (the
+ * "run" count is always 0 today). The words say that, in plain terms.
  */
 export function storyConfidenceWords(band: string | null): string | null {
   if (band === null) return null;
-  if (band === "FULL") return "Confidence: not limited by the kind of evidence";
-  if (band === "CAPPED") return "Confidence: limited by the kind of evidence";
+  if (band === "FULL") return "Confidence: full, because most of what the answer rests on was looked up in sources";
+  if (band === "CAPPED") return "Confidence: capped, because too little of what the answer rests on was looked up in sources";
   return `Confidence: ${band.toLowerCase()}`;
 }
 
@@ -85,6 +93,7 @@ export function toStoryView(answer: Answer, story: AnswerStory | null, debateId:
   const body = ready && story !== null ? story.story : null;
   const status: AnswerStory["status"] = ready && body === null ? "UNAVAILABLE" : requested;
   const label = {
+    verdictState: answer.verdict_state === null ? null : liveVerdictState(answer.verdict_state),
     labelWords: storyLabelWords(answer.verdict_state),
     labelSentence: storyLabelSentence(answer.verdict_state),
     confidenceWords: storyConfidenceWords(answer.confidence_band)

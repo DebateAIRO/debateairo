@@ -20,12 +20,16 @@ import { toStoryView } from "../lib/v3/storyView";
  * vendored fonts are inlined when they are present. The file needs no network
  * and runs no script.
  *
- * Usage (from apps/ui): pnpm run story:mock <output.html>
+ * Usage: pnpm --filter dialectical-engine-v2ui run story:mock <absolute path to the output .html>
+ * (pnpm runs the script from apps/ui, so a relative path is resolved from there).
  */
 
 const outputPath = process.argv[2];
 if (outputPath === undefined || outputPath.trim().length === 0) {
-  console.error("Usage: pnpm --filter dialectical-engine-v2ui run story:mock <output.html>");
+  console.error(
+    "Usage: pnpm --filter dialectical-engine-v2ui run story:mock <absolute path to the output .html> " +
+      "(a relative path is resolved from apps/ui)"
+  );
   process.exit(2);
 }
 

@@ -90,7 +90,7 @@ describe("public page short story (spec §10)", () => {
     const withNote = await render(STORY);
     expect(withNote.querySelector('.storyBox[data-box="note"]')).not.toBeNull();
     expect(withNote.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
-    expect(withNote.textContent).not.toContain("Our checker still had a reservation");
+    expect(withNote.textContent).not.toContain("Our checker's reservation");
     await act(async () => root!.unmount());
     root = null;
     document.body.replaceChildren();
@@ -127,7 +127,7 @@ describe("shared short-story blocks (StoryShortBlocks)", () => {
       <StoryShortBlocks story={{ ...CONTENT, reservation: "P7 comes from one source." }} className="ownerStory" />
     );
     expect(container.querySelector('.storyBox[data-box="reservation"]')?.textContent)
-      .toBe("Our checker's reservationOur checker still had a reservation: P7 comes from one source.");
+      .toBe("Our checker's reservationP7 comes from one source.");
   });
 
   it("shows no reservation box for a null or absent reservation", async () => {

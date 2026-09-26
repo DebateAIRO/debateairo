@@ -48,8 +48,23 @@ describe("StoryPanel (spec §10)", () => {
     expect(html).toContain("Download full report (PDF)");
     expect(html).toContain('data-ai-generated="true"');
     expect(html).toContain('<div class="storyPanelStory" data-ai-generated="true"><h2 class="storyHeadline">');
-    expect(html).not.toContain("Our checker still had a reservation:");
+    expect(html).not.toContain("Our checker&#x27;s reservation");
     expect(html).not.toContain(POINT_NUMBER_NOTE);
+  });
+
+  it("puts the download above the story, where it shows without scrolling", () => {
+    const html = markup(storyFixture("READY"));
+    const download = html.indexOf('<p class="storyPanelActions">');
+    expect(download).toBeGreaterThan(html.indexOf('<p class="storyPanelSentence">'));
+    expect(download).toBeLessThan(html.indexOf('<div class="storyPanelStory"'));
+  });
+
+  it("colours the label from the arithmetic state, whatever the label's words say", () => {
+    const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID);
+    const html = renderToStaticMarkup(<StoryPanel view={{ ...view, labelWords: "Disputed" }} />);
+    expect(html).toContain('<span class="storyPanelLabel" data-verdict="contested">Disputed</span>');
+    const none = markup(storyFixture("READY"), { ...STORY_FIXTURE_ANSWER, verdict_state: null });
+    expect(none).toContain('<span class="storyPanelLabel" data-verdict="none">No verdict</span>');
   });
 
   it("is a plain section, never a section.card the debate view clips", () => {
@@ -59,8 +74,9 @@ describe("StoryPanel (spec §10)", () => {
   it("READY_WITH_RESERVATION: adds the checker's reservation box", () => {
     const html = markup(storyFixture("READY_WITH_RESERVATION"));
     expect(html).toContain('data-story-status="READY_WITH_RESERVATION"');
-    expect(html).toContain("Our checker still had a reservation:");
+    expect(html).toContain('<span class="storyBoxTitle">Our checker&#x27;s reservation</span><p>Rezumatul prezintă');
     expect(html).toContain("o singură comparație de anunțuri");
+    expect(html).not.toContain("still had a reservation");
   });
 
   it("READY_WITH_RESERVATION: says where the reservation's point numbers are explained, beside the PDF link", () => {
@@ -72,7 +88,7 @@ describe("StoryPanel (spec §10)", () => {
   it("leaves the point-number note out when the reservation names no point number", () => {
     const story = { ...storyFixture("READY_WITH_RESERVATION"), reservation: "Cifra de 30% vine dintr-o singură comparație." };
     const html = markup(story);
-    expect(html).toContain("Our checker still had a reservation:");
+    expect(html).toContain("Our checker&#x27;s reservation");
     expect(actions(html)).toContain("Download full report (PDF)");
     expect(html).not.toContain(POINT_NUMBER_NOTE);
   });

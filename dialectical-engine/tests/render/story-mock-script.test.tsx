@@ -39,5 +39,7 @@ describe("the owner's story mock (look first, then wire)", () => {
     });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("Usage:");
+    expect(result.stderr).toContain("<absolute path to the output .html>");
+    expect(result.stderr).toContain("a relative path is resolved from apps/ui");
   }, 125_000);
 });
