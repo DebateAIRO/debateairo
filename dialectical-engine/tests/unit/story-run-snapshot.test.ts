@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderGateway } from "@debateai/providers";
+import type { StoryStepLease } from "@debateai/story";
 import { buildStoryRunSnapshot, type StorySnapshotSource } from "../../apps/runner/src/story-snapshot.js";
 
 /**
@@ -13,6 +14,7 @@ const FROZEN = "33333333-3333-4333-8333-333333333333";
 const ARROW_CHILD = "44444444-4444-4444-8444-444444444444";
 const ARROW_FROZEN = "55555555-5555-4555-8555-555555555555";
 const provider: ProviderGateway = { call: async () => { throw new Error("unused"); } };
+const stepLease: StoryStepLease = (use) => use();
 const UUID_SHAPED = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu;
 /** What the story reads for a frozen branch: the runner's own reason names node ids, so it is replaced. */
 const FROZEN_REASON = "BRANCH-FROZEN-LOW-LEVERAGE: Adaptive stopping froze this branch: its leverage on the positions "
@@ -75,7 +77,8 @@ function source(): StorySnapshotSource {
         reason: "MONO_MAKER_RUN", affectedNodeIds: [ROOT]
       }
     ],
-    resolveProvider: (roleRef) => (roleRef === "provider:a" ? { provider, providerRef: roleRef } : null)
+    resolveProvider: (roleRef) => (roleRef === "provider:a" ? { provider, providerRef: roleRef } : null),
+    stepLease
   };
 }
 
@@ -185,8 +188,10 @@ describe("buildStoryRunSnapshot", () => {
     expect(snapshot.sensitivity).toEqual([{ removedNodeId: ROOT, leverage: 0.5 }]);
   });
 
-  it("carries each node's judge artifact and the run's own role resolver", () => {
+  it("carries each node's judge artifact, the run's own role resolver and its step lease", () => {
     const snapshot = buildStoryRunSnapshot(source());
+    // The story runs after the run's lease; each of its steps takes this one.
+    expect(snapshot.stepLease).toBe(stepLease);
     expect([...snapshot.judgeArtifactRefs]).toEqual([
       [ROOT, "artifact-root"], [CHILD, "artifact-child"], [FROZEN, "artifact-frozen"]
     ]);

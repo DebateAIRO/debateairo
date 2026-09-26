@@ -60,8 +60,11 @@ export {
 export { readStoryEnrichment } from "./enrichment.js";
 export {
   StoryWriter,
+  withoutStoryNodeIds,
   type StoryRecordSink,
   type StoryRoleResolver,
+  type StorySnapshotFailure,
+  type StoryStepLease,
   type StoryWriteInput,
   type StoryWriterDependencies
 } from "./writer.js";

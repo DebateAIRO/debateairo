@@ -24,18 +24,24 @@ import {
   restoreStoryRefs,
   toCheckerPromptMaterial,
   toStoryPromptMaterial,
+  type StoryNodeEnrichment,
   type StoryRunSnapshot
 } from "./material.js";
 import type { StoryPack } from "./pack.js";
-import { StoryRepository, type StoryRecordInput } from "./repository.js";
+import { StoryRepository, isPrivateContentErased, type StoryRecordInput } from "./repository.js";
 import { classifyCheckerContent, classifyStoryContent, parseCheckerVerdict, parseStoryBody } from "./validate.js";
 
 /**
- * THE VERDICT STORY WRITER (spec §3, §3.1). The runner calls it once, straight
- * after the work item is settled, still inside the run's content lease. It
- * checks readiness, reads the database material, builds the material, runs the
- * write-and-check loop on the story lane, and stores ONE row. Whatever happens —
- * a provider, the database, a defect in this file — it NEVER rejects: a thrown
+ * THE VERDICT STORY WRITER (spec §3, §3.1). The runner calls it once, after the
+ * work item is settled and AFTER the run's content lease is released (spec §3,
+ * amended). It checks readiness, reads the database material, builds the
+ * material, runs the write-and-check loop on the story lane, and stores ONE
+ * row. Each step that touches the run's private content — the enrichment read,
+ * each provider call, the insert — takes its own short lease (`stepLease`), so
+ * a user's erasure is never held up for the length of a story: an erasure
+ * between two steps makes the next one fail PRIVATE_CONTENT_ERASED, and the
+ * story ends FAILED, or RUN_ERASED at the insert. Whatever happens — a
+ * provider, the database, a defect in this file — it NEVER rejects: a thrown
  * error there would reach the Hatchet handler's failure path and be recorded
  * against a work item that is already DONE.
  */
@@ -73,14 +79,33 @@ export interface StoryWriterDependencies {
 }
 
 /**
+ * One story step under the run's content lease. The runner's is its disclosure
+ * lease — the run AND its memory-linked prior run, exactly the runs the debate
+ * held — taken afresh for each step on the runner's own pool, so every store and
+ * gateway inside it borrows the lease rather than taking a second one.
+ */
+export type StoryStepLease = <T>(use: () => Promise<T>) => Promise<T>;
+
+/**
  * The runner's snapshot, plus each node's judge artifact and, optionally, the
- * run's OWN role resolver (its claim-eligible providers), which outranks the
- * boot-time one.
+ * run's OWN role resolver (its claim-eligible providers), which REPLACES the
+ * boot-time one for that run, and the step lease. With no step lease each step
+ * runs bare, and each store and gateway takes its own lease on the run.
  */
 export type StoryWriteInput = StoryRunSnapshot & {
   readonly judgeArtifactRefs: ReadonlyMap<string, string>;
   readonly resolveProvider?: StoryRoleResolver;
+  readonly stepLease?: StoryStepLease;
 };
+
+/** What the runner reports when it could not even build the snapshot. */
+export interface StorySnapshotFailure {
+  readonly answerId: string;
+  readonly answerVersion: number;
+  readonly error: unknown;
+}
+
+const BARE_STEP: StoryStepLease = (use) => use();
 
 /** The story's two call sites and the named role each one carries (the gateway checks the pair). */
 type StoryCallSite = "STORYTELLER" | "CHECKER";
@@ -93,10 +118,40 @@ function isStoryPack(pack: StoryPack | { readonly error: string }): pack is Stor
   return typeof pack === "object" && pack !== null && !("error" in pack);
 }
 
+/** A class name that can travel in a log line: a code shape, never a sentence. */
+const LOG_ERROR_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/u;
+
+/** A thrown value as a log code: its typed code, a database code, or its class name; never its message. */
 function codeOf(error: unknown): string {
   if (error instanceof TypedDomainError) return error.code;
   const code = typeof error === "object" && error !== null ? (error as { readonly code?: unknown }).code : undefined;
-  return typeof code === "string" && /^[0-9A-Z_]{1,64}$/u.test(code) ? `DATABASE:${code}` : "UNTYPED";
+  if (typeof code === "string" && /^[0-9A-Z_]{1,64}$/u.test(code)) return `DATABASE:${code}`;
+  return error instanceof Error && LOG_ERROR_NAME.test(error.name) ? error.name : "UNTYPED";
+}
+
+/** Any id shaped like a node's, in any letter case. */
+const STORY_NODE_ID_TEXT = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
+
+/**
+ * Free text with every node-id-shaped run replaced by "(a point)". The models
+ * read points only as P1…Pn, so no free text handed to them may carry an id:
+ * the runner applies this to its snapshot's texts, the writer to the judges'
+ * and reviewers' texts it reads from the database.
+ */
+export function withoutStoryNodeIds(text: string): string {
+  return text.replace(STORY_NODE_ID_TEXT, "(a point)");
+}
+
+/** The database's judge and review texts, cleared of node ids before they enter the material. */
+function enrichmentWithoutNodeIds(
+  enrichment: ReadonlyMap<string, StoryNodeEnrichment>
+): ReadonlyMap<string, StoryNodeEnrichment> {
+  return new Map([...enrichment].map(([nodeId, entry]) => [nodeId, Object.freeze({
+    ...entry,
+    judgeBestCase: entry.judgeBestCase === null ? null : withoutStoryNodeIds(entry.judgeBestCase),
+    judgeObjection: entry.judgeObjection === null ? null : withoutStoryNodeIds(entry.judgeObjection),
+    reviewReasons: Object.freeze(entry.reviewReasons.map(withoutStoryNodeIds))
+  })] as const));
 }
 
 function lineageOf(result: ProviderCallResult, providerRef: string): MakerLineage {
@@ -241,45 +296,64 @@ export class StoryWriter {
 
   async writeAfterSettle(input: StoryWriteInput): Promise<void> {
     try {
-      await this.#store(await this.#compose(input));
+      await this.#store(await this.#compose(input), input.stepLease ?? BARE_STEP);
       return;
     } catch (error) {
-      this.#log("STORY_WRITE_FAILED", { ...this.#idsOf(input), code: codeOf(error) });
+      this.#log("STORY_WRITE_FAILED", () => ({
+        answerId: input.answerId, answerVersion: input.answerVersion, code: codeOf(error)
+      }));
     }
     try {
       const pack = isStoryPack(this.#deps.pack) ? this.#deps.pack : null;
-      await this.#store(fallbackRecord(input, pack));
+      await this.#store(fallbackRecord(input, pack), input.stepLease ?? BARE_STEP);
     } catch (secondError) {
-      this.#log("STORY_FAILURE_NOT_RECORDED", { ...this.#idsOf(input), code: codeOf(secondError) });
+      this.#log("STORY_FAILURE_NOT_RECORDED", () => ({
+        answerId: input.answerId, answerVersion: input.answerVersion, code: codeOf(secondError)
+      }));
     }
   }
 
-  /** The answer's ids for a log line; reading them can never throw out of the writer. */
-  #idsOf(input: StoryWriteInput): Record<string, unknown> {
-    try {
-      return { answerId: input.answerId, answerVersion: input.answerVersion };
-    } catch {
-      return {};
-    }
+  /**
+   * The runner could not build the snapshot, so there is no story to write:
+   * say so by code or class name, never by message. Never throws.
+   */
+  reportSnapshotFailure(failure: StorySnapshotFailure): void {
+    this.#log("STORY_SNAPSHOT_FAILED", () => ({
+      answerId: failure.answerId, answerVersion: failure.answerVersion, code: codeOf(failure.error)
+    }));
   }
 
-  #log(event: string, detail: Record<string, unknown>): void {
+  /**
+   * The detail is built INSIDE the guard, so reading an error's code cannot
+   * throw out of the writer, and an async sink's rejection is caught here, so it
+   * can never become an unhandled rejection.
+   */
+  #log(event: string, detail: () => Record<string, unknown>): void {
     try {
-      this.#deps.log(event, detail);
+      const returned: unknown = this.#deps.log(event, detail());
+      void Promise.resolve(returned).catch(() => undefined);
     } catch {
       // A failing log sink never costs the caller anything.
     }
   }
 
-  async #store(record: StoryRecordInput): Promise<void> {
-    const stored = await this.#repository.insert(record);
-    this.#log("STORY_STORED", {
+  async #store(record: StoryRecordInput, stepLease: StoryStepLease): Promise<void> {
+    let stored: "INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED";
+    try {
+      stored = await stepLease(() => this.#repository.insert(record));
+    } catch (error) {
+      // An erasure that landed before this step: the step's own lease refuses,
+      // and an erased run has nothing left to tell.
+      if (!isPrivateContentErased(error)) throw error;
+      stored = "RUN_ERASED";
+    }
+    this.#log("STORY_STORED", () => ({
       answerId: record.answerId,
       answerVersion: record.answerVersion,
       outcome: record.outcome,
       failureCode: record.failureCode,
       stored
-    });
+    }));
   }
 
   async #compose(input: StoryWriteInput): Promise<StoryRecordInput> {
@@ -313,25 +387,27 @@ export class StoryWriter {
       sensitivity: input.sensitivity,
       setAside: input.setAside
     };
-    // Awaited here, inside the runner's lease, on the runner's own pool: the
-    // reader borrows that lease rather than taking a second one.
-    const enrichment = await (this.#deps.readEnrichment ?? readStoryEnrichment)(this.#deps.pool, {
+    const stepLease = input.stepLease ?? BARE_STEP;
+    const readEnrichment = this.#deps.readEnrichment ?? readStoryEnrichment;
+    // Awaited INSIDE its own step lease, on the runner's own pool: the reader
+    // borrows that lease rather than taking a second one.
+    const enrichment = await stepLease(() => readEnrichment(this.#deps.pool, {
       runId: input.runId,
       nodes: input.nodes.map((node) => ({
         nodeId: node.nodeId,
         judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null
       }))
-    });
+    }));
     const built = buildStoryMaterial({
       snapshot,
-      enrichment,
+      enrichment: enrichmentWithoutNodeIds(enrichment),
       budgetBytes: policy.materialBudget[input.compositionBudgetTier],
       shapeIds: new Set(pack.shapes.map((shape) => shape.id))
     });
     if (built.kind === "TOO_LARGE") {
-      this.#log("STORY_MATERIAL_TOO_LARGE", {
+      this.#log("STORY_MATERIAL_TOO_LARGE", () => ({
         answerId: input.answerId, bytes: built.bytes, budgetBytes: built.budgetBytes
-      });
+      }));
       return failedRecord(input, "STORY_MATERIAL_TOO_LARGE", pack);
     }
 
@@ -352,7 +428,7 @@ export class StoryWriter {
           material: toStoryPromptMaterial(built.material, priorObjection),
           classifyContent: (content) => classifyStoryContent(content, built.index)
         });
-        const result = await storyteller.provider.call(request);
+        const result = await stepLease(() => storyteller.provider.call(request));
         // Short refs on purpose: the checker judges this body against the SAME
         // material the storyteller read. Real ids are restored only for storage.
         const body: StoryBody = parseStoryBody(result.content, built.index);
@@ -375,7 +451,7 @@ export class StoryWriter {
           material: toCheckerPromptMaterial(built.material, candidate),
           classifyContent: (content) => classifyCheckerContent(content)
         });
-        const result = await checker.provider.call(request);
+        const result = await stepLease(() => checker.provider.call(request));
         return {
           artifactRef: result.rawArtifactRef,
           callSiteKey: request.callSiteKey,
@@ -386,21 +462,22 @@ export class StoryWriter {
     });
     // Why a story failed, or why an earlier draft is the one served: codes only.
     if (outcome.outcome === "FAILED") {
-      this.#log("STORY_LOOP_FAILED", {
+      this.#log("STORY_LOOP_FAILED", () => ({
         answerId: input.answerId,
         answerVersion: input.answerVersion,
         failureCode: outcome.failureCode,
         cause: outcome.cause,
         rounds: outcome.rounds.length
-      });
+      }));
     } else if (outcome.laterFailure !== null) {
-      this.#log("STORY_LATER_ROUND_FAILED", {
+      const laterFailure = outcome.laterFailure;
+      this.#log("STORY_LATER_ROUND_FAILED", () => ({
         answerId: input.answerId,
         answerVersion: input.answerVersion,
         servedRound: outcome.servedRound,
-        failureCode: outcome.laterFailure.failureCode,
-        cause: outcome.laterFailure.cause
-      });
+        failureCode: laterFailure.failureCode,
+        cause: laterFailure.cause
+      }));
     }
     return recordFromOutcome(input, pack, outcome, built.refMap);
   }

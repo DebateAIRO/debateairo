@@ -1,11 +1,18 @@
 import type { CompositionBudgetTier, WayOfKnowing } from "@debateai/kernel";
-import type { StoryRoleResolver, StoryWriteInput } from "@debateai/story";
+import {
+  withoutStoryNodeIds,
+  type StoryRoleResolver,
+  type StoryStepLease,
+  type StoryWriteInput
+} from "@debateai/story";
 
 /**
  * VERDICT STORY — the runner's in-memory material, projected for the story at
- * the post-settle hook (spec §3.1 step 1). Pure and total: it throws nowhere,
- * because the hook runs after the work item is DONE and nothing that fails
- * there may reach the Hatchet failure path. (The hook guards it anyway.)
+ * the post-settle hook (spec §3.1 step 1). Built INSIDE the run's content lease,
+ * where the material lives; the story itself runs after that lease, under the
+ * step lease this snapshot carries. Pure and total: it throws nowhere, because
+ * the hook runs after the work item is DONE and nothing that fails there may
+ * reach the Hatchet failure path. (The hook guards it anyway.)
  *
  * Structural input on purpose: the authored-node record is a type local to
  * `execute`, and this module states only the members the story reads.
@@ -31,14 +38,8 @@ const STORY_REASON_BY_MARK: ReadonlyMap<string, string> = new Map([[
   "Adaptive stopping froze this branch: its leverage on the positions was below the sealed branch-freeze "
     + "threshold, so nothing was expanded beneath it"
 ]]);
-/** Any id shaped like a node's, in any letter case. */
-const NODE_ID_TEXT = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
-const NODE_ID_STAND_IN = "(a point)";
-
 /** Free text with every node-id-shaped run replaced: the safety net under every field below. */
-function withoutNodeIds(text: string): string {
-  return text.replace(NODE_ID_TEXT, NODE_ID_STAND_IN);
-}
+const withoutNodeIds = withoutStoryNodeIds;
 
 function storyReason(record: { readonly mark: string; readonly reason: string }): string {
   return withoutNodeIds(`${record.mark}: ${STORY_REASON_BY_MARK.get(record.mark) ?? record.reason}`);
@@ -104,6 +105,8 @@ export interface StorySnapshotSource {
     readonly affectedNodeIds: readonly string[];
   }[];
   readonly resolveProvider: StoryRoleResolver;
+  /** One story step under the run's disclosure lease (the story runs after the run's own lease). */
+  readonly stepLease: StoryStepLease;
 }
 
 /**
@@ -181,6 +184,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
       .filter((record) => SET_ASIDE_MARKS.has(record.mark))
       .map((record) => Object.freeze({ nodeId: record.subjectRef, reason: storyReason(record) }))),
     judgeArtifactRefs: new Map(source.authored.map((node) => [node.nodeId, node.provenanceRef] as const)),
-    resolveProvider: source.resolveProvider
+    resolveProvider: source.resolveProvider,
+    stepLease: source.stepLease
   });
 }

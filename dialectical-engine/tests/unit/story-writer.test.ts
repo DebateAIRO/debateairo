@@ -17,7 +17,9 @@ import {
   loadStoryPack,
   resolveStoryPackDir,
   storyContractHash,
+  type StoryNodeEnrichment,
   type StoryRecordInput,
+  type StoryStepLease,
   type StoryWriteInput,
   type StoryWriterDependencies
 } from "@debateai/story";
@@ -508,5 +510,196 @@ describe("StoryWriter — never rejects", () => {
     const { writer, events } = harness({ policy: null, repository: { insert: async () => "RUN_ERASED" as const } });
     await expect(writer.writeAfterSettle(SNAPSHOT)).resolves.toBeUndefined();
     expect(events).toEqual(["STORY_STORED"]);
+  });
+});
+
+/**
+ * Fix round 1 (spec §3, amended): the story runs AFTER the run's lease, and each
+ * step — the enrichment read, each provider call, the insert — takes its own
+ * short lease. `erasedFrom` makes the lease refuse from its Nth entry on, as the
+ * real lease does once an erasure has landed between two steps.
+ */
+function steppedLease(erasedFrom: number | null = null) {
+  let entries = 0;
+  let held = false;
+  const lease: StoryStepLease = async (use) => {
+    entries += 1;
+    if (erasedFrom !== null && entries >= erasedFrom) {
+      throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
+    }
+    held = true;
+    try {
+      return await use();
+    } finally {
+      held = false;
+    }
+  };
+  return { lease, entries: () => entries, held: () => held };
+}
+
+describe("StoryWriter — one short lease per step, never the whole story", () => {
+  it("runs the enrichment read, each provider call and the insert each inside its own lease", async () => {
+    const stepped = steppedLease();
+    const outside: string[] = [];
+    const { provider, calls } = scripted((request) => {
+      if (!stepped.held()) outside.push(request.callSiteKey);
+      return byContract(request);
+    });
+    const inserted: StoryRecordInput[] = [];
+    const { writer } = harness({
+      ...providing(provider),
+      readEnrichment: async () => {
+        if (!stepped.held()) outside.push("enrichment");
+        return new Map();
+      },
+      repository: {
+        insert: async (record) => {
+          if (!stepped.held()) outside.push("insert");
+          inserted.push(record);
+          return "INSERTED";
+        }
+      }
+    });
+    await writer.writeAfterSettle({ ...SNAPSHOT, stepLease: stepped.lease });
+    expect(inserted[0]?.outcome).toBe("READY");
+    expect(calls).toHaveLength(2);
+    expect(outside).toEqual([]);
+    // enrichment + storyteller + checker + insert: four short leases, none spanning two steps.
+    expect(stepped.entries()).toBe(4);
+  });
+
+  it.each([
+    ["before the enrichment read", 1, 0, ["STORY_WRITE_FAILED", "STORY_STORED"]],
+    ["before the storyteller's call", 2, 0, ["STORY_LOOP_FAILED", "STORY_STORED"]],
+    ["between the storyteller's call and the checker's", 3, 1, ["STORY_LOOP_FAILED", "STORY_STORED"]],
+    ["before the insert", 4, 2, ["STORY_STORED"]]
+  ])("an erasure %s ends the story benignly: no row, no throw, nothing more called", async (_name, erasedFrom, callCount, eventNames) => {
+    const stepped = steppedLease(erasedFrom);
+    const { provider, calls } = scripted(byContract);
+    const inserted: StoryRecordInput[] = [];
+    const { writer, events, details } = harness({
+      ...providing(provider),
+      repository: { insert: async (record) => { inserted.push(record); return "INSERTED"; } }
+    });
+    await expect(writer.writeAfterSettle({ ...SNAPSHOT, stepLease: stepped.lease })).resolves.toBeUndefined();
+    expect(calls).toHaveLength(callCount);
+    expect(inserted).toEqual([]);
+    expect(events).toEqual(eventNames);
+    expect(details.at(-1)).toMatchObject({ event: "STORY_STORED", stored: "RUN_ERASED" });
+    expect(events).not.toContain("STORY_FAILURE_NOT_RECORDED");
+  });
+
+  it("names the erasure as the loop's cause when it lands between two calls", async () => {
+    const { provider } = scripted(byContract);
+    const { writer, details } = harness(providing(provider));
+    await writer.writeAfterSettle({ ...SNAPSHOT, stepLease: steppedLease(3).lease });
+    expect(details).toContainEqual(expect.objectContaining({
+      // Round 1's storyteller ran; its checker's lease was refused.
+      event: "STORY_LOOP_FAILED", failureCode: "STORY_UNEXPECTED_ERROR", cause: "PRIVATE_CONTENT_ERASED", rounds: 1
+    }));
+  });
+
+  it("reads the database's erasure refusal at the insert as RUN_ERASED too", async () => {
+    const erased = Object.assign(new Error("PRIVATE_CONTENT_ERASED"), { code: "55000" });
+    const { writer, events, details } = harness({
+      policy: null,
+      repository: { insert: async () => "INSERTED" as const }
+    });
+    await writer.writeAfterSettle({ ...SNAPSHOT, stepLease: async () => { throw erased; } });
+    expect(events).toEqual(["STORY_STORED"]);
+    expect(details[0]).toMatchObject({ stored: "RUN_ERASED" });
+  });
+
+  it("with no step lease, runs each step bare (each store and gateway still takes its own)", async () => {
+    const { provider } = scripted(byContract);
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]?.outcome).toBe("READY");
+  });
+});
+
+describe("StoryWriter — fix round 1 minors", () => {
+  const UUID_SHAPED = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu;
+
+  it("clears node ids out of the judges' and reviewers' texts before any model reads them", async () => {
+    const withIds: StoryNodeEnrichment = {
+      judgeBestCase: `The best case, building on ${ATTACK}.`,
+      judgeObjection: `The objection, citing ${ROOT.toUpperCase()}.`,
+      reviewOutcome: "dispute",
+      reviewReasons: [`It contradicts ${ATTACK}.`, "A reason with no id."],
+      dispersion: null
+    };
+    const { provider, calls } = scripted(byContract);
+    const { writer, inserted } = harness({
+      ...providing(provider),
+      readEnrichment: async () => new Map([[ROOT, withIds], [ATTACK, withIds]])
+    });
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]?.outcome).toBe("READY");
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      const material = readPromptFrame(call.packet).fields.map((field) => field.content);
+      for (const content of material) expect(content).not.toMatch(UUID_SHAPED);
+      expect(material.join("\n")).toContain("building on (a point).");
+      expect(material.join("\n")).toContain("A reason with no id.");
+    }
+  });
+
+  it("logs a snapshot the runner could not build, by code or error name, never by message", () => {
+    const { writer, details } = harness();
+    writer.reportSnapshotFailure({
+      answerId: SNAPSHOT.answerId, answerVersion: 1, error: new TypeError("the model wrote this")
+    });
+    writer.reportSnapshotFailure({
+      answerId: SNAPSHOT.answerId, answerVersion: 1, error: new TypedDomainError("SERVED_ROOT_UNRESOLVED", "x")
+    });
+    expect(details).toEqual([
+      { event: "STORY_SNAPSHOT_FAILED", answerId: SNAPSHOT.answerId, answerVersion: 1, code: "TypeError" },
+      { event: "STORY_SNAPSHOT_FAILED", answerId: SNAPSHOT.answerId, answerVersion: 1, code: "SERVED_ROOT_UNRESOLVED" }
+    ]);
+    expect(JSON.stringify(details)).not.toContain("the model wrote this");
+    const throwing = harness({ log: () => { throw new Error("sink down"); } });
+    expect(() => throwing.writer.reportSnapshotFailure({
+      answerId: SNAPSHOT.answerId, answerVersion: 1, error: new Error("x")
+    })).not.toThrow();
+  });
+
+  it("an async log sink that rejects never becomes an unhandled rejection", async () => {
+    let rejected = 0;
+    const onUnhandled = () => { rejected += 1; };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      const { writer } = harness({
+        policy: null,
+        log: (async () => { throw new Error("async sink down"); }) as StoryWriterDependencies["log"],
+        repository: { insert: async () => { throw new Error("database down"); } }
+      });
+      await expect(writer.writeAfterSettle(SNAPSHOT)).resolves.toBeUndefined();
+      writer.reportSnapshotFailure({ answerId: SNAPSHOT.answerId, answerVersion: 1, error: new Error("x") });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(rejected).toBe(0);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  it("an error whose code cannot even be read still ends in the fallback, never a rejection", async () => {
+    const unreadable = new Error("x");
+    Object.defineProperty(unreadable, "code", { get() { throw new Error("getter down"); } });
+    let attempts = 0;
+    const inserted: StoryRecordInput[] = [];
+    const { writer } = harness({
+      policy: null,
+      repository: {
+        insert: async (record) => {
+          attempts += 1;
+          if (attempts === 1) throw unreadable;
+          inserted.push(record);
+          return "INSERTED";
+        }
+      }
+    });
+    await expect(writer.writeAfterSettle(SNAPSHOT)).resolves.toBeUndefined();
+    expect(inserted).toEqual([expect.objectContaining({ failureCode: "STORY_UNEXPECTED_ERROR" })]);
   });
 });

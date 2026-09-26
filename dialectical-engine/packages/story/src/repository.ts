@@ -89,7 +89,7 @@ interface StoryRow {
 }
 
 /** Erasure is benign for the story: the run's content is gone, so there is nothing to tell. */
-function isPrivateContentErased(error: unknown): boolean {
+export function isPrivateContentErased(error: unknown): boolean {
   if (error instanceof TypedDomainError) return error.code === "PRIVATE_CONTENT_ERASED";
   return typeof error === "object" && error !== null
     && (error as { readonly code?: unknown }).code === "55000"

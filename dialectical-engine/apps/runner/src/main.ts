@@ -94,9 +94,12 @@ const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER
     return null;
   });
 const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
-/** Codes and ids only: a story log line never carries story or debate text. */
+/**
+ * Codes and ids only: a story log line never carries story or debate text. The
+ * detail goes FIRST, so no detail key can overwrite the line's kind or event.
+ */
 const storyLog = (event: string, detail: Record<string, unknown>): void => {
-  console.warn(JSON.stringify({ kind: "DEBATEAI_STORY", event, ...detail }));
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_STORY", event }));
 };
 /**
  * The shape pack is loaded ONCE, here (spec §5.1). An invalid pack never stops
@@ -214,8 +217,10 @@ assertRunnerPrimaryProviderConfiguration({
 /**
  * VERDICT STORY: one writer for this runner, on the runner's OWN pool (the
  * content lease is borrowed by pool identity). Its boot resolver covers every
- * configured provider; at each run the runner hands it the run's own
- * claim-eligible providers, which take precedence.
+ * configured provider, but the runner hands every run's story that run's own
+ * claim-eligible providers, and that resolver REPLACES the boot one for the
+ * run: a story role outside them is STORY_ROLE_UNAVAILABLE, never a fallback
+ * to a provider the run's claim did not probe.
  */
 const storyWriter = new StoryWriter({
   pool,

@@ -121,7 +121,7 @@ import {
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, exhaustive, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
-import type { StoryWriteInput } from "@debateai/story";
+import type { StorySnapshotFailure, StoryWriteInput } from "@debateai/story";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot } from "./story-snapshot.js";
 
@@ -1424,7 +1424,10 @@ export interface WalkingSkeletonSettings {
    * on purpose: an absent writer means no story (every fixture, and the
    * acceptance root, which stays story-free on register v3).
    */
-  readonly story?: { writeAfterSettle(input: StoryWriteInput): Promise<void> };
+  readonly story?: {
+    writeAfterSettle(input: StoryWriteInput): Promise<void>;
+    reportSnapshotFailure(failure: StorySnapshotFailure): void;
+  };
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -2709,8 +2712,21 @@ export class WalkingSkeletonRunner {
     if (claimed === null) return { kind: "NO_WORK" };
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
+    /**
+     * VERDICT STORY (spec §3, amended): what the settled debate hands its story.
+     * The snapshot is built INSIDE the lease below, where the in-memory material
+     * lives, and the story runs AFTER the lease is released, so an erasure is
+     * never held up for the length of a story.
+     */
+    const afterSettle: {
+      story:
+        | { readonly kind: "SNAPSHOT"; readonly input: StoryWriteInput }
+        | ({ readonly kind: "SNAPSHOT_FAILED" } & StorySnapshotFailure)
+        | null;
+    } = { story: null };
+    let executed: RunnerExecutionResult;
     try {
-    return await this.#memory.withDisclosureContentLease([claimedRunId],async () => {
+    executed = await this.#memory.withDisclosureContentLease([claimedRunId],async () => {
     const runnerAttemptId = randomUUID();
     let run: Awaited<ReturnType<RunRepository["readFrozenHead"]>>;
     try {
@@ -5035,60 +5051,70 @@ export class WalkingSkeletonRunner {
     });
     if (wonSettlement) {
       /**
-       * VERDICT STORY (spec §3): the work item is DONE and nothing can re-claim
-       * it; this is still inside the run's content lease, so the in-memory
-       * material is here and the encrypted rows can be read and written on this
-       * runner's own pool (the lease is borrowed, never taken twice). Only an
-       * answer that carries a label gets a story. The writer never rejects; the
-       * catch below exists so that no defect in the snapshot or the writer can
-       * ever reach the failure path of a work item that is already DONE.
+       * VERDICT STORY (spec §3, amended): the work item is DONE and nothing can
+       * re-claim it. Only an answer that carries a label gets a story. Its
+       * snapshot is built HERE, inside the run's content lease, where the
+       * in-memory material is; the story itself runs after the lease (below
+       * `executeWorkItem`'s catch), each step under its own short disclosure
+       * lease on this runner's pool. Building the snapshot cannot fail the
+       * settled run: a failure is kept and logged by code after the lease.
        */
       const storyWriter = this.settings.story;
       if (storyWriter !== undefined && answerCarriesLabel) {
         try {
-          await storyWriter.writeAfterSettle(buildStoryRunSnapshot({
-            runId: run.runId,
-            workItemId: claimed.workItemId,
-            answerId: persisted.answerId,
-            answerVersion: persisted.answerVersion,
-            questionLine: run.questionLine,
-            compositionBudgetTier: run.compositionBudgetTier,
-            verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
-            servedRootNodeId: servedRoot.nodeId,
-            servedStrength: servedRootSelection.servedStrength,
-            runnerUp: servedRootSelection.runnerUp,
-            margin: servedRootSelection.margin,
-            // The SAME quantity the label's disagreement rung read: the winning
-            // root's recorded panel dispersion, or ABSENT with s04's reason.
-            disagreement: verdictLabelBasis.disagreement,
-            thresholds: {
-              gamma: verdictLabelControls.gamma,
-              highCut: verdictLabelControls.highCut,
-              lowCut: verdictLabelControls.lowCut,
-              disagreementThreshold: verdictLabelControls.disagreementThreshold
-            },
-            confidenceBand: result.confidenceBand,
-            answerMarks: result.conditionMarks,
-            servedSegments: finalSegments,
-            authored: authoredNodeList,
-            positionNodeIds: makerPositionNodeIds,
-            baseStrengths: materialised.nodes,
-            finalStrengths: propagation.strengths,
-            // The WHOLE graph's arrows, in the engine's fixed order, so every
-            // argued point keeps its arrow and the points number the same way.
-            arrows: materialised.arrows,
-            arrowOrder: materialised.arrowOrder,
-            sensitivity: propagation.sensitivityRecords,
-            conditionMarkRecords,
-            // The run's OWN claim-eligible providers: a role provider that the
-            // claim-time probe found absent is never called for the story.
-            resolveProvider: (roleRef) => {
-              const maker = synthesisMakers.find((candidate) => candidate.providerRef === roleRef);
-              return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
-            }
-          }));
-        } catch {
-          // See above: the story can never cost the verdict.
+          afterSettle.story = {
+            kind: "SNAPSHOT",
+            input: buildStoryRunSnapshot({
+              runId: run.runId,
+              workItemId: claimed.workItemId,
+              answerId: persisted.answerId,
+              answerVersion: persisted.answerVersion,
+              questionLine: run.questionLine,
+              compositionBudgetTier: run.compositionBudgetTier,
+              verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
+              servedRootNodeId: servedRoot.nodeId,
+              servedStrength: servedRootSelection.servedStrength,
+              runnerUp: servedRootSelection.runnerUp,
+              margin: servedRootSelection.margin,
+              // The SAME quantity the label's disagreement rung read: the winning
+              // root's recorded panel dispersion, or ABSENT with s04's reason.
+              disagreement: verdictLabelBasis.disagreement,
+              thresholds: {
+                gamma: verdictLabelControls.gamma,
+                highCut: verdictLabelControls.highCut,
+                lowCut: verdictLabelControls.lowCut,
+                disagreementThreshold: verdictLabelControls.disagreementThreshold
+              },
+              confidenceBand: result.confidenceBand,
+              answerMarks: result.conditionMarks,
+              servedSegments: finalSegments,
+              authored: authoredNodeList,
+              positionNodeIds: makerPositionNodeIds,
+              baseStrengths: materialised.nodes,
+              finalStrengths: propagation.strengths,
+              // The WHOLE graph's arrows, in the engine's fixed order, so every
+              // argued point keeps its arrow and the points number the same way.
+              arrows: materialised.arrows,
+              arrowOrder: materialised.arrowOrder,
+              sensitivity: propagation.sensitivityRecords,
+              conditionMarkRecords,
+              // The run's OWN claim-eligible providers: a role provider that the
+              // claim-time probe found absent is never called for the story.
+              resolveProvider: (roleRef) => {
+                const maker = synthesisMakers.find((candidate) => candidate.providerRef === roleRef);
+                return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
+              },
+              // Each story step re-takes the SAME disclosure lease the debate held
+              // (this run and its memory-linked prior run), briefly, on this
+              // runner's pool: every store and gateway inside it borrows it, and
+              // an erasure between steps ends the story at the next one.
+              stepLease: (use) => this.#memory.withDisclosureContentLease([run.runId], use)
+            })
+          };
+        } catch (error) {
+          afterSettle.story = {
+            kind: "SNAPSHOT_FAILED", answerId: persisted.answerId, answerVersion: persisted.answerVersion, error
+          };
         }
       }
       return { kind: "COMPLETED", answerId: persisted.answerId };
@@ -5106,6 +5132,26 @@ export class WalkingSkeletonRunner {
         "The runner failed inside its private-content disclosure lease"
       );
     }
+    /**
+     * VERDICT STORY (spec §3, amended): the run's lease is released, the work
+     * item is DONE and the answer is served. The story runs now, and nothing it
+     * does can change that: the writer never rejects, and this catch exists so
+     * that no defect in the writer can reach the failure path of a DONE item.
+     */
+    const storyWriter = this.settings.story;
+    const settled = afterSettle.story;
+    if (storyWriter !== undefined && settled !== null) {
+      try {
+        if (settled.kind === "SNAPSHOT") {
+          await storyWriter.writeAfterSettle(settled.input);
+        } else {
+          storyWriter.reportSnapshotFailure(settled);
+        }
+      } catch {
+        // See above: the story can never cost the verdict.
+      }
+    }
+    return executed;
   }
 }
 
