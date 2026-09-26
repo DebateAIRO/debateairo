@@ -3,14 +3,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { StoryBodySchema, StoryFateSchema } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   STORY_PACK_LIMITS,
   STORY_SHAPES_DIR_ENV_KEY,
   StoryCheckerVerdictSchema,
   assembleStorytellerInstruction,
+  buildStoryMaterial,
   loadStoryPack,
-  resolveStoryPackDir
+  resolveStoryPackDir,
+  toStoryPromptMaterial,
+  type StoryMaterialResult
 } from "@debateai/story";
 
 /**
@@ -110,7 +114,7 @@ const tooBigInstruction: PackFiles = {
 const REFUSALS: readonly (readonly [rule: string, why: string, files: PackFiles])[] = [
   ["FILE_MISSING", "checker.md is absent", { "checker.md": null }],
   ["FILE_MISSING", "a listed shape has no file", { "shapes/beta.md": null }],
-  ["FILE_TOO_LARGE", "a file is over the file limit (16 KB)", { "common.md": "x".repeat(STORY_PACK_LIMITS.maxFileBytes + 1) }],
+  ["FILE_TOO_LARGE", "a file is over the file limit (24 KB)", { "common.md": "x".repeat(STORY_PACK_LIMITS.maxFileBytes + 1) }],
   ["NOT_UTF8", "a file is not UTF-8", { "common.md": Uint8Array.from([0x43, 0xff, 0xfe, 0x0a]) }],
   ["CONTROL_CHARACTER", "a file holds a bell character", { "checker.md": "Checker\u0007 instructions.\n" }],
   ["CONTROL_CHARACTER", "a file has Windows line endings", { "common.md": "Common\r\ninstructions.\r\n" }],
@@ -220,64 +224,62 @@ describe("verdict story — the shipped pack", () => {
     expect(instruction).toContain("When none fits clearly, choose general.");
   });
 
-  it("carries the owners' rules the story depends on", () => {
-    // Not a pin of the owners' text (it is theirs to edit): a smoke check that
-    // the first pack says the things the checker will hold the story to.
-    expect(pack.common).toContain("language of the question");
-    expect(pack.common).toContain("The label is final");
-    expect(pack.common).toContain("marked as your reading");
-    expect(pack.checker).toContain("goal_marked_as_reading");
-    for (const id of ["health", "money-decision", "legal"]) {
-      expect(pack.shapes.find((shape) => shape.id === id)?.guidance).toMatch(/this is not (medical|financial|legal)\b/u);
+  /**
+   * The pack is the owners' to edit, so nothing below pins its prose (fix round
+   * 1, minor 7): an owner's rewording must never break CI. What is checked is
+   * structural and keyed on code's own identifiers, which any rewording still
+   * has to explain: every field the storyteller reads and writes, the fate codes
+   * and the limits they follow, and every criterion the checker's verdict carries.
+   */
+  it("explains to the storyteller every material field it reads and every story field it writes", () => {
+    const material = toStoryPromptMaterial(built(buildStoryMaterial({
+      snapshot: {
+        runId: "run", workItemId: "work", answerId: "answer", answerVersion: 1, questionLine: "Should we?",
+        argumentLanguage: null, compositionBudgetTier: "low",
+        verdictBasis: {
+          label: "SUPPORTED", rung: 3, trigger: "AT_OR_ABOVE_HIGH_CUT", winner_node_id: "p", winner_strength: 0.8,
+          runner_up_node_id: null, runner_up_strength: null, margin: null, disagreement: null,
+          thresholds: { gamma: 0.05, high_cut: 0.7, low_cut: 0.35, disagreement: 0.25 }, confidence_band: "FULL", marks: []
+        },
+        servedStatement: ["Yes."],
+        nodes: [{
+          nodeId: "p", claim: "Yes.", isPosition: true, wayOfKnowing: "REASONING", baseScore: 0.8, finalStrength: 0.8,
+          excludedReason: null, authorModel: null, panelDispersion: null, criticSummary: null
+        }],
+        arrows: [], sensitivity: [], setAside: []
+      },
+      enrichment: new Map(), budgetBytes: 40_000, shapeIds: new Set(["general"])
+    })).material, "prior").map((field) => field.name);
+    expect(material).toContain("prior_objection");
+    const short = Object.keys(StoryBodySchema.shape.short.shape).map((member) => `short.${member}`);
+    for (const name of [
+      ...material, ...short, "why.reasons", "long.sections", "reviewer_note", "node_refs", "position_ref",
+      ...StoryFateSchema.options, "high_cut", "low_cut", "confidence_band"
+    ]) {
+      expect([name, pack.common.includes(name) || pack.common.includes(name.split(".").at(-1)!)]).toEqual([name, true]);
     }
   });
 
-  it("tells the storyteller the look gate's rules (R1, spec §14.1-§14.2)", () => {
-    // Smoke checks, not pins: the owners may reword all of this.
-    for (const rule of [
-      "short.confidence", "why.reasons", "Our answer always comes first",
-      "Never write that the debate did not settle the question",
-      "the words of the debate's own workings", "code refuses a story that prints one",
-      "what we could not confirm", "Something left out was not proven wrong",
-      "Examples of the tone", "never templates to copy"
-    ]) {
-      expect(pack.common).toContain(rule);
-    }
-    // The owners' own picks (a1, b1, b3, c1, c3, d), in Romanian, as tone examples.
-    for (const example of [
-      "„Răspunsul nostru: mutați-vă treptat", "„Cât de siguri suntem: destul de siguri",
-      "„Ne-am baza pe acest răspuns, cu o rezervă", "„Nu am putut confirma cât de ușor",
-      "„Partea despre școală nu a putut fi verificată", "„Am lăsat deoparte o singură obiecție"
-    ]) {
-      expect(pack.common).toContain(example);
-    }
-  });
-
-  it("tells the checker every criterion its verdict carries, speaks_to_the_person and the confidence ladder among them", () => {
+  it("tells the checker every criterion its verdict carries", () => {
     for (const criterion of Object.keys(StoryCheckerVerdictSchema.shape.criteria.shape)) {
-      expect(pack.checker).toContain(`${criterion}:`);
+      expect([criterion, pack.checker.includes(criterion)]).toEqual([criterion, true]);
     }
-    expect(pack.checker).toContain("The confidence sentence is never surer than this ladder allows");
-    // The reservation is internal now: the checker is not told a reader sees it.
-    expect(pack.checker).toContain("the person who asked never sees it");
-    expect(pack.checker).not.toContain("the person reads your objection");
+    expect(pack.checker).toContain("candidate_story");
   });
 
-  it("steers no shape toward the engine's words: no scores, judges, reviewers, runner-up or cuts", () => {
-    for (const shape of pack.shapes) {
-      expect(shape.guidance).not.toMatch(/how it (scored|finished)|\bthe judges\b|\breviewers?\b|runner-up|high cut|low cut/u);
-      expect(shape.sections.join(" ")).not.toMatch(/\bverdict\b/u);
-    }
-  });
-
-  it("keeps each file under the raised 16 KB file limit and the whole instruction under 48 KB (controller ruling, R1)", () => {
-    expect(STORY_PACK_LIMITS.maxFileBytes).toBe(16 * 1024);
+  it("keeps each file under the 24 KB file limit and the whole instruction under 48 KB (controller ruling, R1 fix round 1)", () => {
+    expect(STORY_PACK_LIMITS.maxFileBytes).toBe(24 * 1024);
     expect(STORY_PACK_LIMITS.maxInstructionBytes).toBe(48 * 1024);
     for (const file of ["common.md", "checker.md", "pack.json", ...pack.shapes.map((shape) => `shapes/${shape.id}.md`)]) {
       expect(readFileSync(join(SHIPPED_DIR, file)).byteLength).toBeLessThanOrEqual(STORY_PACK_LIMITS.maxFileBytes);
     }
   });
 });
+
+function built(result: StoryMaterialResult): Extract<StoryMaterialResult, { kind: "OK" }> {
+  if (result.kind !== "OK") throw new Error("the probe material must fit");
+  return result;
+}
 
 describe("verdict story — the assembled instruction's layout", () => {
   it("renders common text, the choosing rule, then each shape in pack order", () => {

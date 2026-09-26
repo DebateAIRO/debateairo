@@ -7,7 +7,9 @@ import type { StoredStory } from "./repository.js";
  * READY or READY_WITH_RESERVATION story with a body is published. Nothing
  * owner-only crosses: not the checker's reservation (it names points by numbers
  * only the owner's appendix explains), not the reasons in `why` (full report
- * only), no lineage, no point numbers, no verdict basis, no pack, no language tag.
+ * only), no lineage, no point numbers, no verdict basis, no pack. The question's
+ * language is not private, but it is not published here either: a later task
+ * decides how the public page learns it.
  */
 export function toPublicStoryShort(stored: StoredStory): PublicStoryShort | null {
   const ready = stored.outcome === "READY" || stored.outcome === "READY_WITH_RESERVATION";

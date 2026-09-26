@@ -18,6 +18,6 @@ The options we weighed: one paragraph per position, ours first. For each: what i
 
 What the answer depends on: the points in hinges, in order, a sentence or two each: what the point says, which way it pushes, and why our answer leans on it. When one rests on reasoning alone, say so.
 
-What is still uncertain: what we could not confirm and why, which important points are argued rather than looked up or worked out, where the assessments were most divided, and what the debate did not examine; for each, what the person can do about it.
+What is still uncertain: what we could not confirm and why, which important points are argued rather than looked up or worked out, which points are genuinely open to different readings, and what the debate did not examine; for each, what the person can do about it.
 
 What would change the answer, and what to do next: the specific findings that would tip the answer, then a practical next step, for example what to find out, check or ask before relying on it.

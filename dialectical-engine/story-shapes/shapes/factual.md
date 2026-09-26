@@ -20,7 +20,7 @@ The explanations we weighed: one paragraph per position, ours first: what it cla
 
 The evidence the answer rests on: the hinge points and the other points the answer depends on, grouped by how each is known. Say plainly when the answer rests on reasoning alone and was not checked against a source.
 
-What is still uncertain: what we could not confirm and why, where the assessments were most divided, and what the debate did not check.
+What is still uncertain: what we could not confirm and why, which points are genuinely open to different readings, and what the debate did not check.
 
 What would change the answer: the specific finding, source or measurement that would tip the answer, and where the person could look for it.
 

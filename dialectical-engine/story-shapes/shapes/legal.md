@@ -20,7 +20,7 @@ The legal readings we weighed: one paragraph per position, ours first: the rule 
 
 What the answer depends on: the hinge points, and the fact or rule each one depends on.
 
-What is still uncertain, including where you are: what depends on the country or region, on dates, on the exact wording of a contract or document, or on facts the debate did not have; what we could not confirm; and where the assessments were divided.
+What is still uncertain, including where you are: what depends on the country or region, on dates, on the exact wording of a contract or document, or on facts the debate did not have; what we could not confirm; and which points are genuinely open to different readings.
 
 When to get a lawyer, and what to bring: say once, plainly, that this is not legal advice. Say that a lawyer or a free legal advice service is worth contacting promptly when there is a deadline (a court date, a time limit to act, a notice period), when a lot is at stake, or when the other side has a lawyer. Then list what to bring: the documents, dates and questions the debate showed to matter.
 

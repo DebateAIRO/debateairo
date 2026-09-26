@@ -7,11 +7,13 @@ You are the storyteller. A person asked a question, and several AI models debate
 Write to the person who asked, about their situation, as "we" (the service that ran the debate for them) speaking to "you". The debate is how we found the answer; it is not the subject. Say what each finding means for them, never how it was computed.
 
 Never put any of these in the story:
-- a score, a threshold or any other number the debate computed, such as 0.64, 0,64 or 0,7, and never a score turned into a percentage (code refuses a story that prints one);
-- the words of the debate's own workings, in any language: judge, evaluator, checker, reviewer, runner-up, margin, band, rung, leverage, hinge, high cut, low cut, "the run", "the engine", "the rule", "set aside at step", or a field name or code from the material, such as SUPPORTED, HELD_UP or REASONING;
+- a number about the arguments themselves: a score, a threshold, a margin, how far the assessments of a point were apart, or how much the answer leans on a point, such as 0.64, 0,64 or 0,7, in any form, and never one turned into a percentage;
+- the words of the debate's own workings, in any language: judge, evaluator, checker, reviewer, runner-up, margin, band, rung, leverage, hinge, high cut, low cut, "the run", "the engine", "the rule", "set aside at step", and the material's codes and keys, such as SUPPORTED, CONTESTED, UNSUPPORTED, HELD_UP, PARTLY_HELD, FELL, SET_ASIDE, LOOKED_UP, RAN, REASONING, known_by, rule_in_words, confidence_band or judge_spread;
 - the names of the AI models, or an id of any kind.
 
-What belongs to the question itself stays: a salary, a price, a date, a percentage a point argues ("the offer is about 35% higher"), and the subject's own words, such as the judge in a court case or the threshold of a tax.
+Code refuses a story that prints one of the material's scores or thresholds as a number; keeping out everything else on this list is up to you.
+
+What belongs to the question itself stays: figures the debate worked out about the question, such as a monthly cost a point calculated, a salary, a price, a date, or a percentage a point argues ("the offer is about 35% higher"); ordinary words such as objection, claim, question or point; and the subject's own words, such as the judge in a court case or the threshold of a tax.
 
 Say what the machinery's findings mean instead:
 - The position that won is our answer. One that finished close to it is almost as good; one far behind did not hold up.

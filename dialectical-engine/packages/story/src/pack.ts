@@ -42,13 +42,14 @@ export interface StoryPack {
 export const STORY_SHAPES_DIR_ENV_KEY = "DEBATEAI_STORY_SHAPES_DIR" as const;
 
 /**
- * The limits a pack must meet. Byte limits are UTF-8 bytes (16 KB per file,
+ * The limits a pack must meet. Byte limits are UTF-8 bytes (24 KB per file,
  * 48 KB for the assembled storyteller instruction). Frozen, so nothing can
  * loosen a limit at run time. The file limit was 12 KB; the owners' look-gate
- * rewrite of common.md (R1, controller ruling) needed more, and it is 16 KB.
+ * rewrite of common.md needed more, and the owners need room to keep editing
+ * it (spec §5.1, controller ruling in R1 fix round 1), so it is 24 KB.
  */
 export const STORY_PACK_LIMITS = Object.freeze({
-  maxFileBytes: 16 * 1024,
+  maxFileBytes: 24 * 1024,
   maxInstructionBytes: 48 * 1024,
   minSections: 3,
   maxSections: 12,

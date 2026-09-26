@@ -104,6 +104,30 @@ describe("story fixture (the owner's mock data)", () => {
     expect(storyFixture("WRITING").language).toBeNull();
   });
 
+  it("gives each path the fate the pack's threshold rule gives it, and keeps the verdict's numbers consistent (I-5)", () => {
+    const story = storyFixture("READY");
+    const basis = story.verdict_basis!;
+    const finalOf = new Map(STORY_FIXTURE_ANSWER.nodes.map((node) => [node.node_id, node.final_strength?.value ?? null]));
+    for (const path of story.story!.short.paths) {
+      const final = finalOf.get(path.position_ref);
+      if (final === null || final === undefined) throw new Error(`no final for ${path.position_ref}`);
+      const ruled = final >= basis.thresholds.high_cut ? "HELD_UP" : final >= basis.thresholds.low_cut ? "PARTLY_HELD" : "FELL";
+      expect([path.position_ref, path.fate]).toEqual([path.position_ref, ruled]);
+    }
+    // The winner is the strongest position and the runner-up the next; the margin is their difference.
+    const positions = story.story!.short.paths.map((path) => finalOf.get(path.position_ref)!).sort((a, b) => b - a);
+    expect([basis.winner_strength, basis.runner_up_strength]).toEqual(positions.slice(0, 2));
+    expect(finalOf.get(basis.winner_node_id)).toBe(basis.winner_strength);
+    expect(finalOf.get(basis.runner_up_node_id!)).toBe(basis.runner_up_strength);
+    expect(basis.margin).toBeCloseTo(basis.winner_strength - basis.runner_up_strength!, 10);
+  });
+
+  it("serves a statement that leads with the answer, never one that says the debate did not settle it (I-4)", () => {
+    const [lead] = STORY_FIXTURE_ANSWER.composed_text;
+    expect(lead?.text.startsWith("Cea mai bună variantă este mutarea treptată")).toBe(true);
+    expect(STORY_FIXTURE_ANSWER.composed_text.map((segment) => segment.text).join(" ")).not.toMatch(/nu a ajuns|răspuns clar/u);
+  });
+
   it("numbers every node exactly once, P1 to P8, the three positions first", () => {
     const ids = STORY_FIXTURE_ANSWER.nodes.map((node) => node.node_id);
     expect(Object.keys(STORY_FIXTURE_POINT_NUMBERS).sort()).toEqual([...ids].sort());
@@ -127,7 +151,7 @@ describe("toStoryView (spec §10)", () => {
     expect(view.confidenceWords).toBe("Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued");
     expect(view.headline).toBe("Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.");
     expect(view.paths.map((path) => [path.positionRef, path.fateWords])).toEqual([
-      ["n-hybrid", "Held up"], ["n-yes", "Partly held"], ["n-not-now", "Fell"]
+      ["n-hybrid", "Partly held"], ["n-yes", "Partly held"], ["n-not-now", "Fell"]
     ]);
     expect(view.morePaths).toBe(0);
     expect(view.change).toContain("lucrul hibrid");

@@ -135,7 +135,7 @@ function fixtureNodes(): Node[] {
     }),
     storyFixtureNode({
       id: "n-not-now", claim: "Nu acum. Primii doi ani costă mai mult decât aduce salariul, din cauza chiriei și a mutării.",
-      way: "REASONING", base: 0.61, final: 0.52, maker: "Anthropic",
+      way: "REASONING", base: 0.61, final: 0.31, maker: "Anthropic",
       review: { outcome: "dispute", by: "OpenAI", reason: "Costul mutării se plătește o singură dată, nu în fiecare an." },
       locator: null, marks: []
     }),
@@ -198,7 +198,7 @@ function fixtureAnswer(): Answer {
     composed_text: [
       {
         segment_id: "seg:1",
-        text: "Dezbaterea nu a ajuns la un răspuns clar. Cea mai puternică poziție spune că mutarea merită doar cu lucru hibrid și după încheierea anului școlar.",
+        text: "Cea mai bună variantă este mutarea treptată: lucrați hibrid de la început, iar familia se mută după încheierea anului școlar. Alegerea e strânsă, pentru că și mutarea imediată are argumente bune.",
         load_bearing: true,
         served_number_refs: []
       },
@@ -260,18 +260,21 @@ const FIXTURE_BASIS: NonNullable<AnswerStory["verdict_basis"]> = {
  * one sentence tied to this debate, and never shows a score, a threshold or
  * the machinery's words. Its phrasing follows the owners' picks (a1, b1, c1,
  * d). The site texts name no point number; the reasons and the long story cite
- * points through node_refs, which the PDF prints as [Pn].
+ * points through node_refs, which the PDF prints as [Pn]. Each path's fate
+ * follows the threshold rule the pack gives the storyteller: 0.64 and 0.58 sit
+ * between the low cut (0.35) and the high cut (0.70), so both are PARTLY_HELD,
+ * and "not now" finished at 0.31, below the low cut, so it FELL.
  */
 const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
   shape_id: "personal-choice",
   short: {
     headline: "Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.",
-    summary: "Ne-ați întrebat dacă merită să vă mutați cu familia din București la Cluj pentru un salariu mai mare. Răspunsul nostru: da, dar treptat. Începeți noul job lucrând parțial de acasă, iar familia vi se alătură după încheierea anului școlar. E o decizie strânsă, pentru că și mutarea imediată are argumente bune: oferta este cu aproximativ 35% mai mare, după impozite. Varianta treptată vă păstrează însă câștigul de salariu fără să-i mutați pe copii la jumătatea anului.",
+    summary: "Ne-ați întrebat dacă merită să vă mutați cu familia din București la Cluj pentru un salariu mai mare. Merită, dar în doi pași: începeți noul job lucrând parțial de acasă, iar familia vi se alătură după ce copiii termină anul școlar. Mutarea imediată ar fi aproape la fel de bună, fiindcă oferta este cu aproximativ 35% mai mare, după impozite, dar chiriile din Cluj îi taie din avantaj, iar copiii ar schimba școala în mijlocul anului.",
     confidence: "Cât de siguri suntem: destul de siguri, dar totul depinde de un lucru pe care nu îl știm încă: dacă angajatorul acceptă lucrul hibrid.",
     paths: [
       {
-        position_ref: "n-hybrid", fate: "HELD_UP",
-        line: "Mutare treptată, cu lucru hibrid: cea mai bună variantă, pentru că vă aduce salariul mai mare fără să-i scoată pe copii din școală la jumătatea anului.",
+        position_ref: "n-hybrid", fate: "PARTLY_HELD",
+        line: "Mutare treptată, cu lucru hibrid: cea mai bună variantă, dacă angajatorul o acceptă, pentru că vă aduce salariul mai mare fără să-i scoată pe copii din școală la jumătatea anului.",
         node_refs: ["n-hybrid", "n-hybrid-school"]
       },
       {
@@ -297,11 +300,11 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
         node_refs: ["n-yes-pay", "n-not-now-once"]
       },
       {
-        text: "Momentul contează pentru copii. Schimbarea școlii la jumătatea anului are un cost real pentru ei, iar varianta treptată îl evită: familia se mută abia după încheierea anului școlar.",
+        text: "Momentul contează pentru copii. Cel mai puternic argument pentru varianta treptată este că o schimbare de școală la jumătatea anului i-ar putea costa mult; mutându-vă după încheierea anului școlar, evitați acest risc.",
         node_refs: ["n-hybrid", "n-hybrid-school"]
       },
       {
-        text: "Chiriile pentru trei camere sunt în Cluj cu circa 30% mai mari decât în cartierul de acum. De aceea mutarea imediată aduce mai puțin decât pare și rămâne pe locul al doilea, deși are argumente bune.",
+        text: "Chiriile pentru trei camere sunt în Cluj cu circa 30% mai mari decât în cartierul de acum. De aceea mutarea imediată aduce mai puțin decât pare: are argumente bune și este aproape la fel de bună, dar nu mai bună.",
         node_refs: ["n-yes", "n-yes-rent"]
       }
     ]
@@ -318,7 +321,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
       {
         title: "Răspunsul nostru pe scurt",
         paragraphs: [{
-          text: "Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar. E o decizie strânsă, pentru că și mutarea imediată are argumente bune, dar varianta treptată vă păstrează câștigul de salariu fără să-i mutați pe copii la jumătatea anului.",
+          text: "Vă recomandăm să vă mutați în doi pași. Câștigul de salariu îl aveți de la prima lună, lucrând parțial de acasă, iar familia se mută abia când se încheie anul școlar, așa că nimeni nu trebuie să schimbe totul deodată. Alegerea e strânsă, pentru că și mutarea imediată are argumente bune.",
           node_refs: ["n-hybrid", "n-yes"]
         }]
       },
@@ -326,7 +329,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
         title: "Variantele cântărite",
         paragraphs: [
           {
-            text: "Mutarea treptată, cu lucru hibrid. Începeți noul job lucrând parțial de acasă, iar familia vi se alătură după încheierea anului școlar. Cel mai puternic argument pentru ea este că schimbarea școlii la jumătatea anului are un cost real pentru copii. Varianta ține însă doar dacă angajatorul acceptă lucrul hibrid.",
+            text: "Mutarea treptată, cu lucru hibrid. Începeți noul job lucrând parțial de acasă, iar familia vi se alătură după încheierea anului școlar. Cel mai puternic argument pentru ea este că o schimbare de școală la jumătatea anului i-ar putea costa mult pe copii. Varianta ține doar dacă angajatorul acceptă lucrul hibrid, iar argumentul despre școală nu a putut fi verificat, așa că este cea mai bună dintre variante, nu una sigură.",
             node_refs: ["n-hybrid", "n-hybrid-school"]
           },
           {
@@ -338,7 +341,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
             node_refs: ["n-not-now", "n-not-now-once"]
           },
           {
-            text: "Am lăsat deoparte o singură obiecție, pentru că se baza pe o sursă slabă: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Asta nu înseamnă că obiecția e greșită, doar că nu ne putem sprijini pe ea; răspunsul angajatorului o lămurește.",
+            text: "Am lăsat deoparte o singură obiecție: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Se baza pe o sursă slabă și, chiar luată în serios, nu ar fi schimbat răspunsul, așa că dezbaterea nu a mai urmărit-o. Asta nu înseamnă că obiecția e greșită; răspunsul angajatorului o lămurește.",
             node_refs: ["n-hybrid-forum"]
           }
         ]

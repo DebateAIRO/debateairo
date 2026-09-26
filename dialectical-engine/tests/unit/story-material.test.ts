@@ -418,7 +418,10 @@ describe("verdict story — restoring node ids before storage", () => {
 /**
  * R1 — the story never prints a score. The index carries every score and
  * threshold the material shows, as a story might print it: two decimals with a
- * point and with a comma, and a threshold's one-decimal form when it is exact.
+ * point and with a comma, and the value exactly as the material prints it
+ * (0.6123, 0.7), with a point and with a comma. A form the question or a
+ * claim, a best case, an objection or a review reason also holds is the
+ * person's own figure, and is left out (fix round 1, I-1 and I-2).
  */
 describe("verdict story — the score values a story may never print", () => {
   const result = built(buildStoryMaterial({ snapshot: snapshot(), enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES }));
@@ -426,20 +429,95 @@ describe("verdict story — the score values a story may never print", () => {
 
   it("holds every point's base and final score, every position's, the verdict's four and every threshold", () => {
     expect([...result.index.scoreTexts].sort()).toEqual(both(
-      // points: base 0.5 everywhere; finals 0.45 (points) and the positions' 0.6123 and 0.4
-      "0.50", "0.45", "0.61", "0.40",
+      // points: base 0.5 everywhere (0.50, and 0.5 as the material prints it); finals 0.45
+      // (points) and the positions' 0.6123 and 0.4 (0.61 and 0.40 at two decimals)
+      "0.50", "0.5", "0.45", "0.61", "0.6123", "0.40", "0.4",
       // verdict: winner 0.6123, runner-up 0.4, margin 0.2123, disagreement 0.08
-      "0.21", "0.08",
-      // thresholds: tie margin 0.05, high cut 0.7 (and 0.7 itself, exact at one decimal), low cut 0.35, disagreement 0.25
+      "0.21", "0.2123", "0.08",
+      // thresholds: tie margin 0.05, high cut 0.7 (0.70, and 0.7 as the material prints it), low cut 0.35, disagreement 0.25
       "0.05", "0.70", "0.7", "0.35", "0.25"
     ).sort());
   });
 
   it("leaves out what is not a score: leverage and the judges' spread", () => {
     // Leverage 0.3 and 0.2, spread 0.1 and 0.08: 0.08 is there only as the verdict's disagreement.
-    for (const absent of ["0.30", "0,30", "0.20", "0,20", "0.10", "0,10", "0.3", "0.4", "0.6"]) {
+    for (const absent of ["0.30", "0,30", "0.3", "0,3", "0.20", "0,20", "0.2", "0.10", "0,10", "0.1", "0.6"]) {
       expect(result.index.scoreTexts.has(absent)).toBe(false);
     }
+  });
+
+  it("holds each value exactly as the material prints it, four decimals included (I-2)", () => {
+    const precise = built(buildStoryMaterial({
+      snapshot: snapshot({
+        verdictBasis: { ...BASIS, winner_strength: 0.6412, margin: 0.2412 },
+        nodes: snapshot().nodes.map((entry) => entry.nodeId === "position:a" ? { ...entry, finalStrength: 0.6412 } : entry)
+      }),
+      enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES
+    }));
+    for (const printed of ["0.6412", "0,6412", "0.64", "0,64", "0.2412", "0,2412"]) {
+      expect(precise.index.scoreTexts.has(printed)).toBe(true);
+    }
+    const story = storyWithPaths(["P1", "P2"]);
+    story.long.sections[0]!.paragraphs[0]!.text = "Mutarea treptată a obținut 0,6412.";
+    const refused = classifyStoryContent(JSON.stringify(story), precise.index);
+    expect(refused.parseStatus).toBe("SCHEMA_FAILED");
+    expect(refused.parseError).toContain("STORY_TEXT_SCORE_VALUE");
+  });
+
+  describe("the person's own figures are never refused (I-1)", () => {
+    // The high cut is 0.7, so 0.70 and 0,70 are score texts, until the debate itself talks about 0,70 lei/kWh.
+    const priced = (claim: string, overrides: Partial<StoryRunSnapshot> = {}): BuiltMaterial => built(buildStoryMaterial({
+      snapshot: snapshot({
+        ...overrides,
+        nodes: snapshot().nodes.map((entry) => entry.nodeId === "point:c" ? { ...entry, claim } : entry)
+      }),
+      enrichment: ENRICHMENT, budgetBytes: LOW_BUDGET, shapeIds: SHAPES
+    }));
+
+    it("accepts a story repeating a claim's own figure, 0,70 lei/kWh, in either separator", () => {
+      const own = priced("Electricity costs 0,70 lei/kWh on the day tariff.");
+      expect(result.index.scoreTexts.has("0,70")).toBe(true);
+      expect(own.index.scoreTexts.has("0,70")).toBe(false);
+      expect(own.index.scoreTexts.has("0.70")).toBe(false);
+      // Only that figure: the high cut's other printed form, and every other score, stay refused.
+      expect(own.index.scoreTexts.has("0,7")).toBe(true);
+      expect(own.index.scoreTexts.has("0,61")).toBe(true);
+      const story = storyWithPaths(["P1", "P2"]);
+      story.short.summary = "Curentul costă 0,70 lei/kWh ziua, așa că merită.";
+      story.long.sections[0]!.paragraphs[0]!.text = "At 0.70 lei/kWh the savings hold.";
+      expect(classifyStoryContent(JSON.stringify(story), own.index)).toEqual({ parseStatus: "PARSED", parseError: null });
+      story.long.sections[1]!.paragraphs[0]!.text = "Funding finished at 0,61.";
+      expect(classifyStoryContent(JSON.stringify(story), own.index).parseError).toContain("STORY_TEXT_SCORE_VALUE");
+    });
+
+    it("reads the person's figures in the question, the best case, the objection and the review reasons too", () => {
+      for (const [question, enrichment] of [
+        ["Is a 0,45 lei/kWh night tariff worth it?", ENRICHMENT],
+        ["Should the city fund the tram?", new Map([["position:a", { ...ENRICHMENT.get("position:a")!, judgeBestCase: "Night power costs 0.45 lei." }]])],
+        ["Should the city fund the tram?", new Map([["position:a", { ...ENRICHMENT.get("position:a")!, judgeObjection: "The 0,45 lei rate is promotional." }]])],
+        ["Should the city fund the tram?", new Map([["position:a", { ...ENRICHMENT.get("position:a")!, reviewReasons: ["The 0.45 lei figure is on the bill."] }]])]
+      ] as const) {
+        const own = built(buildStoryMaterial({
+          snapshot: snapshot({ questionLine: question }), enrichment, budgetBytes: LOW_BUDGET, shapeIds: SHAPES
+        }));
+        expect(own.index.scoreTexts.has("0.45")).toBe(false);
+        expect(own.index.scoreTexts.has("0,45")).toBe(false);
+        expect(own.index.scoreTexts.has("0.61")).toBe(true);
+      }
+    });
+
+    it("does not count a whole-token lookalike, a percentage, or the engine's own texts as the person's figure", () => {
+      // A longer number, a percentage (already never refused), the served statement
+      // (written from a digest that carries the scores) and a set-aside reason (code's
+      // words, which can quote a score: "Recorded strength 0.45 ...") exempt nothing.
+      const own = priced("It costs 10,70 lei, or 0,705 of the budget, and 0,70% a year.", {
+        servedStatement: ["The leading answer scored 0.45 and 0,70."],
+        nodes: snapshot().nodes.map((entry) => entry.nodeId === "point:e"
+          ? { ...entry, excludedReason: "HIDDEN-LOW-SCORE: Recorded strength 0.45 is at or below the ruled hidden-node threshold" }
+          : entry.nodeId === "point:c" ? { ...entry, claim: "It costs 10,70 lei, or 0,705 of the budget, and 0,70% a year." } : entry)
+      });
+      for (const kept of ["0,70", "0.70", "0.45", "0,45"]) expect(own.index.scoreTexts.has(kept)).toBe(true);
+    });
   });
 
   it("rounds half up, the way a person prints a score, whatever the float underneath", () => {

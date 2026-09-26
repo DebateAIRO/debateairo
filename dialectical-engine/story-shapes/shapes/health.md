@@ -20,7 +20,7 @@ The explanations and options we weighed: one paragraph per position, ours first:
 
 What the answer depends on: the hinge points, and why our answer leans on each.
 
-What this debate can and cannot tell you: what the debate could not know (the person's history, other conditions, current medicines, test results), what we could not confirm, where the assessments were divided, and which points rest on reasoning alone.
+What this debate can and cannot tell you: what the debate could not know (the person's history, other conditions, current medicines, test results), what we could not confirm, which points are genuinely open to different readings, and which rest on reasoning alone.
 
 When to see a professional, and what to ask: say once, plainly, that this is not medical advice and does not replace a doctor, pharmacist or other qualified professional. Say when to see one, in general terms: when symptoms are severe, sudden, getting worse or not improving; before starting, stopping or changing a medicine; during pregnancy, for a child, or with a long-term condition. Then give, in plain sentences, the questions from the debate worth taking to that appointment.
 

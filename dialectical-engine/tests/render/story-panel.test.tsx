@@ -44,8 +44,8 @@ describe("StoryPanel (spec §10)", () => {
     expect(html).toContain('data-story-status="READY"');
     expect(html).toContain("<details class=\"storyPanelDetails\" open=\"\">");
     expect(html).toContain("Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.");
-    expect(html).toContain("Held up");
-    expect(html).toContain("Partly held");
+    // The fixture's fates follow the threshold rule: two positions partly held, one fell.
+    expect(html.match(/Partly held/gu)).toHaveLength(2);
     expect(html).toContain("Fell");
     expect(html).toContain("What would change the answer:");
     expect(html).toContain("Reviewer&#x27;s note");

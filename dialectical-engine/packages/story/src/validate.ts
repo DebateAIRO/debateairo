@@ -36,8 +36,9 @@ export interface StoryMaterialIndex {
   readonly pathCap: number;
   /**
    * Every score and threshold of the material as a story might print it: two
-   * decimals with "." and with "," (0.64, 0,64), and a threshold's one-decimal
-   * form when that form is exact (0.7, 0,7). A text holding one as a whole
+   * decimals, and the value as the material prints it (0.6412, 0.7), each with
+   * "." and with "," (0.64, 0,64). A form the question or a claim also states
+   * is the person's own figure and is not held. A text holding one as a whole
    * token (no digit on either side, and no percent sign after it) is refused,
    * STORY_TEXT_SCORE_VALUE.
    */

@@ -19,8 +19,8 @@ import {
  * The material names points by short references (Task 3); the index holds
  * exactly those, and every score and threshold of the material as a story
  * might print it (R1): here a winner of 0.64, a runner-up of 0.58, a high cut
- * of 0.7 (also printed 0,7: its one-decimal form is exact) and a low cut of
- * 0.35 (whose one-decimal form is not).
+ * of 0.7 (also 0,7: the material prints it as 0.7) and a low cut of 0.35
+ * (whose rounding to 0,3 the material never prints).
  */
 const SCORE_TEXTS: ReadonlySet<string> = new Set([
   "0.64", "0,64", "0.58", "0,58", "0.70", "0,70", "0.7", "0,7", "0.35", "0,35"
@@ -319,7 +319,7 @@ describe("verdict story — the story classifier", () => {
       ["a figure with a digit on either side", "The rent is 10,640 lei a year, not 0,645 of the salary."],
       ["a longer decimal that only starts like a score", "Inflation ran at 0.643 last quarter."],
       ["a number the material does not hold", "The tram runs every 0.25 hours at peak."],
-      ["a threshold's inexact one-decimal form", "Roughly 0,3 of the budget is fixed."],
+      ["a rounding of a threshold the material never prints", "Roughly 0,3 of the budget is fixed."],
       ["a range that only looks like one, the point read literally", "Children aged 0-7 ride free, and 0 64 is a bus line."],
       // A percentage is the debate's own figure, even when its digits match a
       // threshold: an interest rate of 0,35% a month, a fee of 0.64 %.

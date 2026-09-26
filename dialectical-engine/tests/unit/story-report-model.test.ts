@@ -214,7 +214,7 @@ describe("buildReportModel (spec §10 PDF layout)", () => {
 
   it("puts the short version first, with fate words and what would change the answer", () => {
     expect(model.inShort.headline).toBe(storyFixture("READY").story!.short.headline);
-    expect(model.inShort.paths.map((path) => path.fateWords)).toEqual(["Held up", "Partly held", "Fell"]);
+    expect(model.inShort.paths.map((path) => path.fateWords)).toEqual(["Partly held", "Partly held", "Fell"]);
     expect(model.inShort.morePaths).toBeNull();
     expect(model.inShort.change.spans.slice(1).map((span) => span.kind === "cite" ? span.label : "")).toEqual(["P3", "P5"]);
   });

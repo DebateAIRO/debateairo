@@ -220,15 +220,33 @@ function storyNumber(value: number): number {
 /**
  * A score as a story might print it (spec §14.1): two decimals, rounded half up
  * the way a person rounds (0.575 prints 0.58, though the float sits a hair
- * below), with a point and with a comma. A threshold also in its one-decimal
- * form when that form is exact (0.7, not 0.35 as 0.3). Scores are at most four
- * decimals here (`storyNumber`), so the small nudge never crosses a real half.
+ * below), and the value exactly as the material prints it (0.6412, 0.7, 0.5),
+ * each with a point and with a comma. A value the material prints without a
+ * decimal separator (0, 1) has no form: a bare digit is never a score text.
+ * Scores are at most four decimals here (`storyNumber`), so the small nudge
+ * never crosses a real half.
  */
-function storyScoreForms(value: number, threshold: boolean): readonly string[] {
+function storyScoreForms(value: number): readonly string[] {
   const magnitude = Math.abs(value);
-  const printed = [(Math.round(magnitude * 100 + 1e-7) / 100).toFixed(2)];
-  if (threshold && Number(magnitude.toFixed(1)) === magnitude) printed.push(magnitude.toFixed(1));
-  return printed.flatMap((form) => [form, form.replace(".", ",")]);
+  const printed = new Set([(Math.round(magnitude * 100 + 1e-7) / 100).toFixed(2), String(magnitude)]);
+  return [...printed]
+    .filter((form) => /^[0-9]+\.[0-9]+$/u.test(form))
+    .flatMap((form) => [form, form.replace(".", ",")]);
+}
+
+/**
+ * Every decimal a text states as a figure of its own: a digit run, one "." or
+ * ",", a digit run, with no digit or further separator on either side and no
+ * percent sign after it. Read with the comma as a point, so "0,70" and "0.70"
+ * are the same figure. A percentage is never refused anyway, so it frees nothing.
+ */
+function storyStatedFigures(texts: readonly string[]): ReadonlySet<string> {
+  const figures = new Set<string>();
+  const decimal = /(?<![\p{Nd}.,])\p{Nd}+[.,]\p{Nd}+(?![\p{Nd}]|[.,]\p{Nd})(?![\p{Zs}]?%)/gu;
+  for (const text of texts) {
+    for (const match of text.matchAll(decimal)) figures.add(match[0].replace(",", "."));
+  }
+  return figures;
 }
 
 /**
@@ -237,12 +255,29 @@ function storyScoreForms(value: number, threshold: boolean): readonly string[] {
  * and every threshold, as a story might print them. Only what the material
  * shows: a point the last ladder step left out adds nothing. Leverage and the
  * judges' spread are not scores and are not held.
+ *
+ * A form the person's side of the debate also states as a figure is left out
+ * (fix round 1, I-1): the question, every claim, every best case, objection and
+ * review reason. "0,70 lei/kWh" in a claim is the question's own price, and the
+ * story must be free to repeat it even when a threshold is 0.7. The served
+ * statement and the set-aside and exclusion reasons free nothing: the first is
+ * written from a digest that carries the scores, the others are code's words,
+ * which can quote a score ("Recorded strength 0.21 ...").
  */
 function storyScoreTexts(material: StoryMaterial): ReadonlySet<string> {
+  const stated = storyStatedFigures([
+    material.question,
+    ...material.positions.map((position) => position.claim),
+    ...material.points.flatMap((point) => [
+      point.claim, point.best_case ?? "", point.objection ?? "", ...(point.review_reasons ?? [])
+    ])
+  ]);
   const texts = new Set<string>();
-  const add = (value: number | null | undefined, threshold = false): void => {
+  const add = (value: number | null | undefined): void => {
     if (value === null || value === undefined || !Number.isFinite(value)) return;
-    for (const form of storyScoreForms(value, threshold)) texts.add(form);
+    for (const form of storyScoreForms(value)) {
+      if (!stated.has(form.replace(",", "."))) texts.add(form);
+    }
   };
   for (const point of material.points) {
     add(point.base);
@@ -254,7 +289,11 @@ function storyScoreTexts(material: StoryMaterial): ReadonlySet<string> {
   add(verdict.runner_up_final);
   add(verdict.margin);
   add(verdict.disagreement);
-  for (const threshold of Object.values(verdict.thresholds)) add(threshold, true);
+  // The thresholds as the verdict field prints them, and as rule_in_words does (four decimals).
+  for (const threshold of Object.values(verdict.thresholds)) {
+    add(threshold);
+    add(storyNumber(threshold));
+  }
   return texts;
 }
 
