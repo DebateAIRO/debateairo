@@ -2341,7 +2341,9 @@ export const CONTENT_CARRIERS = Object.freeze([
   "core.value_hinge",
   "ledger.overlay_run",
   "core.run_progress_event",
-  "memory.alias_row"
+  "memory.alias_row",
+  // Verdict story (migration 0072): the story, its reservation and its verdict basis.
+  "serve.answer_story"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

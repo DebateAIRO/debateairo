@@ -400,7 +400,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0069_remaining_content_carriers.sql",
         // DL7-F9 (Task 14): the threshold operator principal; the daemon loses INSERT on the
         // policy that rules it. 0069 and 0070 are reserved for V-6. A new prefix, no pair.
-        "0071_observation_threshold_operator.sql"
+        "0071_observation_threshold_operator.sql",
+        // Verdict story (spec 2026-09-26 §7): serve.answer_story and the STORY spend
+        // source. The next free prefix after 0071; 0070 stays reserved. No pair.
+        "0072_answer_story.sql"
       ]);
   });
 });

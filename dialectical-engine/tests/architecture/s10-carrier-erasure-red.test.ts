@@ -205,6 +205,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/memory/src/index.ts",
       "packages/serve/src/index.ts",
       "packages/settlement/src/index.ts",
+      // Verdict story (0072): the story repository seals and reads serve.answer_story
+      // inside withRunContentLease, borrowed when the runner's hook already holds it.
+      "packages/story/src/repository.ts",
       "packages/valuation/src/index.ts"
     ]);
     for (const path of primitiveFiles.filter((path) => path !== "packages/db/src/index.ts")) {

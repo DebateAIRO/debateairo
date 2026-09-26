@@ -718,6 +718,9 @@ importers:
       '@debateai/contract':
         specifier: workspace:*
         version: link:../contract
+      '@debateai/db':
+        specifier: workspace:*
+        version: link:../db
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel

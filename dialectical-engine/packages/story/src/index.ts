@@ -51,3 +51,8 @@ export {
   type StoryLoopOutcome,
   type StoryRoundRecord
 } from "./loop.js";
+export {
+  StoryRepository,
+  type StoredStory,
+  type StoryRecordInput
+} from "./repository.js";
