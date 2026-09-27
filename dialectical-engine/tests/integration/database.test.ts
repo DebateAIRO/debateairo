@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { persistTerminalAnswer, persistTerminalRun } from "../support/settledRun.js";
 import { createServer, type Server } from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { once } from "node:events";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -59,9 +61,9 @@ import {
 import { AnswerSchema } from "@debateai/contract";
 import { DEBATE_ROLES, debateRoleFromCallSiteKey, type DebateRole, type ServedRootRuleHistory } from "@debateai/kernel";
 import { canonicalPromptFingerprint, selectSeatCandidate, type RoleSeat } from "@debateai/scorecard";
-import { createPostgresMomentSource, exportRunMoments } from "../../acceptance/export-moment.js";
-import { captureMomentPacket, parseMomentBuilder } from "../../acceptance/moment-tools.js";
-import { replayMoment } from "../../acceptance/replay-moment.js";
+import { createPostgresMomentSource, exportRunMoments, momentFileNameFor } from "../../acceptance/export-moment.js";
+import { captureMomentPacket, parseMomentBuilder, writePrivateJsonFile } from "../../acceptance/moment-tools.js";
+import { readMomentFile, replayMoment } from "../../acceptance/replay-moment.js";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -8931,11 +8933,18 @@ describe("A18 · every recorded call of a run is a moment, and replays as the sa
     const exported = await exportRunMoments(createPostgresMomentSource(database.pool), {
       runId: scenario.runId, exportedAt: new Date().toISOString(), engineCommit: null
     });
-    // Every model call of this run is a debate role's call with a prompt record.
+    // Every model call of this run is a debate role's call with a prompt record, and an answer.
     expect(exported.skipped).toEqual([]);
     expect(new Set(exported.moments.map((moment) => moment.role))).toEqual(new Set(DEBATE_ROLES));
+    expect(exported.moments.filter((moment) => moment.recorded === null).map((moment) => moment.source.callSiteKey))
+      .toEqual([]);
 
-    // (1) Each moment carries the fingerprint the GATEWAY recorded for its call's first attempt.
+    // (1) Each moment carries the fingerprint the GATEWAY recorded for its key's first prompt record. That
+    //     is carry 1's sequence (the one that holds the first answer) because every key answered on its
+    //     first sequence: no call of this scenario failed. Pinned here, so a scenario that adds a failure
+    //     says why check (1) no longer applies.
+    expect(scenario.calls.filter((call) => call.outcome !== "OK").map((call) => [call.call_site_key, call.outcome]))
+      .toEqual([]);
     const firstAttempts = await database.pool.query<{ call_site_key: string; attempt_id: string }>(
       `SELECT DISTINCT ON (entry.call_site_key) entry.call_site_key, entry.attempt_id::text AS attempt_id
          FROM ledger.ledger_entry AS entry
@@ -8944,42 +8953,64 @@ describe("A18 · every recorded call of a run is a moment, and replays as the sa
         ORDER BY entry.call_site_key, entry.sequence`,
       [scenario.runId]
     );
-    const gatewayRecorded: Record<string, string | undefined> = {};
+    const gatewayRecorded: Record<string, string> = {};
     for (const row of firstAttempts.rows) {
-      gatewayRecorded[row.call_site_key] = (await readCallPrompt(database.pool, row.attempt_id))?.promptFingerprint;
+      const record = await readCallPrompt(database.pool, row.attempt_id);
+      expect(record, row.call_site_key).not.toBeNull();
+      gatewayRecorded[row.call_site_key] = record!.promptFingerprint;
     }
     expect(Object.fromEntries(exported.moments.map((moment) => [moment.source.callSiteKey, moment.recorded?.promptFingerprint])))
       .toEqual(gatewayRecorded);
 
-    // (2) Replay sends that same prompt, for every role. The relay refuses every
-    //     call, so no model answers: what is compared is the prompt alone.
-    const refusing = (async () => new Response(JSON.stringify({ error: "CLI_RELAY_FAILED" }), { status: 502 })) as typeof fetch;
-    for (const moment of exported.moments) {
-      const offline = await captureMomentPacket(parseMomentBuilder(moment.builder, moment.role));
-      const replayed = await replayMoment({
-        moment,
-        thinkingLevel: "DEFAULT_ONLY",
-        bound: { maxAttempts: 1, tokenCeiling: 512, deadlineMs: 5_000 },
-        endpoint: {
-          providerRef: "replay:refusing", maker: "Refusing relay", tool: "claude", modelId: "refusing-model",
-          baseUrl: "http://127.0.0.1:9/v1", bearerToken: "r".repeat(43), thinkingLevels: [], contextWindowTokens: null
-        },
-        fetchImplementation: refusing,
-        sleepImplementation: async () => undefined
-      });
-      expect({
-        key: moment.source.callSiteKey,
-        offline: canonicalPromptFingerprint(offline.messages),
-        sent: replayed.promptFingerprint,
-        same: replayed.fingerprintMatchesRecorded,
-        outcome: replayed.outcome
-      }).toEqual({
-        key: moment.source.callSiteKey,
-        offline: moment.recorded?.promptFingerprint,
-        sent: moment.recorded?.promptFingerprint,
-        same: true,
-        outcome: "FAILED"
-      });
+    // (2) Replay sends that same prompt, for every role, the way the evaluator reads it: from an
+    //     owner-only moment file. The relay records each request it receives and refuses it with a
+    //     502, so no model answers: what is compared is the prompt alone, as it LEFT the gateway, and
+    //     FAILED is the relay's refusal, never a refusal before the wire.
+    const wire: string[] = [];
+    const refusing = (async (_input: unknown, init?: { readonly body?: unknown }) => {
+      wire.push(String(init?.body));
+      return new Response(JSON.stringify({ error: "CLI_RELAY_FAILED" }), { status: 502 });
+    }) as typeof fetch;
+    const momentDirectory = await mkdtemp(join(tmpdir(), "a18-moments-"));
+    try {
+      for (const exportedMoment of exported.moments) {
+        const momentPath = join(momentDirectory, momentFileNameFor(exportedMoment));
+        await writePrivateJsonFile(momentPath, exportedMoment);
+        const moment = await readMomentFile(momentPath);
+        const offline = await captureMomentPacket(parseMomentBuilder(moment.builder, moment.role));
+        wire.length = 0;
+        const replayed = await replayMoment({
+          moment,
+          thinkingLevel: "DEFAULT_ONLY",
+          bound: { maxAttempts: 1, tokenCeiling: 512, deadlineMs: 5_000 },
+          endpoint: {
+            providerRef: "replay:refusing", maker: "Refusing relay", tool: "claude", modelId: "refusing-model",
+            baseUrl: "http://127.0.0.1:9/v1", bearerToken: "r".repeat(43), thinkingLevels: [], contextWindowTokens: null
+          },
+          fetchImplementation: refusing,
+          sleepImplementation: async () => undefined
+        });
+        const onWire = JSON.parse(wire[0] ?? "{}") as { readonly messages?: readonly { readonly role: string; readonly content: string }[] };
+        expect({
+          key: moment.source.callSiteKey,
+          requests: wire.length,
+          onWire: canonicalPromptFingerprint(onWire.messages ?? []),
+          offline: canonicalPromptFingerprint(offline.messages),
+          sent: replayed.promptFingerprint,
+          same: replayed.fingerprintMatchesRecorded,
+          outcome: replayed.outcome
+        }).toEqual({
+          key: exportedMoment.source.callSiteKey,
+          requests: 1,
+          onWire: exportedMoment.recorded?.promptFingerprint,
+          offline: exportedMoment.recorded?.promptFingerprint,
+          sent: exportedMoment.recorded?.promptFingerprint,
+          same: true,
+          outcome: "FAILED"
+        });
+      }
+    } finally {
+      await rm(momentDirectory, { recursive: true, force: true });
     }
   });
 });
