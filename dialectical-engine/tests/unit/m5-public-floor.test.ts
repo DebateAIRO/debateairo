@@ -58,7 +58,7 @@ const authenticated = Object.freeze({
 }) satisfies AuthenticatedSession;
 
 type FloorReader = (input: Readonly<{ runId: string; answerId: string; userId: string; ownerRef: string }>) =>
-  Promise<Readonly<{ verdictState: string; leadingNodeId: string }> | null>;
+  Promise<Readonly<{ verdictState: string; leadingNodeId: string; basisIncomplete: boolean | null }> | null>;
 
 /** The engine's node ids are UUIDs (the record's column is `uuid`); the fixture's first node takes one. */
 const LEADING = "33333333-3333-4333-8333-333333333333";
@@ -118,14 +118,17 @@ describe("M5 · the public snapshot's floor, in the contract", () => {
     expect(PublicDebateSchema.parse(OLD_SNAPSHOT).floor).toBeUndefined();
   });
 
-  it("parses a snapshot that carries a floor", () => {
-    const floor = { verdict_state: "SUPPORTED", leading_node_id: "33333333-3333-4333-8333-333333333333" } as const;
+  it("parses a snapshot that carries a floor, with its thin-basis flag", () => {
+    const floor = { verdict_state: "SUPPORTED", leading_node_id: "33333333-3333-4333-8333-333333333333", basis_incomplete: true } as const;
     expect(PublicDebateSchema.parse({ ...OLD_SNAPSHOT, floor }).floor).toEqual(floor);
   });
 
-  it("refuses a floor with a member the contract does not name, a label outside the three, or a leading node that is not an id", () => {
-    const floor = { verdict_state: "SUPPORTED", leading_node_id: "33333333-3333-4333-8333-333333333333" } as const;
+  it("refuses a floor with a member the contract does not name, a label outside the three, a leading node that is not an id, or no basis flag", () => {
+    const floor = { verdict_state: "SUPPORTED", leading_node_id: "33333333-3333-4333-8333-333333333333", basis_incomplete: false } as const;
     expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, floor: { ...floor, reason: "ENVELOPE_EXHAUSTED" } }).success).toBe(false);
+    expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, floor: { ...floor, floor_reason: "ENVELOPE_EXHAUSTED" } }).success).toBe(false);
+    const { basis_incomplete: _dropped, ...withoutBasis } = floor;
+    expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, floor: withoutBasis }).success).toBe(false);
     expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, floor: { ...floor, verdict_state: "LIKELY" } }).success).toBe(false);
     expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, floor: { ...floor, leading_node_id: "node:1" } }).success).toBe(false);
     expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, floor: null }).success).toBe(false);
@@ -137,9 +140,10 @@ describe("M5 · publishing copies the floor from the owner's record", () => {
     const answer = componentsOnlyAnswer();
     const leading = answer.nodes[0]!.node_id;
     expect(leading).toBe(LEADING);
-    const reader = vi.fn<FloorReader>(async () => ({ verdictState: "CONTESTED", leadingNodeId: leading }));
+    const reader = vi.fn<FloorReader>(async () => ({ verdictState: "CONTESTED", leadingNodeId: leading, basisIncomplete: true }));
     const debate = await publishWith(answer, reader);
-    expect(debate.floor).toEqual({ verdict_state: "CONTESTED", leading_node_id: leading });
+    // M5 review, I2: the thin-basis flag travels; the cause never does.
+    expect(debate.floor).toEqual({ verdict_state: "CONTESTED", leading_node_id: leading, basis_incomplete: true });
     expect(debate.answer).toMatchObject({ terminal: "COMPONENTS_ONLY", verdict: null, verdict_available: false });
     expect(reader).toHaveBeenCalledWith({
       runId: RUN_ID, answerId: STORY_TEST_ANSWER_ID, userId: authenticated.userId, ownerRef: authenticated.ownerRef
@@ -152,7 +156,7 @@ describe("M5 · publishing copies the floor from the owner's record", () => {
   });
 
   it("never reads a floor for a served answer: it carries its own label", async () => {
-    const reader = vi.fn<FloorReader>(async () => ({ verdictState: "CONTESTED", leadingNodeId: randomUUID() }));
+    const reader = vi.fn<FloorReader>(async () => ({ verdictState: "CONTESTED", leadingNodeId: randomUUID(), basisIncomplete: false }));
     const debate = await publishWith(buildFairShapedAnswer({ run_ref: RUN_ID, answer_id: STORY_TEST_ANSWER_ID }), reader);
     expect("floor" in debate).toBe(false);
     expect(reader).not.toHaveBeenCalled();
@@ -160,8 +164,9 @@ describe("M5 · publishing copies the floor from the owner's record", () => {
 
   it.each([
     ["the record cannot be read", async () => { throw new TypedDomainError("SERVE_DISCLOSURE_ROW_INVALID", "row 7 near SELECT floor"); }, "SERVE_DISCLOSURE_ROW_INVALID"],
-    ["the record's label is not one the contract names", async () => ({ verdictState: "LIKELY", leadingNodeId: randomUUID() }), "FLOOR_REFUSED"],
-    ["its leading position is not a published node", async () => ({ verdictState: "SUPPORTED", leadingNodeId: randomUUID() }), "FLOOR_NODE_NOT_PUBLISHED"]
+    ["the record's label is not one the contract names", async () => ({ verdictState: "LIKELY", leadingNodeId: LEADING, basisIncomplete: false }), "FLOOR_REFUSED"],
+    ["the floor's label receipt is missing, so its basis is unknown", async () => ({ verdictState: "SUPPORTED", leadingNodeId: LEADING, basisIncomplete: null }), "FLOOR_REFUSED"],
+    ["its leading position is not a published node", async () => ({ verdictState: "SUPPORTED", leadingNodeId: randomUUID(), basisIncomplete: false }), "FLOOR_NODE_NOT_PUBLISHED"]
   ] as const)("never blocks the publish when %s: no floor, one bounded log line", async (_name, reader, diagnostic) => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const debate = await publishWith(componentsOnlyAnswer(), reader as FloorReader);

@@ -28,6 +28,7 @@ export {
 // content-free disclosure row beside each served answer (migration 0076), and
 // its owner and operator reads (Task M5).
 export {
+  FLOOR_BASIS_INCOMPLETE_SQL,
   SERVE_DISCLOSURE_BODY_STOPS,
   SERVE_DISCLOSURE_FLOOR_STATES,
   SERVE_DISCLOSURE_SERVE_STOPS,
@@ -38,7 +39,8 @@ export {
   type ServeDisclosureRead,
   type ServeDisclosureRecord,
   type ServeDisclosureServeStop,
-  type StoredServeDisclosure
+  type StoredServeDisclosure,
+  type StoredServeFloor
 } from "./serve-disclosure.js";
 
 export {

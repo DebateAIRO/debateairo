@@ -45,6 +45,7 @@ import {
   ENGINE_COMPOSITION_SEGMENT_CAP,
   ENGINE_FIXED_ORGANS_PER_COMPOSITION,
   ENGINE_MAX_RECOMPOSE,
+  readVerdictLabelControls,
   resolveScoringOperator,
   type AdaptiveStoppingControls
 } from "@debateai/register";
@@ -959,7 +960,8 @@ export type ReviewCatchUpRefusal =
   | "CATCH_UP_DISCLOSURE_MISMATCH"
   | "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE"
   | "CATCH_UP_WOULD_DOWNGRADE"
-  | "CATCH_UP_NUMBER_WOULD_MOVE";
+  | "CATCH_UP_NUMBER_WOULD_MOVE"
+  | "CATCH_UP_FLOOR_WOULD_MOVE";
 
 /** The previous answer's class-H/class-D row, as the catch-up lane reads it. */
 export interface StoredUnjudgedDisclosure {
@@ -1128,11 +1130,30 @@ export interface ReviewCatchUpReviewer {
   }>;
 }
 
+/**
+ * ENGINE MONEY RULE, TASK M5 review (M1) — a floor answer's floor, as the
+ * catch-up compares it: the leading position and its label. `verdictState` is
+ * null when the leading position MOVED: its label is not re-derived, because
+ * the move alone refuses the version.
+ */
+export interface ReviewCatchUpFloor {
+  readonly leadingNodeId: string;
+  readonly verdictState: VerdictLabelDerivation["label"] | null;
+}
+
 export interface ReviewCatchUpVersionCandidate {
   readonly terminalBefore: "SERVED" | "DOWNGRADED" | "COMPONENTS_ONLY" | "BLOCKED";
   readonly terminalAfter: "SERVED" | "DOWNGRADED" | "COMPONENTS_ONLY" | "BLOCKED";
   readonly numberBefore: number | null;
   readonly numberAfter: number | null;
+  /**
+   * M5 review (M1): the floor of the answer being superseded (null when it has
+   * none), and the floor re-derived from the catch-up's own propagation (null
+   * when no servable position is left). A superseding version carries the
+   * floor forward on the owner's record, so it may not move it.
+   */
+  readonly floorBefore: ReviewCatchUpFloor | null;
+  readonly floorAfter: ReviewCatchUpFloor | null;
   readonly nowVisible: number;
   readonly stillSetAside: number;
   persist(): Promise<{ readonly answerVersion: number }>;
@@ -1308,6 +1329,13 @@ export async function runReviewCatchUp(input: {
   if (!Object.is(candidate.numberAfter, candidate.numberBefore)) {
     return reportWithoutVersion("CATCH_UP_NUMBER_WOULD_MOVE", reviewed, work.length - reviewed);
   }
+  // Engine money rule, M5 review (M1): a floor answer has no served number, so
+  // the guard above can never see its label move. Its floor — the leading
+  // position and the label — is re-derived from the same propagation, and a
+  // version that would move either is refused the same way.
+  if (catchUpFloorWouldMove(candidate.floorBefore, candidate.floorAfter)) {
+    return reportWithoutVersion("CATCH_UP_FLOOR_WOULD_MOVE", reviewed, work.length - reviewed);
+  }
   const persisted = await candidate.persist();
   const afterAttempts = await input.dependencies.countRunModelAttempts(input.runId);
   return Object.freeze({
@@ -1318,6 +1346,46 @@ export async function runReviewCatchUp(input: {
     envelopeRemaining: Math.max(0, maximumAttempts - afterAttempts), refusal: null
   });
   });
+}
+
+/** A floor moved when it is gone, led by another position, or labelled otherwise. */
+export function catchUpFloorWouldMove(before: ReviewCatchUpFloor | null, after: ReviewCatchUpFloor | null): boolean {
+  if (before === null) return false;
+  return after === null || after.leadingNodeId !== before.leadingNodeId || after.verdictState !== before.verdictState;
+}
+
+/**
+ * ENGINE MONEY RULE, TASK M5 review (M1) — THE FLOOR, RE-DERIVED from a
+ * catch-up's own propagation, the way the runner derived it: the servable
+ * maker positions (the graph's parentless, non-folder nodes that propagated)
+ * are ranked by `selectServedRootByStrength`; when the same position leads, its
+ * label is re-derived by the sealed `deriveVerdictLabel` from the new winning
+ * strength and margin, the SAME disagreement the floor's label read (the
+ * leading position's recorded panel dispersion, which a review never changes)
+ * and the label controls of the register version the floor's receipt names.
+ */
+export function rederiveCatchUpFloor(input: Readonly<{
+  nodes: readonly Readonly<{ nodeId: string; parentNodeId?: string | null; isFolder?: boolean }>[];
+  strengths: readonly Readonly<{ nodeId: string; strength: number }>[];
+  leadingNodeId: string;
+  disagreement: VerdictLabelBasis["disagreement"];
+  controls: VerdictLabelBasis["controls"];
+}>): ReviewCatchUpFloor | null {
+  const propagated = new Set(input.strengths.map((row) => row.nodeId));
+  const servable = input.nodes.filter((node) =>
+    (node.parentNodeId ?? null) === null && node.isFolder !== true && propagated.has(node.nodeId));
+  if (servable.length === 0) return null;
+  const selection = selectServedRootByStrength(servable, input.strengths);
+  if (selection.root.nodeId !== input.leadingNodeId) {
+    return Object.freeze({ leadingNodeId: selection.root.nodeId, verdictState: null });
+  }
+  const label = deriveVerdictLabel(Object.freeze({
+    winner: selection.servedStrength,
+    margin: selection.margin,
+    disagreement: input.disagreement,
+    controls: input.controls
+  }));
+  return Object.freeze({ leadingNodeId: selection.root.nodeId, verdictState: label.label });
 }
 
 export function createPostgresReviewCatchUpDependencies(input: {
@@ -1340,6 +1408,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
   const ledger = new LedgerRepository(input.pool);
   const serve = new ServeRepository(input.pool);
   const budget = new BudgetRepository(input.pool);
+  const disclosures = new ServeDisclosureRepository(input.pool);
   const resolveSnapshot = async (runId: string): Promise<EvaluationSnapshot> => {
     const materialised = await graph.materialiseSnapshot(runId);
     const targets = [...new Set(materialised.arrows.flatMap((arrow) =>
@@ -1490,6 +1559,28 @@ export function createPostgresReviewCatchUpDependencies(input: {
       const currentNumber = source.servedNumber;
       const nextStrength = currentNumber === null ? null
         : propagation.strengths.find((row) => row.nodeId === currentNumber.nodeId)?.strength ?? null;
+      // M5 review (M1): the floor the answer carries on the owner's record, and
+      // the one this propagation would give it.
+      const floorReceipt = await disclosures.readLatestFloorReceipt(answerId);
+      const floorBefore: ReviewCatchUpFloor | null = floorReceipt === null ? null : Object.freeze({
+        leadingNodeId: floorReceipt.floor.leadingNodeId,
+        verdictState: floorReceipt.floor.verdictState
+      });
+      const floorAfter = floorReceipt === null ? null : await (async () => {
+        const controls = await readVerdictLabelControls(input.pool, floorReceipt.registerVersion);
+        return rederiveCatchUpFloor({
+          nodes: fullSnapshot.nodes,
+          strengths: propagation.strengths,
+          leadingNodeId: floorReceipt.floor.leadingNodeId,
+          disagreement: floorReceipt.disagreement,
+          controls: Object.freeze({
+            gamma: controls.gamma,
+            highCut: controls.highCut,
+            lowCut: controls.lowCut,
+            disagreementThreshold: controls.disagreementThreshold
+          })
+        });
+      })();
       const result = {
         terminal: source.answer.terminal,
         answerForm: source.answer.answer_form as ServeGateResult["answerForm"],
@@ -1529,6 +1620,8 @@ export function createPostgresReviewCatchUpDependencies(input: {
         terminalAfter: result.terminal,
         numberBefore: currentNumber?.value ?? null,
         numberAfter: nextStrength,
+        floorBefore,
+        floorAfter,
         nowVisible: standing.snapshot.nodes.length,
         stillSetAside: standing.hiddenNodeIds.length,
         persist: async () => serve.persist({
@@ -2235,7 +2328,9 @@ export function serveDisclosureBodyFacts(input: Readonly<{
  *  · `leadingNodeId`: the position the label rests on, the same node the
  *    label's `servedNodeId` names;
  *  · `reason`: the sealed components-only cause (the result's crash class), a
- *    code; the terminal's own name if a result ever carries none.
+ *    code. Every sealed components-only constructor names one, so a result
+ *    without one is a typed stop (`SERVE_FLOOR_REASON_UNRESOLVED`), never an
+ *    unnamed floor (M5 review, M5).
  *
  * The sealed answer stays COMPONENTS_ONLY: nothing here reaches it, so no
  * artifact and no checker verdict are invented (money map R1, route (a)). A
@@ -2255,10 +2350,16 @@ export function serveFloorOf(input: Readonly<{
   leadingNodeId: string;
 }>): ServeFloor | null {
   if (input.terminal !== "COMPONENTS_ONLY") return null;
+  if (input.crashClass === null) {
+    throw new TypedDomainError(
+      "SERVE_FLOOR_REASON_UNRESOLVED",
+      "A components-only result names its sealed crash class; a floor is never written without its cause"
+    );
+  }
   return Object.freeze({
     verdictState: input.label,
     leadingNodeId: input.leadingNodeId,
-    reason: input.crashClass ?? input.terminal
+    reason: input.crashClass
   });
 }
 
@@ -6716,6 +6817,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SERVE_DISCLOSURE_RECORD_INVALID",
   "SERVE_DISCLOSURE_ROW_INVALID",
   "SERVE_DRAFT_UNRESOLVED",
+  "SERVE_FLOOR_REASON_UNRESOLVED",
   "SERVE_GATE_CHAIN_FAILED",
   "SERVE_ITEMS_NOT_A_LIST",
   "SERVE_ITEM_INVALID",

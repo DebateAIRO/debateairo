@@ -5,6 +5,7 @@ import {
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
 import { withPublicationContentLease } from "./publication-lease.js";
+import { FLOOR_BASIS_INCOMPLETE_SQL } from "./serve-disclosure.js";
 
 const PUBLICATION_TRANSITION_SIGNATURE =
   "core.transition_run_publication(uuid,uuid,uuid,uuid,uuid,text,text,uuid,text,jsonb,timestamptz,uuid,uuid,uuid)";
@@ -438,19 +439,26 @@ export class PostgresPublicationRepository {
    * Engine money rule, Task M5 (spec 2026-09-26 §14.4.4): the FLOOR of an
    * answer of a run the active user owns, for the public snapshot — the label
    * and the leading position from the answer's latest disclosure record
-   * (migration 0076's serve.serve_disclosure). Content-free (a code and a node
-   * id), so it needs no content lease. Null for a run that is not theirs, an
-   * answer with no record, or a record with no floor.
+   * (migration 0076's serve.serve_disclosure), and whether that label was
+   * derived without a margin or a disagreement measure (M5 review, I2: read
+   * from its label receipt by the disclosure repository's own rule).
+   * Content-free (codes, a node id and a flag), so it needs no content lease.
+   * Null for a run that is not theirs, an answer with no record, or a record
+   * with no floor; `basisIncomplete` is null when the floor's receipt is
+   * missing, which the caller treats as a floor it cannot publish.
    */
   async readAnswerFloor(input: Readonly<{
     runId: string;
     answerId: string;
     userId: string;
     ownerRef: string;
-  }>): Promise<Readonly<{ verdictState: string; leadingNodeId: string }> | null> {
-    const result = await this.pool.query<{ verdict_state: string | null; leading_node_id: string | null }>(`
+  }>): Promise<Readonly<{ verdictState: string; leadingNodeId: string; basisIncomplete: boolean | null }> | null> {
+    const result = await this.pool.query<{
+      verdict_state: string | null; leading_node_id: string | null; basis_incomplete: boolean | null;
+    }>(`
       SELECT disclosure.floor_verdict_state AS verdict_state,
-             disclosure.floor_leading_node_id::text AS leading_node_id
+             disclosure.floor_leading_node_id::text AS leading_node_id,
+             ${FLOOR_BASIS_INCOMPLETE_SQL} AS basis_incomplete
       FROM serve.serve_disclosure AS disclosure
       JOIN identity."user" AS identity_user
         ON identity_user.user_id=$3 AND identity_user.owner_ref=$4
@@ -464,7 +472,9 @@ export class PostgresPublicationRepository {
     const row = result.rows[0];
     return row === undefined || row.verdict_state === null || row.leading_node_id === null
       ? null
-      : Object.freeze({ verdictState: row.verdict_state, leadingNodeId: row.leading_node_id });
+      : Object.freeze({
+        verdictState: row.verdict_state, leadingNodeId: row.leading_node_id, basisIncomplete: row.basis_incomplete
+      });
   }
 
   async readOwnedVisibility(

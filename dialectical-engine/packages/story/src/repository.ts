@@ -223,10 +223,17 @@ export class StoryRepository {
   }
 
   /**
-   * The story of one answer, for its owner only. `answerVersion: null` means
-   * the answer's LATEST version (not the latest story), so a superseded answer
-   * whose new version has no story yet reads as "no story". "Not yours" and
-   * "malformed" are both `null`: the route answers one closed 404 for both.
+   * The story of one answer, for its owner only: the story of the LATEST answer
+   * version at or below the target that has one (M5 review, I1). The target is
+   * `answerVersion`, or the answer's latest version when it is `null`.
+   *
+   * A story is written once, by the runner, for the version it persisted. A
+   * DR-184 review catch-up appends a later version with no story of its own; it
+   * carries the verdict forward and refuses a moved number, a downgrade or a
+   * moved floor, so the story of the version it supersedes is still this
+   * answer's story. The returned row names its OWN `answerVersion`.
+   * "Not yours" and "malformed" are both `null`: the route answers one closed
+   * 404 for both.
    */
   async readForAnswer(input: {
     readonly answerId: string;
@@ -264,8 +271,10 @@ export class StoryRepository {
               story.content, story.content_ciphertext, story.created_at
        FROM target
        JOIN serve.answer_story AS story
-         ON story.answer_id = target.answer_id AND story.answer_version = target.answer_version
-       WHERE core.run_is_owned_by(target.run_id, $3, $4)`,
+         ON story.answer_id = target.answer_id AND story.answer_version <= target.answer_version
+       WHERE core.run_is_owned_by(target.run_id, $3, $4)
+       ORDER BY story.answer_version DESC
+       LIMIT 1`,
       [input.answerId, input.answerVersion, access.ownerRef, access.legacyAskerId]
     );
     const row = result.rows[0];
@@ -312,5 +321,42 @@ export class StoryRepository {
       if (isPrivateContentErased(error)) return null;
       throw error;
     }
+  }
+
+  /**
+   * The answer version a story is written for, and when it was stored (M5
+   * review, I1): the answer's FIRST version, the one the runner persisted. A
+   * DR-184 catch-up version never gets a story of its own, so the waiting window
+   * for a story not stored yet runs from this version, never from a later one.
+   * Owner-only, like `readForAnswer`; `null` for "not yours" and "malformed".
+   * Plaintext operational columns: no content lease.
+   */
+  async readStoryAnchor(input: {
+    readonly answerId: string;
+    readonly ownership: { readonly ownerRef?: string; readonly legacyAskerId?: string };
+  }): Promise<{ readonly answerVersion: number; readonly storedAt: Date } | null> {
+    if (!UUID_TEXT.test(input.answerId)) return null;
+    let access: RunOwnershipAccess;
+    try {
+      access = normalizeRunOwnership({
+        ownerRef: input.ownership.ownerRef ?? null,
+        legacyAskerId: input.ownership.legacyAskerId ?? null
+      });
+    } catch {
+      return null;
+    }
+    const result = await this.pool.query<{ answer_version: number; relevant_as_of: Date }>(
+      `SELECT answer.answer_version, answer.relevant_as_of
+         FROM serve.answer AS answer
+        WHERE answer.answer_id = $1
+          AND core.run_is_owned_by(answer.run_id, $2, $3)
+        ORDER BY answer.answer_version ASC
+        LIMIT 1`,
+      [input.answerId, access.ownerRef, access.legacyAskerId]
+    );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : Object.freeze({ answerVersion: Number(row.answer_version), storedAt: row.relevant_as_of });
   }
 }

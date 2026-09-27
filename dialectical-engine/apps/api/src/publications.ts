@@ -203,7 +203,8 @@ function logLanguageNotPublished(requestId: string, diagnostic: string): void {
  * Engine money rule, Task M5 (spec 2026-09-26 §14.4.4): the FLOOR of a
  * components-only answer — its label and its leading position — copied from
  * the owner's disclosure record, so the public page can say "Our best answer"
- * with the position's own statement. A served answer carries its own label and
+ * with the position's own statement, and whether that label's basis was thin
+ * (M5 review, I2). Never its cause. A served answer carries its own label and
  * is never read. Like the story and the language, it never blocks publishing:
  * a failed read, a floor the snapshot schema refuses, or a leading position
  * that is not among the published nodes publishes no floor, and the log
@@ -214,7 +215,7 @@ async function readPublishableFloor(
   input: Readonly<{ runId: string; answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
 ): Promise<AnswerFloor | null> {
   if (input.answer.terminal !== "COMPONENTS_ONLY") return null;
-  let floor: Readonly<{ verdictState: string; leadingNodeId: string }> | null;
+  let floor: Readonly<{ verdictState: string; leadingNodeId: string; basisIncomplete: boolean | null }> | null;
   try {
     floor = await repository.readAnswerFloor({
       runId: input.runId,
@@ -227,7 +228,11 @@ async function readPublishableFloor(
     return null;
   }
   if (floor === null) return null;
-  const parsed = AnswerFloorSchema.safeParse({ verdict_state: floor.verdictState, leading_node_id: floor.leadingNodeId });
+  // A floor whose label receipt is missing has no known basis (`null`): the
+  // schema refuses it, so no floor goes out without its thin-basis flag.
+  const parsed = AnswerFloorSchema.safeParse({
+    verdict_state: floor.verdictState, leading_node_id: floor.leadingNodeId, basis_incomplete: floor.basisIncomplete
+  });
   if (!parsed.success) {
     logFloorNotPublished(input.source.requestId, "FLOOR_REFUSED");
     return null;

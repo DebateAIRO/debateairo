@@ -151,8 +151,9 @@ describe("Accounts S8 publication architecture", () => {
     expect(schema).toContain("language: StoryLanguageTagSchema.optional()");
     // Engine money rule, Task M5 (spec §14.4.4): a components-only answer's
     // floor rides on the snapshot, optional (old snapshots parse), copied at
-    // publish time from the owner's record: the label and the published
-    // position it rests on — never the reason code, a model or a count.
+    // publish time from the owner's record: the label, the published position
+    // it rests on and whether that label's basis was thin (M5 review, I2) —
+    // never the reason code (owner-only `floor_reason`), a model or a count.
     expect(schema).toContain("floor: AnswerFloorSchema.optional()");
     expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
       .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor"]);
@@ -163,7 +164,7 @@ describe("Accounts S8 publication architecture", () => {
     const floorSchema = disclosure.slice(floorStart, floorEnd);
     expect(floorSchema).toContain(".strict()");
     expect([...floorSchema.matchAll(/^\s*([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["verdict_state", "leading_node_id"]);
+      .toEqual(["verdict_state", "leading_node_id", "basis_incomplete"]);
     for (const forbidden of [...ownerOnly, "reason", "model", "provider", "writer", "checker", "cut_short", "digest"]) {
       expect(floorSchema).not.toContain(forbidden);
     }

@@ -27,8 +27,10 @@ import {
 import { framedField, framedFixturePacket, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { requestedReviewEdges, type RequestedReviewEdge } from "../support/reviewBearings.js";
 import {
+  ALGORITHM_REGISTER_ROW_FAMILIES,
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
   assertBootstrapEquality,
+  buildAlgorithmRegisterRows,
   loadBootstrapRegister,
   parseRegisterVersionText,
   persistBootstrapRegister,
@@ -41,6 +43,7 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   applySingleLineageBandCap,
+  catchUpFloorWouldMove,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
   EVALUATOR_CONTRACT_TEXT,
@@ -78,7 +81,8 @@ import {
   type RunCreationSettings
 } from "@debateai/api";
 import { buildAnswerDisclosure } from "../../apps/api/src/disclosures.js";
-import { runServeDisclosureCli } from "../../apps/runner/src/serve-disclosure-cli.js";
+import { openServeDisclosureReader, runServeDisclosureCli } from "../../apps/runner/src/serve-disclosure-cli.js";
+import { persistCatchUpVersion } from "../support/catchUpVersion.js";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
 import {
@@ -6449,19 +6453,22 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
  * it rests on and the sealed cause land on the owner's row. The sealed answer is
  * untouched: COMPONENTS_ONLY, no label, no prose, no checked round.
  */
-async function labelledRoot(runId: string): Promise<Readonly<{ servedNodeId: string; label: string }>> {
-  const receipt = await database.pool.query<{ served_node_id: string | null; label: string | null }>(
+async function labelledRoot(runId: string): Promise<Readonly<{ servedNodeId: string; label: string; basisIncomplete: boolean }>> {
+  const receipt = await database.pool.query<{ served_node_id: string | null; label: string | null; basis_absence: unknown }>(
     `SELECT propagation.served_root_selection ->> 'servedNodeId' AS served_node_id,
-            propagation.served_root_selection #>> '{verdictLabel,label}' AS label
+            propagation.served_root_selection #>> '{verdictLabel,label}' AS label,
+            propagation.served_root_selection #> '{verdictLabel,basisAbsence}' AS basis_absence
        FROM ledger.propagation_run AS propagation
-      WHERE propagation.run_id = $1
+      WHERE propagation.run_id = $1 AND propagation.served_root_selection IS NOT NULL
       ORDER BY propagation.at_seq DESC
       LIMIT 1`,
     [runId]
   );
   const row = receipt.rows[0];
-  if (row?.served_node_id == null || row.label == null) throw new Error("TEST_LABEL_RECEIPT_ABSENT");
-  return Object.freeze({ servedNodeId: row.served_node_id, label: row.label });
+  if (row?.served_node_id == null || row.label == null || !Array.isArray(row.basis_absence)) {
+    throw new Error("TEST_LABEL_RECEIPT_ABSENT");
+  }
+  return Object.freeze({ servedNodeId: row.served_node_id, label: row.label, basisIncomplete: row.basis_absence.length > 0 });
 }
 
 /** The floor on the row IS the label on the receipt; the sealed answer invents nothing. */
@@ -6481,7 +6488,9 @@ async function expectFloor(
   const row = await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1);
   expect(row).toMatchObject({
     writerServedRef: null, checkerServedRef: null,
-    floorVerdictState: receipt.label, floorLeadingNodeId: receipt.servedNodeId, floorReason: reason
+    floorVerdictState: receipt.label, floorLeadingNodeId: receipt.servedNodeId, floorReason: reason,
+    // M5 review, I2: the floor's thin basis is the receipt's.
+    floorBasisIncomplete: receipt.basisIncomplete
   });
   // The leading position is a node of the answer the person reads.
   expect(scenario.answer?.nodes.map((node) => node.node_id)).toContain(receipt.servedNodeId);
@@ -6583,58 +6592,7 @@ describe("Engine money rule M5 — the disclosure read over the runner's own row
   }
 
   /** A DR-184 review catch-up version: what `prepareVersion` persists, and it runs no answer-writing step. */
-  async function catchUpVersion(runId: string): Promise<number> {
-    const serve = new ServeRepository(database.pool);
-    const source = await serve.readReviewCatchUpSource(runId);
-    const records = source.answer.condition_mark_records.map((record): PreservedConditionMarkRecord => ({
-      mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope, subjectRef: record.subject_ref,
-      reason: record.reason, liftPath: record.lift_path, servedRootRule: record.served_root_rule,
-      affectedNodeIds: record.affected_node_ids, callSiteKey: record.call_site_key,
-      plannedLegCount: record.planned_leg_count,
-      terminalTransportOutcome: record.terminal_transport_outcome,
-      hiddenStrength: record.hidden_strength, hiddenScoreThreshold: record.hidden_score_threshold,
-      hiddenScoreThresholdSourceRef: record.hidden_score_threshold_source_ref,
-      excludedFromServedNumber: record.excluded_from_served_number,
-      judgedBasisCount: record.judged_basis_count
-    }));
-    const persisted = await serve.persist({
-      runId, workItemId: source.workItemId, factBundleVersion: source.factBundleVersion,
-      factBundleContentHash: createHash("sha256").update(JSON.stringify(source.factBundle)).digest("hex"),
-      factBundle: source.factBundle,
-      result: {
-        terminal: source.answer.terminal, answerForm: source.answer.answer_form,
-        factBundle: source.factBundle, gateTrace: [], conditionMarks: source.answer.condition_marks,
-        conformance: [], coverageMode: "NOT_RUN", segments: [],
-        compositionBudget: { tier: "low", bound: 1, registerRowKey: "test", registerVersion: 1, sourceRef: "test" },
-        confidenceBand: source.answer.confidence_band,
-        bandCeiling: source.answer.band_ceiling === null ? null : {
-          label: source.answer.band_ceiling.label, basis: source.answer.band_ceiling.basis,
-          registerRowKey: source.answer.band_ceiling.register_row_key,
-          registerVersion: source.answer.band_ceiling.register_version,
-          sourceRef: source.answer.band_ceiling.source_ref,
-          liftPath: source.answer.band_ceiling.lift_path
-        },
-        digest: null, loopRounds: [], standingObjection: null, crashClass: null,
-        projections: { reversalPoint: source.answer.reversal_point,
-          buildsOnPrevious: source.factBundle.buildsOnPrevious,
-          memoryDisclosure: source.factBundle.memoryDisclosure }
-      } as never,
-      segments: source.answer.composed_text.map((segment) => ({
-        segmentId: segment.segment_id, text: segment.text, loadBearing: segment.load_bearing,
-        assertedNodeRefs: [], servedNumberRefs: segment.served_number_refs
-      })),
-      compositionRawArtifactRef: null, compositionAttempt: 0, conformanceRawArtifactRefs: [],
-      conditionMarkRecords: records,
-      servedNumber: source.servedNumber === null ? null : {
-        numberRef: source.servedNumber.numberRef, value: source.servedNumber.value,
-        numberKind: source.servedNumber.numberKind, sourceRef: source.servedNumber.sourceRef,
-        producer: source.servedNumber.producer, replayHandle: source.servedNumber.replayHandle,
-        propagationRunId: source.servedNumber.propagationRunId
-      },
-      supersedes: { answerId: source.answerId }
-    });
-    return persisted.answerVersion;
-  }
+  const catchUpVersion = (runId: string): Promise<number> => persistCatchUpVersion(database.pool, runId);
 
   const PRIMARY_MODEL = { maker: "Primary test maker", model_id: "test-layer/primary-model", transport: "openai-compatible-http", provider_ref: PRIMARY_REF };
   const SECONDARY_MODEL = { maker: "Secondary test maker", model_id: "test-layer/secondary-model", transport: "openai-compatible-http", provider_ref: SECONDARY_REF };
@@ -6661,6 +6619,7 @@ describe("Engine money rule M5 — the disclosure read over the runner's own row
       answer_id: answerId,
       answer_version: 1,
       floor: null,
+      floor_reason: null,
       writer: { planned_model: PRIMARY_MODEL, served_model: SECONDARY_MODEL, lower_cost: true },
       checker: { planned_model: PRIMARY_MODEL, served_model: SECONDARY_MODEL, lower_cost: true },
       checker_same_as_writer: true,
@@ -6712,7 +6671,8 @@ describe("Engine money rule M5 — the disclosure read over the runner's own row
     expect(AnswerDisclosureSchema.parse(buildAnswerDisclosure(read!))).toEqual({
       answer_id: answerId,
       answer_version: 1,
-      floor: { verdict_state: receipt.label, leading_node_id: receipt.servedNodeId },
+      floor: { verdict_state: receipt.label, leading_node_id: receipt.servedNodeId, basis_incomplete: receipt.basisIncomplete },
+      floor_reason: "ENVELOPE_EXHAUSTED",
       writer: null,
       checker: null,
       checker_same_as_writer: false,
@@ -6739,11 +6699,122 @@ describe("Engine money rule M5 — the disclosure read over the runner's own row
       "answer: not written by a model; the floor stands in for it",
       `floor: ${receipt.label}, on the leading position ${receipt.servedNodeId}`,
       "floor reason: ENVELOPE_EXHAUSTED",
+      `floor label basis: ${receipt.basisIncomplete
+        ? "incomplete (derived without a margin or a disagreement measure)" : "complete"}`,
       `answer writer planned: Primary test maker · test-layer/primary-model (${PRIMARY_REF})`,
       "answer writer used: none (no checked round was served)",
       "answer-writing cut short by: money",
       "digest the answer-writer read: rung 0, whole"
     ]));
+  });
+});
+
+/**
+ * M5 review (M1) — a DR-184 catch-up version may not move a floor. A floor
+ * answer has no served number, so the number guard cannot see its label move;
+ * `prepareVersion` re-derives the floor from its own propagation and the label
+ * controls of the register version the floor's receipt names, and the catch-up
+ * refuses a version that would move it. The guard, the re-derivation's move
+ * cases and the refusal before persisting are unit rows
+ * (tests/unit/dr184-catch-up.test.ts, tests/unit/m5-serve-floor.test.ts); here
+ * the re-derivation reproduces the runner's own floor over real rows.
+ */
+describe("Engine money rule M5 review — a catch-up version re-derives the floor it would carry", () => {
+  /** A register version holding the sealed algorithm rows — the verdict-label family among them — as a deployment publishes them. */
+  async function labelRegisterVersion(): Promise<number> {
+    await persistBootstrapRegister(database.pool, await loadBootstrapRegister());
+    const rows = buildAlgorithmRegisterRows({
+      deploymentSourceRef: "test-layer:M5-review",
+      synthesizerRoleRef: PRIMARY_REF,
+      evaluatorRoleRef: PRIMARY_REF,
+      providerFamilies: [{ familyRef: "test-layer:family", providerRefs: [PRIMARY_REF, SECONDARY_REF] }]
+    }).map((row) => registerFixtureRow(row.rowKey, row.value, row.sourceRef));
+    const keys = new Set(rows.map((row) => row.rowKey));
+    for (const key of ALGORITHM_REGISTER_ROW_FAMILIES.verdictLabel) expect(keys.has(key)).toBe(true);
+    const receipt = await publishReplacementRegisterFixture(
+      database.pool, parseRegisterVersionText("1"), rows, `test-layer:M5-review:${randomUUID()}`
+    );
+    return registerVersionToSafeLegacyNumber(receipt.registerVersion);
+  }
+
+  function catchUpDependencies() {
+    const settings = runnerSettings();
+    return createPostgresReviewCatchUpDependencies({
+      pool: database.pool,
+      reviewers: [],
+      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+      propagationContractHash: settings.propagationContractHash,
+      propagationNumberKind: settings.propagationNumberKind,
+      propagationProducer: settings.propagationProducer,
+      judgementSelectionRule: { ...settings.judgementPolicy!.selectionRule },
+      compositionBudget: settings.servePolicy!.compositionBudgets.low
+    });
+  }
+
+  it("re-derives the same floor — the same leading position and label — when nothing it rests on moved", async () => {
+    const registerVersion = await labelRegisterVersion();
+    const primaryDebate = fullDebate("Primary M5 review floor stays");
+    const secondaryDebate = fullDebate("Secondary M5 review floor stays");
+    const scenario = await executeResil01Scenario({
+      label: "m5-review-floor-stays",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      secondaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      settings: { verdictLabelPolicy: { ...runnerSettings().verdictLabelPolicy!, registerVersion } }
+    });
+    const answerId = answerIdOf(scenario);
+    const receipt = await labelledRoot(scenario.runId);
+    const candidate = await catchUpDependencies().prepareVersion({ runId: scenario.runId, answerId, fromVersion: 1 });
+    expect(candidate.floorBefore).toEqual({ leadingNodeId: receipt.servedNodeId, verdictState: receipt.label });
+    expect(candidate.floorAfter).toEqual(candidate.floorBefore);
+    expect(catchUpFloorWouldMove(candidate.floorBefore, candidate.floorAfter)).toBe(false);
+  });
+
+  it("leaves a served answer's catch-up to the number guard: it has no floor to re-derive", async () => {
+    const primaryDebate = fullDebate("Primary M5 review served");
+    const secondaryDebate = fullDebate("Secondary M5 review served");
+    const scenario = await executeResil01Scenario({
+      label: "m5-review-served-no-floor",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews, resil01Composition, evaluatorSatisfied()],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews]
+    });
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    const candidate = await catchUpDependencies().prepareVersion({
+      runId: scenario.runId, answerId: answerIdOf(scenario), fromVersion: 1
+    });
+    expect(candidate).toMatchObject({ floorBefore: null, floorAfter: null });
+  });
+});
+
+/**
+ * M5 review (M3) — the operator's report reads through a READ-ONLY connection
+ * and, in production, only as the runner's own principal. Over the embedded
+ * database's own connection (not the runner principal).
+ */
+describe("Engine money rule M5 review — the operator report's connection", () => {
+  it("opens read-only: a write through the report's connection is refused by the database", async () => {
+    const reader = await openServeDisclosureReader(database.connectionString, false);
+    try {
+      await expect(reader.read(randomUUID())).resolves.toBeNull();
+    } finally {
+      await reader.close();
+    }
+    // The same opening, with its pool in hand, refuses a write.
+    const { createPool } = await import("@debateai/db");
+    const pool = createPool(database.connectionString, { max: 1 });
+    pool.on("connect", (client) => { client.query("SET default_transaction_read_only = on").catch(() => undefined); });
+    try {
+      await expect(pool.query("CREATE TEMP TABLE m5_review_write_probe (x int)"))
+        .rejects.toMatchObject({ code: "25006" });
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it("refuses, in production, a connection that is not the runner's principal", async () => {
+    await expect(openServeDisclosureReader(database.connectionString, true))
+      .rejects.toThrowError(/^SERVE_DISCLOSURE_PRINCIPAL_INVALID$/u);
   });
 });
 

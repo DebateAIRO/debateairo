@@ -541,6 +541,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SERVE_DISCLOSURE_RECORD_INVALID",
   "SERVE_DISCLOSURE_ROW_INVALID",
   "SERVE_DRAFT_UNRESOLVED",
+  "SERVE_FLOOR_REASON_UNRESOLVED",
   "SERVE_GATE_CHAIN_FAILED",
   "SERVE_ITEMS_NOT_A_LIST",
   "SERVE_ITEM_INVALID",
@@ -2187,8 +2188,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // Verdict story (spec 2026-09-26 §10). Mounted outside the guarded
   // registration zone. "Not yours", "malformed" and "not composed" share one
   // closed 404. The answer read is the ownership gate and supplies the
-  // version, the verdict presence and the creation time (relevant_as_of is
-  // the answer row's insert time) the waiting window is measured from.
+  // version and the verdict presence. M5 review, I1: the story read is the
+  // latest version at or below the answer's that HAS a story (a DR-184 catch-up
+  // version carries its predecessor's story forward), the response names the
+  // story's OWN version, and a story not stored yet is waited for from the
+  // version it is written for (the answer's first), never from a catch-up.
   api.get<{ Params: { id: string } }>("/v1/answers/:id/story", routePolicy("GET /v1/answers/{id}/story"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     const stories = options.stories;
@@ -2207,9 +2211,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       });
       // Task M5 (spec §14.4.4): a components-only answer with a FLOOR gets a
       // story too, so it waits like a served one instead of "no verdict". Read
-      // only when it can matter: no stored story, and no label of its own.
+      // only when it can matter — no stored story, and no label of its own —
+      // and through the floor-only read (M5 review, M6).
       const floor = stored === null && answer.verdict_state === null && options.disclosures !== undefined
-        ? (await options.disclosures.readDisclosure({ answerId: answer.answer_id, ownership }))?.floor ?? null
+        ? await options.disclosures.readFloor({ answerId: answer.answer_id, ownership })
+        : null;
+      const anchor = stored === null
+        ? await stories.readStoryAnchor({ answerId: answer.answer_id, ownership })
         : null;
       const derived = deriveStoryStatus({
         stored,
@@ -2217,12 +2225,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           verdictState: answer.verdict_state,
           floorVerdictState: floor?.verdict_state ?? null
         }),
-        answerCreatedAt: new Date(answer.relevant_as_of),
+        answerCreatedAt: anchor?.storedAt ?? new Date(answer.relevant_as_of),
         now: options.storyClock?.() ?? new Date()
       });
       body = AnswerStorySchema.parse(buildAnswerStory({
         answerId: answer.answer_id,
-        answerVersion: answer.answer_version,
+        answerVersion: stored?.answerVersion ?? anchor?.answerVersion ?? answer.answer_version,
         stored,
         derived
       }));

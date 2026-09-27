@@ -1,5 +1,7 @@
 import type { Pool } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
+// The owner reads use the ONE ownership normaliser every owner read uses.
+import { normalizeRunOwnership } from "./index.js";
 
 /**
  * ENGINE MONEY RULE (spec 2026-09-26 §14.4.5), TASK M3 — THE OWNER-SIDE
@@ -26,7 +28,19 @@ import { TypedDomainError } from "@debateai/kernel";
  * predicate. `readLatestForOperator` is the operator report's: by answer id or
  * run id, no ownership. Both return, beside the row, the model each named maker
  * answered as, read from the run's own recorded calls (`ledger.raw_artifact`:
- * maker, model id, transport, provider ref — never text).
+ * maker, model id, transport, provider ref — never text). `readLatestFloorForAnswer`
+ * is the floor alone, for the story route, with no model lookups.
+ *
+ * THE FLOOR'S BASIS (M5 review, I2). A floor's label may have been derived
+ * without a margin or a disagreement measure; a SERVED label says so with
+ * LABEL-BASIS-INCOMPLETE, and a floor says so with `floorBasisIncomplete`. It is
+ * READ, not stored: the runner records the label it derived — with its
+ * `basisAbsence` — on the run's propagation receipt
+ * (`ledger.propagation_run.served_root_selection.verdictLabel`, T10/T11) before
+ * the answer is sealed. The receipt of a floor is the run's latest one sealed
+ * before the answer version, whose served node and label are the floor's; a
+ * floor with no such receipt is a row that breaks its rules
+ * (`SERVE_DISCLOSURE_ROW_INVALID`).
  */
 export const SERVE_DISCLOSURE_BODY_STOPS = Object.freeze(["MONEY", "ATTEMPTS", "USAGE", "DAILY"] as const);
 export type ServeDisclosureBodyStop = typeof SERVE_DISCLOSURE_BODY_STOPS[number];
@@ -82,6 +96,23 @@ export interface ServeDisclosureRecord {
 
 export interface StoredServeDisclosure extends ServeDisclosureRecord {
   readonly createdAt: Date;
+  /**
+   * The floor's label was derived without a margin or a disagreement measure
+   * (its receipt's `basisAbsence` is not empty). Null exactly when there is no
+   * floor. Read from the label receipt, never stored (see the file header).
+   */
+  readonly floorBasisIncomplete: boolean | null;
+}
+
+/** The floor alone, as the owner's story route and the catch-up read it. */
+export interface StoredServeFloor {
+  readonly answerId: string;
+  readonly answerVersion: number;
+  readonly runId: string;
+  readonly verdictState: ServeDisclosureFloorState;
+  readonly leadingNodeId: string;
+  readonly reason: string;
+  readonly basisIncomplete: boolean;
 }
 
 /**
@@ -215,16 +246,45 @@ interface ServeDisclosureRow {
   readonly floor_leading_node_id: string | null;
   readonly floor_reason: string | null;
   readonly created_at: Date;
+  readonly floor_basis_incomplete: boolean | null;
 }
 
+/**
+ * The floor's label receipt, as a boolean: its `basisAbsence` is not empty.
+ * NULL when the row has no floor, or when no receipt matches — the run's latest
+ * propagation receipt sealed BEFORE the answer version, naming the floor's node
+ * and label (a DR-184 catch-up receipt names no root, so it never matches).
+ * Reads the table aliased `disclosure`; exported so the publication read uses
+ * the same rule.
+ */
+export const FLOOR_BASIS_INCOMPLETE_SQL = `(
+         SELECT CASE WHEN jsonb_typeof(receipt.served_root_selection #> '{verdictLabel,basisAbsence}') = 'array'
+                     THEN jsonb_array_length(receipt.served_root_selection #> '{verdictLabel,basisAbsence}') > 0
+                END
+           FROM ledger.propagation_run AS receipt
+          WHERE receipt.run_id = disclosure.run_id
+            AND receipt.served_root_selection ->> 'servedNodeId' = disclosure.floor_leading_node_id::text
+            AND receipt.served_root_selection #>> '{verdictLabel,label}' = disclosure.floor_verdict_state
+            AND receipt.at_seq < (
+              SELECT answer.sealed_at_seq FROM serve.answer AS answer
+               WHERE answer.answer_id = disclosure.answer_id AND answer.answer_version = disclosure.answer_version
+            )
+          ORDER BY receipt.at_seq DESC
+          LIMIT 1
+       )`;
+
 /** Every column, as the typed read takes it. */
-const SELECT_ROW = `SELECT answer_id::text AS answer_id, answer_version, run_id::text AS run_id,
-              writer_planned_ref, checker_planned_ref, writer_served_ref, checker_served_ref,
-              writer_fallback, checker_fallback, fallback_reason, checker_same_as_writer,
-              body_stop, points_without_review, serve_stop, digest_rung, digest_points_omitted,
-              floor_verdict_state, floor_leading_node_id::text AS floor_leading_node_id, floor_reason,
-              created_at
-         FROM serve.serve_disclosure`;
+const SELECT_ROW = `SELECT disclosure.answer_id::text AS answer_id, disclosure.answer_version,
+              disclosure.run_id::text AS run_id,
+              disclosure.writer_planned_ref, disclosure.checker_planned_ref,
+              disclosure.writer_served_ref, disclosure.checker_served_ref,
+              disclosure.writer_fallback, disclosure.checker_fallback, disclosure.fallback_reason,
+              disclosure.checker_same_as_writer, disclosure.body_stop, disclosure.points_without_review,
+              disclosure.serve_stop, disclosure.digest_rung, disclosure.digest_points_omitted,
+              disclosure.floor_verdict_state, disclosure.floor_leading_node_id::text AS floor_leading_node_id,
+              disclosure.floor_reason, disclosure.created_at,
+              ${FLOOR_BASIS_INCOMPLETE_SQL} AS floor_basis_incomplete
+         FROM serve.serve_disclosure AS disclosure`;
 
 /** A stored row, held to the same rules as a record before its INSERT. */
 function storedFrom(row: ServeDisclosureRow): StoredServeDisclosure {
@@ -248,9 +308,13 @@ function storedFrom(row: ServeDisclosureRow): StoredServeDisclosure {
     floorVerdictState: row.floor_verdict_state,
     floorLeadingNodeId: row.floor_leading_node_id,
     floorReason: row.floor_reason,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    floorBasisIncomplete: row.floor_basis_incomplete
   };
-  const violation = recordViolation(stored);
+  const violation = recordViolation(stored)
+    ?? ((stored.floorVerdictState === null) !== (stored.floorBasisIncomplete === null)
+      ? "a floor is read with the label receipt it was derived from, and only a floor has one"
+      : null);
   if (violation !== null) {
     throw new TypedDomainError(
       "SERVE_DISCLOSURE_ROW_INVALID",
@@ -258,6 +322,37 @@ function storedFrom(row: ServeDisclosureRow): StoredServeDisclosure {
     );
   }
   return Object.freeze(stored);
+}
+
+/** The floor of a stored row, or null when it has none. */
+function floorOf(row: StoredServeDisclosure): StoredServeFloor | null {
+  if (row.floorVerdictState === null || row.floorLeadingNodeId === null || row.floorReason === null
+    || row.floorBasisIncomplete === null) {
+    return null;
+  }
+  return Object.freeze({
+    answerId: row.answerId,
+    answerVersion: row.answerVersion,
+    runId: row.runId,
+    verdictState: row.floorVerdictState,
+    leadingNodeId: row.floorLeadingNodeId,
+    reason: row.floorReason,
+    basisIncomplete: row.floorBasisIncomplete
+  });
+}
+
+/**
+ * Exactly one ownership key, through `normalizeRunOwnership`; anything it
+ * refuses is null, so the caller answers one closed "not found".
+ */
+function ownershipOf(
+  ownership: Readonly<{ ownerRef: string | null; legacyAskerId: string | null }>
+): Readonly<{ ownerRef: string | null; legacyAskerId: string | null }> | null {
+  try {
+    return normalizeRunOwnership({ ownerRef: ownership.ownerRef, legacyAskerId: ownership.legacyAskerId });
+  } catch {
+    return null;
+  }
 }
 
 interface ModelRow {
@@ -314,7 +409,7 @@ export class ServeDisclosureRepository {
     }
     const result = await this.pool.query<ServeDisclosureRow>(
       `${SELECT_ROW}
-        WHERE answer_id = $1 AND answer_version = $2`,
+        WHERE disclosure.answer_id = $1 AND disclosure.answer_version = $2`,
       [answerId, answerVersion]
     );
     const row = result.rows[0];
@@ -333,20 +428,93 @@ export class ServeDisclosureRepository {
     answerId: string;
     ownership: Readonly<{ ownerRef: string | null; legacyAskerId: string | null }>;
   }>): Promise<ServeDisclosureRead | null> {
-    const { ownerRef, legacyAskerId } = input.ownership;
-    if (!UUID_TEXT.test(input.answerId)) return null;
-    if ((ownerRef === null) === (legacyAskerId === null)) return null;
-    if (ownerRef !== null && !UUID_TEXT.test(ownerRef)) return null;
-    if (legacyAskerId !== null && legacyAskerId.trim().length === 0) return null;
-    const result = await this.pool.query<ServeDisclosureRow>(
-      `${SELECT_ROW}
-        WHERE answer_id = $1 AND core.run_is_owned_by(run_id, $2::uuid, $3)
-        ORDER BY answer_version DESC
-        LIMIT 1`,
-      [input.answerId, ownerRef, legacyAskerId]
+    const row = await this.#latestOwnedRow(input);
+    return row === null ? null : this.#withModels(row);
+  }
+
+  /**
+   * The owner's floor alone (M5 review, M6): what the story route needs to tell
+   * a floor answer from an answer with no label, without the model lookups.
+   * Same ownership, same latest-version-with-a-row rule as `readLatestForAnswer`.
+   */
+  async readLatestFloorForAnswer(input: Readonly<{
+    answerId: string;
+    ownership: Readonly<{ ownerRef: string | null; legacyAskerId: string | null }>;
+  }>): Promise<StoredServeFloor | null> {
+    const row = await this.#latestOwnedRow(input);
+    return row === null ? null : floorOf(row);
+  }
+
+  /**
+   * The floor of an answer's latest row, for the DR-184 catch-up (M5 review,
+   * M1), which runs on the host and names no owner — and the label receipt's
+   * own inputs the floor was derived from: the register version of the label
+   * controls and the disagreement the label's rung read.
+   */
+  async readLatestFloorReceipt(answerId: string): Promise<Readonly<{
+    floor: StoredServeFloor;
+    registerVersion: number;
+    disagreement: Readonly<{ kind: "MEASURED"; value: number }> | Readonly<{ kind: "ABSENT"; reason: string }>;
+  }> | null> {
+    if (!UUID_TEXT.test(answerId)) return null;
+    const result = await this.pool.query<ServeDisclosureRow & { receipt_label: unknown }>(
+      `SELECT latest.*, (
+         SELECT receipt.served_root_selection -> 'verdictLabel'
+           FROM ledger.propagation_run AS receipt
+          WHERE receipt.run_id = latest.run_id::uuid
+            AND receipt.served_root_selection ->> 'servedNodeId' = latest.floor_leading_node_id
+            AND receipt.served_root_selection #>> '{verdictLabel,label}' = latest.floor_verdict_state
+            AND receipt.at_seq < (
+              SELECT answer.sealed_at_seq FROM serve.answer AS answer
+               WHERE answer.answer_id = latest.answer_id::uuid AND answer.answer_version = latest.answer_version
+            )
+          ORDER BY receipt.at_seq DESC
+          LIMIT 1
+       ) AS receipt_label
+         FROM (${SELECT_ROW}
+                WHERE disclosure.answer_id = $1
+                ORDER BY disclosure.answer_version DESC
+                LIMIT 1) AS latest`,
+      [answerId]
     );
     const row = result.rows[0];
-    return row === undefined ? null : this.#withModels(storedFrom(row));
+    if (row === undefined) return null;
+    const floor = floorOf(storedFrom(row));
+    if (floor === null) return null;
+    const receipt = row.receipt_label as { registerVersion?: unknown; disagreement?: unknown } | null;
+    const disagreement = receipt?.disagreement as { kind?: unknown; value?: unknown; reason?: unknown } | undefined;
+    const registerVersion = receipt?.registerVersion;
+    const parsed = disagreement?.kind === "MEASURED" && typeof disagreement.value === "number"
+      ? Object.freeze({ kind: "MEASURED" as const, value: disagreement.value })
+      : disagreement?.kind === "ABSENT" && typeof disagreement.reason === "string"
+        ? Object.freeze({ kind: "ABSENT" as const, reason: disagreement.reason })
+        : null;
+    if (parsed === null || typeof registerVersion !== "number" || !Number.isSafeInteger(registerVersion)) {
+      throw new TypedDomainError(
+        "SERVE_DISCLOSURE_ROW_INVALID",
+        "The stored serve disclosure's floor has no label receipt it can be re-derived from"
+      );
+    }
+    return Object.freeze({ floor, registerVersion, disagreement: parsed });
+  }
+
+  /** The answer's latest row under the run's ownership predicate, or null. */
+  async #latestOwnedRow(input: Readonly<{
+    answerId: string;
+    ownership: Readonly<{ ownerRef: string | null; legacyAskerId: string | null }>;
+  }>): Promise<StoredServeDisclosure | null> {
+    if (!UUID_TEXT.test(input.answerId)) return null;
+    const access = ownershipOf(input.ownership);
+    if (access === null) return null;
+    const result = await this.pool.query<ServeDisclosureRow>(
+      `${SELECT_ROW}
+        WHERE disclosure.answer_id = $1 AND core.run_is_owned_by(disclosure.run_id, $2::uuid, $3)
+        ORDER BY disclosure.answer_version DESC
+        LIMIT 1`,
+      [input.answerId, access.ownerRef, access.legacyAskerId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : storedFrom(row);
   }
 
   /**
@@ -358,8 +526,8 @@ export class ServeDisclosureRepository {
     if (!UUID_TEXT.test(answerOrRunId)) return null;
     const result = await this.pool.query<ServeDisclosureRow>(
       `${SELECT_ROW}
-        WHERE answer_id = $1 OR run_id = $1
-        ORDER BY (answer_id = $1) DESC, answer_version DESC, created_at DESC
+        WHERE disclosure.answer_id = $1 OR disclosure.run_id = $1
+        ORDER BY (disclosure.answer_id = $1) DESC, disclosure.answer_version DESC, disclosure.created_at DESC
         LIMIT 1`,
       [answerOrRunId]
     );

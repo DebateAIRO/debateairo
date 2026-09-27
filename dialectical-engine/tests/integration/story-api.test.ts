@@ -15,6 +15,8 @@ import {
   type StoryEncryptedOwner
 } from "../support/storyEncryptedOwner.js";
 import { STORY_TEST_BASIS, STORY_TEST_BODY } from "../support/storyApiFixtures.js";
+import { persistCatchUpVersion } from "../support/catchUpVersion.js";
+import { recordFloorLabelReceipt } from "../support/floorReceipt.js";
 import {
   createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase
 } from "../support/testDatabase.js";
@@ -162,6 +164,10 @@ beforeAll(async () => {
   // Engine money rule, Task M5: a components-only answer whose record keeps a
   // FLOOR (its label, its leading position, the sealed cause), and no story yet.
   flooredRunId = await createEncryptedStoryRun(database.pool, theOwnerNow, "story api floored answer");
+  // The label receipt the runner records before it seals the answer (M5 review, I2).
+  await recordFloorLabelReceipt(database.pool, {
+    runId: flooredRunId, servedNodeId: FLOOR_LEADING_NODE_ID, label: "SUPPORTED", basisAbsence: ["MARGIN"]
+  });
   flooredAnswerId = await answerFor(flooredRunId, `floored-${randomUUID()}`);
   await expect(new ServeDisclosureRepository(database.pool).insert({
     answerId: flooredAnswerId, answerVersion: 1, runId: flooredRunId,
@@ -282,7 +288,9 @@ describe("GET /v1/answers/{id}/disclosure over the real database (engine money r
     expect(AnswerDisclosureSchema.parse(response.json())).toEqual({
       answer_id: flooredAnswerId,
       answer_version: 1,
-      floor: { verdict_state: "SUPPORTED", leading_node_id: FLOOR_LEADING_NODE_ID },
+      // M5 review: the thin basis from the label receipt (I2), the owner-only cause (M2).
+      floor: { verdict_state: "SUPPORTED", leading_node_id: FLOOR_LEADING_NODE_ID, basis_incomplete: true },
+      floor_reason: "ENVELOPE_EXHAUSTED",
       writer: null,
       checker: null,
       checker_same_as_writer: false,
@@ -312,6 +320,12 @@ describe("GET /v1/answers/{id}/disclosure over the real database (engine money r
     await expect(reader.readDisclosure({
       answerId: flooredAnswerId, ownership: { ownerRef: ownerAuth.ownerRef, legacyAskerId: null }
     })).resolves.toMatchObject({ floor: { verdict_state: "SUPPORTED" } });
+    await expect(reader.readFloor({
+      answerId: flooredAnswerId, ownership: { ownerRef: foreignAuth.ownerRef, legacyAskerId: null }
+    })).resolves.toBeNull();
+    await expect(reader.readFloor({
+      answerId: flooredAnswerId, ownership: { ownerRef: ownerAuth.ownerRef, legacyAskerId: null }
+    })).resolves.toEqual({ verdict_state: "SUPPORTED", leading_node_id: FLOOR_LEADING_NODE_ID, basis_incomplete: true });
   });
 
   it("reports a floor answer's story as WRITING while it is written — never NO_VERDICT, never a 404 — and READY once stored", async () => {
@@ -330,6 +344,48 @@ describe("GET /v1/answers/{id}/disclosure over the real database (engine money r
     expect(ready.statusCode).toBe(200);
     expect(AnswerStorySchema.parse(ready.json())).toMatchObject({
       answer_id: flooredAnswerId, status: "READY", story: STORY_TEST_BODY
+    });
+  });
+});
+
+/**
+ * M5 review, I1 — a DR-184 review catch-up appends version 2 with no story and
+ * no disclosure record of its own, and carries the verdict forward. Before the
+ * fix the route looked for a story of version 2 exactly: WRITING for 40 minutes,
+ * then STORY_WINDOW_PASSED, and the story was gone for good.
+ */
+describe("a review catch-up version keeps the answer's story over the real database (M5 review, I1)", () => {
+  async function storyAfterCatchUp(answerId: string): Promise<ReturnType<typeof AnswerStorySchema.parse>> {
+    const response = await theApi().inject({
+      method: "GET", url: `/v1/answers/${answerId}/story`, headers: headersFor(OWNER_TOKEN)
+    });
+    expect(response.statusCode).toBe(200);
+    return AnswerStorySchema.parse(response.json());
+  }
+
+  it("still returns the answer's READY story, named as version 1, once a catch-up version 2 exists", async () => {
+    expect(await persistCatchUpVersion(database.pool, storiedRunId)).toBe(2);
+    const answer = AnswerSchema.parse((await theApi().inject({
+      method: "GET", url: `/v1/answers/${storiedAnswerId}`, headers: headersFor(OWNER_TOKEN)
+    })).json());
+    expect(answer.answer_version).toBe(2);
+    expect(await storyAfterCatchUp(storiedAnswerId)).toMatchObject({
+      answer_id: storiedAnswerId, answer_version: 1, status: "READY", story: STORY_TEST_BODY, verdict_basis: STORY_TEST_BASIS
+    });
+  });
+
+  it("keeps a floor answer's story and its floor after a catch-up version 2", async () => {
+    // The floor answer's story was stored by the previous describe's last case.
+    expect(await persistCatchUpVersion(database.pool, flooredRunId)).toBe(2);
+    expect(await storyAfterCatchUp(flooredAnswerId)).toMatchObject({
+      answer_id: flooredAnswerId, answer_version: 1, status: "READY", story: STORY_TEST_BODY
+    });
+    const disclosure = await theApi().inject({
+      method: "GET", url: `/v1/answers/${flooredAnswerId}/disclosure`, headers: headersFor(OWNER_TOKEN)
+    });
+    expect(AnswerDisclosureSchema.parse(disclosure.json())).toMatchObject({
+      answer_version: 1,
+      floor: { verdict_state: "SUPPORTED", leading_node_id: FLOOR_LEADING_NODE_ID, basis_incomplete: true }
     });
   });
 });

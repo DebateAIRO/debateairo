@@ -10,11 +10,17 @@
  * under `systemd-run` with the runner's `EnvironmentFile`
  * (deploy/vps/README.md §11, "The cost envelopes").
  *
+ * The connection is READ-ONLY (`default_transaction_read_only`, checked before
+ * any read), and in production it must be the runner's own database principal
+ * (`debateai_prod_runner_runtime`), the way the rotation command refuses any
+ * connection but the support principal (M5 review, M3).
+ *
  * It prints the answer's LATEST version that has a record, one fact per line,
  * in plain words: ids, codes, counts and the names of the models — never debate
  * or model text, a price, an address or a credential. A refusal is ONE code on
- * stderr: `SERVE_DISCLOSURE_USAGE` (exit 2), `SERVE_DISCLOSURE_NOT_FOUND`, a
- * typed code, or `SERVE_DISCLOSURE_REPORT_FAILED` (exit 1).
+ * stderr: `SERVE_DISCLOSURE_USAGE` (exit 2), `SERVE_DISCLOSURE_NOT_FOUND`,
+ * `SERVE_DISCLOSURE_CONNECTION_NOT_READ_ONLY`, `SERVE_DISCLOSURE_PRINCIPAL_INVALID`,
+ * a typed code, or `SERVE_DISCLOSURE_REPORT_FAILED` (exit 1).
  *
  * Every decision lives in the exported functions, which the unit tests drive
  * without a database; the bottom of this file only opens things.
@@ -24,6 +30,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   createPool,
   ServeDisclosureRepository,
+  type Pool,
   type ServeDisclosureModel,
   type ServeDisclosureRead
 } from "@debateai/db";
@@ -93,7 +100,12 @@ export function renderServeDisclosure(read: ServeDisclosureRead): string {
         ? "answer: not written by a model; the floor stands in for it"
         : "answer: not written by a model",
     floor ? `floor: ${row.floorVerdictState!}, on the leading position ${row.floorLeadingNodeId!}` : "floor: none",
-    ...(floor ? [`floor reason: ${row.floorReason ?? "unknown"}`] : []),
+    ...(floor ? [
+      `floor reason: ${row.floorReason ?? "unknown"}`,
+      `floor label basis: ${row.floorBasisIncomplete === true
+        ? "incomplete (derived without a margin or a disagreement measure)"
+        : "complete"}`
+    ] : []),
     `answer writer planned: ${modelWords(models.writerPlanned, row.writerPlannedRef)}`,
     `answer writer used: ${usedWords(models.writerServed, row.writerServedRef)}`,
     `answer checker planned: ${modelWords(models.checkerPlanned, row.checkerPlannedRef)}`,
@@ -115,6 +127,55 @@ function refusalCode(error: unknown): string {
   if (error instanceof Error && error.name === "ZodError") return "SERVE_DISCLOSURE_ENVIRONMENT_INVALID";
   if (error instanceof TypeError && PRINTABLE_CODE.test(error.message)) return error.message;
   return "SERVE_DISCLOSURE_REPORT_FAILED";
+}
+
+/** The runner's own database principal on the host (deploy/vps/README.md §3; P3-01 `runner-runtime`). */
+const RUNNER_RUNTIME_PRINCIPAL = "debateai_prod_runner_runtime";
+
+/**
+ * The connection this report reads through: one connection, read-only for
+ * every transaction it opens, and — in production — the runner's principal and
+ * no other. Refused before any row is read.
+ */
+export async function assertServeDisclosureReportConnection(
+  pool: Pick<Pool, "query">,
+  production: boolean
+): Promise<void> {
+  const witness = await pool.query<{ role: string; read_only: string }>(
+    "SELECT current_user::text AS role, current_setting('default_transaction_read_only') AS read_only"
+  );
+  const row = witness.rows[0];
+  if (row?.read_only !== "on") throw new TypeError("SERVE_DISCLOSURE_CONNECTION_NOT_READ_ONLY");
+  if (production && row.role !== RUNNER_RUNTIME_PRINCIPAL) throw new TypeError("SERVE_DISCLOSURE_PRINCIPAL_INVALID");
+}
+
+/**
+ * Open the report's reader: ONE connection, so the read-only setting made when
+ * it opens holds for every read after it (a replacement connection opens the
+ * same way), then the connection check above. Closed again on a refusal.
+ */
+export async function openServeDisclosureReader(
+  databaseUrl: string,
+  production: boolean
+): Promise<Readonly<{
+  read(answerOrRunId: string): Promise<ServeDisclosureRead | null>;
+  close(): Promise<void>;
+}>> {
+  const pool = createPool(databaseUrl, { max: 1 });
+  pool.on("connect", (client) => {
+    client.query("SET default_transaction_read_only = on").catch(() => undefined);
+  });
+  try {
+    await assertServeDisclosureReportConnection(pool, production);
+  } catch (error) {
+    await pool.end().catch(() => undefined);
+    throw error;
+  }
+  const repository = new ServeDisclosureRepository(pool);
+  return Object.freeze({
+    read: (answerOrRunId: string) => repository.readLatestForOperator(answerOrRunId),
+    close: () => pool.end()
+  });
 }
 
 /** The whole command, with its outputs and its database seam injected. Returns the exit code. */
@@ -152,11 +213,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     stdout: (text) => process.stdout.write(text),
     stderr: (text) => process.stderr.write(text)
   }, async () => {
-    const pool = createPool(loadServeDisclosureReportEnvironment().DATABASE_URL);
-    const repository = new ServeDisclosureRepository(pool);
-    return {
-      read: (answerOrRunId) => repository.readLatestForOperator(answerOrRunId),
-      close: () => pool.end()
-    };
+    const environment = loadServeDisclosureReportEnvironment();
+    return openServeDisclosureReader(environment.DATABASE_URL, environment.NODE_ENV === "production");
   });
 }

@@ -15,12 +15,16 @@ const VerdictStateSchema = z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]);
  * arithmetic label existed. `verdict_state` is that label, exactly as the
  * engine derived it before the answer-writing step; `leading_node_id` is the
  * position it rests on, a node of the answer, whose own statement the page
- * shows as "Our best answer". The sealed answer itself stays components-only.
- * The same shape rides a public snapshot (`PublicDebateSchema.floor`).
+ * shows as "Our best answer". `basis_incomplete` is true when that label was
+ * derived without a margin or a disagreement measure — what a served label
+ * discloses as LABEL-BASIS-INCOMPLETE; the page shows a plain note for it.
+ * The sealed answer itself stays components-only. The same shape rides a
+ * public snapshot (`PublicDebateSchema.floor`); its cause does not.
  */
 export const AnswerFloorSchema = z.object({
   verdict_state: VerdictStateSchema,
-  leading_node_id: z.guid()
+  leading_node_id: z.guid(),
+  basis_incomplete: z.boolean()
 }).strict();
 export type AnswerFloor = z.infer<typeof AnswerFloorSchema>;
 
@@ -42,6 +46,14 @@ export const DisclosedRoleSchema = z.object({
 }).strict();
 export type DisclosedRole = z.infer<typeof DisclosedRoleSchema>;
 
+/**
+ * Why no answer could be written (§14.4.4): the sealed components-only cause of
+ * a floor answer — money after every cheaper model, a digest that cannot
+ * exist, a dead model connection, or a draft with nothing to serve. Owner-only:
+ * it is never in a public snapshot.
+ */
+export const FloorReasonSchema = z.enum(["ENVELOPE_EXHAUSTED", "DIGEST_CANNOT_EXIST", "TRANSPORT_DEATH", "NO_ARTIFACT"]);
+
 /** What cut the ARGUING short (§14.4.1): a stop kind, or null when nothing did. */
 export const ArguingStopSchema = z.enum(["MONEY", "ATTEMPTS", "USAGE", "DAILY"]);
 /** What cut the ANSWER-WRITING loop short (§14.4.2), whether or not a round was kept. */
@@ -55,7 +67,8 @@ export const AnswerWritingStopSchema = z.enum(["MONEY", "ATTEMPTS", "USAGE", "DA
  *    answer-writing step, so it has no record of its own and the one before it
  *    is read.
  *  · `floor`: the floor, or null for an answer that carries its own label (or
- *    none at all).
+ *    none at all); `floor_reason`, beside it and owner-only, its cause (null
+ *    exactly when there is no floor).
  *  · `writer` / `checker`: null when the answer has no checked round
  *    (components-only).
  *  · `checker_same_as_writer`: one model both wrote and checked the served
@@ -63,6 +76,7 @@ export const AnswerWritingStopSchema = z.enum(["MONEY", "ATTEMPTS", "USAGE", "DA
  *  · `digest`: `compacted` is true when the answer-writer read a shortened
  *    digest of the debate (any ladder rung above the whole one, §14.4.3);
  *    `points_left_out` counts the points its last rung left out (0 otherwise).
+ *    Null when no digest was handed to the answer-writer at all.
  *  · `cut_short`: what ended the arguing early, and what ended the
  *    answer-writing loop early; null when nothing did.
  *
@@ -73,16 +87,20 @@ export const AnswerDisclosureSchema = z.object({
   answer_id: z.string().min(1),
   answer_version: z.number().int().positive(),
   floor: AnswerFloorSchema.nullable(),
+  floor_reason: FloorReasonSchema.nullable(),
   writer: DisclosedRoleSchema.nullable(),
   checker: DisclosedRoleSchema.nullable(),
   checker_same_as_writer: z.boolean(),
   digest: z.object({
     compacted: z.boolean(),
     points_left_out: z.number().int().nonnegative()
-  }).strict(),
+  }).strict().nullable(),
   cut_short: z.object({
     arguing: ArguingStopSchema.nullable(),
     answer_writing: AnswerWritingStopSchema.nullable()
   }).strict()
-}).strict();
+}).strict().refine(
+  (disclosure) => (disclosure.floor === null) === (disclosure.floor_reason === null),
+  { message: "A floor names its cause, and only a floor has one" }
+);
 export type AnswerDisclosure = z.infer<typeof AnswerDisclosureSchema>;

@@ -146,6 +146,10 @@ function servingStories(reads: unknown[]): AnswerStoryApplication {
     readStory: async (input) => {
       reads.push(input);
       return storedStoryRecord();
+    },
+    readStoryAnchor: async (input) => {
+      reads.push(input);
+      return { answerVersion: 1, storedAt: new Date() };
     }
   };
 }
@@ -160,11 +164,16 @@ function servingDisclosures(reads: unknown[]): AnswerDisclosureApplication {
       reads.push(input);
       return {
         answer_id: ANSWER_ID, answer_version: 1,
-        floor: { verdict_state: "CONTESTED", leading_node_id: NODE_ID },
+        floor: { verdict_state: "CONTESTED", leading_node_id: NODE_ID, basis_incomplete: false },
+        floor_reason: "ENVELOPE_EXHAUSTED",
         writer: null, checker: null, checker_same_as_writer: false,
         digest: { compacted: false, points_left_out: 0 },
         cut_short: { arguing: null, answer_writing: "MONEY" }
       };
+    },
+    readFloor: async (input) => {
+      reads.push(input);
+      return { verdict_state: "CONTESTED", leading_node_id: NODE_ID, basis_incomplete: false };
     }
   };
 }

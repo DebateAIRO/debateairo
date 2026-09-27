@@ -13,6 +13,8 @@ import { PostgresPublicationApplication } from "../../apps/api/src/publications.
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 import { RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
 import { persistTerminalRun } from "../support/settledRun.js";
+import { persistCatchUpVersion } from "../support/catchUpVersion.js";
+import { recordFloorLabelReceipt } from "../support/floorReceipt.js";
 import {
   createEncryptedStoryRun,
   provisionStoryEncryptedOwner,
@@ -121,10 +123,15 @@ function storyRecord(runId: string, answerId: string, outcome: StoredOutcome): S
 /** One owner's run with a settled answer and a stored story of the given outcome. */
 async function storiedRun(
   outcome: StoredOutcome,
-  language?: Readonly<{ tag: string; name: string }>
+  language?: Readonly<{ tag: string; name: string }>,
+  /** M5: the floor's label receipt, recorded before the answer is sealed, as the runner records it. */
+  floorReceipt?: Readonly<{ servedNodeId: string; basisAbsence: readonly ("MARGIN" | "DISAGREEMENT")[] }>
 ): Promise<{ runId: string; answerId: string }> {
   const marker = `${outcome.toLowerCase()}-${randomUUID()}`;
   const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story publication ${marker}`, language);
+  if (floorReceipt !== undefined) {
+    await recordFloorLabelReceipt(database.pool, { runId, label: "UNSUPPORTED", ...floorReceipt });
+  }
   const { answerId } = await persistTerminalRun({
     pool: database.pool,
     runId,
@@ -141,10 +148,12 @@ async function storiedRun(
   return { runId, answerId };
 }
 
-async function publish(runId: string, answerId: string): Promise<string> {
+async function publish(runId: string, answerId: string, answerVersion = 1): Promise<string> {
   const transition = await application.publish({
     runId,
-    answer: buildFairShapedAnswer({ run_ref: runId, answer_id: answerId, question_line: "story publication question" }),
+    answer: buildFairShapedAnswer({
+      run_ref: runId, answer_id: answerId, answer_version: answerVersion, question_line: "story publication question"
+    }),
     authenticated: ownerSession(),
     grantToken: await publishGrant(runId),
     source
@@ -229,6 +238,28 @@ describe("publishing copies the question's language from the run over the real d
   });
 });
 
+/** The components-only answer the owner publishes, its first position the record's leading one. */
+async function publishComponentsOnly(runId: string, answerId: string, leadingNodeId: string, answerVersion = 1): Promise<string> {
+  const served = buildFairShapedAnswer({
+    run_ref: runId, answer_id: answerId, answer_version: answerVersion, question_line: "story publication question"
+  });
+  const transition = await application.publish({
+    runId,
+    answer: {
+      ...served,
+      terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY", verdict_state: null,
+      verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_ENVELOPE" }, composed_text: [],
+      confidence_band: null, band_ceiling: null,
+      nodes: served.nodes.map((node, index) => index === 0 ? { ...node, node_id: leadingNodeId } : node)
+    },
+    authenticated: ownerSession(),
+    grantToken: await publishGrant(runId),
+    source
+  });
+  expect(transition?.state).toBe("PUBLISHED");
+  return transition!.public_ref;
+}
+
 describe("publishing copies the floor from the owner's record over the real database (engine money rule, Task M5)", () => {
   /** The owner's record for a components-only answer: with a floor, or with none. */
   async function recordFor(runId: string, answerId: string, leadingNodeId: string | null): Promise<void> {
@@ -243,32 +274,12 @@ describe("publishing copies the floor from the owner's record over the real data
     })).resolves.toBe("INSERTED");
   }
 
-  /** The components-only answer the owner publishes, its first position the record's leading one. */
-  async function publishComponentsOnly(runId: string, answerId: string, leadingNodeId: string): Promise<string> {
-    const served = buildFairShapedAnswer({ run_ref: runId, answer_id: answerId, question_line: "story publication question" });
-    const transition = await application.publish({
-      runId,
-      answer: {
-        ...served,
-        terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY", verdict_state: null,
-        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_ENVELOPE" }, composed_text: [],
-        confidence_band: null, band_ceiling: null,
-        nodes: served.nodes.map((node, index) => index === 0 ? { ...node, node_id: leadingNodeId } : node)
-      },
-      authenticated: ownerSession(),
-      grantToken: await publishGrant(runId),
-      source
-    });
-    expect(transition?.state).toBe("PUBLISHED");
-    return transition!.public_ref;
-  }
-
-  it("copies a components-only answer's floor — its label and leading position, nothing else — into the public snapshot", async () => {
-    const { runId, answerId } = await storiedRun("READY");
+  it("copies a components-only answer's floor — its label, leading position and thin-basis flag, nothing else — into the public snapshot", async () => {
     const leading = randomUUID();
+    const { runId, answerId } = await storiedRun("READY", undefined, { servedNodeId: leading, basisAbsence: ["MARGIN", "DISAGREEMENT"] });
     await recordFor(runId, answerId, leading);
     const debate = await application.readPublicDebate(await publishComponentsOnly(runId, answerId, leading));
-    expect(debate?.floor).toEqual({ verdict_state: "UNSUPPORTED", leading_node_id: leading });
+    expect(debate?.floor).toEqual({ verdict_state: "UNSUPPORTED", leading_node_id: leading, basis_incomplete: true });
     expect(debate?.answer).toMatchObject({ terminal: "COMPONENTS_ONLY", verdict: null, verdict_available: false });
     // Owner-side facts never cross: the reason code, the makers, the stops.
     const text = JSON.stringify(debate);
@@ -284,5 +295,46 @@ describe("publishing copies the floor from the owner's record over the real data
     const unrecorded = await storiedRun("FAILED");
     const withoutRecord = await application.readPublicDebate(await publishComponentsOnly(unrecorded.runId, unrecorded.answerId, randomUUID()));
     expect("floor" in withoutRecord!).toBe(false);
+  });
+
+  it("publishes no floor whose label receipt is missing: its basis would be unknown (M5 review, I2)", async () => {
+    const { runId, answerId } = await storiedRun("READY");
+    const leading = randomUUID();
+    await recordFor(runId, answerId, leading);
+    const debate = await application.readPublicDebate(await publishComponentsOnly(runId, answerId, leading));
+    expect(debate).not.toBeNull();
+    expect("floor" in debate!).toBe(false);
+    expect(debate?.story_short).toEqual(PUBLIC_SHORT);
+  });
+});
+
+/**
+ * M5 review, I1 — a DR-184 review catch-up appends version 2 with no story of
+ * its own. Before the fix the publish read the story of version 2 exactly, so a
+ * debate published after a catch-up lost its short story.
+ */
+describe("publishing after a review catch-up version still carries the story (M5 review, I1)", () => {
+  it("copies the READY story of version 1 into the snapshot of version 2", async () => {
+    const { runId, answerId } = await storiedRun("READY");
+    expect(await persistCatchUpVersion(database.pool, runId)).toBe(2);
+    const debate = await application.readPublicDebate(await publish(runId, answerId, 2));
+    expect(debate?.story_short).toEqual(PUBLIC_SHORT);
+  });
+
+  it("copies a floor answer's story and its floor into the snapshot of version 2", async () => {
+    const leading = randomUUID();
+    const { runId, answerId } = await storiedRun("READY", undefined, { servedNodeId: leading, basisAbsence: [] });
+    const records = new ServeDisclosureRepository(database.pool);
+    await expect(records.insert({
+      answerId, answerVersion: 1, runId,
+      writerPlannedRef: "provider:a", checkerPlannedRef: "provider:a", writerServedRef: null, checkerServedRef: null,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false,
+      bodyStop: null, pointsWithoutReview: null, serveStop: "TRANSPORT_DEATH", digestRung: 0, digestPointsOmitted: 0,
+      floorVerdictState: "UNSUPPORTED", floorLeadingNodeId: leading, floorReason: "TRANSPORT_DEATH"
+    })).resolves.toBe("INSERTED");
+    expect(await persistCatchUpVersion(database.pool, runId)).toBe(2);
+    const debate = await application.readPublicDebate(await publishComponentsOnly(runId, answerId, leading, 2));
+    expect(debate?.story_short).toEqual(PUBLIC_SHORT);
+    expect(debate?.floor).toEqual({ verdict_state: "UNSUPPORTED", leading_node_id: leading, basis_incomplete: false });
   });
 });

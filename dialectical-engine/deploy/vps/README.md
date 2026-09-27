@@ -1208,8 +1208,9 @@ read -r DEBATE_ID && systemd-run --pipe --wait --collect --uid=debateai-runner -
 
 `sudo -u` does not read the unit's `EnvironmentFile`; `systemd-run` does, so the command connects
 as the runner's own database principal (`runner.env` `DATABASE_URL`) without the credential ever
-reaching a command line. It only reads: the record, and the maker and model names of the calls the
-run recorded. It prints the answer's latest version that has a record (a review catch-up version
+reaching a command line. It only reads — its one connection is opened read-only, and on this host it
+refuses any principal but `debateai_prod_runner_runtime` — the record, the label receipt the floor
+was derived from, and the maker and model names of the calls the run recorded. It prints the answer's latest version that has a record (a review catch-up version
 has none of its own), one fact per line — ids, codes, counts and model names, never debate text, a
 price, an address or a credential:
 
@@ -1217,6 +1218,7 @@ price, an address or a credential:
 |---|---|
 | `answer: written by a model and checked` | a model wrote the answer and a checker read it |
 | `answer: not written by a model; the floor stands in for it` + `floor: <label>, on the leading position <id>` + `floor reason: <code>` | no answer could be written; the sealed answer stays components-only and the page shows the floor (the reason is the sealed cause: `ENVELOPE_EXHAUSTED`, `DIGEST_CANNOT_EXIST`, `TRANSPORT_DEATH` or `NO_ARTIFACT`) |
+| `floor label basis: incomplete (…)` / `complete` | the floor's label was derived without a margin or a disagreement measure (one position, or one voice), which the page notes in plain words |
 | `answer writer planned:` / `used:`, `answer checker planned:` / `used:` | maker · model (provider ref); `none` when no checked round was served |
 | `a lower-cost model was used: yes, for money` | the planned model could not be paid, and a cheaper one of the run's own models stood in (the only substitution the engine makes) |
 | `one model both wrote and checked the answer: yes` | the two-model check was lost to the substitution |
@@ -1225,8 +1227,9 @@ price, an address or a credential:
 
 A refusal is one code on stderr: `SERVE_DISCLOSURE_USAGE` (not exactly one id), `SERVE_DISCLOSURE_NOT_FOUND`
 (no record for that id: a failed run has none), `SERVE_DISCLOSURE_ENVIRONMENT_INVALID` (no
-`DATABASE_URL`: the `EnvironmentFile` was not loaded), `DATABASE_URL_TLS_REQUIRED:DATABASE_URL`, or
-`SERVE_DISCLOSURE_REPORT_FAILED`.
+`DATABASE_URL`: the `EnvironmentFile` was not loaded), `DATABASE_URL_TLS_REQUIRED:DATABASE_URL`,
+`SERVE_DISCLOSURE_CONNECTION_NOT_READ_ONLY`, `SERVE_DISCLOSURE_PRINCIPAL_INVALID` (not run as the
+runner, with `runner.env`), or `SERVE_DISCLOSURE_REPORT_FAILED`.
 
 ### Publishing the settings register on this host
 

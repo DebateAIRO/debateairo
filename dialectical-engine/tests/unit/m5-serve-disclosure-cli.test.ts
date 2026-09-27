@@ -4,6 +4,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { ServeDisclosureModel, ServeDisclosureRead, StoredServeDisclosure } from "@debateai/db";
 import { parseServeDisclosureReportEnvironment } from "@debateai/register";
 import {
+  assertServeDisclosureReportConnection,
   renderServeDisclosure,
   runServeDisclosureCli,
   type OpenServeDisclosureReader
@@ -36,7 +37,7 @@ function row(overrides: Partial<StoredServeDisclosure> = {}): StoredServeDisclos
     writerFallback: true, checkerFallback: true, fallbackReason: "MONEY", checkerSameAsWriter: true,
     bodyStop: "MONEY", pointsWithoutReview: 2, serveStop: null,
     digestRung: 7, digestPointsOmitted: 140,
-    floorVerdictState: null, floorLeadingNodeId: null, floorReason: null,
+    floorVerdictState: null, floorLeadingNodeId: null, floorReason: null, floorBasisIncomplete: null,
     createdAt: new Date("2026-09-27T10:00:00.000Z"),
     ...overrides
   });
@@ -52,7 +53,8 @@ const FLOOR: ServeDisclosureRead = Object.freeze({
     writerServedRef: null, checkerServedRef: null, writerFallback: false, checkerFallback: false,
     fallbackReason: null, checkerSameAsWriter: false, bodyStop: null, pointsWithoutReview: null,
     serveStop: "TRANSPORT_DEATH", digestRung: 0, digestPointsOmitted: 0,
-    floorVerdictState: "CONTESTED", floorLeadingNodeId: LEADING, floorReason: "TRANSPORT_DEATH"
+    floorVerdictState: "CONTESTED", floorLeadingNodeId: LEADING, floorReason: "TRANSPORT_DEATH",
+    floorBasisIncomplete: true
   }),
   models: Object.freeze({ writerPlanned: null, writerServed: null, checkerPlanned: MODEL_A, checkerServed: null })
 });
@@ -108,6 +110,7 @@ describe("M5 · the operator's disclosure report prints a row, one fact per line
       "answer: not written by a model; the floor stands in for it",
       `floor: CONTESTED, on the leading position ${LEADING}`,
       "floor reason: TRANSPORT_DEATH",
+      "floor label basis: incomplete (derived without a margin or a disagreement measure)",
       "answer writer planned: provider:a (no call by it is recorded in this run)",
       "answer writer used: none (no checked round was served)",
       "answer checker planned: Maker A · maker-a/model-1 (provider:a)",
@@ -120,6 +123,12 @@ describe("M5 · the operator's disclosure report prints a row, one fact per line
       "digest the answer-writer read: rung 0, whole",
       "points left out of that digest: 0"
     ]));
+  });
+
+  it("says a floor's label basis is complete when its receipt names no absent limb", () => {
+    expect(renderServeDisclosure({ ...FLOOR, row: row({ ...FLOOR.row, floorBasisIncomplete: false }) }))
+      .toContain("floor label basis: complete\n");
+    expect(renderServeDisclosure(SERVED)).not.toContain("floor label basis");
   });
 
   it("names every rung and every stop in words", () => {
@@ -197,6 +206,24 @@ describe("M5 · the command", () => {
       throw new Error("connect ECONNREFUSED postgres://user:secret@host/db");
     })).toBe(1);
     expect(untyped.err()).toBe("SERVE_DISCLOSURE_REPORT_FAILED\n");
+  });
+
+  /**
+   * M5 review, M3: the report reads through a READ-ONLY connection, and in
+   * production only as the runner's own principal (the rotation command's rule,
+   * deploy/vps/README.md §3). The real connection is proven over the embedded
+   * database in tests/integration/database.test.ts.
+   */
+  it.each([
+    ["accepts a read-only runner connection in production", "debateai_prod_runner_runtime", "on", true, null],
+    ["accepts a read-only connection as any role outside production", "debateai", "on", false, null],
+    ["refuses a connection that is not read-only", "debateai_prod_runner_runtime", "off", true, "SERVE_DISCLOSURE_CONNECTION_NOT_READ_ONLY"],
+    ["refuses another principal in production", "debateai_prod_api_runtime", "on", true, "SERVE_DISCLOSURE_PRINCIPAL_INVALID"]
+  ] as const)("%s", async (_name, role, readOnly, production, refusal) => {
+    const pool = { query: async () => ({ rows: [{ role, read_only: readOnly }] }) } as never;
+    const check = assertServeDisclosureReportConnection(pool, production);
+    if (refusal === null) await expect(check).resolves.toBeUndefined();
+    else await expect(check).rejects.toThrowError(new RegExp(`^${refusal}$`, "u"));
   });
 
   it("takes the runner's DATABASE_URL through its own loader, with the production floors", () => {

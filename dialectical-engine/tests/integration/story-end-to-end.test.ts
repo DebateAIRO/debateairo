@@ -1,10 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
 import { BudgetRepository, CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
-import { StoryBodySchema } from "@debateai/contract";
+import { SESSION_COOKIE_NAME, PostgresAskApplication, buildApi } from "@debateai/api";
+import { AnswerDisclosureSchema, AnswerStorySchema, StoryBodySchema, type Session } from "@debateai/contract";
 import { RunRepository, ServeDisclosureRepository, migrate } from "@debateai/db";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import { CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY, type StoryPolicy } from "@debateai/register";
@@ -23,7 +24,11 @@ import {
 } from "@debateai/story";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
-import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { persistCatchUpVersion } from "../support/catchUpVersion.js";
+import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
+import { RepositoryAnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
+import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
 
 /**
  * Verdict story, Task 9 — the whole path, in the t17 style: a real one-maker
@@ -342,6 +347,75 @@ function runnerWith(endpoint: string, writer: StoryWriter): WalkingSkeletonRunne
   }), { ...runnerSettings(), story: writer });
 }
 
+/**
+ * M5 review, I1: the owner routes need an owner. The runner suites use legacy
+ * runs, so an ACTIVE account claims the settled run through the database's own
+ * ownership event (what the legacy-run claim does), and a session for it reads
+ * through the real API root.
+ */
+async function claimedByOwner(runId: string): Promise<AuthenticatedSession> {
+  const userId = randomUUID();
+  const ownerRef = randomUUID();
+  const sessionId = randomUUID();
+  await database.pool.query(
+    `INSERT INTO identity."user" (
+       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+       adult_affirmed_at,created_at
+     ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+    [userId, randomBytes(32), `story-e2e-${randomUUID()}`, randomUUID(), ownerRef]
+  );
+  await database.pool.query("SELECT core.append_run_ownership_event($1,$2)", [runId, ownerRef]);
+  const session: Session = Object.freeze({
+    asker_id: `owner:${ownerRef}`,
+    session_id: sessionId,
+    caller_scope: "ASKER" as const,
+    ownership_provenance: "server_session" as const,
+    provisional_identity_model: false as const
+  });
+  return Object.freeze({
+    session, userId, ownerRef, tokenHash: `hash:${sessionId}`, csrfTokenHash: `hash:csrf:${sessionId}`, authKind: "cookie" as const
+  });
+}
+
+/** The real API root over this database, for one owner, and the reads the tests make through it. */
+async function ownerReads(owner: AuthenticatedSession, answerId: string) {
+  const token = "o".repeat(43);
+  const api = buildApi({
+    application: new PostgresAskApplication(
+      database.pool, {} as never, {} as never, undefined, database.pool,
+      createTestAskAdmissionPoolFacades(database.pool)
+    ),
+    sessions: {
+      authenticate: async (presented: string) => presented === token ? owner : null,
+      verifyCsrf: () => false
+    } as unknown as SessionApplication,
+    allowedOrigin: "https://ui.story-e2e.test",
+    stories: new RepositoryAnswerStoryApplication(new StoryRepository(database.pool)),
+    disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(database.pool))
+  });
+  const get = async (path: string) => {
+    const response = await api.inject({ method: "GET", url: `/v1/answers/${answerId}${path}`, headers: {
+      cookie: `${SESSION_COOKIE_NAME}=${token}`
+    } });
+    expect(response.statusCode).toBe(200);
+    return response.json() as unknown;
+  };
+  try {
+    return {
+      answer: await get("") as { answer_version: number; verdict_state: string | null },
+      story: AnswerStorySchema.parse(await get("/story")),
+      disclosure: AnswerDisclosureSchema.parse(await get("/disclosure")),
+      // The publish-time read: the story of the version being published.
+      publishedShort: await new RepositoryPublicationStoryReader(new StoryRepository(database.pool)).readStoryShort({
+        answerId, answerVersion: 2, ownerRef: owner.ownerRef
+      })
+    };
+  } finally {
+    await api.close();
+  }
+}
+
 async function servedAnswers(answerId: string): Promise<readonly { answer_version: number; verdict_state: string | null }[]> {
   const answers = await database.pool.query<{ answer_version: number; verdict_state: string | null }>(
     "SELECT answer_version, verdict_state FROM serve.answer WHERE answer_id = $1", [answerId]
@@ -618,8 +692,11 @@ describe("verdict story — end to end, after the debate is settled", () => {
       );
       const rootNodeId = root.rows[0]?.node_id;
       if (rootNodeId === undefined) throw new Error("STORY_E2E_ROOT_UNRESOLVED");
+      // M5 review, I2: one maker, so the label had neither a margin nor a
+      // disagreement measure — its receipt says so, and so does the floor.
       expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
-        floorVerdictState: "CONTESTED", floorLeadingNodeId: rootNodeId, floorReason: "DIGEST_CANNOT_EXIST"
+        floorVerdictState: "CONTESTED", floorLeadingNodeId: rootNodeId, floorReason: "DIGEST_CANNOT_EXIST",
+        floorBasisIncomplete: true
       });
       // No answer-writing call: the only model calls after the debate are the story's.
       const composer = await database.pool.query(
@@ -646,6 +723,63 @@ describe("verdict story — end to end, after the debate is settled", () => {
       expect(served.length).toBeGreaterThan(0);
       for (const field of served) expect(JSON.parse(field.content)).toEqual([positionStatement]);
       for (const content of provider.storyMaterial()) expect(content).not.toMatch(UUID_SHAPED);
+    } finally {
+      await provider.stop();
+    }
+  });
+});
+
+/**
+ * M5 review, I1 — a DR-184 review catch-up appends version 2 with no story and
+ * no disclosure record of its own, and carries the verdict forward. The owner's
+ * story route and the publish-time read must still find version 1's story.
+ */
+describe("verdict story — a review catch-up version keeps the story (M5 review, I1)", () => {
+  it("serves a SERVED answer's READY story through the owner route after a catch-up version 2, and publishes it", async () => {
+    const debate = await createStoryDebate("story-e2e-catch-up-served");
+    const provider = await startStoryDebateProvider({ storyteller: "valid" });
+    try {
+      const result = await runnerWith(provider.endpoint, storyWriter(LOCAL_STORY_POLICY)).executeWorkItem(debate.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error(`STORY_E2E_EXPECTED_COMPLETION:${result.kind}`);
+      expect(await persistCatchUpVersion(database.pool, debate.runId)).toBe(2);
+      const reads = await ownerReads(await claimedByOwner(debate.runId), result.answerId);
+      expect(reads.answer).toMatchObject({ answer_version: 2, verdict_state: "CONTESTED" });
+      expect(reads.story).toMatchObject({ answer_version: 1, status: "READY", unavailable_reason: null });
+      expect(StoryBodySchema.parse(reads.story.story)).toEqual(reads.story.story);
+      // The record belongs to version 1, the one the runner wrote.
+      expect(reads.disclosure).toMatchObject({ answer_version: 1, floor: null, floor_reason: null });
+      expect(reads.publishedShort?.headline).toBe(reads.story.story?.short.headline);
+    } finally {
+      await provider.stop();
+    }
+  });
+
+  it("serves a FLOOR answer's READY story, its floor and its thin basis after a catch-up version 2, and publishes it", async () => {
+    const debate = await createStoryDebate("story-e2e-catch-up-floor");
+    const provider = await startStoryDebateProvider({ storyteller: "valid", positionStatement: "A floor position." });
+    try {
+      const settings = runnerSettings();
+      const policy = settings.servePolicy!;
+      const tiny = (tier: "low" | "medium" | "high") => ({ ...policy.compositionBudgets[tier], bound: 1 });
+      const result = await new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
+      }), {
+        ...settings,
+        servePolicy: { ...policy, compositionBudgets: { low: tiny("low"), medium: tiny("medium"), high: tiny("high") } },
+        story: storyWriter(LOCAL_STORY_POLICY)
+      }).executeWorkItem(debate.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error(`STORY_E2E_EXPECTED_COMPLETION:${result.kind}`);
+      expect(await persistCatchUpVersion(database.pool, debate.runId)).toBe(2);
+      const reads = await ownerReads(await claimedByOwner(debate.runId), result.answerId);
+      expect(reads.answer).toMatchObject({ answer_version: 2, verdict_state: null });
+      expect(reads.story).toMatchObject({ answer_version: 1, status: "READY" });
+      expect(reads.disclosure).toMatchObject({
+        answer_version: 1,
+        floor: { verdict_state: "CONTESTED", basis_incomplete: true },
+        floor_reason: "DIGEST_CANNOT_EXIST",
+        digest: null
+      });
+      expect(reads.publishedShort?.headline).toBe(reads.story.story?.short.headline);
     } finally {
       await provider.stop();
     }

@@ -46,12 +46,16 @@ function application(answer: Answer | null, reads: unknown[] = []): AskApplicati
   };
 }
 
+/** The story's version as the repository reads it: the answer's first (M5 review, I1). */
+const ANCHOR = Object.freeze({ answerVersion: 1, storedAt: new Date(CREATED_AT) });
+
 function stories(stored: StoredStory | null, calls: unknown[] = []): AnswerStoryApplication {
   return {
     readStory: async (input) => {
       calls.push(input);
       return stored;
-    }
+    },
+    readStoryAnchor: async () => ANCHOR
   };
 }
 
@@ -62,7 +66,8 @@ function failingStories(calls: unknown[] = []): AnswerStoryApplication {
     readStory: async (input) => {
       calls.push(input);
       throw new TypedDomainError("STORY_ROW_INVALID", FAILURE_DETAIL);
-    }
+    },
+    readStoryAnchor: async () => ANCHOR
   };
 }
 
@@ -187,6 +192,32 @@ describe("GET /v1/answers/{id}/story (spec §10)", () => {
     await server.close();
   });
 
+  /**
+   * M5 review, I1: a DR-184 review catch-up appends version 2 with no story of
+   * its own and carries the verdict forward. The story of version 1 is still
+   * this answer's story, and the response names the story's own version.
+   */
+  it("returns version 1's story, READY and named as version 1, for an answer a catch-up moved to version 2", async () => {
+    const calls: unknown[] = [];
+    const server = api({ answer: servedAnswer({ answer_version: 2 }), stories: stories(storedStoryRecord(), calls) });
+    const body = AnswerStorySchema.parse((await server.inject({ method: "GET", url: URL_OF, headers: HEADERS })).json());
+    expect(body).toMatchObject({ answer_version: 1, status: "READY", story: STORY_TEST_BODY });
+    expect(calls).toEqual([{
+      answerId: STORY_TEST_ANSWER_ID, answerVersion: 2, ownership: { ownerRef: OWNER.authenticated.ownerRef, legacyAskerId: null }
+    }]);
+    await server.close();
+  });
+
+  it("waits for a story not stored yet from the version it is written for, never from a catch-up version", async () => {
+    // Version 2 was appended 50 minutes after version 1: measured from version
+    // 2 the story would still be WRITING; it was lost 10 minutes ago.
+    const answer = servedAnswer({ answer_version: 2, relevant_as_of: "2026-09-26T10:50:00.000Z" });
+    const server = api({ answer, stories: stories(null), now: "2026-09-26T10:51:00.000Z" });
+    const body = AnswerStorySchema.parse((await server.inject({ method: "GET", url: URL_OF, headers: HEADERS })).json());
+    expect(body).toMatchObject({ answer_version: 1, status: "UNAVAILABLE", unavailable_reason: "STORY_WINDOW_PASSED" });
+    await server.close();
+  });
+
   it("says UNAVAILABLE at once for an answer without a verdict", async () => {
     const answer = servedAnswer({
       terminal: "BLOCKED", verdict_state: null, verdict_unavailable: { reason_ref: "reason:blocked" }
@@ -232,7 +263,7 @@ describe("GET /v1/answers/{id}/story (spec §10)", () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const server = api({
       answer: servedAnswer(),
-      stories: { readStory: async () => { throw new Error(FAILURE_DETAIL); } }
+      stories: { readStory: async () => { throw new Error(FAILURE_DETAIL); }, readStoryAnchor: async () => ANCHOR }
     });
     const response = await server.inject({ method: "GET", url: URL_OF, headers: HEADERS });
     expect(response.statusCode).toBe(200);
@@ -259,11 +290,19 @@ describe("story ownership adapter", () => {
       readForAnswer: async (input) => {
         received.push(input);
         return stored;
+      },
+      readStoryAnchor: async (input) => {
+        received.push(input);
+        return ANCHOR;
       }
     });
     await expect(adapter.readStory({
       answerId: STORY_TEST_ANSWER_ID, answerVersion: 3, ownership: { ownerRef: "owner-1", legacyAskerId: null }
     })).resolves.toBe(stored);
     expect(received).toEqual([{ answerId: STORY_TEST_ANSWER_ID, answerVersion: 3, ownership: { ownerRef: "owner-1" } }]);
+    await expect(adapter.readStoryAnchor({
+      answerId: STORY_TEST_ANSWER_ID, ownership: { ownerRef: null, legacyAskerId: "legacy-1" }
+    })).resolves.toBe(ANCHOR);
+    expect(received.at(-1)).toEqual({ answerId: STORY_TEST_ANSWER_ID, ownership: { legacyAskerId: "legacy-1" } });
   });
 });
