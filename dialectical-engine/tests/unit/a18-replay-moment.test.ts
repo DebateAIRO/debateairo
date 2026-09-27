@@ -5,7 +5,7 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DebateRole } from "@debateai/kernel";
-import { estimatePromptTokens } from "@debateai/providers";
+import { estimatePromptTokens, estimateWindowTokens } from "@debateai/providers";
 import {
   MomentFileSchema,
   ReplayResultSchema,
@@ -216,6 +216,32 @@ describe("A18 · replayMoment, one job, every outcome", () => {
     expect(relay.log.urls).toEqual([]);
   });
 
+  it("walls the window where the gateway does: UTF-8 bytes / 2 plus the bound, and an exact fit is sent (fix round 1, Minor 2)", async () => {
+    const messages = (await captureMomentPacket(parseMomentBuilder(ASSESS))).messages;
+    const wall = estimateWindowTokens(messages);
+    const thumb = estimatePromptTokens(messages);
+    // The windows below sit BETWEEN the two estimates: the rule of thumb (characters / 4)
+    // would admit every one of them, and the wall (R1) refuses all but the exact fit.
+    expect(thumb).toBeLessThan(wall);
+    const replayAt = async (contextWindowTokens: number) => {
+      const relay = echoingRelay();
+      const result = await replayMoment({
+        moment: await assessMoment(), endpoint: { ...ENDPOINT, contextWindowTokens }, thinkingLevel: "low",
+        bound: BOUND, ...SEAMS, fetchImplementation: relay.fetchImplementation
+      });
+      return { result, calls: relay.log.urls.length };
+    };
+    for (const window of [thumb + BOUND.tokenCeiling, wall + BOUND.tokenCeiling - 1]) {
+      // Refused by the replay's own check (0 seconds), before the gateway is even built.
+      const refused = await replayAt(window);
+      expect(refused.result).toMatchObject({ outcome: "CONTEXT_TOO_LARGE", replyText: null, seconds: 0 });
+      expect(refused.calls).toBe(0);
+    }
+    const fits = await replayAt(wall + BOUND.tokenCeiling);
+    expect(fits.result.outcome).toBe("OK");
+    expect(fits.calls).toBe(1);
+  });
+
   it("fails a level the endpoint does not declare, without sending (R7)", async () => {
     const relay = fetchDouble(() => completion(JSON.stringify(ASSESSMENT)));
     const result = await replayMoment({
@@ -299,6 +325,82 @@ describe("A18 · replayMoments, a batch from files", () => {
     await expect(replayMoments(laid.options(relay.fetchImplementation))).resolves.toEqual({ replayed: 2, alreadyDone: 0 });
     expect((await results()).map((result) => [result.candidate.thinkingLevel, result.outcome]))
       .toEqual([["low", "USAGE_CAP"], ["low", "OK"], ["high", "OK"]]);
+  });
+
+  it("writes a time-out without stopping the batch, and a resumed batch asks that job again (F25, fix round 1, Minor 1)", async () => {
+    const laid = await lay([ENDPOINT], JOBS);
+    const levelsAsked = (log: FetchLog) => log.bodies.map((body) => body.x_thinking_level);
+    const flaky = fetchDouble((body) => {
+      if (body.x_thinking_level === "low") throw new DOMException("the relay did not answer", "TimeoutError");
+      return completion(JSON.stringify(ASSESSMENT), echoedLevelOf(body));
+    });
+    await expect(replayMoments(laid.options(flaky.fetchImplementation))).resolves.toEqual({ replayed: 2, alreadyDone: 0 });
+    // Both attempts of the timed-out job, then the next job: a time-out does not stop the batch.
+    expect(levelsAsked(flaky.log)).toEqual(["low", "low", "high"]);
+    expect((await results()).map((result) => [result.candidate.thinkingLevel, result.outcome]))
+      .toEqual([["low", "TIMED_OUT"], ["high", "OK"]]);
+    // A time-out is not an answer: the rerun asks that job again, and only that job.
+    const relay = echoingRelay();
+    await expect(replayMoments(laid.options(relay.fetchImplementation))).resolves.toEqual({ replayed: 1, alreadyDone: 1 });
+    expect(levelsAsked(relay.log)).toEqual(["low"]);
+    expect((await results()).map((result) => [result.candidate.thinkingLevel, result.outcome]))
+      .toEqual([["low", "TIMED_OUT"], ["high", "OK"], ["low", "OK"]]);
+  });
+
+  it("cuts a torn tail at the last newline BYTE, even one torn inside a character (fix round 1, Minor 3)", async () => {
+    const laid = await lay([ENDPOINT], JOBS);
+    const relay = echoingRelay();
+    await replayMoments(laid.options(relay.fetchImplementation));
+    const whole = await readFile(join(scratch, "results.jsonl"));
+    // Every line opens with the result's kind (the schema's first member): that is how a torn tail is recognised.
+    for (const line of whole.toString("utf8").split("\n").filter((entry) => entry !== "")) {
+      expect(line.startsWith('{"kind":"DEBATEAI_REPLAY_RESULT"')).toBe(true);
+    }
+    // A crash mid-append: the tail stops inside "Ă" (two bytes in UTF-8), after its first byte.
+    const torn = Buffer.from('{"kind":"DEBATEAI_REPLAY_RESULT","formatVersion":1,"replyText":"Ă', "utf8");
+    await appendFile(join(scratch, "results.jsonl"), torn.subarray(0, torn.length - 1));
+    await expect(replayMoments(laid.options(relay.fetchImplementation))).resolves.toEqual({ replayed: 0, alreadyDone: 2 });
+    expect((await readFile(join(scratch, "results.jsonl"))).equals(whole)).toBe(true);
+    expect(relay.log.urls).toHaveLength(2);
+  });
+
+  it("refuses an --out that is not a results file, or a damaged one, and leaves it byte for byte (fix round 1, Minor 3)", async () => {
+    const laid = await lay([ENDPOINT], JOBS);
+    const relay = echoingRelay();
+    const out = join(scratch, "results.jsonl");
+    const refusedUnchanged = async (bytes: Buffer): Promise<void> => {
+      await writeFile(out, bytes, { mode: 0o600 });
+      await chmod(out, 0o600);
+      await expect(replayMoments(laid.options(relay.fetchImplementation)))
+        .rejects.toMatchObject({ code: "MOMENT_REPLAY_RESULTS_UNREADABLE" });
+      expect((await readFile(out)).equals(bytes)).toBe(true);
+    };
+    // Another owner-only file named by mistake, with no final newline: a jobs file of two lines...
+    await refusedUnchanged(await readFile(join(scratch, "jobs.jsonl")));
+    // ...and one of a single line, which holds no newline at all.
+    await refusedUnchanged(Buffer.from(JSON.stringify(JOBS[0]), "utf8"));
+    expect(relay.log.urls).toEqual([]);
+    // A real results file with one invalid byte inside a COMPLETE line, then a torn tail. Decoded
+    // leniently, that byte grows into three and the cut lands inside the tail.
+    await rm(out);
+    await replayMoments(laid.options(relay.fetchImplementation));
+    const written = await readFile(out);
+    const at = written.indexOf('"replyText":"') + '"replyText":"'.length;
+    const calls = relay.log.urls.length;
+    await refusedUnchanged(Buffer.concat([
+      written.subarray(0, at), Buffer.from([0xff]), written.subarray(at), Buffer.from('{"kind":"DEBATEAI_REPL', "utf8")
+    ]));
+    expect(relay.log.urls).toHaveLength(calls);
+  });
+
+  it("refuses an endpoint window the gateway would refuse, before any call, and admits the largest it takes (fix round 1, Minor 5)", async () => {
+    const relay = echoingRelay();
+    const tooLarge = await lay([{ ...ENDPOINT, contextWindowTokens: 2 ** 31 }], JOBS);
+    await expect(replayMoments(tooLarge.options(relay.fetchImplementation)))
+      .rejects.toMatchObject({ code: "MOMENT_REPLAY_ENDPOINTS_INVALID" });
+    expect(relay.log.urls).toEqual([]);
+    const largest = await lay([{ ...ENDPOINT, contextWindowTokens: 2 ** 31 - 1 }], JOBS);
+    await expect(replayMoments(largest.options(relay.fetchImplementation))).resolves.toEqual({ replayed: 2, alreadyDone: 0 });
   });
 
   it("refuses an exposed endpoints file, an unknown route and a remote plain-http endpoint before any call", async () => {

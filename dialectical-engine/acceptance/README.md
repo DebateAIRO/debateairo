@@ -187,16 +187,20 @@ this machine's own. The relays themselves run only on this machine: they are for
 local use, never for the hosted site. Each line of the jobs file names one moment
 file, one route of the endpoints file and one thinking level:
 `{"momentFile":"a.moment.json","providerRef":"local:pi-glm","thinkingLevel":"low"}`
-(a relative `momentFile` is read from the jobs file's folder). Every route and
-every moment file is checked before the first call. `--bound` is required, because no
+(a relative `momentFile` is read from the jobs file's folder). Before the first
+call, every route is checked, every moment file is read and checked, and each
+moment's prompt is built on this machine without sending it. So a bad job stops
+the batch before anyone is asked. `--bound` is required, because no
 recorded call kept its own limits: for example, `1,2048,180000` means one attempt,
 at most 2048 answer tokens, and three minutes. It applies to every call in the
 batch, so replay one kind of step per batch. Each job adds one line to the
 `--out` file. A rerun skips the jobs that already have a final answer there, so a
-stopped batch picks up where it stopped. A prompt too big for a model's declared
-window is written as `CONTEXT_TOO_LARGE` and never sent. When a subscription hits
-its usage cap, that job's line is written and the batch stops at once with
-`MOMENT_REPLAY_USAGE_CAP <providerRef>`. A capped or timed-out job is not a final
+stopped batch picks up where it stopped. A last line that a crash cut short is
+dropped, and its job is asked again. An `--out` file that is not a results file is
+refused (`MOMENT_REPLAY_RESULTS_UNREADABLE`) and left exactly as it was. A prompt
+too big for a model's declared window is written as `CONTEXT_TOO_LARGE` and never
+sent. When a subscription hits its usage cap, that job's line is written and the
+batch stops at once with `MOMENT_REPLAY_USAGE_CAP <providerRef>`. A capped or timed-out job is not a final
 answer: a rerun asks it again, and its newest line is the one that counts. A
 time-out does not stop the batch. The results hold the models' answers to the
 private debate text. So the `--out` file is written owner-only (0600), and it must sit

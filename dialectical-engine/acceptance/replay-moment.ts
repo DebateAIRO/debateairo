@@ -46,9 +46,11 @@ import { absolutePathOf } from "./untracked-path.js";
  * USAGE_CAP or TIMED_OUT result is asked again, and a cap stops the batch —
  * pre-flight ruling F25) and refuses a hosted deployment before it reads
  * anything. A result carries the model's answer to private debate text, so the
- * out file is owner-only (0600) and, inside any git checkout, must sit under a
- * `.local/` folder (A18 carry 4); a reply is recorded only when it is the
- * model's own answer (carry 6), never a vendor's error body.
+ * out file is owner-only (0600) and, inside this engine's checkout or any
+ * checkout enclosing it, must sit under a `.local/` folder (A18 carry 4); a
+ * checkout elsewhere (the private evaluator's own) is not this tool's to judge.
+ * A reply is recorded only when it is the model's own answer (carry 6), never
+ * a vendor's error body.
  */
 
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -72,7 +74,9 @@ const endpointSchema = z.object({
   baseUrl: z.string().refine(isReplayEndpointUrl),
   bearerToken: z.string().min(1),
   thinkingLevels: z.array(z.string().min(1)),
-  contextWindowTokens: z.number().int().positive().nullable()
+  // Fix round 1 (review Minor 5): the gateway's own bound (a usage counter, 2^31 - 1), so a window
+  // it would refuse at its first job is refused here, before any call.
+  contextWindowTokens: z.number().int().positive().max(2 ** 31 - 1).nullable()
 }).strict();
 export const ReplayEndpointsFileSchema = z.object({ relays: z.array(endpointSchema).min(1) }).strict();
 export type ReplayEndpoint = z.infer<typeof endpointSchema>;
@@ -166,22 +170,50 @@ export function replayJobKey(momentId: string, providerRef: string, thinkingLeve
 }
 
 /**
+ * How every result line opens: `kind` is the result schema's first member, and
+ * each line is `JSON.stringify` of a parsed result (a test pins it).
+ */
+const RESULT_LINE_OPENING = Buffer.from('{"kind":"DEBATEAI_REPLAY_RESULT"', "utf8");
+
+/** A last line without its newline that could be the start of a result line: a record a crash tore. */
+function isTornResultLine(tail: Buffer): boolean {
+  const shared = Math.min(tail.length, RESULT_LINE_OPENING.length);
+  return tail.subarray(0, shared).equals(RESULT_LINE_OPENING.subarray(0, shared));
+}
+
+/**
  * The jobs already answered in `outPath`. A last line without its newline is a
  * record a crash tore: it is cut off, and its job runs again.
+ *
+ * Fix round 1 (review Minor 3) — THE FILE IS PROVED A RESULTS FILE BEFORE
+ * ANYTHING IS CUT, and the cut is taken on its RAW bytes, as the evaluator's
+ * `cutTornTail` takes it. The complete part ends at the last newline BYTE
+ * (0x0a); it must be valid UTF-8 (a lenient decode turns one bad byte into
+ * three, which moved the cut into the tail) and every line in it a replay
+ * result. The torn tail must be the start of a result line. Only then is the
+ * tail cut. Anything else — another owner-only file named by mistake, with or
+ * without a newline, or a damaged results file — is refused
+ * `MOMENT_REPLAY_RESULTS_UNREADABLE` and left byte for byte as it was.
  */
 export async function readCompletedReplayKeys(outPath: string): Promise<Set<string>> {
-  let text: string;
+  const unreadable = (where: string): TypedDomainError => new TypedDomainError("MOMENT_REPLAY_RESULTS_UNREADABLE", where);
+  let bytes: Buffer;
   try {
-    text = await readFile(outPath, "utf8");
+    bytes = await readFile(outPath);
   } catch (error) {
     if (isMissing(error)) return new Set();
-    throw new TypedDomainError("MOMENT_REPLAY_RESULTS_UNREADABLE", `${outPath} cannot be read`);
+    throw unreadable(`${outPath} cannot be read`);
   }
   if (((await stat(outPath)).mode & 0o077) !== 0) {
     throw new TypedDomainError("MOMENT_REPLAY_RESULTS_EXPOSED", `${outPath} holds replies to private moments; make it owner-only (chmod 600)`);
   }
-  const complete = text.slice(0, text.lastIndexOf("\n") + 1);
-  if (complete.length < text.length) await truncate(outPath, Buffer.byteLength(complete, "utf8"));
+  const completeLength = bytes.lastIndexOf(0x0a) + 1;
+  let complete: string;
+  try {
+    complete = new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, completeLength));
+  } catch {
+    throw unreadable(`${outPath} is not UTF-8 text`);
+  }
   const done = new Set<string>();
   for (const [index, line] of complete.split("\n").entries()) {
     if (line.trim() === "") continue;
@@ -189,11 +221,17 @@ export async function readCompletedReplayKeys(outPath: string): Promise<Set<stri
     try {
       result = ReplayResultSchema.parse(JSON.parse(line));
     } catch {
-      throw new TypedDomainError("MOMENT_REPLAY_RESULTS_UNREADABLE", `${outPath}:${String(index + 1)}`);
+      throw unreadable(`${outPath}:${String(index + 1)}`);
     }
     // Pre-flight ruling F25: a cap or a timeout is not an answer; the job is asked again.
     if (RETRYABLE_REPLAY_OUTCOMES.has(result.outcome)) continue;
     done.add(replayJobKey(result.momentId, result.candidate.providerRef, result.candidate.thinkingLevel));
+  }
+  if (completeLength < bytes.length) {
+    if (!isTornResultLine(bytes.subarray(completeLength))) {
+      throw unreadable(`${outPath}: its last line is neither complete nor the start of a replay result`);
+    }
+    await truncate(outPath, completeLength);
   }
   return done;
 }
@@ -378,13 +416,24 @@ export async function replayMoments(options: ReplayMomentsOptions): Promise<{ re
   if (unknown !== undefined) {
     throw new TypedDomainError("MOMENT_REPLAY_ENDPOINT_UNKNOWN", `${unknown.providerRef} is not in the endpoints file`);
   }
-  // So is every moment, its role checked against its builder (carry 3): a bad
-  // file anywhere in the jobs stops the batch before anyone is asked.
+  // So is every moment: read, its role checked against its builder (carry 3),
+  // and its prompt built by the live builder OFFLINE, as `replayMoment` will
+  // build it (fix round 1, review Minor 6; nothing leaves the process). A bad
+  // file, or a moment the builder refuses, anywhere in the jobs stops the batch
+  // before anyone is asked.
   const momentPathOf = (job: ReplayJob): string => resolve(dirname(jobsPath), job.momentFile);
   const moments = new Map<string, MomentFile>();
   for (const job of jobs) {
     const momentPath = momentPathOf(job);
-    if (!moments.has(momentPath)) moments.set(momentPath, await readMomentFile(momentPath));
+    if (moments.has(momentPath)) continue;
+    const moment = await readMomentFile(momentPath);
+    try {
+      await captureMomentPacket(parseMomentBuilder(moment.builder, moment.role));
+    } catch (error) {
+      if (error instanceof TypedDomainError) throw new TypedDomainError(error.code, `${momentPath}: ${error.message}`);
+      throw error;
+    }
+    moments.set(momentPath, moment);
   }
   const done = await readCompletedReplayKeys(outPath);
   // Its folder, owner-only, before the first call: a paid answer must never be lost to a missing folder.
