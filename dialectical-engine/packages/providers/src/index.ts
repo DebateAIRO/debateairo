@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { z } from "zod";
-import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
 
@@ -134,6 +134,18 @@ export interface ProviderCallRequest {
    * sent (PROVIDER_THINKING_LEVEL_UNSUPPORTED) — never run at another level.
    */
   readonly thinkingLevel?: string;
+  /**
+   * Model scorecard §2.1 (ruling R5): the debate job this call does, in the
+   * scorecard's seven-role vocabulary (`@debateai/kernel` DEBATE_ROLES).
+   * RECORDED on every attempt's ledger row, never sent. Optional on the type
+   * because the dormant evaluator lane has none; `role` above is the T9
+   * provider identity and stays exactly as it is.
+   */
+  readonly modelRole?: DebateRole;
+  /** Model scorecard §2.3: the scorecard candidate holding this seat. Recorded, never sent. */
+  readonly candidateId?: string | null;
+  /** Model scorecard §2.3: the scorecard version the seat's assignment came from. Recorded, never sent. */
+  readonly scorecardVersion?: number | null;
 }
 
 export class ProviderCallFailedError extends TypedDomainError {
@@ -971,6 +983,8 @@ export interface RawArtifactInput {
   readonly inputHash: string;
   readonly contractHash: string;
   readonly contentHash: string;
+  /** Model scorecard §2.3: the vendor-reported thinking tokens of this attempt; null when not reported. */
+  readonly thinkingTokens?: number | null;
 }
 
 export interface ProviderLedgerInput {
@@ -987,6 +1001,27 @@ export interface ProviderLedgerInput {
   readonly rawArtifactRef: string | null;
   readonly startedAt: Date;
   readonly finishedAt: Date;
+  /** Model scorecard §2.1: the debate job; null for a caller that names none. */
+  readonly modelRole?: DebateRole | null;
+  /** Model scorecard §2.3: the scorecard candidate and the scorecard version of the seat. */
+  readonly candidateId?: string | null;
+  readonly scorecardVersion?: number | null;
+  /** Model scorecard §2.2: the level the attempt ran at (the relay's echo, else the level sent) or DEFAULT_ONLY. */
+  readonly thinkingLevel?: string | null;
+}
+
+/**
+ * Model scorecard §2.3 — the exact prompt of ONE attempt, handed to the
+ * composition before the attempt is sent. `promptText` is the `messages`
+ * member exactly as it is serialised into the request body; `messages` is the
+ * same value, for the canonical fingerprint the composition computes. The
+ * gateway never stores it itself: the store is the run's content envelope.
+ */
+export interface CallPromptRecordInput {
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly promptText: string;
+  readonly messages: PromptPacket["messages"];
 }
 
 /**
@@ -1063,6 +1098,13 @@ export interface OpenAICompatibleGatewayOptions {
   readonly thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   /** Model scorecard §2.10: from the target's `context_window_tokens`. Absent = no window check. */
   readonly contextWindowTokens?: number;
+  /**
+   * Model scorecard §2.3: records each attempt's prompt just before it is sent.
+   * Optional: the unit doubles and a gateway with no debate run record none.
+   * The runner's `createPostgresProviderGateway` always supplies it
+   * (`ledger.call_prompt`, through the run's content envelope).
+   */
+  readonly persistCallPrompt?: (prompt: CallPromptRecordInput) => Promise<void>;
 }
 
 /**
@@ -1201,6 +1243,31 @@ function relayErrorCode(decoded: unknown): string | null {
   if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return null;
   const value = (decoded as Readonly<Record<string, unknown>>).x_cli_relay_error;
   return typeof value === "string" ? value : null;
+}
+
+/**
+ * Model scorecard §2.3: ONE token — the pattern 0072's
+ * ledger_entry_candidate_id_token CHECK holds, character for character (the
+ * scorecard's own identifierText, packages/scorecard/src/schema.ts, after the
+ * 0072 fix round 1: the first character is a letter or a digit).
+ */
+const CANDIDATE_ID_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$/u;
+
+/**
+ * Model scorecard §2.1/§2.3: the record fields are checked BEFORE anything is
+ * sent. The ledger's CHECKs would otherwise refuse the row only after a paid
+ * call, and an unrecorded paid call is the one thing this ledger must not have.
+ */
+function assertProviderCallRecord(request: ProviderCallRequest): void {
+  const role = request.modelRole;
+  const candidate = request.candidateId;
+  const version = request.scorecardVersion;
+  if ((role !== undefined && !isDebateRole(role))
+    || (candidate !== undefined && candidate !== null && !CANDIDATE_ID_TOKEN.test(candidate))
+    || (version !== undefined && version !== null
+      && (!Number.isSafeInteger(version) || version < 1 || version > MAX_USAGE_COUNTER))) {
+    throw new TypeError("PROVIDER_CALL_RECORD_INVALID");
+  }
 }
 
 /** Delay before `attempt` (only attempts after the first back off). */
@@ -1403,6 +1470,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * loop, like the frame refusal: nothing was sent, so nothing is ledgered.
      */
     const thinking = resolveThinkingLevel(request.thinkingLevel, this.#options.thinking, request.providerRef);
+    assertProviderCallRecord(request);
+    const callFacts = Object.freeze({
+      modelRole: request.modelRole ?? null,
+      candidateId: request.candidateId ?? null,
+      scorecardVersion: request.scorecardVersion ?? null
+    });
     const fetcher = this.#options.fetchImplementation ?? fetch;
     const sleep = this.#options.sleepImplementation ?? realSleep;
     let attemptsMade = 0;
@@ -1481,6 +1554,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       const startedAt = new Date();
       let rawArtifactRef: string | null = null;
       let ledgerRecorded = false;
+      // Model scorecard §2.2: the level this attempt ran at, as far as it got. A
+      // failure before any body arrived records the level that was sent.
+      let attemptThinkingLevel: string = thinking.sent;
+      // Pre-flight fix F13: set when the prompt could not be recorded, so the
+      // catch below lets that failure leave unsent, unledgered and unretried.
+      let promptRecordFailed = false;
       try {
         const headers: Record<string, string> = { "content-type": "application/json" };
         if (this.#options.authorizationHeader !== undefined) {
@@ -1506,6 +1585,23 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             PROVIDER_CONTEXT_WINDOW_EXCEEDED,
             `${request.providerRef} declares a ${contextWindowTokens}-token context window and this attempt would not fit`
           );
+        }
+        // Model scorecard §2.3: the exact prompt of THIS attempt, recorded
+        // before it leaves and under this attempt's id, so every attempt the
+        // ledger shows as sent — a transport failure included — has its prompt
+        // on record. A call with no run records none (the support chat).
+        if (request.runId !== null && this.#options.persistCallPrompt !== undefined) {
+          try {
+            await this.#options.persistCallPrompt({
+              runId: request.runId,
+              attemptId,
+              promptText: JSON.stringify(attemptPacket.messages),
+              messages: attemptPacket.messages
+            });
+          } catch (promptError) {
+            promptRecordFailed = true;
+            throw promptError;
+          }
         }
         const response = await fetcher(`${this.#options.endpoint}/chat/completions`, {
           method: "POST",
@@ -1555,6 +1651,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         const echoedLevel = echoedThinkingLevel(decoded);
         const thinkingLevelUsed = echoedLevel ?? thinking.sent;
         const reasoningTokens = reportedReasoningTokens(rawUsage);
+        attemptThinkingLevel = thinkingLevelUsed;
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
         let classifiedContent: ContentClassification | {
@@ -1616,7 +1713,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           parseError: classifiedContent.parseError,
           inputHash,
           contractHash: request.contractHash,
-          contentHash: digest(rawText)
+          contentHash: digest(rawText),
+          thinkingTokens: reasoningTokens
         });
         /**
          * V-28 / I4 — THE CHARGE, at the one point every attempt with a body
@@ -1759,6 +1857,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             subjectItemId: request.subjectItemId,
             stanceAtAction: "UNASSIGNED",
             outcome: "FAILED",
+            ...callFacts,
+            thinkingLevel: thinkingLevelUsed,
             inputHash,
             contractHash: request.contractHash,
             actorRef: request.providerRef,
@@ -1825,6 +1925,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           subjectItemId: request.subjectItemId,
           stanceAtAction: "UNASSIGNED",
           outcome: "OK",
+          ...callFacts,
+          thinkingLevel: thinkingLevelUsed,
           inputHash,
           contractHash: request.contractHash,
           actorRef: request.providerRef,
@@ -1845,6 +1947,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           reasoningTokens
         };
       } catch (error) {
+        /**
+         * Pre-flight fix F13: the prompt record could not be written (a database
+         * or erasure-barrier refusal), so this attempt was never sent and no
+         * vendor was asked. It is neither a FAILED model call nor a transport
+         * failure: no ledger row, no retry, and the error leaves unwrapped, so
+         * a seat never reads it as a reason to switch to its backup.
+         */
+        if (promptRecordFailed) throw error;
         /**
          * The refusals below are OURS, not the transport's, and none of them is
          * repaired by asking again — so each propagates untouched instead of
@@ -1890,6 +2000,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           subjectItemId: request.subjectItemId,
           stanceAtAction: "UNASSIGNED",
           outcome: lastOutcome,
+          ...callFacts,
+          thinkingLevel: attemptThinkingLevel,
           inputHash,
           contractHash: request.contractHash,
           actorRef: request.providerRef,

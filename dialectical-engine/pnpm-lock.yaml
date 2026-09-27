@@ -275,6 +275,9 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../../packages/register
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../../packages/scorecard
       '@debateai/serve':
         specifier: workspace:*
         version: link:../../packages/serve

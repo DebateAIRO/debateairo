@@ -5,6 +5,7 @@ import {
   ProviderProbeRepository,
   RunRepository,
   assertNoOpenWriteTransaction,
+  insertCallPrompt,
   withRunContentLease,
   withWriteTransaction,
   type CompletionActivationResolution,
@@ -90,6 +91,7 @@ import {
   type ProviderCostEnvelopeSeam,
   type ProviderGateway
 } from "@debateai/providers";
+import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
   buildFactBundle,
   compositionEvidenceRequired,
@@ -6184,7 +6186,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
 
 export function createPostgresProviderGateway(
   pool: Pool,
-  options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction">
+  options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction" | "persistCallPrompt">
     & {
       /**
        * V-28 (DL4-F2): the money bound, built per CALL from the run the gateway
@@ -6203,7 +6205,17 @@ export function createPostgresProviderGateway(
     ...gatewayOptions,
     assertNoOpenWriteTransaction,
     persistRawArtifact: (artifact) => ledger.appendRawArtifact(artifact),
-    appendLedgerEntry: async (entry) => (await ledger.append(entry)).ledgerEntryId
+    appendLedgerEntry: async (entry) => (await ledger.append(entry)).ledgerEntryId,
+    // Model scorecard §2.3: every attempt's exact prompt, through the run's
+    // content envelope (ledger.call_prompt). The fingerprint is the scorecard's
+    // own canonical one, so a replayed moment is compared with the SAME
+    // function that recorded it.
+    persistCallPrompt: (prompt) => insertCallPrompt(pool, {
+      runId: prompt.runId,
+      attemptId: prompt.attemptId,
+      promptText: prompt.promptText,
+      promptFingerprint: canonicalPromptFingerprint(prompt.messages)
+    })
   });
   return {
     async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
