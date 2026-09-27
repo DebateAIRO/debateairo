@@ -2,14 +2,22 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { RELAY_MESSAGE_MAX_UTF8_BYTES, renderPromptTranscript } from "./relay-core.js";
+import { RELAY_MESSAGE_MAX_UTF8_BYTES, RELAY_MINIMAL_SYSTEM_PROMPT, renderPromptTranscript } from "./relay-core.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  loggedWorkspaces,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
 import {
   ACCEPTANCE_PI_BINARY,
+  PI_ATTACHED_PROMPT_MESSAGE,
   PI_BINARY_NAME,
   PI_GLM_CONTEXT_WINDOW_TOKENS,
+  PI_HANDSHAKE_PROMPT,
   PI_RELAY_SYSTEM_PROMPT,
   ZAI_MAKER,
   keepPiStdoutLine,
@@ -585,5 +593,90 @@ describe("D10 pi relay binary resolution", () => {
       if (previous === undefined) delete process.env.ACCEPTANCE_PI_BINARY;
       else process.env.ACCEPTANCE_PI_BINARY = previous;
     }
+  });
+});
+
+describe("D8 lean calls — pi (Task A12b)", () => {
+  it("adds --no-prompt-templates, gives pi the relay's one sentence as its system prompt, and keeps the prompt in the @file", async () => {
+    const relay = await start();
+
+    const echo = echoOf(await (await post(relay, "Lean canary 5e1d.")).json() as PiCompletion);
+
+    expect(PI_RELAY_SYSTEM_PROMPT).toBe(RELAY_MINIMAL_SYSTEM_PROMPT);
+    expect(echo.argumentList).toEqual([
+      "--print",
+      "--mode", "json",
+      "--provider", "zai",
+      "--model", "glm-5.3-flash",
+      "--thinking", "high",
+      "--no-tools",
+      "--no-session",
+      "--no-extensions",
+      "--no-skills",
+      "--no-context-files",
+      "--no-prompt-templates",
+      "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT,
+      `@${echo.promptFile}`,
+      PI_ATTACHED_PROMPT_MESSAGE
+    ]);
+    expect(echo.argumentList.some((argument) => argument.includes("Lean canary 5e1d."))).toBe(false);
+    expect(echo.environment.PI_TELEMETRY).toBe("0");
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, the @file beside the call's empty directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const relay = await start({
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          "const leanArgv = process.argv.slice(1);",
+          'const leanModel = leanArgv[leanArgv.indexOf("--model") + 1];',
+          'const leanPromptFile = (leanArgv.find((argument) => argument.startsWith("@")) ?? "@").slice(1);',
+          // A11: the handshake reply must be "ok", so the probe reads the @file
+          // and answers the handshake as pi does.
+          'const leanHandshake = require("node:fs").readFileSync(leanPromptFile, "utf8").includes("acceptance transport handshake");',
+          'const leanText = leanHandshake ? "OK" : JSON.stringify({ ...leanCwdReport, promptFile: leanPromptFile });',
+          'console.log(JSON.stringify({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: leanText }], provider: "zai", model: leanModel, stopReason: "stop" } }));'
+        ].join("\n"), "--"]
+      }
+    });
+
+    const completion = await (await post(relay, "Probe cwd.")).json() as PiCompletion;
+    const report = JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport & { readonly promptFile: string };
+
+    const workspace = await expectLeanWorkingDirectory(report, "z-ai", logPath);
+    expect(dirname(dirname(report.promptFile))).toBe(workspace);
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what pi adds around the handshake and only reports it", async () => {
+    const relay = await start();
+    const own = Math.ceil(renderPromptTranscript([{ role: "user", content: PI_HANDSHAKE_PROMPT }]).length / 4);
+
+    // The fake prints the measured default-profile usage: 480 input tokens.
+    expect(relay.harnessOverhead).toEqual({
+      maker: "Z.AI", reportedInputTokens: 480, promptTokensEstimate: own, overheadTokens: 480 - own
+    });
+  });
+});
+
+describe("D8 a start whose handshake fails leaves no workspace behind (Task A12b)", () => {
+  it("removes the workspace it opened for the handshake before the start rejects", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const failing = [leanCwdReportSnippet(logPath), "process.exitCode = 1;"].join("\n");
+
+    await expect(startPiRelay({
+      port: 0,
+      timeoutMs: 2_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", failing, "--"] }
+    })).rejects.toThrow("PI_CLI_FAILED");
+
+    const logged = await loggedWorkspaces(logPath);
+    expect(logged.length).toBeGreaterThan(0);
+    expect(new Set(logged).size).toBe(1);
+    expect(basename(logged[0]!).startsWith("relay-z-ai-workspace-")).toBe(true);
+    expect(existsSync(logged[0]!)).toBe(false);
   });
 });

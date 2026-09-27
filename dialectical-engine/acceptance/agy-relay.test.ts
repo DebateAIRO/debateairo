@@ -1,12 +1,14 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderPromptTranscript } from "./relay-core.js";
 import {
   ACCEPTANCE_AGY_BINARY,
   AGY_BINARY_NAME,
+  AGY_HANDSHAKE_PROMPT,
   AGY_STDIN_FORMAT,
   agyArguments,
   agyStdinPayload,
@@ -17,6 +19,12 @@ import {
   type AgyRelayHandle,
   type AgyRelayOptions
 } from "./agy-relay.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  loggedWorkspaces,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-agy-cli.mjs", import.meta.url));
 const handles: AgyRelayHandle[] = [];
@@ -347,6 +355,7 @@ describe("AGY-01 the two stdin forms (Task A10 Step 0 decides which one ships)",
       "--output-format", "json",
       "--mode", "plan",
       "--sandbox",
+      "--disable-slash-commands",
       "--model", "gemini-3.8-flash-high",
       "--print"
     ]);
@@ -359,6 +368,7 @@ describe("AGY-01 the two stdin forms (Task A10 Step 0 decides which one ships)",
       "--input-format", "stream-json",
       "--mode", "plan",
       "--sandbox",
+      "--disable-slash-commands",
       "--model", "gemini-3.8-flash-high",
       "--print"
     ]);
@@ -444,5 +454,78 @@ describe("D10 agy relay binary resolution", () => {
       if (previous === undefined) delete process.env.ACCEPTANCE_AGY_BINARY;
       else process.env.ACCEPTANCE_AGY_BINARY = previous;
     }
+  });
+});
+
+describe("D8 lean calls — agy (Task A12b)", () => {
+  it("turns slash commands off beside plan mode and the sandbox, and still never puts the prompt on argv", async () => {
+    const relay = await start();
+
+    const echo = echoOf(await (await post(relay, "Lean canary 1b4d.")).json() as AgyCompletion);
+
+    expect(echo.argumentList).toEqual(agyArguments("gemini-3.8-flash-high", AGY_STDIN_FORMAT));
+    expect(echo.argumentList.slice(echo.argumentList.indexOf("--mode"), echo.argumentList.indexOf("--model")))
+      .toEqual(["--mode", "plan", "--sandbox", "--disable-slash-commands"]);
+    expect(echo.argumentList.some((argument) => argument.includes("Lean canary 1b4d."))).toBe(false);
+    // agy has no system-prompt flag (M5): what it is asked is the engine's transcript, unchanged.
+    expect(echo.prompt).toBe(renderPromptTranscript([
+      { role: "system", content: "Return strict JSON." },
+      { role: "user", content: "Lean canary 1b4d." }
+    ]));
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, each call in an empty 0700 directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const relay = await start({
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          // A10 fix round 1: the handshake reply must be "ok", so the probe reads
+          // stdin to EOF and answers the handshake as agy does.
+          'let leanStdin = "";',
+          'process.stdin.setEncoding("utf8");',
+          'process.stdin.on("data", (chunk) => { leanStdin += chunk; });',
+          'process.stdin.on("end", () => console.log(JSON.stringify({ status: "SUCCESS", response: leanStdin.includes("acceptance transport handshake") ? "OK" : JSON.stringify(leanCwdReport) })));'
+        ].join("\n"), "--"]
+      }
+    });
+
+    const completion = await (await post(relay, "Probe cwd.")).json() as AgyCompletion;
+
+    const workspace = await expectLeanWorkingDirectory(
+      JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport, "google", logPath
+    );
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what agy adds around the handshake and only reports it", async () => {
+    const relay = await start();
+    const own = Math.ceil(AGY_HANDSHAKE_PROMPT.length / 4);
+
+    // The fake prints the measured default usage: 13 977 input tokens.
+    expect(relay.harnessOverhead).toEqual({
+      maker: "Google", reportedInputTokens: 13_977, promptTokensEstimate: own, overheadTokens: 13_977 - own
+    });
+  });
+});
+
+describe("D8 a start whose handshake fails leaves no workspace behind (Task A12b)", () => {
+  it("removes the workspace it opened for the handshake before the start rejects", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const failing = [leanCwdReportSnippet(logPath), "process.exitCode = 1;"].join("\n");
+
+    await expect(startAgyRelay({
+      port: 0,
+      timeoutMs: 2_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", failing, "--"] }
+    })).rejects.toThrow("AGY_CLI_FAILED");
+
+    const logged = await loggedWorkspaces(logPath);
+    expect(logged.length).toBeGreaterThan(0);
+    expect(new Set(logged).size).toBe(1);
+    expect(basename(logged[0]!).startsWith("relay-google-workspace-")).toBe(true);
+    expect(existsSync(logged[0]!)).toBe(false);
   });
 });

@@ -6,7 +6,9 @@ import {
   CliRelayFailure,
   buildCliUsage,
   invokeCli,
+  openRelayWorkspace,
   renderPromptTranscript,
+  reportHarnessOverhead,
   resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
@@ -15,7 +17,8 @@ import {
   type CliRelayAdapter,
   type CliRelayHandle,
   type CliUsage,
-  type CommandSpec
+  type CommandSpec,
+  type HarnessOverhead
 } from "./relay-core.js";
 
 /** The NAME this maker's CLI is looked up by; never a path (D10, 2026-09-17). */
@@ -49,6 +52,19 @@ export const ACCEPTANCE_MAKER = "OpenAI" as const;
 export const CODEX_THINKING_LEVELS = Object.freeze(
   ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const
 );
+/**
+ * D8 (lean calls) — codex-cli 0.156.1, measured 2026-09-26 (M5): with these
+ * disabled and the relay's instructions file in place of codex's own base
+ * instructions, a one-line call read 6,909 input tokens instead of 15,370 and
+ * still answered on the subscription. `code_mode_host` is deliberately NOT
+ * here: disabling it adds an error item to the event stream.
+ */
+export const CODEX_DISABLED_FEATURES = Object.freeze([
+  "apps", "browser_use", "browser_use_external", "computer_use", "goals", "hooks",
+  "image_generation", "multi_agent", "plugins", "shell_tool", "skill_search", "sleep_tool",
+  "tool_suggest", "unified_exec", "view_image", "workspace_dependencies", "in_app_browser",
+  "shell_snapshot"
+] as const);
 export const CODEX_HANDSHAKE_PROMPT =
   "DR-181 acceptance transport handshake. Reply with the single word: OK" as const;
 
@@ -73,6 +89,8 @@ export interface ModelShimHandle extends CliRelayHandle {
   readonly maker: typeof ACCEPTANCE_MAKER;
   /** §2.2: the `model_reasoning_effort` values this relay accepts as `x_thinking_level`. */
   readonly thinkingLevels: readonly string[];
+  /** D8: what codex added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
 }
 
 export function renderCodexPrompt(messages: readonly {
@@ -216,21 +234,34 @@ function createCodexAdapter(sessionsRoot: string, model?: string): CliRelayAdapt
     failureCode: "CODEX_CLI_FAILED",
     timeoutCode: "CODEX_CLI_TIMEOUT",
     thinkingLevels: CODEX_THINKING_LEVELS,
+    // D8: relay-core writes RELAY_MINIMAL_SYSTEM_PROMPT to a 0600 file once per
+    // relay start and never runs this adapter without it.
+    readsInstructionsFile: true,
     // §2.2: the level is one checked token, so the quoted config value cannot
     // be broken out of; it is APPENDED only when asked and the prompt stays last.
-    buildArguments: (prompt: string, invocation?: CliInvocation) => [
-      "exec",
-      "--skip-git-repo-check",
-      "--sandbox", "read-only",
-      "--ignore-rules",
-      "--ignore-user-config",
-      "--json",
-      ...(model === undefined ? [] : ["-c", `model="${model}"`]),
-      ...(invocation?.thinkingLevel === undefined
-        ? []
-        : ["-c", `model_reasoning_effort="${invocation.thinkingLevel}"`]),
-      prompt
-    ],
+    // D8: the lean flags sit right after --json, so the prompt stays last too.
+    buildArguments: (prompt: string, invocation?: CliInvocation) => {
+      if (invocation?.instructionsFile === undefined) {
+        throw new CliRelayFailure("FAILED", "CODEX_CLI_INSTRUCTIONS_FILE_MISSING");
+      }
+      return [
+        "exec",
+        "--skip-git-repo-check",
+        "--sandbox", "read-only",
+        "--ignore-rules",
+        "--ignore-user-config",
+        "--json",
+        // D8: codex's own base instructions are REPLACED by the relay's one
+        // sentence. JSON quoting is a valid TOML basic string for any path.
+        "-c", `model_instructions_file=${JSON.stringify(invocation.instructionsFile)}`,
+        ...CODEX_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]),
+        ...(model === undefined ? [] : ["-c", `model="${model}"`]),
+        ...(invocation.thinkingLevel === undefined
+          ? []
+          : ["-c", `model_reasoning_effort="${invocation.thinkingLevel}"`]),
+        prompt
+      ];
+    },
     parseCompletion: (stdout) => parseCodexCompletion(stdout, sessionsRoot)
   };
 }
@@ -259,23 +290,34 @@ export async function startModelShim(options: ModelShimOptions): Promise<ModelSh
     "TEST_ONLY_CODEX_COMMAND_FORBIDDEN"
   );
   const adapter = createCodexAdapter(options.testOnlySessionsRoot ?? defaultCodexSessionsRoot(), options.model);
-  const handshake = await invokeCli(command, adapter, CODEX_HANDSHAKE_PROMPT, options.timeoutMs);
-  if (options.model !== undefined && handshake.model !== options.model) {
-    throw new CliRelayFailure("FAILED", "CODEX_CLI_MODEL_MISMATCH");
+  // D8: ONE private workspace for this relay's whole life. It holds the 0600
+  // instructions file every call — the handshake included — points codex at.
+  const workspace = await openRelayWorkspace(adapter);
+  try {
+    const handshake = await invokeCli(command, adapter, CODEX_HANDSHAKE_PROMPT, options.timeoutMs, { workspace });
+    if (options.model !== undefined && handshake.model !== options.model) {
+      throw new CliRelayFailure("FAILED", "CODEX_CLI_MODEL_MISMATCH");
+    }
+    const harnessOverhead = reportHarnessOverhead(ACCEPTANCE_MAKER, CODEX_HANDSHAKE_PROMPT, handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      adapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model: handshake.model,
+      maker: ACCEPTANCE_MAKER,
+      thinkingLevels: CODEX_THINKING_LEVELS,
+      harnessOverhead,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
   }
-  const server = await startCliRelayServer({
-    port: options.port,
-    timeoutMs: options.timeoutMs,
-    command,
-    adapter
-  });
-  return Object.freeze({
-    port: server.port,
-    baseUrl: server.baseUrl,
-    authorizationHeader: server.authorizationHeader,
-    model: handshake.model,
-    maker: ACCEPTANCE_MAKER,
-    thinkingLevels: CODEX_THINKING_LEVELS,
-    close: () => server.close()
-  });
 }

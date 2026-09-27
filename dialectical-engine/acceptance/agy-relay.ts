@@ -4,6 +4,8 @@ import {
   buildCliUsage,
   invokeCli,
   isRelayHandshakeReply,
+  openRelayWorkspace,
+  reportHarnessOverhead,
   resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
@@ -11,7 +13,8 @@ import {
   type CliInvocation,
   type CliRelayAdapter,
   type CliRelayHandle,
-  type CommandSpec
+  type CommandSpec,
+  type HarnessOverhead
 } from "./relay-core.js";
 
 /**
@@ -106,6 +109,9 @@ export function agyArguments(modelWithLevel: string, format: AgyStdinFormat): re
     ...(format === "text" ? [] : ["--input-format", "stream-json"]),
     "--mode", "plan",
     "--sandbox",
+    // D8 (lean calls, M5): agy has no system-prompt flag; slash commands are the
+    // one extra it lets a relay switch off. The ~13k tokens left are agy's own.
+    "--disable-slash-commands",
     "--model", modelWithLevel,
     "--print"
   ]);
@@ -209,6 +215,8 @@ export interface AgyRelayHandle extends CliRelayHandle {
   readonly model: string;
   readonly maker: typeof GOOGLE_MAKER;
   readonly thinkingLevels: readonly string[];
+  /** D8: what agy added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
 }
 
 export async function startAgyRelay(options: AgyRelayOptions): Promise<AgyRelayHandle> {
@@ -234,25 +242,35 @@ export async function startAgyRelay(options: AgyRelayOptions): Promise<AgyRelayH
     "TEST_ONLY_AGY_COMMAND_FORBIDDEN"
   );
   const adapter = createAgyAdapter(model, thinkingLevels, defaultThinkingLevel);
-  // The handshake IS the sign-in check: agy 1.2.11 has no auth-status command.
-  // It is also the stdin check: the reply must be the "ok" the prompt asked for.
-  const handshake = await invokeCli(command, adapter, AGY_HANDSHAKE_PROMPT, options.timeoutMs);
-  if (!isAgyHandshakeReply(handshake.content)) {
-    throw new CliRelayFailure("FAILED", "AGY_CLI_HANDSHAKE_MISMATCH");
+  // D8: ONE private workspace for this relay's whole life, the handshake included.
+  const workspace = await openRelayWorkspace(adapter);
+  try {
+    // The handshake IS the sign-in check: agy 1.2.11 has no auth-status command.
+    // It is also the stdin check: the reply must be the "ok" the prompt asked for.
+    const handshake = await invokeCli(command, adapter, AGY_HANDSHAKE_PROMPT, options.timeoutMs, { workspace });
+    if (!isAgyHandshakeReply(handshake.content)) {
+      throw new CliRelayFailure("FAILED", "AGY_CLI_HANDSHAKE_MISMATCH");
+    }
+    const harnessOverhead = reportHarnessOverhead(GOOGLE_MAKER, AGY_HANDSHAKE_PROMPT, handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      adapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model,
+      maker: GOOGLE_MAKER,
+      thinkingLevels,
+      harnessOverhead,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
   }
-  const server = await startCliRelayServer({
-    port: options.port,
-    timeoutMs: options.timeoutMs,
-    command,
-    adapter
-  });
-  return Object.freeze({
-    port: server.port,
-    baseUrl: server.baseUrl,
-    authorizationHeader: server.authorizationHeader,
-    model,
-    maker: GOOGLE_MAKER,
-    thinkingLevels,
-    close: () => server.close()
-  });
 }

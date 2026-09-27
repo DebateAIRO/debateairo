@@ -159,7 +159,15 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
       expect(relay.bearerToken).toMatch(/^[A-Za-z0-9_-]{43}$/u);
     }
     expect(new Set(written.relays.map(({ baseUrl }) => baseUrl)).size).toBe(5);
-    expect(emitted).toEqual([`RELAYS SERVING 5 ${endpointsPath}`]);
+    expect(emitted.at(-1)).toBe(`RELAYS SERVING 5 ${endpointsPath}`);
+    // F37: one overhead line per relay, attributed to its candidate, in candidate order.
+    expect(emitted.slice(0, -1).map((line) => line.split(" ").slice(0, 4).join(" "))).toEqual([
+      "RELAY OVERHEAD Anthropic local:claude",
+      "RELAY OVERHEAD OpenAI local:codex",
+      "RELAY OVERHEAD xAI local:grok",
+      "RELAY OVERHEAD Google local:agy",
+      "RELAY OVERHEAD Z.AI local:pi-glm"
+    ]);
 
     const pi = written.relays.find(({ tool }) => tool === "pi")!;
     const response = await fetch(`${pi.baseUrl}/chat/completions`, {
@@ -229,6 +237,8 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
       environment: LOCAL,
       seams: SEAMS,
       emit: (line) => {
+        // D8 (Task A12b): the informational overhead lines come first; this case is about RELAYS SERVING.
+        if (line.startsWith("RELAY OVERHEAD ")) return;
         served = (JSON.parse(readFileSync(endpointsPath, "utf8")) as { relays: RelayHostEndpoint[] }).relays;
         throw new Error(`EMIT_BROKEN ${line.split(" ")[0]}`);
       }
@@ -256,7 +266,8 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
     const { baseUrl } = host.endpoints[0]!;
     await chmod(endpointsDirectory, 0o500);
     try {
-      await expect(host.stop()).rejects.toThrow("RELAY_HOST_ENDPOINTS_REMOVE_FAILED");
+      // A12 review carry-over (Task A12b): the code first, then the path, so the operator can delete it.
+      await expect(host.stop()).rejects.toThrow(`RELAY_HOST_ENDPOINTS_REMOVE_FAILED ${endpointsPath}`);
 
       expect(existsSync(endpointsPath)).toBe(true);
       await expect.poll(() => listeningServers()).toBe(before);
@@ -282,6 +293,8 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
         environment: LOCAL,
         seams: SEAMS,
         emit: (line) => {
+          // D8 (Task A12b): the informational overhead lines come first; this case is about the lines after them.
+          if (line.startsWith("RELAY OVERHEAD ")) return;
           lines.push(line);
           if (line.startsWith("RELAYS SERVING")) {
             // The file is written; from here on the cleanup cannot delete it.
@@ -335,11 +348,13 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
     });
     hosts.push(host);
 
-    expect(emitted).toEqual([
+    expect(emitted.filter((line) => !line.startsWith("RELAY OVERHEAD "))).toEqual([
       "RELAY ABSENT local:claude RELAY_HOST_MODEL_MISMATCH",
       "RELAY ABSENT local:grok RELAY_HOST_THINKING_LEVEL_UNSUPPORTED",
       `RELAYS SERVING 1 ${endpointsPath}`
     ]);
+    expect(emitted.filter((line) => line.startsWith("RELAY OVERHEAD ")).map((line) => line.split(" ").slice(0, 4).join(" ")))
+      .toEqual(["RELAY OVERHEAD Z.AI local:pi-glm"]);
     expect(host.endpoints.map(({ providerRef }) => providerRef)).toEqual(["local:pi-glm"]);
   });
 
@@ -625,5 +640,93 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
       if (previous === undefined) delete process.env.ACCEPTANCE_PI_BINARY;
       else process.env.ACCEPTANCE_PI_BINARY = previous;
     }
+  });
+});
+
+describe("D8 / A20b: a grok candidate may name the id grok's -m selects (Task A12b)", () => {
+  it("passes modelSelection to grok as -m and still holds the reported id to modelId", async () => {
+    const directory = await workspace();
+    const host = await serveRelayHost({
+      candidatesPath: await candidatesFile(directory, [{
+        providerRef: "local:grok",
+        tool: "grok",
+        modelId: "grok-fake-cli-model",
+        modelSelection: "grok-4.7",
+        thinkingLevels: []
+      }]),
+      endpointsPath: join(directory, "endpoints.json"),
+      environment: LOCAL,
+      seams: SEAMS,
+      emit: () => undefined
+    });
+    hosts.push(host);
+    const grok = host.endpoints[0]!;
+    expect(grok.modelId).toBe("grok-fake-cli-model");
+
+    const response = await fetch(`${grok.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${grok.bearerToken}` },
+      body: JSON.stringify({ model: grok.modelId, messages: [{ role: "user", content: "Selection probe." }] })
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const argumentList = (JSON.parse(body.choices[0]!.message.content) as { argumentList: readonly string[] })
+      .argumentList;
+    expect(argumentList[argumentList.indexOf("-m") + 1]).toBe("grok-4.7");
+  });
+
+  it("refuses modelSelection on any other tool", async () => {
+    const directory = await workspace();
+
+    await expect(serveRelayHost({
+      candidatesPath: await candidatesFile(directory, [{ ...PI_CANDIDATE, modelSelection: "glm-5.3-flash" }]),
+      endpointsPath: join(directory, "endpoints.json"),
+      environment: LOCAL,
+      seams: SEAMS,
+      emit: () => undefined
+    })).rejects.toThrow("RELAY_HOST_CANDIDATES_INVALID");
+  });
+});
+
+describe("D8: the attributed overhead lines are one more emit the host survives (Task A12b)", () => {
+  it("removes the endpoints file and closes every relay when emit throws on a RELAY OVERHEAD line", async () => {
+    const directory = await workspace();
+    const endpointsPath = join(directory, "endpoints.json");
+    const before = listeningServers();
+
+    const failure = await serveRelayHost({
+      candidatesPath: await candidatesFile(directory, [PI_CANDIDATE]),
+      endpointsPath,
+      environment: LOCAL,
+      seams: SEAMS,
+      emit: (line) => { if (line.startsWith("RELAY OVERHEAD ")) throw new Error("EMIT_BROKEN OVERHEAD"); }
+    }).then((host) => {
+      // A host that wrongly served is still stopped, so a regression here strands nothing.
+      hosts.push(host);
+      return null;
+    }, (error: unknown) => error);
+
+    expect(failure).toEqual(new Error("EMIT_BROKEN OVERHEAD"));
+
+    expect(existsSync(endpointsPath)).toBe(false);
+    await expect.poll(() => listeningServers()).toBe(before);
+  });
+
+  it("prints the candidate's figures after the maker: reported, own and overhead, as the relay measured them", async () => {
+    const directory = await workspace();
+    const emitted: string[] = [];
+    const host = await serveRelayHost({
+      candidatesPath: await candidatesFile(directory, [PI_CANDIDATE]),
+      endpointsPath: join(directory, "endpoints.json"),
+      environment: LOCAL,
+      seams: SEAMS,
+      emit: (line) => { emitted.push(line); }
+    });
+    hosts.push(host);
+
+    // The fake pi reports M4's default-profile 480 input tokens for the handshake.
+    expect(emitted.filter((line) => line.startsWith("RELAY OVERHEAD ")))
+      .toEqual([expect.stringMatching(/^RELAY OVERHEAD Z\.AI local:pi-glm reported=480 own=[0-9]+ overhead=-?[0-9]+$/u)]);
   });
 });

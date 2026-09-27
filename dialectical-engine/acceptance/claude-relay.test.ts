@@ -1,19 +1,27 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { isAbsolute, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CLAUDE_BINARY_NAME,
   CLAUDE_CLI_USAGE_CAP,
+  CLAUDE_HANDSHAKE_PROMPT,
   CLAUDE_USAGE_CAP_PATTERN,
   preflightClaudeCli,
   resolveClaudeBinary,
   startClaudeRelay,
   type ClaudeRelayHandle
 } from "./claude-relay.js";
-import { CLI_RELAY_USAGE_CAP_CODE_TOKEN } from "./relay-core.js";
+import { CLI_RELAY_USAGE_CAP_CODE_TOKEN, RELAY_MINIMAL_SYSTEM_PROMPT } from "./relay-core.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  loggedWorkspaces,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
 const handles: ClaudeRelayHandle[] = [];
@@ -267,6 +275,8 @@ describe("FAIR-02 Claude Code CLI relay", () => {
       expect(relayed.argumentList).toEqual([
         "-p", relayed.prompt,
         "--output-format", "json",
+        // D8 (Task A12b): Claude Code's own system prompt is replaced.
+        "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT,
         // D18: "user", not "" — "" severed the CLI's keychain login.
         // --safe-mode restores the isolation "" provided, without the auth cost.
         "--setting-sources", "user",
@@ -734,5 +744,117 @@ if (prompt.includes("CAP_EXIT_ONE")) {
       expect(body, marker).not.toContain("SENTINEL");
       expect(body, marker).not.toContain("reached your");
     }
+  });
+});
+
+describe("D8 lean calls — Claude Code (Task A12b)", () => {
+  it("replaces Claude Code's own system prompt with the relay's one sentence, never passes --bare, and keeps the transcript whole", async () => {
+    const relay = await start();
+
+    const completion = await (await postCompletion(relay, "Lean canary 3c9f.")).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string;
+      argumentList: readonly string[];
+    };
+    expect(relayed.argumentList.slice(2, 6)).toEqual([
+      "--output-format", "json", "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT
+    ]);
+    // M5: --bare also disables the OAuth/keychain login, so a subscription could not sign in.
+    expect(relayed.argumentList).not.toContain("--bare");
+    expect(relayed.argumentList.flatMap((argument, index) =>
+      argument.includes("Lean canary 3c9f.") ? [index] : []
+    )).toEqual([1]);
+    expect(JSON.parse(relayed.prompt)).toEqual({
+      format: "debateai.relay-messages.v1",
+      messages: [
+        { role: "system", content: "Return strict JSON." },
+        { role: "user", content: "Lean canary 3c9f." }
+      ]
+    });
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, each call in an empty 0700 directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          'console.log(JSON.stringify({ is_error: false, result: JSON.stringify(leanCwdReport), modelUsage: { "claude-probe-model": {} } }));'
+        ].join("\n"), "--"]
+      }
+    });
+    handles.push(relay);
+
+    const completion = await (await postCompletion(relay, "Probe cwd.")).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+
+    const workspace = await expectLeanWorkingDirectory(
+      JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport, "anthropic", logPath
+    );
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what Claude Code adds around the handshake, cached input included, and only reports it", async () => {
+    // M5's lean Opus 5.5 call: 2 input tokens plus 685 cache-creation tokens.
+    const envelope = 'console.log(JSON.stringify({ is_error: false, result: "OK", modelUsage: { "claude-opus-5-5": { inputTokens: 2, outputTokens: 1, cacheCreationInputTokens: 685, cacheReadInputTokens: 0 } } }));';
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", envelope, "--"] }
+    });
+    handles.push(relay);
+    const own = Math.ceil(CLAUDE_HANDSHAKE_PROMPT.length / 4);
+
+    expect(relay.harnessOverhead).toEqual({
+      maker: "Anthropic", reportedInputTokens: 687, promptTokensEstimate: own, overheadTokens: 687 - own
+    });
+  });
+
+  it("gives a standalone preflight (the ceremony's) its own private workspace and removes it before returning", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const preflight = await preflightClaudeCli({
+      timeoutMs: 1_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          'console.log(JSON.stringify({ is_error: false, result: JSON.stringify(leanCwdReport), modelUsage: { "claude-probe-model": {} } }));'
+        ].join("\n"), "--"]
+      }
+    });
+
+    const report = JSON.parse(preflight.handshake.content) as LeanCwdReport;
+    const workspace = dirname(report.cwd);
+    expect(basename(workspace)).toMatch(/^relay-anthropic-workspace-/u);
+    expect(report.cwdEntries).toEqual([]);
+    expect(report.cwdMode).toBe("700");
+    expect(existsSync(workspace)).toBe(false);
+  });
+});
+
+describe("D8 a start whose handshake fails leaves no workspace behind (Task A12b)", () => {
+  it("removes the workspace it opened for the handshake before the start rejects", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const failing = [leanCwdReportSnippet(logPath), "process.exitCode = 1;"].join("\n");
+
+    await expect(startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", failing, "--"] }
+    })).rejects.toThrow("CLAUDE_CLI_FAILED");
+
+    const logged = await loggedWorkspaces(logPath);
+    expect(logged.length).toBeGreaterThan(0);
+    expect(new Set(logged).size).toBe(1);
+    expect(basename(logged[0]!).startsWith("relay-anthropic-workspace-")).toBe(true);
+    expect(existsSync(logged[0]!)).toBe(false);
   });
 });

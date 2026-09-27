@@ -12,8 +12,10 @@ import { startModelShim } from "./model-shim.js";
 import { startPiRelay } from "./pi-relay.js";
 import {
   CLI_RELAY_THINKING_LEVEL_TOKEN,
+  harnessOverheadLine,
   type CliRelayHandle,
-  type CommandSpec
+  type CommandSpec,
+  type HarnessOverhead
 } from "./relay-core.js";
 
 /**
@@ -47,6 +49,9 @@ const candidateSchema = z.object({
   providerRef: z.string().regex(/^[a-z][a-z0-9._:-]{0,127}$/u),
   tool: z.enum(RELAY_HOST_TOOLS),
   modelId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u),
+  // D8 / A20b: grok only — the id grok's `-m` selects when it differs from the
+  // id grok reports (`grok-4.7` answers as `grok-4.7-build`).
+  modelSelection: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u).optional(),
   thinkingLevels: z.array(z.string().regex(CLI_RELAY_THINKING_LEVEL_TOKEN)).max(16)
 }).strict();
 
@@ -57,8 +62,10 @@ const candidatesFileSchema = z.object({
 export type RelayHostCandidate = Readonly<{
   providerRef: string;
   tool: RelayHostTool;
-  /** agy: the BASE id, without its level suffix. */
+  /** agy: the BASE id, without its level suffix. grok: the id grok REPORTS. */
   modelId: string;
+  /** grok only: the id `-m` selects (`grok-4.7` for `grok-4.7-build`). Absent ⇒ grok's own default. */
+  modelSelection?: string;
   /** The levels replay will ask; agy: the id suffixes to serve (at least one). */
   thinkingLevels: readonly string[];
 }>;
@@ -108,6 +115,8 @@ type StartedRelay = CliRelayHandle & Readonly<{
   maker: string;
   thinkingLevels: readonly string[];
   contextWindowTokens?: number;
+  /** D8: what the relay measured around its handshake (every relay handle carries it since A12b). */
+  harnessOverhead?: HarnessOverhead;
 }>;
 
 /** V-9(c): the relay host is local-mode tooling and refuses the hosted deployment outright. */
@@ -137,13 +146,15 @@ export async function readRelayHostCandidates(path: string): Promise<readonly Re
   const candidates = parsed.data.candidates;
   if (new Set(candidates.map(({ providerRef }) => providerRef)).size !== candidates.length
     || candidates.some(({ thinkingLevels }) => new Set(thinkingLevels).size !== thinkingLevels.length)
-    || candidates.some(({ tool, thinkingLevels }) => tool === "agy" && thinkingLevels.length === 0)) {
+    || candidates.some(({ tool, thinkingLevels }) => tool === "agy" && thinkingLevels.length === 0)
+    || candidates.some(({ tool, modelSelection }) => modelSelection !== undefined && tool !== "grok")) {
     throw new TypeError("RELAY_HOST_CANDIDATES_INVALID");
   }
   return Object.freeze(candidates.map((candidate) => Object.freeze({
     providerRef: candidate.providerRef,
     tool: candidate.tool,
     modelId: candidate.modelId,
+    ...(candidate.modelSelection === undefined ? {} : { modelSelection: candidate.modelSelection }),
     thinkingLevels: Object.freeze([...candidate.thinkingLevels])
   })));
 }
@@ -180,9 +191,14 @@ const RELAY_STARTS: Readonly<Record<RelayHostTool, RelayStart>> = {
     ...testOnlyCommandFor(seams, "codex"),
     ...(seams.codexSessionsRoot === undefined ? {} : { testOnlySessionsRoot: seams.codexSessionsRoot })
   }),
-  // grok pins no model; its CLI-reported lineage is held to modelId below.
-  grok: (_candidate, timeoutMs, seams) => startGrokRelay({
-    port: 0, timeoutMs, ...testOnlyCommandFor(seams, "grok")
+  // D8 / A20b: grok SELECTS by a short id and REPORTS a longer one. A candidate's
+  // modelSelection, when given, is what `-m` gets; the CLI-reported lineage is
+  // still held to modelId below.
+  grok: (candidate, timeoutMs, seams) => startGrokRelay({
+    port: 0,
+    timeoutMs,
+    ...(candidate.modelSelection === undefined ? {} : { model: candidate.modelSelection }),
+    ...testOnlyCommandFor(seams, "grok")
   }),
   agy: (candidate, timeoutMs, seams) => startAgyRelay({
     port: 0,
@@ -340,6 +356,12 @@ export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHo
     })));
     await writeEndpointsFile(endpointsPath, endpoints);
     written = true;
+    // Pre-flight fix F37: each relay printed its overhead by maker; the host knows
+    // which CANDIDATE each relay serves, so it prints the figures once more,
+    // attributed to the candidate's providerRef.
+    for (const { candidate, relay } of started) {
+      if (relay.harnessOverhead !== undefined) emit(harnessOverheadLine(relay.harnessOverhead, candidate.providerRef));
+    }
     emit(`RELAYS SERVING ${endpoints.length} ${endpointsPath}`);
   } catch (error) {
     if (written) {
@@ -373,7 +395,9 @@ export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHo
           removal = error;
         }
         await closeAll();
-        if (removal !== null) throw new TypeError("RELAY_HOST_ENDPOINTS_REMOVE_FAILED");
+        // A12 review carry-over: the code first, then the path, so the operator
+        // can delete the file by hand (the README's promise).
+        if (removal !== null) throw new TypeError(`RELAY_HOST_ENDPOINTS_REMOVE_FAILED ${endpointsPath}`);
       })();
       return stopping;
     }

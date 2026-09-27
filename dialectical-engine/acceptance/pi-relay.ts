@@ -1,10 +1,13 @@
 import { z } from "zod";
 import {
   CliRelayFailure,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
   buildCliUsage,
   invokeCli,
   isRelayHandshakeReply,
+  openRelayWorkspace,
   renderPromptTranscript,
+  reportHarnessOverhead,
   resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
@@ -12,7 +15,8 @@ import {
   type CliInvocation,
   type CliRelayAdapter,
   type CliRelayHandle,
-  type CommandSpec
+  type CommandSpec,
+  type HarnessOverhead
 } from "./relay-core.js";
 
 /**
@@ -67,9 +71,12 @@ export const PI_DEFAULT_THINKING_LEVEL = "high" as const;
 export const PI_GLM_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 export const PI_HANDSHAKE_PROMPT =
   "PI-01 acceptance transport handshake. Reply with the single word: OK" as const;
-/** Fixed engine text — never debate content — so it may travel on argv. */
-export const PI_RELAY_SYSTEM_PROMPT =
-  "You answer one request. The attached file holds a JSON object in the format debateai.relay-messages.v1; its messages array carries the instructions and the conversation. Follow those instructions exactly and reply with the answer only." as const;
+/**
+ * Fixed engine text — never debate content — so it may travel on argv. D8
+ * (lean calls): it IS relay-core's one minimal sentence, so pi's system text is
+ * every other relay's; the transcript in the @file says what it is.
+ */
+export const PI_RELAY_SYSTEM_PROMPT = RELAY_MINIMAL_SYSTEM_PROMPT;
 /** Fixed engine text: the one sentence after the `@file`. */
 export const PI_ATTACHED_PROMPT_MESSAGE = "Answer the request in the attached file." as const;
 const PI_MODEL_PIN_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
@@ -110,6 +117,8 @@ export function piArguments(model: string, thinkingLevel: string, promptFile: st
     "--no-extensions",
     "--no-skills",
     "--no-context-files",
+    // D8 (lean calls, M5): with the flags above, 84 input tokens for a one-line prompt.
+    "--no-prompt-templates",
     "--system-prompt", PI_RELAY_SYSTEM_PROMPT,
     `@${promptFile}`,
     PI_ATTACHED_PROMPT_MESSAGE
@@ -242,6 +251,8 @@ export interface PiRelayHandle extends CliRelayHandle {
   readonly maker: typeof ZAI_MAKER;
   readonly thinkingLevels: readonly string[];
   readonly contextWindowTokens: typeof PI_GLM_CONTEXT_WINDOW_TOKENS;
+  /** D8: what pi added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
 }
 
 export async function startPiRelay(options: PiRelayOptions): Promise<PiRelayHandle> {
@@ -257,33 +268,40 @@ export async function startPiRelay(options: PiRelayOptions): Promise<PiRelayHand
     "TEST_ONLY_PI_COMMAND_FORBIDDEN"
   );
   const adapter = createPiAdapter(model, defaultThinkingLevel);
-  // The handshake is the sign-in check AND the lineage check: parsePiEvents
-  // refuses an answer from any provider or model other than the pinned one.
-  // It is also the prompt-file check: a pi that ignored the `@file` still
-  // answers, generically, so the reply must be the "ok" the prompt asked for.
-  const handshake = await invokeCli(
-    command,
-    adapter,
-    renderPromptTranscript([{ role: "user", content: PI_HANDSHAKE_PROMPT }]),
-    options.timeoutMs
-  );
-  if (!isRelayHandshakeReply(handshake.content)) {
-    throw new CliRelayFailure("FAILED", "PI_CLI_HANDSHAKE_MISMATCH");
+  const handshakePrompt = renderPromptTranscript([{ role: "user", content: PI_HANDSHAKE_PROMPT }]);
+  // D8: ONE private workspace for this relay's whole life, the handshake included.
+  // The "file" transport's prompt directory is made inside it too, per call.
+  const workspace = await openRelayWorkspace(adapter);
+  try {
+    // The handshake is the sign-in check AND the lineage check: parsePiEvents
+    // refuses an answer from any provider or model other than the pinned one.
+    // It is also the prompt-file check: a pi that ignored the `@file` still
+    // answers, generically, so the reply must be the "ok" the prompt asked for.
+    const handshake = await invokeCli(command, adapter, handshakePrompt, options.timeoutMs, { workspace });
+    if (!isRelayHandshakeReply(handshake.content)) {
+      throw new CliRelayFailure("FAILED", "PI_CLI_HANDSHAKE_MISMATCH");
+    }
+    const harnessOverhead = reportHarnessOverhead(ZAI_MAKER, handshakePrompt, handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      adapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model,
+      maker: ZAI_MAKER,
+      thinkingLevels: PI_THINKING_LEVELS,
+      contextWindowTokens: PI_GLM_CONTEXT_WINDOW_TOKENS,
+      harnessOverhead,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
   }
-  const server = await startCliRelayServer({
-    port: options.port,
-    timeoutMs: options.timeoutMs,
-    command,
-    adapter
-  });
-  return Object.freeze({
-    port: server.port,
-    baseUrl: server.baseUrl,
-    authorizationHeader: server.authorizationHeader,
-    model,
-    maker: ZAI_MAKER,
-    thinkingLevels: PI_THINKING_LEVELS,
-    contextWindowTokens: PI_GLM_CONTEXT_WINDOW_TOKENS,
-    close: () => server.close()
-  });
 }

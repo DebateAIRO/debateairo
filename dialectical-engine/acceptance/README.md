@@ -145,6 +145,28 @@ then deletes the endpoints file first and closes every relay; a second Ctrl-C
 does not cut that short. If the file cannot be deleted, the host says so with
 `RELAY_HOST_ENDPOINTS_REMOVE_FAILED` and the path, so you can delete it yourself.
 
+**Lean calls (model scorecard D8, owner ruling 2026-09-26).** A relayed call
+carries what an API call would, and as little else as each CLI allows. Every relay
+opens one private directory (mode 0700) when it starts and removes it when it stops;
+each call, the handshake included, runs in a fresh EMPTY directory inside it, so no
+project file (`CLAUDE.md`, `AGENTS.md` …) is ever read. Each CLI's own system prompt
+is replaced by one fixed sentence, `RELAY_MINIMAL_SYSTEM_PROMPT` in `relay-core.ts`:
+claude `--system-prompt` (never `--bare`, which also disables the subscription
+login); codex `-c model_instructions_file=` pointing at a 0600 file in the relay's
+directory, plus one `--disable` per name in `CODEX_DISABLED_FEATURES`; grok
+`--system-prompt-override`; pi `--system-prompt` plus `--no-prompt-templates`. agy
+has no system-prompt flag and gets `--disable-slash-commands`. The engine's own
+messages are untouched. What a CLI still adds is measured once, after the
+handshake, and printed as `RELAY OVERHEAD <maker> reported=<n> own=<m> overhead=<n−m>`
+(`own` is the handshake prompt's characters ÷ 4, rounded up): information, never a
+gate, and never a price. `relays:serve` prints each line once more with the
+candidate's providerRef after the maker. The Support relay (`hermes`) is out of
+scope: it plays no debate role, so it keeps its own handshake and prompt. grok
+selects a model by a short id and reports a longer one: `startGrokRelay`'s `model`
+option, and a relay-host `grok` candidate's `modelSelection`, is what `-m` gets
+(e.g. `grok-4.7`), while the relay still reports what grok answers as (e.g.
+`grok-4.7-build`).
+
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size
 ceiling refuses a lawful nonempty debate. Grok's fixed relay port is

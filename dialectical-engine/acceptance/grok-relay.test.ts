@@ -1,17 +1,26 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { isAbsolute, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   GROK_BINARY_NAME,
+  GROK_HANDSHAKE_PROMPT,
   GROK_SANDBOX_PROFILE,
   SANDBOX_PROFILE_UNAVAILABLE,
   resolveGrokBinary,
   startGrokRelay,
   type GrokRelayHandle
 } from "./grok-relay.js";
+import { RELAY_MINIMAL_SYSTEM_PROMPT } from "./relay-core.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  loggedWorkspaces,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-grok-cli.mjs", import.meta.url));
 const handles: GrokRelayHandle[] = [];
@@ -229,6 +238,8 @@ describe("GROK-01 Grok Build CLI relay", () => {
         "--single", relayed.prompt,
         "--output-format", "json",
         "--verbatim",
+        // D8 (Task A12b): grok's own system prompt is replaced.
+        "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT,
         "--sandbox", "read-only",
         "--no-memory",
         "--no-subagents",
@@ -571,7 +582,7 @@ describe("F-GROK-SANDBOX-PROFILE the sandbox profile is probed, never assumed", 
     expect(argumentList).not.toContain("--sandbox");
     expect(argumentList).not.toContain(GROK_SANDBOX_PROFILE);
     expect(argumentList.filter((argument) => argument.startsWith("--"))).toEqual([
-      "--single", "--output-format", "--verbatim",
+      "--single", "--output-format", "--verbatim", "--system-prompt-override",
       "--no-memory", "--no-subagents", "--disable-web-search", "--tools"
     ]);
   });
@@ -758,5 +769,141 @@ describe("§2.2 Grok thinking level and §2.3 reasoning tokens", () => {
         completion_tokens_details: { reasoning_tokens: 28 }
       }
     });
+  });
+});
+
+describe("D8 lean calls — grok (Task A12b)", () => {
+  interface RelayedGrok {
+    readonly prompt: string;
+    readonly argumentList: readonly string[];
+  }
+
+  const relayedOf = async (handle: GrokRelayHandle, content: string): Promise<RelayedGrok> => {
+    const completion = await (await postCompletion(handle, content)).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+    return JSON.parse(completion.choices[0]!.message.content) as RelayedGrok;
+  };
+
+  it("overrides grok's own system prompt with the relay's one sentence, and passes -m only when a model is selected", async () => {
+    const unselected = await relayedOf(await start(), "Lean canary 7a2e.");
+    expect(unselected.argumentList.slice(4, 7)).toEqual([
+      "--verbatim", "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT
+    ]);
+    expect(unselected.argumentList).not.toContain("-m");
+
+    const selecting = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "grok-4.7",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+    handles.push(selecting);
+    // The lineage is still what the CLI REPORTS (live, `-m grok-4.7` answers as grok-4.7-build).
+    expect(selecting.model).toBe("grok-fake-cli-model");
+    const selected = await relayedOf(selecting, "Assess this claim.");
+    expect(selected.argumentList.slice(4, 9)).toEqual([
+      "--verbatim", "-m", "grok-4.7", "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT
+    ]);
+
+    const refused = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "grok 4.7",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    }).then((relay) => {
+      // A relay that wrongly started is still closed, so a regression here strands nothing.
+      handles.push(relay);
+      return null;
+    }, (error: unknown) => error);
+    expect(refused instanceof Error ? refused.message : refused).toBe("GROK_CLI_MODEL_PIN_INVALID");
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, each call in an empty 0700 directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const relay = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: ["-e", [
+          leanCwdReportSnippet(logPath),
+          'console.log(JSON.stringify({ text: JSON.stringify(leanCwdReport), stopReason: "end_turn", modelUsage: { "grok-probe-model": {} } }));'
+        ].join("\n"), "--"]
+      }
+    });
+    handles.push(relay);
+
+    const completion = await (await postCompletion(relay, "Probe cwd.")).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+
+    const workspace = await expectLeanWorkingDirectory(
+      JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport, "xai", logPath
+    );
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what grok adds around the handshake and only reports it", async () => {
+    const relay = await start();
+    const own = Math.ceil(GROK_HANDSHAKE_PROMPT.length / 4);
+
+    // The fake reports 1 input token, so its "overhead" is negative: this pins the arithmetic, not a CLI.
+    expect(relay.harnessOverhead).toEqual({
+      maker: "xAI", reportedInputTokens: 1, promptTokensEstimate: own, overheadTokens: 1 - own
+    });
+  });
+});
+
+describe("D8 a start whose handshake fails leaves no workspace behind (Task A12b)", () => {
+  it("removes the workspace it opened for the handshake before the start rejects", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const failing = [leanCwdReportSnippet(logPath), "process.exitCode = 1;"].join("\n");
+
+    await expect(startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", failing, "--"] }
+    })).rejects.toThrow("GROK_CLI_FAILED");
+
+    const logged = await loggedWorkspaces(logPath);
+    expect(logged.length).toBeGreaterThan(0);
+    expect(new Set(logged).size).toBe(1);
+    expect(basename(logged[0]!).startsWith("relay-xai-workspace-")).toBe(true);
+    expect(existsSync(logged[0]!)).toBe(false);
+  });
+});
+
+describe("D8 grok's sandbox probe runs every handshake in the relay's one workspace (Task A12b)", () => {
+  it("keeps both sandboxed attempts, the unsandboxed one and the served call in ONE workspace, removed at stop", async () => {
+    const logPath = join(await temporaryDirectory("relay-lean-log-"), "workspaces.log");
+    const probe = [
+      leanCwdReportSnippet(logPath),
+      'if (process.argv.includes("--sandbox")) {',
+      "  process.exitCode = 1;",
+      "} else {",
+      '  console.log(JSON.stringify({ text: JSON.stringify(leanCwdReport), stopReason: "end_turn", modelUsage: { "grok-probe-model": {} } }));',
+      "}"
+    ].join("\n");
+    const relay = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", probe, "--"] }
+    });
+    handles.push(relay);
+    expect(relay.sandboxProfile).toBeNull();
+
+    const completion = await (await postCompletion(relay, "Probe cwd.")).json() as {
+      choices: readonly { message: { content: string } }[];
+    };
+
+    const report = JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport;
+    const workspace = dirname(report.cwd);
+    expect(basename(workspace).startsWith("relay-xai-workspace-")).toBe(true);
+    expect(report.cwdEntries).toEqual([]);
+    expect(await loggedWorkspaces(logPath)).toEqual([workspace, workspace, workspace, workspace]);
+    await relay.close();
+    expect(existsSync(workspace)).toBe(false);
   });
 });
