@@ -642,10 +642,20 @@ export async function withCooldownRetry<T>(input: {
    * the final retry is granted exactly as before.
    */
   readonly finalRetryPermitted?: () => Promise<boolean>;
+  /**
+   * Model scorecard A16a (controller ruling on concern 2): the site's TRUE
+   * attempts, every seat key at the site counted off the ledger. A seat that
+   * switched to its backup spent on TWO keys, and each error carries only its
+   * own sequence, so an assigned run's hold and halt records read this instead.
+   * Absent (every legacy run), they count the errors' attempts exactly as before.
+   */
+  readonly siteAttemptsSpent?: () => Promise<number>;
 }): Promise<
   | { readonly kind: "AUTHORED"; readonly value: T }
   | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
 > {
+  const spent = async (fromErrors: number): Promise<number> =>
+    input.siteAttemptsSpent === undefined ? fromErrors : await input.siteAttemptsSpent();
   const halted = async (error: ProviderCallFailedError, attemptsSpent: number) => {
     const record = Object.freeze({
       callSiteKey: input.callSiteKey,
@@ -664,7 +674,7 @@ export async function withCooldownRetry<T>(input: {
       parentNodeId: input.parentNodeId,
       holdMs: input.policy.cooldownMs,
       holdUntil: null,
-      attemptsSpent,
+      attemptsSpent: await spent(attemptsSpent),
       transportOutcome: error.lastOutcome,
       plannedLegCount: input.plannedLegCount
     });
@@ -696,6 +706,7 @@ export async function withCooldownRetry<T>(input: {
     // final attempt that the structural ceiling provisions at every site.
     if (holds >= input.policy.maxCooldownHoldsPerRun) return finalAttempt(error);
     const holdUntil = new Date(Date.now() + input.policy.cooldownMs).toISOString();
+    const heldAttempts = await spent(error.attempts);
     await input.hold.record({
       kind: "node.retrying",
       state: "COOLDOWN_HOLD",
@@ -704,7 +715,7 @@ export async function withCooldownRetry<T>(input: {
       parentNodeId: input.parentNodeId,
       holdMs: input.policy.cooldownMs,
       holdUntil,
-      attemptsSpent: error.attempts,
+      attemptsSpent: heldAttempts,
       transportOutcome: error.lastOutcome,
       plannedLegCount: input.plannedLegCount
     });
@@ -717,7 +728,7 @@ export async function withCooldownRetry<T>(input: {
       parentNodeId: input.parentNodeId,
       holdMs: input.policy.cooldownMs,
       holdUntil,
-      attemptsSpent: error.attempts,
+      attemptsSpent: heldAttempts,
       transportOutcome: error.lastOutcome,
       plannedLegCount: input.plannedLegCount
     });
@@ -2853,6 +2864,24 @@ export class WalkingSkeletonRunner {
       if (hold === undefined) {
         throw new TypedDomainError("RUN_HOLD_RECORDER_UNRESOLVED", "runDeathPolicy requires a production hold recorder");
       }
+      /**
+       * A16a (controller ruling on concern 2): an assigned site's TRUE attempts —
+       * both of its seat keys, off the ledger — for its hold and halt records. A
+       * seat that switched to its backup spent on two keys; the legacy book has
+       * one bare key and keeps today's arithmetic byte for byte.
+       */
+      const siteAttemptsSpent = input.seatMember === undefined ? undefined : async (): Promise<number> => {
+        let total = 0;
+        for (const seat of ["main", "runnerUp"] as const) {
+          total += await this.#ledger.countModelAttempts({
+            runId: run.runId,
+            workItemId: claimed.workItemId,
+            contractHash: this.settings.judgeContractHash,
+            callSiteKey: seatCallSiteKey(siteKey, seat)
+          });
+        }
+        return total;
+      };
       const preflight = preflightHaltedSites.get(siteKey)
         ?? (input.seatMember === null ? spentSiteHalts.get(siteKey) : undefined);
       if (preflight !== undefined) {
@@ -2873,7 +2902,9 @@ export class WalkingSkeletonRunner {
           parentNodeId: input.parentNodeId,
           holdMs: policy.cooldownMs,
           holdUntil: null,
-          attemptsSpent: this.settings.judgeBound.maxAttempts + policy.finalRetryAttempts,
+          attemptsSpent: siteAttemptsSpent === undefined
+            ? this.settings.judgeBound.maxAttempts + policy.finalRetryAttempts
+            : await siteAttemptsSpent(),
           transportOutcome: preflight.outcome,
           plannedLegCount: input.plannedLegCount
         });
@@ -2890,6 +2921,7 @@ export class WalkingSkeletonRunner {
         policy,
         hold,
         attempt: input.attempt,
+        ...(siteAttemptsSpent === undefined ? {} : { siteAttemptsSpent }),
         // A15d (controller carry 3, the ruling's preferred option): the site's
         // ONE final retry. A seat key past the sequence bound has spent it, so
         // the member answering here gets none when its partner's key has.
@@ -3280,14 +3312,62 @@ export class WalkingSkeletonRunner {
      */
     const restoredRootMembers = new Map<number, SeatMember>();
     /**
+     * A16a (controller ruling on carry 1) — what EARLIER passes of this work
+     * item recorded under each seat-marked judge key: its attempts, and the
+     * order of its latest answer (an `OK` row; a refused answer is `FAILED`).
+     * Filled from the ledger before the first root, with the root restoration
+     * below; empty on a first pass and on the legacy book.
+     */
+    const seatKeyHistory = new Map<string, { readonly attempts: number; readonly lastAnsweredAt: number | null }>();
+    /**
+     * A16a (controller ruling on carry 1) — A15d's root restoration, for EVERY
+     * judge seat site. The seat caller's down marks live in memory only, so
+     * without this a resumed pass would try a site's main first again after the
+     * runner-up took the site over, and meet the main's spent key
+     * (`CALL_BUDGET_EXHAUSTED`). From the ledger instead:
+     *  · a site one slot ANSWERED is answered by that slot again;
+     *  · a slot whose first sequence is spent (`judge` attempts) with no answer,
+     *    at a site whose other slot was tried and can still answer (fewer than
+     *    `judge`), is never tried there again — a finished switch stays made.
+     * It restricts a two-member seat only, and only when the restriction leaves
+     * the call a member its own rule allows; A15d's carry-6 hand-off and carry-3
+     * check are untouched, and the per-key caps keep the site within 2j + f.
+     * `baseKeyOf` is the member's key before its seat marker (the panel names
+     * the answering route in its key).
+     */
+    const ledgerSeatRule = (
+      seat: RunSeat,
+      baseKeyOf: (member: SeatMember) => string,
+      allowed: (member: SeatMember) => boolean
+    ): ((member: SeatMember) => boolean) => {
+      if (!seatBook.assigned || seat.runnerUp === null) return () => true;
+      const members = [seat.main, seat.runnerUp].filter(allowed);
+      const historyOf = (member: SeatMember) => seatKeyHistory.get(
+        seatCallSiteKey(baseKeyOf(member), member.pinnedAs === "MAIN" ? "main" : "runnerUp")
+      );
+      const attemptsOf = (member: SeatMember): number => historyOf(member)?.attempts ?? 0;
+      const answeredAt = (member: SeatMember): number => historyOf(member)?.lastAnsweredAt ?? -1;
+      const answered = members.filter((member) => answeredAt(member) >= 0)
+        .sort((left, right) => answeredAt(right) - answeredAt(left))[0];
+      if (answered !== undefined) return (member) => member.pinnedAs === answered.pinnedAs;
+      const judgeAttempts = this.settings.judgeBound.maxAttempts;
+      const abandoned = members.find((member) => attemptsOf(member) >= judgeAttempts
+        && members.some((other) => other !== member && attemptsOf(other) >= 1 && attemptsOf(other) < judgeAttempts));
+      if (abandoned !== undefined) return (member) => member.pinnedAs !== abandoned.pinnedAs;
+      return () => true;
+    };
+    /**
      * A15: who may answer ONE seat call at `siteKey` on this pass — the call's
      * own fairness rule, minus a member whose key the preflight found spent
-     * (carry 6). `seatMember` is the member the seat caller will call first; it
-     * is undefined on the legacy book, which keeps today's cooldown path.
+     * (carry 6), then the ledger's record of earlier passes (A16a,
+     * `ledgerSeatRule`). `seatMember` is the member the seat caller will call
+     * first; it is undefined on the legacy book, which keeps today's cooldown path.
      */
     const seatCallPlan = (seat: RunSeat, siteKey: string, rule?: (member: SeatMember) => boolean) => {
-      const eligible = (member: SeatMember): boolean => (rule === undefined || rule(member))
+      const allowed = (member: SeatMember): boolean => (rule === undefined || rule(member))
         && spentSeatSlots.get(siteKey) !== member.pinnedAs;
+      const fromLedger = ledgerSeatRule(seat, () => siteKey, allowed);
+      const eligible = (member: SeatMember): boolean => allowed(member) && fromLedger(member);
       return Object.freeze({
         eligible,
         seatMember: seatBook.assigned ? seatCaller.plan(seat, siteKey, { eligible }) : undefined
@@ -3405,8 +3485,13 @@ export class WalkingSkeletonRunner {
       const notTheAuthor = (member: SeatMember): boolean => member.maker !== input.authorMaker;
       const panelCallCap = Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1;
       let panelCallsPlanned = 0;
+      const panelKeyFor = (member: SeatMember): string => `${input.callSiteKey}:${member.providerRef}`;
       const panelMembers = seatBook.judge.flatMap((seat) => {
-        const planned = seatCaller.plan(seat, input.callSiteKey, { eligible: notTheAuthor });
+        // A16a (controller ruling on carry 1): a panel site a slot answered on an
+        // earlier pass is answered by that slot again (`ledgerSeatRule`).
+        const fromLedger = ledgerSeatRule(seat, panelKeyFor, notTheAuthor);
+        const eligible = (member: SeatMember): boolean => notTheAuthor(member) && fromLedger(member);
+        const planned = seatCaller.plan(seat, input.callSiteKey, { eligible });
         if (planned === null) {
           return [{
             memberRole: seat.main.maker,
@@ -3430,8 +3515,8 @@ export class WalkingSkeletonRunner {
             const answered = await seatCaller.callSeat({
               seat,
               callSiteKey: input.callSiteKey,
-              eligible: notTheAuthor,
-              keyFor: (member) => `${input.callSiteKey}:${member.providerRef}`,
+              eligible,
+              keyFor: panelKeyFor,
               call: (member, callSiteKey) => member.judge.assess({
                 runId: run.runId,
                 subjectItemId: claimed.workItemId,
@@ -3701,6 +3786,7 @@ export class WalkingSkeletonRunner {
     const recordedSlotBySite = new Map<string, SeatSlot>();
     if (seatBook.assigned) {
       const answeredSlotBySite = new Map<string, SeatSlot>();
+      let order = 0;
       for (const row of await this.#ledger.readSeatMarkedModelCalls({
         runId: run.runId, workItemId: claimed.workItemId, contractHash: this.settings.judgeContractHash
       })) {
@@ -3708,6 +3794,13 @@ export class WalkingSkeletonRunner {
         const slot: SeatSlot = seatOfCallSiteKey(row.callSiteKey) === "main" ? "MAIN" : "RUNNER_UP";
         if (!recordedSlotBySite.has(site)) recordedSlotBySite.set(site, slot);
         if (row.outcome === "OK") answeredSlotBySite.set(site, slot);
+        // A16a: every seat key's history, for `ledgerSeatRule` (rows arrive in ledger order).
+        const seen = seatKeyHistory.get(row.callSiteKey);
+        seatKeyHistory.set(row.callSiteKey, {
+          attempts: (seen?.attempts ?? 0) + 1,
+          lastAnsweredAt: row.outcome === "OK" ? order : seen?.lastAnsweredAt ?? null
+        });
+        order += 1;
       }
       seatBook.position.forEach((seat, rootIndex) => {
         const siteKey = rootIndex === 0 ? "JUDGE" : rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;

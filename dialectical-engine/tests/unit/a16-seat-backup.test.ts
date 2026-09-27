@@ -678,6 +678,47 @@ describe("A16 · carry 5 — a backup gets ONE sequence per site: a cooldown sit
   });
 });
 
+describe("A16 · pre-review ruling 2 — hold and halt records report the SITE's true attempts", () => {
+  const records = () => {
+    const events: { state: string; attemptsSpent: number }[] = [];
+    return {
+      events,
+      hold: {
+        countCooldownHolds: async () => 0,
+        record: async (event: { state: string; attemptsSpent: number }) => { events.push({ state: event.state, attemptsSpent: event.attemptsSpent }); },
+        wait: async () => undefined
+      }
+    };
+  };
+  const failing = (attempts: number) => async (): Promise<never> => {
+    throw new ProviderCallFailedError(new Error("down"), attempts, "FAILED", "ledger:down");
+  };
+  const site = {
+    runId: "run:a16", callSiteKey: "leg", parentNodeId: "node:parent", plannedLegCount: 1, baseMaxAttempts: 1,
+    failureScope: "EXPANSION" as const, policy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 }
+  };
+
+  it("reads the site's count for the hold, the retry and the halt when the caller supplies it", async () => {
+    const { events, hold } = records();
+    const ledgerTotals = [2, 3];
+    await expect(withCooldownRetry({ ...site, hold, attempt: failing(1), siteAttemptsSpent: async () => ledgerTotals.shift()! }))
+      .resolves.toMatchObject({ kind: "HALTED" });
+    expect(events).toEqual([
+      { state: "COOLDOWN_HOLD", attemptsSpent: 2 }, { state: "COOLDOWN_RETRY", attemptsSpent: 2 },
+      { state: "EXPANSION_HALTED", attemptsSpent: 3 }
+    ]);
+  });
+
+  it("keeps today's arithmetic when it does not (every legacy run)", async () => {
+    const { events, hold } = records();
+    await withCooldownRetry({ ...site, hold, attempt: failing(1) });
+    expect(events).toEqual([
+      { state: "COOLDOWN_HOLD", attemptsSpent: 1 }, { state: "COOLDOWN_RETRY", attemptsSpent: 1 },
+      { state: "EXPANSION_HALTED", attemptsSpent: 2 }
+    ]);
+  });
+});
+
 describe("A16 · carry 6 — a backup's call is stamped as its own candidate, under its own seat key", () => {
   it("sends the runner-up's model role, thinking level, candidate and scorecard version, keyed `:seat:runnerUp`", async () => {
     const requests: ProviderCallRequest[] = [];
