@@ -1367,19 +1367,21 @@ export class RunRepository {
    * disclosure into a crashed run. Every run discloses the switch on its answer
    * through the BACKUP-MODEL-USED records.
    *
-   * A16c (controller carry 8: one disclosure per real switch; fix round 1,
-   * Minor 1) — an event this run already holds is not written twice
+   * A16c (controller carry 8: one disclosure per real switch; fix rounds 1
+   * and 2) — an event this run already holds is not written twice
    * (`ALREADY_RECORDED`):
-   *  · a BACKUP_MODEL_ENGAGED switch is the same switch when it names the same
-   *    run, role, seat and failed key (`call_site_key`, which carries the
-   *    switched member's seat marker; null for a switch made at claim),
-   *    WHATEVER its `cause`. So a seat switched at claim is told once however
-   *    many passes re-make the claim, and an outage switch whose pass died
-   *    while the runner-up's first call was in flight — told as
+   *  · a BACKUP_MODEL_ENGAGED switch is the same switch when it matches on
+   *    run, role, seat_index, call_site_key (null-safe; null for a switch made
+   *    at claim), from_provider_ref and to_provider_ref — every field but
+   *    `cause`, which alone is ignored. So a seat switched at claim is told
+   *    once however many passes re-make the claim, and an outage switch whose
+   *    pass died while the runner-up's first call was in flight — told as
    *    TRANSPORT_FAILURE — is not told again when the next pass hands the same
-   *    key over through the ledger as SPENT_ON_EARLIER_PASS. Two genuinely
-   *    distinct switches never share that key: a site switches away from a
-   *    member at most once (DR-184-v5).
+   *    key over, between the same two routes, as SPENT_ON_EARLIER_PASS. The
+   *    routes are part of the match because a key names a member SLOT, and
+   *    across a claim-shape flip (a role that fell back to the debaters on one
+   *    pass and not the next) the same slot and key can hold other routes: that
+   *    is a different switch, and it is recorded.
    *  · a ROLE_FELL_BACK_TO_DEBATERS event is the same event when its whole
    *    value is equal.
    */
@@ -1401,8 +1403,13 @@ export class RunRepository {
               AND value_json->>'state'='BACKUP_MODEL_ENGAGED'
               AND value_json->>'role'=$2
               AND value_json->'seat_index'=to_jsonb($3::integer)
-              AND value_json->>'call_site_key' IS NOT DISTINCT FROM $4::text`,
-          [input.runId, input.value.role, input.value.seat_index, input.value.call_site_key]
+              AND value_json->>'call_site_key' IS NOT DISTINCT FROM $4::text
+              AND value_json->>'from_provider_ref'=$5
+              AND value_json->>'to_provider_ref'=$6`,
+          [
+            input.runId, input.value.role, input.value.seat_index, input.value.call_site_key,
+            input.value.from_provider_ref, input.value.to_provider_ref
+          ]
         )
         : await client.query(
           `SELECT 1 FROM core.run_progress_event

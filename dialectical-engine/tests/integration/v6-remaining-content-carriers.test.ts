@@ -1066,11 +1066,30 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
 
     const legacyRunId = await createLegacyRun(`v6 backup switch legacy ${marker}`, `legacy-v6-${randomUUID()}`);
     await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value })).resolves.toBe("RECORDED");
-    // One disclosure per real switch: the same switch told again (a resumed pass's claim) is not a second event.
+    // One disclosure per real switch: the same switch told again (a resumed pass's claim) is not a second event…
     await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value })).resolves.toBe("ALREADY_RECORDED");
+    // …nor is it when a later pass would name another CAUSE for it (A16c fix round 1: the outage switch a
+    // resumed pass hands over through the ledger). The cause is the ONE field the match ignores.
+    await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value: { ...value, cause: "SPENT_ON_EARLIER_PASS" } }))
+      .resolves.toBe("ALREADY_RECORDED");
+    // A16c fix round 2: how NARROW the match is — every other field names a different switch, recorded.
+    const distinct = [
+      { ...value, call_site_key: "JUDGE:seat:runnerUp" },
+      { ...value, seat_index: 1 },
+      { ...value, role: "SUPPORT_ATTACK" },
+      { ...value, call_site_key: null },
+      { ...value, from_provider_ref: "provider:c" },
+      { ...value, to_provider_ref: "provider:c" }
+    ];
+    for (const other of distinct) {
+      await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value: other })).resolves.toBe("RECORDED");
+    }
     await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value: fallback })).resolves.toBe("RECORDED");
     expect((await database.pool.query<{ value_json: unknown }>(
       "SELECT value_json FROM core.run_progress_event WHERE run_id=$1 AND kind='ledger.could_not_do' ORDER BY at_seq", [legacyRunId]
-    )).rows.map((row) => row.value_json)).toEqual([value, fallback]);
+    )).rows.map((row) => row.value_json)).toEqual([value, ...distinct, fallback]);
+    // …and the same switch in ANOTHER run is that run's own event.
+    const otherLegacyRunId = await createLegacyRun(`v6 backup switch legacy other ${marker}`, `legacy-v6-${randomUUID()}`);
+    await expect(runs.recordBackupSwitchEvent({ runId: otherLegacyRunId, value })).resolves.toBe("RECORDED");
   });
 });
