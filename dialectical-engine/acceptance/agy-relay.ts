@@ -49,6 +49,22 @@ export function resolveAgyBinary(source: NodeJS.ProcessEnv = process.env): strin
 export const GOOGLE_MAKER = "Google" as const;
 export const AGY_HANDSHAKE_PROMPT =
   "AGY-01 acceptance transport handshake. Reply with the single word: OK" as const;
+/** The one reply the handshake accepts, once trimmed, lower-cased and stripped of trailing punctuation. */
+const AGY_HANDSHAKE_REPLY = "ok" as const;
+
+/**
+ * Fix round 1: the handshake READS the reply. Until the owner's Step 0
+ * measurement settles the stdin form, the silent failure is an agy that never
+ * reads stdin, runs on an EMPTY prompt and still says SUCCESS with some generic
+ * text. Every served call would then answer 200 with text that does not answer
+ * its prompt — a transport fault the scorecard would blame on the model. Only
+ * an agy that actually read the handshake prompt replies "ok", so anything else
+ * stops the relay before it serves (AGY_CLI_HANDSHAKE_MISMATCH).
+ */
+export function isAgyHandshakeReply(content: string): boolean {
+  return content.trim().toLowerCase().replace(/[\s\p{P}]+$/u, "") === AGY_HANDSHAKE_REPLY;
+}
+
 /** `agy models` 1.2.11 (M4): the thinking level is the id's suffix, one of these three. */
 export const AGY_MODEL_LEVEL_SUFFIXES = Object.freeze(["low", "medium", "high"] as const);
 /** The base id the development panel pins (plan choice; the owner may pin another). */
@@ -162,7 +178,7 @@ function createAgyAdapter(
     // exported GEMINI_API_KEY or GOOGLE_API_KEY could move a SUBSCRIPTION call
     // onto paid API billing. agy's own sign-in lives under HOME (a common key).
     authEnvironmentKeys: Object.freeze(["USER", "LOGNAME"]),
-    testEnvironmentKeys: Object.freeze(["FAKE_AGY_ALWAYS_FAIL"]),
+    testEnvironmentKeys: Object.freeze(["FAKE_AGY_ALWAYS_FAIL", "FAKE_AGY_IGNORE_STDIN"]),
     failureCode: "AGY_CLI_FAILED",
     timeoutCode: "AGY_CLI_TIMEOUT",
     promptTransport: "stdin" as const,
@@ -197,8 +213,9 @@ export interface AgyRelayHandle extends CliRelayHandle {
 
 export async function startAgyRelay(options: AgyRelayOptions): Promise<AgyRelayHandle> {
   const model = options.model ?? AGY_DEFAULT_MODEL;
+  // Fix round 1: the suffix check ignores case, so `…-High` cannot slip past it.
   if (!AGY_MODEL_PIN_PATTERN.test(model)
-    || AGY_MODEL_LEVEL_SUFFIXES.some((suffix) => model.endsWith(`-${suffix}`))) {
+    || AGY_MODEL_LEVEL_SUFFIXES.some((suffix) => model.toLowerCase().endsWith(`-${suffix}`))) {
     throw new CliRelayFailure("FAILED", "AGY_CLI_MODEL_PIN_INVALID");
   }
   const thinkingLevels = Object.freeze([...(options.thinkingLevels ?? AGY_MODEL_LEVEL_SUFFIXES)]);
@@ -218,7 +235,11 @@ export async function startAgyRelay(options: AgyRelayOptions): Promise<AgyRelayH
   );
   const adapter = createAgyAdapter(model, thinkingLevels, defaultThinkingLevel);
   // The handshake IS the sign-in check: agy 1.2.11 has no auth-status command.
-  await invokeCli(command, adapter, AGY_HANDSHAKE_PROMPT, options.timeoutMs);
+  // It is also the stdin check: the reply must be the "ok" the prompt asked for.
+  const handshake = await invokeCli(command, adapter, AGY_HANDSHAKE_PROMPT, options.timeoutMs);
+  if (!isAgyHandshakeReply(handshake.content)) {
+    throw new CliRelayFailure("FAILED", "AGY_CLI_HANDSHAKE_MISMATCH");
+  }
   const server = await startCliRelayServer({
     port: options.port,
     timeoutMs: options.timeoutMs,

@@ -10,6 +10,7 @@ import {
   AGY_STDIN_FORMAT,
   agyArguments,
   agyStdinPayload,
+  isAgyHandshakeReply,
   parseAgyOutput,
   resolveAgyBinary,
   startAgyRelay,
@@ -196,6 +197,17 @@ describe("AGY-01 Google agy relay (model scorecard §2.10)", () => {
     expect(await response.json()).toEqual({ error: "AGY_CLI_TOOL_DENIED" });
   });
 
+  it("treats a tool attempt as a FAILED call even when agy also returned text", async () => {
+    const relay = await start();
+
+    const response = await post(relay, "TOOLS_WITH_TEXT_CLI create a file");
+
+    expect(response.status).toBe(502);
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toEqual({ error: "AGY_CLI_TOOL_DENIED" });
+    expect(body).not.toHaveProperty("choices");
+  });
+
   it("refuses a non-SUCCESS status, unparseable output and a CLI failure without fabricating choices", async () => {
     const relay = await start();
 
@@ -216,7 +228,7 @@ describe("AGY-01 Google agy relay (model scorecard §2.10)", () => {
     const environmentKeys = [
       "HOME", "PATH", "TMPDIR", "LANG", "USER", "LOGNAME",
       "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "DATABASE_URL", "UNRELATED_SECRET",
-      "FAKE_AGY_ALWAYS_FAIL"
+      "FAKE_AGY_ALWAYS_FAIL", "FAKE_AGY_IGNORE_STDIN"
     ] as const;
     const previousEnvironment = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
     Object.assign(process.env, {
@@ -233,6 +245,7 @@ describe("AGY-01 Google agy relay (model scorecard §2.10)", () => {
       UNRELATED_SECRET: "must-not-reach-child"
     });
     delete process.env.FAKE_AGY_ALWAYS_FAIL;
+    delete process.env.FAKE_AGY_IGNORE_STDIN;
     try {
       const relay = await start();
       const echo = echoOf(await (await post(relay, "Assess this claim.")).json() as AgyCompletion);
@@ -290,6 +303,21 @@ describe("AGY-01 Google agy relay (model scorecard §2.10)", () => {
     await expect(start({ thinkingLevels: [] })).rejects.toThrow("AGY_CLI_THINKING_LEVELS_INVALID");
     await expect(start({ thinkingLevels: ["low"], defaultThinkingLevel: "medium" }))
       .rejects.toThrow("AGY_CLI_THINKING_LEVELS_INVALID");
+  });
+
+  it("refuses a model pin whose level suffix is written in another case", async () => {
+    await expect(start({ model: "gemini-3.8-flash-High" })).rejects.toThrow("AGY_CLI_MODEL_PIN_INVALID");
+    await expect(start({ model: "GEMINI-3.8-FLASH-LOW" })).rejects.toThrow("AGY_CLI_MODEL_PIN_INVALID");
+    await expect(start({ model: "gemini-3.8-flash-Medium" })).rejects.toThrow("AGY_CLI_MODEL_PIN_INVALID");
+  });
+
+  it("refuses to start when the handshake reply is not ok — an agy that ignored stdin and answered an empty prompt", async () => {
+    process.env.FAKE_AGY_IGNORE_STDIN = "1";
+    try {
+      await expect(start()).rejects.toThrow("AGY_CLI_HANDSHAKE_MISMATCH");
+    } finally {
+      delete process.env.FAKE_AGY_IGNORE_STDIN;
+    }
   });
 
   it("keeps the process-double seam test-only", async () => {
@@ -360,6 +388,19 @@ describe("AGY-01 the two stdin forms (Task A10 Step 0 decides which one ships)",
       .toThrow("AGY_CLI_TOOL_DENIED");
     expect(() => parseAgyOutput(`${JSON.stringify(MEASURED_TOOLS)}\n`, "gemini-3.8-flash", "stream-json"))
       .toThrow("AGY_CLI_TOOL_DENIED");
+  });
+});
+
+describe("AGY-01 the handshake reply (fix round 1)", () => {
+  it("accepts only ok: trimmed, in any case, with trailing punctuation dropped", () => {
+    for (const reply of ["OK", "ok", "Ok", "OK.", "ok!", "  OK. ", "OK\n", "OK …"]) {
+      expect(isAgyHandshakeReply(reply), JSON.stringify(reply)).toBe(true);
+    }
+    for (const reply of [
+      "", "Hello! How can I help you today?", "okay", "not ok", "OK OK", "OK, but", "\"OK", "no"
+    ]) {
+      expect(isAgyHandshakeReply(reply), JSON.stringify(reply)).toBe(false);
+    }
   });
 });
 

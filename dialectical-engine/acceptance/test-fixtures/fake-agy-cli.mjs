@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 
-// Test-layer fake of agy 1.2.11 print mode (model scorecard §2.10). Reachable
-// only through the NODE_ENV=test guarded command seam (DR-115). Every shape is
+// Test-layer fake of agy 1.2.11 print mode (model scorecard §2.10). The fake
+// itself enforces nothing: a relay reaches it only when a TEST hands it over —
+// as `testOnlyCommand`, which `resolveTestGuardedCommand` refuses outside
+// NODE_ENV=test (TEST_ONLY_AGY_COMMAND_FORBIDDEN, DR-115), or through a launcher
+// a test wrote and named in ACCEPTANCE_AGY_BINARY. Every shape is
 // the redacted real capture of 2026-09-26 (M4): ONE JSON object — conversation_id,
 // status, response, duration_seconds, num_turns, usage and, only when a tool
 // was attempted, denied_actions. The prompt arrives on STDIN, never on argv,
@@ -94,6 +97,11 @@ function respond(stdinText) {
   if (process.env.FAKE_AGY_ALWAYS_FAIL === "1") {
     process.stderr.write("intentional fake agy CLI handshake failure\n");
     process.exitCode = 7;
+  } else if (process.env.FAKE_AGY_IGNORE_STDIN === "1") {
+    // Fix round 1: the failure Step 0 has not ruled out — an agy that never
+    // reads stdin, runs on an EMPTY prompt and still says SUCCESS with a
+    // generic, non-empty reply that answers nothing it was asked.
+    emit(result({ response: "Hello! How can I help you today?\n" }));
   } else if (prompt.includes("FAIL_CLI")) {
     process.stderr.write("intentional fake agy CLI failure\n");
     process.exitCode = 17;
@@ -107,6 +115,14 @@ function respond(stdinText) {
     // status SUCCESS with an EMPTY response and a non-empty denied_actions.
     process.stderr.write("jetski: no output produced — a tool required the \"command\" permission that headless mode cannot prompt for, so it was auto-denied.\n");
     emit(result({ usage: MEASURED_TOOLS_USAGE, denied_actions: [{ action: "command", display_name: "RunCommand" }] }));
+  } else if (prompt.includes("TOOLS_WITH_TEXT_CLI")) {
+    // Fix round 1: a denied tool beside a NON-empty response — text written
+    // around a blocked action is still not an answer.
+    emit(result({
+      response: "I have created the file as requested.\n",
+      usage: MEASURED_TOOLS_USAGE,
+      denied_actions: [{ action: "command", display_name: "RunCommand" }]
+    }));
   } else if (prompt.includes("STATUS_ERROR_CLI")) {
     emit(result({ status: "ERROR", response: "partial" }));
   } else if (prompt.includes("NON_JSON_CLI")) {
