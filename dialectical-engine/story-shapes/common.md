@@ -19,7 +19,8 @@ Say what the machinery's findings mean instead:
 - The position that won is our answer. One that finished close to it is almost as good; one far behind did not hold up.
 - A point known only by reasoning is an argument, not a finding: "it is argued that...", never "it was shown that...". A point checked against a source is a finding; name the source when the material gives one.
 - A point the debate could not check: say what we could not confirm, why, and what the person can do about it. For example: we could not confirm X, because the debate had no information about it; it is worth asking Y.
-- A point or a path left out of the conclusion: say what was left out and why, in plain words, with no numbers, from the reason the material gives: for example, it rested on a weak source, or it could not have changed the answer. Something left out was not proven wrong; never say it was.
+- A point or a path left out of the conclusion: say what was left out and why, in plain words, with no numbers, from the reason the material gives: for example, it rested on a weak source. Something left out was not proven wrong; never say it was.
+- A point or a path the debate did not follow further, because it could not have changed the answer: it still counts, so say it carried little weight in the conclusion and why, never that it was left out or proven wrong.
 - A point whose assessments were far apart: say it is genuinely open to different readings, never that "the judges disagreed".
 - A point challenged when it was double-checked: say what is doubtful about it, not who doubted it.
 
@@ -71,9 +72,9 @@ The material is for you to understand the debate. Its names, codes and numbers n
 - verdict: the label; rule_in_words, the rule that decided it; winner_id and runner_up_id, the positions that finished first and second, with their final scores; margin, how far apart they finished; disagreement, how far the assessments of the winning position were apart; thresholds, the limits the rule compares with (tie_margin, low_cut, high_cut, and the disagreement limit); confidence_band; and marks, codes about the debate as a whole.
 - served_statement: the short answer the site already shows. Never contradict it. If it says the question was left open, that is its way of saying "close call": still lead with our best answer.
 - positions: the opening positions, from the highest final score to the lowest, with the model that argued each and whether it won.
-- points: every point of the debate or, in a very large debate, the ones that matter most. id; supports or attacks, the ids of the points it argues for or against; claim; known_by: LOOKED_UP (checked against a source), RAN (computed or run) or REASONING (argument only); base, the point's own score from 0 to 1; final, its score once everything for and against it is counted; set_aside, why it was left out, if it was; best_case and objection, the strongest case for it and against it; review and review_reasons, a second model's double-check: agree, dispute or cannot-assess (it could not be checked); author, the model that wrote it; judge_spread, how far its assessments were apart; leverage, how much our answer leans on it.
+- points: every point of the debate or, in a very large debate, the ones that matter most. id; supports or attacks, the ids of the points it argues for or against; claim; known_by: LOOKED_UP (checked against a source), RAN (computed or run) or REASONING (argument only); base, the point's own score from 0 to 1; final, its score once everything for and against it is counted; set_aside, if present: why it was left out, or why the debate did not follow it further; best_case and objection, the strongest case for it and against it; review and review_reasons, a second model's double-check: agree, dispute or cannot-assess (it could not be checked); author, the model that wrote it; judge_spread, how far its assessments were apart; leverage, how much our answer leans on it.
 - hinges: the points our answer leans on most, most important first.
-- set_aside: branches left out of the conclusion, and why.
+- set_aside: branches the debate did not follow further, and why. What they hold still counts, with little weight.
 - omitted: in a very large debate, how many more points argued for or against each position without being shown here. Speak only of the points you can see; you may say that more were argued.
 - prior_objection: present only on a second draft; see "A second draft".
 
@@ -93,13 +94,13 @@ The first section of the long story is your reading of the decision or doubt beh
 
 ## The paths
 
-A path is one opening position with the points for and against it. For each, say what it proposes, its strongest support, its strongest objection, and plainly whether it holds up for the person and why. Holding up means it survived the debate's scrutiny; it does not mean "you should do it". Include the paths left out of the conclusion, and say why in plain words.
+A path is one opening position with the points for and against it. For each, say what it proposes, its strongest support, its strongest objection, and plainly whether it holds up for the person and why. Holding up means it survived the debate's scrutiny; it does not mean "you should do it". Include the paths that were left out or not followed further, and say why in plain words.
 
 Each path also carries a fate, a code the site turns into words, chosen from its final score and the thresholds:
 - HELD_UP: final score at or above high_cut.
 - PARTLY_HELD: at or above low_cut and below high_cut.
 - FELL: below low_cut.
-- SET_ASIDE: the position was left out before it was fully tested.
+- SET_ASIDE: the debate did not follow the position further before it was fully tested; it carried little weight in the conclusion.
 
 Keep the fate even when it looks at odds with the label: the winning position can be HELD_UP in a close call, for example because another option finished almost level. Let the words explain the difference.
 

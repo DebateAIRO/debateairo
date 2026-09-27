@@ -29,15 +29,18 @@ function fill(template: string, values: Readonly<Record<string, ReactNode>>): Re
 export function LanguageOfferStrip({
   target,
   interfaceLocale,
-  catalog
+  catalog,
+  displayNames = Intl.DisplayNames
 }: {
   target: LocaleDefinition;
   interfaceLocale: LocaleCode;
   catalog: MessageCatalog;
+  /** The browser's own language names; a test hands in one that cannot name the language. */
+  displayNames?: typeof Intl.DisplayNames;
 }) {
   const code = target.code as LocaleCode;
   const nativeName = <bdi lang={code}>{target.nativeName}</bdi>;
-  const interfaceName = languageNameIn(code, interfaceLocale);
+  const interfaceName = languageNameIn(code, interfaceLocale, displayNames);
   const language = interfaceName ?? nativeName;
   const text = interfaceName === null
     ? fill(t(catalog, "chrome.languageOffer.textNative"), { language })

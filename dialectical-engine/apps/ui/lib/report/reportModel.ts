@@ -47,7 +47,11 @@ export interface ReportAppendixEntry {
   readonly wayOfKnowing: string;
   readonly author: string;
   readonly review: string;
-  /** Why the point was left out of the conclusion, in plain words, or null when it was not. */
+  /**
+   * In plain words, why the point was left out of the conclusion, or why it
+   * carried little weight in it (the debate did not follow it further); null
+   * when neither.
+   */
   readonly setAsideLine: string | null;
   /** The few notes a reader can use about the point (its source, its age, how many models weighed it), or null. */
   readonly notesLine: string | null;
@@ -297,15 +301,18 @@ function stanceWords(point: NumberedPoint, answer: Answer, numbers: ReadonlyMap<
   return t(catalog, "public.report.point.linked", { point: point.parentNumber });
 }
 
-type SetAsideReason = "unweighed" | "weak" | "noEffect";
+type SetAsideReason = "unweighed" | "weak" | "littleWeight";
 
 /**
- * Why a point was left out of the conclusion (fix round 1). The site's tree
- * reads the two hidden-node records; the low-leverage freeze is a mark on the
- * node itself. Only the KIND is read: a record's own `reason` is the engine's
- * text ("Recorded strength 0.21 is at or below the ruled hidden-node
- * threshold"), with scores and engine words, and is never printed. When
- * several apply, the strongest reason is the one given.
+ * What became of a point in the conclusion (fix rounds 1 and 2). The two
+ * hidden-node records really leave a point out, and the site's tree reads them
+ * too. The low-leverage freeze is a mark on the node itself, and it leaves
+ * nothing out: the debate only did not follow the point further, because it
+ * could not move the answer, so it still counts, with little weight. Only the
+ * KIND is read: a record's own `reason` is the engine's text ("Recorded
+ * strength 0.21 is at or below the ruled hidden-node threshold"), with scores
+ * and engine words, and is never printed. When several apply, the strongest is
+ * the one given.
  */
 function setAsideReason(node: Answer["nodes"][number], answer: Answer): SetAsideReason | null {
   const hidden = new Set(answer.condition_mark_records
@@ -313,7 +320,7 @@ function setAsideReason(node: Answer["nodes"][number], answer: Answer): SetAside
     .map((record) => record.mark));
   if (hidden.has("HIDDEN-UNJUDGEABLE")) return "unweighed";
   if (hidden.has("HIDDEN-LOW-SCORE")) return "weak";
-  if (node.condition_marks.includes("BRANCH-FROZEN-LOW-LEVERAGE")) return "noEffect";
+  if (node.condition_marks.includes("BRANCH-FROZEN-LOW-LEVERAGE")) return "littleWeight";
   return null;
 }
 
@@ -321,12 +328,12 @@ function setAsideWords(reason: SetAsideReason, catalog: MessageCatalog): string 
   switch (reason) {
     case "unweighed": return t(catalog, "public.report.point.setAsideUnweighed");
     case "weak": return t(catalog, "public.report.point.setAsideWeak");
-    case "noEffect": return t(catalog, "public.report.point.setAsideNoEffect");
+    case "littleWeight": return t(catalog, "public.report.point.littleWeight");
   }
 }
 
-type PointNote = "fewerModels" | "sourceUnconfirmed" | "outdated" | "figureRemoved";
-const POINT_NOTE_ORDER: readonly PointNote[] = Object.freeze(["fewerModels", "sourceUnconfirmed", "outdated", "figureRemoved"]);
+type PointNote = "oneModel" | "fewerModels" | "sourceUnconfirmed" | "outdated" | "figureRemoved";
+const POINT_NOTE_ORDER: readonly PointNote[] = Object.freeze(["oneModel", "fewerModels", "sourceUnconfirmed", "outdated", "figureRemoved"]);
 
 /**
  * The note a condition mark gives a reader about ONE point, or null for a mark
@@ -336,8 +343,10 @@ const POINT_NOTE_ORDER: readonly PointNote[] = Object.freeze(["fewerModels", "so
  */
 function pointNote(mark: ConditionMark): PointNote | null {
   switch (mark) {
-    case "PANEL-PARTIAL":
+    // Every other model's assessment failed: only the author's own survived (round 2).
     case "PANEL-DEGRADED-SINGLE-VOICE":
+      return "oneModel";
+    case "PANEL-PARTIAL":
     case "SINGLE-LINEAGE":
     case "DEGRADED-DIVERSITY":
     case "CRITIQUE-UNAVAILABLE":
@@ -383,6 +392,7 @@ function pointNote(mark: ConditionMark): PointNote | null {
 
 function pointNoteWords(note: PointNote, catalog: MessageCatalog): string {
   switch (note) {
+    case "oneModel": return t(catalog, "public.report.point.noteOneModel");
     case "fewerModels": return t(catalog, "public.report.point.noteFewerModels");
     case "sourceUnconfirmed": return t(catalog, "public.report.point.noteSourceUnconfirmed");
     case "outdated": return t(catalog, "public.report.point.noteOutdated");
@@ -390,9 +400,14 @@ function pointNoteWords(note: PointNote, catalog: MessageCatalog): string {
   }
 }
 
-/** Each note once, in a fixed order, as sentences; null when the point has none. */
+/**
+ * Each note once, in a fixed order, as sentences; null when the point has none.
+ * "Only one AI model" already says what "fewer AI models than usual" would, so
+ * the second is left out beside it.
+ */
 function notesLine(node: Answer["nodes"][number], catalog: MessageCatalog): string | null {
   const notes = new Set(node.condition_marks.map(pointNote).filter((note): note is PointNote => note !== null));
+  if (notes.has("oneModel")) notes.delete("fewerModels");
   const words = POINT_NOTE_ORDER.filter((note) => notes.has(note)).map((note) => pointNoteWords(note, catalog));
   return words.length === 0 ? null : words.join(" ");
 }

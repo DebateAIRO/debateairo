@@ -97,6 +97,10 @@ describe("story fixture (the owner's mock data)", () => {
     expect(opening).toContain("Dumneavoastră vă cunoașteți situația mai bine");
     expect(body.reviewer_note!.text).toContain("celelalte costuri de trai din Cluj");
     expect(body.reviewer_note!.text).not.toContain("costuri ale vieții");
+    // The forum objection was only not followed further: it carried little weight, it was not left out (round 2).
+    const texts = body.long.sections.flatMap((section) => section.paragraphs.map((paragraph) => paragraph.text)).join(" ");
+    expect(texts).toContain("O singură obiecție nu a cântărit în concluzie");
+    expect(texts).not.toContain("Am lăsat deoparte");
   });
 
   it("gives each path the fate the pack's threshold rule gives it, and keeps the verdict's numbers consistent (I-5)", () => {

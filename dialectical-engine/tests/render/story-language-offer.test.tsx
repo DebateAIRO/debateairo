@@ -7,10 +7,10 @@ import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicDebateSchema } from "@debateai/contract";
-import { QuestionLanguageOffer } from "../../apps/ui/components/QuestionLanguageOffer.js";
+import { LanguageOfferStrip, QuestionLanguageOffer } from "../../apps/ui/components/QuestionLanguageOffer.js";
 import { LANGUAGE_OFFER_DISMISSED_KEY } from "../../apps/ui/lib/i18n/localeChoice.js";
 import { languageNameIn } from "../../apps/ui/lib/i18n/questionLocale.js";
-import { LOCALE_COOKIE } from "../../apps/ui/lib/i18n/locales.js";
+import { getLocale, LOCALE_COOKIE } from "../../apps/ui/lib/i18n/locales.js";
 import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
 import chromeRomanian from "../../apps/ui/messages/ro/chrome.json" with { type: "json" };
 
@@ -87,7 +87,7 @@ describe("QuestionLanguageOffer", () => {
     expect(container.querySelector(".languageOfferSwitch")?.textContent).toBe("Treceți la limba engleză");
   });
 
-  it("falls back to the language's own name, once, where the interface cannot name it", () => {
+  it("falls back to the language's own name, once, where the interface cannot name it", async () => {
     const unnamed = class { constructor() { throw new RangeError("no display names"); } } as unknown as typeof Intl.DisplayNames;
     expect(languageNameIn("ro", "en")).toBe("Romanian");
     expect(languageNameIn("en", "ro")).toBe("engleză");
@@ -95,7 +95,15 @@ describe("QuestionLanguageOffer", () => {
     // A name the interface only echoes back (the code, or the native name itself) is no name either.
     const echo = class { of(code: string) { return code; } } as unknown as typeof Intl.DisplayNames;
     expect(languageNameIn("de", "en", echo)).toBeNull();
-    expect(renderToStaticMarkup(<QuestionLanguageOffer questionLocale="de" interfaceLocale="en" catalog={chromeEnglish} />)).toBe("");
+    // The strip, with a DisplayNames that throws, says the one-name sentence (chrome.languageOffer.textNative).
+    const container = await mount(
+      <LanguageOfferStrip target={getLocale("ro")} interfaceLocale="en" catalog={chromeEnglish} displayNames={unnamed} />
+    );
+    expect(container.querySelector(".languageOfferText")?.textContent).toBe("This debate is in Română. Show the page in Română?");
+    expect(container.querySelector(".languageOfferText")?.textContent)
+      .toBe(chromeEnglish["chrome.languageOffer.textNative"].replaceAll("{language}", "Română"));
+    expect([...container.querySelectorAll(".languageOfferText bdi")].map((name) => name.textContent)).toEqual(["Română", "Română"]);
+    expect(container.querySelector(".languageOfferSwitch")?.textContent).toBe("Switch to Română");
   });
 
   it("renders nothing on the server, so a dismissed offer never flashes on reload (fix round 1)", async () => {

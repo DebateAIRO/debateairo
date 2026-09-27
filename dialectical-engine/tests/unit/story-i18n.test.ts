@@ -160,9 +160,10 @@ describe("the report's list of points speaks to the person too (fix round 1)", (
     expect(englishEngineCopy.filter((phrase) => printed.includes(phrase))).toEqual([]);
     for (const retired of ["Lăsat deoparte:", "Mențiuni:", "Ramură", "evaluatori", "pragul", "punctaj"]) expect(printed).not.toContain(retired);
     // The one set-aside line (the strongest reason wins) and the few notes a reader can use, in plain Romanian.
+    // A point only one model could weigh says so, and not also that fewer models than usual could (round 2).
     expect(entry.setAsideLine).toBe(catalog("ro", "public")["public.report.point.setAsideUnweighed"]);
     expect(entry.notesLine).toBe([
-      "public.report.point.noteFewerModels", "public.report.point.noteSourceUnconfirmed",
+      "public.report.point.noteOneModel", "public.report.point.noteSourceUnconfirmed",
       "public.report.point.noteOutdated", "public.report.point.noteFigureRemoved"
     ].map((key) => catalog("ro", "public")[key]).join(" "));
   });
@@ -170,11 +171,28 @@ describe("the report's list of points speaks to the person too (fix round 1)", (
   it("words each set-aside reason plainly, and never prints the record's own reason", async () => {
     const ro = catalog("ro", "public");
     expect((await entryFor(markedAnswer(["HIDDEN-LOW-SCORE"]), "ro")).setAsideLine).toBe(ro["public.report.point.setAsideWeak"]);
-    expect((await entryFor(markedAnswer([]), "ro")).setAsideLine).toBe(ro["public.report.point.setAsideNoEffect"]);
-    expect(ro["public.report.point.setAsideNoEffect"]).toBe("Lăsat în afara concluziei: nu ar fi putut schimba răspunsul.");
     const english = await entryFor(markedAnswer(["HIDDEN-LOW-SCORE"]), "en");
     expect(english.setAsideLine).toBe("Left out of the conclusion: it was too weak to count.");
     expect(JSON.stringify(english)).not.toContain(ENGINE_REASON.slice(0, 20));
+  });
+
+  it("says a point the debate did not follow further carried little weight, never that it was left out (round 2)", async () => {
+    // BRANCH-FROZEN-LOW-LEVERAGE: the point still counts; the debate only did not follow it further.
+    expect((await entryFor(markedAnswer([]), "ro")).setAsideLine).toBe("Nu a cântărit în concluzie: nu ar fi putut schimba răspunsul.");
+    expect((await entryFor(markedAnswer([]), "en")).setAsideLine)
+      .toBe("Carried little weight in the conclusion: it could not have changed the answer.");
+  });
+
+  it("says only one model could weigh a point whose panel fell to one voice (round 2)", async () => {
+    const one = (marks: Answer["nodes"][number]["condition_marks"]): Answer => ({
+      ...STORY_FIXTURE_ANSWER,
+      nodes: [...STORY_FIXTURE_ANSWER.nodes, storyFixtureNode({
+        id: "n-marked", claim: "Un punct.", way: "REASONING", base: 0.5, final: 0.5, maker: "OpenAI", review: null, locator: null, marks
+      })]
+    });
+    expect((await entryFor(one(["PANEL-DEGRADED-SINGLE-VOICE"]), "ro")).notesLine).toBe("Un singur model AI a putut cântări acest punct.");
+    expect((await entryFor(one(["PANEL-DEGRADED-SINGLE-VOICE"]), "en")).notesLine).toBe("Only one AI model could weigh this point.");
+    expect((await entryFor(one(["PANEL-PARTIAL"]), "en")).notesLine).toBe("Fewer AI models than usual could weigh it.");
   });
 
   it("prints no notes line for a point whose marks only describe the machinery", async () => {
