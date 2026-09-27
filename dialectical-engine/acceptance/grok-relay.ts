@@ -123,7 +123,7 @@ const GROK_SANDBOX_FLAG = "--sandbox" as const;
  * relay that had to start WITHOUT its sandbox profile.
  *
  * It is deliberately NOT a member of the kernel's `CONDITION_MARKS`. That
- * vocabulary is closed and pinned (37 members, whose last four are read
+ * vocabulary is closed and pinned (38 members, whose last four are read
  * POSITIONALLY by `CONDITION_MARKS.slice(-4)`), it is minted only by the
  * kernel — this ticket's contract touches neither — and every member of it
  * describes a property of a DEBATE that ran. This names a property of the

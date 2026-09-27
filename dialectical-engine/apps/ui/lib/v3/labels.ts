@@ -29,7 +29,7 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     // rule): no role, seat or "runner-up", and true in BOTH switch directions
     // (carry 12: the 80-20 split can plan the runner-up, which then falls back
     // to the main model) and for both causes (usage limit or outage).
-    case "BACKUP-MODEL-USED": return "One AI model was unavailable, so another one answered in its place";
+    case "BACKUP-MODEL-USED": return "Where a planned AI model was unavailable, another one stepped in";
     case "SINGLE-LINEAGE": return "Single model lineage";
     case "CRITIQUE-UNAVAILABLE": return "Independent critique unavailable";
     case "PANEL-PARTIAL": return "Some judges could not assess this point";
