@@ -32,11 +32,6 @@
   outline-offset: 2px;
 }
 
-.languageSwitcherFlag {
-  font-size: 14px;
-  line-height: 1;
-}
-
 .languageSwitcherCode,
 .languageSwitcherRowCode,
 .languageSwitcherTitle,
