@@ -13,7 +13,7 @@ import {
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
 import { BudgetRepository, type CostEnvelopePhase } from "@debateai/budget";
-import { ProviderProbeRepository, RunRepository, migrate } from "@debateai/db";
+import { ProviderProbeRepository, RunRepository, ServeDisclosureRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
 import { EVALUATOR_INSTRUCTIONS, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
@@ -589,9 +589,16 @@ async function executeResil01Scenario(input: {
   /** Engine money rule, Task M2: each maker's money seam, as a hosted runner builds one per call. */
   readonly primaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
   readonly secondaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  /** Engine money rule, Task M3: settings a test adds on top of the scenario's own. */
+  readonly settings?: Partial<WalkingSkeletonSettings>;
+  /** Engine money rule, Task M3: every request each maker's gateway is handed, before the seam. */
+  readonly observe?: (maker: "primary" | "secondary", request: ProviderCallRequest) => void;
 }) {
   const primary = await startProviderDouble(input.primary);
   const secondary = await startProviderDouble(input.secondary);
+  const observed = (maker: "primary" | "secondary", gateway: ProviderGateway): ProviderGateway => input.observe === undefined
+    ? gateway
+    : { call: (request) => { input.observe!(maker, request); return gateway.call(request); } };
   try {
     const question = `${input.label}-${randomUUID()}`;
     const runId = input.envelopeBasis === undefined
@@ -602,10 +609,10 @@ async function executeResil01Scenario(input: {
     });
     await input.beforeExecute?.({ runId, workItemId });
     const runRepository = new RunRepository(database.pool);
-    const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+    const runner = new WalkingSkeletonRunner(database.pool, observed("primary", createPostgresProviderGateway(database.pool, {
       endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker",
       ...(input.primaryCostEnvelope === undefined ? {} : { buildCostEnvelopeSeam: input.primaryCostEnvelope })
-    }), {
+    })), {
       ...runnerSettings(),
       claimMs: 1_204_000,
       runDeathPolicy: { cooldownMs: 600_000, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 },
@@ -624,14 +631,15 @@ async function executeResil01Scenario(input: {
         wait: async () => undefined
       },
       critique: {
-        provider: createPostgresProviderGateway(database.pool, {
+        provider: observed("secondary", createPostgresProviderGateway(database.pool, {
           endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker",
           ...(input.secondaryCostEnvelope === undefined ? {} : { buildCostEnvelopeSeam: input.secondaryCostEnvelope })
-        }),
+        })),
         providerRef: "provider:test-layer:secondary",
         maker: "Secondary test maker"
       },
-      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+      ...input.settings
     });
     let result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null = null;
     let error: unknown = null;
@@ -5419,6 +5427,579 @@ describe("Engine money rule M2 — a stop while arguing never skips the answer (
   });
 });
 
+/**
+ * ENGINE MONEY RULE (spec §14.4.2 and §14.4.5), TASK M3 — A CHEAPER MAKER WHEN
+ * THE PLANNED ONE CANNOT BE PAID, DRAFTS KEPT, AND THE OWNER-SIDE RECORD,
+ * through the PRODUCTION runner on the embedded Postgres.
+ *
+ * Before M3 an answer-writing call refused for money took the components-only
+ * envelope terminal at once, and a round-2 failure threw away the round the
+ * checker had already read. Now the SAME call site and the SAME framed prompt
+ * are offered to the run's other claim-eligible makers (cheapest first by the
+ * runner's price map; the seam decides what fits), a later failure keeps the
+ * last complete round, and every answer gets one content-free disclosure row.
+ *
+ * Doubles only at the provider boundary. Money is refused the way a hosted
+ * deployment refuses it — by the per-call seam each maker's gateway builds for
+ * the call's phase — so a refused try is made BEFORE sending and leaves no
+ * ledger row, exactly as in production.
+ */
+function moneySeam(input: Readonly<{
+  /** Which BODY call of this gateway is refused (1-based). */
+  refuseBody?: number;
+  /** Which SERVE calls of this gateway are refused (1-based), or all of them. */
+  refuseServe?: "ALL" | readonly number[];
+}> = {}): Readonly<{
+  build: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  phases(): readonly CostEnvelopePhase[];
+}> {
+  let bodyCalls = 0;
+  let serveCalls = 0;
+  const phases: CostEnvelopePhase[] = [];
+  return Object.freeze({
+    phases: () => Object.freeze([...phases]),
+    build: (_runId: string, phase: CostEnvelopePhase): ProviderCostEnvelopeSeam => {
+      phases.push(phase);
+      const ordinal = phase === "BODY" ? (bodyCalls += 1) : (serveCalls += 1);
+      const refused = phase === "BODY"
+        ? ordinal === input.refuseBody
+        : input.refuseServe === "ALL" || (input.refuseServe ?? []).includes(ordinal);
+      return {
+        assertCallAllowed: () => {
+          if (refused) {
+            throw new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", `test-layer: ${phase} call ${String(ordinal)} does not fit`);
+          }
+        },
+        recordCall: () => undefined,
+        assertUsageReported: () => undefined
+      };
+    }
+  });
+}
+
+const evaluatorObjecting = (objection: string): string => JSON.stringify({
+  satisfied: false,
+  objection,
+  criteria: {
+    fairness_to_losers: false,
+    statement_label_agreement: true,
+    no_overstatement: true,
+    restatement: true,
+    citation_tracing: true
+  }
+});
+
+const m3RoundTwoComposition = JSON.stringify({ segments: [
+  { segment_id: "segment:verdict", text: "A round-two rewrite nobody checked.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+  { segment_id: "segment:research", text: "Check a second independent source.", node_refs: [], served_number_refs: [] }
+] });
+
+/** A full two-maker debate at depth 1, every review agreeing (T6's C-5 shape). */
+function fullDebate(label: string): Readonly<{ judgements: readonly string[]; reviews: readonly string[] }> {
+  return Object.freeze({
+    judgements: Array.from({ length: 4 }, (_, index) => judgementDouble(`${label} position ${index + 1}`)),
+    reviews: Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `${label} review ${index + 1}`))
+  });
+}
+
+const PRIMARY_REF = "provider:test-layer";
+const SECONDARY_REF = "provider:test-layer:secondary";
+const THIRD_REF = "provider:test-layer:third";
+
+/** Which maker's recorded artifact each persisted round's draft and verdict resolve to. */
+async function servedRoundMakers(answerId: string): Promise<readonly Readonly<{
+  round: number; writer: string; checker: string; candidate_call_site_key: string; evaluator_call_site_key: string;
+}>[]> {
+  const rows = await database.pool.query<{
+    round: number; writer: string; checker: string; candidate_call_site_key: string; evaluator_call_site_key: string;
+  }>(
+    `SELECT synthesis.round, writer.provider_ref AS writer, checker.provider_ref AS checker,
+            synthesis.candidate_call_site_key, synthesis.evaluator_call_site_key
+       FROM serve.synthesis_round AS synthesis
+       JOIN ledger.raw_artifact AS writer ON writer.raw_artifact_id = synthesis.candidate_artifact_ref
+       JOIN ledger.raw_artifact AS checker ON checker.raw_artifact_id = synthesis.evaluator_artifact_ref
+      WHERE synthesis.answer_id = $1
+      ORDER BY synthesis.round`,
+    [answerId]
+  );
+  return rows.rows;
+}
+
+/** Every answer-writing MODEL_CALL the ledger holds for the run, and who made it. */
+async function serveLedger(runId: string): Promise<readonly Readonly<{ call_site_key: string; actor_ref: string; outcome: string }>[]> {
+  const rows = await database.pool.query<{ call_site_key: string; actor_ref: string; outcome: string }>(
+    `SELECT call_site_key, actor_ref, outcome FROM ledger.ledger_entry
+      WHERE run_id=$1 AND action_kind='MODEL_CALL'
+        AND (call_site_key LIKE 'COMPOSER:%' OR call_site_key LIKE 'POST_COMPOSE_R9:%')
+      ORDER BY sequence`,
+    [runId]
+  );
+  return rows.rows;
+}
+
+function answerIdOf(scenario: Readonly<{ result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null }>): string {
+  if (scenario.result?.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+  return scenario.result.answerId;
+}
+
+const NO_DIGEST_OR_FLOOR = Object.freeze({
+  digestRung: null,
+  digestPointsOmitted: null,
+  floorVerdictState: null,
+  floorLeadingNodeId: null,
+  floorReason: null
+});
+
+describe("Engine money rule M3 — a cheaper maker when the planned one cannot be paid, drafts kept, disclosed (production runner)", () => {
+  it("substitutes the healthy maker for MONEY at the same call site with the same framed prompt, persists it through the sealed chain, and discloses it", async () => {
+    const primaryDebate = fullDebate("Primary M3 fallback");
+    const secondaryDebate = fullDebate("Secondary M3 fallback");
+    const primarySeam = moneySeam({ refuseServe: "ALL" });
+    const secondarySeam = moneySeam();
+    const seen: { maker: "primary" | "secondary"; request: ProviderCallRequest }[] = [];
+    const scenario = await executeResil01Scenario({
+      label: "m3-money-fallback",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews, resil01Composition, evaluatorSatisfied()],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build,
+      observe: (maker, request) => {
+        if (request.lane === "served" && (request.role === "SYNTHESIZER" || request.role === "EVALUATOR")) {
+          seen.push({ maker, request });
+        }
+      }
+    });
+
+    // Answered — before M3 this ended components-only, the answer unwritten.
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    // The fallback FIT, so nothing was stopped: no envelope record.
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+
+    // The planned maker was asked first for each role and refused for money;
+    // the healthy maker then answered the SAME request.
+    expect(primarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(2);
+    expect(secondarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(2);
+    expect(seen.map((entry) => `${entry.maker}:${entry.request.role}`)).toEqual([
+      "primary:SYNTHESIZER", "secondary:SYNTHESIZER", "primary:EVALUATOR", "secondary:EVALUATOR"
+    ]);
+    for (const [planned, fallback] of [[seen[0]!, seen[1]!], [seen[2]!, seen[3]!]] as const) {
+      expect(planned.request.providerRef).toBe(PRIMARY_REF);
+      expect(fallback.request.providerRef).toBe(SECONDARY_REF);
+      expect(fallback.request.callSiteKey).toBe(planned.request.callSiteKey);
+      expect(fallback.request.contractHash).toBe(planned.request.contractHash);
+      expect(fallback.request.bound).toEqual(planned.request.bound);
+      // The framed request BYTES are the planned call's, unchanged.
+      expect(JSON.stringify(fallback.request.packet)).toBe(JSON.stringify(planned.request.packet));
+    }
+    expect(seen[0]!.request.callSiteKey).toBe("COMPOSER:SYNTHESIZER:INITIAL:1");
+    expect(seen[2]!.request.callSiteKey).toBe("POST_COMPOSE_R9:EVALUATOR:1");
+
+    // The refused tries left nothing in the ledger; the fallback's calls are
+    // there under the SAME call-site keys, and the sealed persist took them.
+    expect(await serveLedger(scenario.runId)).toEqual([
+      { call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: SECONDARY_REF, outcome: "OK" },
+      { call_site_key: "POST_COMPOSE_R9:EVALUATOR:1", actor_ref: SECONDARY_REF, outcome: "OK" }
+    ]);
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: SECONDARY_REF, checker: SECONDARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+
+    // Disclosed on the owner-side row — never in the verdict text — and the
+    // lost diversity with it (R9): both roles ended on one maker.
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+      answerId,
+      answerVersion: 1,
+      runId: scenario.runId,
+      writerPlannedRef: PRIMARY_REF,
+      checkerPlannedRef: PRIMARY_REF,
+      writerServedRef: SECONDARY_REF,
+      checkerServedRef: SECONDARY_REF,
+      writerFallback: true,
+      checkerFallback: true,
+      fallbackReason: "MONEY",
+      checkerSameAsWriter: true,
+      bodyStop: null,
+      pointsWithoutReview: null,
+      ...NO_DIGEST_OR_FLOOR
+    });
+  });
+
+  it("tries the cheapest maker first by the price map, and lets the checker prefer a maker other than the writer (M=3)", async () => {
+    const makerA = await startProviderDouble([judgementDouble("Maker A M3 price-order position")]);
+    const makerB = await startProviderDouble([judgementDouble("Maker B M3 price-order position"), evaluatorSatisfied()]);
+    const makerC = await startProviderDouble([judgementDouble("Maker C M3 price-order position"), resil01Composition]);
+    // A's answer-writing calls cannot be paid. C's panel voice is refused too,
+    // so the arguing stops after the first root (M2) and the test is the serve leg.
+    const seamA = moneySeam({ refuseServe: "ALL" });
+    const seamB = moneySeam();
+    const seamC = moneySeam({ refuseBody: 1 });
+    try {
+      const question = `m3-price-order-${randomUUID()}`;
+      const runId = await createRun(question, 90, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A", buildCostEnvelopeSeam: seamA.build
+      }), {
+        ...settings,
+        providerRef: PRIMARY_REF,
+        maker: "Maker A",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B", buildCostEnvelopeSeam: seamB.build
+          }),
+          providerRef: SECONDARY_REF,
+          maker: "Maker B"
+        },
+        additionalMakers: [{
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C", buildCostEnvelopeSeam: seamC.build
+          }),
+          providerRef: THIRD_REF,
+          maker: "Maker C"
+        }],
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        // C is the cheapest and B the dearest: the roster order (B before C) is
+        // NOT the order a money refusal tries them in.
+        providerPrices: new Map([
+          [PRIMARY_REF, { inputMicrosPerMillionTokens: 3_000_000, outputMicrosPerMillionTokens: 3_000_000 }],
+          [SECONDARY_REF, { inputMicrosPerMillionTokens: 9_000_000, outputMicrosPerMillionTokens: 9_000_000 }],
+          [THIRD_REF, { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 }]
+        ])
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const answer = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, `asker:${question}`);
+      expect(SERVED_TERMINALS).toContain(answer?.terminal);
+
+      // The writer: A refused, then C — the cheapest — wrote; B was never asked.
+      // The checker: A refused, then B, because C wrote the draft; C, though
+      // cheaper, was never asked to check its own draft.
+      expect(seamA.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+      expect(seamC.phases()).toEqual(["BODY", "SERVE"]);
+      expect(seamB.phases()).toEqual(["BODY", "SERVE"]);
+      expect(await servedRoundMakers(result.answerId)).toEqual([{
+        round: 1, writer: THIRD_REF, checker: SECONDARY_REF,
+        candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+      }]);
+      expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
+        writerPlannedRef: PRIMARY_REF,
+        checkerPlannedRef: PRIMARY_REF,
+        writerServedRef: THIRD_REF,
+        checkerServedRef: SECONDARY_REF,
+        writerFallback: true,
+        checkerFallback: true,
+        fallbackReason: "MONEY",
+        checkerSameAsWriter: false,
+        // The arguing stopped on the first root's panel: one point, never cross-reviewed.
+        bodyStop: "MONEY",
+        pointsWithoutReview: 1
+      });
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
+    }
+  });
+
+  it("keeps round 1 when round 2's writer cannot be paid by any maker, and serves it with the stop on its record", async () => {
+    const primaryDebate = fullDebate("Primary M3 keep-best money");
+    const secondaryDebate = fullDebate("Secondary M3 keep-best money");
+    // SERVE call 3 of the planned maker is round 2's writer; no other maker fits.
+    const primarySeam = moneySeam({ refuseServe: [3] });
+    const secondarySeam = moneySeam({ refuseServe: "ALL" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-keep-best-money",
+      primary: [
+        ...primaryDebate.judgements, ...primaryDebate.reviews,
+        resil01Composition, evaluatorObjecting("Round one is unfair to the losing side."), m3RoundTwoComposition
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    // Served — before M3 this discarded round 1 and ended components-only.
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.serve_state).toBe("COMPOSED");
+    const texts = scenario.answer?.composed_text.map((segment) => segment.text) ?? [];
+    expect(texts).toContain("The judged position survives.");
+    expect(texts).not.toContain("A round-two rewrite nobody checked.");
+    expect(primarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(3);
+    expect(secondarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(1);
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    // Round 1's own objection stands, and the stop rides the answer.
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining(["SYNTHESIS-OBJECTION-STANDING", "ENVELOPE_EXHAUSTED"]));
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: true,
+      bodyStop: null, pointsWithoutReview: null
+    });
+  });
+
+  it("keeps round 1 when round 2's writer transport dies, and serves it without inventing a verdict", async () => {
+    const primaryDebate = fullDebate("Primary M3 keep-best death");
+    const secondaryDebate = fullDebate("Secondary M3 keep-best death");
+    const seen: string[] = [];
+    const scenario = await executeResil01Scenario({
+      label: "m3-keep-best-death",
+      primary: [
+        ...primaryDebate.judgements, ...primaryDebate.reviews,
+        resil01Composition, evaluatorObjecting("Round one overstates the margin."),
+        // Round 2's writer: a dead transport (the sealed bound allows one attempt).
+        { status: 500 }, m3RoundTwoComposition
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      observe: (maker, request) => {
+        if (request.lane === "served" && request.role === "SYNTHESIZER") seen.push(`${maker}:${request.callSiteKey}`);
+      }
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.serve_state).toBe("COMPOSED");
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    // A dead transport is not money: no maker was substituted for it.
+    expect(seen).toEqual(["primary:COMPOSER:SYNTHESIZER:INITIAL:1", "primary:COMPOSER:SYNTHESIZER:RETRY:2"]);
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    expect(scenario.answer?.condition_marks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(scenario.answer?.condition_marks).not.toContain("DEFECT");
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF, writerFallback: false, checkerFallback: false
+    });
+  });
+
+  it("keeps today's components-only outcome when round 1's checker cannot be paid by any maker, and still writes the row", async () => {
+    const primaryDebate = fullDebate("Primary M3 round-one refusal");
+    const secondaryDebate = fullDebate("Secondary M3 round-one refusal");
+    const primarySeam = moneySeam({ refuseServe: [2] });
+    const secondarySeam = moneySeam({ refuseServe: "ALL" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-round-one-refusal",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews, resil01Composition, evaluatorSatisfied()],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    // No checked round exists, so no verdict is invented: components-only, as
+    // today (Task M5 adds the floor).
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(scenario.answer?.composed_text).toEqual([]);
+    expect(secondarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(1);
+    expect(await servedRoundMakers(answerId)).toEqual([]);
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+      writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
+      writerServedRef: null, checkerServedRef: null,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false,
+      bodyStop: null, pointsWithoutReview: null, ...NO_DIGEST_OR_FLOOR
+    });
+  });
+
+  /**
+   * Found while proving the kept round (Task M3): once round 1's DRAFT was
+   * written, a crash class the sealed chain returns afterwards (here round 1's
+   * checker transport dying) was persisted with that draft's composition
+   * evidence still attached. The sealed persist rightly refuses a
+   * components-only answer carrying a draft (INCONSISTENT_PRE_COMPOSITION_EVIDENCE),
+   * so the run FAILED instead of ending components-only / DEFECT — and a failed
+   * run could never get Task M5's floor. The persist now takes the evidence of
+   * the round the result serves, and of none when it serves none.
+   */
+  it("ends components-only / DEFECT, not a failed run, when round 1's checker transport dies after its draft was written", async () => {
+    const primaryDebate = fullDebate("Primary M3 round-one checker death");
+    const secondaryDebate = fullDebate("Secondary M3 round-one checker death");
+    const scenario = await executeResil01Scenario({
+      label: "m3-round-one-checker-death",
+      primary: [
+        ...primaryDebate.judgements, ...primaryDebate.reviews,
+        resil01Composition, { status: 500 }, evaluatorSatisfied()
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews]
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(scenario.answer?.composed_text).toEqual([]);
+    expect(await servedRoundMakers(answerId)).toEqual([]);
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+      writerServedRef: null, checkerServedRef: null, writerFallback: false, checkerFallback: false
+    });
+  });
+
+  it("records the stop while arguing and the points it left unreviewed, for a served answer with no fallback", async () => {
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-row-body-stop",
+      primary: [judgementDouble("Primary M3 row position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M3 row position")],
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    const row = await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1);
+    expect(row).toMatchObject({
+      answerId, answerVersion: 1, runId: scenario.runId,
+      writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: true,
+      // Root 1 was refused: root 0 is the one point, and nobody cross-reviewed it.
+      bodyStop: "MONEY", pointsWithoutReview: 1,
+      ...NO_DIGEST_OR_FLOOR
+    });
+    expect(row?.createdAt).toBeInstanceOf(Date);
+  });
+
+  it("keeps the stop while arguing on the row of a DEFECT answer, which carries no envelope record (M2 review carry)", async () => {
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-row-defect-body-stop",
+      // Round 1's writer transport dies: no checked round, a DEFECT answer.
+      primary: [judgementDouble("Primary M3 defect position"), { status: 500 }, resil01Composition],
+      secondary: [judgementDouble("Secondary M3 defect position")],
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+      writerServedRef: null, checkerServedRef: null, bodyStop: "MONEY", pointsWithoutReview: 1
+    });
+  });
+
+  it.each([
+    ["a typed refusal", "SERVE_DISCLOSURE_RECORD_INVALID", null],
+    ["the database's own refusal", "UNTYPED", "23503"]
+  ] as const)("never lets %s to write the row change the answer", async (_name, code, sqlState) => {
+    const logs: Record<string, unknown>[] = [];
+    const repository = new ServeDisclosureRepository(database.pool);
+    const otherRunId = await createRun(`m3-row-other-run-${randomUUID()}`);
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: `m3-row-failure-${code.toLowerCase()}`,
+      primary: [judgementDouble("Primary M3 row-failure position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M3 row-failure position")],
+      secondaryCostEnvelope: secondarySeam.build,
+      settings: {
+        serveDisclosure: {
+          store: {
+            insert: code === "UNTYPED"
+              // The real table's own guard: a row filed under another run.
+              ? (record) => repository.insert({ ...record, runId: otherRunId })
+              : async () => { throw new TypedDomainError("SERVE_DISCLOSURE_RECORD_INVALID", "test-layer: refused"); }
+          },
+          log: (event, detail) => { logs.push({ event, ...detail }); }
+        }
+      }
+    });
+
+    // The answer is served and the work item is settled, exactly as without the row.
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    const item = await database.pool.query<{ state: string; settled_artifact_ref: string | null }>(
+      "SELECT state, settled_artifact_ref::text AS settled_artifact_ref FROM core.work_item WHERE work_item_id=$1",
+      [scenario.workItemId]
+    );
+    expect(item.rows[0]).toEqual({ state: "DONE", settled_artifact_ref: answerId });
+    // The failure is logged by code, with ids only.
+    expect(logs).toEqual([{
+      event: "SERVE_DISCLOSURE_WRITE_FAILED", code, sqlState, runId: scenario.runId, answerId
+    }]);
+    const rows = await database.pool.query("SELECT 1 FROM serve.serve_disclosure WHERE answer_id=$1", [answerId]);
+    expect(rows.rowCount).toBe(0);
+  });
+
+  it("migration 0076: insert-once, closed to UPDATE and DELETE, coherent by CHECK, bound to its answer's run, replay-safe", async () => {
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-row-table",
+      primary: [judgementDouble("Primary M3 table position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M3 table position")],
+      secondaryCostEnvelope: secondarySeam.build
+    });
+    const answerId = answerIdOf(scenario);
+    const repository = new ServeDisclosureRepository(database.pool);
+    const written = await repository.readForAnswerVersion(answerId, 1);
+    expect(written).not.toBeNull();
+    const { createdAt: _createdAt, ...record } = written!;
+
+    // Insert-once: a second write for the same answer version changes nothing.
+    await expect(repository.insert({ ...record, bodyStop: null })).resolves.toBe("ALREADY_PRESENT");
+    expect((await repository.readForAnswerVersion(answerId, 1))?.bodyStop).toBe("MONEY");
+    // UPDATE and DELETE are closed for every role, the owner included.
+    await expect(database.pool.query("UPDATE serve.serve_disclosure SET body_stop=NULL WHERE answer_id=$1", [answerId]))
+      .rejects.toMatchObject({ code: "55000" });
+    await expect(database.pool.query("DELETE FROM serve.serve_disclosure WHERE answer_id=$1", [answerId]))
+      .rejects.toMatchObject({ code: "55000" });
+    // The repository refuses an incoherent record, typed, before the database…
+    await expect(repository.insert({ ...record, writerServedRef: SECONDARY_REF }))
+      .rejects.toMatchObject({ code: "SERVE_DISCLOSURE_RECORD_INVALID" });
+    // …and the table refuses it too, for a writer that bypasses the repository.
+    const rawInsert = (overrides: Readonly<{ runId?: string; writerFallback?: boolean; fallbackReason?: string | null }>) =>
+      database.pool.query(
+        `INSERT INTO serve.serve_disclosure (
+           answer_id, answer_version, run_id, writer_planned_ref, checker_planned_ref,
+           writer_served_ref, checker_served_ref, writer_fallback, checker_fallback,
+           fallback_reason, checker_same_as_writer
+         ) VALUES ($1, 1, $2, $3, $3, $4, $3, $5, false, $6, false)`,
+        [answerId, overrides.runId ?? scenario.runId, PRIMARY_REF, SECONDARY_REF,
+          overrides.writerFallback ?? true, overrides.fallbackReason === undefined ? "MONEY" : overrides.fallbackReason]
+      );
+    await expect(rawInsert({ writerFallback: false })).rejects.toMatchObject({ code: "23514" });
+    await expect(rawInsert({ fallbackReason: null })).rejects.toMatchObject({ code: "23514" });
+    const otherRunId = await createRun(`m3-row-table-other-${randomUUID()}`);
+    await expect(rawInsert({ runId: otherRunId })).rejects.toMatchObject({
+      code: "23503", message: "SERVE_DISCLOSURE_RUN_MISMATCH"
+    });
+    // Replay-safe: the file applies again on a migrated database, its closing
+    // contract still holds, and the row is untouched.
+    const migration = await readFile(new URL("../../migrations/0076_serve_disclosure.sql", import.meta.url), "utf8");
+    await database.pool.query(migration);
+    const guards = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM pg_catalog.pg_trigger
+        WHERE tgrelid = 'serve.serve_disclosure'::regclass AND NOT tgisinternal AND tgenabled IN ('O','A')`
+    );
+    expect(guards.rows[0]?.count).toBe("3");
+    expect(await repository.readForAnswerVersion(answerId, 1)).toEqual(written);
+  });
+});
+
 describe("TERM-01 micro-round — run-scoped instrument-certification facts (Grok advisory 1)", () => {
   it("never attributes another run's instrument certifications to the completing run", async () => {
     const targetRunId = await createRun("term01-instrument-scope-target");
@@ -5868,8 +6449,16 @@ describe("T10/T11 · the served root and its label, through the production runne
    * run called an already-absent provider and recorded the result as an
    * ordinary transport death. It must refuse instead, without substituting the
    * still-healthy maker, and leave a durable event naming the ROLE (J25).
+   *
+   * ENGINE MONEY RULE, TASK M3 (spec §14.4.2): J24 now has ONE exception — a
+   * disclosed substitution for COST, when the planned maker's answer-writing
+   * call is refused for money ("Engine money rule M3 …" below). This case pins
+   * that the exception is exactly that wide: an absent role provider is not a
+   * money refusal, so the run still refuses at claim, even with the price map
+   * wired and a cheaper healthy maker right there, and nothing is served,
+   * spent or disclosed.
    */
-  it("T9/J24 refuses when a configured sealed role provider is absent at claim, and never substitutes the healthy maker", async () => {
+  it("T9/J24 refuses when a configured sealed role provider is absent at claim, and substitutes the healthy maker only for money, never for absence", async () => {
     const absentRolePrimary = await startProviderDouble([]);
     const healthySecondary = await startProviderDouble([
       judgementDouble("The healthy maker would have authored this", 0.4),
@@ -5924,7 +6513,13 @@ describe("T10/T11 · the served root and its label, through the production runne
         // forbids.
         claimTimeProbe: async (member) => member.provider_ref === primaryMember.provider_ref
           ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
-          : { state: "HEALTHY", modelId: member.model_id, failureCode: null }
+          : { state: "HEALTHY", modelId: member.model_id, failureCode: null },
+        // Task M3: the cost fallback is wired, with the healthy maker the
+        // cheaper one. It still may not stand in for an ABSENT provider.
+        providerPrices: new Map([
+          [primaryMember.provider_ref, { inputMicrosPerMillionTokens: 9_000_000, outputMicrosPerMillionTokens: 9_000_000 }],
+          [secondaryMember.provider_ref, { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 }]
+        ])
       });
 
       await expect(runner.executeWorkItem(workItemId))
@@ -5937,6 +6532,11 @@ describe("T10/T11 · the served root and its label, through the production runne
         "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
       );
       expect(answers.rows[0]?.count).toBe("0");
+      // Task M3: and nothing to disclose — no answer, so no owner-side row.
+      const disclosures = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.serve_disclosure WHERE run_id=$1", [runId]
+      );
+      expect(disclosures.rows[0]?.count).toBe("0");
 
       // J25: the disclosure is DURABLE and names the role, so a reader of the
       // run sees why it stopped. Both live-event surfaces render this kind.
