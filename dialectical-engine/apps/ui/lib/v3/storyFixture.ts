@@ -316,7 +316,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
       {
         title: "Ce încercați de fapt să decideți",
         paragraphs: [{
-          text: "Așa cum înțelegem noi întrebarea, nu este vorba doar despre bani. Vreți să știți dacă un salariu mai bun merită schimbarea orașului, a școlii și a rutinei întregii familii, și în ce ordine ar fi bine să faceți aceste schimbări.",
+          text: "Așa cum înțelegem noi întrebarea, nu este vorba doar despre bani. Vreți să știți dacă un salariu mai bun merită schimbarea orașului, a școlii și a rutinei întregii familii, și în ce ordine ar fi bine să faceți aceste schimbări. Dumneavoastră vă cunoașteți situația mai bine decât am putea-o înțelege noi dintr-o singură întrebare, așa că luați ce urmează ca pe un sprijin pentru decizie, nu ca pe o decizie luată în locul dumneavoastră.",
           node_refs: ["n-yes", "n-hybrid"]
         }]
       },
@@ -378,17 +378,16 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
     ]
   },
   reviewer_note: {
-    text: "Dezbaterea a comparat salariul și chiriile, dar nu și celelalte costuri ale vieții în Cluj, cum ar fi transportul sau cumpărăturile de zi cu zi. Dacă acestea sunt mult mai mari decât în București, câștigul scade pentru ambele variante de mutare. Nota aceasta nu schimbă răspunsul nostru.",
+    text: "Dezbaterea a comparat salariul și chiriile, dar nu și celelalte costuri de trai din Cluj, cum ar fi transportul sau cumpărăturile de zi cu zi. Dacă acestea sunt mult mai mari decât în București, câștigul scade pentru ambele variante de mutare. Nota aceasta nu schimbă răspunsul nostru.",
     node_refs: ["n-yes-pay", "n-yes-rent"]
   }
 };
 
 /**
  * The checker's reservation. It names a point by its number (P5, the rent
- * comparison), as the checker is told to. Only the owner sees it: on the
- * owner's panel, where a note inside the reservation box says such numbers
- * refer to the numbered points in the full report (PDF), and in that report,
- * whose appendix lists them. The short texts above never name a point number
+ * comparison), as the checker is told to. It is stored for the owner's records
+ * only: the panel and the report show the gentle catalogue line instead, never
+ * these words (spec §14.2). The short texts above never name a point number
  * (the story checks refuse one there).
  */
 const FIXTURE_RESERVATION =

@@ -91,6 +91,14 @@ describe("story fixture (the owner's mock data)", () => {
     expect(storyFixture("WRITING").language).toBeNull();
   });
 
+  it("reads as the personal-choice shape asks: the person knows their situation best, in natural Romanian (R2 carry)", () => {
+    const body = storyFixture("READY").story!;
+    const opening = body.long.sections[0]!.paragraphs.map((paragraph) => paragraph.text).join(" ");
+    expect(opening).toContain("Dumneavoastră vă cunoașteți situația mai bine");
+    expect(body.reviewer_note!.text).toContain("celelalte costuri de trai din Cluj");
+    expect(body.reviewer_note!.text).not.toContain("costuri ale vieții");
+  });
+
   it("gives each path the fate the pack's threshold rule gives it, and keeps the verdict's numbers consistent (I-5)", () => {
     const story = storyFixture("READY");
     const basis = story.verdict_basis!;
