@@ -11,8 +11,9 @@ import { TypedDomainError } from "@debateai/kernel";
  * which makers were planned and which actually wrote and checked the served
  * round, whether a cheaper maker was used and why, whether the two roles ended
  * on one maker (R9), the stop that cut the arguing short and the points it left
- * without a cross-review. The digest ladder (M4) and the floor (M5) fill their
- * own columns; this task writes them as null.
+ * without a cross-review, and what cut the answer-writing loop short. The digest
+ * ladder (M4) and the floor (M5) fill their own columns; this task writes them
+ * as null.
  *
  * The rules below are the table's CHECKs, held here too so a record the table
  * would refuse is refused typed, before the INSERT (`SERVE_DISCLOSURE_RECORD_INVALID`).
@@ -21,6 +22,16 @@ import { TypedDomainError } from "@debateai/kernel";
  */
 export const SERVE_DISCLOSURE_BODY_STOPS = Object.freeze(["MONEY", "ATTEMPTS", "USAGE", "DAILY"] as const);
 export type ServeDisclosureBodyStop = typeof SERVE_DISCLOSURE_BODY_STOPS[number];
+
+/**
+ * What ended the answer-writing loop early (M3 review polish): a spend stop on an
+ * answer-writing call after every cheaper maker was refused, a dead role
+ * transport, or a draft with nothing to serve — whether or not a round was kept.
+ */
+export const SERVE_DISCLOSURE_SERVE_STOPS = Object.freeze([
+  "MONEY", "ATTEMPTS", "USAGE", "DAILY", "TRANSPORT_DEATH", "NO_ARTIFACT"
+] as const);
+export type ServeDisclosureServeStop = typeof SERVE_DISCLOSURE_SERVE_STOPS[number];
 
 export const SERVE_DISCLOSURE_FLOOR_STATES = Object.freeze(["SUPPORTED", "CONTESTED", "UNSUPPORTED"] as const);
 export type ServeDisclosureFloorState = typeof SERVE_DISCLOSURE_FLOOR_STATES[number];
@@ -40,6 +51,7 @@ export interface ServeDisclosureRecord {
   readonly checkerSameAsWriter: boolean;
   readonly bodyStop: ServeDisclosureBodyStop | null;
   readonly pointsWithoutReview: number | null;
+  readonly serveStop: ServeDisclosureServeStop | null;
   readonly digestRung: number | null;
   readonly digestPointsOmitted: number | null;
   readonly floorVerdictState: ServeDisclosureFloorState | null;
@@ -52,6 +64,8 @@ export interface StoredServeDisclosure extends ServeDisclosureRecord {
 }
 
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+/** ASCII white space at either end: exactly the set migration 0076's btrim() strips. */
+const REF_EDGE_SPACE = /^[ \t\n\r\f\v]|[ \t\n\r\f\v]$/u;
 const ENGINE_CODE = /^[A-Z][A-Z0-9_]{0,95}$/u;
 /** PostgreSQL `integer` and `smallint`: a count or rung above cannot be stored. */
 const COLUMN_LIMITS = Object.freeze({ integer: 2_147_483_647, smallint: 32_767, refLength: 256 });
@@ -63,9 +77,16 @@ function invalid(rule: string): TypedDomainError {
   );
 }
 
+/**
+ * 1 to 256 characters counted as PostgreSQL's length() counts them — code
+ * points, not UTF-16 units — with no ASCII white space at either end: the
+ * table's own CHECK, so a raw-inserted row can never pass the database and then
+ * fail the typed read.
+ */
 function isRef(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= COLUMN_LIMITS.refLength
-    && value.trim() === value;
+  if (typeof value !== "string") return false;
+  const characters = [...value].length;
+  return characters >= 1 && characters <= COLUMN_LIMITS.refLength && !REF_EDGE_SPACE.test(value);
 }
 
 function isCount(value: unknown, limit: number): value is number {
@@ -103,6 +124,9 @@ function recordViolation(record: ServeDisclosureRecord): string | null {
   if (record.pointsWithoutReview !== null && !isCount(record.pointsWithoutReview, COLUMN_LIMITS.integer)) {
     return "points_without_review";
   }
+  if (record.serveStop !== null && !(SERVE_DISCLOSURE_SERVE_STOPS as readonly string[]).includes(record.serveStop)) {
+    return "serve_stop";
+  }
   if (record.digestRung !== null && !isCount(record.digestRung, COLUMN_LIMITS.smallint)) return "digest_rung";
   if (record.digestPointsOmitted !== null && !isCount(record.digestPointsOmitted, COLUMN_LIMITS.integer)) {
     return "digest_points_omitted";
@@ -134,6 +158,7 @@ interface ServeDisclosureRow {
   readonly checker_same_as_writer: boolean;
   readonly body_stop: ServeDisclosureBodyStop | null;
   readonly points_without_review: number | null;
+  readonly serve_stop: ServeDisclosureServeStop | null;
   readonly digest_rung: number | null;
   readonly digest_points_omitted: number | null;
   readonly floor_verdict_state: ServeDisclosureFloorState | null;
@@ -158,15 +183,15 @@ export class ServeDisclosureRepository {
          answer_id, answer_version, run_id,
          writer_planned_ref, checker_planned_ref, writer_served_ref, checker_served_ref,
          writer_fallback, checker_fallback, fallback_reason, checker_same_as_writer,
-         body_stop, points_without_review, digest_rung, digest_points_omitted,
+         body_stop, points_without_review, serve_stop, digest_rung, digest_points_omitted,
          floor_verdict_state, floor_leading_node_id, floor_reason
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        ON CONFLICT (answer_id, answer_version) DO NOTHING`,
       [
         record.answerId, record.answerVersion, record.runId,
         record.writerPlannedRef, record.checkerPlannedRef, record.writerServedRef, record.checkerServedRef,
         record.writerFallback, record.checkerFallback, record.fallbackReason, record.checkerSameAsWriter,
-        record.bodyStop, record.pointsWithoutReview, record.digestRung, record.digestPointsOmitted,
+        record.bodyStop, record.pointsWithoutReview, record.serveStop, record.digestRung, record.digestPointsOmitted,
         record.floorVerdictState, record.floorLeadingNodeId, record.floorReason
       ]
     );
@@ -182,7 +207,7 @@ export class ServeDisclosureRepository {
       `SELECT answer_id::text AS answer_id, answer_version, run_id::text AS run_id,
               writer_planned_ref, checker_planned_ref, writer_served_ref, checker_served_ref,
               writer_fallback, checker_fallback, fallback_reason, checker_same_as_writer,
-              body_stop, points_without_review, digest_rung, digest_points_omitted,
+              body_stop, points_without_review, serve_stop, digest_rung, digest_points_omitted,
               floor_verdict_state, floor_leading_node_id::text AS floor_leading_node_id, floor_reason,
               created_at
          FROM serve.serve_disclosure
@@ -205,6 +230,7 @@ export class ServeDisclosureRepository {
       checkerSameAsWriter: row.checker_same_as_writer,
       bodyStop: row.body_stop,
       pointsWithoutReview: row.points_without_review,
+      serveStop: row.serve_stop,
       digestRung: row.digest_rung,
       digestPointsOmitted: row.digest_points_omitted,
       floorVerdictState: row.floor_verdict_state,

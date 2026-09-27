@@ -5625,6 +5625,8 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       checkerSameAsWriter: true,
       bodyStop: null,
       pointsWithoutReview: null,
+      // The fallback FIT: the loop was never cut short.
+      serveStop: null,
       ...NO_DIGEST_OR_FLOOR
     });
   });
@@ -5702,13 +5704,130 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
         checkerSameAsWriter: false,
         // The arguing stopped on the first root's panel: one point, never cross-reviewed.
         bodyStop: "MONEY",
-        pointsWithoutReview: 1
+        pointsWithoutReview: 1,
+        serveStop: null
       });
     } finally {
       await makerC.stop();
       await makerB.stop();
       await makerA.stop();
     }
+  });
+
+  it("keeps the writer's cheapest fallback off the planned checker's maker whenever another maker fits (M=3)", async () => {
+    const makerA = await startProviderDouble([judgementDouble("Maker A M3 writer-avoids-checker position")]);
+    const makerB = await startProviderDouble([judgementDouble("Maker B M3 writer-avoids-checker position"), resil01Composition]);
+    const makerC = await startProviderDouble([judgementDouble("Maker C M3 writer-avoids-checker position"), evaluatorSatisfied()]);
+    // A, the planned writer, cannot be paid. C — the planned CHECKER — is the
+    // cheapest maker; B is the dearest. C's panel voice is refused so the
+    // arguing stops after the first root (M2) and the test is the serve leg.
+    const seamA = moneySeam({ refuseServe: "ALL" });
+    const seamB = moneySeam();
+    const seamC = moneySeam({ refuseBody: 1 });
+    try {
+      const question = `m3-writer-avoids-checker-${randomUUID()}`;
+      const runId = await createRun(question, 90, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A", buildCostEnvelopeSeam: seamA.build
+      }), {
+        ...settings,
+        providerRef: PRIMARY_REF,
+        maker: "Maker A",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B", buildCostEnvelopeSeam: seamB.build
+          }),
+          providerRef: SECONDARY_REF,
+          maker: "Maker B"
+        },
+        additionalMakers: [{
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C", buildCostEnvelopeSeam: seamC.build
+          }),
+          providerRef: THIRD_REF,
+          maker: "Maker C"
+        }],
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        // The sealed pair names two DIFFERENT makers: A writes, C checks.
+        synthesisRolePolicy: {
+          ...settings.synthesisRolePolicy,
+          synthesizerRoleRef: PRIMARY_REF,
+          evaluatorRoleRef: THIRD_REF,
+          identicalRoleRefs: false
+        },
+        providerPrices: new Map([
+          [PRIMARY_REF, { inputMicrosPerMillionTokens: 3_000_000, outputMicrosPerMillionTokens: 3_000_000 }],
+          [SECONDARY_REF, { inputMicrosPerMillionTokens: 9_000_000, outputMicrosPerMillionTokens: 9_000_000 }],
+          [THIRD_REF, { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 }]
+        ])
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const answer = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, `asker:${question}`);
+      expect(SERVED_TERMINALS).toContain(answer?.terminal);
+
+      // The writer's fallback skipped C, the cheapest, because C will check the
+      // draft; B, dearer, fitted and wrote it. C then checked as planned, so the
+      // two roles stayed on two makers.
+      expect(seamA.phases()).toEqual(["BODY", "SERVE"]);
+      expect(seamB.phases()).toEqual(["BODY", "SERVE"]);
+      expect(seamC.phases()).toEqual(["BODY", "SERVE"]);
+      expect(await servedRoundMakers(result.answerId)).toEqual([{
+        round: 1, writer: SECONDARY_REF, checker: THIRD_REF,
+        candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+      }]);
+      expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
+        writerPlannedRef: PRIMARY_REF,
+        checkerPlannedRef: THIRD_REF,
+        writerServedRef: SECONDARY_REF,
+        checkerServedRef: THIRD_REF,
+        writerFallback: true,
+        checkerFallback: false,
+        fallbackReason: "MONEY",
+        checkerSameAsWriter: false,
+        serveStop: null
+      });
+      expect(answer?.condition_marks).not.toContain("DEGRADED-DIVERSITY");
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
+    }
+  });
+
+  it("keeps a serve-leg money stop on the owner's record when the answer's one envelope record already names the stop while arguing", async () => {
+    // The arguing is stopped on root 1 (money), and round 2's writer can then be
+    // paid by no maker. The answer carries ONE envelope record, the body stop's
+    // (`servePhaseStopDisclosure` adds none beside it); the row keeps both.
+    const primarySeam = moneySeam({ refuseServe: [3] });
+    const secondarySeam = moneySeam({ refuseBody: 2, refuseServe: "ALL" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-row-body-and-serve-stop",
+      primary: [
+        judgementDouble("Primary M3 two-stop position"),
+        resil01Composition, evaluatorObjecting("Round one leaves out the losing side."), m3RoundTwoComposition
+      ],
+      secondary: [judgementDouble("Secondary M3 two-stop position")],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    expect((scenario.answer?.condition_mark_records ?? []).filter((record) => record.mark === "ENVELOPE_EXHAUSTED"))
+      .toHaveLength(1);
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
+      bodyStop: "MONEY", pointsWithoutReview: 1, serveStop: "MONEY"
+    });
   });
 
   it("keeps round 1 when round 2's writer cannot be paid by any maker, and serves it with the stop on its record", async () => {
@@ -5750,7 +5869,9 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
       writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
       writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: true,
-      bodyStop: null, pointsWithoutReview: null
+      bodyStop: null, pointsWithoutReview: null,
+      // Round 2's writer could not be paid by any maker: the loop was cut short.
+      serveStop: "MONEY"
     });
   });
 
@@ -5786,8 +5907,10 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.answer?.condition_marks).toContain("SYNTHESIS-OBJECTION-STANDING");
     expect(scenario.answer?.condition_marks).not.toContain("DEFECT");
     expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    // The death leaves no mark on the answer; the owner's record keeps it.
     expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
-      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF, writerFallback: false, checkerFallback: false
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF, writerFallback: false, checkerFallback: false,
+      serveStop: "TRANSPORT_DEATH"
     });
   });
 
@@ -5819,7 +5942,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
       writerServedRef: null, checkerServedRef: null,
       writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false,
-      bodyStop: null, pointsWithoutReview: null, ...NO_DIGEST_OR_FLOOR
+      bodyStop: null, pointsWithoutReview: null, serveStop: "MONEY", ...NO_DIGEST_OR_FLOOR
     });
   });
 
@@ -5827,11 +5950,15 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
    * Found while proving the kept round (Task M3): once round 1's DRAFT was
    * written, a crash class the sealed chain returns afterwards (here round 1's
    * checker transport dying) was persisted with that draft's composition
-   * evidence still attached. The sealed persist rightly refuses a
-   * components-only answer carrying a draft (INCONSISTENT_PRE_COMPOSITION_EVIDENCE),
-   * so the run FAILED instead of ending components-only / DEFECT — and a failed
-   * run could never get Task M5's floor. The persist now takes the evidence of
-   * the round the result serves, and of none when it serves none.
+   * evidence still attached. With a composition artifact present the sealed
+   * persist writes the composed text and then a conformance record whose
+   * coverage mode is the crash result's `NOT_RUN`, which the database refuses
+   * (`serve.conformance_record.coverage_mode IN ('EXHAUSTIVE','SAMPLED')`,
+   * migrations/0000_s00.sql, SQLSTATE 23514). That surfaced as
+   * ANSWER_PERSIST_FAILED, so the run FAILED instead of ending
+   * components-only / DEFECT — and a failed run could never get Task M5's
+   * floor. The persist now takes the evidence of the round the result serves,
+   * and of none when it serves none.
    */
   it("ends components-only / DEFECT, not a failed run, when round 1's checker transport dies after its draft was written", async () => {
     const primaryDebate = fullDebate("Primary M3 round-one checker death");
@@ -5852,7 +5979,8 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.answer?.composed_text).toEqual([]);
     expect(await servedRoundMakers(answerId)).toEqual([]);
     expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
-      writerServedRef: null, checkerServedRef: null, writerFallback: false, checkerFallback: false
+      writerServedRef: null, checkerServedRef: null, writerFallback: false, checkerFallback: false,
+      serveStop: "TRANSPORT_DEATH"
     });
   });
 
@@ -5876,6 +6004,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: true,
       // Root 1 was refused: root 0 is the one point, and nobody cross-reviewed it.
       bodyStop: "MONEY", pointsWithoutReview: 1,
+      serveStop: null,
       ...NO_DIGEST_OR_FLOOR
     });
     expect(row?.createdAt).toBeInstanceOf(Date);
@@ -5897,7 +6026,8 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.answer?.condition_marks).toContain("DEFECT");
     expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
     expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
-      writerServedRef: null, checkerServedRef: null, bodyStop: "MONEY", pointsWithoutReview: 1
+      writerServedRef: null, checkerServedRef: null, bodyStop: "MONEY", pointsWithoutReview: 1,
+      serveStop: "TRANSPORT_DEATH"
     });
   });
 
@@ -5983,6 +6113,40 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       );
     await expect(rawInsert({ writerFallback: false })).rejects.toMatchObject({ code: "23514" });
     await expect(rawInsert({ fallbackReason: null })).rejects.toMatchObject({ code: "23514" });
+    // M3 polish: the repository's ref and code rules are the table's too, so a
+    // raw-inserted row can never pass the database and then fail the typed read.
+    const rawRow = (answer: string, overrides: Readonly<{ writerRef?: string; serveStop?: string | null }>) =>
+      database.pool.query(
+        `INSERT INTO serve.serve_disclosure (
+           answer_id, answer_version, run_id, writer_planned_ref, checker_planned_ref,
+           writer_served_ref, checker_served_ref, writer_fallback, checker_fallback,
+           fallback_reason, checker_same_as_writer, serve_stop
+         ) VALUES ($1, 1, $2, $3, $3, $3, $3, false, false, NULL, true, $4)`,
+        [answer, answer === answerId ? scenario.runId : unwritten.runId,
+          overrides.writerRef ?? PRIMARY_REF, overrides.serveStop ?? null]
+      );
+    const unwritten = await executeResil01Scenario({
+      label: "m3-row-table-unwritten",
+      primary: [judgementDouble("Primary M3 unwritten-row position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M3 unwritten-row position")],
+      secondaryCostEnvelope: stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" }).build,
+      // The runner's own write is swallowed, so this answer has no row yet.
+      settings: { serveDisclosure: { store: { insert: async () => "INSERTED" as const }, log: () => undefined } }
+    });
+    const unwrittenAnswerId = answerIdOf(unwritten);
+    await expect(rawRow(unwrittenAnswerId, { writerRef: "p".repeat(257) })).rejects.toMatchObject({ code: "23514" });
+    await expect(rawRow(unwrittenAnswerId, { writerRef: ` ${PRIMARY_REF}` })).rejects.toMatchObject({ code: "23514" });
+    await expect(rawRow(unwrittenAnswerId, { writerRef: `${PRIMARY_REF}\t` })).rejects.toMatchObject({ code: "23514" });
+    await expect(rawRow(unwrittenAnswerId, { serveStop: "BUDGET" })).rejects.toMatchObject({ code: "23514" });
+    // 256 characters counted as the database counts them (code points), not as
+    // UTF-16 units: passes the table AND the typed read.
+    const astralRef = "\u{1F4B0}".repeat(256);
+    await expect(repository.insert({ ...record, answerId: unwrittenAnswerId, runId: unwritten.runId,
+      writerPlannedRef: "\u{1F4B0}".repeat(257) })).rejects.toMatchObject({ code: "SERVE_DISCLOSURE_RECORD_INVALID" });
+    await rawRow(unwrittenAnswerId, { writerRef: astralRef, serveStop: "NO_ARTIFACT" });
+    expect(await repository.readForAnswerVersion(unwrittenAnswerId, 1)).toMatchObject({
+      writerPlannedRef: astralRef, writerServedRef: astralRef, checkerSameAsWriter: true, serveStop: "NO_ARTIFACT"
+    });
     const otherRunId = await createRun(`m3-row-table-other-${randomUUID()}`);
     await expect(rawInsert({ runId: otherRunId })).rejects.toMatchObject({
       code: "23503", message: "SERVE_DISCLOSURE_RUN_MISMATCH"
@@ -6458,7 +6622,7 @@ describe("T10/T11 · the served root and its label, through the production runne
    * wired and a cheaper healthy maker right there, and nothing is served,
    * spent or disclosed.
    */
-  it("T9/J24 refuses when a configured sealed role provider is absent at claim, and substitutes the healthy maker only for money, never for absence", async () => {
+  it("T9/J24 refuses when a configured sealed role provider is absent at claim, and never substitutes the healthy maker for absence, even with the cost fallback wired (its money half: \"Engine money rule M3\")", async () => {
     const absentRolePrimary = await startProviderDouble([]);
     const healthySecondary = await startProviderDouble([
       judgementDouble("The healthy maker would have authored this", 0.4),

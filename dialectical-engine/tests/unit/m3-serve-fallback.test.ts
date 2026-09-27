@@ -31,6 +31,7 @@ import {
   callServeRoleWithFallback,
   serveDisclosureBodyFacts,
   servePhaseFallbackOrder,
+  serveLoopStopOf,
   servePhaseStopDisclosure,
   type ServeRoleMaker
 } from "../../apps/runner/src/index.js";
@@ -559,15 +560,15 @@ function loopOver(dependencies: ServeGateDependencies) {
 }
 
 describe("M3 · keep the best complete round (R4): a later failure keeps what the checker already read", () => {
-  it("names the failures that keep a complete round: every run-level spend stop, and a dead transport", () => {
+  it("names the failures that keep a complete round: every run-level spend stop, a dead transport, and no artifact", () => {
     for (const code of [
       "RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED", "PROVIDER_USAGE_UNREPORTED",
-      "DAILY_COST_ENVELOPE_REACHED", "SYNTHESIS_TRANSPORT_DEATH"
+      "DAILY_COST_ENVELOPE_REACHED", "SYNTHESIS_TRANSPORT_DEATH", "SYNTHESIS_NO_ARTIFACT"
     ]) {
       expect(keepsCompleteSynthesisRounds(new TypedDomainError(code, "x")), code).toBe(true);
     }
     for (const code of [
-      "COMPOSITION_CONTRACT_ERROR", "EVALUATOR_CONTRACT_ERROR", "SYNTHESIS_NO_ARTIFACT",
+      "COMPOSITION_CONTRACT_ERROR", "EVALUATOR_CONTRACT_ERROR",
       "EVALUATOR_VERDICT_INCOHERENT", "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED", "CALL_BUDGET_EXHAUSTED"
     ]) {
       expect(keepsCompleteSynthesisRounds(new TypedDomainError(code, "x")), code).toBe(false);
@@ -611,6 +612,16 @@ describe("M3 · keep the best complete round (R4): a later failure keeps what th
     expect(outcome.candidate).toEqual(segments("Draft 2."));
     expect(outcome.standingObjection).toBe("Still unfair.");
     expect(outcome.endedEarlyBy).toBe("SYNTHESIS_TRANSPORT_DEATH");
+  });
+
+  it("a later round that produced no artifact keeps round 1 too: a technical failure of that round, not of round 1", async () => {
+    const { dependencies } = scriptedLoop({
+      failAt: { round: 2, role: "SYNTHESIZER", error: new TypedDomainError("SYNTHESIS_NO_ARTIFACT", "nothing to serve") }
+    });
+    const outcome = await loopOver(dependencies);
+    expect(outcome.rounds.map((round) => round.round)).toEqual([1]);
+    expect(outcome.candidate).toEqual(segments("Draft 1."));
+    expect(outcome.endedEarlyBy).toBe("SYNTHESIS_NO_ARTIFACT");
   });
 
   it("a finished loop says it was not cut short", async () => {
@@ -674,6 +685,26 @@ describe("M3 · keep the best complete round (R4): a later failure keeps what th
   });
 });
 
+describe("M3 polish · what ended the answer-writing loop early, for the owner's record (serve_stop)", () => {
+  it.each([
+    ["RUN_COST_ENVELOPE_MONEY_REACHED", "MONEY"],
+    ["RUN_COST_ENVELOPE_EXHAUSTED", "ATTEMPTS"],
+    ["PROVIDER_USAGE_UNREPORTED", "USAGE"],
+    ["DAILY_COST_ENVELOPE_REACHED", "DAILY"],
+    ["SYNTHESIS_TRANSPORT_DEATH", "TRANSPORT_DEATH"],
+    ["SYNTHESIS_NO_ARTIFACT", "NO_ARTIFACT"]
+  ] as const)("names %s as %s", (code, stop) => {
+    expect(serveLoopStopOf(new TypedDomainError(code, "x"))).toBe(stop);
+  });
+
+  it("names nothing for no failure, a failure that ends no loop early, or a code-shaped object", () => {
+    expect(serveLoopStopOf(null)).toBeNull();
+    expect(serveLoopStopOf(new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "x"))).toBeNull();
+    expect(serveLoopStopOf(new Error("boom"))).toBeNull();
+    expect(serveLoopStopOf({ code: "SYNTHESIS_TRANSPORT_DEATH" })).toBeNull();
+  });
+});
+
 describe("M3 · a round kept after a spend stop says so on the answer", () => {
   const base = { runId: "run:m3", servedRootNodeId: "root:A", resultConditionMarks: [] as readonly string[] };
 
@@ -727,7 +758,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       ...ids,
       planned: { writerRef: "provider:a", checkerRef: "provider:b" },
       served: { writerRef: "provider:a", checkerRef: "provider:b" },
-      body: { bodyStop: null, pointsWithoutReview: null }
+      body: { bodyStop: null, pointsWithoutReview: null },
+      serveStop: null
     })).toEqual({
       ...ids,
       writerPlannedRef: "provider:a",
@@ -740,6 +772,7 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       checkerSameAsWriter: false,
       bodyStop: null,
       pointsWithoutReview: null,
+      serveStop: null,
       digestRung: null,
       digestPointsOmitted: null,
       floorVerdictState: null,
@@ -753,7 +786,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       ...ids,
       planned: { writerRef: "provider:a", checkerRef: "provider:b" },
       served: { writerRef: "provider:c", checkerRef: "provider:c" },
-      body: { bodyStop: "MONEY", pointsWithoutReview: 3 }
+      body: { bodyStop: "MONEY", pointsWithoutReview: 3 },
+      serveStop: null
     });
     expect(record).toMatchObject({
       writerFallback: true,
@@ -770,7 +804,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       ...ids,
       planned: { writerRef: "provider:a", checkerRef: "provider:b" },
       served: { writerRef: "provider:b", checkerRef: "provider:b" },
-      body: { bodyStop: null, pointsWithoutReview: null }
+      body: { bodyStop: null, pointsWithoutReview: null },
+      serveStop: null
     });
     expect(record).toMatchObject({ writerFallback: true, checkerFallback: false, fallbackReason: "MONEY", checkerSameAsWriter: true });
   });
@@ -780,7 +815,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       ...ids,
       planned: { writerRef: "provider:a", checkerRef: "provider:a" },
       served: null,
-      body: { bodyStop: "ATTEMPTS", pointsWithoutReview: 0 }
+      body: { bodyStop: "ATTEMPTS", pointsWithoutReview: 0 },
+      serveStop: "MONEY"
     });
     expect(record).toMatchObject({
       writerServedRef: null,
@@ -790,8 +826,20 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       fallbackReason: null,
       checkerSameAsWriter: false,
       bodyStop: "ATTEMPTS",
-      pointsWithoutReview: 0
+      pointsWithoutReview: 0,
+      serveStop: "MONEY"
     });
+  });
+
+  it("records what ended the loop early even when a round was kept, beside the stop while arguing", () => {
+    const record = buildServeDisclosureRecord({
+      ...ids,
+      planned: { writerRef: "provider:a", checkerRef: "provider:a" },
+      served: { writerRef: "provider:a", checkerRef: "provider:a" },
+      body: { bodyStop: "MONEY", pointsWithoutReview: 1 },
+      serveStop: "NO_ARTIFACT"
+    });
+    expect(record).toMatchObject({ bodyStop: "MONEY", serveStop: "NO_ARTIFACT", writerServedRef: "provider:a" });
   });
 
   it("counts the points a stop left without a cross-review only on the spend-stopped footing", () => {

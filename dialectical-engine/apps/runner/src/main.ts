@@ -30,7 +30,7 @@ import {
   resolveStoryPackDir,
   type StoryPack
 } from "@debateai/story";
-import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
+import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logServeDisclosure, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -100,15 +100,6 @@ const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
  */
 const storyLog = (event: string, detail: Record<string, unknown>): void => {
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_STORY", event }));
-};
-/**
- * Engine money rule, Task M3 (spec §14.4.5): the owner-side disclosure row is
- * written after every answer and can never change it; a failure to write it is
- * this one line. Codes and ids only — the detail goes FIRST, so no detail key
- * can overwrite the line's kind or event.
- */
-const serveDisclosureLog = (event: string, detail: Readonly<Record<string, unknown>>): void => {
-  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_SERVE_DISCLOSURE", event }));
 };
 /**
  * The shape pack is loaded ONCE, here (spec §5.1). An invalid pack never stops
@@ -322,8 +313,10 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // makers first. Hosted only (local mode's map is empty); never sealed.
   providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
   // Engine money rule, Task M3 (spec §14.4.5): the row goes to the runner's own
-  // pool (the default store); a failure to write it is logged here.
-  serveDisclosure: { log: serveDisclosureLog },
+  // pool (the default store); a failure to write it is the runner's one
+  // code-only DEBATEAI_SERVE_DISCLOSURE line, named here so the shipped wiring
+  // says where it goes.
+  serveDisclosure: { log: logServeDisclosure },
   claimTimeSynthesisRoleProbe: async (providerRef) => {
     const target = providerTargets.find((candidate) => candidate.providerRef === providerRef);
     if (target === undefined) {

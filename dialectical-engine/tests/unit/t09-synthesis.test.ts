@@ -592,7 +592,7 @@ describe("T9 crash classes — the ONLY four ways COMPONENTS_ONLY still exists",
     expect(result.digest).toBeNull();
   });
 
-  it("NO_ARTIFACT: the synthesizer answered with nothing to serve", async () => {
+  it("NO_ARTIFACT before any complete round: the synthesizer answered with nothing to serve", async () => {
     const double = recorder({ synthesize: async () => [] });
     const result = await runServeGateChain(chainInput(), double.dependencies);
     expect(result.terminal).toBe("COMPONENTS_ONLY");
@@ -600,6 +600,28 @@ describe("T9 crash classes — the ONLY four ways COMPONENTS_ONLY still exists",
     expect(result.conditionMarks).toContain("DEFECT");
     expect(result.gateTrace).toContain("COMPONENTS_ONLY_DEFECT");
     expect(double.evaluatorRequests).toHaveLength(0);
+  });
+
+  /**
+   * ENGINE MONEY RULE, TASK M3 polish: like its sibling, a dead transport, an
+   * empty LATER draft is a technical failure of that round, and the complete
+   * round 1 before it is valid. The sealed chain raises NO_ARTIFACT inside the
+   * loop; the loop now ends on round 1 instead of crashing to components-only.
+   */
+  it("NO_ARTIFACT after a complete round keeps that round and serves it (Task M3)", async () => {
+    const double = recorder({
+      verdicts: [unsatisfied("Round one is unfair.", "fairnessToLosers"), SATISFIED],
+      synthesize: async (request) => request.round === 2 ? [] : segments(`candidate ${request.round}`)
+    });
+    const result = await runServeGateChain(chainInput(), double.dependencies);
+    expect(result.terminal).not.toBe("COMPONENTS_ONLY");
+    expect(result.crashClass).toBeNull();
+    expect(result.conditionMarks).not.toContain("DEFECT");
+    expect(double.synthesizerRequests.map((request) => request.round)).toEqual([1, 2]);
+    expect(double.evaluatorRequests.map((request) => request.round)).toEqual([1]);
+    expect(result.loopRounds.map((round) => round.round)).toEqual([1]);
+    expect(result.segments.map((segment) => segment.text)).toEqual(segments("candidate 1").map((segment) => segment.text));
+    expect(result.standingObjection).toBe("Round one is unfair.");
   });
 
   it("TRANSPORT_DEATH before any complete round: a dead role transport ends in components-only, not a thrown run", async () => {
@@ -790,6 +812,14 @@ describe("T9 DoD row 2 — no NON-CRASH path returns COMPONENTS_ONLY", () => {
           }
         });
       }
+    },
+    {
+      // Task M3 polish: before it this reached NO_ARTIFACT and discarded round 1.
+      name: "an empty draft after round 1 completed",
+      run: async () => runServeGateChain(chainInput(), recorder({
+        verdicts: [unsatisfied("one", "fairnessToLosers"), SATISFIED],
+        synthesize: async (request) => request.round === 2 ? [] : segments(`candidate ${request.round}`)
+      }).dependencies)
     },
     {
       name: "three unsatisfied rounds",

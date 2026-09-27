@@ -644,19 +644,27 @@ export interface SynthesisLoopDependencies<TCandidate> {
  *
  * Every run-level spend stop (the kernel's one list: money — after the
  * runner's cheaper-maker fallback found nothing that fits — the attempt
- * ceiling, a vendor that reports no usage, a spent day) and a dead role
- * transport. None of them says anything about the drafts already checked: the
- * draft the checker read, and the verdict it gave, are as real as they were a
- * call ago. The owner's rule is that money never costs the person an answer.
+ * ceiling, a vendor that reports no usage, a spent day), a dead role transport,
+ * and a later draft with nothing to serve (`SYNTHESIS_NO_ARTIFACT`, the sealed
+ * chain's own check; M3 review polish). None of them says anything about the
+ * drafts already checked: the draft the checker read, and the verdict it gave,
+ * are as real as they were a call ago. The owner's rule is that money never
+ * costs the person an answer, and a technical failure of a LATER round is not a
+ * failure of the round before it.
  *
  * A contract or content error (`COMPOSITION_CONTRACT_ERROR`,
- * `EVALUATOR_CONTRACT_ERROR`, an incoherent verdict, no artifact) is NOT on
- * this list: it is not money, and it keeps today's handling. Only a
- * `TypedDomainError` is trusted — a code-shaped object is not a refusal.
+ * `EVALUATOR_CONTRACT_ERROR`, an incoherent verdict) is NOT on this list: it
+ * keeps today's handling. Only a `TypedDomainError` is trusted — a code-shaped
+ * object is not a refusal.
  */
+const ROUND_KEEPING_TECHNICAL_FAILURES: readonly string[] = Object.freeze([
+  "SYNTHESIS_TRANSPORT_DEATH",
+  "SYNTHESIS_NO_ARTIFACT"
+]);
+
 export function keepsCompleteSynthesisRounds(error: unknown): boolean {
   return error instanceof TypedDomainError
-    && (isRunLevelSpendStop(error) || error.code === "SYNTHESIS_TRANSPORT_DEATH");
+    && (isRunLevelSpendStop(error) || ROUND_KEEPING_TECHNICAL_FAILURES.includes(error.code));
 }
 
 /**
@@ -695,7 +703,7 @@ function loopOutcomeEndingOn<TCandidate>(input: {
  *
  * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — KEEP THE BEST COMPLETE ROUND.
  * Once at least one round is COMPLETE (a draft and its checker's verdict), a
- * later round that fails with a spend stop or a dead transport
+ * later round that fails with a spend stop, a dead transport or no artifact
  * (`keepsCompleteSynthesisRounds`) no longer throws the complete rounds away:
  * the loop ends there, on its last complete round, as if its bound had been
  * that round. "Best" is the loop's own rule — the latest complete draft, which
@@ -774,7 +782,7 @@ export async function runSynthesisLoop<TCandidate>(
         verdictCallSiteKey: evaluated.verdictCallSiteKey
       }));
     } catch (error) {
-      // Task M3: a spend stop or a dead transport after a complete round keeps
+      // Task M3: a spend stop, a dead transport or an empty draft after a complete round keeps
       // that round. `complete` is non-null exactly when `rounds` is non-empty.
       if (complete !== null && keepsCompleteSynthesisRounds(error)) {
         return loopOutcomeEndingOn({

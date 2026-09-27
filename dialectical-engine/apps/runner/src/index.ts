@@ -1963,8 +1963,10 @@ export async function callServeRoleWithFallback<T>(input: Readonly<{
  *
  * `null` — nothing to add: no failure escaped a role call; no round was kept
  * (a round-1 refusal still takes the terminal, which has its own record); the
- * failure was a dead transport, which is not a spend bound; the answer already
- * carries the mark; or the answer is DEFECT.
+ * failure was a dead transport or an empty draft, which are not spend bounds;
+ * the answer already carries the mark (the stop while arguing took it); or the
+ * answer is DEFECT. The owner's row names the loop's stop in every one of these
+ * cases (`serve_stop`, `serveLoopStopOf`).
  */
 export function servePhaseStopDisclosure(input: Readonly<{
   servePhaseFailure: unknown;
@@ -1987,6 +1989,30 @@ export function servePhaseStopDisclosure(input: Readonly<{
     servedRootRule: null,
     affectedNodeIds: Object.freeze([input.servedRootNodeId])
   } satisfies ConditionMarkRecord);
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M3 review polish — WHAT ENDED THE
+ * ANSWER-WRITING LOOP EARLY, for the owner's record (`serve_stop`).
+ *
+ * The runner's view of the loop's `endedEarlyBy`: the sealed chain does not
+ * hand the loop's outcome back, so the runner keeps the failure that left a
+ * role call (`whileServing`) — money only after every cheaper maker was
+ * refused — or the empty draft it handed the chain. Every failure named here
+ * ends the loop: kept on a complete round, or, before one, a components-only
+ * terminal. It is recorded either way, and it is the only durable trace of a
+ * transport death after a kept round and of a serve-leg stop whose envelope
+ * record the stop while arguing already took. `null` for anything else.
+ */
+export type ServeLoopStop = EnvelopeStopKind | "TRANSPORT_DEATH" | "NO_ARTIFACT";
+
+export function serveLoopStopOf(failure: unknown): ServeLoopStop | null {
+  const stop = envelopeStopKind(failure);
+  if (stop !== null) return stop;
+  if (!(failure instanceof TypedDomainError)) return null;
+  if (failure.code === "SYNTHESIS_TRANSPORT_DEATH") return "TRANSPORT_DEATH";
+  if (failure.code === "SYNTHESIS_NO_ARTIFACT") return "NO_ARTIFACT";
+  return null;
 }
 
 /**
@@ -2032,6 +2058,8 @@ export function buildServeDisclosureRecord(input: Readonly<{
   planned: Readonly<{ writerRef: string; checkerRef: string }>;
   served: Readonly<{ writerRef: string; checkerRef: string }> | null;
   body: Readonly<{ bodyStop: EnvelopeStopKind | null; pointsWithoutReview: number | null }>;
+  /** What ended the answer-writing loop early (`serveLoopStopOf`), or null. */
+  serveStop: ServeLoopStop | null;
 }>): ServeDisclosureRecord {
   const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
   const checkerFallback = input.served !== null && input.served.checkerRef !== input.planned.checkerRef;
@@ -2049,6 +2077,7 @@ export function buildServeDisclosureRecord(input: Readonly<{
     checkerSameAsWriter: input.served !== null && input.served.checkerRef === input.served.writerRef,
     bodyStop: input.body.bodyStop,
     pointsWithoutReview: input.body.pointsWithoutReview,
+    serveStop: input.serveStop,
     digestRung: null,
     digestPointsOmitted: null,
     floorVerdictState: null,
@@ -2073,8 +2102,13 @@ function databaseStateOf(error: unknown): string | null {
   return typeof code === "string" && /^[0-9A-Z]{5}$/u.test(code) ? code : null;
 }
 
-/** Codes and ids only: a disclosure log line never carries debate or model text. */
-function logServeDisclosure(event: string, detail: Readonly<Record<string, unknown>>): void {
+/**
+ * The ONE disclosure log line (M3 review polish: `main.ts` composes this same
+ * function rather than a copy). Codes and ids only: it never carries debate or
+ * model text. The detail goes FIRST, so no detail key can overwrite the line's
+ * kind or event.
+ */
+export function logServeDisclosure(event: string, detail: Readonly<Record<string, unknown>>): void {
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_SERVE_DISCLOSURE", event }));
 }
 
@@ -5412,11 +5446,14 @@ export class WalkingSkeletonRunner {
         // Task M3 (spec §14.4.2): refused for MONEY, this SAME request — call
         // site, framed prompt, bound — is offered to the cheaper claim-eligible
         // makers; only the provider changes, and the seam decides what fits.
+        // M3 review polish: the planned CHECKER's maker is offered last, so the
+        // cheapest fallback writer is not the maker that will check its draft
+        // whenever another maker fits.
         const served = await whileServing(() => callServeRoleWithFallback({
           planned: role,
           claimEligible: synthesisMakers,
           prices: servePrices,
-          preferNot: null,
+          preferNot: synthesisRoles.evaluatorRoleRef,
           call: (maker, call) => callSynthesisRole(maker.provider, call, "COMPOSITION_CONTRACT_ERROR"),
           request: {
           runId: run.runId,
@@ -5483,6 +5520,16 @@ export class WalkingSkeletonRunner {
           providerRef: served.servedBy.providerRef
         }));
         draftWriterByRound.set(request.round, served.servedBy.providerRef);
+        // M3 review polish: an empty draft is what the sealed chain answers with
+        // SYNTHESIS_NO_ARTIFACT, its first check on every draft; it ends the loop
+        // (kept on a complete round), so the owner's record names it. The
+        // composition schema requires a segment, so today nothing reaches this.
+        if (partitioned.conformanceSegments.length === 0) {
+          servePhaseFailure = new TypedDomainError(
+            "SYNTHESIS_NO_ARTIFACT",
+            `The synthesizer returned no segment to serve at ${synthesizerCallSiteKey}`
+          );
+        }
         return {
           candidate: partitioned.conformanceSegments,
           // codex r1 B2: the RECORDED artifact for THIS round. `compositionRawArtifactRef`
@@ -5598,8 +5645,12 @@ export class WalkingSkeletonRunner {
       // that round's own draft, artifact and attempt, never a later draft its
       // checker did not read — and, for a result that serves NO round (a crash
       // class the chain returned after a draft was written, e.g. round 1's
-      // checker transport dying), no draft at all: the sealed persist refuses a
-      // components-only answer that carries one, which failed the whole run.
+      // checker transport dying), no draft at all. With a stale draft attached
+      // the sealed persist wrote the composed text and then a conformance record
+      // with the crash result's coverage mode `NOT_RUN`, which the database's
+      // CHECK refuses (`serve.conformance_record.coverage_mode IN
+      // ('EXHAUSTIVE','SAMPLED')`, 23514): ANSWER_PERSIST_FAILED, and the whole
+      // run failed instead of ending components-only / DEFECT.
       const servedRound = result.loopRounds.at(-1);
       if (servedRound === undefined) {
         finalSegments = [];
@@ -5799,7 +5850,8 @@ export class WalkingSkeletonRunner {
         writerRef: servedRoleRef(servedDrafts.get(answeredRound.candidateRef)?.providerRef, "writer"),
         checkerRef: servedRoleRef(servedChecks.get(answeredRound.verdictRef), "checker")
       },
-      body: serveDisclosureBody
+      body: serveDisclosureBody,
+      serveStop: serveLoopStopOf(servePhaseFailure)
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",

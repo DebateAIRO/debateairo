@@ -29,10 +29,12 @@ export {
 export {
   SERVE_DISCLOSURE_BODY_STOPS,
   SERVE_DISCLOSURE_FLOOR_STATES,
+  SERVE_DISCLOSURE_SERVE_STOPS,
   ServeDisclosureRepository,
   type ServeDisclosureBodyStop,
   type ServeDisclosureFloorState,
   type ServeDisclosureRecord,
+  type ServeDisclosureServeStop,
   type StoredServeDisclosure
 } from "./serve-disclosure.js";
 

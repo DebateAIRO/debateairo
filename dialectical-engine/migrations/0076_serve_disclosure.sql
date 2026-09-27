@@ -7,8 +7,17 @@
 -- why, whether both roles ended on one maker (R9: DEGRADED-DIVERSITY is derived
 -- from the SEALED refs, so a fallback onto one maker is recorded here instead),
 -- the stop that cut the arguing short and the points it left without a
--- cross-review. The digest columns are filled by Task M4 and the floor columns
--- by Task M5; this file only creates them.
+-- cross-review, and what cut the answer-writing loop short. The digest columns
+-- are filled by Task M4 and the floor columns by Task M5; this file only
+-- creates them.
+--
+-- AMENDED IN PLACE (M3 review polish, 2026-09-27), before it ever shipped: the
+-- serve_stop column and the 256-character ref CHECKs were added to the CREATE
+-- TABLE itself. Every database that applied the first text of this file was an
+-- embedded test database, created in a temporary directory and deleted when its
+-- suite stopped; no persistent database applied it. migrate() keys on the file
+-- name, so a database that had applied the first text would never re-apply this
+-- one anyway.
 --
 -- It exists because the sealed serve file (packages/serve/src/index.ts) has no
 -- place for a new disclosure: the answer and its marks are sealed. The runner
@@ -43,11 +52,26 @@ CREATE TABLE IF NOT EXISTS serve.serve_disclosure (
   answer_id uuid NOT NULL,
   answer_version integer NOT NULL,
   run_id uuid NOT NULL REFERENCES core.run(run_id),
-  writer_planned_ref text NOT NULL CHECK (length(btrim(writer_planned_ref)) > 0),
-  checker_planned_ref text NOT NULL CHECK (length(btrim(checker_planned_ref)) > 0),
+  -- A provider ref: 1 to 256 characters (code points, as length() counts them)
+  -- with no ASCII white space at either end. ServeDisclosureRepository holds the
+  -- same rule, so a row this table accepts is a row the typed read accepts.
+  writer_planned_ref text NOT NULL CHECK (
+    length(writer_planned_ref) BETWEEN 1 AND 256
+    AND writer_planned_ref = btrim(writer_planned_ref, E' \t\n\r\f\x0B')
+  ),
+  checker_planned_ref text NOT NULL CHECK (
+    length(checker_planned_ref) BETWEEN 1 AND 256
+    AND checker_planned_ref = btrim(checker_planned_ref, E' \t\n\r\f\x0B')
+  ),
   -- NULL when the served result has no checked round (components-only).
-  writer_served_ref text CHECK (writer_served_ref IS NULL OR length(btrim(writer_served_ref)) > 0),
-  checker_served_ref text CHECK (checker_served_ref IS NULL OR length(btrim(checker_served_ref)) > 0),
+  writer_served_ref text CHECK (writer_served_ref IS NULL OR (
+    length(writer_served_ref) BETWEEN 1 AND 256
+    AND writer_served_ref = btrim(writer_served_ref, E' \t\n\r\f\x0B')
+  )),
+  checker_served_ref text CHECK (checker_served_ref IS NULL OR (
+    length(checker_served_ref) BETWEEN 1 AND 256
+    AND checker_served_ref = btrim(checker_served_ref, E' \t\n\r\f\x0B')
+  )),
   writer_fallback boolean NOT NULL,
   checker_fallback boolean NOT NULL,
   fallback_reason text CHECK (fallback_reason IS NULL OR fallback_reason IN ('MONEY')),
@@ -57,13 +81,25 @@ CREATE TABLE IF NOT EXISTS serve.serve_disclosure (
   -- CHECK that refused one of them would lose the whole row.
   body_stop text CHECK (body_stop IS NULL OR body_stop IN ('MONEY', 'ATTEMPTS', 'USAGE', 'DAILY')),
   points_without_review integer CHECK (points_without_review IS NULL OR points_without_review >= 0),
+  -- What ended the answer-writing loop early, whether or not a complete round
+  -- was kept (spec §14.4.2): a spend stop on an answer-writing call after every
+  -- cheaper maker was refused, a dead role transport, or a draft with nothing to
+  -- serve. NULL when the loop ran to a satisfied checker or to its bound, or
+  -- never started. It is the one durable trace of a transport death after a kept
+  -- round (the answer carries no mark for it), and of a serve-leg stop whose
+  -- envelope record the stop while arguing already took.
+  serve_stop text CHECK (
+    serve_stop IS NULL
+    OR serve_stop IN ('MONEY', 'ATTEMPTS', 'USAGE', 'DAILY', 'TRANSPORT_DEATH', 'NO_ARTIFACT')
+  ),
   digest_rung smallint CHECK (digest_rung IS NULL OR digest_rung >= 0),
   digest_points_omitted integer CHECK (digest_points_omitted IS NULL OR digest_points_omitted >= 0),
   floor_verdict_state text CHECK (
     floor_verdict_state IS NULL OR floor_verdict_state IN ('SUPPORTED', 'CONTESTED', 'UNSUPPORTED')
   ),
   floor_leading_node_id uuid,
-  -- Engine codes only: a reason is never model text.
+  -- Engine codes only: a reason is never model text (at most 96 characters,
+  -- inside the repository's 256-character cap).
   floor_reason text CHECK (floor_reason IS NULL OR floor_reason ~ '^[A-Z][A-Z0-9_]{0,95}$'),
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY (answer_id, answer_version),
