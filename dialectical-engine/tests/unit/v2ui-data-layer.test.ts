@@ -206,6 +206,27 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
     });
   });
 
+  /**
+   * Engine money rule (spec §14.4.1), Task M2: a debate stopped while it was
+   * argued is now SERVED, and its answer keeps the envelope mark that says it
+   * was cut short. The page keys "Components-only" on the terminal and the
+   * serve state, never on that mark, so the person sees the answer, and the
+   * honesty drawer still names the mark.
+   */
+  it("shows a served answer that was cut short while arguing as an answer, never as components-only", () => {
+    const answer = buildFairShapedAnswer({
+      condition_marks: [...buildFairShapedAnswer().condition_marks, "SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"]
+    });
+    const detail = debateDetailFromAnswer(answer);
+
+    expect(answer.terminal).toBe("SERVED");
+    expect(detail.status).toBe("complete");
+    expect(detail.completion?.humanReason ?? null).toBeNull();
+    expect(detail.synthesis?.verdict).toBe(answer.composed_text.map((segment) => segment.text).join("\n\n").trim());
+    expect(detail.synthesis?.verdict).not.toBe(composeEnglish["compose.v3.componentsOnlyVerdict"]);
+    expect(conditionMarkLabel("ENVELOPE_EXHAUSTED")).toBe("Run envelope exhausted");
+  });
+
   it("maps every terminal outcome onto an honest V2 status", () => {
     expect(debateStatusFromTerminal("SERVED")).toBe("complete");
     expect(debateStatusFromTerminal("DOWNGRADED")).toBe("complete");

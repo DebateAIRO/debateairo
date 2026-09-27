@@ -155,10 +155,17 @@ const machineIdentifierSchema = z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9:
  *
  * Two independent bounds refuse the next provider call, and the serve leg's
  * catch has to tell them apart from a genuine failure, which must keep
- * travelling. Both end the run the same way — the components-only envelope
- * terminal, which serves the nodes already verified — but they are reached by
- * different questions and are lifted by different operator actions, so the
- * distinction is named rather than inferred from a count.
+ * travelling. Both end the run the same way, but they are reached by different
+ * questions and are lifted by different operator actions, so the distinction is
+ * named rather than inferred from a count.
+ *
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — "the same way" depends on WHERE
+ * the refusal lands. While the debate is argued, every kind below stops the
+ * ARGUING and the run goes on to write its answer with the tree it has
+ * (`RUN_BODY_STOP_KINDS`); the stop rides the answer as its envelope record
+ * (`runBodyStopDisclosure`). On an answer-writing call it still takes the
+ * components-only envelope terminal, which serves the nodes already verified
+ * (Task M3 puts a cheaper-model fallback in front of that).
  */
 export const ENVELOPE_STOP_CODES = Object.freeze({
   /** The attempt ceiling pinned on the run head (`assertModelAttemptAllowed`). */
@@ -210,8 +217,9 @@ export const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> =
  * on one lineage because a spend bound stopped the run before the other maker
  * positions could be afforded. One lift per stop, because "re-ask with more
  * money", "wait for the next day" and "fix the vendor" are different actions.
- * The ATTEMPT ceiling is listed for completeness of the record: it is never a
- * run-body stop (`RUN_BODY_STOP_KINDS`), so no such record is ever minted for it.
+ * The ATTEMPT ceiling was listed only for completeness of the record while it
+ * failed the run instead of stopping it; since Task M2 it is a run-body stop
+ * (`RUN_BODY_STOP_KINDS`) and its lift is used like the others.
  */
 const SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
   ATTEMPTS: "Re-ask under a larger attempt ceiling so the other maker positions can be authored",
@@ -250,9 +258,14 @@ export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
  * evaluation that already stands in front of the serve chain, where the terminal
  * IS buildable and the components produced so far are what it serves.
  *
- * `null` means "this is not a phase stop, let it travel". The ATTEMPT ceiling is
- * deliberately `null`: it has always propagated from these phases, changing that
- * is a behaviour nobody ruled, and V-28 is about money.
+ * `null` means "this is not a phase stop, let it travel".
+ *
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2: the ATTEMPT ceiling is a phase stop
+ * too. It used to be deliberately `null` — it propagated from these phases and
+ * FAILED the run — because V-28 was about money. The owner's rule is that a cost
+ * bound never costs the person their answer, and the attempt ceiling is a cost
+ * bound by count, so it now stops the arguing like money does (the controller's
+ * ruling R10, 2026-09-27).
  */
 /**
  * C3 (re-review) — WHICH QUESTION THE ENVELOPE IS ASKED, per stop.
@@ -275,9 +288,10 @@ export function envelopeStopPendingAttempts(stop: EnvelopeStopKind): Readonly<{
 /**
  * The kinds that stop a run-body phase, enumerated POSITIVELY: a fifth kind
  * added tomorrow does not become a phase stop by omission, it has to be listed
- * and reasoned about. `ATTEMPTS` is deliberately absent (see above).
+ * and reasoned about. Since Task M2 that is all four of today's: `ATTEMPTS` was
+ * deliberately absent until the engine money rule (see above).
  */
-const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["MONEY", "USAGE", "DAILY"]);
+const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["ATTEMPTS", "MONEY", "USAGE", "DAILY"]);
 
 export function expansionPhaseStop(error: unknown): EnvelopeStopKind | null {
   const stop = envelopeStopKind(error);
@@ -295,9 +309,12 @@ export type ReviewFailureOutcome =
  * `NODE_REVIEW_UNAVAILABLE`: a diagnostic naming the wrong cause, and one no
  * envelope path can recognise. The list is a DECISION now, so it can be tested
  * instead of read.
+ *
+ * Task M2: `RUN_COST_ENVELOPE_EXHAUSTED` left this list. The attempt ceiling is
+ * a phase stop now (`RUN_BODY_STOP_KINDS`), so a review it refuses is a
+ * `BUDGET_STOP` — the entry here could no longer be reached.
  */
 const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
-  "RUN_COST_ENVELOPE_EXHAUSTED",
   "CALL_BUDGET_EXHAUSTED",
   "PRODUCER_GRADING_FORBIDDEN"
 ]);
@@ -309,6 +326,99 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
     return Object.freeze({ kind: "RETHROW" as const });
   }
   return Object.freeze({ kind: "UNAVAILABLE" as const });
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — WHAT A NODE'S PANEL DOES WITH A
+ * STOP RAISED BY ONE OF ITS MEMBERS.
+ *
+ * `runJudgePanel` rethrows a run-level spend stop rather than noting it as a
+ * member failure (C2(b)), so the stop reaches the caller of the panel.
+ *
+ *  · "TRAVEL" — every node but the first root: the stop leaves the panel as it
+ *    always has, and the phase catch that authored the node records it (the
+ *    node is not minted, and the run goes on to its answer with what it has).
+ *  · "AUTHOR_ONLY" — the first root's panel (`PANEL:root`). Nothing exists yet
+ *    to answer from but this node, so letting the stop travel would fail the
+ *    whole work item. The panel instead rests on the author's own judgement —
+ *    exactly what a panel whose every other voice failed reduces to, with its
+ *    single-voice disclosure — and hands the stop back for the caller to record.
+ *
+ * `null` means "let it travel".
+ */
+export type PanelSpendStopRule = "AUTHOR_ONLY" | "TRAVEL";
+
+export function panelSpendStop(error: unknown, rule: PanelSpendStopRule): EnvelopeStopKind | null {
+  return rule === "AUTHOR_ONLY" ? expansionPhaseStop(error) : null;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — THE ONE STOP THAT STILL ENDS A RUN
+ * WITHOUT AN ANSWER.
+ *
+ * If the author's own FIRST call — the first root's judgement — is refused by a
+ * ceiling, nothing exists to answer from: no node, no label, nothing a floor
+ * could print. That is not money deciding the outcome; it is a configuration
+ * fault, a ceiling below one call, which the owner's rule counts as technical.
+ * It fails TYPED, under its own code, so the operator is told what to lift.
+ *
+ * Only the two CEILINGS map here. A vendor that reports no usage and a spent day
+ * are not a ceiling below one call: each already fails typed under its own code,
+ * and each is lifted differently (ruling R-C). `null` means "let it travel as it
+ * is".
+ */
+const FIRST_CALL_CEILING_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["ATTEMPTS", "MONEY"]);
+
+export function firstCallCeilingFailure(error: unknown): TypedDomainError | null {
+  const stop = envelopeStopKind(error);
+  if (stop === null || !FIRST_CALL_CEILING_KINDS.includes(stop)) return null;
+  return new TypedDomainError(
+    "RUN_CEILING_BELOW_FIRST_CALL",
+    `${ENVELOPE_STOP_REASONS[stop]} refused the first position's own call: nothing exists to answer from, so the run's ceiling for arguing is below one call`
+  );
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — THE STOP WHILE ARGUING, KEPT ON THE
+ * ANSWER IT NO LONGER PREVENTS.
+ *
+ * Before M2 a stop while arguing forced the envelope terminal, whose answer-scope
+ * `ENVELOPE_EXHAUSTED` record named the stop — and that record is what told a
+ * reader (the honesty drawer's "Run envelope exhausted") the debate was cut
+ * short. The terminal is gone from that path; the record is not. It is the same
+ * record, minted AFTER the serve chain, the way the owed-check and type-fallback
+ * disclosures are, so:
+ *
+ *  · the answer-writer's own input is unchanged by it;
+ *  · the chain's post-answer envelope check, which treats the mark as "the
+ *    envelope terminal already fired", still runs.
+ *
+ * `null` — nothing to add:
+ *
+ *  · the run was never stopped;
+ *  · the answer already carries the mark, because a refused ANSWER-WRITING call
+ *    took the envelope terminal with its own record;
+ *  · the answer is DEFECT: serve's own rule keeps DEFECT and ENVELOPE_EXHAUSTED
+ *    independent terminals.
+ */
+export function runBodyStopDisclosure(input: Readonly<{
+  runBodyBudgetStop: EnvelopeStopKind | null;
+  resultConditionMarks: readonly string[];
+  runId: string;
+  servedRootNodeId: string;
+}>): ConditionMarkRecord | null {
+  if (input.runBodyBudgetStop === null) return null;
+  if (input.resultConditionMarks.includes("ENVELOPE_EXHAUSTED")) return null;
+  if (input.resultConditionMarks.includes("DEFECT")) return null;
+  return Object.freeze({
+    mark: "ENVELOPE_EXHAUSTED" as const,
+    scope: "answer" as const,
+    subjectRef: input.runId,
+    reason: ENVELOPE_STOP_REASONS[input.runBodyBudgetStop],
+    liftPath: null,
+    servedRootRule: null,
+    affectedNodeIds: Object.freeze([input.servedRootNodeId])
+  } satisfies ConditionMarkRecord);
 }
 
 const compositionSchema = z.object({
@@ -3073,6 +3183,12 @@ export class WalkingSkeletonRunner {
       readonly statement: string;
       readonly callSiteKey: string;
       readonly questionLine: string;
+      /**
+       * Task M2 (spec §14.4.1): what a run-level spend stop raised by a panel
+       * member does — see `panelSpendStop`. "AUTHOR_ONLY" on the first root's
+       * panel only; "TRAVEL" everywhere else, as before.
+       */
+      readonly onSpendStop: PanelSpendStopRule;
     }): Promise<{
       readonly selectedJudgementRef: string;
       readonly tau: number;
@@ -3088,6 +3204,12 @@ export class WalkingSkeletonRunner {
        */
       readonly marks: readonly PanelDegradationMark[];
       readonly panelFailureReason: string | null;
+      /**
+       * Task M2: the stop that cut this panel short, for the caller to record;
+       * `null` on every panel that ran to its end. Only an "AUTHOR_ONLY" panel
+       * can return one.
+       */
+      readonly spendStop: EnvelopeStopKind | null;
     }> => {
       const judgeContractHash = this.settings.judgeContractHash;
       const authorOnlySelection = (): {
@@ -3120,7 +3242,8 @@ export class WalkingSkeletonRunner {
           panelContractHashes: Object.freeze([judgeContractHash]),
           disagreement: createUnmeasuredDisagreement(),
           marks: Object.freeze([]),
-          panelFailureReason: null
+          panelFailureReason: null,
+          spendStop: null
         });
       }
       if (panelPolicy === undefined) {
@@ -3133,7 +3256,10 @@ export class WalkingSkeletonRunner {
         );
       }
 
-      const panel = await runJudgePanel({
+      let spendStop: EnvelopeStopKind | null = null;
+      let panel: Awaited<ReturnType<typeof runJudgePanel>>;
+      try {
+      panel = await runJudgePanel({
         artifactProducerRef: input.authorProviderRef,
         primary: {
           judgementRef: input.authorJudgementRef,
@@ -3161,6 +3287,27 @@ export class WalkingSkeletonRunner {
           }
         }))
       });
+      } catch (error) {
+        const stop = panelSpendStop(error, input.onSpendStop);
+        if (stop === null) throw error;
+        spendStop = stop;
+        // Task M2: the first root's panel was cut short by a spend stop. What is
+        // left is the author's own judgement — the author-only selection — and
+        // it goes through the SAME reduction as a panel whose every other voice
+        // failed, so it carries that panel's single-voice disclosure
+        // (PANEL-DEGRADED-SINGLE-VOICE, the declared step-down) rather than a
+        // new one. With one candidate the selection below is exactly
+        // `authorOnlySelection()`: the same judgement, tau and earned weight.
+        panel = Object.freeze({
+          judgements: Object.freeze([Object.freeze({
+            judgementRef: input.authorJudgementRef,
+            assessment: input.authorAssessment,
+            memberRole: input.authorMaker,
+            contractHash: null
+          })]),
+          notes: Object.freeze([])
+        });
+      }
 
       // Each member's assessment is reduced through the SAME ratified
       // composition as the author's, so the taus are commensurable.
@@ -3231,10 +3378,13 @@ export class WalkingSkeletonRunner {
       if (nonAuthorVoices === 0) marks.push(PANEL_DEGRADED_SINGLE_VOICE_MARK);
       else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);
       // The reason names WHICH members fell over and how — a disclosure that says only
-      // "partial" tells a reader nothing they can act on.
-      const panelFailureReason = memberFailures.length === 0
-        ? null
-        : memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`).join("; ");
+      // "partial" tells a reader nothing they can act on. Task M2: a panel cut short
+      // by a spend stop names the stop, which is the true reason no other voice spoke.
+      const panelFailureReason = spendStop !== null
+        ? ENVELOPE_STOP_REASONS[spendStop]
+        : memberFailures.length === 0
+          ? null
+          : memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`).join("; ");
 
       const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
@@ -3284,9 +3434,12 @@ export class WalkingSkeletonRunner {
               kind: note.kind,
               failureKind: note.failureKind,
               reason: note.reason
-            })))
+            }))),
+            // Task M2: present only on a panel a spend stop cut short.
+            ...(spendStop === null ? {} : { spendStop: ENVELOPE_STOP_REASONS[spendStop] })
           })
-        })
+        }),
+        spendStop
       });
     };
 
@@ -3337,6 +3490,29 @@ export class WalkingSkeletonRunner {
       }
     }
 
+    /**
+     * C1 (review round 2) — WHICH SPEND BOUND, IF ANY, STOPPED THIS RUN BODY.
+     *
+     * Set by the first root's panel and by the authoring, expansion and review
+     * phases when the gateway refuses on money, on the attempt ceiling or on an
+     * unbillable vendor. It is NOT an error path: the phase stops where it is,
+     * and the run keeps everything it has produced. `null` all the way through
+     * is a run that was never stopped by a spend bound.
+     *
+     * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — IT STOPS THE ARGUING, NOT THE
+     * ANSWER. It used to be read at the serve gate to FORCE the components-only
+     * envelope terminal, so a stopped run never reached the answer-writer. Now
+     * nothing more is argued, the run goes on to serve with the tree as it
+     * stands, and the stop rides the answer as its envelope record
+     * (`runBodyStopDisclosure`), so a reader is still told the debate was cut
+     * short.
+     *
+     * RE-REVIEW: declared before the secondary and additional ROOT loops, so a
+     * refusal while authoring root 1 or 2 keeps the root 0 already minted and
+     * panelled. Task M2 declares it before root 0 itself, because a stop on
+     * root 0's own panel is recorded here too instead of failing the run.
+     */
+    let runBodyBudgetStop: EnvelopeStopKind | null = null;
     const judgementScheduledAt = new Date();
     await this.#ledger.append({
       runId: run.runId,
@@ -3369,6 +3545,12 @@ export class WalkingSkeletonRunner {
         contractHash: this.settings.judgeContractHash,
         bound: { ...this.settings.judgeBound, maxAttempts }
       })
+    }).catch((error: unknown) => {
+      // Task M2 (spec §14.4.1): the author's own first call is the one stop that
+      // leaves nothing to answer from. A ceiling that refuses it is below one
+      // call — a configuration fault, failed typed under its own code. Anything
+      // else, a vendor that reports no usage included, travels as it is.
+      throw firstCallCeilingFailure(error) ?? error;
     });
     if (primaryAttempt.kind === "HALTED") {
       throw new TypedDomainError(
@@ -3395,8 +3577,14 @@ export class WalkingSkeletonRunner {
       claimType: judged.normalizedClaim.claimType,
       statement: judged.statement,
       callSiteKey: "PANEL:root",
-      questionLine: run.questionLine
+      questionLine: run.questionLine,
+      onSpendStop: "AUTHOR_ONLY"
     });
+    // Task M2 (spec §14.4.1): a stop on the first root's panel no longer escapes
+    // the work item. Root 0 rests on its author's own judgement, with the
+    // single-voice disclosure, and the stop ends the arguing here: the run goes
+    // straight on to its answer.
+    if (selection.spendStop !== null) runBodyBudgetStop = selection.spendStop;
     const nodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
       const created = await writer.addNode({
         runId: run.runId,
@@ -3601,7 +3789,9 @@ export class WalkingSkeletonRunner {
           // The PANEL assesses a node against THE DEBATE'S QUESTION. It used to
           // receive the leg's concatenated instruction string, so a parent's
           // statement rode into the panel prompt as well (DL4-F4).
-          questionLine: run.questionLine
+          questionLine: run.questionLine,
+          // A stop here travels to the phase catch that authored this node.
+          onSpendStop: "TRAVEL"
         });
         const { created: childNodeId, minted: childSourcedEdges } = await this.#graph.withGraphWrite(run.runId, async (writer) => {
           const created = await writer.addNode({
@@ -3691,24 +3881,9 @@ export class WalkingSkeletonRunner {
         }) };
     };
 
-    /**
-     * C1 (review round 2) — WHICH SPEND BOUND, IF ANY, STOPPED THIS RUN BODY.
-     *
-     * Set by the authoring, expansion and review phases when the gateway refuses
-     * on money or on an unbillable vendor. It is NOT an error path: the phase
-     * stops where it is, the run keeps everything it has produced, and the
-     * envelope evaluation in front of the serve chain turns it into the ruled
-     * components-only terminal. `null` all the way through is a run that was
-     * never stopped by a spend bound, which is every run today.
-     *
-     * RE-REVIEW: declared HERE, before the secondary and additional ROOT loops.
-     * Round 2 declared it after them, so a refusal while authoring root 1 or 2
-     * threw MAKER_POSITION_UNAVAILABLE and discarded a root 0 that had already
-     * been minted and panelled. Root 0 existing is exactly what makes the
-     * terminal buildable, so that run had something to serve and served nothing.
-     */
-    let runBodyBudgetStop: EnvelopeStopKind | null = null;
-    if (effectiveMakerCount > 1) {
+    // Task M2: a stop on the first root's panel has already ended the arguing;
+    // authoring the secondary root would be one more call after it.
+    if (effectiveMakerCount > 1 && runBodyBudgetStop === null) {
       let secondary: Awaited<ReturnType<typeof authorPosition>> | null = null;
       try {
       secondary = await authorPosition({
@@ -4740,21 +4915,28 @@ export class WalkingSkeletonRunner {
       }).certaintyBand ?? capped;
     };
     /**
-     * C1 (review round 2): the run body's own spend stop is asked HERE, the
-     * first point at which the ruled terminal can be built — the propagation
-     * has run, the served root is chosen and the fact bundle exists, so the
-     * components the run produced before it ran out are exactly what this
-     * terminal serves. A money or usage stop during authoring, expansion or
-     * review arrives as `runBodyBudgetStop` rather than as an exception,
-     * because there was no terminal to build where it was raised.
+     * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — A STOP WHILE ARGUING NEVER
+     * SKIPS THE ANSWER.
+     *
+     * C1 (review round 2) asked the run body's own spend stop HERE and forced
+     * the envelope decision to a hard stop with it, so a run stopped while
+     * arguing took the components-only terminal and the answer-writer was never
+     * called. V-28 is amended: the stop ends the arguing only. This question is
+     * asked on the attempt count alone — J28's comparison, WITHIN at equality —
+     * exactly as for a run that was never stopped, and a stopped run goes on to
+     * the answer with the tree as it stands. The stop is not lost: it rides the
+     * answer as its envelope record, appended after the chain.
+     *
+     * The only terminal taken here is the attempt-overspend one, for a run that
+     * somehow spent MORE attempts than its receipt allows.
      */
-    const initialEnvelopeDecision = await evaluateEnvelope(0, runBodyBudgetStop !== null);
+    const initialEnvelopeDecision = await evaluateEnvelope();
     let result: Awaited<ReturnType<typeof runServeGateChain>>;
     // F4: no `restatementStatus === "PASS"` conjunct. The envelope terminal
     // fires on HARD_STOP whenever no served statement exists yet, independent
     // of restatement status — never serving over budget.
     if (initialEnvelopeDecision.kind === "HARD_STOP") {
-      result = await makeEnvelopeTerminal(initialEnvelopeDecision, runBodyBudgetStop ?? "ATTEMPTS");
+      result = await makeEnvelopeTerminal(initialEnvelopeDecision);
     } else {
       await recordEnvelope(initialEnvelopeDecision);
       const candidateConfidenceBand = await servedCandidateConfidenceBand();
@@ -4970,6 +5152,19 @@ export class WalkingSkeletonRunner {
           await recordEnvelope(finalEnvelopeDecision);
         }
       }
+    }
+    // Task M2 (spec §14.4.1): a stop while arguing no longer decides the
+    // terminal, but it stays on the record of the answer, so the honesty drawer
+    // still says the debate was cut short and which bound cut it.
+    const runBodyStopRecord = runBodyStopDisclosure({
+      runBodyBudgetStop,
+      resultConditionMarks: result.conditionMarks,
+      runId: run.runId,
+      servedRootNodeId: servedRoot.nodeId
+    });
+    if (runBodyStopRecord !== null) {
+      conditionMarkRecords = Object.freeze([...conditionMarkRecords, runBodyStopRecord]);
+      result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, runBodyStopRecord.mark]) };
     }
     // The served number is the POSITION node's final strength — selected by
     // node identity, never by array position (a multi-node graph reorders).
@@ -5655,6 +5850,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RIVAL_CARVER_UNAVAILABLE",
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
+  "RUN_CEILING_BELOW_FIRST_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",

@@ -25,6 +25,17 @@ import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
  *
  * What distinguishes the two is WHY, and that is carried where a reader can see
  * it: the typed refusal code and the condition-mark record's reason.
+ *
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — WHERE THIS TERMINAL STILL APPLIES.
+ * V-28 is amended: at the limit a run stops ARGUING and still answers. A stop
+ * while the debate is argued no longer reaches this terminal at all — the serve
+ * gate no longer forces it (`tests/unit/m2-body-stop-serves.test.ts` drives that
+ * run to a SERVED answer, and `tests/architecture/v28-serve-decision-wiring.test.ts`
+ * pins that the gate never forces a hard stop from it). What is pinned here is
+ * the terminal a refused ANSWER-WRITING call still takes, through the serve
+ * chain's own catch (`envelopeStopPendingAttempts`). Task M3 adds the
+ * cheaper-model fallback in front of it; until then these rows are exactly as
+ * they were.
  */
 /**
  * Fifty permitted attempts against three spent: this basis has attempts to
@@ -33,7 +44,7 @@ import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
  */
 const basis = parseCostEnvelopeBasis(fixtureStructuralCeiling(50));
 
-describe("V-28 a money stop is a HARD_STOP even with attempts to spare", () => {
+describe("V-28 a money stop on an answer-writing call is a HARD_STOP even with attempts to spare", () => {
   it("is WITHIN on attempts alone when the money envelope has not been reached", () => {
     expect(decideBudgetPressure({
       basis,
@@ -146,12 +157,16 @@ describe("V-28 the runner tells a money stop from an attempt stop from a failure
  * calls, and asserted against literals rather than against the constant it is
  * testing: a resolved result, in the run's own components-only terminal, with
  * no answer form, carrying the work the run had already paid for, and NOT a
- * DEFECT. The WIRING half — that the runner takes this terminal on the run-body
- * money stop instead of rethrowing — cannot be driven without a pool, and is
- * pinned on the source by `tests/architecture/v28-serve-decision-wiring.test.ts`
- * ("FW-F / C1 …"), whose last row proves itself against that same mutation.
+ * DEFECT. The WIRING half used to be that the runner takes this terminal on the
+ * run-body money stop instead of rethrowing. Since Task M2 the run-body stop
+ * takes the ANSWER instead (the serve gate no longer forces this terminal), and
+ * `tests/architecture/v28-serve-decision-wiring.test.ts` pins THAT, with its own
+ * mutations. This terminal is now reached from the serve chain's catch, on a
+ * refused answer-writing call; that catch is proven end to end on the persisted
+ * record, for the attempt ceiling, by `tests/integration/t17-envelope-ledger.test.ts`
+ * (T17B).
  */
-describe("V-28 a money stop ends in the run's own terminal state, never as a crash", () => {
+describe("V-28 a money stop on an answer-writing call ends in the run's own terminal state, never as a crash", () => {
   const COMPOSITION_BUDGET: CompositionBudgetResolution = Object.freeze({
     tier: "low",
     bound: 100_000,

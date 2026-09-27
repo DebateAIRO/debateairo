@@ -3,16 +3,16 @@ import type { EvaluationSnapshot } from "@debateai/propagation";
 import {
   assertRequiredConditionMarkRecords,
   buildFactBundle,
-  createEnvelopeExhaustedResult,
   SERVE_CRASH_CLASSES,
-  type CompositionBudgetResolution,
   type ConditionMarkRecord
 } from "@debateai/serve";
 import {
   ENVELOPE_STOP_REASONS,
   decideMakerPositionServe,
-  projectJudgedStanding
+  projectJudgedStanding,
+  runBodyStopDisclosure
 } from "../../apps/runner/src/index.js";
+import { serveCutShortRun } from "../support/servedChainDouble.js";
 
 /**
  * ROUND 4 (V-28, rulings R-A / R-B) — THE PATH ITSELF, DRIVEN WITH THE STATE THE
@@ -32,8 +32,10 @@ import {
  * statement on the path; its five cases pass whether or not the runner reaches
  * it. This file drives the decision the runner now takes ONCE, from the state
  * the stop leaves to the served root and the disclosure, and carries the result
- * through the terminal the answer actually reaches. The pin that the runner
- * CALLS this decision, at both sites, is `tests/architecture/v28-serve-decision-wiring.test.ts`.
+ * through the terminal the answer actually reaches — since the engine money
+ * rule's Task M2, the served answer (spec §14.4.1: a stop while arguing never
+ * skips the answer). The pin that the runner CALLS this decision, at both
+ * sites, is `tests/architecture/v28-serve-decision-wiring.test.ts`.
  */
 const ROOT_0 = Object.freeze({ nodeId: "node:root-0", maker: "maker-a" });
 const ROOT_1 = Object.freeze({ nodeId: "node:root-1", maker: "maker-b" });
@@ -91,14 +93,6 @@ const EXPANDED: EvaluationSnapshot = {
 
 const nodeIds = (snapshot: EvaluationSnapshot): readonly string[] => snapshot.nodes.map((node) => node.nodeId);
 
-const COMPOSITION_BUDGET: CompositionBudgetResolution = Object.freeze({
-  tier: "low",
-  bound: 100_000,
-  registerRowKey: "compositionBundleBudget.low",
-  registerVersion: 91,
-  sourceRef: "test-layer:V-28"
-});
-
 describe("R-A — the mechanism that killed the run, stated once so it stays visible", () => {
   it("an empty reviewed seed hides the only root — which is why the seed is the decision", () => {
     // `projectJudgedStanding` is unchanged and still does this: with nothing
@@ -110,7 +104,7 @@ describe("R-A — the mechanism that killed the run, stated once so it stays vis
 });
 
 describe("R-A / R-B — M = 2, the second root's first call refused", () => {
-  const decide = (stop: "MONEY" | "USAGE") => decideMakerPositionServe({
+  const decide = (stop: "MONEY" | "USAGE" | "ATTEMPTS") => decideMakerPositionServe({
     effectiveMakerCount: 2,
     runBodyBudgetStop: stop,
     authoredMakerPositions: [ROOT_0],
@@ -134,7 +128,9 @@ describe("R-A / R-B — M = 2, the second root's first call refused", () => {
   });
 
   it("says the answer rests on ONE lineage, and names the spend stop as the reason", () => {
-    for (const stop of ["MONEY", "USAGE"] as const) {
+    // Task M2: the attempt ceiling reaches this state too, now that it stops the
+    // arguing instead of failing the run.
+    for (const stop of ["MONEY", "USAGE", "ATTEMPTS"] as const) {
       const decision = decide(stop);
 
       expect(decision.disclosure.conditionMarks).toEqual(["SINGLE-LINEAGE"]);
@@ -153,7 +149,18 @@ describe("R-A / R-B — M = 2, the second root's first call refused", () => {
     }
   });
 
-  it("reaches the envelope terminal with root 0 kept, and every mark has its record", () => {
+  /**
+   * ENGINE MONEY RULE (spec §14.4.1), TASK M2. This row used to carry the same
+   * state into `createEnvelopeExhaustedResult` — the components-only terminal
+   * the serve gate FORCED on any stop while arguing, with no answer attempted.
+   * The stop now ends the arguing only, so the same state is carried into the
+   * REAL serve chain and comes out served. What the row always checked still
+   * holds: root 0 is kept, the answer says it rests on one lineage, and the
+   * envelope record that names the stop — `runBodyStopDisclosure`, the one the
+   * runner appends after the chain — still rides it, so the honesty drawer
+   * still says the debate was cut short.
+   */
+  it("reaches the answer with root 0 kept, and every mark has its record", async () => {
     const decision = decide("MONEY");
     const factBundle = buildFactBundle({
       facts: Object.freeze(["root 0's statement"]),
@@ -164,31 +171,33 @@ describe("R-A / R-B — M = 2, the second root's first call refused", () => {
       buildsOnPrevious: { value: false, answerRef: null },
       memoryDisclosure: null
     });
-    const result = createEnvelopeExhaustedResult({
+    const result = await serveCutShortRun({
       factBundle,
-      compositionBudget: COMPOSITION_BUDGET,
-      verifiedNodeIds: [decision.servedRoot.nodeId],
-      skippedEnrichmentRows: [],
-      protectedCoreRestatement: "PASS",
-      servedStatementExists: false
+      servedRootNodeId: decision.servedRoot.nodeId,
+      servedStatement: "root 0's statement",
+      materialisedNodeIds: nodeIds(ROOT_0_ONLY)
     });
-    const envelopeRecord: ConditionMarkRecord = Object.freeze({
-      mark: "ENVELOPE_EXHAUSTED",
-      scope: "answer",
-      subjectRef: "run:test",
-      reason: ENVELOPE_STOP_REASONS.MONEY,
-      liftPath: null,
-      servedRootRule: null,
-      affectedNodeIds: Object.freeze([decision.servedRoot.nodeId])
+    const envelopeRecord = runBodyStopDisclosure({
+      runBodyBudgetStop: "MONEY",
+      resultConditionMarks: result.conditionMarks,
+      runId: "run:test",
+      servedRootNodeId: decision.servedRoot.nodeId
     });
+    expect(envelopeRecord).not.toBeNull();
+    const answerMarks = [...result.conditionMarks, envelopeRecord!.mark];
 
-    expect(result.terminal).toBe(SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal);
-    expect(result.conditionMarks).toEqual(expect.arrayContaining(["SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"]));
-    expect(result.conditionMarks).not.toContain("UNSERVED-MAKER-POSITION");
+    // A SERVED answer: SERVED, or DOWNGRADED when (as here) the cited node rests
+    // on reasoning alone — both carry the label and the answer-writer's prose.
+    expect(["SERVED", "DOWNGRADED"]).toContain(result.terminal);
+    expect(result.answerForm).not.toBeNull();
+    expect(result.terminal).not.toBe(SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal);
+    expect(answerMarks).toEqual(expect.arrayContaining(["SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"]));
+    expect(answerMarks).not.toContain("UNSERVED-MAKER-POSITION");
+    expect(envelopeRecord!.reason).toBe(ENVELOPE_STOP_REASONS.MONEY);
     // The persistence contract the runner meets at `ServeRepository.persist`.
     expect(() => assertRequiredConditionMarkRecords(
-      result.conditionMarks,
-      [...decision.disclosure.records, envelopeRecord]
+      answerMarks,
+      [...decision.disclosure.records, envelopeRecord!]
     )).not.toThrow();
   });
 });

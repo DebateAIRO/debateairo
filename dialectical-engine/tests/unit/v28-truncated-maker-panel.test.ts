@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFactBundle,
-  createEnvelopeExhaustedResult,
-  SERVE_CRASH_CLASSES,
-  type CompositionBudgetResolution
+  SERVE_CRASH_CLASSES
 } from "@debateai/serve";
 import {
   ENVELOPE_STOP_REASONS,
   buildMakerPositionDisclosure,
-  buildUnservedMakerPositionRecord
+  buildUnservedMakerPositionRecord,
+  runBodyStopDisclosure
 } from "../../apps/runner/src/index.js";
+import { serveCutShortRun } from "../support/servedChainDouble.js";
 
 /**
  * RE-REVIEW 2(a), ROUND 3 — A RUN WHOSE SECOND MAKER WAS NEVER AFFORDED.
@@ -54,13 +54,6 @@ const MONO_RECORDS = Object.freeze(MONO_MARKS.map((mark) => Object.freeze({
   servedRootRule: null,
   affectedNodeIds: Object.freeze([ROOT_0.nodeId])
 })));
-const COMPOSITION_BUDGET: CompositionBudgetResolution = Object.freeze({
-  tier: "low",
-  bound: 100_000,
-  registerRowKey: "compositionBundleBudget.low",
-  registerVersion: 91,
-  sourceRef: "test-layer:V-28"
-});
 
 describe("2(a) — the disclosure of maker positions a run could not afford", () => {
   it("still discloses the unserved root when BOTH were authored", () => {
@@ -100,7 +93,8 @@ describe("2(a) — the disclosure of maker positions a run could not afford", ()
     // The state a spend stop on root 1 leaves behind. There is no second
     // position to name, so `UNSERVED-MAKER-POSITION` would be a falsehood —
     // and silence (round 3) left the answer with no lineage statement at all.
-    for (const stop of ["MONEY", "USAGE"] as const) {
+    // Task M2: and the attempt ceiling, which now stops the arguing too.
+    for (const stop of ["MONEY", "USAGE", "ATTEMPTS"] as const) {
       const disclosure = buildMakerPositionDisclosure({
         effectiveMakerCount: 2,
         runBodyBudgetStop: stop,
@@ -177,8 +171,18 @@ describe("2(a) — the disclosure of maker positions a run could not afford", ()
   });
 });
 
-describe("2(a) — the cut-short run reaches the terminal with its root kept", () => {
-  it("serves root 0 through the envelope terminal, saying it rests on one lineage", () => {
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2. This row used to hand the
+ * disclosure to `createEnvelopeExhaustedResult`: the serve gate FORCED the
+ * components-only terminal on any stop while arguing, so the cut-short run was
+ * "served" as components with no answer attempted. The stop now ends the arguing
+ * only, and the same disclosure goes through the REAL serve chain and comes out
+ * served. The row's intent is unchanged: the root is kept, the answer says it
+ * rests on one lineage, it says nothing about a position nobody wrote, and the
+ * envelope mark that tells a reader the debate was cut short still rides it.
+ */
+describe("2(a) — the cut-short run reaches the answer with its root kept", () => {
+  it("serves root 0 through the answer-writer, saying it rests on one lineage", async () => {
     const disclosure = buildMakerPositionDisclosure({
       effectiveMakerCount: 2,
       runBodyBudgetStop: "MONEY",
@@ -197,20 +201,29 @@ describe("2(a) — the cut-short run reaches the terminal with its root kept", (
       memoryDisclosure: null
     });
 
-    const result = createEnvelopeExhaustedResult({
+    const result = await serveCutShortRun({
       factBundle,
-      compositionBudget: COMPOSITION_BUDGET,
-      verifiedNodeIds: [ROOT_0.nodeId],
-      skippedEnrichmentRows: [],
-      protectedCoreRestatement: "PASS",
-      servedStatementExists: false
+      servedRootNodeId: ROOT_0.nodeId,
+      servedStatement: "root 0's statement",
+      materialisedNodeIds: [ROOT_0.nodeId]
     });
+    const cutShort = runBodyStopDisclosure({
+      runBodyBudgetStop: "MONEY",
+      resultConditionMarks: result.conditionMarks,
+      runId: "run:test",
+      servedRootNodeId: ROOT_0.nodeId
+    });
+    const answerMarks = cutShort === null ? result.conditionMarks : [...result.conditionMarks, cutShort.mark];
 
-    // The run ENDS, in its own terminal state, and keeps what it produced.
-    expect(result.terminal).toBe(SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal);
-    expect(result.conditionMarks).toContain("ENVELOPE_EXHAUSTED");
-    expect(result.conditionMarks).toContain("SINGLE-LINEAGE");
+    // The run is ANSWERED, and keeps what it produced.
+    // A SERVED answer: SERVED, or DOWNGRADED when (as here) the cited node rests
+    // on reasoning alone — both carry the label and the answer-writer's prose.
+    expect(["SERVED", "DOWNGRADED"]).toContain(result.terminal);
+    expect(result.answerForm).not.toBeNull();
+    expect(result.terminal).not.toBe(SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal);
+    expect(answerMarks).toContain("ENVELOPE_EXHAUSTED");
+    expect(answerMarks).toContain("SINGLE-LINEAGE");
     // And it says nothing about a maker position nobody ever wrote.
-    expect(result.conditionMarks).not.toContain("UNSERVED-MAKER-POSITION");
+    expect(answerMarks).not.toContain("UNSERVED-MAKER-POSITION");
   });
 });
