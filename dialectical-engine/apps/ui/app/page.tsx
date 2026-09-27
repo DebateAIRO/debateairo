@@ -41,6 +41,9 @@ export default async function HomePage({
       : token !== null ? "yours" : "public";
   const userAgent = (await headers()).get("user-agent") ?? undefined;
   const clientIp = readTrustedClientIp(await headers());
+  // Task M8 (spec 2026-09-26 §14.4.7): the composer says today's limit for new
+  // debates in the words /new uses, so it reads that catalogue too.
+  const newDebateCatalog = await loadNamespace(locale, "newDebate");
   let debates: DebateSummary[] = [];
   let error: string | null = null;
   let sessionConfirmed = false;
@@ -101,7 +104,7 @@ export default async function HomePage({
             session; an unconfirmed one gets the notice above instead. */}
         {sessionConfirmed ? (
           <section data-support-primary-control id="start-a-debate" aria-label={t(catalog, "home.startDebateLabel")}>
-            <LibraryComposer catalog={catalog} />
+            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} />
           </section>
         ) : null}
 

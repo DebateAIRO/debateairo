@@ -38,6 +38,13 @@ export type RequestFailureKind =
   | "MISSING"
   /** The coordinator answered: too many requests, this one was not attempted. */
   | "BUSY"
+  /**
+   * Task M8 (spec 2026-09-26 §14.4.7). The coordinator answered: today's
+   * capacity for NEW debates is used up (429 `DAILY_COST_ENVELOPE_REACHED`).
+   * It resets at the next UTC midnight and the reply carries `Retry-After`;
+   * the page says "tomorrow" and computes no hour.
+   */
+  | "DAILY_LIMIT_REACHED"
   /** No answer arrived. What happened upstream is UNKNOWN, not failed. */
   | "UNREACHABLE"
   /** The coordinator answered with a failure of its own. */
@@ -68,7 +75,8 @@ const SUBJECT_CLAUSE: Readonly<Record<RequestFailureSubject, string>> = Object.f
 const KIND_CLAUSE: Readonly<Record<RequestFailureKind, string>> = Object.freeze({
   REFUSED: "The coordinator answered and refused it. Sign in again, then retry.",
   MISSING: "The coordinator holds nothing at that address.",
-  BUSY: "The coordinator is rate-limiting requests right now. Retry shortly.",
+  BUSY: "There have been too many requests in a short time. Please wait a little, then try again.",
+  DAILY_LIMIT_REACHED: "We've reached today's limit for new debates. Please try again tomorrow.",
   UNREACHABLE: "The coordinator could not be reached, so the outcome is unknown.",
   SERVER_FAILED: "The coordinator failed while handling it, so the outcome is unknown.",
   UNREADABLE: "The coordinator's reply could not be read, so the outcome is unknown.",
@@ -80,6 +88,19 @@ const KIND_CLAUSE: Readonly<Record<RequestFailureKind, string>> = Object.freeze(
     "It failed before any answer arrived, so the outcome is unknown. "
     + "This is not a decision the coordinator made."
 });
+
+/** Every kind the classifier can return: each has its words in every catalogue that reads them. */
+export const REQUEST_FAILURE_KINDS: readonly RequestFailureKind[] = Object.freeze(
+  Object.keys(KIND_CLAUSE) as RequestFailureKind[]
+);
+
+/**
+ * Task M8 (spec 2026-09-26 §14.4.7). The only refusal a 429 names by its own
+ * code: the day's spend would not admit one more run (`apps/api` answers 429
+ * for this code alone, with the figures withheld). Every other 429, the hourly
+ * per-owner limit (`ADMISSION_RATE_LIMITED`) included, stays BUSY.
+ */
+const DAILY_LIMIT_SERVER_CODE = "DAILY_COST_ENVELOPE_REACHED";
 
 /**
  * SYNC3 (map section 2, item 4). dev's debate tiers refuse an ask its plan
@@ -97,6 +118,9 @@ function kindOf(error: unknown): RequestFailureKind {
   if (error.status === 422 && error.serverCode !== null
     && Object.hasOwn(PLAN_TIER_REFUSALS, error.serverCode)) {
     return PLAN_TIER_REFUSALS[error.serverCode]!;
+  }
+  if (error.code === "RATE_LIMITED" && error.serverCode === DAILY_LIMIT_SERVER_CODE) {
+    return "DAILY_LIMIT_REACHED";
   }
   if (error.serverCode === "API_UPSTREAM_UNREACHABLE" || [502, 503, 504].includes(error.status)) {
     return "UNREACHABLE";

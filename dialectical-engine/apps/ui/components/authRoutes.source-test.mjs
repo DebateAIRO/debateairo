@@ -103,9 +103,12 @@ test("the project home confirms a real session before exposing its debate compos
   // rather than by that copy.
   assert.match(home, /let sessionConfirmed = false/);
   assert.match(home, /sessionConfirmed = true/);
-  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} \/>/);
+  // Task M8 (spec 2026-09-26 §14.4.7): the composer also reads the newDebate
+  // catalogue, to say today's limit for new debates where the person typed.
+  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>/);
+  assert.match(home, /const newDebateCatalog = await loadNamespace\(locale, "newDebate"\);/);
   assert.match(home, /id="start-a-debate"/);
-  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} \/>[\s\S]*?\{error \?/);
+  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>[\s\S]*?\{error \?/);
 });
 
 test("the login route sends an already-authenticated browser back to its debate workspace", () => {
