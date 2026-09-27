@@ -432,7 +432,9 @@ function requestedModel(body: string): string | undefined {
 
 async function startProviderDouble(
   contents: readonly ProviderDoubleResponse[],
-  panelAssessment: string = DEFAULT_PANEL_ASSESSMENT
+  panelAssessment: string = DEFAULT_PANEL_ASSESSMENT,
+  // A16a fix round 1: the first N panel calls this route answers fail at the transport (503).
+  panelFailures = 0
 ): Promise<{
   endpoint: string; calls(): number; bodies(): readonly string[]; stop(): Promise<void>;
 }> {
@@ -496,6 +498,12 @@ async function startProviderDouble(
       // encoding that defeats a quoted fragment (T3 N4, below).
       if (body.includes("fatalFlags") && !body.includes("restatement_text")) {
         calls += 1;
+        if (panelFailures > 0) {
+          panelFailures -= 1;
+          response.writeHead(503, { "content-type": "application/json" })
+            .end(JSON.stringify({ error: "test-layer panel transport failure" }));
+          return;
+        }
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `panel-assess-${calls}`,
           model: askedModel,
@@ -6584,11 +6592,13 @@ async function executeSeatScenario(input: {
   /** A15d carries: the ledger an earlier pass of this work item left behind. */
   readonly beforeExecute?: (context: { readonly runId: string; readonly workItemId: string }) => Promise<void>;
   readonly settings?: Partial<WalkingSkeletonSettings>;
+  /** A16a fix round 1: how many of each route's first panel calls fail at the transport. */
+  readonly panelFailures?: Partial<Record<SeatRoute, number>>;
 }) {
   const doubles = {
-    primary: await startProviderDouble(input.primary),
-    secondary: await startProviderDouble(input.secondary),
-    third: await startProviderDouble(input.third)
+    primary: await startProviderDouble(input.primary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.primary ?? 0),
+    secondary: await startProviderDouble(input.secondary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.secondary ?? 0),
+    third: await startProviderDouble(input.third, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.third ?? 0)
   };
   const gatewayFor = (route: SeatRoute) => createPostgresProviderGateway(database.pool, {
     endpoint: doubles[route].endpoint, model: SEAT_ROUTES[route].model, maker: SEAT_ROUTES[route].maker
@@ -6786,7 +6796,7 @@ describe("A15 · a pinned role assignment seats the run", () => {
  */
 async function appendEarlierPassCall(context: {
   readonly runId: string; readonly workItemId: string;
-}, callSiteKey: string, outcome: "OK" | "FAILED", actorRef: string,
+}, callSiteKey: string, outcome: "OK" | "FAILED" | "TIMED_OUT", actorRef: string,
 // A16a: a synthesis row names its own contract (runnerSettings' composer or conformance hash).
 contractHash = "contract:judge:test-layer"): Promise<void> {
   const now = new Date();
@@ -7088,7 +7098,7 @@ function legRunnerUpAssignment() {
 
 async function seedEarlierPass(
   context: { readonly runId: string; readonly workItemId: string },
-  rows: readonly (readonly [key: string, outcome: "OK" | "FAILED", count: number, actorRef: string])[]
+  rows: readonly (readonly [key: string, outcome: "OK" | "FAILED" | "TIMED_OUT", count: number, actorRef: string])[]
 ): Promise<void> {
   for (const [key, outcome, count, actorRef] of rows) {
     for (let index = 0; index < count; index += 1) await appendEarlierPassCall(context, key, outcome, actorRef);
@@ -7888,5 +7898,254 @@ describe("A16a · resume gap 2 — a site with no slot left to call halts or end
       [`${callSiteKey}:seat:main`, "FAILED"], [`${callSiteKey}:seat:main`, "OK"], [`${callSiteKey}:seat:runnerUp`, "OK"]
     ]);
     expect(scenario.lifecycle).toEqual([]);
+  });
+});
+
+/**
+ * A16a fix round 1 — a slot a resumed pass restores is a PREFERENCE: the seat
+ * keeps its backup, so an outage on the restored slot moves the site to the
+ * other member (R4), on every kind of seat site. Each earlier pass below
+ * switched on a usage cap (the main's one capped attempt), so both keys can
+ * still be called.
+ */
+describe("A16a fix round 1 · a restored slot keeps its backup on resume", () => {
+  const judgeMaxAttempts = 2;
+
+  it("a LEG: the runner-up that answered fails with an outage, the main answers in the same call", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-leg-restored-backup",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 1, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        judgementDouble("Primary A16a fx1 root", 0.5),
+        { status: 503 },
+        judgementDouble("Primary A16a fx1 cross-exchange", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a fx1 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a fx1 ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a fx1 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a fx1 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${callSiteKey}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      [`${callSiteKey}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef],
+      [`${callSiteKey}:seat:runnerUp`, "OK", SEAT_ROUTES.primary.providerRef],
+      [`${callSiteKey}:seat:runnerUp`, "FAILED", SEAT_ROUTES.primary.providerRef],
+      [`${callSiteKey}:seat:main`, "OK", SEAT_ROUTES.third.providerRef]
+    ]);
+    // Switched inside the first sequence: no cooldown, no halt.
+    expect(scenario.lifecycle).toEqual([]);
+  });
+
+  it("ROOT 1: the runner-up that wrote it fails with an outage, the main writes it, and its cross-exchange follows", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-root-restored-backup",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 1, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a fx1 root ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a fx1 root review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a fx1 root ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        { status: 503 },
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a fx1 root leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a fx1 root review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:secondary:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef],
+      ["JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef],
+      ["JUDGE:root:secondary:seat:runnerUp", "FAILED", SEAT_ROUTES.third.providerRef],
+      ["JUDGE:root:secondary:seat:main", "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:1->0"))
+      .map((call) => [call.call_site_key, call.actor_ref]))
+      .toEqual([["JUDGE:cross-root:1->0:seat:main", SEAT_ROUTES.secondary.providerRef]]);
+    expect(scenario.lifecycle).toEqual([]);
+  });
+
+  it("a PANEL member: the runner-up that judged fails with an outage, the main judges, the node keeps its voice", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-panel-restored-backup",
+      judgeMaxAttempts,
+      panelFailures: { secondary: 1 },
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third", "secondary", 0)],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "FAILED", 1, SEAT_ROUTES.third.providerRef],
+        [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.secondary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a fx1 panel ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a fx1 panel review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a fx1 panel ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a fx1 panel leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a fx1 panel review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:root:"))
+      .map((call) => [call.call_site_key, call.outcome])).toEqual([
+      [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "FAILED"],
+      [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "OK"],
+      [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "FAILED"],
+      [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "OK"]
+    ]);
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-PARTIAL");
+  });
+
+  it("a SYNTHESIS seat: the backup that answered fails with an outage, the main answers", async () => {
+    const site = "COMPOSER:SYNTHESIZER:INITIAL:1";
+    const base = runnerSettings();
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-synthesis-restored-backup",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary", "third", 0)],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      settings: {
+        synthesisRolePolicy: {
+          ...base.synthesisRolePolicy!,
+          synthesizerBound: { ...base.synthesisRolePolicy!.synthesizerBound, maxAttempts: 2 }
+        }
+      },
+      beforeExecute: async (context) => {
+        await appendEarlierPassCall(context, `${site}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef, "contract:composer:test-layer");
+        await appendEarlierPassCall(context, `${site}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef, "contract:composer:test-layer");
+      },
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a fx1 synth ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a fx1 synth review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a fx1 synth ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a fx1 synth leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a fx1 synth review ${index + 1}`)),
+        // The backup's composition fails at the transport; the entry after it only types the failure.
+        { status: 503 },
+        resil01Composition,
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${site}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      [`${site}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef],
+      [`${site}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef],
+      [`${site}:seat:runnerUp`, "FAILED", SEAT_ROUTES.third.providerRef],
+      [`${site}:seat:main`, "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+  });
+});
+
+describe("A16a fix round 1 · a spent site's halt cites its ledger truthfully", () => {
+  const judgeMaxAttempts = 2;
+  const callSiteKey = "JUDGE:defender:root0:r1:p0";
+  const doubles = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  });
+  const haltOutcome = async (runId: string) => (await database.pool.query<{ outcome: string }>(
+    `SELECT value_json->>'transport_outcome' AS outcome FROM core.run_progress_event
+      WHERE run_id=$1 AND value_json->>'state'='EXPANSION_HALTED' AND value_json->>'call_site_key'=$2`,
+    [runId, callSiteKey]
+  )).rows.map((row) => row.outcome);
+
+  it("names the site's latest failure with its OWN outcome (a timeout stays a timeout)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-halt-timed-out",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 1, SEAT_ROUTES.primary.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "TIMED_OUT", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      ...doubles("A16a fx1 halt timeout")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(await haltOutcome(scenario.runId)).toEqual(["TIMED_OUT"]);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey, terminal_transport_outcome: "TIMED_OUT"
+    }));
+  });
+
+  it("never halts on a made-up outcome: a site whose spent keys only ever answered keeps the gateway's refusal", async () => {
+    // Every attempt at the site answered, so there is no transport outcome to name, and the database
+    // admits only TIMED_OUT or FAILED for a halt. The site is not halted as FAILED.
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-halt-no-failure",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "OK", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 2, SEAT_ROUTES.primary.providerRef]
+      ]),
+      ...doubles("A16a fx1 halt no failure")
+    });
+    expect(await haltOutcome(scenario.runId)).toEqual([]);
+    expect(scenario.error).toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(4);
   });
 });

@@ -491,6 +491,29 @@ describe("A16 · callSeat — R3's 80-20 split, a pure function of the site (car
   });
 });
 
+describe("A16 · fix round 1 — a restored slot is a preference, and its seat keeps the backup", () => {
+  it("tries the preferred slot first in place of the 80-20 choice, whichever the ordinal names", async () => {
+    const seat = judgeSeat(0.2);
+    const [toMain] = sitesWith(seat, "MAIN", 1);
+    const [toRunnerUp] = sitesWith(seat, "RUNNER_UP", 1);
+    const script = scripted({ "provider:a": answers("a"), "provider:b": answers("b") });
+    const caller = createSeatCaller({ assigned: true });
+    expect(caller.plan(seat, toMain!, { prefer: "RUNNER_UP" })?.providerRef).toBe("provider:b");
+    expect((await caller.callSeat({ seat, callSiteKey: toMain!, prefer: "RUNNER_UP", call: script.call })).value).toBe("b");
+    expect((await caller.callSeat({ seat, callSiteKey: toRunnerUp!, prefer: "MAIN", call: script.call })).value).toBe("a");
+  });
+
+  it("keeps the other member as the preferred slot's backup: an outage there switches, as R4 says", async () => {
+    const script = scripted({ "provider:a": answers("a"), "provider:b": throws(transportFailure) });
+    const caller = createSeatCaller({ assigned: true });
+    await expect(caller.callSeat({ seat: backupOnlySeat(), callSiteKey: "k", prefer: "RUNNER_UP", call: script.call }))
+      .resolves.toMatchObject({ value: "a", callSiteKey: "k:seat:main" });
+    expect(script.calls).toEqual(["provider:b@k:seat:runnerUp", "provider:a@k:seat:main"]);
+    expect(caller.switches().map((record) => [record.fromProviderRef, record.toProviderRef, record.cause]))
+      .toEqual([["provider:b", "provider:a", "TRANSPORT_FAILURE"]]);
+  });
+});
+
 describe("A16 · carry 3 — the split and the backup choose only among the members the call's rule leaves", () => {
   const notB = (member: SeatMember): boolean => member.providerRef !== "provider:b";
   const notA = (member: SeatMember): boolean => member.providerRef !== "provider:a";
@@ -594,9 +617,13 @@ async function cooldownSite(caller: SeatCaller, seat: RunSeat, site: string, led
     attempt: (maxAttempts) => caller.callSeat({
       seat, callSiteKey: site, call: (member, key) => ledger.call(member, key, maxAttempts)
     }),
+    // As `cooldownAttempt` does (A16a fix round 1): the key opposite the member that ACTUALLY retries,
+    // asked between the sequences.
     ...(planned === null ? {} : {
-      finalRetryPermitted: async () =>
-        ledger.count(`${site}:seat:${planned.pinnedAs === "MAIN" ? "runnerUp" : "main"}`) <= J
+      finalRetryPermitted: async () => {
+        const retrying = caller.plan(seat, site) ?? planned;
+        return ledger.count(`${site}:seat:${retrying.pinnedAs === "MAIN" ? "runnerUp" : "main"}`) <= J;
+      }
     })
   });
 }
@@ -616,12 +643,36 @@ describe("A16 · carry 5 — a backup gets ONE sequence per site: a cooldown sit
     expect(ledger.total("leg")).toBe(2 * J + F);
   });
 
-  it("switches at a usage cap at once and still keeps the site within 2j + f", async () => {
+  it("switches at a usage cap at once, and the post-cooldown retry never returns to the capped key", async () => {
+    // Fix round 1 (R4: cap → switch NOW): the capped main spends k = 1; the runner-up runs its sequence
+    // (j) and then the site's one retry (f). k + j + f = 1 + 2 + 1 = 4 <= 2j + f = 5, because k <= j.
     const ledger = cappedLedger({ "provider:a": "CAP", "provider:b": "TRANSPORT" });
     const caller = createSeatCaller({ assigned: true });
     await expect(cooldownSite(caller, backupOnlySeat(), "leg", ledger)).resolves.toMatchObject({ kind: "HALTED" });
-    expect([ledger.count("leg:seat:main"), ledger.count("leg:seat:runnerUp")]).toEqual([2, J]);
+    expect([ledger.count("leg:seat:main"), ledger.count("leg:seat:runnerUp")]).toEqual([1, J + F]);
     expect(ledger.total("leg")).toBeLessThanOrEqual(2 * J + F);
+    expect(caller.switches().map((record) => record.cause)).toEqual(["USAGE_CAP"]);
+  });
+
+  it("sends the retry to the main when the split's runner-up was the one capped", async () => {
+    const seat = judgeSeat(0.2);
+    const [site] = sitesWith(seat, "RUNNER_UP", 1);
+    const ledger = cappedLedger({ "provider:a": "TRANSPORT", "provider:b": "CAP" });
+    const caller = createSeatCaller({ assigned: true });
+    await expect(cooldownSite(caller, seat, site!, ledger)).resolves.toMatchObject({ kind: "HALTED" });
+    // k (the runner-up's cap) + j + f on the main's key: 1 + 2 + 1 = 4 <= 2j + f.
+    expect([ledger.count(`${site!}:seat:main`), ledger.count(`${site!}:seat:runnerUp`)]).toEqual([J + F, 1]);
+  });
+
+  it("the named worst case: the split's runner-up fails, the main fails, the retry returns to the runner-up's key", async () => {
+    const seat = judgeSeat(0.2);
+    const [site] = sitesWith(seat, "RUNNER_UP", 1);
+    const ledger = cappedLedger({ "provider:a": "TRANSPORT", "provider:b": "TRANSPORT" });
+    const caller = createSeatCaller({ assigned: true });
+    await expect(cooldownSite(caller, seat, site!, ledger)).resolves.toMatchObject({ kind: "HALTED" });
+    // main j, runner-up j + f: exactly v5's 2j + f.
+    expect([ledger.count(`${site!}:seat:main`), ledger.count(`${site!}:seat:runnerUp`)]).toEqual([J, J + F]);
+    expect(ledger.total(site!)).toBe(2 * J + F);
   });
 
   it("answers from the backup inside the first sequence, with no cooldown", async () => {

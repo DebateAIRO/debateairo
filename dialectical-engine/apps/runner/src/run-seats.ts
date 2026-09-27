@@ -361,6 +361,12 @@ export interface SeatCall<T> {
   readonly callSiteKey: string;
   /** An explicit 80-20 ordinal (the synthesis roles pass `diversityOrdinalForRun`). */
   readonly ordinal?: number;
+  /**
+   * A16a fix round 1: the slot a resumed pass restores — the one the ledger
+   * says answered this site — tried FIRST in place of the 80-20 choice. It is a
+   * preference, never a filter: the other member stays its backup (R4).
+   */
+  readonly prefer?: SeatSlot;
   /** A fairness rule a member must pass to answer THIS call (R5). */
   readonly eligible?: (member: SeatMember) => boolean;
   /** The member-specific base key (the panel names the answering route in its key). */
@@ -379,6 +385,7 @@ export interface SeatAnswer<T> {
 export interface SeatPlanOptions {
   readonly eligible?: (member: SeatMember) => boolean;
   readonly ordinal?: number;
+  readonly prefer?: SeatSlot;
 }
 
 export interface SeatCaller {
@@ -494,15 +501,22 @@ export function seatSiteOrdinal(site: {
  * ledger's per-key count.
  *
  * DR-184-v5 — ONE BACKUP SEQUENCE PER SITE. A site called AGAIN on this pass
- * is the cooldown's post-cooldown final retry. It goes back to the member that
- * ran the site's first sequence, under that member's already-used key, so the
- * retry adds only that key's remainder (`judge + final` to ONE key), and it
- * never switches: a backup reached on the retry would open a fresh key at
- * `judge + final`, one sequence above v5's `2 * judge + final`. The member the
- * retry goes to is the one `plan` named before the first sequence, which is
- * the member whose OTHER key `cooldownAttempt` asks the ledger about before
- * granting the retry (A15d carry 3). When every eligible member is down at a
- * site not called before, the preferred one is called under its own key.
+ * is the cooldown's post-cooldown final retry, and it never switches: a
+ * backup reached on the retry would open a fresh key at `judge + final`, one
+ * sequence above v5's `2 * judge + final`. It goes back to the member that ran
+ * the site's first sequence, under that member's already-used key, so the
+ * retry adds only that key's remainder (`judge + final` to ONE key) — unless a
+ * usage cap downed that member (R4: cap → switch NOW; A16a fix round 1): then
+ * the retry goes to the OTHER member, never the capped key, and the site
+ * spends `k + judge + final` with the capped key's `k <= judge` attempts. `plan`
+ * called between the sequences names the member the retry goes to, and
+ * `cooldownAttempt` asks the ledger about THAT member's other key before
+ * granting it (A15d carry 3). When every eligible member is down at a site not
+ * called before, the preferred one is called under its own key.
+ *
+ * A16a fix round 1 — `prefer`: a resumed pass passes the slot the ledger says
+ * answered the site; it goes first in place of the 80-20 choice, and the other
+ * member stays its backup.
  *
  * A15b fix round 1 (M5): a bare-key caller records every member of a seat
  * under ONE key, so a main and its runner-up would share one per-key allowance
@@ -536,19 +550,31 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
     }
     const eligible = plan.eligible ?? always;
     if (seat.runnerUp === null) return [seat.main].filter(eligible);
-    // The CLAIMED seat's share decides (M2: no runner-up, no share); the pinned seat only names the candidates.
-    const toRunnerUp = seat.pinned !== null && selectSeatCandidate(
+    // A16a fix round 1: a slot the ledger restores goes first; the other stays its backup.
+    // Otherwise the CLAIMED seat's share decides (M2: no runner-up, no share); the pinned seat only names the candidates.
+    const toRunnerUp = plan.prefer !== undefined ? plan.prefer === "RUNNER_UP" : seat.pinned !== null && selectSeatCandidate(
       { ...seat.pinned, diversityShare: seat.diversityShare },
       plan.ordinal ?? seatSiteOrdinal({ runId, role: seat.role, pinnedSeatIndex: seat.pinnedSeatIndex, callSiteKey })
     ).via === "RUNNER_UP";
     return (toRunnerUp ? [seat.runnerUp, seat.main] : [seat.main, seat.runnerUp]).filter(eligible);
   };
-  /** The member this call calls first: a site's retry goes back to its first member; else the first one up. */
+  const cappedAt = (seat: RunSeat, member: SeatMember): boolean =>
+    downFailures.get(slotId(seat, member))?.cause === "USAGE_CAP";
+  /**
+   * The member this call calls first. A site's retry goes back to the member
+   * that ran its first sequence — unless a usage cap downed that member (R4:
+   * "cap → switch NOW"): then the other member takes the retry and the capped
+   * key is never called again. Any other call takes the first member up.
+   */
   const firstOf = (seat: RunSeat, callSiteKey: string, members: readonly SeatMember[]): SeatMember | undefined => {
     const firstSlot = firstSlotAt.get(siteId(seat, callSiteKey));
-    return (firstSlot === undefined ? undefined : members.find((member) => member.pinnedAs === firstSlot))
-      ?? members.find((member) => !isDown(seat, member))
-      ?? members[0];
+    const siteFirst = firstSlot === undefined ? undefined : members.find((member) => member.pinnedAs === firstSlot);
+    if (siteFirst !== undefined) {
+      return cappedAt(seat, siteFirst)
+        ? members.find((member) => member !== siteFirst && !cappedAt(seat, member)) ?? siteFirst
+        : siteFirst;
+    }
+    return members.find((member) => !isDown(seat, member)) ?? members[0];
   };
   return Object.freeze({
     plan: (seat: RunSeat, callSiteKey: string, planOptions: SeatPlanOptions = {}) =>
@@ -556,7 +582,8 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
     callSeat: async <T>(input: SeatCall<T>): Promise<SeatAnswer<T>> => {
       const members = ordered(input.seat, input.callSiteKey, {
         ...(input.eligible === undefined ? {} : { eligible: input.eligible }),
-        ...(input.ordinal === undefined ? {} : { ordinal: input.ordinal })
+        ...(input.ordinal === undefined ? {} : { ordinal: input.ordinal }),
+        ...(input.prefer === undefined ? {} : { prefer: input.prefer })
       });
       const first = firstOf(input.seat, input.callSiteKey, members);
       if (first === undefined) {
