@@ -9,7 +9,7 @@ import type {
   CryptoEnvelope,
   PreparedRunContentCipher
 } from "@debateai/crypto";
-import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
+import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export {
   PostgresSessionRepository,
@@ -850,6 +850,173 @@ export async function allocateSequence(client: PoolClient): Promise<number> {
   const value = result.rows[0]?.sequence;
   if (value === undefined) throw new TypedDomainError("SEQUENCE_ALLOCATION_FAILED", "No sequence was allocated");
   return Number(value);
+}
+
+/**
+ * Model scorecard §2.3 (migration 0072) — THE PROMPT OF ONE MODEL-CALL ATTEMPT.
+ *
+ * `ledger.call_prompt` is a content carrier in 0063's mechanism. For a run with
+ * content encryption the stored row carries the sentinel and a NULL
+ * fingerprint, and BOTH the prompt text and its fingerprint live inside the
+ * attested envelope: a readable fingerprint would be a digest of private
+ * content, the locator 0040 replaced with random bytes on
+ * `ledger_entry.input_hash`. A legacy run keeps both in the clear. Erasure is
+ * inherited: the envelope is unreadable once the run key is shredded, and the
+ * erasure barrier (with the content lease below) refuses a new row once the
+ * run's private content is gone.
+ */
+export interface CallPromptInput {
+  readonly runId: string;
+  /** The gateway attempt the prompt was sent on: the row's primary key, a lower-case uuid. */
+  readonly attemptId: string;
+  /** The `messages` member exactly as it was serialised into the request body. */
+  readonly promptText: string;
+  /** `canonicalPromptFingerprint(messages)` (@debateai/scorecard): 64 lower-case hex characters. */
+  readonly promptFingerprint: string;
+}
+
+export type CallPromptRecord = Readonly<{
+  runId: string;
+  attemptId: string;
+  promptText: string;
+  promptFingerprint: string;
+}>;
+
+const CALL_PROMPT_ATTEMPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const CALL_PROMPT_FINGERPRINT = /^[0-9a-f]{64}$/u;
+
+export async function insertCallPrompt(pool: Pool, input: CallPromptInput): Promise<void> {
+  // The attestation binds the envelope to `attempt_id::text`, which Postgres
+  // renders lower-case; an upper-case id would seal an envelope no row accepts.
+  if (!CALL_PROMPT_ATTEMPT_ID.test(input.attemptId)
+    || !CALL_PROMPT_FINGERPRINT.test(input.promptFingerprint)
+    || typeof input.promptText !== "string" || input.promptText.length === 0) {
+    throw new TypeError("CALL_PROMPT_INPUT_INVALID");
+  }
+  await withRunContentLease(pool, [input.runId], async () => {
+    const content = await encryptAttestedContentForRun(
+      pool, input.runId, "ledger.call_prompt", input.attemptId,
+      { promptText: input.promptText, promptFingerprint: input.promptFingerprint }
+    );
+    await pool.query(
+      `INSERT INTO ledger.call_prompt (
+         attempt_id, run_id, prompt_fingerprint, prompt_text,
+         content_ciphertext, content_attestation
+       ) VALUES ($1,$2,$3,$4,$5::jsonb,$6)`,
+      [
+        input.attemptId, input.runId,
+        content === null ? input.promptFingerprint : null,
+        content === null ? input.promptText : CONTENT_CIPHERTEXT_SENTINEL,
+        content === null ? null : JSON.stringify(content.envelope),
+        content?.attestation ?? null
+      ]
+    );
+  });
+}
+
+export async function readCallPrompt(pool: Pool, attemptId: string): Promise<CallPromptRecord | null> {
+  if (!CALL_PROMPT_ATTEMPT_ID.test(attemptId)) throw new TypeError("CALL_PROMPT_INPUT_INVALID");
+  const row = (await pool.query<{
+    run_id: string;
+    prompt_fingerprint: string | null;
+    prompt_text: string;
+    content_ciphertext: CryptoEnvelope | null;
+  }>(
+    `SELECT run_id, prompt_fingerprint, prompt_text, content_ciphertext
+     FROM ledger.call_prompt WHERE attempt_id=$1`,
+    [attemptId]
+  )).rows[0];
+  if (row === undefined) return null;
+  const content = await decryptContentForRun<Readonly<{ promptText?: unknown; promptFingerprint?: unknown }>>(
+    pool, row.run_id, "ledger.call_prompt", attemptId, row.content_ciphertext,
+    { promptText: row.prompt_text, promptFingerprint: row.prompt_fingerprint }
+  );
+  if (typeof content.promptText !== "string"
+    || typeof content.promptFingerprint !== "string"
+    || !CALL_PROMPT_FINGERPRINT.test(content.promptFingerprint)) {
+    throw new TypeError("CALL_PROMPT_RECORD_INVALID");
+  }
+  return Object.freeze({
+    runId: row.run_id,
+    attemptId,
+    promptText: content.promptText,
+    promptFingerprint: content.promptFingerprint
+  });
+}
+
+/**
+ * Model scorecard §2.4 (migration 0072) — THE ROLE ASSIGNMENT PINNED ON A RUN.
+ *
+ * An append-only side table the API writes ONCE, after the run row exists and
+ * before its first work item is enqueued. It is not a column of core.run,
+ * because a column would need the in-database encrypted-run creator redefined,
+ * and a replay of 0040 or 0067 would silently restore the older body. The
+ * assignment holds engine identifiers only — provider refs, model ids,
+ * candidate ids, levels — never debate text. Its shape is `RoleAssignmentSchema`
+ * (@debateai/scorecard), which this package cannot import: the writer takes
+ * an already validated object and the reader returns it undecoded.
+ */
+export interface RunRoleAssignmentInput {
+  readonly runId: string;
+  /** A `RoleAssignment` (@debateai/scorecard), validated by the caller. */
+  readonly assignment: Readonly<Record<string, unknown>>;
+  readonly strength: ModelStrength;
+  readonly steppedDown: boolean;
+}
+
+export type RunRoleAssignmentRecord = Readonly<{
+  runId: string;
+  assignment: unknown;
+  strength: ModelStrength;
+  steppedDown: boolean;
+  createdAt: Date;
+}>;
+
+function isModelStrength(value: unknown): value is ModelStrength {
+  return typeof value === "string" && (MODEL_STRENGTHS as readonly string[]).includes(value);
+}
+
+export async function insertRunRoleAssignment(
+  executor: Pick<Pool, "query"> | PoolClient,
+  input: RunRoleAssignmentInput
+): Promise<void> {
+  if (typeof input.assignment !== "object" || input.assignment === null
+    || Array.isArray(input.assignment)
+    || !isModelStrength(input.strength)
+    || typeof input.steppedDown !== "boolean") {
+    throw new TypeError("RUN_ROLE_ASSIGNMENT_INVALID");
+  }
+  await executor.query(
+    `INSERT INTO core.run_role_assignment (run_id, assignment, strength, stepped_down)
+     VALUES ($1,$2::jsonb,$3,$4)`,
+    [input.runId, JSON.stringify(input.assignment), input.strength, input.steppedDown]
+  );
+}
+
+export async function readRunRoleAssignment(
+  executor: Pick<Pool, "query"> | PoolClient,
+  runId: string
+): Promise<RunRoleAssignmentRecord | null> {
+  const row = (await executor.query<{
+    run_id: string;
+    assignment: unknown;
+    strength: string;
+    stepped_down: boolean;
+    created_at: Date;
+  }>(
+    `SELECT run_id, assignment, strength, stepped_down, created_at
+     FROM core.run_role_assignment WHERE run_id=$1`,
+    [runId]
+  )).rows[0];
+  if (row === undefined) return null;
+  if (!isModelStrength(row.strength)) throw new TypeError("RUN_ROLE_ASSIGNMENT_INVALID");
+  return Object.freeze({
+    runId: row.run_id,
+    assignment: row.assignment,
+    strength: row.strength,
+    steppedDown: row.stepped_down,
+    createdAt: row.created_at
+  });
 }
 
 export interface InitialBatteryRow {

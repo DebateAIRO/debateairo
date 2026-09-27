@@ -12,6 +12,7 @@ import {
 import {
   TypedDomainError,
   classifyLedgerActionKind,
+  type DebateRole,
   type LedgerOutcome,
   type OperatorSupplyingLevel,
   type ScoringOperator,
@@ -32,6 +33,16 @@ export interface AppendLedgerInput {
   readonly rawArtifactRef?: string | null;
   readonly startedAt: Date;
   readonly finishedAt: Date;
+  /**
+   * Model scorecard §2.1–§2.3 (migration 0072): the debate job, the scorecard
+   * candidate, the scorecard version and the thinking level of a MODEL_CALL
+   * attempt. Absent means NULL: every other writer (settlement, evaluator,
+   * budget) is unchanged, and the database refuses them on any other action.
+   */
+  readonly modelRole?: DebateRole | null;
+  readonly candidateId?: string | null;
+  readonly scorecardVersion?: number | null;
+  readonly thinkingLevel?: string | null;
 }
 
 export interface LedgerEntryRecord {
@@ -58,6 +69,8 @@ export interface AppendRawArtifactInput {
   readonly inputHash: string;
   readonly contractHash: string;
   readonly contentHash: string;
+  /** Model scorecard §2.3 (migration 0072): the vendor-reported thinking tokens; null when not reported. */
+  readonly thinkingTokens?: number | null;
 }
 
 interface ScheduledArtifactRow {
@@ -195,14 +208,17 @@ export class LedgerRepository {
         `INSERT INTO ledger.ledger_entry (
           ledger_entry_id, sequence, run_id, attempt_id, action_kind, call_site_key, subject_item_id,
           stance_at_action, outcome, actor_ref, input_hash, contract_hash,
-          input_hash_version, raw_artifact_ref, started_at, finished_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          input_hash_version, raw_artifact_ref, started_at, finished_at,
+          model_role, candidate_id, scorecard_version, thinking_level
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
         RETURNING ledger_entry_id, subject_item_id, stance_at_action, outcome`,
         [
           ledgerEntryId, sequence, input.runId, input.attemptId ?? null, actionKind, callSiteKey,
           input.subjectItemId, input.stanceAtAction, input.outcome, input.actorRef,input.inputHash,
           input.contractHash,1,input.rawArtifactRef ?? null,
-          input.startedAt, input.finishedAt
+          input.startedAt, input.finishedAt,
+          input.modelRole ?? null, input.candidateId ?? null,
+          input.scorecardVersion ?? null, input.thinkingLevel ?? null
         ]
       );
       const row = result.rows[0]!;
@@ -244,8 +260,8 @@ export class LedgerRepository {
           model_id, maker, model_version, raw_text, metadata_json,
           parse_status, parse_error, input_hash, contract_hash, content_hash, at_seq,
           input_hash_version,content_hash_version,
-          content_ciphertext,content_attestation
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20)
+          content_ciphertext,content_attestation,thinking_tokens
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20,$21)
         RETURNING raw_artifact_id`,
         [
           input.artifactId, input.attemptId, input.runId, input.providerRef, input.provider,
@@ -255,7 +271,8 @@ export class LedgerRepository {
           content === null ? input.inputHash : null,input.contractHash,
           content === null ? input.contentHash : null,sequence,
           content === null ? 1 : 2,content === null ? 1 : 2,
-          content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null
+          content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null,
+          input.thinkingTokens ?? null
         ]
       );
       return result.rows[0]!.raw_artifact_id;
