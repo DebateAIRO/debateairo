@@ -4,7 +4,7 @@ import { act, StrictMode, type ReactElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Answer, ArgumentLanguage, RunEvent } from "@debateai/contract";
+import type { Answer, AnswerStory, ArgumentLanguage, RunEvent } from "@debateai/contract";
 import { debateDetailFromAnswer, debateDetailFromRunProjection } from "../../apps/ui/lib/v3/adapter.js";
 import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, storyFixture } from "../../apps/ui/lib/v3/storyFixture.js";
 import { LOCALE_COOKIE, type LocaleCode } from "../../apps/ui/lib/i18n/locales.js";
@@ -204,6 +204,18 @@ describe("the story strip on the owner's debate page", () => {
     expect(readRefreshes()).toEqual([]);
   });
 
+  it("shows no strip until the first reply, so a reload never announces a story being written", async () => {
+    let reply: (story: AnswerStory) => void = () => {};
+    mocks.readAnswerStory.mockReturnValue(new Promise<AnswerStory>((resolve) => { reply = resolve; }));
+    const container = await mount({ questionLocale: "ro", storyLocale: "ro", storyCatalog: publicRomanian });
+    expect(mocks.readAnswerStory).toHaveBeenCalledTimes(1);
+    expect(panelOf(container)).toBeNull();
+    expect(container.textContent).not.toContain(publicRomanian["public.story.writing"]);
+    await act(async () => reply(storyFixture("READY")));
+    await flush();
+    expect(panelOf(container)?.getAttribute("data-story-status")).toBe("READY");
+  });
+
   it("shows today's composed text when the story is UNAVAILABLE, and reads it once", async () => {
     mocks.readAnswerStory.mockResolvedValue(storyFixture("UNAVAILABLE"));
     const container = await mount({ questionLocale: "ro", storyLocale: "ro", storyCatalog: publicRomanian });
@@ -221,6 +233,14 @@ describe("the story strip on the owner's debate page", () => {
     expect(mocks.readAnswerStory).not.toHaveBeenCalled();
     expect(readRefreshes()).toEqual([]);
   });
+
+  it("never asks the server to render again on the public page, even with no question locale", async () => {
+    mocks.readAnswerStory.mockResolvedValue(storyFixture("READY"));
+    const container = await mount({ publicMode: true, questionLocale: null, storyLocale: "en", storyCatalog: publicEnglish });
+    expect(panelOf(container)).toBeNull();
+    expect(mocks.readRun).not.toHaveBeenCalled();
+    expect(readRefreshes()).toEqual([]);
+  });
 });
 
 describe("the starting flow learns the question's language from its own run read (mechanism (a))", () => {
@@ -233,7 +253,12 @@ describe("the starting flow learns the question's language from its own run read
     expect(readRefreshes()).toEqual([""]);
     expect(window.location.pathname).toBe(`/debate/${RUN_REF}`);
 
-    // The run settles and the answer arrives; the story is read, but no English words wrap it.
+    // The server's second render hands over the question's locale and its catalogue.
+    await rerender({ id: RUN_REF, answer: null, questionLocale: "ro", storyLocale: "ro", storyCatalog: publicRomanian });
+    // The offer to switch the page to Romanian comes with it.
+    expect(container.querySelector("section.languageOffer")).not.toBeNull();
+
+    // The run settles and the answer arrives: the strip shows, in Romanian, with no further refresh.
     mocks.readRun.mockResolvedValue(runProjection("SETTLED", ROMANIAN));
     expect(mocks.emit).toBeTypeOf("function");
     await act(async () => {
@@ -243,18 +268,49 @@ describe("the starting flow learns the question's language from its own run read
     await flush();
     expect(mocks.readRunAnswer).toHaveBeenCalled();
     expect(mocks.readAnswerStory).toHaveBeenCalledWith(STORY_FIXTURE_ANSWER.answer_id);
-    expect(panelOf(container)).toBeNull();
-    expect(readRefreshes()).toHaveLength(1);
-
-    // The server's second render hands over the question's locale and its catalogue.
-    await rerender({ id: RUN_REF, answer: null, questionLocale: "ro", storyLocale: "ro", storyCatalog: publicRomanian });
     const panel = panelOf(container);
     expect(panel?.getAttribute("lang")).toBe("ro");
     expect(panel?.getAttribute("data-story-status")).toBe("READY");
     expect(panel?.querySelector(".storyPanelLabel")?.textContent).toBe(publicRomanian["public.story.label.contested"]);
-    // The offer to switch the page to Romanian comes with it.
-    expect(container.querySelector("section.languageOffer")).not.toBeNull();
     expect(readRefreshes()).toHaveLength(1);
+  });
+
+  it("asks once more when the answer arrives with the question's catalogue still missing, and never a third time", async () => {
+    window.history.replaceState(null, "", `/debate/${RUN_REF}?starting=1`);
+    mocks.readRun.mockResolvedValue(runProjection("RUNNING", ROMANIAN));
+    mocks.readAnswerStory.mockResolvedValue(storyFixture("READY"));
+    const starting = { id: RUN_REF, answer: null, questionLocale: null, storyLocale: "en", storyCatalog: publicEnglish } as const;
+    const container = await mount(starting);
+    expect(readRefreshes()).toEqual([""]);
+    // That render's own read came back pending: the server still learned no language.
+    await rerender(starting);
+    expect(readRefreshes()).toHaveLength(1);
+
+    // The answer arrives, still without the Romanian catalogue: one more try, and no English-framed strip.
+    mocks.readRun.mockResolvedValue(runProjection("SETTLED", ROMANIAN));
+    await act(async () => {
+      mocks.emit!(terminalEvent());
+      await Promise.resolve();
+    });
+    await flush();
+    expect(mocks.readAnswerStory).toHaveBeenCalledWith(STORY_FIXTURE_ANSWER.answer_id);
+    expect(readRefreshes()).toEqual(["", ""]);
+    expect(panelOf(container)).toBeNull();
+
+    // Further client reads and server renders that still learn nothing never ask a third time.
+    await act(async () => {
+      mocks.emit!({ ...terminalEvent(), event_id: "event:terminal-again", at_sequence: 2 });
+      await Promise.resolve();
+    });
+    await flush();
+    await rerender(starting);
+    expect(readRefreshes()).toHaveLength(2);
+    expect(panelOf(container)).toBeNull();
+
+    // The second try's render brings the catalogue: the strip shows.
+    await rerender({ id: RUN_REF, answer: null, questionLocale: "ro", storyLocale: "ro", storyCatalog: publicRomanian });
+    expect(panelOf(container)?.getAttribute("lang")).toBe("ro");
+    expect(readRefreshes()).toHaveLength(2);
   });
 
   it.each([
@@ -271,20 +327,44 @@ describe("the starting flow learns the question's language from its own run read
     expect(readRefreshes()).toEqual([]);
   });
 
-  it("asks only once, even when React runs its effects twice (StrictMode)", async () => {
-    window.history.replaceState(null, "", `/debate/${RUN_REF}?starting=1`);
-    function Probe(props: Readonly<{ questionLocale: LocaleCode | null; storyLocale: LocaleCode }>) {
+  describe("useStoryLocaleReady asks at most twice, even when React runs its effects twice (StrictMode)", () => {
+    type ProbeProps = Readonly<{ questionLocale: LocaleCode | null; storyLocale: LocaleCode; hasAnswer: boolean }>;
+    function Probe(props: ProbeProps) {
       return <p data-ready={String(useStoryLocaleReady({ ...props, readQuestionLocale: "ro" }))} />;
     }
-    const container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
-    await act(async () => root!.render(<StrictMode><Probe questionLocale={null} storyLocale="en" /></StrictMode>));
-    expect(readRefreshes()).toEqual([""]);
-    expect(container.querySelector("p")?.dataset.ready).toBe("false");
-    await act(async () => root!.render(<StrictMode><Probe questionLocale="ro" storyLocale="ro" /></StrictMode>));
-    expect(container.querySelector("p")?.dataset.ready).toBe("true");
-    expect(readRefreshes()).toHaveLength(1);
+    async function render(container: HTMLElement | null, props: ProbeProps): Promise<HTMLElement> {
+      let host = container;
+      if (host === null) {
+        host = document.createElement("div");
+        document.body.append(host);
+        root = createRoot(host);
+      }
+      await act(async () => root!.render(<StrictMode><Probe {...props} /></StrictMode>));
+      return host;
+    }
+
+    it("once while the debate runs, once more when the answer first arrives, then never again", async () => {
+      window.history.replaceState(null, "", `/debate/${RUN_REF}?starting=1`);
+      const container = await render(null, { questionLocale: null, storyLocale: "en", hasAnswer: false });
+      expect(readRefreshes()).toEqual([""]);
+      expect(container.querySelector("p")?.dataset.ready).toBe("false");
+      await render(container, { questionLocale: null, storyLocale: "en", hasAnswer: true });
+      expect(readRefreshes()).toEqual(["", ""]);
+      await render(container, { questionLocale: null, storyLocale: "en", hasAnswer: false });
+      await render(container, { questionLocale: null, storyLocale: "en", hasAnswer: true });
+      expect(readRefreshes()).toHaveLength(2);
+      await render(container, { questionLocale: "ro", storyLocale: "ro", hasAnswer: true });
+      expect(container.querySelector("p")?.dataset.ready).toBe("true");
+      expect(readRefreshes()).toHaveLength(2);
+    });
+
+    it("only once when the answer is already there at the first try", async () => {
+      const container = await render(null, { questionLocale: null, storyLocale: "en", hasAnswer: true });
+      expect(readRefreshes()).toEqual([""]);
+      await render(container, { questionLocale: null, storyLocale: "en", hasAnswer: false });
+      await render(container, { questionLocale: null, storyLocale: "en", hasAnswer: true });
+      expect(readRefreshes()).toHaveLength(1);
+    });
   });
 
   it("shows no panel while its own run read has not answered", async () => {
@@ -314,29 +394,24 @@ describe("the owner page's server render loads the question's catalogue (page.ts
     }) as PageElement;
   }
 
-  it("renders the panel with lang=\"ro\" and the Romanian label words for a Romanian question under an English interface", async () => {
+  it("hands a Romanian question under an English interface the Romanian public catalogue, and renders no strip on the server", async () => {
     const page = await ownerPage(ROMANIAN);
     expect(page.props.storyLocale).toBe("ro");
+    expect(page.props.storyCatalog).toEqual(publicRomanian);
+    expect(page.props.publicCatalog).toEqual(publicEnglish);
+    // The server reads no story, so it shows no strip: never "being written" before the first reply.
     const markup = renderToStaticMarkup(page);
-    // No effect runs on the server: the strip starts as WRITING, over today's answer.
-    expect(markup).toContain(
-      `<section class="storyPanel" aria-label="${html(publicRomanian["public.story.panelTitle"])}" lang="ro" dir="ltr" data-story-status="WRITING">`
-    );
-    expect(markup).toContain(`>${html(publicRomanian["public.story.label.contested"])}</span>`);
-    expect(markup).toContain(html(publicRomanian["public.story.writing"]));
-    expect(markup).not.toContain(html(publicEnglish["public.story.panelTitle"]));
-    expect(markup).not.toContain(`>${publicEnglish["public.story.label.contested"]}<`);
+    expect(markup).not.toContain("storyPanel");
+    expect(markup).not.toContain(html(publicRomanian["public.story.writing"]));
+    expect(markup).not.toContain(html(publicEnglish["public.story.writing"]));
   });
 
-  it("renders the same page in English for an und question", async () => {
+  it("hands an und question the interface's own public catalogue", async () => {
     const page = await ownerPage({ tag: "und", name: "the same language as the question" });
     expect(page.props.storyLocale).toBe("en");
-    const markup = renderToStaticMarkup(page);
-    expect(markup).toContain(
-      `<section class="storyPanel" aria-label="${html(publicEnglish["public.story.panelTitle"])}" lang="en" dir="ltr" data-story-status="WRITING">`
-    );
-    expect(markup).toContain(`>${publicEnglish["public.story.label.contested"]}</span>`);
-    expect(markup).not.toContain(html(publicRomanian["public.story.panelTitle"]));
+    expect(page.props.storyCatalog).toBe(page.props.publicCatalog);
+    expect(page.props.storyCatalog).toEqual(publicEnglish);
+    expect(renderToStaticMarkup(page)).not.toContain("storyPanel");
   });
 
   it("reuses the interface's public catalogue when the question speaks the interface's language", async () => {

@@ -6,6 +6,7 @@ import { debateDetailFromRunProjection } from "../../apps/ui/lib/v3/adapter.js";
 import DebatePageClient, * as DebatePageModule from "../../apps/ui/app/debate/[id]/DebatePageClient.js";
 import { createLiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
 import { readNotFoundCalls, resetNotFoundCalls } from "./stubs/next-navigation.js";
 
 const mocks = vi.hoisted(() => ({
@@ -44,6 +45,8 @@ function renderClient(
       initialAnswer={answer}
       initialError={error}
       initialPending
+      storyLocale="en"
+      storyCatalog={publicEnglish}
     />
   );
 }

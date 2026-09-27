@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Answer, RunEvent } from "@debateai/contract";
 import { debateDetailFromAnswer, debateDetailFromRunProjection } from "../../apps/ui/lib/v3/adapter.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
 
 const mocks = vi.hoisted(() => ({
   readRun: vi.fn(),
@@ -86,6 +87,8 @@ async function mount(initialAnswer: Answer | null = null): Promise<void> {
           : debateDetailFromRunProjection(runningRun)}
         initialAnswer={initialAnswer}
         initialPending={initialAnswer === null}
+        storyLocale="en"
+        storyCatalog={publicEnglish}
       />
     );
   });

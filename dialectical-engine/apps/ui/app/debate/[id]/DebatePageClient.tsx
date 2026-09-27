@@ -994,14 +994,16 @@ export default function DebatePageClient({
 
   // Verdict story (spec 2026-09-26 §10): owner-only. Polls its own route while
   // the story is being written; the public page reads nothing here. The strip
-  // speaks the question's language, so it waits for that language's catalogue.
+  // shows only once the first reply is in, so a reload never announces a story
+  // "being written" that is already written, or never will be. It speaks the
+  // question's language, so it also waits for that language's catalogue.
   const story = useAnswerStory(publicMode ? null : answer?.answer_id ?? null, {
     answerVersion: answer?.answer_version
   });
-  const storyLocaleReady = useStoryLocaleReady({ questionLocale, readQuestionLocale, storyLocale });
+  const storyLocaleReady = useStoryLocaleReady({ questionLocale, readQuestionLocale, storyLocale, hasAnswer: answer !== null });
   const storyView = useMemo(
-    () => (publicMode || answer === null || !storyLocaleReady ? null : toStoryView(answer, story, id, storyLocale)),
-    [publicMode, answer, storyLocaleReady, story, id, storyLocale]
+    () => (publicMode || answer === null || story === null || !storyLocaleReady ? null : toStoryView(answer, story, id, storyLocale)),
+    [publicMode, answer, story, storyLocaleReady, id, storyLocale]
   );
 
   const showInspection = useCallback(async () => {

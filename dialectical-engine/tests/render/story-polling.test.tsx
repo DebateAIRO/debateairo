@@ -13,14 +13,15 @@ import { STORY_FIXTURE_DEBATE_ID, storyFixture } from "../../apps/ui/lib/v3/stor
  * final status and when the page goes away.
  */
 
-function Probe({ client, answerId }: { client: StoryReader; answerId: string | null }) {
-  const story = useAnswerStory(answerId, { answerVersion: 1, client });
+function Probe({ client, answerId, answerVersion = 1 }: { client: StoryReader; answerId: string | null; answerVersion?: number }) {
+  const story = useAnswerStory(answerId, { answerVersion, client });
   return (
     <p
       data-testid="probe"
       data-status={story?.status ?? "none"}
       data-reason={story?.unavailable_reason ?? ""}
       data-answer={story?.answer_id ?? ""}
+      data-version={story?.answer_version ?? ""}
     />
   );
 }
@@ -42,8 +43,8 @@ async function mount(client: StoryReader, answerId: string | null = STORY_FIXTUR
   return container.querySelector('[data-testid="probe"]')!;
 }
 
-async function rerender(client: StoryReader, answerId: string | null): Promise<void> {
-  await act(async () => root!.render(<Probe client={client} answerId={answerId} />));
+async function rerender(client: StoryReader, answerId: string | null, answerVersion = 1): Promise<void> {
+  await act(async () => root!.render(<Probe client={client} answerId={answerId} answerVersion={answerVersion} />));
 }
 
 async function advance(ms: number): Promise<void> {
@@ -301,6 +302,28 @@ describe("a new answer restarts the poll (a re-run)", () => {
     expect(client.callsFor(NEW_ANSWER)).toBe(2);
     expect(probe.dataset.status).toBe("READY");
     expect(client.callsFor(STORY_FIXTURE_DEBATE_ID)).toBe(1);
+  });
+
+  it("drops the previous version's story when the answer is superseded under the same id", async () => {
+    let answerVersionTwo: (story: AnswerStory) => void = () => {};
+    const reads: Array<() => Promise<AnswerStory>> = [
+      async () => storyFixture("READY"),
+      () => new Promise<AnswerStory>((resolve) => { answerVersionTwo = resolve; })
+    ];
+    const readAnswerStory = vi.fn(() => reads.shift()!());
+    const client = { readAnswerStory };
+    const probe = await mount(client);
+    expect(probe.dataset.status).toBe("READY");
+    expect(probe.dataset.version).toBe("1");
+    await rerender(client, STORY_FIXTURE_DEBATE_ID, 2);
+    await flush();
+    expect(readAnswerStory).toHaveBeenCalledTimes(2);
+    // Version 1's ready story is gone while version 2's first read is still out.
+    expect(probe.dataset.status).toBe("none");
+    await act(async () => answerVersionTwo({ ...storyFixture("WRITING"), answer_version: 2 }));
+    await flush();
+    expect(probe.dataset.status).toBe("WRITING");
+    expect(probe.dataset.version).toBe("2");
   });
 
   it("never lets a late reply for the old answer land", async () => {

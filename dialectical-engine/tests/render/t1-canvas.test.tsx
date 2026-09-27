@@ -12,6 +12,7 @@ import { ModelMetaLine } from "../../apps/ui/components/ModelPresentation.js";
 import { SynthesisPanel } from "../../apps/ui/components/SynthesisPanel.js";
 import type { DebateNode } from "../../apps/ui/lib/types.js";
 import debateViewsEnglish from "../../apps/ui/messages/en/debateViews.json" with { type: "json" };
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
 
 const mocks = vi.hoisted(() => ({
   getDebateBundle: vi.fn(),
@@ -86,6 +87,8 @@ async function mountDebate(initialAnswer: Answer | null): Promise<HTMLElement> {
           : treeLessDebate}
         initialAnswer={initialAnswer}
         initialPending={initialAnswer === null}
+        storyLocale="en"
+        storyCatalog={publicEnglish}
       />
     );
   });

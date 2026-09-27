@@ -57,15 +57,16 @@ export function unreadableStory(answerId: string, answerVersion: number, reason:
  * included, keeps what the panel shows and tries again on the same backoff;
  * the fourth failure in a row ends the poll: with the server's own
  * STORY_UNREADABLE answer if that was the fourth, else as STORY_READ_FAILED.
- * A new answer (a re-run) drops the old story and starts again at once, and a
- * late reply for the old answer never lands.
+ * A new answer (a re-run), or a new version of the same answer (a superseding
+ * serve keeps the id and adds one to the version), drops the old story and
+ * starts again at once, and a late reply for the old one never lands.
  */
 export function useAnswerStory(
   answerId: string | null,
   options: Readonly<{ answerVersion?: number; client?: StoryReader }> = {}
 ): AnswerStory | null {
-  const [state, setState] = useState<Readonly<{ answerId: string; story: AnswerStory }> | null>(null);
-  // The version only labels a locally made UNAVAILABLE record; the panel never shows it.
+  const [state, setState] = useState<Readonly<{ answerId: string; answerVersion: number; story: AnswerStory }> | null>(null);
+  // The version keys the story with the id, and labels a locally made UNAVAILABLE record.
   const answerVersion = options.answerVersion ?? 1;
   const client = options.client;
   useEffect(() => {
@@ -75,7 +76,7 @@ export function useAnswerStory(
     let delay: number | null = null;
     let failures = 0;
     const settle = (story: AnswerStory) => {
-      if (active) setState({ answerId, story });
+      if (active) setState({ answerId, answerVersion, story });
     };
     const schedule = () => {
       delay = nextStoryPollDelay(delay);
@@ -118,5 +119,5 @@ export function useAnswerStory(
       if (timer !== null) clearTimeout(timer);
     };
   }, [answerId, answerVersion, client]);
-  return state !== null && state.answerId === answerId ? state.story : null;
+  return state !== null && state.answerId === answerId && state.answerVersion === answerVersion ? state.story : null;
 }
