@@ -172,7 +172,7 @@
   "debateChrome.condition.uninstrumented": "Registrazione delle verifiche incompleta",
   "debateChrome.condition.unfalsifiedAfterRotation": "Non falsificata dopo la rotazione dei modelli",
   "debateChrome.condition.skippedByBudget": "Arricchimento omesso per limiti di risorse",
-  "debateChrome.condition.envelopeExhausted": "Limiti dell’esecuzione esauriti",
+  "debateChrome.condition.envelopeExhausted": "Esplorazione interrotta prima per restare nel budget",
   "debateChrome.condition.leverageUnresolved": "Impatto non determinato",
   "debateChrome.condition.branchFrozenLowLeverage": "Ramo non espanso: non avrebbe potuto modificare la risposta",
   "debateChrome.condition.degradedDiversity": "Diversità dei modelli ridotta",

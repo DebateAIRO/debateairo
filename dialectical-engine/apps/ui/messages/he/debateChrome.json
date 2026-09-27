@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "רישום הבדיקה אינו מלא",
   "debateChrome.condition.unfalsifiedAfterRotation": "לא הופרך לאחר החלפת המודלים",
   "debateChrome.condition.skippedByBudget": "ההעשרה דולגה עקב מגבלת התקציב",
-  "debateChrome.condition.envelopeExhausted": "מעטפת ההרצה מוצתה",
+  "debateChrome.condition.envelopeExhausted": "החקירה נעצרה מוקדם כדי לעמוד בתקציב",
   "debateChrome.condition.leverageUnresolved": "יכולת ההשפעה לא נקבעה",
   "debateChrome.condition.branchFrozenLowLeverage": "הענף לא הורחב: לא היה ביכולתו לשנות את התשובה",
   "debateChrome.condition.degradedDiversity": "גיוון המודלים נפגע",

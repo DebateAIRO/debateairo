@@ -4,7 +4,7 @@ import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from
 import type { LiveRunState } from "@/lib/v3/liveEvents";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { unrepresentedEdges } from "@/lib/v3/adapter";
-import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel, summarizeFreshness } from "@/lib/v3/labels";
+import { abstentionKindLabel, conditionMarkLabel, panelStoppedBySpendStop, riskTierSourceLabel, summarizeFreshness } from "@/lib/v3/labels";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
@@ -29,6 +29,21 @@ function labeledNumberLine(
     source: number.source,
     replayHandle: number.replay_handle
   });
+}
+
+/**
+ * The answer's limits in plain words (Task M6, M2 review carry). The section
+ * measures the answer's spending and attempt limits; the raw state stays in
+ * the chip's title. "Stayed within the limits" sits beside the mark "Stopped
+ * exploring early to stay within budget" without contradicting it: the debate
+ * stopped early precisely so that it would.
+ */
+function limitsStateWords(state: Answer["cost_envelope"]["state"], catalog: MessageCatalog): string {
+  switch (state) {
+    case "WITHIN": return t(catalog, "misc.answerHonesty.limitsWithin");
+    case "ENRICHMENT_SKIPPED": return t(catalog, "misc.answerHonesty.limitsSkippedChecks");
+    case "EXHAUSTED": return t(catalog, "misc.answerHonesty.limitsReached");
+  }
 }
 
 export function AnswerHonestyDrawer({
@@ -184,7 +199,10 @@ export function AnswerHonestyDrawer({
                       <span>{record.subject_ref}</span>
                     </div>
                     <div className="drawerFindingText">{record.reason}</div>
-                    {record.lift_path !== null ? (
+                    {panelStoppedBySpendStop(record) ? (
+                      // A panel a spend stop cut short: the runner's remedy blames failed members (M2 carry).
+                      <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.panelStoppedEarly")}</div>
+                    ) : record.lift_path !== null ? (
                       <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.liftPath", { liftPath: record.lift_path })}</div>
                     ) : null}
                   </li>
@@ -244,7 +262,7 @@ export function AnswerHonestyDrawer({
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.costEnvelope")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.costEnvelope")}</div>
             <div className="drawerFindingMeta">
-              <span>{answer.cost_envelope.state}</span>
+              <span title={answer.cost_envelope.state}>{limitsStateWords(answer.cost_envelope.state, catalog)}</span>
               <span>{tPlural(
                 catalog,
                 "misc.answerHonesty.modelAttemptsConsumed",

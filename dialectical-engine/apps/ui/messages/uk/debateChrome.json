@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Запис перевірки неповний",
   "debateChrome.condition.unfalsifiedAfterRotation": "Не спростовано після ротації моделей",
   "debateChrome.condition.skippedByBudget": "Збагачення пропущено через обмеження бюджету",
-  "debateChrome.condition.envelopeExhausted": "Межі запуску вичерпано",
+  "debateChrome.condition.envelopeExhausted": "Дослідження припинено раніше, щоб не вийти за межі бюджету",
   "debateChrome.condition.leverageUnresolved": "Вплив не визначено",
   "debateChrome.condition.branchFrozenLowLeverage": "Гілку не розгорнуто: вона не могла вплинути на відповідь",
   "debateChrome.condition.degradedDiversity": "Різноманітність моделей знижено",

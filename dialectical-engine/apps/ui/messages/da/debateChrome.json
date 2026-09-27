@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Kontrolregistrering ufuldstændig",
   "debateChrome.condition.unfalsifiedAfterRotation": "Ikke falsificeret efter modelrotation",
   "debateChrome.condition.skippedByBudget": "Berigelse udeladt på grund af budgettet",
-  "debateChrome.condition.envelopeExhausted": "Kørselsramme opbrugt",
+  "debateChrome.condition.envelopeExhausted": "Holdt tidligt op med at undersøge for at holde budgettet",
   "debateChrome.condition.leverageUnresolved": "Indflydelse uafklaret",
   "debateChrome.condition.branchFrozenLowLeverage": "Grenen blev ikke udvidet: Den kunne ikke ændre svaret",
   "debateChrome.condition.degradedDiversity": "Modelmangfoldighed reduceret",

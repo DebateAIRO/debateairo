@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Prüfnachweis unvollständig",
   "debateChrome.condition.unfalsifiedAfterRotation": "Nach Modellwechsel nicht falsifiziert",
   "debateChrome.condition.skippedByBudget": "Anreicherung wegen Budgetgrenze übersprungen",
-  "debateChrome.condition.envelopeExhausted": "Rahmen des Durchlaufs ausgeschöpft",
+  "debateChrome.condition.envelopeExhausted": "Erkundung früher beendet, um im Budget zu bleiben",
   "debateChrome.condition.leverageUnresolved": "Einfluss ungeklärt",
   "debateChrome.condition.branchFrozenLowLeverage": "Zweig nicht erweitert: Er hätte die Antwort nicht verändert",
   "debateChrome.condition.degradedDiversity": "Modellvielfalt eingeschränkt",

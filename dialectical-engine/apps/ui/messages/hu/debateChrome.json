@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Az ellenőrzési nyilvántartás hiányos",
   "debateChrome.condition.unfalsifiedAfterRotation": "Modellváltás után sem cáfolt",
   "debateChrome.condition.skippedByBudget": "A költségkeret miatt kimaradt a bővítés",
-  "debateChrome.condition.envelopeExhausted": "A futtatási keret kimerült",
+  "debateChrome.condition.envelopeExhausted": "A feltárás korábban leállt, hogy a költségkereten belül maradjon",
   "debateChrome.condition.leverageUnresolved": "A befolyás tisztázatlan",
   "debateChrome.condition.branchFrozenLowLeverage": "Az ág nem bővült: nem módosíthatta a választ",
   "debateChrome.condition.degradedDiversity": "A modellváltozatosság csökkent",

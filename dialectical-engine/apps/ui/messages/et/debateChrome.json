@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Kontrollikirje on puudulik",
   "debateChrome.condition.unfalsifiedAfterRotation": "Pärast mudeli vahetamist ümber lükkamata",
   "debateChrome.condition.skippedByBudget": "Rikastamine jäeti eelarve tõttu vahele",
-  "debateChrome.condition.envelopeExhausted": "Käituse piirmäär on ammendatud",
+  "debateChrome.condition.envelopeExhausted": "Uurimine lõpetati varem, et eelarves püsida",
   "debateChrome.condition.leverageUnresolved": "Mõjujõud jäi määramata",
   "debateChrome.condition.branchFrozenLowLeverage": "Haru ei laiendatud: selle mõjujõud ei olnud vastuse muutmiseks piisav",
   "debateChrome.condition.degradedDiversity": "Mudelite mitmekesisus on halvenenud",

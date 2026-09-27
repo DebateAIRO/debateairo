@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Záznam kontroly není úplný",
   "debateChrome.condition.unfalsifiedAfterRotation": "Nevyvráceno po vystřídání modelů",
   "debateChrome.condition.skippedByBudget": "Obohacení přeskočeno kvůli rozpočtu",
-  "debateChrome.condition.envelopeExhausted": "Rámec běhu vyčerpán",
+  "debateChrome.condition.envelopeExhausted": "Zkoumání skončilo dříve, aby se dodržel rozpočet",
   "debateChrome.condition.leverageUnresolved": "Vliv nevyřešen",
   "debateChrome.condition.branchFrozenLowLeverage": "Větev nerozšířena: nemohla ovlivnit odpověď",
   "debateChrome.condition.degradedDiversity": "Rozmanitost modelů snížena",

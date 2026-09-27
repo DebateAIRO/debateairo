@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Η καταγραφή του ελέγχου είναι ελλιπής",
   "debateChrome.condition.unfalsifiedAfterRotation": "Δεν διαψεύστηκε μετά την εναλλαγή μοντέλου",
   "debateChrome.condition.skippedByBudget": "Ο εμπλουτισμός παραλείφθηκε λόγω προϋπολογισμού",
-  "debateChrome.condition.envelopeExhausted": "Εξαντλήθηκαν τα όρια της εκτέλεσης",
+  "debateChrome.condition.envelopeExhausted": "Η εξερεύνηση σταμάτησε νωρίτερα για να τηρηθεί ο προϋπολογισμός",
   "debateChrome.condition.leverageUnresolved": "Η επιρροή παραμένει ανεπίλυτη",
   "debateChrome.condition.branchFrozenLowLeverage": "Ο κλάδος δεν επεκτάθηκε: δεν μπορούσε να μεταβάλει την απάντηση",
   "debateChrome.condition.degradedDiversity": "Η ποικιλομορφία των μοντέλων υποβαθμίστηκε",

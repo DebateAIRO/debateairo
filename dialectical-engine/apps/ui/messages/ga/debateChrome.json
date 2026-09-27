@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Taifead seiceála neamhiomlán",
   "debateChrome.condition.unfalsifiedAfterRotation": "Gan bréagnú tar éis uainíocht na samhlacha",
   "debateChrome.condition.skippedByBudget": "Saibhriú fágtha ar lár de bharr an bhuiséid",
-  "debateChrome.condition.envelopeExhausted": "Teorainn an rite ídithe",
+  "debateChrome.condition.envelopeExhausted": "Stopadh ag fiosrú go luath chun fanacht laistigh den bhuiséad",
   "debateChrome.condition.leverageUnresolved": "Ní fios fós an bhféadfadh sé an freagra a athrú",
   "debateChrome.condition.branchFrozenLowLeverage": "Brainse gan leathnú: ní fhéadfadh sé an freagra a athrú",
   "debateChrome.condition.degradedDiversity": "Éagsúlacht na samhlacha laghdaithe",

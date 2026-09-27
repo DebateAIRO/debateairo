@@ -170,7 +170,7 @@
   "debateChrome.condition.uninstrumented": "Hồ sơ kiểm tra chưa đầy đủ",
   "debateChrome.condition.unfalsifiedAfterRotation": "Không bị bác bỏ sau khi luân chuyển mô hình",
   "debateChrome.condition.skippedByBudget": "Bỏ qua bước bổ sung do ngân sách",
-  "debateChrome.condition.envelopeExhausted": "Đã dùng hết giới hạn lần chạy",
+  "debateChrome.condition.envelopeExhausted": "Đã ngừng khám phá sớm để giữ trong ngân sách",
   "debateChrome.condition.leverageUnresolved": "Mức tác động chưa được giải quyết",
   "debateChrome.condition.branchFrozenLowLeverage": "Nhánh không được mở rộng: không thể làm thay đổi câu trả lời",
   "debateChrome.condition.degradedDiversity": "Độ đa dạng mô hình bị suy giảm",

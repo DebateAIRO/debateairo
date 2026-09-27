@@ -1,4 +1,5 @@
 import type { AbstentionKind, Answer, ConditionMark, StalenessState } from "@debateai/contract";
+import { RUN_LEVEL_SPEND_STOP_CODES } from "@debateai/kernel";
 import debateChromeEnglish from "../../messages/en/debateChrome.json" with { type: "json" };
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import type { LiveVerdictState } from "../types.js";
@@ -64,6 +65,25 @@ export function conditionMarkLabel(
     case "UNAUTHORED-BRANCH-HALTED": return t(catalog, "debateChrome.condition.unauthoredBranchHalted");
     case "LABEL-BASIS-INCOMPLETE": return t(catalog, "debateChrome.condition.labelBasisIncomplete");
   }
+}
+
+/**
+ * Task M6 (M2 review carry): a panel a spend stop cut short. Since Task M2 the
+ * runner names the stop code in the panel record's reason ("OpenAI:
+ * PROVIDER_ERROR; RUN_COST_ENVELOPE_MONEY_REACHED"), because the members after
+ * the stop never spoke. The runner's own remedy for the two panel marks ("Re-ask
+ * to collect the assessments the failed panel members owed", "Re-ask when
+ * another healthy maker can assess this node") does not fit such a panel: no
+ * member failed, and a re-ask under the same budget stops the same way. The
+ * honesty drawer then says, from the catalogue, why fewer models weighed the
+ * point. Only the reason's code is read, from the kernel's one list of stops.
+ */
+export function panelStoppedBySpendStop(
+  record: Pick<Answer["condition_mark_records"][number], "mark" | "reason">
+): boolean {
+  if (record.mark !== "PANEL-PARTIAL" && record.mark !== "PANEL-DEGRADED-SINGLE-VOICE") return false;
+  const parts = record.reason.split(";").map((part) => part.trim());
+  return RUN_LEVEL_SPEND_STOP_CODES.some((code) => parts.includes(code));
 }
 
 /**

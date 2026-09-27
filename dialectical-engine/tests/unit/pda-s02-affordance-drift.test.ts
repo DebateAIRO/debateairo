@@ -118,7 +118,7 @@ describe("S02 owner/public affordance drift pins", () => {
       // NODE DRAWER — public contract nodes retain relevant-as-of state.
       ["misc.answerHonesty.perItemFreshness", "Per-item freshness"],
       // TYPED ABSENCE — named explicitly as not included in the public snapshot.
-      ["misc.answerHonesty.costEnvelope", "Cost envelope"],
+      ["misc.answerHonesty.costEnvelope", "Spending and attempt limits"],
       // TREE SURFACE — public edges are projected into the shared reading views.
       ["misc.answerHonesty.graphEdges", "Graph edges"],
       // NODE DRAWER — public nodes retain labeled numbers with owner pointers redacted.

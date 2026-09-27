@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Zapis preverjanja ni popoln",
   "debateChrome.condition.unfalsifiedAfterRotation": "Po menjavi modelov ni bilo ovrženo",
   "debateChrome.condition.skippedByBudget": "Obogatitev je bila zaradi proračuna preskočena",
-  "debateChrome.condition.envelopeExhausted": "Razpoložljivi okvir izvajanja je izčrpan",
+  "debateChrome.condition.envelopeExhausted": "Raziskovanje se je prej ustavilo, da bi ostali v okviru proračuna",
   "debateChrome.condition.leverageUnresolved": "Vpliv ni razjasnjen",
   "debateChrome.condition.branchFrozenLowLeverage": "Veja ni razširjena: odgovora ne bi mogla spremeniti",
   "debateChrome.condition.degradedDiversity": "Raznolikost modelov je zmanjšana",
