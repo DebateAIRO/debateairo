@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Yazan",
   "public.report.about.checkedBy": "Kontrol eden",
   "public.report.about.notRecorded": "Kaydedilmedi",
+  "public.report.error.signIn": "Bu raporu indirmek için oturum açın.",
+  "public.report.error.notAvailable": "Bu rapor mevcut değil.",
+  "public.report.error.tryAgain": "Rapor şu anda hazırlanamadı. Lütfen biraz sonra tekrar deneyin.",
   "public.story.morePaths.one": "ve {count} görüş daha",
   "public.story.morePaths.other": "ve {count} görüş daha"
 }

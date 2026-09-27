@@ -170,5 +170,8 @@
   "public.report.about.writtenBy": "Mô hình viết",
   "public.report.about.checkedBy": "Mô hình kiểm tra",
   "public.report.about.notRecorded": "Không được ghi nhận",
+  "public.report.error.signIn": "Đăng nhập để tải xuống báo cáo này.",
+  "public.report.error.notAvailable": "Báo cáo này không có sẵn.",
+  "public.report.error.tryAgain": "Hiện chưa thể tạo báo cáo. Vui lòng thử lại sau giây lát.",
   "public.story.morePaths.other": "và {count} quan điểm khác"
 }

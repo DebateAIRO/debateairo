@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Kirjoittanut",
   "public.report.about.checkedBy": "Tarkistanut",
   "public.report.about.notRecorded": "Ei kirjattu",
+  "public.report.error.signIn": "Kirjaudu sisään ladataksesi tämän raportin.",
+  "public.report.error.notAvailable": "Tämä raportti ei ole saatavilla.",
+  "public.report.error.tryAgain": "Raporttia ei voitu laatia juuri nyt. Yritä hetken kuluttua uudelleen.",
   "public.story.morePaths.one": "ja {count} muu kanta",
   "public.story.morePaths.other": "ja {count} muuta kantaa"
 }

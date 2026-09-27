@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Napisao",
   "public.report.about.checkedBy": "Provjerio",
   "public.report.about.notRecorded": "Nije zabilježeno",
+  "public.report.error.signIn": "Prijavite se kako biste preuzeli ovo izvješće.",
+  "public.report.error.notAvailable": "Ovo izvješće nije dostupno.",
+  "public.report.error.tryAgain": "Izvješće trenutačno nije bilo moguće pripremiti. Pokušajte ponovno za nekoliko trenutaka.",
   "public.story.morePaths.one": "i još {count} stajalište",
   "public.story.morePaths.few": "i još {count} stajališta",
   "public.story.morePaths.other": "i još {count} stajališta"

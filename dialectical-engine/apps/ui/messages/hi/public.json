@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "लिखने वाला मॉडल",
   "public.report.about.checkedBy": "जाँचने वाला मॉडल",
   "public.report.about.notRecorded": "दर्ज नहीं",
+  "public.report.error.signIn": "यह रिपोर्ट डाउनलोड करने के लिए साइन इन करें।",
+  "public.report.error.notAvailable": "यह रिपोर्ट उपलब्ध नहीं है।",
+  "public.report.error.tryAgain": "रिपोर्ट अभी तैयार नहीं की जा सकी। कृपया थोड़ी देर बाद फिर से प्रयास करें।",
   "public.story.morePaths.one": "और {count} मत",
   "public.story.morePaths.other": "और {count} मत"
 }

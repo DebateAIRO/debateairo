@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Írta",
   "public.report.about.checkedBy": "Ellenőrizte",
   "public.report.about.notRecorded": "Nincs rögzítve",
+  "public.report.error.signIn": "Jelentkezzen be a jelentés letöltéséhez.",
+  "public.report.error.notAvailable": "Ez a jelentés nem érhető el.",
+  "public.report.error.tryAgain": "A jelentést most nem sikerült elkészíteni. Kérjük, próbálja újra egy kis idő múlva.",
   "public.story.morePaths.one": "és még {count} álláspont",
   "public.story.morePaths.other": "és még {count} álláspont"
 }

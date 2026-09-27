@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Verfasst von",
   "public.report.about.checkedBy": "Überprüft von",
   "public.report.about.notRecorded": "Nicht erfasst",
+  "public.report.error.signIn": "Melden Sie sich an, um diesen Bericht herunterzuladen.",
+  "public.report.error.notAvailable": "Dieser Bericht ist nicht verfügbar.",
+  "public.report.error.tryAgain": "Der Bericht konnte gerade nicht erstellt werden. Bitte versuchen Sie es gleich noch einmal.",
   "public.story.morePaths.one": "und {count} weitere Position",
   "public.story.morePaths.other": "und {count} weitere Positionen"
 }

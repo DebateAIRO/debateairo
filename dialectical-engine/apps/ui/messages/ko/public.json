@@ -170,5 +170,8 @@
   "public.report.about.writtenBy": "작성 모델",
   "public.report.about.checkedBy": "확인 모델",
   "public.report.about.notRecorded": "기록되지 않음",
+  "public.report.error.signIn": "이 보고서를 다운로드하려면 로그인하세요.",
+  "public.report.error.notAvailable": "이 보고서는 이용할 수 없습니다.",
+  "public.report.error.tryAgain": "지금은 보고서를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "public.story.morePaths.other": "외 {count}개 입장"
 }

@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Escrita por",
   "public.report.about.checkedBy": "Verificada por",
   "public.report.about.notRecorded": "Não registado",
+  "public.report.error.signIn": "Inicie sessão para descarregar este relatório.",
+  "public.report.error.notAvailable": "Este relatório não está disponível.",
+  "public.report.error.tryAgain": "Não foi possível preparar o relatório neste momento. Tente novamente daqui a pouco.",
   "public.story.morePaths.one": "e mais {count} posição",
   "public.story.morePaths.many": "e mais {count} posições",
   "public.story.morePaths.other": "e mais {count} posições"

@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Написана от",
   "public.report.about.checkedBy": "Проверена от",
   "public.report.about.notRecorded": "Не е записано",
+  "public.report.error.signIn": "Влезте, за да изтеглите този доклад.",
+  "public.report.error.notAvailable": "Този доклад не е наличен.",
+  "public.report.error.tryAgain": "Докладът не можа да бъде изготвен в момента. Моля, опитайте отново след малко.",
   "public.story.morePaths.one": "и още {count} позиция",
   "public.story.morePaths.other": "и още {count} позиции"
 }

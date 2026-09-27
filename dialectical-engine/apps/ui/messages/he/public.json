@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "נכתב על ידי",
   "public.report.about.checkedBy": "נבדק על ידי",
   "public.report.about.notRecorded": "לא תועד",
+  "public.report.error.signIn": "יש להתחבר כדי להוריד את הדוח הזה.",
+  "public.report.error.notAvailable": "הדוח הזה אינו זמין.",
+  "public.report.error.tryAgain": "לא ניתן היה להכין את הדוח כרגע. אפשר לנסות שוב בעוד רגע.",
   "public.story.morePaths.one": "ועוד {count} עמדה",
   "public.story.morePaths.two": "ועוד {count} עמדות",
   "public.story.morePaths.other": "ועוד {count} עמדות"

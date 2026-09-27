@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Scritta da",
   "public.report.about.checkedBy": "Verificata da",
   "public.report.about.notRecorded": "Non registrato",
+  "public.report.error.signIn": "Accedi per scaricare questo rapporto.",
+  "public.report.error.notAvailable": "Questo rapporto non è disponibile.",
+  "public.report.error.tryAgain": "Non è stato possibile preparare il rapporto in questo momento. Riprova tra poco.",
   "public.story.morePaths.one": "e {count} altra posizione",
   "public.story.morePaths.many": "e altre {count} posizioni",
   "public.story.morePaths.other": "e altre {count} posizioni"

@@ -170,5 +170,8 @@
   "public.report.about.writtenBy": "Ditulis oleh",
   "public.report.about.checkedBy": "Diperiksa oleh",
   "public.report.about.notRecorded": "Tidak tercatat",
+  "public.report.error.signIn": "Masuk untuk mengunduh laporan ini.",
+  "public.report.error.notAvailable": "Laporan ini tidak tersedia.",
+  "public.report.error.tryAgain": "Laporan tidak dapat dibuat saat ini. Silakan coba lagi sebentar lagi.",
   "public.story.morePaths.other": "dan {count} posisi lainnya"
 }

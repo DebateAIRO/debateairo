@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Kirjutanud",
   "public.report.about.checkedBy": "Kontrollinud",
   "public.report.about.notRecorded": "Pole salvestatud",
+  "public.report.error.signIn": "Logige sisse, et see aruanne alla laadida.",
+  "public.report.error.notAvailable": "See aruanne pole saadaval.",
+  "public.report.error.tryAgain": "Aruannet ei õnnestunud praegu koostada. Palun proovige mõne hetke pärast uuesti.",
   "public.story.morePaths.one": "ja veel {count} seisukoht",
   "public.story.morePaths.other": "ja veel {count} seisukohta"
 }

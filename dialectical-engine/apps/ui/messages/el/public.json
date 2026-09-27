@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Γράφτηκε από",
   "public.report.about.checkedBy": "Ελέγχθηκε από",
   "public.report.about.notRecorded": "Δεν καταγράφηκε",
+  "public.report.error.signIn": "Συνδεθείτε για να κατεβάσετε αυτή την αναφορά.",
+  "public.report.error.notAvailable": "Αυτή η αναφορά δεν είναι διαθέσιμη.",
+  "public.report.error.tryAgain": "Δεν ήταν δυνατό να δημιουργηθεί η αναφορά αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο.",
   "public.story.morePaths.one": "και {count} ακόμη θέση",
   "public.story.morePaths.other": "και {count} ακόμη θέσεις"
 }

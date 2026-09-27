@@ -221,6 +221,7 @@ apps/ui/app/debate/[id]/DebatePageClient.tsx
 apps/ui/app/debate/[id]/DebatePageGate.tsx
 apps/ui/app/debate/[id]/loading.tsx
 apps/ui/app/debate/[id]/page.tsx
+apps/ui/app/debate/[id]/report/route.ts
 apps/ui/app/enroll-mfa/layout.tsx
 apps/ui/app/enroll-mfa/page.tsx
 apps/ui/app/help/page.tsx
@@ -440,6 +441,7 @@ apps/ui/lib/report/pointNumbers.ts
 apps/ui/lib/report/renderReport.ts
 apps/ui/lib/report/reportLanguage.ts
 apps/ui/lib/report/reportModel.ts
+apps/ui/lib/report/reportRoute.ts
 apps/ui/lib/returnPath.ts
 apps/ui/lib/scoring/scoringResponseSpecification.ts
 apps/ui/lib/scoringFormat.ts

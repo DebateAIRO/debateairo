@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Written by",
   "public.report.about.checkedBy": "Checked by",
   "public.report.about.notRecorded": "Not recorded",
+  "public.report.error.signIn": "Sign in to download this report.",
+  "public.report.error.notAvailable": "This report isn't available.",
+  "public.report.error.tryAgain": "The report couldn't be made right now. Please try again in a moment.",
   "public.story.morePaths.one": "and {count} more",
   "public.story.morePaths.other": "and {count} more"
 }

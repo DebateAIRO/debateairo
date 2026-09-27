@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Scrisă de",
   "public.report.about.checkedBy": "Verificată de",
   "public.report.about.notRecorded": "Neînregistrat",
+  "public.report.error.signIn": "Autentificați-vă pentru a descărca acest raport.",
+  "public.report.error.notAvailable": "Acest raport nu este disponibil.",
+  "public.report.error.tryAgain": "Raportul nu a putut fi pregătit acum. Vă rugăm să încercați din nou peste câteva clipe.",
   "public.story.morePaths.one": "și încă {count} poziție",
   "public.story.morePaths.few": "și încă {count} poziții",
   "public.story.morePaths.other": "și încă {count} de poziții"

@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Geschreven door",
   "public.report.about.checkedBy": "Gecontroleerd door",
   "public.report.about.notRecorded": "Niet vastgelegd",
+  "public.report.error.signIn": "Meld u aan om dit verslag te downloaden.",
+  "public.report.error.notAvailable": "Dit verslag is niet beschikbaar.",
+  "public.report.error.tryAgain": "Het verslag kon nu niet worden gemaakt. Probeer het over een ogenblik opnieuw.",
   "public.story.morePaths.one": "en nog {count} standpunt",
   "public.story.morePaths.other": "en nog {count} standpunten"
 }

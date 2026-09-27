@@ -170,5 +170,8 @@
   "public.report.about.writtenBy": "撰写模型",
   "public.report.about.checkedBy": "核对模型",
   "public.report.about.notRecorded": "未记录",
+  "public.report.error.signIn": "请登录以下载此报告。",
+  "public.report.error.notAvailable": "此报告不可用。",
+  "public.report.error.tryAgain": "暂时无法生成报告。请稍后重试。",
   "public.story.morePaths.other": "另有 {count} 个立场"
 }

@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Rédigée par",
   "public.report.about.checkedBy": "Vérifiée par",
   "public.report.about.notRecorded": "Non enregistré",
+  "public.report.error.signIn": "Connectez-vous pour télécharger ce rapport.",
+  "public.report.error.notAvailable": "Ce rapport n’est pas disponible.",
+  "public.report.error.tryAgain": "Le rapport n’a pas pu être préparé pour le moment. Veuillez réessayer dans un instant.",
   "public.story.morePaths.one": "et {count} autre position",
   "public.story.morePaths.many": "et {count} autres positions",
   "public.story.morePaths.other": "et {count} autres positions"

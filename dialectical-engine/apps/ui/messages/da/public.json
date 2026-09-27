@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Skrevet af",
   "public.report.about.checkedBy": "Kontrolleret af",
   "public.report.about.notRecorded": "Ikke registreret",
+  "public.report.error.signIn": "Log ind for at hente denne rapport.",
+  "public.report.error.notAvailable": "Denne rapport er ikke tilgængelig.",
+  "public.report.error.tryAgain": "Rapporten kunne ikke laves lige nu. Prøv igen om et øjeblik.",
   "public.story.morePaths.one": "og {count} position mere",
   "public.story.morePaths.other": "og {count} positioner mere"
 }

@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Uzrakstīja",
   "public.report.about.checkedBy": "Pārbaudīja",
   "public.report.about.notRecorded": "Nav reģistrēts",
+  "public.report.error.signIn": "Pierakstieties, lai lejupielādētu šo pārskatu.",
+  "public.report.error.notAvailable": "Šis pārskats nav pieejams.",
+  "public.report.error.tryAgain": "Pašlaik pārskatu neizdevās sagatavot. Lūdzu, mēģiniet vēlreiz pēc brīža.",
   "public.story.morePaths.zero": "un vēl {count} nostājas",
   "public.story.morePaths.one": "un vēl {count} nostāja",
   "public.story.morePaths.other": "un vēl {count} nostājas"

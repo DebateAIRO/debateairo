@@ -170,6 +170,9 @@
   "public.report.about.writtenBy": "Redactada por",
   "public.report.about.checkedBy": "Comprobada por",
   "public.report.about.notRecorded": "No registrado",
+  "public.report.error.signIn": "Inicie sesión para descargar este informe.",
+  "public.report.error.notAvailable": "Este informe no está disponible.",
+  "public.report.error.tryAgain": "No se ha podido preparar el informe ahora mismo. Vuelva a intentarlo en unos instantes.",
   "public.story.morePaths.one": "y {count} posición más",
   "public.story.morePaths.many": "y {count} posiciones más",
   "public.story.morePaths.other": "y {count} posiciones más"
