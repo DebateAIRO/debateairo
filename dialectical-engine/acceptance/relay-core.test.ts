@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, join, relative } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -11,22 +11,31 @@ import { resolveCodexBinary } from "./model-shim.js";
 import { resolveAgyBinary } from "./agy-relay.js";
 import { resolvePiBinary } from "./pi-relay.js";
 import { afterEach, describe, expect, it } from "vitest";
-import { estimateWindowTokens } from "@debateai/providers";
+import { estimatePromptTokens, estimateWindowTokens } from "@debateai/providers";
 import {
+  CLI_RELAY_INSTRUCTIONS_FILE_MISSING,
+  CLI_RELAY_INSTRUCTIONS_FILE_NAME,
   CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES,
   CLI_RELAY_STDOUT_LINE_DECISION_BYTES,
   CLI_RELAY_STDOUT_MAX_BYTES,
   CLI_RELAY_USAGE_CAP_CODE_TOKEN,
   RELAY_MESSAGE_MAX_UTF8_BYTES,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
+  RELAY_PROMPT_CHARACTERS_PER_TOKEN,
   RELAY_REQUEST_MAX_BYTES,
   RELAY_REQUEST_MAX_MESSAGES,
   buildCliUsage,
   createStdoutLineFilter,
+  harnessOverheadLine,
   invokeCli,
   isRelayHandshakeReply,
+  measureHarnessOverhead,
+  openRelayWorkspace,
   renderPromptTranscript,
+  reportHarnessOverhead,
   resolveConfiguredBinary,
   startCliRelayServer,
+  type CliCompletion,
   type CliFailureEvidence,
   type CliRelayAdapter,
   type CliRelayHandle
@@ -966,8 +975,7 @@ describe("§2.10 prompt transport", () => {
     // The refusal does not wait on a child, so give a wrongly spawned one time to show itself.
     await delay(500);
     expect(existsSync(marker)).toBe(false);
-    expect((await readdir(tmpdir())).filter((entry) => entry.startsWith("relay-stdin-throwing-fixture-")))
-      .toEqual([]);
+    expect(await relayLeftovers("stdin-throwing-fixture")).toEqual([]);
   });
 });
 
@@ -1329,9 +1337,25 @@ describe("R1: the relay speaks the gateway's own markers", () => {
  * makes starts `relay-<maker slug>-`, the prompt directory included, so a
  * maker name no other test's name begins with makes "nothing left behind" one
  * exact listing. No probe here echoes the environment.
+ *
+ * D8 (Task A12b): a SERVED call's directories now sit inside its relay's open
+ * workspace (`relay-<maker slug>-workspace-…`, removed at stop), so the listing
+ * looks inside every such workspace. Whatever a call left there is still named;
+ * the relay's own workspace, alive until close(), is not a call's leftover.
  */
 async function relayLeftovers(maker: string): Promise<string[]> {
-  return (await readdir(tmpdir())).filter((entry) => entry.startsWith(`relay-${maker}-`));
+  const root = tmpdir();
+  const leftovers: string[] = [];
+  for (const entry of await readdir(root)) {
+    if (!entry.startsWith(`relay-${maker}-`)) continue;
+    if (!entry.startsWith(`relay-${maker}-workspace-`)) {
+      leftovers.push(entry);
+      continue;
+    }
+    const inside = await readdir(join(root, entry)).catch((): string[] => []);
+    leftovers.push(...inside.map((inner) => join(entry, inner)));
+  }
+  return leftovers;
 }
 
 describe("fix round 1: a spawn that throws synchronously is a CLI failure, and nothing is left behind", () => {
@@ -1701,5 +1725,245 @@ describe("A11 fix round 1: an adapter's stdout line filter", () => {
 
     expect(response.status).toBe(200);
     expect(parsed).toBe("KEEP one\nKEEP two");
+  });
+});
+
+/**
+ * D8 lean calls (owner ruling 2026-09-26, Task A12b): one private workspace per
+ * relay, the one minimal system sentence, the instructions file a codex-style
+ * CLI reads, and the informational harness-overhead line — each proven on a
+ * fixture adapter. W6: the probes report paths, modes and listings only.
+ */
+const WORKSPACE_PROBE = [
+  'const { readdirSync, statSync } = require("node:fs");',
+  "process.stdout.write(JSON.stringify({",
+  "  cwd: process.cwd(),",
+  "  cwdMode: (statSync(process.cwd()).mode & 0o777).toString(8),",
+  "  cwdEntries: readdirSync(process.cwd())",
+  "}));"
+].join("");
+
+const INSTRUCTIONS_PROBE = [
+  'const { readFileSync, readdirSync, statSync } = require("node:fs");',
+  "const instructionsFile = process.argv[process.argv.length - 1];",
+  "process.stdout.write(JSON.stringify({",
+  "  instructionsFile,",
+  "  instructionsMode: (statSync(instructionsFile).mode & 0o777).toString(8),",
+  '  instructions: readFileSync(instructionsFile, "utf8"),',
+  "  cwd: process.cwd(),",
+  "  cwdMode: (statSync(process.cwd()).mode & 0o777).toString(8),",
+  "  cwdEntries: readdirSync(process.cwd())",
+  "}));"
+].join("");
+
+interface WorkspaceObservation {
+  readonly cwd: string;
+  readonly cwdMode: string;
+  readonly cwdEntries: readonly string[];
+}
+
+interface InstructionsObservation extends WorkspaceObservation {
+  readonly instructionsFile: string;
+  readonly instructionsMode: string;
+  readonly instructions: string;
+}
+
+async function observeRelay<T>(handle: CliRelayHandle, content: string): Promise<T> {
+  const body = await (await postRelay(handle, userTurn(content))).json() as RelayBody;
+  return JSON.parse(body.choices[0]!.message.content) as T;
+}
+
+describe("D8 the relay's private workspace", () => {
+  it("allows one short neutral sentence as the only system text a relay gives a CLI", () => {
+    expect(RELAY_MINIMAL_SYSTEM_PROMPT).toBe("Follow the instructions in the user message exactly.");
+  });
+
+  it("runs every call in its own empty 0700 directory inside ONE 0700 workspace per relay, removed at stop", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("cwd-fixture"), WORKSPACE_PROBE);
+
+    const first = await observeRelay<WorkspaceObservation>(handle, "Workspace probe one.");
+    const second = await observeRelay<WorkspaceObservation>(handle, "Workspace probe two.");
+
+    const workspace = dirname(first.cwd);
+    expect(dirname(second.cwd)).toBe(workspace);
+    // CONT-01 / STATE-01 unchanged: a fresh directory per call, reaped after it.
+    expect(second.cwd).not.toBe(first.cwd);
+    for (const observed of [first, second]) {
+      expect(observed.cwdEntries).toEqual([]);
+      expect(observed.cwdMode).toBe("700");
+      expect(basename(observed.cwd)).toMatch(/^relay-cwd-fixture-/u);
+      await expect.poll(() => existsSync(observed.cwd)).toBe(false);
+    }
+    expect(basename(workspace)).toMatch(/^relay-cwd-fixture-workspace-/u);
+    expect(((await stat(workspace)).mode & 0o777).toString(8)).toBe("700");
+    const fromProject = relative(process.cwd(), workspace);
+    expect(fromProject.startsWith("..") || isAbsolute(fromProject)).toBe(true);
+
+    await handle.close();
+
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("writes the sentence ONCE per start to a 0600 file for an adapter that reads it from a file, beside every cwd and never in one", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("instructions-fixture", {
+      readsInstructionsFile: true,
+      buildArguments: (_prompt, invocation) => {
+        if (invocation?.instructionsFile === undefined) throw new Error("FIXTURE_INSTRUCTIONS_FILE_MISSING");
+        return [invocation.instructionsFile];
+      }
+    }), INSTRUCTIONS_PROBE);
+
+    const first = await observeRelay<InstructionsObservation>(handle, "Instructions probe one.");
+    const second = await observeRelay<InstructionsObservation>(handle, "Instructions probe two.");
+
+    expect(second.instructionsFile).toBe(first.instructionsFile);
+    expect(isAbsolute(first.instructionsFile)).toBe(true);
+    expect(basename(first.instructionsFile)).toBe(CLI_RELAY_INSTRUCTIONS_FILE_NAME);
+    expect(first.instructionsMode).toBe("600");
+    expect(first.instructions).toBe(RELAY_MINIMAL_SYSTEM_PROMPT);
+    expect(dirname(first.instructionsFile)).toBe(dirname(first.cwd));
+    expect(first.cwdEntries).toEqual([]);
+
+    await handle.close();
+
+    expect(existsSync(first.instructionsFile)).toBe(false);
+  });
+
+  it("never runs such an adapter without its file: refused before any directory or child exists", async () => {
+    const { marker, probe } = await spawnMarker();
+    const adapter = fixtureAdapter("no-instructions-fixture", { readsInstructionsFile: true });
+
+    await expect(invokeCli(
+      { binary: process.execPath, prefixArguments: ["-e", probe, "--"] },
+      adapter,
+      "Instructions probe.",
+      1_000
+    )).rejects.toThrow(CLI_RELAY_INSTRUCTIONS_FILE_MISSING);
+    expect(existsSync(marker)).toBe(false);
+    expect(await relayLeftovers("no-instructions-fixture")).toEqual([]);
+  });
+
+  it("serves in the workspace its caller opened for the handshake, and stop removes it", async () => {
+    const adapter = fixtureAdapter("lent-workspace-fixture");
+    const command = { binary: process.execPath, prefixArguments: ["-e", WORKSPACE_PROBE, "--"] };
+    const workspace = await openRelayWorkspace(adapter);
+    const handshake = JSON.parse(
+      (await invokeCli(command, adapter, "Handshake probe.", 5_000, { workspace })).content
+    ) as WorkspaceObservation;
+    const handle = await startCliRelayServer({ port: 0, timeoutMs: 5_000, command, adapter, workspace });
+    handles.push(handle);
+
+    const served = await observeRelay<WorkspaceObservation>(handle, "Served probe.");
+
+    expect(dirname(handshake.cwd)).toBe(workspace.directory);
+    expect(dirname(served.cwd)).toBe(workspace.directory);
+    expect(served.cwd).not.toBe(handshake.cwd);
+    await handle.close();
+    expect(existsSync(workspace.directory)).toBe(false);
+  });
+
+  it("leaves a call made outside any relay (discovery) where it always ran: its own empty directory in the system temp root", async () => {
+    const observed = JSON.parse((await invokeCli(
+      { binary: process.execPath, prefixArguments: ["-e", WORKSPACE_PROBE, "--"] },
+      fixtureAdapter("bare-call-fixture"),
+      "Bare probe.",
+      5_000
+    )).content) as WorkspaceObservation;
+
+    expect(dirname(observed.cwd)).toBe(await realpath(tmpdir()));
+    expect(observed.cwdEntries).toEqual([]);
+  });
+});
+
+describe("D8 harness overhead, measured once at start and only reported", () => {
+  const reported = (promptTokens: number): CliCompletion =>
+    ({ content: "OK", model: "fixture-model", usage: { promptTokens } });
+  const unreported: CliCompletion = { content: "OK", model: "fixture-model", usage: null };
+  const PROMPT = "a".repeat(41); // ⌈41 ÷ 4⌉ = 11
+
+  it("is the CLI-reported input minus our own characters ÷ 4 count of the handshake prompt", () => {
+    expect(measureHarnessOverhead("Fixture", PROMPT, reported(700))).toEqual({
+      maker: "Fixture", reportedInputTokens: 700, promptTokensEstimate: 11, overheadTokens: 689
+    });
+    // A CLI that counts cached input apart (Claude Code) reports everything it read.
+    expect(measureHarnessOverhead("Fixture", PROMPT, { ...reported(2), reportedInputTokens: 687 }))
+      .toMatchObject({ reportedInputTokens: 687, overheadTokens: 676 });
+    expect(measureHarnessOverhead("Fixture", PROMPT, unreported)).toEqual({
+      maker: "Fixture", reportedInputTokens: null, promptTokensEstimate: 11, overheadTokens: null
+    });
+  });
+
+  it("counts exactly as @debateai/providers' estimatePromptTokens does", () => {
+    expect(RELAY_PROMPT_CHARACTERS_PER_TOKEN).toBe(4);
+    for (const prompt of [
+      "",
+      "a",
+      "Ce urmează din aceste dovezi?",
+      renderPromptTranscript([{ role: "user", content: "Handshake." }])
+    ]) {
+      expect(measureHarnessOverhead("Fixture", prompt, unreported).promptTokensEstimate, prompt)
+        .toBe(estimatePromptTokens([{ role: "user", content: prompt }]));
+    }
+  });
+
+  it("prints one informational line, and a line that cannot be written never refuses a start", () => {
+    const lines: string[] = [];
+
+    const overhead = reportHarnessOverhead("Fixture", PROMPT, reported(700), (line) => { lines.push(line); });
+
+    expect(lines).toEqual(["RELAY OVERHEAD Fixture reported=700 own=11 overhead=689"]);
+    expect(harnessOverheadLine(overhead)).toBe(lines[0]);
+    // F37: the relay host's attributed form names the candidate.
+    expect(harnessOverheadLine(overhead, "local:fixture"))
+      .toBe("RELAY OVERHEAD Fixture local:fixture reported=700 own=11 overhead=689");
+    expect(harnessOverheadLine(measureHarnessOverhead("Fixture", "", unreported)))
+      .toBe("RELAY OVERHEAD Fixture reported=none own=0 overhead=unknown");
+    expect(() => reportHarnessOverhead("Fixture", PROMPT, unreported, () => { throw new Error("EPIPE"); }))
+      .not.toThrow();
+  });
+});
+
+describe("D8 the workspace also holds the file transport's prompt, and a failed start leaves nothing", () => {
+  it("makes the prompt directory in the relay's workspace, beside the call's empty directory, and reaps both", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("workspace-file-fixture", {
+      promptTransport: "file",
+      buildArguments: (_prompt, invocation) => {
+        if (invocation?.promptFile === undefined) throw new Error("FIXTURE_PROMPT_FILE_MISSING");
+        return ["--attach", invocation.promptFile];
+      }
+    }), FILE_PROBE);
+
+    const observed = await observeRelay<{
+      readonly promptFile: string;
+      readonly mode: string;
+      readonly cwd: string;
+      readonly cwdEntries: readonly string[];
+    }>(handle, "Workspace file probe.");
+
+    const workspace = dirname(observed.cwd);
+    expect(basename(workspace)).toMatch(/^relay-workspace-file-fixture-workspace-/u);
+    expect(dirname(dirname(observed.promptFile))).toBe(workspace);
+    expect(basename(dirname(observed.promptFile))).toMatch(/^relay-workspace-file-fixture-prompt-/u);
+    expect(observed.mode).toBe("600");
+    expect(observed.cwdEntries).toEqual([]);
+    expect(existsSync(dirname(observed.promptFile))).toBe(false);
+    expect(await relayLeftovers("workspace-file-fixture")).toEqual([]);
+
+    await handle.close();
+
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("removes the workspace a server opened when it cannot listen", async () => {
+    const occupying = await startFixtureRelay(fixtureAdapter("occupying-fixture"), WORKSPACE_PROBE);
+
+    await expect(startCliRelayServer({
+      port: occupying.port,
+      timeoutMs: 1_000,
+      command: { binary: process.execPath, prefixArguments: ["-e", WORKSPACE_PROBE, "--"] },
+      adapter: fixtureAdapter("listen-failure-fixture")
+    })).rejects.toThrow("EADDRINUSE");
+    expect((await readdir(tmpdir())).filter((entry) => entry.startsWith("relay-listen-failure-fixture-")))
+      .toEqual([]);
   });
 });

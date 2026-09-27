@@ -5,7 +5,7 @@ import { once } from "node:events";
 import {
   accessSync, closeSync, constants, lstatSync, openSync, readSync, statSync
 } from "node:fs";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
 import type { Readable, Writable } from "node:stream";
@@ -61,6 +61,13 @@ export interface CliCompletion {
    * it; an adapter sets it only if its CLI reports running at another level.
    */
   readonly thinkingLevel?: string;
+  /**
+   * D8: every input token the CLI says the model read for this call, cached
+   * input included — set ONLY by a CLI that counts cache apart from
+   * `usage.promptTokens` (Claude Code). Read by the harness-overhead line and
+   * nothing else: it is never echoed and never prices anything.
+   */
+  readonly reportedInputTokens?: number;
 }
 
 export interface CliUsage {
@@ -112,6 +119,8 @@ export interface CliInvocation {
   readonly promptFile?: string;
   /** Already checked against the adapter's `thinkingLevels`; absent ⇒ no level flag. */
   readonly thinkingLevel?: string;
+  /** D8: absolute, mode 0600, holds RELAY_MINIMAL_SYSTEM_PROMPT; only for an adapter that `readsInstructionsFile`. */
+  readonly instructionsFile?: string;
 }
 
 /** What a non-zero exit left behind — shown to the adapter's usage-cap classifier and to nothing else. */
@@ -187,6 +196,14 @@ export interface CliRelayAdapter {
   readonly defaultThinkingLevel?: string;
   /** §2.10: a declared context window; a request that cannot fit is refused (413) before any child exists. */
   readonly contextWindowTokens?: number;
+  /**
+   * D8: true for a CLI that reads its system text from a FILE (codex:
+   * `-c model_instructions_file=…`). The relay then writes
+   * RELAY_MINIMAL_SYSTEM_PROMPT once per start, mode 0600, in its workspace,
+   * and hands the path to `buildArguments` as `invocation.instructionsFile`.
+   * Such an adapter is never run without that file.
+   */
+  readonly readsInstructionsFile?: boolean;
   /**
    * R4: this maker's usage-cap signature, read off a NON-ZERO exit. Returns the
    * maker's typed cap code, or null. Absent, or null, keeps today's FAILED —
@@ -558,6 +575,131 @@ export function createStdoutLineFilter(keepLine: (lineStart: string) => boolean)
   };
 }
 
+/**
+ * D8 — lean calls (owner ruling 2026-09-26; Appendix B, M5). The ONE system
+ * text a relay may give a CLI in place of the CLI's own: fixed engine text,
+ * never debate content, so it may travel on argv. The engine's own system and
+ * user messages stay in the prompt transcript exactly as before.
+ */
+export const RELAY_MINIMAL_SYSTEM_PROMPT = "Follow the instructions in the user message exactly." as const;
+/** D8: the file RELAY_MINIMAL_SYSTEM_PROMPT is written to, for a CLI that reads its instructions from a file. */
+export const CLI_RELAY_INSTRUCTIONS_FILE_NAME = "relay-instructions.md" as const;
+export const CLI_RELAY_INSTRUCTIONS_FILE_MISSING = "CLI_RELAY_INSTRUCTIONS_FILE_MISSING" as const;
+/**
+ * D8: the local size estimate — characters ÷ 4, rounded up — the same rule as
+ * `@debateai/providers`' `estimatePromptTokens` (a relay-core test pins the
+ * agreement), restated so the relay core takes no dependency on providers.
+ */
+export const RELAY_PROMPT_CHARACTERS_PER_TOKEN = 4 as const;
+
+/** The maker's name as one lower-case path token: "Z.AI" → "z-ai", "xAI" → "xai". */
+function makerSlugOf(maker: string): string {
+  return maker.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cli";
+}
+
+/**
+ * D8: ONE private directory per relay, opened at start — before the handshake —
+ * and removed at stop. Every call's fresh, EMPTY working directory (CONT-01,
+ * still reaped after each call) and the "file" transport's prompt directory
+ * are created inside it, so nothing a relay writes outlives the relay. It is
+ * never a working directory itself: the instructions file it may hold is never
+ * in a child's cwd.
+ */
+export interface RelayWorkspace {
+  /** Absolute; mode 0700. */
+  readonly directory: string;
+  /** Absolute; mode 0600; RELAY_MINIMAL_SYSTEM_PROMPT. Only for an adapter that `readsInstructionsFile`. */
+  readonly instructionsFile?: string;
+  /** Removes the directory and everything in it; safe to call more than once. */
+  close(): Promise<void>;
+}
+
+export async function openRelayWorkspace(
+  adapter: Pick<CliRelayAdapter, "maker" | "readsInstructionsFile">
+): Promise<RelayWorkspace> {
+  const directory = await mkdtemp(
+    join(await realpath(tmpdir()), `relay-${makerSlugOf(adapter.maker)}-workspace-`)
+  );
+  const remove = (): Promise<void> => rm(directory, { recursive: true, force: true }).catch(() => undefined);
+  try {
+    // mkdtemp already creates 0700; stated again so no platform default can widen it.
+    await chmod(directory, 0o700);
+    let instructionsFile: string | undefined;
+    if (adapter.readsInstructionsFile === true) {
+      instructionsFile = join(directory, CLI_RELAY_INSTRUCTIONS_FILE_NAME);
+      // `wx`: the directory is new and empty, so an existing file is an anomaly.
+      await writeFile(instructionsFile, RELAY_MINIMAL_SYSTEM_PROMPT, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    }
+    let closing: Promise<void> | undefined;
+    return Object.freeze({
+      directory,
+      ...(instructionsFile === undefined ? {} : { instructionsFile }),
+      close: () => (closing ??= remove())
+    });
+  } catch (error) {
+    await remove();
+    throw error;
+  }
+}
+
+/** D8: what one relay's CLI adds around a prompt, measured once at start. */
+export interface HarnessOverhead {
+  readonly maker: string;
+  /** The CLI's own input count for the handshake; null when it reported none. */
+  readonly reportedInputTokens: number | null;
+  /** Our own count of the handshake prompt handed to the CLI: characters ÷ 4, rounded up. */
+  readonly promptTokensEstimate: number;
+  /** reported − own: what the CLI added. null when nothing was reported. */
+  readonly overheadTokens: number | null;
+}
+
+export function measureHarnessOverhead(
+  maker: string,
+  prompt: string,
+  handshake: CliCompletion
+): HarnessOverhead {
+  const reportedInputTokens = handshake.reportedInputTokens ?? handshake.usage?.promptTokens ?? null;
+  const promptTokensEstimate = Math.ceil(prompt.length / RELAY_PROMPT_CHARACTERS_PER_TOKEN);
+  return Object.freeze({
+    maker,
+    reportedInputTokens,
+    promptTokensEstimate,
+    overheadTokens: reportedInputTokens === null ? null : reportedInputTokens - promptTokensEstimate
+  });
+}
+
+/**
+ * `providerRef` (pre-flight fix F37): a relay does not know which candidate it
+ * serves, so its own line names the maker only. The relay host, which does,
+ * prints the same figures once more with the candidate's providerRef, so two
+ * candidates of one maker (two claude models, say) can be told apart.
+ */
+export function harnessOverheadLine(overhead: HarnessOverhead, providerRef?: string): string {
+  return `RELAY OVERHEAD ${overhead.maker}${providerRef === undefined ? "" : ` ${providerRef}`}`
+    + ` reported=${overhead.reportedInputTokens ?? "none"}`
+    + ` own=${overhead.promptTokensEstimate} overhead=${overhead.overheadTokens ?? "unknown"}`;
+}
+
+/**
+ * D8: measures a handshake's overhead and prints ONE informational line
+ * (stdout by default, beside `RELAY DEGRADED`). Never a gate: nothing here can
+ * refuse a start, and a line that cannot be written is dropped.
+ */
+export function reportHarnessOverhead(
+  maker: string,
+  prompt: string,
+  handshake: CliCompletion,
+  write: (line: string) => void = (line) => { process.stdout.write(`${line}\n`); }
+): HarnessOverhead {
+  const overhead = measureHarnessOverhead(maker, prompt, handshake);
+  try {
+    write(harnessOverheadLine(overhead));
+  } catch {
+    // Informational only.
+  }
+  return overhead;
+}
+
 /** §2.2: stamps the level a REQUEST asked for; an unasked call stays DEFAULT_ONLY. */
 function withRequestedLevel(completion: CliCompletion, requestedLevel: string | undefined): CliCompletion {
   return requestedLevel === undefined || completion.thinkingLevel !== undefined
@@ -584,7 +726,7 @@ export async function invokeCli(
   adapter: CliRelayAdapter,
   prompt: string,
   timeoutMs: number,
-  options: Readonly<{ thinkingLevel?: string }> = {}
+  options: Readonly<{ thinkingLevel?: string; workspace?: RelayWorkspace }> = {}
 ): Promise<CliCompletion> {
   // Fix round 1: the handshake paths call invokeCli without startCliRelayServer,
   // so the adapter's own declarations are checked here too, before anything exists.
@@ -597,9 +739,18 @@ export async function invokeCli(
   if (thinkingLevel !== undefined && !(adapter.thinkingLevels ?? []).includes(thinkingLevel)) {
     throw new TypeError(CLI_RELAY_THINKING_LEVEL_UNSUPPORTED);
   }
+  // D8: a CLI that reads its system text from a file runs with the relay's own
+  // file or not at all — never silently with its built-in default.
+  const instructionsFile = options.workspace?.instructionsFile;
+  if (adapter.readsInstructionsFile === true && instructionsFile === undefined) {
+    throw new TypeError(CLI_RELAY_INSTRUCTIONS_FILE_MISSING);
+  }
   const transport = adapter.promptTransport ?? "argv";
-  const makerSlug = adapter.maker.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cli";
-  const temporaryRoot = await realpath(tmpdir());
+  const makerSlug = makerSlugOf(adapter.maker);
+  // D8: inside a relay, the call's empty directory (and the "file" transport's
+  // prompt directory) is made in the relay's private workspace; a call made
+  // outside any relay (discovery) keeps the system temp root, as before.
+  const temporaryRoot = options.workspace?.directory ?? await realpath(tmpdir());
   const scratchDirectory = await mkdtemp(join(temporaryRoot, `relay-${makerSlug}-`));
   let promptDirectory: string | undefined;
   // Vendor litter and the prompt file are not relay input: both directories are
@@ -627,7 +778,8 @@ export async function invokeCli(
     }
     const invocation: CliInvocation = Object.freeze({
       ...(promptFile === undefined ? {} : { promptFile }),
-      ...(thinkingLevel === undefined ? {} : { thinkingLevel })
+      ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
+      ...(instructionsFile === undefined ? {} : { instructionsFile })
     });
     argumentList = [...command.prefixArguments, ...adapter.buildArguments(prompt, invocation)];
     // §2.10, fix round 1: "never on argv" is a law of the core, not a courtesy of
@@ -830,6 +982,12 @@ export interface CliRelayServerOptions {
   readonly timeoutMs: number;
   readonly command: CommandSpec;
   readonly adapter: CliRelayAdapter;
+  /**
+   * D8: the relay's private workspace, opened by its start function BEFORE the
+   * handshake. The server owns it from here and removes it at close(). Absent
+   * ⇒ the server opens one of its own.
+   */
+  readonly workspace?: RelayWorkspace;
 }
 
 export interface CliRelayHandle {
@@ -962,6 +1120,8 @@ export async function startCliRelayServer(options: CliRelayServerOptions): Promi
     throw new TypeError("CLI_RELAY_TIMEOUT_INVALID");
   }
   assertAdapterDeclarations(options.adapter);
+  // D8: every served call runs inside this relay's own workspace.
+  const workspace = options.workspace ?? await openRelayWorkspace(options.adapter);
   const authorizationHeader = `Bearer ${randomBytes(32).toString("base64url")}`;
   const authorizationDigest = createHash("sha256").update(authorizationHeader, "utf8").digest();
   const server: Server = createServer(async (request, response) => {
@@ -993,7 +1153,7 @@ export async function startCliRelayServer(options: CliRelayServerOptions): Promi
         options.adapter,
         prompt,
         options.timeoutMs,
-        requestedLevel === undefined ? {} : { thinkingLevel: requestedLevel }
+        requestedLevel === undefined ? { workspace } : { thinkingLevel: requestedLevel, workspace }
       );
       sendJson(response, 200, {
         id: `chatcmpl-${randomUUID()}`,
@@ -1029,11 +1189,17 @@ export async function startCliRelayServer(options: CliRelayServerOptions): Promi
       sendJson(response, 400, { error: "MALFORMED_REQUEST" });
     }
   });
-  server.listen(options.port, "127.0.0.1");
-  await once(server, "listening");
+  try {
+    server.listen(options.port, "127.0.0.1");
+    await once(server, "listening");
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
   const address = server.address();
   if (address === null || typeof address === "string") {
     server.close();
+    await workspace.close();
     throw new Error("CLI_RELAY_ADDRESS_FAILED");
   }
   return {
@@ -1041,9 +1207,12 @@ export async function startCliRelayServer(options: CliRelayServerOptions): Promi
     baseUrl: `http://127.0.0.1:${address.port}`,
     authorizationHeader,
     async close() {
-      if (!server.listening) return;
-      server.close();
-      await once(server, "close");
+      if (server.listening) {
+        server.close();
+        await once(server, "close");
+      }
+      // D8: the workspace goes with the relay, whatever a call left in it.
+      await workspace.close();
     }
   };
 }

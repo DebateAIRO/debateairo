@@ -47,8 +47,25 @@ afterEach(async () => {
   await Promise.all(handles.splice(0).map((handle) => handle.close()));
 });
 
+/**
+ * D8 (Task A12b): a served call's directories sit inside its relay's open
+ * workspace (`relay-<maker>-workspace-…`, removed at stop), so the listing looks
+ * inside every such workspace: whatever a CALL left there is still named, and the
+ * relay's own workspace, alive until close(), is not a call's leftover.
+ */
 async function relayLeftovers(maker: string): Promise<string[]> {
-  return (await readdir(tmpdir())).filter((entry) => entry.startsWith(`relay-${maker}-`));
+  const root = tmpdir();
+  const leftovers: string[] = [];
+  for (const entry of await readdir(root)) {
+    if (!entry.startsWith(`relay-${maker}-`)) continue;
+    if (!entry.startsWith(`relay-${maker}-workspace-`)) {
+      leftovers.push(entry);
+      continue;
+    }
+    const inside = await readdir(join(root, entry)).catch((): string[] => []);
+    leftovers.push(...inside.map((inner) => join(entry, inner)));
+  }
+  return leftovers;
 }
 
 describe("fix round 2: EMFILE/ENFILE — spawn returns a child without stdio and a scheduled error", () => {
