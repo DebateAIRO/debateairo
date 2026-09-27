@@ -754,6 +754,7 @@ describe("D10 maker CLI binary resolution", () => {
     expect(sources).toContain("relay-core.ts");
     expect(sources).toContain("agy-relay.ts");
     expect(sources).toContain("pi-relay.ts");
+    expect(sources).toContain("relay-host.ts");
     expect(sources).toContain(join("test-fixtures", "evaluator-double.ts"));
     expect(sources).toContain(join("test-fixtures", "fake-claude-cli.mjs"));
     expect(sources).toContain(join("test-fixtures", "fake-agy-cli.mjs"));

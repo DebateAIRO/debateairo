@@ -1,0 +1,337 @@
+import { randomUUID } from "node:crypto";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { z } from "zod";
+import { resolveDeploymentMode } from "@debateai/register";
+import { startAgyRelay } from "./agy-relay.js";
+import { startClaudeRelay } from "./claude-relay.js";
+import { startGrokRelay } from "./grok-relay.js";
+import { startModelShim } from "./model-shim.js";
+import { startPiRelay } from "./pi-relay.js";
+import {
+  CLI_RELAY_THINKING_LEVEL_TOKEN,
+  type CliRelayHandle,
+  type CommandSpec
+} from "./relay-core.js";
+
+/**
+ * Model scorecard §2.9/§2.10 — `pnpm run relays:serve`. The LOCAL operator's
+ * relay host for step replay: one relay per candidate of a candidates file,
+ * each on its own loopback port with its own random bearer, and an endpoints
+ * file (mode 0600) that tells `moment:replay` where each one is. It runs until
+ * SIGTERM (or SIGINT), then closes every relay and removes the endpoints file.
+ *
+ * It REFUSES in the hosted deployment — V-9(c): the relays ARE the local mode
+ * and the hosted site never runs them — before it reads a file or starts a CLI.
+ * It never prints a bearer; the endpoints file is the only place one is written.
+ */
+
+export const RELAY_HOST_TOOLS = Object.freeze(["claude", "codex", "grok", "agy", "pi"] as const);
+export type RelayHostTool = typeof RELAY_HOST_TOOLS[number];
+
+/** The development panel's per-call deadline, restated: acceptance does not import the runner. */
+const RELAY_HOST_DEFAULT_TIMEOUT_MS = 180_000;
+/** The same ceiling the discovery-target parser holds its operator file to. */
+const RELAY_HOST_CANDIDATES_MAX_BYTES = 65_536;
+
+const candidateSchema = z.object({
+  providerRef: z.string().regex(/^[a-z][a-z0-9._:-]{0,127}$/u),
+  tool: z.enum(RELAY_HOST_TOOLS),
+  modelId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u),
+  thinkingLevels: z.array(z.string().regex(CLI_RELAY_THINKING_LEVEL_TOKEN)).max(16)
+}).strict();
+
+const candidatesFileSchema = z.object({
+  candidates: z.array(candidateSchema).min(1).max(32)
+}).strict();
+
+export type RelayHostCandidate = Readonly<{
+  providerRef: string;
+  tool: RelayHostTool;
+  /** agy: the BASE id, without its level suffix. */
+  modelId: string;
+  /** The levels replay will ask; agy: the id suffixes to serve (at least one). */
+  thinkingLevels: readonly string[];
+}>;
+
+export interface RelayHostEndpoint {
+  readonly providerRef: string;
+  readonly maker: string;
+  readonly tool: RelayHostTool;
+  readonly modelId: string;
+  /** `http://127.0.0.1:<port>/v1` — usable as a discovery target's `base_url` as is. */
+  readonly baseUrl: string;
+  /** The relay's bearer WITHOUT the `Bearer ` scheme; the header is `Bearer <bearerToken>`. */
+  readonly bearerToken: string;
+  readonly thinkingLevels: readonly string[];
+  readonly contextWindowTokens: number | null;
+}
+
+export interface RelayHostSeams {
+  /** Test-only CLI doubles per tool. Each start function refuses them outside NODE_ENV=test. */
+  readonly commands?: Readonly<Partial<Record<RelayHostTool, CommandSpec>>>;
+  readonly codexSessionsRoot?: string;
+}
+
+export interface RelayHostOptions {
+  readonly candidatesPath: string;
+  readonly endpointsPath: string;
+  readonly timeoutMs?: number;
+  readonly environment: Readonly<Record<string, string | undefined>>;
+  readonly seams?: RelayHostSeams;
+  readonly emit?: (line: string) => void;
+}
+
+export interface RelayHostHandle {
+  readonly endpoints: readonly RelayHostEndpoint[];
+  stop(): Promise<void>;
+}
+
+type StartedRelay = CliRelayHandle & Readonly<{
+  model: string;
+  maker: string;
+  thinkingLevels: readonly string[];
+  contextWindowTokens?: number;
+}>;
+
+/** V-9(c): the relay host is local-mode tooling and refuses the hosted deployment outright. */
+export function assertRelayHostRuntime(environment: Readonly<Record<string, string | undefined>>): void {
+  if (resolveDeploymentMode(environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV) === "hosted") {
+    throw new TypeError("RELAY_HOST_REFUSED_IN_HOSTED");
+  }
+}
+
+export async function readRelayHostCandidates(path: string): Promise<readonly RelayHostCandidate[]> {
+  let text: string;
+  try {
+    const bytes = await readFile(path);
+    if (bytes.byteLength > RELAY_HOST_CANDIDATES_MAX_BYTES) throw new RangeError("too large");
+    text = bytes.toString("utf8");
+  } catch {
+    throw new TypeError("RELAY_HOST_CANDIDATES_UNREADABLE");
+  }
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(text);
+  } catch {
+    throw new TypeError("RELAY_HOST_CANDIDATES_INVALID");
+  }
+  const parsed = candidatesFileSchema.safeParse(decoded);
+  if (!parsed.success) throw new TypeError("RELAY_HOST_CANDIDATES_INVALID");
+  const candidates = parsed.data.candidates;
+  if (new Set(candidates.map(({ providerRef }) => providerRef)).size !== candidates.length
+    || candidates.some(({ thinkingLevels }) => new Set(thinkingLevels).size !== thinkingLevels.length)
+    || candidates.some(({ tool, thinkingLevels }) => tool === "agy" && thinkingLevels.length === 0)) {
+    throw new TypeError("RELAY_HOST_CANDIDATES_INVALID");
+  }
+  return Object.freeze(candidates.map((candidate) => Object.freeze({
+    providerRef: candidate.providerRef,
+    tool: candidate.tool,
+    modelId: candidate.modelId,
+    thinkingLevels: Object.freeze([...candidate.thinkingLevels])
+  })));
+}
+
+/** The Claude CLI takes a family ALIAS: the id's second segment, exactly as the dev panel derives it. */
+function claudeAliasOf(modelId: string): string {
+  const alias = modelId.split("-")[1];
+  if (alias === undefined || !/^[a-z0-9]+$/u.test(alias)) {
+    throw new TypeError("RELAY_HOST_MODEL_ALIAS_UNRESOLVED");
+  }
+  return alias;
+}
+
+function testOnlyCommandFor(seams: RelayHostSeams, tool: RelayHostTool): { readonly testOnlyCommand?: CommandSpec } {
+  const command = seams.commands?.[tool];
+  return command === undefined ? {} : { testOnlyCommand: command };
+}
+
+type RelayStart = (
+  candidate: RelayHostCandidate,
+  timeoutMs: number,
+  seams: RelayHostSeams
+) => Promise<StartedRelay>;
+
+// Annotated directly (not through Object.freeze) so every arrow is contextually typed.
+const RELAY_STARTS: Readonly<Record<RelayHostTool, RelayStart>> = {
+  claude: (candidate, timeoutMs, seams) => startClaudeRelay({
+    port: 0, timeoutMs, modelAlias: claudeAliasOf(candidate.modelId), ...testOnlyCommandFor(seams, "claude")
+  }),
+  codex: (candidate, timeoutMs, seams) => startModelShim({
+    port: 0,
+    timeoutMs,
+    model: candidate.modelId,
+    ...testOnlyCommandFor(seams, "codex"),
+    ...(seams.codexSessionsRoot === undefined ? {} : { testOnlySessionsRoot: seams.codexSessionsRoot })
+  }),
+  // grok pins no model; its CLI-reported lineage is held to modelId below.
+  grok: (_candidate, timeoutMs, seams) => startGrokRelay({
+    port: 0, timeoutMs, ...testOnlyCommandFor(seams, "grok")
+  }),
+  agy: (candidate, timeoutMs, seams) => startAgyRelay({
+    port: 0,
+    timeoutMs,
+    model: candidate.modelId,
+    thinkingLevels: candidate.thinkingLevels,
+    ...testOnlyCommandFor(seams, "agy")
+  }),
+  pi: (candidate, timeoutMs, seams) => startPiRelay({
+    port: 0, timeoutMs, model: candidate.modelId, ...testOnlyCommandFor(seams, "pi")
+  })
+};
+
+/** A relay serves a candidate only if it IS that model and can run every one of its levels. */
+async function startVerifiedRelay(
+  candidate: RelayHostCandidate,
+  timeoutMs: number,
+  seams: RelayHostSeams
+): Promise<StartedRelay> {
+  const relay = await RELAY_STARTS[candidate.tool](candidate, timeoutMs, seams);
+  const refusal = relay.model !== candidate.modelId
+    ? "RELAY_HOST_MODEL_MISMATCH"
+    : candidate.thinkingLevels.some((level) => !relay.thinkingLevels.includes(level))
+      ? "RELAY_HOST_THINKING_LEVEL_UNSUPPORTED"
+      : null;
+  if (refusal !== null) {
+    await relay.close();
+    throw new TypeError(refusal);
+  }
+  return relay;
+}
+
+function failureCodeOf(reason: unknown): string {
+  return reason instanceof Error && reason.message.trim() !== ""
+    ? reason.message
+    : "RELAY_HOST_RELAY_START_FAILED";
+}
+
+function bearerTokenOf(authorizationHeader: string): string {
+  const scheme = "Bearer ";
+  if (!authorizationHeader.startsWith(scheme)) throw new TypeError("RELAY_HOST_RELAY_CREDENTIAL_INVALID");
+  return authorizationHeader.slice(scheme.length);
+}
+
+/** Written whole or not at all: a 0600 temporary file in the same directory, then renamed over. */
+async function writeEndpointsFile(path: string, endpoints: readonly RelayHostEndpoint[]): Promise<void> {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, `${JSON.stringify({ relays: endpoints }, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx"
+    });
+    await rename(temporary, path);
+  } catch {
+    await rm(temporary, { force: true });
+    throw new TypeError("RELAY_HOST_ENDPOINTS_WRITE_FAILED");
+  }
+}
+
+export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHostHandle> {
+  assertRelayHostRuntime(options.environment);
+  const timeoutMs = options.timeoutMs ?? RELAY_HOST_DEFAULT_TIMEOUT_MS;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new TypeError("RELAY_HOST_TIMEOUT_INVALID");
+  const emit = options.emit ?? ((line: string) => { process.stdout.write(`${line}\n`); });
+  const candidates = await readRelayHostCandidates(resolve(options.candidatesPath));
+  const endpointsPath = resolve(options.endpointsPath);
+  const seams = options.seams ?? {};
+  const settled = await Promise.allSettled(candidates.map((candidate) =>
+    startVerifiedRelay(candidate, timeoutMs, seams)
+  ));
+  const started: { readonly candidate: RelayHostCandidate; readonly relay: StartedRelay }[] = [];
+  settled.forEach((outcome, index) => {
+    const candidate = candidates[index]!;
+    if (outcome.status === "fulfilled") started.push({ candidate, relay: outcome.value });
+    else emit(`RELAY ABSENT ${candidate.providerRef} ${failureCodeOf(outcome.reason)}`);
+  });
+  const closeAll = async (): Promise<void> => {
+    await Promise.allSettled(started.map(({ relay }) => relay.close()));
+  };
+  if (started.length === 0) throw new TypeError("RELAY_HOST_NO_RELAY_STARTED");
+  let endpoints: readonly RelayHostEndpoint[];
+  try {
+    endpoints = Object.freeze(started.map(({ candidate, relay }) => Object.freeze({
+      providerRef: candidate.providerRef,
+      maker: relay.maker,
+      tool: candidate.tool,
+      modelId: relay.model,
+      baseUrl: `${relay.baseUrl}/v1`,
+      bearerToken: bearerTokenOf(relay.authorizationHeader),
+      thinkingLevels: candidate.thinkingLevels,
+      contextWindowTokens: relay.contextWindowTokens ?? null
+    })));
+    await writeEndpointsFile(endpointsPath, endpoints);
+  } catch (error) {
+    await closeAll();
+    throw error;
+  }
+  emit(`RELAYS SERVING ${endpoints.length} ${endpointsPath}`);
+  let stopping: Promise<void> | undefined;
+  return Object.freeze({
+    endpoints,
+    stop() {
+      stopping ??= (async () => {
+        await closeAll();
+        await rm(endpointsPath, { force: true });
+      })();
+      return stopping;
+    }
+  });
+}
+
+/** `--candidates <file> --endpoints <file> [--timeout-ms <n>]`; a leading `--` (pnpm) is ignored. */
+export function parseRelayHostArguments(argv: readonly string[]): Readonly<{
+  candidatesPath: string;
+  endpointsPath: string;
+  timeoutMs?: number;
+}> {
+  const tokens = argv[0] === "--" ? argv.slice(1) : argv;
+  const values = new Map<string, string>();
+  for (let index = 0; index < tokens.length; index += 2) {
+    const flag = tokens[index];
+    const value = tokens[index + 1];
+    if (flag === undefined || value === undefined || value.startsWith("--") || values.has(flag)
+      || !["--candidates", "--endpoints", "--timeout-ms"].includes(flag)) {
+      throw new TypeError("RELAY_HOST_ARGUMENTS_INVALID");
+    }
+    values.set(flag, value);
+  }
+  const candidatesPath = values.get("--candidates");
+  const endpointsPath = values.get("--endpoints");
+  const timeoutText = values.get("--timeout-ms");
+  if (candidatesPath === undefined || endpointsPath === undefined
+    || (timeoutText !== undefined && !/^[1-9][0-9]{0,8}$/u.test(timeoutText))) {
+    throw new TypeError("RELAY_HOST_ARGUMENTS_INVALID");
+  }
+  return Object.freeze({
+    candidatesPath,
+    endpointsPath,
+    ...(timeoutText === undefined ? {} : { timeoutMs: Number(timeoutText) })
+  });
+}
+
+export async function main(
+  argv: readonly string[],
+  signals: Pick<NodeJS.EventEmitter, "once" | "off"> = process,
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): Promise<void> {
+  const host = await serveRelayHost({ ...parseRelayHostArguments(argv), environment });
+  await new Promise<void>((resolveStop) => {
+    const stop = (): void => {
+      signals.off("SIGTERM", stop);
+      signals.off("SIGINT", stop);
+      resolveStop();
+    };
+    signals.once("SIGTERM", stop);
+    signals.once("SIGINT", stop);
+  });
+  await host.stop();
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main(process.argv.slice(2)).catch((error: unknown) => {
+    process.stderr.write(`${error instanceof Error ? error.message : "RELAY_HOST_FAILED"}\n`);
+    process.exitCode = 1;
+  });
+}

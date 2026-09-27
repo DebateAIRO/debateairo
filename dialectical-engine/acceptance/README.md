@@ -124,6 +124,21 @@ backup — until one is captured. When a real cap happens, keep that call's stdo
 and stderr, remove anything credential-shaped, and add the exact signature to that
 maker's `classifyUsageCap` together with a test that replays the capture.
 
+**Serving relays for step replay (`pnpm run relays:serve`, model scorecard §2.9).**
+Local and operator-only: it refuses in the hosted deployment before it reads a
+file. Write a candidates file, `{"candidates":[{"providerRef":"local:pi-glm","tool":"pi","modelId":"glm-5.3-flash","thinkingLevels":["low","high"]}]}`,
+where `tool` is one of `claude`, `codex`, `grok`, `agy`, `pi`, then run
+`pnpm run relays:serve -- --candidates <file> --endpoints <file>`. One relay starts
+per candidate on its own loopback port with its own bearer. A candidate whose CLI
+answers as a different model than `modelId`, or cannot run one of its
+`thinkingLevels`, is left out with a `RELAY ABSENT <providerRef> <code>` line. For
+`agy`, `modelId` is the base id without the level suffix and `thinkingLevels` lists
+the suffixes to serve. The endpoints file is written with mode 0600:
+`{relays:[{providerRef, maker, tool, modelId, baseUrl, bearerToken, thinkingLevels, contextWindowTokens}]}`,
+where `baseUrl` already ends in `/v1` and `bearerToken` is the value after `Bearer `.
+The host runs until SIGTERM or Ctrl-C, then closes every relay and deletes the
+endpoints file.
+
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size
 ceiling refuses a lawful nonempty debate. Grok's fixed relay port is
