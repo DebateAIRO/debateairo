@@ -413,8 +413,10 @@ export const evaluatorVerdictSchema = z.object({
 
 /**
  * Model scorecard A17 (spec §2.9) — THE SYNTHESIS PROMPT BUILDER, callable on
- * its own. Both runner closures build their packet here, and `replay-moment`
- * calls this same function, so a replayed prompt is the live prompt by
+ * its own. Both runner closures build their packet here, and `moment:replay`
+ * (`replayMoment`, acceptance/replay-moment.ts) calls this same function
+ * through `captureMomentPacket` and `invokeMomentBuilder`
+ * (acceptance/moment-tools.ts), so a replayed prompt is the live prompt by
  * construction. It stays in THIS module because the evaluator's contract is
  * declared here (the seeders import it and `f-sealedrows-a-dataflow` mocks that
  * export). `randomBytes` exists for the byte-equality test; production never

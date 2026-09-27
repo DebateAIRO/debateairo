@@ -175,6 +175,36 @@ where it really leads, by the same rule as the endpoints file above. Environment
 `DEBATEAI_CUSTODY_GROUP`, the same settings the runner uses, plus
 `KEK_PREVIOUS_PATH` during a key changeover.
 
+**Asking other models the same question (`pnpm run moment:replay`, model scorecard §2.9).**
+Local and operator-only: it refuses in the hosted deployment before it reads a
+file, and it never touches the database. It takes moment files and sends each
+one's prompt, rebuilt by today's live prompt builder, to other candidate models,
+then writes down what each one answered. Run
+`pnpm run moment:replay -- --endpoints <file> --jobs <jobs.jsonl> --out <results.jsonl> --bound <maxAttempts>,<tokenCeiling>,<deadlineMs>`.
+The endpoints file is the one `relays:serve` writes. It holds the relays'
+bearers, so it must be owner-only (mode 0600), and a plain-http address must be
+this machine's own. The relays themselves run only on this machine: they are for
+local use, never for the hosted site. Each line of the jobs file names one moment
+file, one route of the endpoints file and one thinking level:
+`{"momentFile":"a.moment.json","providerRef":"local:pi-glm","thinkingLevel":"low"}`
+(a relative `momentFile` is read from the jobs file's folder). Every route and
+every moment file is checked before the first call. `--bound` is required, because no
+recorded call kept its own limits: for example, `1,2048,180000` means one attempt,
+at most 2048 answer tokens, and three minutes. It applies to every call in the
+batch, so replay one kind of step per batch. Each job adds one line to the
+`--out` file. A rerun skips the jobs that already have a final answer there, so a
+stopped batch picks up where it stopped. A prompt too big for a model's declared
+window is written as `CONTEXT_TOO_LARGE` and never sent. When a subscription hits
+its usage cap, that job's line is written and the batch stops at once with
+`MOMENT_REPLAY_USAGE_CAP <providerRef>`. A capped or timed-out job is not a final
+answer: a rerun asks it again, and its newest line is the one that counts. A
+time-out does not stop the batch. The results hold the models' answers to the
+private debate text. So the `--out` file is written owner-only (0600), and it must sit
+outside the repository or under any `.local/` folder inside it, judged by the same
+rule as above (`MOMENT_OUTPUT_PATH_REFUSED`). A reply is recorded only when it is
+the model's own answer, accepted or refused. An error body from a relay or a
+vendor never is.
+
 **Lean calls (model scorecard D8, owner ruling 2026-09-26).** A relayed call
 carries what an API call would, and as little else as each CLI allows. Every relay
 opens one private directory (mode 0700) when it starts and removes it when it stops;

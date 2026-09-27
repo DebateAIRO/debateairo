@@ -459,7 +459,9 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // by the same two counts, in either direction.
     expect(occurrences(runner, "JSON.stringify(request)")).toBe(0);
     // A17: both call sites build through the ONE exported synthesis builder,
-    // which replay-moment also calls, and that builder is the only place the
+    // which `moment:replay` (`replayMoment`) also calls, through
+    // `captureMomentPacket` and `invokeMomentBuilder` in
+    // acceptance/moment-tools.ts, and that builder is the only place the
     // projection is applied.
     expect(occurrences(runner, "buildSynthesisRolePrompt(request)")).toBe(SYNTHESIS_CALL_SITES);
     expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
