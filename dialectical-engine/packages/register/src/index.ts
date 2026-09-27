@@ -818,6 +818,7 @@ export {
   loadMigrationEnvironment,
   loadReplaySelfTestEnvironment,
   loadRunnerEnvironment,
+  loadServeDisclosureReportEnvironment,
   loadSettlementEnvironment,
   parseApiEnvironment,
   parseKeyRotationEnvironment,
@@ -825,6 +826,7 @@ export {
   parseMigrationEnvironment,
   parseReplaySelfTestEnvironment,
   parseRunnerEnvironment,
+  parseServeDisclosureReportEnvironment,
   parseSettlementEnvironment
 } from "./runtime-environment.js";
 

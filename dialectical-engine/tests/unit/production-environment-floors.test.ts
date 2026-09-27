@@ -163,7 +163,7 @@ describe("production configuration floors (R2)", () => {
       new URL("../../packages/register/src/runtime-environment.ts", import.meta.url),
       "utf8"
     );
-    for (const name of ["Migration", "ReplaySelfTest", "Liveness", "Settlement", "Runner"]) {
+    for (const name of ["Migration", "ReplaySelfTest", "Liveness", "Settlement", "Runner", "ServeDisclosureReport"]) {
       expect(source).toContain(
         `export function load${name}Environment() {\n  return parse${name}Environment(process.env);\n}`
       );

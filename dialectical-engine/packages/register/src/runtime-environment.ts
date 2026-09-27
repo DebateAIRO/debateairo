@@ -278,6 +278,24 @@ export function loadSettlementEnvironment() {
   return parseSettlementEnvironment(process.env);
 }
 
+/**
+ * Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the operator's
+ * read-only disclosure report (`pnpm ops:serve-disclosure`,
+ * apps/runner/src/serve-disclosure-cli.ts). It reads content-free rows as the
+ * runner's own database principal, so it takes the runner's `DATABASE_URL`,
+ * through this loader and no other: a key a booting service reads is never read
+ * by `readOperatorCommandEnvironment`. On the host it runs under `systemd-run`
+ * with the runner's `EnvironmentFile` (deploy/vps/README.md §11), the way the
+ * rotation command runs with the API's; the production floors hold here too.
+ */
+export function parseServeDisclosureReportEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({ DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment }, source));
+}
+
+export function loadServeDisclosureReportEnvironment() {
+  return parseServeDisclosureReportEnvironment(process.env);
+}
+
 const positiveInteger = z.coerce.number().int().positive();
 const nonNegativeInteger = z.coerce.number().int().nonnegative();
 const boundedRate = z.coerce.number().min(0).max(1);

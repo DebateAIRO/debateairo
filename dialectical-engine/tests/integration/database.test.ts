@@ -78,6 +78,7 @@ import {
   type RunCreationSettings
 } from "@debateai/api";
 import { buildAnswerDisclosure } from "../../apps/api/src/disclosures.js";
+import { runServeDisclosureCli } from "../../apps/runner/src/serve-disclosure-cli.js";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
 import {
@@ -6722,6 +6723,27 @@ describe("Engine money rule M5 — the disclosure read over the runner's own row
     expect(read?.models).toMatchObject({
       writerPlanned: { providerRef: PRIMARY_REF, maker: "Primary test maker" }, writerServed: null, checkerServed: null
     });
+
+    // The operator's command prints the same record, by the run's id, one fact per line.
+    const printed: string[] = [];
+    const refused: string[] = [];
+    const repository = new ServeDisclosureRepository(database.pool);
+    expect(await runServeDisclosureCli([scenario.runId], {
+      stdout: (text) => printed.push(text), stderr: (text) => refused.push(text)
+    }, async () => ({ read: (id) => repository.readLatestForOperator(id), close: async () => undefined }))).toBe(0);
+    expect(refused).toEqual([]);
+    const lines = printed.join("").split("\n");
+    expect(lines).toEqual(expect.arrayContaining([
+      `answer: ${answerId} (version 1)`,
+      `run: ${scenario.runId}`,
+      "answer: not written by a model; the floor stands in for it",
+      `floor: ${receipt.label}, on the leading position ${receipt.servedNodeId}`,
+      "floor reason: ENVELOPE_EXHAUSTED",
+      `answer writer planned: Primary test maker · test-layer/primary-model (${PRIMARY_REF})`,
+      "answer writer used: none (no checked round was served)",
+      "answer-writing cut short by: money",
+      "digest the answer-writer read: rung 0, whole"
+    ]));
   });
 });
 

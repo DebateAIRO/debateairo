@@ -1191,6 +1191,43 @@ figures, so its cost cannot be counted). Set a monthly spending cap on each vend
 as well (go-live checklist line 8): the envelopes are the application's ceiling, the dashboard cap
 is the vendor's.
 
+#### One answer's record: what money and size did to it
+
+Every answer gets one owner-side record (`serve.serve_disclosure`, engine money rule §14.4.5 of
+`docs/superpowers/specs/2026-09-26-verdict-story-design.md`): which models were planned for writing
+and checking the answer and which actually did, whether a lower-cost model stood in because the
+planned one could not be paid, what cut the arguing or the answer-writing short, how far the
+debate's digest was shortened for the answer-writer, and — when no answer could be written at all —
+the **floor**: the label the engine derived and the leading position the page shows as the best
+answer. The answer's owner reads it through `GET /v1/answers/{id}/disclosure`; you read it with
+
+```sh
+# Paste the answer's id, or the run's id, at the prompt.
+read -r DEBATE_ID && systemd-run --pipe --wait --collect --uid=debateai-runner --gid=debateai-runner --property=EnvironmentFile=/etc/debateai/runner.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm ops:serve-disclosure "$DEBATE_ID"
+```
+
+`sudo -u` does not read the unit's `EnvironmentFile`; `systemd-run` does, so the command connects
+as the runner's own database principal (`runner.env` `DATABASE_URL`) without the credential ever
+reaching a command line. It only reads: the record, and the maker and model names of the calls the
+run recorded. It prints the answer's latest version that has a record (a review catch-up version
+has none of its own), one fact per line — ids, codes, counts and model names, never debate text, a
+price, an address or a credential:
+
+| Line | Meaning |
+|---|---|
+| `answer: written by a model and checked` | a model wrote the answer and a checker read it |
+| `answer: not written by a model; the floor stands in for it` + `floor: <label>, on the leading position <id>` + `floor reason: <code>` | no answer could be written; the sealed answer stays components-only and the page shows the floor (the reason is the sealed cause: `ENVELOPE_EXHAUSTED`, `DIGEST_CANNOT_EXIST`, `TRANSPORT_DEATH` or `NO_ARTIFACT`) |
+| `answer writer planned:` / `used:`, `answer checker planned:` / `used:` | maker · model (provider ref); `none` when no checked round was served |
+| `a lower-cost model was used: yes, for money` | the planned model could not be paid, and a cheaper one of the run's own models stood in (the only substitution the engine makes) |
+| `one model both wrote and checked the answer: yes` | the two-model check was lost to the substitution |
+| `arguing cut short by:` / `answer-writing cut short by:` | `money`, `the attempt ceiling`, `a vendor that reported no usage`, `the daily ceiling`, `a dead model connection`, `a draft with nothing to serve`, or `nothing` |
+| `digest the answer-writer read: rung N, …` + `points left out of that digest: N` | how far the debate was shortened to fit the answer-writer's input; only the last rung (the spine) leaves points out |
+
+A refusal is one code on stderr: `SERVE_DISCLOSURE_USAGE` (not exactly one id), `SERVE_DISCLOSURE_NOT_FOUND`
+(no record for that id: a failed run has none), `SERVE_DISCLOSURE_ENVIRONMENT_INVALID` (no
+`DATABASE_URL`: the `EnvironmentFile` was not loaded), `DATABASE_URL_TLS_REQUIRED:DATABASE_URL`, or
+`SERVE_DISCLOSURE_REPORT_FAILED`.
+
 ### Publishing the settings register on this host
 
 Both services read their settings from ONE register version in the database, named by
