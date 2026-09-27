@@ -149,8 +149,15 @@ const StoryShortShape = StoryBodySchema.shape.short.shape;
  * fields of a READY or READY_WITH_RESERVATION story, its confidence sentence
  * among them (§14.2), and the reviewer's note. Everything else stays
  * owner-only: the long story, the reasons in `why`, the PDF, the checker's
- * reservation (it names points by numbers only the owner's appendix explains),
- * the lineages, the point numbers, the verdict basis and the pack.
+ * reservation TEXT (it names points by numbers only the owner's appendix
+ * explains), the lineages, the point numbers, the verdict basis and the pack.
+ *
+ * `double_checked` (final review, Important 2): OPTIONAL, and `false` only for
+ * a READY_WITH_RESERVATION story. Only that fact crosses, never the text: the
+ * public page shows it as the same gentle catalogue line the owner's page and
+ * the PDF show (§14.2, "Parts of this summary could not be fully
+ * double-checked."). A snapshot without it — every one published before, and
+ * every READY story — shows no such line.
  *
  * LIMITS: every member below IS the StoryBodySchema member, so the public
  * limits mirror the body's short fields and reviewer's note exactly
@@ -166,6 +173,7 @@ export const PublicStoryShortSchema = z.object({
   confidence: StoryShortShape.confidence,
   paths: StoryShortShape.paths,
   change: StoryShortShape.change,
-  reviewer_note: StoryBodySchema.shape.reviewer_note
+  reviewer_note: StoryBodySchema.shape.reviewer_note,
+  double_checked: z.boolean().optional()
 }).strict();
 export type PublicStoryShort = z.infer<typeof PublicStoryShortSchema>;

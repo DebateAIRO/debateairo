@@ -30,7 +30,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * the real database. The story is sealed by StoryRepository for an ENCRYPTED
  * run; publishing reads it back through the owner-scoped repository reader,
  * copies the short story into the encrypted public snapshot, and the anonymous
- * public read carries it. The checker's reservation never crosses, and a
+ * public read carries it. The checker's reservation text never crosses (only
+ * `double_checked: false`, final review Important 2), and a
  * FAILED story publishes no short story.
  */
 
@@ -194,11 +195,13 @@ describe("publishing copies story_short over the real database (spec §11)", () 
     expect(text).not.toContain(STORY_TEST_BODY.why.reasons[0]!.text);
   });
 
-  it("copies a READY_WITH_RESERVATION story without the checker's reservation", async () => {
+  it("copies a READY_WITH_RESERVATION story as not fully double-checked, without the checker's reservation", async () => {
     const { runId, answerId } = await storiedRun("READY_WITH_RESERVATION");
     const publicRef = await publish(runId, answerId);
     const debate = await application.readPublicDebate(publicRef);
-    expect(debate?.story_short).toEqual(PUBLIC_SHORT);
+    // Final review, Important 2: the public page's gentle line reads this flag;
+    // the checker's own text never crosses.
+    expect(debate?.story_short).toEqual({ ...PUBLIC_SHORT, double_checked: false });
     expect(JSON.stringify(debate)).not.toContain("the rent figure");
   });
 

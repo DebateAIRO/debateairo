@@ -8,9 +8,10 @@ import { morePathsWords, storyFateWords, type StoryFateValue } from "@/lib/v3/st
  * the public overview maps its snapshot's `story_short` to this, and the
  * owner's StoryPanel passes its view. Every string here was written by a model.
  * `morePaths` is how many positions the short version left out (0 or more).
- * `reservation` is true only on the owner's panel for a READY_WITH_RESERVATION
- * story: the box then shows the gentle catalogue line, never the checker's own
- * text (spec 2026-09-26 §14.2), and the public page never passes it.
+ * `reservation` is true for a READY_WITH_RESERVATION story: on the owner's
+ * panel, and on the public page when its snapshot says `double_checked: false`
+ * (final review, Important 2). The box then shows the gentle catalogue line,
+ * never the checker's own text (spec 2026-09-26 §14.2).
  */
 export interface StoryShortContent {
   readonly headline: string | null;

@@ -81,7 +81,8 @@ function StoryBodyView({ view, catalog, locale }: { view: StoryView; catalog: Me
  * carries that locale's `lang` and `dir`. The label is the arithmetic label in
  * human words; the confidence line is the storyteller's own sentence. The
  * short story is the shared StoryShortBlocks, the same blocks the public page
- * shows, plus the gentle reservation line, which only the owner sees. Every
+ * shows, with the gentle reservation line (the public page shows it too, from
+ * its snapshot's `double_checked: false`; final review, Important 2). Every
  * model-written string is a React text child: never HTML, Markdown or a link.
  * The download is a plain link to the PDF route, which answers with an
  * attachment; it is not a Next Link, so nothing prefetches a PDF render.

@@ -188,8 +188,13 @@ describe("Accounts S8 publication architecture", () => {
     expect(storyEnd).toBeGreaterThan(storyStart);
     const storySchema = story.slice(storyStart, storyEnd);
     expect(storySchema).toContain(".strict()");
+    // Final review, Important 2: `double_checked`, an optional boolean set only
+    // for a story the checker was not fully satisfied with, so the public page
+    // shows the same gentle catalogue line as the owner's page and the PDF. It
+    // is a flag, never the checker's own text.
     expect([...storySchema.matchAll(/^\s*([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["headline", "summary", "confidence", "paths", "change", "reviewer_note"]);
+      .toEqual(["headline", "summary", "confidence", "paths", "change", "reviewer_note", "double_checked"]);
+    expect(storySchema).toContain("double_checked: z.boolean().optional()");
     for (const forbidden of [
       ...ownerOnly, "answer_version", "reservation", "point_numbers", "verdict_basis", "storyteller",
       "checker", "lineage", "pack", "fingerprint", "shape_id", "long", "rounds", "written_at", "why"

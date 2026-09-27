@@ -150,6 +150,22 @@ describe("public short story contract (spec §10)", () => {
     expect(PublicStoryShortSchema.safeParse({ ...SHORT, reservation: null }).success).toBe(false);
     expect(PublicStoryShortSchema.safeParse({ ...SHORT, reservation: "P7 comes from one source." }).success).toBe(false);
   });
+
+  /**
+   * Final review, Important 2: the public page shows the gentle catalogue line
+   * for a story the checker was not fully satisfied with, as the owner's page
+   * and the PDF do. Only a flag crosses: never the checker's own text.
+   */
+  it("parses a short story with and without the double-checked flag, and nothing but a boolean in it", () => {
+    // Old snapshots, and READY stories, carry no flag.
+    expect(PublicDebateSchema.parse({ ...OLD_SNAPSHOT, story_short: SHORT }).story_short?.double_checked).toBeUndefined();
+    expect(PublicStoryShortSchema.parse({ ...SHORT, double_checked: false }).double_checked).toBe(false);
+    expect(PublicDebateSchema.parse({ ...OLD_SNAPSHOT, story_short: { ...SHORT, double_checked: false } }).story_short)
+      .toEqual({ ...SHORT, double_checked: false });
+    for (const refused of ["no", "Parts of this summary could not be fully double-checked.", 0, null, { checked: false }]) {
+      expect(PublicStoryShortSchema.safeParse({ ...SHORT, double_checked: refused }).success).toBe(false);
+    }
+  });
 });
 
 /**
@@ -224,12 +240,20 @@ describe("toPublicStoryShort", () => {
     expect(text).not.toContain(STORY_TEST_BODY.long.sections[0]!.paragraphs[0]!.text);
   });
 
-  it("publishes a READY_WITH_RESERVATION story without the checker's reservation", () => {
+  it("publishes a READY_WITH_RESERVATION story as not fully double-checked, without the checker's reservation", () => {
     const short = toPublicStoryShort(storedStoryRecord({
       outcome: "READY_WITH_RESERVATION", reservation: "P7, the rent figure, comes from one source."
     }));
-    expect(short).toEqual(SHORT);
+    // Final review, Important 2: the flag the public page's gentle line reads.
+    expect(short).toEqual({ ...SHORT, double_checked: false });
+    expect(Object.keys(short ?? {}).sort())
+      .toEqual(["change", "confidence", "double_checked", "headline", "paths", "reviewer_note", "summary"]);
     expect(JSON.stringify(short)).not.toContain("the rent figure");
+    expect(JSON.stringify(short)).not.toContain("P7");
+  });
+
+  it("publishes a READY story with no double-checked flag at all", () => {
+    expect("double_checked" in (toPublicStoryShort(storedStoryRecord()) ?? {})).toBe(false);
   });
 
   it("publishes nothing for a FAILED story", () => {

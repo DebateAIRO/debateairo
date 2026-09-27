@@ -125,7 +125,7 @@ describe("public page short story (spec §10, R2 §14.2-§14.3)", () => {
     expect(container.querySelector(".publicThresholdLabel")?.textContent).toBe("confidence · capped");
   });
 
-  it("leaves out the note box when the story has none, and never shows a reservation", async () => {
+  it("leaves out the note box when the story has none, and shows no reservation for a story without the flag", async () => {
     const withNote = await render(STORY);
     expect(withNote.querySelector('.storyBox[data-box="note"]')).not.toBeNull();
     expect(withNote.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
@@ -136,6 +136,28 @@ describe("public page short story (spec §10, R2 §14.2-§14.3)", () => {
     const container = await render({ ...STORY, reviewer_note: null });
     expect(container.querySelector('.storyBox[data-box="note"]')).toBeNull();
     expect(container.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
+  });
+
+  /**
+   * Final review, Important 2: a story the checker was not fully satisfied with
+   * carries `double_checked: false`, and the public page shows the same gentle
+   * catalogue line as the owner's page and the PDF (spec §14.2), in the
+   * question's language. The checker's own text never reaches the snapshot.
+   */
+  it("shows the gentle reservation line, in the question's language, for a story that was not fully double-checked", async () => {
+    const container = await render({ ...STORY, double_checked: false });
+    const box = container.querySelector('.publicStory .storyBox[data-box="reservation"]');
+    expect(box?.textContent).toBe(ro("public.story.reservation"));
+    expect(box?.closest(".publicStory")?.getAttribute("lang")).toBe("ro");
+    expect(container.textContent).not.toContain("Parts of this summary could not be fully double-checked.");
+    // The reviewer's note is still its own box.
+    expect(container.querySelector('.storyBox[data-box="note"]')).not.toBeNull();
+  });
+
+  it("shows no reservation line for a story marked double-checked", async () => {
+    const container = await render({ ...STORY, double_checked: true });
+    expect(container.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
+    expect(container.textContent).not.toContain(ro("public.story.reservation"));
   });
 
   it("prints model text literally, never as markup", async () => {
