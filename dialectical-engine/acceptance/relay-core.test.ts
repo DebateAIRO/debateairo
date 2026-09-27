@@ -8,6 +8,7 @@ import { resolveClaudeBinary } from "./claude-relay.js";
 import { resolveGrokBinary } from "./grok-relay.js";
 import { resolveHermesBinary } from "./hermes-relay.js";
 import { resolveCodexBinary } from "./model-shim.js";
+import { resolveAgyBinary } from "./agy-relay.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { estimateWindowTokens } from "@debateai/providers";
 import {
@@ -747,8 +748,10 @@ describe("D10 maker CLI binary resolution", () => {
     }
 
     expect(sources).toContain("relay-core.ts");
+    expect(sources).toContain("agy-relay.ts");
     expect(sources).toContain(join("test-fixtures", "evaluator-double.ts"));
     expect(sources).toContain(join("test-fixtures", "fake-claude-cli.mjs"));
+    expect(sources).toContain(join("test-fixtures", "fake-agy-cli.mjs"));
     expect(offenders).toEqual([]);
   });
 });
@@ -766,10 +769,11 @@ describe("D10 every maker resolves to an ABSOLUTE path", () => {
     { name: "claude", key: "ACCEPTANCE_CLAUDE_BINARY", resolve: resolveClaudeBinary },
     { name: "grok", key: "ACCEPTANCE_GROK_BINARY", resolve: resolveGrokBinary },
     { name: "codex", key: "ACCEPTANCE_CODEX_BINARY", resolve: resolveCodexBinary },
-    { name: "hermes", key: "ACCEPTANCE_HERMES_BINARY", resolve: resolveHermesBinary }
+    { name: "hermes", key: "ACCEPTANCE_HERMES_BINARY", resolve: resolveHermesBinary },
+    { name: "agy", key: "ACCEPTANCE_AGY_BINARY", resolve: resolveAgyBinary }
   ] as const;
 
-  it("from PATH discovery and from a relative key alike, for all four", async () => {
+  it("from PATH discovery and from a relative key alike, for every maker", async () => {
     for (const maker of makers) {
       const directory = await pathDirectory();
       const program = await place(directory, SHEBANG, 0o755, maker.name);

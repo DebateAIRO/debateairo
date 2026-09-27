@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
- * W6 (SECURITY). Six acceptance fixtures echo their child environment back as
+ * W6 (SECURITY). Seven acceptance fixtures echo their child environment back as
  * model content or to a file on disk, and that content is persisted to
  * `ledger.raw_artifact`. Each must project the environment through an EXPLICIT
  * allow-list: a variable the product admits and an assertion names IS echoed;
@@ -102,19 +102,24 @@ async function scratchDirectory(prefix: string): Promise<string> {
 async function emit(
   binaryArguments: readonly string[],
   environment: Readonly<Record<string, string>>,
-  cwd: string = tmpdir()
+  cwd: string = tmpdir(),
+  stdin = ""
 ): Promise<string> {
-  const { stdout } = await execFileAsync(process.execPath, [...binaryArguments], {
+  const running = execFileAsync(process.execPath, [...binaryArguments], {
     cwd,
     env: { ...environment, [CANARY_KEY]: CANARY_VALUE, [UNLISTED_KEY]: UNLISTED_VALUE }
   });
+  // The agy fake reads its prompt from stdin to EOF, as agy does; every other
+  // member ignores stdin, so closing it — empty — changes nothing for them.
+  running.child.stdin?.end(stdin);
+  const { stdout } = await running;
   return stdout;
 }
 
 /**
  * The F3 boundary, asserted on every member: an unnamed key is visible by NAME
  * and invisible by VALUE. `emitted` is the raw text the member produced — stdout
- * for five members, the written file for `relay-core`.
+ * for six members, the written file for `relay-core`.
  */
 function expectUnlistedKeyVisibleByNameOnly(echo: Echo, emitted: string): void {
   // Labelled so the RED frame names the owed emission. Without it the first
@@ -128,7 +133,7 @@ function expectUnlistedKeyVisibleByNameOnly(echo: Echo, emitted: string): void {
 }
 
 /**
- * Three of the six members are generated INSIDE a test file as an array of
+ * Three of the seven members are generated INSIDE a test file as an array of
  * string pieces and are not importable, so each is read out of its own file's
  * source and run — the product's own script, never a copy of it (`:2051`).
  *
@@ -198,6 +203,27 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
 
     expect(echo.environment.HOME).toBe("/tmp/w6-grok-home");
     expectCredentialDigestedNotEchoed(echo, stdout, "XAI_API_KEY");
+    expect(echo.environment[CANARY_KEY]).toBeUndefined();
+    expect(stdout).not.toContain(CANARY_VALUE);
+    expectUnlistedKeyVisibleByNameOnly(echo, stdout);
+  });
+
+  it("fake-agy-cli.mjs echoes the admitted locator and not the unnamed canary", async () => {
+    const stdout = await emit(
+      [fixturePath("fake-agy-cli.mjs"), "--output-format", "json", "--print"],
+      {
+        GEMINI_API_KEY: CREDENTIAL_CANARY_VALUE,
+        HOME: "/tmp/w6-agy-home",
+        PATH: "/usr/bin:/bin"
+      },
+      tmpdir(),
+      "W6 allow-list probe"
+    );
+    const result = JSON.parse(stdout) as { readonly response: string };
+    const echo = JSON.parse(result.response) as Echo;
+
+    expect(echo.environment.HOME).toBe("/tmp/w6-agy-home");
+    expectCredentialDigestedNotEchoed(echo, stdout, "GEMINI_API_KEY");
     expect(echo.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
     expectUnlistedKeyVisibleByNameOnly(echo, stdout);
