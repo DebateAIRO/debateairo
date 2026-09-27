@@ -524,7 +524,9 @@ export async function invokeCli(
     argumentList = [...command.prefixArguments, ...adapter.buildArguments(prompt, invocation)];
     // §2.10, fix round 1: "never on argv" is a law of the core, not a courtesy of
     // each adapter. Refused here, so the catch below reaps the prompt directory.
-    if (transport !== "argv" && argumentList.some((argument) => argument.includes(prompt))) {
+    // An empty prompt is "in" every string, so it is never counted as present.
+    if (transport !== "argv" && prompt.length > 0
+      && argumentList.some((argument) => argument.includes(prompt))) {
       throw new CliRelayFailure("FAILED", CLI_RELAY_PROMPT_ON_ARGV_CODE);
     }
     // P4-01: model subprocesses never inherit the API environment. Only
@@ -542,6 +544,22 @@ export async function invokeCli(
     // the only ambient filesystem context for every handshake and relay call.
     // DR-133: a CLI left with an OPEN stdin can hang. "argv" and "file" keep
     // stdin closed; "stdin" writes the prompt and closes the pipe at once.
+    // One settle for every path — a spawn that throws, a half-built child, an
+    // `error` event, `close` — so none of them can answer twice.
+    let settled = false;
+    let deadlineTimer: NodeJS.Timeout | undefined;
+    let forceKillTimer: NodeJS.Timeout | undefined;
+    let terminationFailure: CliRelayFailure | undefined;
+    const settleOnce = (settle: () => void): void => {
+      if (settled) return;
+      settled = true;
+      if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
+      if (forceKillTimer !== undefined) clearTimeout(forceKillTimer);
+      void reap().then(settle);
+    };
+    const rejectAsCliFailure = (): void => {
+      settleOnce(() => reject(terminationFailure ?? new CliRelayFailure("FAILED", adapter.failureCode)));
+    };
     let spawned: ChildProcessByStdio<Writable | null, Readable, Readable>;
     try {
       spawned = transport === "stdin"
@@ -556,11 +574,23 @@ export async function invokeCli(
       // ELOOP and Node's own argument checks (a NUL byte) THROW here instead of
       // arriving as an `error` event, before any listener exists. It is still a
       // CLI failure, and the directories — the prompt file included — are reaped.
-      void reap().then(() => reject(new CliRelayFailure("FAILED", adapter.failureCode)));
+      rejectAsCliFailure();
       return;
     }
     const child = spawned;
-    if (child.stdin !== null) {
+    // Fix round 2: the `error` listener goes on FIRST. ENOENT, EACCES and EAGAIN
+    // — and EMFILE/ENFILE — arrive as an `error` event on the next tick, and an
+    // `error` with no listener is an uncaught exception that ends the relay.
+    // `on`, not `once`: a second `error` (a failed kill) is absorbed by the guard.
+    child.on("error", rejectAsCliFailure);
+    // Fix round 2: under EMFILE/ENFILE Node returns a child whose stdio was never
+    // set up (`undefined`, which the typings do not admit) beside that scheduled
+    // `error`. It is the same CLI failure as a throw: reaped, answered once.
+    if (child.stdout == null || child.stderr == null || (transport === "stdin" && child.stdin == null)) {
+      rejectAsCliFailure();
+      return;
+    }
+    if (child.stdin != null) {
       // A child that exits before reading everything must not become an
       // unhandled EPIPE; its exit status still decides the outcome.
       child.stdin.on("error", () => undefined);
@@ -570,9 +600,6 @@ export async function invokeCli(
     let stdoutBytes = 0;
     const stderr: Buffer[] = [];
     let stderrBytes = 0;
-    let settled = false;
-    let forceKillTimer: NodeJS.Timeout | undefined;
-    let terminationFailure: CliRelayFailure | undefined;
     const beginTermination = (failure: CliRelayFailure): void => {
       if (settled || terminationFailure !== undefined) return;
       terminationFailure = failure;
@@ -601,21 +628,9 @@ export async function invokeCli(
       stderrBytes += kept.byteLength;
       stderr.push(kept);
     });
-    const deadlineTimer = setTimeout(() => {
+    deadlineTimer = setTimeout(() => {
       beginTermination(new CliRelayFailure("TIMEOUT", adapter.timeoutCode));
     }, timeoutMs);
-    const settleOnce = (settle: () => void): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(deadlineTimer);
-      if (forceKillTimer !== undefined) clearTimeout(forceKillTimer);
-      void reap().then(settle);
-    };
-    child.once("error", () => {
-      settleOnce(() => reject(
-        terminationFailure ?? new CliRelayFailure("FAILED", adapter.failureCode)
-      ));
-    });
     child.once("close", (code) => {
       settleOnce(() => {
         if (terminationFailure !== undefined) {
@@ -787,7 +802,11 @@ function exceedsContextWindow(
   return Math.ceil(contentBytes / CONTEXT_WINDOW_BYTES_PER_TOKEN) + outputBound > contextWindowTokens;
 }
 
-/** An adapter's own declarations are checked once, at start, never per call. */
+/**
+ * An adapter's own declarations: refused by `startCliRelayServer` at start, and
+ * again by every `invokeCli` call, because the handshake paths call `invokeCli`
+ * without ever starting a server.
+ */
 function assertAdapterDeclarations(adapter: CliRelayAdapter): void {
   const levels = adapter.thinkingLevels ?? [];
   const invalid = levels.some((level) => !CLI_RELAY_THINKING_LEVEL_TOKEN.test(level))

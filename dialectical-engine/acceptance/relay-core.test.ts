@@ -1490,6 +1490,21 @@ describe("fix round 1: a stdin or file transport never puts the prompt on argv",
     }
   });
 
+  it("never counts an empty prompt as present in every argument (fix round 2)", async () => {
+    for (const transport of ["stdin", "file"] as const) {
+      const maker = `empty-prompt-${transport}-fixture`;
+      const completion = await invokeCli(
+        { binary: process.execPath, prefixArguments: ["-e", 'process.stdout.write("OK");', "--"] },
+        fixtureAdapter(maker, { promptTransport: transport, buildArguments: () => ["--fixture-flag"] }),
+        "",
+        5_000
+      );
+
+      expect(completion.content, transport).toBe("OK");
+      expect(await relayLeftovers(maker), transport).toEqual([]);
+    }
+  });
+
   it("leaves the argv transport (the four original makers) free to pass the prompt as an argument", async () => {
     const handle = await startFixtureRelay(fixtureAdapter("argv-law-argv-fixture", {
       buildArguments: (prompt) => [prompt]
