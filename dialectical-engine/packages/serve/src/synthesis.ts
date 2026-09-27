@@ -324,26 +324,6 @@ export type SynthesizerRequest =
     };
 
 /**
- * THE ONE call-site key builder, used by BOTH the runner that RECORDS the call
- * and the persistence that VERIFIES it (codex r4 B1).
- *
- * Before this, the runner built these keys with two template literals and
- * persistence accepted whatever the caller supplied, checking only that the key
- * ended in `:<round>`. A real round-1 SYNTHESIZER artifact offered as the
- * round's verdict therefore passed both the suffix check and the ledger lookup,
- * and a synthesizer response committed as the evaluator verdict.
- *
- * Deriving the EXPECTED key here, from the typed role and the round's own
- * fields, makes the role a PREDICATE. It also makes a future format change fail
- * closed: the runner and the verifier move together or not at all, because
- * there is only one place the format exists.
- *
- * The two prefixes are load-bearing beyond this module and are NOT free to
- * rename: `core.read_terminal_recorded_facts` (migrations/0049) counts
- * `COMPOSER:%` into `composer_calls` and `POST_COMPOSE_R9:%` into `r9_calls`,
- * which battery-row predicates read.
- */
-/**
  * Model scorecard A15 (owner rulings R3/R4, 2026-09-26) — THE SEAT MARKER.
  *
  * A run with a pinned role assignment calls each seat's main OR its
@@ -353,16 +333,34 @@ export type SynthesizerRequest =
  * therefore ends in `:seat:<main|runnerUp>`. It is a SUFFIX on purpose, so
  * every prefix reader keeps matching: 0049's `COMPOSER:%` / `POST_COMPOSE_R9:%`
  * counts and the `JUDGE:%` / `PANEL:%` readers. A run without an assignment
- * records the bare key, exactly as before. The ONE place the format exists.
+ * records the bare key, exactly as before.
  *
- * A cross-exchange author site has no runner-up (DR-184-v5 bills it no backup),
- * so a cross-exchange key is only ever recorded with `:seat:main`.
+ * The format lives in TWO places: here (`CALL_SITE_SEATS`, `SEAT_MARKER`),
+ * which builds and reads the marker, and the kernel's `SEAT_SUFFIX`
+ * (packages/kernel/src/debate-roles.ts), which strips it before reading a
+ * key's role. tests/unit/a15-seat-call-site-keys.test.ts pins that the two
+ * agree: the kernel strips exactly the markers this module recognises.
+ *
+ * A cross-exchange site uses one key; its marker is the pinned slot of the
+ * member that wrote the root, so `:seat:runnerUp` is possible.
  */
 export const CALL_SITE_SEATS = Object.freeze(["main", "runnerUp"] as const);
 export type CallSiteSeat = typeof CALL_SITE_SEATS[number];
 const SEAT_MARKER = ":seat:";
 
+/**
+ * `<base>:seat:<seat>`. A base that already ENDS in a seat marker is refused:
+ * `JUDGE:seat:main:seat:runnerUp` would strip to `JUDGE:seat:main`, whose role
+ * the kernel reads as null, so a root call would lose its role.
+ */
 export function seatCallSiteKey(base: string, seat: CallSiteSeat): string {
+  const marked = seatOfCallSiteKey(base);
+  if (marked !== null) {
+    throw new TypedDomainError(
+      "CALL_SITE_SEAT_ALREADY_MARKED",
+      `Call site ${base} already carries the ${marked} seat marker; a key carries at most one`
+    );
+  }
   return `${base}${SEAT_MARKER}${seat}`;
 }
 
@@ -386,6 +384,26 @@ export type SynthesisCallSiteBinding =
     }
   | { readonly role: "EVALUATOR"; readonly round: number; readonly seat?: CallSiteSeat };
 
+/**
+ * THE ONE call-site key builder, used by BOTH the runner that RECORDS the call
+ * and the persistence that VERIFIES it (codex r4 B1).
+ *
+ * Before this, the runner built these keys with two template literals and
+ * persistence accepted whatever the caller supplied, checking only that the key
+ * ended in `:<round>`. A real round-1 SYNTHESIZER artifact offered as the
+ * round's verdict therefore passed both the suffix check and the ledger lookup,
+ * and a synthesizer response committed as the evaluator verdict.
+ *
+ * Deriving the EXPECTED key here, from the typed role and the round's own
+ * fields, makes the role a PREDICATE. It also makes a future format change fail
+ * closed: the runner and the verifier move together or not at all, because
+ * there is only one place the format exists.
+ *
+ * The two prefixes are load-bearing beyond this module and are NOT free to
+ * rename: `core.read_terminal_recorded_facts` (migrations/0049) counts
+ * `COMPOSER:%` into `composer_calls` and `POST_COMPOSE_R9:%` into `r9_calls`,
+ * which battery-row predicates read.
+ */
 export function synthesisCallSiteKey(binding: SynthesisCallSiteBinding): string {
   if (!Number.isInteger(binding.round) || binding.round < 1) {
     throw new TypedDomainError(

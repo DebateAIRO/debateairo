@@ -17,10 +17,8 @@ import {
  * prefix reader keeps matching; this file proves that against the readers
  * themselves (0049's SQL is read from the migration, not restated).
  *
- * The cross-exchange rows go through BOTH seats only to prove these functions
- * and readers are seat-blind. A cross-exchange author site has no runner-up
- * (DR-184-v5 bills it no backup; its seat is built with `runnerUp: null`), so
- * a recorded cross-exchange key only ever ends in `:seat:main`.
+ * A cross-exchange site uses one key; its marker is the pinned slot of the
+ * member that wrote the root, so `:seat:runnerUp` is possible.
  */
 const NODE = "0f4d7c1e-2b8a-4c3d-9e5f-a1b2c3d4e5f6";
 const INVOCATION = "11111111-2222-4333-8444-555555555555";
@@ -69,6 +67,76 @@ describe("A15 · the seat marker", () => {
   it.each(KEYS)("keeps the kernel's role for %s whatever the seat", (key, role) => {
     expect(debateRoleFromCallSiteKey(key)).toBe(role);
     for (const seat of CALL_SITE_SEATS) expect(debateRoleFromCallSiteKey(seatCallSiteKey(key, seat))).toBe(role);
+  });
+});
+
+describe("A15 · fix round 1 — one marker at most, and only a real one at the end", () => {
+  it.each(KEYS)("refuses to mark %s twice, whichever seats", (key) => {
+    for (const first of CALL_SITE_SEATS) {
+      for (const second of CALL_SITE_SEATS) {
+        expect(() => seatCallSiteKey(seatCallSiteKey(key, first), second))
+          .toThrowError(expect.objectContaining({ code: "CALL_SITE_SEAT_ALREADY_MARKED" }));
+      }
+    }
+  });
+
+  it("refuses the double suffix that would cost a root key its role", () => {
+    expect(() => seatCallSiteKey("JUDGE:seat:main", "runnerUp"))
+      .toThrowError(expect.objectContaining({ code: "CALL_SITE_SEAT_ALREADY_MARKED" }));
+    expect(() => synthesisCallSiteKey({ role: "EVALUATOR", round: 1, seat: "main" })).not.toThrow();
+  });
+
+  // A panel key embeds its author's key, so `:seat:` can sit mid-string. Only a
+  // TRAILING marker counts: mid-string, the key is bare and may still be marked.
+  it.each([
+    ["PANEL:JUDGE:seat:runnerUp:provider:x", "JUDGE"],
+    ["PANEL:JUDGE:root:secondary:seat:main:provider:test-layer:secondary", "JUDGE"],
+    [`JUDGE:review:${NODE}:seat:main:x`, "REVIEWER"]
+  ] as const)("reads %s (':seat:' mid-string) as bare, and keeps its role when marked", (key, role) => {
+    expect(seatOfCallSiteKey(key)).toBeNull();
+    expect(seatBaseCallSiteKey(key)).toBe(key);
+    expect(debateRoleFromCallSiteKey(key)).toBe(role);
+    for (const seat of CALL_SITE_SEATS) {
+      const marked = seatCallSiteKey(key, seat);
+      expect(seatOfCallSiteKey(marked)).toBe(seat);
+      expect(seatBaseCallSiteKey(marked)).toBe(key);
+      expect(debateRoleFromCallSiteKey(marked)).toBe(role);
+    }
+  });
+
+  it.each([
+    "JUDGE:seat:backup",
+    "JUDGE:seat:Main",
+    "JUDGE:seat:RUNNERUP",
+    "JUDGE:seat:",
+    "JUDGE:root:secondary:seat:backup",
+    "COMPOSER:SYNTHESIZER:INITIAL:1:seat:Main",
+    "POST_COMPOSE_R9:EVALUATOR:1:seat:backup"
+  ])("reads %s (not a seat this module names) as bare", (key) => {
+    expect(seatOfCallSiteKey(key)).toBeNull();
+    expect(seatBaseCallSiteKey(key)).toBe(key);
+  });
+
+  // The kernel's SEAT_SUFFIX and this module's CALL_SITE_SEATS must name the
+  // SAME markers: the kernel's role of any key equals its role once the serve
+  // package has stripped the marker. A kernel that also stripped `:seat:Main`
+  // (or a serve side that accepted `:seat:backup`) would make a pair disagree.
+  it.each([
+    ...KEYS.flatMap(([key]) => [key, ...CALL_SITE_SEATS.map((seat) => seatCallSiteKey(key, seat))]),
+    "JUDGE:seat:backup",
+    "JUDGE:seat:Main",
+    "JUDGE:root:secondary:seat:backup",
+    "COMPOSER:SYNTHESIZER:INITIAL:1:seat:Main",
+    "PANEL:JUDGE:seat:runnerUp:provider:x"
+  ])("the kernel and the serve package agree on %s", (key) => {
+    expect(debateRoleFromCallSiteKey(key)).toBe(debateRoleFromCallSiteKey(seatBaseCallSiteKey(key)));
+  });
+
+  it("an unrecognised marker is not stripped by the kernel either", () => {
+    expect(debateRoleFromCallSiteKey("JUDGE:seat:backup")).toBeNull();
+    expect(debateRoleFromCallSiteKey("JUDGE:seat:Main")).toBeNull();
+    expect(debateRoleFromCallSiteKey("JUDGE:seat:main")).toBe("POSITION");
+    expect(debateRoleFromCallSiteKey("JUDGE:seat:runnerUp")).toBe("POSITION");
   });
 });
 

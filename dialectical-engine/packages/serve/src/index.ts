@@ -2289,7 +2289,7 @@ export class ServeRepository {
           if (!bound.expected.includes(bound.callSiteKey)) {
             throw new TypedDomainError(
               "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
-              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected[0]!}`
+              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected[0]!} or its seat forms`
             );
           }
           const producer = await client.query<{ raw_artifact_ref: string }>(
