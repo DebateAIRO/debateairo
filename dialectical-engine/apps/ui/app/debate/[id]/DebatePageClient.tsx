@@ -1849,6 +1849,7 @@ export default function DebatePageClient({
         <NodeDetailDrawer
           node={detailNode}
           v3={v3NodeById?.get(detailNode.id)}
+          conditionRecords={answer?.condition_mark_records ?? []}
           scoring={scoringByNodeId.get(detailNode.id)}
           scoringError={scoringErrorsByNodeId.get(detailNode.id)}
           feedbackSummary={feedbackSummaryByNodeId.get(detailNode.id)}

@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Nie obalono po rotacji modeli",
   "debateChrome.condition.skippedByBudget": "Wzbogacenie pominięto z powodu budżetu",
   "debateChrome.condition.envelopeExhausted": "Zakończono wcześniej, aby zmieścić się w budżecie",
+  "debateChrome.condition.envelopeExhaustedService": "Zakończono wcześniej z powodu problemu z usługą AI",
   "debateChrome.condition.leverageUnresolved": "Nie rozstrzygnięto wpływu",
   "debateChrome.condition.branchFrozenLowLeverage": "Nie rozwinięto gałęzi: nie mogła zmienić odpowiedzi",
   "debateChrome.condition.degradedDiversity": "Ograniczona różnorodność modeli",

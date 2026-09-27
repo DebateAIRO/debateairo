@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Nevyvrátené po výmene modelu",
   "debateChrome.condition.skippedByBudget": "Rozšírenie sa vynechalo pre rozpočtové obmedzenie",
   "debateChrome.condition.envelopeExhausted": "Skončilo sa skôr, aby sa dodržal rozpočet",
+  "debateChrome.condition.envelopeExhaustedService": "Skončilo sa skôr pre problém so službou AI",
   "debateChrome.condition.leverageUnresolved": "Vplyv zostal nevyriešený",
   "debateChrome.condition.branchFrozenLowLeverage": "Vetva nebola rozšírená: nemohla zmeniť odpoveď",
   "debateChrome.condition.degradedDiversity": "Rozmanitosť modelov je obmedzená",

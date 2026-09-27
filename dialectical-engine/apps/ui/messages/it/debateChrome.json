@@ -173,6 +173,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Non falsificata dopo la rotazione dei modelli",
   "debateChrome.condition.skippedByBudget": "Arricchimento omesso per limiti di risorse",
   "debateChrome.condition.envelopeExhausted": "Terminato prima per restare nel budget",
+  "debateChrome.condition.envelopeExhaustedService": "Terminato prima per un problema con un servizio di IA",
   "debateChrome.condition.leverageUnresolved": "Impatto non determinato",
   "debateChrome.condition.branchFrozenLowLeverage": "Ramo non espanso: non avrebbe potuto modificare la risposta",
   "debateChrome.condition.degradedDiversity": "Diversità dei modelli ridotta",

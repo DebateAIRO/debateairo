@@ -173,6 +173,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "No refutada tras la rotación de modelos",
   "debateChrome.condition.skippedByBudget": "Enriquecimiento omitido por presupuesto",
   "debateChrome.condition.envelopeExhausted": "Terminó antes de tiempo para no superar el presupuesto",
+  "debateChrome.condition.envelopeExhaustedService": "Terminó antes de tiempo por un problema con un servicio de IA",
   "debateChrome.condition.leverageUnresolved": "Influencia sin determinar",
   "debateChrome.condition.branchFrozenLowLeverage": "Rama no ampliada: no podía cambiar la respuesta",
   "debateChrome.condition.degradedDiversity": "Diversidad de modelos reducida",

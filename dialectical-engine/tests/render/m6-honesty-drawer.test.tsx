@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 import type { Answer } from "@debateai/contract";
 import { RUN_LEVEL_SPEND_STOP_CODES } from "@debateai/kernel";
 import { AnswerHonestyDrawer } from "../../apps/ui/components/AnswerHonestyDrawer.js";
+import { NodeDetailDrawer } from "../../apps/ui/components/NodeDetailDrawer.js";
 import { PublicHonestyDrawer } from "../../apps/ui/components/PublicHonestyDrawer.js";
-import { panelSpendStopKind } from "../../apps/ui/lib/v3/labels.js";
+import { debateDetailFromAnswer } from "../../apps/ui/lib/v3/adapter.js";
+import { conditionRecordLabel, markLabelFromRecords, panelSpendStopKind } from "../../apps/ui/lib/v3/labels.js";
 import { createLiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 
@@ -215,5 +217,82 @@ describe("a panel a spend stop cut short gets a remedy that fits", () => {
     const text = visible(drawer(answer));
     expect(text).toContain(`Lift path: ${PARTIAL_LIFT}`);
     expect(text).not.toContain("stopped exploring early");
+  });
+});
+
+/**
+ * Fix round 2 (ruling R2): a vendor that reports no usage mints the same
+ * ENVELOPE_EXHAUSTED record as money, attempts or the day's spend, with its
+ * stop code as the reason. Worded by the mark alone, it read "Ended early to
+ * stay within budget", and an operator told "money" raises the wrong ceiling.
+ * The mark is now worded by its record's reason.
+ */
+describe("the envelope mark is worded by its record's reason (fix round 2)", () => {
+  const SERVICE = "Ended early because of a problem with an AI service";
+  const BUDGET = "Ended early to stay within budget";
+
+  function envelopeRecord(reason: string): Record_ {
+    return {
+      ...panelRecord("PANEL-PARTIAL", reason, ""),
+      mark: "ENVELOPE_EXHAUSTED", scope: "answer", subject_ref: "run:fair", lift_path: null, affected_node_ids: ["node:fair:pro"]
+    };
+  }
+  function stopped(reason: string): Answer {
+    return buildFairShapedAnswer({
+      condition_marks: [...buildFairShapedAnswer().condition_marks, "ENVELOPE_EXHAUSTED"],
+      condition_mark_records: [...buildFairShapedAnswer().condition_mark_records, envelopeRecord(reason)]
+    });
+  }
+
+  it("says a problem with an AI service for a usage stop, and the budget for every other stop", () => {
+    expect(conditionRecordLabel(envelopeRecord("PROVIDER_USAGE_UNREPORTED"), chromeEn)).toBe(SERVICE);
+    for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED", "DAILY_COST_ENVELOPE_REACHED"]) {
+      expect(conditionRecordLabel(envelopeRecord(code), chromeEn), code).toBe(BUDGET);
+    }
+    // A bare mark takes its answer's record; with none, the plain label.
+    expect(markLabelFromRecords("ENVELOPE_EXHAUSTED", [envelopeRecord("PROVIDER_USAGE_UNREPORTED")], chromeEn)).toBe(SERVICE);
+    expect(markLabelFromRecords("ENVELOPE_EXHAUSTED", [], chromeEn)).toBe(BUDGET);
+    // Another mark is never reworded by a stop code in its reason.
+    expect(conditionRecordLabel({ mark: "SINGLE-LINEAGE", reason: "PROVIDER_USAGE_UNREPORTED" }, chromeEn))
+      .toBe(words(chromeEn, "debateChrome.condition.singleLineage"));
+    expect(conditionRecordLabel(envelopeRecord("PROVIDER_USAGE_UNREPORTED"), chromeRo))
+      .toBe(words(chromeRo, "debateChrome.condition.envelopeExhaustedService"));
+  });
+
+  it("the answer's drawer: a usage stop's chip and record say an AI service, never the budget", () => {
+    const text = visible(drawer(stopped("PROVIDER_USAGE_UNREPORTED")));
+    expect(text).toContain(SERVICE);
+    expect(text).not.toContain(BUDGET);
+    const money = visible(drawer(stopped("RUN_COST_ENVELOPE_MONEY_REACHED")));
+    expect(money).toContain(BUDGET);
+    expect(money).not.toContain(SERVICE);
+  });
+
+  it("the node drawer: the served root's pill is worded by the answer's record", () => {
+    const node = (reason: string | null) => {
+      const answer = reason === null ? stopped("RUN_COST_ENVELOPE_MONEY_REACHED") : stopped(reason);
+      const v3 = { ...answer.nodes[0]!, condition_marks: ["ENVELOPE_EXHAUSTED" as const] };
+      const detail = debateDetailFromAnswer(answer);
+      return visible(renderToStaticMarkup(
+        <NodeDetailDrawer
+          node={detail.tree!.children[0]!}
+          v3={v3}
+          token={null}
+          onClose={noop}
+          onFocusRecommendationNode={() => false}
+          canFocusRecommendationNode={() => false}
+          onQueued={noop}
+          onError={noop}
+          onAuthRejected={noop}
+          debateChromeCatalog={chromeEn}
+          conditionRecords={reason === null ? [] : answer.condition_mark_records}
+        />
+      ));
+    };
+    expect(node("PROVIDER_USAGE_UNREPORTED")).toContain(SERVICE);
+    expect(node("PROVIDER_USAGE_UNREPORTED")).not.toContain(BUDGET);
+    expect(node("RUN_COST_ENVELOPE_MONEY_REACHED")).toContain(BUDGET);
+    // No record to read (the public snapshot carries none): the plain label.
+    expect(node(null)).toContain(BUDGET);
   });
 });

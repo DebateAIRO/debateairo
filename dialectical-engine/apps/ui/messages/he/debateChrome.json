@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "לא הופרך לאחר החלפת המודלים",
   "debateChrome.condition.skippedByBudget": "ההעשרה דולגה עקב מגבלת התקציב",
   "debateChrome.condition.envelopeExhausted": "הסתיים מוקדם כדי לעמוד בתקציב",
+  "debateChrome.condition.envelopeExhaustedService": "הסתיים מוקדם בגלל תקלה באחד משירותי הבינה המלאכותית",
   "debateChrome.condition.leverageUnresolved": "יכולת ההשפעה לא נקבעה",
   "debateChrome.condition.branchFrozenLowLeverage": "הענף לא הורחב: לא היה ביכולתו לשנות את התשובה",
   "debateChrome.condition.degradedDiversity": "גיוון המודלים נפגע",

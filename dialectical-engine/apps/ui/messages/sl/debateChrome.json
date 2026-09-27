@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Po menjavi modelov ni bilo ovrženo",
   "debateChrome.condition.skippedByBudget": "Obogatitev je bila zaradi proračuna preskočena",
   "debateChrome.condition.envelopeExhausted": "Končano prej, da bi ostali v okviru proračuna",
+  "debateChrome.condition.envelopeExhaustedService": "Končano prej zaradi težave s storitvijo UI",
   "debateChrome.condition.leverageUnresolved": "Vpliv ni razjasnjen",
   "debateChrome.condition.branchFrozenLowLeverage": "Veja ni razširjena: odgovora ne bi mogla spremeniti",
   "debateChrome.condition.degradedDiversity": "Raznolikost modelov je zmanjšana",

@@ -23,9 +23,9 @@ import {
 } from "@/lib/recommendation";
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
-import type { Node as ContractNode } from "@debateai/contract";
+import type { Answer, Node as ContractNode } from "@debateai/contract";
 import { v3NodeHonestyRows, wayOfKnowingLabel } from "@/lib/v3/adapter";
-import { abstentionKindLabel, conditionMarkLabel } from "@/lib/v3/labels";
+import { abstentionKindLabel, markLabelFromRecords } from "@/lib/v3/labels";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
@@ -97,7 +97,8 @@ export function NodeDetailDrawer({
   catalog = debateDrawersEnglish,
   miscCatalog = miscEnglish,
   debateChromeCatalog = debateChromeEnglish,
-  composeCatalog = composeEnglish
+  composeCatalog = composeEnglish,
+  conditionRecords = []
 }: {
   node: DebateNode;
   /**
@@ -128,6 +129,12 @@ export function NodeDetailDrawer({
   debateChromeCatalog?: MessageCatalog;
   /** The interface locale's `compose` catalogue: way of knowing, V3 honesty rows, recommendations, model family. */
   composeCatalog?: MessageCatalog;
+  /**
+   * The answer's condition-mark records (Task M6, fix round 2): a node's mark is
+   * worded by the answer's record for it, so a stop's mark says which stop it
+   * was. Empty on the public page, whose snapshot carries no records.
+   */
+  conditionRecords?: readonly Pick<Answer["condition_mark_records"][number], "mark" | "reason">[];
 }) {
   const { locale } = useChromeI18n();
   const role = roleOf(node);
@@ -285,6 +292,7 @@ export function NodeDetailDrawer({
 
           {v3 ? <NodeHonestyDetails
               v3={v3}
+              conditionRecords={conditionRecords}
               catalog={catalog}
               miscCatalog={miscCatalog}
               debateChromeCatalog={debateChromeCatalog}
@@ -399,6 +407,7 @@ export function NodeDetailDrawer({
  */
 function NodeHonestyDetails({
   v3,
+  conditionRecords,
   catalog,
   miscCatalog,
   debateChromeCatalog,
@@ -406,6 +415,7 @@ function NodeHonestyDetails({
   locale
 }: {
   v3: ContractNode;
+  conditionRecords: readonly Pick<Answer["condition_mark_records"][number], "mark" | "reason">[];
   catalog: MessageCatalog;
   miscCatalog: MessageCatalog;
   debateChromeCatalog: MessageCatalog;
@@ -475,7 +485,7 @@ function NodeHonestyDetails({
                 : "dispute";
             return (
               <span key={mark} className={`drawerConditionPill ${tone}`} data-condition-pill data-mark={tone} title={mark}>
-                {conditionMarkLabel(mark, debateChromeCatalog)}
+                {markLabelFromRecords(mark, conditionRecords, debateChromeCatalog)}
               </span>
             );
           })}

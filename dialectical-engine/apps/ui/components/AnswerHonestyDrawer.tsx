@@ -4,7 +4,16 @@ import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from
 import type { LiveRunState } from "@/lib/v3/liveEvents";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { unrepresentedEdges } from "@/lib/v3/adapter";
-import { abstentionKindLabel, conditionMarkLabel, panelSpendStopKind, riskTierSourceLabel, summarizeFreshness, type PanelSpendStopKind } from "@/lib/v3/labels";
+import {
+  abstentionKindLabel,
+  conditionMarkLabel,
+  conditionRecordLabel,
+  markLabelFromRecords,
+  panelSpendStopKind,
+  riskTierSourceLabel,
+  summarizeFreshness,
+  type PanelSpendStopKind
+} from "@/lib/v3/labels";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
@@ -202,7 +211,7 @@ export function AnswerHonestyDrawer({
               <div className="roleChips">
                 {answer.condition_marks.map((mark) => (
                   <span key={mark} className="roleChip" title={mark}>
-                    {conditionMarkLabel(mark, debateChromeCatalog)}
+                    {markLabelFromRecords(mark, answer.condition_mark_records, debateChromeCatalog)}
                   </span>
                 ))}
               </div>
@@ -212,7 +221,7 @@ export function AnswerHonestyDrawer({
                 {answer.condition_mark_records.map((record) => (
                   <li key={`${record.mark}:${record.subject_ref}`} className="drawerFindingItem">
                     <div className="drawerFindingMeta">
-                      <span>{conditionMarkLabel(record.mark, debateChromeCatalog)}</span>
+                      <span>{conditionRecordLabel(record, debateChromeCatalog)}</span>
                       <span>{record.scope}</span>
                       <span>{record.subject_ref}</span>
                     </div>

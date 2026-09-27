@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Ei kumoutunut mallien vaihdon jälkeen",
   "debateChrome.condition.skippedByBudget": "Rikastus ohitettiin budjetin vuoksi",
   "debateChrome.condition.envelopeExhausted": "Päättyi aikaisemmin budjetissa pysymiseksi",
+  "debateChrome.condition.envelopeExhaustedService": "Päättyi aikaisemmin tekoälypalvelun ongelman vuoksi",
   "debateChrome.condition.leverageUnresolved": "Vaikutus jäi ratkaisematta",
   "debateChrome.condition.branchFrozenLowLeverage": "Haaraa ei laajennettu: se ei voinut muuttaa vastausta",
   "debateChrome.condition.degradedDiversity": "Mallien monimuotoisuus heikkeni",

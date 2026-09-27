@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Inte falsifierad efter modellrotation",
   "debateChrome.condition.skippedByBudget": "Berikningen hoppades över på grund av budgeten",
   "debateChrome.condition.envelopeExhausted": "Avslutades tidigare för att hålla budgeten",
+  "debateChrome.condition.envelopeExhaustedService": "Avslutades tidigare på grund av ett problem med en AI-tjänst",
   "debateChrome.condition.leverageUnresolved": "Påverkan är inte fastställd",
   "debateChrome.condition.branchFrozenLowLeverage": "Grenen utvidgades inte: den kunde inte påverka svaret",
   "debateChrome.condition.degradedDiversity": "Modellmångfalden är försämrad",

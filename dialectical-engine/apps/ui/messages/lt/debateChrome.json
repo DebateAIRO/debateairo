@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Pakeitus modelius nepaneigta",
   "debateChrome.condition.skippedByBudget": "Papildymas praleistas dėl biudžeto",
   "debateChrome.condition.envelopeExhausted": "Baigta anksčiau, kad nebūtų viršytas biudžetas",
+  "debateChrome.condition.envelopeExhaustedService": "Baigta anksčiau dėl DI paslaugos problemos",
   "debateChrome.condition.leverageUnresolved": "Poveikis neišaiškintas",
   "debateChrome.condition.branchFrozenLowLeverage": "Šaka neišplėsta: ji negalėjo pakeisti atsakymo",
   "debateChrome.condition.degradedDiversity": "Modelių įvairovė sumažėjo",

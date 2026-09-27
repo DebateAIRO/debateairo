@@ -171,6 +171,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "模型轮换后仍未被证伪",
   "debateChrome.condition.skippedByBudget": "因预算限制跳过了内容增强",
   "debateChrome.condition.envelopeExhausted": "为不超出预算而提前结束",
+  "debateChrome.condition.envelopeExhaustedService": "因某项 AI 服务出现问题而提前结束",
   "debateChrome.condition.leverageUnresolved": "影响力未确定",
   "debateChrome.condition.branchFrozenLowLeverage": "分支未扩展：它无法改变答案",
   "debateChrome.condition.degradedDiversity": "模型多样性下降",

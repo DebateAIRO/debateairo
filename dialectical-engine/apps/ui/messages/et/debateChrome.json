@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Pärast mudeli vahetamist ümber lükkamata",
   "debateChrome.condition.skippedByBudget": "Rikastamine jäeti eelarve tõttu vahele",
   "debateChrome.condition.envelopeExhausted": "Lõpetati varem, et eelarves püsida",
+  "debateChrome.condition.envelopeExhaustedService": "Lõpetati varem ühe tehisintellektiteenuse probleemi tõttu",
   "debateChrome.condition.leverageUnresolved": "Mõjujõud jäi määramata",
   "debateChrome.condition.branchFrozenLowLeverage": "Haru ei laiendatud: selle mõjujõud ei olnud vastuse muutmiseks piisav",
   "debateChrome.condition.degradedDiversity": "Mudelite mitmekesisus on halvenenud",

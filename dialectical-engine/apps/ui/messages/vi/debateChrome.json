@@ -171,6 +171,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Không bị bác bỏ sau khi luân chuyển mô hình",
   "debateChrome.condition.skippedByBudget": "Bỏ qua bước bổ sung do ngân sách",
   "debateChrome.condition.envelopeExhausted": "Đã kết thúc sớm để giữ trong ngân sách",
+  "debateChrome.condition.envelopeExhaustedService": "Đã kết thúc sớm do sự cố ở một dịch vụ AI",
   "debateChrome.condition.leverageUnresolved": "Mức tác động chưa được giải quyết",
   "debateChrome.condition.branchFrozenLowLeverage": "Nhánh không được mở rộng: không thể làm thay đổi câu trả lời",
   "debateChrome.condition.degradedDiversity": "Độ đa dạng mô hình bị suy giảm",

@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "Не опровергнуто после смены моделей",
   "debateChrome.condition.skippedByBudget": "Дополнение пропущено из-за бюджета",
   "debateChrome.condition.envelopeExhausted": "Завершено раньше, чтобы уложиться в бюджет",
+  "debateChrome.condition.envelopeExhaustedService": "Завершено раньше из-за проблемы с сервисом ИИ",
   "debateChrome.condition.leverageUnresolved": "Влияние не определено",
   "debateChrome.condition.branchFrozenLowLeverage": "Ветвь не расширена: она не могла изменить ответ",
   "debateChrome.condition.degradedDiversity": "Разнообразие моделей снижено",

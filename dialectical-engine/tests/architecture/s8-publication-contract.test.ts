@@ -168,6 +168,20 @@ describe("Accounts S8 publication architecture", () => {
     for (const forbidden of [...ownerOnly, "reason", "model", "provider", "writer", "checker", "cut_short", "digest"]) {
       expect(floorSchema).not.toContain(forbidden);
     }
+    // Task M6 (fix round 2): the public list's summary is pinned the same way, so a new field needs a
+    // deliberate edit here. The floor rides on it as its label only (`floor_verdict`): never the
+    // position, the thin-basis flag or the owner-only cause.
+    const summaryStart = contract.indexOf("export const PublicDebateSummarySchema");
+    const summaryEnd = contract.indexOf("export type PublicDebateSummary =");
+    expect(summaryStart).toBeGreaterThan(-1);
+    expect(summaryEnd).toBeGreaterThan(summaryStart);
+    const summarySchema = contract.slice(summaryStart, summaryEnd);
+    expect(summarySchema).toContain(".strict()");
+    expect([...summarySchema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "models", "verdict", "confidence_band", "floor_verdict"]);
+    for (const forbidden of [...ownerOnly, "leading_node_id", "basis_incomplete", "floor_reason"]) {
+      expect(summarySchema).not.toContain(forbidden);
+    }
     const storyStart = story.indexOf("export const PublicStoryShortSchema");
     const storyEnd = story.indexOf("export type PublicStoryShort =");
     expect(storyStart).toBeGreaterThan(-1);

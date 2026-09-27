@@ -172,6 +172,7 @@
   "debateChrome.condition.unfalsifiedAfterRotation": "मॉडल क्रमावर्तन के बाद खंडित नहीं हुआ",
   "debateChrome.condition.skippedByBudget": "बजट के कारण संवर्धन छोड़ा गया",
   "debateChrome.condition.envelopeExhausted": "बजट के भीतर रहने के लिए जल्दी समाप्त किया गया",
+  "debateChrome.condition.envelopeExhaustedService": "किसी AI सेवा में समस्या के कारण जल्दी समाप्त किया गया",
   "debateChrome.condition.leverageUnresolved": "प्रभाव क्षमता अनसुलझी है",
   "debateChrome.condition.branchFrozenLowLeverage": "शाखा का विस्तार नहीं हुआ: यह उत्तर को बदल नहीं सकती थी",
   "debateChrome.condition.degradedDiversity": "मॉडल विविधता घटी",
