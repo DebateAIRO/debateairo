@@ -7,18 +7,16 @@
  *  - a new scorecard is a NEW version, while every earlier version still reads
  *    exactly what it sealed;
  *  - a publication without `--scorecard` seals a version where it is ABSENT;
- *  - the boot check refuses a version whose scorecard row the engine refuses;
- *  - sealing a scorecard just under the 64 KiB scorecard bound works in under
- *    a minute, and how long it takes (M3's open measurement: the database
- *    re-canonicalises every row character by character, at a cost that grows
- *    with the square of the size; at ~100 KB it took ~84 s, which is why the
- *    owners set the bound at 64 KiB on 2026-09-27).
+ *  - the boot check refuses a version whose scorecard row the engine refuses.
+ *
+ * How long sealing a scorecard at the 64 KiB bound takes is measured apart, in
+ * ./model-scorecard-seal-timing.test.ts (review Minor 4), so a slow host can
+ * turn only that wall-clock row red, never these four.
  */
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
 import {
-  MODEL_SCORECARD_MAX_BYTES,
   MODEL_SCORECARD_ROW_KEY,
   parseCanonicalRegisterJson,
   readEngineVersion,
@@ -175,22 +173,5 @@ describe("A19 · the hosted model scorecard on PostgreSQL", () => {
       database.pool, receipt.registerVersion, JSON.stringify(hostedFile().providerTargets)
     ).then(() => "NO_REFUSAL", hostedRegisterRefusalCode);
     expect(code).toBe("HOSTED_REGISTER_MODEL_SCORECARD_REFUSED:SCHEMA_INVALID");
-  }, 120_000);
-
-  it("seals a scorecard just under the 64 KiB bound in under a minute, and says how long that took", async () => {
-    const big = await compatibleExampleScorecard(4, MODEL_SCORECARD_MAX_BYTES);
-    const bytes = Buffer.byteLength(JSON.stringify(big), "utf8");
-    expect(bytes).toBeGreaterThan(MODEL_SCORECARD_MAX_BYTES - 1_024);
-    expect(bytes).toBeLessThanOrEqual(MODEL_SCORECARD_MAX_BYTES);
-    const operations = createPostgresHostedRegisterOperations(database.pool);
-    // Pre-flight fix F34: plan first, so the clock times the SEAL alone, not the planning.
-    const plan = await planWith(big);
-    const started = performance.now();
-    const published = await publishHostedRegister({ plan, operations });
-    const elapsedMs = Math.round(performance.now() - started);
-    console.info(`A19_SCORECARD_SEAL bytes=${bytes} elapsed_ms=${elapsedMs}`);
-    expect(published.outcome).toBe("CREATED");
-    await expect(scorecardAt(published.registerVersion)).resolves.toMatchObject({ state: "VALID" });
-    expect(elapsedMs).toBeLessThan(60_000);
   }, 120_000);
 });

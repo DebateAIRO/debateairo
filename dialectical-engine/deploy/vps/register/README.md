@@ -94,8 +94,8 @@ as it is stored. Local mode reads its scorecard file (`scorecards/current.json`)
 accepted or refused the same way in both.
 
 Why 64 KiB (the owners' ruling of 2026-09-27): the database re-checks a stored value one character at a time, and that
-takes longer the bigger the value, faster than in step with its size. A scorecard close to 64 KiB takes about half a
-minute to publish; one of about 100 KB took almost a minute and a half. The seven-model example scorecard is about
+takes longer the bigger the value, faster than in step with its size. A scorecard close to 64 KiB takes about 40
+seconds to publish; one of about 100 KB took almost a minute and a half. The seven-model example scorecard is about
 18 KB.
 
 ```sh
@@ -112,6 +112,10 @@ pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json 
   which are stored as the longer `\u000a`).
 - It is checked by the engine's own scorecard validation. A refusal is `HOSTED_REGISTER_SCORECARD_REFUSED:` followed by
   the reason (`SCHEMA_INVALID`, `ENGINE_INCOMPATIBLE`, `UNKNOWN_CANDIDATE` or `NUMBER_SHAPE`).
+- It may carry only the fields the scorecard format defines. The format itself ignores a field it does not know, but a
+  sealed version can never be edited, so publishing refuses such a field instead of sealing it forever:
+  `HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:` followed by where it is (for example `candidates.1.privateNote`). The line
+  names the field, never its value. The evaluator writes only defined fields, so an approved scorecard is not refused.
 - It becomes the `modelScorecard` row of the NEW register version. The row's source reference is your `sourceRef`,
   followed by ` | modelScorecard v<version> sha256:<hash of the sealed document>`.
 - The plan prints `model_scorecard version=… candidates=… bytes=… sha256=…`, or

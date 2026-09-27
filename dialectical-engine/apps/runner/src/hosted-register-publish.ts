@@ -380,7 +380,10 @@ async function readCustodiedBytes(path: string, maxBytes: number, refusals: Cust
   const resolved = resolve(path);
   let handle;
   try {
-    handle = await open(resolved, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    // Fix round 1 (review Minor 1): `O_NONBLOCK` so a FIFO opens at once and is
+    // refused below as not a regular file, instead of the command waiting for a
+    // writer. It changes nothing for a regular file.
+    handle = await open(resolved, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   } catch (error) {
     if (isFileSystemError(error, "ENOENT")) refuse(refusals.absent);
     return refuse(refusals.custody);
@@ -439,6 +442,41 @@ export type HostedModelScorecard = Readonly<{
   bytes: number;
 }>;
 
+/** One path segment in the printable code alphabet, so the refusal line stays a typed code. */
+function printableKeySegment(segment: string): string {
+  return segment.replace(/[^A-Za-z0-9_-]/gu, "_").slice(0, 64) || "_";
+}
+
+/**
+ * Fix round 1 (review Minor 2): the first key of the operator's document that
+ * the engine's own validation DROPPED — a field the scorecard format does not
+ * define — as a dotted path, or null. `validated` is `parseScorecard`'s output
+ * for the same document: the format ignores (strips) an unknown field, so any
+ * key present in `raw` and absent at the same place in `validated` is one the
+ * schema does not define, at any depth. The schema is never restated here.
+ * Only key NAMES reach the path, never a value.
+ */
+function firstUndefinedScorecardKey(raw: unknown, validated: unknown, path: readonly string[] = []): string | null {
+  if (Array.isArray(raw)) {
+    if (!Array.isArray(validated)) return null;
+    for (let index = 0; index < raw.length; index += 1) {
+      const found = firstUndefinedScorecardKey(raw[index], validated[index], [...path, String(index)]);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (raw === null || typeof raw !== "object" || validated === null || typeof validated !== "object") return null;
+  for (const key of Object.keys(raw)) {
+    const at = [...path, key];
+    if (!Object.hasOwn(validated, key)) return at.map(printableKeySegment).join(".").slice(0, 200);
+    const found = firstUndefinedScorecardKey(
+      (raw as Readonly<Record<string, unknown>>)[key], (validated as Readonly<Record<string, unknown>>)[key], at
+    );
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 /**
  * The scorecard file's bytes -> what will be sealed. The file must fit the
  * scorecard bound (`MODEL_SCORECARD_MAX_BYTES`, 64 KiB). The register's
@@ -446,7 +484,9 @@ export type HostedModelScorecard = Readonly<{
  * before `JSON.parse` could pick one, and the canonical text that will be
  * sealed must fit the same bound (escapes can make it longer than the file).
  * Then the engine's own scorecard validation runs, and its reason is the
- * refusal's suffix.
+ * refusal's suffix. Last, a field that validation would ignore is refused by
+ * its path (`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:<path>`), because the
+ * document is sealed as it is.
  */
 export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: string): HostedModelScorecard {
   if (!(bytes instanceof Uint8Array) || bytes.byteLength < 1 || bytes.byteLength > MODEL_SCORECARD_MAX_BYTES) {
@@ -461,11 +501,15 @@ export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: strin
   if (Buffer.byteLength(valueJsonText, "utf8") > MODEL_SCORECARD_MAX_BYTES) {
     refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
   }
-  const read = modelScorecardFromValue(
-    JSON.parse(valueJsonText) as unknown, HOSTED_REGISTER_DEPLOYMENT_REF, engineVersion
-  );
+  const raw = JSON.parse(valueJsonText) as unknown;
+  const read = modelScorecardFromValue(raw, HOSTED_REGISTER_DEPLOYMENT_REF, engineVersion);
   if (read.state === "REFUSED") refuse(`HOSTED_REGISTER_SCORECARD_REFUSED:${read.reason}`);
   if (read.state !== "VALID") return refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  // Fix round 1 (review Minor 2): what is sealed is the operator's document
+  // itself, and a sealed row is never edited, so a field the format does not
+  // define is refused here rather than sealed forever.
+  const unknownKey = firstUndefinedScorecardKey(raw, read.scorecard);
+  if (unknownKey !== null) refuse(`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:${unknownKey}`);
   return Object.freeze({
     valueJsonText,
     scorecardVersion: read.scorecard.scorecardVersion,

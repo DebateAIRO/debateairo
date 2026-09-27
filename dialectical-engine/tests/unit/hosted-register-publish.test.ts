@@ -8,9 +8,12 @@
  * the dry-run plan. The database-backed half (publish, replay, boot readiness)
  * is `tests/integration/hosted-register-publish.test.ts`.
  */
-import { chmod, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { constants } from "node:fs";
+import { chmod, mkdtemp, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   HOSTED_REGISTER_EXAMPLE_SOURCE_REF,
@@ -713,9 +716,15 @@ describe("A19 · the model scorecard, published beside the register file", () =>
     // "\n" is 2 bytes in the file and `\u000a`, 6 bytes, in the register's canonical form.
     const engine = await readEngineVersion();
     const base = await compatibleExampleScorecard();
-    // Control: an unknown field is ignored by the scorecard format, so a short one is accepted.
-    expect(codeOf(() => parseHostedScorecardFile(bytesOf({ ...base, futureNote: "\n" }), engine))).toBe("NO_REFUSAL");
-    const expanding = bytesOf({ ...base, futureNote: "\n".repeat(12_000) });
+    // A defined text field (fix round 1: an unknown field is now refused on its own).
+    const withVendorText = (text: string) => {
+      const value = structuredClone(base) as { candidates: Array<Record<string, unknown>> };
+      value.candidates[0]!.vendor = text;
+      return bytesOf(value);
+    };
+    // Control: the same field with one newline is accepted.
+    expect(codeOf(() => parseHostedScorecardFile(withVendorText("Vendor\n"), engine))).toBe("NO_REFUSAL");
+    const expanding = withVendorText(`Vendor${"\n".repeat(12_000)}`);
     expect(expanding.byteLength).toBeLessThanOrEqual(MODEL_SCORECARD_MAX_BYTES);
     expect(codeOf(() => parseHostedScorecardFile(expanding, engine))).toBe("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
   });
@@ -750,5 +759,129 @@ describe("A19 · the model scorecard, published beside the register file", () =>
     );
     expect({ exitCode, stderr, opened })
       .toEqual({ exitCode: 2, stderr: "HOSTED_REGISTER_SCORECARD_FILE_ABSENT\n", opened: false });
+  });
+});
+
+/**
+ * A19 fix round 1 (review Minor 2) — a sealed row is never edited, so hosted
+ * publish REFUSES a scorecard that carries any field the scorecard format does
+ * not define, at any depth. The format itself ignores such a field (zod strips
+ * it), which is why local mode, which seals nothing, still reads it. The code
+ * names the field's path, in the printable code alphabet, and never its value.
+ */
+describe("A19 fix round 1 · a field the scorecard format does not define is never sealed", () => {
+  const SECRET = "private-evaluator-note-must-never-print";
+  type Mutable = Record<string, any>;
+
+  async function codeAndText(value: unknown): Promise<{ code: string; text: string }> {
+    try {
+      parseHostedScorecardFile(bytesOf(value), await readEngineVersion());
+    } catch (error) {
+      return { code: hostedRegisterRefusalCode(error), text: `${String(error)} ${JSON.stringify(error)}` };
+    }
+    return { code: "NO_REFUSAL", text: "" };
+  }
+
+  it("refuses an unknown field at every depth the schema defines, naming its path and never its value", async () => {
+    const example = await compatibleExampleScorecard() as Mutable;
+    // Control: the example carries only defined fields, and is accepted.
+    expect((await codeAndText(example)).code).toBe("NO_REFUSAL");
+    const role = Object.keys(example.roles).find((name) => example.roles[name].length > 0)!;
+    const priced = (example.candidates as Mutable[]).findIndex((candidate) => candidate.apiPrice !== null);
+    expect(priced).toBeGreaterThanOrEqual(0);
+    const cases: Record<string, (value: Mutable) => void> = {
+      privateNote: (value) => { value.privateNote = SECRET; },
+      "engineCompatibility.privateNote": (value) => { value.engineCompatibility.privateNote = SECRET; },
+      "candidates.1.privateNote": (value) => { value.candidates[1].privateNote = SECRET; },
+      "candidates.0.accessRoutes.0.privateNote": (value) => { value.candidates[0].accessRoutes[0].privateNote = SECRET; },
+      [`candidates.${priced}.apiPrice.privateNote`]: (value) => { value.candidates[priced].apiPrice.privateNote = SECRET; },
+      [`roles.${role}.0.privateNote`]: (value) => { value.roles[role][0].privateNote = SECRET; },
+      [`roles.${role}.0.quality.privateNote`]: (value) => { value.roles[role][0].quality.privateNote = SECRET; },
+      [`roles.${role}.0.qualityByLanguage.privateNote`]: (value) => {
+        value.roles[role][0].qualityByLanguage = { ro: { ...value.roles[role][0].quality }, privateNote: SECRET };
+      },
+      [`roles.${role}.0.typicalCall.privateNote`]: (value) => { value.roles[role][0].typicalCall.privateNote = SECRET; },
+      [`roles.${role}.0.tags.0.privateNote`]: (value) => {
+        value.roles[role][0].tags = [{ code: "PRIVATE_TAG", strength: "WEAK", text: "a tag", privateNote: SECRET }];
+      },
+      "pickerSettings.privateNote": (value) => { value.pickerSettings.privateNote = SECRET; },
+      [`pickerSettings.economyCap.${role}.privateNote`]: (value) => { value.pickerSettings.economyCap[role].privateNote = SECRET; },
+      "pickerSettings.planStrengthCaps.privateNote": (value) => { value.pickerSettings.planStrengthCaps.privateNote = SECRET; }
+    };
+    for (const [path, mutate] of Object.entries(cases)) {
+      const value = structuredClone(example);
+      mutate(value);
+      const refused = await codeAndText(value);
+      expect(refused.code, path).toBe(`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:${path}`);
+      expect(`${refused.code} ${refused.text}`, path).not.toContain(SECRET);
+    }
+  });
+
+  it("keeps the named path inside the printable code alphabet", async () => {
+    const value = { ...await compatibleExampleScorecard(), "private note/é": SECRET };
+    expect((await codeAndText(value)).code).toBe("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:private_note__");
+  });
+
+  it("refuses it as operator input, before the plan and before any connection", async () => {
+    const path = await custodyFile(JSON.stringify(validFile()));
+    const scorecardPath = await custodyFile(JSON.stringify({ ...await compatibleExampleScorecard(), privateNote: SECRET }));
+    let stdout = "";
+    let stderr = "";
+    let opened = false;
+    const exitCode = await runHostedRegisterPublishCli(
+      ["--dry-run", "--file", path, "--scorecard", scorecardPath],
+      { stdout: (text) => { stdout += text; }, stderr: (text) => { stderr += text; } },
+      async () => { opened = true; throw new Error("unreachable"); }
+    );
+    expect({ exitCode, stdout, stderr, opened }).toEqual({
+      exitCode: 2, stdout: "", stderr: "HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:privateNote\n", opened: false
+    });
+  });
+});
+
+/**
+ * A19 fix round 1 (review Minor 1) — the operator files are opened without
+ * waiting: a FIFO named by `--file` or `--scorecard` is refused by the custody
+ * rule (not a regular file) at once, instead of blocking the command until
+ * something writes to it.
+ */
+describe("A19 fix round 1 · a FIFO in place of an operator file", () => {
+  async function fifoInCustodyDirectory(): Promise<string> {
+    const root = await mkdtemp(join(tmpdir(), "debateai-hosted-register-"));
+    temporaryRoots.push(root);
+    await chmod(root, 0o700);
+    const fifo = join(root, "operator-file.json");
+    execFileSync("mkfifo", [fifo]);
+    await chmod(fifo, 0o600);
+    return fifo;
+  }
+
+  /** The read's answer within 2 s; a reader still blocked in open() is then released so the worker can exit. */
+  async function answerWithin(fifo: string, read: Promise<string>): Promise<string> {
+    const stop = new AbortController();
+    try {
+      return await Promise.race([
+        read,
+        delay(2_000, undefined, { signal: stop.signal }).then(() => "STILL_WAITING_FOR_A_WRITER", () => "ABORTED")
+      ]);
+    } finally {
+      stop.abort();
+      // With no reader waiting this refuses (ENXIO) and is ignored.
+      await open(fifo, constants.O_WRONLY | constants.O_NONBLOCK).then((handle) => handle.close(), () => undefined);
+      await Promise.race([read.catch(() => undefined), delay(1_000)]);
+    }
+  }
+
+  it("refuses a FIFO given as --scorecard at once", async () => {
+    const fifo = await fifoInCustodyDirectory();
+    const engine = await readEngineVersion();
+    expect(await answerWithin(fifo, codeOfAsync(() => readHostedScorecardFile(fifo, engine))))
+      .toBe("HOSTED_REGISTER_SCORECARD_FILE_CUSTODY_INVALID");
+  });
+
+  it("refuses a FIFO given as --file at once", async () => {
+    const fifo = await fifoInCustodyDirectory();
+    expect(await answerWithin(fifo, codeOfAsync(() => readHostedRegisterFile(fifo))))
+      .toBe("HOSTED_REGISTER_FILE_CUSTODY_INVALID");
   });
 });
