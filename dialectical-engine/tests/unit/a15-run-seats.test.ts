@@ -13,6 +13,9 @@ import {
   stampCandidateGateway,
   type ConfiguredSeatMaker,
   type RouteHealth,
+  type RunSeat,
+  type RunSeatBook,
+  type SeatCaller,
   type SeatMember,
   type SeatPlanOptions
 } from "@debateai/runner";
@@ -258,6 +261,19 @@ describe("A15 · the seat caller", () => {
   });
 });
 
+const sites = ["PANEL:root", "PANEL:n1", "PANEL:n2", "PANEL:n3", "PANEL:n4", "PANEL:n5"];
+const notA = (member: SeatMember): boolean => member.providerRef !== "provider:a";
+// Each call claims afresh: new routes, new gateways, new members — what a resumed pass does.
+const claimBook = () => buildAssignedRunSeatBook({
+  assignment: assignment({ POSITION: [seat(0, "a", "c"), seat(1, "b")], JUDGE: [seat(0, "a", "c")] }),
+  configured: routes("a", "b", "c"),
+  routeHealth: health({ a: "HEALTHY", b: "HEALTHY", c: "HEALTHY" })
+}).book;
+const recorded = async (caller: SeatCaller, seatToCall: RunSeat, callSiteKey: string, options: SeatPlanOptions) => {
+  const answer = await caller.callSeat({ seat: seatToCall, callSiteKey, ...options, call: async () => null });
+  return [answer.member.providerRef, answer.member.pinnedAs, answer.callSiteKey];
+};
+
 describe("A15 · controller rulings A13 and A14", () => {
   it("keeps the debate role, and every other field, on a stamped request (A13)", async () => {
     const requests: ProviderCallRequest[] = [];
@@ -274,33 +290,114 @@ describe("A15 · controller rulings A13 and A14", () => {
   });
 
   it("chooses the member and the key from the call site alone, so a resumed pass repeats them (A14)", async () => {
+    // This case names no member: it compares two passes, so it stays valid once A16a adds the 80-20 split.
+    const firstBook = claimBook();
+    const resumedBook = claimBook();
+    const seatsIn = (book: RunSeatBook): readonly RunSeat[] => [book.position[0]!, book.judge[0]!];
+    const slot = (member: SeatMember | null) => (member === null ? null : [member.providerRef, member.pinnedAs]);
+    // The first pass has already made calls on these seats, in one visit order...
+    const firstPass = createSeatCaller({ assigned: true });
+    for (const seatToCall of seatsIn(firstBook)) {
+      for (const callSiteKey of sites) await firstPass.callSeat({ seat: seatToCall, callSiteKey, call: async () => null });
+    }
+    // ...and a resumed pass is a FRESH caller on a SECOND book, visiting the sites in another order.
+    const resumed = createSeatCaller({ assigned: true });
+    for (const [index, resumedSeat] of seatsIn(resumedBook).entries()) {
+      const firstSeat = seatsIn(firstBook)[index]!;
+      expect(resumedSeat).not.toBe(firstSeat);
+      for (const callSiteKey of [...sites].reverse()) {
+        for (const options of [{}, { eligible: notA }] satisfies SeatPlanOptions[]) {
+          expect(slot(resumed.plan(resumedSeat, callSiteKey, options))).toEqual(slot(firstPass.plan(firstSeat, callSiteKey, options)));
+          expect(await recorded(resumed, resumedSeat, callSiteKey, options))
+            .toEqual(await recorded(firstPass, firstSeat, callSiteKey, options));
+        }
+      }
+    }
+  });
+
+  it("A15b: no 80-20 split yet — main first", async () => {
+    // A16a REPLACES this case when it adds the split (R3); the A14 case above stays as it is.
+    const judgeSeat = claimBook().judge[0]!;
+    const caller = createSeatCaller({ assigned: true });
+    for (const callSiteKey of sites) {
+      expect(await recorded(caller, judgeSeat, callSiteKey, {})).toEqual(["provider:a", "MAIN", `${callSiteKey}:seat:main`]);
+      expect(await recorded(caller, judgeSeat, callSiteKey, { eligible: notA }))
+        .toEqual(["provider:c", "RUNNER_UP", `${callSiteKey}:seat:runnerUp`]);
+    }
+  });
+});
+
+describe("A15b fix round 1", () => {
+  it("gives a seat left without a runner-up at claim no share (M2: no runner-up, no share)", () => {
     const { book } = buildAssignedRunSeatBook({
-      assignment: assignment({ POSITION: [seat(0, "a", "c"), seat(1, "b")], JUDGE: [seat(0, "a", "c")] }),
+      assignment: assignment({ POSITION: [seat(0, "a", "c"), seat(1, "b", "d"), seat(2, "e", "f")] }),
+      configured: routes("a", "b", "c", "d", "e", "f"),
+      routeHealth: health({
+        a: "CLAIM_PROVIDER_ABSENT", b: "HEALTHY", c: "HEALTHY", d: "CLAIM_PROVIDER_ABSENT", e: "HEALTHY", f: "HEALTHY"
+      })
+    });
+    // Seat 0: main absent, runner-up promoted. Seat 1: runner-up absent. Seat 2: both healthy (the control).
+    expect(book.position.map((entry) => [entry.main.providerRef, entry.runnerUp?.providerRef ?? null, entry.diversityShare]))
+      .toEqual([["provider:c", null, 0], ["provider:b", null, 0], ["provider:e", "provider:f", 0.2]]);
+  });
+
+  it("mirrors the claimed POSITION seats for CROSS_EXCHANGE: one switch record, root i's writer, no backup (M3)", async () => {
+    const positionSeats = [seat(0, "a", "c"), seat(1, "b")];
+    const { book, claimSwitches } = buildAssignedRunSeatBook({
+      assignment: assignment({ POSITION: positionSeats, CROSS_EXCHANGE: positionSeats }),
+      configured: routes("a", "b", "c"),
+      routeHealth: health({ a: "CLAIM_PROVIDER_ABSENT", b: "HEALTHY", c: "HEALTHY" })
+    });
+    expect(claimSwitches.map((entry) => [entry.role, entry.seatIndex, entry.cause])).toEqual([["POSITION", 0, "ABSENT_AT_CLAIM"]]);
+    expect(book.crossExchange.map((entry) => [
+      entry.role, entry.seatIndex, entry.pinnedSeatIndex, entry.main.providerRef, entry.main.pinnedAs, entry.runnerUp, entry.diversityShare
+    ])).toEqual([
+      ["CROSS_EXCHANGE", 0, 0, "provider:c", "RUNNER_UP", null, 0],
+      ["CROSS_EXCHANGE", 1, 1, "provider:b", "MAIN", null, 0]
+    ]);
+    book.crossExchange.forEach((entry, index) => expect(entry.main).toBe(book.position[index]!.main));
+    // The site's ONE key carries the pinned slot of the member that wrote the root (A15a).
+    const answer = await createSeatCaller({ assigned: true }).callSeat({
+      seat: book.crossExchange[0]!, callSiteKey: "JUDGE:cross-root:0->1", call: async () => null
+    });
+    expect(answer.callSiteKey).toBe("JUDGE:cross-root:0->1:seat:runnerUp");
+
+    // All healthy: the POSITION seat keeps its runner-up, the cross-exchange has none.
+    const healthy = buildAssignedRunSeatBook({
+      assignment: assignment({ POSITION: positionSeats, CROSS_EXCHANGE: positionSeats }),
       configured: routes("a", "b", "c"),
       routeHealth: health({ a: "HEALTHY", b: "HEALTHY", c: "HEALTHY" })
+    }).book;
+    expect(healthy.position[0]!.runnerUp?.providerRef).toBe("provider:c");
+    expect(healthy.crossExchange.map((entry) => [entry.main.providerRef, entry.main.pinnedAs, entry.runnerUp, entry.diversityShare]))
+      .toEqual([["provider:a", "MAIN", null, 0], ["provider:b", "MAIN", null, 0]]);
+  });
+
+  it("keeps crossExchange[i] on root i's writer when R5 refuses a POSITION promotion (M3)", () => {
+    const positionSeats = [seat(0, "a", "b"), seat(1, "b")];
+    const { book, claimSwitches } = buildAssignedRunSeatBook({
+      assignment: assignment({ POSITION: positionSeats, CROSS_EXCHANGE: positionSeats }),
+      configured: routes("a", "b"),
+      routeHealth: health({ a: "CLAIM_PROVIDER_ABSENT", b: "HEALTHY" })
     });
-    const judgeSeat = book.judge[0]!;
-    const notA = (member: SeatMember): boolean => member.providerRef !== "provider:a";
-    const sites = ["PANEL:root", "PANEL:n1", "PANEL:n2", "PANEL:n3", "PANEL:n4", "PANEL:n5"];
-    // The first pass has already made calls on this seat, in one visit order...
-    const firstPass = createSeatCaller({ assigned: true });
-    for (const callSiteKey of sites) {
-      await firstPass.callSeat({ seat: judgeSeat, callSiteKey, call: async () => null });
-    }
-    // ...and a resumed pass is a FRESH caller that visits the sites in another order.
-    const resumed = createSeatCaller({ assigned: true });
-    const keyed = async (caller: ReturnType<typeof createSeatCaller>, callSiteKey: string, options: SeatPlanOptions) =>
-      (await caller.callSeat({
-        seat: judgeSeat, callSiteKey, ...options, call: async (member, key) => `${member.providerRef}@${key}`
-      })).value;
-    for (const callSiteKey of [...sites].reverse()) {
-      for (const options of [{}, { eligible: notA }] satisfies SeatPlanOptions[]) {
-        expect(resumed.plan(judgeSeat, callSiteKey, options)).toBe(firstPass.plan(judgeSeat, callSiteKey, options));
-        expect(await keyed(resumed, callSiteKey, options)).toBe(await keyed(firstPass, callSiteKey, options));
-      }
-      // No visit counter: however many calls came before, the main is asked first, the runner-up only when barred.
-      expect(await keyed(resumed, callSiteKey, {})).toBe(`provider:a@${callSiteKey}:seat:main`);
-      expect(await keyed(resumed, callSiteKey, { eligible: notA })).toBe(`provider:c@${callSiteKey}:seat:runnerUp`);
-    }
+    expect(claimSwitches).toEqual([]);
+    expect(book.position.map((entry) => [entry.seatIndex, entry.pinnedSeatIndex, entry.main.providerRef])).toEqual([[0, 1, "provider:b"]]);
+    expect(book.crossExchange.map((entry) => [entry.seatIndex, entry.pinnedSeatIndex, entry.main.providerRef, entry.main.pinnedAs]))
+      .toEqual([[0, 1, "provider:b", "MAIN"]]);
+    expect(book.crossExchange[0]!.main).toBe(book.position[0]!.main);
+  });
+
+  it("refuses a seat with a runner-up on a bare-key caller (M5)", async () => {
+    const seatWithRunnerUp = claimBook().judge[0]!;
+    const bare = createSeatCaller({ assigned: false });
+    let called = false;
+    expect(() => bare.plan(seatWithRunnerUp, "PANEL:root"))
+      .toThrowError(expect.objectContaining({ code: "CALL_SITE_SEAT_MARKER_REQUIRED" }));
+    await expect(bare.callSeat({
+      seat: seatWithRunnerUp, callSiteKey: "PANEL:root", call: async () => { called = true; return null; }
+    })).rejects.toMatchObject({ code: "CALL_SITE_SEAT_MARKER_REQUIRED" });
+    expect(called).toBe(false);
+    // A seat without a runner-up still records its bare key, as the legacy case above shows.
+    expect(bare.plan(claimBook().position[1]!, "PANEL:root")?.providerRef).toBe("provider:b");
   });
 });

@@ -150,7 +150,12 @@ function seatsOf(assignment: RoleAssignment, role: DebateRole): readonly RoleSea
   return assignment.roles[role] ?? [];
 }
 
-/** Why a pinned assignment cannot seat a debate, or null when it can. */
+/**
+ * Why a pinned assignment cannot seat a debate, or null when it can. It counts
+ * seats only: it assumes `RoleAssignmentSchema` already ran on the assignment
+ * (a runner-up on its main's route, a shared POSITION maker, a CROSS_EXCHANGE
+ * that is not POSITION's are the schema's checks, not this one's).
+ */
 export function roleAssignmentSeatProblem(assignment: RoleAssignment): string | null {
   if (seatsOf(assignment, "POSITION").length === 0) return "POSITION has no seat";
   for (const role of ["ANSWER_WRITER", "ANSWER_CHECKER"] as const) {
@@ -201,9 +206,18 @@ export function buildAssignedRunSeatBook(input: {
       judge: new Judge(provider), provider, providerRef: maker.providerRef, maker: maker.maker, candidate, pinnedAs
     });
   };
+  // A15b fix round 1 (M2): "no runner-up, no share" (RoleAssignmentSchema) holds
+  // for the CLAIMED seat too — a runner-up promoted at claim, or absent at claim,
+  // leaves the seat one member and no share. `pinned` still records the assignment.
   const seated = (role: DebateRole, pinned: RoleSeat, seatIndex: number, main: SeatMember, runnerUp: SeatMember | null): RunSeat =>
     Object.freeze({
-      role, seatIndex, pinnedSeatIndex: pinned.seatIndex, main, runnerUp, diversityShare: pinned.diversityShare, pinned
+      role,
+      seatIndex,
+      pinnedSeatIndex: pinned.seatIndex,
+      main,
+      runnerUp,
+      diversityShare: runnerUp === null ? 0 : pinned.diversityShare,
+      pinned
     });
   const resolve = (
     role: DebateRole,
@@ -259,19 +273,33 @@ export function buildAssignedRunSeatBook(input: {
       droppedPositionSeats.push(Object.freeze({ candidate: pinned.main, failureCode: resolved.failureCode }));
     }
   }
-  const multiSeat = (role: "SUPPORT_ATTACK" | "CROSS_EXCHANGE" | "JUDGE" | "REVIEWER"): readonly RunSeat[] => {
+  const multiSeat = (role: "SUPPORT_ATTACK" | "JUDGE" | "REVIEWER"): readonly RunSeat[] => {
     const seats: RunSeat[] = [];
     for (const pinned of seatsOf(assignment, role)) {
       const resolved = resolve(role, pinned, seats.length, () => true);
       if (resolved.kind === "SEATED") seats.push(resolved.seat);
     }
-    // A cross-exchange is written by the member that wrote its root (R5), so
-    // an empty CROSS_EXCHANGE list is lawful. Any OTHER role left without a
-    // seat keeps TODAY's rule for that role: the debaters sit in it (spec
-    // §2.4, "a role the scorecard does not cover falls back to today's").
-    if (seats.length > 0 || role === "CROSS_EXCHANGE") return Object.freeze(seats);
+    // A role left without a seat keeps TODAY's rule for that role: the
+    // debaters sit in it (spec §2.4, "a role the scorecard does not cover
+    // falls back to today's").
+    if (seats.length > 0) return Object.freeze(seats);
     return Object.freeze(position.map((debater) => Object.freeze({ ...debater, role })));
   };
+  // A15b fix round 1 (M3): a cross-exchange defends a root, so it is written by
+  // the member that wrote that root (R5). Its seats therefore MIRROR the
+  // CLAIMED POSITION seats and are never resolved again: a claim switch is
+  // recorded once, and crossExchange[i] stays root i's writer even where R5
+  // refused a POSITION promotion. A mirrored seat has no runner-up and no share
+  // (a cross-exchange site has no backup, DR-184-v5), and its member keeps its
+  // pinned slot, so the site's one key carries the root writer's marker (A15a).
+  // RoleAssignmentSchema pins CROSS_EXCHANGE equal to POSITION, so no
+  // candidate is lost; an assignment with no CROSS_EXCHANGE seat keeps an
+  // empty list, which is lawful.
+  const crossExchange: readonly RunSeat[] = seatsOf(assignment, "CROSS_EXCHANGE").length === 0
+    ? Object.freeze([])
+    : Object.freeze(position.map((debater) => Object.freeze({
+      ...debater, role: "CROSS_EXCHANGE" as const, runnerUp: null, diversityShare: 0
+    })));
   const unavailableSynthesis: {
     readonly role: "ANSWER_WRITER" | "ANSWER_CHECKER";
     readonly candidate: SeatCandidate;
@@ -293,7 +321,7 @@ export function buildAssignedRunSeatBook(input: {
     scorecardVersion: assignment.scorecardVersion,
     position: Object.freeze(position),
     supportAttack: multiSeat("SUPPORT_ATTACK"),
-    crossExchange: multiSeat("CROSS_EXCHANGE"),
+    crossExchange,
     judge: multiSeat("JUDGE"),
     reviewer: multiSeat("REVIEWER"),
     answerWriter: single("ANSWER_WRITER"),
@@ -361,8 +389,18 @@ export function createSeatCaller(options: { readonly assigned: boolean }): SeatC
     const base = input.keyFor?.(member) ?? input.callSiteKey;
     return options.assigned ? seatCallSiteKey(base, member.pinnedAs === "MAIN" ? "main" : "runnerUp") : base;
   };
-  const eligibleMembers = (seat: RunSeat, eligible: (member: SeatMember) => boolean): readonly SeatMember[] =>
-    (seat.runnerUp === null ? [seat.main] : [seat.main, seat.runnerUp]).filter(eligible);
+  const eligibleMembers = (seat: RunSeat, eligible: (member: SeatMember) => boolean): readonly SeatMember[] => {
+    // A15b fix round 1 (M5): a bare-key caller records every member of a seat
+    // under ONE key, so a main and its runner-up would share one per-key
+    // allowance and one lineage row. Such a caller refuses a two-member seat.
+    if (!options.assigned && seat.runnerUp !== null) {
+      throw new TypedDomainError(
+        "CALL_SITE_SEAT_MARKER_REQUIRED",
+        `${seat.role} seat ${String(seat.pinnedSeatIndex)} has a runner-up, so its calls need a seat marker; this caller records bare keys`
+      );
+    }
+    return (seat.runnerUp === null ? [seat.main] : [seat.main, seat.runnerUp]).filter(eligible);
+  };
   return Object.freeze({
     plan: (seat: RunSeat, _callSiteKey: string, planOptions: SeatPlanOptions = {}) =>
       eligibleMembers(seat, planOptions.eligible ?? always)[0] ?? null,

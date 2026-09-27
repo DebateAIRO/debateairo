@@ -232,9 +232,18 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/withPublicSampleLease\(sample/);
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/provider\.classify/);
     expect(contents.get("packages/evaluator/src/index.ts")).toMatch(/withRunContentLease/);
-    // Judge is a pure prompt/parser object. Its only production construction is
-    // under the leased runner and the run-required gateway above.
-    expect(contents.get("apps/runner/src/index.ts")).toMatch(/new Judge\(/);
+    // Judge is a pure prompt/parser object. Its production constructions are all
+    // under the leased runner and the run-required gateway above: the runner's
+    // own, and the seat book's (model scorecard A15), which builds a Judge around
+    // a configured maker's gateway wrapped in the candidate stamp. run-seats.ts
+    // opens no lease of its own, and only the leased runner imports it.
+    expect([...contents].filter(([,body]) => /new Judge\(/.test(body)).map(([path]) => path).sort()).toEqual([
+      "apps/runner/src/index.ts",
+      "apps/runner/src/run-seats.ts"
+    ]);
+    expect(contents.get("apps/runner/src/run-seats.ts")).toMatch(/new Judge\(provider\)/);
+    expect([...contents].filter(([,body]) => /from "\.\/run-seats\.js"/.test(body)).map(([path]) => path))
+      .toEqual(["apps/runner/src/index.ts"]);
   });
 
   it("classifies direct ContentCipher consumers as provisioning or public-corpus paths", async () => {
