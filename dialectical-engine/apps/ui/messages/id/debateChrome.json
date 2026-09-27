@@ -172,6 +172,7 @@
   "debateChrome.condition.skippedByBudget": "Pengayaan dilewati karena batas anggaran",
   "debateChrome.condition.envelopeExhausted": "Berakhir lebih awal agar tetap dalam anggaran",
   "debateChrome.condition.envelopeExhaustedService": "Berakhir lebih awal karena masalah pada layanan AI",
+  "debateChrome.condition.endedEarly": "Berakhir lebih awal",
   "debateChrome.condition.leverageUnresolved": "Daya pengaruh belum terselesaikan",
   "debateChrome.condition.branchFrozenLowLeverage": "Cabang tidak dikembangkan: cabang ini tidak dapat mengubah jawaban",
   "debateChrome.condition.degradedDiversity": "Keragaman model menurun",

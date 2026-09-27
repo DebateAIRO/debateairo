@@ -172,6 +172,7 @@
   "debateChrome.condition.skippedByBudget": "予算上の理由で補強を省略",
   "debateChrome.condition.envelopeExhausted": "予算内に収めるため、早めに終了しました",
   "debateChrome.condition.envelopeExhaustedService": "AIサービスの問題により、早めに終了しました",
+  "debateChrome.condition.endedEarly": "早めに終了しました",
   "debateChrome.condition.leverageUnresolved": "影響力が未確定",
   "debateChrome.condition.branchFrozenLowLeverage": "回答を変えるほどの影響がないため、分岐を展開せず",
   "debateChrome.condition.degradedDiversity": "モデルの多様性が低下",

@@ -77,8 +77,19 @@ function drawer(answer: Answer, locale: "en" | "ro" = "en", floorShown = false):
 /** The drawer's visible text: the markup without its tags and attributes. */
 const visible = (html: string): string => html.replace(/<[^>]*>/gu, " ").replace(/&#x27;/gu, "'").replace(/&quot;/gu, '"').replace(/&amp;/gu, "&");
 
+/** The stop's record, as the runner writes it: the mark, and the stop's code as its reason. */
+function stopRecord(reason: string): Record_ {
+  return {
+    mark: "ENVELOPE_EXHAUSTED", scope: "answer", subject_ref: "run:fair", reason, lift_path: null, served_root_rule: null,
+    call_site_key: null, planned_leg_count: null, terminal_transport_outcome: null, review_outcome: null,
+    hidden_strength: null, hidden_score_threshold: null, hidden_score_threshold_source_ref: null,
+    excluded_from_served_number: null, judged_basis_count: null, affected_node_ids: ["node:fair:pro"]
+  };
+}
+
 const CUT_SHORT = buildFairShapedAnswer({
-  condition_marks: [...buildFairShapedAnswer().condition_marks, "SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"]
+  condition_marks: [...buildFairShapedAnswer().condition_marks, "SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"],
+  condition_mark_records: [...buildFairShapedAnswer().condition_mark_records, stopRecord("RUN_COST_ENVELOPE_MONEY_REACHED")]
 });
 
 describe("the drawer's limits line and the stopped-early mark agree", () => {
@@ -121,6 +132,7 @@ describe("the drawer's limits line and the stopped-early mark agree", () => {
       band_ceiling: null,
       composed_text: [],
       condition_marks: ["ENVELOPE_EXHAUSTED"],
+      condition_mark_records: [stopRecord("RUN_COST_ENVELOPE_MONEY_REACHED")],
       cost_envelope: { ...buildFairShapedAnswer().cost_envelope, state: "EXHAUSTED" }
     });
     const text = visible(drawer(floorAnswer));
@@ -231,12 +243,8 @@ describe("the envelope mark is worded by its record's reason (fix round 2)", () 
   const SERVICE = "Ended early because of a problem with an AI service";
   const BUDGET = "Ended early to stay within budget";
 
-  function envelopeRecord(reason: string): Record_ {
-    return {
-      ...panelRecord("PANEL-PARTIAL", reason, ""),
-      mark: "ENVELOPE_EXHAUSTED", scope: "answer", subject_ref: "run:fair", lift_path: null, affected_node_ids: ["node:fair:pro"]
-    };
-  }
+  const NEUTRAL = "Ended early";
+  const envelopeRecord = stopRecord;
   function stopped(reason: string): Answer {
     return buildFairShapedAnswer({
       condition_marks: [...buildFairShapedAnswer().condition_marks, "ENVELOPE_EXHAUSTED"],
@@ -249,9 +257,12 @@ describe("the envelope mark is worded by its record's reason (fix round 2)", () 
     for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED", "DAILY_COST_ENVELOPE_REACHED"]) {
       expect(conditionRecordLabel(envelopeRecord(code), chromeEn), code).toBe(BUDGET);
     }
-    // A bare mark takes its answer's record; with none, the plain label.
+    // A bare mark takes its answer's record; with none, it names no cause (round 3).
     expect(markLabelFromRecords("ENVELOPE_EXHAUSTED", [envelopeRecord("PROVIDER_USAGE_UNREPORTED")], chromeEn)).toBe(SERVICE);
-    expect(markLabelFromRecords("ENVELOPE_EXHAUSTED", [], chromeEn)).toBe(BUDGET);
+    expect(markLabelFromRecords("ENVELOPE_EXHAUSTED", [envelopeRecord("RUN_COST_ENVELOPE_MONEY_REACHED")], chromeEn)).toBe(BUDGET);
+    expect(markLabelFromRecords("ENVELOPE_EXHAUSTED", [], chromeEn)).toBe(NEUTRAL);
+    // A record whose reason names no stop names no cause either.
+    expect(conditionRecordLabel(envelopeRecord("Envelope terminal fired"), chromeEn)).toBe(NEUTRAL);
     // Another mark is never reworded by a stop code in its reason.
     expect(conditionRecordLabel({ mark: "SINGLE-LINEAGE", reason: "PROVIDER_USAGE_UNREPORTED" }, chromeEn))
       .toBe(words(chromeEn, "debateChrome.condition.singleLineage"));
@@ -292,7 +303,45 @@ describe("the envelope mark is worded by its record's reason (fix round 2)", () 
     expect(node("PROVIDER_USAGE_UNREPORTED")).toContain(SERVICE);
     expect(node("PROVIDER_USAGE_UNREPORTED")).not.toContain(BUDGET);
     expect(node("RUN_COST_ENVELOPE_MONEY_REACHED")).toContain(BUDGET);
-    // No record to read (the public snapshot carries none): the plain label.
-    expect(node(null)).toContain(BUDGET);
+  });
+
+  it("a public node pill with no record reads the neutral words, naming no cause (round 3)", () => {
+    // The public page passes no records (its snapshot carries none), exactly as here.
+    const answer = stopped("PROVIDER_USAGE_UNREPORTED");
+    const v3 = { ...answer.nodes[0]!, condition_marks: ["ENVELOPE_EXHAUSTED" as const] };
+    const markup = renderToStaticMarkup(
+      <NodeDetailDrawer
+        node={debateDetailFromAnswer(answer).tree!.children[0]!}
+        v3={v3}
+        token={null}
+        onClose={noop}
+        onFocusRecommendationNode={() => false}
+        canFocusRecommendationNode={() => false}
+        onQueued={noop}
+        onError={noop}
+        onAuthRejected={noop}
+        debateChromeCatalog={chromeEn}
+      />
+    );
+    const pill = /<span class="drawerConditionPill [a-z]+"[^>]*title="ENVELOPE_EXHAUSTED"[^>]*>([^<]*)<\/span>/u.exec(markup)?.[1];
+    expect(pill).toBe(NEUTRAL);
+    expect(visible(markup)).not.toContain(BUDGET);
+    expect(visible(markup)).not.toContain(SERVICE);
+    const ro = renderToStaticMarkup(
+      <NodeDetailDrawer
+        node={debateDetailFromAnswer(answer).tree!.children[0]!}
+        v3={v3}
+        token={null}
+        onClose={noop}
+        onFocusRecommendationNode={() => false}
+        canFocusRecommendationNode={() => false}
+        onQueued={noop}
+        onError={noop}
+        onAuthRejected={noop}
+        debateChromeCatalog={chromeRo}
+      />
+    );
+    expect(ro).toContain(`>${words(chromeRo, "debateChrome.condition.endedEarly")}<`);
+    expect(words(chromeRo, "debateChrome.condition.endedEarly")).toBe("S-a încheiat mai devreme");
   });
 });

@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "A költségkeret miatt kimaradt a bővítés",
   "debateChrome.condition.envelopeExhausted": "Korábban befejeződött, hogy a költségkereten belül maradjon",
   "debateChrome.condition.envelopeExhaustedService": "Egy MI-szolgáltatás hibája miatt korábban befejeződött",
+  "debateChrome.condition.endedEarly": "Korábban befejeződött",
   "debateChrome.condition.leverageUnresolved": "A befolyás tisztázatlan",
   "debateChrome.condition.branchFrozenLowLeverage": "Az ág nem bővült: nem módosíthatta a választ",
   "debateChrome.condition.degradedDiversity": "A modellváltozatosság csökkent",

@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "تُجاوز الإثراء بسبب الميزانية",
   "debateChrome.condition.envelopeExhausted": "انتهى مبكرًا للبقاء ضمن الميزانية",
   "debateChrome.condition.envelopeExhaustedService": "انتهى مبكرًا بسبب مشكلة في إحدى خدمات الذكاء الاصطناعي",
+  "debateChrome.condition.endedEarly": "انتهى مبكرًا",
   "debateChrome.condition.leverageUnresolved": "لم تُحسم القدرة على التأثير",
   "debateChrome.condition.branchFrozenLowLeverage": "لم يتوسّع الفرع: لم يكن قادرًا على تغيير الإجابة",
   "debateChrome.condition.degradedDiversity": "تراجع تنوّع النماذج",

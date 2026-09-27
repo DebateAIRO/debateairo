@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "Збагачення пропущено через обмеження бюджету",
   "debateChrome.condition.envelopeExhausted": "Завершено раніше, щоб не вийти за межі бюджету",
   "debateChrome.condition.envelopeExhaustedService": "Завершено раніше через проблему із сервісом ШІ",
+  "debateChrome.condition.endedEarly": "Завершено раніше",
   "debateChrome.condition.leverageUnresolved": "Вплив не визначено",
   "debateChrome.condition.branchFrozenLowLeverage": "Гілку не розгорнуто: вона не могла вплинути на відповідь",
   "debateChrome.condition.degradedDiversity": "Різноманітність моделей знижено",

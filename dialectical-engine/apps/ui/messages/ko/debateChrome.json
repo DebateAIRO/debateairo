@@ -172,6 +172,7 @@
   "debateChrome.condition.skippedByBudget": "예산으로 인해 보강 생략",
   "debateChrome.condition.envelopeExhausted": "예산을 지키기 위해 일찍 끝남",
   "debateChrome.condition.envelopeExhaustedService": "AI 서비스 문제로 일찍 끝남",
+  "debateChrome.condition.endedEarly": "일찍 끝남",
   "debateChrome.condition.leverageUnresolved": "영향력 미확정",
   "debateChrome.condition.branchFrozenLowLeverage": "분기 미확장: 답변을 바꿀 수 없었음",
   "debateChrome.condition.degradedDiversity": "모델 다양성 저하",

@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "Anreicherung wegen Budgetgrenze übersprungen",
   "debateChrome.condition.envelopeExhausted": "Früher beendet, um im Budget zu bleiben",
   "debateChrome.condition.envelopeExhaustedService": "Früher beendet wegen eines Problems mit einem KI-Dienst",
+  "debateChrome.condition.endedEarly": "Früher beendet",
   "debateChrome.condition.leverageUnresolved": "Einfluss ungeklärt",
   "debateChrome.condition.branchFrozenLowLeverage": "Zweig nicht erweitert: Er hätte die Antwort nicht verändert",
   "debateChrome.condition.degradedDiversity": "Modellvielfalt eingeschränkt",

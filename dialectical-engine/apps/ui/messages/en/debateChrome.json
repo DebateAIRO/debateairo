@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "Enrichment skipped by budget",
   "debateChrome.condition.envelopeExhausted": "Ended early to stay within budget",
   "debateChrome.condition.envelopeExhaustedService": "Ended early because of a problem with an AI service",
+  "debateChrome.condition.endedEarly": "Ended early",
   "debateChrome.condition.leverageUnresolved": "Leverage unresolved",
   "debateChrome.condition.branchFrozenLowLeverage": "Branch not expanded: it could not move the answer",
   "debateChrome.condition.degradedDiversity": "Model diversity degraded",

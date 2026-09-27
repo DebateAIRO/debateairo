@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "Papildināšana izlaista budžeta dēļ",
   "debateChrome.condition.envelopeExhausted": "Pabeigts agrāk, lai nepārsniegtu budžetu",
   "debateChrome.condition.envelopeExhaustedService": "Pabeigts agrāk kāda MI pakalpojuma problēmas dēļ",
+  "debateChrome.condition.endedEarly": "Pabeigts agrāk",
   "debateChrome.condition.leverageUnresolved": "Ietekme nav noteikta",
   "debateChrome.condition.branchFrozenLowLeverage": "Zars nav izvērsts: tas nevarēja mainīt atbildi",
   "debateChrome.condition.degradedDiversity": "Modeļu daudzveidība samazināta",

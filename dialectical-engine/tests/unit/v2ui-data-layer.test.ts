@@ -227,7 +227,9 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
     // Task M6 (M2 review carry, fix round 1): the mark says what happened in plain words, true for all
     // three of its uses (arguing cut short, the envelope terminal, a stopped answer-writing loop), and it
     // agrees with the drawer's "Stayed within the limits" instead of reading as its contradiction.
-    expect(conditionMarkLabel("ENVELOPE_EXHAUSTED")).toBe("Ended early to stay within budget");
+    // Round 3: with no record to read, the mark names no cause; its record words the cause
+    // (labels.ts conditionRecordLabel; tests/render/m6-honesty-drawer.test.tsx).
+    expect(conditionMarkLabel("ENVELOPE_EXHAUSTED")).toBe("Ended early");
   });
 
   it("maps every terminal outcome onto an honest V2 status", () => {

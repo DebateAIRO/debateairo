@@ -176,6 +176,7 @@
   "debateChrome.condition.skippedByBudget": "L-arrikkiment inqabeż minħabba l-baġit",
   "debateChrome.condition.envelopeExhausted": "Intemm kmieni biex jinżamm il-baġit",
   "debateChrome.condition.envelopeExhaustedService": "Intemm kmieni minħabba problema f’servizz tal-IA",
+  "debateChrome.condition.endedEarly": "Intemm kmieni",
   "debateChrome.condition.leverageUnresolved": "L-influwenza għadha mhix solvuta",
   "debateChrome.condition.branchFrozenLowLeverage": "Il-fergħa ma ġietx estiża: ma setgħetx tibdel ir-risposta",
   "debateChrome.condition.degradedDiversity": "Id-diversità tal-mudelli marret lura",

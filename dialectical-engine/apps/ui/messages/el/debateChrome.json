@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "Ο εμπλουτισμός παραλείφθηκε λόγω προϋπολογισμού",
   "debateChrome.condition.envelopeExhausted": "Ολοκληρώθηκε νωρίτερα για να τηρηθεί ο προϋπολογισμός",
   "debateChrome.condition.envelopeExhaustedService": "Ολοκληρώθηκε νωρίτερα λόγω προβλήματος σε μια υπηρεσία ΤΝ",
+  "debateChrome.condition.endedEarly": "Ολοκληρώθηκε νωρίτερα",
   "debateChrome.condition.leverageUnresolved": "Η επιρροή παραμένει ανεπίλυτη",
   "debateChrome.condition.branchFrozenLowLeverage": "Ο κλάδος δεν επεκτάθηκε: δεν μπορούσε να μεταβάλει την απάντηση",
   "debateChrome.condition.degradedDiversity": "Η ποικιλομορφία των μοντέλων υποβαθμίστηκε",

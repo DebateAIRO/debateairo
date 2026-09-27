@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "Verrijking overgeslagen wegens budget",
   "debateChrome.condition.envelopeExhausted": "Eerder beëindigd om binnen het budget te blijven",
   "debateChrome.condition.envelopeExhaustedService": "Eerder beëindigd door een probleem met een AI-dienst",
+  "debateChrome.condition.endedEarly": "Eerder beëindigd",
   "debateChrome.condition.leverageUnresolved": "Invloed niet vastgesteld",
   "debateChrome.condition.branchFrozenLowLeverage": "Vertakking niet uitgebreid: deze kon het antwoord niet wijzigen",
   "debateChrome.condition.degradedDiversity": "Modeldiversiteit verminderd",

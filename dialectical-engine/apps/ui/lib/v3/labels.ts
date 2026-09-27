@@ -30,7 +30,8 @@ export function conditionMarkLabel(
     case "UNINSTRUMENTED": return t(catalog, "debateChrome.condition.uninstrumented");
     case "UNFALSIFIED-AFTER-ROTATION": return t(catalog, "debateChrome.condition.unfalsifiedAfterRotation");
     case "SKIPPED-BY-BUDGET": return t(catalog, "debateChrome.condition.skippedByBudget");
-    case "ENVELOPE_EXHAUSTED": return t(catalog, "debateChrome.condition.envelopeExhausted");
+    // Round 3: the bare mark names no cause; its record words the cause (conditionRecordLabel).
+    case "ENVELOPE_EXHAUSTED": return t(catalog, "debateChrome.condition.endedEarly");
     case "LEVERAGE_UNRESOLVED": return t(catalog, "debateChrome.condition.leverageUnresolved");
     case "BRANCH-FROZEN-LOW-LEVERAGE": return t(catalog, "debateChrome.condition.branchFrozenLowLeverage");
     case "DEGRADED-DIVERSITY": return t(catalog, "debateChrome.condition.degradedDiversity");
@@ -106,15 +107,22 @@ export function panelSpendStopKind(record: MarkRecord): PanelSpendStopKind | nul
 }
 
 /**
- * A condition mark as its own record says it (Task M6, fix round 2, ruling R2).
- * ENVELOPE_EXHAUSTED is minted with the same mark for every spend stop, its stop
- * code as the reason; a vendor that reports no usage is a problem with an AI
- * service, and an operator told "budget" would raise the wrong ceiling. Every
- * other stop, and every other mark, keeps the mark's own words.
+ * A condition mark as its own record says it (Task M6, fix rounds 2 and 3,
+ * ruling R2). ENVELOPE_EXHAUSTED is minted with the same mark for every spend
+ * stop, its stop code as the reason: a vendor that reports no usage is a
+ * problem with an AI service (an operator told "budget" would raise the wrong
+ * ceiling); money, the attempt ceiling and the day's spend are the budget. A
+ * reason that names no stop, like the bare mark with no record at all (a public
+ * snapshot carries none), names no cause: "Ended early". Every other mark keeps
+ * its own words.
  */
 export function conditionRecordLabel(record: MarkRecord, catalog: MessageCatalog): string {
-  if (record.mark === "ENVELOPE_EXHAUSTED" && spendStopKindOfReason(record.reason) === "SERVICE") {
-    return t(catalog, "debateChrome.condition.envelopeExhaustedService");
+  if (record.mark === "ENVELOPE_EXHAUSTED") {
+    switch (spendStopKindOfReason(record.reason)) {
+      case "SERVICE": return t(catalog, "debateChrome.condition.envelopeExhaustedService");
+      case "BUDGET": return t(catalog, "debateChrome.condition.envelopeExhausted");
+      case null: return t(catalog, "debateChrome.condition.endedEarly");
+    }
   }
   return conditionMarkLabel(record.mark, catalog);
 }

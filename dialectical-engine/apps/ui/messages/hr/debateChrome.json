@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "Obogaćivanje preskočeno zbog proračuna",
   "debateChrome.condition.envelopeExhausted": "Ranije završeno radi poštovanja proračuna",
   "debateChrome.condition.envelopeExhaustedService": "Ranije završeno zbog problema s uslugom umjetne inteligencije",
+  "debateChrome.condition.endedEarly": "Ranije završeno",
   "debateChrome.condition.leverageUnresolved": "Utjecaj nije utvrđen",
   "debateChrome.condition.branchFrozenLowLeverage": "Grana nije proširena: nije mogla promijeniti odgovor",
   "debateChrome.condition.degradedDiversity": "Raznolikost modela je smanjena",

@@ -173,6 +173,7 @@
   "debateChrome.condition.skippedByBudget": "Обогатяването е пропуснато поради бюджета",
   "debateChrome.condition.envelopeExhausted": "Приключи по-рано, за да не се надхвърли бюджетът",
   "debateChrome.condition.envelopeExhaustedService": "Приключи по-рано заради проблем с услуга за ИИ",
+  "debateChrome.condition.endedEarly": "Приключи по-рано",
   "debateChrome.condition.leverageUnresolved": "Влиянието не е изяснено",
   "debateChrome.condition.branchFrozenLowLeverage": "Клонът не е разширен: не можеше да промени отговора",
   "debateChrome.condition.degradedDiversity": "Разнообразието на моделите е понижено",
