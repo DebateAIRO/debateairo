@@ -22,9 +22,11 @@ grew too big. The story never changes the verdict. It only explains it.
   takes a few minutes, and the page updates by itself. Meanwhile the debate's usual answer is
   shown, so there is always something to read.
 - The story leads with the answer, in human words:
-  - **"Clear answer"**: one position came out clearly ahead.
-  - **"Close call"**: two positions were nearly level.
-  - **"Best guess, weak evidence"**: the best position is still weak.
+  - **"Clear answer"**: one position came out strong and clearly ahead.
+  - **"Close call"**: no position was clearly ahead. For example, two were nearly level, the AIs
+    that weighed the leader disagreed, the leader was only middling, or there was too little to
+    compare.
+  - **"Best guess, weak evidence"**: even the best position is weak.
 - Then come the positions the debate explored, each marked "Held up", "Partly held", "Fell" or
   "Set aside", and "What would change the answer".
 - Sometimes a box titled **"Worth knowing"** adds a remark the storyteller thinks you should
@@ -103,8 +105,8 @@ are never the reason.
   writer. This is mentioned only in "About this report" (for example "A lower-cost AI model wrote
   this answer, to stay within the debate's budget.") and in your own records. It never appears in
   the verdict text.
-- **Nothing already paid for is thrown away.** If a later round of answer-writing fails, the best
-  finished round is kept.
+- **A finished round is kept.** If a later round of answer-writing fails, the best round that was
+  already written and checked is kept, instead of throwing it all away.
 - **Big debates fit.** A debate of about 195 points used to be too large for the answer-writer and
   always ended without an answer. Now the engine shortens what it sends. As a last resort it keeps
   the positions and the most important points, and counts the rest. The report then says "The
@@ -129,8 +131,8 @@ are never the reason.
    would stop at 70% of its money and still end without an answer. This branch ships them as one.
    Do not publish the two values on a server running older code.
 3. **The website and the API ship together.** The public list of debates now carries the floor
-   label, and the website insists on the exact shape of that list. An old website against a new
-   API, or the other way round, would fail to show the list.
+   label, and the old website insists on the exact old shape of that list. An old website in front
+   of the new API would fail to show the list. (The new website reads an old API's list fine.)
 4. **The day must hold one full debate plus its story.** With today's values that is
    $0.30 + $0.06 = $0.36. A daily limit below that is refused when you publish, and neither
    service will start.
@@ -162,9 +164,8 @@ are never the reason.
   story, not to that older row.
 - **The verdict depends on tiny rounding.** The engine compares raw decimal numbers. So two
   positions scored 0.20 and 0.15 (exactly 0.05 apart) do not count as a tie, but 0.30 and 0.25
-  do, because the computer stores those numbers slightly differently. The PDF now says this
-  honestly, instead of printing "0.05 > 0.05". Whether the engine should round before it compares
-  is your call. It touches a sealed rule.
+  do, because the computer stores those numbers slightly differently. Whether the engine should
+  round before it compares is your call. It touches a sealed rule.
 - **No limit on PDF downloads at once.** A signed-in owner can ask for many PDFs in a row, and each
   one takes real work on the server. A cap belongs in the hosting hardening. (The date in the file
   name is in UTC.)
@@ -191,7 +192,7 @@ are never the reason.
 
 ## Wordings you can choose from later
 
-The first wording of each is the one shipped.
+Unless marked otherwise, the first wording of each is the one shipped.
 
 - **Lead-in to the floor answer:** "Our best answer:" / "Our answer:" / "What we would go with:"
 - **Thin basis:** "This answer rests on less evidence than usual." / "Fewer points of view than
