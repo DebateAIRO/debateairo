@@ -48,6 +48,7 @@ import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RunRepository,
   decryptLeasedContentForRun,
+  insertRunRoleAssignment,
   prepareLeasedContentEncryptionForRun,
   withOwnerAskAdmissionLease,
   withRunContentLease,
@@ -2511,6 +2512,20 @@ async function admitWithScorecard(input: Readonly<{
   scorecard: Scorecard;
 }>): Promise<AskAdmission> {
   const { settings, ask, risk, discoveredPanel, picker } = input;
+  // Carry 15 (A20.2 review m1): `askModelPickerSettings` refuses this at boot, but
+  // the settings are a plain interface. Settings built any other way with a HOSTED
+  // mode and no usable ceiling would switch the picker's step-down and its
+  // BUDGET_TOO_SMALL refusal off without a word, so admission refuses them too,
+  // first, as an engine fault (a 500).
+  if (picker.mode === "HOSTED") {
+    const ceiling = picker.perRunCeilingMicros;
+    if (ceiling === null || !Number.isSafeInteger(ceiling) || ceiling < 1) {
+      throw new TypedDomainError(
+        ASK_MODEL_ASSIGNMENT_INVALID,
+        "Hosted admission needs a positive safe-integer per-run money ceiling"
+      );
+    }
+  }
   const reachable = reachableInTodaysOrder(discoveredPanel, input.rosterModelIds, picker.targetFacts);
   const plannedDebaters = debaterSeatCount(reachable, input.rosterModelIds.length);
   // Carry 10: zero reachable makers (only an empty discovery) is refused HERE,
@@ -2581,16 +2596,34 @@ async function admitWithScorecard(input: Readonly<{
   picker.log?.(`MODEL_PICKER assigned strength=${outcome.appliedStrength} stepped_down=${String(outcome.steppedDown)}`
     + ` estimate_money_micros=${String(outcome.estimate.moneyMicros)} estimate_seconds=${String(outcome.estimate.seconds)}`);
   const byProviderRef = new Map(discoveredPanel.map((member) => [member.provider_ref, member] as const));
-  const debaters = outcome.assignment.roles.POSITION.map((seat) => {
-    const member = byProviderRef.get(seat.main.providerRef);
+  const discovered = (seated: Readonly<{ providerRef: string }>): DiscoveredPanelMember => {
+    const member = byProviderRef.get(seated.providerRef);
     if (member === undefined) {
       throw new TypedDomainError(
         ASK_MODEL_ASSIGNMENT_INVALID,
-        `The picker seated ${seat.main.providerRef}, which discovery did not return`
+        `The picker seated ${seated.providerRef}, which discovery did not return`
       );
     }
     return member;
-  });
+  };
+  // Carry 15 (A20.2 review m2): every seat of every role, mains and runner-ups
+  // alike, sits on a route discovery returned, and the picker seats no more
+  // debaters than the estimate counted. The real picker draws only from the
+  // reachable targets and stops at the demand; these catch a picker defect, as
+  // the same engine fault.
+  for (const seats of Object.values(outcome.assignment.roles)) {
+    for (const seat of seats) {
+      discovered(seat.main);
+      if (seat.runnerUp !== null) discovered(seat.runnerUp);
+    }
+  }
+  if (outcome.assignment.roles.POSITION.length > plannedDebaters) {
+    throw new TypedDomainError(
+      ASK_MODEL_ASSIGNMENT_INVALID,
+      `The picker seated ${String(outcome.assignment.roles.POSITION.length)} debaters where ${String(plannedDebaters)} were planned`
+    );
+  }
+  const debaters = outcome.assignment.roles.POSITION.map((seat) => discovered(seat.main));
   const makerAvailability = makerAvailabilityFor(debaters);
   try {
     assertMakerAdmission(risk.effectiveRiskTier, makerAvailability);
@@ -2604,6 +2637,16 @@ async function admitWithScorecard(input: Readonly<{
   const envelopeBasis = debaters.length === plannedDebaters && backupSequencesProvisioned === 0
     ? plannedBasis
     : await resolveBasis(debaters.length, backupSequencesProvisioned);
+  // Carry 15 (A20.2 review m3): a required input field does not force a
+  // composition to read it. One that drops the provision would mint DR-184-v4
+  // for a run whose runner-ups need v5's backup allowance, and that run could
+  // exhaust its ceiling part-way. The receipt names its formula, so it is checked.
+  if (backupSequencesProvisioned === 1 && envelopeBasis.formula_version !== "DR-184-v5") {
+    throw new TypedDomainError(
+      ASK_MODEL_ASSIGNMENT_INVALID,
+      "The attempt ceiling was minted without the backup sequence a runner-up needs"
+    );
+  }
   return {
     risk,
     envelopeBasis,
@@ -2750,7 +2793,8 @@ export class PostgresAskApplication implements AskApplication {
     const ownership: RunOwnershipAccess = principal.kind === "legacy"
       ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
       : Object.freeze({ ownerRef: principal.ownerRef, legacyAskerId: null });
-    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment } =
+      await evaluateAskAdmission(this.settings, ask);
     let runId:string;
     try {
       const admissionPool=principal.kind === "server"
@@ -2793,6 +2837,21 @@ export class PostgresAskApplication implements AskApplication {
       }
       throw error;
     }
+    // A20: the role assignment is pinned beside the run (core.run_role_assignment,
+    // append-only) the moment the run exists and BEFORE its work is queued, so no
+    // runner can claim a scorecard-admitted run without it. core.run is never
+    // updated. No scorecard: nothing is pinned and the runner keeps today's seats.
+    if (modelAssignment !== undefined) {
+      await insertRunRoleAssignment(this.pool, {
+        runId,
+        // A plain copy: the writer takes a JSON object, and a copy of the
+        // assignment is assignable to it whether RoleAssignment is a type or
+        // an interface.
+        assignment: { ...modelAssignment.assignment },
+        strength: modelAssignment.appliedStrength,
+        steppedDown: modelAssignment.steppedDown
+      });
+    }
     await this.#serve.recordMemoryQuestion({
       runId,
       questionLine: ask.question_line,
@@ -2809,7 +2868,14 @@ export class PostgresAskApplication implements AskApplication {
       commandKey: `S00:${runId}:Q1`
     });
     await this.dispatcher.dispatch({ runId, workItemId });
-    return { run_ref: runId, status: "QUEUED" };
+    return modelAssignment === undefined
+      ? { run_ref: runId, status: "QUEUED" }
+      : {
+          run_ref: runId,
+          status: "QUEUED",
+          model_strength_applied: modelAssignment.appliedStrength,
+          model_strength_stepped_down: modelAssignment.steppedDown
+        };
   }
 
   async unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null> {

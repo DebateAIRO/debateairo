@@ -99,6 +99,8 @@ function settingsWith(input: Readonly<{
   backups?: (0 | 1)[];
   discoveries?: { count: number };
   assertDailyCostEnvelope?: () => Promise<void>;
+  /** Carry 15 m3: a composition that forgets to pass the backup provision through. */
+  dropsBackupProvision?: boolean;
 }>): RunCreationSettings {
   return {
     strangerSampleRate: 0,
@@ -114,7 +116,8 @@ function settingsWith(input: Readonly<{
       input.panelSizes?.push(panelSize);
       input.backups?.push(backupSequencesProvisioned);
       return computeStructuralCeilingBasis({
-        ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned
+        ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth),
+        ...(input.dropsBackupProvision === true ? {} : { backupSequencesProvisioned })
       });
     },
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
@@ -459,6 +462,87 @@ describe("A20 · refusals", () => {
     expect(error).toBeInstanceOf(TypedDomainError);
     expect(error).toMatchObject({ code: "ASK_MODEL_ASSIGNMENT_INVALID" });
     expect(error).not.toMatchObject({ name: "AskRefusal" });
+  });
+});
+
+/** A seat candidate on a route discovery never returned: only a picker defect could seat it. */
+const GHOST: SeatCandidate = Object.freeze({
+  candidateId: "ghost@DEFAULT_ONLY", providerRef: "development:ghost", maker: "Ghost",
+  modelId: "ghost-1", thinkingLevel: "DEFAULT_ONLY"
+});
+
+/** Expects the engine fault (a 500), never an ask refusal (a 422). */
+async function expectEngineFault(admission: Promise<unknown>): Promise<void> {
+  const error = await admission.then(() => "admitted", (failure: unknown) => failure);
+  expect(error).toBeInstanceOf(TypedDomainError);
+  expect(error).toMatchObject({ code: "ASK_MODEL_ASSIGNMENT_INVALID" });
+  expect(error).not.toMatchObject({ name: "AskRefusal" });
+}
+
+describe("A20 · admission re-checks what the picker and the composition promised (carry 15, A20.2 review m1–m3)", () => {
+  it("m1: refuses HOSTED picker settings without a positive safe-integer ceiling, before the basis and the picker", async () => {
+    // A composition that builds the settings without askModelPickerSettings would otherwise
+    // switch the picker's step-down and BUDGET_TOO_SMALL off without a word.
+    picker.outcome = assigned([candidate(at("development:codex-premium-cli")), candidate(at("development:claude-premium-cli"))]);
+    for (const perRunCeilingMicros of [null, 0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53]) {
+      const panelSizes: number[] = [];
+      await expectEngineFault(evaluateAskAdmission(
+        settingsWith({ modelPicker: valid({ mode: "HOSTED", perRunCeilingMicros }), panelSizes }), ask("premium")
+      ));
+      expect(panelSizes).toEqual([]);
+    }
+    expect(picker.calls).toEqual([]);
+    // A positive safe-integer ceiling admits, and LOCAL keeps its null ceiling.
+    await expect(evaluateAskAdmission(
+      settingsWith({ modelPicker: valid({ mode: "HOSTED", perRunCeilingMicros: 1 }) }), ask("premium")
+    )).resolves.toHaveProperty("modelAssignment");
+    await expect(evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("premium")))
+      .resolves.toHaveProperty("modelAssignment");
+  });
+
+  it("m2: checks every seat's main and runner-up against discovery, and POSITION against the planned debaters", async () => {
+    const two = [candidate(at("development:codex-cli")), candidate(at("development:claude-cli"))];
+    // A runner-up discovery never returned (JUDGE seat 0).
+    picker.outcome = withJudgeRunnerUp(assigned(two), GHOST);
+    await expectEngineFault(evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("free")));
+    // A main discovery never returned, in a role other than POSITION (REVIEWER seat 0).
+    const plain = assigned(two);
+    if (plain.state !== "ASSIGNED") throw new Error("the fixture must be assigned");
+    picker.outcome = Object.freeze({
+      ...plain,
+      assignment: Object.freeze({
+        ...plain.assignment,
+        roles: Object.freeze({
+          ...plain.assignment.roles,
+          REVIEWER: Object.freeze([Object.freeze({ ...plain.assignment.roles.REVIEWER[0]!, main: GHOST }),
+            plain.assignment.roles.REVIEWER[1]!])
+        })
+      })
+    });
+    await expectEngineFault(evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("free")));
+    // More debaters than the free plan's two, all of them discovered: the estimate counted two.
+    picker.outcome = assigned([...two, candidate(at("development:grok-cli"))]);
+    await expectEngineFault(evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("free")));
+    // The planned count itself is admitted.
+    picker.outcome = assigned(two);
+    await expect(evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("free")))
+      .resolves.toHaveProperty("modelAssignment");
+  });
+
+  it("m3: refuses a ceiling minted without the backup a runner-up needs (the composition dropped the provision)", async () => {
+    const two = [candidate(at("development:codex-cli")), candidate(at("development:claude-cli"))];
+    picker.outcome = withJudgeRunnerUp(assigned(two), candidate(at("development:grok-cli")));
+    const backups: (0 | 1)[] = [];
+    await expectEngineFault(evaluateAskAdmission(
+      settingsWith({ modelPicker: valid(), backups, dropsBackupProvision: true }), ask("free")
+    ));
+    // Admission did ask for the backup; the composition minted DR-184-v4 anyway.
+    expect(backups).toEqual([0, 1]);
+    // Without a runner-up DR-184-v4 is the right ceiling, so the same composition still admits.
+    picker.outcome = assigned(two);
+    await expect(evaluateAskAdmission(
+      settingsWith({ modelPicker: valid(), dropsBackupProvision: true }), ask("free")
+    )).resolves.toMatchObject({ envelopeBasis: { formula_version: "DR-184-v4" } });
   });
 });
 

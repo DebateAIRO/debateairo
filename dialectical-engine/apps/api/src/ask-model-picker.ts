@@ -21,8 +21,11 @@ import type { ReachableTarget, RoleAssignment, TargetPrice } from "@debateai/sco
  *    capped by the distinct makers reachable) and a seat per debater in every
  *    debate role; one each for the two answer roles;
  *  - EXPECTED CALLS per role — read off the structural basis admission already
- *    computed (`computeStructuralCeilingBasis`), one call per call site, so the
- *    estimate and the run ceiling count the same tree;
+ *    computed (`computeStructuralCeilingBasis`), one call per call site, on the
+ *    PLANNED tree. When the picker seats fewer debaters than planned, admission
+ *    re-sizes the run ceiling to the smaller admitted tree, but the estimate (and
+ *    any step-down it caused) stays on the planned, larger tree: it over-estimates
+ *    on purpose, in the safe direction;
  *  - the configured PRICES (keyed by provider ref), and each target's declared
  *    thinking levels and context window, from PROVIDER_DISCOVERY_TARGETS_JSON.
  *
