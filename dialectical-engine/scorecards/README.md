@@ -7,7 +7,9 @@ version behind the website's.
 - It is **absent until the owners approve the first scorecard**. While it is absent, every ask
   keeps the plan rosters (`PLAN_TIER_ROSTERS`), exactly as before scorecards existed.
 - The file may be at most **64 KiB** (65,536 bytes), and so may the scorecard as the register stores it. That is the
-  same limit the hosted site publishes under, so one file is accepted or refused the same way in both modes.
+  same limit the hosted site publishes under, so on SIZE one file gets the same answer in both modes.
+- A scorecard with a field the format does not define works here (the field is ignored), but hosted publishing
+  refuses it, because a published scorecard can never be edited.
 - A file that fails validation is **refused, never half-applied**. The API prints
   `MODEL_SCORECARD state=REFUSED reason=…` when it starts and also keeps the plan rosters.
 - The **hosted site never reads this file**. It reads the sealed `modelScorecard` register row,

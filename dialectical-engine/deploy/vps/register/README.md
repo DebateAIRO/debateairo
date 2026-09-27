@@ -90,8 +90,9 @@ runs the command, inside a `0700` directory owned by that same user, not a symli
 
 The owners' approved model scorecard is published **beside** the register file, never inside it. It is its own
 document, with its own argument and its own size limit: **64 KiB** (65,536 bytes), for the file and for the scorecard
-as it is stored. Local mode reads its scorecard file (`scorecards/current.json`) under the same limit, so a file is
-accepted or refused the same way in both.
+as it is stored. Local mode reads its scorecard file (`scorecards/current.json`) under the same limit, so on SIZE a
+file gets the same answer in both. (On fields they differ: see the "only the fields the scorecard format defines"
+point below.)
 
 Why 64 KiB (the owners' ruling of 2026-09-27): the database re-checks a stored value one character at a time, and that
 takes longer the bigger the value, faster than in step with its size. A scorecard close to 64 KiB takes about 40
@@ -114,8 +115,11 @@ pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json 
   the reason (`SCHEMA_INVALID`, `ENGINE_INCOMPATIBLE`, `UNKNOWN_CANDIDATE` or `NUMBER_SHAPE`).
 - It may carry only the fields the scorecard format defines. The format itself ignores a field it does not know, but a
   sealed version can never be edited, so publishing refuses such a field instead of sealing it forever:
-  `HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:` followed by where it is (for example `candidates.1.privateNote`). The line
-  names the field, never its value. The evaluator writes only defined fields, so an approved scorecard is not refused.
+  `HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:` followed by the place that holds it and a `*` (for example
+  `candidates.1.*`: the second candidate has a field it should not; just `*` means the top level). The line never
+  prints the field's name or its value, since either could be private. Local mode ignores such a field instead, so
+  the same file can work locally and still be refused here. The evaluator writes only defined fields, so an approved
+  scorecard is not refused.
 - It becomes the `modelScorecard` row of the NEW register version. The row's source reference is your `sourceRef`,
   followed by ` | modelScorecard v<version> sha256:<hash of the sealed document>`.
 - The plan prints `model_scorecard version=… candidates=… bytes=… sha256=…`, or

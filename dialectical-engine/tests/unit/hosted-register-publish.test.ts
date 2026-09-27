@@ -766,11 +766,16 @@ describe("A19 · the model scorecard, published beside the register file", () =>
  * A19 fix round 1 (review Minor 2) — a sealed row is never edited, so hosted
  * publish REFUSES a scorecard that carries any field the scorecard format does
  * not define, at any depth. The format itself ignores such a field (zod strips
- * it), which is why local mode, which seals nothing, still reads it. The code
- * names the field's path, in the printable code alphabet, and never its value.
+ * it), which is why local mode, which seals nothing, still reads it.
+ *
+ * Fix round 2 (re-review Minor 1): the code names only the DEFINED parent path
+ * and a fixed `*` marker — never the unknown key's name, which is operator text
+ * and could be secret-shaped — and never its value.
  */
 describe("A19 fix round 1 · a field the scorecard format does not define is never sealed", () => {
   const SECRET = "private-evaluator-note-must-never-print";
+  /** Secret-shaped, and entirely inside the printable code alphabet, so no sanitising could hide it. */
+  const SECRET_KEY = "sk-live-4f9c2a7e1b8d6f3a0c5e9b2d7a4f1c8e";
   type Mutable = Record<string, any>;
 
   async function codeAndText(value: unknown): Promise<{ code: string; text: string }> {
@@ -782,7 +787,7 @@ describe("A19 fix round 1 · a field the scorecard format does not define is nev
     return { code: "NO_REFUSAL", text: "" };
   }
 
-  it("refuses an unknown field at every depth the schema defines, naming its path and never its value", async () => {
+  it("refuses an unknown field at every depth the schema defines, naming its defined parent and never its name or value", async () => {
     const example = await compatibleExampleScorecard() as Mutable;
     // Control: the example carries only defined fields, and is accepted.
     expect((await codeAndText(example)).code).toBe("NO_REFUSAL");
@@ -790,23 +795,23 @@ describe("A19 fix round 1 · a field the scorecard format does not define is nev
     const priced = (example.candidates as Mutable[]).findIndex((candidate) => candidate.apiPrice !== null);
     expect(priced).toBeGreaterThanOrEqual(0);
     const cases: Record<string, (value: Mutable) => void> = {
-      privateNote: (value) => { value.privateNote = SECRET; },
-      "engineCompatibility.privateNote": (value) => { value.engineCompatibility.privateNote = SECRET; },
-      "candidates.1.privateNote": (value) => { value.candidates[1].privateNote = SECRET; },
-      "candidates.0.accessRoutes.0.privateNote": (value) => { value.candidates[0].accessRoutes[0].privateNote = SECRET; },
-      [`candidates.${priced}.apiPrice.privateNote`]: (value) => { value.candidates[priced].apiPrice.privateNote = SECRET; },
-      [`roles.${role}.0.privateNote`]: (value) => { value.roles[role][0].privateNote = SECRET; },
-      [`roles.${role}.0.quality.privateNote`]: (value) => { value.roles[role][0].quality.privateNote = SECRET; },
-      [`roles.${role}.0.qualityByLanguage.privateNote`]: (value) => {
-        value.roles[role][0].qualityByLanguage = { ro: { ...value.roles[role][0].quality }, privateNote: SECRET };
+      "*": (value) => { value[SECRET_KEY] = SECRET; },
+      "engineCompatibility.*": (value) => { value.engineCompatibility[SECRET_KEY] = SECRET; },
+      "candidates.1.*": (value) => { value.candidates[1][SECRET_KEY] = SECRET; },
+      "candidates.0.accessRoutes.0.*": (value) => { value.candidates[0].accessRoutes[0][SECRET_KEY] = SECRET; },
+      [`candidates.${priced}.apiPrice.*`]: (value) => { value.candidates[priced].apiPrice[SECRET_KEY] = SECRET; },
+      [`roles.${role}.0.*`]: (value) => { value.roles[role][0][SECRET_KEY] = SECRET; },
+      [`roles.${role}.0.quality.*`]: (value) => { value.roles[role][0].quality[SECRET_KEY] = SECRET; },
+      [`roles.${role}.0.qualityByLanguage.*`]: (value) => {
+        value.roles[role][0].qualityByLanguage = { ro: { ...value.roles[role][0].quality }, [SECRET_KEY]: SECRET };
       },
-      [`roles.${role}.0.typicalCall.privateNote`]: (value) => { value.roles[role][0].typicalCall.privateNote = SECRET; },
-      [`roles.${role}.0.tags.0.privateNote`]: (value) => {
-        value.roles[role][0].tags = [{ code: "PRIVATE_TAG", strength: "WEAK", text: "a tag", privateNote: SECRET }];
+      [`roles.${role}.0.typicalCall.*`]: (value) => { value.roles[role][0].typicalCall[SECRET_KEY] = SECRET; },
+      [`roles.${role}.0.tags.0.*`]: (value) => {
+        value.roles[role][0].tags = [{ code: "PRIVATE_TAG", strength: "WEAK", text: "a tag", [SECRET_KEY]: SECRET }];
       },
-      "pickerSettings.privateNote": (value) => { value.pickerSettings.privateNote = SECRET; },
-      [`pickerSettings.economyCap.${role}.privateNote`]: (value) => { value.pickerSettings.economyCap[role].privateNote = SECRET; },
-      "pickerSettings.planStrengthCaps.privateNote": (value) => { value.pickerSettings.planStrengthCaps.privateNote = SECRET; }
+      "pickerSettings.*": (value) => { value.pickerSettings[SECRET_KEY] = SECRET; },
+      [`pickerSettings.economyCap.${role}.*`]: (value) => { value.pickerSettings.economyCap[role][SECRET_KEY] = SECRET; },
+      "pickerSettings.planStrengthCaps.*": (value) => { value.pickerSettings.planStrengthCaps[SECRET_KEY] = SECRET; }
     };
     for (const [path, mutate] of Object.entries(cases)) {
       const value = structuredClone(example);
@@ -814,17 +819,23 @@ describe("A19 fix round 1 · a field the scorecard format does not define is nev
       const refused = await codeAndText(value);
       expect(refused.code, path).toBe(`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:${path}`);
       expect(`${refused.code} ${refused.text}`, path).not.toContain(SECRET);
+      expect(`${refused.code} ${refused.text}`, path).not.toContain(SECRET_KEY);
     }
   });
 
-  it("keeps the named path inside the printable code alphabet", async () => {
-    const value = { ...await compatibleExampleScorecard(), "private note/é": SECRET };
-    expect((await codeAndText(value)).code).toBe("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:private_note__");
+  it("never prints the unknown key's name, whatever its characters or length", async () => {
+    for (const name of [SECRET_KEY, "private note/é", `sk-${"a".repeat(300)}`, ""]) {
+      const value = structuredClone(await compatibleExampleScorecard()) as Mutable;
+      value.candidates[1][name] = SECRET;
+      const refused = await codeAndText(value);
+      expect(refused.code, name).toBe("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*");
+      if (name !== "") expect(`${refused.code} ${refused.text}`, name).not.toContain(name.slice(0, 16));
+    }
   });
 
-  it("refuses it as operator input, before the plan and before any connection", async () => {
+  it("refuses it as operator input, before the plan and before any connection, with nothing from the file on stderr", async () => {
     const path = await custodyFile(JSON.stringify(validFile()));
-    const scorecardPath = await custodyFile(JSON.stringify({ ...await compatibleExampleScorecard(), privateNote: SECRET }));
+    const scorecardPath = await custodyFile(JSON.stringify({ ...await compatibleExampleScorecard(), [SECRET_KEY]: SECRET }));
     let stdout = "";
     let stderr = "";
     let opened = false;
@@ -834,8 +845,10 @@ describe("A19 fix round 1 · a field the scorecard format does not define is nev
       async () => { opened = true; throw new Error("unreachable"); }
     );
     expect({ exitCode, stdout, stderr, opened }).toEqual({
-      exitCode: 2, stdout: "", stderr: "HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:privateNote\n", opened: false
+      exitCode: 2, stdout: "", stderr: "HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:*\n", opened: false
     });
+    expect(stderr).not.toContain(SECRET_KEY);
+    expect(stderr).not.toContain(SECRET);
   });
 });
 

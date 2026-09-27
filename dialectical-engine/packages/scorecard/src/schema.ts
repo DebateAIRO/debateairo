@@ -13,6 +13,11 @@ import { DEBATE_ROLES, MODEL_STRENGTHS } from "@debateai/kernel";
  *
  * Numbers must also be sealable by the register (`isRegisterSealableNumber`, ./parse.ts).
  * That rule is checked on the raw value, unknown fields included.
+ *
+ * Hosted publish (apps/runner/src/hosted-register-publish.ts, `firstUndefinedScorecardKey`)
+ * compares this schema's parsed OUTPUT keys with the input document's to refuse a field the
+ * format does not define before it is sealed; a transform, a rename or `.passthrough()` here
+ * changes what that guard sees, so update the hosted check and its tests together with it.
  */
 export const TIERS = ["TOP", "GOOD_VALUE", "AVOID", "UNTESTED"] as const;
 export type Tier = typeof TIERS[number];

@@ -190,7 +190,9 @@ function refuse(code: string): never {
 
 // At least one separator: a SQLSTATE (`P0001`) or an errno name (`ENOENT`) is
 // not a refusal code, and must fall through to the message it came with.
-const TYPED_CODE = /^[A-Z][A-Z0-9]*(?:[_-][A-Z0-9]+)+(?::[A-Za-z0-9_.:-]+)?$/u;
+// `*` is admitted after the colon for one fixed marker only: the unknown-field
+// refusal's "a key here" (`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*`).
+const TYPED_CODE = /^[A-Z][A-Z0-9]*(?:[_-][A-Z0-9]+)+(?::[A-Za-z0-9_.:*-]+)?$/u;
 const TYPED_CODE_PREFIX = /^([A-Z][A-Z0-9_]*):\s/u;
 
 /**
@@ -442,7 +444,11 @@ export type HostedModelScorecard = Readonly<{
   bytes: number;
 }>;
 
-/** One path segment in the printable code alphabet, so the refusal line stays a typed code. */
+/**
+ * One DEFINED path segment (a schema field, a role-enum key or an index) in the
+ * printable code alphabet — already true of every such segment today; kept as
+ * a guard so the refusal line always stays a typed code.
+ */
 function printableKeySegment(segment: string): string {
   return segment.replace(/[^A-Za-z0-9_-]/gu, "_").slice(0, 64) || "_";
 }
@@ -450,11 +456,15 @@ function printableKeySegment(segment: string): string {
 /**
  * Fix round 1 (review Minor 2): the first key of the operator's document that
  * the engine's own validation DROPPED — a field the scorecard format does not
- * define — as a dotted path, or null. `validated` is `parseScorecard`'s output
- * for the same document: the format ignores (strips) an unknown field, so any
- * key present in `raw` and absent at the same place in `validated` is one the
+ * define — as its DEFINED parent path plus the fixed marker `*` (just `*` at
+ * the top level), or null. `validated` is `parseScorecard`'s output for the
+ * same document: the format ignores (strips) an unknown field, so any key
+ * present in `raw` and absent at the same place in `validated` is one the
  * schema does not define, at any depth. The schema is never restated here.
- * Only key NAMES reach the path, never a value.
+ * Nothing the operator chose reaches the path: not the unknown key's name, not
+ * any value (fix round 2). If the scorecard schema ever gains a transform, a
+ * rename or `.passthrough()`, this comparison changes meaning: update it and
+ * its tests with the schema (packages/scorecard/src/schema.ts says so too).
  */
 function firstUndefinedScorecardKey(raw: unknown, validated: unknown, path: readonly string[] = []): string | null {
   if (Array.isArray(raw)) {
@@ -468,7 +478,13 @@ function firstUndefinedScorecardKey(raw: unknown, validated: unknown, path: read
   if (raw === null || typeof raw !== "object" || validated === null || typeof validated !== "object") return null;
   for (const key of Object.keys(raw)) {
     const at = [...path, key];
-    if (!Object.hasOwn(validated, key)) return at.map(printableKeySegment).join(".").slice(0, 200);
+    // Fix round 2 (re-review Minor 1): the unknown key's NAME is operator text
+    // and could be secret-shaped, so only its DEFINED parent is printed, then a
+    // fixed marker. Every segment of `path` is a key validation kept (a schema
+    // field, a role-enum key) or an array index — never operator-chosen text.
+    if (!Object.hasOwn(validated, key)) {
+      return path.length === 0 ? "*" : `${path.map(printableKeySegment).join(".").slice(0, 200)}.*`;
+    }
     const found = firstUndefinedScorecardKey(
       (raw as Readonly<Record<string, unknown>>)[key], (validated as Readonly<Record<string, unknown>>)[key], at
     );
@@ -485,7 +501,7 @@ function firstUndefinedScorecardKey(raw: unknown, validated: unknown, path: read
  * sealed must fit the same bound (escapes can make it longer than the file).
  * Then the engine's own scorecard validation runs, and its reason is the
  * refusal's suffix. Last, a field that validation would ignore is refused by
- * its path (`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:<path>`), because the
+ * where it is (`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:<defined parent>.*`), because the
  * document is sealed as it is.
  */
 export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: string): HostedModelScorecard {
