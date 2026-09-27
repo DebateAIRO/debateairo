@@ -55,7 +55,8 @@
     "job:review-catch-up": "tsx acceptance/review-catch-up.ts",
     "replay:ceremony": "tsx apps/replay/src/cli.ts",
     "eval:roles": "tsx acceptance/eval-harness-cli.ts",
-    "relays:serve": "tsx acceptance/relay-host.ts"
+    "relays:serve": "tsx acceptance/relay-host.ts",
+    "moment:export": "tsx acceptance/export-moment.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
