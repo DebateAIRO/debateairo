@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import {
+  AnswerFloorSchema,
   PublicDebateSchema,
   PublicStoryShortSchema,
   StoryLanguageTagSchema,
   type Answer,
+  type AnswerFloor,
   type Edge,
   type Node,
   type PublicDebate,
@@ -197,6 +199,54 @@ function logLanguageNotPublished(requestId: string, diagnostic: string): void {
   })));
 }
 
+/**
+ * Engine money rule, Task M5 (spec 2026-09-26 §14.4.4): the FLOOR of a
+ * components-only answer — its label and its leading position — copied from
+ * the owner's disclosure record, so the public page can say "Our best answer"
+ * with the position's own statement. A served answer carries its own label and
+ * is never read. Like the story and the language, it never blocks publishing:
+ * a failed read, a floor the snapshot schema refuses, or a leading position
+ * that is not among the published nodes publishes no floor, and the log
+ * records only a bounded diagnostic.
+ */
+async function readPublishableFloor(
+  repository: PostgresPublicationRepository,
+  input: Readonly<{ runId: string; answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+): Promise<AnswerFloor | null> {
+  if (input.answer.terminal !== "COMPONENTS_ONLY") return null;
+  let floor: Readonly<{ verdictState: string; leadingNodeId: string }> | null;
+  try {
+    floor = await repository.readAnswerFloor({
+      runId: input.runId,
+      answerId: input.answer.answer_id,
+      userId: input.authenticated.userId,
+      ownerRef: input.authenticated.ownerRef
+    });
+  } catch (error) {
+    logFloorNotPublished(input.source.requestId, storyReadDiagnostic(error));
+    return null;
+  }
+  if (floor === null) return null;
+  const parsed = AnswerFloorSchema.safeParse({ verdict_state: floor.verdictState, leading_node_id: floor.leadingNodeId });
+  if (!parsed.success) {
+    logFloorNotPublished(input.source.requestId, "FLOOR_REFUSED");
+    return null;
+  }
+  if (!input.answer.nodes.some((node) => node.node_id === parsed.data.leading_node_id)) {
+    logFloorNotPublished(input.source.requestId, "FLOOR_NODE_NOT_PUBLISHED");
+    return null;
+  }
+  return parsed.data;
+}
+
+function logFloorNotPublished(requestId: string, diagnostic: string): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.publication.floor_not_published",
+    requestId,
+    diagnostic
+  })));
+}
+
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
   reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
@@ -327,6 +377,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     if (pseudonym === null) return null;
     const storyShort = await readPublishableStory(this.stories, input);
     const language = await readPublishableLanguage(this.repository, input);
+    const floor = await readPublishableFloor(this.repository, input);
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
     if (!await this.repository.prepareKeyProvision({
@@ -357,7 +408,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
         tree_included: true
       },
       ...(storyShort === null ? {} : { story_short: storyShort }),
-      ...(language === null ? {} : { language })
+      ...(language === null ? {} : { language }),
+      ...(floor === null ? {} : { floor })
     });
     let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;
     try {

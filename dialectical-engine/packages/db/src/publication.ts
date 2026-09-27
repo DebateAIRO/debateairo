@@ -434,6 +434,39 @@ export class PostgresPublicationRepository {
     return result.rows[0]?.tag ?? null;
   }
 
+  /**
+   * Engine money rule, Task M5 (spec 2026-09-26 §14.4.4): the FLOOR of an
+   * answer of a run the active user owns, for the public snapshot — the label
+   * and the leading position from the answer's latest disclosure record
+   * (migration 0076's serve.serve_disclosure). Content-free (a code and a node
+   * id), so it needs no content lease. Null for a run that is not theirs, an
+   * answer with no record, or a record with no floor.
+   */
+  async readAnswerFloor(input: Readonly<{
+    runId: string;
+    answerId: string;
+    userId: string;
+    ownerRef: string;
+  }>): Promise<Readonly<{ verdictState: string; leadingNodeId: string }> | null> {
+    const result = await this.pool.query<{ verdict_state: string | null; leading_node_id: string | null }>(`
+      SELECT disclosure.floor_verdict_state AS verdict_state,
+             disclosure.floor_leading_node_id::text AS leading_node_id
+      FROM serve.serve_disclosure AS disclosure
+      JOIN identity."user" AS identity_user
+        ON identity_user.user_id=$3 AND identity_user.owner_ref=$4
+          AND identity_user.state='active'
+      WHERE disclosure.run_id=$1
+        AND disclosure.answer_id=$2
+        AND core.run_is_owned_by($1,$4,NULL)
+      ORDER BY disclosure.answer_version DESC
+      LIMIT 1
+    `, [input.runId, input.answerId, input.userId, input.ownerRef]);
+    const row = result.rows[0];
+    return row === undefined || row.verdict_state === null || row.leading_node_id === null
+      ? null
+      : Object.freeze({ verdictState: row.verdict_state, leadingNodeId: row.leading_node_id });
+  }
+
   async readOwnedVisibility(
     runId: string,
     userId: string,

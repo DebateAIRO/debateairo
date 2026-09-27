@@ -3,7 +3,7 @@ import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
-import { AnswerDisclosureSchema } from "./disclosure.js"; export * from "./disclosure.js";
+import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -597,7 +597,13 @@ export const PublicDebateSchema = z.object({
   // run: the public page shows the short story's fixed text in it. Not private
   // (low-entropy operational metadata dev keeps even after erasure); optional,
   // so every snapshot published before it still parses.
-  language: StoryLanguageTagSchema.optional()
+  language: StoryLanguageTagSchema.optional(),
+  // Engine money rule, Task M5 (spec §14.4.4): the floor of a components-only
+  // answer, copied at publish time from the owner's record: the label the
+  // engine derived and the published position it rests on, whose own
+  // statement the public page shows. No reason code, no model: optional, so
+  // every snapshot published before it still parses.
+  floor: AnswerFloorSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 

@@ -123,10 +123,11 @@ describe("Accounts S8 publication architecture", () => {
   });
 
   it("exposes a dedicated strict public contract and no anonymous owner-only carriers", async () => {
-    const [contract, story, api] = await Promise.all([
+    const [contract, story, api, disclosure] = await Promise.all([
       read("packages/contract/src/index.ts"),
       read("packages/contract/src/story.ts"),
-      read("apps/api/src/index.ts")
+      read("apps/api/src/index.ts"),
+      read("packages/contract/src/disclosure.ts")
     ]);
     const schema = contract.slice(
       contract.indexOf("export const PublicDebateSchema"),
@@ -148,8 +149,24 @@ describe("Accounts S8 publication architecture", () => {
     // the short story: optional (old snapshots parse), the story's own bounded
     // tag schema, copied at publish time from the run by the owner-scoped read.
     expect(schema).toContain("language: StoryLanguageTagSchema.optional()");
+    // Engine money rule, Task M5 (spec §14.4.4): a components-only answer's
+    // floor rides on the snapshot, optional (old snapshots parse), copied at
+    // publish time from the owner's record: the label and the published
+    // position it rests on — never the reason code, a model or a count.
+    expect(schema).toContain("floor: AnswerFloorSchema.optional()");
     expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language"]);
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor"]);
+    const floorStart = disclosure.indexOf("export const AnswerFloorSchema");
+    const floorEnd = disclosure.indexOf("export type AnswerFloor =");
+    expect(floorStart).toBeGreaterThan(-1);
+    expect(floorEnd).toBeGreaterThan(floorStart);
+    const floorSchema = disclosure.slice(floorStart, floorEnd);
+    expect(floorSchema).toContain(".strict()");
+    expect([...floorSchema.matchAll(/^\s*([a-z_]+):/gmu)].map((match) => match[1]))
+      .toEqual(["verdict_state", "leading_node_id"]);
+    for (const forbidden of [...ownerOnly, "reason", "model", "provider", "writer", "checker", "cut_short", "digest"]) {
+      expect(floorSchema).not.toContain(forbidden);
+    }
     const storyStart = story.indexOf("export const PublicStoryShortSchema");
     const storyEnd = story.indexOf("export type PublicStoryShort =");
     expect(storyStart).toBeGreaterThan(-1);

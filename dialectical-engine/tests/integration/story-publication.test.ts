@@ -7,7 +7,7 @@ import {
   loadKek,
   type AuditContextHasher
 } from "../../packages/crypto/src/index.js";
-import { PostgresPublicationRepository, RunRepository, migrate, withRunContentLease } from "@debateai/db";
+import { PostgresPublicationRepository, RunRepository, ServeDisclosureRepository, migrate, withRunContentLease } from "@debateai/db";
 import { StoryRepository, type StoryRecordInput } from "@debateai/story";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
@@ -226,5 +226,63 @@ describe("publishing copies the question's language from the run over the real d
       ownerRef: theOwner().ownerRef, legacyAskerId: null
     });
     expect(projection?.argumentLanguage).toEqual({ tag: "ro", name: "Romanian" });
+  });
+});
+
+describe("publishing copies the floor from the owner's record over the real database (engine money rule, Task M5)", () => {
+  /** The owner's record for a components-only answer: with a floor, or with none. */
+  async function recordFor(runId: string, answerId: string, leadingNodeId: string | null): Promise<void> {
+    await expect(new ServeDisclosureRepository(database.pool).insert({
+      answerId, answerVersion: 1, runId,
+      writerPlannedRef: "provider:a", checkerPlannedRef: "provider:a", writerServedRef: null, checkerServedRef: null,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false,
+      bodyStop: null, pointsWithoutReview: null, serveStop: "MONEY", digestRung: 0, digestPointsOmitted: 0,
+      floorVerdictState: leadingNodeId === null ? null : "UNSUPPORTED",
+      floorLeadingNodeId: leadingNodeId,
+      floorReason: leadingNodeId === null ? null : "ENVELOPE_EXHAUSTED"
+    })).resolves.toBe("INSERTED");
+  }
+
+  /** The components-only answer the owner publishes, its first position the record's leading one. */
+  async function publishComponentsOnly(runId: string, answerId: string, leadingNodeId: string): Promise<string> {
+    const served = buildFairShapedAnswer({ run_ref: runId, answer_id: answerId, question_line: "story publication question" });
+    const transition = await application.publish({
+      runId,
+      answer: {
+        ...served,
+        terminal: "COMPONENTS_ONLY", serve_state: "COMPONENTS_ONLY", verdict_state: null,
+        verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_ENVELOPE" }, composed_text: [],
+        confidence_band: null, band_ceiling: null,
+        nodes: served.nodes.map((node, index) => index === 0 ? { ...node, node_id: leadingNodeId } : node)
+      },
+      authenticated: ownerSession(),
+      grantToken: await publishGrant(runId),
+      source
+    });
+    expect(transition?.state).toBe("PUBLISHED");
+    return transition!.public_ref;
+  }
+
+  it("copies a components-only answer's floor — its label and leading position, nothing else — into the public snapshot", async () => {
+    const { runId, answerId } = await storiedRun("READY");
+    const leading = randomUUID();
+    await recordFor(runId, answerId, leading);
+    const debate = await application.readPublicDebate(await publishComponentsOnly(runId, answerId, leading));
+    expect(debate?.floor).toEqual({ verdict_state: "UNSUPPORTED", leading_node_id: leading });
+    expect(debate?.answer).toMatchObject({ terminal: "COMPONENTS_ONLY", verdict: null, verdict_available: false });
+    // Owner-side facts never cross: the reason code, the makers, the stops.
+    const text = JSON.stringify(debate);
+    for (const ownerOnly of ["ENVELOPE_EXHAUSTED", "provider:a", "MONEY"]) expect(text).not.toContain(ownerOnly);
+  });
+
+  it("publishes no floor for a components-only answer whose record has none, or that has no record", async () => {
+    const recorded = await storiedRun("FAILED");
+    await recordFor(recorded.runId, recorded.answerId, null);
+    const withoutFloor = await application.readPublicDebate(await publishComponentsOnly(recorded.runId, recorded.answerId, randomUUID()));
+    expect(withoutFloor).not.toBeNull();
+    expect("floor" in withoutFloor!).toBe(false);
+    const unrecorded = await storiedRun("FAILED");
+    const withoutRecord = await application.readPublicDebate(await publishComponentsOnly(unrecorded.runId, unrecorded.answerId, randomUUID()));
+    expect("floor" in withoutRecord!).toBe(false);
   });
 });
