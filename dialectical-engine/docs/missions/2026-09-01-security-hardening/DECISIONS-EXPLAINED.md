@@ -167,6 +167,8 @@ The re-check of the 656 newer commits produced four questions that are yours rat
 **Alternative.** Rely on each vendor's own monthly spending limit. That works, but it protects you only after the fact and it stops *everything* when hit, not just the runaway debate.
 **Cost.** Half an agent-day plus a decision on the number. My suggested starting point: a per-debate ceiling roughly 3× a normal debate's measured cost, which stops runaways without touching ordinary use.
 
+**Amended 28 September 2026.** You ruled yes to V-28, and later (27 September) yes to a rule that goes further: no debate ends without a verdict for money reasons. A debate at its ceiling now stops arguing and still writes its answer, from money kept aside for it (30% in the example values) and a 20% margin; a cheaper model or, at the last, the debate's strongest position answers when the planned model cannot be paid. See "Amendment to V-28" in [V-DECISIONS-PACKET.md](V-DECISIONS-PACKET.md).
+
 ### V-29 — The monitoring agent can read every query's text
 **About.** The monitoring agent logs into the database with a role that belongs to PostgreSQL's built-in "monitor" group. That group can see the text of every query running on the server — which can include user content — while the agent only ever runs one narrow query of its own.
 **Corrected 22 September, before you ruled.** "Which can include user content" was overstated: the application always sends user text separately from the command text, so the commands that group can watch contain only placeholders. What it *can* watch is administrative commands — including ones that set passwords, while they run — and the server's full configuration. **Ruled 22 September: yes — the small window.**

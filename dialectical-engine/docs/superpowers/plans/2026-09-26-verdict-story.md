@@ -16021,6 +16021,8 @@ The owner's look gate (2026-09-26) and answers (2026-09-27) added the tasks belo
 
 Order: Task 14 → Task 15 → R-fonts → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 → Task 16.
 
+**Re-synced 2026-09-28 (Task 16).** Each task section below is now the brief the implementer actually received, with the controller's later notes folded in (M3: `body_stop` and `points_without_review`; M5: the latest-version read and `cut_short`; M6: the thin basis, the spine line only when the writer served, the cut-short line, the drawer lines and the remedy text; M7: the cross-row daily check). Below each section, a dated list says what was built differently and why, from the rulings in the task ledger. The sections as first written are in commit 9f2b8b41.
+
 ### Task R-fonts: the full report (PDF) prints in every one of the 35 languages
 
 **Owner decision (2026-09-27): "A: add them".** Script fonts are vendored server-side, about 30–60 MB accepted, with right-to-left layout for Hebrew and Arabic. Then `reportSupportedForLocale` becomes true for every locale.
@@ -16121,6 +16123,14 @@ Order: Task 14 → Task 15 → R-fonts → M1 → M2 → M3 → M4 → M5 → M6
 #### Commits
 Commit in logical steps: fonts and provenance; face choice and fallback; CJK breaks; RTL; flip and tests. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
 
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **Arabic stays hidden.** react-pdf 4.9.0 drops the marks' vertical offsets, so Arabic dots land in the wrong place ("جوابنا" printed as "حوابنا"). 34 of the 35 locales print; `ar` stays in `REPORT_UNPRINTABLE_LOCALES`. The owner was offered four routes (patch react-pdf, wait for upstream, another engine for Arabic, keep it hidden) and has not chosen, so it stays hidden.
+- **The glyph fixes are code-owned** (`apps/ui/lib/report/reportGlyphs.ts`). Each face handed to react-pdf is wrapped by `reportPlacedFont`: every run gets fresh glyph objects carrying their own characters, x offsets move into the advances, and right-to-left runs are shaped right to left. Why: textkit 7.0.1 lost or moved Hindi glyphs at line ends and misplaced Hebrew points.
+- **Review round 1.** A branded Proxy assertion, a Hindi words-whole control and an installed-version pin (`fonts.test.mjs` `MEASURED_PIPELINE`) were added, because the react-pdf parts under the renderer are held by the lockfile alone and a bump would silently undo the fixes. The models line takes each locale's own list separator (zh had none; ja, ko, ru, lt and tr had a bare space); en and ro are unchanged.
+- **Size and look.** 35.5 MiB added, under the 60 MB stop. Latin reports stay byte-identical to the base.
+- **Task 16 final pass.** The Hindi glyph test takes its expected glyphs from a plain fontkit font instead of `reportPlacedFont` (the code under test); the literal U+FFFD in the report test became its escape; the `fonts.test.mjs` comment names both exact pins (the renderer and pdfkit).
+
 ### Task M1: money for the answer is set aside, and the answer may go a little over
 
 **Authority.** Spec `dialectical-engine/docs/superpowers/specs/2026-09-26-verdict-story-design.md` §14.4 (read all of it; this task is §14.4.1, first half).
@@ -16219,6 +16229,13 @@ Run all of these:
 #### Commits
 Commit in logical steps. Every message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
 
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **The attempt reserve is stored per run** as an optional `envelope_basis.serve_reserve_attempts` (18 on the real shape; older runs read 0). Why: the stored basis did not carry the serve leg separately, so it was added in a backwards-compatible way.
+- **The post-answer review catch-up counts as BODY**, following "every non-serve call is BODY". It can lose up to 18 calls it could have used; accepted, because it is an operator-only job (owner note). The polish round made the catch-up read the BODY attempt ceiling, removed an unused export, and pinned that a sealed hosted row never carries the code-owned 3000/2000.
+- **The cross-row daily check** (one run plus its story must fit in a day) had no home here; it moved to M7.
+- **Deploy together.** M1 must not be deployed without M2: publishing 3000/2000 before M2 makes a stop while arguing come at 70% and still end without an answer. The branch ships as one.
+
 ### Task M2: A stop while arguing never skips the answer
 
 **Authority.** Spec §14.4. This task implements §14.4.1, second half: "A stop while arguing never skips the answer" and "The first root's panel".
@@ -16298,6 +16315,14 @@ Never edit `packages/serve/src/index.ts` or `packages/propagation/src/index.ts`.
 #### Commits
 Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
 
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **The first root's panel keeps the voices it heard.** `runJudgePanel` gained a `RETURN_HEARD` rule, used on `PANEL:root` only: member voices already paid for are kept and disclosed as PANEL-PARTIAL, and the author is alone only when no member had answered. Children, secondary roots and cross-root panels keep the money behaviour. Why: paid judgements should not be thrown away on the one node every answer rests on. The rule keeps its older name, `AUTHOR_ONLY`.
+- **The kernel's `RUN_LEVEL_SPEND_STOP_CODES` gained `RUN_COST_ENVELOPE_EXHAUSTED`**, so an attempt stop inside a panel travels as a stop instead of a PROVIDER_ERROR member note.
+- **`RUN_CEILING_BELOW_FIRST_CALL`** keeps the seam's own numbers and names both readings (a ceiling set too low, or a re-claim that carried the earlier claim's spend over). The attempt refusal carries its counts. A pin shows that nothing fails the run after the serve gate.
+- **Carried on.** Unreviewed points and a body stop's trace went into M3's disclosure (`body_stop`, `points_without_review`) and an M6 About line; the drawer wording went to M6.
+- **Task 16 final pass.** The stale "author-only fallback" wording in the kernel and the wiring test was corrected, and the default-rule panel test now hears a voice before the stop and shows that it is dropped.
+
 ### Task M3: a cheaper model when the planned one cannot be paid, and drafts are kept
 
 **Authority:** spec §14.4, specifically §14.4.2 and §14.4.5 (the table only).
@@ -16343,6 +16368,8 @@ Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@
   - `writer_fallback`, `checker_fallback` (boolean)
   - `fallback_reason` (NULL, or `'MONEY'`)
   - `checker_same_as_writer` (boolean)
+  - `body_stop` (text NULL, CHECK in MONEY/ATTEMPTS/USAGE): the stop that ended the arguing early, if any (M2 review carry). Today it is kept only in memory, and nothing records it on a DEFECT answer.
+  - `points_without_review` (integer NULL): the number of points the stop left without a cross-review. They are seeded from their panel with UNKNOWN edges (M2 review Minor 1).
   - `digest_rung` (smallint NULL; filled by M4)
   - `digest_points_omitted` (integer NULL; M4)
   - `floor_verdict_state` (text NULL, CHECK in SUPPORTED/CONTESTED/UNSUPPORTED; M5)
@@ -16393,6 +16420,14 @@ Never edit `packages/serve/src/index.ts` or `packages/propagation/src/index.ts`.
 
 #### Commits
 Commit in logical steps. Every message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **The runner price map is an optional setting** (`providerPrices?`, empty by default), not a required family: local mode never needs it, and a missing map changes only the order of the tries, never whether a call fits.
+- **The best complete round is kept after any spend stop** (money, attempts, usage, daily) and after transport death: an extension of R10. It costs no extra call and no overspend; only money substitutes a model.
+- **The disclosure table** `serve.serve_disclosure` is keyed by `(answer_id, answer_version)`. It gained `serve_stop` (MONEY, ATTEMPTS, USAGE, DAILY, TRANSPORT_DEATH, NO_ARTIFACT), `body_stop` (DAILY admitted) and `points_without_review`, with 256-character CHECKs, by amending the unshipped 0076 (no deployed database had it).
+- **The writer's fallback avoids the planned checker's maker** when another fits, and a round-2 NO_ARTIFACT keeps round 1.
+- **An older defect was fixed on the way:** a crash after a draft now ends components-only (DEFECT) instead of `ANSWER_PERSIST_FAILED`; the cause was the `conformance_record.coverage_mode` CHECK.
 
 ### Task M4: deep debates fit the answer-writer's input (a shrinking digest)
 
@@ -16473,6 +16508,15 @@ Never edit `packages/serve/src/index.ts` or `packages/propagation/src/index.ts`.
 #### Commits
 Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
 
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **Measured:** the compact rung is 42,185 bytes for 195 points, over even the high tier's 30,000, so deep debates use the spine at every tier.
+- **The spine walks a fixed (K, cap) schedule**, (20,60) → (30,60) → (30,120) → (40,120) → (60,120) → (60,240) → (80,240) → (80,480) → (120,480) → (all, verbatim), keeping the last step that fits; a spine that fits with K below 20 first widens its own summaries to 60. Results: high 75 points at 120 (23,537 bytes), medium 75 at 60 (19,036), low 36 at 60 (9,231). Why: the first version gave the high tier exactly the medium tier's result.
+- **Leverage is handed in, not approximated:** the runner passes each node's largest finite leverage from the same propagation records the story reads; a test pins story/serve parity.
+- **Short refs and ids in the answer's prose are refused** by the writer's content check (for example `n12`, or a UUID-shaped id), which triggers the provider's repair re-ask; if repairs run out the round ends `SYNTHESIS_NO_ARTIFACT` (M3 keeps an earlier round; in round 1 the answer is components-only and M5's floor answers). A token that appears whole in the question or in any node's statement is exempt. The model's own words are never rewritten, and no new FAILED path exists.
+- **Summaries cut on code points,** and the walk tries every step.
+- **Accepted:** "n4,5"-style leaks (a comma and a digit read as a decimal, as in Romanian). A crash window after the last refused repair and before the components-only save is a pre-existing class (final-review note). The sealed serve file's comment at ~145-147 is stale and cannot be edited; spec §14.4 "As built" records the amendment.
+
 ### Task M5: the floor answer and the disclosure read (engine and API)
 
 **Authority.** Spec §14.4, parts §14.4.4 and §14.4.5 (the reads).
@@ -16508,6 +16552,8 @@ Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@
 - **Model names.** A model is shown by the same display rule the story's "Written by" uses (`lineageOf` in `packages/story/src/writer.ts` ~164-171). Never a provider URL or key.
 - **The route.** `GET /v1/answers/{id}/disclosure`, owner-scoped with the same answer gate as `/story`. A missing row gives a closed 404 `DISCLOSURE_NOT_FOUND`. Add it to the contract client (`readAnswerDisclosure`) and to the generated contract (`pnpm run generate:contract`).
 - **Tests.** Follow the story route's tests: owner allowed, foreign 404, no session 401.
+- **Versions (M3 review carry).** The table's key is `(answer_id, answer_version)`, and a DR-184 review catch-up version gets no row. The read returns the row of the LATEST answer version that has one. Test it: the catch-up version is newer than the row.
+- **Also expose** `body_stop` and `serve_stop` (M2/M3 carries) as plain enums in the schema, for example `cut_short: { arguing: kind | null, answer_writing: kind | null }`, so that M6 can word the About lines.
 
 ##### 4. The public snapshot
 - `PublicDebateSchema` stays `.strict()`. It gains an optional `floor` (`{ verdict_state, leading_node_id }`), copied at publish time from the disclosure row, the same way `language` was added in R2.
@@ -16541,6 +16587,14 @@ Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@
 #### Commits
 Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
 
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **No migration 0077.** The floor's label basis comes from the label receipt that is already persisted.
+- **The story is read at the latest version ≤ the target** (a branch defect fixed here: after a DR-184 review catch-up the story disappeared from the route, the public page and the PDF). The waiting window runs from the story's own version.
+- **`floor.basis_incomplete`** (owner and public) says a floor's label rests on a thin basis; the sealed marks are untouched.
+- **`floor_reason` is owner-only;** the digest is null when no rung was recorded; a catch-up that would move the floor is refused (`CATCH_UP_FLOOR_WOULD_MOVE`). The CLI runs in a read-only transaction and asserts its principal.
+- **Accepted:** a carried story's per-point detail may be stale after a catch-up (its conclusion is identical). The `FloorReasonSchema` pin was added in Task 16.
+
 ### Task M6: the person sees the floor answer, and the report names a lower-cost model
 
 **Authority:** spec §14.4, specifically §14.4.4 ("What the person sees") and §14.4.5 (the PDF's "About").
@@ -16563,6 +16617,7 @@ Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@
   - a lead-in, "Our best answer:" (new key);
   - the leading position's own statement, which is already in the question's language.
 - **Language of the parts.** The verdict area's fixed words follow the page's usual rule: the interface locale, like every other fixed word in that area. The statement is the debate's own text. The honesty drawer keeps the true marks.
+- **A thin basis (M5 review carry).** When `floor.basis_incomplete` is true, show one plain catalogue line under the floor answer, in the same spirit as the served answer's LABEL-BASIS-INCOMPLETE disclosure. For example: "This label rests on less evidence than usual." Use no engine words. Show it on both the owner page and the public page.
 - **Where the disclosure is read.** Read it where the page reads the answer, on the server for the first render and in the client refresh, without adding a sequential server round-trip if it can run in parallel.
   - A 404 `DISCLOSURE_NOT_FOUND` or a failed read means no floor, and the page behaves as today.
 - **The story strip.** For a floor answer:
@@ -16582,8 +16637,14 @@ The report pipeline reads the disclosure as well. The Task 15 route gains the re
 - **"Answer written by"**: the served writer model. **"Answer checked by"**: the served checker model. Show them only when the disclosure has them.
 - **A lower-cost model:** when `writer.lower_cost` or `checker.lower_cost` is true, one plain sentence, for example "A lower-cost AI model wrote this answer, to stay within the debate's budget." (or "…checked…", or "…wrote and checked…"). Pick the plainest wording in English and Romanian, and offer 3 phrasings in the report for the owner to choose from later. Ship the first.
 - **A floor answer:** one plain sentence, for example "No AI model could write the full answer within the budget, so this answer is the debate's leading position."
-- **A spine digest** (`digest.points_left_out > 0`): one plain sentence without numbers from the engine, for example "The debate was very large, so the answer was written from its most important points."
+- **A debate cut short** (the disclosure's `body_stop` is set): one plain sentence without numbers, for example "The debate stopped exploring early to stay within its budget; the answer uses everything argued until then."
+- **A spine digest** (`digest.points_left_out > 0` AND the writer actually served the answer (`writer.served_model` not null). For a floor answer, the digest was never sent, so do not mention it (M4 review carry).): one plain sentence without numbers from the engine, for example "The debate was very large, so the answer was written from its most important points."
 - **Engine words.** No engine words (judge, evaluator, checker, reviewer, score, threshold, margin, band, runner-up). The existing ban test `tests/unit/story-i18n.test.ts` covers `public.report.*`. "Checked by" is already used in the report, so reuse its wording pattern.
+
+##### 3b. The honesty drawer (M2 review carry)
+A served answer that was cut short shows "Cost envelope: WITHIN" (`AnswerHonestyDrawer.tsx` ~247, which is about the attempt count) beside the mark "Run envelope exhausted" (`labels.ts` ~32). The two lines read as a contradiction. Reword both in plain words so they agree, in every locale that has them (these are dev's existing catalogue keys, so change their values, not their names). For example: the mark becomes "Stopped exploring early to stay within budget", and the envelope line says what it measures. The drawer is the technical view, but it must not contradict itself.
+
+The drawer's remedy lines have the same problem (M2 review carry). Every PANEL-PARTIAL record gets "Re-ask to collect the assessments the failed panel members owed" (runner ~4660-4662, shown word for word by the drawer at `AnswerHonestyDrawer.tsx` ~187-188), and the single-voice record gets "Re-ask when another healthy maker can assess this node". When the panel was cut short by a spend stop, both are wrong: no member failed, and a re-ask under the same budget hits the same stop. Choose the remedy by whether the panel was stopped (the record's reason names the stop code), for example "This point was judged by fewer AI models because the debate stopped exploring early to stay within its budget." These remedies are code-owned English in the runner today. Find how the drawer renders them, and if they are English literals shown to users, route the new wording through the catalogue in the same way.
 
 ##### 4. Catalogues
 - New keys go in all 35 locales, with real, natural translations. You translate them yourself, offline: no web and no translation services. Use a calm, polite tone.
@@ -16613,6 +16674,13 @@ Known unrelated reds:
 #### Commits
 Commit in logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
 
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **The ENVELOPE_EXHAUSTED mark is worded by its reason:** "Ended early to stay within budget" for a budget stop, "…because of a problem with an AI service" for a usage stop, and a neutral "Ended early" when there is no record (a public snapshot). Why: the first wording was false for a floor and for a stopped answer loop.
+- **The PDF's floor line says "strongest position"**, the plainest of three phrasings; the owner picks later. Thin-basis wording ships phrasing 3 ("less to compare").
+- **The public library row shows a floor's label;** the public list summary gained an optional `floor_verdict`. This is a contract change, so the UI and the API ship together (owner note).
+- **The flag-gated VerdictBanner does not know floors** (the flag is off): owner note.
+
 ### Task M7: the story's margin and its cheaper model
 
 **Authority.** Spec §14.4, §14.4.6 and §14.2 ("The story has a small money margin and a fallback").
@@ -16627,7 +16695,8 @@ Commit in logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5
   - A missing value means 0.
   - This is a new version, published through the usual code-owned row path, so no sealed snapshot file is touched.
 - The story ceiling becomes `perStory × (10000 + overrun) / 10000`, rounded down: 60,000 µUSD with today's values. This is computed in `#envelopeFor` (`packages/budget/src/model-spend.ts` ~352-379).
-- The daily admission reserve (M1's "the most one run may spend") uses the story's raised ceiling in its second term.
+- The daily admission reserve (M1's `mostOneRunMaySpendMicros`, `packages/budget/src/model-spend.ts` ~210-217) uses the story's raised ceiling in its second term.
+- **A cross-row check (M1 review carry).** Spec §14.4.1 wants daily ≥ `perRun × (1 + overrun) + perStory × (1 + storyOverrun)`. The cost-envelope row's own schema cannot see the story row, so add one check that reads BOTH rows: at hosted register publication (plan time, `hosted-register-publish.ts`) and when the runner and API start, where both rows are already read. It fails loudly with a typed code when the daily ceiling cannot cover one full run plus its story. Test both places.
 - Update the pins: `tests/unit/story-policy.test.ts` ~70-92, `hosted-register-publish.test.ts` ~251, `register-support-publication` (hash literals and counts), and `v28-model-spend-ledger`. Report each moved pin.
 
 ##### 2. A cheaper model for the story
@@ -16665,6 +16734,12 @@ Commit in logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5
 #### Commits
 Commit in logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
 
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **The storyteller's fallback is strictly cheapest first;** the checker still prefers a maker other than the writer's. Why: writer and checker share one 60,000 µUSD total, so steering the writer to a dearer model could leave the checker unpaid and fail a story that cheapest-first would have finished.
+- **The cross-row daily check** `STORY_DAILY_CEILING_INSUFFICIENT` (a day must hold one run's maximum plus its story's) runs at hosted publish and at runner and API boot, reusing M1's arithmetic.
+- **The docs say a refused try is free only on its first attempt.**
+
 ### Task M8: A friendly message when today's capacity for new debates is used up
 
 **Authority:** spec §14.4.7.
@@ -16699,3 +16774,8 @@ Commit in logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5
 #### Commits
 Commit in one or two steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
 
+#### What was built differently, and why (Task 16, 2026-09-28)
+
+- **The hourly per-owner limit was reworded too:** "Please wait a little, then try again."
+- **The home composer** shows the daily-limit message where the person typed. Its own ask, though, is refused in the browser before it is sent (it sends no risk tier), so it always goes on to /new. This is pre-existing dev behaviour (owner note).
+- **Task 16 final pass:** the ban test checks "coordinator" in each catalogue language; the `requestFailure.ts` comment says it is the only ask refusal answered with 429; the home page hands the composer only the two values its message prints.

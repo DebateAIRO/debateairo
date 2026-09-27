@@ -87,6 +87,7 @@ Seven read-only lanes (`delta-L1` … `delta-L7`), same schema and rubric as the
 ## New rows for `V-DECISIONS-PACKET.md`
 - **V-26** (DL1-F6): should account erasure cascade to the account's support transcripts and cases? Recommended: yes — wire `shredOwner(ownerRef)` into the erasure coordinator once DB1 makes the shred path live.
 - **V-28** (DL4-F2): seal a per-run token/cost envelope (tokens or USD per ask) in the register, enforced by the gateway, so the ask cap bounds money and not only attempt counts. Recommended: yes, before any paid gateway is configured (V-9c).
+  - *Amended 2026-09-28:* V-28 was ruled 2026-09-22 and amended by the engine money rule (spec `docs/superpowers/specs/2026-09-26-verdict-story-design.md` §14.4): at the limit the run stops arguing and still answers. See "Amendment to V-28" in `../V-DECISIONS-PACKET.md`.
 - **V-29** (DL5-F8): replace the observation agent's `pg_monitor` membership with the narrower grants its one query needs. Recommended: yes, small.
 - **V-30** (DL7-F2): the acceptance CLI relays put the prompt on the vendor CLI's argv; on a single-user Mac this is the A4 residual V-10 grades LOW; on the server the relays must never run at all (V-9c: paid API keys through the HTTP gateway). Recommended: rule both; no code change in dev.
 

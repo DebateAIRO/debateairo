@@ -1139,12 +1139,17 @@ service.
 
 ### The cost envelopes (V-28) — and the temporary values for the first paid run
 
-Two ceilings, both in money, both enforced in code in the hosted deployment only: **per run** (the
-call that would cross it is refused before it is made; the debate stops cleanly, keeps what it
-produced and is served as a components-only answer marked `ENVELOPE_EXHAUSTED`), and **per day**
-across every debate and vendor (no new debate starts until the next UTC day; debates under way
-finish). Every charged call is one row in `ledger.model_spend`, and both ceilings are sums over
-those rows. The operator record is
+Two ceilings, both in money, both enforced in code in the hosted deployment only: **per run** and
+**per day** across every debate and vendor (no new debate starts until the next UTC day; debates
+under way finish). At the per-run ceiling the call that would cross it is refused before it is
+made, and since the engine money rule (V-28 amended 2026-09-28; spec 2026-09-26 §14.4) the debate
+still gets its answer: a stop while it is argued ends the arguing only, and the run goes on to
+write its answer from what it has, with money kept aside for that (the reserve and overrun below).
+If the planned answer-writing model cannot be paid, the same call is retried on a cheaper model
+the run may use. Only when no model can be paid does the sealed answer stay components-only,
+marked `ENVELOPE_EXHAUSTED`, and the page then shows the **floor** (the label and the debate's
+strongest position; see "One answer's record" below). Every charged call is one row in
+`ledger.model_spend`, and both ceilings are sums over those rows. The operator record is
 `docs/missions/2026-09-01-security-hardening/COST-ENVELOPES-2026-09-22.md`.
 
 **The values in force are temporary and deliberately low**, for the owner's first paid run:
