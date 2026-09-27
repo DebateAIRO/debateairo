@@ -39,6 +39,7 @@ const LINK = "#3D5A80";
 // Wide enough for the longest fate word in the report's languages, set in capitals ("A REZISTAT PARȚIAL"
 // wraps to two lines here), with a gutter before the path line.
 const FATE_COLUMN = 108;
+const FATE_GUTTER = 12;
 const BODY = 10.5;
 // textkit's own infinity (linebreak.infinity in @react-pdf/textkit 7.0.1): a penalty this high is never a
 // line break. Every run boundary in a text (a word, then a [Pn] citation or an in-text P5 link; a change of
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
   cite: { color: LINK, fontSize: 8.5, textDecoration: "none" },
   mention: { color: LINK, textDecoration: "underline" },
   pathRow: { flexDirection: "row", marginBottom: 7 },
-  fate: { width: FATE_COLUMN, paddingRight: 12, fontWeight: 700, fontSize: 8, lineHeight: 1.35, letterSpacing: 0.6, color: MUTED, paddingTop: 2.5 },
+  fate: { width: FATE_COLUMN, paddingRight: FATE_GUTTER, fontWeight: 700, fontSize: 8, lineHeight: 1.35, letterSpacing: 0.6, color: MUTED, paddingTop: 2.5 },
   pathLine: { flex: 1, fontSize: BODY, lineHeight: 1.5 },
   morePaths: { marginLeft: FATE_COLUMN, fontSize: 9, lineHeight: 1.45, color: MUTED, marginBottom: 2 },
   sectionTitleBox: { marginTop: 18, marginBottom: 7 },
@@ -127,24 +128,51 @@ function capitals(model: ReportModel, text: string): string {
 type Style = Styles[string];
 type TextStyle = Style | Style[];
 
-/** What a report's language adds to the shared styles (lib/report/reportLayout.ts). */
+/**
+ * What a report's language adds to the shared styles (lib/report/reportLayout.ts). A left-to-right report
+ * adds nothing but its faces, so its styles are exactly the shared ones. A right-to-left one aligns every
+ * text to the right and gives each its direction (react-pdf does not inherit it, and textkit reads a
+ * paragraph's direction from its first run), runs each row from the right, and mirrors the fate column's
+ * gutter, the "more positions" indent and the footer.
+ */
 interface Look {
   readonly model: ReportModel;
-  /** The text's faces, set on every page. */
+  /** The text's faces, set on every page, and its alignment. */
   readonly page: Style;
   /** The part titles' faces and weight. */
   readonly heading: Style;
   /** No letter spacing on the small labels in a script without capitals. */
   readonly tracked: Style;
+  /** Every text's direction, on each text and each nested run. */
+  readonly text: Style;
+  /** A row of two columns (a fate and its line, a reason and its number, an About label and its value, the label pill). */
+  readonly row: Style;
+  readonly fate: Style;
+  readonly morePaths: Style;
+  /** The footer's words, and the page numbers opposite them on the side a line ends. */
+  readonly footerText: Style;
+  readonly footerPages: Style;
 }
 
 function lookOf(model: ReportModel, layout: ReportLayout): Look {
+  const rtl = layout.direction === "rtl";
+  const pagesLeft = layout.pageNumberSide === "left";
   return {
     model,
-    page: { fontFamily: [...layout.faces.body] },
+    page: rtl ? { fontFamily: [...layout.faces.body], textAlign: layout.textAlign } : { fontFamily: [...layout.faces.body] },
     heading: { fontFamily: [...layout.faces.heading], fontWeight: layout.faces.headingWeight },
-    tracked: layout.trackedCapitals ? {} : { letterSpacing: 0 }
+    tracked: layout.trackedCapitals ? {} : { letterSpacing: 0 },
+    text: rtl ? { direction: "rtl" } : {},
+    row: layout.markerSide === "right" ? { flexDirection: "row-reverse" } : {},
+    fate: layout.markerSide === "right" ? { paddingRight: 0, paddingLeft: FATE_GUTTER } : {},
+    morePaths: layout.markerSide === "right" ? { marginLeft: 0, marginRight: FATE_COLUMN } : {},
+    footerText: pagesLeft ? styles.footerRight : styles.footerLeft,
+    footerPages: pagesLeft ? styles.footerLeft : styles.footerRight
   };
+}
+
+function withDirection(style: TextStyle, look: Look): Style[] {
+  return [...(Array.isArray(style) ? style : [style]), look.text];
 }
 
 /**
@@ -156,7 +184,8 @@ function lookOf(model: ReportModel, layout: ReportLayout): Look {
  * a run only where reportLineBreaker allows, and that rule is built from the
  * whole text, so it knows what stands on both sides of a run boundary.
  */
-function Words({ style, text, fixed = false, wrap = true }: {
+function Words({ look, style, text, fixed = false, wrap = true }: {
+  look: Look;
   style: TextStyle;
   text: string;
   fixed?: boolean;
@@ -164,7 +193,7 @@ function Words({ style, text, fixed = false, wrap = true }: {
 }): JSX.Element {
   return (
     <Text
-      style={style}
+      style={withDirection(style, look)}
       fixed={fixed}
       wrap={wrap}
       hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}
@@ -186,14 +215,22 @@ function paragraphText(paragraph: ReportParagraph): string {
 }
 
 // StyleSheet.create keeps each style's literal shape, so the caller picks a variant rather than passing a style.
-function StoryText({ paragraph, variant }: { paragraph: ReportParagraph; variant: "paragraph" | "pathLine" | "box" }): JSX.Element {
+function StoryText({ look, paragraph, variant }: {
+  look: Look;
+  paragraph: ReportParagraph;
+  variant: "paragraph" | "pathLine" | "box";
+}): JSX.Element {
   const style = variant === "pathLine" ? styles.pathLine : variant === "box" ? styles.boxText : styles.paragraph;
   return (
-    <Text style={style} hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS} hyphenationCallback={reportLineBreaker(paragraphText(paragraph))}>
+    <Text
+      style={withDirection(style, look)}
+      hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}
+      hyphenationCallback={reportLineBreaker(paragraphText(paragraph))}
+    >
       {paragraph.spans.map((span, index) => {
-        if (span.kind === "text") return <Text key={index}>{span.text}</Text>;
-        if (span.kind === "mention") return <Link key={index} src={`#${span.anchor}`} style={styles.mention}>{span.label}</Link>;
-        return <Link key={index} src={`#${span.anchor}`} style={styles.cite}>{citationText(span.label)}</Link>;
+        if (span.kind === "text") return <Text key={index} style={look.text}>{span.text}</Text>;
+        if (span.kind === "mention") return <Link key={index} src={`#${span.anchor}`} style={[styles.mention, look.text]}>{span.label}</Link>;
+        return <Link key={index} src={`#${span.anchor}`} style={[styles.cite, look.text]}>{citationText(span.label)}</Link>;
       })}
     </Text>
   );
@@ -216,15 +253,15 @@ function KeepWithNext({ ahead, style, id, children }: {
 function Heading({ look, title, first = false }: { look: Look; title: string; first?: boolean }): JSX.Element {
   return (
     <KeepWithNext ahead={60} style={first ? styles.headingFirstBox : styles.headingBox}>
-      <Words style={[styles.heading, look.heading]} text={title} />
+      <Words look={look} style={[styles.heading, look.heading]} text={title} />
     </KeepWithNext>
   );
 }
 
-function Subheading({ text }: { text: string }): JSX.Element {
+function Subheading({ look, text }: { look: Look; text: string }): JSX.Element {
   return (
     <KeepWithNext ahead={30} style={styles.subheadingBox}>
-      <Words style={styles.subheading} text={text} />
+      <Words look={look} style={styles.subheading} text={text} />
     </KeepWithNext>
   );
 }
@@ -233,9 +270,9 @@ function Footer({ look }: { look: Look }): JSX.Element {
   const { model } = look;
   return (
     <>
-      <Words style={styles.footerLeft} fixed text={model.footer.text} />
+      <Words look={look} style={look.footerText} fixed text={model.footer.text} />
       <Text
-        style={styles.footerRight}
+        style={withDirection(look.footerPages, look)}
         fixed
         hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}
         render={({ pageNumber, totalPages }) => reportPageWords(model, pageNumber, totalPages)}
@@ -249,29 +286,29 @@ function CoverAndShort({ look }: { look: Look }): JSX.Element {
   const { cover, inShort } = model;
   return (
     <>
-      <Words style={[styles.eyebrow, look.tracked]} text={capitals(model, cover.eyebrow)} />
-      <Words style={styles.question} text={cover.question} />
+      <Words look={look} style={[styles.eyebrow, look.tracked]} text={capitals(model, cover.eyebrow)} />
+      <Words look={look} style={styles.question} text={cover.question} />
       {cover.labelWords === null ? null : (
-        <View style={styles.labelRow}>
-          <Words style={[styles.label, look.tracked]} text={capitals(model, cover.labelWords)} />
+        <View style={[styles.labelRow, look.row]}>
+          <Words look={look} style={[styles.label, look.tracked]} text={capitals(model, cover.labelWords)} />
         </View>
       )}
-      <Words style={styles.confidence} text={cover.confidence} />
-      <Words style={styles.meta} text={cover.generatedLine} />
-      <Words style={styles.meta} text={cover.modelsLine} />
+      <Words look={look} style={styles.confidence} text={cover.confidence} />
+      <Words look={look} style={styles.meta} text={cover.generatedLine} />
+      <Words look={look} style={styles.meta} text={cover.modelsLine} />
       <View style={styles.disclosure}>
-        <Words style={styles.disclosureLine} text={cover.disclosure} />
+        <Words look={look} style={styles.disclosureLine} text={cover.disclosure} />
       </View>
       <Heading look={look} title={inShort.title} />
-      <Words style={styles.headline} text={inShort.headline} />
-      <Words style={styles.paragraph} text={inShort.summary} />
+      <Words look={look} style={styles.headline} text={inShort.headline} />
+      <Words look={look} style={styles.paragraph} text={inShort.summary} />
       {inShort.paths.map((path, index) => (
-        <View key={index} style={styles.pathRow} wrap={false}>
-          <Words style={[styles.fate, look.tracked]} text={capitals(model, path.fateWords)} />
-          <StoryText paragraph={path.line} variant="pathLine" />
+        <View key={index} style={[styles.pathRow, look.row]} wrap={false}>
+          <Words look={look} style={[styles.fate, look.tracked, look.fate]} text={capitals(model, path.fateWords)} />
+          <StoryText look={look} paragraph={path.line} variant="pathLine" />
         </View>
       ))}
-      {inShort.morePaths === null ? null : <Words style={styles.morePaths} text={inShort.morePaths} />}
+      {inShort.morePaths === null ? null : <Words look={look} style={[styles.morePaths, look.morePaths]} text={inShort.morePaths} />}
     </>
   );
 }
@@ -281,24 +318,24 @@ function LongStory({ look }: { look: Look }): JSX.Element {
   return (
     <>
       <Heading look={look} title={model.storyTitle} first />
-      <Words style={styles.intro} text={model.storyIntro} />
+      <Words look={look} style={styles.intro} text={model.storyIntro} />
       {model.sections.map((section, index) => (
         <Fragment key={index}>
           <KeepWithNext ahead={48} style={styles.sectionTitleBox}>
-            <Words style={styles.sectionTitle} text={section.title} />
+            <Words look={look} style={styles.sectionTitle} text={section.title} />
           </KeepWithNext>
           {section.paragraphs.map((item, itemIndex) => (
-            <StoryText key={itemIndex} paragraph={item} variant="paragraph" />
+            <StoryText look={look} key={itemIndex} paragraph={item} variant="paragraph" />
           ))}
         </Fragment>
       ))}
       {model.reviewerNote === null ? null : (
         <View style={styles.box} wrap={false}>
-          <Words style={[styles.boxTitle, look.tracked]} text={capitals(model, model.reviewerNote.title)} />
-          <StoryText paragraph={model.reviewerNote.paragraph} variant="box" />
+          <Words look={look} style={[styles.boxTitle, look.tracked]} text={capitals(model, model.reviewerNote.title)} />
+          <StoryText look={look} paragraph={model.reviewerNote.paragraph} variant="box" />
         </View>
       )}
-      {model.reservation === null ? null : <Words style={styles.reservation} wrap={false} text={model.reservation} />}
+      {model.reservation === null ? null : <Words look={look} style={styles.reservation} wrap={false} text={model.reservation} />}
     </>
   );
 }
@@ -315,15 +352,15 @@ function Why({ look }: { look: Look }): JSX.Element {
     <>
       <Heading look={look} title={why.title} first />
       {why.reasons.map((reason, index) => (
-        <View key={index} style={styles.reasonRow}>
-          <Words style={styles.reasonNumber} text={reasonNumber(model, index)} />
+        <View key={index} style={[styles.reasonRow, look.row]}>
+          <Words look={look} style={styles.reasonNumber} text={reasonNumber(model, index)} />
           <View style={styles.reasonText}>
-            <StoryText paragraph={reason} variant="paragraph" />
+            <StoryText look={look} paragraph={reason} variant="paragraph" />
           </View>
         </View>
       ))}
-      <Subheading text={why.changeLead} />
-      <StoryText paragraph={why.change} variant="paragraph" />
+      <Subheading look={look} text={why.changeLead} />
+      <StoryText look={look} paragraph={why.change} variant="paragraph" />
     </>
   );
 }
@@ -333,25 +370,25 @@ function Appendix({ look }: { look: Look }): JSX.Element {
   return (
     <>
       <Heading look={look} title={model.appendix.title} first />
-      <Words style={styles.intro} text={model.appendix.intro} />
+      <Words look={look} style={styles.intro} text={model.appendix.intro} />
       {model.appendix.entries.map((entry) => (
         <Fragment key={entry.anchor}>
           <KeepWithNext ahead={52} style={styles.entryHeadBox} id={entry.anchor}>
             <Text
-              style={styles.entryHead}
+              style={withDirection(styles.entryHead, look)}
               hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}
               hyphenationCallback={reportLineBreaker(`${entry.number}   ${entry.stance}`)}
             >
-              <Text style={styles.entryNumber}>{entry.number}</Text>
-              <Text style={styles.entryStance}>{`   ${entry.stance}`}</Text>
+              <Text style={[styles.entryNumber, look.text]}>{entry.number}</Text>
+              <Text style={[styles.entryStance, look.text]}>{`   ${entry.stance}`}</Text>
             </Text>
           </KeepWithNext>
-          <Words style={styles.entryClaim} text={entry.claim} />
-          <Words style={styles.entryMeta} text={`${entry.strength} · ${entry.wayOfKnowing}`} />
-          <Words style={styles.entryMeta} text={entry.author} />
-          <Words style={styles.entryMeta} text={entry.review} />
-          {entry.setAsideLine === null ? null : <Words style={styles.entryMeta} text={entry.setAsideLine} />}
-          {entry.notesLine === null ? null : <Words style={styles.entryMeta} text={entry.notesLine} />}
+          <Words look={look} style={styles.entryClaim} text={entry.claim} />
+          <Words look={look} style={styles.entryMeta} text={`${entry.strength} · ${entry.wayOfKnowing}`} />
+          <Words look={look} style={styles.entryMeta} text={entry.author} />
+          <Words look={look} style={styles.entryMeta} text={entry.review} />
+          {entry.setAsideLine === null ? null : <Words look={look} style={styles.entryMeta} text={entry.setAsideLine} />}
+          {entry.notesLine === null ? null : <Words look={look} style={styles.entryMeta} text={entry.notesLine} />}
         </Fragment>
       ))}
     </>
@@ -364,9 +401,9 @@ function About({ look }: { look: Look }): JSX.Element {
     <>
       <Heading look={look} title={model.about.title} first />
       {model.about.rows.map((row, index) => (
-        <View key={index} style={styles.aboutRow} wrap={false}>
-          <Words style={styles.aboutLabel} text={row.label} />
-          <Words style={styles.aboutValue} text={row.value} />
+        <View key={index} style={[styles.aboutRow, look.row]} wrap={false}>
+          <Words look={look} style={styles.aboutLabel} text={row.label} />
+          <Words look={look} style={styles.aboutValue} text={row.value} />
         </View>
       ))}
     </>

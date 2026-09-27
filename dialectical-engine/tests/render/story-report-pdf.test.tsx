@@ -313,6 +313,7 @@ describe("the report in the question's own script (R-fonts)", () => {
   it.each([
     ["ru", ["NotoSans-Bold", "NotoSans-Italic", "NotoSans-Regular"]],
     ["el", ["NotoSans-Bold", "NotoSans-Italic", "NotoSans-Regular"]],
+    ["he", ["NotoSans-Regular", "NotoSansHebrew-Bold", "NotoSansHebrew-Regular"]],
     ["hi", ["NotoSans-Regular", "NotoSansDevanagari-Bold", "NotoSansDevanagari-Regular"]],
     ["zh", ["NotoSansSC-Bold", "NotoSansSC-Regular"]],
     ["ja", ["NotoSansJP-Bold", "NotoSansJP-Regular"]],
@@ -333,6 +334,44 @@ describe("the report in the question's own script (R-fonts)", () => {
     const sample = storyScriptSampleText(locale);
     const missing = letters(sample).filter((codePoint) => !maps.includes(codePoint));
     expect(missing, locale).toEqual([]);
+  }, 120_000);
+
+  it("prints Hebrew right to left: each line in reading order from the right, a Latin name, a number and [Pn] in their own order, the fates on the right, the page numbers on the left", async () => {
+    const hebrew = await catalogs("he");
+    const pages = drawnLines(await render("he"));
+    const all = pages.flat().join("\n");
+    /** How a run of Hebrew words stands on the page: its letters from the right. */
+    const printed = (words: string) => [...words].reverse().join("");
+    // The headline, as printed on the page, from its first words at the right edge.
+    expect(pages[0]!.some((line) => line.endsWith(printed("התשובה שלנו:")))).toBe(true);
+    // A Latin word, a number and a citation keep their own left-to-right order inside the Hebrew lines.
+    expect(all).toContain("Zoom");
+    expect(all).not.toContain("mooZ");
+    expect(all).toContain("35%");
+    expect(all).toMatch(/\[P\d\]/u);
+    // Each short path line starts at the right with its fate, in the fate column.
+    const fate = hebrew.publicCatalog["public.story.fate.partlyHeld"]!;
+    expect(pages[0]!.filter((line) => line.endsWith(printed(fate))).length).toBe(2);
+    // The footer: page numbers on the left, the footer's words on the right.
+    const footer = pages[0]!.at(-1)!;
+    expect(footer.indexOf("1")).toBeLessThan(footer.indexOf("DebateAI"));
+    // A left-to-right report keeps its footer the other way round (control).
+    const romanian = drawnLines(await renderReportPdf({
+      answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY"), generatedAt: new Date("2026-09-26T12:00:00.000Z"), catalogs: ROMANIAN
+    }));
+    const romanianFooter = romanian[0]!.at(-1)!;
+    expect(romanianFooter.indexOf("DebateAI")).toBeLessThan(romanianFooter.indexOf("1"));
+  }, 120_000);
+
+  it.each(["he", "hi", "ru", "zh"] as const)("prints punctuation next to a point number the %s text names, where a span starts inside a fallback stretch, with no empty box", async (locale) => {
+    // textkit 7.0.1 lets a span's own first face win for a stretch it had given to a fallback face; the
+    // first face of each report must therefore have every character that can stand next to a span.
+    const { answer, story } = storyScriptSample(locale);
+    const paragraph = story.story!.long.sections[1]!.paragraphs[0]!;
+    paragraph.text = `${paragraph.text} (P1) P1, P1. P1: «P1» "P1" [P1] P1;`;
+    const pdf = await renderReportPdf({ answer, story, generatedAt: new Date("2026-09-26T12:00:00.000Z"), catalogs: await catalogs(locale) });
+    expect(drawnGlyphs(pdf).filter((glyph) => glyph === "0000"), locale).toEqual([]);
+    expect(embeddedFonts(pdf.toString("latin1")).filter((name) => /Helvetica|Times|Courier/u.test(name)), locale).toEqual([]);
   }, 120_000);
 
   it.each(["zh", "ja", "ko"] as const)("breaks %s lines without printing a hyphen the text does not have, and fills the lines", async (locale) => {

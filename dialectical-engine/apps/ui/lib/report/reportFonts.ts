@@ -90,13 +90,28 @@ const { sans, serif, notoSans, hebrew, devanagari, simplifiedChinese, japanese, 
 /**
  * Each script's own face first, then the two that always follow. Arabic has
  * none: the report cannot print it yet (reportLanguage.ts says why).
+ *
+ * Hebrew and Devanagari are the exception: Noto Sans comes first and the
+ * script's face second, so every Hebrew or Devanagari letter still prints in
+ * Noto Sans Hebrew or Noto Sans Devanagari, and what those faces lack (Latin
+ * letters and, for Hebrew, the digits and every ASCII punctuation mark; for
+ * Devanagari « » $ & @) prints in Noto Sans, their designed partner. With the
+ * script's face first, textkit 7.0.1 printed an empty box: when a span (a P1
+ * the text names, a [P3]) starts inside a stretch textkit has given to a
+ * fallback face, the span's own first face wins for that stretch
+ * (flattenRegularRuns), so the comma in "P1, " was shaped with Noto Sans
+ * Hebrew, which has no comma. With a first face that has every such
+ * character, the face that wins always has it. (A zero-width joiner, which
+ * Noto Sans also has, then ends a Devanagari run: a requested half form
+ * prints as the full letter with a visible virama, a correct if plainer
+ * spelling.)
  */
 const PRIMARY_FACES: Readonly<Record<ReportScript, readonly ReportFontFamily[] | null>> = Object.freeze({
   latin: [sans, notoSans],
   cyrillicGreek: [notoSans, sans],
-  hebrew: [hebrew, notoSans, sans],
+  hebrew: [notoSans, hebrew, sans],
   arabic: null,
-  devanagari: [devanagari, notoSans, sans],
+  devanagari: [notoSans, devanagari, sans],
   simplifiedChinese: [simplifiedChinese, notoSans, sans],
   japanese: [japanese, notoSans, sans],
   korean: [korean, notoSans, sans]

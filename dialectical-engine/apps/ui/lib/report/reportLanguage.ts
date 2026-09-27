@@ -9,18 +9,23 @@ import type { MessageCatalog } from "../i18n/translate.js";
  * FONTS (Task R-fonts, owner decision 2026-09-27: "A: add them"): the vendored
  * faces (apps/ui/assets/fonts, SOURCES.md; the choice per language is
  * lib/report/reportFonts.ts) print the 25 Latin-script locales, Cyrillic and
- * Greek (Noto Sans), Devanagari (Noto Sans Devanagari) and Chinese, Japanese
- * and Korean (Noto Sans SC, JP, KR; lines break between Chinese and Japanese
- * characters, lib/report/reportLineBreaks.ts); fonts.test.mjs checks every
- * catalogue value against them. A locale stays in this list, and its report
- * is refused (the panel hides the download and says the report is not
- * available in that language yet), only while the report cannot print it
- * correctly:
- * - he: right-to-left layout is not wired yet;
- * - ar: react-pdf 4.9.0 drops the vertical mark positions the Noto Arabic
- *   fonts need for every dotted letter (lib/report/reportGlyphs.ts).
+ * Greek (Noto Sans), Devanagari, Hebrew (right to left, lib/report/
+ * reportLayout.ts) and Chinese, Japanese and Korean (their Noto faces; lines
+ * break between Chinese and Japanese characters, lib/report/
+ * reportLineBreaks.ts); fonts.test.mjs checks every catalogue value against
+ * them. A locale stays in this list, and its report is refused (the panel
+ * hides the download and says the report is not available in that language
+ * yet), only while the report cannot print it correctly:
+ * - ar: every dotted Arabic letter is drawn in Noto Sans Arabic and Noto Naskh
+ *   Arabic as a dotless letter plus its dots, and the dots (and the vowel
+ *   marks) sit where the font's vertical offsets put them. react-pdf 4.9.0
+ *   drops every vertical offset (lib/report/reportGlyphs.ts), so the dots land
+ *   too high or too low. Printing Arabic needs a renderer that keeps them; the
+ *   owner decides how.
+ * The list may become empty; reportSupportedForLocale and the hidden-download
+ * path stay, and their tests inject their own rule.
  */
-export const REPORT_UNPRINTABLE_LOCALES: readonly LocaleCode[] = Object.freeze(["he", "ar"]);
+export const REPORT_UNPRINTABLE_LOCALES: readonly LocaleCode[] = Object.freeze(["ar"]);
 
 export function reportSupportedForLocale(locale: string): boolean {
   return !(REPORT_UNPRINTABLE_LOCALES as readonly string[]).includes(locale);

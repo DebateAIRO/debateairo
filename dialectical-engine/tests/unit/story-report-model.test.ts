@@ -401,12 +401,12 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
 });
 
 describe("the report's language (lib/report/reportLanguage.ts)", () => {
-  it("prints the Latin, Cyrillic, Greek, Devanagari and CJK locales, and refuses the scripts it cannot print correctly yet", () => {
+  it("prints every locale's script but Arabic, which it cannot print correctly yet", () => {
     const refused = LOCALES.map(({ code }) => code).filter((code) => !reportSupportedForLocale(code)).sort();
-    expect(refused).toEqual(["ar", "he"]);
+    expect(refused).toEqual(["ar"]);
     expect([...REPORT_UNPRINTABLE_LOCALES].sort()).toEqual(refused);
-    // One per script group: Latin (with and without diacritics, Vietnamese), Cyrillic, Greek, Devanagari, CJK.
-    expect(["ro", "en", "vi", "pl", "tr", "ru", "bg", "uk", "el", "hi", "zh", "ja", "ko"].every(reportSupportedForLocale)).toBe(true);
+    // One per script group: Latin (with and without diacritics, Vietnamese), Cyrillic, Greek, Hebrew, Devanagari, CJK.
+    expect(["ro", "en", "vi", "pl", "tr", "ru", "bg", "uk", "el", "he", "hi", "zh", "ja", "ko"].every(reportSupportedForLocale)).toBe(true);
   });
 
   it("loads the question's catalogues, and the English public catalogue for the metadata only", async () => {

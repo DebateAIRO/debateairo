@@ -169,6 +169,29 @@ test("every glyph of a run stands for the characters of its own place in the tex
   }
 });
 
+test("a Hebrew point is printed where Noto Sans Hebrew places it in right-to-left text, as textkit lays the run out", () => {
+  const text = "שָׁלוֹם עֲבוֹדָה";
+  const spots = (run) => {
+    let pen = 0;
+    return run.glyphs.map((glyph, index) => {
+      const spot = pen + run.positions[index].xOffset;
+      pen += run.positions[index].xAdvance;
+      return `${glyph.id}@${spot}`;
+    }).sort();
+  };
+  // fontkit shaping the run right to left by itself, drawn left to right: where every glyph belongs.
+  const own = openSync(path("noto-sans-hebrew/NotoSansHebrew-Regular.ttf")).layout(text, [], undefined, undefined, "rtl");
+  // textkit asks for left to right, then reverses the run (the control: the points land a letter off).
+  const textkit = (font) => {
+    const run = font.layout(text, [], undefined, undefined, "ltr");
+    return { glyphs: [...run.glyphs].reverse(), positions: [...run.positions].reverse() };
+  };
+  assert.notDeepEqual(spots(textkit(openSync(path("noto-sans-hebrew/NotoSansHebrew-Regular.ttf")))), spots(own));
+  const placed = textkit(reportPlacedFont(openSync(path("noto-sans-hebrew/NotoSansHebrew-Regular.ttf"))));
+  assert.deepEqual(spots(placed), spots(own));
+  assert.deepEqual(placed.positions.filter((position) => position.xOffset !== 0), []);
+});
+
 // Every family directory under assets/fonts, and every file in it.
 const FAMILY_DIRECTORIES = readdirSync(fileURLToPath(fontRoot), { withFileTypes: true })
   .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();

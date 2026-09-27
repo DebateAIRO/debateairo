@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
-import { bakeGlyphOffsets, type ReportGlyphPosition } from "../../apps/ui/lib/report/reportGlyphs.js";
+import { bakeGlyphOffsets, basesBeforeTheirMarks, placeGlyphs, type ReportGlyphPosition } from "../../apps/ui/lib/report/reportGlyphs.js";
 import { REPORT_FONT_FACES, REPORT_FONT_FAMILIES, reportFaces, reportScript } from "../../apps/ui/lib/report/reportFonts.js";
+import { reportLayout } from "../../apps/ui/lib/report/reportLayout.js";
 
 const NON_LATIN = ["bg", "ru", "uk", "el", "he", "ar", "hi", "zh", "ja", "ko"];
 const LATIN = LOCALES.map(({ code }) => code).filter((code) => !NON_LATIN.includes(code));
@@ -26,7 +27,11 @@ describe("the report's faces, chosen from its language (lib/report/reportFonts.t
     };
     for (const [locale, family] of Object.entries(own)) {
       const faces = reportFaces(locale, "");
-      expect(faces.body[0], locale).toBe(family);
+      // Hebrew and Devanagari letters come from their own face, second in line: Noto Sans first takes what
+      // those faces do not have (reportFonts.ts says why it must be first).
+      const second = locale === "he" || locale === "hi";
+      expect(faces.body[second ? 1 : 0], locale).toBe(family);
+      if (second) expect(faces.body[0], locale).toBe(notoSans);
       expect(faces.heading, locale).toEqual(faces.body);
       expect(faces.headingWeight, locale).toBe(700);
       // Fraunces is a Latin display face: never outside a Latin report.
@@ -48,6 +53,8 @@ describe("the report's faces, chosen from its language (lib/report/reportFonts.t
     expect(reportFaces("ro", "Citat: 中文").body).toEqual([sans, notoSans, simplifiedChinese]);
     expect(reportFaces("en", "Quote: 한국어").body).toEqual([sans, notoSans, korean]);
     expect(reportFaces("ru", "Цитата: שלום и नमस्ते").body).toEqual([notoSans, sans, hebrew, devanagari]);
+    expect(reportFaces("he", "").body).toEqual([notoSans, hebrew, sans]);
+    expect(reportFaces("hi", "").body).toEqual([notoSans, devanagari, sans]);
     // A face already in the list is not added twice.
     expect(reportFaces("ja", "日本語のテキスト").body).toEqual([japanese, notoSans, sans, simplifiedChinese]);
     expect(reportFaces("zh", "中文").body).toEqual([simplifiedChinese, notoSans, sans]);
@@ -115,5 +122,51 @@ describe("glyph placement (lib/report/reportGlyphs.ts)", () => {
     bakeGlyphOffsets(run);
     expect(drawnAt(run)).toEqual([0, 0, 250]);
     expect(width(run)).toBe(500);
+  });
+});
+
+describe("right to left (lib/report/reportLayout.ts)", () => {
+  it("sets a Hebrew report right to left: aligned right, the fates, numbers and labels on the right, the page numbers on the left", () => {
+    expect(reportLayout("he", "")).toMatchObject({
+      direction: "rtl", textAlign: "right", markerSide: "right", pageNumberSide: "left", trackedCapitals: false
+    });
+  });
+
+  it("keeps every left-to-right report as it was: aligned left, markers on the left, page numbers on the right", () => {
+    for (const { code } of LOCALES.filter(({ code }) => code !== "ar" && code !== "he")) {
+      expect(reportLayout(code, ""), code).toMatchObject({ direction: "ltr", textAlign: "left", markerSide: "left", pageNumberSide: "right" });
+    }
+  });
+
+  it("letter-spaces the small capitals only where the script has capitals", () => {
+    const tracked = LOCALES.map(({ code }) => code).filter((code) => code !== "ar" && reportLayout(code, "").trackedCapitals);
+    expect(tracked.sort()).toEqual([...LATIN, "bg", "el", "ru", "uk"].sort());
+  });
+});
+
+describe("glyph placement in a right-to-left run (lib/report/reportGlyphs.ts)", () => {
+  // fontkit's right-to-left run, left to right: a mark (placed 52 into its letter), the letter, a dot (placed
+  // 140 into the next letter), that letter.
+  const run = (): ReportGlyphPosition[] => [
+    { xAdvance: 0, xOffset: 52 }, { xAdvance: 269, xOffset: 0 }, { xAdvance: 0, xOffset: 140 }, { xAdvance: 477, xOffset: 0 }
+  ];
+  const drawnAt = (list: readonly ReportGlyphPosition[]): number[] => {
+    let pen = 0;
+    return list.map((position) => { const spot = pen + position.xOffset; pen += position.xAdvance; return spot; });
+  };
+
+  it("draws each letter before its marks", () => {
+    expect(basesBeforeTheirMarks(run())).toEqual([1, 0, 3, 2]);
+    expect(basesBeforeTheirMarks([{ xAdvance: 300, xOffset: 0 }, { xAdvance: 0, xOffset: 0 }])).toEqual([0, 1]);
+  });
+
+  it("draws every glyph where fontkit placed it, with no offset, and keeps the run's width", () => {
+    const positions = run();
+    const glyphs = ["mark", "letter", "dot", "next letter"];
+    placeGlyphs(glyphs, positions, basesBeforeTheirMarks(positions));
+    expect(glyphs).toEqual(["letter", "mark", "next letter", "dot"]);
+    expect(drawnAt(positions)).toEqual([0, 52, 269, 409]);
+    expect(positions.every(({ xOffset }) => xOffset === 0)).toBe(true);
+    expect(positions.reduce((sum, { xAdvance }) => sum + xAdvance, 0)).toBe(746);
   });
 });
