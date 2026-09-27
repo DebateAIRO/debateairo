@@ -17,10 +17,12 @@ import {
   storyFixtureNode
 } from "../../apps/ui/lib/v3/storyFixture.js";
 import {
+  STORY_SCRIPT_SAMPLE_LOCALES,
   storyScriptSample,
   storyScriptSampleText,
   type StoryScriptSampleLocale
 } from "../../apps/ui/lib/v3/storyScriptSamples.js";
+import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 
 function answerWithPoints(roots: number, childrenPerRoot: number): Answer {
   const nodes: Answer["nodes"] = [];
@@ -41,6 +43,13 @@ function answerWithPoints(roots: number, childrenPerRoot: number): Answer {
     }
   }
   return { ...STORY_FIXTURE_ANSWER, nodes, edges };
+}
+
+/** answerWithPoints, its points in the sample language's own words (the sample's five claims, in turn). */
+function answerWithPointsIn(locale: StoryScriptSampleLocale, roots: number, childrenPerRoot: number): Answer {
+  const claims = storyScriptSample(locale).answer.nodes.map((node) => node.claim);
+  const base = answerWithPoints(roots, childrenPerRoot);
+  return { ...base, nodes: base.nodes.map((node, index) => ({ ...node, claim: `${claims[index % claims.length]!} (${index + 1})` })) };
 }
 
 /** The decompressed text of each content stream, lower-cased. */
@@ -344,6 +353,10 @@ describe("the report in the question's own script (R-fonts)", () => {
     const printed = (words: string) => [...words].reverse().join("");
     // The headline, as printed on the page, from its first words at the right edge.
     expect(pages[0]!.some((line) => line.endsWith(printed("התשובה שלנו:")))).toBe(true);
+    // Every Hebrew word of the sample is drawn whole, its letters from the right.
+    const words = [...new Set(storyScriptSampleText("he").split(/[\s.,:;()]+/u).filter((word) => /^\p{Script=Hebrew}+$/u.test(word)))];
+    expect(words.length).toBeGreaterThan(200);
+    expect(words.filter((word) => !all.includes(printed(word)))).toEqual([]);
     // A Latin word, a number and a citation keep their own left-to-right order inside the Hebrew lines.
     expect(all).toContain("Zoom");
     expect(all).not.toContain("mooZ");
@@ -396,6 +409,44 @@ describe("the report in the question's own script (R-fonts)", () => {
   }, 120_000);
 });
 
+describe("every interface language (R-fonts)", () => {
+  it("renders the report in each of the 35 locales but Arabic, with no empty box and no standard font, and refuses Arabic", async () => {
+    const printed: string[] = [];
+    for (const { code } of LOCALES) {
+      const sample = (STORY_SCRIPT_SAMPLE_LOCALES as readonly string[]).includes(code)
+        ? storyScriptSample(code as StoryScriptSampleLocale)
+        : { answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY_WITH_RESERVATION") };
+      if (code === "ar") {
+        await expect(renderReportPdf({ ...sample, generatedAt: new Date("2026-09-26T12:00:00.000Z"), catalogs: { ...ENGLISH, locale: "ar" } }))
+          .rejects.toThrow("REPORT_LOCALE_UNSUPPORTED");
+        continue;
+      }
+      const catalogs = await loadReportCatalogs({ questionTag: code, interfaceLocale: "en", load: loadNamespace });
+      const pdf = await renderReportPdf({ ...sample, generatedAt: new Date("2026-09-26T12:00:00.000Z"), catalogs });
+      const raw = pdf.toString("latin1");
+      expect(raw, code).toContain(`/Lang (${code})`);
+      expect(embeddedFonts(raw).filter((name) => /Helvetica|Times|Courier/u.test(name)), code).toEqual([]);
+      expect(drawnGlyphs(pdf).filter((glyph) => glyph === "0000"), code).toEqual([]);
+      printed.push(code);
+    }
+    expect(printed).toHaveLength(34);
+  }, 300_000);
+
+  it.each(["ja", "he"] as const)("renders a 150-point appendix across many pages in %s", async (locale) => {
+    const { story } = storyScriptSample(locale);
+    const pdf = await renderReportPdf({
+      answer: answerWithPointsIn(locale, 10, 14),
+      story: { ...story, point_numbers: null },
+      generatedAt: new Date("2026-09-26T12:00:00.000Z"),
+      catalogs: await loadReportCatalogs({ questionTag: locale, interfaceLocale: "en", load: loadNamespace })
+    });
+    const raw = pdf.toString("latin1");
+    expect(raw.match(/\/Type \/Page\b/g)?.length ?? 0).toBeGreaterThan(20);
+    expect(new Set(raw.match(/\(point-P[0-9]+\)/g)).size).toBe(150);
+    expect(drawnGlyphs(pdf).filter((glyph) => glyph === "0000")).toEqual([]);
+  }, 180_000);
+});
+
 describe("the owner's sample report script (look first, then wire)", () => {
   const run = (args: string[]) => spawnSync(process.execPath, ["--import", "tsx", "scripts/story-sample-pdf.ts", ...args], {
     cwd: resolve(process.cwd(), "apps/ui"),
@@ -414,6 +465,22 @@ describe("the owner's sample report script (look first, then wire)", () => {
     // The appendix points are link targets, and the sample is the Romanian question's report.
     expect(pdf.toString("latin1")).toContain("(point-P5)");
     expect(pdf.toString("latin1")).toContain("/Lang (ro)");
+  }, 125_000);
+
+  it("writes a script sample's report when given its language, and refuses Arabic", () => {
+    const directory = mkdtempSync(join(tmpdir(), "story-sample-pdf-"));
+    const output = join(directory, "story-report-ja.pdf");
+    const result = run([output, "ja"]);
+    expect({ status: result.status, stderr: result.stderr }).toMatchObject({ status: 0 });
+    const pdf = readFileSync(output);
+    expect(result.stdout.trim()).toBe(`STORY_SAMPLE_PDF_WRITTEN=${output} bytes=${pdf.length}`);
+    expect(pdf.toString("latin1")).toContain("/Lang (ja)");
+    const arabic = run([join(directory, "story-report-ar.pdf"), "ar"]);
+    expect(arabic.status).not.toBe(0);
+    expect(arabic.stderr).toContain("REPORT_LOCALE_UNSUPPORTED: ar");
+    const unknown = run([join(directory, "story-report-xx.pdf"), "xx"]);
+    expect(unknown.status).toBe(2);
+    expect(unknown.stderr).toContain("Usage:");
   }, 125_000);
 
   it("fails loudly without an output path", () => {
