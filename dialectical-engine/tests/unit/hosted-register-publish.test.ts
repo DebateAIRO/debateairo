@@ -898,3 +898,18 @@ describe("A19 fix round 1 · a FIFO in place of an operator file", () => {
       .toBe("HOSTED_REGISTER_FILE_CUSTODY_INVALID");
   });
 });
+
+describe("A19 fix round 2 · the refusal line admits `*` only as the unknown-field marker", () => {
+  it("prints both marker forms as codes and keeps any other `*` on the generic line", () => {
+    expect(hostedRegisterRefusalCode(new Error("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*")))
+      .toBe("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*");
+    expect(hostedRegisterRefusalCode(new Error("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:*")))
+      .toBe("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:*");
+    expect(hostedRegisterRefusalCode(new Error("PROVIDER_TARGET_PRICE_ZERO:vendor:beta")))
+      .toBe("PROVIDER_TARGET_PRICE_ZERO:vendor:beta");
+    expect(hostedRegisterRefusalCode(new Error("PROVIDER_TARGET_PRICE_ZERO:vendor:a*b")))
+      .toBe("HOSTED_REGISTER_PUBLISH_FAILED");
+    expect(hostedRegisterRefusalCode(new Error("PROVIDER_TARGET_PRICE_ZERO:vendor:*b")))
+      .toBe("HOSTED_REGISTER_PUBLISH_FAILED");
+  });
+});

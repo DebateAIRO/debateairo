@@ -190,9 +190,12 @@ function refuse(code: string): never {
 
 // At least one separator: a SQLSTATE (`P0001`) or an errno name (`ENOENT`) is
 // not a refusal code, and must fall through to the message it came with.
-// `*` is admitted after the colon for one fixed marker only: the unknown-field
-// refusal's "a key here" (`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*`).
-const TYPED_CODE = /^[A-Z][A-Z0-9]*(?:[_-][A-Z0-9]+)+(?::[A-Za-z0-9_.:*-]+)?$/u;
+// `*` is admitted after the colon for one fixed marker only, and only in its two
+// forms: the unknown-field refusal's "a key here" as a trailing `.*`
+// (`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*`) or a bare `*`. Any
+// other `*` (an operator's `providerRef`, say) still falls through to the
+// generic line, as it did before the marker existed.
+const TYPED_CODE = /^[A-Z][A-Z0-9]*(?:[_-][A-Z0-9]+)+(?::(?:[A-Za-z0-9_.:-]+(?:\.\*)?|\*))?$/u;
 const TYPED_CODE_PREFIX = /^([A-Z][A-Z0-9_]*):\s/u;
 
 /**
