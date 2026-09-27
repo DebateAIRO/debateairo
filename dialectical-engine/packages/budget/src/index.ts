@@ -97,11 +97,20 @@ const costEnvelopeBasisSchema = z.object({
   max_model_attempts: z.number().int().positive(),
   panel_size: z.number().int().positive(),
   depth: ExpansionDepthSchema,
+  /**
+   * Read WITH `formula_version`: `organ` is the per-round serve limit on a
+   * DR-184-v4 receipt and the serve site's total, backup included, on a
+   * DR-184-v5 one. A14 fix round 1 — `cross_exchange_site` is OPTIONAL: a v5
+   * receipt carries it (the cross-exchange author sites, which have no backup),
+   * and a v4 receipt, including every one already stored, never does. Still
+   * strict: any OTHER key is refused, and the new one must be a positive integer.
+   */
   per_site_attempts: z.object({
     judge: z.number().int().positive(),
     organ: z.number().int().positive(),
     panel_member: z.number().int().positive(),
-    cooldown_site: z.number().int().positive()
+    cooldown_site: z.number().int().positive(),
+    cross_exchange_site: z.number().int().positive().optional()
   }).strict(),
   call_sites: z.object({
     author: z.number().int().positive(),
