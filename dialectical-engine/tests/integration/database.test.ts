@@ -13,7 +13,7 @@ import {
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
 import { BudgetRepository } from "@debateai/budget";
-import { ProviderProbeRepository, RunRepository, migrate } from "@debateai/db";
+import { ProviderProbeRepository, RunRepository, migrate, readCallPrompt } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
 import { EVALUATOR_INSTRUCTIONS, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
@@ -58,7 +58,10 @@ import {
 } from "@debateai/serve";
 import { AnswerSchema } from "@debateai/contract";
 import { DEBATE_ROLES, debateRoleFromCallSiteKey, type DebateRole, type ServedRootRuleHistory } from "@debateai/kernel";
-import { selectSeatCandidate, type RoleSeat } from "@debateai/scorecard";
+import { canonicalPromptFingerprint, selectSeatCandidate, type RoleSeat } from "@debateai/scorecard";
+import { createPostgresMomentSource, exportRunMoments } from "../../acceptance/export-moment.js";
+import { captureMomentPacket, parseMomentBuilder } from "../../acceptance/moment-tools.js";
+import { replayMoment } from "../../acceptance/replay-moment.js";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -8892,5 +8895,91 @@ describe("A16c · carry 14c — a site no slot can answer fails terminally citin
       [scenario.workItemId]
     );
     expect(work.rows).toEqual([{ settled_attempt_id: failure!.attemptId, settled_artifact_ref: failure!.artifactRef }]);
+  });
+});
+
+describe("A18 · every recorded call of a run is a moment, and replays as the same prompt", () => {
+  it("exports all seven roles of a real run and sends each one's recorded prompt again", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a18-moments",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A18 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A18 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A18 position ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A18 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A18 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+
+    const exported = await exportRunMoments(createPostgresMomentSource(database.pool), {
+      runId: scenario.runId, exportedAt: new Date().toISOString(), engineCommit: null
+    });
+    // Every model call of this run is a debate role's call with a prompt record.
+    expect(exported.skipped).toEqual([]);
+    expect(new Set(exported.moments.map((moment) => moment.role))).toEqual(new Set(DEBATE_ROLES));
+
+    // (1) Each moment carries the fingerprint the GATEWAY recorded for its call's first attempt.
+    const firstAttempts = await database.pool.query<{ call_site_key: string; attempt_id: string }>(
+      `SELECT DISTINCT ON (entry.call_site_key) entry.call_site_key, entry.attempt_id::text AS attempt_id
+         FROM ledger.ledger_entry AS entry
+        WHERE entry.run_id=$1 AND entry.action_kind='MODEL_CALL'
+          AND EXISTS (SELECT 1 FROM ledger.call_prompt AS prompt WHERE prompt.attempt_id = entry.attempt_id)
+        ORDER BY entry.call_site_key, entry.sequence`,
+      [scenario.runId]
+    );
+    const gatewayRecorded: Record<string, string | undefined> = {};
+    for (const row of firstAttempts.rows) {
+      gatewayRecorded[row.call_site_key] = (await readCallPrompt(database.pool, row.attempt_id))?.promptFingerprint;
+    }
+    expect(Object.fromEntries(exported.moments.map((moment) => [moment.source.callSiteKey, moment.recorded?.promptFingerprint])))
+      .toEqual(gatewayRecorded);
+
+    // (2) Replay sends that same prompt, for every role. The relay refuses every
+    //     call, so no model answers: what is compared is the prompt alone.
+    const refusing = (async () => new Response(JSON.stringify({ error: "CLI_RELAY_FAILED" }), { status: 502 })) as typeof fetch;
+    for (const moment of exported.moments) {
+      const offline = await captureMomentPacket(parseMomentBuilder(moment.builder, moment.role));
+      const replayed = await replayMoment({
+        moment,
+        thinkingLevel: "DEFAULT_ONLY",
+        bound: { maxAttempts: 1, tokenCeiling: 512, deadlineMs: 5_000 },
+        endpoint: {
+          providerRef: "replay:refusing", maker: "Refusing relay", tool: "claude", modelId: "refusing-model",
+          baseUrl: "http://127.0.0.1:9/v1", bearerToken: "r".repeat(43), thinkingLevels: [], contextWindowTokens: null
+        },
+        fetchImplementation: refusing,
+        sleepImplementation: async () => undefined
+      });
+      expect({
+        key: moment.source.callSiteKey,
+        offline: canonicalPromptFingerprint(offline.messages),
+        sent: replayed.promptFingerprint,
+        same: replayed.fingerprintMatchesRecorded,
+        outcome: replayed.outcome
+      }).toEqual({
+        key: moment.source.callSiteKey,
+        offline: moment.recorded?.promptFingerprint,
+        sent: moment.recorded?.promptFingerprint,
+        same: true,
+        outcome: "FAILED"
+      });
+    }
   });
 });
