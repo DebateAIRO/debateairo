@@ -5289,6 +5289,10 @@ describe("Engine money rule M2 — a stop while arguing never skips the answer (
     expect(scenario.error).toBeInstanceOf(TypedDomainError);
     expect((scenario.error as TypedDomainError).code).toBe("RUN_CEILING_BELOW_FIRST_CALL");
     expect(runnerTerminalFailureReason(scenario.error)).toBe("RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL");
+    // M2 review polish: the refusal's own evidence survives the runner, verbatim
+    // and as the cause, so a ceiling set too low can be told from a re-claim.
+    expect((scenario.error as Error).message).toContain("test-layer: the run's ceiling for arguing is reached");
+    expect((scenario.error as Error).cause).toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
     expect(scenario.primaryCalls).toBe(0);
     expect(scenario.secondaryCalls).toBe(0);
     expect(scenario.snapshot.nodes).toHaveLength(0);

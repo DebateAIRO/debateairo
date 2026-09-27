@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
+import {
+  CostEnvelopeGuard,
+  costEnvelopeDay,
+  type ModelSpendEntry,
+  type ModelSpendStore
+} from "@debateai/budget";
+import { Judge, runJudgePanel } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
+import type { ProviderGateway } from "@debateai/providers";
 import type { EvaluationSnapshot } from "@debateai/propagation";
+import { costEnvelopePolicyFromValue, COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW } from "@debateai/register";
 import {
   assertRequiredConditionMarkRecords,
   buildFactBundle,
@@ -39,6 +48,18 @@ import { serveCutShortRun } from "../support/servedChainDouble.js";
 const STOP_CODES = Object.freeze(Object.keys(ENVELOPE_STOP_CODES)) as readonly (keyof typeof ENVELOPE_STOP_CODES)[];
 /** The two terminals that carry a label and the answer-writer's prose. */
 const SERVED_TERMINALS: readonly string[] = Object.freeze(["SERVED", "DOWNGRADED"]);
+/** One panel member's call, as `runNodePanel` makes it (see tests/unit/t03-judge-panel.test.ts). */
+const PANEL_CALL = Object.freeze({
+  runId: "run:panel",
+  subjectItemId: "work:panel",
+  callSiteKey: "PANEL:root:provider:b",
+  questionLine: "Should the proposal stand?",
+  statement: "The proposal should stand.",
+  authorMaker: "house-a",
+  providerRef: "provider:b",
+  contractHash: "b".repeat(64),
+  bound: Object.freeze({ maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 })
+});
 
 /*
  * The phase half — every stop kind, the attempt ceiling included, stops the
@@ -46,10 +67,49 @@ const SERVED_TERMINALS: readonly string[] = Object.freeze(["SERVED", "DOWNGRADED
  * in `tests/unit/v28-run-body-budget-stop.test.ts`.
  */
 describe("M2 — the first root's panel falls back to its author's own judgement", () => {
-  it("hands every stop kind back on the first root's panel", () => {
+  /**
+   * THE REAL PATH, not a hand-made error (M2 review polish). A panel member's
+   * call goes through `Judge.assess`, which rewrites every error it does not
+   * know into a `PanelMemberFailure`, and `runJudgePanel`, which notes a member
+   * failure and asks the next member. Only what leaves BOTH reaches the runner's
+   * catch. Before the kernel's `RUN_LEVEL_SPEND_STOP_CODES` listed the attempt
+   * ceiling, an attempt refusal never left them: it became a PROVIDER_ERROR
+   * note, so this row's first version asserted ATTEMPTS through a path the
+   * runtime could not take. It now drives the member call itself.
+   */
+  it("hands every stop kind back on the first root's panel, through the real member call", async () => {
     for (const code of STOP_CODES) {
-      expect(panelSpendStop(new TypedDomainError(code, "x"), "AUTHOR_ONLY"), code)
-        .toBe(ENVELOPE_STOP_CODES[code]);
+      const reached: string[] = [];
+      const refusing: ProviderGateway = {
+        call: async () => {
+          reached.push("refused member");
+          throw new TypedDomainError(code, "test-layer: refused before sending");
+        }
+      };
+      const escaped = await runJudgePanel({
+        artifactProducerRef: "actor:author",
+        primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
+        members: [
+          {
+            memberRole: "member-1", actorRef: "actor:one", contractHash: "c1",
+            judge: async () => {
+              const assessed = await new Judge(refusing).assess(PANEL_CALL);
+              return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
+            }
+          },
+          {
+            memberRole: "member-2", actorRef: "actor:two", contractHash: "c2",
+            judge: async () => { reached.push("next member"); return { judgementRef: "j2", assessment: {} as never }; }
+          }
+        ]
+      }).then(() => null, (error: unknown) => error);
+
+      // It left the panel as itself — not a PROVIDER_ERROR note — and the panel
+      // asked nobody after it.
+      expect(escaped, code).toBeInstanceOf(TypedDomainError);
+      expect((escaped as TypedDomainError).code, code).toBe(code);
+      expect(reached, code).toEqual(["refused member"]);
+      expect(panelSpendStop(escaped, "AUTHOR_ONLY"), code).toBe(ENVELOPE_STOP_CODES[code]);
     }
   });
 
@@ -68,6 +128,66 @@ describe("M2 — the first root's panel falls back to its author's own judgement
 });
 
 describe("M2 — a ceiling below the first call is the one typed configuration failure", () => {
+  /**
+   * M2 review polish — A RE-CLAIM CARRIES THE EARLIER CLAIM'S SPEND OVER.
+   *
+   * After a crash, a re-claim of the same run starts with the spend (and the
+   * attempts) the earlier claim already used. A ceiling that fits one call can
+   * therefore refuse the re-claim's FIRST call. The code stays
+   * `RUN_CEILING_BELOW_FIRST_CALL`, but the message must not assert that
+   * reading as fact: it names both, and carries the seam's own numbers, which
+   * are what tell a crash-and-re-claim from a ceiling set too low.
+   */
+  it("keeps the refusal's own numbers when a re-claim starts with the earlier claim's spend", async () => {
+    const runId = "run:re-claimed";
+    const policy = costEnvelopePolicyFromValue(
+      COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.value,
+      COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+    );
+    const carriedOver: ModelSpendEntry = Object.freeze({
+      spendId: "spend:earlier-claim",
+      spendSource: "RUN",
+      runId,
+      providerRef: "provider:test-layer",
+      chargedOn: costEnvelopeDay(new Date("2026-09-27T11:00:00.000Z")),
+      chargeMicros: 174_900,
+      inputTokens: 1,
+      outputTokens: 1,
+      spendPhase: "BODY"
+    });
+    const store: ModelSpendStore = {
+      recordSpend: async () => undefined,
+      readRunSpentMicros: async (candidate) => candidate === runId ? carriedOver.chargeMicros : 0,
+      readRunStorySpentMicros: async () => 0,
+      readDaySpentMicros: async () => carriedOver.chargeMicros,
+      admitNewRun: async () => ({ admitted: true, committedMicros: 0 })
+    };
+    const seam = new CostEnvelopeGuard({ store, policy, clock: () => new Date("2026-09-27T11:00:00.000Z") })
+      .providerSeam({
+        runId,
+        price: { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 },
+        requireReportedUsage: true,
+        phase: "BODY"
+      });
+
+    // The re-claim's first call: the real seam refuses it on the spend carried over.
+    const refusal = await Promise.resolve(seam.assertCallAllowed({ requestBytes: 800, completionTokenCeiling: 64 }))
+      .then(() => null, (error: unknown) => error);
+    expect(refusal).toBeInstanceOf(TypedDomainError);
+    expect((refusal as TypedDomainError).code).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+
+    const failure = firstCallCeilingFailure(refusal);
+    expect(failure?.code).toBe("RUN_CEILING_BELOW_FIRST_CALL");
+    // The seam's evidence, verbatim: spent, ceiling and the next call's cost.
+    expect(failure?.message).toContain((refusal as Error).message);
+    expect(failure?.message).toContain("spent 174900 of 175000");
+    expect(failure?.message).toMatch(/the next call could cost \d+ more/u);
+    // Both readings are named; neither is asserted as the cause.
+    expect(failure?.message).toContain("below one call");
+    expect(failure?.message).toContain("re-claim");
+    expect(failure?.cause).toBe(refusal);
+  });
+
   it("turns a money or attempt refusal of the author's first call into RUN_CEILING_BELOW_FIRST_CALL", () => {
     for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED"] as const) {
       const failure = firstCallCeilingFailure(new TypedDomainError(code, "x"));

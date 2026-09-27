@@ -251,12 +251,13 @@ export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
 /**
  * C1 (review round 2) — WHAT A RUN-BODY PHASE DOES WITH AN ENVELOPE REFUSAL.
  *
- * The envelope terminal cannot be built during authoring, expansion or review:
- * it needs the propagation, the served root and the fact bundle, and none of
- * them exists yet. So a spend refusal raised there cannot become a terminal on
- * the spot — it must STOP THE PHASE and let the run reach the envelope
- * evaluation that already stands in front of the serve chain, where the terminal
- * IS buildable and the components produced so far are what it serves.
+ * A spend refusal raised during authoring, expansion or review must STOP THE
+ * PHASE, never travel: travelling discards what the run already paid for. C1
+ * then carried the stop to the envelope evaluation in front of the serve chain,
+ * which turned it into the components-only terminal. Since Task M2 (spec
+ * §14.4.1) that evaluation no longer reads it: the run goes on to write its
+ * answer with what it has, and the stop rides the answer as its envelope
+ * record (`runBodyStopDisclosure`).
  *
  * `null` means "this is not a phase stop, let it travel".
  *
@@ -358,9 +359,17 @@ export function panelSpendStop(error: unknown, rule: PanelSpendStopRule): Envelo
  *
  * If the author's own FIRST call — the first root's judgement — is refused by a
  * ceiling, nothing exists to answer from: no node, no label, nothing a floor
- * could print. That is not money deciding the outcome; it is a configuration
- * fault, a ceiling below one call, which the owner's rule counts as technical.
- * It fails TYPED, under its own code, so the operator is told what to lift.
+ * could print. That is not money deciding the outcome; the owner's rule counts
+ * it as technical. It fails TYPED, under its own code, so the operator is told
+ * which kind of limit to look at.
+ *
+ * The code names the usual cause, a ceiling below one call. The MESSAGE does
+ * not assume it (M2 review polish): a crash followed by a re-claim carries the
+ * earlier claim's attempts and spend over, so a ceiling that fits one call can
+ * still refuse the first call of the re-claim. So the message states both
+ * readings and keeps the refusal's own evidence verbatim — for money, "spent X
+ * of Y … the next call could cost Z" — which is what tells them apart. The
+ * refusal is also kept as the `cause`.
  *
  * Only the two CEILINGS map here. A vendor that reports no usage and a spent day
  * are not a ceiling below one call: each already fails typed under its own code,
@@ -372,10 +381,15 @@ const FIRST_CALL_CEILING_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["AT
 export function firstCallCeilingFailure(error: unknown): TypedDomainError | null {
   const stop = envelopeStopKind(error);
   if (stop === null || !FIRST_CALL_CEILING_KINDS.includes(stop)) return null;
-  return new TypedDomainError(
+  const evidence = error instanceof Error ? error.message : String(error);
+  const failure = new TypedDomainError(
     "RUN_CEILING_BELOW_FIRST_CALL",
-    `${ENVELOPE_STOP_REASONS[stop]} refused the first position's own call: nothing exists to answer from, so the run's ceiling for arguing is below one call`
+    `${ENVELOPE_STOP_REASONS[stop]} refused the first position's own call, so nothing exists to answer from.`
+      + " Either the run's ceiling for arguing is below one call, or an earlier claim of this run"
+      + ` spent it before a re-claim. The refusal said: ${evidence}`
   );
+  failure.cause = error;
+  return failure;
 }
 
 /**
@@ -2108,7 +2122,8 @@ export interface MakerPositionDisclosureRoot {
  *    vocabulary and the record's REASON is a free string, so the mark carries
  *    the truth and the reason names what actually happened: the run-level
  *    spend-stop code (`RUN_COST_ENVELOPE_MONEY_REACHED`,
- *    `PROVIDER_USAGE_UNREPORTED`, `DAILY_COST_ENVELOPE_REACHED`) — never
+ *    `RUN_COST_ENVELOPE_EXHAUSTED` since Task M2, `PROVIDER_USAGE_UNREPORTED`,
+ *    `DAILY_COST_ENVELOPE_REACHED`) — never
  *    `MONO_MAKER_RUN`, which means one maker was CONFIGURED, a different fact
  *    with a different lift. The only way the run body reaches one authored root
  *    at M > 1 is a spend stop (a halted root 1 throws `MAKER_POSITION_UNAVAILABLE`
@@ -4124,9 +4139,8 @@ export class WalkingSkeletonRunner {
     let stoppedByAdaptiveRule = false;
     for (const [legIndex, leg] of expansionPlan.entries()) {
       // C1: an earlier leg, or a review between rounds, reached a spend bound.
-      // Expansion stops here and the run carries what it has to the envelope
-      // evaluation in front of the serve chain, which turns it into the ruled
-      // components-only terminal.
+      // Expansion stops here and, since Task M2, the run carries what it has
+      // on to its answer; the stop rides that answer as its envelope record.
       if (runBodyBudgetStop !== null) break;
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();

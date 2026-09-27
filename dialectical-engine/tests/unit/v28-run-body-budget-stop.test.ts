@@ -149,19 +149,22 @@ describe("R2 — an unbillable vendor ends the run cleanly, under its own name",
  * travel untouched through both.
  */
 describe("C2(b) — a run-level spend stop is never a panel member failure", () => {
-  it("names the three run-level stops, and nothing else", () => {
+  it("names the four run-level stops, the attempt ceiling included (Task M2), and nothing else", () => {
     expect([...RUN_LEVEL_SPEND_STOP_CODES].sort()).toEqual([
       "DAILY_COST_ENVELOPE_REACHED",
       "PROVIDER_USAGE_UNREPORTED",
+      "RUN_COST_ENVELOPE_EXHAUSTED",
       "RUN_COST_ENVELOPE_MONEY_REACHED"
     ]);
     for (const code of RUN_LEVEL_SPEND_STOP_CODES) {
       expect(isRunLevelSpendStop(new TypedDomainError(code, "x"))).toBe(true);
     }
-    // The ATTEMPT ceiling is a run-level bound too, but it is NOT in this set:
-    // it has always been a panel member failure and this package does not
-    // change what it does.
-    expect(isRunLevelSpendStop(new TypedDomainError("RUN_COST_ENVELOPE_EXHAUSTED", "x"))).toBe(false);
+    // Before Task M2 the ATTEMPT ceiling was deliberately NOT in this set: a
+    // panel member refused by it was noted as a PROVIDER_ERROR member failure.
+    // M2 made it a run-body stop like money, so the panel lets it travel like
+    // money — the four codes are exactly the four kinds the runner stops the
+    // arguing on (`ENVELOPE_STOP_CODES`).
+    expect([...RUN_LEVEL_SPEND_STOP_CODES].sort()).toEqual(Object.keys(ENVELOPE_STOP_CODES).sort());
     expect(isRunLevelSpendStop(new TypedDomainError("PROVIDER_CALL_FAILED", "x"))).toBe(false);
     expect(isRunLevelSpendStop(new TypeError("boom"))).toBe(false);
   });

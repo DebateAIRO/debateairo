@@ -130,6 +130,9 @@ describe("V-28 round 4 — the post-authoring serve decision is one function, ca
  *  · the serve gate NEVER forces a hard stop from it — the envelope question is
  *    asked on the attempt count alone, and the only terminal taken there is the
  *    attempt-overspend one;
+ *  · nothing after the gate reads it either — not the serve chain, not the
+ *    persist — except the one call that puts it on the answer, so no later
+ *    statement can fail the run on it (M2 review polish);
  *  · it rides the answer as the envelope record that names it
  *    (`runBodyStopDisclosure`), so the honesty drawer still says the debate was
  *    cut short;
@@ -418,6 +421,19 @@ function assertRunBodyStopWiring(source: string): void {
   expect(disclosedAt, "before the label is decided").toBeLessThan(source.indexOf(LABEL_DECISION));
   expect(source.indexOf(DISCLOSURE_APPEND), "appended where it is minted")
     .toBeGreaterThan(disclosedAt);
+
+  // 7. M2 review polish — NOTHING AFTER THE GATE READS THE STOP BUT THE
+  //    DISCLOSURE. Pin 5 keeps the gate from forcing a hard stop; this keeps any
+  //    later statement from doing the same thing by other means — a
+  //    `if (runBodyBudgetStop !== null) throw …` in the serve chain, around the
+  //    persist or before the settle would end the run without its answer again,
+  //    and only the integration suites (not in this gate) would see it. From the
+  //    gate's end to the disclosure the stop is not mentioned; after the
+  //    disclosure's own argument list it is never mentioned again in the file.
+  const afterGate = source.slice(source.indexOf(GATE_END), disclosedAt);
+  expect(afterGate, "the serve chain reads no stop while arguing").not.toContain("runBodyBudgetStop");
+  const afterDisclosure = source.slice(disclosedAt + disclosureArgs.length);
+  expect(afterDisclosure, "nothing after the disclosure reads the stop").not.toContain("runBodyBudgetStop");
 }
 
 describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at six catches, and the serve gate never forces a hard stop from it", () => {
@@ -470,10 +486,17 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at six catc
     // A ceiling below the first call is an untyped failure again.
     ["the first-call failure is no longer typed", FIRST_CALL_FAILURE, "throw error;"],
     // The answer stops saying the debate was cut short.
-    ["the stop no longer rides the answer", DISCLOSURE_APPEND, ""]
+    ["the stop no longer rides the answer", DISCLOSURE_APPEND, ""],
+    // M2 review polish: the run fails on the stop AFTER the gate — inside the
+    // serve leg, before the stop is disclosed...
+    ["the run fails on the stop after the gate", DISCLOSURE_CALL,
+      `if (runBodyBudgetStop !== null) throw new TypedDomainError("RUN_BODY_STOPPED", "stopped");\n    ${DISCLOSURE_CALL}`],
+    // ...or after it is disclosed, before the answer is persisted.
+    ["the run fails on the stop after the disclosure", LABEL_DECISION,
+      `if (runBodyBudgetStop !== null) throw new TypedDomainError("RUN_BODY_STOPPED", "stopped");\n    ${LABEL_DECISION}`]
   ]);
 
-  it("fails when any one of fourteen mutations is applied to that same source", async () => {
+  it("fails when any one of sixteen mutations is applied to that same source", async () => {
     const source = await readFile(RUNNER, "utf8");
 
     for (const [name, from, to] of MUTATIONS) {
