@@ -2,7 +2,7 @@ import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -530,6 +530,76 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
     await refused(join(flippedOuter, "Tree", "engine", "endpoints.json"));
     await refused(join(outer, "tREE", "engine", "endpoints.json"));
     await refused(join(outer, "Tree", "ENGINE", "endpoints.json"));
+  });
+
+  /**
+   * A18a fix round 1: the endpoints path is judged where the KERNEL puts it.
+   * `unresolved` joins as a string, so `..` stays for the kernel to read after a
+   * link; `join` would fold it away first.
+   */
+  const unresolved = (...segments: string[]): string => segments.join(sep);
+  const expectEndpointsRefused = async (endpointsPath: string, engine: string, candidatesPath: string): Promise<void> => {
+    await expect(serveRelayHost({
+      candidatesPath,
+      endpointsPath,
+      environment: LOCAL,
+      seams: { ...SEAMS, repositoryRoot: engine },
+      emit: () => undefined
+    }), endpointsPath).rejects.toThrow("RELAY_HOST_ENDPOINTS_PATH_REFUSED");
+  };
+  /** Admitted: the refusal it meets is the absent candidates file, one step later. */
+  const expectEndpointsAdmitted = async (endpointsPath: string, engine: string, candidatesPath: string): Promise<void> => {
+    await expect(serveRelayHost({
+      candidatesPath,
+      endpointsPath,
+      environment: LOCAL,
+      seams: { ...SEAMS, repositoryRoot: engine },
+      emit: () => undefined
+    }), endpointsPath).rejects.toThrow("RELAY_HOST_CANDIDATES_UNREADABLE");
+  };
+
+  it("reads `..` in an endpoints path the way the kernel does, after a link is followed", async () => {
+    const { tree, engine } = await workTree();
+    const absentCandidates = join(tree, "absent-candidates.json");
+    const engineLink = join(await workspace(), "engine-link");
+    await symlink(engine, engineLink);
+    // engine-link/.. is the TREE, not the folder the link sits in.
+    await expectEndpointsRefused(unresolved(engineLink, "..", "endpoints.json"), engine, absentCandidates);
+    // `.local/..` leaves the ignored folder.
+    await expectEndpointsRefused(unresolved(engine, ".local", "..", "endpoints.json"), engine, absentCandidates);
+    await expectEndpointsAdmitted(unresolved(engineLink, ".local", "endpoints.json"), engine, absentCandidates);
+  });
+
+  it("refuses an endpoints path whose last segment is a link, and any dangling link on the way", async () => {
+    const { tree, engine } = await workTree();
+    const absentCandidates = join(tree, "absent-candidates.json");
+    const outside = await workspace();
+    await mkdir(join(engine, ".local"));
+    const privateFile = join(outside, "endpoints.json");
+    await writeFile(privateFile, "{}\n");
+    // The atomic rename would replace the LINK with a file of bearers, inside the tree.
+    await symlink(privateFile, join(engine, "endpoints.json"));
+    await expectEndpointsRefused(join(engine, "endpoints.json"), engine, absentCandidates);
+    // A dangling link under .local/ leads into the tree.
+    await symlink(join(tree, "endpoints.json"), join(engine, ".local", "endpoints.json"));
+    await expectEndpointsRefused(join(engine, ".local", "endpoints.json"), engine, absentCandidates);
+    await symlink(join(tree, "absent-folder"), join(engine, ".local", "gone"));
+    await expectEndpointsRefused(join(engine, ".local", "gone", "endpoints.json"), engine, absentCandidates);
+  });
+
+  it("refuses an endpoints path inside ANY enclosing checkout, not only the nearest", async () => {
+    // A worktree nests inside its main checkout, and both are tracked trees.
+    const outer = join(await workspace(), "main");
+    const worktree = join(outer, "worktrees", "wt");
+    const engine = join(worktree, "engine");
+    await mkdir(join(outer, ".git"), { recursive: true });
+    await mkdir(engine, { recursive: true });
+    await writeFile(join(worktree, ".git"), "gitdir: elsewhere\n");
+    const absentCandidates = join(outer, "absent-candidates.json");
+    await expectEndpointsRefused(join(outer, "apps", "endpoints.json"), engine, absentCandidates);
+    await expectEndpointsRefused(unresolved(engine, "..", "..", "..", "apps", "endpoints.json"), engine, absentCandidates);
+    await expectEndpointsAdmitted(join(outer, ".local", "endpoints.json"), engine, absentCandidates);
+    expect(existsSync(join(outer, "apps"))).toBe(false);
   });
 
   it("refuses a bare endpoints file name, which would resolve into this repository's tracked tree", async () => {

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, realpathSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
 import { resolveDeploymentMode } from "@debateai/register";
@@ -10,6 +10,7 @@ import { startClaudeRelay } from "./claude-relay.js";
 import { startGrokRelay } from "./grok-relay.js";
 import { startModelShim } from "./model-shim.js";
 import { startPiRelay } from "./pi-relay.js";
+import { absolutePathOf, trackedPathRefusal } from "./untracked-path.js";
 import {
   CLI_RELAY_THINKING_LEVEL_TOKEN,
   harnessOverheadLine,
@@ -260,46 +261,18 @@ async function writeEndpointsFile(path: string, endpoints: readonly RelayHostEnd
 }
 
 /**
- * `path` with every symbolic link resolved and every existing segment in its ON-DISK
- * letter case, including when its last segments do not exist yet. Fix round 2: the
- * native realpath, because the JavaScript one keeps the caller's spelling, and on a
- * case-insensitive volume (the macOS default) a folder above the work tree spelled
- * in another case would then compare as "outside" it and be admitted.
- */
-function canonicalPath(path: string): string {
-  let existing = resolve(path);
-  const missing: string[] = [];
-  while (!existsSync(existing)) {
-    const parent = dirname(existing);
-    if (parent === existing) break;
-    missing.unshift(basename(existing));
-    existing = parent;
-  }
-  return join(realpathSync.native(existing), ...missing);
-}
-
-/** The work tree around `root`: the nearest directory holding `.git` (a worktree's is a file), else `root`. */
-function repositoryBoundaryOf(root: string): string {
-  const canonicalRoot = canonicalPath(root);
-  for (let current = canonicalRoot; ; current = dirname(current)) {
-    if (existsSync(join(current, ".git"))) return current;
-    if (dirname(current) === current) return canonicalRoot;
-  }
-}
-
-/**
  * Fix round 1: the endpoints file holds live bearers, so it may never land in the
  * tracked tree — a bare `--endpoints e.json` resolves from the cwd, which `pnpm run`
  * makes the engine root. Inside the repository it must sit under a `.local/`
- * directory (git-ignored); outside, anywhere. Links are resolved first, so a path
- * cannot reach into the tree through one.
+ * directory (git-ignored); outside, anywhere. Fix round 2: the native realpath, so
+ * another letter case cannot compare as "outside". A18a fix round 1: the rule now
+ * lives in `untracked-path.ts`, shared with the moment tools — the path is judged
+ * where the KERNEL puts it (`..` after a link included), a last segment that is a
+ * link is refused (the atomic rename would replace it), and every enclosing
+ * checkout counts, not only the nearest.
  */
 function assertEndpointsPathUntracked(endpointsPath: string, repositoryRoot: string): void {
-  const boundary = repositoryBoundaryOf(repositoryRoot);
-  const fromBoundary = relative(boundary, canonicalPath(endpointsPath));
-  const outside = isAbsolute(fromBoundary) || fromBoundary === ".." || fromBoundary.startsWith(`..${sep}`);
-  if (outside) return;
-  if (fromBoundary === "" || !fromBoundary.split(sep).slice(0, -1).includes(".local")) {
+  if (trackedPathRefusal(endpointsPath, "file", repositoryRoot) !== null) {
     throw new TypeError("RELAY_HOST_ENDPOINTS_PATH_REFUSED");
   }
 }
@@ -316,7 +289,9 @@ export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHo
   const repositoryRoot = seams.repositoryRoot ?? RELAY_HOST_ENGINE_ROOT;
   const endpointsPath = options.endpointsPath === undefined
     ? join(resolve(repositoryRoot), RELAY_HOST_DEFAULT_ENDPOINTS_PATH)
-    : resolve(options.endpointsPath);
+    // A18a fix round 1: made absolute WITHOUT normalising, so the guard, the
+    // writer and the removal all read `..` after a link as the kernel does.
+    : absolutePathOf(options.endpointsPath);
   assertEndpointsPathUntracked(endpointsPath, repositoryRoot);
   const candidates = await readRelayHostCandidates(resolve(options.candidatesPath));
   try {

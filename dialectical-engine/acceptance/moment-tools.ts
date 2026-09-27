@@ -1,7 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, realpathSync } from "node:fs";
 import { rename, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import {
@@ -43,6 +41,7 @@ import {
   type SynthesisLoopControls,
   type SynthesizerRequest
 } from "@debateai/serve";
+import { trackedPathRefusal, type TrackedPathRefusal, type UntrackedPathKind } from "./untracked-path.js";
 
 /**
  * Model scorecard A18 (spec §2.9) — what `moment:export` and `moment:replay` share.
@@ -472,15 +471,34 @@ export async function captureMomentPacket(builder: TypedMomentBuilder): Promise<
       throw new TypedDomainError("MOMENT_PACKET_CAPTURED", "offline capture: nothing was sent");
     }
   };
+  // Fix round 1 (review Minor 3): the capture's own sentinel is expected, but a
+  // builder that refused BEFORE the gateway is the reason no packet exists, and
+  // the operator is told which one.
+  const failure: { error: unknown } = { error: undefined };
   await invokeMomentBuilder(builder, capture, {
     providerRef: "moment:capture",
     bound: { maxAttempts: 1, tokenCeiling: 1, deadlineMs: 1 },
     callSiteKey: "moment:capture",
     contractHash: "moment:capture",
     subjectItemId: "moment:capture"
-  }).catch(() => undefined);
-  if (captured.packet === null) throw new TypedDomainError("MOMENT_PACKET_UNCAPTURED", builder.family);
+  }).catch((error: unknown) => { failure.error = error; });
+  if (captured.packet === null) {
+    throw new TypedDomainError(
+      "MOMENT_PACKET_UNCAPTURED",
+      `${String(builder.family)}: the live builder built no packet (${reasonOf(failure.error)})`
+    );
+  }
   return captured.packet;
+}
+
+/** An error's code and message, for a message that must name it. */
+function reasonOf(error: unknown): string {
+  if (error === undefined) return "it returned without calling the gateway";
+  if (error instanceof Error) {
+    const code = (error as { readonly code?: unknown }).code;
+    return typeof code === "string" && code !== "" ? `${code}: ${error.message}` : `${error.name}: ${error.message}`;
+  }
+  return String(error);
 }
 
 const REFUSED_REPLY_CODES: ReadonlySet<string> = new Set([
@@ -540,7 +558,9 @@ export async function writePrivateJsonFile(path: string, value: unknown): Promis
     await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
     await rename(temporary, path);
   } catch (error) {
-    await rm(temporary, { force: true });
+    // Fix round 1 (review Minor 4): the write's own failure is the one reported;
+    // a cleanup that fails as well must never replace it.
+    await rm(temporary, { force: true }).catch(() => undefined);
     throw error;
   }
 }
@@ -548,41 +568,21 @@ export async function writePrivateJsonFile(path: string, value: unknown): Promis
 /** This engine's root (acceptance/..), from the module's own address — never a spelled-out path. */
 const MOMENT_TOOLS_ENGINE_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-/**
- * `path` with every symbolic link resolved and every existing segment in its
- * on-disk letter case, including when its last segments do not exist yet —
- * relay-host's `canonicalPath`, restated: acceptance modules do not import one
- * another's private helpers.
- */
-function canonicalPath(path: string): string {
-  let existing = resolve(path);
-  const missing: string[] = [];
-  while (!existsSync(existing)) {
-    const parent = dirname(existing);
-    if (parent === existing) break;
-    missing.unshift(basename(existing));
-    existing = parent;
-  }
-  return join(realpathSync.native(existing), ...missing);
-}
-
-/** The work tree around `root`: the nearest directory holding `.git` (a worktree's is a file), else `root`. */
-function repositoryBoundaryOf(root: string): string {
-  const canonicalRoot = canonicalPath(root);
-  for (let current = canonicalRoot; ; current = dirname(current)) {
-    if (existsSync(join(current, ".git"))) return current;
-    if (dirname(current) === current) return canonicalRoot;
-  }
-}
+const OUTPUT_PATH_REFUSAL_REASONS: Readonly<Record<TrackedPathRefusal, string>> = Object.freeze({
+  INSIDE_A_TRACKED_TREE: "it is inside a git checkout",
+  LAST_SEGMENT_IS_A_LINK: "its last segment is a link, which a writer may replace or follow",
+  DANGLING_LINK_ON_THE_WAY: "a dangling link sits on the way"
+});
 
 /**
  * A18 carry 4 (pre-flight R6) — A MOMENT NEVER LANDS IN THE TRACKED TREE. A
  * moment file and a replay result carry DECRYPTED debate text, and a relative
  * `--out` / `--out-dir` resolves from the cwd, which `pnpm run` makes the
- * engine root. Inside the repository an output path must therefore sit under a
- * `.local/` folder (git-ignored); outside it, anywhere. Links are resolved
- * first, so a path cannot reach into the tree through one. relay-host's
- * endpoints rule (`acceptance/relay-host.ts`, `assertEndpointsPathUntracked`).
+ * engine root. Inside any enclosing checkout an output path must therefore sit
+ * under a `.local/` folder (git-ignored); outside, anywhere. The path is judged
+ * where the kernel puts it (`acceptance/untracked-path.ts`, the rule relay-host
+ * shares): links and `..` after them are read as the kernel reads them, a file
+ * path whose last segment is a link is refused, and so is a dangling link.
  *
  * A `"file"` is written AT `path`, so a `.local` folder must sit above it; a
  * `"directory"` receives files INSIDE it, so it may itself be the `.local`
@@ -590,25 +590,20 @@ function repositoryBoundaryOf(root: string): string {
  */
 export function assertMomentOutputPathUntracked(
   path: string,
-  kind: "file" | "directory",
+  kind: UntrackedPathKind,
   repositoryRoot?: string
 ): void {
   if (repositoryRoot !== undefined && process.env.NODE_ENV !== "test") {
     throw new TypedDomainError(
-      "MOMENT_OUTPUT_PATH_ROOT_TEST_ONLY",
+      "MOMENT_TOOLS_TEST_ONLY_REPOSITORY_ROOT_FORBIDDEN",
       "the repository-root seam exists for tests; the moment tools decide from their own engine root"
     );
   }
-  const boundary = repositoryBoundaryOf(repositoryRoot ?? MOMENT_TOOLS_ENGINE_ROOT);
-  const fromBoundary = relative(boundary, canonicalPath(path));
-  const outside = isAbsolute(fromBoundary) || fromBoundary === ".." || fromBoundary.startsWith(`..${sep}`);
-  if (outside) return;
-  const segments = fromBoundary === "" ? [] : fromBoundary.split(sep);
-  const folders = kind === "file" ? segments.slice(0, -1) : segments;
-  if (!folders.includes(".local")) {
+  const refusal = trackedPathRefusal(path, kind, repositoryRoot ?? MOMENT_TOOLS_ENGINE_ROOT);
+  if (refusal !== null) {
     throw new TypedDomainError(
       "MOMENT_OUTPUT_PATH_REFUSED",
-      `${path} is inside the repository: moment files carry private debate text, so write them under a .local/ folder or outside the repository`
+      `${path}: ${OUTPUT_PATH_REFUSAL_REASONS[refusal]}. Moment files carry private debate text: write them under a .local/ folder, or outside the repository`
     );
   }
 }

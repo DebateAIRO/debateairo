@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT, PanelMemberFailure } from "@debateai/judgement";
@@ -32,7 +32,8 @@ import {
   momentFamilyOf,
   parseMomentBuilder,
   replayOutcomeOf,
-  replyContentOf
+  replyContentOf,
+  type TypedMomentBuilder
 } from "../../acceptance/moment-tools.js";
 
 /**
@@ -145,6 +146,20 @@ describe("A18 · the same prompt, rebuilt from recorded material, for every deba
     expect(() => parseMomentBuilder(builderAt(2), "POSITION")).toThrowError(invalid);
     expect(() => parseMomentBuilder(builderAt(4), "SUPPORT_ATTACK")).toThrowError(invalid);
     expect(() => parseMomentBuilder(builderAt(3), "CROSS_EXCHANGE")).toThrowError(invalid);
+  });
+
+  it("names the live builder's own refusal when no packet could be captured (fix round 1, Minor 3)", async () => {
+    // Both bypass parseMomentBuilder on purpose: the builder refuses before the gateway is reached.
+    const malformed = { family: "JUDGE_ASSESS", inputs: { questionLine: QUESTION, statement: 42 } } as unknown as TypedMomentBuilder;
+    await expect(captureMomentPacket(malformed)).rejects.toThrowError(expect.objectContaining({
+      code: "MOMENT_PACKET_UNCAPTURED",
+      message: expect.stringContaining("PROMPT_FRAME_MATERIAL_MALFORMED")
+    }));
+    const unknownFamily = { family: "JUDGE_UNKNOWN", inputs: {} } as unknown as TypedMomentBuilder;
+    await expect(captureMomentPacket(unknownFamily)).rejects.toThrowError(expect.objectContaining({
+      code: "MOMENT_PACKET_UNCAPTURED",
+      message: expect.stringContaining("Unknown closed-vocabulary member")
+    }));
   });
 });
 
@@ -287,6 +302,91 @@ describe("A18 · output paths never land in the tracked tree (carry 4)", () => {
     }
   });
 
+  /** Joined as a STRING, so `..` stays for the kernel: `join` would fold it away before any link is read. */
+  const unresolved = (...segments: string[]): string => segments.join(sep);
+
+  it("reads `..` the way the kernel does, after a link is followed (fix round 1, Important 1)", async () => {
+    const { engine } = await workTree();
+    const outside = await workspace();
+    const engineLink = join(outside, "engine-link");
+    await symlink(engine, engineLink);
+    // engine-link/.. is the TREE, not the folder the link sits in.
+    for (const path of [
+      unresolved(engineLink, "..", "m.json"),
+      unresolved(engineLink, "..", "moments", "m.json"),
+      // `.local/..` leaves the ignored folder.
+      unresolved(engine, ".local", "..", "m.json")
+    ]) {
+      expect(() => assertMomentOutputPathUntracked(path, "file", engine), path).toThrowError(refused);
+    }
+    for (const path of [unresolved(engineLink, ".."), unresolved(engine, ".local", "..", "moments")]) {
+      expect(() => assertMomentOutputPathUntracked(path, "directory", engine), path).toThrowError(refused);
+    }
+    // The same reading admits what the kernel puts under .local/ or outside the tree.
+    for (const path of [
+      unresolved(engine, ".local", "moments", "..", "m.json"),
+      unresolved(engineLink, ".local", "m.json"),
+      unresolved(engineLink, "..", "..", "m.json")
+    ]) {
+      expect(() => assertMomentOutputPathUntracked(path, "file", engine), path).not.toThrow();
+    }
+  });
+
+  it("refuses a file path whose last segment is a link, and any dangling link on the way (fix round 1, Important 2)", async () => {
+    const { tree, engine } = await workTree();
+    const outside = await workspace();
+    await mkdir(join(engine, ".local"));
+    const privateFile = join(outside, "private.json");
+    await writeFile(privateFile, "{}\n");
+    // A careful operator's link to a private file: an atomic rename replaces the LINK, inside the tree.
+    await symlink(privateFile, join(engine, "moment.json"));
+    // A dangling link under .local/: an append would create its target, inside the tree.
+    await symlink(join(tree, "results.jsonl"), join(engine, ".local", "results.jsonl"));
+    // Outside the tree too: the check never guesses whether a writer follows the link or replaces it.
+    await symlink(privateFile, join(outside, "alias.json"));
+    for (const path of [join(engine, "moment.json"), join(engine, ".local", "results.jsonl"), join(outside, "alias.json")]) {
+      expect(() => assertMomentOutputPathUntracked(path, "file", engine), path).toThrowError(refused);
+    }
+    // A dangling link on the way cannot be judged: where it leads does not exist yet.
+    await symlink(join(tree, "absent-folder"), join(engine, ".local", "gone"));
+    expect(() => assertMomentOutputPathUntracked(join(engine, ".local", "gone", "m.json"), "file", engine)).toThrowError(refused);
+    expect(() => assertMomentOutputPathUntracked(join(engine, ".local", "gone"), "directory", engine)).toThrowError(refused);
+    // A folder link is followed, as a writer follows it: judged where the files land.
+    await symlink(outside, join(engine, "moments-elsewhere"));
+    await symlink(tree, join(outside, "back-into-the-tree"));
+    expect(() => assertMomentOutputPathUntracked(join(engine, "moments-elsewhere"), "directory", engine)).not.toThrow();
+    expect(() => assertMomentOutputPathUntracked(join(outside, "back-into-the-tree"), "directory", engine)).toThrowError(refused);
+  });
+
+  it("refuses a path inside ANY enclosing checkout, not only the nearest (fix round 1, Minor 2)", async () => {
+    // A worktree nests inside its main checkout, and both are tracked trees.
+    const outer = join(await workspace(), "main");
+    const worktree = join(outer, "worktrees", "wt");
+    const engine = join(worktree, "engine");
+    await mkdir(join(outer, ".git"), { recursive: true });
+    await mkdir(engine, { recursive: true });
+    await writeFile(join(worktree, ".git"), "gitdir: elsewhere\n");
+    for (const path of [
+      join(outer, "apps", "x.json"),
+      unresolved(engine, "..", "..", "..", "apps", "x.json"),
+      join(worktree, "x.json"),
+      join(engine, "x.json")
+    ]) {
+      expect(() => assertMomentOutputPathUntracked(path, "file", engine), path).toThrowError(refused);
+    }
+    expect(() => assertMomentOutputPathUntracked(join(outer, "apps"), "directory", engine)).toThrowError(refused);
+    for (const path of [join(outer, ".local", "x.json"), join(engine, ".local", "x.json")]) {
+      expect(() => assertMomentOutputPathUntracked(path, "file", engine), path).not.toThrow();
+    }
+    // A checkout that sits under an outer .local/ folder is still a tracked tree of its own.
+    const ignoredCheckout = join(outer, ".local", "scratch-checkout");
+    const ignoredEngine = join(ignoredCheckout, "engine");
+    await mkdir(join(ignoredCheckout, ".git"), { recursive: true });
+    await mkdir(ignoredEngine);
+    expect(() => assertMomentOutputPathUntracked(join(ignoredEngine, "x.json"), "file", ignoredEngine)).toThrowError(refused);
+    expect(() => assertMomentOutputPathUntracked(join(ignoredEngine, ".local", "x.json"), "file", ignoredEngine)).not.toThrow();
+  });
+
   it("refuses a tracked path spelled in another letter case, on a case-insensitive volume", async (context) => {
     // relay-host fix round 2: a folder spelled in another case must not compare as "outside" the tree.
     const outer = join(await workspace(), "CaseFold");
@@ -322,7 +422,7 @@ describe("A18 · output paths never land in the tracked tree (carry 4)", () => {
     process.env.NODE_ENV = "development";
     try {
       expect(() => assertMomentOutputPathUntracked(join(engine, ".local", "m.json"), "file", engine))
-        .toThrowError(expect.objectContaining({ code: "MOMENT_OUTPUT_PATH_ROOT_TEST_ONLY" }));
+        .toThrowError(expect.objectContaining({ code: "MOMENT_TOOLS_TEST_ONLY_REPOSITORY_ROOT_FORBIDDEN" }));
     } finally {
       if (previous === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = previous;
