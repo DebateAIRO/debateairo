@@ -8723,6 +8723,10 @@ a:focus-visible {
 .floorAnswerStatement { margin: 0; color: var(--text); font-size: 14px; line-height: 1.6; }
 .floorAnswerNote { margin: 0; color: var(--muted); font-size: 12.5px; font-style: italic; line-height: 1.55; }
 .publicVerdictText .floorAnswerNote { margin-block-start: 8px; }
+/* In the owner's verdict card the statement takes the card's own type and ink. */
+.synthVerdictBody .floorAnswerStatement { font-size: inherit; line-height: inherit; color: inherit; }
+.synthVerdictBody .floorAnswerLead,
+.synthVerdictBody .floorAnswerNote { font-size: 11px; }
 /* The offer to show the debate page in the language the debate was argued in
    (components/QuestionLanguageOffer.tsx, spec 2026-09-26 §14.3): a slim strip
    under the AI notice, in the page's own quiet colours, with the switch as the

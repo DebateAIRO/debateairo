@@ -19,11 +19,12 @@ describe("the owner's story mock (look first, then wire)", () => {
     for (const status of ["WRITING", "READY", "READY_WITH_RESERVATION", "UNAVAILABLE"]) {
       expect(html).toContain(`data-story-status=&quot;${status}&quot;`);
     }
-    // Four states at desktop width, four at phone width, the four in dark mode, and the language offer at both widths.
-    expect(html.match(/<iframe /g)).toHaveLength(14);
+    // Four states at desktop width, four at phone width, the four in dark mode, the floor answer
+    // (Task M6) twice at desktop width and once at phone width, and the language offer at both widths.
+    expect(html.match(/<iframe /g)).toHaveLength(17);
     // Each preview is a whole document inside its iframe's escaped srcdoc attribute; the page is the English reader's.
     expect(html.match(/srcDoc="&lt;!doctype html&gt;&lt;html lang=&quot;en&quot; data-mode=&quot;chamber&quot;&gt;/gi)).toHaveLength(4);
-    expect(html.match(/srcDoc="&lt;!doctype html&gt;&lt;html lang=&quot;en&quot; data-mode=&quot;terracotta&quot;&gt;/gi)).toHaveLength(10);
+    expect(html.match(/srcDoc="&lt;!doctype html&gt;&lt;html lang=&quot;en&quot; data-mode=&quot;terracotta&quot;&gt;/gi)).toHaveLength(13);
     expect(html).toContain("/* === verdict-story === */");
     expect(html).toContain("Ar trebui să ne mutăm cu familia din București la Cluj");
     // R2: the panel is Romanian (the question's language) under an English page, and says no engine words.
@@ -37,11 +38,16 @@ describe("the owner's story mock (look first, then wire)", () => {
     expect(html.match(/class=&quot;languageOffer&quot;/g)).toHaveLength(2);
     expect(html).toContain("This debate is in Romanian (&lt;bdi lang=&quot;ro&quot;&gt;Română&lt;/bdi&gt;).");
     expect(html).not.toMatch(/<script|https?:\/\//);
+    // Task M6: the floor answer, in the strip (Romanian) and in the page's own verdict card (English), never "Components-only".
+    expect(html).toContain("Cel mai bun răspuns al nostru:");
+    expect(html).toContain("Our best answer:");
+    expect(html).toContain("Acest răspuns se sprijină pe mai puține dovezi decât de obicei.");
+    expect(html).not.toContain("Components-only");
     // The vendored fonts are inlined, but only the three faces the panel uses (Plus Jakarta Sans 400 and
-    // 700, Fraunces 600), once in the page and once in each of the 14 previews.
+    // 700, Fraunces 600), once in the page and once in each of the 17 previews.
     expect(html).not.toContain("fonts are not bundled yet");
-    expect(html.match(/@font-face \{/g)).toHaveLength(45);
-    expect(html.match(/data:font\/ttf;base64,/g)).toHaveLength(45);
+    expect(html.match(/@font-face \{/g)).toHaveLength(54);
+    expect(html.match(/data:font\/ttf;base64,/g)).toHaveLength(54);
     expect(html.match(/font-style: italic; font-weight: \d+; src: url\(data:/g)).toBeNull();
   }, 125_000);
 

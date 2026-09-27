@@ -9,13 +9,25 @@ import type { AnswerStory } from "@debateai/contract";
 import { AiNotice } from "../apps/ui/components/AiNotice";
 import { LanguageOfferStrip } from "../apps/ui/components/QuestionLanguageOffer";
 import { StoryPanel } from "../apps/ui/components/StoryPanel";
+import { SynthesisPanel } from "../apps/ui/components/SynthesisPanel";
 import { languageOfferLocale, questionLocale } from "../apps/ui/lib/i18n/questionLocale";
 import { t } from "../apps/ui/lib/i18n/translate";
-import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, STORY_FIXTURE_LANGUAGE, storyFixture } from "../apps/ui/lib/v3/storyFixture";
+import { reportSupportedForLocale } from "../apps/ui/lib/report/reportLanguage";
+import { floorAnswerView, resolveFloor } from "../apps/ui/lib/v3/floorAnswer";
+import {
+  STORY_FIXTURE_ANSWER,
+  STORY_FIXTURE_DEBATE_ID,
+  STORY_FIXTURE_FLOOR,
+  STORY_FIXTURE_FLOOR_ANSWER,
+  STORY_FIXTURE_LANGUAGE,
+  storyFixture
+} from "../apps/ui/lib/v3/storyFixture";
 import { toStoryView } from "../apps/ui/lib/v3/storyView";
 import chromeEnglish from "../apps/ui/messages/en/chrome.json" with { type: "json" };
 import debateChromeEnglish from "../apps/ui/messages/en/debateChrome.json" with { type: "json" };
+import debateDrawersEnglish from "../apps/ui/messages/en/debateDrawers.json" with { type: "json" };
 import homeEnglish from "../apps/ui/messages/en/home.json" with { type: "json" };
+import publicEnglish from "../apps/ui/messages/en/public.json" with { type: "json" };
 import publicRomanian from "../apps/ui/messages/ro/public.json" with { type: "json" };
 
 /**
@@ -29,7 +41,9 @@ import publicRomanian from "../apps/ui/messages/ro/public.json" with { type: "js
  * .debateView column, under a stand-in header and the real AI notice, so what
  * the owner sees is what the page will show, and the phone previews get the
  * phone breakpoints. The vendored fonts are inlined when they are present. The
- * file needs no network and runs no script.
+ * file needs no network and runs no script. Task M6 adds the FLOOR answer: the
+ * same debate when no answer could be written, as the strip and the page's
+ * real verdict card show it.
  *
  * Usage: pnpm --filter dialectical-engine-v2ui run story:mock <absolute path to the output .html>
  * (pnpm runs the script from apps/ui, so a relative path is resolved from there).
@@ -132,11 +146,55 @@ const OFFER_TARGET = languageOfferLocale(STORY_LOCALE, INTERFACE_LOCALE);
 if (OFFER_TARGET === null) throw new Error("STORY_MOCK_OFFER_MISSING: the sample's language is the interface's");
 
 /**
+ * The floor (spec §14.4.4) of STORY_FIXTURE_FLOOR_ANSWER: its label, its leading
+ * position's statement, and a label that rests on less than usual.
+ */
+const FLOOR = resolveFloor(
+  { terminal: STORY_FIXTURE_FLOOR_ANSWER.terminal, verdict: STORY_FIXTURE_FLOOR_ANSWER.verdict_state, nodes: STORY_FIXTURE_FLOOR_ANSWER.nodes },
+  STORY_FIXTURE_FLOOR
+);
+if (FLOOR === null) throw new Error("STORY_MOCK_FLOOR_MISSING: the fixture's floor does not resolve");
+
+type Variant = "served" | "floor";
+
+/**
+ * The argument views' space. For a floor answer it also holds the page's real
+ * verdict card, whose fixed words follow the reader's interface (English here),
+ * as every fixed word there does; the statement is the debate's own.
+ */
+function PreviewMain({ variant }: { variant: Variant }): JSX.Element {
+  const note = <p>The debate&apos;s argument views (tree, thread, split and map) stay here, below the story.</p>;
+  if (variant === "served") return <div className="debateMain mockMain">{note}</div>;
+  return (
+    <div className="debateMain">
+      <div className="mockMain" style={{ display: "flex", flex: 1, minWidth: 0 }}>{note}</div>
+      <SynthesisPanel
+        ready
+        pending={false}
+        streaming={false}
+        structured
+        proClaim=""
+        conClaim=""
+        verdict=""
+        meta=""
+        lean={null}
+        sections={[]}
+        floor={floorAnswerView(FLOOR!, publicEnglish, INTERFACE_LOCALE, STORY_LOCALE)}
+        catalog={debateDrawersEnglish}
+      />
+    </div>
+  );
+}
+
+/**
  * The debate page around the panel: a stand-in header, the real AI notice, the
  * real language offer when asked for (as before the reader answers it), the
  * panel, and the space the argument views keep.
  */
-function PreviewPage({ status, offer }: { status: AnswerStory["status"]; offer: boolean }): JSX.Element {
+function PreviewPage({ status, offer, variant }: { status: AnswerStory["status"]; offer: boolean; variant: Variant }): JSX.Element {
+  const view = variant === "floor"
+    ? toStoryView(STORY_FIXTURE_FLOOR_ANSWER, storyFixture(status), STORY_FIXTURE_DEBATE_ID, STORY_LOCALE, reportSupportedForLocale, FLOOR)
+    : toStoryView(STORY_FIXTURE_ANSWER, storyFixture(status), STORY_FIXTURE_DEBATE_ID, STORY_LOCALE);
   return (
     <div className="debateView">
       <header className="debateTopBar">
@@ -156,20 +214,14 @@ function PreviewPage({ status, offer }: { status: AnswerStory["status"]; offer: 
         <AiNotice catalog={{ ...homeEnglish, ...chromeEnglish }} body={t(debateChromeEnglish, "debateChrome.aiNotice")} />
       </div>
       {offer ? <LanguageOfferStrip target={OFFER_TARGET} interfaceLocale={INTERFACE_LOCALE} catalog={chromeEnglish} /> : null}
-      <StoryPanel
-        view={toStoryView(STORY_FIXTURE_ANSWER, storyFixture(status), STORY_FIXTURE_DEBATE_ID, STORY_LOCALE)}
-        catalog={publicRomanian}
-        locale={STORY_LOCALE}
-      />
-      <div className="debateMain mockMain">
-        <p>The debate&apos;s argument views (tree, thread, split and map) stay here, below the story.</p>
-      </div>
+      <StoryPanel view={view} catalog={publicRomanian} locale={STORY_LOCALE} />
+      <PreviewMain variant={variant} />
     </div>
   );
 }
 
-function previewDocument(mode: "terracotta" | "chamber", status: AnswerStory["status"], offer: boolean): string {
-  const body = renderToStaticMarkup(<PreviewPage status={status} offer={offer} />);
+function previewDocument(mode: "terracotta" | "chamber", status: AnswerStory["status"], offer: boolean, variant: Variant): string {
+  const body = renderToStaticMarkup(<PreviewPage status={status} offer={offer} variant={variant} />);
   return `<!doctype html><html lang="en" data-mode="${mode}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Story panel preview</title><style>${previewCss}</style></head><body>${body}</body></html>`;
 }
 
@@ -207,11 +259,12 @@ const STATES: readonly StateCopy[] = Object.freeze([
   }
 ]);
 
-function Frame({ state, screen, mode, offer = false }: {
+function Frame({ state, screen, mode, offer = false, variant = "served" }: {
   state: StateCopy;
   screen: Screen;
   mode: "terracotta" | "chamber";
   offer?: boolean;
+  variant?: Variant;
 }): JSX.Element {
   const title = `${state.title} (${screen.words}${mode === "chamber" ? ", dark mode" : ""})`;
   return (
@@ -220,7 +273,7 @@ function Frame({ state, screen, mode, offer = false }: {
         <strong>{title}</strong>
         <span>{state.words}</span>
       </figcaption>
-      <iframe title={title} width={screen.width} height={screen.height} srcDoc={previewDocument(mode, state.status, offer)} />
+      <iframe title={title} width={screen.width} height={screen.height} srcDoc={previewDocument(mode, state.status, offer, variant)} />
     </figure>
   );
 }
@@ -230,6 +283,20 @@ const OFFER_STATE: StateCopy = Object.freeze({
   title: "The offer to switch languages",
   words: "What a reader with an English interface sees first on a Romanian debate. \"Switch to Romanian\" shows the whole site in Romanian; \"No, thanks\" hides the offer for the rest of the visit, and it does not come back on a reload."
 });
+
+/** The floor answer's states (Task M6): while its story is written, and once it is ready. */
+const FLOOR_STATES: readonly StateCopy[] = Object.freeze([
+  {
+    status: "WRITING",
+    title: "No answer could be written: while the story is written",
+    words: "The debate ran out of budget before any AI model could write the answer. The strip still gives an answer: the close-call label, \"Cel mai bun răspuns al nostru:\" and the strongest position's own words, with a quiet line because this label rests on less evidence than usual. On the right, the page's own answer card says the same in the reader's English, where it used to show only a technical line."
+  },
+  {
+    status: "READY",
+    title: "No answer could be written: the story is ready",
+    words: "The full story is told from the same label. Only the PDF's \"About this report\" says why no full answer was written; the story and the page never do."
+  }
+]);
 
 const fontsMissing = presentFonts.length < FONT_FACES.length;
 
@@ -277,6 +344,18 @@ function MockPage(): JSX.Element {
         <p>The four states with the site&apos;s dark mode on, on a computer.</p>
         <div className="mockGrid">
           {STATES.map((state) => <Frame key={state.status} state={state} screen={DESKTOP} mode="chamber" />)}
+        </div>
+      </section>
+      <section className="mockSection">
+        <h2>When no AI model could write the full answer</h2>
+        <p>
+          The same debate when the budget ran out before any AI model could write the answer. The reader still gets an
+          answer: the label, &ldquo;Our best answer:&rdquo; and the strongest position&apos;s own statement. The public page
+          shows it the same way, in the question&apos;s language.
+        </p>
+        <div className="mockGrid">
+          {FLOOR_STATES.map((state) => <Frame key={state.status} state={state} screen={DESKTOP} mode="terracotta" variant="floor" />)}
+          <Frame state={FLOOR_STATES[0]!} screen={PHONE} mode="terracotta" variant="floor" />
         </div>
       </section>
       <section className="mockSection">
