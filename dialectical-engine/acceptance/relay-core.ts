@@ -141,9 +141,16 @@ const CONTEXT_WINDOW_BYTES_PER_TOKEN = 2;
  * R4: the only thing a cap classifier may hand back is ONE upper-case code token
  * (e.g. `CLAUDE_CLI_USAGE_CAP`). It becomes the 429's `error`, so anything else —
  * a slice of the evidence, which can echo the prompt — is treated as "no cap
- * recognised" and never leaves the relay.
+ * recognised" and never leaves the relay. Exported so an adapter's own tests can
+ * check its code against it.
  */
-const CLI_RELAY_USAGE_CAP_CODE_TOKEN = /^[A-Z][A-Z0-9_]{0,63}$/u;
+export const CLI_RELAY_USAGE_CAP_CODE_TOKEN = /^[A-Z][A-Z0-9_]{0,63}$/u;
+/**
+ * §2.10, fix round 1: a "stdin" or "file" adapter whose argument list carries the
+ * prompt text is refused before any child exists. Only the "argv" transport (the
+ * four original makers) may put the prompt on a command line.
+ */
+export const CLI_RELAY_PROMPT_ON_ARGV_CODE = "CLI_RELAY_PROMPT_ON_ARGV" as const;
 
 /** P8 strategy: how one maker's CLI is invoked and how its output is parsed. */
 export interface CliRelayAdapter {
@@ -177,6 +184,9 @@ export interface CliRelayAdapter {
    * R4: this maker's usage-cap signature, read off a NON-ZERO exit. Returns the
    * maker's typed cap code, or null. Absent, or null, keeps today's FAILED —
    * the conservative default for a CLI whose cap output has not been captured.
+   * The code must be ONE upper-case token (`CLI_RELAY_USAGE_CAP_CODE_TOKEN`); any
+   * other result — prose, a slice of the evidence, an empty string — is treated
+   * as no cap recognised: FAILED (502), never 429. So is a classifier that throws.
    */
   classifyUsageCap?(evidence: CliFailureEvidence): string | null;
   buildArguments(prompt: string, invocation?: CliInvocation): readonly string[];
@@ -468,6 +478,9 @@ export async function invokeCli(
   timeoutMs: number,
   options: Readonly<{ thinkingLevel?: string }> = {}
 ): Promise<CliCompletion> {
+  // Fix round 1: the handshake paths call invokeCli without startCliRelayServer,
+  // so the adapter's own declarations are checked here too, before anything exists.
+  assertAdapterDeclarations(adapter);
   // §2.2: the level on the command line is the one asked for, else the
   // adapter's own explicit default, else none. An undeclared level is refused
   // here before any directory or child exists; the HTTP server has already
@@ -509,6 +522,11 @@ export async function invokeCli(
       ...(thinkingLevel === undefined ? {} : { thinkingLevel })
     });
     argumentList = [...command.prefixArguments, ...adapter.buildArguments(prompt, invocation)];
+    // §2.10, fix round 1: "never on argv" is a law of the core, not a courtesy of
+    // each adapter. Refused here, so the catch below reaps the prompt directory.
+    if (transport !== "argv" && argumentList.some((argument) => argument.includes(prompt))) {
+      throw new CliRelayFailure("FAILED", CLI_RELAY_PROMPT_ON_ARGV_CODE);
+    }
     // P4-01: model subprocesses never inherit the API environment. Only
     // process basics plus this maker's exact auth locators cross the seam.
     environment = buildCliChildEnvironment(adapter, scratchDirectory);
@@ -524,13 +542,24 @@ export async function invokeCli(
     // the only ambient filesystem context for every handshake and relay call.
     // DR-133: a CLI left with an OPEN stdin can hang. "argv" and "file" keep
     // stdin closed; "stdin" writes the prompt and closes the pipe at once.
-    const child: ChildProcessByStdio<Writable | null, Readable, Readable> = transport === "stdin"
-      ? spawn(command.binary, argumentList, {
-        cwd: scratchDirectory, env: environment, stdio: ["pipe", "pipe", "pipe"]
-      })
-      : spawn(command.binary, argumentList, {
-        cwd: scratchDirectory, env: environment, stdio: ["ignore", "pipe", "pipe"]
-      });
+    let spawned: ChildProcessByStdio<Writable | null, Readable, Readable>;
+    try {
+      spawned = transport === "stdin"
+        ? spawn(command.binary, argumentList, {
+          cwd: scratchDirectory, env: environment, stdio: ["pipe", "pipe", "pipe"]
+        })
+        : spawn(command.binary, argumentList, {
+          cwd: scratchDirectory, env: environment, stdio: ["ignore", "pipe", "pipe"]
+        });
+    } catch {
+      // Fix round 1: ENOEXEC (a 0-byte launcher), E2BIG, ENAMETOOLONG, EPERM,
+      // ELOOP and Node's own argument checks (a NUL byte) THROW here instead of
+      // arriving as an `error` event, before any listener exists. It is still a
+      // CLI failure, and the directories — the prompt file included — are reaped.
+      void reap().then(() => reject(new CliRelayFailure("FAILED", adapter.failureCode)));
+      return;
+    }
+    const child = spawned;
     if (child.stdin !== null) {
       // A child that exits before reading everything must not become an
       // unhandled EPIPE; its exit status still decides the outcome.

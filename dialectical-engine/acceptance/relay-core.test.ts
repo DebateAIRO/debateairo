@@ -13,10 +13,12 @@ import { estimateWindowTokens } from "@debateai/providers";
 import {
   CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES,
   CLI_RELAY_STDOUT_MAX_BYTES,
+  CLI_RELAY_USAGE_CAP_CODE_TOKEN,
   RELAY_MESSAGE_MAX_UTF8_BYTES,
   RELAY_REQUEST_MAX_BYTES,
   RELAY_REQUEST_MAX_MESSAGES,
   buildCliUsage,
+  invokeCli,
   renderPromptTranscript,
   resolveConfiguredBinary,
   startCliRelayServer,
@@ -1119,6 +1121,33 @@ describe("§2.10 declared context window at the relay", () => {
     });
   });
 
+  it("halves the SUM of the content bytes once, as the gateway does, on messages of odd byte counts (R1)", async () => {
+    const handle = await startFixtureRelay(
+      fixtureAdapter("window-odd-fixture", { contextWindowTokens: WINDOW }),
+      'process.stdout.write("OK");'
+    );
+    // "Țara" is 5 UTF-8 bytes (Ț is 2) and "ăîșa" is 7. Halving the sum gives 6 tokens;
+    // halving each message and adding gives 3 + 4 = 7. Only the first is the gateway's count,
+    // and the even-sized packet above cannot tell the two apart.
+    const messages = [
+      { role: "system", content: "Țara" },
+      { role: "user", content: "ăîșa" }
+    ] as const;
+    expect(messages.map((message) => Buffer.byteLength(message.content, "utf8"))).toEqual([5, 7]);
+    expect(estimateWindowTokens(messages)).toBe(6);
+    const gatewayBound = WINDOW - estimateWindowTokens(messages);
+    const post = (maxTokens: number): Promise<Response> =>
+      postRelay(handle, { model: "fixture-model", messages, max_tokens: maxTokens });
+
+    expect((await post(gatewayBound)).status).toBe(200);
+    const over = await post(gatewayBound + 1);
+    expect(over.status).toBe(413);
+    expect(await over.json()).toEqual({
+      error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED",
+      x_cli_relay_error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED"
+    });
+  });
+
   it("counts max_tokens only when it is a positive integer", async () => {
     const handle = await startFixtureRelay(
       fixtureAdapter("window-bound-fixture", { contextWindowTokens: WINDOW }),
@@ -1280,5 +1309,197 @@ describe("R1: the relay speaks the gateway's own markers", () => {
     expect(relay.CLI_RELAY_THINKING_LEVEL_TOKEN.flags).toBe(gateway.THINKING_LEVEL_TOKEN.flags);
     expect(gateway.THINKING_PARAMETERS).toContain("x_thinking_level");
     expect(kernel.THINKING_LEVEL_DEFAULT_ONLY).toBe("DEFAULT_ONLY");
+  });
+});
+
+/**
+ * Task A8 fix round 1 (review of a9ec7b5d). Every relay directory this core
+ * makes starts `relay-<maker slug>-`, the prompt directory included, so a
+ * maker name no other test's name begins with makes "nothing left behind" one
+ * exact listing. No probe here echoes the environment.
+ */
+async function relayLeftovers(maker: string): Promise<string[]> {
+  return (await readdir(tmpdir())).filter((entry) => entry.startsWith(`relay-${maker}-`));
+}
+
+describe("fix round 1: a spawn that throws synchronously is a CLI failure, and nothing is left behind", () => {
+  it("answers 502 with the adapter's failure code and reaps the prompt directory (a NUL argument; nothing runs)", async () => {
+    const seen: string[] = [];
+    const handle = await startFixtureRelay(fixtureAdapter("nul-argument-fixture", {
+      promptTransport: "file",
+      buildArguments: (_prompt, invocation) => {
+        const promptFile = invocation?.promptFile;
+        if (promptFile === undefined) throw new Error("FIXTURE_PROMPT_FILE_MISSING");
+        seen.push(promptFile);
+        return ["--attach", promptFile, "bad\u0000argument"];
+      }
+    }), ARGV_PROBE);
+
+    const response = await postRelay(handle, userTurn("Spawn canary 1d04."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "FIXTURE_FAILED" });
+    expect(seen).toHaveLength(1);
+    expect(existsSync(dirname(seen[0]!))).toBe(false);
+    expect(await relayLeftovers("nul-argument-fixture")).toEqual([]);
+  });
+});
+
+describe("fix round 1: invokeCli checks an adapter's declarations itself", () => {
+  it("refuses an inconsistent adapter before any directory or child exists, whoever calls it", async () => {
+    const { marker, probe } = await spawnMarker();
+
+    for (const overrides of [
+      { thinkingLevels: ["low", "high"], defaultThinkingLevel: "medium" },
+      { thinkingLevels: ["High"] },
+      { thinkingLevels: ["low", "low"] },
+      { contextWindowTokens: 0 }
+    ] satisfies readonly Partial<CliRelayAdapter>[]) {
+      await expect(invokeCli(
+        { binary: process.execPath, prefixArguments: ["-e", probe, "--"] },
+        fixtureAdapter("declaration-check-fixture", overrides),
+        renderPromptTranscript([{ role: "user", content: "Declaration probe." }]),
+        1_000
+      ), JSON.stringify(overrides)).rejects.toThrow("CLI_RELAY_ADAPTER_DECLARATION_INVALID");
+    }
+    expect(existsSync(marker)).toBe(false);
+    expect(await relayLeftovers("declaration-check-fixture")).toEqual([]);
+  });
+});
+
+describe("fix round 1: the file transport's prompt directory is reaped on every failure path", () => {
+  const recordingFileAdapter = (
+    maker: string,
+    seen: string[],
+    overrides: Partial<CliRelayAdapter> = {}
+  ): CliRelayAdapter => fixtureAdapter(maker, {
+    promptTransport: "file",
+    buildArguments: (_prompt, invocation) => {
+      const promptFile = invocation?.promptFile;
+      if (promptFile === undefined) throw new Error("FIXTURE_PROMPT_FILE_MISSING");
+      seen.push(promptFile);
+      return ["--attach", promptFile];
+    },
+    ...overrides
+  });
+  const expectReaped = async (maker: string, seen: readonly string[]): Promise<void> => {
+    expect(seen).toHaveLength(1);
+    expect(existsSync(seen[0]!)).toBe(false);
+    expect(existsSync(dirname(seen[0]!))).toBe(false);
+    expect(await relayLeftovers(maker)).toEqual([]);
+  };
+
+  it("after a deadline kill (504)", async () => {
+    const seen: string[] = [];
+    const handle = await startFixtureRelay(
+      recordingFileAdapter("reap-timeout-fixture", seen),
+      "setTimeout(() => undefined, 2_000);",
+      300
+    );
+
+    const response = await postRelay(handle, userTurn("Reap probe."));
+
+    expect(response.status).toBe(504);
+    await expectReaped("reap-timeout-fixture", seen);
+  });
+
+  it("after a non-zero exit (502)", async () => {
+    const seen: string[] = [];
+    const handle = await startFixtureRelay(recordingFileAdapter("reap-exit-fixture", seen), "process.exitCode = 3;");
+
+    const response = await postRelay(handle, userTurn("Reap probe."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "FIXTURE_FAILED" });
+    await expectReaped("reap-exit-fixture", seen);
+  });
+
+  it("after a spawn error for a program that does not exist (502; nothing runs)", async () => {
+    const seen: string[] = [];
+    const handle = await startCliRelayServer({
+      port: 0,
+      timeoutMs: 5_000,
+      command: { binary: join(await pathDirectory(), "absent-cli"), prefixArguments: [] },
+      adapter: recordingFileAdapter("reap-enoent-fixture", seen)
+    });
+    handles.push(handle);
+
+    const response = await postRelay(handle, userTurn("Reap probe."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "FIXTURE_FAILED" });
+    await expectReaped("reap-enoent-fixture", seen);
+  });
+
+  it("after the argument builder throws (400, as a throwing builder has always answered)", async () => {
+    const seen: string[] = [];
+    const handle = await startFixtureRelay(recordingFileAdapter("reap-builder-fixture", seen, {
+      buildArguments: (_prompt, invocation) => {
+        if (invocation?.promptFile !== undefined) seen.push(invocation.promptFile);
+        throw new Error("FIXTURE_ARGUMENTS_FAILED");
+      }
+    }), 'process.stdout.write("OK");');
+
+    const response = await postRelay(handle, userTurn("Reap probe."));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "MALFORMED_REQUEST" });
+    await expectReaped("reap-builder-fixture", seen);
+  });
+});
+
+describe("fix round 1: the usage-cap code pattern is exported for adapter authors", () => {
+  it("accepts one upper-case code token of at most 64 characters, and nothing else", () => {
+    for (const code of ["FIXTURE_USAGE_CAP", "CLAUDE_CLI_USAGE_CAP", "A", `A${"B".repeat(63)}`]) {
+      expect(CLI_RELAY_USAGE_CAP_CODE_TOKEN.test(code), code).toBe(true);
+    }
+    for (const code of [
+      "", "fixture_usage_cap", "_USAGE_CAP", "1USAGE_CAP", "USAGE CAP", "USAGE-CAP", "USAGE_CAP\n", `A${"B".repeat(64)}`
+    ]) {
+      expect(CLI_RELAY_USAGE_CAP_CODE_TOKEN.test(code), JSON.stringify(code)).toBe(false);
+    }
+  });
+});
+
+describe("fix round 1: a stdin or file transport never puts the prompt on argv", () => {
+  it("refuses, before spawning and with cleanup, an argument list that carries the prompt", async () => {
+    for (const transport of ["stdin", "file"] as const) {
+      const maker = `argv-law-${transport}-fixture`;
+      const { marker, probe } = await spawnMarker();
+      const seen: string[] = [];
+      const handle = await startFixtureRelay(fixtureAdapter(maker, {
+        promptTransport: transport,
+        buildArguments: (prompt, invocation) => {
+          if (invocation?.promptFile !== undefined) seen.push(invocation.promptFile);
+          return [`--prompt=${prompt}`];
+        }
+      }), probe);
+
+      const response = await postRelay(handle, userTurn("Argv canary 6c1e."));
+
+      expect(response.status, transport).toBe(502);
+      const text = await response.text();
+      expect(JSON.parse(text), transport).toEqual({ error: "CLI_RELAY_PROMPT_ON_ARGV" });
+      expect(text).not.toContain("Argv canary 6c1e.");
+      expect(existsSync(marker), transport).toBe(false);
+      expect(await relayLeftovers(maker), transport).toEqual([]);
+      if (transport === "file") {
+        expect(seen).toHaveLength(1);
+        expect(existsSync(dirname(seen[0]!))).toBe(false);
+      }
+    }
+  });
+
+  it("leaves the argv transport (the four original makers) free to pass the prompt as an argument", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("argv-law-argv-fixture", {
+      buildArguments: (prompt) => [prompt]
+    }), ARGV_PROBE);
+
+    const response = await postRelay(handle, userTurn("Argv canary 6c1e."));
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as RelayBody;
+    expect(JSON.parse(body.choices[0]!.message.content))
+      .toEqual([renderPromptTranscript([{ role: "user", content: "Argv canary 6c1e." }])]);
   });
 });
