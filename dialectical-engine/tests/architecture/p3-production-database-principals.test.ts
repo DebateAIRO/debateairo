@@ -423,6 +423,12 @@ describe("P3-01 production database-principal manifest", () => {
         // the only one granted UPDATE on those two columns (0054:884-885).
         { component: "apps/runner", environmentKey: "SUPPORT_DATABASE_URL", purpose: "SUPPORT_KEK_ROTATION", binding: "WIRED" },
         { component: "apps/runner", environmentKey: "DATABASE_URL", purpose: "RUNNER_PRODUCT_RUNTIME", binding: "WIRED" },
+        // Engine money rule, Task M5: the operator's read-only disclosure report
+        // (`pnpm ops:serve-disclosure`) runs as the runner, with the runner's own
+        // EnvironmentFile, and only SELECTs rows that principal already reads and
+        // writes (serve.serve_disclosure, serve.synthesis_round, ledger.raw_artifact);
+        // no privilege is added.
+        { component: "apps/runner:serve-disclosure-cli", environmentKey: "DATABASE_URL", purpose: "SERVE_DISCLOSURE_OPERATOR_REPORT", binding: "WIRED", condition: "package script ops:serve-disclosure" },
         { component: "apps/scheduler:replay-self-test", environmentKey: "REPLAY_SELF_TEST_DATABASE_URL", purpose: "REPLAY_SELF_TEST", binding: "WIRED" },
         { component: "apps/scheduler:liveness", environmentKey: "LIVENESS_DATABASE_URL", purpose: "LIVENESS_SWEEP", binding: "WIRED" },
         { component: "apps/scheduler:settlement", environmentKey: "SETTLEMENT_DATABASE_URL", purpose: "SETTLEMENT_WATCH", binding: "WIRED" },
