@@ -602,7 +602,7 @@ describe("T9 crash classes — the ONLY four ways COMPONENTS_ONLY still exists",
     expect(double.evaluatorRequests).toHaveLength(0);
   });
 
-  it("TRANSPORT_DEATH: a dead role transport ends in components-only, not a thrown run", async () => {
+  it("TRANSPORT_DEATH before any complete round: a dead role transport ends in components-only, not a thrown run", async () => {
     const double = recorder({});
     const result = await runServeGateChain(chainInput(), {
       ...double.dependencies,
@@ -613,6 +613,58 @@ describe("T9 crash classes — the ONLY four ways COMPONENTS_ONLY still exists",
     expect(result.terminal).toBe("COMPONENTS_ONLY");
     expect(result.crashClass).toBe("TRANSPORT_DEATH");
     expect(result.conditionMarks).toContain("DEFECT");
+  });
+
+  /**
+   * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — a death AFTER a complete round
+   * is no longer a crash class. Before M3 `runSynthesisLoop` had no catch, so a
+   * round-2 transport death reached this same components-only terminal and
+   * threw round 1 away — the draft AND the verdict its checker had given. Now
+   * the loop ends on round 1, which is served exactly as a finished loop's last
+   * round: its own draft, its own standing objection, nothing invented.
+   */
+  it("TRANSPORT_DEATH after a complete round keeps that round and serves it (Task M3)", async () => {
+    const double = recorder({ verdicts: [unsatisfied("Round one is unfair.", "fairnessToLosers"), SATISFIED] });
+    const result = await runServeGateChain(chainInput(), {
+      ...double.dependencies,
+      synthesize: async (request) => {
+        if (request.round === 2) {
+          throw new TypedDomainError("SYNTHESIS_TRANSPORT_DEATH", "SYNTHESIZER transport exhausted after 3 attempts");
+        }
+        return double.dependencies.synthesize(request);
+      }
+    });
+    expect(result.terminal).not.toBe("COMPONENTS_ONLY");
+    expect(result.crashClass).toBeNull();
+    expect(result.conditionMarks).not.toContain("DEFECT");
+    expect(result.loopRounds.map((round) => round.round)).toEqual([1]);
+    expect(result.segments.map((segment) => segment.text)).toEqual(segments("candidate 1").map((segment) => segment.text));
+    expect(result.standingObjection).toBe("Round one is unfair.");
+    expect(result.conditionMarks).toContain(SYNTHESIS_OBJECTION_STANDING_MARK);
+  });
+
+  it("a spend stop after a complete round keeps it too; before one, it still leaves the chain for the envelope terminal (Task M3)", async () => {
+    const money = new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "no maker fits");
+    const kept = recorder({ verdicts: [unsatisfied("Round one overstates.", "noOverstatement"), SATISFIED] });
+    const served = await runServeGateChain(chainInput(), {
+      ...kept.dependencies,
+      evaluate: async (request) => {
+        if (request.round === 2) throw money;
+        return kept.dependencies.evaluate(request);
+      }
+    });
+    expect(served.crashClass).toBeNull();
+    expect(served.loopRounds.map((round) => round.round)).toEqual([1]);
+    // Round 2's draft was written, but its checker never read it: round 1 is served.
+    expect(kept.synthesizerRequests.map((request) => request.round)).toEqual([1, 2]);
+    expect(served.segments.map((segment) => segment.text)).toEqual(segments("candidate 1").map((segment) => segment.text));
+    // Round 1 refused: nothing checked exists, so the refusal travels to the
+    // runner, which takes the ENVELOPE_EXHAUSTED terminal exactly as before.
+    const first = recorder({});
+    await expect(runServeGateChain(chainInput(), {
+      ...first.dependencies,
+      synthesize: async () => { throw money; }
+    })).rejects.toBe(money);
   });
 
   it("ENVELOPE_EXHAUSTED: the retired guard — an exhausted envelope with no served statement takes the envelope terminal even when restatement FAILED", () => {
@@ -724,6 +776,20 @@ describe("T9 DoD row 2 — no NON-CRASH path returns COMPONENTS_ONLY", () => {
       run: async () => runServeGateChain(chainInput(), recorder({
         verdicts: [unsatisfied("Post-compose R9 objection.", "restatement")]
       }).dependencies)
+    },
+    {
+      // Task M3: before M3 this reached TRANSPORT_DEATH and discarded round 1.
+      name: "a dead transport after round 1 completed",
+      run: async () => {
+        const double = recorder({ verdicts: [unsatisfied("one", "fairnessToLosers"), SATISFIED] });
+        return runServeGateChain(chainInput(), {
+          ...double.dependencies,
+          synthesize: async (request) => {
+            if (request.round === 2) throw new TypedDomainError("SYNTHESIS_TRANSPORT_DEATH", "dead");
+            return double.dependencies.synthesize(request);
+          }
+        });
+      }
     },
     {
       name: "three unsatisfied rounds",

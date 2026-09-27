@@ -1,5 +1,5 @@
 import type { WayOfKnowing } from "@debateai/kernel";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, isRunLevelSpendStop } from "@debateai/kernel";
 import type { PromptContract } from "@debateai/providers";
 
 /**
@@ -583,6 +583,13 @@ export interface SynthesisLoopOutcome<TCandidate> {
   readonly standingObjection: string | null;
   /** `[SYNTHESIS-OBJECTION-STANDING]` when an objection stands, else empty. */
   readonly marks: readonly string[];
+  /**
+   * ENGINE MONEY RULE (spec §14.4.2), TASK M3: the code of the failure that
+   * ended the loop before its bound or a satisfied checker, when the loop kept
+   * its complete rounds instead of discarding them
+   * (`keepsCompleteSynthesisRounds`); null for a loop that finished.
+   */
+  readonly endedEarlyBy: string | null;
 }
 
 /**
@@ -632,10 +639,71 @@ export interface SynthesisLoopDependencies<TCandidate> {
 }
 
 /**
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — THE FAILURES AFTER WHICH A
+ * COMPLETE ROUND IS KEPT RATHER THAN DISCARDED.
+ *
+ * Every run-level spend stop (the kernel's one list: money — after the
+ * runner's cheaper-maker fallback found nothing that fits — the attempt
+ * ceiling, a vendor that reports no usage, a spent day) and a dead role
+ * transport. None of them says anything about the drafts already checked: the
+ * draft the checker read, and the verdict it gave, are as real as they were a
+ * call ago. The owner's rule is that money never costs the person an answer.
+ *
+ * A contract or content error (`COMPOSITION_CONTRACT_ERROR`,
+ * `EVALUATOR_CONTRACT_ERROR`, an incoherent verdict, no artifact) is NOT on
+ * this list: it is not money, and it keeps today's handling. Only a
+ * `TypedDomainError` is trusted — a code-shaped object is not a refusal.
+ */
+export function keepsCompleteSynthesisRounds(error: unknown): boolean {
+  return error instanceof TypedDomainError
+    && (isRunLevelSpendStop(error) || error.code === "SYNTHESIS_TRANSPORT_DEATH");
+}
+
+/**
+ * The outcome a loop that ENDS on `rounds.at(-1)` serves: that round's draft,
+ * and whatever objection that round's own checker left standing. One rule for
+ * a loop that ran to its bound (or to a satisfied checker) and for a loop cut
+ * short after a complete round, so a kept round is served exactly as the
+ * sealed chain serves a finished loop's last round — the chain reads
+ * `loop.rounds.at(-1)!.verdict`, and the rounds handed to it always END with a
+ * complete round. No verdict is ever invented here.
+ */
+function loopOutcomeEndingOn<TCandidate>(input: {
+  readonly candidate: TCandidate;
+  readonly candidateStatement: string;
+  readonly rounds: readonly SynthesisLoopRound[];
+  readonly endedEarlyBy: string | null;
+}): SynthesisLoopOutcome<TCandidate> {
+  const standingObjection = input.rounds.at(-1)?.verdict.satisfied === true
+    ? null
+    : input.rounds.at(-1)?.verdict.objection ?? null;
+  return Object.freeze({
+    candidate: input.candidate,
+    candidateStatement: input.candidateStatement,
+    rounds: Object.freeze([...input.rounds]),
+    standingObjection,
+    marks: Object.freeze(standingObjection === null ? [] : [SYNTHESIS_OBJECTION_STANDING_MARK]),
+    endedEarlyBy: input.endedEarlyBy
+  });
+}
+
+/**
  * ≤ `evaluatorLoopMaxRounds` rounds, or evaluator satisfied — whichever comes
  * first. After the last round the statement is SERVED regardless: the loop
  * never returns "no answer", it returns the last candidate plus whatever
  * objection is still standing, and the caller serves it WITH the mark.
+ *
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — KEEP THE BEST COMPLETE ROUND.
+ * Once at least one round is COMPLETE (a draft and its checker's verdict), a
+ * later round that fails with a spend stop or a dead transport
+ * (`keepsCompleteSynthesisRounds`) no longer throws the complete rounds away:
+ * the loop ends there, on its last complete round, as if its bound had been
+ * that round. "Best" is the loop's own rule — the latest complete draft, which
+ * answered every earlier objection verbatim — and it is the only draft the
+ * sealed chain can serve, because the chain reads the LAST round's verdict.
+ * A draft written in the failed round is never served: its checker never read
+ * it. Before any round is complete there is nothing checked to keep, and the
+ * failure travels exactly as it always has.
  */
 export async function runSynthesisLoop<TCandidate>(
   input: {
@@ -654,70 +722,85 @@ export async function runSynthesisLoop<TCandidate>(
   }
   const rounds: SynthesisLoopRound[] = [];
   let prior: { objection: string; candidateRef: string } | null = null;
-  let candidate: TCandidate | null = null;
-  let candidateStatement = "";
+  /** The draft of the last COMPLETE round — never one its checker did not read. */
+  let complete: { readonly candidate: TCandidate; readonly candidateStatement: string } | null = null;
   for (let round = 1; round <= maxRounds; round += 1) {
-    const synthesizerRequest = buildSynthesizerRequest({
-      controls: input.controls,
-      round,
-      digest: input.digest,
-      codeLabel: input.codeLabel,
-      prior
-    });
-    const synthesized = await dependencies.synthesize(synthesizerRequest);
-    candidate = synthesized.candidate;
-    const candidateRef = synthesized.candidateRef;
-    if (candidateRef.trim().length === 0) {
-      throw new TypedDomainError(
-        "SYNTHESIS_CANDIDATE_REF_MISSING",
-        "A round's candidate must carry the reference of the artifact the provider call recorded"
-      );
+    let verdict: EvaluatorVerdict;
+    let candidate: TCandidate;
+    let candidateStatement: string;
+    let candidateRef: string;
+    try {
+      const synthesizerRequest = buildSynthesizerRequest({
+        controls: input.controls,
+        round,
+        digest: input.digest,
+        codeLabel: input.codeLabel,
+        prior
+      });
+      const synthesized = await dependencies.synthesize(synthesizerRequest);
+      candidate = synthesized.candidate;
+      candidateRef = synthesized.candidateRef;
+      if (candidateRef.trim().length === 0) {
+        throw new TypedDomainError(
+          "SYNTHESIS_CANDIDATE_REF_MISSING",
+          "A round's candidate must carry the reference of the artifact the provider call recorded"
+        );
+      }
+      candidateStatement = dependencies.readCandidateStatement(candidate);
+      const evaluatorRequest = buildEvaluatorRequest({
+        controls: input.controls,
+        round,
+        digest: input.digest,
+        codeLabel: input.codeLabel,
+        candidateStatement
+      });
+      const evaluated = await dependencies.evaluate(evaluatorRequest);
+      verdict = assertEvaluatorVerdict(evaluated.verdict);
+      if (evaluated.verdictRef.trim().length === 0) {
+        throw new TypedDomainError(
+          "SYNTHESIS_CANDIDATE_REF_MISSING",
+          "A round's verdict must carry the reference of the artifact the evaluator call recorded"
+        );
+      }
+      rounds.push(Object.freeze({
+        round,
+        synthesizerRequest,
+        candidateRef,
+        candidateStatement,
+        evaluatorRequest,
+        verdict,
+        verdictRef: evaluated.verdictRef,
+        candidateCallSiteKey: synthesized.candidateCallSiteKey,
+        verdictCallSiteKey: evaluated.verdictCallSiteKey
+      }));
+    } catch (error) {
+      // Task M3: a spend stop or a dead transport after a complete round keeps
+      // that round. `complete` is non-null exactly when `rounds` is non-empty.
+      if (complete !== null && keepsCompleteSynthesisRounds(error)) {
+        return loopOutcomeEndingOn({
+          candidate: complete.candidate,
+          candidateStatement: complete.candidateStatement,
+          rounds,
+          endedEarlyBy: (error as TypedDomainError).code
+        });
+      }
+      throw error;
     }
-    candidateStatement = dependencies.readCandidateStatement(candidate);
-    const evaluatorRequest = buildEvaluatorRequest({
-      controls: input.controls,
-      round,
-      digest: input.digest,
-      codeLabel: input.codeLabel,
-      candidateStatement
-    });
-    const evaluated = await dependencies.evaluate(evaluatorRequest);
-    const verdict = assertEvaluatorVerdict(evaluated.verdict);
-    if (evaluated.verdictRef.trim().length === 0) {
-      throw new TypedDomainError(
-        "SYNTHESIS_CANDIDATE_REF_MISSING",
-        "A round's verdict must carry the reference of the artifact the evaluator call recorded"
-      );
-    }
-    rounds.push(Object.freeze({
-      round,
-      synthesizerRequest,
-      candidateRef,
-      candidateStatement,
-      evaluatorRequest,
-      verdict,
-      verdictRef: evaluated.verdictRef,
-      candidateCallSiteKey: synthesized.candidateCallSiteKey,
-      verdictCallSiteKey: evaluated.verdictCallSiteKey
-    }));
+    complete = { candidate, candidateStatement };
     if (verdict.satisfied) {
       prior = null;
       break;
     }
     prior = { objection: verdict.objection!, candidateRef };
   }
-  if (candidate === null) {
+  if (complete === null) {
     throw new TypedDomainError("SYNTHESIS_LOOP_PRODUCED_NO_CANDIDATE", "The loop bound admitted no round");
   }
-  const standingObjection = rounds.at(-1)?.verdict.satisfied === true
-    ? null
-    : rounds.at(-1)?.verdict.objection ?? null;
-  return Object.freeze({
-    candidate,
-    candidateStatement,
-    rounds: Object.freeze(rounds),
-    standingObjection,
-    marks: Object.freeze(standingObjection === null ? [] : [SYNTHESIS_OBJECTION_STANDING_MARK])
+  return loopOutcomeEndingOn({
+    candidate: complete.candidate,
+    candidateStatement: complete.candidateStatement,
+    rounds,
+    endedEarlyBy: null
   });
 }
 
