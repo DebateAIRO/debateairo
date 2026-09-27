@@ -4,11 +4,13 @@ import {
   CLI_RELAY_THINKING_LEVEL_UNSUPPORTED,
   CLI_RELAY_USAGE_CAP,
   OpenAICompatibleProviderGateway,
+  PROVIDER_CONTENT_LENGTH_EXCEEDED,
   PROVIDER_CONTEXT_WINDOW_EXCEEDED,
   PROVIDER_THINKING_LEVEL_CHANGED,
   PROVIDER_THINKING_LEVEL_UNSUPPORTED,
   PROVIDER_USAGE_CAP,
   ProviderCallFailedError,
+  ProviderContentUnacceptedError,
   estimatePromptTokens,
   estimateWindowTokens,
   reportedReasoningTokens,
@@ -65,6 +67,20 @@ function request(extra: Readonly<Record<string, unknown>> = {}) {
   };
 }
 
+/** The attempt guard and the money seam, each recording that it was asked. */
+function guardSpies() {
+  const seen: string[] = [];
+  const guards = {
+    assertAttemptAllowed: () => { seen.push("assertAttemptAllowed"); },
+    costEnvelope: {
+      assertCallAllowed: () => { seen.push("assertCallAllowed"); },
+      recordCall: () => { seen.push("recordCall"); },
+      assertUsageReported: () => { seen.push("assertUsageReported"); }
+    }
+  };
+  return { guards, seen };
+}
+
 describe("model scorecard — the thinking level on the wire", () => {
   it("sends today's three-member body, byte for byte, when no level is requested — declared levels or not", async () => {
     const expected = JSON.stringify({ model: MODEL, max_tokens: TOKEN_CEILING, messages: PACKET.messages });
@@ -78,7 +94,9 @@ describe("model scorecard — the thinking level on the wire", () => {
 
   it("adds exactly one member, named by the target, when a declared level is requested", async () => {
     for (const [controls, member] of [[RELAY, "x_thinking_level"], [VENDOR, "reasoning_effort"]] as const) {
-      const { gateway, bodies } = gatewayWith(() => completion(), controls);
+      // Fix round 1, finding 2: a relay that was sent a level must echo it.
+      const reply = member === "x_thinking_level" ? completion({ x_thinking_level: "high" }) : completion();
+      const { gateway, bodies } = gatewayWith(() => reply, controls);
       await gateway.call(request({ thinkingLevel: "high" }));
       expect(bodies).toEqual([JSON.stringify({
         model: MODEL, max_tokens: TOKEN_CEILING, [member]: "high", messages: PACKET.messages
@@ -89,11 +107,63 @@ describe("model scorecard — the thinking level on the wire", () => {
   it("refuses an undeclared level BEFORE sending: PROVIDER_THINKING_LEVEL_UNSUPPORTED, no call, no ledger row", async () => {
     for (const [controls, level] of [[{}, "high"], [RELAY, "medium"], [RELAY, "HIGH"], [VENDOR, "--effort"]] as const) {
       const { gateway, bodies, ledger } = gatewayWith(() => completion(), controls);
-      await expect(gateway.call(request({ thinkingLevel: level })))
+      const { guards, seen } = guardSpies();
+      await expect(gateway.call(request({ thinkingLevel: level, ...guards })))
         .rejects.toMatchObject({ code: PROVIDER_THINKING_LEVEL_UNSUPPORTED });
       expect(bodies).toEqual([]);
       expect(ledger).toEqual([]);
+      // Fix round 1, finding 5: neither the attempt guard nor the money seam is asked.
+      expect(seen).toEqual([]);
     }
+    // Control: the same spies DO fire on a declared level, so the empty lists above are not vacuous.
+    const { gateway } = gatewayWith(() => completion({ x_thinking_level: "high" }), RELAY);
+    const { guards, seen } = guardSpies();
+    await gateway.call(request({ thinkingLevel: "high", ...guards }));
+    expect(seen).toEqual(["assertAttemptAllowed", "assertCallAllowed", "recordCall", "assertUsageReported"]);
+  });
+
+  // Fix round 1, finding 1: the level check runs on the raw body, before the
+  // content classifier and the strict response parse, so a wrong-level answer is
+  // never repaired, length-retried or retried as a transport failure.
+  it("refuses a wrong-level echo before the content classifier: CHANGED, one body, one FAILED row", async () => {
+    const { gateway, bodies, ledger } = gatewayWith(() => completion({ x_thinking_level: "low" }), RELAY);
+    await expect(gateway.call(request({
+      thinkingLevel: "high",
+      classifyContent: () => ({ parseStatus: "SCHEMA_FAILED" as const, parseError: "refused by the classifier" })
+    }))).rejects.toMatchObject({ code: PROVIDER_THINKING_LEVEL_CHANGED });
+    expect(bodies).toHaveLength(1);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+
+  it("refuses a wrong-level echo before the strict response parse: CHANGED, one body, one FAILED row", async () => {
+    const schemaRefused = () => new Response(JSON.stringify({ model: MODEL, x_thinking_level: "low" }));
+    const { gateway, bodies, ledger } = gatewayWith(schemaRefused, RELAY);
+    await expect(gateway.call(request({ thinkingLevel: "high" })))
+      .rejects.toMatchObject({ code: PROVIDER_THINKING_LEVEL_CHANGED });
+    expect(bodies).toHaveLength(1);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+
+  // Fix round 1, finding 2 (fail closed): every relay 200 carries its level, so
+  // a relay that was sent a level and does not say it ran it is CHANGED.
+  it("refuses a relay 200 that does not echo the level it was sent: missing, malformed or DEFAULT_ONLY", async () => {
+    for (const reply of [
+      completion(),
+      completion({ x_thinking_level: "HIGH" }),
+      completion({ x_thinking_level: "DEFAULT_ONLY" })
+    ]) {
+      const { gateway, bodies, ledger } = gatewayWith(() => reply, RELAY);
+      await expect(gateway.call(request({ thinkingLevel: "high" })))
+        .rejects.toMatchObject({ code: PROVIDER_THINKING_LEVEL_CHANGED });
+      expect(bodies).toHaveLength(1);
+      expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+    }
+  });
+
+  it("accepts a vendor that never echoes: the level sent is the level used", async () => {
+    const { gateway, bodies } = gatewayWith(() => completion(), VENDOR);
+    await expect(gateway.call(request({ thinkingLevel: "low" }))).resolves.toMatchObject({ thinkingLevel: "low" });
+    expect(bodies).toHaveLength(1);
   });
 
   it("reports the level the call ran at: the relay's echo, else the level sent, else DEFAULT_ONLY", async () => {
@@ -148,6 +218,44 @@ describe("model scorecard — the context window and the usage cap", () => {
     await expect(admitted.gateway.call(request())).resolves.toMatchObject({ content: "ok" });
   });
 
+  // Fix round 1, finding 3: the window code means "this prompt is over this
+  // candidate's window". When the ORIGINAL prompt fit and only a later attempt's
+  // raised bound would not, nothing more is sent and the call ends as exhaustion.
+  it("ends as exhaustion when only a later attempt would overflow the window: the length refusal, one body", async () => {
+    const fits = estimateWindowTokens(PACKET.messages) + TOKEN_CEILING;
+    const { gateway, bodies, ledger } = gatewayWith(() => completion({
+      choices: [{ message: { content: "{\"cut" }, finish_reason: "length" }]
+    }), { contextWindowTokens: fits });
+    const failure = await gateway.call(request({
+      classifyContent: () => ({ parseStatus: "PARSE_FAILED" as const, parseError: "cut off at the bound" })
+    })).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ProviderContentUnacceptedError);
+    expect(failure).toMatchObject({ attempts: 1, lastParseStatus: PROVIDER_CONTENT_LENGTH_EXCEEDED });
+    expect(bodies).toHaveLength(1);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+
+  // Fix round 1, finding 4 (fail closed): a programmatic window that is not a
+  // positive whole number would silently disable the wall, so it is refused.
+  it("refuses at construction a context window that is not a positive whole number within the counter bound", () => {
+    const options = {
+      endpoint: "http://fixture/v1", model: MODEL, maker: "fixture",
+      persistRawArtifact: async () => "artifact",
+      appendLedgerEntry: async () => "ledger",
+      assertNoOpenWriteTransaction: () => undefined
+    };
+    for (const contextWindowTokens of [Number.NaN, 0, -1, 1.5, 2 ** 31, Number.POSITIVE_INFINITY]) {
+      expect(() => new OpenAICompatibleProviderGateway({ ...options, contextWindowTokens }))
+        .toThrowError(new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID"));
+    }
+    expect(() => new OpenAICompatibleProviderGateway({ ...options, contextWindowTokens: null as unknown as number }))
+      .toThrowError(new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID"));
+    for (const contextWindowTokens of [1, 2 ** 31 - 1]) {
+      expect(() => new OpenAICompatibleProviderGateway({ ...options, contextWindowTokens })).not.toThrow();
+    }
+    expect(() => new OpenAICompatibleProviderGateway(options)).not.toThrow();
+  });
+
   it("stops at the relay's usage cap without retrying, and still retries a bare 429", async () => {
     const capped = gatewayWith(() => new Response(JSON.stringify({
       error: CLI_RELAY_USAGE_CAP, x_cli_relay_error: CLI_RELAY_USAGE_CAP
@@ -164,6 +272,19 @@ describe("model scorecard — the context window and the usage cap", () => {
     const failure = await limited.gateway.call(request()).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(ProviderCallFailedError);
     expect(limited.bodies).toHaveLength(3);
+  });
+
+  // Fix round 1, finding 5: `attempts` is the attempt that met the cap, not always 1.
+  it("stops at a usage cap met on attempt 2: attempts = 2, the cap as cause, two bodies", async () => {
+    const capped = gatewayWith((attempt) => attempt === 1
+      ? new Response(JSON.stringify({ error: "upstream" }), { status: 500 })
+      : new Response(JSON.stringify({ error: CLI_RELAY_USAGE_CAP, x_cli_relay_error: CLI_RELAY_USAGE_CAP }), { status: 429 }));
+    const cap = await capped.gateway.call(request()).catch((error: unknown) => error);
+    expect(cap).toBeInstanceOf(ProviderCallFailedError);
+    expect(cap).toMatchObject({ code: "PROVIDER_CALL_FAILED", attempts: 2, lastOutcome: "FAILED" });
+    expect((cap as ProviderCallFailedError).cause).toMatchObject({ code: PROVIDER_USAGE_CAP });
+    expect(capped.bodies).toHaveLength(2);
+    expect(capped.ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED"]);
   });
 });
 

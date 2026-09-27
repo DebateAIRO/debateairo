@@ -295,9 +295,17 @@ function providerTargetThinkingLevels(value: unknown): readonly string[] {
   return Object.freeze([...value] as string[]);
 }
 
-/** Model scorecard §2.10: a positive whole number of tokens within the usage-counter bound. */
+/**
+ * Model scorecard §2.10: a positive whole number of tokens within the
+ * usage-counter bound. One rule for the target parser and the gateway
+ * constructor (task review fix round 1, finding 4).
+ */
+function isContextWindowTokens(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= MAX_USAGE_COUNTER;
+}
+
 function providerTargetContextWindow(value: unknown): number {
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > MAX_USAGE_COUNTER) {
+  if (!isContextWindowTokens(value)) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_CONTEXT_WINDOW_INVALID");
   }
   return value;
@@ -1145,7 +1153,18 @@ export function reportedReasoningTokens(rawUsage: unknown): number | null {
     && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
 }
 
-type ResolvedThinkingLevel = Readonly<{ wire: Readonly<Record<string, string>>; sent: string }>;
+/**
+ * `echoRequired` (task review fix round 1, finding 2 — fail closed): a CLI relay
+ * (`x_thinking_level`) states on every 200 the level it ran at (the relay
+ * contract, Task A8), so a level SENT to one must come back verbatim. An API
+ * vendor (`reasoning_effort`) never echoes, and there the level sent is the
+ * level used. Nothing was sent at DEFAULT_ONLY, so nothing is required back.
+ */
+type ResolvedThinkingLevel = Readonly<{
+  wire: Readonly<Record<string, string>>;
+  sent: string;
+  echoRequired: boolean;
+}>;
 
 /** Model scorecard §2.2: the one body member a requested level becomes, or the refusal. */
 function resolveThinkingLevel(
@@ -1154,7 +1173,7 @@ function resolveThinkingLevel(
   providerRef: string
 ): ResolvedThinkingLevel {
   if (requested === undefined || requested === THINKING_LEVEL_DEFAULT_ONLY) {
-    return Object.freeze({ wire: Object.freeze({}), sent: THINKING_LEVEL_DEFAULT_ONLY });
+    return Object.freeze({ wire: Object.freeze({}), sent: THINKING_LEVEL_DEFAULT_ONLY, echoRequired: false });
   }
   if (!THINKING_LEVEL_TOKEN.test(requested) || control === undefined || !control.levels.includes(requested)) {
     throw new TypedDomainError(
@@ -1162,7 +1181,11 @@ function resolveThinkingLevel(
       `${providerRef} cannot set the requested thinking level`
     );
   }
-  return Object.freeze({ wire: Object.freeze({ [control.parameter]: requested }), sent: requested });
+  return Object.freeze({
+    wire: Object.freeze({ [control.parameter]: requested }),
+    sent: requested,
+    echoRequired: control.parameter === "x_thinking_level"
+  });
 }
 
 /** Model scorecard §2.2: the level a relay says it ran at — a token or DEFAULT_ONLY, else nothing. */
@@ -1346,6 +1369,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
   readonly #options: OpenAICompatibleGatewayOptions;
 
   constructor(options: OpenAICompatibleGatewayOptions) {
+    /**
+     * Task review fix round 1, finding 4 — fail closed. A window that is not a
+     * positive whole number (NaN, 0, negative, fractional, Infinity, past the
+     * counter bound) makes the wall refuse everything or nothing by accident,
+     * with no word said. The target parser refuses it; a programmatic caller
+     * is refused here under the same rule.
+     */
+    if (options.contextWindowTokens !== undefined && !isContextWindowTokens(options.contextWindowTokens)) {
+      throw new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID");
+    }
     this.#options = options;
   }
 
@@ -1388,12 +1421,35 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       ledgerEntryRef: string;
     } | null = null;
 
+    /**
+     * Model scorecard §2.10: whether one attempt fits the declared window. The
+     * prompt side is the ONE local estimate (`estimateWindowTokens`: UTF-8
+     * bytes / 2, the relays' same rule, R1); the answer side is that attempt's
+     * own token bound, because the window must hold both.
+     */
+    const contextWindowTokens = this.#options.contextWindowTokens;
+    const fitsContextWindow = (packet: PromptPacket, tokenCeiling: number): boolean =>
+      contextWindowTokens === undefined
+        || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
+
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
+      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
+      /**
+       * Task review fix round 1, finding 3. PROVIDER_CONTEXT_WINDOW_EXCEEDED
+       * means "this prompt is over this candidate's window", and the picker
+       * reads it so (`packages/scorecard/src/picker.ts`). That is only true of
+       * attempt 1. A LATER attempt can outgrow a window the original prompt
+       * fit — a length retry raises the bound, a repair packet is longer — and
+       * then nothing more is sent: the loop ends exactly as exhaustion would,
+       * before the backoff and the attempt guard, with no ledger row for an
+       * attempt that never happened, and the caller sees the earlier content
+       * rejection (or the usual PROVIDER_CALL_FAILED), never the window code.
+       */
+      if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
       // L4-F8: back off first, then re-check the ceiling, so the decision to spend an attempt is
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
       await request.assertAttemptAllowed?.();
-      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
       // The packet cap (L4-F2) is taken on the body actually sent, which carries the
       // per-attempt bound a length retry raised (W10/2).
       // Model scorecard §2.2: with no level asked this is today's three-member
@@ -1439,15 +1495,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         }
         /**
          * Model scorecard §2.10: a declared context window is a wall, checked
-         * before the call is sent. The prompt side is the ONE local estimate
-         * (`estimateWindowTokens`: UTF-8 bytes / 2, the relays' same rule, R1); the answer side is this
-         * attempt's own token bound, because the window must hold both. The
-         * same prompt does not fit one backoff later, so the refusal
-         * short-circuits below, after its FAILED ledger row.
+         * before the call is sent (`fitsContextWindow` above). The same prompt
+         * does not fit one backoff later, so the refusal short-circuits below,
+         * after its FAILED ledger row. Only attempt 1 can reach this throw: a
+         * later attempt that would not fit ended the loop at its head (fix
+         * round 1, finding 3).
          */
-        const contextWindowTokens = this.#options.contextWindowTokens;
-        if (contextWindowTokens !== undefined
-          && estimateWindowTokens(attemptPacket.messages) + attemptTokenCeiling > contextWindowTokens) {
+        if (!fitsContextWindow(attemptPacket, attemptTokenCeiling)) {
           throw new TypedDomainError(
             PROVIDER_CONTEXT_WINDOW_EXCEEDED,
             `${request.providerRef} declares a ${contextWindowTokens}-token context window and this attempt would not fit`
@@ -1618,6 +1672,32 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           );
         }
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
+        /**
+         * Model scorecard §2.2: the identity check's mirror for the level. A
+         * relay that ran a requested level at another one produced an answer
+         * from a candidate the scorecard did not pick. Nothing is compared
+         * when no level was asked; then the relay's own level is recorded.
+         *
+         * Task review fix round 1:
+         *  · finding 1 — decided HERE, on the raw body, before the content
+         *    classifier and the strict response parse, so a wrong-level answer
+         *    is never repaired, length-retried or retried as a transport
+         *    failure; it is one FAILED row and CHANGED, like the other
+         *    short-circuits.
+         *  · finding 2 — fail closed: a relay that was SENT a level and does
+         *    not echo it verbatim (no echo, a malformed one, DEFAULT_ONLY or
+         *    another level) is CHANGED. A vendor never echoes, so there only a
+         *    different echo is a change.
+         */
+        if (thinking.sent !== THINKING_LEVEL_DEFAULT_ONLY
+          && (thinking.echoRequired
+            ? echoedLevel !== thinking.sent
+            : echoedLevel !== null && echoedLevel !== thinking.sent)) {
+          throw new TypedDomainError(
+            PROVIDER_THINKING_LEVEL_CHANGED,
+            `${request.providerRef} was asked for thinking level ${thinking.sent} and did not report running at it`
+          );
+        }
         assertBoundedProviderResponse(decoded);
         /**
          * V-28 — THE HOSTED REQUIREMENT, asked only of a SUCCESSFUL completion.
@@ -1735,17 +1815,6 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           throw new TypedDomainError(
             "PROVIDER_MODEL_IDENTITY_CHANGED",
             `${request.providerRef} is pinned to ${this.#options.model} and the response asserted a different model`
-          );
-        }
-        // Model scorecard §2.2: the identity check's mirror for the level. A
-        // relay that ran a requested level at another one produced an answer
-        // from a candidate the scorecard did not pick. Nothing is compared
-        // when no level was asked; then the relay's own level is recorded.
-        if (thinking.sent !== THINKING_LEVEL_DEFAULT_ONLY
-          && echoedLevel !== null && echoedLevel !== thinking.sent) {
-          throw new TypedDomainError(
-            PROVIDER_THINKING_LEVEL_CHANGED,
-            `${request.providerRef} was asked for thinking level ${thinking.sent} and reported another`
           );
         }
         const ledgerEntryRef = await this.#options.appendLedgerEntry({
