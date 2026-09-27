@@ -181,6 +181,47 @@ describe("Task 14b · the operator's hosted register file", () => {
     expect(plan.exampleTargetRefs).toEqual(plan.vendorRefs);
   });
 
+  /**
+   * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1). `costEnvelopePolicy`
+   * stays operator-owned, so the answer's reserve and overrun reach a hosted
+   * deployment only through this file. The format string stays v1: every v1
+   * file already published stays valid and keeps its meaning (missing = 0).
+   */
+  it("ships an example carrying the answer's reserve (3000) and overrun (2000), and the plan prints them", async () => {
+    const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
+    expect(example.format).toBe("debateai.hosted-register.v1");
+    expect(example.costEnvelopePolicy).toMatchObject({
+      serve_reserve_basis_points: 3_000,
+      serve_overrun_basis_points: 2_000
+    });
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
+    expect(plan.costEnvelope).toMatchObject({ serveReserveBasisPoints: 3_000, serveOverrunBasisPoints: 2_000 });
+    expect(renderHostedRegisterPlan(plan))
+      .toMatch(/^cost_envelope .* serve_reserve_basis_points=3000 serve_overrun_basis_points=2000$/mu);
+    const envelope = plan.rows.find((row) => row.rowKey === COST_ENVELOPE_POLICY_ROW_KEY);
+    expect(JSON.parse(envelope!.valueJsonText)).toMatchObject({
+      serve_reserve_basis_points: 3_000, serve_overrun_basis_points: 2_000
+    });
+  });
+
+  it("keeps a v1 file WITHOUT the two members valid, and means 0 by it (the margin is off)", async () => {
+    const file = validFile();
+    expect(file.costEnvelopePolicy).not.toHaveProperty("serve_reserve_basis_points");
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)));
+    expect(plan.costEnvelope).toMatchObject({ serveReserveBasisPoints: 0, serveOverrunBasisPoints: 0 });
+    expect(renderHostedRegisterPlan(plan)).toContain("serve_reserve_basis_points=0 serve_overrun_basis_points=0");
+  });
+
+  it("refuses an overrun the day cannot hold, by the register's own code", async () => {
+    const file = validFile();
+    // 250 000 x 1.2 = 300 000 must fit in the day; 299 999 does not hold it.
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      serve_overrun_basis_points: 2_000, daily_ceiling_micros: 299_999
+    });
+    await expect(planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file))))
+      .rejects.toThrowError(expect.objectContaining({ code: "COST_ENVELOPE_POLICY_INVALID" }));
+  });
+
   it("refuses to PUBLISH the example's vendors, which live under reserved example names", async () => {
     const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));

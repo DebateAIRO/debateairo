@@ -563,7 +563,10 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
     `cost_envelope currency=${plan.costEnvelope.currency}`
       + ` per_run_ceiling_micros=${plan.costEnvelope.perRunCeilingMicros}`
       + ` daily_ceiling_micros=${plan.costEnvelope.dailyCeilingMicros}`
-      + ` provisional=${plan.costEnvelope.provisional}`,
+      + ` provisional=${plan.costEnvelope.provisional}`
+      // Task M1: the answer's reserve and overrun, 0 when the file leaves them out.
+      + ` serve_reserve_basis_points=${plan.costEnvelope.serveReserveBasisPoints}`
+      + ` serve_overrun_basis_points=${plan.costEnvelope.serveOverrunBasisPoints}`,
     `synthesis_roles synthesizer=${plan.synthesisRoles.synthesizerRoleRef}`
       + ` evaluator=${plan.synthesisRoles.evaluatorRoleRef}`,
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`

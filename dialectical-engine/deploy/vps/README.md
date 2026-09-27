@@ -1152,6 +1152,29 @@ those rows. The operator record is
 |---|---|---|
 | `per_run_ceiling_micros` | `250000` | 0.25 USD per debate |
 | `daily_ceiling_micros` | `2000000` | 2.00 USD per UTC day |
+| `serve_reserve_basis_points` | `3000` | 30% of each debate's money is kept for writing the answer |
+| `serve_overrun_basis_points` | `2000` | writing the answer may go 20% over the per-debate ceiling |
+
+**The last two rows keep money for the answer** (engine money rule, spec 2026-09-26 §14.4.1).
+They are in basis points, where `10000` is the whole per-debate ceiling. With the values above,
+the calls made while a debate is argued may spend up to 70% of the per-debate ceiling
+(0.175 USD); the calls that write the answer may take the same debate's total up to 120% of it
+(0.30 USD). Both limits count the same running total, so the reserve is simply the part the
+arguing may not touch. The daily ceiling must hold one debate at its new maximum (per-debate
+ceiling plus the overrun, here 0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`);
+each new debate then reserves that maximum, plus the story's own ceiling, against the day.
+Every debate charge written from now on is recorded with the part of the debate that spent it
+(`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer;
+empty for the support chat, the story and older rows), so the first paid run shows the two
+amounts separately.
+
+**Both are optional, and a version without them means 0: no money is kept back and the margin
+is off.** Every register version published before these members existed, and every file that
+leaves them out, keeps exactly the old single ceiling. The kit's example file carries `3000` and
+`2000`, but on this host they take effect only when you publish a register version whose
+`costEnvelopePolicy` carries them (§"Publishing the settings register on this host"; go-live
+checklist line 12). The file format stays `debateai.hosted-register.v1`: a v1 file without them
+is still valid and still means what it meant.
 
 The `costEnvelopePolicy` row says so about itself: it carries `provisional: true` and a
 `provisional_reason` naming V-28. They are meant to stop things — a normal debate costs dollars,
@@ -1226,7 +1249,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `PROVIDER_TARGET_PRICE_REQUIRED:` / `PROVIDER_TARGET_PRICE_ZERO:` + ref | the same refusals the units raise at start-up |
 | `PROVIDER_TARGET_LOOPBACK_REFUSED:` / `PROVIDER_BASE_URL_TLS_REQUIRED:` / `PROVIDER_INLINE_CREDENTIAL_REFUSED:` + ref | a relay, a local or private address, cleartext, or a credential written into the file |
 | `PROVIDER_VENDOR_NOT_VETTED:` + ref | the vendor's V-9(4) record is missing or incomplete |
-| `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units, or the daily ceiling is below the per-run one |
+| `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000 |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
