@@ -184,7 +184,7 @@ describe("M4 · the measured case: 195 points fit every tier", () => {
     ["low", TIERS.low, 36, 60, 9_231],
     ["medium", TIERS.medium, 75, 60, 19_036],
     ["high", TIERS.high, 75, 120, 23_537]
-  ] as const)("%s uses its room: %i points at %i-character summaries", (_tier, budget, kept, cap, bytes) => {
+  ] as const)("%s (%i bytes) uses its room: %i points at %i-character summaries", (_tier, budget, kept, cap, bytes) => {
     const digest = fitted(buildSynthesisDigest({ nodes, servedRootNodeId: uuid(0), budgetBound: budget }));
     expect(digest.compressionLevel).toBe(SPINE);
     expect(digest.nodes).toHaveLength(kept);
