@@ -132,7 +132,8 @@ import {
   type ServeNode,
   type SynthesisDigest,
   type SynthesizerRequest,
-  type VerdictLabelBasis
+  type VerdictLabelBasis,
+  type VerdictLabelDerivation
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import {
@@ -2220,6 +2221,48 @@ export function serveDisclosureBodyFacts(input: Readonly<{
 }
 
 /**
+ * ENGINE MONEY RULE (spec §14.4.4), TASK M5 — THE FLOOR: an answer even when no
+ * answer could be written.
+ *
+ * The runner derives the arithmetic label BEFORE the answer-writing step (T11),
+ * from the propagated numbers alone. When the sealed result still ends
+ * COMPONENTS_ONLY — whatever the cause: money after every cheaper maker, a
+ * digest that cannot exist, a dead transport, a draft with nothing to serve, a
+ * round-1 checker that could not be paid, an attempt overspend — that label
+ * still exists, and the owner's row keeps it:
+ *
+ *  · `verdictState`: the label, exactly as derived;
+ *  · `leadingNodeId`: the position the label rests on, the same node the
+ *    label's `servedNodeId` names;
+ *  · `reason`: the sealed components-only cause (the result's crash class), a
+ *    code; the terminal's own name if a result ever carries none.
+ *
+ * The sealed answer stays COMPONENTS_ONLY: nothing here reaches it, so no
+ * artifact and no checker verdict are invented (money map R1, route (a)). A
+ * SERVED or DOWNGRADED answer carries its own label and has no floor; a FAILED
+ * run persists no answer, so it has no row and no floor.
+ */
+export type ServeFloor = Readonly<{
+  verdictState: VerdictLabelDerivation["label"];
+  leadingNodeId: string;
+  reason: string;
+}>;
+
+export function serveFloorOf(input: Readonly<{
+  terminal: ServeGateResult["terminal"];
+  crashClass: ServeGateResult["crashClass"];
+  label: VerdictLabelDerivation["label"];
+  leadingNodeId: string;
+}>): ServeFloor | null {
+  if (input.terminal !== "COMPONENTS_ONLY") return null;
+  return Object.freeze({
+    verdictState: input.label,
+    leadingNodeId: input.leadingNodeId,
+    reason: input.crashClass ?? input.terminal
+  });
+}
+
+/**
  * ENGINE MONEY RULE (spec §14.4.5), TASK M3 — THE OWNER-SIDE DISCLOSURE ROW.
  *
  * Content-free: provider refs, codes and counts. The served refs are the
@@ -2231,8 +2274,8 @@ export function serveDisclosureBodyFacts(input: Readonly<{
  * DEGRADED-DIVERSITY reads the SEALED refs, so a fallback that put both roles
  * on one maker is recorded here instead. The digest fields (Task M4) are the
  * rung and the points left out of the digest the answer-writer was handed
- * (`serveDisclosureDigestFacts`); the floor fields (M5) are null until that
- * task fills them.
+ * (`serveDisclosureDigestFacts`); the floor fields (Task M5) are the floor of a
+ * components-only answer (`serveFloorOf`), all three or none.
  */
 export function buildServeDisclosureRecord(input: Readonly<{
   answerId: string;
@@ -2245,6 +2288,8 @@ export function buildServeDisclosureRecord(input: Readonly<{
   serveStop: ServeLoopStop | null;
   /** The digest built for the answer-writer, served or not (`serveDisclosureDigestFacts`), or null. */
   digest: Readonly<{ rung: number; pointsOmitted: number }> | null;
+  /** The floor of a components-only answer (`serveFloorOf`), or null. */
+  floor: ServeFloor | null;
 }>): ServeDisclosureRecord {
   const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
   const checkerFallback = input.served !== null && input.served.checkerRef !== input.planned.checkerRef;
@@ -2265,9 +2310,9 @@ export function buildServeDisclosureRecord(input: Readonly<{
     serveStop: input.serveStop,
     digestRung: input.digest?.rung ?? null,
     digestPointsOmitted: input.digest?.pointsOmitted ?? null,
-    floorVerdictState: null,
-    floorLeadingNodeId: null,
-    floorReason: null
+    floorVerdictState: input.floor?.verdictState ?? null,
+    floorLeadingNodeId: input.floor?.leadingNodeId ?? null,
+    floorReason: input.floor?.reason ?? null
   });
 }
 
@@ -6023,6 +6068,16 @@ export class WalkingSkeletonRunner {
         result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, LABEL_BASIS_INCOMPLETE_MARK]) };
       }
     }
+    // Task M5 (spec §14.4.4): an answer that still ends COMPONENTS_ONLY keeps the
+    // label derived above as its FLOOR, on the owner's row, with the position
+    // the label rests on and the sealed cause. The sealed persist below is
+    // handed no basis for it: the answer stays components-only.
+    const floor = serveFloorOf({
+      terminal: result.terminal,
+      crashClass: result.crashClass,
+      label: verdictLabel.label,
+      leadingNodeId: servedRoot.nodeId
+    });
     const persisted = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#serve.persist({
       runId: run.runId,
       workItemId: claimed.workItemId,
@@ -6065,7 +6120,8 @@ export class WalkingSkeletonRunner {
       },
       body: serveDisclosureBody,
       serveStop: serveLoopStopOf(servePhaseFailure),
-      digest: serveDisclosureDigestFacts(writerDigest)
+      digest: serveDisclosureDigestFacts(writerDigest),
+      floor
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",
@@ -6092,15 +6148,18 @@ export class WalkingSkeletonRunner {
     if (wonSettlement) {
       /**
        * VERDICT STORY (spec §3, amended): the work item is DONE and nothing can
-       * re-claim it. Only an answer that carries a label gets a story. Its
-       * snapshot is built HERE, inside the run's content lease, where the
+       * re-claim it. Only an answer that carries a label gets a story: its own
+       * served label, or — Task M5, spec §14.4.4 — its FLOOR, whose story takes
+       * the SAME label basis and has the leading position's own statement as
+       * its answer. The story's checks are unchanged: the label stays fixed.
+       * The snapshot is built HERE, inside the run's content lease, where the
        * in-memory material is; the story itself runs after the lease (below
        * `executeWorkItem`'s catch), each step under its own short disclosure
        * lease on this runner's pool. Building the snapshot cannot fail the
        * settled run: a failure is kept and logged by code after the lease.
        */
       const storyWriter = this.settings.story;
-      if (storyWriter !== undefined && answerCarriesLabel) {
+      if (storyWriter !== undefined && (answerCarriesLabel || floor !== null)) {
         try {
           afterSettle.story = {
             kind: "SNAPSHOT",
@@ -6130,7 +6189,9 @@ export class WalkingSkeletonRunner {
               },
               confidenceBand: result.confidenceBand,
               answerMarks: result.conditionMarks,
-              servedSegments: finalSegments,
+              // A floor answer has no prose: its answer is the leading position's
+              // own statement (the node the label's servedNodeId names).
+              servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
               authored: authoredNodeList,
               positionNodeIds: makerPositionNodeIds,
               baseStrengths: materialised.nodes,

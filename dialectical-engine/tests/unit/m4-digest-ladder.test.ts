@@ -949,7 +949,8 @@ describe("M4 · the owner's row carries the rung and the points left out", () =>
     served: { writerRef: "provider:a", checkerRef: "provider:b" },
     body: { bodyStop: null, pointsWithoutReview: null },
     serveStop: null,
-    digest
+    digest,
+    floor: null
   });
 
   it("names the spine rung and counts what it left out", () => {

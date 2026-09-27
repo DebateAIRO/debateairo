@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
 import { BudgetRepository, CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { StoryBodySchema } from "@debateai/contract";
-import { RunRepository, migrate } from "@debateai/db";
+import { RunRepository, ServeDisclosureRepository, migrate } from "@debateai/db";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import { CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY, type StoryPolicy } from "@debateai/register";
 import {
@@ -132,11 +132,15 @@ async function startStoryDebateProvider(input: {
   readonly storyteller: "valid" | "invalid";
   /** `objects-then-invalid`: round 1's check objects, and every later check answers unusable content. */
   readonly checker?: "satisfied" | "objects-then-invalid";
+  /** Task M5: the position's own statement, when a test must tell it from the answer-writer's prose. */
+  readonly positionStatement?: string;
 }): Promise<{
   readonly endpoint: string;
   storyCalls(): number;
   /** Every material field every story request carried, repair turns included. */
   storyMaterial(): readonly string[];
+  /** The same fields, by name. */
+  storyFields(): readonly Readonly<{ name: string; content: string }>[];
   /** Every story request's system message: the owners' instruction and dev's language directive. */
   storySystem(): readonly string[];
   stop(): Promise<void>;
@@ -145,12 +149,14 @@ async function startStoryDebateProvider(input: {
   let checkerCalls = 0;
   let served = 0;
   const storyMaterial: string[] = [];
+  const storyFields: Readonly<{ name: string; content: string }>[] = [];
   const storySystem: string[] = [];
   const contentFor = async (body: string): Promise<string> => {
     const framed = readFramedMaterial(wirePacket(body));
     const contractId = framed.contractId;
     if (contractId === STORYTELLER_CONTRACT_ID || contractId === STORY_CHECKER_CONTRACT_ID) {
       storyMaterial.push(...framed.fields.map((field) => field.content));
+      storyFields.push(...framed.fields.map((field) => Object.freeze({ name: field.name, content: field.content })));
       const messages = (JSON.parse(body) as { readonly messages?: readonly { role: string; content: string }[] }).messages ?? [];
       storySystem.push(...messages.filter((message) => message.role === "system").map((message) => message.content));
     }
@@ -165,7 +171,13 @@ async function startStoryDebateProvider(input: {
       return CHECKER_SATISFIED;
     }
     if (body.includes("fairness_to_losers")) return EVALUATOR_SATISFIED;
-    if (body.includes("restatement_text")) return JUDGEMENT;
+    if (body.includes("restatement_text")) {
+      return input.positionStatement === undefined ? JUDGEMENT : JSON.stringify({
+        ...JSON.parse(JUDGEMENT) as Record<string, unknown>,
+        statement: input.positionStatement,
+        restatement_text: input.positionStatement
+      });
+    }
     if (body.includes("served_number_refs")) return COMPOSITION;
     throw new Error("STORY_E2E_UNEXPECTED_REQUEST");
   };
@@ -194,6 +206,7 @@ async function startStoryDebateProvider(input: {
     endpoint: `http://127.0.0.1:${address.port}`,
     storyCalls: () => storyCalls,
     storyMaterial: () => [...storyMaterial],
+    storyFields: () => [...storyFields],
     storySystem: () => [...storySystem],
     async stop() { server.close(); await once(server, "close"); }
   };
@@ -567,6 +580,72 @@ describe("verdict story — end to end, after the debate is settled", () => {
         "STORY:CHECKER:1", "STORY:CHECKER:2", "STORY:CHECKER:2", "STORY:STORYTELLER:1", "STORY:STORYTELLER:2"
       ]);
       expect(await servedAnswers(result.answerId)).toEqual([{ answer_version: 1, verdict_state: "CONTESTED" }]);
+    } finally {
+      await provider.stop();
+    }
+  });
+
+  /**
+   * ENGINE MONEY RULE (spec §14.4.4), TASK M5 — a FLOOR answer gets a story too.
+   * No digest can exist (every tier's bound is one byte), so no answer-writer is
+   * called and the sealed answer ends COMPONENTS_ONLY; the label derived before
+   * that step is the floor. The story's snapshot takes the SAME label basis, and
+   * its answer is the leading position's own statement.
+   */
+  it("writes the story of a floor answer from the label's own basis, with the leading position's statement as its answer (Task M5)", async () => {
+    const debate = await createStoryDebate("story-e2e-floor");
+    const positionStatement = "Rent near work beats a cheaper place across town.";
+    const provider = await startStoryDebateProvider({ storyteller: "valid", positionStatement });
+    try {
+      const settings = runnerSettings();
+      const policy = settings.servePolicy!;
+      const tiny = (tier: "low" | "medium" | "high") => ({ ...policy.compositionBudgets[tier], bound: 1 });
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: provider.endpoint, model: "test-layer/model", maker: "test-layer"
+      }), {
+        ...settings,
+        servePolicy: { ...policy, compositionBudgets: { low: tiny("low"), medium: tiny("medium"), high: tiny("high") } },
+        story: storyWriter(LOCAL_STORY_POLICY)
+      });
+      const result = await runner.executeWorkItem(debate.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error(`STORY_E2E_EXPECTED_COMPLETION:${result.kind}`);
+      // The sealed answer is components-only and carries no label: nothing faked.
+      expect(await servedAnswers(result.answerId)).toEqual([{ answer_version: 1, verdict_state: null }]);
+      const root = await database.pool.query<{ node_id: string }>(
+        `SELECT node_id::text AS node_id FROM core.node
+         WHERE run_id = $1 AND parent_node_id IS NULL ORDER BY created_at_seq LIMIT 1`,
+        [debate.runId]
+      );
+      const rootNodeId = root.rows[0]?.node_id;
+      if (rootNodeId === undefined) throw new Error("STORY_E2E_ROOT_UNRESOLVED");
+      expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
+        floorVerdictState: "CONTESTED", floorLeadingNodeId: rootNodeId, floorReason: "DIGEST_CANNOT_EXIST"
+      });
+      // No answer-writing call: the only model calls after the debate are the story's.
+      const composer = await database.pool.query(
+        `SELECT 1 FROM ledger.ledger_entry WHERE run_id = $1 AND action_kind = 'MODEL_CALL'
+           AND (call_site_key LIKE 'COMPOSER:%' OR call_site_key LIKE 'POST_COMPOSE_R9:%')`,
+        [debate.runId]
+      );
+      expect(composer.rowCount).toBe(0);
+      expect(await storyCallSites(debate.runId)).toEqual(["STORY:CHECKER:1", "STORY:STORYTELLER:1"]);
+
+      const stored = await new StoryRepository(database.pool).readForAnswer({
+        answerId: result.answerId, answerVersion: null, ownership: { legacyAskerId: debate.askerId }
+      });
+      expect(stored).toMatchObject({ outcome: "READY", failureCode: null, shapeId: PACK.defaultShape, rounds: 1 });
+      // The label basis is the one the floor's label was derived from: the same
+      // label, rung and position; no band, because nothing was served.
+      expect(stored?.verdictBasis).toMatchObject({
+        label: "CONTESTED", rung: 0, trigger: "BASIS_INCOMPLETE", winner_node_id: rootNodeId,
+        margin: null, disagreement: null, confidence_band: null
+      });
+      expect(stored?.verdictBasis?.marks).toContain("DIGEST-CANNOT-EXIST");
+      // The story's answer is the leading position's own statement.
+      const served = provider.storyFields().filter((field) => field.name === "served_statement");
+      expect(served.length).toBeGreaterThan(0);
+      for (const field of served) expect(JSON.parse(field.content)).toEqual([positionStatement]);
+      for (const content of provider.storyMaterial()) expect(content).not.toMatch(UUID_SHAPED);
     } finally {
       await provider.stop();
     }

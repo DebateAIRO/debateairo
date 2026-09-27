@@ -778,7 +778,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       served: { writerRef: "provider:a", checkerRef: "provider:b" },
       body: { bodyStop: null, pointsWithoutReview: null },
       serveStop: null,
-      digest: null
+      digest: null,
+      floor: null
     })).toEqual({
       ...ids,
       writerPlannedRef: "provider:a",
@@ -807,7 +808,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       served: { writerRef: "provider:c", checkerRef: "provider:c" },
       body: { bodyStop: "MONEY", pointsWithoutReview: 3 },
       serveStop: null,
-      digest: null
+      digest: null,
+      floor: null
     });
     expect(record).toMatchObject({
       writerFallback: true,
@@ -826,7 +828,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       served: { writerRef: "provider:b", checkerRef: "provider:b" },
       body: { bodyStop: null, pointsWithoutReview: null },
       serveStop: null,
-      digest: null
+      digest: null,
+      floor: null
     });
     expect(record).toMatchObject({ writerFallback: true, checkerFallback: false, fallbackReason: "MONEY", checkerSameAsWriter: true });
   });
@@ -838,7 +841,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       served: null,
       body: { bodyStop: "ATTEMPTS", pointsWithoutReview: 0 },
       serveStop: "MONEY",
-      digest: null
+      digest: null,
+      floor: null
     });
     expect(record).toMatchObject({
       writerServedRef: null,
@@ -860,7 +864,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       served: { writerRef: "provider:a", checkerRef: "provider:a" },
       body: { bodyStop: "MONEY", pointsWithoutReview: 1 },
       serveStop: "NO_ARTIFACT",
-      digest: null
+      digest: null,
+      floor: null
     });
     expect(record).toMatchObject({ bodyStop: "MONEY", serveStop: "NO_ARTIFACT", writerServedRef: "provider:a" });
   });

@@ -9,7 +9,7 @@ const read = (path: string) => readFile(new URL(`../../${path}`, import.meta.url
  * item is settled; acceptance stays story-free.
  */
 describe("verdict story — wired into the shipped runner, after settle, never inside the debate", () => {
-  it("builds the snapshot inside the run's lease, after settle, and only when the answer carries a label", async () => {
+  it("builds the snapshot inside the run's lease, after settle, and only when the answer carries a label or a floor", async () => {
     const runner = await read("apps/runner/src/index.ts");
     const lease = runner.indexOf(
       "executed = await this.#memory.withDisclosureContentLease([claimedRunId],async () => {"
@@ -24,7 +24,8 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(completed).toBeGreaterThan(snapshot);
     expect(leaseClosed).toBeGreaterThan(completed);
     expect(runner.split("buildStoryRunSnapshot({")).toHaveLength(2);
-    expect(runner.slice(settle, completed)).toContain("storyWriter !== undefined && answerCarriesLabel");
+    // Task M5 (spec §14.4.4): a floor answer carries a label too.
+    expect(runner.slice(settle, completed)).toContain("storyWriter !== undefined && (answerCarriesLabel || floor !== null)");
     // Never the gated-family shape: `story` stays optional for every other root.
     expect(runner).not.toMatch(/this\.settings\.story === undefined/u);
   });

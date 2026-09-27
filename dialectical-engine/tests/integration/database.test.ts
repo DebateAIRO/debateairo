@@ -5700,7 +5700,8 @@ function answerIdOf(scenario: Readonly<{ result: Awaited<ReturnType<WalkingSkele
 /**
  * Task M4: every M3 debate below is small, and in each the writer was called
  * (paid or refused), so the row records the digest it was handed — whole, at
- * rung 0, nothing left out. The floor fields are M5's and still null.
+ * rung 0, nothing left out. A SERVED answer carries its own label, so it has no
+ * floor (Task M5); the components-only cases assert theirs with `expectFloor`.
  */
 const WHOLE_DIGEST_NO_FLOOR = Object.freeze({
   digestRung: 0,
@@ -6148,8 +6149,9 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.answer?.composed_text).toEqual([]);
     expect(scenario.answer?.condition_marks).toContain("DEFECT");
     expect(await servedRoundMakers(answerIdOf(scenario))).toEqual([]);
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerIdOf(scenario), 1)).toMatchObject({
-      writerServedRef: null, checkerServedRef: null, serveStop: "NO_ARTIFACT", ...WHOLE_DIGEST_NO_FLOOR
+    // Task M5: the label derived before the writer was asked is the floor.
+    expect(await expectFloor(scenario, "NO_ARTIFACT")).toMatchObject({
+      writerServedRef: null, checkerServedRef: null, serveStop: "NO_ARTIFACT", digestRung: 0, digestPointsOmitted: 0
     });
   });
 
@@ -6197,7 +6199,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.error).toBeNull();
     const answerId = answerIdOf(scenario);
     // No checked round exists, so no verdict is invented: components-only, as
-    // today (Task M5 adds the floor).
+    // before; Task M5's floor keeps the label on the owner's row instead.
     expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
     expect(scenario.answer?.composed_text).toEqual([]);
     expect(secondarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(1);
@@ -6205,11 +6207,11 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect((scenario.answer?.condition_mark_records ?? [])
       .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
       .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+    expect(await expectFloor(scenario, "ENVELOPE_EXHAUSTED")).toMatchObject({
       writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
       writerServedRef: null, checkerServedRef: null,
       writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false,
-      bodyStop: null, pointsWithoutReview: null, serveStop: "MONEY", ...WHOLE_DIGEST_NO_FLOOR
+      bodyStop: null, pointsWithoutReview: null, serveStop: "MONEY", digestRung: 0, digestPointsOmitted: 0
     });
   });
 
@@ -6249,6 +6251,8 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       writerServedRef: null, checkerServedRef: null, writerFallback: false, checkerFallback: false,
       serveStop: "TRANSPORT_DEATH"
     });
+    // Task M5: round 1's checker died after its draft was written; the floor keeps the label.
+    await expectFloor(scenario, "TRANSPORT_DEATH");
   });
 
   it("records the stop while arguing and the points it left unreviewed, for a served answer with no fallback", async () => {
@@ -6296,6 +6300,8 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       writerServedRef: null, checkerServedRef: null, bodyStop: "MONEY", pointsWithoutReview: 1,
       serveStop: "TRANSPORT_DEATH"
     });
+    // Task M5: stopped while arguing AND no answer written: the floor still keeps the label.
+    await expectFloor(scenario, "TRANSPORT_DEATH");
   });
 
   it.each([
@@ -6428,6 +6434,136 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     );
     expect(guards.rows[0]?.count).toBe("3");
     expect(await repository.readForAnswerVersion(answerId, 1)).toEqual(written);
+  });
+});
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.4), TASK M5 — THE FLOOR, through the PRODUCTION
+ * runner on the embedded Postgres.
+ *
+ * The runner derives the arithmetic label BEFORE the answer-writing step. When
+ * the run still ends COMPONENTS_ONLY — for any cause — that label, the position
+ * it rests on and the sealed cause land on the owner's row. The sealed answer is
+ * untouched: COMPONENTS_ONLY, no label, no prose, no checked round.
+ */
+async function labelledRoot(runId: string): Promise<Readonly<{ servedNodeId: string; label: string }>> {
+  const receipt = await database.pool.query<{ served_node_id: string | null; label: string | null }>(
+    `SELECT propagation.served_root_selection ->> 'servedNodeId' AS served_node_id,
+            propagation.served_root_selection #>> '{verdictLabel,label}' AS label
+       FROM ledger.propagation_run AS propagation
+      WHERE propagation.run_id = $1
+      ORDER BY propagation.at_seq DESC
+      LIMIT 1`,
+    [runId]
+  );
+  const row = receipt.rows[0];
+  if (row?.served_node_id == null || row.label == null) throw new Error("TEST_LABEL_RECEIPT_ABSENT");
+  return Object.freeze({ servedNodeId: row.served_node_id, label: row.label });
+}
+
+/** The floor on the row IS the label on the receipt; the sealed answer invents nothing. */
+async function expectFloor(
+  scenario: Readonly<{ runId: string; result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null;
+    answer: Awaited<ReturnType<ServeRepository["readAnswerProjection"]>> | null; error: unknown }>,
+  reason: string
+): Promise<NonNullable<Awaited<ReturnType<ServeDisclosureRepository["readForAnswerVersion"]>>>> {
+  expect(scenario.error).toBeNull();
+  const answerId = answerIdOf(scenario);
+  // The sealed answer stays components-only: no label, no prose, no checked round.
+  expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+  expect(scenario.answer?.verdict_state).toBeNull();
+  expect(scenario.answer?.composed_text).toEqual([]);
+  expect(await servedRoundMakers(answerId)).toEqual([]);
+  const receipt = await labelledRoot(scenario.runId);
+  const row = await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1);
+  expect(row).toMatchObject({
+    writerServedRef: null, checkerServedRef: null,
+    floorVerdictState: receipt.label, floorLeadingNodeId: receipt.servedNodeId, floorReason: reason
+  });
+  // The leading position is a node of the answer the person reads.
+  expect(scenario.answer?.nodes.map((node) => node.node_id)).toContain(receipt.servedNodeId);
+  return row!;
+}
+
+describe("Engine money rule M5 — the floor: the label and the leading position when no answer could be written (production runner)", () => {
+  it("records a floor when round 1's writer cannot be paid by any maker", async () => {
+    const primaryDebate = fullDebate("Primary M5 writer refusal");
+    const secondaryDebate = fullDebate("Secondary M5 writer refusal");
+    const scenario = await executeResil01Scenario({
+      label: "m5-writer-refusal",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      secondaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build
+    });
+    const row = await expectFloor(scenario, "ENVELOPE_EXHAUSTED");
+    expect(scenario.answer?.condition_marks).toContain("ENVELOPE_EXHAUSTED");
+    expect(row).toMatchObject({ serveStop: "MONEY", digestRung: 0, digestPointsOmitted: 0 });
+    // Nothing was written for the answer: the ledger holds no answer-writing call.
+    expect(await serveLedger(scenario.runId)).toEqual([]);
+  });
+
+  it("records a floor when no digest can exist, before any answer-writing call", async () => {
+    const policy = runnerSettings().servePolicy!;
+    const tiny = (tier: "low" | "medium" | "high") => ({ ...policy.compositionBudgets[tier], bound: 1 });
+    const debate = fullDebate("Primary M5 digest cannot exist");
+    const secondaryDebate = fullDebate("Secondary M5 digest cannot exist");
+    const scenario = await executeResil01Scenario({
+      label: "m5-digest-cannot-exist",
+      primary: [...debate.judgements, ...debate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: {
+        servePolicy: { ...policy, compositionBudgets: { low: tiny("low"), medium: tiny("medium"), high: tiny("high") } }
+      }
+    });
+    const row = await expectFloor(scenario, "DIGEST_CANNOT_EXIST");
+    expect(scenario.answer?.condition_marks).toContain("DIGEST-CANNOT-EXIST");
+    // No digest was handed to a writer, and none was called.
+    expect(row).toMatchObject({ serveStop: null, digestRung: null, digestPointsOmitted: null });
+    expect(await serveLedger(scenario.runId)).toEqual([]);
+  });
+
+  it("records a floor when round 1's writer transport dies", async () => {
+    const debate = fullDebate("Primary M5 writer death");
+    const secondaryDebate = fullDebate("Secondary M5 writer death");
+    const scenario = await executeResil01Scenario({
+      label: "m5-writer-death",
+      primary: [...debate.judgements, ...debate.reviews, { status: 500 }, resil01Composition],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews]
+    });
+    const row = await expectFloor(scenario, "TRANSPORT_DEATH");
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(row).toMatchObject({ serveStop: "TRANSPORT_DEATH" });
+  });
+
+  it("writes no floor, and no row, for a run that FAILED on a contract error after its label was derived", async () => {
+    const debate = fullDebate("Primary M5 contract failure");
+    const secondaryDebate = fullDebate("Secondary M5 contract failure");
+    const scenario = await executeResil01Scenario({
+      label: "m5-contract-failure",
+      primary: [...debate.judgements, ...debate.reviews, "this is not a composition"],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews]
+    });
+    // A technical failure: the run failed, so it has no answer, no label and no floor.
+    expect(scenario.result).toBeNull();
+    expect(scenario.error).toBeInstanceOf(TypedDomainError);
+    const answers = await database.pool.query("SELECT 1 FROM serve.answer WHERE run_id=$1", [scenario.runId]);
+    expect(answers.rowCount).toBe(0);
+    const rows = await database.pool.query("SELECT 1 FROM serve.serve_disclosure WHERE run_id=$1", [scenario.runId]);
+    expect(rows.rowCount).toBe(0);
+  });
+
+  it("writes no floor, and no row, for a run that FAILED before any label existed", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "m5-first-call-money",
+      primary: [judgementDouble("Primary M5 never-authored position")],
+      secondary: [judgementDouble("Secondary M5 never-authored position")],
+      primaryCostEnvelope: stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" }).build
+    });
+    expect(scenario.result).toBeNull();
+    expect((scenario.error as TypedDomainError).code).toBe("RUN_CEILING_BELOW_FIRST_CALL");
+    const rows = await database.pool.query("SELECT 1 FROM serve.serve_disclosure WHERE run_id=$1", [scenario.runId]);
+    expect(rows.rowCount).toBe(0);
   });
 });
 
