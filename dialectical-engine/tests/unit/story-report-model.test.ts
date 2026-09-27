@@ -401,13 +401,12 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
 });
 
 describe("the report's language (lib/report/reportLanguage.ts)", () => {
-  it("prints every Latin-script locale and refuses the ten scripts the fonts do not carry", () => {
+  it("prints the Latin, Cyrillic, Greek and Devanagari locales, and refuses the scripts it cannot print correctly yet", () => {
     const refused = LOCALES.map(({ code }) => code).filter((code) => !reportSupportedForLocale(code)).sort();
-    expect(refused).toEqual(["ar", "bg", "el", "he", "hi", "ja", "ko", "ru", "uk", "zh"]);
+    expect(refused).toEqual(["ar", "he", "ja", "ko", "zh"]);
     expect([...REPORT_UNPRINTABLE_LOCALES].sort()).toEqual(refused);
-    // One per script group: Latin (with and without diacritics, Vietnamese), Cyrillic, Greek, Hebrew, Arabic, Devanagari, CJK.
-    expect(["ro", "en", "vi", "pl", "tr"].map(reportSupportedForLocale)).toEqual([true, true, true, true, true]);
-    expect(["ru", "bg", "uk", "el", "he", "ar", "hi", "zh", "ja", "ko"].some(reportSupportedForLocale)).toBe(false);
+    // One per script group: Latin (with and without diacritics, Vietnamese), Cyrillic, Greek, Devanagari.
+    expect(["ro", "en", "vi", "pl", "tr", "ru", "bg", "uk", "el", "hi"].every(reportSupportedForLocale)).toBe(true);
   });
 
   it("loads the question's catalogues, and the English public catalogue for the metadata only", async () => {
@@ -428,11 +427,11 @@ describe("the report's language (lib/report/reportLanguage.ts)", () => {
     expect((await loadReportCatalogs({ questionTag: "pt-BR", interfaceLocale: "en", load: loadFromFiles })).locale).toBe("pt");
   });
 
-  it("refuses a question in a script the fonts cannot print, before loading anything", async () => {
+  it("refuses a question in a script the report cannot print, before loading anything", async () => {
     const load: ReportCatalogLoader = async () => { throw new Error("must not load"); };
-    await expect(loadReportCatalogs({ questionTag: "ru", interfaceLocale: "en", load })).rejects.toThrow("REPORT_LOCALE_UNSUPPORTED");
-    // und falls back to an interface locale the fonts cannot print either.
-    await expect(loadReportCatalogs({ questionTag: "und", interfaceLocale: "ja", load })).rejects.toThrow("REPORT_LOCALE_UNSUPPORTED");
+    await expect(loadReportCatalogs({ questionTag: "ar", interfaceLocale: "en", load })).rejects.toThrow("REPORT_LOCALE_UNSUPPORTED");
+    // und falls back to an interface locale the report cannot print either.
+    await expect(loadReportCatalogs({ questionTag: "und", interfaceLocale: "ar", load })).rejects.toThrow("REPORT_LOCALE_UNSUPPORTED");
   });
 });
 
@@ -524,7 +523,9 @@ describe("the PDF's text styles (apps/ui/lib/report/ReportDocument.tsx)", () => 
 
   it("uses the serif family for the fixed headings only", () => {
     expect([...styles].filter(([, body]) => body.includes("REPORT_FONT_SERIF")).map(([name]) => name)).toEqual(["heading"]);
-    expect(source.match(/style=\{styles\.heading\}/gu)).toHaveLength(1);
+    // The report's language adds its own faces (lib/report/reportFonts.ts): Fraunces first only in a Latin report.
+    expect(source.match(/style=\{\[styles\.heading, look\.heading\]\}/gu)).toHaveLength(1);
+    expect(source.match(/styles\.heading\b/gu)).toHaveLength(1);
   });
 
   it("underlines a point number the text names, and keeps each [Pn] citation with the word before it", () => {

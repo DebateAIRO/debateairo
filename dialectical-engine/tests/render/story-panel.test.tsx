@@ -24,10 +24,11 @@ function markup(
   story: AnswerStory | null,
   answer: Answer = STORY_FIXTURE_ANSWER,
   catalog: Record<string, string> = publicRomanian,
-  locale = "ro"
+  locale = "ro",
+  supported?: (locale: string) => boolean
 ): string {
   return renderToStaticMarkup(
-    <StoryPanel view={toStoryView(answer, story, STORY_FIXTURE_DEBATE_ID, locale)} catalog={catalog} locale={locale} />
+    <StoryPanel view={toStoryView(answer, story, STORY_FIXTURE_DEBATE_ID, locale, supported)} catalog={catalog} locale={locale} />
   );
 }
 
@@ -143,7 +144,8 @@ describe("StoryPanel in the question's language (R2, spec §14.2, §14.3)", () =
 
   it("hides the download in a language the report cannot print yet, with a short note, and turns right to left", () => {
     const arabic = publicArabic as Record<string, string>;
-    const text = markup(storyFixture("READY"), STORY_FIXTURE_ANSWER, arabic, "ar");
+    // The rule is injected, so this path stays covered whichever languages the report prints.
+    const text = markup(storyFixture("READY"), STORY_FIXTURE_ANSWER, arabic, "ar", (locale) => locale !== "ar");
     expect(text).toContain('lang="ar" dir="rtl"');
     expect(actions(text)).toBeNull();
     expect(text).toContain(`<p class="storyPanelNote">${html(arabic["public.story.reportUnsupported"]!)}</p>`);

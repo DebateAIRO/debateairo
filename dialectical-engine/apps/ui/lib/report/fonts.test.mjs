@@ -5,31 +5,38 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { openSync } from "fontkit";
 import { LOCALES } from "../i18n/locales.ts";
+import { STORY_FIXTURE_ANSWER, storyFixture } from "../v3/storyFixture.ts";
+import { STORY_SCRIPT_SAMPLE_LOCALES, storyScriptSample, storyScriptSampleText } from "../v3/storyScriptSamples.ts";
+import { reportPlacedFont } from "./reportGlyphs.ts";
+import { REPORT_FONT_FACES, reportFaces } from "./reportFonts.ts";
 import { reportSupportedForLocale } from "./reportLanguage.ts";
+import { reportPrintedText } from "./reportLayout.ts";
+import { buildReportModel } from "./reportModel.ts";
 
 const fontRoot = new URL("../../assets/fonts/", import.meta.url);
 const path = (relative) => fileURLToPath(new URL(relative, fontRoot));
+const opened = new Map();
+const open = (font) => {
+  if (!opened.has(font)) opened.set(font, openSync(path(font)));
+  return opened.get(font);
+};
 
-// Only the faces the PDF and the story panel use: Fraunces 600 for the fixed
-// headings, Plus Jakarta Sans 400, 400 italic and 700 for everything else.
-const FONTS = [
+// A Latin-script report's faces: Fraunces 600 for the fixed headings, Plus
+// Jakarta Sans 400, 400 italic and 700 for everything else.
+const LATIN_FACES = [
   "fraunces/Fraunces9pt-SemiBold.ttf",
   "plus-jakarta-sans/PlusJakartaSans-Regular.ttf",
   "plus-jakarta-sans/PlusJakartaSans-Italic.ttf",
   "plus-jakarta-sans/PlusJakartaSans-Bold.ttf"
 ];
-const SANS = FONTS.filter((font) => font.startsWith("plus-jakarta-sans/"));
-// The standard PDF fonts cannot print ș and ț; every vendored face must.
+const SANS = LATIN_FACES.filter((font) => font.startsWith("plus-jakarta-sans/"));
+// The standard PDF fonts cannot print ș and ț; every Latin face must.
 const ROMANIAN = [..."șțăîâȘȚĂÎÂ„”"];
 // The list of points and the story text print these in the sans face.
 const ARITHMETIC = [..."→≈·—…"];
 
 // R2 (spec §14.3): each interface locale's own letters, upper and lower case,
-// the ones a report in that language prints beyond plain a–z. A language the
-// report prints must find every one in every vendored face; the ten it refuses
-// (reportSupportedForLocale) must not be printable, so the refusal is the fonts'
-// truth, not a guess. New script fonts would move a locale from one half to the
-// other, and this test with it.
+// the ones a report in that language prints beyond plain a–z.
 const LETTERS = Object.freeze({
   bg: "абвгдежзийклмнопрстуфхцчшщъьюяАБВГ", cs: "ěščřžýáíéůúťďňĚŠČŘŽÝÁÍÉŮÚŤĎŇ", da: "æøåÆØÅ", de: "äöüßÄÖÜ",
   el: "αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔ", en: "’“”", es: "ñáéíóúü¿¡ÑÁÉ", et: "õäöüšžÕÄÖÜŠŽ", fi: "äöåÄÖÅ",
@@ -41,26 +48,125 @@ const LETTERS = Object.freeze({
   vi: "ăâđêôơưĂÂĐÊÔƠƯạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ", zh: "中文文本"
 });
 
-const missing = (font, characters) => {
-  const face = openSync(path(font));
-  return characters.filter((character) => !face.hasGlyphForCodePoint(character.codePointAt(0)));
-};
+const missing = (font, characters) => characters.filter((character) => !open(font).hasGlyphForCodePoint(character.codePointAt(0)));
 
-test("every vendored report font prints Romanian letters and quotes", () => {
-  for (const font of FONTS) assert.deepEqual(missing(font, ROMANIAN), [], font);
+/**
+ * The characters of `text` that none of `families` can print in the given
+ * weight and style: react-pdf takes each character from the first family in
+ * the list that has it, and prints .notdef (an empty box) when none has.
+ */
+function uncovered(families, text, fontWeight, fontStyle) {
+  const files = families.map((family) => {
+    const faces = REPORT_FONT_FACES[family];
+    const exact = faces.find((face) => face.fontWeight === fontWeight && face.fontStyle === fontStyle);
+    return (exact ?? faces.find((face) => face.fontStyle === fontStyle) ?? faces[0]).file;
+  });
+  return [...new Set(text)].filter((character) => character !== "\n" && !files.some((file) => open(file).hasGlyphForCodePoint(character.codePointAt(0))));
+}
+
+const STYLES = [[400, "normal"], [700, "normal"], [400, "italic"]];
+
+test("every Latin face prints Romanian letters and quotes", () => {
+  for (const font of LATIN_FACES) assert.deepEqual(missing(font, ROMANIAN), [], font);
 });
 
 test("the sans family prints the report's symbols", () => {
   for (const font of SANS) assert.deepEqual(missing(font, ARITHMETIC), [], font);
 });
 
-test("the report prints exactly the languages whose letters every vendored face carries", () => {
+test("the faces chosen for each language print its letters; Arabic has none, and the report refuses it", () => {
   assert.deepEqual(Object.keys(LETTERS).sort(), LOCALES.map(({ code }) => code).sort());
   for (const { code } of LOCALES) {
-    const printable = FONTS.every((font) => missing(font, [...LETTERS[code]]).length === 0);
-    assert.equal(reportSupportedForLocale(code), printable, `${code}: supported ${reportSupportedForLocale(code)}, printable ${printable}`);
+    if (code === "ar") {
+      assert.throws(() => reportFaces(code, LETTERS.ar), /REPORT_LOCALE_UNSUPPORTED/u);
+      assert.equal(reportSupportedForLocale(code), false);
+      continue;
+    }
+    const { body, heading } = reportFaces(code, LETTERS[code]);
+    for (const [fontWeight, fontStyle] of STYLES) assert.deepEqual(uncovered(body, LETTERS[code], fontWeight, fontStyle), [], `${code} ${fontWeight} ${fontStyle}`);
+    assert.deepEqual(uncovered(heading, LETTERS[code], 600, "normal"), [], `${code} heading`);
   }
-  assert.equal(LOCALES.filter(({ code }) => reportSupportedForLocale(code)).length, 25);
+});
+
+/** One locale's catalogue, read the way the report route reads it. */
+const catalogue = (locale, namespace) =>
+  JSON.parse(readFileSync(new URL(`../../messages/${locale}/${namespace}.json`, import.meta.url), "utf8"));
+
+/**
+ * Everything a report in `locale` can print from its catalogues and formats:
+ * every public.report.* and public.story.* value, the ways of knowing, and a
+ * whole report built from a sample story (its dates, numbers, percentages and
+ * lists in that language, and the sample's own text).
+ */
+function printable(locale) {
+  const publicCatalog = catalogue(locale, "public");
+  const composeCatalog = catalogue(locale, "compose");
+  const values = [
+    ...Object.entries(publicCatalog).filter(([key]) => key.startsWith("public.report.") || key.startsWith("public.story.")),
+    ...Object.entries(composeCatalog).filter(([key]) => key.startsWith("compose.v3.wayOfKnowing."))
+  ].map(([, value]) => value);
+  const sample = STORY_SCRIPT_SAMPLE_LOCALES.includes(locale)
+    ? storyScriptSample(locale)
+    : { answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY_WITH_RESERVATION") };
+  const model = buildReportModel(sample.answer, sample.story, new Date("2026-09-26T12:00:00.000Z"), {
+    locale, publicCatalog, composeCatalog, metadataCatalog: catalogue("en", "public")
+  });
+  return `${values.join("\n")}\n${reportPrintedText(model)}`;
+}
+
+test("every catalogue value and every formatted value a report prints has a glyph in the faces chosen for its language", () => {
+  const printed = LOCALES.map(({ code }) => code).filter(reportSupportedForLocale);
+  assert.ok(printed.length >= 30, printed.join(" "));
+  for (const locale of printed) {
+    const text = printable(locale);
+    const { body, heading } = reportFaces(locale, text);
+    for (const [fontWeight, fontStyle] of STYLES) assert.deepEqual(uncovered(body, text, fontWeight, fontStyle), [], `${locale} ${fontWeight} ${fontStyle}`);
+    assert.deepEqual(uncovered(heading, text, 600, "normal"), [], `${locale} heading`);
+  }
+});
+
+test("every script sample's text has a glyph in the faces chosen for its language", () => {
+  for (const locale of STORY_SCRIPT_SAMPLE_LOCALES.filter(reportSupportedForLocale)) {
+    const text = storyScriptSampleText(locale);
+    const { body } = reportFaces(locale, text);
+    for (const [fontWeight, fontStyle] of STYLES) assert.deepEqual(uncovered(body, text, fontWeight, fontStyle), [], `${locale} ${fontWeight} ${fontStyle}`);
+  }
+});
+
+test("a mark is printed where Noto Sans Devanagari places it: its offset moves into the advances, and the word keeps its width", () => {
+  const font = open("noto-sans-devanagari/NotoSansDevanagari-Regular.ttf");
+  // Words whose marks the font places with an x offset (the nukta, the candrabindu, the u and ai signs).
+  const text = "ज़रूरी हूँ कुछ रुपये फ़ैसला";
+  const raw = font.layout(text);
+  const placed = reportPlacedFont(font).layout(text);
+  assert.ok(raw.positions.filter((position) => position.xOffset !== 0).length >= 3, "the control run has x offsets");
+  assert.deepEqual(placed.positions.map((position) => position.xOffset).filter((offset) => offset !== 0), []);
+  const drawn = (positions) => {
+    let pen = 0;
+    return positions.map((position) => { const spot = pen + position.xOffset; pen += position.xAdvance; return spot; });
+  };
+  const width = (positions) => positions.reduce((sum, position) => sum + position.xAdvance, 0);
+  assert.deepEqual(drawn(placed.positions), drawn(raw.positions));
+  assert.equal(width(placed.positions), width(raw.positions));
+  assert.deepEqual(placed.glyphs.map((glyph) => glyph.id), raw.glyphs.map((glyph) => glyph.id));
+  // Everything else is the font itself, for pdfkit to embed.
+  assert.equal(reportPlacedFont(font).postscriptName, font.postscriptName);
+  assert.equal(reportPlacedFont(font).unitsPerEm, font.unitsPerEm);
+});
+
+test("every glyph of a run stands for the characters of its own place in the text, so textkit finds where each line ends", () => {
+  // "ें" is one glyph in both words, standing for one character in क़दमों (the ों left over from ो) and two in में.
+  const words = ["क़दमों", "में", "करें,", "लें।"];
+  const characters = (run) => run.glyphs.reduce((sum, glyph) => sum + glyph.codePoints.length, 0);
+  // Control: fontkit keeps the glyph shaped first, with its first characters, so a later word counts short.
+  const cached = openSync(path("noto-sans-devanagari/NotoSansDevanagari-Regular.ttf"));
+  const short = words.filter((word) => characters(cached.layout(word.normalize("NFD"))) !== word.normalize("NFD").length);
+  assert.ok(short.length > 0, "the control shows the cache miscounting");
+  const placed = reportPlacedFont(openSync(path("noto-sans-devanagari/NotoSansDevanagari-Regular.ttf")));
+  for (const word of [...words, ...words]) {
+    const text = word.normalize("NFD");
+    assert.equal(characters(placed.layout(text)), text.length, word);
+  }
 });
 
 // Every family directory under assets/fonts, and every file in it.

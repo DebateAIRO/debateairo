@@ -60,9 +60,16 @@ export function storyReportHref(debateId: string): string {
 /**
  * `locale` is the question's locale, the one the story's fixed text and the
  * report are in (lib/i18n/questionLocale.ts), so the view knows whether the
- * report can print it.
+ * report can print it. `supported` is the report's own rule; a test passes
+ * another so the hidden-download path stays covered whatever the rule holds.
  */
-export function toStoryView(answer: Answer, story: AnswerStory | null, debateId: string, locale: string): StoryView {
+export function toStoryView(
+  answer: Answer,
+  story: AnswerStory | null,
+  debateId: string,
+  locale: string,
+  supported: (locale: string) => boolean = reportSupportedForLocale
+): StoryView {
   const requested: AnswerStory["status"] = story === null ? "WRITING" : story.status;
   const ready = requested === "READY" || requested === "READY_WITH_RESERVATION";
   const body = ready && story !== null ? story.story : null;
@@ -93,7 +100,7 @@ export function toStoryView(answer: Answer, story: AnswerStory | null, debateId:
     };
   }
   const paths = body.short.paths.map((path) => ({ fate: path.fate, line: path.line, positionRef: path.position_ref }));
-  const printable = reportSupportedForLocale(locale);
+  const printable = supported(locale);
   return {
     status,
     ...label,

@@ -1,8 +1,10 @@
 import { Fragment, type JSX } from "react";
-import { Document, Link, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Link, Page, StyleSheet, Text, View, type Styles } from "@react-pdf/renderer";
 import type { Answer, AnswerStory } from "@debateai/contract";
 import { formatNumber } from "../i18n/translate.js";
+import { REPORT_FONT_FAMILIES } from "./reportFonts.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
+import { reportLayout, reportPrintedText, type ReportLayout } from "./reportLayout.js";
 import { buildReportModel, reportPageWords, type ReportModel, type ReportParagraph } from "./reportModel.js";
 
 /**
@@ -10,12 +12,15 @@ import { buildReportModel, reportPageWords, type ReportModel, type ReportParagra
  * ReportModel and nothing else: every string is plain text, in the report's one
  * language, and the only links are the code-built internal ones to the entries
  * in the list of points ([Pn] citations, and point numbers the story's text
- * names). The serif family prints only the fixed part titles; every model- or
- * user-written string is set in the sans family, which carries ș ț „ → and
- * every Latin letter the report's languages use (see fonts.test.mjs).
+ * names). In a Latin-script report the serif family prints only the fixed part
+ * titles; every model- or user-written string is set in the sans family, which
+ * carries ș ț „ → and every Latin letter the report's languages use. A report
+ * in another script sets everything in that script's Noto face, and every
+ * character a face lacks comes from the next face in the list
+ * (lib/report/reportFonts.ts; fonts.test.mjs checks the catalogues against it).
  */
-export const REPORT_FONT_SANS = "ReportSans";
-export const REPORT_FONT_SERIF = "ReportSerif";
+export const REPORT_FONT_SANS = REPORT_FONT_FAMILIES.sans;
+export const REPORT_FONT_SERIF = REPORT_FONT_FAMILIES.serif;
 
 // Print colours from the site's light palette (apps/ui/app/globals.css :root): --ink, --text-strong,
 // --text-2, --muted, --accent, --gold-bg, --gold-border and --link. LINE is a solid warm
@@ -117,6 +122,28 @@ function capitals(model: ReportModel, text: string): string {
   return text.toLocaleUpperCase(model.language);
 }
 
+type Style = Styles[string];
+
+/** What a report's language adds to the shared styles (lib/report/reportLayout.ts). */
+interface Look {
+  readonly model: ReportModel;
+  /** The text's faces, set on every page. */
+  readonly page: Style;
+  /** The part titles' faces and weight. */
+  readonly heading: Style;
+  /** No letter spacing on the small labels in a script without capitals. */
+  readonly tracked: Style;
+}
+
+function lookOf(model: ReportModel, layout: ReportLayout): Look {
+  return {
+    model,
+    page: { fontFamily: [...layout.faces.body] },
+    heading: { fontFamily: [...layout.faces.heading], fontWeight: layout.faces.headingWeight },
+    tracked: layout.trackedCapitals ? {} : { letterSpacing: 0 }
+  };
+}
+
 // StyleSheet.create keeps each style's literal shape, so the caller picks a variant rather than passing a style.
 function StoryText({ paragraph, variant }: { paragraph: ReportParagraph; variant: "paragraph" | "pathLine" | "box" }): JSX.Element {
   const style = variant === "pathLine" ? styles.pathLine : variant === "box" ? styles.boxText : styles.paragraph;
@@ -146,10 +173,10 @@ function KeepWithNext({ ahead, style, id, children }: {
   return <View wrap={false} minPresenceAhead={ahead} style={style} {...(id === undefined ? {} : { id })}>{children}</View>;
 }
 
-function Heading({ title, first = false }: { title: string; first?: boolean }): JSX.Element {
+function Heading({ look, title, first = false }: { look: Look; title: string; first?: boolean }): JSX.Element {
   return (
     <KeepWithNext ahead={60} style={first ? styles.headingFirstBox : styles.headingBox}>
-      <Text style={styles.heading}>{title}</Text>
+      <Text style={[styles.heading, look.heading]}>{title}</Text>
     </KeepWithNext>
   );
 }
@@ -162,7 +189,8 @@ function Subheading({ text }: { text: string }): JSX.Element {
   );
 }
 
-function Footer({ model }: { model: ReportModel }): JSX.Element {
+function Footer({ look }: { look: Look }): JSX.Element {
+  const { model } = look;
   return (
     <>
       <Text style={styles.footerLeft} fixed>{model.footer.text}</Text>
@@ -175,15 +203,16 @@ function Footer({ model }: { model: ReportModel }): JSX.Element {
   );
 }
 
-function CoverAndShort({ model }: { model: ReportModel }): JSX.Element {
+function CoverAndShort({ look }: { look: Look }): JSX.Element {
+  const { model } = look;
   const { cover, inShort } = model;
   return (
     <>
-      <Text style={styles.eyebrow}>{capitals(model, cover.eyebrow)}</Text>
+      <Text style={[styles.eyebrow, look.tracked]}>{capitals(model, cover.eyebrow)}</Text>
       <Text style={styles.question}>{cover.question}</Text>
       {cover.labelWords === null ? null : (
         <View style={styles.labelRow}>
-          <Text style={styles.label}>{capitals(model, cover.labelWords)}</Text>
+          <Text style={[styles.label, look.tracked]}>{capitals(model, cover.labelWords)}</Text>
         </View>
       )}
       <Text style={styles.confidence}>{cover.confidence}</Text>
@@ -192,12 +221,12 @@ function CoverAndShort({ model }: { model: ReportModel }): JSX.Element {
       <View style={styles.disclosure}>
         <Text style={styles.disclosureLine}>{cover.disclosure}</Text>
       </View>
-      <Heading title={inShort.title} />
+      <Heading look={look} title={inShort.title} />
       <Text style={styles.headline}>{inShort.headline}</Text>
       <Text style={styles.paragraph}>{inShort.summary}</Text>
       {inShort.paths.map((path, index) => (
         <View key={index} style={styles.pathRow} wrap={false}>
-          <Text style={styles.fate}>{capitals(model, path.fateWords)}</Text>
+          <Text style={[styles.fate, look.tracked]}>{capitals(model, path.fateWords)}</Text>
           <StoryText paragraph={path.line} variant="pathLine" />
         </View>
       ))}
@@ -206,10 +235,11 @@ function CoverAndShort({ model }: { model: ReportModel }): JSX.Element {
   );
 }
 
-function LongStory({ model }: { model: ReportModel }): JSX.Element {
+function LongStory({ look }: { look: Look }): JSX.Element {
+  const { model } = look;
   return (
     <>
-      <Heading title={model.storyTitle} first />
+      <Heading look={look} title={model.storyTitle} first />
       <Text style={styles.intro}>{model.storyIntro}</Text>
       {model.sections.map((section, index) => (
         <Fragment key={index}>
@@ -223,7 +253,7 @@ function LongStory({ model }: { model: ReportModel }): JSX.Element {
       ))}
       {model.reviewerNote === null ? null : (
         <View style={styles.box} wrap={false}>
-          <Text style={styles.boxTitle}>{capitals(model, model.reviewerNote.title)}</Text>
+          <Text style={[styles.boxTitle, look.tracked]}>{capitals(model, model.reviewerNote.title)}</Text>
           <StoryText paragraph={model.reviewerNote.paragraph} variant="box" />
         </View>
       )}
@@ -237,11 +267,12 @@ function reasonNumber(model: ReportModel, index: number): string {
   return formatNumber(model.language, index + 1);
 }
 
-function Why({ model }: { model: ReportModel }): JSX.Element {
+function Why({ look }: { look: Look }): JSX.Element {
+  const { model } = look;
   const { why } = model;
   return (
     <>
-      <Heading title={why.title} first />
+      <Heading look={look} title={why.title} first />
       {why.reasons.map((reason, index) => (
         <View key={index} style={styles.reasonRow}>
           <Text style={styles.reasonNumber}>{reasonNumber(model, index)}</Text>
@@ -256,10 +287,11 @@ function Why({ model }: { model: ReportModel }): JSX.Element {
   );
 }
 
-function Appendix({ model }: { model: ReportModel }): JSX.Element {
+function Appendix({ look }: { look: Look }): JSX.Element {
+  const { model } = look;
   return (
     <>
-      <Heading title={model.appendix.title} first />
+      <Heading look={look} title={model.appendix.title} first />
       <Text style={styles.intro}>{model.appendix.intro}</Text>
       {model.appendix.entries.map((entry) => (
         <Fragment key={entry.anchor}>
@@ -281,10 +313,11 @@ function Appendix({ model }: { model: ReportModel }): JSX.Element {
   );
 }
 
-function About({ model }: { model: ReportModel }): JSX.Element {
+function About({ look }: { look: Look }): JSX.Element {
+  const { model } = look;
   return (
     <>
-      <Heading title={model.about.title} first />
+      <Heading look={look} title={model.about.title} first />
       {model.about.rows.map((row, index) => (
         <View key={index} style={styles.aboutRow} wrap={false}>
           <Text style={styles.aboutLabel}>{row.label}</Text>
@@ -296,6 +329,8 @@ function About({ model }: { model: ReportModel }): JSX.Element {
 }
 
 export function ReportDocumentView({ model }: { model: ReportModel }): JSX.Element {
+  const look = lookOf(model, reportLayout(model.language, reportPrintedText(model)));
+  const page = [styles.page, look.page];
   return (
     <Document
       title={model.documentTitle}
@@ -306,25 +341,25 @@ export function ReportDocumentView({ model }: { model: ReportModel }): JSX.Eleme
       keywords="AI-generated"
       language={model.language}
     >
-      <Page size="A4" style={styles.page} bookmark={model.inShort.title}>
-        <CoverAndShort model={model} />
-        <Footer model={model} />
+      <Page size="A4" style={page} bookmark={model.inShort.title}>
+        <CoverAndShort look={look} />
+        <Footer look={look} />
       </Page>
-      <Page size="A4" style={styles.page} bookmark={model.storyTitle}>
-        <LongStory model={model} />
-        <Footer model={model} />
+      <Page size="A4" style={page} bookmark={model.storyTitle}>
+        <LongStory look={look} />
+        <Footer look={look} />
       </Page>
-      <Page size="A4" style={styles.page} bookmark={model.why.title}>
-        <Why model={model} />
-        <Footer model={model} />
+      <Page size="A4" style={page} bookmark={model.why.title}>
+        <Why look={look} />
+        <Footer look={look} />
       </Page>
-      <Page size="A4" style={styles.page} bookmark={model.appendix.title}>
-        <Appendix model={model} />
-        <Footer model={model} />
+      <Page size="A4" style={page} bookmark={model.appendix.title}>
+        <Appendix look={look} />
+        <Footer look={look} />
       </Page>
-      <Page size="A4" style={styles.page} bookmark={model.about.title}>
-        <About model={model} />
-        <Footer model={model} />
+      <Page size="A4" style={page} bookmark={model.about.title}>
+        <About look={look} />
+        <Footer look={look} />
       </Page>
     </Document>
   );

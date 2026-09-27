@@ -2,21 +2,18 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Font, renderToBuffer } from "@react-pdf/renderer";
 import type { Answer, AnswerStory } from "@debateai/contract";
-import { REPORT_FONT_SANS, REPORT_FONT_SERIF, ReportDocument } from "./ReportDocument.js";
+import { ReportDocumentView } from "./ReportDocument.js";
+import { reportPlacedFont } from "./reportGlyphs.js";
+import { REPORT_FONT_FACES, type ReportFontFamily } from "./reportFonts.js";
 import { reportSupportedForLocale, type ReportCatalogs } from "./reportLanguage.js";
-import { reportWordPieces } from "./reportModel.js";
+import { reportLayout, reportPrintedText } from "./reportLayout.js";
+import { buildReportModel, reportWordPieces } from "./reportModel.js";
 
 /**
- * The vendored OFL fonts (apps/ui/assets/fonts, with each family's OFL.txt).
- * Only the faces the report and the story panel use: Fraunces 600 for the fixed
- * headings, Plus Jakarta Sans 400, 400 italic and 700 for everything else.
+ * The vendored OFL fonts (apps/ui/assets/fonts, with each family's OFL.txt and
+ * SOURCES.md): the faces lib/report/reportFonts.ts lists, and only those.
  */
-export const REPORT_FONT_FILES = Object.freeze({
-  serifSemiBold: "fraunces/Fraunces9pt-SemiBold.ttf",
-  sansRegular: "plus-jakarta-sans/PlusJakartaSans-Regular.ttf",
-  sansItalic: "plus-jakarta-sans/PlusJakartaSans-Italic.ttf",
-  sansBold: "plus-jakarta-sans/PlusJakartaSans-Bold.ttf"
-});
+const FONT_DIRECTORY_MARKER = REPORT_FONT_FACES.ReportSans[0]!.file;
 
 /**
  * No machine path: the UI process runs from apps/ui (deploy/vps/systemd
@@ -26,7 +23,7 @@ export const REPORT_FONT_FILES = Object.freeze({
  */
 export function resolveReportFontDirectory(cwd: string = process.cwd()): string {
   for (const candidate of [resolve(cwd, "assets/fonts"), resolve(cwd, "apps/ui/assets/fonts")]) {
-    if (existsSync(join(candidate, REPORT_FONT_FILES.sansRegular))) return candidate;
+    if (existsSync(join(candidate, FONT_DIRECTORY_MARKER))) return candidate;
   }
   throw new Error("REPORT_FONTS_UNRESOLVED: the report fonts are not under assets/fonts or apps/ui/assets/fonts");
 }
@@ -48,28 +45,56 @@ let registeredFontDirectory: string | null = null;
 
 function registerReportFonts(directory: string): void {
   if (registeredFontDirectory === directory) return;
-  Font.register({
-    family: REPORT_FONT_SERIF,
-    fonts: [{ src: join(directory, REPORT_FONT_FILES.serifSemiBold), fontWeight: 600 }]
-  });
-  Font.register({
-    family: REPORT_FONT_SANS,
-    fonts: [
-      { src: join(directory, REPORT_FONT_FILES.sansRegular), fontWeight: 400 },
-      { src: join(directory, REPORT_FONT_FILES.sansItalic), fontWeight: 400, fontStyle: "italic" },
-      { src: join(directory, REPORT_FONT_FILES.sansBold), fontWeight: 700 }
-    ]
-  });
+  for (const [family, faces] of Object.entries(REPORT_FONT_FACES)) {
+    Font.register({
+      family,
+      fonts: faces.map(({ file, fontWeight, fontStyle }) => ({ src: join(directory, file), fontWeight, fontStyle }))
+    });
+  }
   Font.registerHyphenationCallback(reportHyphenation);
   registeredFontDirectory = directory;
+}
+
+type FontSource = NonNullable<ReturnType<typeof Font.getRegisteredFonts>[string]>["sources"][number];
+type LoadedFont = NonNullable<FontSource["data"]>;
+
+/** One loaded, placed font per file: a script's italic is its regular file registered twice, and shares it. */
+const placedFonts = new Map<string, Promise<LoadedFont>>();
+const preparedSources = new WeakSet<FontSource>();
+
+/**
+ * Loads the families a report uses before react-pdf does, and hands react-pdf
+ * each font wrapped by reportPlacedFont (lib/report/reportGlyphs.ts says why).
+ * Only these families are loaded: a Latin report never reads the CJK files.
+ * Each file is read once per process, however many times it is registered.
+ */
+async function prepareReportFonts(families: readonly ReportFontFamily[]): Promise<void> {
+  const registered = Font.getRegisteredFonts();
+  for (const family of families) {
+    for (const source of registered[family]?.sources ?? []) {
+      if (preparedSources.has(source)) continue;
+      let placed = placedFonts.get(source.src);
+      if (placed === undefined) {
+        placed = source.load().then(() => {
+          if (source.data === null) throw new Error(`REPORT_FONT_UNREADABLE: ${source.src}`);
+          return reportPlacedFont(source.data);
+        });
+        placed.catch(() => placedFonts.delete(source.src));
+        placedFonts.set(source.src, placed);
+      }
+      source.data = await placed;
+      source.loadResultPromise = Promise.resolve();
+      preparedSources.add(source);
+    }
+  }
 }
 
 /**
  * Renders the owner's full report, in the language of `catalogs`
  * (loadReportCatalogs: the question's, or the reader's when the question's is
  * not known). Nothing is written to disk; the caller streams the bytes. A
- * language whose script the vendored fonts cannot print is refused here too,
- * never printed as empty boxes.
+ * language whose script the report cannot print is refused here too, never
+ * printed as empty boxes.
  */
 export async function renderReportPdf(input: Readonly<{
   answer: Answer;
@@ -80,10 +105,8 @@ export async function renderReportPdf(input: Readonly<{
 }>): Promise<Buffer> {
   if (!reportSupportedForLocale(input.catalogs.locale)) throw new RangeError(`REPORT_LOCALE_UNSUPPORTED: ${input.catalogs.locale}`);
   registerReportFonts(input.fontDirectory ?? resolveReportFontDirectory());
-  return renderToBuffer(ReportDocument({
-    answer: input.answer,
-    story: input.story,
-    generatedAt: input.generatedAt,
-    catalogs: input.catalogs
-  }));
+  const model = buildReportModel(input.answer, input.story, input.generatedAt, input.catalogs);
+  const { faces } = reportLayout(model.language, reportPrintedText(model));
+  await prepareReportFonts([...new Set([...faces.body, ...faces.heading])]);
+  return renderToBuffer(ReportDocumentView({ model }));
 }

@@ -6,18 +6,21 @@ import type { MessageCatalog } from "../i18n/translate.js";
  * The language the full report is printed in (spec 2026-09-26 §14.3): the
  * question's, so the report reads in one language from cover to appendix.
  *
- * FONTS (interim, until the owner's font decision): the vendored faces
- * (apps/ui/assets/fonts, Fraunces and Plus Jakarta Sans) carry every Latin
- * letter the 25 Latin-script interface locales use, Vietnamese included, and
- * none of the Cyrillic, Greek, Hebrew, Arabic, Devanagari or CJK scripts
- * (lib/report/fonts.test.mjs measures both halves). A report in one of those
- * ten would print empty boxes, so it is refused: the panel hides its download
- * and says the report is not available in that language yet. New script fonts
- * (and right-to-left layout for ar and he) would flip this list.
+ * FONTS (Task R-fonts, owner decision 2026-09-27: "A: add them"): the vendored
+ * faces (apps/ui/assets/fonts, SOURCES.md; the choice per language is
+ * lib/report/reportFonts.ts) print the 25 Latin-script locales, Cyrillic and
+ * Greek (Noto Sans) and Devanagari (Noto Sans Devanagari); fonts.test.mjs
+ * checks every catalogue value against them. A locale stays in this list, and
+ * its report is refused (the panel hides the download and says the report is
+ * not available in that language yet), only while the report cannot print it
+ * correctly:
+ * - he: right-to-left layout is not wired yet;
+ * - zh, ja, ko: CJK text breaks between runs of different scripts with a
+ *   printed hyphen until its own line-break rule is wired;
+ * - ar: react-pdf 4.9.0 drops the vertical mark positions the Noto Arabic
+ *   fonts need for every dotted letter (lib/report/reportGlyphs.ts).
  */
-export const REPORT_UNPRINTABLE_LOCALES: readonly LocaleCode[] = Object.freeze([
-  "bg", "ru", "uk", "el", "he", "ar", "hi", "zh", "ja", "ko"
-]);
+export const REPORT_UNPRINTABLE_LOCALES: readonly LocaleCode[] = Object.freeze(["he", "ar", "zh", "ja", "ko"]);
 
 export function reportSupportedForLocale(locale: string): boolean {
   return !(REPORT_UNPRINTABLE_LOCALES as readonly string[]).includes(locale);

@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { Answer, AnswerStory } from "@debateai/contract";
 import { CONDITION_MARKS } from "@debateai/kernel";
 import { tPlural } from "../../apps/ui/lib/i18n/translate.js";
-import { loadReportCatalogs, type ReportCatalogLoader } from "../../apps/ui/lib/report/reportLanguage.js";
+import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
+import { loadReportCatalogs, reportSupportedForLocale, type ReportCatalogLoader } from "../../apps/ui/lib/report/reportLanguage.js";
 import { buildReportModel } from "../../apps/ui/lib/report/reportModel.js";
 import {
   STORY_FIXTURE_ANSWER,
@@ -273,8 +274,20 @@ describe("toStoryView holds data, never words (R2, spec §14.2)", () => {
 
   it("offers the PDF only in a language the report can print, and says so otherwise", () => {
     expect(view("READY", "ro")).toMatchObject({ pdfHref: `/debate/${STORY_FIXTURE_DEBATE_ID}/report`, reportUnsupported: false });
-    expect(view("READY", "ru")).toMatchObject({ pdfHref: null, reportUnsupported: true });
-    expect(view("WRITING", "ru")).toMatchObject({ pdfHref: null, reportUnsupported: false });
+    // An injected rule keeps the refusal covered whatever REPORT_UNPRINTABLE_LOCALES holds (it may be empty one day).
+    const printsOnlyRomanian = (locale: string) => locale === "ro";
+    const viewIn = (status: AnswerStory["status"], locale: string) =>
+      toStoryView(STORY_FIXTURE_ANSWER, storyFixture(status), STORY_FIXTURE_DEBATE_ID, locale, printsOnlyRomanian);
+    expect(viewIn("READY", "ro")).toMatchObject({ pdfHref: `/debate/${STORY_FIXTURE_DEBATE_ID}/report`, reportUnsupported: false });
+    expect(viewIn("READY", "ru")).toMatchObject({ pdfHref: null, reportUnsupported: true });
+    expect(viewIn("WRITING", "ru")).toMatchObject({ pdfHref: null, reportUnsupported: false });
+  });
+
+  it("follows the report's own rule by default, for every interface locale", () => {
+    for (const { code } of LOCALES) {
+      expect(view("READY", code).reportUnsupported, code).toBe(!reportSupportedForLocale(code));
+      expect(view("READY", code).pdfHref === null, code).toBe(!reportSupportedForLocale(code));
+    }
   });
 
   it("holds no fixed English words at all", () => {

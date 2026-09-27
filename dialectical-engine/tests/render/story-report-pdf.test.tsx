@@ -16,6 +16,11 @@ import {
   storyFixtureEdge,
   storyFixtureNode
 } from "../../apps/ui/lib/v3/storyFixture.js";
+import {
+  storyScriptSample,
+  storyScriptSampleText,
+  type StoryScriptSampleLocale
+} from "../../apps/ui/lib/v3/storyScriptSamples.js";
 
 function answerWithPoints(roots: number, childrenPerRoot: number): Answer {
   const nodes: Answer["nodes"] = [];
@@ -38,8 +43,8 @@ function answerWithPoints(roots: number, childrenPerRoot: number): Answer {
   return { ...STORY_FIXTURE_ANSWER, nodes, edges };
 }
 
-/** The decompressed text of every content stream, lower-cased: enough to read the ToUnicode maps. */
-function inflatedStreams(pdf: Buffer): string {
+/** The decompressed text of each content stream, lower-cased. */
+function streamTexts(pdf: Buffer): string[] {
   const raw = pdf.toString("latin1");
   const out: string[] = [];
   const marker = /stream\r?\n/g;
@@ -49,12 +54,39 @@ function inflatedStreams(pdf: Buffer): string {
     const end = raw.indexOf("endstream", start);
     if (end < 0) break;
     try {
-      out.push(inflateSync(pdf.subarray(start, end)).toString("latin1"));
+      out.push(inflateSync(pdf.subarray(start, end)).toString("latin1").toLowerCase());
     } catch {
       // not a deflate stream (an image, say); nothing to read
     }
   }
-  return out.join("\n").toLowerCase();
+  return out;
+}
+
+/** The decompressed text of every content stream, lower-cased: enough to read the ToUnicode maps. */
+function inflatedStreams(pdf: Buffer): string {
+  return streamTexts(pdf).join("\n");
+}
+
+/**
+ * Every glyph the pages draw, as the four hex digits pdfkit writes for an
+ * embedded font (Identity-H). A glyph 0000 is the font's .notdef: an empty box
+ * where a character had no glyph.
+ */
+function drawnGlyphs(pdf: Buffer): string[] {
+  const glyphs: string[] = [];
+  for (const stream of streamTexts(pdf)) {
+    for (const array of stream.matchAll(/\[([^\]]*)\]\s*tj/gu)) {
+      for (const hex of array[1]!.matchAll(/<([0-9a-f]*)>/gu)) {
+        for (let at = 0; at < hex[1]!.length; at += 4) glyphs.push(hex[1]!.slice(at, at + 4));
+      }
+    }
+  }
+  return glyphs;
+}
+
+/** The embedded fonts' names, without pdfkit's six-letter subset tag. */
+function embeddedFonts(raw: string): string[] {
+  return [...new Set(Array.from(raw.matchAll(/\/BaseFont \/(?:[A-Z]{6}\+)?([A-Za-z0-9-]+)/gu), (match) => match[1]!))].sort();
 }
 
 /**
@@ -182,15 +214,55 @@ describe("renderReportPdf (spec §10)", () => {
     ]);
   }, 120_000);
 
-  it("refuses to print a language whose script the fonts do not carry, instead of printing boxes", async () => {
-    const russian: ReportCatalogs = { ...ENGLISH, locale: "ru" };
+  it("refuses to print a language it cannot print correctly, instead of printing it wrongly", async () => {
+    // Arabic: react-pdf 4.9.0 drops the vertical mark positions its dotted letters need (reportLanguage.ts).
+    const arabic: ReportCatalogs = { ...ENGLISH, locale: "ar" };
+    const { answer, story } = storyScriptSample("ar");
     await expect(renderReportPdf({
-      answer: STORY_FIXTURE_ANSWER,
-      story: storyFixture("READY"),
+      answer,
+      story,
       generatedAt: new Date("2026-09-26T12:00:00.000Z"),
-      catalogs: russian
+      catalogs: arabic
     })).rejects.toThrow("REPORT_LOCALE_UNSUPPORTED");
   });
+});
+
+describe("the report in the question's own script (R-fonts)", () => {
+  const catalogs = (locale: string) => loadReportCatalogs({ questionTag: locale, interfaceLocale: "en", load: loadNamespace });
+  const render = async (locale: StoryScriptSampleLocale) => {
+    const { answer, story } = storyScriptSample(locale);
+    return renderReportPdf({ answer, story, generatedAt: new Date("2026-09-26T12:00:00.000Z"), catalogs: await catalogs(locale) });
+  };
+  /**
+   * The letters each sample prints, as the ToUnicode maps write them. Not the
+   * Devanagari independent vowels: Noto Sans Devanagari draws ई as इ plus a
+   * mark, one glyph that can copy out as only one of the two.
+   */
+  const letters = (text: string) => [...new Set([...text])]
+    .filter((character) => /\p{L}/u.test(character) && !/[\u0904-\u0914]/u.test(character))
+    .map((character) => character.codePointAt(0)!.toString(16).padStart(4, "0"));
+
+  it.each([
+    ["ru", ["NotoSans-Bold", "NotoSans-Italic", "NotoSans-Regular"]],
+    ["el", ["NotoSans-Bold", "NotoSans-Italic", "NotoSans-Regular"]],
+    ["hi", ["NotoSans-Regular", "NotoSansDevanagari-Bold", "NotoSansDevanagari-Regular"]]
+  ] as const)("prints the %s sample in its own Noto face, with no empty box and no fallback to the standard fonts", async (locale, faces) => {
+    const pdf = await render(locale);
+    const raw = pdf.toString("latin1");
+    expect(raw).toContain(`/Lang (${locale})`);
+    const embedded = embeddedFonts(raw);
+    for (const face of faces) expect(embedded, locale).toContain(face);
+    // Nothing fell back to Helvetica, whose standard encoding has no glyph for these letters.
+    expect(embedded.filter((name) => /Helvetica|Times|Courier/u.test(name)), locale).toEqual([]);
+    const glyphs = drawnGlyphs(pdf);
+    expect(glyphs.length, locale).toBeGreaterThan(500);
+    expect(glyphs.filter((glyph) => glyph === "0000"), `${locale}: .notdef drawn`).toEqual([]);
+    // Every letter of the sample copies out of the PDF as itself.
+    const maps = inflatedStreams(pdf);
+    const sample = storyScriptSampleText(locale);
+    const missing = letters(sample).filter((codePoint) => !maps.includes(codePoint));
+    expect(missing, locale).toEqual([]);
+  }, 120_000);
 });
 
 describe("the owner's sample report script (look first, then wire)", () => {
