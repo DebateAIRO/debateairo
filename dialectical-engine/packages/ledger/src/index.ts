@@ -606,16 +606,39 @@ export class LedgerRepository {
     readonly runId: string;
     readonly workItemId: string;
     readonly contractHash: string;
-  }): Promise<readonly { readonly callSiteKey: string; readonly outcome: "OK" | "FAILED" | "TIMED_OUT" }[]> {
-    const result = await this.pool.query<{ call_site_key: string; outcome: "OK" | "FAILED" | "TIMED_OUT" }>(
-      `SELECT call_site_key, outcome FROM ledger.ledger_entry
+  }): Promise<readonly {
+    readonly callSiteKey: string;
+    readonly outcome: "OK" | "FAILED" | "TIMED_OUT";
+    /**
+     * Model scorecard A16a: the row itself, so a resumed pass that finds a
+     * site's every seat key spent can halt it, or fail the work item, citing
+     * the ledger's own record (as the preflight does for an exhausted key).
+     */
+    readonly ledgerEntryRef: string;
+    readonly attemptId: string | null;
+    readonly artifactRef: string | null;
+  }[]> {
+    const result = await this.pool.query<{
+      call_site_key: string;
+      outcome: "OK" | "FAILED" | "TIMED_OUT";
+      ledger_entry_id: string;
+      attempt_id: string | null;
+      raw_artifact_ref: string | null;
+    }>(
+      `SELECT call_site_key, outcome, ledger_entry_id, attempt_id, raw_artifact_ref FROM ledger.ledger_entry
        WHERE run_id = $1 AND subject_item_id = $2
          AND action_kind = 'MODEL_CALL' AND contract_hash = $3
          AND (call_site_key LIKE '%:seat:main' OR call_site_key LIKE '%:seat:runnerUp')
        ORDER BY sequence`,
       [input.runId, input.workItemId, input.contractHash]
     );
-    return Object.freeze(result.rows.map((row) => Object.freeze({ callSiteKey: row.call_site_key, outcome: row.outcome })));
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      callSiteKey: row.call_site_key,
+      outcome: row.outcome,
+      ledgerEntryRef: row.ledger_entry_id,
+      attemptId: row.attempt_id,
+      artifactRef: row.raw_artifact_ref
+    })));
   }
 
   async countModelAttempts(input: {

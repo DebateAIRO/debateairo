@@ -6786,13 +6786,15 @@ describe("A15 · a pinned role assignment seats the run", () => {
  */
 async function appendEarlierPassCall(context: {
   readonly runId: string; readonly workItemId: string;
-}, callSiteKey: string, outcome: "OK" | "FAILED", actorRef: string): Promise<void> {
+}, callSiteKey: string, outcome: "OK" | "FAILED", actorRef: string,
+// A16a: a synthesis row names its own contract (runnerSettings' composer or conformance hash).
+contractHash = "contract:judge:test-layer"): Promise<void> {
   const now = new Date();
   await new LedgerRepository(database.pool).append({
     runId: context.runId, attemptId: randomUUID(), actionKind: "MODEL_CALL", callSiteKey,
     subjectItemId: context.workItemId, stanceAtAction: "UNASSIGNED", outcome,
     actorRef, inputHash: `input:earlier-pass:${randomUUID()}`,
-    contractHash: "contract:judge:test-layer", rawArtifactRef: null,
+    contractHash, rawArtifactRef: null,
     startedAt: now, finishedAt: now
   });
 }
@@ -7693,5 +7695,198 @@ describe("A16a · carry 1 on resume — a site an earlier pass switched stays wi
     ]);
     expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
     expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-PARTIAL");
+  });
+});
+
+/**
+ * A16a controller rulings on the resume gaps — (1) a synthesis seat that
+ * switched is answered again by a slot that can still be called, never failed
+ * off its spent main alone; (2) a site whose every usable key is spent reaches
+ * today's clean halt or terminal, never a CALL_BUDGET_EXHAUSTED crash.
+ */
+describe("A16a · resume gap 1 — a synthesis seat keeps a slot that can still answer", () => {
+  const SYNTHESIZER_SITE = "COMPOSER:SYNTHESIZER:INITIAL:1";
+  const COMPOSER_CONTRACT = "contract:composer:test-layer";
+  // The synthesizer's sealed bound at 2, so a slot that answered once can be asked again.
+  const synthesisSettings = (): Partial<WalkingSkeletonSettings> => {
+    const base = runnerSettings();
+    return {
+      synthesisRolePolicy: {
+        ...base.synthesisRolePolicy!,
+        synthesizerBound: { ...base.synthesisRolePolicy!.synthesizerBound, maxAttempts: 2 }
+      }
+    };
+  };
+  const writerRunnerUpAssignment = () => pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    // The writer's runner-up is the third route (share 0: backup only).
+    ANSWER_WRITER: [pinnedSeat(0, "secondary", "third", 0)],
+    ANSWER_CHECKER: [pinnedSeat(0, "third")]
+  });
+  // The main (secondary) holds NO composition: were it asked, the run would fail on its answer.
+  const doubles = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+    third: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`)),
+      resil01Composition,
+      evaluatorSatisfied()
+    ]
+  });
+  const composerRows = (calls: readonly { readonly call_site_key: string; readonly outcome: string; readonly actor_ref: string }[]) =>
+    calls.filter((call) => call.call_site_key.startsWith(`${SYNTHESIZER_SITE}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref]);
+  const seedSynthesis = (rows: readonly (readonly [slot: "main" | "runnerUp", outcome: "OK" | "FAILED", count: number])[]) =>
+    async (context: { readonly runId: string; readonly workItemId: string }): Promise<void> => {
+      for (const [slot, outcome, count] of rows) {
+        for (let index = 0; index < count; index += 1) {
+          await appendEarlierPassCall(context, `${SYNTHESIZER_SITE}:seat:${slot}`, outcome,
+            slot === "main" ? SEAT_ROUTES.secondary.providerRef : SEAT_ROUTES.third.providerRef, COMPOSER_CONTRACT);
+        }
+      }
+    };
+  const MAIN_FAILED = [`${SYNTHESIZER_SITE}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef];
+  const BACKUP_OK = [`${SYNTHESIZER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef];
+
+  it("asks the backup that answered the synthesis on the earlier pass again, never the spent main, and completes", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-synthesis-backup-answered",
+      assignment: writerRunnerUpAssignment(),
+      settings: synthesisSettings(),
+      beforeExecute: seedSynthesis([["main", "FAILED", 2], ["runnerUp", "OK", 1]]),
+      ...doubles("A16a synth answered")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(composerRows(scenario.calls)).toEqual([MAIN_FAILED, MAIN_FAILED, BACKUP_OK, BACKUP_OK]);
+  });
+
+  it("hands a spent main's synthesis to its untried backup (carry 6's hand-off)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-synthesis-backup-untried",
+      assignment: writerRunnerUpAssignment(),
+      settings: synthesisSettings(),
+      beforeExecute: seedSynthesis([["main", "FAILED", 2]]),
+      ...doubles("A16a synth untried")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(composerRows(scenario.calls)).toEqual([MAIN_FAILED, MAIN_FAILED, BACKUP_OK]);
+  });
+
+  it("fails the work item terminally, as today and before any call, when BOTH synthesis slots are spent", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-synthesis-both-spent",
+      assignment: writerRunnerUpAssignment(),
+      settings: synthesisSettings(),
+      beforeExecute: seedSynthesis([["main", "FAILED", 2], ["runnerUp", "FAILED", 2]]),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("TERMINAL_FAILED");
+    expect(scenario.calls).toHaveLength(4);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" }]);
+  });
+});
+
+describe("A16a · resume gap 2 — a site with no slot left to call halts or ends cleanly, never CALL_BUDGET_EXHAUSTED", () => {
+  const judgeMaxAttempts = 2;
+  const callSiteKey = "JUDGE:defender:root0:r1:p0";
+
+  it("halts a leg whose two slots both spent their first sequence (a pass that died in the cooldown)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-both-first-sequences",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 2, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a gap2 ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a gap2 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a gap2 ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A16a gap2 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a gap2 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // No new call at the site; the halt names the bare site and the ledger's true count.
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(4);
+    expect(scenario.lifecycle).toContainEqual({ state: "EXPANSION_HALTED", call_site_key: callSiteKey, attempts_spent: 4 });
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
+  });
+
+  it("fails root 1 terminally, as today and before any call, when its two slots both spent their first sequence", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-root-both-first-sequences",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 2, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "FAILED", 2, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("TERMINAL_FAILED");
+    expect(scenario.calls).toHaveLength(4);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" }]);
+  });
+
+  it("hands a leg whose answering slot has no attempt left to the slot that still has one", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-answered-at-bound",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // The main answered on its last allowed attempt; the runner-up was never tried.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 1, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:main`, "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary A16a bound ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a bound review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a bound ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A16a bound leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a bound review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${callSiteKey}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome])).toEqual([
+      [`${callSiteKey}:seat:main`, "FAILED"], [`${callSiteKey}:seat:main`, "OK"], [`${callSiteKey}:seat:runnerUp`, "OK"]
+    ]);
+    expect(scenario.lifecycle).toEqual([]);
   });
 });

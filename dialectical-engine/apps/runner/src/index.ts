@@ -3312,69 +3312,126 @@ export class WalkingSkeletonRunner {
      */
     const restoredRootMembers = new Map<number, SeatMember>();
     /**
-     * A16a (controller ruling on carry 1) — what EARLIER passes of this work
-     * item recorded under each seat-marked judge key: its attempts, and the
-     * order of its latest answer (an `OK` row; a refused answer is `FAILED`).
-     * Filled from the ledger before the first root, with the root restoration
-     * below; empty on a first pass and on the legacy book.
+     * A16a (controller rulings on carry 1 and on the resume gaps) — what
+     * EARLIER passes of this work item recorded under each seat-marked key of
+     * the judge contract and of the two synthesis contracts (their keys never
+     * collide): its attempts, the order of its latest answer (an `OK` row; a
+     * refused answer is `FAILED`), and the rows a spent site cites. Filled from
+     * the ledger before the first root; empty on a first pass and on the legacy
+     * book.
      */
-    const seatKeyHistory = new Map<string, { readonly attempts: number; readonly lastAnsweredAt: number | null }>();
+    type SeatKeyRow = Awaited<ReturnType<LedgerRepository["readSeatMarkedModelCalls"]>>[number];
+    const seatKeyHistory = new Map<string, {
+      readonly attempts: number;
+      readonly lastAnsweredAt: number | null;
+      /** The key's latest row with an attempt id, and its latest failed one, each with its ledger order. */
+      readonly latest: { readonly row: SeatKeyRow; readonly at: number } | null;
+      readonly latestFailure: { readonly row: SeatKeyRow; readonly at: number } | null;
+    }>();
+    /** The base keys of every synthesis site an earlier pass recorded, by contract. */
+    const synthesisSitesByContract = new Map<string, Set<string>>();
+    const seatKeyOf = (baseKey: string, member: SeatMember): string =>
+      seatCallSiteKey(baseKey, member.pinnedAs === "MAIN" ? "main" : "runnerUp");
     /**
-     * A16a (controller ruling on carry 1) — A15d's root restoration, for EVERY
-     * judge seat site. The seat caller's down marks live in memory only, so
-     * without this a resumed pass would try a site's main first again after the
-     * runner-up took the site over, and meet the main's spent key
-     * (`CALL_BUDGET_EXHAUSTED`). From the ledger instead:
-     *  · a site one slot ANSWERED is answered by that slot again;
-     *  · a slot whose first sequence is spent (`judge` attempts) with no answer,
-     *    at a site whose other slot was tried and can still answer (fewer than
-     *    `judge`), is never tried there again — a finished switch stays made.
-     * It restricts a two-member seat only, and only when the restriction leaves
-     * the call a member its own rule allows; A15d's carry-6 hand-off and carry-3
-     * check are untouched, and the per-key caps keep the site within 2j + f.
-     * `baseKeyOf` is the member's key before its seat marker (the panel names
-     * the answering route in its key).
+     * A16a (controller rulings on carry 1 and on the resume gaps) — A15d's root
+     * restoration, for EVERY seat site of the judge and synthesis contracts. The
+     * seat caller's down marks live in memory only, so without this a resumed
+     * pass would try a site's main first again after the runner-up took the
+     * site over, and meet the main's spent key (`CALL_BUDGET_EXHAUSTED`). From
+     * the ledger instead, among the members the call's own rule allows:
+     *  · a slot that ANSWERED the site and can still be called (fewer than
+     *    `bound` attempts) answers it again;
+     *  · otherwise a slot at or over `bound` is never tried while another slot
+     *    can still be called — a finished switch stays made, and a spent main
+     *    hands the site to an untried runner-up as carry 6 does.
+     * `bound` is the site's first-sequence allowance (`judge`, or the synthesis
+     * role's). It restricts a two-member seat only, and only when a member
+     * remains; A15d's carry-6 hand-off and carry-3 check are untouched, and the
+     * per-key caps keep a cooldown site within 2j + f. `baseKeyOf` is the
+     * member's key before its seat marker (the panel names the answering route
+     * in its key).
      */
     const ledgerSeatRule = (
       seat: RunSeat,
       baseKeyOf: (member: SeatMember) => string,
-      allowed: (member: SeatMember) => boolean
+      allowed: (member: SeatMember) => boolean,
+      bound: number
     ): ((member: SeatMember) => boolean) => {
       if (!seatBook.assigned || seat.runnerUp === null) return () => true;
       const members = [seat.main, seat.runnerUp].filter(allowed);
-      const historyOf = (member: SeatMember) => seatKeyHistory.get(
-        seatCallSiteKey(baseKeyOf(member), member.pinnedAs === "MAIN" ? "main" : "runnerUp")
-      );
-      const attemptsOf = (member: SeatMember): number => historyOf(member)?.attempts ?? 0;
+      const historyOf = (member: SeatMember) => seatKeyHistory.get(seatKeyOf(baseKeyOf(member), member));
       const answeredAt = (member: SeatMember): number => historyOf(member)?.lastAnsweredAt ?? -1;
-      const answered = members.filter((member) => answeredAt(member) >= 0)
+      const callable = members.filter((member) => (historyOf(member)?.attempts ?? 0) < bound);
+      const answered = callable.filter((member) => answeredAt(member) >= 0)
         .sort((left, right) => answeredAt(right) - answeredAt(left))[0];
       if (answered !== undefined) return (member) => member.pinnedAs === answered.pinnedAs;
-      const judgeAttempts = this.settings.judgeBound.maxAttempts;
-      const abandoned = members.find((member) => attemptsOf(member) >= judgeAttempts
-        && members.some((other) => other !== member && attemptsOf(other) >= 1 && attemptsOf(other) < judgeAttempts));
-      if (abandoned !== undefined) return (member) => member.pinnedAs !== abandoned.pinnedAs;
+      if (callable.length > 0 && callable.length < members.length) {
+        return (member) => callable.some((usable) => usable.pinnedAs === member.pinnedAs);
+      }
       return () => true;
     };
+    /**
+     * A16a (controller ruling on resume gap 2) — the ledger row a site cites
+     * when EVERY member its call may use was already at or over `bound` on an
+     * earlier pass, so the site can make no call; null otherwise. The site then
+     * reaches today's clean halt (a judge site) or terminal (roots 0/1, a
+     * synthesis site) instead of a `CALL_BUDGET_EXHAUSTED` crash. It cites the
+     * latest failure when there is one, else the latest row.
+     */
+    const spentSiteRow = (slots: readonly SeatSlot[], baseKey: string, bound: number): SeatKeyRow | null => {
+      if (!seatBook.assigned || slots.length === 0) return null;
+      const histories = slots.map((slot) => seatKeyHistory.get(seatCallSiteKey(baseKey, slot === "MAIN" ? "main" : "runnerUp")));
+      if (histories.some((history) => (history?.attempts ?? 0) < bound)) return null;
+      const latestOf = (pick: "latest" | "latestFailure") => histories
+        .map((history) => history?.[pick] ?? null)
+        .filter((entry): entry is { readonly row: SeatKeyRow; readonly at: number } => entry !== null)
+        .sort((left, right) => right.at - left.at)[0]?.row ?? null;
+      return latestOf("latestFailure") ?? latestOf("latest");
+    };
+    const membersOf = (seat: RunSeat): readonly SeatMember[] =>
+      seat.runnerUp === null ? [seat.main] : [seat.main, seat.runnerUp];
     /**
      * A15: who may answer ONE seat call at `siteKey` on this pass — the call's
      * own fairness rule, minus a member whose key the preflight found spent
      * (carry 6), then the ledger's record of earlier passes (A16a,
      * `ledgerSeatRule`). `seatMember` is the member the seat caller will call
-     * first; it is undefined on the legacy book, which keeps today's cooldown path.
+     * first; it is undefined on the legacy book, which keeps today's cooldown
+     * path, and null when no member can be called. A16a (resume gap 2): when
+     * every usable key is already spent, `spent` is the row the site cites and
+     * the site halts through `spentSiteHalts` without a call.
      */
     const seatCallPlan = (seat: RunSeat, siteKey: string, rule?: (member: SeatMember) => boolean) => {
+      const judgeAttempts = this.settings.judgeBound.maxAttempts;
       const allowed = (member: SeatMember): boolean => (rule === undefined || rule(member))
         && spentSeatSlots.get(siteKey) !== member.pinnedAs;
-      const fromLedger = ledgerSeatRule(seat, () => siteKey, allowed);
+      const fromLedger = ledgerSeatRule(seat, () => siteKey, allowed, judgeAttempts);
       const eligible = (member: SeatMember): boolean => allowed(member) && fromLedger(member);
+      const spent = spentSiteRow(membersOf(seat).filter(eligible).map((member) => member.pinnedAs), siteKey, judgeAttempts);
+      if (spent !== null) {
+        spentSiteHalts.set(siteKey, {
+          outcome: spent.outcome === "TIMED_OUT" ? "TIMED_OUT" : "FAILED",
+          ledgerEntryRef: spent.ledgerEntryRef
+        });
+      }
       return Object.freeze({
         eligible,
-        seatMember: seatBook.assigned ? seatCaller.plan(seat, siteKey, { eligible }) : undefined
+        spent,
+        seatMember: !seatBook.assigned ? undefined : spent === null ? seatCaller.plan(seat, siteKey, { eligible }) : null
       });
     };
     const positionRule = (seat: RunSeat) => (member: SeatMember): boolean => positionMakerIsFree(seat, member)
       && (restoredRootMembers.get(seat.seatIndex) ?? member) === member;
+    /**
+     * A16a (controller ruling on resume gap 1): who may answer a synthesis
+     * site on this pass — the ledger's record of earlier passes, against the
+     * role's own sealed bound (`ledgerSeatRule`). A site no slot can answer
+     * never gets here: the work item already failed terminally before the
+     * first root.
+     */
+    const synthesisEligible = (role: "SYNTHESIZER" | "EVALUATOR", seat: RunSeat, siteKey: string) =>
+      ledgerSeatRule(seat, () => siteKey, () => true, role === "SYNTHESIZER"
+        ? this.settings.synthesisRolePolicy.synthesizerBound.maxAttempts
+        : this.settings.synthesisRolePolicy.evaluatorBound.maxAttempts);
     // The explicit 80-20 ordinal of the two single-call-per-run roles; A16c
     // replaces it with `diversityOrdinalForRun(run.runId)`.
     const synthesisOrdinal = 0;
@@ -3489,7 +3546,7 @@ export class WalkingSkeletonRunner {
       const panelMembers = seatBook.judge.flatMap((seat) => {
         // A16a (controller ruling on carry 1): a panel site a slot answered on an
         // earlier pass is answered by that slot again (`ledgerSeatRule`).
-        const fromLedger = ledgerSeatRule(seat, panelKeyFor, notTheAuthor);
+        const fromLedger = ledgerSeatRule(seat, panelKeyFor, notTheAuthor, this.settings.judgeBound.maxAttempts);
         const eligible = (member: SeatMember): boolean => notTheAuthor(member) && fromLedger(member);
         const planned = seatCaller.plan(seat, input.callSiteKey, { eligible });
         if (planned === null) {
@@ -3731,11 +3788,20 @@ export class WalkingSkeletonRunner {
          * after the FIRST sequence ended in a transport exhaustion. The final
          * retry itself may have ended in a schema failure; the switch answers
          * the first sequence's transport exhaustion. That needs a final retry to
-         * exist, hence the guard. Synthesis sites stay terminal on a re-claim:
-         * they have no cooldown, so their ledger cannot tell a transport
-         * exhaustion from a schema one.
+         * exist, hence the guard. Synthesis sites have no cooldown, so their
+         * ledger cannot tell a transport exhaustion from a schema one; A16a
+         * (controller ruling on resume gap 1) hands them over anyway, below,
+         * because a work item re-claimed at all was not ended by a refused
+         * answer — every error a pass throws records the item's terminal
+         * failure — so its spent key comes from a pass that died mid-site.
          */
         const exhaustedMarker = seatOfCallSiteKey(exhausted.callSiteKey);
+        // A16a (controller ruling on resume gap 1): an assigned run's synthesis
+        // key is ONE of its site's two seat keys. Whether the site is spent — no
+        // slot left that can be called — is decided with both keys in view, after
+        // the ledger read below; a backup that answered it, or an untried one next
+        // to this spent main, answers it again instead of the work item failing.
+        if (!isJudgeSite && exhaustedMarker !== null) continue;
         if (isJudgeSite && exhaustedMarker !== null && (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0) >= 1) {
           const spentSlot: SeatSlot = exhaustedMarker === "main" ? "MAIN" : "RUNNER_UP";
           const rootSeat = exhaustedSite === "JUDGE"
@@ -3787,20 +3853,32 @@ export class WalkingSkeletonRunner {
     if (seatBook.assigned) {
       const answeredSlotBySite = new Map<string, SeatSlot>();
       let order = 0;
-      for (const row of await this.#ledger.readSeatMarkedModelCalls({
-        runId: run.runId, workItemId: claimed.workItemId, contractHash: this.settings.judgeContractHash
-      })) {
-        const site = seatBaseCallSiteKey(row.callSiteKey);
-        const slot: SeatSlot = seatOfCallSiteKey(row.callSiteKey) === "main" ? "MAIN" : "RUNNER_UP";
-        if (!recordedSlotBySite.has(site)) recordedSlotBySite.set(site, slot);
-        if (row.outcome === "OK") answeredSlotBySite.set(site, slot);
-        // A16a: every seat key's history, for `ledgerSeatRule` (rows arrive in ledger order).
-        const seen = seatKeyHistory.get(row.callSiteKey);
-        seatKeyHistory.set(row.callSiteKey, {
-          attempts: (seen?.attempts ?? 0) + 1,
-          lastAnsweredAt: row.outcome === "OK" ? order : seen?.lastAnsweredAt ?? null
-        });
-        order += 1;
+      for (const contractHash of [
+        this.settings.judgeContractHash, this.settings.composerContractHash, this.settings.conformanceContractHash
+      ]) {
+        const isJudge = contractHash === this.settings.judgeContractHash;
+        for (const row of await this.#ledger.readSeatMarkedModelCalls({
+          runId: run.runId, workItemId: claimed.workItemId, contractHash
+        })) {
+          const site = seatBaseCallSiteKey(row.callSiteKey);
+          if (isJudge) {
+            const slot: SeatSlot = seatOfCallSiteKey(row.callSiteKey) === "main" ? "MAIN" : "RUNNER_UP";
+            if (!recordedSlotBySite.has(site)) recordedSlotBySite.set(site, slot);
+            if (row.outcome === "OK") answeredSlotBySite.set(site, slot);
+          } else {
+            synthesisSitesByContract.set(contractHash, (synthesisSitesByContract.get(contractHash) ?? new Set()).add(site));
+          }
+          // A16a: every seat key's history, for `ledgerSeatRule` and `spentSiteRow` (rows arrive in ledger order).
+          const seen = seatKeyHistory.get(row.callSiteKey);
+          const cited = row.attemptId === null ? null : { row, at: order };
+          seatKeyHistory.set(row.callSiteKey, {
+            attempts: (seen?.attempts ?? 0) + 1,
+            lastAnsweredAt: row.outcome === "OK" ? order : seen?.lastAnsweredAt ?? null,
+            latest: cited ?? seen?.latest ?? null,
+            latestFailure: row.outcome !== "OK" && cited !== null ? cited : seen?.latestFailure ?? null
+          });
+          order += 1;
+        }
       }
       seatBook.position.forEach((seat, rootIndex) => {
         const siteKey = rootIndex === 0 ? "JUDGE" : rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
@@ -3811,6 +3889,51 @@ export class WalkingSkeletonRunner {
         restoredRootMembers.set(rootIndex, restored);
         positionAnswerers.set(rootIndex, restored);
       });
+      /**
+       * A16a (controller rulings on the resume gaps) — a site this pass could
+       * make NO call at ends the way the preflight ends an exhausted key, before
+       * any call is made: roots 0 and 1 and every synthesis site fail the work
+       * item terminally (the other roots and every other judge site halt, through
+       * `seatCallPlan`, when they are reached). A synthesis site with a slot that
+       * can still be called is planned to it (`ledgerSeatRule`), so a backup that
+       * answered it, or an untried one next to a spent main, answers it again.
+       */
+      const spentSites: { readonly row: SeatKeyRow }[] = [];
+      for (const [rootIndex, siteKey] of [[0, "JUDGE"], [1, "JUDGE:root:secondary"]] as const) {
+        const seat = seatBook.position[rootIndex];
+        const spent = seat === undefined ? null : seatCallPlan(seat, siteKey, positionRule(seat)).spent;
+        if (spent !== null) spentSites.push({ row: spent });
+      }
+      for (const synthesis of [
+        {
+          seat: seatBook.answerWriter,
+          contractHash: this.settings.composerContractHash,
+          bound: this.settings.synthesisRolePolicy.synthesizerBound.maxAttempts
+        },
+        {
+          seat: seatBook.answerChecker,
+          contractHash: this.settings.conformanceContractHash,
+          bound: this.settings.synthesisRolePolicy.evaluatorBound.maxAttempts
+        }
+      ]) {
+        for (const siteKey of synthesisSitesByContract.get(synthesis.contractHash) ?? []) {
+          // A FALLBACK synthesis seat is the sealed ref's one member, recorded under `:seat:main`.
+          const slots: readonly SeatSlot[] = synthesis.seat === null
+            ? ["MAIN"]
+            : membersOf(synthesis.seat)
+              .filter(ledgerSeatRule(synthesis.seat, () => siteKey, () => true, synthesis.bound))
+              .map((member) => member.pinnedAs);
+          const spent = spentSiteRow(slots, siteKey, synthesis.bound);
+          if (spent !== null) spentSites.push({ row: spent });
+        }
+      }
+      const cited = spentSites.find((entry) => entry.row.attemptId !== null)?.row;
+      if (cited !== undefined && cited.attemptId !== null) {
+        await this.#work.failFromExhaustedAttempt({
+          workItemId: claimed.workItemId, attemptId: cited.attemptId, artifactRef: cited.artifactRef
+        });
+        return { kind: "TERMINAL_FAILED", artifactRef: cited.artifactRef };
+      }
     }
 
     const judgementScheduledAt = new Date();
@@ -5343,13 +5466,22 @@ export class WalkingSkeletonRunner {
       // (A16's 80-20 ordinal chooses between main and runner-up); the loop bound
       // stays the sealed row's.
       synthesisRoleControls: Object.freeze({
+        // A16a: planned as round 1's site will be (`synthesisEligible`), so a
+        // resumed pass names the slot the ledger hands that site to.
         synthesizerRoleRef: seatBook.answerWriter === null
           ? synthesisRoles.synthesizerRoleRef
-          : seatCaller.plan(seatBook.answerWriter, "COMPOSER:SYNTHESIZER", { ordinal: synthesisOrdinal })?.providerRef
+          : seatCaller.plan(seatBook.answerWriter, "COMPOSER:SYNTHESIZER", {
+            ordinal: synthesisOrdinal,
+            eligible: synthesisEligible("SYNTHESIZER", seatBook.answerWriter,
+              synthesisCallSiteKey({ role: "SYNTHESIZER", stage: "INITIAL", round: 1 }))
+          })?.providerRef
             ?? seatBook.answerWriter.main.providerRef,
         evaluatorRoleRef: seatBook.answerChecker === null
           ? synthesisRoles.evaluatorRoleRef
-          : seatCaller.plan(seatBook.answerChecker, "POST_COMPOSE_R9:EVALUATOR", { ordinal: synthesisOrdinal })?.providerRef
+          : seatCaller.plan(seatBook.answerChecker, "POST_COMPOSE_R9:EVALUATOR", {
+            ordinal: synthesisOrdinal,
+            eligible: synthesisEligible("EVALUATOR", seatBook.answerChecker, synthesisCallSiteKey({ role: "EVALUATOR", round: 1 }))
+          })?.providerRef
             ?? seatBook.answerChecker.main.providerRef,
         evaluatorLoopMaxRounds: synthesisRoles.evaluatorLoopMaxRounds
       })
@@ -5382,6 +5514,7 @@ export class WalkingSkeletonRunner {
           seat: writerSeat,
           callSiteKey: writerSiteKey,
           ordinal: synthesisOrdinal,
+          eligible: synthesisEligible("SYNTHESIZER", writerSeat, writerSiteKey),
           call: (member, callSiteKey) => member.provider.call({
             runId: run.runId,
             subjectItemId: claimed.workItemId,
@@ -5475,6 +5608,7 @@ export class WalkingSkeletonRunner {
           seat: checkerSeat,
           callSiteKey: checkerSiteKey,
           ordinal: synthesisOrdinal,
+          eligible: synthesisEligible("EVALUATOR", checkerSeat, checkerSiteKey),
           call: (member, callSiteKey) => member.provider.call({
             runId: run.runId,
             subjectItemId: claimed.workItemId,
