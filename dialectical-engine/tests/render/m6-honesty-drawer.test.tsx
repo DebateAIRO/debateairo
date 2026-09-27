@@ -271,17 +271,23 @@ describe("the envelope mark is worded by its record's reason (fix round 2)", () 
   });
 
   it("the answer's drawer: a usage stop's chip and record say an AI service, never the budget", () => {
+    /** How often `phrase` stands in `text`. */
+    const count = (text: string, phrase: string) => text.split(phrase).length - 1;
+    // Both places, the mark's chip and the record's row, carry the cause: a
+    // fallback to the neutral words in either one leaves a count short.
     const text = visible(drawer(stopped("PROVIDER_USAGE_UNREPORTED")));
-    expect(text).toContain(SERVICE);
+    expect(count(text, SERVICE)).toBe(2);
+    expect(count(text, NEUTRAL)).toBe(2);
     expect(text).not.toContain(BUDGET);
     const money = visible(drawer(stopped("RUN_COST_ENVELOPE_MONEY_REACHED")));
-    expect(money).toContain(BUDGET);
+    expect(count(money, BUDGET)).toBe(2);
+    expect(count(money, NEUTRAL)).toBe(2);
     expect(money).not.toContain(SERVICE);
   });
 
   it("the node drawer: the served root's pill is worded by the answer's record", () => {
-    const node = (reason: string | null) => {
-      const answer = reason === null ? stopped("RUN_COST_ENVELOPE_MONEY_REACHED") : stopped(reason);
+    const node = (reason: string) => {
+      const answer = stopped(reason);
       const v3 = { ...answer.nodes[0]!, condition_marks: ["ENVELOPE_EXHAUSTED" as const] };
       const detail = debateDetailFromAnswer(answer);
       return visible(renderToStaticMarkup(
@@ -296,7 +302,7 @@ describe("the envelope mark is worded by its record's reason (fix round 2)", () 
           onError={noop}
           onAuthRejected={noop}
           debateChromeCatalog={chromeEn}
-          conditionRecords={reason === null ? [] : answer.condition_mark_records}
+          conditionRecords={answer.condition_mark_records}
         />
       ));
     };

@@ -7,7 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError, PublicDebateSchema, type Answer, type AnswerDisclosure, type AnswerFloor, type RunEvent } from "@debateai/contract";
-import { debateDetailFromAnswer } from "../../apps/ui/lib/v3/adapter.js";
+import { contractNodesById, debateDetailFromAnswer } from "../../apps/ui/lib/v3/adapter.js";
 import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, storyFixture } from "../../apps/ui/lib/v3/storyFixture.js";
 import { LOCALE_COOKIE, type LocaleCode } from "../../apps/ui/lib/i18n/locales.js";
 import composeEnglish from "../../apps/ui/messages/en/compose.json" with { type: "json" };
@@ -399,5 +399,49 @@ describe("the public page shows the same floor answer, in the question's languag
     const source = readFileSync(resolve(process.cwd(), "apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx"), "utf8");
     expect(source).toMatch(/publicFloor=\{publicFloor\}/);
     expect(source).toMatch(/resolveFloor\(publicFloorHost\(debate\.answer\), debate\.floor\)/);
+  });
+});
+
+/**
+ * M6 review carry (Task M8). The owner's answer carries condition records whose
+ * reasons name owner-only stop causes (a vendor that reported no usage, the
+ * budget). A public node pill must never word itself by them: the page hands
+ * the node drawer no records in public mode, even if an answer were ever
+ * loaded there, so the pill reads the neutral words.
+ */
+describe("a public node pill never names an owner-only stop cause", () => {
+  it("hands the node drawer no records in public mode, even with an answer loaded", async () => {
+    const usageStop: Answer["condition_mark_records"][number] = {
+      mark: "ENVELOPE_EXHAUSTED", scope: "answer", subject_ref: "run:story", reason: "PROVIDER_USAGE_UNREPORTED",
+      lift_path: null, served_root_rule: null, call_site_key: null, planned_leg_count: null,
+      terminal_transport_outcome: null, review_outcome: null, hidden_strength: null, hidden_score_threshold: null,
+      hidden_score_threshold_source_ref: null, excluded_from_served_number: null, judged_basis_count: null,
+      affected_node_ids: ["n-yes"]
+    };
+    const answer: Answer = {
+      ...STORY_FIXTURE_ANSWER,
+      condition_marks: [...STORY_FIXTURE_ANSWER.condition_marks, "ENVELOPE_EXHAUSTED"],
+      condition_mark_records: [usageStop]
+    };
+    const stopped = { ...answer.nodes.find((node) => node.node_id === "n-yes")!, condition_marks: ["ENVELOPE_EXHAUSTED" as const] };
+    const container = await mount(
+      <DebatePageClient
+        id={STORY_FIXTURE_DEBATE_ID}
+        initialDebate={debateDetailFromAnswer(answer)}
+        initialAnswer={answer}
+        timeCatalog={{}}
+        publicMode
+        publicNodesById={contractNodesById({ nodes: [stopped] })}
+        publicOverview={({ onRead }) => <button type="button" data-test-read onClick={() => onRead("n-yes")}>read</button>}
+        storyLocale="en"
+        storyCatalog={publicEnglish}
+      />
+    );
+    await act(async () => container.querySelector<HTMLButtonElement>("[data-test-read]")!.click());
+    await flush();
+    const pill = container.querySelector<HTMLElement>('.drawerConditionPill[title="ENVELOPE_EXHAUSTED"]');
+    expect(pill?.textContent).toBe("Ended early");
+    expect(container.textContent).not.toContain("problem with an AI service");
+    expect(container.textContent).not.toContain("to stay within budget");
   });
 });

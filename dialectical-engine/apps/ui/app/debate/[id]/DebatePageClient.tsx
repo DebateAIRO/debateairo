@@ -1849,7 +1849,9 @@ export default function DebatePageClient({
         <NodeDetailDrawer
           node={detailNode}
           v3={v3NodeById?.get(detailNode.id)}
-          conditionRecords={answer?.condition_mark_records ?? []}
+          // Owner-only stop causes never reach a public pill, even if an answer
+          // were ever loaded in public mode: the public pill reads the neutral words.
+          conditionRecords={publicMode ? [] : answer?.condition_mark_records ?? []}
           scoring={scoringByNodeId.get(detailNode.id)}
           scoringError={scoringErrorsByNodeId.get(detailNode.id)}
           feedbackSummary={feedbackSummaryByNodeId.get(detailNode.id)}
