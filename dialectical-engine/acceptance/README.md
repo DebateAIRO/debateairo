@@ -52,12 +52,12 @@ here, never written down. For each maker the relay asks, in this order:
 
 1. the maker's own environment key — `ACCEPTANCE_CLAUDE_BINARY`,
    `ACCEPTANCE_CODEX_BINARY`, `ACCEPTANCE_GROK_BINARY`,
-   `ACCEPTANCE_HERMES_BINARY`, `ACCEPTANCE_AGY_BINARY` — which may hold a full
+   `ACCEPTANCE_HERMES_BINARY`, `ACCEPTANCE_AGY_BINARY`, `ACCEPTANCE_PI_BINARY` — which may hold a full
    path or a bare name to look up. A key that is present but blank stops the
    relay with the maker's bare code (`CLAUDE_CLI_BINARY_UNRESOLVED` and its
    siblings): an operator who set the key meant to decide, and the harness never
    guesses on their behalf.
-2. with no key set, the maker's NAME — `claude`, `codex`, `grok`, `hermes`, `agy` — is
+2. with no key set, the maker's NAME — `claude`, `codex`, `grok`, `hermes`, `agy`, `pi` — is
    looked up across the directories of `PATH` in order. **The first entry that
    exists under the name is the match, and it is then admitted or refused; a
    broken entry is never stepped over.** That is deliberately unlike `command -v`,

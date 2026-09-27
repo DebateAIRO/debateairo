@@ -9,6 +9,7 @@ import { resolveGrokBinary } from "./grok-relay.js";
 import { resolveHermesBinary } from "./hermes-relay.js";
 import { resolveCodexBinary } from "./model-shim.js";
 import { resolveAgyBinary } from "./agy-relay.js";
+import { resolvePiBinary } from "./pi-relay.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { estimateWindowTokens } from "@debateai/providers";
 import {
@@ -20,6 +21,7 @@ import {
   RELAY_REQUEST_MAX_MESSAGES,
   buildCliUsage,
   invokeCli,
+  isRelayHandshakeReply,
   renderPromptTranscript,
   resolveConfiguredBinary,
   startCliRelayServer,
@@ -749,9 +751,11 @@ describe("D10 maker CLI binary resolution", () => {
 
     expect(sources).toContain("relay-core.ts");
     expect(sources).toContain("agy-relay.ts");
+    expect(sources).toContain("pi-relay.ts");
     expect(sources).toContain(join("test-fixtures", "evaluator-double.ts"));
     expect(sources).toContain(join("test-fixtures", "fake-claude-cli.mjs"));
     expect(sources).toContain(join("test-fixtures", "fake-agy-cli.mjs"));
+    expect(sources).toContain(join("test-fixtures", "fake-pi-cli.mjs"));
     expect(offenders).toEqual([]);
   });
 });
@@ -770,7 +774,8 @@ describe("D10 every maker resolves to an ABSOLUTE path", () => {
     { name: "grok", key: "ACCEPTANCE_GROK_BINARY", resolve: resolveGrokBinary },
     { name: "codex", key: "ACCEPTANCE_CODEX_BINARY", resolve: resolveCodexBinary },
     { name: "hermes", key: "ACCEPTANCE_HERMES_BINARY", resolve: resolveHermesBinary },
-    { name: "agy", key: "ACCEPTANCE_AGY_BINARY", resolve: resolveAgyBinary }
+    { name: "agy", key: "ACCEPTANCE_AGY_BINARY", resolve: resolveAgyBinary },
+    { name: "pi", key: "ACCEPTANCE_PI_BINARY", resolve: resolvePiBinary }
   ] as const;
 
   it("from PATH discovery and from a relative key alike, for every maker", async () => {
@@ -1520,5 +1525,21 @@ describe("fix round 1: a stdin or file transport never puts the prompt on argv",
     const body = await response.json() as RelayBody;
     expect(JSON.parse(body.choices[0]!.message.content))
       .toEqual([renderPromptTranscript([{ role: "user", content: "Argv canary 6c1e." }])]);
+  });
+});
+
+describe("the shared handshake reply rule (Task A10 fix round 1, shared from Task A11)", () => {
+  it("accepts only ok: trimmed, in any case, with trailing punctuation dropped", () => {
+    // A relay whose CLI ignored the prompt still answers — generically. Only a
+    // CLI that READ the handshake prompt replies "ok", so the agy and pi relays
+    // refuse to start on any other reply.
+    for (const reply of ["OK", "ok", "Ok", "OK.", "ok!", "  OK. ", "OK\n", "OK …"]) {
+      expect(isRelayHandshakeReply(reply), JSON.stringify(reply)).toBe(true);
+    }
+    for (const reply of [
+      "", "Hello! How can I help you today?", "okay", "not ok", "OK OK", "OK, but", "\"OK", "no"
+    ]) {
+      expect(isRelayHandshakeReply(reply), JSON.stringify(reply)).toBe(false);
+    }
   });
 });

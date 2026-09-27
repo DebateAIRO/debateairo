@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
- * W6 (SECURITY). Seven acceptance fixtures echo their child environment back as
+ * W6 (SECURITY). Eight acceptance fixtures echo their child environment back as
  * model content or to a file on disk, and that content is persisted to
  * `ledger.raw_artifact`. Each must project the environment through an EXPLICIT
  * allow-list: a variable the product admits and an assertion names IS echoed;
@@ -119,7 +119,7 @@ async function emit(
 /**
  * The F3 boundary, asserted on every member: an unnamed key is visible by NAME
  * and invisible by VALUE. `emitted` is the raw text the member produced — stdout
- * for six members, the written file for `relay-core`.
+ * for seven members, the written file for `relay-core`.
  */
 function expectUnlistedKeyVisibleByNameOnly(echo: Echo, emitted: string): void {
   // Labelled so the RED frame names the owed emission. Without it the first
@@ -133,7 +133,7 @@ function expectUnlistedKeyVisibleByNameOnly(echo: Echo, emitted: string): void {
 }
 
 /**
- * Three of the seven members are generated INSIDE a test file as an array of
+ * Three of the eight members are generated INSIDE a test file as an array of
  * string pieces and are not importable, so each is read out of its own file's
  * source and run — the product's own script, never a copy of it (`:2051`).
  *
@@ -224,6 +224,35 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
 
     expect(echo.environment.HOME).toBe("/tmp/w6-agy-home");
     expectCredentialDigestedNotEchoed(echo, stdout, "GEMINI_API_KEY");
+    expect(echo.environment[CANARY_KEY]).toBeUndefined();
+    expect(stdout).not.toContain(CANARY_VALUE);
+    expectUnlistedKeyVisibleByNameOnly(echo, stdout);
+  });
+
+  it("fake-pi-cli.mjs echoes the admitted maker locator and not the unnamed canary", async () => {
+    const directory = await scratchDirectory("w6-pi-prompt-");
+    const promptFile = join(directory, "prompt.txt");
+    await writeFile(promptFile, "W6 allow-list probe", { mode: 0o600 });
+    // Pre-flight fix F37: run in the scratch directory. The fake echoes its cwd listing in four events,
+    // and the default cwd (the system tmpdir) can hold enough entries to pass the 1 MiB stdout buffer.
+    const stdout = await emit(
+      [fixturePath("fake-pi-cli.mjs"), "--print", "--mode", "json", "--model", "glm-5.3-flash", `@${promptFile}`],
+      {
+        HOME: "/tmp/w6-pi-home",
+        PATH: "/usr/bin:/bin",
+        ZAI_API_KEY: CREDENTIAL_CANARY_VALUE
+      },
+      directory
+    );
+    const events = stdout.trim().split("\n").map((line) => JSON.parse(line) as {
+      readonly type: string;
+      readonly message?: { readonly role?: string; readonly content?: readonly { readonly text?: string }[] };
+    });
+    const answer = events.filter((event) => event.type === "message_end" && event.message?.role === "assistant").at(-1);
+    const echo = JSON.parse(answer!.message!.content![0]!.text!) as Echo;
+
+    expect(echo.environment.HOME).toBe("/tmp/w6-pi-home");
+    expectCredentialDigestedNotEchoed(echo, stdout, "ZAI_API_KEY");
     expect(echo.environment[CANARY_KEY]).toBeUndefined();
     expect(stdout).not.toContain(CANARY_VALUE);
     expectUnlistedKeyVisibleByNameOnly(echo, stdout);

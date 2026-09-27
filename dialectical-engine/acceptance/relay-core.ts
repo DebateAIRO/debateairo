@@ -233,6 +233,22 @@ export function renderPromptTranscript(messages: readonly {
   });
 }
 
+/** The one reply a start-up handshake accepts, once trimmed, lower-cased and stripped of trailing punctuation. */
+const RELAY_HANDSHAKE_REPLY = "ok" as const;
+
+/**
+ * Task A10 fix round 1, shared from Task A11: a relay whose CLI takes its prompt
+ * off argv (stdin, or a prompt file) must READ the handshake reply. The silent
+ * failure is a CLI that never reads the prompt, answers some other request and
+ * still exits cleanly with generic text: every served call would then answer
+ * 200 with text that does not answer its prompt — a transport fault a scorecard
+ * would blame on the model. Only a CLI that read the handshake prompt replies
+ * "ok", so any other reply must stop the relay before it serves.
+ */
+export function isRelayHandshakeReply(content: string): boolean {
+  return content.trim().toLowerCase().replace(/[\s\p{P}]+$/u, "") === RELAY_HANDSHAKE_REPLY;
+}
+
 /**
  * The default may be supplied LAZILY. A default that reads configuration can
  * fail on its own account (see resolveConfiguredBinary), and eager evaluation

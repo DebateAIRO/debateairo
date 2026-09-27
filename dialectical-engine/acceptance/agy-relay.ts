@@ -3,6 +3,7 @@ import {
   CliRelayFailure,
   buildCliUsage,
   invokeCli,
+  isRelayHandshakeReply,
   resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
@@ -49,8 +50,6 @@ export function resolveAgyBinary(source: NodeJS.ProcessEnv = process.env): strin
 export const GOOGLE_MAKER = "Google" as const;
 export const AGY_HANDSHAKE_PROMPT =
   "AGY-01 acceptance transport handshake. Reply with the single word: OK" as const;
-/** The one reply the handshake accepts, once trimmed, lower-cased and stripped of trailing punctuation. */
-const AGY_HANDSHAKE_REPLY = "ok" as const;
 
 /**
  * Fix round 1: the handshake READS the reply. Until the owner's Step 0
@@ -59,10 +58,11 @@ const AGY_HANDSHAKE_REPLY = "ok" as const;
  * text. Every served call would then answer 200 with text that does not answer
  * its prompt — a transport fault the scorecard would blame on the model. Only
  * an agy that actually read the handshake prompt replies "ok", so anything else
- * stops the relay before it serves (AGY_CLI_HANDSHAKE_MISMATCH).
+ * stops the relay before it serves (AGY_CLI_HANDSHAKE_MISMATCH). The rule is the
+ * shared one in relay-core (Task A11), which the pi relay applies too.
  */
 export function isAgyHandshakeReply(content: string): boolean {
-  return content.trim().toLowerCase().replace(/[\s\p{P}]+$/u, "") === AGY_HANDSHAKE_REPLY;
+  return isRelayHandshakeReply(content);
 }
 
 /** `agy models` 1.2.11 (M4): the thinking level is the id's suffix, one of these three. */
