@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Позиции, рассмотренные в дебатах",
   "public.story.hide": "Скрыть",
   "public.story.show": "Показать",
+  "public.story.floorLead": "Наш лучший ответ:",
+  "public.story.floorThinBasis": "Этот ответ опирается на меньшее количество доказательств, чем обычно.",
   "public.report.documentTitle": "Отчёт о дебатах: {question}",
   "public.report.eyebrow": "DebateAI · Отчёт о дебатах",
   "public.report.footer": "DebateAI · Отчёт создан ИИ",

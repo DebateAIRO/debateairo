@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Debatuose nagrinėtos pozicijos",
   "public.story.hide": "Slėpti",
   "public.story.show": "Rodyti",
+  "public.story.floorLead": "Mūsų geriausias atsakymas:",
+  "public.story.floorThinBasis": "Šis atsakymas remiasi mažesniu nei įprasta įrodymų kiekiu.",
   "public.report.documentTitle": "Debatų ataskaita: {question}",
   "public.report.eyebrow": "DebateAI · Debatų ataskaita",
   "public.report.footer": "DebateAI · DI sugeneruota ataskaita",

@@ -25,7 +25,9 @@ const sourcePaths = [
   "lib/v3/storyView.ts",
   "lib/report/reportModel.ts",
   // The PDF download route's refusals (Task 15): short plain lines, `public.report.error.*`.
-  "lib/report/reportRoute.ts"
+  "lib/report/reportRoute.ts",
+  // The floor answer (Task M6): "Our best answer:" and the thin-basis line, `public.story.floor*`.
+  "lib/v3/floorAnswer.ts"
 ];
 const sources = new Map(sourcePaths.map((path) => [path, readFileSync(join(root, path), "utf8")]));
 const catalogPath = join(root, "messages/en/public.json");

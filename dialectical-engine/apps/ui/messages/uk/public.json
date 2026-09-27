@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Позиції, розглянуті в дебатах",
   "public.story.hide": "Сховати",
   "public.story.show": "Показати",
+  "public.story.floorLead": "Наша найкраща відповідь:",
+  "public.story.floorThinBasis": "Ця відповідь спирається на менше доказів, ніж зазвичай.",
   "public.report.documentTitle": "Звіт про дебати: {question}",
   "public.report.eyebrow": "DebateAI · Звіт про дебати",
   "public.report.footer": "DebateAI · Звіт створено ШІ",

@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Stanowiska rozważone w debacie",
   "public.story.hide": "Ukryj",
   "public.story.show": "Pokaż",
+  "public.story.floorLead": "Nasza najlepsza odpowiedź:",
+  "public.story.floorThinBasis": "Ta odpowiedź opiera się na mniejszej liczbie dowodów niż zwykle.",
   "public.report.documentTitle": "Raport z debaty: {question}",
   "public.report.eyebrow": "DebateAI · Raport z debaty",
   "public.report.footer": "DebateAI · Raport wygenerowany przez AI",

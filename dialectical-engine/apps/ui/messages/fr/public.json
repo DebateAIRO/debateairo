@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Positions explorées par le débat",
   "public.story.hide": "Masquer",
   "public.story.show": "Afficher",
+  "public.story.floorLead": "Notre meilleure réponse :",
+  "public.story.floorThinBasis": "Cette réponse repose sur moins d’éléments que d’habitude.",
   "public.report.documentTitle": "Rapport du débat : {question}",
   "public.report.eyebrow": "DebateAI · Rapport du débat",
   "public.report.footer": "DebateAI · Rapport généré par IA",

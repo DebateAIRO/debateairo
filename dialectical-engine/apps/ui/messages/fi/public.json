@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Väittelyssä tutkitut kannat",
   "public.story.hide": "Piilota",
   "public.story.show": "Näytä",
+  "public.story.floorLead": "Paras vastauksemme:",
+  "public.story.floorThinBasis": "Tämä vastaus perustuu tavallista vähäisempään näyttöön.",
   "public.report.documentTitle": "Väittelyraportti: {question}",
   "public.report.eyebrow": "DebateAI · Väittelyraportti",
   "public.report.footer": "DebateAI · Tekoälyn tuottama raportti",

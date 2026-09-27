@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Pożizzjonijiet li d-dibattitu esplora",
   "public.story.hide": "Aħbi",
   "public.story.show": "Uri",
+  "public.story.floorLead": "L-aħjar tweġiba tagħna:",
+  "public.story.floorThinBasis": "Din it-tweġiba tistrieħ fuq inqas evidenza mis-soltu.",
   "public.report.documentTitle": "Rapport tad-dibattitu: {question}",
   "public.report.eyebrow": "DebateAI · Rapport tad-dibattitu",
   "public.report.footer": "DebateAI · Rapport iġġenerat mill-IA",

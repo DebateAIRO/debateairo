@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Positioner, som debatten undersøgte",
   "public.story.hide": "Skjul",
   "public.story.show": "Vis",
+  "public.story.floorLead": "Vores bedste svar:",
+  "public.story.floorThinBasis": "Dette svar bygger på mindre dokumentation end normalt.",
   "public.report.documentTitle": "Debatrapport: {question}",
   "public.report.eyebrow": "DebateAI · Debatrapport",
   "public.report.footer": "DebateAI · AI-genereret rapport",

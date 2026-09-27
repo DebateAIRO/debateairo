@@ -1,6 +1,7 @@
 import type { Answer, AnswerStory } from "@debateai/contract";
 import { reportSupportedForLocale } from "../report/reportLanguage.js";
 import type { LiveVerdictState } from "../types.js";
+import type { ResolvedFloor } from "./floorAnswer.js";
 import { liveVerdictState } from "./labels.js";
 import { countStoryPositions, type StoryFateValue, type StoryLabel } from "./storyWords.js";
 
@@ -47,6 +48,14 @@ export interface StoryView {
    * ready story, or when nothing was composed.
    */
   readonly fallbackText: string | null;
+  /**
+   * A floor answer (spec §14.4.4, Task M6): the answer ended components-only
+   * but the engine kept its label, so while the story is WRITING and when it is
+   * UNAVAILABLE the strip shows the floor answer ("Our best answer:" and the
+   * leading position's statement) in the question's language. Null for a ready
+   * story, and for an answer without a floor.
+   */
+  readonly floor: ResolvedFloor | null;
   /** The PDF download, only for a ready story whose language the report can print. */
   readonly pdfHref: string | null;
   /** A ready story whose language the report cannot print yet: the panel says so instead of offering the PDF. */
@@ -62,21 +71,25 @@ export function storyReportHref(debateId: string): string {
  * report are in (lib/i18n/questionLocale.ts), so the view knows whether the
  * report can print it. `supported` is the report's own rule; a test passes
  * another so the hidden-download path stays covered whatever the rule holds.
+ * `floor` is the answer's floor (lib/v3/floorAnswer.ts resolveFloor), or null:
+ * the label comes from it when the answer carries none (Task M6).
  */
 export function toStoryView(
   answer: Answer,
   story: AnswerStory | null,
   debateId: string,
   locale: string,
-  supported: (locale: string) => boolean = reportSupportedForLocale
+  supported: (locale: string) => boolean = reportSupportedForLocale,
+  floor: ResolvedFloor | null = null
 ): StoryView {
   const requested: AnswerStory["status"] = story === null ? "WRITING" : story.status;
   const ready = requested === "READY" || requested === "READY_WITH_RESERVATION";
   const body = ready && story !== null ? story.story : null;
   const status: AnswerStory["status"] = ready && body === null ? "UNAVAILABLE" : requested;
+  const verdict = answer.verdict_state ?? floor?.label ?? null;
   const label = {
-    label: answer.verdict_state,
-    verdictState: answer.verdict_state === null ? null : liveVerdictState(answer.verdict_state)
+    label: verdict,
+    verdictState: verdict === null ? null : liveVerdictState(verdict)
   };
   if (body === null) {
     const composed = answer.composed_text
@@ -95,6 +108,7 @@ export function toStoryView(
       reviewerNote: null,
       reservation: false,
       fallbackText: composed.length > 0 ? composed : null,
+      floor,
       pdfHref: null,
       reportUnsupported: false
     };
@@ -113,6 +127,7 @@ export function toStoryView(
     reviewerNote: body.reviewer_note === null ? null : body.reviewer_note.text,
     reservation: status === "READY_WITH_RESERVATION",
     fallbackText: null,
+    floor: null,
     pdfHref: printable ? storyReportHref(debateId) : null,
     reportUnsupported: !printable
   };

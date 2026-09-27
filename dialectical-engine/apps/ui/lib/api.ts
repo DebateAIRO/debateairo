@@ -19,6 +19,7 @@ import type {
   ScoringFeedbackVote,
   WorkerStatus
 } from "./types.js";
+import { readAnswerFloor, type AnswerFloorRead } from "./v3/floorAnswer.js";
 import {
   adaptiveDepthUnavailable,
   debateDetailFromAnswer,
@@ -132,9 +133,11 @@ export async function validateSession(client: ContractClient = contractClient): 
  * (spec 2026-09-26 §14.3), on every kind of bundle: the page's "starting"
  * render did no server read, so this is where the page learns it. Null when
  * the run records none, or when the id was an answer id and no run was read.
+ * `floorRead` is a served answer's floor (spec §14.4.4, Task M6), read beside
+ * the answer: a components-only answer's record, and nothing for any other.
  */
 export type DebateBundle =
-  | { kind: "served"; answer: Answer; detail: DebateDetail; run: null; questionLanguage: ArgumentLanguage | null }
+  | { kind: "served"; answer: Answer; detail: DebateDetail; run: null; questionLanguage: ArgumentLanguage | null; floorRead: AnswerFloorRead }
   | { kind: "loading"; answer: null; detail: DebateDetail; run: RunProjection; questionLanguage: ArgumentLanguage | null }
   | { kind: "failed"; answer: null; detail: DebateDetail; run: RunProjection; questionLanguage: ArgumentLanguage | null };
 
@@ -149,13 +152,19 @@ export type DebateBundleReadOptions = Readonly<{
   locale?: string;
 }>;
 
-function servedDebateBundle(answer: Answer, catalog: MessageCatalog, run: RunProjection | null): DebateBundle {
+async function servedDebateBundle(
+  answer: Answer,
+  catalog: MessageCatalog,
+  run: RunProjection | null,
+  client: Pick<ContractClient, "readAnswerDisclosure">
+): Promise<DebateBundle> {
   return {
     kind: "served",
     answer,
     detail: debateDetailFromAnswer(answer, catalog),
     run: null,
-    questionLanguage: run?.argument_language ?? null
+    questionLanguage: run?.argument_language ?? null,
+    floorRead: await readAnswerFloor(client, answer)
   };
 }
 
@@ -180,22 +189,22 @@ export async function getDebateBundle(
   if (run !== null) {
     if (run.state === "SETTLED" || options.answerExpected) {
       try {
-        return servedDebateBundle(await client.readRunAnswer(id), catalog, run);
+        return await servedDebateBundle(await client.readRunAnswer(id), catalog, run, client);
       } catch (failure) {
         // The projection and answer are committed by separate bounded writes.
         // Treat a momentary answer miss as finalizing, never as a user error.
         if (!isNotFound(failure)) throw failure;
-        if (options.currentAnswer) return servedDebateBundle(options.currentAnswer, catalog, run);
+        if (options.currentAnswer) return await servedDebateBundle(options.currentAnswer, catalog, run, client);
       }
     }
-    if (options.currentAnswer) return servedDebateBundle(options.currentAnswer, catalog, run);
+    if (options.currentAnswer) return await servedDebateBundle(options.currentAnswer, catalog, run, client);
     const questionLanguage = run.argument_language ?? null;
     if (run.state === "FAILED") {
       return { kind: "failed", answer: null, detail: debateDetailFromRunProjection(run, catalog, options.locale), run, questionLanguage };
     }
     return { kind: "loading", answer: null, detail: debateDetailFromRunProjection(run, catalog, options.locale), run, questionLanguage };
   }
-  return servedDebateBundle(await client.readAnswer(id), catalog, null);
+  return await servedDebateBundle(await client.readAnswer(id), catalog, null, client);
 }
 
 export async function getDebate(

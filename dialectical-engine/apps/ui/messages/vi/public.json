@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Các quan điểm đã được xem xét trong cuộc tranh luận",
   "public.story.hide": "Ẩn",
   "public.story.show": "Hiển thị",
+  "public.story.floorLead": "Câu trả lời tốt nhất của chúng tôi:",
+  "public.story.floorThinBasis": "Câu trả lời này dựa trên ít bằng chứng hơn thường lệ.",
   "public.report.documentTitle": "Báo cáo tranh luận: {question}",
   "public.report.eyebrow": "DebateAI · Báo cáo tranh luận",
   "public.report.footer": "DebateAI · Báo cáo do AI tạo",

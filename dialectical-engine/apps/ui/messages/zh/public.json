@@ -117,6 +117,8 @@
   "public.story.pathsListName": "辩论探讨过的立场",
   "public.story.hide": "隐藏",
   "public.story.show": "显示",
+  "public.story.floorLead": "我们的最佳答案：",
+  "public.story.floorThinBasis": "这个答案所依据的证据比平常少。",
   "public.report.documentTitle": "辩论报告：{question}",
   "public.report.eyebrow": "DebateAI · 辩论报告",
   "public.report.footer": "DebateAI · AI 生成的报告",

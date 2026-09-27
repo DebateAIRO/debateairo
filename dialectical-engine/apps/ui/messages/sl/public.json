@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Stališča, obravnavana v razpravi",
   "public.story.hide": "Skrij",
   "public.story.show": "Prikaži",
+  "public.story.floorLead": "Naš najboljši odgovor:",
+  "public.story.floorThinBasis": "Ta odgovor temelji na manj dokazih kot običajno.",
   "public.report.documentTitle": "Poročilo o razpravi: {question}",
   "public.report.eyebrow": "DebateAI · Poročilo o razpravi",
   "public.report.footer": "DebateAI · Poročilo, ustvarjeno z UI",

@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Debatēs aplūkotās nostājas",
   "public.story.hide": "Paslēpt",
   "public.story.show": "Rādīt",
+  "public.story.floorLead": "Mūsu labākā atbilde:",
+  "public.story.floorThinBasis": "Šī atbilde balstās uz mazāk pierādījumiem nekā parasti.",
   "public.report.documentTitle": "Debašu pārskats: {question}",
   "public.report.eyebrow": "DebateAI · Debašu pārskats",
   "public.report.footer": "DebateAI · MI ģenerēts pārskats",

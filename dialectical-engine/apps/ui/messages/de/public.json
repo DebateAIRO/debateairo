@@ -117,6 +117,8 @@
   "public.story.pathsListName": "In der Debatte untersuchte Positionen",
   "public.story.hide": "Ausblenden",
   "public.story.show": "Einblenden",
+  "public.story.floorLead": "Unsere beste Antwort:",
+  "public.story.floorThinBasis": "Diese Antwort stützt sich auf weniger Belege als üblich.",
   "public.report.documentTitle": "Debattenbericht: {question}",
   "public.report.eyebrow": "DebateAI · Debattenbericht",
   "public.report.footer": "DebateAI · KI-generierter Bericht",

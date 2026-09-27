@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Ståndpunkter som debatten utforskade",
   "public.story.hide": "Dölj",
   "public.story.show": "Visa",
+  "public.story.floorLead": "Vårt bästa svar:",
+  "public.story.floorThinBasis": "Det här svaret vilar på mindre underlag än vanligt.",
   "public.report.documentTitle": "Debattrapport: {question}",
   "public.report.eyebrow": "DebateAI · Debattrapport",
   "public.report.footer": "DebateAI · AI-genererad rapport",

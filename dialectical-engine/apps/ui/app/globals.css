@@ -8695,6 +8695,34 @@ a:focus-visible {
   .storyPanelStory .storyPaths { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
   .storyPanelStory .storyPathMore { grid-column: 1 / -1; }
 }
+/* The floor answer (components/FloorAnswer.tsx, spec 2026-09-26 §14.4.4):
+   when no answer could be written but the label was kept, the label in human
+   words, "Our best answer:" as a small lead, the leading position's own
+   statement, and a quiet line when the label rests on less than usual. It sits
+   in the owner's verdict card, in the owner's story strip while the story is
+   written, and in the public verdict. */
+.floorAnswer { display: grid; gap: 6px; justify-items: start; }
+.floorAnswerLabel {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border: 1px solid var(--gold-border);
+  border-radius: var(--r-pill);
+  background: var(--gold-bg);
+  color: var(--gold-text);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.floorAnswerLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
+.floorAnswerLabel[data-verdict="contested"],
+.floorAnswerLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
+.floorAnswerLead { margin: 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; line-height: 1.4; }
+.floorAnswerStatement { margin: 0; color: var(--text); font-size: 14px; line-height: 1.6; }
+.floorAnswerNote { margin: 0; color: var(--muted); font-size: 12.5px; font-style: italic; line-height: 1.55; }
+.publicVerdictText .floorAnswerNote { margin-block-start: 8px; }
 /* The offer to show the debate page in the language the debate was argued in
    (components/QuestionLanguageOffer.tsx, spec 2026-09-26 §14.3): a slim strip
    under the AI notice, in the page's own quiet colours, with the switch as the

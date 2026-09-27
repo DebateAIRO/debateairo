@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Stanoviska zvažovaná v debatě",
   "public.story.hide": "Skrýt",
   "public.story.show": "Zobrazit",
+  "public.story.floorLead": "Naše nejlepší odpověď:",
+  "public.story.floorThinBasis": "Tato odpověď se opírá o méně důkazů než obvykle.",
   "public.report.documentTitle": "Zpráva o debatě: {question}",
   "public.report.eyebrow": "DebateAI · Zpráva o debatě",
   "public.report.footer": "DebateAI · Zpráva vytvořená AI",

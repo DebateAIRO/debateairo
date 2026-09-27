@@ -1,7 +1,9 @@
 import type { JSX } from "react";
+import { FloorAnswer } from "@/components/FloorAnswer";
 import { StoryShortBlocks } from "@/components/StoryShortBlocks";
 import { localeDirection } from "@/lib/i18n/questionLocale";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { floorAnswerView } from "@/lib/v3/floorAnswer";
 import type { StoryView } from "@/lib/v3/storyView";
 import { storyLabelWords } from "@/lib/v3/storyWords";
 
@@ -15,6 +17,16 @@ function ComposedAnswer({ text }: { text: string | null }): JSX.Element | null {
   );
 }
 
+/**
+ * The answer shown while there is no story: today's composed answer, or for a
+ * floor answer (spec §14.4.4) "Our best answer:" and the leading position's
+ * statement, in the strip's language. The pill above already says the label.
+ */
+function InterimAnswer({ view, catalog, locale }: { view: StoryView; catalog: MessageCatalog; locale: string }): JSX.Element | null {
+  if (view.floor !== null) return <FloorAnswer view={floorAnswerView(view.floor, catalog, locale, locale)} showLabel={false} />;
+  return <ComposedAnswer text={view.fallbackText} />;
+}
+
 function StoryBodyView({ view, catalog, locale }: { view: StoryView; catalog: MessageCatalog; locale: string }): JSX.Element {
   // While the story is written, and when it cannot be, the reader still gets
   // today's answer under the status line (spec §14.2: always an answer).
@@ -23,7 +35,7 @@ function StoryBodyView({ view, catalog, locale }: { view: StoryView; catalog: Me
       <>
         <p className="storyPanelStatus" role="status" data-writing="true">{t(catalog, "public.story.writing")}</p>
         <p className="storyPanelNote">{t(catalog, "public.story.writingNote")}</p>
-        <ComposedAnswer text={view.fallbackText} />
+        <InterimAnswer view={view} catalog={catalog} locale={locale} />
       </>
     );
   }
@@ -31,9 +43,11 @@ function StoryBodyView({ view, catalog, locale }: { view: StoryView; catalog: Me
     return (
       <>
         <p className="storyPanelStatus">
-          {view.fallbackText === null ? t(catalog, "public.story.unavailableEmpty") : t(catalog, "public.story.unavailable")}
+          {view.fallbackText === null && view.floor === null
+            ? t(catalog, "public.story.unavailableEmpty")
+            : t(catalog, "public.story.unavailable")}
         </p>
-        <ComposedAnswer text={view.fallbackText} />
+        <InterimAnswer view={view} catalog={catalog} locale={locale} />
       </>
     );
   }

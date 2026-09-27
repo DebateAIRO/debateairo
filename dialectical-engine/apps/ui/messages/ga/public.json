@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Seasaimh a scrúdaigh an díospóireacht",
   "public.story.hide": "Folaigh",
   "public.story.show": "Taispeáin",
+  "public.story.floorLead": "Ár bhfreagra is fearr:",
+  "public.story.floorThinBasis": "Tá an freagra seo bunaithe ar níos lú fianaise ná mar is gnách.",
   "public.report.documentTitle": "Tuarascáil díospóireachta: {question}",
   "public.report.eyebrow": "DebateAI · Tuarascáil díospóireachta",
   "public.report.footer": "DebateAI · Tuarascáil ginte ag IS",

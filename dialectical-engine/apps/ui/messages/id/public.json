@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Posisi yang dibahas dalam debat",
   "public.story.hide": "Sembunyikan",
   "public.story.show": "Tampilkan",
+  "public.story.floorLead": "Jawaban terbaik kami:",
+  "public.story.floorThinBasis": "Jawaban ini bertumpu pada bukti yang lebih sedikit daripada biasanya.",
   "public.report.documentTitle": "Laporan debat: {question}",
   "public.report.eyebrow": "DebateAI · Laporan debat",
   "public.report.footer": "DebateAI · Laporan buatan AI",

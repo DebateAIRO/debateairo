@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Stajališta razmotrena u raspravi",
   "public.story.hide": "Sakrijte",
   "public.story.show": "Prikažite",
+  "public.story.floorLead": "Naš najbolji odgovor:",
+  "public.story.floorThinBasis": "Ovaj se odgovor oslanja na manje dokaza nego inače.",
   "public.report.documentTitle": "Izvješće o raspravi: {question}",
   "public.report.eyebrow": "DebateAI · Izvješće o raspravi",
   "public.report.footer": "DebateAI · Izvješće koje je generirala umjetna inteligencija",

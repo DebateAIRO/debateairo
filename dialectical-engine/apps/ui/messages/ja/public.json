@@ -117,6 +117,8 @@
   "public.story.pathsListName": "ディベートで検討した立場",
   "public.story.hide": "非表示",
   "public.story.show": "表示",
+  "public.story.floorLead": "私たちの最善の回答：",
+  "public.story.floorThinBasis": "この回答は、通常より少ない根拠に基づいています。",
   "public.report.documentTitle": "ディベートレポート：{question}",
   "public.report.eyebrow": "DebateAI · ディベートレポート",
   "public.report.footer": "DebateAI · AIが作成したレポート",

@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Posizioni esplorate nel dibattito",
   "public.story.hide": "Nascondi",
   "public.story.show": "Mostra",
+  "public.story.floorLead": "La nostra risposta migliore:",
+  "public.story.floorThinBasis": "Questa risposta si basa su meno prove del solito.",
   "public.report.documentTitle": "Rapporto del dibattito: {question}",
   "public.report.eyebrow": "DebateAI · Rapporto del dibattito",
   "public.report.footer": "DebateAI · Rapporto generato dall’IA",

@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Позиции, разгледани в дебата",
   "public.story.hide": "Скриване",
   "public.story.show": "Показване",
+  "public.story.floorLead": "Нашият най-добър отговор:",
+  "public.story.floorThinBasis": "Този отговор се основава на по-малко доказателства от обичайното.",
   "public.report.documentTitle": "Доклад за дебата: {question}",
   "public.report.eyebrow": "DebateAI · Доклад за дебата",
   "public.report.footer": "DebateAI · Доклад, създаден от ИИ",

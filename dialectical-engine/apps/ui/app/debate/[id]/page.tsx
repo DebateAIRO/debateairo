@@ -1,6 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
-import type { Answer } from "@debateai/contract";
+import type { Answer, AnswerFloor } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
 import { getDebateServer, questionLanguageTagOf, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import type { DebateDetail } from "@/lib/types";
@@ -67,6 +67,7 @@ export default async function DebatePage({
         newDebateCatalog={newDebateCatalog}
         storyLocale={locale}
         storyCatalog={publicCatalog}
+        initialFloor={null}
       />
     );
   }
@@ -80,6 +81,9 @@ export default async function DebatePage({
   let initialAnswer: Answer | null = null;
   let initialPending = true;
   let initialError: string | null = null;
+  // A components-only answer's floor (spec 2026-09-26 §14.4.4), read beside
+  // the answer; null when there is none or it could not be read.
+  let initialFloor: AnswerFloor | null = null;
   // The language the debate was argued in (spec 2026-09-26 §14.3); the page
   // offers to switch to it when it differs from the reader's.
   let questionLanguage: LocaleCode | null = null;
@@ -98,6 +102,7 @@ export default async function DebatePage({
     if (result.ok) {
       initialDebate = result.debate;
       initialAnswer = result.answer;
+      initialFloor = result.floor;
       initialPending = false;
     } else if (result.kind === "loading") {
       initialDebate = debateDetailFromRunProjection(result.run, composeCatalog, locale);
@@ -137,6 +142,7 @@ export default async function DebatePage({
       questionLocale={questionLanguage}
       storyLocale={storyLocale}
       storyCatalog={storyCatalog}
+      initialFloor={initialFloor}
     />
   );
 }

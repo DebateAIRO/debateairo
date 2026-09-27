@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Väitluses käsitletud seisukohad",
   "public.story.hide": "Peitke",
   "public.story.show": "Näidake",
+  "public.story.floorLead": "Meie parim vastus:",
+  "public.story.floorThinBasis": "See vastus toetub tavalisest vähematele tõenditele.",
   "public.report.documentTitle": "Väitluse aruanne: {question}",
   "public.report.eyebrow": "DebateAI · Väitluse aruanne",
   "public.report.footer": "DebateAI · Tehisintellekti loodud aruanne",

@@ -117,6 +117,8 @@
   "public.story.pathsListName": "토론에서 살펴본 입장",
   "public.story.hide": "숨기기",
   "public.story.show": "보기",
+  "public.story.floorLead": "저희의 최선의 답:",
+  "public.story.floorThinBasis": "이 답은 평소보다 적은 근거에 기대고 있습니다.",
   "public.report.documentTitle": "토론 보고서: {question}",
   "public.report.eyebrow": "DebateAI · 토론 보고서",
   "public.report.footer": "DebateAI · AI가 생성한 보고서",

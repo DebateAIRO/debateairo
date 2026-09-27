@@ -2,6 +2,7 @@ import {
   ContractHttpError,
   createContractClient,
   type Answer,
+  type AnswerFloor,
   type ArgumentLanguage,
   type ContractClient,
   type RunProjection
@@ -9,6 +10,7 @@ import {
 import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../trusted-client-ip.mjs";
 import type { DebateDetail, DebateSummary } from "./types.js";
 import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.js";
+import { readAnswerFloor } from "./v3/floorAnswer.js";
 import composeEnglish from "../messages/en/compose.json" with { type: "json" };
 import type { MessageCatalog } from "./i18n/translate.js";
 
@@ -112,7 +114,7 @@ export async function listDebatesPageServer(
 }
 
 export type GetDebateServerResult =
-  | { ok: true; debate: DebateDetail; answer: Answer; questionLanguage: ArgumentLanguage | null }
+  | { ok: true; debate: DebateDetail; answer: Answer; questionLanguage: ArgumentLanguage | null; floor: AnswerFloor | null }
   | { ok: false; kind: "loading"; run: RunProjection }
   | { ok: false; kind: "failed"; run: RunProjection; reason: string }
   | { ok: false; kind: "not_found" }
@@ -164,11 +166,20 @@ export async function getDebateServer(
       return { ok: false, kind: "pending", message: runFailure instanceof Error ? runFailure.message : "Unable to load run" };
     }
   }
+  // The question's language and, for a components-only answer, its floor
+  // (spec 2026-09-26 §14.4.4) are read side by side: both need only the
+  // answer, so the page waits for one round trip, not two. Neither read can
+  // fail the page: no language keeps the reader's, no floor reads as today.
+  const [questionLanguage, floorRead] = await Promise.all([
+    readQuestionLanguage(resolvedClient, answer.run_ref),
+    readAnswerFloor(resolvedClient, answer)
+  ]);
   return {
     ok: true,
     debate: debateDetailFromAnswer(answer, catalog),
     answer,
-    questionLanguage: await readQuestionLanguage(resolvedClient, answer.run_ref)
+    questionLanguage,
+    floor: floorRead.floor
   };
 }
 

@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Positions the debate explored",
   "public.story.hide": "Hide",
   "public.story.show": "Show",
+  "public.story.floorLead": "Our best answer:",
+  "public.story.floorThinBasis": "This answer rests on less evidence than usual.",
   "public.report.documentTitle": "Debate report: {question}",
   "public.report.eyebrow": "DebateAI · Debate report",
   "public.report.footer": "DebateAI · AI-generated report",

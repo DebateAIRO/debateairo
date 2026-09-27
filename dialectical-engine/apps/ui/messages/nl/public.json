@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Standpunten die het debat heeft verkend",
   "public.story.hide": "Verbergen",
   "public.story.show": "Tonen",
+  "public.story.floorLead": "Ons beste antwoord:",
+  "public.story.floorThinBasis": "Dit antwoord steunt op minder bewijs dan gewoonlijk.",
   "public.report.documentTitle": "Debatverslag: {question}",
   "public.report.eyebrow": "DebateAI · Debatverslag",
   "public.report.footer": "DebateAI · Door AI gegenereerd verslag",

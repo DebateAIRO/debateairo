@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Tartışmada ele alınan görüşler",
   "public.story.hide": "Gizle",
   "public.story.show": "Göster",
+  "public.story.floorLead": "En iyi yanıtımız:",
+  "public.story.floorThinBasis": "Bu yanıt her zamankinden daha az kanıta dayanıyor.",
   "public.report.documentTitle": "Tartışma raporu: {question}",
   "public.report.eyebrow": "DebateAI · Tartışma raporu",
   "public.report.footer": "DebateAI · Yapay zekâ tarafından üretilen rapor",

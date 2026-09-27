@@ -1,7 +1,9 @@
 "use client";
 
+import { FloorAnswer } from "@/components/FloorAnswer";
 import type { Synthesis } from "@/lib/types";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import type { FloorAnswerView } from "@/lib/v3/floorAnswer";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 
 export type SynthesisView = {
@@ -17,6 +19,12 @@ export type SynthesisView = {
   meta: string;
   lean?: { pct: number; label: string; source: "dialectical" | "structural" } | null;
   sections?: { title: string; items: string[] }[];
+  /**
+   * A components-only answer whose label the engine kept (spec 2026-09-26
+   * §14.4.4): the verdict card shows the floor answer in place of the
+   * "Components-only…" line. Null or absent for every other answer.
+   */
+  floor?: FloorAnswerView | null;
 };
 
 const LEAN_SOURCE_TITLE_KEYS: Record<"dialectical" | "structural", string> = {
@@ -74,7 +82,9 @@ export function SynthesisPanel({
                 <span className="synthCardLabel verdict">{t(catalog, "debateDrawers.synthesis.verdict")}</span>
                 {view.meta ? <span className="synthVerdictMeta">{view.meta}</span> : null}
               </div>
-              <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>{verdictBody}</div>
+              <div className={`synthVerdictBody${view.streaming ? " cursor" : ""}`}>
+                {view.floor ? <FloorAnswer view={view.floor} showLabel /> : verdictBody}
+              </div>
               {view.lean ? (
                 <div className="synthLean" title={t(catalog, LEAN_SOURCE_TITLE_KEYS[view.lean.source])}>
                   <span className="synthLeanLabel">{t(catalog, "debateDrawers.synthesis.leans")}</span>

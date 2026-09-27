@@ -117,6 +117,8 @@
   "public.story.pathsListName": "المواقف التي تناولتها المناظرة",
   "public.story.hide": "إخفاء",
   "public.story.show": "إظهار",
+  "public.story.floorLead": "أفضل إجابة لدينا:",
+  "public.story.floorThinBasis": "تستند هذه الإجابة إلى أدلة أقل من المعتاد.",
   "public.report.documentTitle": "تقرير المناظرة: {question}",
   "public.report.eyebrow": "DebateAI · تقرير المناظرة",
   "public.report.footer": "DebateAI · تقرير أنشأه الذكاء الاصطناعي",

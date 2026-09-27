@@ -257,6 +257,7 @@ apps/ui/components/DebateTree.tsx
 apps/ui/components/DebateWorkspaceDrawer.tsx
 apps/ui/components/DebatesBuffer.tsx
 apps/ui/components/EvaluatorDevMenu.tsx
+apps/ui/components/FloorAnswer.tsx
 apps/ui/components/GuideModal.tsx
 apps/ui/components/InvestigationDrawer.tsx
 apps/ui/components/LanguageSwitcher.tsx
@@ -466,6 +467,7 @@ apps/ui/lib/types.ts
 apps/ui/lib/v3/adapter.ts
 apps/ui/lib/v3/answerExport.ts
 apps/ui/lib/v3/census.ts
+apps/ui/lib/v3/floorAnswer.ts
 apps/ui/lib/v3/labels.ts
 apps/ui/lib/v3/liveEvents.ts
 apps/ui/lib/v3/missingCapabilities.ts

@@ -117,7 +117,7 @@ describe("chrome and views", () => {
       _client: unknown,
       options?: { currentAnswer?: Answer | null }
     ) => options?.currentAnswer
-      ? { kind: "served", answer: options.currentAnswer, detail: debateDetailFromAnswer(options.currentAnswer), run: null }
+      ? { kind: "served", answer: options.currentAnswer, detail: debateDetailFromAnswer(options.currentAnswer), run: null, floorRead: { floor: null, failed: false } }
       : { kind: "loading", answer: null, detail: treeLessDebate, run: runningRun });
     mocks.readEvents.mockReset().mockResolvedValue([]);
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by T1 chrome tests"));
@@ -333,7 +333,7 @@ describe("card anatomy", () => {
       _client: unknown,
       options?: { currentAnswer?: Answer | null }
     ) => options?.currentAnswer
-      ? { kind: "served", answer: options.currentAnswer, detail: debateDetailFromAnswer(options.currentAnswer), run: null }
+      ? { kind: "served", answer: options.currentAnswer, detail: debateDetailFromAnswer(options.currentAnswer), run: null, floorRead: { floor: null, failed: false } }
       : { kind: "loading", answer: null, detail: treeLessDebate, run: runningRun });
     mocks.readEvents.mockReset().mockResolvedValue([]);
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by T1 card-anatomy tests"));

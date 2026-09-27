@@ -11,6 +11,8 @@ import {
 import { v3ScorePercentage } from "@/lib/v3/adapter";
 import { countStoryPositions, storyLabelWords } from "@/lib/v3/storyWords";
 import { StoryShortBlocks, type StoryShortContent } from "@/components/StoryShortBlocks";
+import { FloorAnswer } from "@/components/FloorAnswer";
+import { floorAnswerView, publicFloorHost, resolveFloor } from "@/lib/v3/floorAnswer";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import composeEnglish from "@/messages/en/compose.json";
@@ -147,7 +149,12 @@ export function PublicDebateOverview({
   // sentence replaces the generic confidence words (spec §14.2), both in the
   // question's language. Without one, the snapshot reads as it always did.
   const story = debate.story_short;
-  const storyVerdict = story === undefined ? null : debate.answer.verdict;
+  // A components-only snapshot whose label the engine kept (spec §14.4.4): the
+  // label in human words and, without a story, "Our best answer:" and the
+  // leading position's statement, all in the question's language.
+  const floor = resolveFloor(publicFloorHost(debate.answer), debate.floor);
+  const floorView = floor === null ? null : floorAnswerView(floor, storyCatalog, storyLocale, storyLocale);
+  const storyVerdict = floor !== null ? floor.label : story === undefined ? null : debate.answer.verdict;
   const returnPath = `/public/debate/${encodeURIComponent(debate.public_ref)}`;
   const signInHref = `/login?next=${encodeURIComponent(returnPath)}`;
 
@@ -187,9 +194,14 @@ export function PublicDebateOverview({
             <div className="publicVerdictText">
               {story !== undefined
                 ? <StoryShortBlocks story={publicStoryContent(story, debate.answer)} catalog={storyCatalog} locale={storyLocale} className="publicStory" />
-                : presentation.summary.length > 0
-                  ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
-                  : <p>{t(catalog, "public.overview.composedVerdictUnavailable")}</p>}
+                : floorView !== null
+                  ? <FloorAnswer view={floorView} showLabel={false} />
+                  : presentation.summary.length > 0
+                    ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+                    : <p>{t(catalog, "public.overview.composedVerdictUnavailable")}</p>}
+              {story !== undefined && floorView !== null && floorView.thinBasis !== null ? (
+                <p className="floorAnswerNote" lang={floorView.locale} dir={floorView.direction}>{floorView.thinBasis}</p>
+              ) : null}
             </div>
             <p className="publicVerdictCaveat"><span aria-hidden>⚠</span> {t(catalog, "public.overview.caveat", { caveat: presentation.caveat })}</p>
             <div className="publicMetricRow">

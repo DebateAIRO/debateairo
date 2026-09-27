@@ -117,6 +117,8 @@
   "public.story.pathsListName": "A vitában vizsgált álláspontok",
   "public.story.hide": "Elrejtés",
   "public.story.show": "Megjelenítés",
+  "public.story.floorLead": "A legjobb válaszunk:",
+  "public.story.floorThinBasis": "Ez a válasz a szokásosnál kevesebb bizonyítékon alapul.",
   "public.report.documentTitle": "Vitajelentés: {question}",
   "public.report.eyebrow": "DebateAI · Vitajelentés",
   "public.report.footer": "DebateAI · MI által készített jelentés",

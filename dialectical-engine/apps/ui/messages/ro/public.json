@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Pozițiile cântărite în dezbatere",
   "public.story.hide": "Ascundeți",
   "public.story.show": "Afișați",
+  "public.story.floorLead": "Cel mai bun răspuns al nostru:",
+  "public.story.floorThinBasis": "Acest răspuns se sprijină pe mai puține dovezi decât de obicei.",
   "public.report.documentTitle": "Raportul dezbaterii: {question}",
   "public.report.eyebrow": "DebateAI · Raportul dezbaterii",
   "public.report.footer": "DebateAI · Raport generat de AI",

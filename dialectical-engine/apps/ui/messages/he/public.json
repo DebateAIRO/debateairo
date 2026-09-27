@@ -117,6 +117,8 @@
   "public.story.pathsListName": "העמדות שנבחנו בדיון",
   "public.story.hide": "הסתרה",
   "public.story.show": "הצגה",
+  "public.story.floorLead": "התשובה הטובה ביותר שלנו:",
+  "public.story.floorThinBasis": "התשובה הזו נשענת על פחות ראיות מהרגיל.",
   "public.report.documentTitle": "דוח הדיון: {question}",
   "public.report.eyebrow": "DebateAI · דוח הדיון",
   "public.report.footer": "DebateAI · דוח שנוצר על ידי בינה מלאכותית",

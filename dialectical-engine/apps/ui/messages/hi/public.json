@@ -117,6 +117,8 @@
   "public.story.pathsListName": "वाद-विवाद में परखे गए मत",
   "public.story.hide": "छिपाएँ",
   "public.story.show": "दिखाएँ",
+  "public.story.floorLead": "हमारा सबसे अच्छा उत्तर:",
+  "public.story.floorThinBasis": "यह उत्तर सामान्य से कम प्रमाणों पर आधारित है।",
   "public.report.documentTitle": "वाद-विवाद रिपोर्ट: {question}",
   "public.report.eyebrow": "DebateAI · वाद-विवाद रिपोर्ट",
   "public.report.footer": "DebateAI · AI द्वारा जनरेट की गई रिपोर्ट",

@@ -117,6 +117,8 @@
   "public.story.pathsListName": "Θέσεις που εξέτασε η αντιπαράθεση",
   "public.story.hide": "Απόκρυψη",
   "public.story.show": "Εμφάνιση",
+  "public.story.floorLead": "Η καλύτερη απάντησή μας:",
+  "public.story.floorThinBasis": "Αυτή η απάντηση στηρίζεται σε λιγότερα στοιχεία από ό,τι συνήθως.",
   "public.report.documentTitle": "Αναφορά αντιπαράθεσης: {question}",
   "public.report.eyebrow": "DebateAI · Αναφορά αντιπαράθεσης",
   "public.report.footer": "DebateAI · Αναφορά που δημιουργήθηκε από ΤΝ",
