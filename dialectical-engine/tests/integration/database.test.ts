@@ -8424,6 +8424,35 @@ describe("A16c · switches a RESUMED pass makes or inherits (carries 8c, 9, 13)"
     expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
   });
 
+  it("fix round 1 (Minor 1): an outage switch whose pass died during the runner-up's first call is announced ONCE across the resume", async () => {
+    const passOneEvent = {
+      state: "BACKUP_MODEL_ENGAGED" as const, role: "SUPPORT_ATTACK", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.primary.providerRef,
+      cause: "TRANSPORT_FAILURE" as const, call_site_key: `${callSiteKey}:seat:main`
+    };
+    const scenario = await executeSeatScenario({
+      label: "a16c-outage-announced-once",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // Pass 1: the main failed its `judge` attempts, the switch was announced (TRANSPORT_FAILURE, the main's
+      // key), and the pass died while the runner-up's first call was in flight — no runner-up row exists.
+      beforeExecute: async (context) => {
+        await seedEarlierPass(context, [[`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef]]);
+        await expect(new RunRepository(database.pool).recordBackupSwitchEvent({ runId: context.runId, value: passOneEvent }))
+          .resolves.toBe("RECORDED");
+      },
+      ...legDoubles("A16c outage once")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // Pass 2 hands the site to the runner-up through the ledger (the main is at its bound). That is the SAME
+    // switch pass 1 already told — same run, role, seat and failed key; only the cause it would name differs.
+    expect(scenario.calls.filter((call) => call.call_site_key === `${callSiteKey}:seat:runnerUp`).map((call) => [call.outcome, call.actor_ref]))
+      .toEqual([["OK", SEAT_ROUTES.primary.providerRef]]);
+    expect(scenario.switchEvents).toEqual([passOneEvent]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
   it("9/13: a site an EARLIER pass switched is disclosed on the answer from the ledger — and never announced a second time", async () => {
     const scenario = await executeSeatScenario({
       label: "a16c-resume-carried-switch",

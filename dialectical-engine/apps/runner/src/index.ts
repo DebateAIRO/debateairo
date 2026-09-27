@@ -1622,7 +1622,8 @@ function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
  * existing organ code: a provider that answered with unusable content is a
  * contract error, not a dead transport.
  */
-async function callSynthesisRole<T>(
+// A16c fix round 1 (Minor 6): exported so its mapping of a bare usage cap is pinned by a unit test.
+export async function callSynthesisRole<T>(
   call: () => Promise<T>,
   site: { readonly role: SynthesisRoleName; readonly callSiteKey: string },
   organFailureCode: string
@@ -3486,6 +3487,24 @@ export class WalkingSkeletonRunner {
      * stream; this pass only re-asks the member that answered (node ids are
      * rebuilt), so there is no second switch to record (carry 13) — the answer
      * still discloses the stand-in from who answered (`BackupAnswer`).
+     *
+     * WHY READING THE ACTORS AND READING THE MARKER AGREE (fix round 1,
+     * Minor 3 — keep the actor read; the `ran-by-marker` mutant survives for
+     * exactly this reason). For ONE claim shape the two are the same fact:
+     * a member always records under its OWN slot's marker (`keyOf` in
+     * run-seats.ts), RoleAssignmentSchema forbids one route twice in a role,
+     * and the one seat that keeps an older marker — a cross-exchange, which
+     * follows its root's writer — has no runner-up, so it never reaches this
+     * function. "The other member's route ran at the site" is then "the other
+     * member's key holds rows". They part only when the claim SHAPE flips
+     * between passes: a role that fell back to the debaters on one pass and not
+     * on the next (or the reverse) leaves a site key such as `…:seat:main`
+     * holding ANOTHER seat's route. Neither reading is exact there: if that
+     * debater's route is this seat's runner-up, the actor read sees it as "ran
+     * here" and suppresses a real move, while the marker read would count the
+     * debater's rows against the wrong member. Only the progress stream is at
+     * stake — the answer's disclosure counts who answered on this pass — and
+     * the per-key caps still bound the site.
      */
     const newLedgerMove = (input: {
       readonly seat: RunSeat;
@@ -6016,11 +6035,16 @@ export class WalkingSkeletonRunner {
      * rounds cite — so a writer an earlier pass switched to and this pass asked
      * again counts, and a discarded pass's rounds never do. A crash answer is
      * left alone (W2). The legacy run keeps the sealed-ref rule.
+     *
+     * Fix round 1 (Minor 5): a failure of this READ is reported as the
+     * terminal-state read it is — the stage the runner already uses for the
+     * run's recorded state at terminal (`TERMINAL_STATE_READ_FAILED`, above) —
+     * never as a persist failure: nothing has been persisted yet. No new code.
      */
     if (seatBook.assigned && result.crashClass === null) {
       const actorByArtifact = new Map<string, string>();
       for (const contractHash of [this.settings.composerContractHash, this.settings.conformanceContractHash]) {
-        const rows = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#ledger.readSeatMarkedModelCalls({
+        const rows = await runnerStage("TERMINAL_STATE_READ_FAILED", () => this.#ledger.readSeatMarkedModelCalls({
           runId: run.runId, workItemId: claimed.workItemId, contractHash
         }));
         for (const row of rows) {

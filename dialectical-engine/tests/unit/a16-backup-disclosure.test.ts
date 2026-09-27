@@ -7,9 +7,11 @@ import {
   assertRequiredConditionMarkRecords,
   type ServeGateResult
 } from "@debateai/serve";
+import { TypedDomainError } from "@debateai/kernel";
 import {
   BACKUP_MODEL_USED_WORDING,
   backupModelUsedRecords,
+  callSynthesisRole,
   backupSwitchEventValue,
   buildAssignedRunSeatBook,
   buildLegacyRunSeatBook,
@@ -317,10 +319,11 @@ describe("A16c · the seat caller counts every site a stand-in ANSWERED (carries
     // The member the call reaches first IS the planned one (the ledger's exclusion did not bind): no switch.
     await caller.callSeat({ seat: judgeSeat(), callSiteKey: "k", ledgerMove, call: scripted({ "provider:a": answers("a"), "provider:b": answers("b") }).call });
     expect(caller.switches()).toEqual([]);
-    // The same site again on this pass is its post-cooldown retry: it never switches.
+    // The same site again on this pass is its post-cooldown retry: it never switches. It completes —
+    // the runner-up answers under its own key — so the empty switch list below is about a call that ran.
     const onlyB = (member: SeatMember): boolean => member.pinnedAs !== "MAIN";
-    await caller.callSeat({ seat: judgeSeat(), callSiteKey: "k", eligible: onlyB, ledgerMove, call: scripted({ "provider:a": answers("a"), "provider:b": answers("b") }).call })
-      .catch(() => undefined);
+    await expect(caller.callSeat({ seat: judgeSeat(), callSiteKey: "k", eligible: onlyB, ledgerMove, call: scripted({ "provider:a": answers("a"), "provider:b": answers("b") }).call }))
+      .resolves.toMatchObject({ value: "b", callSiteKey: "k:seat:runnerUp" });
     expect(caller.switches()).toEqual([]);
   });
 
@@ -363,6 +366,26 @@ describe("A16c · DEGRADED-DIVERSITY from the writer and checker that ACTUALLY a
   it("leaves a crash answer alone: the mark is a property of a SERVED answer (W2), and a crash serves none", () => {
     const crashed = resultWith(["ENVELOPE_EXHAUSTED"], "ENVELOPE_EXHAUSTED");
     expect(withEffectiveDegradedDiversity(crashed, "provider:b")).toBe(crashed);
+  });
+});
+
+describe("A16c fix round 1 (Minor 6) · a bare usage cap that leaves a synthesis seat is a dead transport", () => {
+  const site = { role: "SYNTHESIZER" as const, callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1:seat:main" };
+
+  it("maps a bare PROVIDER_USAGE_CAP to SYNTHESIS_TRANSPORT_DEATH, naming the role and the call site", async () => {
+    const capped = callSynthesisRole(async () => {
+      throw new TypedDomainError("PROVIDER_USAGE_CAP", "subscription usage cap reached");
+    }, site, "COMPOSITION_CONTRACT_ERROR");
+    await expect(capped).rejects.toBeInstanceOf(TypedDomainError);
+    await expect(capped).rejects.toMatchObject({
+      code: "SYNTHESIS_TRANSPORT_DEATH",
+      message: "SYNTHESIZER hit a subscription usage cap at COMPOSER:SYNTHESIZER:INITIAL:1:seat:main"
+    });
+  });
+
+  it("leaves any other typed failure exactly as it arrived", async () => {
+    const other = new TypedDomainError("CALL_BUDGET_EXHAUSTED", "site");
+    await expect(callSynthesisRole(async () => { throw other; }, site, "COMPOSITION_CONTRACT_ERROR")).rejects.toBe(other);
   });
 });
 

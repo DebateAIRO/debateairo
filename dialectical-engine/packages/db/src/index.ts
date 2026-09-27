@@ -1367,13 +1367,21 @@ export class RunRepository {
    * disclosure into a crashed run. Every run discloses the switch on its answer
    * through the BACKUP-MODEL-USED records.
    *
-   * A16c (controller carry 8: one disclosure per real switch): a value this run
-   * already holds is not written twice — `ALREADY_RECORDED`. A resumed pass
-   * re-makes its claim, so a seat switched at claim would otherwise be told
-   * once per pass, and a pass that died between the announcement and the
-   * backup's call would tell its successor's switch again. Two genuinely
-   * distinct switches never share a value: an in-call switch names the site's
-   * failed key, and a site switches at most once per direction (DR-184-v5).
+   * A16c (controller carry 8: one disclosure per real switch; fix round 1,
+   * Minor 1) — an event this run already holds is not written twice
+   * (`ALREADY_RECORDED`):
+   *  · a BACKUP_MODEL_ENGAGED switch is the same switch when it names the same
+   *    run, role, seat and failed key (`call_site_key`, which carries the
+   *    switched member's seat marker; null for a switch made at claim),
+   *    WHATEVER its `cause`. So a seat switched at claim is told once however
+   *    many passes re-make the claim, and an outage switch whose pass died
+   *    while the runner-up's first call was in flight — told as
+   *    TRANSPORT_FAILURE — is not told again when the next pass hands the same
+   *    key over through the ledger as SPENT_ON_EARLIER_PASS. Two genuinely
+   *    distinct switches never share that key: a site switches away from a
+   *    member at most once (DR-184-v5).
+   *  · a ROLE_FELL_BACK_TO_DEBATERS event is the same event when its whole
+   *    value is equal.
    */
   async recordBackupSwitchEvent(input: {
     readonly runId: string;
@@ -1386,11 +1394,21 @@ export class RunRepository {
       );
       if (encryption.rows[0]?.encrypted !== false) return "WITHHELD_ENCRYPTED_RUN" as const;
       const value = JSON.stringify(input.value);
-      const existing = await client.query(
-        `SELECT 1 FROM core.run_progress_event
-          WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json=$2::jsonb`,
-        [input.runId, value]
-      );
+      const existing = input.value.state === "BACKUP_MODEL_ENGAGED"
+        ? await client.query(
+          `SELECT 1 FROM core.run_progress_event
+            WHERE run_id=$1 AND kind='ledger.could_not_do'
+              AND value_json->>'state'='BACKUP_MODEL_ENGAGED'
+              AND value_json->>'role'=$2
+              AND value_json->'seat_index'=to_jsonb($3::integer)
+              AND value_json->>'call_site_key' IS NOT DISTINCT FROM $4::text`,
+          [input.runId, input.value.role, input.value.seat_index, input.value.call_site_key]
+        )
+        : await client.query(
+          `SELECT 1 FROM core.run_progress_event
+            WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json=$2::jsonb`,
+          [input.runId, value]
+        );
       if ((existing.rowCount ?? 0) > 0) return "ALREADY_RECORDED" as const;
       await client.query(
         `INSERT INTO core.run_progress_event (run_id, at_seq, kind, value_json)
