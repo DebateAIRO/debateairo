@@ -354,9 +354,27 @@ function boundedMemberFailureReason(error: unknown): string {
 export async function runJudgePanel(input: {
   readonly artifactProducerRef: string;
   readonly primary: { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string };
-  readonly members: readonly { readonly memberRole: string; readonly actorRef: string; readonly contractHash: string; readonly judge: () => Promise<{ readonly judgementRef: string; readonly assessment: JudgeAssessment }> }[];
-}): Promise<{ readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly contractHash: string | null }[]; readonly notes: readonly { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }[] }> {
-  const judgements = [{ ...input.primary, contractHash: null as string | null }];
+  readonly members: readonly {
+    readonly memberRole: string;
+    readonly actorRef: string;
+    readonly contractHash: string;
+    /**
+     * Model scorecard A15 (R5): a member may be answered by its seat's backup,
+     * so its judge reports WHO answered — the route (`actorRef`) and its maker
+     * (`memberRole`). Absent, the member's own values stand. The family
+     * discount keys on this route, never on a maker name looked up in a list.
+     */
+    readonly judge: () => Promise<{
+      readonly judgementRef: string;
+      readonly assessment: JudgeAssessment;
+      readonly actorRef?: string;
+      readonly memberRole?: string;
+    }>;
+  }[];
+}): Promise<{ readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly actorRef: string; readonly contractHash: string | null }[]; readonly notes: readonly { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }[] }> {
+  const judgements: { judgementRef: string; assessment: JudgeAssessment; memberRole: string; actorRef: string; contractHash: string | null }[] = [
+    { ...input.primary, actorRef: input.artifactProducerRef, contractHash: null }
+  ];
   const notes: { memberRole: string; contractHash: string; kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; failureKind: PanelMemberFailureKind; reason: string }[] = [];
   for (const member of input.members) {
     if (member.actorRef === input.artifactProducerRef) {
@@ -365,7 +383,21 @@ export async function runJudgePanel(input: {
     }
     try {
       const judged = await member.judge();
-      judgements.push({ ...judged, memberRole: member.memberRole, contractHash: member.contractHash });
+      const actorRef = judged.actorRef ?? member.actorRef;
+      const memberRole = judged.memberRole ?? member.memberRole;
+      // FX-HR-H6 holds for WHOEVER answered: a backup on the producer's own
+      // route is refused exactly as the producer's own seat is.
+      if (actorRef === input.artifactProducerRef) {
+        notes.push({ memberRole, contractHash: member.contractHash, kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN", reason: "FX-HR-H6" });
+        continue;
+      }
+      judgements.push({
+        judgementRef: judged.judgementRef,
+        assessment: judged.assessment,
+        memberRole,
+        actorRef,
+        contractHash: member.contractHash
+      });
     } catch (error) {
       // V-28: a RUN-LEVEL spend stop is not this member's failure, it is the
       // run's, and noting it would carry the panel on to the next member — one

@@ -257,3 +257,50 @@ describe("T3 / S2-2 — author != judge, through the panel the runner calls", ()
     expect(result.notes[0]).toMatchObject({ memberRole: "house-b", failureKind: "SCHEMA_FAILURE" });
   });
 });
+
+describe("A15 · the panel records the route that ANSWERED (family discount input, R5)", () => {
+  const primary = { judgementRef: "artifact:author", assessment: assessmentContent, memberRole: "house-a" };
+
+  it("gives the primary the producer's route and a member its own route by default", async () => {
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+        judge: async () => ({ judgementRef: "artifact:b", assessment: assessmentContent })
+      }]
+    });
+    expect(result.judgements.map((entry) => [entry.memberRole, entry.actorRef])).toEqual([
+      ["house-a", "provider:a"], ["house-b", "provider:b"]
+    ]);
+  });
+
+  it("records a backup's route and maker when the member's judge reports them", async () => {
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+        judge: async () => ({
+          judgementRef: "artifact:c", assessment: assessmentContent, actorRef: "provider:c", memberRole: "house-c"
+        })
+      }]
+    });
+    expect(result.judgements[1]).toMatchObject({ memberRole: "house-c", actorRef: "provider:c", contractHash: "b".repeat(64) });
+  });
+
+  it("refuses a judgement that came back from the producer's own route, even through a backup", async () => {
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+        judge: async () => ({ judgementRef: "artifact:self", assessment: assessmentContent, actorRef: "provider:a", memberRole: "house-a" })
+      }]
+    });
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["artifact:author"]);
+    expect(result.notes).toEqual([expect.objectContaining({
+      memberRole: "house-a", kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN"
+    })]);
+  });
+});
