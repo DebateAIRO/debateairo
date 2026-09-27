@@ -1,9 +1,19 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { AnswerStory } from "@debateai/contract";
+import type { Answer, AnswerStory } from "@debateai/contract";
+import { CONDITION_MARKS } from "@debateai/kernel";
 import { tPlural } from "../../apps/ui/lib/i18n/translate.js";
-import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, storyFixture } from "../../apps/ui/lib/v3/storyFixture.js";
+import { loadReportCatalogs, type ReportCatalogLoader } from "../../apps/ui/lib/report/reportLanguage.js";
+import { buildReportModel } from "../../apps/ui/lib/report/reportModel.js";
+import {
+  STORY_FIXTURE_ANSWER,
+  STORY_FIXTURE_DEBATE_ID,
+  STORY_FIXTURE_POINT_NUMBERS,
+  storyFixture,
+  storyFixtureEdge,
+  storyFixtureNode
+} from "../../apps/ui/lib/v3/storyFixture.js";
 import { toStoryView } from "../../apps/ui/lib/v3/storyView.js";
 import { morePathsWords, storyFateWords, storyLabelWords } from "../../apps/ui/lib/v3/storyWords.js";
 
@@ -85,6 +95,96 @@ describe("the story's fixed words speak to the person, never about the engine (R
     for (const retired of ["Reviewer's note", "Our checker's reservation", "It does not change the verdict", "a reviewer disputed a point", "How this verdict was computed"]) {
       expect(all).not.toContain(retired);
     }
+  });
+});
+
+/**
+ * Fix round 1 (review, Important): the PDF's list of points printed the
+ * engine's own record text ("Recorded strength 0.21 is at or below the ruled
+ * hidden-node threshold"), dev's machinery labels ("Some judges could not
+ * assess this point") and scores. The report now words a set-aside point and a
+ * point's notes from its own plain keys, drops marks that only describe the
+ * machinery, and never prints a record's reason.
+ */
+describe("the report's list of points speaks to the person too (fix round 1)", () => {
+  const load: ReportCatalogLoader = async (locale, namespace) => catalog(locale, namespace);
+  const ENGINE_REASON = "Recorded strength 0.21 is at or below the ruled hidden-node threshold of 0.25 (register v1).";
+
+  /** A condition-mark record as the answer carries one, for the marked point only. */
+  function record(mark: "HIDDEN-UNJUDGEABLE" | "HIDDEN-LOW-SCORE"): Answer["condition_mark_records"][number] {
+    return {
+      mark, scope: "node", subject_ref: "n-marked", reason: ENGINE_REASON, lift_path: null, served_root_rule: null,
+      call_site_key: null, planned_leg_count: null, terminal_transport_outcome: null, review_outcome: null,
+      hidden_strength: 0.21, hidden_score_threshold: 0.25, hidden_score_threshold_source_ref: "register:v1",
+      excluded_from_served_number: true, judged_basis_count: null, affected_node_ids: ["n-marked"]
+    };
+  }
+
+  /** The fixture plus one point that carries every condition mark there is, and both hidden-node records. */
+  function markedAnswer(records: readonly ("HIDDEN-UNJUDGEABLE" | "HIDDEN-LOW-SCORE")[]): Answer {
+    const marked = storyFixtureNode({
+      id: "n-marked", claim: "Un punct marcat.", way: "LOOKED_UP", base: 0.5, final: null,
+      maker: "OpenAI", review: null, locator: "o sursă", marks: [...CONDITION_MARKS]
+    });
+    return {
+      ...STORY_FIXTURE_ANSWER,
+      nodes: [...STORY_FIXTURE_ANSWER.nodes, marked],
+      edges: [...STORY_FIXTURE_ANSWER.edges, storyFixtureEdge({ from: "n-marked", to: "n-hybrid", relation: "attack", strength: 0.2 })],
+      condition_mark_records: records.map(record)
+    };
+  }
+
+  async function entryFor(answer: Answer, locale: string) {
+    const story = storyFixture("READY");
+    story.point_numbers = { ...STORY_FIXTURE_POINT_NUMBERS, "n-marked": "P9" };
+    const model = buildReportModel(answer, story, new Date("2026-09-26T12:00:00.000Z"), await loadReportCatalogs({ questionTag: locale, interfaceLocale: "en", load }));
+    const entry = model.appendix.entries.find((item) => item.number === "P9");
+    if (entry === undefined) throw new Error("P9 missing");
+    return entry;
+  }
+
+  /** Every fixed English phrase the old list of points could print: dev's mark labels and hidden-node lines. */
+  const englishEngineCopy = [
+    ...Object.entries(catalog("en", "debateChrome")).filter(([key]) => key.startsWith("debateChrome.condition.")).map(([, value]) => value),
+    ...Object.entries(catalog("en", "compose")).filter(([key]) => key.startsWith("compose.v3.hidden.")).map(([, value]) => value.split("{")[0]!.trim()),
+    ...Object.entries(catalog("en", "public")).filter(([key]) => key.startsWith("public.report.point.")).map(([, value]) => value.split("{")[0]!.trim())
+  ].filter((phrase) => phrase.length > 3);
+
+  it("prints a point carrying every mark and both hidden records with no engine word, no score and no English (Romanian)", async () => {
+    const entry = await entryFor(markedAnswer(["HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE"]), "ro");
+    const printed = [entry.stance, entry.strength, entry.wayOfKnowing, entry.author, entry.review, entry.setAsideLine, entry.notesLine]
+      .filter((line): line is string => line !== null).join("\n");
+    expect(engineWordsIn(printed, [...STORY_ENGINE_WORDS.en, ...STORY_ENGINE_WORDS.ro])).toEqual([]);
+    expect(printed).not.toMatch(/(?<![\p{N}])0[.,][0-9]/u);
+    expect(printed).not.toContain("Recorded strength");
+    expect(englishEngineCopy.filter((phrase) => printed.includes(phrase))).toEqual([]);
+    for (const retired of ["Lăsat deoparte:", "Mențiuni:", "Ramură", "evaluatori", "pragul", "punctaj"]) expect(printed).not.toContain(retired);
+    // The one set-aside line (the strongest reason wins) and the few notes a reader can use, in plain Romanian.
+    expect(entry.setAsideLine).toBe(catalog("ro", "public")["public.report.point.setAsideUnweighed"]);
+    expect(entry.notesLine).toBe([
+      "public.report.point.noteFewerModels", "public.report.point.noteSourceUnconfirmed",
+      "public.report.point.noteOutdated", "public.report.point.noteFigureRemoved"
+    ].map((key) => catalog("ro", "public")[key]).join(" "));
+  });
+
+  it("words each set-aside reason plainly, and never prints the record's own reason", async () => {
+    const ro = catalog("ro", "public");
+    expect((await entryFor(markedAnswer(["HIDDEN-LOW-SCORE"]), "ro")).setAsideLine).toBe(ro["public.report.point.setAsideWeak"]);
+    expect((await entryFor(markedAnswer([]), "ro")).setAsideLine).toBe(ro["public.report.point.setAsideNoEffect"]);
+    expect(ro["public.report.point.setAsideNoEffect"]).toBe("Lăsat în afara concluziei: nu ar fi putut schimba răspunsul.");
+    const english = await entryFor(markedAnswer(["HIDDEN-LOW-SCORE"]), "en");
+    expect(english.setAsideLine).toBe("Left out of the conclusion: it was too weak to count.");
+    expect(JSON.stringify(english)).not.toContain(ENGINE_REASON.slice(0, 20));
+  });
+
+  it("prints no notes line for a point whose marks only describe the machinery", async () => {
+    const machinery = storyFixtureNode({
+      id: "n-marked", claim: "Un punct.", way: "REASONING", base: 0.5, final: 0.5, maker: "OpenAI", review: null, locator: null,
+      marks: ["SKIPPED-BY-BUDGET", "ENVELOPE_EXHAUSTED", "LEVERAGE_UNRESOLVED", "DIGEST-COMPRESSED", "UNDER-EXPLORED", "SYNTHESIS-OBJECTION-STANDING"]
+    });
+    const answer: Answer = { ...STORY_FIXTURE_ANSWER, nodes: [...STORY_FIXTURE_ANSWER.nodes, machinery] };
+    const entry = await entryFor(answer, "ro");
+    expect([entry.setAsideLine, entry.notesLine]).toEqual([null, null]);
   });
 });
 

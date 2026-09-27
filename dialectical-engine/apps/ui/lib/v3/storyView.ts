@@ -41,7 +41,11 @@ export interface StoryView {
    * records and never reaches the page (spec §14.2).
    */
   readonly reservation: boolean;
-  /** Today's composed text, shown only when the story is UNAVAILABLE. */
+  /**
+   * Today's composed answer, shown while the story is WRITING and when it is
+   * UNAVAILABLE, so the reader always sees an answer (spec §14.2). Null for a
+   * ready story, or when nothing was composed.
+   */
   readonly fallbackText: string | null;
   /** The PDF download, only for a ready story whose language the report can print. */
   readonly pdfHref: string | null;
@@ -83,7 +87,7 @@ export function toStoryView(answer: Answer, story: AnswerStory | null, debateId:
       change: null,
       reviewerNote: null,
       reservation: false,
-      fallbackText: status === "UNAVAILABLE" && composed.length > 0 ? composed : null,
+      fallbackText: composed.length > 0 ? composed : null,
       pdfHref: null,
       reportUnsupported: false
     };

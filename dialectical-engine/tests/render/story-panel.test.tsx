@@ -75,10 +75,16 @@ describe("StoryPanel in the question's language (R2, spec §14.2, §14.3)", () =
     expect(text).toContain(">What would change the answer<");
   });
 
-  it("WRITING: says the story is being written, with the label, no confidence line and no download", () => {
+  it("WRITING: says the story is being written, and shows today's answer under the note, with no confidence line or download", () => {
     const text = markup(storyFixture("WRITING"));
     expect(text).toContain(`role="status" data-writing="true">${ro("public.story.writing")}</p>`);
     expect(text).toContain(ro("public.story.writingNote"));
+    // The user always gets an answer (spec §14.2), in the same block UNAVAILABLE uses, after the note.
+    const note = text.indexOf(ro("public.story.writingNote"));
+    const answer = text.indexOf('<div class="storyPanelFallback" data-ai-generated="true"><p>Cea mai bună variantă este mutarea treptată');
+    expect(answer).toBeGreaterThan(note);
+    expect(text).toContain("<p>Chiria mai mare din Cluj rămâne principala obiecție la o mutare imediată.</p>");
+    expect(markup(storyFixture("WRITING"), { ...STORY_FIXTURE_ANSWER, composed_text: [] })).not.toContain("storyPanelFallback");
     expect(text).toContain(`>${ro("public.story.label.contested")}</span>`);
     expect(text).not.toContain("storyConfidence");
     expect(text).not.toContain(ro("public.story.download"));

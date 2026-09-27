@@ -20,9 +20,9 @@ export interface NumberedPoint {
 }
 
 /**
- * The tree's order, from the site's own projection. `composeCatalog` is the
- * report's `compose` catalogue: the projection words each point's set-aside
- * reason with it, and the list of points prints that reason.
+ * The tree's order, from the site's own projection. Only the ORDER is read,
+ * never the projection's words; `composeCatalog` is the report's own `compose`
+ * catalogue, handed on because the projection takes one.
  */
 function positionsFirstOrder(answer: Answer, composeCatalog: MessageCatalog): readonly DebateNode[] {
   const positions = debateDetailFromAnswer(answer, composeCatalog).tree?.children ?? [];

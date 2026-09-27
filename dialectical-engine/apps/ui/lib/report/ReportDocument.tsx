@@ -274,7 +274,7 @@ function Appendix({ model }: { model: ReportModel }): JSX.Element {
           <Text style={styles.entryMeta}>{entry.author}</Text>
           <Text style={styles.entryMeta}>{entry.review}</Text>
           {entry.setAsideLine === null ? null : <Text style={styles.entryMeta}>{entry.setAsideLine}</Text>}
-          {entry.marksLine === null ? null : <Text style={styles.entryMeta}>{entry.marksLine}</Text>}
+          {entry.notesLine === null ? null : <Text style={styles.entryMeta}>{entry.notesLine}</Text>}
         </Fragment>
       ))}
     </>

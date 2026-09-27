@@ -166,11 +166,14 @@ describe("toStoryView (spec §10)", () => {
     expect(toStoryView(STORY_FIXTURE_ANSWER, leaked, STORY_FIXTURE_DEBATE_ID, "ro").reservation).toBe(false);
   });
 
-  it("says WRITING with no story text and no PDF, also before the first reply", () => {
+  it("says WRITING with no story text and no PDF, but today's answer meanwhile, also before the first reply", () => {
+    const composed = STORY_FIXTURE_ANSWER.composed_text.map((segment) => segment.text).join("\n\n");
     for (const story of [storyFixture("WRITING"), null]) {
       const view = toStoryView(STORY_FIXTURE_ANSWER, story, STORY_FIXTURE_DEBATE_ID, "ro");
       expect(view.status).toBe("WRITING");
-      expect([view.headline, view.summary, view.change, view.fallbackText, view.pdfHref]).toEqual([null, null, null, null, null]);
+      // The user always sees an answer (spec §14.2): the composed answer shows while the story is written.
+      expect(view.fallbackText).toBe(composed);
+      expect([view.headline, view.summary, view.change, view.pdfHref]).toEqual([null, null, null, null]);
       expect([view.confidence, view.reviewerNote, view.reservation]).toEqual([null, null, false]);
       expect([view.paths.length, view.morePaths]).toEqual([0, 0]);
     }

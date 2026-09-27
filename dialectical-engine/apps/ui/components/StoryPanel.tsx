@@ -5,27 +5,35 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { StoryView } from "@/lib/v3/storyView";
 import { storyLabelWords } from "@/lib/v3/storyWords";
 
+/** Today's composed answer, as the model wrote it: plain paragraphs, never HTML. */
+function ComposedAnswer({ text }: { text: string | null }): JSX.Element | null {
+  if (text === null) return null;
+  return (
+    <div className="storyPanelFallback" data-ai-generated="true">
+      {text.split("\n\n").map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+    </div>
+  );
+}
+
 function StoryBodyView({ view, catalog, locale }: { view: StoryView; catalog: MessageCatalog; locale: string }): JSX.Element {
+  // While the story is written, and when it cannot be, the reader still gets
+  // today's answer under the status line (spec §14.2: always an answer).
   if (view.status === "WRITING") {
     return (
       <>
         <p className="storyPanelStatus" role="status" data-writing="true">{t(catalog, "public.story.writing")}</p>
         <p className="storyPanelNote">{t(catalog, "public.story.writingNote")}</p>
+        <ComposedAnswer text={view.fallbackText} />
       </>
     );
   }
   if (view.status === "UNAVAILABLE") {
-    const paragraphs = view.fallbackText === null ? [] : view.fallbackText.split("\n\n");
     return (
       <>
         <p className="storyPanelStatus">
-          {paragraphs.length === 0 ? t(catalog, "public.story.unavailableEmpty") : t(catalog, "public.story.unavailable")}
+          {view.fallbackText === null ? t(catalog, "public.story.unavailableEmpty") : t(catalog, "public.story.unavailable")}
         </p>
-        {paragraphs.length === 0 ? null : (
-          <div className="storyPanelFallback" data-ai-generated="true">
-            {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
-          </div>
-        )}
+        <ComposedAnswer text={view.fallbackText} />
       </>
     );
   }

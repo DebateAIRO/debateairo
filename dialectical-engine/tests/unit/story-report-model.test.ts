@@ -289,7 +289,7 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
     expect(model.about.rows).toEqual([
       { label: "Întrebarea", value: STORY_FIXTURE_ANSWER.question_line },
       { label: "Raport generat", value: "26 septembrie 2026 la 12:00 UTC" },
-      { label: "Poveste scrisă", value: "26 septembrie 2026 la 09:31 UTC" },
+      { label: "Povestea a fost scrisă", value: "26 septembrie 2026 la 09:31 UTC" },
       { label: "Scrisă de", value: OPENAI },
       { label: "Verificată de", value: ANTHROPIC }
     ]);
@@ -321,7 +321,7 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
     expect(byNumber.get("P5")?.stance).toBe("Contestă P1");
     expect(byNumber.get("P7")?.review).toBe(`Un al doilea model AI (${XAI}) l-a verificat, dar nu s-a putut pronunța. Nu există date despre școala copiilor.`);
     expect(byNumber.get("P8")?.stance).toBe("Contestă P3");
-    expect(byNumber.get("P8")?.setAsideLine).toBe(`Lăsat deoparte: ${message("ro", "debateChrome", "debateChrome.condition.branchFrozenLowLeverage")}`);
+    expect(byNumber.get("P8")?.setAsideLine).toBe("Lăsat în afara concluziei: nu ar fi putut schimba răspunsul.");
     expect(byNumber.get("P8")?.review).toBe("Niciun al doilea model AI nu a verificat acest punct.");
     expect(byNumber.get("P1")?.setAsideLine).toBeNull();
   });
@@ -341,7 +341,7 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
     expect(english?.stance).toBe("Challenges the link from P5 to P1");
   });
 
-  it("prints marks, an unrecorded author and a withheld strength in the report's language", () => {
+  it("prints a point's notes, an unrecorded author and a withheld strength in the report's language", () => {
     const marked = storyFixtureNode({
       id: "n-marked", claim: "Un punct marcat.", way: "REASONING", base: 0.305, final: null,
       maker: null, review: null, locator: null, marks: ["STALE", "UNDER-REVIEW"]
@@ -351,7 +351,8 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
     expect(entry.appendix.entries[0]).toMatchObject({
       strength: `${pct(0.305)} luat separat · după cântărire: neafișat`,
       author: "Modelul care l-a scris nu a fost înregistrat",
-      marksLine: `Mențiuni: ${message("ro", "debateChrome", "debateChrome.condition.stale")}; ${message("ro", "debateChrome", "debateChrome.condition.underReview")}`
+      // STALE says something about the point; UNDER-REVIEW only about the machinery, so it is left out.
+      notesLine: ro("public.report.point.noteOutdated")
     });
   });
 
@@ -416,7 +417,7 @@ describe("the report's language (lib/report/reportLanguage.ts)", () => {
     };
     const catalogs = await loadReportCatalogs({ questionTag: "ro", interfaceLocale: "de", load });
     expect(catalogs.locale).toBe("ro");
-    expect(calls.sort()).toEqual(["en/public", "ro/compose", "ro/debateChrome", "ro/public"]);
+    expect(calls.sort()).toEqual(["en/public", "ro/compose", "ro/public"]);
   });
 
   it("falls back to the interface locale for und and for an unknown tag", async () => {

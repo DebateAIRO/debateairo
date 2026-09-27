@@ -23,8 +23,12 @@ export function reportSupportedForLocale(locale: string): boolean {
   return !(REPORT_UNPRINTABLE_LOCALES as readonly string[]).includes(locale);
 }
 
-/** The namespaces the report prints from: its own words (public), the appendix's score and way-of-knowing words (compose) and set-aside and mark words (debateChrome). */
-export type ReportNamespace = "public" | "compose" | "debateChrome";
+/**
+ * The namespaces the report prints from: its own words (public) and the way of
+ * knowing each point rests on (compose). Its set-aside and note lines are its
+ * own plain `public.report.point.*` keys, never dev's machinery labels.
+ */
+export type ReportNamespace = "public" | "compose";
 
 /**
  * Loads one namespace's catalogue for one locale. The report route passes dev's
@@ -44,7 +48,6 @@ export interface ReportCatalogs {
   readonly locale: LocaleCode;
   readonly publicCatalog: MessageCatalog;
   readonly composeCatalog: MessageCatalog;
-  readonly debateChromeCatalog: MessageCatalog;
   readonly metadataCatalog: MessageCatalog;
 }
 
@@ -61,11 +64,10 @@ export async function loadReportCatalogs(input: Readonly<{
 }>): Promise<ReportCatalogs> {
   const locale = questionLocale(input.questionTag, input.interfaceLocale);
   if (!reportSupportedForLocale(locale)) throw new RangeError(`REPORT_LOCALE_UNSUPPORTED: ${locale}`);
-  const [publicCatalog, composeCatalog, debateChromeCatalog, metadataCatalog] = await Promise.all([
+  const [publicCatalog, composeCatalog, metadataCatalog] = await Promise.all([
     input.load(locale, "public"),
     input.load(locale, "compose"),
-    input.load(locale, "debateChrome"),
     input.load("en", "public")
   ]);
-  return Object.freeze({ locale, publicCatalog, composeCatalog, debateChromeCatalog, metadataCatalog });
+  return Object.freeze({ locale, publicCatalog, composeCatalog, metadataCatalog });
 }

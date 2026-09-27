@@ -1,7 +1,6 @@
-import type { Answer, AnswerStory, Edge, MakerLineage } from "@debateai/contract";
+import type { Answer, AnswerStory, ConditionMark, Edge, MakerLineage } from "@debateai/contract";
 import { formatDate, formatNumber, t, type MessageCatalog } from "../i18n/translate.js";
 import { contractNodesById, wayOfKnowingLabel } from "../v3/adapter.js";
-import { conditionMarkLabel } from "../v3/labels.js";
 import { countStoryPositions, morePathsWords, storyFateWords, storyLabelWords, type StoryFateValue } from "../v3/storyWords.js";
 import { orderedPoints, type NumberedPoint } from "./pointNumbers.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
@@ -48,9 +47,10 @@ export interface ReportAppendixEntry {
   readonly wayOfKnowing: string;
   readonly author: string;
   readonly review: string;
-  /** The printed lines for the two optional facts, "Set aside: …" and "Marks: …", or null. */
+  /** Why the point was left out of the conclusion, in plain words, or null when it was not. */
   readonly setAsideLine: string | null;
-  readonly marksLine: string | null;
+  /** The few notes a reader can use about the point (its source, its age, how many models weighed it), or null. */
+  readonly notesLine: string | null;
 }
 
 export interface ReportRow {
@@ -297,6 +297,106 @@ function stanceWords(point: NumberedPoint, answer: Answer, numbers: ReadonlyMap<
   return t(catalog, "public.report.point.linked", { point: point.parentNumber });
 }
 
+type SetAsideReason = "unweighed" | "weak" | "noEffect";
+
+/**
+ * Why a point was left out of the conclusion (fix round 1). The site's tree
+ * reads the two hidden-node records; the low-leverage freeze is a mark on the
+ * node itself. Only the KIND is read: a record's own `reason` is the engine's
+ * text ("Recorded strength 0.21 is at or below the ruled hidden-node
+ * threshold"), with scores and engine words, and is never printed. When
+ * several apply, the strongest reason is the one given.
+ */
+function setAsideReason(node: Answer["nodes"][number], answer: Answer): SetAsideReason | null {
+  const hidden = new Set(answer.condition_mark_records
+    .filter((record) => record.affected_node_ids.includes(node.node_id))
+    .map((record) => record.mark));
+  if (hidden.has("HIDDEN-UNJUDGEABLE")) return "unweighed";
+  if (hidden.has("HIDDEN-LOW-SCORE")) return "weak";
+  if (node.condition_marks.includes("BRANCH-FROZEN-LOW-LEVERAGE")) return "noEffect";
+  return null;
+}
+
+function setAsideWords(reason: SetAsideReason, catalog: MessageCatalog): string {
+  switch (reason) {
+    case "unweighed": return t(catalog, "public.report.point.setAsideUnweighed");
+    case "weak": return t(catalog, "public.report.point.setAsideWeak");
+    case "noEffect": return t(catalog, "public.report.point.setAsideNoEffect");
+  }
+}
+
+type PointNote = "fewerModels" | "sourceUnconfirmed" | "outdated" | "figureRemoved";
+const POINT_NOTE_ORDER: readonly PointNote[] = Object.freeze(["fewerModels", "sourceUnconfirmed", "outdated", "figureRemoved"]);
+
+/**
+ * The note a condition mark gives a reader about ONE point, or null for a mark
+ * that only describes the machinery (budgets, envelopes, digests, leverage,
+ * sampling, the run's own checks) and is left out (fix round 1). Exhaustive
+ * over the kernel's vocabulary, so a new mark must be placed here on purpose.
+ */
+function pointNote(mark: ConditionMark): PointNote | null {
+  switch (mark) {
+    case "PANEL-PARTIAL":
+    case "PANEL-DEGRADED-SINGLE-VOICE":
+    case "SINGLE-LINEAGE":
+    case "DEGRADED-DIVERSITY":
+    case "CRITIQUE-UNAVAILABLE":
+      return "fewerModels";
+    case "WAY-OF-KNOWING-DOWNGRADED":
+    case "OFF-SUBJECT-DOWNGRADE":
+      return "sourceUnconfirmed";
+    case "STALE":
+      return "outdated";
+    case "MISSING-NUMBER":
+      return "figureRemoved";
+    case "UNINSTRUMENTED":
+    case "UNFALSIFIED-AFTER-ROTATION":
+    case "SKIPPED-BY-BUDGET":
+    case "ENVELOPE_EXHAUSTED":
+    case "LEVERAGE_UNRESOLVED":
+    case "BRANCH-FROZEN-LOW-LEVERAGE":
+    case "AMBIGUOUS_ATTRIBUTION":
+    case "UNDER-REVIEW":
+    case "UNDER-EXPLORED":
+    case "UNRESOLVED-TYPE-FALLBACK":
+    case "DEFECT":
+    case "UNPRICED":
+    case "UNADJUDICATED":
+    case "UNCOVERED-SCOPE":
+    case "UNSERVED-MAKER-POSITION":
+    case "NON-COMPARABLE":
+    case "NOT_SAMPLED":
+    case "AMENDED-SEARCH":
+    case "LABEL-BASIS-INCOMPLETE":
+    case "OWED-CHECK-UNEXECUTED":
+    case "SYNTHESIS-OBJECTION-STANDING":
+    case "DIGEST-COMPRESSED":
+    case "DIGEST-CANNOT-EXIST":
+    case "PROTECTED-CORE-GUARD-RETIRED":
+    case "HIDDEN-UNJUDGEABLE":
+    case "DERIVED-STANDING-UNREVIEWED":
+    case "HIDDEN-LOW-SCORE":
+    case "UNAUTHORED-BRANCH-HALTED":
+      return null;
+  }
+}
+
+function pointNoteWords(note: PointNote, catalog: MessageCatalog): string {
+  switch (note) {
+    case "fewerModels": return t(catalog, "public.report.point.noteFewerModels");
+    case "sourceUnconfirmed": return t(catalog, "public.report.point.noteSourceUnconfirmed");
+    case "outdated": return t(catalog, "public.report.point.noteOutdated");
+    case "figureRemoved": return t(catalog, "public.report.point.noteFigureRemoved");
+  }
+}
+
+/** Each note once, in a fixed order, as sentences; null when the point has none. */
+function notesLine(node: Answer["nodes"][number], catalog: MessageCatalog): string | null {
+  const notes = new Set(node.condition_marks.map(pointNote).filter((note): note is PointNote => note !== null));
+  const words = POINT_NOTE_ORDER.filter((note) => notes.has(note)).map((note) => pointNoteWords(note, catalog));
+  return words.length === 0 ? null : words.join(" ");
+}
+
 /** What the second model that checked the point made of it, then its own reasons. */
 function reviewWords(review: Answer["nodes"][number]["review"], catalog: MessageCatalog): string {
   if (review === null) return t(catalog, "public.report.point.notChecked");
@@ -312,18 +412,14 @@ function reviewWords(review: Answer["nodes"][number]["review"], catalog: Message
 function appendixEntry(
   point: NumberedPoint,
   node: Answer["nodes"][number],
+  answer: Answer,
   stance: string,
   catalogs: ReportCatalogs
 ): ReportAppendixEntry {
   const { locale, publicCatalog } = catalogs;
   const base = percent(locale, node.base_score.value);
-  const frozen = node.condition_marks.includes("BRANCH-FROZEN-LOW-LEVERAGE");
   const author = lineageWords(node.maker_lineage);
-  const setAside = point.node.stopping_reason_human
-    ?? (frozen ? conditionMarkLabel("BRANCH-FROZEN-LOW-LEVERAGE", catalogs.debateChromeCatalog) : null);
-  const marks = node.condition_marks
-    .filter((mark) => mark !== "BRANCH-FROZEN-LOW-LEVERAGE")
-    .map((mark) => conditionMarkLabel(mark, catalogs.debateChromeCatalog));
+  const setAside = setAsideReason(node, answer);
   return {
     number: point.number,
     anchor: pointAnchor(point.number),
@@ -335,8 +431,8 @@ function appendixEntry(
     wayOfKnowing: t(publicCatalog, "public.report.point.known", { way: wayOfKnowingLabel(node.way_of_knowing, catalogs.composeCatalog) }),
     author: author === null ? t(publicCatalog, "public.report.point.authorNotRecorded") : t(publicCatalog, "public.report.point.author", { model: author }),
     review: reviewWords(node.review, publicCatalog),
-    setAsideLine: setAside === null ? null : t(publicCatalog, "public.report.point.setAside", { reason: setAside }),
-    marksLine: marks.length === 0 ? null : t(publicCatalog, "public.report.point.marks", { marks: marks.join("; ") })
+    setAsideLine: setAside === null ? null : setAsideWords(setAside, publicCatalog),
+    notesLine: notesLine(node, publicCatalog)
   };
 }
 
@@ -402,7 +498,7 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
       intro: t(publicCatalog, "public.report.pointsIntro"),
       entries: points.flatMap((point) => {
         const node = contractNodes.get(point.node.id);
-        return node === undefined ? [] : [appendixEntry(point, node, stanceWords(point, answer, numbers, publicCatalog), catalogs)];
+        return node === undefined ? [] : [appendixEntry(point, node, answer, stanceWords(point, answer, numbers, publicCatalog), catalogs)];
       })
     },
     about: {

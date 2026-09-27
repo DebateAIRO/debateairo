@@ -35,7 +35,7 @@ describe("the owner's story mock (look first, then wire)", () => {
     expect(html).not.toContain("Rezumatul prezintă ca sigur");
     // The offer, in English, twice (desktop and phone), naming Romanian in its own words.
     expect(html.match(/class=&quot;languageOffer&quot;/g)).toHaveLength(2);
-    expect(html).toContain("This debate is in &lt;bdi lang=&quot;ro&quot;&gt;Română&lt;/bdi&gt;.");
+    expect(html).toContain("This debate is in Romanian (&lt;bdi lang=&quot;ro&quot;&gt;Română&lt;/bdi&gt;).");
     expect(html).not.toMatch(/<script|https?:\/\//);
     // The vendored fonts are inlined, but only the three faces the panel uses (Plus Jakarta Sans 400 and
     // 700, Fraunces 600), once in the page and once in each of the 14 previews.

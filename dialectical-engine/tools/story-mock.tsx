@@ -7,9 +7,9 @@ import { fileURLToPath } from "node:url";
 import type { JSX } from "react";
 import type { AnswerStory } from "@debateai/contract";
 import { AiNotice } from "../apps/ui/components/AiNotice";
-import { QuestionLanguageOffer } from "../apps/ui/components/QuestionLanguageOffer";
+import { LanguageOfferStrip } from "../apps/ui/components/QuestionLanguageOffer";
 import { StoryPanel } from "../apps/ui/components/StoryPanel";
-import { questionLocale } from "../apps/ui/lib/i18n/questionLocale";
+import { languageOfferLocale, questionLocale } from "../apps/ui/lib/i18n/questionLocale";
 import { t } from "../apps/ui/lib/i18n/translate";
 import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, STORY_FIXTURE_LANGUAGE, storyFixture } from "../apps/ui/lib/v3/storyFixture";
 import { toStoryView } from "../apps/ui/lib/v3/storyView";
@@ -126,6 +126,11 @@ const previewCss = [fontCss, MOCK_FONT_VARIABLES, siteCss, PREVIEW_CSS].join("\n
 const INTERFACE_LOCALE = "en";
 const STORY_LOCALE = questionLocale(STORY_FIXTURE_LANGUAGE.tag, INTERFACE_LOCALE);
 
+// The offer as a first-time reader sees it. The page's QuestionLanguageOffer renders nothing on the
+// server (it waits for the browser to check a dismissal), so the preview draws its strip directly.
+const OFFER_TARGET = languageOfferLocale(STORY_LOCALE, INTERFACE_LOCALE);
+if (OFFER_TARGET === null) throw new Error("STORY_MOCK_OFFER_MISSING: the sample's language is the interface's");
+
 /**
  * The debate page around the panel: a stand-in header, the real AI notice, the
  * real language offer when asked for (as before the reader answers it), the
@@ -150,7 +155,7 @@ function PreviewPage({ status, offer }: { status: AnswerStory["status"]; offer: 
       <div className="debateAiDisclosure">
         <AiNotice catalog={{ ...homeEnglish, ...chromeEnglish }} body={t(debateChromeEnglish, "debateChrome.aiNotice")} />
       </div>
-      {offer ? <QuestionLanguageOffer questionLocale={STORY_LOCALE} interfaceLocale={INTERFACE_LOCALE} catalog={chromeEnglish} /> : null}
+      {offer ? <LanguageOfferStrip target={OFFER_TARGET} interfaceLocale={INTERFACE_LOCALE} catalog={chromeEnglish} /> : null}
       <StoryPanel
         view={toStoryView(STORY_FIXTURE_ANSWER, storyFixture(status), STORY_FIXTURE_DEBATE_ID, STORY_LOCALE)}
         catalog={publicRomanian}
@@ -183,7 +188,7 @@ const STATES: readonly StateCopy[] = Object.freeze([
   {
     status: "WRITING",
     title: "Writing",
-    words: "The first few minutes after a debate ends, while the story is being written. No confidence line yet: only the story can say how sure we are."
+    words: "The first few minutes after a debate ends, while the story is being written. The debate's usual answer shows meanwhile, so there is always an answer; no confidence line yet, since only the story can say how sure we are."
   },
   {
     status: "READY",
@@ -223,7 +228,7 @@ function Frame({ state, screen, mode, offer = false }: {
 const OFFER_STATE: StateCopy = Object.freeze({
   status: "READY",
   title: "The offer to switch languages",
-  words: "What a reader with an English interface sees first on a Romanian debate. \"Switch to Română\" shows the whole site in Romanian; \"No, thanks\" hides the offer for the rest of the visit."
+  words: "What a reader with an English interface sees first on a Romanian debate. \"Switch to Romanian\" shows the whole site in Romanian; \"No, thanks\" hides the offer for the rest of the visit, and it does not come back on a reload."
 });
 
 const fontsMissing = presentFonts.length < FONT_FACES.length;

@@ -8530,7 +8530,6 @@ a:focus-visible {
   letter-spacing: .1em;
   text-transform: uppercase;
 }
-.storyBox .storyBoxNote { margin-top: 6px; color: var(--muted); font-size: 11.5px; }
 /* The owner's strip (components/StoryPanel.tsx). A direct child of .debateView,
    a 100dvh flex column with overflow hidden: the strip keeps its natural
    height, its body scrolls inside a bounded height, and the reading views
@@ -8600,12 +8599,6 @@ a:focus-visible {
 .storyPanelLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
 .storyPanelLabel[data-verdict="contested"],
 .storyPanelLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
-.storyPanelConfidence {
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1.5;
-}
 /* A soft shade at the top or bottom edge shows that more text is there to
    scroll to; the local covers hide it at either end. */
 .storyPanelBody {
@@ -8623,7 +8616,6 @@ a:focus-visible {
   background-color: var(--surface-2);
 }
 .storyPanelInner { display: grid; gap: 12px; max-width: 760px; }
-.storyPanelSentence { margin: 0; color: var(--text-2); font-size: 12.5px; line-height: 1.55; }
 .storyPanelStory { display: grid; gap: 12px; }
 .storyPanelStory .storyHeadline {
   margin: 4px 0 0;

@@ -32,3 +32,25 @@ export function languageOfferLocale(
 export function localeDirection(locale: string): "ltr" | "rtl" {
   return getLocale(locale).dir;
 }
+
+/**
+ * A language's name in the INTERFACE's language (fix round 1): "Romanian" for
+ * an English reader, "engleză" for a Romanian one, from the browser's own
+ * Intl.DisplayNames. Null where the interface cannot name it (no DisplayNames,
+ * or a name that is only the code or the language's own name echoed back): the
+ * offer then names the language once, in its own words.
+ */
+export function languageNameIn(
+  code: LocaleCode,
+  interfaceLocale: LocaleCode,
+  displayNames: typeof Intl.DisplayNames = Intl.DisplayNames
+): string | null {
+  let name: string | undefined;
+  try {
+    name = new displayNames([interfaceLocale], { type: "language" }).of(code);
+  } catch {
+    return null;
+  }
+  if (name === undefined || name.trim().length === 0) return null;
+  return name === code || name === getLocale(code).nativeName ? null : name;
+}
