@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { DebateRole } from "@debateai/kernel";
 import { appendFramedRejection, type PromptPacket } from "@debateai/providers";
 import { MomentFileSchema, canonicalPromptFingerprint, momentIdFor, type MomentBuilder } from "@debateai/scorecard";
+import { buildSynthesisDigest, type SynthesisDigest } from "@debateai/serve";
 import {
   configureMomentContentAccess,
   exportMoment,
@@ -227,12 +228,15 @@ describe("A18 · the moment:export command line", () => {
 });
 
 /**
- * A18 carry 1 (pre-flight E4) — THE MOMENT COMES FROM THE SEQUENCE THAT
- * ANSWERED. A resumed pass re-authors every site, so one call-site key can carry
- * different initial packets. A record of exactly 2 messages starts a sequence; a
- * later attempt with no record, or a repair (more than 2 messages), belongs to
- * the sequence before it. The moment is the sequence holding the key's FIRST OK
- * attempt, else the key's first sequence with `recorded: null`.
+ * A18 carry 1 (pre-flight E4), as the controller ruled it in fix round 1 — THE
+ * MOMENT IS THE FIRST ANSWER THAT BELONGS TO A RECORDED SEQUENCE. A resumed pass
+ * re-authors every site, so one call-site key can carry different initial
+ * packets. A record of exactly 2 messages starts a sequence; a later attempt
+ * with no record, or a repair (more than 2 messages), belongs to the sequence
+ * before it. An OK attempt with no recorded start at or before it (a pass
+ * before migration 0072) belongs to none and is passed over. With no answer in
+ * any recorded sequence, the moment is the key's first sequence with
+ * `recorded: null`.
  */
 interface RecordedAttempt {
   readonly outcome: "OK" | "FAILED" | "TIMED_OUT";
@@ -258,6 +262,18 @@ function attemptSource(key: string, modelRole: DebateRole | null, attempts: read
     },
     readReply: async (_runId, rawArtifactId) => `reply of ${rawArtifactId}`
   };
+}
+
+/**
+ * A record that is its OWN fingerprint (self-check 1 passes on it) but that the
+ * live builder no longer sends: one sentence appended to the frame's opening
+ * message, as if the instruction had drifted since the run.
+ */
+function drifted(packet: PromptPacket): PromptPacket {
+  const [opening, ...rest] = packet.messages;
+  return Object.freeze({
+    messages: [{ ...opening!, content: `${opening!.content}\nOne more sentence the live builder never writes.` }, ...rest]
+  });
 }
 
 describe("A18 · the moment comes from the sequence that answered (carry 1)", () => {
@@ -310,6 +326,20 @@ describe("A18 · the moment comes from the sequence that answered (carry 1)", ()
     expect(answeredFirst.recorded).toMatchObject({ promptFingerprint: fingerprintOf(a), replyText: `reply of artifact:${KEY}:0` });
   });
 
+  it("passes over an answer that belongs to no recorded sequence (a pass before migration 0072)", async () => {
+    const b = await packetOf(REWRITTEN);
+    // [OK (no record), FAILED (B), OK (B)] → B, answered by the third row.
+    const straddling = await sequenceMoment([
+      { outcome: "OK", prompt: null }, { outcome: "FAILED", prompt: b }, { outcome: "OK", prompt: b }
+    ]);
+    expect(straddling.builder).toEqual(REWRITTEN);
+    expect(straddling.recorded).toMatchObject({ promptFingerprint: fingerprintOf(b), replyText: `reply of artifact:${KEY}:2` });
+    // [OK (no record), FAILED (B)] → B, with no reply: no recorded sequence answered.
+    const neverAnswered = await sequenceMoment([{ outcome: "OK", prompt: null }, { outcome: "FAILED", prompt: b }]);
+    expect(neverAnswered.builder).toEqual(REWRITTEN);
+    expect(neverAnswered.recorded).toBeNull();
+  });
+
   it("takes the key's FIRST sequence, with no reply, when no attempt answered", async () => {
     const [a, b] = [await packetOf(ASSESS), await packetOf(REWRITTEN)];
     const moment = await sequenceMoment([
@@ -322,7 +352,7 @@ describe("A18 · the moment comes from the sequence that answered (carry 1)", ()
     expect(moment.recorded).toBeNull();
   });
 
-  it("runs both self-checks on the answering sequence's own record", async () => {
+  it("checks that the answering sequence's own record is its fingerprint, never a failed pass's record (self-check 1)", async () => {
     const [a, b] = [await packetOf(ASSESS), await packetOf(REWRITTEN)];
     await expect(sequenceMoment([
       { outcome: "FAILED", prompt: a }, { outcome: "OK", prompt: b, storedFingerprint: "f".repeat(64) }
@@ -334,18 +364,83 @@ describe("A18 · the moment comes from the sequence that answered (carry 1)", ()
     expect(moment.builder).toEqual(REWRITTEN);
   });
 
-  it("refuses an answer whose own sequence has no initial prompt on record, and a record that is neither kind", async () => {
+  it("refuses a record that is its own fingerprint but that the live builder no longer sends (self-check 2)", async () => {
+    const a = await packetOf(ASSESS);
+    await expect(sequenceMoment([{ outcome: "OK", prompt: drifted(a) }]))
+      .rejects.toMatchObject({ code: "MOMENT_FINGERPRINT_INCONSISTENT", message: expect.stringContaining("live builder") });
+    // Loud in a whole-run export too: never skipped.
+    await expect(exportRunMoments(attemptSource(KEY, "JUDGE", [{ outcome: "OK", prompt: drifted(a) }]), {
+      runId: RUN, exportedAt: EXPORTED_AT, engineCommit: null
+    })).rejects.toMatchObject({ code: "MOMENT_FINGERPRINT_INCONSISTENT" });
+  });
+
+  it("refuses an orphan repair and a record that is neither kind, loudly", async () => {
     const [a, b] = [await packetOf(ASSESS), await packetOf(REWRITTEN)];
-    // Never paired with a prompt another pass sent.
-    await expect(sequenceMoment([{ outcome: "OK", prompt: null }, { outcome: "FAILED", prompt: b }]))
-      .rejects.toMatchObject({ code: "MOMENT_INPUTS_NOT_RECORDED" });
-    // A repair never starts a sequence.
+    // A repair is built from its own call's initial packet, recorded before it was sent:
+    // a repair with no recorded start before it is a damaged ledger, never a skip.
     await expect(sequenceMoment([{ outcome: "OK", prompt: repairOf(a) }]))
-      .rejects.toMatchObject({ code: "MOMENT_INPUTS_NOT_RECORDED" });
+      .rejects.toMatchObject({ code: "MOMENT_INITIAL_PROMPT_UNRECORDED" });
+    await expect(exportRunMoments(attemptSource(KEY, "JUDGE", [{ outcome: "OK", prompt: repairOf(a) }]), {
+      runId: RUN, exportedAt: EXPORTED_AT, engineCommit: null
+    })).rejects.toMatchObject({ code: "MOMENT_INITIAL_PROMPT_UNRECORDED" });
     // One message is neither an initial packet (2) nor a repair (more).
     const lone: PromptPacket = Object.freeze({ messages: a.messages.slice(0, 1) });
     await expect(sequenceMoment([{ outcome: "FAILED", prompt: lone }, { outcome: "OK", prompt: b }]))
       .rejects.toMatchObject({ code: "MOMENT_RECORDED_PROMPT_UNREADABLE" });
+  });
+});
+
+/**
+ * Review Minor 4 — THE PROMPT TEXT'S JSON ROUND TRIP, per family. A record is
+ * the JSON of the messages; the synthesis inputs are read back out of it (the
+ * digest as the SAME object, key order kept) and rebuilt by the live builder.
+ * Self-check 2 passing here pins that the round trip changes no byte.
+ */
+function digest(): SynthesisDigest {
+  const outcome = buildSynthesisDigest({
+    nodes: [{
+      nodeId: "position:a", statement: "Build it: the old bridge fails inspection.", finalStrength: 0.64,
+      wayOfKnowing: "REASONING", marks: [], polarityRelations: [], isPosition: true, isSurvivingObjection: false
+    }],
+    servedRootNodeId: "position:a",
+    budgetBound: 8_192
+  });
+  if (outcome.kind !== "DIGEST") throw new Error("the A18 digest fixture must exist");
+  return outcome.digest;
+}
+const CODE_LABEL = { verdictLabel: "CONTESTED", servedNodeId: "position:a", servedStrength: 0.64, margin: 0.08 };
+const ROUND_TRIP_CASES: readonly (readonly [DebateRole, string, MomentBuilder])[] = [
+  ["ANSWER_WRITER", "COMPOSER:SYNTHESIZER:INITIAL:1:seat:main", {
+    family: "SYNTHESIS_WRITER", inputs: { round: 1, digest: digest(), codeLabel: CODE_LABEL, priorObjection: null }
+  }],
+  ["ANSWER_CHECKER", "POST_COMPOSE_R9:EVALUATOR:1", {
+    family: "SYNTHESIS_CHECKER",
+    inputs: { round: 1, digest: digest(), codeLabel: CODE_LABEL, candidateStatement: "Build it, with the cost caveat." }
+  }],
+  ["REVIEWER", "JUDGE:review:0f4d7c1e-2b8a-4c3d-9e5f-a1b2c3d4e5f6", {
+    family: "JUDGE_REVIEW",
+    inputs: {
+      questionLine: QUESTION, statement: "The repair costs more over thirty years.",
+      edges: [
+        { targetStatement: "Build it.", polarity: "support" },
+        { targetStatement: "Repair the old one.", polarity: "attack" }
+      ]
+    }
+  }]
+];
+
+describe("A18 · every family survives the recorded prompt's JSON round trip (review Minor 4)", () => {
+  it.each(ROUND_TRIP_CASES)("%s at %s: exported through the record, rebuilt by the live builder", async (role, key, builder) => {
+    const packet = await packetOf(builder);
+    const moment = await exportOne(attemptSource(key, role, [{ outcome: "OK", prompt: packet }]), key);
+    expect(MomentFileSchema.parse(moment)).toEqual(moment);
+    expect(moment.role).toBe(role);
+    expect(moment.builder).toEqual(builder);
+    expect(moment.recorded?.promptFingerprint).toBe(canonicalPromptFingerprint(packet.messages));
+    // Through the file's own JSON as well: the round trip replay starts from.
+    const reread = MomentFileSchema.parse(JSON.parse(JSON.stringify(moment)));
+    const rebuilt = await captureMomentPacket(parseMomentBuilder(reread.builder, reread.role));
+    expect(canonicalPromptFingerprint(rebuilt.messages)).toBe(moment.recorded?.promptFingerprint);
   });
 });
 
@@ -505,6 +600,22 @@ describe("A18 · moment:export writes only where the path was judged (carries 4 
     });
     expect((await stat(single)).mode & 0o777).toBe(0o600);
     expect((await stat(join(engine, ".local", "single"))).mode & 0o777).toBe(0o700);
+  });
+
+  it("writes nothing for any key, not even the folder, when one key of a run fails self-check 2 (--all)", async () => {
+    const { engine } = await workTree();
+    const outDir = join(engine, ".local", "moments");
+    const packet = await packetOf(ASSESS);
+    const lines: string[] = [];
+    await expect(main(["--run", RUN, "--all", "--out-dir", outDir], ENVIRONMENT, (line) => { lines.push(line); }, {
+      source: memorySource([
+        { key: "PANEL:root:provider:a:seat:main", modelRole: "JUDGE", packet, outcomes: ["OK"] },
+        { key: "PANEL:root:provider:b:seat:main", modelRole: "JUDGE", packet: drifted(packet), outcomes: ["OK"] }
+      ]),
+      repositoryRoot: engine
+    })).rejects.toMatchObject({ code: "MOMENT_FINGERPRINT_INCONSISTENT" });
+    expect(existsSync(join(engine, ".local"))).toBe(false);
+    expect(lines).toEqual([]);
   });
 
   it("refuses the in-memory source seam outside NODE_ENV=test", async () => {

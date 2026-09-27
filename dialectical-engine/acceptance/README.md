@@ -151,6 +151,30 @@ then deletes the endpoints file first and closes every relay; a second Ctrl-C
 does not cut that short. If the file cannot be deleted, the host says so with
 `RELAY_HOST_ENDPOINTS_REMOVE_FAILED` and the path, so you can delete it yourself.
 
+**Exporting recorded calls as moments (`pnpm run moment:export`, model scorecard §2.9).**
+Local and operator-only: it refuses in the hosted deployment. It reads one
+finished debate from the database and writes "moment" files; it never writes the
+database and never calls a model. A moment is one recorded model call: the exact
+material its prompt was built from, the question and the passages a grader needs,
+and the answer that call gave (none when the call never succeeded). Run
+`pnpm run moment:export -- --run <runId> --call-site-key <key> --out <file>` for one
+call, or `pnpm run moment:export -- --run <runId> --all --out-dir <folder>` for every
+call of the debate; `--engine-commit <hex>` records which engine version exported
+it. Before a file is written, each moment is checked twice: the recorded prompt
+must match its own fingerprint, and today's prompt builder, fed the moment, must
+send that same prompt again. If either check fails, nothing is written, not even
+the folder. Calls that cannot be moments (recorded before prompts were kept, or not
+a debate role's call) are listed as `MOMENT SKIPPED <key> <code>`. Moment files
+hold the debate's private text, decrypted: they are written owner-only (mode 0600),
+and that text goes only into those files, never to the screen or a log. So
+`--out` and `--out-dir` must sit outside the repository, or under any `.local/`
+folder inside it; any other path is refused (`MOMENT_OUTPUT_PATH_REFUSED`), judged
+where it really leads, by the same rule as the endpoints file above. Environment:
+`DATABASE_URL`. For a local debate whose content is encrypted, also
+`CONTENT_ENCRYPTION_ENABLED`, `KEK_PATH`, `USER_DEK_STORE_PATH` and
+`DEBATEAI_CUSTODY_GROUP`, the same settings the runner uses, plus
+`KEK_PREVIOUS_PATH` during a key changeover.
+
 **Lean calls (model scorecard D8, owner ruling 2026-09-26).** A relayed call
 carries what an API call would, and as little else as each CLI allows. Every relay
 opens one private directory (mode 0700) when it starts and removes it when it stops;

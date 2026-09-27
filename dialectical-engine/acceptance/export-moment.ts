@@ -168,48 +168,73 @@ interface SequenceStart {
   readonly messages: PromptPacket["messages"];
 }
 
+/** The sequence a moment is exported from, and the row that answered in it (null: none did). */
+interface ChosenSequence {
+  readonly start: SequenceStart;
+  readonly answeredIndex: number | null;
+}
+
 /**
- * A18 carry 1 (pre-flight E4) — THE MOMENT COMES FROM THE SEQUENCE THAT
- * ANSWERED. A resumed pass re-authors every site, so one call-site key can
- * carry several different initial packets. An attempt whose prompt record has
- * exactly 2 messages (the frame and one fenced block) STARTS a sequence; a
- * later attempt with no record, or with a repair (more than 2 messages),
- * belongs to the sequence before it. The moment is the sequence holding the
- * key's FIRST answered attempt; with none, the key's FIRST sequence. Records
- * after the deciding attempt are never read.
+ * A18 carry 1 (pre-flight E4), as the controller ruled it in fix round 1 — THE
+ * MOMENT IS THE FIRST ANSWER THAT BELONGS TO A RECORDED SEQUENCE. A resumed pass
+ * re-authors every site, so one call-site key can carry several different
+ * initial packets. An attempt whose prompt record has exactly 2 messages (the
+ * frame and one fenced block) STARTS a sequence; a later attempt with no
+ * record, or with a repair (more than 2 messages), belongs to the latest start
+ * before it. The rows are walked in ledger order, tracking that latest start,
+ * and the walk stops at the first answered row that has one: that row is
+ * `recorded`, that start gives the builder and the fingerprint. An answered row
+ * with no recorded start at or before it (a pass before migration 0072) belongs
+ * to no sequence and is passed over. When no recorded sequence answered, the
+ * moment is the key's FIRST sequence, with `recorded: null`; with no start at
+ * all, null (`MOMENT_INPUTS_NOT_RECORDED`, which `--all` skips). Since the
+ * start is always the latest one before the answer, one pass's prompt is never
+ * paired with another pass's reply.
  *
- * An answer whose own sequence has no initial record (it sits before any
- * sequence, or only a repair was recorded) is `MOMENT_INPUTS_NOT_RECORDED`:
- * pairing it with a prompt another pass sent is exactly what this rule forbids.
+ * Strict on purpose (review Minor 2): EVERY record up to the stopping row is
+ * read, decrypted and parsed, not only the moment's own. So one bad record in
+ * any earlier pass fails this key — and, since its codes are not skippable,
+ * the whole `--all` — rather than being passed over unseen. The two ways a
+ * record can be bad in shape are both loud: one message (neither an initial
+ * packet nor a repair), and a repair with no recorded start before it (review
+ * Minor 3, the brief's `MOMENT_INITIAL_PROMPT_UNRECORDED`): the gateway records
+ * a call's initial packet before sending it, and builds every repair from that
+ * packet, so an orphan repair means a damaged ledger, never a legacy run.
+ * Records after the stopping row are never read.
  */
-async function sequenceStartOf(
+async function chooseSequence(
   source: MomentSource,
   rows: readonly MomentCallRow[],
-  answeredIndex: number,
   callSiteKey: string
-): Promise<SequenceStart | null> {
-  const last = answeredIndex === -1 ? rows.length - 1 : answeredIndex;
-  let start: SequenceStart | null = null;
-  for (let index = 0; index <= last; index += 1) {
-    const attemptId = rows[index]!.attemptId;
-    if (attemptId === null) continue;
-    const prompt = await source.readCallPrompt(attemptId);
-    // No record: this attempt belongs to the sequence before it.
-    if (prompt === null) continue;
-    const messages = recordedMessagesOf(prompt.promptText, callSiteKey);
-    // A repair: it belongs to the sequence before it, and never starts one.
-    if (messages.length > 2) continue;
-    if (messages.length < 2) {
-      throw new TypedDomainError(
-        "MOMENT_RECORDED_PROMPT_UNREADABLE",
-        `${callSiteKey}: a recorded prompt of ${String(messages.length)} message is neither an initial packet nor a repair`
-      );
+): Promise<ChosenSequence | null> {
+  let first: SequenceStart | null = null;
+  let latest: SequenceStart | null = null;
+  for (const [index, entry] of rows.entries()) {
+    const prompt = entry.attemptId === null ? null : await source.readCallPrompt(entry.attemptId);
+    // No record: this attempt belongs to the latest sequence before it, if any.
+    if (prompt !== null) {
+      const messages = recordedMessagesOf(prompt.promptText, callSiteKey);
+      if (messages.length === 2) {
+        latest = Object.freeze({ index, prompt, messages });
+        first ??= latest;
+      } else if (messages.length > 2) {
+        // A repair belongs to the latest sequence before it, and never starts one.
+        if (latest === null) {
+          throw new TypedDomainError(
+            "MOMENT_INITIAL_PROMPT_UNRECORDED",
+            `${callSiteKey}: a repair is on record, but the initial packet it was built from is not`
+          );
+        }
+      } else {
+        throw new TypedDomainError(
+          "MOMENT_RECORDED_PROMPT_UNREADABLE",
+          `${callSiteKey}: a recorded prompt of ${String(messages.length)} message is neither an initial packet nor a repair`
+        );
+      }
     }
-    start = Object.freeze({ index, prompt, messages });
-    // Nothing answered: the key's first sequence is the moment.
-    if (answeredIndex === -1) break;
+    if (answered(entry) && latest !== null) return Object.freeze({ start: latest, answeredIndex: index });
   }
-  return start;
+  return first === null ? null : Object.freeze({ start: first, answeredIndex: null });
 }
 
 export async function exportMoment(source: MomentSource, input: MomentExportInput): Promise<MomentFile> {
@@ -217,14 +242,14 @@ export async function exportMoment(source: MomentSource, input: MomentExportInpu
   if (rows.length === 0) {
     throw new TypedDomainError("MOMENT_CALL_NOT_FOUND", `run ${input.runId} has no model call at ${input.callSiteKey}`);
   }
-  const answeredIndex = rows.findIndex(answered);
-  const start = await sequenceStartOf(source, rows, answeredIndex, input.callSiteKey);
-  if (start === null) {
+  const chosen = await chooseSequence(source, rows, input.callSiteKey);
+  if (chosen === null) {
     throw new TypedDomainError(
       "MOMENT_INPUTS_NOT_RECORDED",
-      `${input.callSiteKey}: no initial prompt record for the sequence that answered (a run admitted before migration 0072, or no attempt was sent)`
+      `${input.callSiteKey}: no initial prompt record (a run admitted before migration 0072, or no attempt was sent)`
     );
   }
+  const { start } = chosen;
   const { prompt } = start;
   const initial = rows[start.index]!;
   const role = momentRoleOf(initial.modelRole, input.callSiteKey);
@@ -238,7 +263,7 @@ export async function exportMoment(source: MomentSource, input: MomentExportInpu
   if (canonicalPromptFingerprint((await captureMomentPacket(builder)).messages) !== prompt.promptFingerprint) {
     throw new TypedDomainError("MOMENT_FINGERPRINT_INCONSISTENT", `${input.callSiteKey}: the live builder does not reproduce the recorded prompt`);
   }
-  const accepted = answeredIndex === -1 ? undefined : rows[answeredIndex]!;
+  const accepted = chosen.answeredIndex === null ? undefined : rows[chosen.answeredIndex]!;
   const recorded = accepted === undefined
     ? null
     : {
@@ -403,8 +428,10 @@ async function writeExport(
     emit(`MOMENT ${moment.role} ${moment.momentId} ${outputPath}`);
     return;
   }
-  await mkdir(outputPath, { recursive: true, mode: 0o700 });
   const exported = await exportRunMoments(source, { runId: args.runId, exportedAt, engineCommit: args.engineCommit });
+  // Review Minor 1: the folder is made only once EVERY moment has passed both
+  // self-checks, so a loud failure leaves nothing behind — no file, no folder.
+  await mkdir(outputPath, { recursive: true, mode: 0o700 });
   for (const moment of exported.moments) {
     await writePrivateJsonFile(fileInside(outputPath, momentFileNameFor(moment)), moment);
     emit(`MOMENT ${moment.role} ${moment.momentId} ${moment.source.callSiteKey}`);
