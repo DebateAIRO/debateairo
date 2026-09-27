@@ -455,8 +455,18 @@ export const PANEL_MEMBER_FAILURE_KINDS = [
 export type PanelMemberFailureKind = typeof PANEL_MEMBER_FAILURE_KINDS[number];
 
 export class PanelMemberFailure extends Error {
-  constructor(readonly failureKind: Exclude<PanelMemberFailureKind, "PRODUCER_GRADING_FORBIDDEN">, message: string) {
-    super(message);
+  /**
+   * Model scorecard A16: the provider failure this wraps travels as `cause`,
+   * so a seat can tell a dead transport or a usage cap (R4: switch to the
+   * runner-up) from a refused answer (never switch). The reason text the panel
+   * records is unchanged: it is still read from `failureKind` alone.
+   */
+  constructor(
+    readonly failureKind: Exclude<PanelMemberFailureKind, "PRODUCER_GRADING_FORBIDDEN">,
+    message: string,
+    options?: { readonly cause?: unknown }
+  ) {
+    super(message, options);
     this.name = "PanelMemberFailure";
   }
 }

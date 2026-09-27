@@ -570,7 +570,8 @@ export class Judge {
       if (error instanceof ProviderCallFailedError) {
         throw new PanelMemberFailure(
           error.lastOutcome === "TIMED_OUT" ? "TIMEOUT" : "PROVIDER_ERROR",
-          `${error.code}:${error.lastOutcome}`
+          `${error.code}:${error.lastOutcome}`,
+          { cause: error }
         );
       }
       // V-28: a run-level spend stop is the RUN's, not this member's. Rewriting
@@ -578,7 +579,11 @@ export class Judge {
       // AND let the panel continue to the next member, which is another billed
       // call. It leaves exactly as it arrived.
       if (isRunLevelSpendStop(error)) throw error;
-      throw new PanelMemberFailure("PROVIDER_ERROR", error instanceof Error ? error.message : String(error));
+      throw new PanelMemberFailure(
+        "PROVIDER_ERROR",
+        error instanceof Error ? error.message : String(error),
+        { cause: error }
+      );
     }
     const parsed = parseStructuredArtifact(response.content, judgeAssessmentSchema);
     if (parsed.kind === "PARSE_FAILURE") throw new PanelMemberFailure("PARSE_FAILURE", parsed.message);

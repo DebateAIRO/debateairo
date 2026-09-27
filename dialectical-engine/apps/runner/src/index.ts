@@ -2812,11 +2812,12 @@ export class WalkingSkeletonRunner {
     /**
      * A15d (controller carry 6) — a resumed pass's SPENT seat keys, by bare
      * site. A `<site>:seat:<slot>` key the preflight found at its allowance,
-     * whose partner key was never tried, is not a halt: the member in that slot
-     * is ineligible for the site on this pass and its partner answers instead
-     * (`spentSeatSlots`). Should the site's seat hold no such partner after all,
-     * the site halts exactly as today (`spentSiteHalts`, the same record the
-     * preflight would have made).
+     * whose partner key holds fewer than `judge` attempts, is not a halt: the
+     * member in that slot is ineligible for the site on this pass and its
+     * partner answers instead (`spentSeatSlots`). A partner at `judge` or more
+     * keeps today's halt or terminal (A16a carry 7). Should the site's seat
+     * hold no such partner after all, the site halts exactly as today
+     * (`spentSiteHalts`, the same record the preflight would have made).
      */
     const spentSeatSlots = new Map<string, SeatSlot>();
     const spentSiteHalts = new Map<string, {
@@ -2892,6 +2893,10 @@ export class WalkingSkeletonRunner {
         // A15d (controller carry 3, the ruling's preferred option): the site's
         // ONE final retry. A seat key past the sequence bound has spent it, so
         // the member answering here gets none when its partner's key has.
+        // A16a: the seat caller sends the post-cooldown retry back to the member
+        // that ran the site's first sequence — `seatMember`, the one planned —
+        // and never switches on it, so this reads exactly the other key; a
+        // backup that answered inside the first sequence left the site done.
         ...(seatMember === undefined || seatMember === null ? {} : {
           finalRetryPermitted: async () => await this.#ledger.countModelAttempts({
             runId: run.runId,
@@ -3244,7 +3249,13 @@ export class WalkingSkeletonRunner {
       );
     }
     const seatBook: RunSeatBook = assignedSeats?.book ?? buildLegacyRunSeatBook(configuredMakers);
-    const seatCaller = createSeatCaller({ assigned: seatBook.assigned });
+    // A16a: the run id is part of every site's 80-20 ordinal (controller carry 1),
+    // and the switches made at claim open the caller's switch record.
+    const seatCaller = createSeatCaller({
+      assigned: seatBook.assigned,
+      runId: run.runId,
+      claimSwitches: assignedSeats?.claimSwitches ?? []
+    });
     const effectiveMakerCount = seatBook.position.length;
     /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct

@@ -40,6 +40,7 @@ import {
   EVALUATOR_PROMPT_CONTRACT,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
+  seatSiteOrdinal,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
@@ -56,7 +57,7 @@ import {
 } from "@debateai/serve";
 import { AnswerSchema } from "@debateai/contract";
 import { DEBATE_ROLES, debateRoleFromCallSiteKey, type DebateRole, type ServedRootRuleHistory } from "@debateai/kernel";
-import type { RoleSeat } from "@debateai/scorecard";
+import { selectSeatCandidate, type RoleSeat } from "@debateai/scorecard";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -7326,5 +7327,245 @@ describe("A15d fix round 1 · the panel's family discount and the claim's probes
     expect(scenario.lifecycle).toContainEqual(expect.objectContaining({
       state: "SYNTHESIS_ROLE_PROVIDER_ABSENT", call_site_key: `EVALUATOR:${SEAT_ROUTES.third.providerRef}`
     }));
+  });
+});
+
+/**
+ * Model scorecard A16a — the seat caller's backup (R4) on the real ledger, and
+ * the resume boundary A15d argued for (controller carry 7).
+ */
+describe("A16a · carry 7 — a partner at EXACTLY judge attempts next to a spent main keeps today's rule", () => {
+  // judge 2 + final 1: the main's key at 3 has spent the site's final retry; the
+  // partner's at 2 has no first sequence left, so it can never answer the site.
+  const judgeMaxAttempts = 2;
+
+  it("fails a root terminally, as today, instead of crashing on CALL_BUDGET_EXHAUSTED", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-root-partner-at-judge",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 3, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "FAILED", 2, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("TERMINAL_FAILED");
+    // Nothing beyond the earlier pass's five rows: the refusal spends nothing.
+    expect(scenario.calls).toHaveLength(5);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" }]);
+  });
+
+  it("halts a leg, as today and under its bare site key, and the run goes on", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-partner-at-judge",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 3, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 2, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a boundary ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a boundary review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a boundary ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A16a boundary leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a boundary review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(5);
+    expect(scenario.lifecycle).toContainEqual({ state: "EXPANSION_HALTED", call_site_key: callSiteKey, attempts_spent: 3 });
+    expect(scenario.lifecycle.every((event) => !event.call_site_key.includes(":seat:"))).toBe(true);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
+  });
+});
+
+describe("A16a · the backup on the real ledger (R4; carries 5 and 6)", () => {
+  const legs = (calls: readonly { readonly call_site_key: string }[]): readonly string[] => [...new Set(calls
+    .map((call) => call.call_site_key.replace(/:seat:(?:main|runnerUp)$/u, ""))
+    .filter((site) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+$/u.test(site)))];
+
+  it("answers a leg from the runner-up in the same call after the main's transport failure, and keeps the main down", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-backup",
+      assignment: legRunnerUpAssignment(),
+      primary: [
+        judgementDouble("Primary A16a root", 0.5),
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary A16a backup leg ${index + 1}`, 0.5)),
+        judgementDouble("Primary A16a cross-exchange", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a node ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        { status: 503 },
+        judgementDouble("Third A16a never", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const sites = legs(scenario.calls);
+    expect(sites).toHaveLength(4);
+    const rowsAt = (site: string) => scenario.calls.filter((call) => call.call_site_key.startsWith(`${site}:seat:`)).map((call) => ({
+      key: call.call_site_key, outcome: call.outcome, actor: call.actor_ref,
+      candidate: call.candidate_id, version: call.scorecard_version, level: call.thinking_level
+    }));
+    const [first, ...later] = sites;
+    // The main's sequence (judge 1) fails, and the runner-up answers the SAME site under its own key,
+    // stamped as its own candidate (carry 6).
+    expect(rowsAt(first!)).toEqual([
+      {
+        key: `${first!}:seat:main`, outcome: "FAILED", actor: SEAT_ROUTES.third.providerRef,
+        candidate: "candidate:third", version: 7, level: "DEFAULT_ONLY"
+      },
+      {
+        key: `${first!}:seat:runnerUp`, outcome: "OK", actor: SEAT_ROUTES.primary.providerRef,
+        candidate: "candidate:primary", version: 7, level: "DEFAULT_ONLY"
+      }
+    ]);
+    // The main stays down for the rest of the run: every later leg goes straight to the runner-up.
+    for (const site of later) {
+      expect(rowsAt(site).map((row) => [row.key, row.outcome, row.actor]))
+        .toEqual([[`${site}:seat:runnerUp`, "OK", SEAT_ROUTES.primary.providerRef]]);
+    }
+    // No cooldown and no halt: the backup answered inside the first sequence.
+    expect(scenario.lifecycle).toEqual([]);
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("UNAUTHORED-BRANCH-HALTED");
+  });
+
+  it("holds a leg whose main AND runner-up fail under its bare key, retries the main's own key once, and halts at 2j + f", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-both-down",
+      assignment: legRunnerUpAssignment(),
+      primary: [
+        judgementDouble("Primary A16a both-down root", 0.5),
+        { status: 503 },
+        judgementDouble("Primary A16a both-down cross-exchange", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a both-down review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a both-down ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        { status: 503 },
+        { status: 503 },
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A16a both-down leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a both-down review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const [first, ...later] = legs(scenario.calls);
+    // judge 1, final 1: the main's key j + f, the runner-up's j — v5's cooldown site, 2j + f = 3.
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${first!}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      [`${first!}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef],
+      [`${first!}:seat:runnerUp`, "FAILED", SEAT_ROUTES.primary.providerRef],
+      [`${first!}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef]
+    ]);
+    // Holds, the retry and the halt name the BARE site (carry 6; migration 0069).
+    expect(scenario.lifecycle.filter((event) => event.call_site_key === first).map((event) => event.state))
+      .toEqual(["COOLDOWN_HOLD", "COOLDOWN_RETRY", "EXPANSION_HALTED"]);
+    expect(scenario.lifecycle.every((event) => !event.call_site_key.includes(":seat:"))).toBe(true);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: first
+    }));
+    // Both members are down, so every later leg calls the preferred member again under its own key.
+    for (const site of later) {
+      expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${site}:seat:`))
+        .map((call) => [call.call_site_key, call.outcome])).toEqual([[`${site}:seat:main`, "OK"]]);
+    }
+  });
+});
+
+describe("A16a · R3's 80-20 split on the real ledger (carry 1)", () => {
+  it("sends every leg and every panel call to the member its SITE's ordinal names, with the run's own id", async () => {
+    const legSeat = pinnedSeat(0, "third", "primary", 0.2);
+    const judgeSeat = pinnedSeat(0, "third", "secondary", 0.2);
+    const scenario = await executeSeatScenario({
+      label: "a16a-live-split",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [legSeat],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [judgeSeat],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      // Either member may author any leg, so each holds a leg answer for every leg.
+      primary: [
+        ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Primary A16a split ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a split review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a split ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a split leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a split review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const routeOf = (slot: "MAIN" | "RUNNER_UP", seat: RoleSeat): string =>
+      (slot === "MAIN" ? seat.main : seat.runnerUp!).providerRef;
+    const via = (seat: RoleSeat, role: DebateRole, callSiteKey: string) =>
+      selectSeatCandidate(seat, seatSiteOrdinal({ runId: scenario.runId, role, pinnedSeatIndex: 0, callSiteKey })).via;
+    const makerOf = (providerRef: string): string =>
+      Object.values(SEAT_ROUTES).find((route) => route.providerRef === providerRef)!.maker;
+    // (1) Legs: no fairness rule narrows the SUPPORT_ATTACK seat, so its site's ordinal alone decides.
+    const legRows = scenario.calls.filter((call) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+:seat:/u.test(call.call_site_key));
+    expect(legRows).toHaveLength(4);
+    const writerOf = new Map<string, string>([
+      ["PANEL:root", SEAT_ROUTES.primary.providerRef],
+      ["PANEL:JUDGE:root:secondary", SEAT_ROUTES.secondary.providerRef],
+      ["PANEL:JUDGE:cross-root:0->1", SEAT_ROUTES.primary.providerRef],
+      ["PANEL:JUDGE:cross-root:1->0", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    for (const row of legRows) {
+      const site = row.call_site_key.replace(/:seat:(?:main|runnerUp)$/u, "");
+      const slot = via(legSeat, "SUPPORT_ATTACK", site);
+      expect([row.call_site_key, row.outcome, row.actor_ref])
+        .toEqual([`${site}:seat:${slot === "MAIN" ? "main" : "runnerUp"}`, "OK", routeOf(slot, legSeat)]);
+      writerOf.set(`PANEL:${site}`, row.actor_ref);
+    }
+    // (2) Panel: the site's ordinal decides unless it names the author's own maker (FX-HR-H6), then the other.
+    const panelRows = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
+    expect(panelRows).toHaveLength(8);
+    for (const row of panelRows) {
+      const site = row.call_site_key.replace(/:seat:(?:main|runnerUp)$/u, "").replace(`:${row.actor_ref}`, "");
+      const author = makerOf(writerOf.get(site)!);
+      const named = via(judgeSeat, "JUDGE", site);
+      const other = named === "MAIN" ? "RUNNER_UP" : "MAIN";
+      const slot = makerOf(routeOf(named, judgeSeat)) === author ? other : named;
+      expect([row.call_site_key, row.actor_ref])
+        .toEqual([`${site}:${routeOf(slot, judgeSeat)}:seat:${slot === "MAIN" ? "main" : "runnerUp"}`, routeOf(slot, judgeSeat)]);
+    }
+    // A split is not a switch: nothing failed, so no hold, no halt.
+    expect(scenario.lifecycle).toEqual([]);
   });
 });

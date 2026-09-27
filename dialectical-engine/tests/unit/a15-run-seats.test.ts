@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Judge } from "@debateai/judgement";
 import type { DebateRole } from "@debateai/kernel";
 import type { ProviderCallRequest, ProviderCallResult, ProviderGateway } from "@debateai/providers";
-import type { RoleAssignment, RoleSeat, SeatCandidate } from "@debateai/scorecard";
+import { selectSeatCandidate, type RoleAssignment, type RoleSeat, type SeatCandidate } from "@debateai/scorecard";
 import { framedFixturePacket } from "../support/framed-packet.js";
 import {
   buildAssignedRunSeatBook,
@@ -10,6 +10,7 @@ import {
   createSeatCaller,
   legacySynthesisSeat,
   roleAssignmentSeatProblem,
+  seatSiteOrdinal,
   stampCandidateGateway,
   type ConfiguredSeatMaker,
   type RouteHealth,
@@ -315,15 +316,25 @@ describe("A15 · controller rulings A13 and A14", () => {
     }
   });
 
-  it("A15b: no 80-20 split yet — main first", async () => {
-    // A16a REPLACES this case when it adds the split (R3); the A14 case above stays as it is.
+  it("A16a: the 80-20 split is the site's own — main first unless the site's ordinal names the runner-up", async () => {
+    // Replaces A15b's "no 80-20 split yet — main first" (R3 is live); the A14 case above stays as it is.
+    // Controller carry 1: the choice is `selectSeatCandidate` on the site's pure ordinal, never a visit count.
     const judgeSeat = claimBook().judge[0]!;
     const caller = createSeatCaller({ assigned: true });
-    for (const callSiteKey of sites) {
-      expect(await recorded(caller, judgeSeat, callSiteKey, {})).toEqual(["provider:a", "MAIN", `${callSiteKey}:seat:main`]);
+    const moreSites = [...sites, ...Array.from({ length: 24 }, (_, index) => `PANEL:m${String(index)}`)];
+    const vias = new Set<string>();
+    for (const callSiteKey of moreSites) {
+      const via = selectSeatCandidate(judgeSeat.pinned!, seatSiteOrdinal({
+        runId: null, role: "JUDGE", pinnedSeatIndex: 0, callSiteKey
+      })).via;
+      vias.add(via);
+      expect(await recorded(caller, judgeSeat, callSiteKey, {})).toEqual(via === "MAIN"
+        ? ["provider:a", "MAIN", `${callSiteKey}:seat:main`]
+        : ["provider:c", "RUNNER_UP", `${callSiteKey}:seat:runnerUp`]);
       expect(await recorded(caller, judgeSeat, callSiteKey, { eligible: notA }))
         .toEqual(["provider:c", "RUNNER_UP", `${callSiteKey}:seat:runnerUp`]);
     }
+    expect(vias).toEqual(new Set(["MAIN", "RUNNER_UP"]));
   });
 });
 
