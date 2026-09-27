@@ -6,11 +6,14 @@ import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CLAUDE_BINARY_NAME,
+  CLAUDE_CLI_USAGE_CAP,
+  CLAUDE_USAGE_CAP_PATTERN,
   preflightClaudeCli,
   resolveClaudeBinary,
   startClaudeRelay,
   type ClaudeRelayHandle
 } from "./claude-relay.js";
+import { CLI_RELAY_USAGE_CAP_CODE_TOKEN } from "./relay-core.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-claude-cli.mjs", import.meta.url));
 const handles: ClaudeRelayHandle[] = [];
@@ -613,5 +616,123 @@ describe("D18 r2 — CLI customizations excluded from relayed calls", () => {
     };
 
     expect(relayed.argumentList).toContain("--safe-mode");
+  });
+});
+
+describe("§2.2 Claude thinking level and R4 usage cap", () => {
+  interface LevelledCompletion {
+    readonly x_thinking_level: string;
+    readonly choices: readonly { readonly message: { readonly content: string } }[];
+  }
+
+  async function postAtLevel(handle: ClaudeRelayHandle, userContent: string, level: string): Promise<Response> {
+    return fetch(`${handle.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: handle.authorizationHeader },
+      body: JSON.stringify({
+        model: "ignored-by-relay",
+        x_thinking_level: level,
+        messages: [{ role: "user", content: userContent }]
+      })
+    });
+  }
+
+  it("declares --effort's five levels and appends --effort <level> only when one is asked", async () => {
+    const relay = await start();
+    expect(relay.thinkingLevels).toEqual(["low", "medium", "high", "xhigh", "max"]);
+
+    const asked = await postAtLevel(relay, "Assess this claim.", "xhigh");
+    expect(asked.status).toBe(200);
+    const askedBody = await asked.json() as LevelledCompletion;
+    expect(askedBody.x_thinking_level).toBe("xhigh");
+    expect((JSON.parse(askedBody.choices[0]!.message.content) as { argumentList: readonly string[] })
+      .argumentList.slice(-4)).toEqual(["--model", "opus", "--effort", "xhigh"]);
+
+    const unasked = await (await postCompletion(relay, "Assess this claim.")).json() as LevelledCompletion;
+    expect(unasked.x_thinking_level).toBe("DEFAULT_ONLY");
+    expect((JSON.parse(unasked.choices[0]!.message.content) as { argumentList: readonly string[] })
+      .argumentList).not.toContain("--effort");
+  });
+
+  it("refuses a level Claude Code has no --effort value for, before spawning", async () => {
+    const relay = await start();
+
+    const response = await postAtLevel(relay, "Assess this claim.", "minimal");
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED",
+      x_cli_relay_error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED"
+    });
+  });
+
+  it("answers the recorded usage-cap envelope with 429 and keeps every other is_error a plain failure", async () => {
+    const relay = await start();
+
+    const capped = await postCompletion(relay, "USAGE_CAP_CLI");
+    expect(capped.status).toBe(429);
+    expect(await capped.json()).toEqual({
+      error: "CLAUDE_CLI_USAGE_CAP",
+      x_cli_relay_error: "CLI_RELAY_USAGE_CAP"
+    });
+
+    const signedOut = await postCompletion(relay, "IS_ERROR_CLI");
+    expect(signedOut.status).toBe(502);
+    expect(await signedOut.json()).toEqual({ error: "CLAUDE_CLI_FAILED" });
+  });
+
+  it("recognises the recorded cap wording and nothing looser", () => {
+    for (const capped of [
+      "You've reached your Fable 5 limit",
+      "You’ve reached your Opus 5 limit · resets 5pm"
+    ]) {
+      expect(CLAUDE_USAGE_CAP_PATTERN.test(capped), capped).toBe(true);
+    }
+    for (const other of ["Failed to authenticate: OAuth session expired", "rate limit exceeded", "limit"]) {
+      expect(CLAUDE_USAGE_CAP_PATTERN.test(other), other).toBe(false);
+    }
+  });
+
+  it("hands back a cap code the relay core admits, and no CLI text, stderr included, reaches the 429", async () => {
+    // A8 law: a cap code that is not ONE upper-case token is a plain 502, never a 429.
+    expect(CLI_RELAY_USAGE_CAP_CODE_TOKEN.test(CLAUDE_CLI_USAGE_CAP)).toBe(true);
+    // Both routes to a cap: exit 1 (the recorded one, read by the classifier) and
+    // exit 0 with is_error true (read by the envelope parser). Each also writes a
+    // stderr sentinel, which must never leave the relay.
+    const capScript = `
+const prompt = process.argv[process.argv.indexOf("-p") + 1] ?? "";
+const envelope = (overrides) => JSON.stringify({
+  is_error: false, result: "OK", total_cost_usd: 0,
+  modelUsage: { "claude-fake-cli-model": { output_tokens: 1 } }, ...overrides
+});
+const capped = envelope({ is_error: true, result: "You've reached your fake-model limit", modelUsage: {} });
+if (prompt.includes("CAP_EXIT_ONE")) {
+  process.stderr.write("STDERR-EVIDENCE-SENTINEL\\n");
+  process.stdout.write(capped);
+  process.exitCode = 1;
+} else if (prompt.includes("CAP_EXIT_ZERO")) {
+  process.stderr.write("STDERR-EVIDENCE-SENTINEL\\n");
+  process.stdout.write(capped);
+} else {
+  process.stdout.write(envelope({}));
+}`;
+    const relay = await startClaudeRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", capScript, "--"] }
+    });
+    handles.push(relay);
+
+    for (const marker of ["CAP_EXIT_ONE", "CAP_EXIT_ZERO"]) {
+      const response = await postCompletion(relay, marker);
+      const body = await response.text();
+      expect(response.status, marker).toBe(429);
+      expect(JSON.parse(body), marker).toEqual({
+        error: CLAUDE_CLI_USAGE_CAP,
+        x_cli_relay_error: "CLI_RELAY_USAGE_CAP"
+      });
+      expect(body, marker).not.toContain("SENTINEL");
+      expect(body, marker).not.toContain("reached your");
+    }
   });
 });

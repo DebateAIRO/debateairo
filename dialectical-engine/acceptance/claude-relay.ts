@@ -6,6 +6,8 @@ import {
   resolveTestGuardedCommand,
   startCliRelayServer,
   type CliCompletion,
+  type CliFailureEvidence,
+  type CliInvocation,
   type CliRelayAdapter,
   type CliRelayHandle,
   type CommandSpec
@@ -68,6 +70,18 @@ export const CLAUDE_HANDSHAKE_PROMPT =
  * "user,project,local" — project and local remain excluded.
  */
 export const CLAUDE_SETTING_SOURCES = "user" as const;
+/** §2.2 — `claude --help` 2.1.282 (M4, 2026-09-26): `--effort low|medium|high|xhigh|max`. */
+export const CLAUDE_THINKING_LEVELS = Object.freeze(["low", "medium", "high", "xhigh", "max"] as const);
+/**
+ * R4 — the ONE usage-cap signature on record for this CLI: 2026-08-11, the
+ * default model answered `is_error: true` with "You've reached your Fable 5
+ * limit" (api_error 429), see CLAUDE_MODEL_ALIAS above. Only that wording is a
+ * cap; every other failure stays CLAUDE_CLI_FAILED, which the gateway retries
+ * and the runner's backup absorbs after the normal retries. A new wording is
+ * added only from a redacted real capture.
+ */
+export const CLAUDE_USAGE_CAP_PATTERN = /\byou(?:'|’)ve reached your\b[^\n]{0,80}?\blimit\b/iu;
+export const CLAUDE_CLI_USAGE_CAP = "CLAUDE_CLI_USAGE_CAP" as const;
 
 const envelopeSchema = z.object({
   is_error: z.boolean(),
@@ -113,7 +127,11 @@ function parseClaudeEnvelope(stdout: string, alias: string) {
   }
   const envelope = envelopeSchema.safeParse(decoded);
   if (!envelope.success) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_OUTPUT_INVALID");
-  if (envelope.data.is_error !== false) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_FAILED");
+  if (envelope.data.is_error !== false) {
+    throw CLAUDE_USAGE_CAP_PATTERN.test(envelope.data.result)
+      ? new CliRelayFailure("USAGE_CAP", CLAUDE_CLI_USAGE_CAP)
+      : new CliRelayFailure("FAILED", "CLAUDE_CLI_FAILED");
+  }
   const content = envelope.data.result.trim();
   if (content.length === 0) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_OUTPUT_INVALID");
   const model = resolveClaudeModel(envelope.data.modelUsage, alias);
@@ -140,6 +158,26 @@ function parseClaudeEnvelope(stdout: string, alias: string) {
   });
 }
 
+/**
+ * R4 for a NON-ZERO exit: the recorded cap exited 1 with its envelope on
+ * stdout. §2.3: the Claude envelope carries no thinking-token counter (its
+ * recorded members are is_error, result, modelUsage and total_cost_usd), so
+ * this relay reports none and never guesses one.
+ */
+function claudeUsageCapCode(evidence: CliFailureEvidence): string | null {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(evidence.stdout);
+  } catch {
+    return null;
+  }
+  const envelope = envelopeSchema.safeParse(decoded);
+  return envelope.success && envelope.data.is_error === true
+    && CLAUDE_USAGE_CAP_PATTERN.test(envelope.data.result)
+    ? CLAUDE_CLI_USAGE_CAP
+    : null;
+}
+
 function createClaudeAdapter(alias: string): CliRelayAdapter {
   if (!CLAUDE_MODEL_ALIAS_PATTERN.test(alias)) {
     throw new CliRelayFailure("FAILED", "CLAUDE_CLI_MODEL_ALIAS_INVALID");
@@ -157,6 +195,8 @@ function createClaudeAdapter(alias: string): CliRelayAdapter {
   ],
   failureCode: "CLAUDE_CLI_FAILED",
   timeoutCode: "CLAUDE_CLI_TIMEOUT",
+  thinkingLevels: CLAUDE_THINKING_LEVELS,
+  classifyUsageCap: claudeUsageCapCode,
   // --no-session-persistence: relay calls must not accrete resumable sessions;
   // --tools "": the relay is a pure completion transport, no agentic tools.
   //
@@ -181,7 +221,9 @@ function createClaudeAdapter(alias: string): CliRelayAdapter {
   // Both are needed: --setting-sources user narrows WHICH SCOPES load,
   // --safe-mode disables the CUSTOMIZATIONS within them. Neither alone is
   // sufficient — dropping either is caught by a test.
-  buildArguments: (prompt) => [
+  // §2.2: `--effort` is APPENDED only when a level was asked, so the argument
+  // vector of an unasked call is byte-for-byte what it was.
+  buildArguments: (prompt: string, invocation?: CliInvocation) => [
     "-p", prompt,
     "--output-format", "json",
     "--setting-sources", CLAUDE_SETTING_SOURCES,
@@ -189,7 +231,8 @@ function createClaudeAdapter(alias: string): CliRelayAdapter {
     "--strict-mcp-config",
     "--no-session-persistence",
     "--tools", "",
-    "--model", alias
+    "--model", alias,
+    ...(invocation?.thinkingLevel === undefined ? [] : ["--effort", invocation.thinkingLevel])
   ],
   parseCompletion: (stdout) => parseClaudeEnvelope(stdout, alias)
   };
@@ -208,6 +251,8 @@ export interface ClaudeRelayHandle extends CliRelayHandle {
   /** The model id the CLI itself reported during the startup handshake. */
   readonly model: string;
   readonly maker: typeof ANTHROPIC_MAKER;
+  /** §2.2: the `--effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
 }
 
 export interface ClaudePreflightOptions {
@@ -282,6 +327,7 @@ export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<Cla
     authorizationHeader: server.authorizationHeader,
     model: handshake.model,
     maker: ANTHROPIC_MAKER,
+    thinkingLevels: CLAUDE_THINKING_LEVELS,
     close: () => server.close()
   });
 }

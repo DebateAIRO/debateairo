@@ -1,12 +1,15 @@
 import { z } from "zod";
 import {
   CliRelayFailure,
+  buildCliUsage,
   invokeCli,
   resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
+  type CliInvocation,
   type CliRelayAdapter,
   type CliRelayHandle,
+  type CliUsage,
   type CommandSpec
 } from "./relay-core.js";
 
@@ -29,6 +32,12 @@ export function resolveGrokBinary(source: NodeJS.ProcessEnv = process.env): stri
   );
 }
 export const XAI_MAKER = "xAI" as const;
+/**
+ * §2.2 — grok 1.0.41 (M4, 2026-09-26): `--reasoning-effort` accepts exactly
+ * these; anything else is refused locally with exit 1. No usage-cap output is
+ * on record for grok, so a cap stays GROK_CLI_FAILED (README: "usage caps").
+ */
+export const GROK_THINKING_LEVELS = Object.freeze(["low", "medium", "high", "xhigh"] as const);
 export const GROK_HANDSHAKE_PROMPT =
   "GROK-01 acceptance transport handshake. Reply with the single word: OK" as const;
 
@@ -41,19 +50,23 @@ const envelopeSchema = z.object({
 
 const observedTokenUsageSchema = z.object({
   input_tokens: z.number().int().nonnegative().optional(),
-  output_tokens: z.number().int().nonnegative().optional()
+  output_tokens: z.number().int().nonnegative().optional(),
+  // grok 1.0.41 (M4 capture, 2026-09-26) spells the per-model counters in
+  // camelCase; 1.0.0 spelled them in snake_case. Both are read, snake first.
+  inputTokens: z.number().int().nonnegative().optional(),
+  outputTokens: z.number().int().nonnegative().optional()
+}).passthrough();
+
+/** §2.3 — grok 1.0.41 reports thinking tokens in the top-level usage block (M4). */
+const reportedReasoningSchema = z.object({
+  reasoning_tokens: z.number().int().nonnegative()
 }).passthrough();
 
 function parseGrokEnvelope(stdout: string): {
   readonly content: string;
   readonly model: string;
   readonly costUsd: number | null;
-  readonly usage: null | {
-    readonly promptTokens?: number;
-    readonly completionTokens?: number;
-    readonly totalTokens?: number;
-    readonly costUsd?: number;
-  };
+  readonly usage: CliUsage | null;
 } {
   let decoded: unknown;
   try {
@@ -71,22 +84,20 @@ function parseGrokEnvelope(stdout: string): {
     throw new CliRelayFailure("FAILED", "GROK_CLI_MODEL_UNRESOLVED");
   }
   const observed = observedTokenUsageSchema.safeParse(envelope.data.modelUsage[model]);
-  const inputTokens = observed.success ? observed.data.input_tokens : undefined;
-  const outputTokens = observed.success ? observed.data.output_tokens : undefined;
+  const inputTokens = observed.success ? observed.data.input_tokens ?? observed.data.inputTokens : undefined;
+  const outputTokens = observed.success ? observed.data.output_tokens ?? observed.data.outputTokens : undefined;
   const costUsd = envelope.data.total_cost_usd;
-  const usage = {
-    ...(inputTokens === undefined ? {} : { promptTokens: inputTokens }),
-    ...(outputTokens === undefined ? {} : { completionTokens: outputTokens }),
-    ...(inputTokens === undefined || outputTokens === undefined
-      ? {}
-      : { totalTokens: inputTokens + outputTokens }),
-    ...(costUsd === undefined ? {} : { costUsd })
-  };
+  const reasoning = reportedReasoningSchema.safeParse(envelope.data.usage);
   return Object.freeze({
     content,
     model,
     costUsd: costUsd ?? null,
-    usage: Object.keys(usage).length === 0 ? null : Object.freeze(usage)
+    usage: buildCliUsage({
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
+      costUsd,
+      reasoningTokens: reasoning.success ? reasoning.data.reasoning_tokens : undefined
+    })
   });
 }
 
@@ -109,7 +120,11 @@ const GROK_SANDBOX_FLAG = "--sandbox" as const;
  */
 export const SANDBOX_PROFILE_UNAVAILABLE = "SANDBOX-PROFILE-UNAVAILABLE" as const;
 
-function grokArguments(prompt: string, sandboxProfile: string | null): readonly string[] {
+function grokArguments(
+  prompt: string,
+  sandboxProfile: string | null,
+  thinkingLevel: string | undefined
+): readonly string[] {
   return [
     "--single", prompt,
     "--output-format", "json",
@@ -118,7 +133,10 @@ function grokArguments(prompt: string, sandboxProfile: string | null): readonly 
     "--no-memory",
     "--no-subagents",
     "--disable-web-search",
-    "--tools", ""
+    "--tools", "",
+    // §2.2: APPENDED only when a level was asked, so an unasked call's vector
+    // is byte-for-byte what it was (and the sandbox probe's flag list with it).
+    ...(thinkingLevel === undefined ? [] : ["--reasoning-effort", thinkingLevel])
   ];
 }
 
@@ -134,7 +152,9 @@ function grokAdapterFor(sandboxProfile: string | null): CliRelayAdapter {
     ],
     failureCode: "GROK_CLI_FAILED",
     timeoutCode: "GROK_CLI_TIMEOUT",
-    buildArguments: (prompt) => grokArguments(prompt, sandboxProfile),
+    thinkingLevels: GROK_THINKING_LEVELS,
+    buildArguments: (prompt: string, invocation?: CliInvocation) =>
+      grokArguments(prompt, sandboxProfile, invocation?.thinkingLevel),
     parseCompletion: (stdout) => parseGrokEnvelope(stdout)
   };
 }
@@ -154,6 +174,8 @@ export interface GrokRelayOptions {
 export interface GrokRelayHandle extends CliRelayHandle {
   readonly model: string;
   readonly maker: typeof XAI_MAKER;
+  /** §2.2: the `--reasoning-effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
   readonly handshakeCostUsd: number | null;
   /** The profile this relay actually applies to every call; null ⇒ none could be applied. */
   readonly sandboxProfile: typeof GROK_SANDBOX_PROFILE | null;
@@ -267,6 +289,7 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     authorizationHeader: server.authorizationHeader,
     model: probed.handshake.model,
     maker: XAI_MAKER,
+    thinkingLevels: GROK_THINKING_LEVELS,
     handshakeCostUsd: probed.handshake.costUsd,
     sandboxProfile: probed.sandboxProfile,
     degradation: probed.degradation,

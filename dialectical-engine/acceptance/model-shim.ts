@@ -1,15 +1,20 @@
 import { readdir, readFile } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 import {
   CliRelayFailure,
+  buildCliUsage,
   invokeCli,
   renderPromptTranscript,
   resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
+  type CliCompletion,
+  type CliInvocation,
   type CliRelayAdapter,
   type CliRelayHandle,
+  type CliUsage,
   type CommandSpec
 } from "./relay-core.js";
 
@@ -34,6 +39,16 @@ export function resolveCodexBinary(source: NodeJS.ProcessEnv = process.env): str
   );
 }
 export const ACCEPTANCE_MAKER = "OpenAI" as const;
+/**
+ * §2.2 — codex-cli 0.156.1 (M4, 2026-09-26): the server accepts exactly these
+ * values for `-c model_reasoning_effort="…"`; anything else is an HTTP 400
+ * before any model work, and the call then fails loudly — never silently at
+ * another level. No usage-cap output is on record for codex, so a cap stays
+ * CODEX_CLI_FAILED (README: "usage caps").
+ */
+export const CODEX_THINKING_LEVELS = Object.freeze(
+  ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const
+);
 export const CODEX_HANDSHAKE_PROMPT =
   "DR-181 acceptance transport handshake. Reply with the single word: OK" as const;
 
@@ -56,6 +71,8 @@ export interface ModelShimOptions {
 export interface ModelShimHandle extends CliRelayHandle {
   readonly model: string;
   readonly maker: typeof ACCEPTANCE_MAKER;
+  /** §2.2: the `model_reasoning_effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
 }
 
 export function renderCodexPrompt(messages: readonly {
@@ -77,7 +94,15 @@ export function stripPromptEcho(stdout: string, prompt: string): string {
 interface ParsedCodexStdout {
   readonly content: string;
   readonly threadId: string;
+  readonly usage: CliUsage | null;
 }
+
+/** §2.3 — the measured 0.156.1 `turn.completed` usage block (M4). */
+const codexTurnUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative().optional(),
+  output_tokens: z.number().int().nonnegative().optional(),
+  reasoning_output_tokens: z.number().int().nonnegative().optional()
+}).passthrough();
 
 function parseCodexStdout(stdout: string): ParsedCodexStdout {
   const events = stdout.split(/\r?\n/).filter((line) => line.trim() !== "").map((line) => {
@@ -105,7 +130,20 @@ function parseCodexStdout(stdout: string): ParsedCodexStdout {
   });
   const content = messages.at(-1);
   if (content === undefined) throw new CliRelayFailure("FAILED", "CODEX_CLI_OUTPUT_INVALID");
-  return Object.freeze({ content, threadId });
+  // Lenient by design: a missing or unreadable usage block is "not reported"
+  // (null), never a refused answer. output_tokens INCLUDES the reasoning tokens,
+  // which are also reported on their own, exactly as OpenAI's own spelling does.
+  const observed = codexTurnUsageSchema.safeParse(
+    events.filter((event) => event.type === "turn.completed").at(-1)?.usage
+  );
+  const usage = observed.success
+    ? buildCliUsage({
+      promptTokens: observed.data.input_tokens,
+      completionTokens: observed.data.output_tokens,
+      reasoningTokens: observed.data.reasoning_output_tokens
+    })
+    : null;
+  return Object.freeze({ content, threadId, usage });
 }
 
 export function parseCodexRolloutModel(jsonl: string, threadId: string): string {
@@ -157,12 +195,12 @@ function defaultCodexSessionsRoot(): string {
 export async function parseCodexCompletion(
   stdout: string,
   sessionsRoot = defaultCodexSessionsRoot()
-): Promise<{ readonly content: string; readonly model: string; readonly usage: null }> {
+): Promise<CliCompletion> {
   const parsed = parseCodexStdout(stdout);
   const matches = await findRollouts(sessionsRoot, parsed.threadId);
   if (matches.length !== 1) throw new CliRelayFailure("FAILED", "CODEX_CLI_MODEL_UNRESOLVED");
   const model = parseCodexRolloutModel(await readFile(matches[0]!, "utf8"), parsed.threadId);
-  return Object.freeze({ content: parsed.content, model, usage: null });
+  return Object.freeze({ content: parsed.content, model, usage: parsed.usage });
 }
 
 const CODEX_MODEL_PIN_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
@@ -177,7 +215,10 @@ function createCodexAdapter(sessionsRoot: string, model?: string): CliRelayAdapt
     testEnvironmentKeys: [],
     failureCode: "CODEX_CLI_FAILED",
     timeoutCode: "CODEX_CLI_TIMEOUT",
-    buildArguments: (prompt) => [
+    thinkingLevels: CODEX_THINKING_LEVELS,
+    // §2.2: the level is one checked token, so the quoted config value cannot
+    // be broken out of; it is APPENDED only when asked and the prompt stays last.
+    buildArguments: (prompt: string, invocation?: CliInvocation) => [
       "exec",
       "--skip-git-repo-check",
       "--sandbox", "read-only",
@@ -185,6 +226,9 @@ function createCodexAdapter(sessionsRoot: string, model?: string): CliRelayAdapt
       "--ignore-user-config",
       "--json",
       ...(model === undefined ? [] : ["-c", `model="${model}"`]),
+      ...(invocation?.thinkingLevel === undefined
+        ? []
+        : ["-c", `model_reasoning_effort="${invocation.thinkingLevel}"`]),
       prompt
     ],
     parseCompletion: (stdout) => parseCodexCompletion(stdout, sessionsRoot)
@@ -231,6 +275,7 @@ export async function startModelShim(options: ModelShimOptions): Promise<ModelSh
     authorizationHeader: server.authorizationHeader,
     model: handshake.model,
     maker: ACCEPTANCE_MAKER,
+    thinkingLevels: CODEX_THINKING_LEVELS,
     close: () => server.close()
   });
 }

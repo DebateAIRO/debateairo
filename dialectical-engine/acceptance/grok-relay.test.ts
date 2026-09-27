@@ -687,3 +687,76 @@ describe("F-GROK-SANDBOX-PROFILE the sandbox profile is probed, never assumed", 
     expect(kernel.CONDITION_MARKS).toHaveLength(37);
   });
 });
+
+describe("§2.2 Grok thinking level and §2.3 reasoning tokens", () => {
+  interface LevelledCompletion {
+    readonly x_thinking_level: string;
+    readonly choices: readonly { readonly message: { readonly content: string } }[];
+  }
+
+  const postAtLevel = (handle: GrokRelayHandle, level: string): Promise<Response> =>
+    fetch(`${handle.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: handle.authorizationHeader },
+      body: JSON.stringify({
+        model: "ignored",
+        x_thinking_level: level,
+        messages: [{ role: "user", content: "Assess this claim." }]
+      })
+    });
+
+  it("declares the four measured levels and appends --reasoning-effort <level> only when one is asked", async () => {
+    const relay = await start();
+    expect(relay.thinkingLevels).toEqual(["low", "medium", "high", "xhigh"]);
+
+    const completion = await (await postAtLevel(relay, "high")).json() as LevelledCompletion;
+
+    expect(completion.x_thinking_level).toBe("high");
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as { argumentList: readonly string[] };
+    expect(relayed.argumentList.slice(-4)).toEqual(["--tools", "", "--reasoning-effort", "high"]);
+  });
+
+  it("refuses max, which grok 1.0.41 rejects, before spawning", async () => {
+    const response = await postAtLevel(await start(), "max");
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED",
+      x_cli_relay_error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED"
+    });
+  });
+
+  it("replays the redacted grok 1.0.41 envelope: camelCase modelUsage, reasoning in usage", async () => {
+    // Shape of the M4 capture of 2026-09-26; ids and thought redacted.
+    const capturedEnvelopeScript = [
+      "console.log(JSON.stringify({",
+      '  text: "OK", stopReason: "end_turn", sessionId: "redacted-session", requestId: "redacted-request", thought: "redacted",',
+      "  usage: { input_tokens: 18385, cache_read_input_tokens: 2944, cache_creation_input_tokens: 0, output_tokens: 29, reasoning_tokens: 28, total_tokens: 21358 },",
+      "  num_turns: 1, total_cost_usd: 0.01306144, total_cost_usd_ticks: 130614400,",
+      '  modelUsage: { "grok-4.7-build": { inputTokens: 18385, outputTokens: 29, cacheReadInputTokens: 2944, cacheCreationInputTokens: 0, modelCalls: 1, costUSD: 0.01306144 } }',
+      "}));"
+    ].join("\n");
+    const relay = await startGrokRelay({
+      port: 0,
+      timeoutMs: 2_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", capturedEnvelopeScript, "--"] }
+    });
+    handles.push(relay);
+    expect(relay.model).toBe("grok-4.7-build");
+
+    const response = await postCompletion(relay, "Captured 1.0.41 replay");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      model: "grok-4.7-build",
+      x_thinking_level: "DEFAULT_ONLY",
+      usage: {
+        prompt_tokens: 18385,
+        completion_tokens: 29,
+        total_tokens: 18414,
+        x_cost_usd: 0.01306144,
+        completion_tokens_details: { reasoning_tokens: 28 }
+      }
+    });
+  });
+});

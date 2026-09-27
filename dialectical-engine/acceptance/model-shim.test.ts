@@ -236,7 +236,12 @@ describe("ACC-01 model shim", () => {
       })
     ].join("\n"), fakeSessionsRoot);
 
-    expect(completion).toEqual({ content: "OK", model: "gpt-5.6-sol", usage: null });
+    // §2.3 (Task A9): usage is now READ off turn.completed instead of dropped.
+    expect(completion).toEqual({
+      content: "OK",
+      model: "gpt-5.6-sol",
+      usage: { promptTokens: 15490, completionTokens: 5, totalTokens: 15495 }
+    });
   });
 
   it("maps an OpenAI request to codex exec, closes stdin, strips the prompt echo, and reports true lineage", async () => {
@@ -258,10 +263,16 @@ describe("ACC-01 model shim", () => {
       model: string;
       maker: string;
       choices: readonly { message: { content: string } }[];
-      usage: null;
+      usage: unknown;
     };
     expect(completion).toMatchObject({ model: "gpt-5.6-sol", maker: "OpenAI" });
-    expect(completion.usage).toBeNull();
+    // §2.3 (Task A9): the fake prints the measured 0.156.1 turn.completed usage.
+    expect(completion.usage).toEqual({
+      prompt_tokens: 15490,
+      completion_tokens: 5,
+      total_tokens: 15495,
+      completion_tokens_details: { reasoning_tokens: 0 }
+    });
     const relayed = JSON.parse(completion.choices[0]!.message.content) as {
       prompt: string;
       arguments: readonly string[];
@@ -499,5 +510,112 @@ describe("D10 Codex shim binary resolution", () => {
       if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
       else process.env.ACCEPTANCE_CODEX_BINARY = previous;
     }
+  });
+});
+
+describe("§2.2 Codex thinking level and §2.3 reasoning tokens", () => {
+  interface LevelledCompletion {
+    readonly x_thinking_level: string;
+    readonly choices: readonly { readonly message: { readonly content: string } }[];
+  }
+
+  const post = (shim: ModelShimHandle, level?: string): Promise<Response> =>
+    fetch(`${shim.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: relayHeaders(shim),
+      body: JSON.stringify({
+        model: "ignored-by-shim",
+        messages: [{ role: "user", content: "Assess this claim." }],
+        ...(level === undefined ? {} : { x_thinking_level: level })
+      })
+    });
+
+  it("declares the seven measured levels and passes -c model_reasoning_effort only when one is asked", async () => {
+    const shim = await start();
+    expect(shim.thinkingLevels).toEqual(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+
+    const completion = await (await post(shim, "xhigh")).json() as LevelledCompletion;
+    expect(completion.x_thinking_level).toBe("xhigh");
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string; arguments: readonly string[];
+    };
+    expect(relayed.arguments).toEqual([
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox", "read-only",
+      "--ignore-rules",
+      "--ignore-user-config",
+      "--json",
+      "-c", 'model_reasoning_effort="xhigh"',
+      relayed.prompt
+    ]);
+
+    const unasked = await (await post(shim)).json() as LevelledCompletion;
+    expect(unasked.x_thinking_level).toBe("DEFAULT_ONLY");
+  });
+
+  it("orders the level after the model pin, so the prompt stays the last argument", async () => {
+    const shim = await startModelShim({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "gpt-5.6-sol",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] },
+      testOnlySessionsRoot: fakeSessionsRoot
+    });
+    handles.push(shim);
+
+    const completion = await (await post(shim, "low")).json() as LevelledCompletion;
+
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string; arguments: readonly string[];
+    };
+    expect(relayed.arguments.slice(-5)).toEqual([
+      "-c", 'model="gpt-5.6-sol"',
+      "-c", 'model_reasoning_effort="low"',
+      relayed.prompt
+    ]);
+  });
+
+  it("refuses a level codex does not accept, before spawning", async () => {
+    const response = await post(await start(), "ultra");
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED",
+      x_cli_relay_error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED"
+    });
+  });
+
+  it("reads usage, reasoning tokens included, off the measured 0.156.1 turn.completed event", async () => {
+    const completion = await parseCodexCompletion([
+      JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }),
+      JSON.stringify({ type: "turn.started" }),
+      JSON.stringify({ type: "item.completed", item: { id: "item_0", type: "agent_message", text: "ok" } }),
+      JSON.stringify({
+        type: "turn.completed",
+        usage: {
+          input_tokens: 15370,
+          cached_input_tokens: 12544,
+          cache_write_input_tokens: 0,
+          output_tokens: 5,
+          reasoning_output_tokens: 0
+        }
+      })
+    ].join("\n"), fakeSessionsRoot);
+
+    expect(completion).toEqual({
+      content: "ok",
+      model: "gpt-5.6-sol",
+      usage: { promptTokens: 15370, completionTokens: 5, totalTokens: 15375, reasoningTokens: 0 }
+    });
+  });
+
+  it("keeps usage null when the stream carries no turn.completed usage", async () => {
+    const completion = await parseCodexCompletion([
+      JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }),
+      JSON.stringify({ type: "item.completed", item: { id: "item_0", type: "agent_message", text: "ok" } })
+    ].join("\n"), fakeSessionsRoot);
+
+    expect(completion.usage).toBeNull();
   });
 });
