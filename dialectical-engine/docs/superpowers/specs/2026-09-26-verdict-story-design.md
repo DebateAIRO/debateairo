@@ -525,14 +525,100 @@ The owner reviewed the panel mock and the sample PDF and asked for these changes
 - **Translation process.** Same as PR #21: AI translator seats work offline, and every locale is checked for exact key sets, plurals, placeholders and non-empty values.
 - **Pending owner decision.** PDFs in non-Latin scripts (bg, ru, uk, el, he, ar, hi, zh, ja, ko) need script fonts, and ar/he need right-to-left layout.
 
-### 14.4 The engine always serves a verdict (pending the owner's yes on the design)
-- **Rule (owner, 2026-09-26).** There is no scenario without a final verdict unless there is a technical problem.
-- **Proposed design:**
-  - a serve reserve set aside at claim time;
-  - up to 20% overrun for the serve phase only, sealed as a new `costEnvelopePolicy` version;
-  - a money stop while the debate is being argued continues into the serve phase instead of stopping;
-  - a cheaper-model fallback for the synthesizer and evaluator, disclosed;
-  - earlier drafts are kept;
-  - deep debates get a compact, shrinking digest like the story's;
-  - a last-resort floor that serves the arithmetic label with a short code-built sentence.
-- **Superseded decisions.** This amends V-28 ("end cleanly at the limit") and closes V-ROLE-1 as "disclosed failover for cost".
+### 14.4 The engine always serves a verdict (owner: yes, 2026-09-27)
+
+**Rule (owner, 2026-09-26).** No debate ends without a final verdict unless there is a technical problem. Money and size are never the reason.
+
+**Owner choices (2026-09-27):**
+- A cheaper model used for the answer is mentioned only in "About this report" (PDF) and in the owner's own records, never in the verdict text.
+- The daily limit for NEW debates stays. The person sees a friendly "try again tomorrow".
+
+**Measured facts behind the design.** Full map: SDD workspace `money-map.md`, 2026-09-27.
+- **Money and size end a run early in five places:**
+  - a stop while the debate is argued skips the answer entirely (COMPONENTS_ONLY);
+  - a refused answer-writing call discards the drafts already written;
+  - the answer-writing loop loses round 1 when round 2 fails;
+  - a refusal on the first root's panel crashes the run (FAILED);
+  - a debate of about 195 points can never fit the answer-writer's input budget (measured: 57 KB at maximum compression against 10/20/30 KB).
+- **The 20% margin alone cannot pay for an answer.** One answer-writing call can cost more than the whole margin. The guarantee therefore comes from a reserve, a cheaper-model fallback and a floor together.
+- **The sealed serve file** (`packages/serve/src/index.ts`, hash-sealed and never edited) sets two limits:
+  - it refuses a SERVED answer without a model-written artifact;
+  - it has no place for a new disclosure mark.
+
+  So the floor and the disclosures live in a NEW unsealed record beside the sealed answer.
+
+#### 14.4.1 Money: a reserve for the answer, a margin, and no early exit
+- **Two optional members in the cost-envelope policy.** They are added as a NEW register version. Old versions still parse, and a missing member means 0.
+  - `serve_reserve_basis_points`: the share of the per-run ceiling held back for the answer.
+  - `serve_overrun_basis_points`: how far the answer may go over the per-run ceiling.
+- **The runbook and example values.**
+  - reserve 3000 (30%), overrun 2000 (20%);
+  - `costEnvelopePolicy` stays operator-owned, so the owner publishes these values with the next hosted register version;
+  - the go-live checklist names that step.
+- **Two ceilings over the same run total.** No new spend column is needed.
+  - **Calls while the debate is argued** (every call that is not a serve call) see `perRun × (1 − reserve)`.
+  - **Serve calls** (role SYNTHESIZER or EVALUATOR with lane `served`, the only pair that identifies them; the judges also use lane `served`) see `perRun × (1 + overrun)`.
+- **A stop while arguing never skips the answer.** The run stops arguing and continues to the answer with what it has. This covers all three stop kinds: money, the attempt ceiling, and a vendor that reports no usage.
+- **The first root's panel.** A money stop on its panel falls back to the author's own judgement (the existing author-only selection with its single-voice disclosure) instead of failing the run.
+  - If the author's own first call cannot be paid, nothing exists to answer from. That is a typed configuration failure: the ceiling is below one call.
+- **The daily admission reserve grows to cover the margins.** It reserves `perRun × (1 + overrun) + perStory × (1 + storyOverrun)`. The policy refinement checks daily ≥ that sum.
+- **Measurement.** `ledger.model_spend` gains a nullable `spend_phase` column (`BODY` | `SERVE`) for RUN rows, so the first paid runs show the spend while arguing separately from the spend on the answer.
+
+#### 14.4.2 A cheaper model when the planned one cannot be paid
+- **A runner price map.** It is built in `apps/runner/src/main.ts` from the provider targets' prices, hosted only, and passed in settings. Prices are never sealed in the register.
+- **When the planned model's call is refused for money:**
+  - the adapter retries the SAME call site with the SAME framed prompt on the claim-eligible makers, cheapest first;
+  - the seam refuses before sending and writes nothing, so each try is free until one fits.
+- **The checker prefers a different model from the writer**, when one fits. When only the same model fits, it is allowed and disclosed.
+- **What this amends.** J24 ("a sealed identity is never substituted") gains one exception: a disclosed substitution for cost. V-ROLE-1 closes as "disclosed failover for cost". Substitution for any other reason stays refused.
+- **Keeping drafts.**
+  - After at least one COMPLETE round (writer plus checker), a later money refusal or transport death keeps the best complete round instead of discarding it.
+  - A round-1 checker refusal first tries the cheaper checker, then the floor. The sealed file needs a checked round, so no verdict is ever invented.
+
+#### 14.4.3 Deep debates: a shrinking digest
+- **The digest ladder** lives in `packages/serve/src/synthesis.ts`, which is not hashed. It follows the story's ladder (§6):
+  1. today's summary compression levels (every point kept);
+  2. then short refs instead of long ids and rounded numbers (every point kept; refs are mapped back before the sealed checks);
+  3. last, the spine: the positions, their direct children and the most decisive points with their chains, with the rest as counts.
+- **Amendment to T9's membership law** ("the byte budget never changes membership"). Membership may drop only at the last rung, and only when every earlier rung is over budget. The drop is disclosed in the new record (§14.4.5).
+- **The prompt contract text does not change**, so the composer and conformance hashes stay.
+
+#### 14.4.4 The floor: an answer even when no answer could be written
+- **When it applies.** A run that ends COMPONENTS_ONLY while its arithmetic label exists, for any reason (money, size, or a technical failure of the answer-writing call), stores a floor verdict. The sealed answer stays COMPONENTS_ONLY: honest, and unchanged in the sealed record.
+- **What it holds.** The arithmetic label (SUPPORTED / CONTESTED / UNSUPPORTED), the id of the leading position, and a reason code. No model text and no content, so no encryption is needed.
+- **What the person sees.**
+  - The page and the public page show the label in human words and "Our best answer:", followed by the leading position's own statement, which is already in the question's language.
+  - This replaces the "Components-only…" line.
+  - The honesty drawer still shows the true marks.
+- **The story for a floor answer.** A floor answer gets a story too, from its own allowance. The story snapshot takes the label basis from the floor record, and its `served_statement` is the leading position's statement. So the person still gets the full story when only the answer-writing step could not be paid.
+- **A run that FAILED for a technical reason** has no label and no floor. It shows a plain failure message.
+
+#### 14.4.5 Disclosure: the new owner-side record
+- **A new table `serve.serve_disclosure`** (migration 0075, insert-once, content-free: ids, codes and counts). One row per answer holds:
+  - the planned and actual writer and checker per round;
+  - whether a fallback was used, and why;
+  - the digest rung and the number of points left out;
+  - the floor fields (§14.4.4).
+- **Who reads it.**
+  - An owner-scoped API read.
+  - The PDF's "About this report", which says in plain words that a lower-cost model wrote or checked the answer, when that happened.
+  - An operator command-line report for a run.
+
+  There is no web admin view today. A web admin page is a separate later feature.
+
+#### 14.4.6 The story's margin
+- **The cap and its margin.** The code-owned story row gains `per_story_overrun_basis_points: 2000` (a new version). The story's ceiling becomes 50,000 × 1.2 = 60,000 µUSD.
+- **When a story call is refused for money**, the story writer retries the same call site on cheaper claim-eligible makers, cheapest first. The story's "Written by / Checked by" already records the model actually used.
+- **With real premium prices, no model may fit** (the 12,000-token output bound dominates). The story then stays unavailable, and the page shows the served answer. It always has one.
+
+#### 14.4.7 The daily limit message
+- **A new failure kind.** A refusal with server code `DAILY_COST_ENVELOPE_REACHED` gets its own kind.
+- **The message** comes from a catalogue key in all 35 locales. It says, in plain calm words, that today's capacity for new debates is used up and to try again tomorrow. It never says "coordinator" or "rate-limiting".
+- **The home composer** stops swallowing this refusal.
+
+#### 14.4.8 What this supersedes
+- V-28 ("end cleanly at the limit") is amended: at the limit the run stops arguing and still answers.
+- J24 gains the disclosed cost exception (§14.4.2).
+- V-ROLE-1 closes.
+- T9's membership law gains the last-rung exception (§14.4.3).
+- The records are updated in Task 16.
