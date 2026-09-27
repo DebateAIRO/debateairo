@@ -412,6 +412,33 @@ export const evaluatorVerdictSchema = z.object({
 }).strict();
 
 /**
+ * Model scorecard A17 (spec §2.9) — THE SYNTHESIS PROMPT BUILDER, callable on
+ * its own. Both runner closures build their packet here, and `replay-moment`
+ * calls this same function, so a replayed prompt is the live prompt by
+ * construction. It stays in THIS module because the evaluator's contract is
+ * declared here (the seeders import it and `f-sealedrows-a-dataflow` mocks that
+ * export). `randomBytes` exists for the byte-equality test; production never
+ * passes it.
+ */
+export function buildSynthesisRolePrompt(
+  request: SynthesizerRequest | EvaluatorRequest,
+  randomBytes?: (size: number) => Buffer
+): FramedPrompt {
+  return buildFramedPrompt({
+    contract: request.role === "SYNTHESIZER" ? SYNTHESIZER_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT,
+    material: toSynthesisPromptMaterial(request),
+    ...(randomBytes === undefined ? {} : { randomBytes })
+  });
+}
+
+/** A17: the classification a live synthesis call applies, exported for replay. */
+export function classifySynthesisRoleContent(role: SynthesisRoleName, content: string): ContentClassification {
+  return role === "SYNTHESIZER"
+    ? classifyStructuredContent(content, compositionSchema)
+    : classifyStructuredContent(content, evaluatorVerdictSchema);
+}
+
+/**
  * FAIR-01 (DR-140(b)): the SECOND real maker's leg. When configured, the
  * critic maker judges the strongest genuine counter-position through the same
  * ruled JUDGE organ, and the counter joins the answer graph as a first-class
@@ -5708,10 +5735,7 @@ export class WalkingSkeletonRunner {
         // `JSON.stringify` of the whole request — the model-authored digest
         // summaries and the prior objection sat in the same compartment as the
         // engine's own `instructions`, with nothing saying which was which.
-        const framed = buildFramedPrompt({
-          contract: SYNTHESIZER_PROMPT_CONTRACT,
-          material: toSynthesisPromptMaterial(request)
-        });
+        const framed = buildSynthesisRolePrompt(request);
         const packet = framed.packet;
         const answered = await callSynthesisRole(() => seatCaller.callSeat({
           seat: writerSeat,
@@ -5741,7 +5765,7 @@ export class WalkingSkeletonRunner {
             contractHash: this.settings.composerContractHash,
             providerRef: member.providerRef,
             packet,
-            classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
+            classifyContent: (content) => classifySynthesisRoleContent("SYNTHESIZER", content),
             buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
           })
         }), { role: "SYNTHESIZER", callSiteKey: writerSiteKey }, "COMPOSITION_CONTRACT_ERROR");
@@ -5801,10 +5825,7 @@ export class WalkingSkeletonRunner {
         const checkerSeat = seatBook.answerChecker
           ?? legacySynthesisSeat("ANSWER_CHECKER", resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR"));
         const checkerSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
-        const framed = buildFramedPrompt({
-          contract: EVALUATOR_PROMPT_CONTRACT,
-          material: toSynthesisPromptMaterial(request)
-        });
+        const framed = buildSynthesisRolePrompt(request);
         const packet = framed.packet;
         const answered = await callSynthesisRole(() => seatCaller.callSeat({
           seat: checkerSeat,
@@ -5826,7 +5847,7 @@ export class WalkingSkeletonRunner {
             contractHash: this.settings.conformanceContractHash,
             providerRef: member.providerRef,
             packet,
-            classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
+            classifyContent: (content) => classifySynthesisRoleContent("EVALUATOR", content),
             buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
           })
         }), { role: "EVALUATOR", callSiteKey: checkerSiteKey }, "EVALUATOR_CONTRACT_ERROR");
