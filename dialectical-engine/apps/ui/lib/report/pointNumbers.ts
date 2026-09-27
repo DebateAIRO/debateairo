@@ -1,6 +1,6 @@
 import type { Answer, AnswerStory } from "@debateai/contract";
+import type { MessageCatalog } from "../i18n/translate.js";
 import type { DebateNode } from "../types.js";
-import composeEnglish from "../../messages/en/compose.json" with { type: "json" };
 import { debateDetailFromAnswer } from "../v3/adapter.js";
 
 /**
@@ -19,10 +19,13 @@ export interface NumberedPoint {
   readonly parentNumber: string | null;
 }
 
-function positionsFirstOrder(answer: Answer): readonly DebateNode[] {
-  // Only the tree's ORDER is used here, never its words; the English catalogue is
-  // passed because the helper takes one (TODO(story localization): the reader's).
-  const positions = debateDetailFromAnswer(answer, composeEnglish).tree?.children ?? [];
+/**
+ * The tree's order, from the site's own projection. `composeCatalog` is the
+ * report's `compose` catalogue: the projection words each point's set-aside
+ * reason with it, and the list of points prints that reason.
+ */
+function positionsFirstOrder(answer: Answer, composeCatalog: MessageCatalog): readonly DebateNode[] {
+  const positions = debateDetailFromAnswer(answer, composeCatalog).tree?.children ?? [];
   const rest: DebateNode[] = [];
   const visit = (node: DebateNode): void => {
     for (const child of node.children) {
@@ -38,8 +41,8 @@ function pointValue(label: string): number {
   return Number(label.slice(1));
 }
 
-export function orderedPoints(answer: Answer, story: AnswerStory | null): readonly NumberedPoint[] {
-  const nodes = positionsFirstOrder(answer);
+export function orderedPoints(answer: Answer, story: AnswerStory | null, composeCatalog: MessageCatalog): readonly NumberedPoint[] {
+  const nodes = positionsFirstOrder(answer, composeCatalog);
   const canonical = story === null ? null : story.point_numbers;
   const numbers = new Map<string, string>();
   const used = new Set<string>();
@@ -66,6 +69,6 @@ export function orderedPoints(answer: Answer, story: AnswerStory | null): readon
     .sort((left, right) => pointValue(left.number) - pointValue(right.number));
 }
 
-export function numberPoints(answer: Answer, story: AnswerStory | null): ReadonlyMap<string, string> {
-  return new Map(orderedPoints(answer, story).map((point) => [point.node.id, point.number]));
+export function numberPoints(answer: Answer, story: AnswerStory | null, composeCatalog: MessageCatalog): ReadonlyMap<string, string> {
+  return new Map(orderedPoints(answer, story, composeCatalog).map((point) => [point.node.id, point.number]));
 }

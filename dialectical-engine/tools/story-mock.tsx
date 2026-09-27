@@ -7,21 +7,29 @@ import { fileURLToPath } from "node:url";
 import type { JSX } from "react";
 import type { AnswerStory } from "@debateai/contract";
 import { AiNotice } from "../apps/ui/components/AiNotice";
+import { QuestionLanguageOffer } from "../apps/ui/components/QuestionLanguageOffer";
 import { StoryPanel } from "../apps/ui/components/StoryPanel";
+import { questionLocale } from "../apps/ui/lib/i18n/questionLocale";
 import { t } from "../apps/ui/lib/i18n/translate";
-import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, storyFixture } from "../apps/ui/lib/v3/storyFixture";
+import { STORY_FIXTURE_ANSWER, STORY_FIXTURE_DEBATE_ID, STORY_FIXTURE_LANGUAGE, storyFixture } from "../apps/ui/lib/v3/storyFixture";
 import { toStoryView } from "../apps/ui/lib/v3/storyView";
+import chromeEnglish from "../apps/ui/messages/en/chrome.json" with { type: "json" };
 import debateChromeEnglish from "../apps/ui/messages/en/debateChrome.json" with { type: "json" };
+import homeEnglish from "../apps/ui/messages/en/home.json" with { type: "json" };
+import publicRomanian from "../apps/ui/messages/ro/public.json" with { type: "json" };
 
 /**
- * The owner's look-first mock (spec 2026-09-26 §10). Renders the REAL
- * StoryPanel with the fixture story in all four states into one HTML file.
- * Each preview is an iframe holding the whole of the site's stylesheet
- * (app/globals.css) and the panel inside the real .debateView column, under a
- * stand-in header and the real AI notice, so what the owner sees is what the
- * page will show, and the phone previews get the phone breakpoints. The
- * vendored fonts are inlined when they are present. The file needs no network
- * and runs no script.
+ * The owner's look-first mock (spec 2026-09-26 §10, revised by §14). Renders
+ * the REAL StoryPanel with the Romanian fixture story in all four states into
+ * one HTML file, the way a reader whose interface is English sees a debate
+ * argued in Romanian: the page around the panel in English, the panel, its
+ * labels and buttons included, in Romanian (spec §14.3), and the REAL offer to
+ * show the page in Romanian. Each preview is an iframe holding the whole of the
+ * site's stylesheet (app/globals.css) and the panel inside the real
+ * .debateView column, under a stand-in header and the real AI notice, so what
+ * the owner sees is what the page will show, and the phone previews get the
+ * phone breakpoints. The vendored fonts are inlined when they are present. The
+ * file needs no network and runs no script.
  *
  * Usage: pnpm --filter dialectical-engine-v2ui run story:mock <absolute path to the output .html>
  * (pnpm runs the script from apps/ui, so a relative path is resolved from there).
@@ -114,8 +122,16 @@ body { margin: 0; background: var(--shell); color: var(--text); font-family: var
 const pageCss = [fontCss, tokenBlock(/^:root\s*\{/), MOCK_FONT_VARIABLES, PAGE_CSS].join("\n");
 const previewCss = [fontCss, MOCK_FONT_VARIABLES, siteCss, PREVIEW_CSS].join("\n");
 
-/** The debate page around the panel: a stand-in header, the real AI notice, the panel, and the space the argument views keep. */
-function PreviewPage({ status }: { status: AnswerStory["status"] }): JSX.Element {
+// The reader's interface is English; the question, and so the story's fixed text, is Romanian.
+const INTERFACE_LOCALE = "en";
+const STORY_LOCALE = questionLocale(STORY_FIXTURE_LANGUAGE.tag, INTERFACE_LOCALE);
+
+/**
+ * The debate page around the panel: a stand-in header, the real AI notice, the
+ * real language offer when asked for (as before the reader answers it), the
+ * panel, and the space the argument views keep.
+ */
+function PreviewPage({ status, offer }: { status: AnswerStory["status"]; offer: boolean }): JSX.Element {
   return (
     <div className="debateView">
       <header className="debateTopBar">
@@ -131,8 +147,15 @@ function PreviewPage({ status }: { status: AnswerStory["status"] }): JSX.Element
           <div className="debateTopClaim"><span className="debateTopTitle">{STORY_FIXTURE_ANSWER.question_line}</span></div>
         </div>
       </header>
-      <div className="debateAiDisclosure"><AiNotice body={t(debateChromeEnglish, "debateChrome.aiNotice")} /></div>
-      <StoryPanel view={toStoryView(STORY_FIXTURE_ANSWER, storyFixture(status), STORY_FIXTURE_DEBATE_ID)} />
+      <div className="debateAiDisclosure">
+        <AiNotice catalog={{ ...homeEnglish, ...chromeEnglish }} body={t(debateChromeEnglish, "debateChrome.aiNotice")} />
+      </div>
+      {offer ? <QuestionLanguageOffer questionLocale={STORY_LOCALE} interfaceLocale={INTERFACE_LOCALE} catalog={chromeEnglish} /> : null}
+      <StoryPanel
+        view={toStoryView(STORY_FIXTURE_ANSWER, storyFixture(status), STORY_FIXTURE_DEBATE_ID, STORY_LOCALE)}
+        catalog={publicRomanian}
+        locale={STORY_LOCALE}
+      />
       <div className="debateMain mockMain">
         <p>The debate&apos;s argument views (tree, thread, split and map) stay here, below the story.</p>
       </div>
@@ -140,8 +163,8 @@ function PreviewPage({ status }: { status: AnswerStory["status"] }): JSX.Element
   );
 }
 
-function previewDocument(mode: "terracotta" | "chamber", status: AnswerStory["status"]): string {
-  const body = renderToStaticMarkup(<PreviewPage status={status} />);
+function previewDocument(mode: "terracotta" | "chamber", status: AnswerStory["status"], offer: boolean): string {
+  const body = renderToStaticMarkup(<PreviewPage status={status} offer={offer} />);
   return `<!doctype html><html lang="en" data-mode="${mode}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Story panel preview</title><style>${previewCss}</style></head><body>${body}</body></html>`;
 }
 
@@ -160,26 +183,31 @@ const STATES: readonly StateCopy[] = Object.freeze([
   {
     status: "WRITING",
     title: "Writing",
-    words: "The first few minutes after a debate ends, while the story is being written."
+    words: "The first few minutes after a debate ends, while the story is being written. No confidence line yet: only the story can say how sure we are."
   },
   {
     status: "READY",
     title: "Ready",
-    words: "The story is written and our checker was satisfied with it."
+    words: "The story is written and a second AI model checked it without a doubt. The label is in plain words, and the line under the headline is the story's own sentence on how sure we are."
   },
   {
     status: "READY_WITH_RESERVATION",
     title: "Ready, with a reservation",
-    words: "The story is written, but our checker still had a doubt. The doubt gets its own box, with a note on what its point numbers mean."
+    words: "The story is written, but the second model still had a doubt. The reader sees only the gentle line at the end; the doubt itself stays in your records."
   },
   {
     status: "UNAVAILABLE",
     title: "Unavailable",
-    words: "No story could be written, for example because the time allowed ran out. The panel shows the debate's usual short answer instead."
+    words: "No story could be written, for example because the time allowed ran out. The panel says so plainly and shows the debate's usual summary instead."
   }
 ]);
 
-function Frame({ state, screen, mode }: { state: StateCopy; screen: Screen; mode: "terracotta" | "chamber" }): JSX.Element {
+function Frame({ state, screen, mode, offer = false }: {
+  state: StateCopy;
+  screen: Screen;
+  mode: "terracotta" | "chamber";
+  offer?: boolean;
+}): JSX.Element {
   const title = `${state.title} (${screen.words}${mode === "chamber" ? ", dark mode" : ""})`;
   return (
     <figure className="mockFigure" style={{ width: screen.width }}>
@@ -187,16 +215,16 @@ function Frame({ state, screen, mode }: { state: StateCopy; screen: Screen; mode
         <strong>{title}</strong>
         <span>{state.words}</span>
       </figcaption>
-      <iframe title={title} width={screen.width} height={screen.height} srcDoc={previewDocument(mode, state.status)} />
+      <iframe title={title} width={screen.width} height={screen.height} srcDoc={previewDocument(mode, state.status, offer)} />
     </figure>
   );
 }
 
-function stateCopy(status: string): StateCopy {
-  const state = STATES.find((entry) => entry.status === status);
-  if (state === undefined) throw new Error(`STORY_MOCK_STATE_MISSING: ${status}`);
-  return state;
-}
+const OFFER_STATE: StateCopy = Object.freeze({
+  status: "READY",
+  title: "The offer to switch languages",
+  words: "What a reader with an English interface sees first on a Romanian debate. \"Switch to Română\" shows the whole site in Romanian; \"No, thanks\" hides the offer for the rest of the visit."
+});
 
 const fontsMissing = presentFonts.length < FONT_FACES.length;
 
@@ -211,10 +239,15 @@ function MockPage(): JSX.Element {
           here is live: the question, the story and the scores exist only for this preview.
         </p>
         <p>
+          The previews show a reader whose site is in English opening a debate that was argued in Romanian. The page
+          around the panel stays in English; the panel is Romanian from its title to its buttons, because it follows
+          the language of the question. The last section shows the offer to switch the whole page to Romanian.
+        </p>
+        <p>
           The panel sits near the top of the debate page, under the AI notice, and the argument views keep the rest of
           the screen. Each box below is the whole page at one screen size; its top line is a simplified stand-in for the
-          page header. Inside a box you can press Hide or Show on the panel&apos;s top line to fold it away, and scroll
-          the panel&apos;s text when it is longer than the panel.
+          page header. Inside a box you can press Ascundeți (hide) or Afișați (show) on the panel&apos;s top line to fold
+          it away, and scroll the panel&apos;s text when it is longer than the panel.
         </p>
         {fontsMissing ? (
           <p>The site&apos;s own fonts are not bundled yet, so your browser&apos;s fonts stand in for them. The layout and the colours are the site&apos;s.</p>
@@ -236,10 +269,20 @@ function MockPage(): JSX.Element {
       </section>
       <section className="mockSection">
         <h2>Dark mode</h2>
-        <p>The panel with the site&apos;s dark mode on, on a computer and on a phone.</p>
+        <p>The four states with the site&apos;s dark mode on, on a computer.</p>
         <div className="mockGrid">
-          <Frame state={stateCopy("READY_WITH_RESERVATION")} screen={DESKTOP} mode="chamber" />
-          <Frame state={stateCopy("READY_WITH_RESERVATION")} screen={PHONE} mode="chamber" />
+          {STATES.map((state) => <Frame key={state.status} state={state} screen={DESKTOP} mode="chamber" />)}
+        </div>
+      </section>
+      <section className="mockSection">
+        <h2>Offering the question&apos;s language</h2>
+        <p>
+          When a debate&apos;s language differs from the reader&apos;s, a slim strip under the AI notice offers to switch.
+          It is written in the reader&apos;s language, and names the other language in its own words.
+        </p>
+        <div className="mockGrid">
+          <Frame state={OFFER_STATE} screen={DESKTOP} mode="terracotta" offer />
+          <Frame state={OFFER_STATE} screen={PHONE} mode="terracotta" offer />
         </div>
       </section>
     </div>

@@ -1,47 +1,47 @@
-import type { Edge, PublicStoryShort } from "@debateai/contract";
+import type { Answer, Edge, PublicStoryShort } from "@debateai/contract";
+import { t, tPlural, type MessageCatalog } from "../i18n/translate.js";
 
 /**
- * Plain words the site uses around a verdict story (spec 2026-09-26 §10).
- * Shared by the public overview, the owner's StoryPanel and the PDF, so the
- * three never word a fate differently. Copy is English; the story itself is in
- * the language of the question.
+ * The fixed words around a verdict story (spec 2026-09-26 §14.2, §14.3), read
+ * from the catalogue handed in. The owner's panel, the public short story and
+ * the PDF all word a label, a fate and "and N more" through these, so the three
+ * never differ. The catalogue is the `public` namespace of the QUESTION's
+ * locale: the story's fixed text follows the language the debate was argued in,
+ * not the interface's.
  */
 export type StoryFateValue = PublicStoryShort["paths"][number]["fate"];
-
-export const STORY_FATE_WORDS: Readonly<Record<StoryFateValue, string>> = Object.freeze({
-  HELD_UP: "Held up",
-  PARTLY_HELD: "Partly held",
-  FELL: "Fell",
-  SET_ASIDE: "Set aside"
-});
-
-export const STORY_CHANGE_LEAD = "What would change the answer:";
-export const STORY_REVIEWER_NOTE_TITLE = "Reviewer's note";
-export const STORY_REVIEWER_NOTE_CAVEAT = "Written by the AI storyteller. It does not change the verdict.";
-/** The reservation box's title; the box then shows the checker's own words, with no second lead. */
-export const STORY_RESERVATION_TITLE = "Our checker's reservation";
-/**
- * The accessible name of the short story's list of positions.
- * TODO(story localization): like every other string in this file it is English
- * only. It moved here out of the JSX attribute in StoryShortBlocks.tsx when
- * dev's no-hardcoded-english scanner arrived; the localization task moves it,
- * with the rest of the story's words, into the catalogues for all 35 locales.
- */
-export const STORY_PATHS_LIST_NAME = "Positions the debate explored";
+export type StoryLabel = NonNullable<Answer["verdict_state"]>;
 
 /**
- * The line under the checker's reservation when it names a point by number
- * (the owner's panel only): those numbers are explained only in the full
- * report's appendix.
+ * The arithmetic label in human words (spec §14.2): the engine's honesty signal,
+ * said the way a person would. The label itself is never changed.
  */
-export function storyPointNumbersNote(example: string): string {
-  return `Point numbers like ${example} refer to the numbered points in the full report (PDF).`;
+export function storyLabelWords(label: StoryLabel, catalog: MessageCatalog): string {
+  switch (label) {
+    case "SUPPORTED": return t(catalog, "public.story.label.supported");
+    case "CONTESTED": return t(catalog, "public.story.label.contested");
+    case "UNSUPPORTED": return t(catalog, "public.story.label.unsupported");
+  }
 }
 
-/** The short version lists at most 8 positions; the rest are counted, never dropped silently. */
-export function morePathsWords(count: number): string | null {
+/** What happened to a position, in plain words. */
+export function storyFateWords(fate: StoryFateValue, catalog: MessageCatalog): string {
+  switch (fate) {
+    case "HELD_UP": return t(catalog, "public.story.fate.heldUp");
+    case "PARTLY_HELD": return t(catalog, "public.story.fate.partlyHeld");
+    case "FELL": return t(catalog, "public.story.fate.fell");
+    case "SET_ASIDE": return t(catalog, "public.story.fate.setAside");
+  }
+}
+
+/**
+ * The short version lists at most 8 positions; the rest are counted, never
+ * dropped silently. A plural in the catalogue's locale (CLDR categories), so
+ * Romanian says "și încă 20 de poziții" where English says "and 20 more".
+ */
+export function morePathsWords(count: number, catalog: MessageCatalog, locale: string): string | null {
   if (!Number.isInteger(count) || count <= 0) return null;
-  return count === 1 ? "and 1 more position" : `and ${count} more positions`;
+  return tPlural(catalog, "public.story.morePaths", count, locale);
 }
 
 /**

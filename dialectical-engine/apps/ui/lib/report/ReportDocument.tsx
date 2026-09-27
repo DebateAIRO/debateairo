@@ -1,34 +1,38 @@
 import { Fragment, type JSX } from "react";
 import { Document, Link, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { Answer, AnswerStory } from "@debateai/contract";
-import { buildReportModel, type ReportModel, type ReportParagraph } from "./reportModel.js";
+import { formatNumber } from "../i18n/translate.js";
+import type { ReportCatalogs } from "./reportLanguage.js";
+import { buildReportModel, reportPageWords, type ReportModel, type ReportParagraph } from "./reportModel.js";
 
 /**
- * The downloadable report (spec 2026-09-26 §10). It renders ReportModel and
- * nothing else: every string is plain text, and the only links are the
- * code-built internal ones to the appendix anchors ([Pn] citations, and point
- * numbers the story's text names). The serif family prints only the fixed
- * English headings (REPORT_TITLES); every model- or user-written string is set
- * in the sans family, which carries ș ț „ → ≤ ≥ (see fonts.test.mjs).
+ * The downloadable report (spec 2026-09-26 §10, amended by §14). It renders
+ * ReportModel and nothing else: every string is plain text, in the report's one
+ * language, and the only links are the code-built internal ones to the entries
+ * in the list of points ([Pn] citations, and point numbers the story's text
+ * names). The serif family prints only the fixed part titles; every model- or
+ * user-written string is set in the sans family, which carries ș ț „ → and
+ * every Latin letter the report's languages use (see fonts.test.mjs).
  */
 export const REPORT_FONT_SANS = "ReportSans";
 export const REPORT_FONT_SERIF = "ReportSerif";
 
 // Print colours from the site's light palette (apps/ui/app/globals.css :root): --ink, --text-strong,
-// --text-2, --muted, --surface-2, --accent, --gold-bg, --gold-border and --link. LINE is a solid warm
+// --text-2, --muted, --accent, --gold-bg, --gold-border and --link. LINE is a solid warm
 // hairline standing in for the translucent --line-strong, so it prints the same on any paper.
 const INK = "#29261F";
 const STRONG = "#1A1613";
 const TEXT_2 = "#555147";
 const MUTED = "#6E675C";
 const LINE = "#D9D3C8";
-const SHELL = "#F4F0E8";
 const ACCENT = "#C15F3C";
 const NOTE_BG = "#F3ECE0";
 const NOTE_BORDER = "#D9C8A9";
 const LINK = "#3D5A80";
 
-const FATE_COLUMN = 86;
+// Wide enough for the longest fate word in the report's languages, set in capitals ("A REZISTAT PARȚIAL"
+// wraps to two lines here), with a gutter before the path line.
+const FATE_COLUMN = 108;
 const BODY = 10.5;
 // textkit's own infinity (linebreak.infinity in @react-pdf/textkit 7.0.1): a penalty this high is never a
 // line break. Every run boundary in story text (a word, then a [Pn] citation or an in-text P5 link) is a
@@ -44,18 +48,16 @@ const styles = StyleSheet.create({
   page: { paddingTop: 58, paddingBottom: 74, paddingHorizontal: 62, fontFamily: REPORT_FONT_SANS, fontSize: BODY, color: INK },
 
   // Cover
-  eyebrow: { fontWeight: 700, fontSize: 8, letterSpacing: 1.6, textTransform: "uppercase", color: ACCENT, marginBottom: 12 },
+  eyebrow: { fontWeight: 700, fontSize: 8, letterSpacing: 1.6, color: ACCENT, marginBottom: 12 },
   question: { fontWeight: 700, fontSize: 21, lineHeight: 1.28, color: STRONG, marginBottom: 16 },
   labelRow: { flexDirection: "row", marginBottom: 8 },
-  label: { fontWeight: 700, fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", paddingTop: 3, paddingBottom: 2, paddingHorizontal: 9, borderWidth: 1, borderColor: NOTE_BORDER, borderRadius: 10, backgroundColor: NOTE_BG },
-  confidence: { fontSize: 9.5, lineHeight: 1.45, color: MUTED, marginBottom: 8 },
-  sentence: { fontSize: BODY, lineHeight: 1.55, color: TEXT_2, marginBottom: 14 },
+  label: { fontWeight: 700, fontSize: 9.5, letterSpacing: 1, paddingTop: 3, paddingBottom: 2, paddingHorizontal: 9, borderWidth: 1, borderColor: NOTE_BORDER, borderRadius: 10, backgroundColor: NOTE_BG },
+  confidence: { fontSize: BODY, lineHeight: 1.55, color: TEXT_2, marginBottom: 14 },
   meta: { fontSize: 9, lineHeight: 1.45, color: MUTED, marginBottom: 2 },
   disclosure: { marginTop: 14, paddingVertical: 9, paddingHorizontal: 11, borderWidth: 1, borderColor: LINE, borderRadius: 6 },
   disclosureLine: { fontSize: 8.5, lineHeight: 1.5, color: MUTED },
-  disclosureGap: { marginTop: 4 },
 
-  // Headings: the serif prints only the fixed English titles. Every heading-like line sits in an
+  // Headings: the serif prints only the fixed part titles. Every heading-like line sits in an
   // unbreakable View with minPresenceAhead (KeepWithNext): measured with 4.9.0's paginator, a Text alone
   // is left at the foot of a page when its own box straddles the page end, whatever minPresenceAhead says.
   headingBox: { marginTop: 26, marginBottom: 12, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: LINE },
@@ -71,31 +73,22 @@ const styles = StyleSheet.create({
   cite: { color: LINK, fontSize: 8.5, textDecoration: "none" },
   mention: { color: LINK, textDecoration: "underline" },
   pathRow: { flexDirection: "row", marginBottom: 7 },
-  fate: { width: FATE_COLUMN, fontWeight: 700, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.6, color: MUTED, paddingTop: 2.5 },
+  fate: { width: FATE_COLUMN, paddingRight: 12, fontWeight: 700, fontSize: 8, lineHeight: 1.35, letterSpacing: 0.6, color: MUTED, paddingTop: 2.5 },
   pathLine: { flex: 1, fontSize: BODY, lineHeight: 1.5 },
   morePaths: { marginLeft: FATE_COLUMN, fontSize: 9, lineHeight: 1.45, color: MUTED, marginBottom: 2 },
   sectionTitleBox: { marginTop: 18, marginBottom: 7 },
   sectionTitle: { fontWeight: 700, fontSize: 13, lineHeight: 1.3, color: STRONG },
 
-  // The reviewer's note and the checker's reservation
+  // The note worth knowing, and the gentle line for a story with a reservation
   box: { marginTop: 16, paddingVertical: 11, paddingHorizontal: 13, borderWidth: 1, borderColor: NOTE_BORDER, borderRadius: 6, backgroundColor: NOTE_BG },
-  boxTitle: { fontWeight: 700, fontSize: 8, letterSpacing: 1.2, textTransform: "uppercase", color: MUTED, marginBottom: 6 },
+  boxTitle: { fontWeight: 700, fontSize: 8, letterSpacing: 1.2, color: MUTED, marginBottom: 6 },
   boxText: { fontSize: BODY, lineHeight: 1.55 },
-  boxCaveat: { marginTop: 6, fontSize: 8.5, lineHeight: 1.45, fontStyle: "italic", color: MUTED },
+  reservation: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 13, borderWidth: 1, borderColor: LINE, borderRadius: 6, fontSize: 9, lineHeight: 1.5, fontStyle: "italic", color: MUTED },
 
-  // How this verdict was computed
-  ruleHead: { flexDirection: "row", paddingVertical: 4, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: MUTED },
-  ruleHeadText: { fontWeight: 700, fontSize: 7.5, letterSpacing: 0.8, textTransform: "uppercase", color: MUTED },
-  ruleRow: { flexDirection: "row", paddingVertical: 6, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: LINE },
-  ruleRowApplied: { backgroundColor: SHELL },
-  ruleNumber: { width: 38, fontSize: BODY, fontWeight: 700, color: MUTED },
-  ruleCondition: { flex: 1, paddingRight: 10, fontSize: BODY, lineHeight: 1.45 },
-  ruleResult: { width: 82, fontSize: BODY, fontWeight: 700 },
-  ruleMarker: { width: 70, fontWeight: 700, fontSize: 7.5, letterSpacing: 0.6, textTransform: "uppercase", color: ACCENT, paddingTop: 1.5 },
-  numberRow: { flexDirection: "row", paddingVertical: 3 },
-  numberLabel: { width: 200, fontSize: BODY, lineHeight: 1.4, color: MUTED },
-  numberValue: { flex: 1, fontSize: BODY, lineHeight: 1.4, fontWeight: 700 },
-  decision: { marginTop: 14, marginBottom: 10, paddingVertical: 9, paddingHorizontal: 11, backgroundColor: SHELL, borderRadius: 6, fontSize: BODY, lineHeight: 1.45, fontWeight: 700 },
+  // Why this answer: each reason beside its number, then what would change the answer.
+  reasonRow: { flexDirection: "row", marginBottom: 9 },
+  reasonNumber: { width: 22, fontWeight: 700, fontSize: BODY, lineHeight: 1.6, color: ACCENT },
+  reasonText: { flex: 1, fontSize: BODY, lineHeight: 1.6 },
 
   // Appendix. Each entry's parts sit directly on the page (a Fragment, not a View): react-pdf only
   // applies minPresenceAhead to a node that has earlier siblings, and an entry's head is the anchor.
@@ -114,6 +107,15 @@ const styles = StyleSheet.create({
   footerLeft: { position: "absolute", bottom: 32, left: 62, fontSize: 8, color: MUTED },
   footerRight: { position: "absolute", bottom: 32, right: 62, fontSize: 8, color: MUTED }
 });
+
+/**
+ * Small labels are set in capitals by the view, not by a textTransform style: react-pdf 4.9.0 measures a
+ * line before it transforms it, so a longer capitalised word ran past its column instead of wrapping.
+ * The report's own locale capitalises (Turkish i becomes İ, not I).
+ */
+function capitals(model: ReportModel, text: string): string {
+  return text.toLocaleUpperCase(model.language);
+}
 
 // StyleSheet.create keeps each style's literal shape, so the caller picks a variant rather than passing a style.
 function StoryText({ paragraph, variant }: { paragraph: ReportParagraph; variant: "paragraph" | "pathLine" | "box" }): JSX.Element {
@@ -160,14 +162,14 @@ function Subheading({ text }: { text: string }): JSX.Element {
   );
 }
 
-function Footer({ footer }: { footer: ReportModel["footer"] }): JSX.Element {
+function Footer({ model }: { model: ReportModel }): JSX.Element {
   return (
     <>
-      <Text style={styles.footerLeft} fixed>{footer.text}</Text>
+      <Text style={styles.footerLeft} fixed>{model.footer.text}</Text>
       <Text
         style={styles.footerRight}
         fixed
-        render={({ pageNumber, totalPages }) => footer.pageWords.replace("{page}", String(pageNumber)).replace("{pages}", String(totalPages))}
+        render={({ pageNumber, totalPages }) => reportPageWords(model, pageNumber, totalPages)}
       />
     </>
   );
@@ -177,32 +179,29 @@ function CoverAndShort({ model }: { model: ReportModel }): JSX.Element {
   const { cover, inShort } = model;
   return (
     <>
-      <Text style={styles.eyebrow}>{cover.eyebrow}</Text>
+      <Text style={styles.eyebrow}>{capitals(model, cover.eyebrow)}</Text>
       <Text style={styles.question}>{cover.question}</Text>
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>{cover.labelWords}</Text>
-      </View>
-      {cover.confidenceWords === null ? null : <Text style={styles.confidence}>{cover.confidenceWords}</Text>}
-      <Text style={styles.sentence}>{cover.labelSentence}</Text>
+      {cover.labelWords === null ? null : (
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>{capitals(model, cover.labelWords)}</Text>
+        </View>
+      )}
+      <Text style={styles.confidence}>{cover.confidence}</Text>
       <Text style={styles.meta}>{cover.generatedLine}</Text>
       <Text style={styles.meta}>{cover.modelsLine}</Text>
       <View style={styles.disclosure}>
-        {cover.disclosure.map((line, index) => (
-          <Text key={index} style={index === 0 ? styles.disclosureLine : [styles.disclosureLine, styles.disclosureGap]}>{line}</Text>
-        ))}
+        <Text style={styles.disclosureLine}>{cover.disclosure}</Text>
       </View>
       <Heading title={inShort.title} />
       <Text style={styles.headline}>{inShort.headline}</Text>
       <Text style={styles.paragraph}>{inShort.summary}</Text>
       {inShort.paths.map((path, index) => (
         <View key={index} style={styles.pathRow} wrap={false}>
-          <Text style={styles.fate}>{path.fateWords}</Text>
+          <Text style={styles.fate}>{capitals(model, path.fateWords)}</Text>
           <StoryText paragraph={path.line} variant="pathLine" />
         </View>
       ))}
       {inShort.morePaths === null ? null : <Text style={styles.morePaths}>{inShort.morePaths}</Text>}
-      <Subheading text={inShort.changeLead} />
-      <StoryText paragraph={inShort.change} variant="paragraph" />
     </>
   );
 }
@@ -224,53 +223,35 @@ function LongStory({ model }: { model: ReportModel }): JSX.Element {
       ))}
       {model.reviewerNote === null ? null : (
         <View style={styles.box} wrap={false}>
-          <Text style={styles.boxTitle}>{model.reviewerNote.title}</Text>
+          <Text style={styles.boxTitle}>{capitals(model, model.reviewerNote.title)}</Text>
           <StoryText paragraph={model.reviewerNote.paragraph} variant="box" />
-          <Text style={styles.boxCaveat}>{model.reviewerNote.caveat}</Text>
         </View>
       )}
-      {model.reservation === null ? null : (
-        <View style={styles.box} wrap={false}>
-          <Text style={styles.boxTitle}>{model.reservation.title}</Text>
-          <StoryText paragraph={model.reservation.paragraph} variant="box" />
-        </View>
-      )}
+      {model.reservation === null ? null : <Text style={styles.reservation} wrap={false}>{model.reservation}</Text>}
     </>
   );
 }
 
-function Computation({ model }: { model: ReportModel }): JSX.Element {
-  const { computation } = model;
+/** A reason's number, written the way the report's language writes numbers. */
+function reasonNumber(model: ReportModel, index: number): string {
+  return formatNumber(model.language, index + 1);
+}
+
+function Why({ model }: { model: ReportModel }): JSX.Element {
+  const { why } = model;
   return (
     <>
-      <Heading title={computation.title} first />
-      <Text style={styles.paragraph}>{computation.intro}</Text>
-      {computation.rules.length === 0 ? null : (
-        <View style={styles.ruleHead}>
-          <Text style={[styles.ruleNumber, styles.ruleHeadText]}>{computation.tableHead.rule}</Text>
-          <Text style={[styles.ruleCondition, styles.ruleHeadText]}>{computation.tableHead.when}</Text>
-          <Text style={[styles.ruleResult, styles.ruleHeadText]}>{computation.tableHead.label}</Text>
-          <Text style={[styles.ruleMarker, styles.ruleHeadText]}>{" "}</Text>
-        </View>
-      )}
-      {computation.rules.map((rule) => (
-        <View key={rule.number} style={rule.applied ? [styles.ruleRow, styles.ruleRowApplied] : styles.ruleRow} wrap={false}>
-          <Text style={styles.ruleNumber}>{rule.number}</Text>
-          <Text style={styles.ruleCondition}>{rule.condition}</Text>
-          <Text style={styles.ruleResult}>{rule.result}</Text>
-          <Text style={styles.ruleMarker}>{rule.applied ? computation.appliedWords : ""}</Text>
+      <Heading title={why.title} first />
+      {why.reasons.map((reason, index) => (
+        <View key={index} style={styles.reasonRow}>
+          <Text style={styles.reasonNumber}>{reasonNumber(model, index)}</Text>
+          <View style={styles.reasonText}>
+            <StoryText paragraph={reason} variant="paragraph" />
+          </View>
         </View>
       ))}
-      {computation.numbersTitle === null ? null : <Subheading text={computation.numbersTitle} />}
-      {computation.numbers.map((row, index) => (
-        <View key={index} style={styles.numberRow} wrap={false}>
-          <Text style={styles.numberLabel}>{row.label}</Text>
-          <Text style={styles.numberValue}>{row.value}</Text>
-        </View>
-      ))}
-      <Text style={styles.decision} wrap={false}>{computation.decision}</Text>
-      {computation.explanation.length === 0 ? null : <Text style={styles.paragraph}>{computation.explanation}</Text>}
-      {computation.marksLine === null ? null : <Text style={styles.meta}>{computation.marksLine}</Text>}
+      <Subheading text={why.changeLead} />
+      <StoryText paragraph={why.change} variant="paragraph" />
     </>
   );
 }
@@ -289,7 +270,7 @@ function Appendix({ model }: { model: ReportModel }): JSX.Element {
             </Text>
           </KeepWithNext>
           <Text style={styles.entryClaim}>{entry.claim}</Text>
-          <Text style={styles.entryMeta}>{`${entry.scores} · ${entry.wayOfKnowing}`}</Text>
+          <Text style={styles.entryMeta}>{`${entry.strength} · ${entry.wayOfKnowing}`}</Text>
           <Text style={styles.entryMeta}>{entry.author}</Text>
           <Text style={styles.entryMeta}>{entry.review}</Text>
           {entry.setAsideLine === null ? null : <Text style={styles.entryMeta}>{entry.setAsideLine}</Text>}
@@ -316,31 +297,44 @@ function About({ model }: { model: ReportModel }): JSX.Element {
 
 export function ReportDocumentView({ model }: { model: ReportModel }): JSX.Element {
   return (
-    <Document title={model.documentTitle} author="DebateAI" subject="AI-generated debate report" creator="DebateAI" producer="DebateAI" keywords="AI-generated">
+    <Document
+      title={model.documentTitle}
+      author="DebateAI"
+      subject={model.metadataSubject}
+      creator="DebateAI"
+      producer="DebateAI"
+      keywords="AI-generated"
+      language={model.language}
+    >
       <Page size="A4" style={styles.page} bookmark={model.inShort.title}>
         <CoverAndShort model={model} />
-        <Footer footer={model.footer} />
+        <Footer model={model} />
       </Page>
       <Page size="A4" style={styles.page} bookmark={model.storyTitle}>
         <LongStory model={model} />
-        <Footer footer={model.footer} />
+        <Footer model={model} />
       </Page>
-      <Page size="A4" style={styles.page} bookmark={model.computation.title}>
-        <Computation model={model} />
-        <Footer footer={model.footer} />
+      <Page size="A4" style={styles.page} bookmark={model.why.title}>
+        <Why model={model} />
+        <Footer model={model} />
       </Page>
       <Page size="A4" style={styles.page} bookmark={model.appendix.title}>
         <Appendix model={model} />
-        <Footer footer={model.footer} />
+        <Footer model={model} />
       </Page>
       <Page size="A4" style={styles.page} bookmark={model.about.title}>
         <About model={model} />
-        <Footer footer={model.footer} />
+        <Footer model={model} />
       </Page>
     </Document>
   );
 }
 
-export function ReportDocument(props: { answer: Answer; story: AnswerStory; generatedAt: Date }): JSX.Element {
-  return <ReportDocumentView model={buildReportModel(props.answer, props.story, props.generatedAt)} />;
+export function ReportDocument(props: {
+  answer: Answer;
+  story: AnswerStory;
+  generatedAt: Date;
+  catalogs: ReportCatalogs;
+}): JSX.Element {
+  return <ReportDocumentView model={buildReportModel(props.answer, props.story, props.generatedAt, props.catalogs)} />;
 }

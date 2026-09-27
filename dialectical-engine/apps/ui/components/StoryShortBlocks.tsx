@@ -1,91 +1,84 @@
 import type { JSX } from "react";
-import {
-  STORY_CHANGE_LEAD,
-  STORY_FATE_WORDS,
-  STORY_PATHS_LIST_NAME,
-  STORY_RESERVATION_TITLE,
-  STORY_REVIEWER_NOTE_CAVEAT,
-  STORY_REVIEWER_NOTE_TITLE,
-  morePathsWords,
-  storyPointNumbersNote,
-  type StoryFateValue
-} from "@/lib/v3/storyWords";
+import { localeDirection } from "@/lib/i18n/questionLocale";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { morePathsWords, storyFateWords, type StoryFateValue } from "@/lib/v3/storyWords";
 
 /**
  * The verdict story's short version, as the two surfaces that show it hold it:
  * the public overview maps its snapshot's `story_short` to this, and the
- * owner's StoryPanel passes its view. Every string but the fixed English copy
- * was written by a model. `morePaths` is how many positions the short version
- * left out (0 or more). `reservation` is the checker's reservation, for the
- * owner's panel only: it names points by numbers only the owner's appendix
- * explains, so the public page never passes one. `reservationPointNumber` is
- * the first such number (for example "P5"); when set, the box explains under
- * the reservation where the numbers are found.
+ * owner's StoryPanel passes its view. Every string here was written by a model.
+ * `morePaths` is how many positions the short version left out (0 or more).
+ * `reservation` is true only on the owner's panel for a READY_WITH_RESERVATION
+ * story: the box then shows the gentle catalogue line, never the checker's own
+ * text (spec 2026-09-26 §14.2), and the public page never passes it.
  */
 export interface StoryShortContent {
   readonly headline: string | null;
+  readonly confidence: string | null;
   readonly summary: string | null;
   readonly paths: readonly Readonly<{ fate: StoryFateValue; line: string; positionRef: string }>[];
   readonly morePaths: number;
   readonly change: string | null;
   readonly reviewerNote: string | null;
-  readonly reservation?: string | null;
-  readonly reservationPointNumber?: string | null;
+  readonly reservation?: boolean;
 }
 
 /**
- * The short-story blocks (spec 2026-09-26 §10): headline, summary, the path
- * list, the change line, the reviewer's note box and the reservation box. One
+ * The short-story blocks (spec 2026-09-26 §10, §14): the headline, the
+ * storyteller's sentence on how sure we are, the summary, the path list, what
+ * would change the answer, the note box and the gentle reservation line. One
  * component for the public overview and the owner's StoryPanel, so the two
- * never drift. Every model-written string is a React text child: never HTML,
- * Markdown or a link. `className` names the surface; `headlineAs` lets a
- * surface make the headline its heading.
+ * never drift. The fixed words come from `catalog`, the `public` catalogue of
+ * the QUESTION's locale, and the blocks carry that locale's `lang` and `dir`:
+ * the story reads in one language from its headline to its last label. Every
+ * model-written string is a React text child: never HTML, Markdown or a link.
  */
 export function StoryShortBlocks({
   story,
+  catalog,
+  locale,
   className,
   headlineAs = "p"
 }: {
   story: StoryShortContent;
+  catalog: MessageCatalog;
+  locale: string;
   className: string;
   headlineAs?: "p" | "h2";
 }): JSX.Element {
-  const more = morePathsWords(story.morePaths);
-  const reservation = story.reservation ?? null;
-  const reservationPointNumber = story.reservationPointNumber ?? null;
+  const more = morePathsWords(story.morePaths, catalog, locale);
   const Headline = headlineAs;
   return (
-    <div className={className} data-ai-generated="true">
+    <div className={className} lang={locale} dir={localeDirection(locale)} data-ai-generated="true">
       {story.headline === null ? null : <Headline className="storyHeadline">{story.headline}</Headline>}
+      {story.confidence === null ? null : <p className="storyConfidence">{story.confidence}</p>}
       {story.summary === null ? null : <p className="storySummary">{story.summary}</p>}
-      <ul className="storyPaths" aria-label={STORY_PATHS_LIST_NAME}>
+      <ul className="storyPaths" aria-label={t(catalog, "public.story.pathsListName")}>
         {story.paths.map((path, index) => (
           <li key={`${index}:${path.positionRef}`} className="storyPath">
-            <span className="storyFate" data-fate={path.fate}>{STORY_FATE_WORDS[path.fate]}</span>
+            <span className="storyFate" data-fate={path.fate}>{storyFateWords(path.fate, catalog)}</span>
             <span className="storyPathLine">{path.line}</span>
           </li>
         ))}
         {more === null ? null : <li className="storyPath storyPathMore">{more}</li>}
       </ul>
       {story.change === null ? null : (
-        <p className="storyChange"><strong>{STORY_CHANGE_LEAD}</strong> {story.change}</p>
+        <div className="storyChange">
+          <span className="storyChangeLead">{t(catalog, "public.story.changeLead")}</span>
+          <p>{story.change}</p>
+        </div>
       )}
       {story.reviewerNote === null ? null : (
         <div className="storyBox" data-box="note">
-          <span className="storyBoxTitle">{STORY_REVIEWER_NOTE_TITLE}</span>
+          <span className="storyBoxTitle">{t(catalog, "public.story.noteTitle")}</span>
           <p>{story.reviewerNote}</p>
-          <p className="storyBoxNote">{STORY_REVIEWER_NOTE_CAVEAT}</p>
         </div>
       )}
-      {reservation === null ? null : (
+      {story.reservation === true ? (
         <div className="storyBox" data-box="reservation">
-          <span className="storyBoxTitle">{STORY_RESERVATION_TITLE}</span>
-          <p>{reservation}</p>
-          {reservationPointNumber === null ? null : (
-            <p className="storyBoxNote">{storyPointNumbersNote(reservationPointNumber)}</p>
-          )}
+          <p>{t(catalog, "public.story.reservation")}</p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

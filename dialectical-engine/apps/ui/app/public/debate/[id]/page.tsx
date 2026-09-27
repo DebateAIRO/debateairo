@@ -33,11 +33,14 @@ export default async function PublicDebatePage({ params }: { params: Promise<{ i
   // The language the debate was argued in, as the snapshot recorded it (spec
   // 2026-09-26 §14.3); an older snapshot without one keeps the reader's.
   const storyLocale = questionLocale(debate.language, locale);
+  // The short story's fixed words are read in that language, whatever the interface's.
+  const storyCatalog = storyLocale === locale ? publicCatalog : await loadNamespace(storyLocale, "public");
   return (
     <PublicDebatePageClient
       debate={debate}
       locale={locale}
       storyLocale={storyLocale}
+      storyCatalog={storyCatalog}
       publicCatalog={publicCatalog}
       timeCatalog={timeCatalog}
       debateChromeCatalog={debateChromeCatalog}

@@ -179,5 +179,12 @@ describe("the debate pages mount the offer", () => {
     }));
     const html = renderToStaticMarkup(await PublicDebatePage({ params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }) }) as ReactElement);
     expect(html).toContain('<section class="languageOffer" aria-label="Page language">');
+    // The page loads the `public` catalogue of the snapshot's language for the short story (R2 §14.3).
+    expect(html).toContain('<div class="publicStory" lang="ro" dir="ltr" data-ai-generated="true">');
+    expect(html).toContain(">A rezistat parțial<");
+    expect(html).toContain(">Ce ar schimba răspunsul<");
+    expect(html).toContain('lang="ro">Decizie strânsă</span>');
+    // The rest of the page stays in the reader's language.
+    expect(html).toContain(">No, thanks<");
   });
 });

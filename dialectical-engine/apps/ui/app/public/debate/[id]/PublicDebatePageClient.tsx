@@ -28,6 +28,7 @@ export function PublicDebatePageClient({
   debate,
   locale,
   storyLocale,
+  storyCatalog,
   publicCatalog,
   timeCatalog,
   debateChromeCatalog,
@@ -40,6 +41,8 @@ export function PublicDebatePageClient({
   locale: LocaleCode;
   /** The locale of the language the debate was argued in (spec 2026-09-26 §14.3); the reader's own when the snapshot does not say. */
   storyLocale: LocaleCode;
+  /** The `public` catalogue of `storyLocale`: the short story's fixed words. */
+  storyCatalog: MessageCatalog;
   publicCatalog: MessageCatalog;
   timeCatalog: MessageCatalog;
   debateChromeCatalog: MessageCatalog;
@@ -142,6 +145,8 @@ export function PublicDebatePageClient({
         <PublicDebateOverview
           debate={debate}
           catalog={publicCatalog}
+          storyCatalog={storyCatalog}
+          storyLocale={storyLocale}
           composeCatalog={composeCatalog}
           onDetails={onDetails}
           onRead={onRead}

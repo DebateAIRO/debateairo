@@ -15,7 +15,15 @@ const sourcePaths = [
   "components/PublicHonestyDrawer.tsx",
   "components/PublicationControl.tsx",
   "lib/publicDebatePresentation.ts",
-  "lib/v3/publicAnswerExport.ts"
+  "lib/v3/publicAnswerExport.ts",
+  // The verdict story's words (R2): the owner's panel, the shared short-story
+  // blocks, the words helpers and the PDF's model read `public.story.*` and
+  // `public.report.*` from the QUESTION's `public` catalogue.
+  "components/StoryPanel.tsx",
+  "components/StoryShortBlocks.tsx",
+  "lib/v3/storyWords.ts",
+  "lib/v3/storyView.ts",
+  "lib/report/reportModel.ts"
 ];
 const sources = new Map(sourcePaths.map((path) => [path, readFileSync(join(root, path), "utf8")]));
 const catalogPath = join(root, "messages/en/public.json");
@@ -49,7 +57,17 @@ const currentHardCodedCopy = [
   "Authenticator code",
   "Delete this private debate",
   "Permanently delete private debate",
-  "Not measured"
+  "Not measured",
+  // The verdict story's retired English copy (R2): now catalogue keys, and the
+  // engine-worded lines are gone for good.
+  "Writing the full story of this debate",
+  "Download full report (PDF)",
+  "Positions the debate explored",
+  "Reviewer's note",
+  "Our checker's reservation",
+  "Written by the AI storyteller",
+  "How this verdict was computed",
+  "Confidence: held below full"
 ];
 
 function visibleEnglish(path, source) {
@@ -93,6 +111,12 @@ test("the public namespace exists and covers every public translation call", () 
   for (const source of sources.values()) {
     for (const match of source.matchAll(/\bt\(\s*[^,]+,\s*["'](public\.[A-Za-z0-9.]+)["']/g)) {
       usedKeys.add(match[1]);
+    }
+    // A plural root is used through its English forms (catalogContractAssertions
+    // derives every other locale's forms from those).
+    for (const match of source.matchAll(/\btPlural\(\s*[^,]+,\s*["'](public\.[A-Za-z0-9.]+)["']/g)) {
+      usedKeys.add(`${match[1]}.one`);
+      usedKeys.add(`${match[1]}.other`);
     }
   }
   assert.ok(usedKeys.size > 0, "S2-public sources must use public namespace keys");

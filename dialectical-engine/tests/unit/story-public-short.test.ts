@@ -22,6 +22,7 @@ import {
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 import { toPublicStoryShort } from "../../packages/story/src/public.js";
 import { countStoryPositions, morePathsWords } from "../../apps/ui/lib/v3/storyWords.js";
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { STORY_TEST_ANSWER_ID, STORY_TEST_BODY, storedStoryRecord } from "../support/storyApiFixtures.js";
 
@@ -354,9 +355,9 @@ describe("story words", () => {
     expect(countStoryPositions(nodes, edges)).toBe(2);
   });
 
-  it("says how many positions the short version left out", () => {
-    expect(morePathsWords(0)).toBeNull();
-    expect(morePathsWords(1)).toBe("and 1 more position");
-    expect(morePathsWords(4)).toBe("and 4 more positions");
+  it("says how many positions the short version left out, from the catalogue it is handed", () => {
+    expect(morePathsWords(0, publicEnglish, "en")).toBeNull();
+    expect(morePathsWords(1, publicEnglish, "en")).toBe("and 1 more");
+    expect(morePathsWords(4, publicEnglish, "en")).toBe("and 4 more");
   });
 });

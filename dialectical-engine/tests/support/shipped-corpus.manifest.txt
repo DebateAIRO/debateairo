@@ -438,6 +438,7 @@ apps/ui/lib/report/ReportDocument.tsx
 apps/ui/lib/report/fonts.test.mjs
 apps/ui/lib/report/pointNumbers.ts
 apps/ui/lib/report/renderReport.ts
+apps/ui/lib/report/reportLanguage.ts
 apps/ui/lib/report/reportModel.ts
 apps/ui/lib/returnPath.ts
 apps/ui/lib/scoring/scoringResponseSpecification.ts
@@ -466,7 +467,6 @@ apps/ui/lib/v3/storyFixture.ts
 apps/ui/lib/v3/storyView.ts
 apps/ui/lib/v3/storyWords.ts
 apps/ui/lib/v3/tokenUnlock.ts
-apps/ui/lib/v3/verdictStateSentences.ts
 apps/ui/middleware.ts
 apps/ui/next-env.d.ts
 apps/ui/next.config.mjs

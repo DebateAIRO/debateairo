@@ -9,8 +9,9 @@ import {
   type PublicArgumentPresentation
 } from "@/lib/publicDebatePresentation";
 import { v3ScorePercentage } from "@/lib/v3/adapter";
-import { countStoryPositions } from "@/lib/v3/storyWords";
+import { countStoryPositions, storyLabelWords } from "@/lib/v3/storyWords";
 import { StoryShortBlocks, type StoryShortContent } from "@/components/StoryShortBlocks";
+import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import composeEnglish from "@/messages/en/compose.json";
 
@@ -100,14 +101,16 @@ function ArgumentCard({
 }
 
 /**
- * The snapshot's short story (spec 2026-09-26 §10) in the shape the shared
- * blocks take. The positions the short version left out are counted from the
- * published tree; a snapshot without a tree counts none. A public snapshot
- * carries no checker's reservation, so none is passed.
+ * The snapshot's short story (spec 2026-09-26 §10, §14) in the shape the shared
+ * blocks take, with the storyteller's confidence sentence. The positions the
+ * short version left out are counted from the published tree; a snapshot
+ * without a tree counts none. The public page never shows a reservation, so
+ * none is passed.
  */
 function publicStoryContent(story: PublicStoryShort, answer: PublicDebate["answer"]): StoryShortContent {
   return {
     headline: story.headline,
+    confidence: story.confidence,
     summary: story.summary,
     paths: story.paths.map((path) => ({ fate: path.fate, line: path.line, positionRef: path.position_ref })),
     morePaths: Math.max(0, countStoryPositions(answer.nodes ?? [], answer.edges ?? []) - story.paths.length),
@@ -119,18 +122,32 @@ function publicStoryContent(story: PublicStoryShort, answer: PublicDebate["answe
 export function PublicDebateOverview({
   debate,
   catalog,
+  storyCatalog,
+  storyLocale,
   composeCatalog = composeEnglish,
   onDetails,
   onRead
 }: {
   debate: PublicDebate;
   catalog: MessageCatalog;
+  /**
+   * The `public` catalogue of the language the debate was argued in (spec
+   * 2026-09-26 §14.3): the short story's label, fates and lines read in it,
+   * whatever the interface's language.
+   */
+  storyCatalog: MessageCatalog;
+  storyLocale: LocaleCode;
   /** The interface locale's `compose` catalogue: V3 score copy and model family names. */
   composeCatalog?: MessageCatalog;
   onDetails: () => void;
   onRead: (nodeId: string) => void;
 }) {
   const presentation = buildPublicDebatePresentation(debate, catalog);
+  // With a story, the label is said in human words and the storyteller's own
+  // sentence replaces the generic confidence words (spec §14.2), both in the
+  // question's language. Without one, the snapshot reads as it always did.
+  const story = debate.story_short;
+  const storyVerdict = story === undefined ? null : debate.answer.verdict;
   const returnPath = `/public/debate/${encodeURIComponent(debate.public_ref)}`;
   const signInHref = `/login?next=${encodeURIComponent(returnPath)}`;
 
@@ -142,14 +159,25 @@ export function PublicDebateOverview({
           <div className="publicVerdictCore">
             <span className="publicVerdictTab" aria-hidden />
             <div className="publicVerdictHead">
-              <span
-                id="public-verdict-label"
-                className="publicVerdictPill"
-                data-verdict={presentation.verdict?.toLowerCase() ?? "unavailable"}
-              >
-                {verdictLabel(presentation.verdict, catalog)}
-              </span>
-              {presentation.confidenceBand ? (
+              {storyVerdict === null ? (
+                <span
+                  id="public-verdict-label"
+                  className="publicVerdictPill"
+                  data-verdict={presentation.verdict?.toLowerCase() ?? "unavailable"}
+                >
+                  {verdictLabel(presentation.verdict, catalog)}
+                </span>
+              ) : (
+                <span
+                  id="public-verdict-label"
+                  className="publicVerdictPill"
+                  data-verdict={storyVerdict.toLowerCase()}
+                  lang={storyLocale}
+                >
+                  {storyLabelWords(storyVerdict, storyCatalog)}
+                </span>
+              )}
+              {story === undefined && presentation.confidenceBand ? (
                 <span className="publicThresholdLabel">{t(catalog, "public.overview.confidence", { confidence: presentation.confidenceBand.toLowerCase() })}</span>
               ) : null}
               <button type="button" className="publicDetailsAction" onClick={onDetails}>
@@ -157,8 +185,8 @@ export function PublicDebateOverview({
               </button>
             </div>
             <div className="publicVerdictText">
-              {debate.story_short !== undefined
-                ? <StoryShortBlocks story={publicStoryContent(debate.story_short, debate.answer)} className="publicStory" />
+              {story !== undefined
+                ? <StoryShortBlocks story={publicStoryContent(story, debate.answer)} catalog={storyCatalog} locale={storyLocale} className="publicStory" />
                 : presentation.summary.length > 0
                   ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
                   : <p>{t(catalog, "public.overview.composedVerdictUnavailable")}</p>}

@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { Font, renderToBuffer } from "@react-pdf/renderer";
 import type { Answer, AnswerStory } from "@debateai/contract";
 import { REPORT_FONT_SANS, REPORT_FONT_SERIF, ReportDocument } from "./ReportDocument.js";
+import { reportSupportedForLocale, type ReportCatalogs } from "./reportLanguage.js";
 import { reportWordPieces } from "./reportModel.js";
 
 /**
@@ -63,13 +64,26 @@ function registerReportFonts(directory: string): void {
   registeredFontDirectory = directory;
 }
 
-/** Renders the owner's full report. Nothing is written to disk; the caller streams the bytes. */
+/**
+ * Renders the owner's full report, in the language of `catalogs`
+ * (loadReportCatalogs: the question's, or the reader's when the question's is
+ * not known). Nothing is written to disk; the caller streams the bytes. A
+ * language whose script the vendored fonts cannot print is refused here too,
+ * never printed as empty boxes.
+ */
 export async function renderReportPdf(input: Readonly<{
   answer: Answer;
   story: AnswerStory;
   generatedAt: Date;
+  catalogs: ReportCatalogs;
   fontDirectory?: string;
 }>): Promise<Buffer> {
+  if (!reportSupportedForLocale(input.catalogs.locale)) throw new RangeError(`REPORT_LOCALE_UNSUPPORTED: ${input.catalogs.locale}`);
   registerReportFonts(input.fontDirectory ?? resolveReportFontDirectory());
-  return renderToBuffer(ReportDocument({ answer: input.answer, story: input.story, generatedAt: input.generatedAt }));
+  return renderToBuffer(ReportDocument({
+    answer: input.answer,
+    story: input.story,
+    generatedAt: input.generatedAt,
+    catalogs: input.catalogs
+  }));
 }

@@ -8416,7 +8416,9 @@ a:focus-visible {
    styles the public one (.publicStory). The consent blocks below must stay the
    last blocks in this file, so this one sits before them. Every colour is a
    var(--token) reference, as outside the two token blocks everywhere in this
-   file. */
+   file. The story carries its question's `lang` and `dir` (R2, spec §14.3),
+   so every side and edge here is a logical property: an Arabic or Hebrew
+   story mirrors. */
 .publicStory {
   display: grid;
   gap: 10px;
@@ -8439,6 +8441,16 @@ a:focus-visible {
   font-size: 14.5px;
   line-height: 1.6;
   color: var(--text);
+}
+/* The storyteller's own sentence on how sure we are (spec §14.2): set apart
+   under the headline, quieter than the summary, never a generic line. */
+.storyConfidence {
+  margin: 0;
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid var(--gold-border);
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 .storyPaths {
   display: grid;
@@ -8478,13 +8490,23 @@ a:focus-visible {
 .storyFate[data-fate="PARTLY_HELD"] { border-color: var(--score-uncertainty-border); background: var(--score-uncertainty-bg); color: var(--score-uncertainty-text); }
 .storyFate[data-fate="FELL"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
 .storyFate[data-fate="SET_ASIDE"] { border-color: var(--muted-border); background: var(--muted-bg); color: var(--muted); }
-.storyChange {
+/* What would change the answer: a small label over the story's own sentence,
+   so no punctuation of one language joins the two. */
+.storyChange { display: grid; gap: 3px; }
+.storyChangeLead {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.storyChange p {
   margin: 0;
   font-size: 13.5px;
   line-height: 1.55;
   color: var(--text);
 }
-.storyChange strong { font-weight: 700; }
 .storyBox {
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
@@ -8495,7 +8517,9 @@ a:focus-visible {
   line-height: 1.55;
 }
 .storyBox p { margin: 0; }
-.storyBox[data-box="reservation"] { border-color: var(--score-uncertainty-border); background: var(--score-uncertainty-bg); }
+/* The gentle line for a story the checker kept a reservation about (spec
+   §14.2): a quiet aside, never an alarm, and never the checker's own words. */
+.storyBox[data-box="reservation"] { border-style: dashed; background: transparent; color: var(--text-2); font-size: 12.5px; font-style: italic; }
 .storyBoxTitle {
   display: block;
   margin-bottom: 4px;
@@ -8534,11 +8558,12 @@ a:focus-visible {
 /* Hide/Show is decoration: the details element already exposes whether it is
    open, so the alternative text after the slash keeps the word out of the
    summary's accessible name. A browser without that syntax keeps the plain
-   declaration before it. */
+   declaration before it. The two words are the story's catalogue's, in the
+   question's language, carried by the summary's data attributes (R2). */
 .storyPanelSummary::after {
-  content: "Hide";
-  content: "Hide" / "";
-  margin-left: auto;
+  content: attr(data-hide-words);
+  content: attr(data-hide-words) / "";
+  margin-inline-start: auto;
   padding: 2px 10px;
   border: 1px solid var(--line-2);
   border-radius: var(--r-pill);
@@ -8547,7 +8572,7 @@ a:focus-visible {
   font-weight: 600;
 }
 .storyPanelSummary:hover::after { border-color: var(--line-strong); color: var(--text); }
-.storyPanelDetails:not([open]) .storyPanelSummary::after { content: "Show"; content: "Show" / ""; }
+.storyPanelDetails:not([open]) .storyPanelSummary::after { content: attr(data-show-words); content: attr(data-show-words) / ""; }
 .storyPanelSummary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .storyPanelEyebrow {
   color: var(--text-3);
@@ -8610,6 +8635,7 @@ a:focus-visible {
   color: var(--text-strong);
 }
 .storyPanelStory .storySummary { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text); }
+.storyPanelStory .storyConfidence { font-size: 13.5px; }
 /* The fate words sit in one column, so the path lines start on one edge. */
 .storyPanelStory .storyPaths { grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; }
 .storyPanelStory .storyPath { grid-column: 1 / -1; grid-template-columns: subgrid; }
@@ -8620,7 +8646,7 @@ a:focus-visible {
   display: inline-block;
   width: 7px;
   height: 7px;
-  margin-right: 9px;
+  margin-inline-end: 9px;
   border-radius: var(--r-dot);
   background: var(--gold);
   vertical-align: 1px;
@@ -8629,9 +8655,10 @@ a:focus-visible {
 .storyPanelNote { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55; }
 .storyPanelFallback {
   padding: 10px 14px;
-  border-left: 2px solid var(--line-strong);
+  border-inline-start: 2px solid var(--line-strong);
   background: var(--core);
-  border-radius: 0 var(--r-card) var(--r-card) 0;
+  border-start-end-radius: var(--r-card);
+  border-end-end-radius: var(--r-card);
 }
 .storyPanelFallback p { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.6; }
 .storyPanelFallback p + p { margin-top: 8px; }

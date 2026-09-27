@@ -9,6 +9,8 @@ import { PLAN_TIER_ROSTERS, type Answer, type AnswerStory } from "@debateai/cont
 export const STORY_FIXTURE_DEBATE_ID = "fe830726-05a2-4840-82de-0d6ef160231e";
 export const STORY_FIXTURE_QUESTION =
   "Ar trebui să ne mutăm cu familia din București la Cluj pentru un salariu mai mare?";
+/** The question's language as the run records it (core.run.argument_language_*): the mock and the sample report read it. */
+export const STORY_FIXTURE_LANGUAGE = Object.freeze({ tag: "ro", name: "Romanian" });
 
 const RUN_REF = "e177d603-1f78-40cc-8bdd-52dc4c22b2e2";
 const ASKED_AT = "2026-09-26T09:00:00.000Z";

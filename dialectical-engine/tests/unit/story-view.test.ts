@@ -11,20 +11,7 @@ import {
   storyFixtureNode
 } from "../../apps/ui/lib/v3/storyFixture.js";
 import { countStoryPositions } from "../../apps/ui/lib/v3/storyWords.js";
-import {
-  storyConfidenceWords,
-  storyLabelSentence,
-  storyLabelWords,
-  toStoryView
-} from "../../apps/ui/lib/v3/storyView.js";
-import { STORY_SUPPORTED_SENTENCE } from "../../apps/ui/lib/v3/verdictStateSentences.js";
-import debateDrawersEnglish from "../../apps/ui/messages/en/debateDrawers.json" with { type: "json" };
-
-// The banner's own D77 sentences (components/VerdictBanner.tsx reads these keys).
-const BANNER_SENTENCE = {
-  contested: debateDrawersEnglish["debateDrawers.verdict.contestedExplanation"],
-  unsupported: debateDrawersEnglish["debateDrawers.verdict.unsupportedExplanation"]
-} as const;
+import { toStoryView } from "../../apps/ui/lib/v3/storyView.js";
 
 /** The rule the story checks use for a point number (packages/story validate.ts STORY_SHORT_POINT_NUMBER). */
 const POINT_NUMBER = /\bP[1-9][0-9]*\b/u;
@@ -142,116 +129,75 @@ describe("story fixture (the owner's mock data)", () => {
 });
 
 describe("toStoryView (spec §10)", () => {
-  it("shows a READY story with the arithmetic label, fate words and the PDF link", () => {
-    const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID);
+  it("shows a READY story with the arithmetic label, the storyteller's confidence and the PDF link", () => {
+    const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID, "ro");
     expect(view.status).toBe("READY");
-    expect(view.labelWords).toBe("Contested");
+    expect(view.label).toBe("CONTESTED");
     expect(view.verdictState).toBe("contested");
-    expect(view.labelSentence).toBe(BANNER_SENTENCE.contested);
-    expect(view.confidenceWords).toBe("Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued");
+    expect(view.confidence).toBe(storyFixture("READY").story!.short.confidence);
     expect(view.headline).toBe("Răspunsul nostru: mutați-vă treptat, cu lucru hibrid, după încheierea anului școlar.");
-    expect(view.paths.map((path) => [path.positionRef, path.fateWords])).toEqual([
-      ["n-hybrid", "Partly held"], ["n-yes", "Partly held"], ["n-not-now", "Fell"]
+    expect(view.paths.map((path) => [path.positionRef, path.fate])).toEqual([
+      ["n-hybrid", "PARTLY_HELD"], ["n-yes", "PARTLY_HELD"], ["n-not-now", "FELL"]
     ]);
     expect(view.morePaths).toBe(0);
     expect(view.change).toContain("lucrul hibrid");
     expect(view.reviewerNote).toContain("Nota aceasta nu schimbă răspunsul nostru.");
-    expect(view.reservation).toBeNull();
-    expect(view.reservationPointNumber).toBeNull();
+    expect(view.reservation).toBe(false);
     expect(view.fallbackText).toBeNull();
     expect(view.pdfHref).toBe(`/debate/${STORY_FIXTURE_DEBATE_ID}/report`);
+    expect(view.reportUnsupported).toBe(false);
   });
 
-  it("adds the checker's reservation only for READY_WITH_RESERVATION", () => {
-    const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY_WITH_RESERVATION"), STORY_FIXTURE_DEBATE_ID);
+  it("marks the gentle reservation line only for READY_WITH_RESERVATION, never with the checker's own text", () => {
+    const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY_WITH_RESERVATION"), STORY_FIXTURE_DEBATE_ID, "ro");
     expect(view.status).toBe("READY_WITH_RESERVATION");
-    expect(view.reservation).toContain("30%");
+    expect(view.reservation).toBe(true);
     expect(view.pdfHref).not.toBeNull();
-  });
-
-  it("picks out the first point number the reservation names, for the note inside the reservation box", () => {
-    const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY_WITH_RESERVATION"), STORY_FIXTURE_DEBATE_ID);
-    expect(view.reservationPointNumber).toBe("P5");
-    const withReservation = (reservation: string): AnswerStory => ({ ...storyFixture("READY_WITH_RESERVATION"), reservation });
-    const pointNumberOf = (reservation: string): string | null =>
-      toStoryView(STORY_FIXTURE_ANSWER, withReservation(reservation), STORY_FIXTURE_DEBATE_ID).reservationPointNumber;
-    expect(pointNumberOf("Cifra de 30% vine dintr-o singură comparație.")).toBeNull();
-    expect(pointNumberOf("Punctele P12 și P3 se contrazic.")).toBe("P12");
-    expect(pointNumberOf("Nu P0, nu MP3, nu P3a, nu p3.")).toBeNull();
-  });
-
-  it("never carries a reservation or its point number outside READY_WITH_RESERVATION", () => {
+    expect(JSON.stringify(view)).not.toContain("o singură comparație de anunțuri");
     const leaked: AnswerStory = { ...storyFixture("READY"), reservation: "Rezervă despre P5." };
-    const view = toStoryView(STORY_FIXTURE_ANSWER, leaked, STORY_FIXTURE_DEBATE_ID);
-    expect([view.reservation, view.reservationPointNumber]).toEqual([null, null]);
+    expect(toStoryView(STORY_FIXTURE_ANSWER, leaked, STORY_FIXTURE_DEBATE_ID, "ro").reservation).toBe(false);
   });
 
   it("says WRITING with no story text and no PDF, also before the first reply", () => {
     for (const story of [storyFixture("WRITING"), null]) {
-      const view = toStoryView(STORY_FIXTURE_ANSWER, story, STORY_FIXTURE_DEBATE_ID);
+      const view = toStoryView(STORY_FIXTURE_ANSWER, story, STORY_FIXTURE_DEBATE_ID, "ro");
       expect(view.status).toBe("WRITING");
       expect([view.headline, view.summary, view.change, view.fallbackText, view.pdfHref]).toEqual([null, null, null, null, null]);
-      expect([view.reviewerNote, view.reservation, view.reservationPointNumber]).toEqual([null, null, null]);
+      expect([view.confidence, view.reviewerNote, view.reservation]).toEqual([null, null, false]);
       expect([view.paths.length, view.morePaths]).toEqual([0, 0]);
     }
   });
 
   it("falls back to the composed text when the story is UNAVAILABLE", () => {
-    const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("UNAVAILABLE"), STORY_FIXTURE_DEBATE_ID);
+    const view = toStoryView(STORY_FIXTURE_ANSWER, storyFixture("UNAVAILABLE"), STORY_FIXTURE_DEBATE_ID, "ro");
     expect(view.status).toBe("UNAVAILABLE");
     expect(view.fallbackText).toBe(STORY_FIXTURE_ANSWER.composed_text.map((segment) => segment.text).join("\n\n"));
     expect(view.pdfHref).toBeNull();
-    expect([view.headline, view.reservation, view.reservationPointNumber]).toEqual([null, null, null]);
-    const empty = toStoryView({ ...STORY_FIXTURE_ANSWER, composed_text: [] }, storyFixture("UNAVAILABLE"), STORY_FIXTURE_DEBATE_ID);
+    expect([view.headline, view.confidence, view.reservation]).toEqual([null, null, false]);
+    const empty = toStoryView({ ...STORY_FIXTURE_ANSWER, composed_text: [] }, storyFixture("UNAVAILABLE"), STORY_FIXTURE_DEBATE_ID, "ro");
     expect(empty.fallbackText).toBeNull();
   });
 
   it("never shows READY without a body", () => {
     const broken = { ...storyFixture("READY"), story: null };
-    expect(toStoryView(STORY_FIXTURE_ANSWER, broken, STORY_FIXTURE_DEBATE_ID).status).toBe("UNAVAILABLE");
+    expect(toStoryView(STORY_FIXTURE_ANSWER, broken, STORY_FIXTURE_DEBATE_ID, "ro").status).toBe("UNAVAILABLE");
   });
 
   it("counts the positions the 8-line short version left out", () => {
-    const view = toStoryView(twelvePositionAnswer(), eightPathStory(), STORY_FIXTURE_DEBATE_ID);
+    const view = toStoryView(twelvePositionAnswer(), eightPathStory(), STORY_FIXTURE_DEBATE_ID, "ro");
     expect(view.paths).toHaveLength(8);
     expect(view.morePaths).toBe(4);
   });
 
   it("encodes the debate id in the PDF link", () => {
-    expect(toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY"), "a/b c").pdfHref).toBe("/debate/a%2Fb%20c/report");
-  });
-
-  it("words every label from the arithmetic, with the D77 sentences", () => {
-    expect(storyLabelWords("SUPPORTED")).toBe("Supported");
-    expect(storyLabelWords("UNSUPPORTED")).toBe("Unsupported");
-    expect(storyLabelWords(null)).toBe("No verdict");
-    expect(storyLabelSentence("SUPPORTED")).toBe(STORY_SUPPORTED_SENTENCE);
-    expect(storyLabelSentence("UNSUPPORTED")).toBe(BANNER_SENTENCE.unsupported);
-    expect(storyLabelSentence("CONTESTED")).toBe(BANNER_SENTENCE.contested);
-    expect(storyLabelSentence(null)).toContain("without a verdict");
-    expect(storyConfidenceWords(null)).toBeNull();
-    expect(storyConfidenceWords("FULL")).toBe("Confidence: full, because none of the checks that can lower it found a reason to");
-    expect(storyConfidenceWords("CAPPED")).toBe("Confidence: held below full, for example because much of the answer rests on reasoning alone, a reviewer disputed a point, or only one AI model argued");
-    // CAPPED is reached by several rules (the evidence mix, a one-model run, a
-    // one-voice panel, a disputed review), so the words give examples and name
-    // no single cause.
-    expect(storyConfidenceWords("CAPPED")).toContain("for example");
-    expect(storyConfidenceWords("MODERATE")).toBe("Confidence: moderate");
+    expect(toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY"), "a/b c", "ro").pdfHref).toBe("/debate/a%2Fb%20c/report");
   });
 
   it("keys the label's colour off the arithmetic state, never off the label's words", () => {
     const state = (label: Answer["verdict_state"]) =>
-      toStoryView({ ...STORY_FIXTURE_ANSWER, verdict_state: label }, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID).verdictState;
+      toStoryView({ ...STORY_FIXTURE_ANSWER, verdict_state: label }, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID, "ro").verdictState;
     expect([state("SUPPORTED"), state("CONTESTED"), state("UNSUPPORTED"), state(null)])
       .toEqual(["supported", "contested", "unsupported", null]);
-  });
-
-  it("says SUPPORTED in plain words: exactly what rung 3 checks, with no engine term and no overclaim", () => {
-    expect(STORY_SUPPORTED_SENTENCE).toBe(
-      "The leading position came out strong, stayed ahead of the other positions by more than the tie margin (a smaller lead counts as a tie), and the judges broadly agreed."
-    );
-    // "Clearly ahead" overclaimed: rung 3 only needs the margin to beat the tie margin, which 0.06 against 0.05 does.
-    expect(STORY_SUPPORTED_SENTENCE).not.toMatch(/clearly|gamma|threshold/u);
   });
 });
 
@@ -279,8 +225,16 @@ describe("story strip layout contract (globals.css)", () => {
 
   it("lets the reader select the summary text, and keeps Hide/Show out of its accessible name", () => {
     expect(block).not.toMatch(/user-select:\s*none/u);
-    expect(block).toMatch(/\.storyPanelSummary::after \{[^}]*content: "Hide" \/ "";/u);
-    expect(block).toMatch(/\.storyPanelDetails:not\(\[open\]\) \.storyPanelSummary::after \{[^}]*content: "Show" \/ "";/u);
+    // R2: the two words come from the catalogue, through the summary's data attributes.
+    expect(block).toMatch(/\.storyPanelSummary::after \{[^}]*content: attr\(data-hide-words\) \/ "";/u);
+    expect(block).toMatch(/\.storyPanelDetails:not\(\[open\]\) \.storyPanelSummary::after \{[^}]*content: attr\(data-show-words\) \/ "";/u);
+    expect(block).not.toMatch(/content: "(?:Hide|Show)"/u);
+  });
+
+  it("uses logical properties only, so a right-to-left story mirrors (R2)", () => {
+    expect(block).not.toMatch(/(?:margin|padding|border)-(?:left|right)\b|\b(?:left|right):|text-align:\s*(?:left|right)/u);
+    expect(block).toMatch(/margin-inline-start: auto;/u);
+    expect(block).toMatch(/border-inline-start:/u);
   });
 
   it("uses only design tokens for colour", () => {
