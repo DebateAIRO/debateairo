@@ -172,7 +172,7 @@
   "debateChrome.condition.uninstrumented": "Înregistrare incompletă a verificării",
   "debateChrome.condition.unfalsifiedAfterRotation": "Neinfirmat după rotația modelelor",
   "debateChrome.condition.skippedByBudget": "Îmbogățire omisă din cauza bugetului",
-  "debateChrome.condition.envelopeExhausted": "Explorarea s-a oprit mai devreme, pentru a rămâne în buget",
+  "debateChrome.condition.envelopeExhausted": "S-a încheiat mai devreme, pentru a rămâne în buget",
   "debateChrome.condition.leverageUnresolved": "Influență nesoluționată",
   "debateChrome.condition.branchFrozenLowLeverage": "Ramură neextinsă: nu putea modifica răspunsul",
   "debateChrome.condition.degradedDiversity": "Diversitatea modelelor s-a degradat",

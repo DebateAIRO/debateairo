@@ -583,6 +583,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       models?: readonly string[];
       verdict: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
       confidence_band: string | null;
+      floor_verdict?: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
     }>[];
     total: number;
   }>> {
@@ -600,7 +601,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
           node.maker_lineage === null ? [] : [node.maker_lineage.model_id]
         ))]),
         verdict: debate.answer.verdict,
-        confidence_band: debate.answer.confidence_band
+        confidence_band: debate.answer.confidence_band,
+        // Task M6: the floor's label only (spec §14.4.4), for the library row.
+        ...(debate.floor === undefined ? {} : { floor_verdict: debate.floor.verdict_state })
       }));
     }
     return Object.freeze({ items: Object.freeze(items), total: page.total });

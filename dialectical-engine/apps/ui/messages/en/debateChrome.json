@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Checking record incomplete",
   "debateChrome.condition.unfalsifiedAfterRotation": "Not falsified after model rotation",
   "debateChrome.condition.skippedByBudget": "Enrichment skipped by budget",
-  "debateChrome.condition.envelopeExhausted": "Stopped exploring early to stay within budget",
+  "debateChrome.condition.envelopeExhausted": "Ended early to stay within budget",
   "debateChrome.condition.leverageUnresolved": "Leverage unresolved",
   "debateChrome.condition.branchFrozenLowLeverage": "Branch not expanded: it could not move the answer",
   "debateChrome.condition.degradedDiversity": "Model diversity degraded",

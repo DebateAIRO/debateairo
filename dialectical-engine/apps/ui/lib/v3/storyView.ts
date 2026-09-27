@@ -86,7 +86,12 @@ export function toStoryView(
   const ready = requested === "READY" || requested === "READY_WITH_RESERVATION";
   const body = ready && story !== null ? story.story : null;
   const status: AnswerStory["status"] = ready && body === null ? "UNAVAILABLE" : requested;
-  const verdict = answer.verdict_state ?? floor?.label ?? null;
+  // A floor answer's label (spec §14.4.4) comes from its floor, or, when the
+  // record could not be read, from the ready story's own sealed basis, which
+  // carries the same label (fix round 1). Only a components-only answer can
+  // have a floor; the answer's own label always wins.
+  const storyLabel = answer.terminal === "COMPONENTS_ONLY" ? story?.verdict_basis?.label ?? null : null;
+  const verdict = answer.verdict_state ?? floor?.label ?? storyLabel;
   const label = {
     label: verdict,
     verdictState: verdict === null ? null : liveVerdictState(verdict)

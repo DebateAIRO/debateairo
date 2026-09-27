@@ -172,7 +172,7 @@
   "debateChrome.condition.uninstrumented": "Dossier de vérification incomplet",
   "debateChrome.condition.unfalsifiedAfterRotation": "Non réfuté après rotation des modèles",
   "debateChrome.condition.skippedByBudget": "Enrichissement omis faute de budget",
-  "debateChrome.condition.envelopeExhausted": "Exploration arrêtée plus tôt pour respecter le budget",
+  "debateChrome.condition.envelopeExhausted": "Arrêté plus tôt pour respecter le budget",
   "debateChrome.condition.leverageUnresolved": "Influence non déterminée",
   "debateChrome.condition.branchFrozenLowLeverage": "Branche non développée : elle ne pouvait pas modifier la réponse",
   "debateChrome.condition.degradedDiversity": "Diversité des modèles dégradée",

@@ -170,7 +170,7 @@
   "debateChrome.condition.uninstrumented": "检查记录不完整",
   "debateChrome.condition.unfalsifiedAfterRotation": "模型轮换后仍未被证伪",
   "debateChrome.condition.skippedByBudget": "因预算限制跳过了内容增强",
-  "debateChrome.condition.envelopeExhausted": "为不超出预算而提前停止了探索",
+  "debateChrome.condition.envelopeExhausted": "为不超出预算而提前结束",
   "debateChrome.condition.leverageUnresolved": "影响力未确定",
   "debateChrome.condition.branchFrozenLowLeverage": "分支未扩展：它无法改变答案",
   "debateChrome.condition.degradedDiversity": "模型多样性下降",

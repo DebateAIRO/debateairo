@@ -303,7 +303,12 @@ export const PublicDebateSummarySchema = z.object({
   published_at: z.iso.datetime(),
   models: z.array(z.string().trim().min(1)).optional(),
   verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
-  confidence_band: z.string().trim().min(1).nullable()
+  confidence_band: z.string().trim().min(1).nullable(),
+  // Engine money rule, Task M6 (spec §14.4.4): a components-only snapshot's
+  // floor label (`PublicDebate.floor.verdict_state`), so the public library row
+  // shows the label the page shows instead of "verdict unavailable". Absent
+  // for every other snapshot; the floor's position and cause never ride here.
+  floor_verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).optional()
 }).strict();
 export type PublicDebateSummary = z.infer<typeof PublicDebateSummarySchema>;
 

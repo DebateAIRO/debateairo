@@ -41,7 +41,7 @@ describe("the owner's story mock (look first, then wire)", () => {
     // Task M6: the floor answer, in the strip (Romanian) and in the page's own verdict card (English), never "Components-only".
     expect(html).toContain("Cel mai bun răspuns al nostru:");
     expect(html).toContain("Our best answer:");
-    expect(html).toContain("Acest răspuns se sprijină pe mai puține dovezi decât de obicei.");
+    expect(html).toContain("Pentru acest răspuns am avut mai puțin de comparat decât de obicei.");
     expect(html).not.toContain("Components-only");
     // The vendored fonts are inlined, but only the three faces the panel uses (Plus Jakarta Sans 400 and
     // 700, Fraunces 600), once in the page and once in each of the 17 previews.

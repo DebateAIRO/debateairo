@@ -224,9 +224,10 @@ describe("v2-ui adapter: V3 answers project onto V2 view models (AC-59, DR-115)"
     expect(detail.completion?.humanReason ?? null).toBeNull();
     expect(detail.synthesis?.verdict).toBe(answer.composed_text.map((segment) => segment.text).join("\n\n").trim());
     expect(detail.synthesis?.verdict).not.toBe(composeEnglish["compose.v3.componentsOnlyVerdict"]);
-    // Task M6 (M2 review carry): the mark says what happened in plain words, so it agrees with the
-    // drawer's "Stayed within the limits" instead of reading as its contradiction.
-    expect(conditionMarkLabel("ENVELOPE_EXHAUSTED")).toBe("Stopped exploring early to stay within budget");
+    // Task M6 (M2 review carry, fix round 1): the mark says what happened in plain words, true for all
+    // three of its uses (arguing cut short, the envelope terminal, a stopped answer-writing loop), and it
+    // agrees with the drawer's "Stayed within the limits" instead of reading as its contradiction.
+    expect(conditionMarkLabel("ENVELOPE_EXHAUSTED")).toBe("Ended early to stay within budget");
   });
 
   it("maps every terminal outcome onto an honest V2 status", () => {

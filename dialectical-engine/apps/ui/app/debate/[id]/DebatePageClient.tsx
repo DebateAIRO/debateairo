@@ -1945,6 +1945,7 @@ export default function DebatePageClient({
           catalog={miscCatalog}
           debateChromeCatalog={debateChromeCatalog}
           composeCatalog={composeCatalog}
+          floorShown={floorView !== null}
         />
       ) : null}
 

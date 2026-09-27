@@ -172,7 +172,7 @@
   "debateChrome.condition.uninstrumented": "Registo de verificação incompleto",
   "debateChrome.condition.unfalsifiedAfterRotation": "Não refutada após a rotação de modelos",
   "debateChrome.condition.skippedByBudget": "Enriquecimento omitido devido ao orçamento",
-  "debateChrome.condition.envelopeExhausted": "Deixou de explorar mais cedo para respeitar o orçamento",
+  "debateChrome.condition.envelopeExhausted": "Terminou mais cedo para respeitar o orçamento",
   "debateChrome.condition.leverageUnresolved": "Influência por determinar",
   "debateChrome.condition.branchFrozenLowLeverage": "Ramo não expandido: não poderia alterar a resposta",
   "debateChrome.condition.degradedDiversity": "Diversidade de modelos reduzida",

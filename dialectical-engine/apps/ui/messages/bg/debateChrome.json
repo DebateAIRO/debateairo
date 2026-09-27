@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Записът на проверката е непълен",
   "debateChrome.condition.unfalsifiedAfterRotation": "Не е опровергано след смяна на моделите",
   "debateChrome.condition.skippedByBudget": "Обогатяването е пропуснато поради бюджета",
-  "debateChrome.condition.envelopeExhausted": "Изследването спря по-рано, за да не се надхвърли бюджетът",
+  "debateChrome.condition.envelopeExhausted": "Приключи по-рано, за да не се надхвърли бюджетът",
   "debateChrome.condition.leverageUnresolved": "Влиянието не е изяснено",
   "debateChrome.condition.branchFrozenLowLeverage": "Клонът не е разширен: не можеше да промени отговора",
   "debateChrome.condition.degradedDiversity": "Разнообразието на моделите е понижено",

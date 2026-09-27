@@ -142,9 +142,13 @@ export function PublicDebatesBuffer({
     const modelCount = models.length > 0
       ? tPlural(catalog, "home.models", models.length, locale)
       : null;
-    const verdict = debate.verdict === null
+    // A components-only snapshot whose label the engine kept (spec 2026-09-26
+    // §14.4.4) shows that label, in the words every other row uses, instead of
+    // "verdict unavailable" (Task M6).
+    const label = debate.verdict ?? debate.floor_verdict ?? null;
+    const verdict = label === null
       ? t(catalog, "home.verdictUnavailable")
-      : t(catalog, VERDICT_KEYS[debate.verdict]);
+      : t(catalog, VERDICT_KEYS[label]);
     return (
       <LibraryRow
         key={debate.public_ref}
@@ -158,12 +162,12 @@ export function PublicDebatesBuffer({
         confidenceBand={debate.confidence_band?.toLowerCase()}
         models={debate.models ?? []}
         status={verdict}
-        generatedStatus={debate.verdict !== null}
-        state={debate.verdict === null
+        generatedStatus={label !== null}
+        state={label === null
           ? "generating"
-          : debate.verdict === "CONTESTED"
+          : label === "CONTESTED"
             ? "contested"
-            : debate.verdict === "UNSUPPORTED"
+            : label === "UNSUPPORTED"
               ? "unsupported"
               : "complete"}
         catalog={catalog}

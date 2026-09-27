@@ -494,11 +494,18 @@ function floorNote(disclosure: AnswerDisclosure, catalog: MessageCatalog): strin
   return t(catalog, "public.report.about.floorProblem");
 }
 
-/** A lower-cost model stood in (spec §14.4.2): for the writer, the checker, or both. */
+/**
+ * A lower-cost model stood in (spec §14.4.2): for the writer, the checker, or
+ * both; one model when the same one did both (fix round 1).
+ */
 function lowerCostNote(disclosure: AnswerDisclosure, catalog: MessageCatalog): string | null {
   const writer = disclosure.writer?.lower_cost === true;
   const checker = disclosure.checker?.lower_cost === true;
-  if (writer && checker) return t(catalog, "public.report.about.lowerCostBoth");
+  if (writer && checker) {
+    return disclosure.checker_same_as_writer
+      ? t(catalog, "public.report.about.lowerCostOneModel")
+      : t(catalog, "public.report.about.lowerCostBoth");
+  }
   if (writer) return t(catalog, "public.report.about.lowerCostWriter");
   if (checker) return t(catalog, "public.report.about.lowerCostChecker");
   return null;
@@ -513,7 +520,9 @@ function aboutNotes(disclosure: AnswerDisclosure | null, catalog: MessageCatalog
   if (disclosure === null) return [];
   const notes: string[] = [];
   if (disclosure.floor !== null) notes.push(floorNote(disclosure, catalog));
-  if (disclosure.cut_short.arguing !== null) notes.push(t(catalog, "public.report.about.cutShort"));
+  // A vendor that reports no usage is a problem with an AI service, never the budget (fix round 1).
+  if (disclosure.cut_short.arguing === "USAGE") notes.push(t(catalog, "public.report.about.cutShortService"));
+  else if (disclosure.cut_short.arguing !== null) notes.push(t(catalog, "public.report.about.cutShort"));
   const lowerCost = lowerCostNote(disclosure, catalog);
   if (lowerCost !== null) notes.push(lowerCost);
   const written = (disclosure.writer?.served_model ?? null) !== null;
@@ -555,9 +564,12 @@ export function buildReportModel(
   const contractNodes = contractNodesById(answer);
   const models = uniqueModels(answer);
   const notRecorded = t(publicCatalog, "public.report.about.notRecorded");
-  // A floor answer carries no label of its own: the cover says the floor's (spec §14.4.4).
+  // A floor answer carries no label of its own: the cover says the floor's (spec §14.4.4), or, when
+  // the record could not be read, the story's own sealed basis, which carries the same label. Only a
+  // components-only answer can have a floor; the answer's own label always wins.
   const floor = resolveFloor({ terminal: answer.terminal, verdict: answer.verdict_state, nodes: answer.nodes }, disclosure?.floor);
-  const label = answer.verdict_state ?? floor?.label ?? null;
+  const storyLabel = answer.terminal === "COMPONENTS_ONLY" ? story.verdict_basis?.label ?? null : null;
+  const label = answer.verdict_state ?? floor?.label ?? storyLabel;
   return {
     language: locale,
     documentTitle: t(publicCatalog, "public.report.documentTitle", { question: answer.question_line }),

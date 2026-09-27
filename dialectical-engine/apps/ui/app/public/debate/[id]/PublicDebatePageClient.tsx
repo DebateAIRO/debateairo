@@ -166,6 +166,7 @@ export function PublicDebatePageClient({
           catalog={publicCatalog}
           locale={locale}
           onClose={close}
+          floorShown={publicFloor !== null}
         />
       )}
       />

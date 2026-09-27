@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import type { Answer } from "@debateai/contract";
 import { RUN_LEVEL_SPEND_STOP_CODES } from "@debateai/kernel";
 import { AnswerHonestyDrawer } from "../../apps/ui/components/AnswerHonestyDrawer.js";
-import { panelStoppedBySpendStop } from "../../apps/ui/lib/v3/labels.js";
+import { PublicHonestyDrawer } from "../../apps/ui/components/PublicHonestyDrawer.js";
+import { panelSpendStopKind } from "../../apps/ui/lib/v3/labels.js";
 import { createLiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 
@@ -30,6 +31,7 @@ const miscEn = catalog("en", "misc");
 const miscRo = catalog("ro", "misc");
 const chromeEn = catalog("en", "debateChrome");
 const chromeRo = catalog("ro", "debateChrome");
+const publicEn = catalog("en", "public");
 
 const noop = () => {};
 
@@ -45,7 +47,7 @@ function panelRecord(mark: "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE", reas
 const PARTIAL_LIFT = "Re-ask to collect the assessments the failed panel members owed";
 const SINGLE_LIFT = "Re-ask when another healthy maker can assess this node";
 
-function drawer(answer: Answer, locale: "en" | "ro" = "en"): string {
+function drawer(answer: Answer, locale: "en" | "ro" = "en", floorShown = false): string {
   return renderToStaticMarkup(
     <AnswerHonestyDrawer
       answer={answer}
@@ -65,6 +67,7 @@ function drawer(answer: Answer, locale: "en" | "ro" = "en"): string {
       onClose={noop}
       catalog={locale === "en" ? miscEn : miscRo}
       debateChromeCatalog={locale === "en" ? chromeEn : chromeRo}
+      floorShown={floorShown}
     />
   );
 }
@@ -77,9 +80,9 @@ const CUT_SHORT = buildFairShapedAnswer({
 });
 
 describe("the drawer's limits line and the stopped-early mark agree", () => {
-  it("says the served answer stopped exploring early to stay within budget, and stayed within the limits", () => {
+  it("says the served answer ended early to stay within budget, and stayed within the limits", () => {
     const text = visible(drawer(CUT_SHORT));
-    expect(text).toContain("Stopped exploring early to stay within budget");
+    expect(text).toContain("Ended early to stay within budget");
     expect(text).toContain("Spending and attempt limits");
     expect(text).toContain("Stayed within the limits");
     expect(text).not.toContain("Run envelope exhausted");
@@ -101,21 +104,95 @@ describe("the drawer's limits line and the stopped-early mark agree", () => {
     expect(text).toContain(words(chromeRo, "debateChrome.condition.envelopeExhausted"));
     expect(text).toContain(words(miscRo, "misc.answerHonesty.costEnvelope"));
     expect(text).toContain(words(miscRo, "misc.answerHonesty.limitsWithin"));
-    expect(words(chromeRo, "debateChrome.condition.envelopeExhausted")).not.toBe("Limita execuției a fost epuizată");
+    expect(words(chromeRo, "debateChrome.condition.envelopeExhausted")).toBe("S-a încheiat mai devreme, pentru a rămâne în buget");
+  });
+
+  it("says nothing untrue for a components-only answer that ended at the envelope with its arguing never cut short (fix round 1)", () => {
+    // The envelope terminal: the answer-writing call could not be paid. The debate did not stop exploring
+    // early (the record's cut_short.arguing is null), so the mark must not say it did.
+    const floorAnswer = buildFairShapedAnswer({
+      terminal: "COMPONENTS_ONLY",
+      serve_state: "COMPONENTS_ONLY",
+      verdict_state: null,
+      verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_ENVELOPE" },
+      confidence_band: null,
+      band_ceiling: null,
+      composed_text: [],
+      condition_marks: ["ENVELOPE_EXHAUSTED"],
+      cost_envelope: { ...buildFairShapedAnswer().cost_envelope, state: "EXHAUSTED" }
+    });
+    const text = visible(drawer(floorAnswer));
+    expect(text).toContain("Ended early to stay within budget");
+    expect(text).toContain("A limit was reached");
+    // (The fixture's own badge, "defeater-explored", is not a claim about stopping.)
+    expect(text).not.toMatch(/exploring/iu);
+  });
+});
+
+describe("a drawer beside a floor answer says what the page shows (fix round 1)", () => {
+  const FLOOR_ANSWER = buildFairShapedAnswer({
+    terminal: "COMPONENTS_ONLY",
+    serve_state: "COMPONENTS_ONLY",
+    verdict_state: null,
+    verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_ENVELOPE" },
+    confidence_band: null,
+    band_ceiling: null,
+    composed_text: []
+  });
+  const SHOWN = "The page shows the debate's strongest position as the answer.";
+
+  it("adds one plain line under the owner's unavailable verdict, keeping the true marks", () => {
+    const text = visible(drawer(FLOOR_ANSWER, "en", true));
+    expect(text).toContain("Verdict unavailable");
+    expect(text).toContain(SHOWN);
+    expect(text).toContain(words(miscEn, "misc.answerHonesty.componentsOnlyNotice"));
+    expect(visible(drawer(FLOOR_ANSWER))).not.toContain(SHOWN);
+    expect(visible(drawer(FLOOR_ANSWER, "ro", true))).toContain(words(miscRo, "misc.answerHonesty.floorShown"));
+  });
+
+  it("adds the same line to the public drawer, whose limits line uses the new name", () => {
+    const answer = {
+      terminal: "COMPONENTS_ONLY" as const,
+      verdict: null,
+      verdict_available: false,
+      confidence_band: null,
+      summary_segments: [],
+      badges: [],
+      residual_objections: [],
+      reversal_point: "A cheaper flat in Cluj.",
+      as_of: "2026-09-26T09:00:00.000Z"
+    };
+    const publicDrawer = (floorShown: boolean) => visible(renderToStaticMarkup(
+      <PublicHonestyDrawer answer={answer} catalog={publicEn} locale="en" onClose={noop} floorShown={floorShown} />
+    ));
+    expect(publicDrawer(true)).toContain(words(publicEn, "public.honesty.verdictUnavailable"));
+    expect(publicDrawer(true)).toContain(SHOWN);
+    expect(publicDrawer(false)).not.toContain(SHOWN);
+    expect(publicDrawer(false)).toContain("Spending and attempt limits: not included in this public snapshot.");
+    expect(publicDrawer(false)).not.toContain("Cost envelope");
   });
 });
 
 describe("a panel a spend stop cut short gets a remedy that fits", () => {
-  it("knows a stopped panel by its record's reason, and nothing else", () => {
+  it("knows a stopped panel by its record's reason, and which stop it was", () => {
     for (const code of RUN_LEVEL_SPEND_STOP_CODES) {
-      expect(panelStoppedBySpendStop(panelRecord("PANEL-PARTIAL", code, PARTIAL_LIFT)), code).toBe(true);
-      expect(panelStoppedBySpendStop(panelRecord("PANEL-DEGRADED-SINGLE-VOICE", `OpenAI: PROVIDER_ERROR; ${code}`, SINGLE_LIFT)), code).toBe(true);
+      const kind = code === "PROVIDER_USAGE_UNREPORTED" ? "SERVICE" : "BUDGET";
+      expect(panelSpendStopKind(panelRecord("PANEL-PARTIAL", code, PARTIAL_LIFT)), code).toBe(kind);
+      expect(panelSpendStopKind(panelRecord("PANEL-DEGRADED-SINGLE-VOICE", `OpenAI: PROVIDER_ERROR; ${code}`, SINGLE_LIFT)), code).toBe(kind);
     }
-    expect(panelStoppedBySpendStop(panelRecord("PANEL-PARTIAL", "OpenAI: PROVIDER_ERROR", PARTIAL_LIFT))).toBe(false);
-    expect(panelStoppedBySpendStop(panelRecord("PANEL-PARTIAL", "Every non-author panel member failed", PARTIAL_LIFT))).toBe(false);
+    expect(panelSpendStopKind(panelRecord("PANEL-PARTIAL", "OpenAI: PROVIDER_ERROR", PARTIAL_LIFT))).toBeNull();
+    expect(panelSpendStopKind(panelRecord("PANEL-PARTIAL", "Every non-author panel member failed", PARTIAL_LIFT))).toBeNull();
     // Only the two panel marks: another record naming a stop keeps its own lift.
     const other = { ...panelRecord("PANEL-PARTIAL", "RUN_COST_ENVELOPE_MONEY_REACHED", "Re-ask"), mark: "SINGLE-LINEAGE" as const };
-    expect(panelStoppedBySpendStop(other)).toBe(false);
+    expect(panelSpendStopKind(other)).toBeNull();
+  });
+
+  it("does not call a vendor that reports no usage a budget: it says an AI service had a problem (fix round 1)", () => {
+    const answer = buildFairShapedAnswer({ condition_mark_records: [panelRecord("PANEL-PARTIAL", "PROVIDER_USAGE_UNREPORTED", PARTIAL_LIFT)] });
+    const text = visible(drawer(answer));
+    expect(text).toContain("This point was weighed by fewer AI models because a problem with an AI service made the debate stop exploring early.");
+    expect(text).not.toContain("to stay within its budget");
+    expect(text).not.toContain(PARTIAL_LIFT);
   });
 
   it("tells a stopped panel why fewer models weighed the point, instead of blaming failed members", () => {

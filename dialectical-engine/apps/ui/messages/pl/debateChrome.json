@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Zapis sprawdzenia jest niepełny",
   "debateChrome.condition.unfalsifiedAfterRotation": "Nie obalono po rotacji modeli",
   "debateChrome.condition.skippedByBudget": "Wzbogacenie pominięto z powodu budżetu",
-  "debateChrome.condition.envelopeExhausted": "Wcześniej przestano badać, aby zmieścić się w budżecie",
+  "debateChrome.condition.envelopeExhausted": "Zakończono wcześniej, aby zmieścić się w budżecie",
   "debateChrome.condition.leverageUnresolved": "Nie rozstrzygnięto wpływu",
   "debateChrome.condition.branchFrozenLowLeverage": "Nie rozwinięto gałęzi: nie mogła zmienić odpowiedzi",
   "debateChrome.condition.degradedDiversity": "Ograniczona różnorodność modeli",

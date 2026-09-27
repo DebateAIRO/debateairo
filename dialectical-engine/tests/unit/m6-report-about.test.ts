@@ -139,9 +139,27 @@ describe("About this report: the plain sentences", () => {
   });
 
   it("says when the debate stopped exploring early, without a number", () => {
-    for (const arguing of ["MONEY", "ATTEMPTS", "USAGE", "DAILY"] as const) {
+    for (const arguing of ["MONEY", "ATTEMPTS", "DAILY"] as const) {
       expect(about(served({ cut_short: { arguing, answer_writing: null } })).notes, arguing).toEqual([EN("cutShort")]);
     }
+  });
+
+  it("does not call a vendor that reports no usage a budget: it says an AI service had a problem (fix round 1)", () => {
+    expect(about(served({ cut_short: { arguing: "USAGE", answer_writing: null } })).notes).toEqual([EN("cutShortService")]);
+    expect(EN("cutShortService")).toBe(
+      "The debate stopped exploring early because of a problem with an AI service; the answer uses everything argued until then."
+    );
+  });
+
+  it("says one lower-cost model wrote and checked the answer when one model did both (fix round 1)", () => {
+    const one = served({
+      writer: { planned_model: OPENAI, served_model: XAI, lower_cost: true },
+      checker: { planned_model: ANTHROPIC, served_model: XAI, lower_cost: true },
+      checker_same_as_writer: true
+    });
+    expect(about(one).notes).toEqual([EN("lowerCostOneModel")]);
+    expect(EN("lowerCostOneModel")).toBe("A lower-cost AI model wrote and checked this answer, to stay within the debate's budget.");
+    expect(about(one, ROMANIAN).notes).toEqual([message("ro", "public.report.about.lowerCostOneModel")]);
   });
 
   it("says when the answer was written from the debate's most important points, only when a model wrote it", () => {
@@ -181,7 +199,18 @@ describe("About this report: the plain sentences", () => {
   it("prints the floor's label on the cover of a floor answer's report", () => {
     const model = buildReportModel(FLOOR_ANSWER, storyFixture("READY"), GENERATED, ROMANIAN, floorRecord("ENVELOPE_EXHAUSTED"));
     expect(model.cover.labelWords).toBe("Decizie strânsă");
-    expect(buildReportModel(FLOOR_ANSWER, storyFixture("READY"), GENERATED, ROMANIAN, null).cover.labelWords).toBeNull();
+  });
+
+  it("keeps a floor story's label on the cover when the record could not be read (fix round 1)", () => {
+    // The story's own sealed basis carries the label the floor rests on.
+    expect(buildReportModel(FLOOR_ANSWER, storyFixture("READY"), GENERATED, ROMANIAN, null).cover.labelWords).toBe("Decizie strânsă");
+    const bare = { ...storyFixture("READY"), verdict_basis: null };
+    expect(buildReportModel(FLOOR_ANSWER, bare, GENERATED, ROMANIAN, null).cover.labelWords).toBeNull();
+    // Only a components-only answer can stand on a floor: a served answer without a label shows none.
+    expect(buildReportModel({ ...STORY_FIXTURE_ANSWER, verdict_state: null }, storyFixture("READY"), GENERATED, ROMANIAN, null).cover.labelWords).toBeNull();
+    // A served answer's own label always wins.
+    const served = buildReportModel(STORY_FIXTURE_ANSWER, { ...storyFixture("READY"), verdict_basis: { ...storyFixture("READY").verdict_basis!, label: "SUPPORTED" } }, GENERATED, ROMANIAN, null);
+    expect(served.cover.labelWords).toBe("Decizie strânsă");
   });
 
   it("never says a lower-cost model anywhere but About", () => {

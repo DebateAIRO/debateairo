@@ -210,4 +210,16 @@ describe("the story strip of a floor answer", () => {
     expect([view.label, view.verdictState, view.floor]).toEqual([null, null, null]);
     expect(toStoryView(STORY_FIXTURE_ANSWER, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID, "ro").label).toBe("CONTESTED");
   });
+
+  it("keeps a ready floor story's label when the record could not be read, from the story's own basis (fix round 1)", () => {
+    const view = toStoryView(FLOOR_ANSWER, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID, "ro");
+    expect([view.label, view.verdictState]).toEqual(["CONTESTED", "contested"]);
+    const bare = { ...storyFixture("READY"), verdict_basis: null };
+    expect(toStoryView(FLOOR_ANSWER, bare, STORY_FIXTURE_DEBATE_ID, "ro").label).toBeNull();
+    // Only a components-only answer can stand on a floor: a served answer without a label shows none.
+    expect(toStoryView({ ...STORY_FIXTURE_ANSWER, verdict_state: null }, storyFixture("READY"), STORY_FIXTURE_DEBATE_ID, "ro").label).toBeNull();
+    // The answer's own label always wins over the story's basis.
+    const other = { ...storyFixture("READY"), verdict_basis: { ...storyFixture("READY").verdict_basis!, label: "SUPPORTED" as const } };
+    expect(toStoryView(STORY_FIXTURE_ANSWER, other, STORY_FIXTURE_DEBATE_ID, "ro").label).toBe("CONTESTED");
+  });
 });

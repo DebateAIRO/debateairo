@@ -221,10 +221,10 @@ describe("the owner's page shows a floor answer as an answer (§14.4.4)", () => 
     expect(mocks.readAnswerDisclosure).toHaveBeenCalledWith(STORY_FIXTURE_DEBATE_ID);
   });
 
-  it("says plainly when the label rests on less evidence than usual", async () => {
+  it("says plainly when the label had less than usual to compare", async () => {
     mocks.readAnswerDisclosure.mockResolvedValue(disclosureOf(THIN_FLOOR));
     const container = await mount(owner({ answer: FLOOR_ANSWER, initialFloor: THIN_FLOOR }));
-    expect(verdictOf(container).querySelector(".floorAnswerNote")?.textContent).toBe("This answer rests on less evidence than usual.");
+    expect(verdictOf(container).querySelector(".floorAnswerNote")?.textContent).toBe("We had less to compare than usual for this answer.");
   });
 
   it("learns the floor from its own refresh when the server read none", async () => {
@@ -276,6 +276,22 @@ describe("the owner's page shows a floor answer as an answer (§14.4.4)", () => 
     expect(panel?.getAttribute("data-story-status")).toBe("READY");
     expect(panel?.querySelector(".storyPanelLabel")?.textContent).toBe("Decizie strânsă");
     expect(panel?.querySelector(".floorAnswer")).toBeNull();
+  });
+
+  it("keeps a ready floor story's label in the strip when the record cannot be read (fix round 1)", async () => {
+    mocks.readAnswerStory.mockResolvedValue(storyFixture("READY"));
+    mocks.readAnswerDisclosure.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 500, "boom"));
+    const container = await mount(owner({ answer: FLOOR_ANSWER, initialFloor: null }));
+    const panel = container.querySelector<HTMLElement>("section.storyPanel");
+    expect(panel?.getAttribute("data-story-status")).toBe("READY");
+    expect(panel?.querySelector(".storyPanelLabel")?.textContent).toBe("Decizie strânsă");
+  });
+
+  it("tells both drawers when the page shows a floor (fix round 1)", () => {
+    const owner = readFileSync(resolve(process.cwd(), "apps/ui/app/debate/[id]/DebatePageClient.tsx"), "utf8");
+    expect(owner).toMatch(/<AnswerHonestyDrawer[\s\S]*?floorShown=\{floorView !== null\}/u);
+    const publicPage = readFileSync(resolve(process.cwd(), "apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx"), "utf8");
+    expect(publicPage).toMatch(/<PublicHonestyDrawer[\s\S]*?floorShown=\{publicFloor !== null\}/u);
   });
 
   it("hands the server's floor to the page (page.tsx)", async () => {

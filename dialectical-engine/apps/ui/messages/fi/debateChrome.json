@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Tarkistustietue on puutteellinen",
   "debateChrome.condition.unfalsifiedAfterRotation": "Ei kumoutunut mallien vaihdon jälkeen",
   "debateChrome.condition.skippedByBudget": "Rikastus ohitettiin budjetin vuoksi",
-  "debateChrome.condition.envelopeExhausted": "Tutkiminen lopetettiin aikaisemmin budjetissa pysymiseksi",
+  "debateChrome.condition.envelopeExhausted": "Päättyi aikaisemmin budjetissa pysymiseksi",
   "debateChrome.condition.leverageUnresolved": "Vaikutus jäi ratkaisematta",
   "debateChrome.condition.branchFrozenLowLeverage": "Haaraa ei laajennettu: se ei voinut muuttaa vastausta",
   "debateChrome.condition.degradedDiversity": "Mallien monimuotoisuus heikkeni",

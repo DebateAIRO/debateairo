@@ -4,7 +4,7 @@ import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from
 import type { LiveRunState } from "@/lib/v3/liveEvents";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { unrepresentedEdges } from "@/lib/v3/adapter";
-import { abstentionKindLabel, conditionMarkLabel, panelStoppedBySpendStop, riskTierSourceLabel, summarizeFreshness } from "@/lib/v3/labels";
+import { abstentionKindLabel, conditionMarkLabel, panelSpendStopKind, riskTierSourceLabel, summarizeFreshness, type PanelSpendStopKind } from "@/lib/v3/labels";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
@@ -46,6 +46,14 @@ function limitsStateWords(state: Answer["cost_envelope"]["state"], catalog: Mess
   }
 }
 
+/** Why fewer models weighed a point a spend stop cut short: the budget, or a problem with an AI service. */
+function panelStoppedWords(kind: PanelSpendStopKind, catalog: MessageCatalog): string {
+  switch (kind) {
+    case "BUDGET": return t(catalog, "misc.answerHonesty.panelStoppedEarly");
+    case "SERVICE": return t(catalog, "misc.answerHonesty.panelStoppedService");
+  }
+}
+
 export function AnswerHonestyDrawer({
   answer,
   live,
@@ -64,7 +72,8 @@ export function AnswerHonestyDrawer({
   onClose,
   catalog = miscEnglish,
   debateChromeCatalog = debateChromeEnglish,
-  composeCatalog = composeEnglish
+  composeCatalog = composeEnglish,
+  floorShown = false
 }: {
   answer: Answer;
   live: LiveRunState;
@@ -86,6 +95,12 @@ export function AnswerHonestyDrawer({
   debateChromeCatalog?: MessageCatalog;
   /** The interface locale's `compose` catalogue: the projection that decides leftover edges. */
   composeCatalog?: MessageCatalog;
+  /**
+   * The page shows this components-only answer's floor as its answer (spec
+   * 2026-09-26 §14.4.4): the drawer keeps "Verdict unavailable", the true
+   * record, and says in one line what the page shows instead.
+   */
+  floorShown?: boolean;
 }) {
   const { locale } = useChromeI18n();
   const freshness = summarizeFreshness(
@@ -158,6 +173,9 @@ export function AnswerHonestyDrawer({
                 })}
               </div>
             )}
+            {answer.verdict_state === null && floorShown ? (
+              <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.floorShown")}</div>
+            ) : null}
             {answer.confidence_band !== null ? (
               <div className="drawerFindingText" data-ai-generated="true">
                 {t(catalog, "misc.answerHonesty.confidenceBand", { band: answer.confidence_band })}
@@ -199,9 +217,9 @@ export function AnswerHonestyDrawer({
                       <span>{record.subject_ref}</span>
                     </div>
                     <div className="drawerFindingText">{record.reason}</div>
-                    {panelStoppedBySpendStop(record) ? (
+                    {panelSpendStopKind(record) !== null ? (
                       // A panel a spend stop cut short: the runner's remedy blames failed members (M2 carry).
-                      <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.panelStoppedEarly")}</div>
+                      <div className="drawerFindingText">{panelStoppedWords(panelSpendStopKind(record)!, catalog)}</div>
                     ) : record.lift_path !== null ? (
                       <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.liftPath", { liftPath: record.lift_path })}</div>
                     ) : null}

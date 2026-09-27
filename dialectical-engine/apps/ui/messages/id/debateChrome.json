@@ -170,7 +170,7 @@
   "debateChrome.condition.uninstrumented": "Catatan pemeriksaan tidak lengkap",
   "debateChrome.condition.unfalsifiedAfterRotation": "Tidak terbantahkan setelah rotasi model",
   "debateChrome.condition.skippedByBudget": "Pengayaan dilewati karena batas anggaran",
-  "debateChrome.condition.envelopeExhausted": "Berhenti menjelajah lebih awal agar tetap dalam anggaran",
+  "debateChrome.condition.envelopeExhausted": "Berakhir lebih awal agar tetap dalam anggaran",
   "debateChrome.condition.leverageUnresolved": "Daya pengaruh belum terselesaikan",
   "debateChrome.condition.branchFrozenLowLeverage": "Cabang tidak dikembangkan: cabang ini tidak dapat mengubah jawaban",
   "debateChrome.condition.degradedDiversity": "Keragaman model menurun",

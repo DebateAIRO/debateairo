@@ -74,16 +74,25 @@ export function conditionMarkLabel(
  * the stop never spoke. The runner's own remedy for the two panel marks ("Re-ask
  * to collect the assessments the failed panel members owed", "Re-ask when
  * another healthy maker can assess this node") does not fit such a panel: no
- * member failed, and a re-ask under the same budget stops the same way. The
+ * member failed, and a re-ask under the same stop stops the same way. The
  * honesty drawer then says, from the catalogue, why fewer models weighed the
  * point. Only the reason's code is read, from the kernel's one list of stops.
+ *
+ * "SERVICE" is a vendor that reports no usage (fix round 1): that is a problem
+ * with an AI service, not the budget, so it is never worded as one. "BUDGET" is
+ * every other stop (money, the attempt ceiling, the day's spend). Null for any
+ * other record, which keeps the runner's own remedy.
  */
-export function panelStoppedBySpendStop(
+export type PanelSpendStopKind = "BUDGET" | "SERVICE";
+
+export function panelSpendStopKind(
   record: Pick<Answer["condition_mark_records"][number], "mark" | "reason">
-): boolean {
-  if (record.mark !== "PANEL-PARTIAL" && record.mark !== "PANEL-DEGRADED-SINGLE-VOICE") return false;
+): PanelSpendStopKind | null {
+  if (record.mark !== "PANEL-PARTIAL" && record.mark !== "PANEL-DEGRADED-SINGLE-VOICE") return null;
   const parts = record.reason.split(";").map((part) => part.trim());
-  return RUN_LEVEL_SPEND_STOP_CODES.some((code) => parts.includes(code));
+  const stop = RUN_LEVEL_SPEND_STOP_CODES.find((code) => parts.includes(code));
+  if (stop === undefined) return null;
+  return stop === "PROVIDER_USAGE_UNREPORTED" ? "SERVICE" : "BUDGET";
 }
 
 /**

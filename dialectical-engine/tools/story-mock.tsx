@@ -289,7 +289,7 @@ const FLOOR_STATES: readonly StateCopy[] = Object.freeze([
   {
     status: "WRITING",
     title: "No answer could be written: while the story is written",
-    words: "The debate ran out of budget before any AI model could write the answer. The strip still gives an answer: the close-call label, \"Cel mai bun răspuns al nostru:\" and the strongest position's own words, with a quiet line because this label rests on less evidence than usual. On the right, the page's own answer card says the same in the reader's English, where it used to show only a technical line."
+    words: "The debate ran out of budget before any AI model could write the answer. The strip still gives an answer: the close-call label, \"Cel mai bun răspuns al nostru:\" and the strongest position's own words, with a quiet line because this label had less than usual to compare. On the right, the page's own answer card says the same in the reader's English, where it used to show only a technical line."
   },
   {
     status: "READY",

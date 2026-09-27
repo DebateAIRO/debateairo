@@ -174,7 +174,7 @@
   "debateChrome.condition.uninstrumented": "Ir-rekord tal-verifika mhuwiex komplut",
   "debateChrome.condition.unfalsifiedAfterRotation": "Ma ġiex iffalsifikat wara r-rotazzjoni tal-mudelli",
   "debateChrome.condition.skippedByBudget": "L-arrikkiment inqabeż minħabba l-baġit",
-  "debateChrome.condition.envelopeExhausted": "L-esplorazzjoni waqfet kmieni biex jinżamm il-baġit",
+  "debateChrome.condition.envelopeExhausted": "Intemm kmieni biex jinżamm il-baġit",
   "debateChrome.condition.leverageUnresolved": "L-influwenza għadha mhix solvuta",
   "debateChrome.condition.branchFrozenLowLeverage": "Il-fergħa ma ġietx estiża: ma setgħetx tibdel ir-risposta",
   "debateChrome.condition.degradedDiversity": "Id-diversità tal-mudelli marret lura",

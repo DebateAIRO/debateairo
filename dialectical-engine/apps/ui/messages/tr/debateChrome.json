@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Denetim kaydı eksik",
   "debateChrome.condition.unfalsifiedAfterRotation": "Model döngüsünden sonra yanlışlanmadı",
   "debateChrome.condition.skippedByBudget": "Zenginleştirme bütçe nedeniyle atlandı",
-  "debateChrome.condition.envelopeExhausted": "Bütçe içinde kalmak için keşif erken durduruldu",
+  "debateChrome.condition.envelopeExhausted": "Bütçe içinde kalmak için erken sonlandırıldı",
   "debateChrome.condition.leverageUnresolved": "Etki çözümlenmedi",
   "debateChrome.condition.branchFrozenLowLeverage": "Dal genişletilmedi: yanıtı değiştiremiyordu",
   "debateChrome.condition.degradedDiversity": "Model çeşitliliği azaldı",

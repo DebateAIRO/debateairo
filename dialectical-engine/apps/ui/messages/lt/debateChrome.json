@@ -171,7 +171,7 @@
   "debateChrome.condition.uninstrumented": "Patikros įrašas neišsamus",
   "debateChrome.condition.unfalsifiedAfterRotation": "Pakeitus modelius nepaneigta",
   "debateChrome.condition.skippedByBudget": "Papildymas praleistas dėl biudžeto",
-  "debateChrome.condition.envelopeExhausted": "Tyrinėjimas sustabdytas anksčiau, kad nebūtų viršytas biudžetas",
+  "debateChrome.condition.envelopeExhausted": "Baigta anksčiau, kad nebūtų viršytas biudžetas",
   "debateChrome.condition.leverageUnresolved": "Poveikis neišaiškintas",
   "debateChrome.condition.branchFrozenLowLeverage": "Šaka neišplėsta: ji negalėjo pakeisti atsakymo",
   "debateChrome.condition.degradedDiversity": "Modelių įvairovė sumažėjo",
