@@ -443,6 +443,7 @@ packages/scorecard/scripts/write-schema.ts
 packages/scorecard/src/estimate.ts
 packages/scorecard/src/index.ts
 packages/scorecard/src/json-schema.ts
+packages/scorecard/src/moment.ts
 packages/scorecard/src/parse.ts
 packages/scorecard/src/picker.ts
 packages/scorecard/src/schema.ts
