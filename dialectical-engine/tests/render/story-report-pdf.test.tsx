@@ -654,10 +654,23 @@ describe("the owner's sample report script (look first, then wire)", () => {
     expect(unknown.stderr).toContain("Usage:");
   }, 125_000);
 
+  it("writes the Romanian sample as a floor answer and as a lower-cost answer (Task M6)", () => {
+    const directory = mkdtempSync(join(tmpdir(), "story-sample-pdf-"));
+    for (const variant of ["floor", "lower-cost"]) {
+      const output = join(directory, `story-report-${variant}.pdf`);
+      const result = run([output, variant]);
+      expect({ variant, status: result.status, stderr: result.stderr }).toMatchObject({ status: 0 });
+      const pdf = readFileSync(output);
+      expect(result.stdout.trim()).toBe(`STORY_SAMPLE_PDF_WRITTEN=${output} bytes=${pdf.length}`);
+      expect(pdf.toString("latin1")).toContain("/Lang (ro)");
+    }
+  }, 250_000);
+
   it("fails loudly without an output path", () => {
     const result = run([]);
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("Usage:");
     expect(result.stderr).toContain("<absolute path to the output .pdf>");
+    expect(result.stderr).toContain("|floor|lower-cost]");
   }, 125_000);
 });

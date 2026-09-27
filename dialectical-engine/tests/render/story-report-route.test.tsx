@@ -63,6 +63,8 @@ function reader(overrides: Partial<ReportReader> = {}): ReportReader {
     readRunAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_SERVED"); },
     readRun: async () => runWithTag(STORY_FIXTURE_LANGUAGE.tag),
     readAnswerStory: async () => storyFixture("READY"),
+    // An answer with no record (Task M6): the report's About then says nothing it holds.
+    readAnswerDisclosure: async () => { throw new ContractHttpError("NOT_FOUND", 404, "DISCLOSURE_NOT_FOUND"); },
     ...overrides
   };
 }
@@ -483,10 +485,12 @@ describe("GET /debate/{id}/report", () => {
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("content-disposition")).toContain("filename*=UTF-8''debate-ar-trebui-s%C4%83-ne-mut%C4%83m");
     expect(Buffer.from(await response.arrayBuffer()).subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    // Task M6: the answer's record is read beside the story (the fake API has none: a 404).
     expect(seen.map((call) => call.path)).toEqual([
       `/v1/answers/${STORY_FIXTURE_DEBATE_ID}`,
       `/v1/runs/${STORY_FIXTURE_ANSWER.run_ref}`,
-      `/v1/answers/${STORY_FIXTURE_DEBATE_ID}/story`
+      `/v1/answers/${STORY_FIXTURE_DEBATE_ID}/story`,
+      `/v1/answers/${STORY_FIXTURE_DEBATE_ID}/disclosure`
     ]);
     for (const call of seen) {
       expect(call.cookie).toBe(`__Host-debateai-session=${SESSION}`);

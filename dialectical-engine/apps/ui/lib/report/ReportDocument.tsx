@@ -1,6 +1,6 @@
 import { Fragment, type JSX } from "react";
 import { Document, Link, Page, StyleSheet, Text, View, type Styles } from "@react-pdf/renderer";
-import type { Answer, AnswerStory } from "@debateai/contract";
+import type { Answer, AnswerDisclosure, AnswerStory } from "@debateai/contract";
 import { formatNumber } from "../i18n/translate.js";
 import { REPORT_FONT_FAMILIES } from "./reportFonts.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
@@ -111,6 +111,8 @@ const styles = StyleSheet.create({
   aboutRow: { flexDirection: "row", paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: LINE },
   aboutLabel: { width: 150, fontSize: BODY, lineHeight: 1.4, color: MUTED },
   aboutValue: { flex: 1, fontSize: BODY, lineHeight: 1.4 },
+  // The plain sentences under the rows (Task M6): what the answer's record says.
+  aboutNote: { marginTop: 10, fontSize: BODY, lineHeight: 1.5 },
 
   footerLeft: { position: "absolute", bottom: 32, left: 62, fontSize: 8, color: MUTED },
   footerRight: { position: "absolute", bottom: 32, right: 62, fontSize: 8, color: MUTED }
@@ -406,6 +408,9 @@ function About({ look }: { look: Look }): JSX.Element {
           <Words look={look} style={styles.aboutValue} text={row.value} />
         </View>
       ))}
+      {model.about.notes.map((note, index) => (
+        <Words key={`note-${index}`} look={look} style={styles.aboutNote} text={note} />
+      ))}
     </>
   );
 }
@@ -452,6 +457,8 @@ export function ReportDocument(props: {
   story: AnswerStory;
   generatedAt: Date;
   catalogs: ReportCatalogs;
+  /** The answer's record (Task M6), or null: About then has no answer rows and no sentences. */
+  disclosure: AnswerDisclosure | null;
 }): JSX.Element {
-  return <ReportDocumentView model={buildReportModel(props.answer, props.story, props.generatedAt, props.catalogs)} />;
+  return <ReportDocumentView model={buildReportModel(props.answer, props.story, props.generatedAt, props.catalogs, props.disclosure)} />;
 }

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Font, renderToBuffer } from "@react-pdf/renderer";
-import type { Answer, AnswerStory } from "@debateai/contract";
+import type { Answer, AnswerDisclosure, AnswerStory } from "@debateai/contract";
 import { ReportDocumentView } from "./ReportDocument.js";
 import { reportPlacedFont } from "./reportGlyphs.js";
 import { REPORT_FONT_FACES, type ReportFontFamily } from "./reportFonts.js";
@@ -97,18 +97,20 @@ async function prepareReportFonts(families: readonly ReportFontFamily[]): Promis
  * (loadReportCatalogs: the question's, or the reader's when the question's is
  * not known). Nothing is written to disk; the caller streams the bytes. A
  * language whose script the report cannot print is refused here too, never
- * printed as empty boxes.
+ * printed as empty boxes. `disclosure` is the answer's record (Task M6), for
+ * "About this report"; absent or null, About says nothing it holds.
  */
 export async function renderReportPdf(input: Readonly<{
   answer: Answer;
   story: AnswerStory;
   generatedAt: Date;
   catalogs: ReportCatalogs;
+  disclosure?: AnswerDisclosure | null;
   fontDirectory?: string;
 }>): Promise<Buffer> {
   if (!reportSupportedForLocale(input.catalogs.locale)) throw new RangeError(`REPORT_LOCALE_UNSUPPORTED: ${input.catalogs.locale}`);
   registerReportFonts(input.fontDirectory ?? resolveReportFontDirectory());
-  const model = buildReportModel(input.answer, input.story, input.generatedAt, input.catalogs);
+  const model = buildReportModel(input.answer, input.story, input.generatedAt, input.catalogs, input.disclosure ?? null);
   const { faces } = reportLayout(model.language, reportPrintedText(model));
   await prepareReportFonts([...new Set([...faces.body, ...faces.heading])]);
   return renderToBuffer(ReportDocumentView({ model }));

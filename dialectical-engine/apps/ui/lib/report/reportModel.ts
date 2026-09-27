@@ -1,6 +1,7 @@
-import type { Answer, AnswerStory, ConditionMark, Edge, MakerLineage } from "@debateai/contract";
+import type { Answer, AnswerDisclosure, AnswerStory, ConditionMark, Edge, MakerLineage } from "@debateai/contract";
 import { formatDate, formatNumber, t, type MessageCatalog } from "../i18n/translate.js";
 import { contractNodesById, wayOfKnowingLabel } from "../v3/adapter.js";
+import { resolveFloor } from "../v3/floorAnswer.js";
 import { countStoryPositions, morePathsWords, storyFateWords, storyLabelWords, type StoryFateValue } from "../v3/storyWords.js";
 import { orderedPoints, type NumberedPoint } from "./pointNumbers.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
@@ -103,7 +104,15 @@ export interface ReportModel {
     change: ReportParagraph;
   }>;
   readonly appendix: Readonly<{ title: string; intro: string; entries: readonly ReportAppendixEntry[] }>;
-  readonly about: Readonly<{ title: string; rows: readonly ReportRow[] }>;
+  /**
+   * "About this report": the rows, then the plain sentences (Task M6, spec
+   * §14.4.5) that say what the answer's record holds: the answer is the
+   * debate's strongest position because no answer could be written; the
+   * debate stopped exploring early; a lower-cost model wrote or checked the
+   * answer; the answer was written from the debate's most important points.
+   * About is the only part of the report that says any of it.
+   */
+  readonly about: Readonly<{ title: string; rows: readonly ReportRow[]; notes: readonly string[] }>;
 }
 
 export function pointAnchor(number: string): string {
@@ -472,7 +481,70 @@ function appendixEntry(
   };
 }
 
-export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt: Date, catalogs: ReportCatalogs): ReportModel {
+/**
+ * Why a floor answer is the debate's strongest position, by its cause: the
+ * budget, a debate too large to write from, or a technical problem (a dead
+ * connection, a draft with nothing to serve, a vendor that reports no usage).
+ */
+function floorNote(disclosure: AnswerDisclosure, catalog: MessageCatalog): string {
+  if (disclosure.floor_reason === "DIGEST_CANNOT_EXIST") return t(catalog, "public.report.about.floorTooLarge");
+  if (disclosure.floor_reason === "ENVELOPE_EXHAUSTED" && disclosure.cut_short.answer_writing !== "USAGE") {
+    return t(catalog, "public.report.about.floorBudget");
+  }
+  return t(catalog, "public.report.about.floorProblem");
+}
+
+/** A lower-cost model stood in (spec §14.4.2): for the writer, the checker, or both. */
+function lowerCostNote(disclosure: AnswerDisclosure, catalog: MessageCatalog): string | null {
+  const writer = disclosure.writer?.lower_cost === true;
+  const checker = disclosure.checker?.lower_cost === true;
+  if (writer && checker) return t(catalog, "public.report.about.lowerCostBoth");
+  if (writer) return t(catalog, "public.report.about.lowerCostWriter");
+  if (checker) return t(catalog, "public.report.about.lowerCostChecker");
+  return null;
+}
+
+/**
+ * The plain sentences under About's rows, in one order. No number the engine
+ * recorded is printed. The most-important-points sentence needs a model that
+ * actually wrote the answer: a floor answer's digest was never sent (M4 carry).
+ */
+function aboutNotes(disclosure: AnswerDisclosure | null, catalog: MessageCatalog): string[] {
+  if (disclosure === null) return [];
+  const notes: string[] = [];
+  if (disclosure.floor !== null) notes.push(floorNote(disclosure, catalog));
+  if (disclosure.cut_short.arguing !== null) notes.push(t(catalog, "public.report.about.cutShort"));
+  const lowerCost = lowerCostNote(disclosure, catalog);
+  if (lowerCost !== null) notes.push(lowerCost);
+  const written = (disclosure.writer?.served_model ?? null) !== null;
+  if (written && disclosure.digest !== null && disclosure.digest.points_left_out > 0) {
+    notes.push(t(catalog, "public.report.about.mostImportantPoints"));
+  }
+  return notes;
+}
+
+/** The answer's writer and checker as the record names them; a row only for a model it names. */
+function answerModelRows(disclosure: AnswerDisclosure | null, catalog: MessageCatalog): ReportRow[] {
+  const writer = lineageWords(disclosure?.writer?.served_model ?? null);
+  const checker = lineageWords(disclosure?.checker?.served_model ?? null);
+  return [
+    ...(writer === null ? [] : [{ label: t(catalog, "public.report.about.answerWrittenBy"), value: writer }]),
+    ...(checker === null ? [] : [{ label: t(catalog, "public.report.about.answerCheckedBy"), value: checker }])
+  ];
+}
+
+/**
+ * `disclosure` is the answer's own record (GET /v1/answers/{id}/disclosure,
+ * Task M5), or null when there is none or it could not be read: then About
+ * has no answer rows and no sentences, and a floor answer's cover no label.
+ */
+export function buildReportModel(
+  answer: Answer,
+  story: AnswerStory,
+  generatedAt: Date,
+  catalogs: ReportCatalogs,
+  disclosure: AnswerDisclosure | null = null
+): ReportModel {
   const body = story.story;
   if (body === null || (story.status !== "READY" && story.status !== "READY_WITH_RESERVATION")) {
     throw new TypeError("REPORT_STORY_NOT_READY");
@@ -483,6 +555,9 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
   const contractNodes = contractNodesById(answer);
   const models = uniqueModels(answer);
   const notRecorded = t(publicCatalog, "public.report.about.notRecorded");
+  // A floor answer carries no label of its own: the cover says the floor's (spec §14.4.4).
+  const floor = resolveFloor({ terminal: answer.terminal, verdict: answer.verdict_state, nodes: answer.nodes }, disclosure?.floor);
+  const label = answer.verdict_state ?? floor?.label ?? null;
   return {
     language: locale,
     documentTitle: t(publicCatalog, "public.report.documentTitle", { question: answer.question_line }),
@@ -492,7 +567,7 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
     cover: {
       eyebrow: t(publicCatalog, "public.report.eyebrow"),
       question: answer.question_line,
-      labelWords: answer.verdict_state === null ? null : storyLabelWords(answer.verdict_state, publicCatalog),
+      labelWords: label === null ? null : storyLabelWords(label, publicCatalog),
       confidence: body.short.confidence,
       generatedLine: t(publicCatalog, "public.report.generated", { date: moment(locale, generatedAt) }),
       models,
@@ -542,10 +617,12 @@ export function buildReportModel(answer: Answer, story: AnswerStory, generatedAt
       rows: [
         { label: t(publicCatalog, "public.report.about.question"), value: answer.question_line },
         { label: t(publicCatalog, "public.report.about.generated"), value: moment(locale, generatedAt) },
+        ...answerModelRows(disclosure, publicCatalog),
         { label: t(publicCatalog, "public.report.about.written"), value: story.written_at === null ? notRecorded : moment(locale, story.written_at) },
         { label: t(publicCatalog, "public.report.about.writtenBy"), value: lineageWords(story.storyteller) ?? notRecorded },
         { label: t(publicCatalog, "public.report.about.checkedBy"), value: lineageWords(story.checker) ?? notRecorded }
-      ]
+      ],
+      notes: aboutNotes(disclosure, publicCatalog)
     }
   };
 }

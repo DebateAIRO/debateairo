@@ -1,4 +1,4 @@
-import { ContractHttpError, type Answer, type AnswerStory, type ContractClient } from "@debateai/contract";
+import { ContractHttpError, type Answer, type AnswerDisclosure, type AnswerStory, type ContractClient } from "@debateai/contract";
 import publicEnglish from "../../messages/en/public.json" with { type: "json" };
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type LocaleCode } from "../i18n/locales.js";
 import { questionLocale } from "../i18n/questionLocale.js";
@@ -18,12 +18,15 @@ import {
  * as a PDF attachment, printed in the QUESTION's language. Only READY and
  * READY_WITH_RESERVATION stories have one. Nothing is stored; every refusal is
  * one short plain line from the `public` catalogue, never the caught text.
+ * The answer's record (Task M6, GET /v1/answers/{id}/disclosure) is read beside
+ * the story, for "About this report"; without one, About says nothing it holds.
  */
-export type ReportReader = Pick<ContractClient, "readAnswer" | "readRunAnswer" | "readRun" | "readAnswerStory">;
+export type ReportReader = Pick<ContractClient, "readAnswer" | "readRunAnswer" | "readRun" | "readAnswerStory" | "readAnswerDisclosure">;
 
 export type ReportRenderer = (input: Readonly<{
   answer: Answer;
   story: AnswerStory;
+  disclosure: AnswerDisclosure | null;
   generatedAt: Date;
   catalogs: ReportCatalogs;
 }>) => Promise<Buffer>;
@@ -209,6 +212,8 @@ interface ReadyReport {
   readonly kind: "ready";
   readonly answer: Answer;
   readonly story: AnswerStory;
+  /** The answer's record, or null: none, not read (HEAD), or a read that failed. */
+  readonly disclosure: AnswerDisclosure | null;
   readonly questionTag: string | null;
   readonly locale: LocaleCode;
 }
@@ -229,6 +234,23 @@ function upstreamRefusal(failure: unknown, locale: LocaleCode): Refusal {
   return refuse(502, locale, tryAgainLine);
 }
 
+/**
+ * The answer's record for About. It never refuses the report: an answer from
+ * before the record existed has none (404), and any other failure means About
+ * says nothing it holds. A real failure is logged as a fixed tag and the typed
+ * code, never the caught message.
+ */
+async function readReportDisclosure(client: ReportReader, answerId: string): Promise<AnswerDisclosure | null> {
+  try {
+    return await client.readAnswerDisclosure(answerId);
+  } catch (failure) {
+    if (!(failure instanceof ContractHttpError && failure.code === "NOT_FOUND")) {
+      console.error("[STORY_REPORT_DISCLOSURE_UNREAD]", failure instanceof ContractHttpError ? failure.code : "UNKNOWN");
+    }
+    return null;
+  }
+}
+
 export type ReportRequestInput = Readonly<{
   id: string;
   sessionCookie: string | null;
@@ -247,11 +269,12 @@ export type ReportRequestInput = Readonly<{
  *  2. the question's locale (`und` or unknown falls back to the interface
  *     locale); a locale the fonts cannot print yet is refused before any
  *     further read;
- *  3. the story, which must be READY or READY_WITH_RESERVATION with a body.
+ *  3. the story, which must be READY or READY_WITH_RESERVATION with a body,
+ *     and, for GET only (`withDisclosure`), the answer's record beside it.
  * A refusal speaks the question's locale once the run has named it, the
  * interface locale before that.
  */
-async function prepareReport(input: ReportRequestInput): Promise<Refusal | ReadyReport> {
+async function prepareReport(input: ReportRequestInput, withDisclosure: boolean): Promise<Refusal | ReadyReport> {
   if (input.sessionCookie === null) return refuse(401, input.interfaceLocale, signInLine);
 
   let client: ReportReader;
@@ -269,15 +292,19 @@ async function prepareReport(input: ReportRequestInput): Promise<Refusal | Ready
   if (!(input.supported ?? reportSupportedForLocale)(locale)) return refuse(404, locale, unsupportedLine);
 
   let story: AnswerStory;
+  let disclosure: AnswerDisclosure | null;
   try {
-    story = await client.readAnswerStory(answer.answer_id);
+    [story, disclosure] = await Promise.all([
+      client.readAnswerStory(answer.answer_id),
+      withDisclosure ? readReportDisclosure(client, answer.answer_id) : Promise.resolve(null)
+    ]);
   } catch (failure) {
     return upstreamRefusal(failure, locale);
   }
   if (story.story === null || (story.status !== "READY" && story.status !== "READY_WITH_RESERVATION")) {
     return refuse(404, locale, notAvailableLine);
   }
-  return { kind: "ready", answer, story, questionTag, locale };
+  return { kind: "ready", answer, story, disclosure, questionTag, locale };
 }
 
 /**
@@ -286,7 +313,7 @@ async function prepareReport(input: ReportRequestInput): Promise<Refusal | Ready
  */
 export async function handleReportRequest(input: ReportRequestInput): Promise<Response> {
   const load = input.load ?? loadNamespace;
-  const prepared = await prepareReport(input);
+  const prepared = await prepareReport(input, true);
   if (prepared.kind === "refused") {
     return textResponse(prepared.status, prepared.line(await refusalCatalog(load, prepared.locale)));
   }
@@ -304,6 +331,7 @@ export async function handleReportRequest(input: ReportRequestInput): Promise<Re
     pdf = await (input.render ?? renderReportPdf)({
       answer: prepared.answer,
       story: prepared.story,
+      disclosure: prepared.disclosure,
       generatedAt: input.now,
       catalogs
     });
@@ -318,10 +346,11 @@ export async function handleReportRequest(input: ReportRequestInput): Promise<Re
  * HEAD: the same session check and the same three reads as GET, answered with
  * GET's status and headers and no body. The PDF is never made (Next would
  * otherwise answer HEAD by running GET and dropping the bytes), so a render
- * failure, which only making it can reveal, is GET's alone.
+ * failure, which only making it can reveal, is GET's alone. The answer's record
+ * is only for the PDF's About, so HEAD never reads it.
  */
 export async function handleReportHeadRequest(input: ReportRequestInput): Promise<Response> {
-  const prepared = await prepareReport(input);
+  const prepared = await prepareReport(input, false);
   if (prepared.kind === "refused") return new Response(null, { status: prepared.status, headers: textHeaders() });
   return new Response(null, { status: 200, headers: pdfHeaders(prepared.answer.question_line, input.now) });
 }

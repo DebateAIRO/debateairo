@@ -1,4 +1,4 @@
-import { PLAN_TIER_ROSTERS, type Answer, type AnswerStory } from "@debateai/contract";
+import { PLAN_TIER_ROSTERS, type Answer, type AnswerDisclosure, type AnswerFloor, type AnswerStory } from "@debateai/contract";
 
 /**
  * A realistic sample debate and its story, for the owner's look-first mock
@@ -437,4 +437,72 @@ export function storyFixture(status: AnswerStory["status"]): AnswerStory {
     point_numbers: ready ? { ...STORY_FIXTURE_POINT_NUMBERS } : null,
     story: ready ? structuredClone(FIXTURE_BODY) : null
   };
+}
+
+/**
+ * Engine money rule, Task M6 (spec §14.4.4): the same debate as a FLOOR answer.
+ * No answer could be written, so the sealed answer is components-only, with no
+ * label and no prose; the engine kept the label and the position it rests on.
+ * The owner's mock and the sample report show how the page and the PDF say so.
+ */
+export const STORY_FIXTURE_FLOOR_ANSWER: Answer = {
+  ...STORY_FIXTURE_ANSWER,
+  terminal: "COMPONENTS_ONLY",
+  serve_state: "COMPONENTS_ONLY",
+  verdict_state: null,
+  verdict_unavailable: { reason_ref: "serve-gate:COMPONENTS_ONLY_ENVELOPE" },
+  confidence_band: null,
+  band_ceiling: null,
+  composed_text: []
+};
+
+/** The floor the engine kept for STORY_FIXTURE_FLOOR_ANSWER: the label, the leading position, and a thin basis. */
+export const STORY_FIXTURE_FLOOR: AnswerFloor = Object.freeze({
+  verdict_state: "CONTESTED",
+  leading_node_id: "n-hybrid",
+  basis_incomplete: true
+});
+
+/**
+ * The answer's record (GET /v1/answers/{id}/disclosure) for the sample report:
+ *  · "served": the planned models wrote and checked the answer, nothing was cut short;
+ *  · "lower-cost": a lower-cost model wrote it, the debate stopped exploring early,
+ *    and the answer-writer read the debate's most important points only;
+ *  · "floor": no answer could be written within the budget (STORY_FIXTURE_FLOOR).
+ */
+export type StoryFixtureDisclosureVariant = "served" | "lower-cost" | "floor";
+
+export function storyFixtureDisclosure(variant: StoryFixtureDisclosureVariant): AnswerDisclosure {
+  const base: AnswerDisclosure = {
+    answer_id: STORY_FIXTURE_DEBATE_ID,
+    answer_version: 1,
+    floor: null,
+    floor_reason: null,
+    writer: { planned_model: lineage("OpenAI"), served_model: lineage("OpenAI"), lower_cost: false },
+    checker: { planned_model: lineage("Anthropic"), served_model: lineage("Anthropic"), lower_cost: false },
+    checker_same_as_writer: false,
+    digest: { compacted: false, points_left_out: 0 },
+    cut_short: { arguing: null, answer_writing: null }
+  };
+  switch (variant) {
+    case "served":
+      return base;
+    case "lower-cost":
+      return {
+        ...base,
+        writer: { planned_model: lineage("OpenAI"), served_model: lineage("xAI"), lower_cost: true },
+        digest: { compacted: true, points_left_out: 12 },
+        cut_short: { arguing: "MONEY", answer_writing: null }
+      };
+    case "floor":
+      return {
+        ...base,
+        floor: { ...STORY_FIXTURE_FLOOR },
+        floor_reason: "ENVELOPE_EXHAUSTED",
+        writer: null,
+        checker: null,
+        digest: null,
+        cut_short: { arguing: "MONEY", answer_writing: "MONEY" }
+      };
+  }
 }
