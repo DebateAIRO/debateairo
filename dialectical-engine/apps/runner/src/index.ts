@@ -107,6 +107,7 @@ import {
   deriveVerdictLabel,
   digestLeverageByNodeId,
   digestPointsOmitted,
+  idShapedTokensIn,
   keepsCompleteSynthesisRounds,
   nodeIdsNamedInText,
   LABEL_BASIS_INCOMPLETE_MARK,
@@ -1791,12 +1792,19 @@ function composedRefResolves(ref: string, citation: ComposedCitationContext): bo
 interface ComposedCitationContext {
   readonly digest: SynthesisDigest;
   readonly servedNodes: readonly Readonly<{ nodeId: string }>[];
+  /**
+   * Review round 2: the id-shaped tokens the person's question and the
+   * debate's FULL statements already contain (`idShapedTokensIn`). They are
+   * the person's and the debaters' own words, so the prose may repeat them.
+   */
+  readonly exemptTokens: ReadonlySet<string>;
 }
 
 /**
  * The writer's content classifier: the composition schema first (unchanged),
- * then every segment's prose and every cited ref (I-1). Deterministic, and it
- * never throws on model content.
+ * then every segment's prose and every cited ref (I-1). A token the person's
+ * question or a node's full statement already states is exempt from the prose
+ * check (review round 2). Deterministic, and it never throws on model content.
  */
 export function classifyComposedContent(content: string, citation: ComposedCitationContext): ContentClassification {
   const structured = classifyStructuredContent(content, compositionSchema);
@@ -1804,7 +1812,7 @@ export function classifyComposedContent(content: string, citation: ComposedCitat
   const composed = compositionSchema.parse(JSON.parse(content));
   const issues: ComposedCitationIssue[] = [];
   for (const [segmentIndex, segment] of composed.segments.entries()) {
-    if (nodeIdsNamedInText(citation.digest, segment.text).length > 0) {
+    if (nodeIdsNamedInText(citation.digest, segment.text, citation.exemptTokens).length > 0) {
       issues.push({ path: ["segments", segmentIndex, "text"], message: "COMPOSED_TEXT_NAMES_A_NODE" });
     }
     for (const [refIndex, ref] of segment.node_refs.entries()) {
@@ -5362,6 +5370,12 @@ export class WalkingSkeletonRunner {
      * ranks "most decisive" by the story's own number. It is never sent.
      */
     const digestLeverage = digestLeverageByNodeId(propagation.sensitivityRecords);
+    /**
+     * Task M4 review round 2: what the answer's prose may repeat although it
+     * looks like an internal id — every such token in the person's question
+     * and in each node's full statement (not the digest's clipped summaries).
+     */
+    const personIdTokens = idShapedTokensIn([run.questionLine, ...authoredNodeList.map((node) => node.statement)]);
     const digestNodes: readonly DigestSourceNode[] = Object.freeze(authoredNodeList.map((node) => Object.freeze({
       nodeId: node.nodeId,
       statement: node.statement,
@@ -5671,7 +5685,11 @@ export class WalkingSkeletonRunner {
           providerRef: role.providerRef,
           packet,
           // Task M4 review fix I-1: the schema, then the prose and the cited refs.
-          classifyContent: (content) => classifyComposedContent(content, { digest: request.digest, servedNodes }),
+          classifyContent: (content) => classifyComposedContent(content, {
+            digest: request.digest,
+            servedNodes,
+            exemptTokens: personIdTokens
+          }),
           buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)
           }
         }));

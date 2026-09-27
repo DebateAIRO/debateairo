@@ -5047,6 +5047,26 @@ describe("apps/runner — legal command lifecycle", () => {
         digestPointsOmitted: 0
       });
     } finally { await provider.stop(); }
+
+    // Review round 2 — THE PERSON'S OWN TOKENS. The same compact rung, but the
+    // question itself states "n1 = 120": the writer repeating the person's
+    // figure is served on its FIRST draft, although `n1` is also the digest's ref.
+    const personal = await startProviderDouble([
+      judge, compositionCiting("n1", "In the trial, n1 = 120 patients; a compact answer."), evaluatorSatisfied()
+    ]);
+    try {
+      const work = await createRunnerWork("m4 compact trial arm n1 = 120 patients");
+      const result = await runnerWithEndpoint(personal.endpoint, compactSettings).executeWorkItem(work.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      expect(writerDigestIn(personal.bodies()).digest.compressionLevel).toBe(DIGEST_LADDER.compactRung);
+      const writerAttempts = personal.bodies().map((body) => readFramedMaterial(wirePacket(body)))
+        .filter((material) => material.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId);
+      expect(writerAttempts).toHaveLength(1);
+      const projection = await new ServeRepository(database.pool)
+        .readAnswerProjection(result.answerId, "asker:m4 compact trial arm n1 = 120 patients");
+      expect(SERVED_TERMINALS).toContain(projection?.terminal);
+      expect(projection?.composed_text.map((segment) => segment.text)).toContain("In the trial, n1 = 120 patients; a compact answer.");
+    } finally { await personal.stop(); }
   });
 
   it("completes redelivery from an existing serve artifact without another provider call", async () => {
@@ -6085,6 +6105,28 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       .map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "OK"]);
     expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerIdOf(scenario), 1))
       .toMatchObject({ serveStop: null, writerServedRef: PRIMARY_REF });
+  });
+
+  it("serves, on its first draft, a writer that quotes a UUID-shaped order number a debater's statement states (Task M4 review round 2)", async () => {
+    const order = "3f2a9c1e-7b4d-4e8f-9a01-5c6d7e8f9a0b";
+    const debate = fullDebate(`Primary M4 order ${order} arrived late`);
+    const secondaryDebate = fullDebate("Secondary M4 order quoted");
+    const scenario = await executeResil01Scenario({
+      label: "m4-order-quoted",
+      primary: [
+        ...debate.judgements, ...debate.reviews,
+        m4Composition(`Order ${order} arrived late, and the position survives.`),
+        evaluatorSatisfied()
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: m4WriterAttempts(2)
+    });
+    expect(scenario.error).toBeNull();
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.composed_text.map((segment) => segment.text))
+      .toContain(`Order ${order} arrived late, and the position survives.`);
+    expect((await serveLedger(scenario.runId)).filter((entry) => entry.call_site_key.startsWith("COMPOSER:"))
+      .map((entry) => entry.outcome)).toEqual(["OK"]);
   });
 
   it("ends a first round that never stops naming an id components-only, never FAILED, and records NO_ARTIFACT (Task M4 I-1)", async () => {

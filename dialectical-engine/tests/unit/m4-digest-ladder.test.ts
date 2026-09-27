@@ -10,6 +10,7 @@ import {
   digestLeverageByNodeId,
   digestNodeRefOf,
   digestPointsOmitted,
+  idShapedTokensIn,
   nodeIdsNamedInText,
   resolveDigestNodeRef,
   runServeGateChain,
@@ -437,13 +438,40 @@ describe("M4 · the spine uses its room (review fix I-2)", () => {
     expect(walk[0]!.digest.nodes).toHaveLength(spineAt(10).digest.nodes.length);
   });
 
+  /**
+   * Review round 2, the reviewer's case: 61-character statements with an emoji
+   * at positions 58-59. A cut at 60 used to keep the emoji's first half alone,
+   * which JSON escapes to six bytes, so (30,60) cost MORE than (30,120) — and a
+   * walk that stopped at the first step over budget skipped a (30,120) that fit.
+   */
+  it("never splits a character, and never skips a later step that fits (the emoji case)", () => {
+    const emojiNodes = measuredTree(195).map((node, index) => ({
+      ...node,
+      statement: `${`Point ${String(index)} `.padEnd(58, "x")}\u{1F600}!`
+    }));
+    expect(emojiNodes[7]!.statement).toHaveLength(61);
+    const emojiInput = { nodes: emojiNodes, servedRootNodeId: uuid(0) };
+    const first = [...synthesisDigestLadder(emojiInput)]
+      .find((attempt) => attempt.digest.compressionLevel === SPINE && attempt.spineDecisiveCount === 20)!;
+    const walk = [...synthesisDigestSpineWidenings(emojiInput, first)];
+    const loneHalf = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u;
+    for (const attempt of [first, ...walk]) {
+      for (const entry of attempt.digest.nodes) expect(loneHalf.test(entry.statementSummary)).toBe(false);
+    }
+    const at = (decisive: number, cap: number): SynthesisDigest => walk.find((attempt) =>
+      attempt.spineDecisiveCount === decisive && attempt.digest.summaryCharacterCap === cap)!.digest;
+    expect(at(30, 60).byteSize).toBeLessThanOrEqual(at(30, 120).byteSize);
+    const served = fitted(buildSynthesisDigest({ ...emojiInput, budgetBound: at(30, 120).byteSize }));
+    expect(JSON.stringify(served)).toBe(JSON.stringify(at(30, 120)));
+  });
+
   it("never widens below the spine rung", () => {
     for (const attempt of ladderOf(nodes).filter((candidate) => candidate.digest.compressionLevel < SPINE)) {
       expect([...synthesisDigestSpineWidenings(input, attempt)]).toEqual([]);
     }
   });
 
-  it("serves the last step that fits and stops at the first that does not", () => {
+  it("serves the last step, in schedule order, that fits", () => {
     const walk = [...synthesisDigestSpineWidenings(input, spineAt(20))];
     const third = walk[2]!.digest;
     // A budget exactly at the third step's size serves the third step.
@@ -507,7 +535,7 @@ function randomTree(random: () => number): readonly DigestSourceNode[] {
 }
 
 describe("M4 · the byte budget is never exceeded, on any rung", () => {
-  it("holds for random trees and random budgets: the first rung that fits, then (at the spine) the largest widening that fits", () => {
+  it("holds for random trees and random budgets: the first rung that fits, then (at the spine) the last widening in schedule order that fits", () => {
     const random = seeded(20_260_927);
     let spineResults = 0;
     for (let trial = 0; trial < 250; trial += 1) {
@@ -525,16 +553,12 @@ describe("M4 · the byte budget is never exceeded, on any rung", () => {
       }
       const digest = fitted(outcome);
       expect(digest.byteSize).toBeLessThanOrEqual(budget);
-      // I-2: after the first spine that fits, the widenings in order, stopping at
-      // the first over budget; sizes only grow along the walk.
+      // I-2, review round 2: after the first spine that fits, EVERY widening is
+      // tried, and the last one in schedule order that fits is served.
       let expected = firstFit.digest;
-      let previousSize = firstFit.digest.byteSize;
       for (const widened of synthesisDigestSpineWidenings({ nodes, servedRootNodeId: "node:0" }, firstFit)) {
         expect(measuredBytes(widened.digest)).toBe(widened.digest.byteSize);
-        expect(widened.digest.byteSize).toBeGreaterThanOrEqual(previousSize);
-        previousSize = widened.digest.byteSize;
-        if (widened.digest.byteSize > budget) break;
-        expected = widened.digest;
+        if (widened.digest.byteSize <= budget) expected = widened.digest;
       }
       expect(JSON.stringify(digest)).toBe(JSON.stringify(expected));
       if (digest.compressionLevel < SPINE) {
@@ -745,7 +769,13 @@ describe("M4 · the answer's prose never names an internal id (review fix I-1)",
   const nodes = measuredTree(195);
   const spine = fitted(buildSynthesisDigest({ nodes, servedRootNodeId: uuid(0), budgetBound: TIERS.low }));
   const wide = fitted(buildSynthesisDigest({ nodes: measuredTree(10), servedRootNodeId: uuid(0), budgetBound: TIERS.high }));
-  const citation = { digest: spine, servedNodes: nodes };
+  const question = "Does the measured evidence settle it?";
+  const citation = {
+    digest: spine,
+    servedNodes: nodes,
+    // Built the runner's way: the question and every node's full statement.
+    exemptTokens: idShapedTokensIn([question, ...nodes.map((node) => node.statement)])
+  };
   const composition = (text: string, refs: readonly string[] = ["n1"]): string => JSON.stringify({ segments: [
     { segment_id: "segment:verdict", text, node_refs: refs, served_number_refs: ["number:final-strength"] },
     { segment_id: "segment:plan", text: "Measure it before relying on it.", node_refs: [], served_number_refs: [] }
@@ -792,6 +822,44 @@ describe("M4 · the answer's prose never names an internal id (review fix I-1)",
     for (const text of ["The answer holds.", "The N1 highway is congested.", "An n-type semiconductor."]) {
       expect(classifyComposedContent(composition(text, ["n1", "primary"]), citation)).toEqual({ parseStatus: "PARSED", parseError: null });
     }
+  });
+
+  /**
+   * Review round 2 — THE PERSON'S OWN TOKENS. A figure the question or a
+   * statement already writes is theirs to repeat, even when it looks like one
+   * of the digest's refs or like a UUID.
+   */
+  it("exempts what the question states: a trial's n1 = 120 is the person's figure", () => {
+    const exempt = idShapedTokensIn(["Trial arms: n1 = 120 and n2 = 118 patients. Which arm did better?"]);
+    expect(nodeIdsNamedInText(spine, "In arm n1 = 120 patients and in n2 = 118.", exempt)).toEqual([]);
+    // n12 appears nowhere the person or a debater wrote it: still refused.
+    expect(nodeIdsNamedInText(spine, "The answer holds (n12).", exempt)).toEqual(["n12"]);
+    const withQuestion = { ...citation, exemptTokens: exempt };
+    expect(classifyComposedContent(composition("In arm n1 = 120 patients and in n2 = 118."), withQuestion))
+      .toEqual({ parseStatus: "PARSED", parseError: null });
+    expect(classifyComposedContent(composition("The answer holds (n12)."), withQuestion).parseStatus).toBe("SCHEMA_FAILED");
+  });
+
+  it("exempts the person's tokens in any script", () => {
+    const exempt = idShapedTokensIn(["Σύγκριση n2 και n3: ποιο είναι καλύτερο;", "În studiu, n1=30."]);
+    expect(nodeIdsNamedInText(spine, "Η σύγκριση n2 και n3 δείχνει διαφορά.", exempt)).toEqual([]);
+    expect(nodeIdsNamedInText(spine, "În studiu, n1=30 de pacienți.", exempt)).toEqual([]);
+    expect(nodeIdsNamedInText(spine, "Η απάντηση (n4) ισχύει.", exempt)).toEqual(["n4"]);
+  });
+
+  it("exempts a UUID a statement quotes (an order number), and still refuses any other", () => {
+    const order = "3f2a9c1e-7b4d-4e8f-9a01-5c6d7e8f9a0b";
+    const exempt = idShapedTokensIn([`The order ${order.toUpperCase()} was delivered late.`]);
+    expect(nodeIdsNamedInText(spine, `Order ${order} arrived late.`, exempt)).toEqual([]);
+    expect(nodeIdsNamedInText(spine, `It rests on ${uuid(0)}.`, exempt)).toEqual([uuid(0)]);
+  });
+
+  it("treats n3.5 as a number, not a ref, and a band a statement names (n78) as the debater's word", () => {
+    expect(nodeIdsNamedInText(spine, "The n3.5 variant is faster.")).toEqual([]);
+    const exempt = idShapedTokensIn(["Band n78 covers 3.3 to 3.8 GHz."]);
+    expect(nodeIdsNamedInText(spine, "On band n78 the signal holds.", exempt)).toEqual([]);
+    // The accepted trade-off: a statement that literally says n12 lets (n12) through.
+    expect(nodeIdsNamedInText(spine, "The answer holds (n12).", idShapedTokensIn(["Unit n12 failed."]))).toEqual([]);
   });
 
   it("keeps the schema's own rejections exactly as before", () => {

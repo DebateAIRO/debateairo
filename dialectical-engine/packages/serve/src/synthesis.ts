@@ -199,7 +199,15 @@ function summarise(statement: string, cap: number | null): { text: string; trunc
   // Provenance-preserving: the summary says it is one, so a reader of the
   // digest can never mistake a shortened statement for the whole statement.
   const ellipsis = "…";
-  return { text: `${statement.slice(0, Math.max(0, cap - ellipsis.length))}${ellipsis}`, truncated: true };
+  let end = Math.max(0, cap - ellipsis.length);
+  // Task M4 review round 2: the cut falls on a code-point boundary. Cutting
+  // between the two halves of a character outside the basic plane (an emoji)
+  // left a lone half, which JSON escapes to six bytes — so a SHORTER summary
+  // could cost MORE bytes. The cut steps back one unit instead; every other
+  // summary is byte for byte what it was.
+  const lastUnit = statement.charCodeAt(end - 1);
+  if (end > 0 && lastUnit >= 0xd800 && lastUnit <= 0xdbff) end -= 1;
+  return { text: `${statement.slice(0, end)}${ellipsis}`, truncated: true };
 }
 
 function compressAt(
@@ -290,11 +298,12 @@ function selectEmphasis(
  *
  * THE SPINE USES ITS ROOM (review fix I-2). The first spine that fits is
  * built at the tightest summary, which is about four words. After it, and at
- * the spine rung ONLY, the builder walks `spineWidenings` in order — more
- * points, then longer summaries, alternately — and serves the LAST step that
- * still fits. Sizes only grow along the walk (each step keeps every member and
- * every summary character of the one before), so the walk stops at the first
- * step over budget. When the spine that fit keeps fewer decisive points than
+ * the spine rung ONLY, the builder tries EVERY step of `spineWidenings` — more
+ * points, then longer summaries, alternately — and serves the LAST step, in
+ * schedule order, that fits. It does not stop at the first step over budget:
+ * sizes grow along the walk for ordinary text, but not for every text (a
+ * verbatim statement can be no longer in bytes than its clipped summary), so a
+ * fitting later step is never skipped (review round 2). When the spine that fit keeps fewer decisive points than
  * the walk's first step, the walk first widens that spine's own summaries to
  * the first step's cap (`(K, 60)` for the K that fit), so a tight budget gets
  * longer summaries before it could ever afford more points. `decisiveCount`
@@ -488,7 +497,12 @@ function digestStanceTowardPosition(nodeId: string, tree: ReadonlyMap<string, Di
   return supports ? "support" : "attack";
 }
 
-function digestOmittedPointsOf(tree: DigestTree, members: ReadonlySet<string>): readonly DigestOmittedPoints[] {
+function digestOmittedPointsOf(
+  tree: DigestTree,
+  members: ReadonlySet<string>,
+  /** The digest's OWN ref table (review round 2): the refs the model is shown. */
+  refOf: ReadonlyMap<string, string>
+): readonly DigestOmittedPoints[] {
   const counts = new Map<string | null, { supporting: number; attacking: number }>();
   for (const node of tree.nodesInRefOrder) {
     if (members.has(node.nodeId)) continue;
@@ -512,7 +526,7 @@ function digestOmittedPointsOf(tree: DigestTree, members: ReadonlySet<string>): 
   return Object.freeze(keys.map((key) => {
     const count = counts.get(key) ?? { supporting: 0, attacking: 0 };
     return Object.freeze({
-      positionNodeId: key === null ? null : tree.refOf.get(key) ?? null,
+      positionNodeId: key === null ? null : refOf.get(key) ?? null,
       supporting: count.supporting,
       attacking: count.attacking
     });
@@ -574,7 +588,7 @@ function compactAt(input: {
     emphasis,
     compressionLevel: input.rung,
     summaryCharacterCap: cap,
-    ...(members === null ? {} : { omittedPoints: digestOmittedPointsOf(tree, members) })
+    ...(members === null ? {} : { omittedPoints: digestOmittedPointsOf(tree, members, refOf) })
   };
   const digest: SynthesisDigest = Object.freeze({
     ...shape,
@@ -712,8 +726,8 @@ export function synthesisDigestLadder(input: {
 
 /**
  * The spine widenings walked after `fitted`, the first spine that fit (review
- * fix I-2; see `DIGEST_LADDER`), in order and built lazily. The builder serves
- * the last one that fits and stops at the first that does not. Empty for an
+ * fix I-2; see `DIGEST_LADDER`), in order and built lazily. The builder tries
+ * every one and serves the last, in this order, that fits. Empty for an
  * attempt below the spine rung: only the spine is ever widened.
  */
 export function synthesisDigestSpineWidenings(input: {
@@ -748,11 +762,11 @@ export function buildSynthesisDigest(input: {
   for (const attempt of ladder) {
     lastTried = attempt.digest.byteSize;
     if (attempt.digest.byteSize <= input.budgetBound) {
-      // I-2: a spine that fits then uses its room — the last widening that fits.
+      // I-2: a spine that fits then uses its room — the last widening, in
+      // schedule order, that fits; every step is tried (review round 2).
       let served = attempt.digest;
       for (const widened of synthesisDigestSpineWidenings(input, attempt)) {
-        if (widened.digest.byteSize > input.budgetBound) break;
-        served = widened.digest;
+        if (widened.digest.byteSize <= input.budgetBound) served = widened.digest;
       }
       return Object.freeze({
         kind: "DIGEST" as const,
@@ -784,28 +798,65 @@ export function resolveDigestNodeRef(digest: SynthesisDigest, ref: string): stri
   return digest.nodes.some((entry) => entry.nodeId === ref) ? ref : null;
 }
 
-/** A whole-token short ref: `n`, then a number from 1, with no letter, digit or underscore on either side. */
-const DIGEST_SHORT_REF_TOKEN = /(?<![\p{L}\p{N}_])n[1-9][0-9]*(?![\p{L}\p{N}_])/gu;
-/** A node id as the engine mints them: a UUID, in either case. */
-const UUID_SHAPED_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
+/**
+ * A whole-token short ref: `n`, then a number from 1, with no letter, digit or
+ * underscore on either side, and not the start of a decimal (`n3.5`).
+ */
+const DIGEST_SHORT_REF_TOKEN = /(?<![\p{L}\p{N}_])n[1-9][0-9]*(?![\p{L}\p{N}_]|[.,]\p{N})/gu;
+/** A node id as the engine mints them: a UUID, in either case, as a whole token. */
+const UUID_SHAPED_ID = /(?<![0-9a-z])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![0-9a-z])/giu;
+
+/** One spelling per token: a short ref as written, a UUID in lower case. */
+function idTokenKey(token: string): string {
+  return token.startsWith("n") ? token : token.toLowerCase();
+}
+
+/**
+ * REVIEW ROUND 2 — THE PERSON'S OWN TOKENS. Every token in these texts that
+ * LOOKS like an internal id — a short ref (`n1`, as a whole token) or a UUID.
+ * The runner passes the question and every node's FULL statement, so a figure
+ * the person or a debater wrote ("n1 = 120 patients", a study arm `n2`, a 5G
+ * band `n78`, an order number shaped like a UUID) is theirs to repeat, and
+ * `nodeIdsNamedInText` exempts it. The story's checks exempt what the question
+ * or a claim states the same way. The trade-off is accepted: a statement that
+ * literally contains `n12` lets `(n12)` through.
+ */
+export function idShapedTokensIn(texts: readonly string[]): ReadonlySet<string> {
+  const tokens = new Set<string>();
+  for (const text of texts) {
+    for (const match of text.matchAll(DIGEST_SHORT_REF_TOKEN)) tokens.add(idTokenKey(match[0]));
+    for (const match of text.matchAll(UUID_SHAPED_ID)) tokens.add(idTokenKey(match[0]));
+  }
+  return tokens;
+}
+
+const NO_EXEMPT_TOKENS: ReadonlySet<string> = new Set<string>();
 
 /**
  * REVIEW FIX I-1 (the owner's rule: no internals in the answer). Every internal
  * node name a text states: each short ref THIS digest carries, as a whole token
  * (`(n12)`, `n3.`), and any UUID-shaped id at any rung. Ordinary text is left
- * alone: `n12` when the digest has no `n12`, `N1 highway`, `n-type`. The
- * runner's writer classifier refuses a draft whose prose names one, so the
- * provider's own repair re-asks; nothing ever rewrites the model's words.
+ * alone: `n12` when the digest has no `n12`, `N1 highway`, `n-type`, `n3.5`.
+ * So is every token in `exempt` (review round 2, `idShapedTokensIn`): the
+ * person's and the debaters' own words. The runner's writer classifier refuses
+ * a draft whose prose names one, so the provider's own repair re-asks; nothing
+ * ever rewrites the model's words.
  */
-export function nodeIdsNamedInText(digest: SynthesisDigest, text: string): readonly string[] {
+export function nodeIdsNamedInText(
+  digest: SynthesisDigest,
+  text: string,
+  exempt: ReadonlySet<string> = NO_EXEMPT_TOKENS
+): readonly string[] {
   const named: string[] = [];
   const table = DIGEST_REF_TABLES.get(digest);
   if (table !== undefined) {
     for (const match of text.matchAll(DIGEST_SHORT_REF_TOKEN)) {
-      if (table.nodeIdOf.has(match[0])) named.push(match[0]);
+      if (table.nodeIdOf.has(match[0]) && !exempt.has(idTokenKey(match[0]))) named.push(match[0]);
     }
   }
-  for (const match of text.matchAll(UUID_SHAPED_ID)) named.push(match[0]);
+  for (const match of text.matchAll(UUID_SHAPED_ID)) {
+    if (!exempt.has(idTokenKey(match[0]))) named.push(match[0]);
+  }
   return Object.freeze(named);
 }
 
