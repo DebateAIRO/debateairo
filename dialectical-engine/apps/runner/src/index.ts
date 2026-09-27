@@ -3018,8 +3018,12 @@ export class WalkingSkeletonRunner {
     // `absentAtClaim` as its dropped POSITION seats below; J24 (3) names a
     // sealed ref's failure from here. A legacy run's copy is the list itself.
     const panelAbsentAtClaim = Object.freeze([...absentAtClaim]);
+    // A15d (fix round 1, minor 4): ONE verdict per route per claim. Declared
+    // here so the sealed-ref probe below reuses what this block probed, rather
+    // than probing a route twice and letting the claim disagree with itself.
+    // Empty on a legacy run.
+    const routeHealth = new Map<string, RouteHealth>();
     if (roleAssignment !== null) {
-      const routeHealth = new Map<string, RouteHealth>();
       for (const member of configuredMakers) routeHealth.set(member.providerRef, Object.freeze({ state: "HEALTHY" as const }));
       for (const absent of absentAtClaim) {
         routeHealth.set(absent.member.provider_ref, Object.freeze({ state: "ABSENT" as const, failureCode: absent.failureCode }));
@@ -3142,6 +3146,15 @@ export class WalkingSkeletonRunner {
       if (panelRefs.has(roleRef)) continue;
       const configured = configuredByProviderRef.get(roleRef);
       if (configured === undefined || this.settings.claimTimeSynthesisRoleProbe === undefined) continue;
+      // A15d (fix round 1, minor 4): a route the assignment also names was
+      // probed above in this claim; its verdict stands, and no second probe row
+      // is written for it.
+      const claimVerdict = routeHealth.get(roleRef);
+      if (claimVerdict !== undefined) {
+        if (claimVerdict.state === "HEALTHY") synthesisMakers.push(configured);
+        else synthesisFailures.set(roleRef, claimVerdict.failureCode);
+        continue;
+      }
       let observation;
       try {
         observation = await this.settings.claimTimeSynthesisRoleProbe(roleRef);
@@ -3601,15 +3614,30 @@ export class WalkingSkeletonRunner {
         const isJudgeSite = callSite.contractHash === this.settings.judgeContractHash;
         const isExemptRoot = exhaustedSite === "JUDGE" || exhaustedSite === "JUDGE:root:secondary";
         /**
-         * A15d (controller carry 6): a judge seat key at its allowance whose
-         * PARTNER key was never tried does not end the site — the partner answers
-         * it on this pass. DR-184-v5 provisions a first sequence on both of a
-         * seat's keys; the site's ONE final retry is guarded in cooldownAttempt
-         * (carry 3). Only where a final retry exists: a key passes the sequence
-         * bound only through the post-cooldown retry, which follows a TRANSPORT
-         * failure, so the partner answers a transport failure and never a schema
-         * one (R4). Synthesis sites stay terminal on a re-claim: their ledger
-         * cannot tell a transport exhaustion from a schema one.
+         * A15d (controller carry 6; fix round 1): a judge seat key at its
+         * allowance does not end the site while its PARTNER key is not itself
+         * spent — the partner answers it on this pass, and on every later pass
+         * (a resume after the partner already answered finds the same spent key
+         * again and must hand it over again, or the rescue would be undone).
+         *
+         * "Not itself spent" is the partner's REACHABLE allowance: the spent key
+         * passed the sequence bound, so it has used the site's ONE post-cooldown
+         * final retry and cooldownAttempt withholds the partner's (carry 3). The
+         * partner may still run its first sequence while its key holds fewer than
+         * `judge` attempts; at `judge` the gateway would refuse the call
+         * (CALL_BUDGET_EXHAUSTED), so the site keeps today's halt or terminal.
+         * The per-key gateway cap plus carry 3 bound the site at DR-184-v5's
+         * `2 * judge + final`.
+         *
+         * Why the switch is lawful (R4: a backup follows a transport failure,
+         * never a schema one): a key passes the sequence bound only through the
+         * post-cooldown final retry, and cooldownAttempt runs that retry only
+         * after the FIRST sequence ended in a transport exhaustion. The final
+         * retry itself may have ended in a schema failure; the switch answers
+         * the first sequence's transport exhaustion. That needs a final retry to
+         * exist, hence the guard. Synthesis sites stay terminal on a re-claim:
+         * they have no cooldown, so their ledger cannot tell a transport
+         * exhaustion from a schema one.
          */
         const exhaustedMarker = seatOfCallSiteKey(exhausted.callSiteKey);
         if (isJudgeSite && exhaustedMarker !== null && (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0) >= 1) {
@@ -3629,8 +3657,11 @@ export class WalkingSkeletonRunner {
               callSiteKey: seatCallSiteKey(exhaustedSite, exhaustedMarker === "main" ? "runnerUp" : "main")
             })
             : null;
-          if (partnerAttempts === 0) {
+          if (partnerAttempts !== null && partnerAttempts < this.settings.judgeBound.maxAttempts) {
             spentSeatSlots.set(exhaustedSite, spentSlot);
+            // The halt below is only the fallback for a site whose seat turns out
+            // to hold no partner on this pass (cooldownAttempt reads it only when
+            // no member is eligible): the same record the preflight made before.
             if (!isExemptRoot) {
               spentSiteHalts.set(exhaustedSite, { outcome: exhausted.outcome, ledgerEntryRef: exhausted.ledgerEntryRef });
             }

@@ -7067,3 +7067,264 @@ describe("A15d · controller carries — restart determinism, resume, fairness",
     expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:EVALUATOR" }]);
   });
 });
+
+/** A15d fix round 1: the SUPPORT_ATTACK seat pins the primary route as the third's runner-up (backup only). */
+function legRunnerUpAssignment() {
+  return pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third", "primary", 0)],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+    ANSWER_CHECKER: [pinnedSeat(0, "third")]
+  });
+}
+
+async function seedEarlierPass(
+  context: { readonly runId: string; readonly workItemId: string },
+  rows: readonly (readonly [key: string, outcome: "OK" | "FAILED", count: number, actorRef: string])[]
+): Promise<void> {
+  for (const [key, outcome, count, actorRef] of rows) {
+    for (let index = 0; index < count; index += 1) await appendEarlierPassCall(context, key, outcome, actorRef);
+  }
+}
+
+describe("A15d fix round 1 · a rescued site stays rescued; both keys spent keeps today's rule", () => {
+  // judge 2 + final 1: a key at 3 attempts has spent the site's final retry.
+  const judgeMaxAttempts = 2;
+
+  it("hands a spent root main to its runner-up AGAIN on the next resume, after the runner-up already answered", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-root-rescued-twice",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 3, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      ...THIRD_WRITES_ROOT_ONE
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const rootOne = scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:secondary:"));
+    expect(rootOne.map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ...Array.from({ length: 3 }, () => ["JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef]),
+      ["JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef],
+      ["JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef]
+    ]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:1->0"))
+      .map((call) => [call.call_site_key, call.actor_ref]))
+      .toEqual([["JUDGE:cross-root:1->0:seat:runnerUp", SEAT_ROUTES.third.providerRef]]);
+  });
+
+  it("hands a spent LEG main to its runner-up again on the next resume, with no halt", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-leg-rescued-twice",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 3, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary A15d fx1 node ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d fx1 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15d fx1 node ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A15d fx1 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15d fx1 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.lifecycle.filter((event) => event.state.endsWith("_HALTED"))).toEqual([]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${callSiteKey}:seat:runnerUp`))
+      .map((call) => [call.outcome, call.actor_ref]))
+      .toEqual([["OK", SEAT_ROUTES.primary.providerRef], ["OK", SEAT_ROUTES.primary.providerRef]]);
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("UNAUTHORED-BRANCH-HALTED");
+  });
+
+  it("fails a root terminally, as today, when BOTH of its seat keys are spent (carry 5: the exemption reads the bare site)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-root-both-spent",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 3, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "FAILED", 3, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("TERMINAL_FAILED");
+    // Nothing beyond the earlier pass's six rows: the refusal spends nothing.
+    expect(scenario.calls).toHaveLength(6);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" }]);
+  });
+
+  it("halts a leg, as today and under its bare site key, when BOTH of its seat keys are spent (carry 5)", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-leg-both-spent",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 3, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 3, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A15d fx1 halt ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d fx1 halt review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15d fx1 halt ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A15d fx1 halt leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15d fx1 halt review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(6);
+    expect(scenario.lifecycle).toContainEqual({ state: "EXPANSION_HALTED", call_site_key: callSiteKey, attempts_spent: 3 });
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
+  });
+});
+
+describe("A15d fix round 1 · the panel's family discount and the claim's probes", () => {
+  it("E9: discounts the member by the family of the ROUTE that answered, not of a debater sharing its maker", async () => {
+    const baseSettings = runnerSettings();
+    const twinSeat: PinnedSeat = {
+      seatIndex: 0,
+      main: {
+        candidateId: "candidate:twin", providerRef: SEAT_TWIN.providerRef, maker: SEAT_TWIN.maker,
+        modelId: SEAT_TWIN.model, thinkingLevel: "DEFAULT_ONLY"
+      },
+      runnerUp: seatCandidateOf("third"),
+      diversityShare: 0,
+      source: "SCORECARD"
+    };
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-family-by-route",
+      twin: true,
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [twinSeat],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      settings: {
+        // The twin shares the PRIMARY's maker but sits in the SECONDARY's family.
+        panelPolicy: {
+          ...baseSettings.panelPolicy!,
+          providerFamilies: [
+            { familyRef: "test-layer:family:primary", providerRefs: [SEAT_ROUTES.primary.providerRef] },
+            { familyRef: "test-layer:family:secondary", providerRefs: [SEAT_ROUTES.secondary.providerRef, SEAT_TWIN.providerRef] }
+          ]
+        }
+      },
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A15d family ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d family review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15d family ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A15d family leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15d family review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const receipts = await database.pool.query<{
+      disagreement: { readonly panel: { readonly members: readonly Readonly<Record<string, unknown>>[] } };
+    }>(
+      `SELECT disagreement FROM ledger.reduced_judgement
+        WHERE run_id=$1 AND disagreement->'panel'->>'authorProviderRef' = $2 ORDER BY at_seq`,
+      [scenario.runId, SEAT_ROUTES.secondary.providerRef]
+    );
+    // Root 1 and cross-exchange 1->0: the author, then the twin — the SAME family,
+    // so the twin's voice is discounted. Looked up by maker, the twin would have
+    // been the primary's family and kept its full weight.
+    expect(receipts.rows).toHaveLength(2);
+    for (const row of receipts.rows) {
+      expect(row.disagreement.panel.members.map((member) => [
+        member.memberRole, member.familyRef, member.familyOrdinal, member.effectiveWeight
+      ])).toEqual([
+        [SEAT_ROUTES.secondary.maker, "test-layer:family:secondary", 1, 1],
+        [SEAT_TWIN.maker, "test-layer:family:secondary", 2, 0.5]
+      ]);
+    }
+  });
+
+  it("probes a sealed ref the assignment also names ONCE per claim, and the claim keeps that one verdict", async () => {
+    const baseSettings = runnerSettings();
+    const fallbackChecker: PinnedSeat = {
+      seatIndex: 0,
+      main: {
+        candidateId: null, providerRef: SEAT_ROUTES.primary.providerRef, maker: SEAT_ROUTES.primary.maker,
+        modelId: SEAT_ROUTES.primary.model, thinkingLevel: "DEFAULT_ONLY"
+      },
+      runnerUp: null,
+      diversityShare: 0,
+      source: "FALLBACK"
+    };
+    const probed: string[] = [];
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-one-probe",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "primary")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        // The judge seat names the sealed checker's route, outside the debate panel.
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [fallbackChecker]
+      }),
+      settings: {
+        synthesisRolePolicy: {
+          ...baseSettings.synthesisRolePolicy!,
+          evaluatorRoleRef: SEAT_ROUTES.third.providerRef,
+          identicalRoleRefs: false
+        },
+        // A route that is absent on the first look and healthy on a second: a
+        // claim that looked twice would disagree with itself.
+        claimTimeSynthesisRoleProbe: async (providerRef) => {
+          probed.push(providerRef);
+          return probed.filter((ref) => ref === providerRef).length === 1
+            ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+            : { state: "HEALTHY", modelId: SEAT_ROUTES.third.model, failureCode: null };
+        }
+      },
+      primary: [], secondary: [], third: []
+    });
+    expect(probed).toEqual([SEAT_ROUTES.third.providerRef]);
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(scenario.calls).toEqual([]);
+    expect(scenario.lifecycle).toContainEqual(expect.objectContaining({
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT", call_site_key: `EVALUATOR:${SEAT_ROUTES.third.providerRef}`
+    }));
+  });
+});
