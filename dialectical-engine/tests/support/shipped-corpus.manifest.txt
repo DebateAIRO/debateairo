@@ -519,6 +519,7 @@ packages/db/src/publication-lease.ts
 packages/db/src/publication.ts
 packages/db/src/recovery.ts
 packages/db/src/schema.ts
+packages/db/src/serve-disclosure.ts
 packages/db/src/sessions.ts
 packages/db/src/support.ts
 packages/evaluator/src/blind-sample.ts

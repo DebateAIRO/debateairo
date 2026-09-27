@@ -413,7 +413,11 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // Engine money rule, Task M1 (spec 2026-09-26 §14.4.1, risk R12): the
         // spend phase (BODY | SERVE) on ledger.model_spend's RUN charges. The
         // next free prefix, no pair.
-        "0075_model_spend_phase.sql"
+        "0075_model_spend_phase.sql",
+        // Engine money rule, Task M3 (spec 2026-09-26 §14.4.5): serve.serve_disclosure,
+        // the owner-side, content-free record beside each served answer. The next
+        // free prefix, no pair.
+        "0076_serve_disclosure.sql"
       ]);
   });
 });
