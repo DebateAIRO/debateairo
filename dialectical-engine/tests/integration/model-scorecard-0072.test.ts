@@ -152,6 +152,25 @@ describe("0072 — the per-call facts are real, nullable columns", () => {
     }
   });
 
+  it("accepts exactly the scorecard's candidate ids, no more and no fewer (fix round 1)", async () => {
+    const runId = await fixture.createLegacyRun(`0072 candidates ${randomUUID()}`);
+    await expect(insertLedgerRow(runId, { candidate_id: "anthropic/claude-opus-5-5@low" })).resolves.toBeDefined();
+    for (const refused of ["-x", "..", "/a"]) {
+      await expect(insertLedgerRow(runId, { candidate_id: refused }), refused)
+        .rejects.toThrow(/ledger_entry_candidate_id_token/u);
+    }
+    // packages/scorecard/src/schema.ts's identifierText; the contract suite pins the two texts equal.
+    const scorecardRule = /^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$/u;
+    for (const id of [
+      "a", "7", "google/gemini-3.1-pro@high", "openai:gpt-5+mini_x", `a${"b".repeat(127)}`,
+      "", `a${"b".repeat(128)}`, "_a", ".a", ":a", "@a", "+a", "a b", " a", "a\n", "a$", "hé", "a,b", "a#b"
+    ]) {
+      const stored = insertLedgerRow(runId, { candidate_id: id });
+      if (scorecardRule.test(id)) await expect(stored, JSON.stringify(id)).resolves.toBeDefined();
+      else await expect(stored, JSON.stringify(id)).rejects.toThrow(/ledger_entry_candidate_id_token/u);
+    }
+  });
+
   it("stores thinking tokens on the artifact and the attempt link on the charge", async () => {
     const runId = await fixture.createLegacyRun(`0072 counters ${randomUUID()}`);
     const artifact = (thinkingTokens: number) => db().query(
@@ -289,28 +308,52 @@ describe("0072 — ledger.call_prompt is a content carrier", () => {
 });
 
 describe("0072 — core.run_role_assignment is pinned once", () => {
+  const assignment = { scorecardVersion: null, strength: "BALANCED", roles: {} };
+  // A well-formed assignment AT a strength: the column and the assignment's own key agree.
+  const at = (strength: string) => JSON.stringify({ ...assignment, strength });
+  const insert = (target: string, strength: string, value: string) => db().query(
+    `INSERT INTO core.run_role_assignment (run_id, assignment, strength, stepped_down)
+     VALUES ($1,$2::jsonb,$3,false)`,
+    [target, value, strength]
+  );
+
   it("takes ONE insert per run and refuses every update, delete, truncate and malformed row", async () => {
     const runId = await fixture.createLegacyRun(`0072 assignment ${randomUUID()}`);
-    const assignment = { scorecardVersion: null, strength: "BALANCED", roles: {} };
-    const insert = (target: string, strength: string, value: string) => db().query(
-      `INSERT INTO core.run_role_assignment (run_id, assignment, strength, stepped_down)
-       VALUES ($1,$2::jsonb,$3,false)`,
-      [target, value, strength]
-    );
-    await insert(runId, "BALANCED", JSON.stringify(assignment));
+    await insert(runId, "BALANCED", at("BALANCED"));
     expect((await db().query(
       "SELECT assignment, strength, stepped_down FROM core.run_role_assignment WHERE run_id=$1", [runId]
     )).rows).toEqual([{ assignment, strength: "BALANCED", stepped_down: false }]);
-    await expect(insert(runId, "BEST", "{}")).rejects.toThrow(/run_role_assignment_pkey/u);
+    await expect(insert(runId, "BEST", at("BEST"))).rejects.toThrow(/run_role_assignment_pkey/u);
     await expect(db().query("UPDATE core.run_role_assignment SET stepped_down=true WHERE run_id=$1", [runId]))
       .rejects.toThrow(/rejects UPDATE/u);
     await expect(db().query("DELETE FROM core.run_role_assignment WHERE run_id=$1", [runId]))
       .rejects.toThrow(/rejects DELETE/u);
     await expect(db().query("TRUNCATE core.run_role_assignment")).rejects.toThrow(/TRUNCATE_REJECTED/u);
     const other = await fixture.createLegacyRun(`0072 assignment other ${randomUUID()}`);
-    await expect(insert(other, "FAST", "{}")).rejects.toThrow(/run_role_assignment_strength_vocabulary/u);
+    await expect(insert(other, "FAST", at("FAST"))).rejects.toThrow(/run_role_assignment_strength_vocabulary/u);
+    // PostgreSQL tests CHECKs in name order: is_object is reported before strength_matches_assignment.
     await expect(insert(other, "BEST", "[]")).rejects.toThrow(/run_role_assignment_is_object/u);
-    await expect(insert(randomUUID(), "BEST", "{}")).rejects.toThrow(/run_role_assignment_run_id_fkey/u);
+    await expect(insert(randomUUID(), "BEST", at("BEST"))).rejects.toThrow(/run_role_assignment_run_id_fkey/u);
+  });
+
+  it("refuses a strength column that disagrees with the assignment's own strength (fix round 1)", async () => {
+    const runId = await fixture.createLegacyRun(`0072 assignment strength ${randomUUID()}`);
+    for (const [column, value] of [
+      ["BEST", at("ECONOMY")],
+      ["ECONOMY", at("BALANCED")],
+      ["BEST", at("best")],
+      ["BEST", JSON.stringify({ scorecardVersion: null, roles: {} })],
+      ["BEST", JSON.stringify({ ...assignment, strength: null })],
+      ["BEST", JSON.stringify({ ...assignment, strength: ["BEST"] })]
+    ] as const) {
+      await expect(insert(runId, column, value), `${column} ${value}`)
+        .rejects.toThrow(/run_role_assignment_strength_matches_assignment/u);
+    }
+    // Every refusal above wrote nothing: the run still takes its one agreeing row.
+    await expect(insert(runId, "ECONOMY", at("ECONOMY"))).resolves.toBeDefined();
+    expect((await db().query(
+      "SELECT strength, assignment->>'strength' AS pinned FROM core.run_role_assignment WHERE run_id=$1", [runId]
+    )).rows).toEqual([{ strength: "ECONOMY", pinned: "ECONOMY" }]);
   });
 });
 
@@ -358,6 +401,20 @@ describe("0072 — replay safety", () => {
     ]) {
       await expect(db().query(await readFile(new URL(replayed, directory), "utf8")), replayed)
         .resolves.toBeDefined();
+      // Pinned after EACH replay (fix round 1): a re-point by an earlier file's replay is
+      // caught here, before the 0072 replay at the end of the list could restore it.
+      const triggers = await db().query<{ tgname: string; function_name: string }>(
+        `SELECT trigger.tgname, trigger.tgfoid::regproc::text AS function_name
+         FROM pg_trigger AS trigger
+         WHERE trigger.tgrelid='ledger.call_prompt'::regclass AND NOT trigger.tgisinternal
+           AND trigger.tgname IN ('aaa_enforce_content_attestation_v2','enforce_content_ciphertext','enforce_erasure_barrier')
+         ORDER BY trigger.tgname`
+      );
+      expect(triggers.rows, replayed).toEqual([
+        { tgname: "aaa_enforce_content_attestation_v2", function_name: "core.enforce_content_attestation_v2_call_prompt" },
+        { tgname: "enforce_content_ciphertext", function_name: "core.enforce_content_ciphertext_call_prompt" },
+        { tgname: "enforce_erasure_barrier", function_name: "core.enforce_erasure_barrier" }
+      ]);
       const marker = randomUUID();
       const runId = await fixture.createEncryptedRun(`0072 replay ${replayed} ${marker}`);
       await expect(insertPromptRow({
@@ -372,17 +429,5 @@ describe("0072 — replay safety", () => {
       await expect(insertLedgerRow(runId, { model_role: "COMPOSER" }), replayed)
         .rejects.toThrow(/ledger_entry_model_role_vocabulary/u);
     }
-    const triggers = await db().query<{ tgname: string; function_name: string }>(
-      `SELECT trigger.tgname, trigger.tgfoid::regproc::text AS function_name
-       FROM pg_trigger AS trigger
-       WHERE trigger.tgrelid='ledger.call_prompt'::regclass AND NOT trigger.tgisinternal
-         AND trigger.tgname IN ('aaa_enforce_content_attestation_v2','enforce_content_ciphertext','enforce_erasure_barrier')
-       ORDER BY trigger.tgname`
-    );
-    expect(triggers.rows).toEqual([
-      { tgname: "aaa_enforce_content_attestation_v2", function_name: "core.enforce_content_attestation_v2_call_prompt" },
-      { tgname: "enforce_content_ciphertext", function_name: "core.enforce_content_ciphertext_call_prompt" },
-      { tgname: "enforce_erasure_barrier", function_name: "core.enforce_erasure_barrier" }
-    ]);
   }, 300_000);
 });

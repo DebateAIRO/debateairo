@@ -52,10 +52,14 @@ ALTER TABLE ledger.ledger_entry ADD CONSTRAINT ledger_entry_model_role_vocabular
     'POSITION', 'SUPPORT_ATTACK', 'CROSS_EXCHANGE', 'JUDGE',
     'REVIEWER', 'ANSWER_WRITER', 'ANSWER_CHECKER'
   ));
--- A scorecard candidate id is ONE token (packages/providers CANDIDATE_ID_TOKEN).
+-- A scorecard candidate id is ONE token. The pattern is the scorecard's own
+-- identifierText, character for character (packages/scorecard/src/schema.ts),
+-- so the column accepts exactly the ids a valid scorecard can name; the 0072
+-- contract suite pins the two texts. The provider-gateway task must reuse this
+-- same text for the token it checks before recording a call.
 ALTER TABLE ledger.ledger_entry DROP CONSTRAINT IF EXISTS ledger_entry_candidate_id_token;
 ALTER TABLE ledger.ledger_entry ADD CONSTRAINT ledger_entry_candidate_id_token
-  CHECK (candidate_id IS NULL OR candidate_id ~ '^[A-Za-z0-9_.:@/+-]{1,128}$');
+  CHECK (candidate_id IS NULL OR candidate_id ~ '^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$');
 ALTER TABLE ledger.ledger_entry DROP CONSTRAINT IF EXISTS ledger_entry_scorecard_version_positive;
 ALTER TABLE ledger.ledger_entry ADD CONSTRAINT ledger_entry_scorecard_version_positive
   CHECK (scorecard_version IS NULL OR scorecard_version >= 1);
@@ -260,6 +264,11 @@ CREATE TABLE IF NOT EXISTS core.run_role_assignment (
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   CONSTRAINT run_role_assignment_strength_vocabulary
     CHECK (strength IN ('ECONOMY', 'BALANCED', 'BEST')),
+  -- The strength column mirrors the pinned assignment's own `strength` and can
+  -- never disagree with it. The key is required (RoleAssignmentSchema requires
+  -- it), so an assignment that is silent about its strength is refused too.
+  CONSTRAINT run_role_assignment_strength_matches_assignment
+    CHECK (assignment->>'strength' IS NOT NULL AND strength = assignment->>'strength'),
   CONSTRAINT run_role_assignment_is_object
     CHECK (jsonb_typeof(assignment) = 'object'),
   CONSTRAINT run_role_assignment_bounded

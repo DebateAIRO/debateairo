@@ -59,6 +59,17 @@ describe("model scorecard migration 0072 — architecture contract", () => {
     expect(migration).toContain(`CHECK (thinking_level IS NULL OR thinking_level ~ '${scorecardRule}')`);
   });
 
+  it("holds candidate_id to the scorecard's identifierText, character for character (fix round 1)", async () => {
+    // A VALID scorecard never names a candidate the ledger would refuse, and the ledger
+    // records no id a scorecard could not name.
+    const schema = await read("packages/scorecard/src/schema.ts");
+    const scorecardRule = /const identifierText = z\.string\(\)\.regex\(\/(.+?)\/u\);/u.exec(schema)?.[1];
+    expect(scorecardRule).toBe("^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$");
+    const migration = await read("migrations/0072_model_scorecard.sql");
+    expect(migration).toContain(`CHECK (candidate_id IS NULL OR candidate_id ~ '${scorecardRule}')`);
+    expect(migration).not.toContain("CANDIDATE_ID_TOKEN");
+  });
+
   it("mirrors every new column and table in schema.ts and declares the carrier to the cipher", async () => {
     const schema = await read("packages/db/src/schema.ts");
     const block = (declaration: string): string => {
