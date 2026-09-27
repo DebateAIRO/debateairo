@@ -93,7 +93,8 @@ type SiteKind = "AUTHOR" | "PANEL" | "REVIEW" | "SERVE";
  */
 function enumerateMaximumPathSites(
   panelSize: number,
-  depth: number
+  depth: number,
+  backupSequences: 0 | 1 = 0
 ): readonly { readonly kind: SiteKind; readonly worstCaseAttempts: number }[] {
   const sites: { kind: SiteKind; worstCaseAttempts: number }[] = [];
   const materializedNodeIds: string[] = [];
@@ -115,14 +116,22 @@ function enumerateMaximumPathSites(
    * Attempts are counted CUMULATIVELY per call-site key, so a cooldown-wrapped
    * site's two sequences share ONE allowance — never two fresh ones.
    * Measured at 4 in tests/integration/t17-envelope-ledger.test.ts.
+   *
+   * A14 (DR-184-v5, only for a run with a runner-up — pre-flight ruling F17):
+   * every seat call may be answered by its backup ONCE, under the backup's OWN
+   * key (`:seat:runnerUp`), so it draws its own allowance: sequence 1 spends the
+   * main's `judgeMaxAttempts`, then the backup's, and the post-cooldown sequence
+   * reaches ONE key whose remainder is the final retry. The retraction above
+   * still stands for ONE key. The panel and serve legs add one sequence each.
    */
-  const cooldownSite = BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts;
+  const backupSequence = BOUNDS.judgeMaxAttempts * backupSequences;
+  const cooldownSite = BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts + backupSequence;
   for (const _nodeId of materializedNodeIds) {
     sites.push({ kind: "AUTHOR", worstCaseAttempts: cooldownSite });
     if (panelSize === 1) continue;
     // runJudgePanel calls every non-author member once; no cooldown wrapper.
     for (let member = 1; member < panelSize; member += 1) {
-      sites.push({ kind: "PANEL", worstCaseAttempts: BOUNDS.judgeMaxAttempts });
+      sites.push({ kind: "PANEL", worstCaseAttempts: BOUNDS.judgeMaxAttempts + backupSequence });
     }
     for (let visit = 0; visit < SEALED.reviewerCallsPerNode; visit += 1) {
       sites.push({ kind: "REVIEW", worstCaseAttempts: cooldownSite });
@@ -147,13 +156,14 @@ function enumerateMaximumPathSites(
     for (const role of SYNTHESIS_ROLES) serveSiteKeys.push(`${role}:${round}`);
   }
   for (let site = 0; site < serveSiteKeys.length; site += 1) {
-    sites.push({ kind: "SERVE", worstCaseAttempts: BOUNDS.organMaxAttempts });
+    // A14: with a runner-up, the synthesis seat's main, then its backup.
+    sites.push({ kind: "SERVE", worstCaseAttempts: BOUNDS.organMaxAttempts + BOUNDS.organMaxAttempts * backupSequences });
   }
   return Object.freeze(sites);
 }
 
-function enumerateMaximumPathAttempts(panelSize: number, depth: number): number {
-  return enumerateMaximumPathSites(panelSize, depth)
+function enumerateMaximumPathAttempts(panelSize: number, depth: number, backupSequences: 0 | 1 = 0): number {
+  return enumerateMaximumPathSites(panelSize, depth, backupSequences)
     .reduce((total, site) => total + site.worstCaseAttempts, 0);
 }
 
@@ -556,5 +566,82 @@ describe("F-T17T9-3 · the serve rule has ONE home", () => {
     const basis = computeStructuralCeilingBasis(ceilingInput(2, 1));
     expect(parseCostEnvelopeBasis(basis).serveLeg)
       .toEqual({ synthesisLoopSites: SERVE_LEG.sites(SEALED), selected: SERVE_LEG.chain });
+  });
+});
+
+/**
+ * A14 — DR-184-v5 BESIDE DR-184-v4 (model scorecard; pre-flight ruling F17).
+ *
+ * V ruled on 2026-09-05 to seal the TRUE maximum, with no padding. A run whose
+ * pinned assignment has no runner-up can never spend a backup sequence, so it
+ * keeps DR-184-v4 exactly; admission passes `backupSequencesProvisioned: 1`
+ * only when some seat has a runner-up, and the receipt names which formula
+ * minted it. Both receipts parse to the SAME shape at the run head.
+ */
+describe("A14 · one backup sequence per seat call, only when admission provisions it", () => {
+  const withBackup = (panelSize: number, depth: number) => ({ ...ceilingInput(panelSize, depth), backupSequencesProvisioned: 1 as const });
+  const withoutBackup = (panelSize: number, depth: number) => ({ ...ceilingInput(panelSize, depth), backupSequencesProvisioned: 0 as const });
+
+  it("mints DR-184-v4 exactly when no backup is provisioned — absent or 0 — and DR-184-v5 when one is", () => {
+    const absent = computeStructuralCeilingBasis(ceilingInput(2, 1));
+    const zero = computeStructuralCeilingBasis(withoutBackup(2, 1));
+    const one = computeStructuralCeilingBasis(withBackup(2, 1));
+    expect(zero).toEqual(absent);
+    expect(absent).toMatchObject({ max_model_attempts: 106, formula_version: "DR-184-v4" });
+    // DR-184-v4's 106 plus one backup sequence at 24 judge sites (8 author,
+    // 8 review, 8 panel; 3 attempts each) and 6 serve sites (3 each): 106 + 90.
+    expect(one).toMatchObject({ max_model_attempts: 196, formula_version: "DR-184-v5" });
+    expect(enumerateMaximumPathAttempts(2, 1, 1)).toBe(196);
+  });
+
+  it("EQUALS the enumerated maximum path with a backup at every seat call, M=1..8, depth=1..5", () => {
+    for (let panelSize = 1; panelSize <= 8; panelSize += 1) {
+      for (let depth = 1; depth <= 5; depth += 1) {
+        expect({ panelSize, depth, attempts: computeStructuralCeilingBasis(withBackup(panelSize, depth)).max_model_attempts })
+          .toEqual({ panelSize, depth, attempts: enumerateMaximumPathAttempts(panelSize, depth, 1) });
+      }
+    }
+  });
+
+  it("pins the DR-184-v5 grid: each v4 cell doubled, less one final retry per author and review site", () => {
+    const expected = [
+      [43, 43, 43, 43, 43],
+      [196, 356, 676, 1316, 2596],
+      [426, 738, 1362, 2610, 5106],
+      [804, 1316, 2340, 4388, 8484]
+    ];
+    for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
+      for (let depth = 1; depth <= 5; depth += 1) {
+        const basis = computeStructuralCeilingBasis(withBackup(panelSize, depth));
+        expect(basis.max_model_attempts).toBe(expected[panelSize - 1]![depth - 1]);
+        expect(basis.formula_version).toBe("DR-184-v5");
+      }
+    }
+  });
+
+  it("discloses the v5 per-site attempts in v4's receipt shape, with v4's call sites", () => {
+    const v4 = computeStructuralCeilingBasis(withoutBackup(2, 1));
+    const v5 = computeStructuralCeilingBasis(withBackup(2, 1));
+    // `judge` stays the sequence bound; the other three are PER SITE, backup included.
+    expect(v5.per_site_attempts).toEqual({ judge: 3, organ: 6, panel_member: 6, cooldown_site: 7 });
+    expect(v4.per_site_attempts).toEqual({ judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 });
+    expect(v5.call_sites).toEqual(v4.call_sites);
+    expect(Object.keys(v5).sort()).toEqual(Object.keys(v4).sort());
+  });
+
+  it("round-trips both receipts through the run-head schema to the same shape", () => {
+    const v4 = parseCostEnvelopeBasis(computeStructuralCeilingBasis(withoutBackup(2, 1)));
+    const v5 = parseCostEnvelopeBasis(computeStructuralCeilingBasis(withBackup(2, 1)));
+    expect(v4).toMatchObject({ maxModelAttempts: 106, panelSize: 2, depth: 1, wire: { formula_version: "DR-184-v4" } });
+    expect(v5).toMatchObject({ maxModelAttempts: 196, panelSize: 2, depth: 1, wire: { formula_version: "DR-184-v5" } });
+    expect(Object.keys(v5).sort()).toEqual(Object.keys(v4).sort());
+  });
+
+  it.each([2, -1, 0.5])("refuses a backup provision of %s: a switch, never a count", (value) => {
+    expect(() => computeStructuralCeilingBasis({ ...ceilingInput(2, 1), backupSequencesProvisioned: value } as never))
+      .toThrowError(expect.objectContaining({
+        name: "TypedDomainError",
+        code: "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID"
+      }));
   });
 });

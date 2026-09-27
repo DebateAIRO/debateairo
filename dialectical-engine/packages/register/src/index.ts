@@ -190,6 +190,16 @@ export interface StructuralCeilingInput {
    * was already admitted.
    */
   readonly maxDepth: number;
+  /**
+   * A14 · DR-184-v5 (model scorecard; pre-flight ruling F17) — whether each
+   * seat call is provisioned ONE backup sequence: 1 only when the run's pinned
+   * role assignment gives at least one seat a runner-up, else 0. Admission
+   * decides it (`evaluateAskAdmission`). Absent means 0 — DR-184-v4 exactly,
+   * the number V sealed on 2026-09-05 without padding — which is the right
+   * value for every caller that predates the scorecard: no runner-up can exist
+   * without a pinned assignment. Checked below: exactly 0 or 1, never a count.
+   */
+  readonly backupSequencesProvisioned?: 0 | 1;
 }
 
 /**
@@ -198,7 +208,7 @@ export interface StructuralCeilingInput {
  * pass, so an omitted term reached the arithmetic as `undefined` and minted a
  * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
  */
-const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Object.freeze([
+const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned">[] = Object.freeze([
   "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
   "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
   "compositionSegmentCap", "fixedOrgansPerComposition",
@@ -303,6 +313,33 @@ export const SERVE_LEG = Object.freeze({
  * Repair attempts are NOT a separate term: `buildRepairPacket` is consumed
  * inside the per-site attempt loop (packages/providers/src/index.ts:326-427),
  * so a repair is one of the `maxAttempts` the site already provisions.
+ *
+ * A14 · DR-184-v5 (model scorecard; owner ruling R4, 2026-09-26; pre-flight
+ * ruling F17) — ONE BACKUP SEQUENCE PER SEAT CALL, ONLY WHEN PROVISIONED. A
+ * seat whose main candidate fails its call (transport exhausted after the
+ * normal retries, or a subscription usage cap) is answered by its runner-up,
+ * under the runner-up's OWN call-site key (`…:seat:runnerUp`), so the
+ * gateway's cumulative per-key count gives it a fresh allowance that v4 never
+ * provisioned. Why one sequence is ENOUGH:
+ *  · a seat call switches at most once — the failed candidate is marked down
+ *    for the rest of the run, a seat has two candidates, and once both are down
+ *    the selected one is retried under its own, already-spent key;
+ *  · AUTHOR/REVIEWER: sequence 1 reaches the main then the backup (judge +
+ *    judge); the cooldown's sequence 2 reaches ONE key, whose remainder is the
+ *    final retry — `2 * judge + final`, the number the earlier draft reached for
+ *    a single key and the ledger refuted; it is reachable now only through TWO;
+ *  · PANEL: main plus backup, never cooldown-wrapped — `2 * judge`;
+ *  · SERVE: main plus backup at the synthesis bound — `2 * organ`;
+ *  · the 80-20 split MOVES a call between a seat's two candidates, never adds one;
+ *  · the runner calls at most `panelSize - 1` judges per node and refuses an
+ *    assignment that seats more than `panelSize` debaters, so the four site
+ *    counts are v4's.
+ * A run with no runner-up can never spend that sequence, so admission passes
+ * `backupSequencesProvisioned: 0` for it and the ceiling stays DR-184-v4, the
+ * TRUE maximum V ruled on 2026-09-05 to seal without padding. The receipt keeps
+ * v4's shape (the run head parses it strictly) and names its formula:
+ * `per_site_attempts.judge` stays the sequence bound, `organ` is the serve
+ * site's allowance, and `panel_member` and `cooldown_site` are per site.
  */
 export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Readonly<Record<string, unknown>> & {
   readonly max_model_attempts: number;
@@ -315,6 +352,14 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
         `The structural ceiling input ${name} must be a positive integer`
       );
     }
+  }
+  // A14 (pre-flight ruling F17): the backup provision is a switch, never a count.
+  const backupSequences = input.backupSequencesProvisioned ?? 0;
+  if (backupSequences !== 0 && backupSequences !== 1) {
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID",
+      "The structural ceiling input backupSequencesProvisioned must be 0 or 1"
+    );
   }
   if (input.depth > input.maxDepth) {
     // B2: the refusal belongs HERE, at admission. `evaluateAskAdmission` wraps
@@ -338,7 +383,12 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   const materializedNodes = input.panelSize === 1
     ? 1
     : input.panelSize * nodesPerRoot + input.panelSize * (input.panelSize - 1);
-  const cooldownSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts;
+  // A14 (DR-184-v5 when provisioned): one backup sequence per seat call — see the doc comment.
+  const backupJudgeSequence = input.judgeMaxAttempts * backupSequences;
+  const backupOrganSequence = input.organMaxAttempts * backupSequences;
+  const cooldownSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts + backupJudgeSequence;
+  const panelMemberAttempts = input.judgeMaxAttempts + backupJudgeSequence;
+  const serveSiteAttempts = input.organMaxAttempts + backupOrganSequence;
   const authorSites = materializedNodes;
   const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
   const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
@@ -364,8 +414,8 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   const synthesisLoopSites = SERVE_LEG.sites(input);
   const serveSites = synthesisLoopSites;
   const maxModelAttempts = (authorSites + reviewerSites) * cooldownSiteAttempts
-    + panelSites * input.judgeMaxAttempts
-    + serveSites * input.organMaxAttempts;
+    + panelSites * panelMemberAttempts
+    + serveSites * serveSiteAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
@@ -373,8 +423,8 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     depth: input.depth,
     per_site_attempts: Object.freeze({
       judge: input.judgeMaxAttempts,
-      organ: input.organMaxAttempts,
-      panel_member: input.judgeMaxAttempts,
+      organ: serveSiteAttempts,
+      panel_member: panelMemberAttempts,
       cooldown_site: cooldownSiteAttempts
     }),
     call_sites: Object.freeze({
@@ -396,7 +446,7 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     }),
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: "DR-184-v4",
+    formula_version: backupSequences === 1 ? "DR-184-v5" : "DR-184-v4",
     bounds_source_ref: "engine-exports+register"
   });
 }
