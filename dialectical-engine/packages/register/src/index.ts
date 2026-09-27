@@ -933,6 +933,7 @@ export {
 // A19: the optional model scorecard (absent -> the plan rosters choose the models).
 export {
   BUNDLED_MODEL_SCORECARD_URL,
+  MODEL_SCORECARD_MAX_BYTES,
   MODEL_SCORECARD_ROW_KEY,
   modelScorecardFromValue,
   readBundledModelScorecard,

@@ -16,7 +16,13 @@
  *    a register the hosted runner cannot start on;
  *  - the two OPERATOR-OWNED rows, read from the operator's file: the vetted
  *    `configuredProviderSet` (V-9(4), built by `buildConfiguredProviderSetDeploymentRow`)
- *    and the `costEnvelopePolicy` (V-28, validated by the register's own schema).
+ *    and the `costEnvelopePolicy` (V-28, validated by the register's own schema);
+ *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
+ *    own `--scorecard` file: the owners' approved document, sealed as it is,
+ *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
+ *    ruling 2026-09-27). It has no code-owned twin by design: a publication without
+ *    `--scorecard` seals a version with no scorecard, and asks then keep the
+ *    plan rosters. A new scorecard is a new version; the old one stays sealed.
  * The historical bootstrap is imported first, exactly as the seeder imports it,
  * and stays the sealed base: these rows are DEPLOYMENT rows, never bootstrap rows.
  *
@@ -55,6 +61,8 @@ import {
   ALGORITHM_REGISTER_ROW_KEYS,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
+  MODEL_SCORECARD_MAX_BYTES,
+  MODEL_SCORECARD_ROW_KEY,
   admissionPolicyFromValue,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
@@ -63,6 +71,7 @@ import {
   costEnvelopePolicyFromValue,
   createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
+  modelScorecardFromValue,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   persistBootstrapRegister,
@@ -70,8 +79,10 @@ import {
   readAuthPolicy,
   readCostEnvelopePolicy,
   readDeploymentRiskTier,
+  readEngineVersion,
   readEnvelopeFormulaInputs,
   readMfaPolicy,
+  readModelScorecard,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
   readRecoveryPolicy,
@@ -114,6 +125,10 @@ const EXAMPLE_PROVIDER_REF_PREFIX = "vendor:example-";
 const EXAMPLE_MAKER_PREFIX = "Example";
 
 const MAX_FILE_BYTES = 64 * 1_024;
+// A19: the scorecard file has its OWN bound, `MODEL_SCORECARD_MAX_BYTES` from
+// @debateai/register (64 KiB, owner ruling 2026-09-27) — the one constant local
+// mode also reads its bundled file under. It equals MAX_FILE_BYTES today by
+// ruling, not by coincidence of code: the two can change separately.
 const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
   "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy",
@@ -207,27 +222,38 @@ export function hostedRegisterRefusalCode(error: unknown): string {
   return "HOSTED_REGISTER_PUBLISH_FAILED";
 }
 
-export type HostedRegisterArguments = Readonly<{ filePath: string; dryRun: boolean }>;
+export type HostedRegisterArguments = Readonly<{ filePath: string; dryRun: boolean; scorecardPath: string | null }>;
 
-/** `--file <path>` once, `--dry-run` at most once, nothing else. */
+/** `--file <path>` once, `--scorecard <path>` at most once (A19), `--dry-run` at most once, nothing else. */
 export function parseHostedRegisterArguments(args: readonly string[]): HostedRegisterArguments {
   let filePath: string | undefined;
+  let scorecardPath: string | undefined;
   let dryRun = false;
+  const valueAfter = (index: number): string | undefined => {
+    const value = args[index + 1];
+    return value !== undefined && value.length > 0 && !value.startsWith("--") ? value : undefined;
+  };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
+    const value = valueAfter(index);
     if (argument === "--dry-run" && !dryRun) {
       dryRun = true;
-    } else if (argument === "--file" && filePath === undefined
-      && args[index + 1] !== undefined && args[index + 1]!.length > 0
-      && !args[index + 1]!.startsWith("--")) {
-      filePath = args[index + 1]!;
+    } else if (argument === "--file" && filePath === undefined && value !== undefined) {
+      filePath = value;
+      index += 1;
+    } else if (argument === "--scorecard" && scorecardPath === undefined && value !== undefined) {
+      scorecardPath = value;
       index += 1;
     } else {
       refuse("HOSTED_REGISTER_USAGE");
     }
   }
   if (filePath === undefined) refuse("HOSTED_REGISTER_USAGE");
-  return Object.freeze({ filePath: resolve(filePath), dryRun });
+  return Object.freeze({
+    filePath: resolve(filePath),
+    dryRun,
+    scorecardPath: scorecardPath === undefined ? null : resolve(scorecardPath)
+  });
 }
 
 const boundedText = z.string().min(1).max(256)
@@ -326,24 +352,39 @@ function isFileSystemError(error: unknown, code: string): boolean {
   return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
 }
 
+/** The refusal codes one custody-checked operator file answers with. */
+type CustodyRefusals = Readonly<{ absent: string; custody: string; invalid: string }>;
+
+const REGISTER_FILE_REFUSALS: CustodyRefusals = Object.freeze({
+  absent: "HOSTED_REGISTER_FILE_ABSENT",
+  custody: "HOSTED_REGISTER_FILE_CUSTODY_INVALID",
+  invalid: "HOSTED_REGISTER_FILE_INVALID"
+});
+
+const SCORECARD_FILE_REFUSALS: CustodyRefusals = Object.freeze({
+  absent: "HOSTED_REGISTER_SCORECARD_FILE_ABSENT",
+  custody: "HOSTED_REGISTER_SCORECARD_FILE_CUSTODY_INVALID",
+  invalid: "HOSTED_REGISTER_SCORECARD_FILE_INVALID"
+});
+
 /**
- * The operator's file, read under the codebase's ONE custody decision
+ * An operator's file, read under the codebase's ONE custody decision
  * (`custodyAccepts`, single-owner contract): a regular file, one link, mode 0600
  * owned by the caller, inside a 0700 directory owned by the caller, opened with
- * `O_NOFOLLOW` and judged on the descriptor actually read. The file holds no
- * secret, but it decides what every service runs under — prices, ceilings,
- * vendors — so a file another principal could replace is refused.
+ * `O_NOFOLLOW` and judged on the descriptor actually read. Neither operator file
+ * holds a secret, but each decides what every service runs under — prices,
+ * ceilings, vendors, which models answer — so a file another principal could
+ * replace is refused. Each file answers with its own codes and its own bound.
  */
-export async function readHostedRegisterFile(path: string): Promise<HostedRegisterFile> {
+async function readCustodiedBytes(path: string, maxBytes: number, refusals: CustodyRefusals): Promise<Buffer> {
   const resolved = resolve(path);
   let handle;
   try {
     handle = await open(resolved, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   } catch (error) {
-    if (isFileSystemError(error, "ENOENT")) refuse("HOSTED_REGISTER_FILE_ABSENT");
-    return refuse("HOSTED_REGISTER_FILE_CUSTODY_INVALID");
+    if (isFileSystemError(error, "ENOENT")) refuse(refusals.absent);
+    return refuse(refusals.custody);
   }
-  let bytes: Buffer;
   try {
     const metadata = await handle.stat();
     const parent = await stat(dirname(resolved));
@@ -359,22 +400,91 @@ export async function readHostedRegisterFile(path: string): Promise<HostedRegist
         expectedSize: undefined
       }
     )) {
-      refuse("HOSTED_REGISTER_FILE_CUSTODY_INVALID");
+      refuse(refusals.custody);
     }
-    if (metadata.size < 1 || metadata.size > MAX_FILE_BYTES) refuse("HOSTED_REGISTER_FILE_INVALID");
-    const bounded = Buffer.alloc(MAX_FILE_BYTES + 1);
+    if (metadata.size < 1 || metadata.size > maxBytes) refuse(refusals.invalid);
+    const bounded = Buffer.alloc(maxBytes + 1);
     let offset = 0;
     while (offset < bounded.length) {
       const { bytesRead } = await handle.read(bounded, offset, bounded.length - offset, offset);
       if (bytesRead === 0) break;
       offset += bytesRead;
     }
-    if (offset !== metadata.size) refuse("HOSTED_REGISTER_FILE_INVALID");
-    bytes = bounded.subarray(0, offset);
+    if (offset !== metadata.size) refuse(refusals.invalid);
+    return bounded.subarray(0, offset);
   } finally {
     await handle.close();
   }
-  return parseHostedRegisterFile(bytes);
+}
+
+/** The register file: at most 64 KiB, its own codes. */
+export async function readHostedRegisterFile(path: string): Promise<HostedRegisterFile> {
+  return parseHostedRegisterFile(await readCustodiedBytes(path, MAX_FILE_BYTES, REGISTER_FILE_REFUSALS));
+}
+
+/**
+ * A19 — THE OWNERS' APPROVED MODEL SCORECARD, as it will be sealed.
+ * `valueJsonText` is the operator's document in the register's canonical form
+ * (sorted keys, no whitespace), so the sealed row IS what was approved; the
+ * numbers the plan prints come from the engine's own validation of it.
+ * `apiCandidateCount` (carry 8) is how many candidates list an API route: the
+ * hosted site reaches models only that way, since relays never run hosted.
+ */
+export type HostedModelScorecard = Readonly<{
+  valueJsonText: RegisterPublicationRow["valueJsonText"];
+  scorecardVersion: number;
+  candidateCount: number;
+  apiCandidateCount: number;
+  sha256: string;
+  bytes: number;
+}>;
+
+/**
+ * The scorecard file's bytes -> what will be sealed. The file must fit the
+ * scorecard bound (`MODEL_SCORECARD_MAX_BYTES`, 64 KiB). The register's
+ * canonical parser runs next: a duplicate key or an exponent number refuses
+ * before `JSON.parse` could pick one, and the canonical text that will be
+ * sealed must fit the same bound (escapes can make it longer than the file).
+ * Then the engine's own scorecard validation runs, and its reason is the
+ * refusal's suffix.
+ */
+export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: string): HostedModelScorecard {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength < 1 || bytes.byteLength > MODEL_SCORECARD_MAX_BYTES) {
+    refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  }
+  let valueJsonText: RegisterPublicationRow["valueJsonText"];
+  try {
+    valueJsonText = parseCanonicalRegisterJson(bytes);
+  } catch {
+    return refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  }
+  if (Buffer.byteLength(valueJsonText, "utf8") > MODEL_SCORECARD_MAX_BYTES) {
+    refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  }
+  const read = modelScorecardFromValue(
+    JSON.parse(valueJsonText) as unknown, HOSTED_REGISTER_DEPLOYMENT_REF, engineVersion
+  );
+  if (read.state === "REFUSED") refuse(`HOSTED_REGISTER_SCORECARD_REFUSED:${read.reason}`);
+  if (read.state !== "VALID") return refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  return Object.freeze({
+    valueJsonText,
+    scorecardVersion: read.scorecard.scorecardVersion,
+    candidateCount: read.scorecard.candidates.length,
+    // Carry 8: the picker's own hosted rule (packages/scorecard/src/picker.ts,
+    // `eligiblePool`): a candidate is reachable hosted only through an API route.
+    apiCandidateCount: read.scorecard.candidates
+      .filter((candidate) => candidate.accessRoutes.some((route) => route.kind === "API")).length,
+    sha256: createHash("sha256").update(valueJsonText).digest("hex"),
+    bytes: Buffer.byteLength(valueJsonText, "utf8")
+  });
+}
+
+/** The scorecard file: the register file's custody rule, the scorecard's 64 KiB bound, its own codes. */
+export async function readHostedScorecardFile(path: string, engineVersion: string): Promise<HostedModelScorecard> {
+  return parseHostedScorecardFile(
+    await readCustodiedBytes(path, MODEL_SCORECARD_MAX_BYTES, SCORECARD_FILE_REFUSALS),
+    engineVersion
+  );
 }
 
 /**
@@ -405,6 +515,15 @@ export type HostedRegisterPlan = Readonly<{
   exampleSourceRef: boolean;
   /** The canonical targets JSON the boot readiness check re-parses. Never printed: it names credential files. */
   providerTargetsJson: string;
+  /** A19: what the additive `modelScorecard` row carries, or null when this publication seals none. */
+  modelScorecard: Readonly<{
+    scorecardVersion: number;
+    candidateCount: number;
+    /** Carry 8: candidates with an API route, the only kind the hosted site can seat. */
+    apiCandidateCount: number;
+    sha256: string;
+    bytes: number;
+  }> | null;
 }>;
 
 function canonicalRowValue(value: unknown): RegisterPublicationRow["valueJsonText"] {
@@ -447,7 +566,10 @@ function resolveSynthesisRoles(
  * Everything decided before a connection exists. A refusal here has published
  * nothing and opened nothing; a plan that returns is exactly what would be sealed.
  */
-export async function planHostedRegisterPublication(file: HostedRegisterFile): Promise<HostedRegisterPlan> {
+export async function planHostedRegisterPublication(
+  file: HostedRegisterFile,
+  scorecard: HostedModelScorecard | null = null
+): Promise<HostedRegisterPlan> {
   // V-9(4): the vetted DEPLOYMENT shape, by its own builder — PROVIDER_VENDOR_NOT_VETTED
   // and CONFIGURED_PROVIDER_SET_INVALID are its codes.
   const providerSetRow = buildConfiguredProviderSetDeploymentRow({
@@ -503,7 +625,24 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   ]);
   const replaced = codeOwnedRows.filter((row) => operatorRows.has(row.rowKey));
   if (replaced.length !== operatorRows.size) refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
-  const rows = Object.freeze(codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row));
+  // A19 — THE ONE ADDITIVE OPERATOR ROW. The two rows above REPLACE a
+  // code-owned twin; the model scorecard has none, by design: a publication
+  // without `--scorecard` then seals a version whose scorecard is ABSENT (asks
+  // keep the plan rosters), never a default the owners did not approve for the
+  // site. A builder that ever minted a twin would make two sources compete for
+  // one key, so that is refused before anything is sealed.
+  if (codeOwnedRows.some((row) => row.rowKey === MODEL_SCORECARD_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const scorecardRows: readonly RegisterPublicationRow[] = scorecard === null ? [] : [Object.freeze({
+    rowKey: MODEL_SCORECARD_ROW_KEY,
+    valueJsonText: scorecard.valueJsonText,
+    sourceRef: `${file.sourceRef} | ${MODEL_SCORECARD_ROW_KEY} v${scorecard.scorecardVersion} sha256:${scorecard.sha256}`
+  })];
+  const rows = Object.freeze([
+    ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
+    ...scorecardRows
+  ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {
     refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
@@ -541,8 +680,39 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
           && isReservedExampleHost(new URL(target.baseUrl).hostname)))
       .map((provider) => provider.providerRef)),
     exampleSourceRef: file.sourceRef === HOSTED_REGISTER_EXAMPLE_SOURCE_REF,
-    providerTargetsJson: targetsJson
+    providerTargetsJson: targetsJson,
+    modelScorecard: scorecard === null ? null : Object.freeze({
+      scorecardVersion: scorecard.scorecardVersion,
+      candidateCount: scorecard.candidateCount,
+      apiCandidateCount: scorecard.apiCandidateCount,
+      sha256: scorecard.sha256,
+      bytes: scorecard.bytes
+    })
   });
+}
+
+/**
+ * A19: the scorecard line the plan prints, and carry 8's API-route count. A
+ * scorecard none of whose candidates has an API route is still VALID and still
+ * sealed — it is NOT a refusal — but the hosted site can seat none of its
+ * models, so the plan says so in plain words.
+ */
+function renderModelScorecardLines(scorecard: HostedRegisterPlan["modelScorecard"]): readonly string[] {
+  if (scorecard === null) return ["model_scorecard=none (asks keep the plan rosters)"];
+  const lines = [
+    `model_scorecard version=${scorecard.scorecardVersion}`
+      + ` candidates=${scorecard.candidateCount}`
+      + ` bytes=${scorecard.bytes} sha256=${scorecard.sha256}`,
+    `model_scorecard api_candidates=${scorecard.apiCandidateCount}`
+      + ` (${scorecard.apiCandidateCount} of the ${scorecard.candidateCount} scored models`
+      + " can be reached through an API; the hosted site reaches models only that way)"
+  ];
+  if (scorecard.apiCandidateCount === 0) {
+    lines.push("model_scorecard note: none of these models can be reached through an API, so the hosted site will keep"
+      + " using the plan's usual models until a model it can reach through an API is scored."
+      + " The scorecard is still valid and can still be published.");
+  }
+  return lines;
 }
 
 /** The plan as the operator reads it. Refs, counts, hashes and money — no path, no URL, no credential. */
@@ -566,6 +736,7 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
       + ` provisional=${plan.costEnvelope.provisional}`,
     `synthesis_roles synthesizer=${plan.synthesisRoles.synthesizerRoleRef}`
       + ` evaluator=${plan.synthesisRoles.evaluatorRoleRef}`,
+    ...renderModelScorecardLines(plan.modelScorecard),
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`
   ].join("\n") + "\n";
 }
@@ -667,6 +838,12 @@ export async function verifyHostedRegisterBootReadiness(
   await readStructuralCeilingPolicyInputs(pool, version);
   await readEnvelopeFormulaInputs(pool, version);
   await readDeploymentRiskTier(pool, version);
+  // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
+  // sealed one the API would refuse at start-up is refused here, by its reason.
+  const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());
+  if (modelScorecard.state === "REFUSED") {
+    refuse(`HOSTED_REGISTER_MODEL_SCORECARD_REFUSED:${modelScorecard.reason}`);
+  }
   await readDevelopmentRunnerPolicy(pool, version);
   const targets = parseProviderDiscoveryTargets(providerTargetsJson, makers.configuredProviders);
   assertDeploymentProviderTargets(targets, { mode: "hosted", nodeEnv: "production" });

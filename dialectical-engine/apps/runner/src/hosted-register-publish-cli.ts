@@ -4,6 +4,9 @@
  *   pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
  *   pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json
  *
+ * and, with the owners' approved model scorecard (A19, optional), the same
+ * command plus `--scorecard /etc/debateai/register/model-scorecard.json`.
+ *
  * with `MIGRATION_DATABASE_URL` naming the P3-01 migrator (the only principal
  * that can publish; the just-in-time credential ceremony is the kit's §4). A dry
  * run needs no database and opens no connection.
@@ -22,7 +25,7 @@
  */
 import { pathToFileURL } from "node:url";
 import { createPool } from "@debateai/db";
-import { loadMigrationEnvironment } from "@debateai/register";
+import { loadMigrationEnvironment, readEngineVersion } from "@debateai/register";
 import {
   HostedRegisterBootCheckFailedError,
   assertHostedRegisterPlanPublishable,
@@ -32,6 +35,7 @@ import {
   planHostedRegisterPublication,
   publishHostedRegister,
   readHostedRegisterFile,
+  readHostedScorecardFile,
   renderHostedRegisterPlan,
   type HostedRegisterOperations,
   type HostedRegisterPublicationResult
@@ -65,7 +69,13 @@ export async function runHostedRegisterPublishCli(
 ): Promise<number> {
   try {
     const parsed = parseHostedRegisterArguments(args);
-    const plan = await planHostedRegisterPublication(await readHostedRegisterFile(parsed.filePath));
+    const file = await readHostedRegisterFile(parsed.filePath);
+    // A19: the scorecard file after the register file, so every register-file
+    // refusal keeps its turn; neither read opens a connection.
+    const scorecard = parsed.scorecardPath === null
+      ? null
+      : await readHostedScorecardFile(parsed.scorecardPath, await readEngineVersion());
+    const plan = await planHostedRegisterPublication(file, scorecard);
     output.stdout(renderHostedRegisterPlan(plan));
     if (parsed.dryRun) {
       output.stdout("HOSTED_REGISTER_DRY_RUN written=none\n");

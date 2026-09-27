@@ -85,3 +85,44 @@ never as an edit of the sealed one.
 The file is read under the same custody rule as the key files: mode `0600`, owned by the user who
 runs the command, inside a `0700` directory owned by that same user, not a symlink
 (`HOSTED_REGISTER_FILE_CUSTODY_INVALID`).
+
+## The model scorecard (optional): `--scorecard`
+
+The owners' approved model scorecard is published **beside** the register file, never inside it. It is its own
+document, with its own argument and its own size limit: **64 KiB** (65,536 bytes), for the file and for the scorecard
+as it is stored. Local mode reads its scorecard file (`scorecards/current.json`) under the same limit, so a file is
+accepted or refused the same way in both.
+
+Why 64 KiB (the owners' ruling of 2026-09-27): the database re-checks a stored value one character at a time, and that
+takes longer the bigger the value, faster than in step with its size. A scorecard close to 64 KiB takes about half a
+minute to publish; one of about 100 KB took almost a minute and a half. The seven-model example scorecard is about
+18 KB.
+
+```sh
+pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json --scorecard /etc/debateai/register/model-scorecard.json
+```
+
+```sh
+pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json --scorecard /etc/debateai/register/model-scorecard.json
+```
+
+- The scorecard file is read under the same custody rule as the register file: mode 0600, in a 0700 directory you own.
+  Its refusals are `HOSTED_REGISTER_SCORECARD_FILE_ABSENT`, `…_CUSTODY_INVALID` and `…_INVALID`. `…_INVALID` also
+  covers a file over 64 KiB, and a file whose stored form would be over 64 KiB (for example, many `\n` escapes,
+  which are stored as the longer `\u000a`).
+- It is checked by the engine's own scorecard validation. A refusal is `HOSTED_REGISTER_SCORECARD_REFUSED:` followed by
+  the reason (`SCHEMA_INVALID`, `ENGINE_INCOMPATIBLE`, `UNKNOWN_CANDIDATE` or `NUMBER_SHAPE`).
+- It becomes the `modelScorecard` row of the NEW register version. The row's source reference is your `sourceRef`,
+  followed by ` | modelScorecard v<version> sha256:<hash of the sealed document>`.
+- The plan prints `model_scorecard version=… candidates=… bytes=… sha256=…`, or
+  `model_scorecard=none (asks keep the plan rosters)`.
+- The hosted site reaches a model only through an API, so the plan also prints how many of the scorecard's models can
+  be reached that way: `model_scorecard api_candidates=N (N of the M scored models can be reached through an API; the
+  hosted site reaches models only that way)`. When that number is 0 it adds one more line, `model_scorecard note: …`,
+  saying the hosted site will keep using the plan's usual models until a model it can reach through an API is scored.
+  That is a warning, not a refusal: the scorecard is still valid and can still be published.
+- **Every publication is a complete register version.**
+  - Publishing again *without* `--scorecard` seals a version with **no** scorecard, and asks then use the plan rosters.
+  - To keep the scorecard while you change something else, pass the same `--scorecard` again.
+  - To go back to an earlier scorecard, pin the earlier `REGISTER_VERSION`. No sealed version is ever edited.
+- When the API starts, it prints one line saying which scorecard it runs: `MODEL_SCORECARD state=VALID|ABSENT|REFUSED …`.

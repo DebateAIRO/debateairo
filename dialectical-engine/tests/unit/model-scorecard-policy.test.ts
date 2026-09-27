@@ -6,14 +6,18 @@
  * `parseScorecard`; these rows prove the register side carries its verdict
  * unchanged and reads only the version it is pinned to.
  */
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { constants } from "node:fs";
+import { mkdir, mkdtemp, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { setTimeout as delay } from "node:timers/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Pool } from "pg";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BUNDLED_MODEL_SCORECARD_URL,
+  MODEL_SCORECARD_MAX_BYTES,
   MODEL_SCORECARD_ROW_KEY,
   modelScorecardFromValue,
   readBundledModelScorecard,
@@ -136,6 +140,80 @@ describe("A19 · the bundled public file (local mode)", () => {
     await expect(readBundledModelScorecard(ENGINE, pathToFileURL(join(root, "current.json"))))
       .resolves.toMatchObject({ state: "REFUSED", reason: "FILE_UNREADABLE" });
   });
+
+  /*
+   * Carry 9 (A19.1 review M2, M3, M5): the path is opened and its descriptor
+   * judged BEFORE anything is read. Only a regular file within the scorecard
+   * bound is read at all, and every refusal's detail is a fixed sentence with
+   * no path.
+   *
+   * Owner ruling 2026-09-27: the bound is 64 KiB, ONE constant shared with
+   * hosted publish, so the same file gets the same answer in both modes. It
+   * caps the file and the form it is stored in, since the database re-checks a
+   * sealed value at a cost that grows with the square of its size.
+   */
+  it("is 64 KiB, one number for both modes", () => {
+    expect(MODEL_SCORECARD_MAX_BYTES).toBe(65_536);
+  });
+
+  it("reads a file of exactly 64 KiB", async () => {
+    const valid = JSON.stringify(await compatible());
+    const atBound = valid + " ".repeat(MODEL_SCORECARD_MAX_BYTES - Buffer.byteLength(valid, "utf8"));
+    expect(Buffer.byteLength(atBound, "utf8")).toBe(65_536);
+    await expect(readBundledModelScorecard(ENGINE, await fileHolding(atBound)))
+      .resolves.toMatchObject({ state: "VALID" });
+  });
+
+  it("refuses a file over 64 KiB from its size alone, before reading it", async () => {
+    const valid = JSON.stringify(await compatible());
+    const oversized = valid + " ".repeat(MODEL_SCORECARD_MAX_BYTES + 1 - Buffer.byteLength(valid, "utf8"));
+    expect(Buffer.byteLength(oversized, "utf8")).toBe(65_537);
+    const location = await fileHolding(oversized);
+    const read = await readBundledModelScorecard(ENGINE, location);
+    expect(read).toMatchObject({ state: "REFUSED", reason: "SCHEMA_INVALID" });
+    expect((read as { detail: string }).detail).toBe("the bundled scorecard is larger than 64 KiB, the limit for one scorecard");
+    expect(JSON.stringify(read)).not.toContain(fileURLToPath(new URL(".", location)));
+  });
+
+  it("refuses a file under 64 KiB whose stored form is over it", async () => {
+    // "\n" is 2 bytes in the file and `\u000a`, 6 bytes, in the register's canonical form.
+    const expanding = JSON.stringify({ ...await compatible(), futureNote: "\n".repeat(12_000) });
+    expect(Buffer.byteLength(expanding, "utf8")).toBeLessThanOrEqual(MODEL_SCORECARD_MAX_BYTES);
+    const read = await readBundledModelScorecard(ENGINE, await fileHolding(expanding));
+    expect(read).toMatchObject({ state: "REFUSED", reason: "SCHEMA_INVALID" });
+    expect((read as { detail: string }).detail)
+      .toBe("the bundled scorecard is larger than 64 KiB once stored, the limit for one scorecard");
+  });
+
+  it("refuses a link whose target is missing, instead of calling it absent", async () => {
+    const root = await temporaryRoot();
+    await symlink(join(root, "approved-elsewhere.json"), join(root, "current.json"));
+    const read = await readBundledModelScorecard(ENGINE, pathToFileURL(join(root, "current.json")));
+    expect(read).toMatchObject({ state: "REFUSED", reason: "FILE_UNREADABLE" });
+    expect(JSON.stringify(read)).not.toContain(root);
+  });
+
+  it("refuses a FIFO at once, without waiting for a writer", async () => {
+    const root = await temporaryRoot();
+    const fifo = join(root, "current.json");
+    execFileSync("mkfifo", [fifo]);
+    const stop = new AbortController();
+    const read = readBundledModelScorecard(ENGINE, pathToFileURL(fifo));
+    try {
+      const settled = await Promise.race([
+        read,
+        delay(2_000, undefined, { signal: stop.signal }).then(() => "STILL_WAITING_FOR_A_WRITER", () => "ABORTED")
+      ]);
+      expect(settled).toMatchObject({ state: "REFUSED", reason: "FILE_UNREADABLE" });
+      expect(JSON.stringify(settled)).not.toContain(root);
+    } finally {
+      stop.abort();
+      // A reader blocked in open() waits for a writer: open and close one end so
+      // it can finish. With no reader waiting this refuses (ENXIO) and is ignored.
+      await open(fifo, constants.O_WRONLY | constants.O_NONBLOCK).then((handle) => handle.close(), () => undefined);
+      await Promise.race([read.catch(() => undefined), delay(1_000)]);
+    }
+  });
 });
 
 describe("A19 · the engine version a scorecard is judged against", () => {
@@ -148,6 +226,17 @@ describe("A19 · the engine version a scorecard is judged against", () => {
     for (const manifest of [{ name: "x" }, { version: "latest" }]) {
       await expect(readEngineVersion(await fileHolding(JSON.stringify(manifest))))
         .rejects.toThrowError("ENGINE_VERSION_UNRESOLVED");
+    }
+  });
+
+  /* Carry 9 (A19.1 review M1): one code for every manifest it cannot use, never a raw ENOENT or SyntaxError. */
+  it("refuses a missing, non-JSON, null or non-object manifest by the same code", async () => {
+    const missing = pathToFileURL(join(await temporaryRoot(), "package.json"));
+    await expect(readEngineVersion(missing))
+      .rejects.toMatchObject({ name: "TypeError", message: "ENGINE_VERSION_UNRESOLVED" });
+    for (const contents of ["not json", "null", "42", "\"0.1.0\""]) {
+      await expect(readEngineVersion(await fileHolding(contents)), contents)
+        .rejects.toMatchObject({ name: "TypeError", message: "ENGINE_VERSION_UNRESOLVED" });
     }
   });
 });
