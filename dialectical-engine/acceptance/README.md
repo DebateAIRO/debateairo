@@ -92,8 +92,8 @@ lines of plain text — and that second file, handed to an interpreter which cou
 not execute it and so re-read it as a script, re-entered itself until the host's
 process table was full.
 
-**Prompt transport, thinking level, context window and usage caps (model scorecard, 2026-09-26).**
-Every relay runs through `relay-core.ts`, which now carries four more laws.
+**Prompt transport, thinking level, context window, stdout lines and usage caps (model scorecard, 2026-09-26).**
+Every relay runs through `relay-core.ts`, which now carries five more laws.
 *Transport*: an adapter says how its CLI receives the prompt — `argv` (the four
 original makers, unchanged), `stdin` (written, then closed) or `file` (a mode-0600
 file in its own private directory, deleted after the call; only its path reaches the
@@ -107,7 +107,13 @@ Thinking tokens a CLI reports are echoed as
 `usage.completion_tokens_details.reasoning_tokens`, and only then. *Context
 window*: an adapter that declares one refuses, with 413
 `CLI_RELAY_CONTEXT_WINDOW_EXCEEDED` and before any CLI starts, a prompt whose size
-at 2 bytes per token plus the request's `max_tokens` would not fit. *Usage caps*: a
+at 2 bytes per token plus the request's `max_tokens` would not fit. *Stdout lines*:
+a relay reads at most 1 MiB of its CLI's output (`CLI_RELAY_STDOUT_LIMIT` beyond it),
+and an adapter may name the lines its parser reads. Each line is then decided from its
+first 4 KiB; a line it does not need is discarded as it arrives and never counted, while
+a kept line counts like any output. The pi relay keeps only pi's final assistant
+message: pi repeats the whole prompt in its own events, and without the filter a prompt
+well inside its 1M window would run on the subscription and then be refused. *Usage caps*: a
 CLI that exits non-zero is shown to its adapter's cap classifier together with up to
 64 KiB of its stderr (kept in memory, never logged or returned); a recognised cap is
 answered 429 with `x_cli_relay_error: "CLI_RELAY_USAGE_CAP"`, so the runner switches

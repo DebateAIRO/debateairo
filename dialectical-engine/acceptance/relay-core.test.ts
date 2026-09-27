@@ -14,12 +14,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { estimateWindowTokens } from "@debateai/providers";
 import {
   CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES,
+  CLI_RELAY_STDOUT_LINE_DECISION_BYTES,
   CLI_RELAY_STDOUT_MAX_BYTES,
   CLI_RELAY_USAGE_CAP_CODE_TOKEN,
   RELAY_MESSAGE_MAX_UTF8_BYTES,
   RELAY_REQUEST_MAX_BYTES,
   RELAY_REQUEST_MAX_MESSAGES,
   buildCliUsage,
+  createStdoutLineFilter,
   invokeCli,
   isRelayHandshakeReply,
   renderPromptTranscript,
@@ -1541,5 +1543,162 @@ describe("the shared handshake reply rule (Task A10 fix round 1, shared from Tas
     ]) {
       expect(isRelayHandshakeReply(reply), JSON.stringify(reply)).toBe(false);
     }
+  });
+});
+
+/**
+ * A11 fix round 1 (review of dee85930). pi repeats the whole prompt in its own
+ * JSON events and may stream the growing partial answer, so its stdout can be
+ * many times the 1 MiB bound while the one line its parser reads is small. An
+ * adapter may therefore declare `keepStdoutLine`: each line is decided from its
+ * first CLI_RELAY_STDOUT_LINE_DECISION_BYTES bytes, a dropped line is discarded
+ * as it arrives and never counted, and a kept line counts toward the bound like
+ * any output does. An adapter without the hook is read exactly as before.
+ */
+describe("A11 fix round 1: an adapter's stdout line filter", () => {
+  const DECISION = CLI_RELAY_STDOUT_LINE_DECISION_BYTES;
+  const keepK = (lineStart: string): boolean => lineStart.startsWith("K");
+  const lines = [
+    "K first kept line",
+    `D${"d".repeat(DECISION * 2)}`,
+    "",
+    `K${"k".repeat(DECISION + 10)}`,
+    "D dropped",
+    "K last, unterminated"
+  ];
+  const stream = Buffer.from(lines.join("\n"), "utf8");
+  const expected = lines.filter(keepK).join("\n");
+
+  function filtered(chunks: readonly Buffer[], keep: (lineStart: string) => boolean = keepK): string {
+    const filter = createStdoutLineFilter(keep);
+    const kept = chunks.flatMap((chunk) => filter.accept(chunk));
+    kept.push(...filter.finish());
+    return Buffer.concat(kept).toString("utf8");
+  }
+
+  function splitAt(buffer: Buffer, positions: readonly number[]): Buffer[] {
+    const edges = [0, ...positions, buffer.byteLength];
+    return edges.slice(1).map((end, index) => buffer.subarray(edges[index], end));
+  }
+
+  it("assembles lines across chunk boundaries: one chunk, one-byte chunks and every two-chunk split agree", () => {
+    expect(filtered([stream])).toBe(expected);
+    expect(filtered(Array.from(stream, (byte) => Buffer.of(byte)))).toBe(expected);
+    for (let position = 0; position <= stream.byteLength; position += 7) {
+      expect(filtered(splitAt(stream, [position])), `split at ${position}`).toBe(expected);
+    }
+    for (const position of [DECISION - 1, DECISION, DECISION + 1, DECISION + 2]) {
+      expect(filtered(splitAt(stream, [position, position + DECISION])), `split at ${position}`).toBe(expected);
+    }
+  });
+
+  it("hands the hook at most the decision bytes of each line, never its newline", () => {
+    const seen: string[] = [];
+    filtered(Array.from(stream, (byte) => Buffer.of(byte)), (lineStart) => {
+      seen.push(lineStart);
+      return keepK(lineStart);
+    });
+
+    expect(seen).toEqual(lines.map((line) => line.slice(0, DECISION)));
+  });
+
+  it("holds at most the decision bytes of an undecided line, then returns a kept line's bytes as they arrive", () => {
+    const filter = createStdoutLineFilter(keepK);
+
+    expect(filter.accept(Buffer.from(`K${"k".repeat(99)}`, "utf8"))).toEqual([]);
+    const rest = filter.accept(Buffer.alloc(DECISION * 3, 0x6b));
+    expect(Buffer.concat(rest).byteLength).toBe(100 + DECISION * 3);
+    expect(filter.finish()).toEqual([]);
+
+    const dropping = createStdoutLineFilter(keepK);
+    expect(dropping.accept(Buffer.alloc(DECISION * 10, 0x64))).toEqual([]);
+    expect(dropping.finish()).toEqual([]);
+  });
+
+  it("returns copies, so a few kept bytes never keep a large, mostly dropped chunk alive", () => {
+    const chunk = Buffer.from(`K kept\nD${"d".repeat(65_536)}\nK${"k".repeat(DECISION)}\n`, "utf8");
+    const filter = createStdoutLineFilter(keepK);
+
+    const kept = filter.accept(chunk);
+
+    expect(Buffer.concat(kept).toString("utf8")).toBe(`K kept\nK${"k".repeat(DECISION)}\n`);
+    for (const piece of kept) expect(piece.buffer).not.toBe(chunk.buffer);
+  });
+
+  it("keeps a line when the hook throws or answers anything but false", () => {
+    expect(filtered([Buffer.from("D a\nD b", "utf8")], () => {
+      throw new Error("fixture hook failure");
+    })).toBe("D a\nD b");
+    expect(filtered([Buffer.from("D a\nD b", "utf8")], () => undefined as unknown as boolean)).toBe("D a\nD b");
+  });
+
+  // About 4.5 MiB of lines to drop, then the one line a parser reads.
+  const OVERSIZED_PROBE = [
+    'const dropped = "D".repeat(1_572_864) + "\\n";',
+    "process.stdout.write(dropped);",
+    "process.stdout.write(dropped);",
+    "process.stdout.write(dropped);",
+    'process.stdout.write("KEEP answer\\n");'
+  ].join("");
+  const keepKeep = (lineStart: string): boolean => lineStart.startsWith("KEEP");
+
+  it("without the hook, oversized output is still CLI_RELAY_STDOUT_LIMIT: the core is unchanged", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("line-filter-absent-fixture"), OVERSIZED_PROBE);
+
+    const response = await postRelay(handle, userTurn("Bound stdout."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "CLI_RELAY_STDOUT_LIMIT" });
+  });
+
+  it("with the hook, dropped lines never count toward the bound and the kept line is answered", async () => {
+    let parsed: string | undefined;
+    const handle = await startFixtureRelay(fixtureAdapter("line-filter-present-fixture", {
+      keepStdoutLine: keepKeep,
+      parseCompletion: (stdout: string) => {
+        parsed = stdout;
+        return { content: stdout, model: "fixture-model", usage: null };
+      }
+    }), OVERSIZED_PROBE);
+
+    const response = await postRelay(handle, userTurn("Filter stdout."));
+
+    expect(response.status).toBe(200);
+    expect(parsed).toBe("KEEP answer\n");
+  });
+
+  it("with the hook, a single kept line past the bound, unterminated, is still refused", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("line-filter-oversized-fixture", {
+      keepStdoutLine: keepKeep
+    }), `process.stdout.write("KEEP" + "k".repeat(${CLI_RELAY_STDOUT_MAX_BYTES}));`);
+
+    const response = await postRelay(handle, userTurn("Bound one line."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "CLI_RELAY_STDOUT_LIMIT" });
+  });
+
+  it("with the hook, lines written in pieces across separate chunks are reassembled end to end", async () => {
+    let parsed: string | undefined;
+    const handle = await startFixtureRelay(fixtureAdapter("line-filter-pieces-fixture", {
+      keepStdoutLine: keepKeep,
+      parseCompletion: (stdout: string) => {
+        parsed = stdout;
+        return { content: stdout, model: "fixture-model", usage: null };
+      }
+    }), [
+      "const write = (text) => new Promise((done) => setTimeout(() => process.stdout.write(text, done), 30));",
+      "(async () => {",
+      '  await write("KE");',
+      '  await write("EP one\\nDRO");',
+      '  await write("P " + "x".repeat(8_192) + "\\nKEEP");',
+      '  await write(" two");',
+      "})();"
+    ].join(""));
+
+    const response = await postRelay(handle, userTurn("Reassemble stdout."));
+
+    expect(response.status).toBe(200);
+    expect(parsed).toBe("KEEP one\nKEEP two");
   });
 });

@@ -12,6 +12,15 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 // message_end (system, user, assistant), turn_end, agent_end, agent_settled.
 // Host paths and ids from the capture are replaced by fixed test values. The
 // prompt is read from the `@file` argument, never from argv text.
+//
+// A11 fix round 1: the fake is the WORST case of pi's stream, a superset of
+// both shapes the relay has seen. The user message carries the actual prompt
+// text (pi repeats the user message in its own events), so the prompt appears
+// in the user message_start, the user message_end and agent_end's message
+// list. Every answer arrives through message_update lines that carry BOTH the
+// measured `assistantMessageEvent` delta and the growing partial `message`, so
+// stdout grows with the square of the answer length. The relay must still
+// answer, because it keeps only the assistant message_end (keepPiStdoutLine).
 const argumentList = process.argv.slice(2);
 const valueAfter = (flag) => {
   const index = argumentList.indexOf(flag);
@@ -24,11 +33,16 @@ const promptFileMode = promptFile === null ? null : (statSync(promptFile).mode &
 const model = process.env.FAKE_PI_WRONG_MODEL === "1" || prompt.includes("WRONG_MODEL_CLI")
   ? "glm-9-fake"
   : valueAfter("--model");
+// A11 fix round 1: the right model id from another provider is still another lineage.
+const provider = prompt.includes("WRONG_PROVIDER_CLI") ? "openrouter" : "zai";
+// The fixed sentence the relay puts after the `@file`; pi sends it with the file's text.
+const attachedMessage = fileArgument === undefined ? undefined : argumentList[argumentList.indexOf(fileArgument) + 1];
 
 // W6 (SECURITY): the echo below is a PROJECTION over this allow-list, never
 // `process.env`. Every key is here because an acceptance assertion reads it:
 //   asserted PRESENT — pi-relay.test.ts exact-set toEqual (HOME, LANG, LOGNAME,
-//   OLDPWD, PATH, PI_TELEMETRY, PWD, TMPDIR, USER);
+//   OLDPWD, PATH, PI_TELEMETRY, PWD, TMPDIR, USER), and PI_CODING_AGENT_DIR in
+//   its own case (the relay passes a moved agent directory through);
 //   asserted ABSENT  — pi-relay.test.ts (DATABASE_URL, GLM_API_KEY,
 //   OPENAI_API_KEY, UNRELATED_SECRET, ZAI_API_KEY: the relay never passes the
 //   Z.AI key, F37); ZAI_API_KEY stays listed for fake-cli-environment.test.ts,
@@ -39,6 +53,7 @@ const ECHOED_ENVIRONMENT_KEYS = [
   "LOGNAME",
   "OLDPWD",
   "PATH",
+  "PI_CODING_AGENT_DIR",
   "PI_TELEMETRY",
   "PWD",
   "TMPDIR",
@@ -85,7 +100,7 @@ function assistant(text, overrides = {}) {
     role: "assistant",
     content: [{ type: "text", text }],
     api: "openai-completions",
-    provider: "zai",
+    provider,
     model,
     usage: MEASURED_USAGE,
     stopReason: "stop",
@@ -96,9 +111,33 @@ function assistant(text, overrides = {}) {
   };
 }
 
-function emitRun(message) {
+/** The answer's text, in deltas of `deltaSize` characters; a message with no text has no update. */
+function updatesOf(message, deltaSize) {
+  const text = message.content.filter((part) => part.type === "text").map((part) => part.text).join("");
+  const updates = [];
+  for (let start = 0; start < text.length; start += deltaSize) {
+    const end = Math.min(start + deltaSize, text.length);
+    updates.push({
+      type: "message_update",
+      // The growing partial message so far (the unmeasured, worst-case shape)…
+      message: { ...message, content: [{ type: "text", text: text.slice(0, end) }], stopReason: "pending" },
+      // …beside the measured delta shape (M4).
+      assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: text.slice(start, end) }
+    });
+  }
+  return updates;
+}
+
+function emitRun(message, deltaSize = 1_024) {
   const system = { role: "system", content: "", sections: { preamble: "redacted" } };
-  const user = { role: "user", content: [{ type: "text", text: "redacted" }], timestamp: 0 };
+  const user = {
+    role: "user",
+    content: [
+      { type: "text", text: prompt },
+      ...(attachedMessage === undefined ? [] : [{ type: "text", text: attachedMessage }])
+    ],
+    timestamp: 0
+  };
   const events = [
     { type: "session", version: 3, id: "00000000-0000-0000-0000-000000000000", timestamp: "2026-09-26T00:00:00.000Z", cwd: process.cwd() },
     { type: "agent_start" },
@@ -108,6 +147,7 @@ function emitRun(message) {
     { type: "message_start", message: user },
     { type: "message_end", message: user },
     { type: "message_start", message: { ...message, stopReason: "pending" } },
+    ...updatesOf(message, deltaSize),
     { type: "message_end", message },
     { type: "turn_end", message, toolResults: [] },
     { type: "agent_end", messages: [system, user, message] },
@@ -138,6 +178,12 @@ if (process.env.FAKE_PI_ALWAYS_FAIL === "1") {
   emitRun(assistant("", { content: [], stopReason: "error", errorMessage: "redacted" }));
 } else if (prompt.includes("LENGTH_STOP_CLI")) {
   emitRun(assistant("a partial answer", { stopReason: "length", rawStopReason: "length" }));
+} else if (prompt.includes("LONG_ANSWER_CLI")) {
+  // 128 KiB of answer in 1 KiB deltas: ~8 MiB of growing partials on stdout.
+  emitRun(assistant("0123456789abcdef".repeat(8_192)));
+} else if (prompt.includes("OVERSIZED_ANSWER_CLI")) {
+  // The one line the relay keeps is still bounded: an answer past 1 MiB (one update).
+  emitRun(assistant("z".repeat(1_048_577)), Number.POSITIVE_INFINITY);
 } else if (prompt.includes("acceptance transport handshake")) {
   emitRun(assistant("OK"));
 } else {

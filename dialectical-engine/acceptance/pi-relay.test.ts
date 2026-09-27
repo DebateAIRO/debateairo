@@ -12,6 +12,7 @@ import {
   PI_GLM_CONTEXT_WINDOW_TOKENS,
   PI_RELAY_SYSTEM_PROMPT,
   ZAI_MAKER,
+  keepPiStdoutLine,
   parsePiEvents,
   piArguments,
   resolvePiBinary,
@@ -192,7 +193,11 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
     // 30 messages of up to 64 KiB ≈ 983 500 tokens at 2 bytes per token: they
     // fit alone, and do not fit once pi's 131 072-token output ceiling is added.
     // The last message carries the fake's handshake marker, so the ADMITTED call
-    // answers a short "OK" instead of echoing two megabytes past the stdout bound.
+    // answers a short "OK" instead of echoing two megabytes in its answer.
+    // A11 fix round 1: pi still repeats the whole prompt in its own events (the
+    // user message_start and message_end, and agent_end) — about 6 MB of stdout,
+    // six times the relay's 1 MiB bound. The ADMITTED call answers 200 only
+    // because the relay keeps nothing but the assistant message_end.
     const chunk = "a".repeat(RELAY_MESSAGE_MAX_UTF8_BYTES);
     const messages = [
       ...Array.from({ length: 29 }, () => ({ role: "user", content: chunk })),
@@ -228,11 +233,32 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
     expect(body.choices[0]?.message.content).toBe("a partial answer");
   });
 
+  it("answers a long answer that pi streams as ~8 MiB of growing partial messages (A11 fix round 1)", async () => {
+    const relay = await start();
+
+    const response = await post(relay, "LONG_ANSWER_CLI");
+
+    expect(response.status).toBe(200);
+    const completion = await response.json() as PiCompletion;
+    expect(completion.choices[0]?.message.content).toBe("0123456789abcdef".repeat(8_192));
+  });
+
+  it("still bounds the one line it keeps: an assistant answer past 1 MiB is CLI_RELAY_STDOUT_LIMIT", async () => {
+    const relay = await start();
+
+    const response = await post(relay, "OVERSIZED_ANSWER_CLI");
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "CLI_RELAY_STDOUT_LIMIT" });
+  });
+
   it("refuses an answer from another model, a non-stop ending, unparseable output and a CLI failure", async () => {
     const relay = await start();
 
     for (const [marker, code] of [
       ["WRONG_MODEL_CLI", "PI_CLI_MODEL_MISMATCH"],
+      // A11 fix round 1: the pinned model id from another provider is another lineage.
+      ["WRONG_PROVIDER_CLI", "PI_CLI_MODEL_MISMATCH"],
       ["STOP_ERROR_CLI", "PI_CLI_STOP_REASON_REFUSED"],
       ["NON_JSON_CLI", "PI_CLI_OUTPUT_INVALID"],
       ["FAIL_CLI", "PI_CLI_FAILED"]
@@ -292,6 +318,26 @@ describe("PI-01 Z.AI GLM relay through pi (model scorecard §2.10)", () => {
       expect(echo.environmentKeyNames.filter((key) => key !== "__CF_USER_TEXT_ENCODING")).toEqual([
         "HOME", "LANG", "LOGNAME", "OLDPWD", "PATH", "PI_TELEMETRY", "PWD", "TMPDIR", "USER"
       ]);
+    } finally {
+      for (const key of environmentKeys) {
+        const value = previousEnvironment[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  it("passes a moved agent directory through: PI_CODING_AGENT_DIR reaches pi when the relay has it", async () => {
+    const environmentKeys = ["PI_CODING_AGENT_DIR", "FAKE_PI_IGNORE_PROMPT_FILE"] as const;
+    const previousEnvironment = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
+    process.env.PI_CODING_AGENT_DIR = "/tmp/relay-pi-agent-dir-sentinel";
+    delete process.env.FAKE_PI_IGNORE_PROMPT_FILE;
+    try {
+      const relay = await start();
+      const echo = echoOf(await (await post(relay, "Assess this claim.")).json() as PiCompletion);
+
+      expect(echo.environment.PI_CODING_AGENT_DIR).toBe("/tmp/relay-pi-agent-dir-sentinel");
+      expect(echo.environmentKeyNames).toContain("PI_CODING_AGENT_DIR");
     } finally {
       for (const key of environmentKeys) {
         const value = previousEnvironment[key];
@@ -411,6 +457,92 @@ describe("PI-01 the measured pi 0.87.1 event stream", () => {
   it("holds every answer to the pinned model", () => {
     // pi's own default model answers as glm-5.3 (M4): never the pinned glm-5.3-flash.
     expect(() => parsePiEvents(streamOf(assistantMessage), "glm-5.3")).toThrow("PI_CLI_MODEL_MISMATCH");
+  });
+
+  it("holds every answer to the zai provider too: the pinned model id from another provider is refused", () => {
+    expect(() => parsePiEvents(streamOf({ ...assistantMessage, provider: "openrouter" }), "glm-5.3-flash"))
+      .toThrow("PI_CLI_MODEL_MISMATCH");
+  });
+});
+
+/** Every stdout line the relay's filter would keep, decided from the line's start as relay-core does. */
+function keptLines(stream: string): string {
+  return stream.split("\n").filter((line) => keepPiStdoutLine(line.slice(0, 4_096))).join("\n");
+}
+
+describe("PI-01 A11 fix round 1: the relay keeps only the line its parser reads", () => {
+  const prompt = renderPromptTranscript([{ role: "user", content: "Prompt canary 5e2d." }]);
+  const answer = Object.freeze({
+    role: "assistant",
+    content: [{ type: "thinking", thinking: "hidden" }, { type: "text", text: "ok" }],
+    api: "openai-completions",
+    provider: "zai",
+    model: "glm-5.3-flash",
+    usage: { input: 480, output: 3, reasoning: 0, totalTokens: 483, cost: { total: 0.0006852 } },
+    stopReason: "stop",
+    rawStopReason: "stop"
+  });
+  const system = { role: "system", content: "", sections: { preamble: "redacted" } };
+  const user = { role: "user", content: [{ type: "text", text: prompt }], timestamp: 0 };
+  // The superset of both shapes: the measured delta-only message_update beside the
+  // partial-message one, and agent_end with the whole message list, user prompt included.
+  const superset = [
+    { type: "session", version: 3, id: "redacted", timestamp: "2026-09-26T00:00:00.000Z", cwd: "redacted" },
+    { type: "agent_start" },
+    { type: "turn_start" },
+    { type: "message_start", message: system },
+    { type: "message_end", message: system },
+    { type: "message_start", message: user },
+    { type: "message_end", message: user },
+    { type: "message_start", message: { ...answer, content: [], stopReason: "pending" } },
+    { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "o" } },
+    {
+      type: "message_update",
+      message: { ...answer, content: [{ type: "text", text: "ok" }], stopReason: "pending" },
+      assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "k" }
+    },
+    { type: "message_end", message: answer },
+    { type: "turn_end", message: answer, toolResults: [] },
+    { type: "agent_end", messages: [system, user, answer] },
+    { type: "agent_settled" }
+  ].map((event) => JSON.stringify(event)).join("\n");
+
+  it("parses the superset stream to the same answer whole and filtered, and the filter drops every copy of the prompt", () => {
+    const expected = {
+      content: "ok",
+      model: "glm-5.3-flash",
+      usage: { promptTokens: 480, completionTokens: 3, totalTokens: 483, costUsd: 0.0006852, reasoningTokens: 0 }
+    };
+
+    expect(superset.split("\n").filter((line) => line.includes("Prompt canary 5e2d."))).toHaveLength(3);
+    expect(parsePiEvents(superset, "glm-5.3-flash")).toEqual(expected);
+    const kept = keptLines(superset);
+    expect(kept).toBe(JSON.stringify({ type: "message_end", message: answer }));
+    expect(kept).not.toContain("Prompt canary 5e2d.");
+    expect(parsePiEvents(kept, "glm-5.3-flash")).toEqual(expected);
+  });
+
+  it("keeps what it cannot classify, so the parser still refuses what it cannot read", () => {
+    expect(keepPiStdoutLine("not json")).toBe(true);
+    expect(keepPiStdoutLine("")).toBe(true);
+    expect(keepPiStdoutLine('{"error":"redacted"}')).toBe(true);
+    // A message_end whose role is not its message's first member (not the measured
+    // shape) is kept: at worst the stdout bound refuses it loudly.
+    expect(keepPiStdoutLine('{"type":"message_end","message":{"content":[],"role":"user"}}')).toBe(true);
+    expect(keepPiStdoutLine('{"message":{"role":"user"},"type":"message_end"}')).toBe(true);
+    expect(keepPiStdoutLine('{"type":"message_end","message":{"role":"assistant","content":[]}}')).toBe(true);
+  });
+
+  it("drops every event type the parser never reads, and the user and system message_end", () => {
+    for (const type of [
+      "session", "agent_start", "turn_start", "message_start", "message_update", "turn_end", "agent_end",
+      "agent_settled", "error"
+    ]) {
+      expect(keepPiStdoutLine(`{"type":"${type}","message":{"role":"assistant"}}`), type).toBe(false);
+    }
+    for (const role of ["user", "system", "toolResult"]) {
+      expect(keepPiStdoutLine(`{"type":"message_end","message":{"role":"${role}","content":[]}}`), role).toBe(false);
+    }
   });
 });
 

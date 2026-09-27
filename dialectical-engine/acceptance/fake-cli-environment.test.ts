@@ -233,8 +233,9 @@ describe("W6 fake-CLI fixtures echo allow-listed variables only", () => {
     const directory = await scratchDirectory("w6-pi-prompt-");
     const promptFile = join(directory, "prompt.txt");
     await writeFile(promptFile, "W6 allow-list probe", { mode: 0o600 });
-    // Pre-flight fix F37: run in the scratch directory. The fake echoes its cwd listing in four events,
-    // and the default cwd (the system tmpdir) can hold enough entries to pass the 1 MiB stdout buffer.
+    // Pre-flight fix F37: run in the scratch directory. The fake echoes its cwd listing in every assistant
+    // event (message_start, each growing message_update, message_end, turn_end, agent_end), and the default
+    // cwd (the system tmpdir) can hold enough entries to pass the 1 MiB stdout buffer.
     const stdout = await emit(
       [fixturePath("fake-pi-cli.mjs"), "--print", "--mode", "json", "--model", "glm-5.3-flash", `@${promptFile}`],
       {

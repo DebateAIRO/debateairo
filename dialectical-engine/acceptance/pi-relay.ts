@@ -166,6 +166,33 @@ export function parsePiEvents(stdout: string, pinnedModel: string): CliCompletio
   });
 }
 
+/** A pi event line's start: its `type`, the first member in every measured event (M4). */
+const PI_EVENT_TYPE_START = /^\{"type":"([^"\\]*)"/u;
+/** A message_end line's start: its message's `role`, the first member of every measured message (M4). */
+const PI_MESSAGE_END_ROLE_START = /^\{"type":"message_end","message":\{"role":"([^"\\]*)"/u;
+
+/**
+ * A11 fix round 1: which of pi's stdout lines the relay keeps (relay-core
+ * `keepStdoutLine`), decided from the line's start. In JSON mode pi repeats the
+ * user message — the whole prompt — in the user message_start and message_end
+ * and again in agent_end, and may stream the growing partial answer in
+ * message_update lines. Counted whole, a prompt far inside the declared 1M window
+ * would pass the relay's 1 MiB stdout bound AFTER a paid call. parsePiEvents
+ * reads the assistant message_end and nothing else (answer, lineage, usage and
+ * stop reason all live in it, and it never carries the prompt), so that is the
+ * one event kept. agent_end and turn_end are DROPPED, not reduced: nothing in
+ * them is needed. A line that is not a recognisable pi event is kept, so the
+ * parser still refuses output it cannot read; so is a message_end whose role is
+ * not the first member of its message — at worst the bound refuses that loudly.
+ */
+export function keepPiStdoutLine(lineStart: string): boolean {
+  const type = PI_EVENT_TYPE_START.exec(lineStart)?.[1];
+  if (type === undefined) return true;
+  if (type !== "message_end") return false;
+  const role = PI_MESSAGE_END_ROLE_START.exec(lineStart)?.[1];
+  return role === undefined || role === "assistant";
+}
+
 function createPiAdapter(model: string, defaultThinkingLevel: string): CliRelayAdapter {
   return Object.freeze({
     maker: ZAI_MAKER,
@@ -186,6 +213,9 @@ function createPiAdapter(model: string, defaultThinkingLevel: string): CliRelayA
     thinkingLevels: PI_THINKING_LEVELS,
     defaultThinkingLevel,
     contextWindowTokens: PI_GLM_CONTEXT_WINDOW_TOKENS,
+    // A11 fix round 1: the 1M window is only true if pi's copies of the prompt do
+    // not count toward the stdout bound; only the assistant message_end is kept.
+    keepStdoutLine: keepPiStdoutLine,
     buildArguments: (_prompt: string, invocation?: CliInvocation) => {
       if (invocation?.promptFile === undefined) {
         throw new CliRelayFailure("FAILED", "PI_CLI_PROMPT_FILE_MISSING");

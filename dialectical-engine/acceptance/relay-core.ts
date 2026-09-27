@@ -126,6 +126,13 @@ export interface CliFailureEvidence {
 export const CLI_RELAY_SIGTERM_GRACE_MS = 250 as const;
 export const CLI_RELAY_STDOUT_MAX_BYTES = 1_048_576 as const;
 export const CLI_RELAY_STDOUT_LIMIT_CODE = "CLI_RELAY_STDOUT_LIMIT" as const;
+/**
+ * A11 fix round 1: how much of a stdout line an adapter's `keepStdoutLine` sees
+ * before it decides. A line is decided from its START so a dropped line is never
+ * assembled at all: pi repeats a whole prompt of up to ~2 MB in one event line,
+ * and assembling that line to look at it would itself pass the stdout bound.
+ */
+export const CLI_RELAY_STDOUT_LINE_DECISION_BYTES = 4_096 as const;
 /** R4: a CLI cannot make the relay hold more stderr evidence than this. */
 export const CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES = 65_536 as const;
 /** §2.10: the "file" transport's prompt file, inside its private directory. */
@@ -189,6 +196,18 @@ export interface CliRelayAdapter {
    * as no cap recognised: FAILED (502), never 429. So is a classifier that throws.
    */
   classifyUsageCap?(evidence: CliFailureEvidence): string | null;
+  /**
+   * A11 fix round 1: which stdout lines reach `parseCompletion`. Absent ⇒ every
+   * byte is read and counted, exactly as before. Present ⇒ stdout is read LINE BY
+   * LINE as it arrives: each line is decided from its first
+   * CLI_RELAY_STDOUT_LINE_DECISION_BYTES bytes (the whole line when shorter, never
+   * its newline); a line answered `false` is discarded as it streams, never
+   * buffered and never counted toward CLI_RELAY_STDOUT_MAX_BYTES; every other line
+   * is kept and counted like any output, so one kept line — terminated or not —
+   * still cannot pass the bound. Only an explicit `false` drops a line: a hook that
+   * throws, or answers anything else, keeps it, and the parser then decides.
+   */
+  keepStdoutLine?(lineStart: string): boolean;
   buildArguments(prompt: string, invocation?: CliInvocation): readonly string[];
   /** Throws CliRelayFailure instead of ever inventing content or lineage. */
   parseCompletion(stdout: string, prompt: string): CliCompletion | Promise<CliCompletion>;
@@ -466,6 +485,79 @@ export function resolveConfiguredBinary(
   );
 }
 
+/** A11 fix round 1: the stdout line filter `invokeCli` runs for an adapter that declares `keepStdoutLine`. */
+export interface CliStdoutLineFilter {
+  /** The bytes of this chunk that belong to KEPT lines, in order, newlines included. */
+  accept(chunk: Buffer): Buffer[];
+  /** At end of stream: an unterminated last line still undecided is decided now. */
+  finish(): Buffer[];
+}
+
+const NEWLINE_BYTE = 0x0a;
+
+/**
+ * Pure, and it counts nothing: the caller counts every byte it returns against
+ * CLI_RELAY_STDOUT_MAX_BYTES. So the only bytes held here are the start of ONE
+ * undecided line — never more than CLI_RELAY_STDOUT_LINE_DECISION_BYTES — while a
+ * kept line's bytes are handed back as they arrive (an unterminated kept line
+ * therefore meets the bound like any output) and a dropped line's are discarded.
+ * A line may arrive split across any number of chunks, and a chunk may hold any
+ * number of lines. What is held or returned is a COPY, never a view into a chunk,
+ * so a few kept bytes can never keep a large, mostly dropped chunk alive: the
+ * memory held is the memory counted.
+ */
+export function createStdoutLineFilter(keepLine: (lineStart: string) => boolean): CliStdoutLineFilter {
+  let mode: "undecided" | "keep" | "drop" = "undecided";
+  let held: Buffer[] = [];
+  let heldBytes = 0;
+  const decide = (kept: Buffer[]): void => {
+    const lineStart = Buffer.concat(held, heldBytes);
+    held = [];
+    heldBytes = 0;
+    let keep = true;
+    try {
+      keep = keepLine(lineStart.toString("utf8")) !== false;
+    } catch {
+      // A hook that cannot read the line has not decided to drop it.
+      keep = true;
+    }
+    mode = keep ? "keep" : "drop";
+    if (keep && lineStart.byteLength > 0) kept.push(lineStart);
+  };
+  return {
+    accept(chunk: Buffer): Buffer[] {
+      const kept: Buffer[] = [];
+      let offset = 0;
+      while (offset < chunk.byteLength) {
+        const newline = chunk.indexOf(NEWLINE_BYTE, offset);
+        const terminated = newline >= 0;
+        let content = chunk.subarray(offset, terminated ? newline : chunk.byteLength);
+        offset = terminated ? newline + 1 : chunk.byteLength;
+        if (mode === "undecided") {
+          const head = content.subarray(0, CLI_RELAY_STDOUT_LINE_DECISION_BYTES - heldBytes);
+          held.push(Buffer.from(head));
+          heldBytes += head.byteLength;
+          content = content.subarray(head.byteLength);
+          // Still short of the decision bytes and the line goes on in a later chunk.
+          if (heldBytes < CLI_RELAY_STDOUT_LINE_DECISION_BYTES && !terminated) continue;
+          decide(kept);
+        }
+        if (mode === "keep") {
+          if (content.byteLength > 0) kept.push(Buffer.from(content));
+          if (terminated) kept.push(Buffer.of(NEWLINE_BYTE));
+        }
+        if (terminated) mode = "undecided";
+      }
+      return kept;
+    },
+    finish(): Buffer[] {
+      const kept: Buffer[] = [];
+      if (mode === "undecided" && heldBytes > 0) decide(kept);
+      return kept;
+    }
+  };
+}
+
 /** §2.2: stamps the level a REQUEST asked for; an unasked call stays DEFAULT_ONLY. */
 function withRequestedLevel(completion: CliCompletion, requestedLevel: string | undefined): CliCompletion {
   return requestedLevel === undefined || completion.thinkingLevel !== undefined
@@ -626,14 +718,31 @@ export async function invokeCli(
         }
       }, CLI_RELAY_SIGTERM_GRACE_MS);
     };
+    // A11 fix round 1: an adapter's line filter runs BEFORE any byte is counted or
+    // buffered. Without one, every chunk is kept whole, exactly as before.
+    const keepStdoutLine = adapter.keepStdoutLine;
+    const lineFilter = keepStdoutLine === undefined
+      ? undefined
+      : createStdoutLineFilter((lineStart) => keepStdoutLine.call(adapter, lineStart));
+    /** false once the bound is passed; the caller stops reading this chunk. */
+    const keepStdout = (piece: Buffer): boolean => {
+      if (piece.byteLength > CLI_RELAY_STDOUT_MAX_BYTES - stdoutBytes) {
+        beginTermination(new CliRelayFailure("FAILED", CLI_RELAY_STDOUT_LIMIT_CODE));
+        return false;
+      }
+      stdoutBytes += piece.byteLength;
+      stdout.push(piece);
+      return true;
+    };
     child.stdout.on("data", (chunk: Buffer) => {
       if (terminationFailure !== undefined) return;
-      if (chunk.byteLength > CLI_RELAY_STDOUT_MAX_BYTES - stdoutBytes) {
-        beginTermination(new CliRelayFailure("FAILED", CLI_RELAY_STDOUT_LIMIT_CODE));
+      if (lineFilter === undefined) {
+        keepStdout(chunk);
         return;
       }
-      stdoutBytes += chunk.byteLength;
-      stdout.push(chunk);
+      for (const piece of lineFilter.accept(chunk)) {
+        if (!keepStdout(piece)) return;
+      }
     });
     // R4 evidence only: bounded, held in memory, shown to the adapter's cap
     // classifier and dropped. It never reaches a response, a log or a prompt.
@@ -648,6 +757,18 @@ export async function invokeCli(
       beginTermination(new CliRelayFailure("TIMEOUT", adapter.timeoutCode));
     }, timeoutMs);
     child.once("close", (code) => {
+      // A11 fix round 1: an unterminated last line shorter than the decision bytes
+      // is decided now. The child has ended, so the bound is enforced without a kill.
+      if (lineFilter !== undefined && terminationFailure === undefined && !settled) {
+        for (const piece of lineFilter.finish()) {
+          if (piece.byteLength > CLI_RELAY_STDOUT_MAX_BYTES - stdoutBytes) {
+            terminationFailure = new CliRelayFailure("FAILED", CLI_RELAY_STDOUT_LIMIT_CODE);
+            break;
+          }
+          stdoutBytes += piece.byteLength;
+          stdout.push(piece);
+        }
+      }
       settleOnce(() => {
         if (terminationFailure !== undefined) {
           reject(terminationFailure);
