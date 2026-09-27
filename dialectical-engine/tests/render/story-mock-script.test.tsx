@@ -37,7 +37,7 @@ describe("the owner's story mock (look first, then wire)", () => {
     // The offer, in English, twice (desktop and phone), naming Romanian in its own words.
     expect(html.match(/class=&quot;languageOffer&quot;/g)).toHaveLength(2);
     expect(html).toContain("This debate is in Romanian (&lt;bdi lang=&quot;ro&quot;&gt;Română&lt;/bdi&gt;).");
-    expect(html).not.toMatch(/<script|https?:\/\//);
+    expect(html).not.toMatch(/<\s*script\b|https?:\/\//iu);
     // Task M6: the floor answer, in the strip (Romanian) and in the page's own verdict card (English), never "Components-only".
     expect(html).toContain("Cel mai bun răspuns al nostru:");
     expect(html).toContain("Our best answer:");

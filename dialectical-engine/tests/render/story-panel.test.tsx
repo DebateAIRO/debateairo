@@ -158,7 +158,7 @@ describe("StoryPanel in the question's language (R2, spec §14.2, §14.3)", () =
     const text = markup(story);
     expect(text).toContain("&lt;script&gt;alert(&quot;story&quot;)&lt;/script&gt;");
     expect(text).toContain("&lt;b&gt;sure&lt;/b&gt;");
-    expect(text).not.toMatch(/<script>|<b>/u);
+    expect(text).not.toMatch(/<\s*(?:script|b)\b/iu);
   });
 
   it("prints every other model text literally too: path line, the note, the fallback", () => {
@@ -168,7 +168,7 @@ describe("StoryPanel in the question's language (R2, spec §14.2, §14.3)", () =
     const text = markup(story);
     expect(text).toContain("&lt;b&gt;line&lt;/b&gt;");
     expect(text).toContain("&lt;img src=x onerror=alert(1)&gt;");
-    expect(text).not.toMatch(/<b>|<img/u);
+    expect(text).not.toMatch(/<\s*(?:b|img)\b/iu);
     const fallback = markup(storyFixture("UNAVAILABLE"), {
       ...STORY_FIXTURE_ANSWER,
       composed_text: [{ segment_id: "seg:1", text: "<script>x</script>", load_bearing: true, served_number_refs: [] }]
