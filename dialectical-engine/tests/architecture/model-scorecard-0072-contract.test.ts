@@ -59,6 +59,20 @@ describe("model scorecard migration 0072 — architecture contract", () => {
     expect(migration).toContain(`CHECK (thinking_level IS NULL OR thinking_level ~ '${scorecardRule}')`);
   });
 
+  it("holds THINKING_LEVEL_TOKEN (packages/providers) to the scorecard's rule minus DEFAULT_ONLY (Task A7a)", async () => {
+    // A target's declared levels are real level names, never DEFAULT_ONLY (that
+    // token means "no level can be set", not a level itself), so the providers'
+    // token rule is the scorecard's rule with the DEFAULT_ONLY alternative removed
+    // — not a second, independently-drifting pattern.
+    const schema = await read("packages/scorecard/src/schema.ts");
+    const scorecardRule = /thinkingLevel: z\.string\(\)\.regex\(\/(.+?)\/u\)/u.exec(schema)?.[1];
+    expect(scorecardRule).toBe("^(?:[a-z][a-z0-9_-]{0,31}|DEFAULT_ONLY)$");
+    const providers = await read("packages/providers/src/index.ts");
+    const providersRule = /THINKING_LEVEL_TOKEN = \/(.+?)\/u;/u.exec(providers)?.[1];
+    expect(providersRule).toBe("^[a-z][a-z0-9_-]{0,31}$");
+    expect(scorecardRule).toBe(`^(?:${providersRule!.slice(1, -1)}|DEFAULT_ONLY)$`);
+  });
+
   it("holds candidate_id to the scorecard's identifierText, character for character (fix round 1)", async () => {
     // A VALID scorecard never names a candidate the ledger would refuse, and the ledger
     // records no id a scorecard could not name.

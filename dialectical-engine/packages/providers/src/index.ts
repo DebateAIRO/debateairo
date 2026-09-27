@@ -44,6 +44,19 @@ export const PROVIDER_FINISH_REASON_LENGTH = "length" as const;
 export const PROVIDER_CONTENT_LENGTH_EXCEEDED = "LENGTH_EXCEEDED" as const;
 
 /**
+ * Model scorecard §2.2 (rulings R1, R7) — THE TWO WIRE SPELLINGS a connection
+ * reads a thinking level from. The target declares which one; the gateway never
+ * guesses. `reasoning_effort` is the OpenAI-compatible body member for vendor
+ * APIs; `x_thinking_level` is this engine's extension (the `x_` prefix follows
+ * `usage.x_cost_usd`), read only by the CLI relays under `acceptance/`.
+ */
+export const THINKING_PARAMETERS = ["reasoning_effort", "x_thinking_level"] as const;
+export type ThinkingParameter = typeof THINKING_PARAMETERS[number];
+
+/** A vendor level name is ONE lower-case code token: never a flag, never prose. */
+export const THINKING_LEVEL_TOKEN = /^[a-z][a-z0-9_-]{0,31}$/u;
+
+/**
  * How a provider's content was REFUSED. `LENGTH_EXCEEDED` is its own member and
  * is never collapsed into `PARSE_FAILED`.
  *
@@ -141,6 +154,8 @@ export interface ProviderGateway {
 
 const MAX_PROVIDER_TARGETS = 32;
 const MAX_PROVIDER_TARGET_CONFIG_BYTES = 64 * 1024;
+/** Model scorecard §2.2: the most level names one connection may declare. */
+const MAX_TARGET_THINKING_LEVELS = 16;
 
 export type ProviderDiscoveryTarget = Readonly<{
   providerRef: string;
@@ -167,6 +182,19 @@ export type ProviderDiscoveryTarget = Readonly<{
    */
   inputPriceMicrosPerMillionTokens?: number;
   outputPriceMicrosPerMillionTokens?: number;
+  /**
+   * Model scorecard §2.2 (ruling R7): how THIS connection carries a thinking
+   * level and which levels it can set, in the vendor's own names. Both or
+   * neither. A target that declares neither is DEFAULT_ONLY: a request that
+   * names a level is refused before it is sent.
+   */
+  thinkingParameter?: ThinkingParameter;
+  thinkingLevels?: readonly string[];
+  /**
+   * Model scorecard §2.10: this connection's context window in tokens (the pi
+   * GLM relay declares 1 000 000). Absent = no pre-send window check.
+   */
+  contextWindowTokens?: number;
 }>;
 
 /**
@@ -188,11 +216,56 @@ export function providerTargetPrice(target: ProviderDiscoveryTarget): Readonly<{
   });
 }
 
+/**
+ * Model scorecard §2.2 / §2.10: the target's thinking capability and window in
+ * the shape the gateway consumes, so no composition root re-derives the field
+ * names. Empty for a target that declares neither.
+ */
+export type ProviderTargetGatewayControls = Readonly<{
+  thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
+  contextWindowTokens?: number;
+}>;
+
+export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): ProviderTargetGatewayControls {
+  return Object.freeze({
+    ...(target.thinkingParameter === undefined || target.thinkingLevels === undefined ? {} : {
+      thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
+    }),
+    ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens })
+  });
+}
+
 /** An integer price in micro-units per million tokens, or a typed refusal. */
 function providerTargetPriceAmount(value: unknown): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0
     || value > Number.MAX_SAFE_INTEGER) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_PRICE_INVALID");
+  }
+  return value;
+}
+
+/** Model scorecard §2.2: one of the two wire spellings, or a typed refusal. */
+function providerTargetThinkingParameter(value: unknown): ThinkingParameter {
+  if (typeof value !== "string" || !(THINKING_PARAMETERS as readonly string[]).includes(value)) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+  }
+  return value as ThinkingParameter;
+}
+
+/** Model scorecard §2.2: 1..16 distinct level tokens, or a typed refusal. */
+function providerTargetThinkingLevels(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_TARGET_THINKING_LEVELS
+    || value.some((level) => typeof level !== "string" || !THINKING_LEVEL_TOKEN.test(level))
+    || new Set(value).size !== value.length) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+  }
+  return Object.freeze([...value] as string[]);
+}
+
+/** Model scorecard §2.10: a positive whole number of tokens within the usage-counter bound. */
+function providerTargetContextWindow(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > MAX_USAGE_COUNTER) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_CONTEXT_WINDOW_INVALID");
   }
   return value;
 }
@@ -264,7 +337,9 @@ export function parseProviderDiscoveryTargets(
     if (Object.keys(row).some((key) => ![
       "provider_ref", "base_url", "model", "authorization_header", "authorization_file",
       // V-28: the vendor's price, declared beside the vendor.
-      "input_price_micros_per_million", "output_price_micros_per_million"
+      "input_price_micros_per_million", "output_price_micros_per_million",
+      // Model scorecard §2.2 / §2.10: the thinking capability and the window.
+      "thinking_parameter", "thinking_levels", "context_window_tokens"
     ].includes(key))) {
       throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
     }
@@ -285,6 +360,22 @@ export function parseProviderDiscoveryTargets(
             providerTargetPriceAmount(row.output_price_micros_per_million)
         })
       : undefined;
+    // Model scorecard §2.2: both or neither, exactly as the price. Half a
+    // declaration is an operator's unfinished edit, and a guessed wire member is
+    // a call the vendor refuses.
+    const declaresThinkingParameter = row.thinking_parameter !== undefined;
+    if (declaresThinkingParameter !== (row.thinking_levels !== undefined)) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+    }
+    const thinking = declaresThinkingParameter
+      ? Object.freeze({
+          thinkingParameter: providerTargetThinkingParameter(row.thinking_parameter),
+          thinkingLevels: providerTargetThinkingLevels(row.thinking_levels)
+        })
+      : undefined;
+    const contextWindow = row.context_window_tokens === undefined
+      ? undefined
+      : Object.freeze({ contextWindowTokens: providerTargetContextWindow(row.context_window_tokens) });
     const providerRef = requiredProviderTargetText(
       row.provider_ref,
       "PROVIDER_DISCOVERY_TARGET_PROVIDER_REF_INVALID"
@@ -324,7 +415,9 @@ export function parseProviderDiscoveryTargets(
       model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
       ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
       ...(authorizationFile === undefined ? {} : { authorizationFile }),
-      ...(price === undefined ? {} : price)
+      ...(price === undefined ? {} : price),
+      ...(thinking === undefined ? {} : thinking),
+      ...(contextWindow === undefined ? {} : contextWindow)
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -921,6 +1014,14 @@ export interface OpenAICompatibleGatewayOptions {
   readonly fetchImplementation?: typeof fetch;
   /** L4-F8: seam for the bounded backoff between HTTP attempts; real time by default. */
   readonly sleepImplementation?: (milliseconds: number) => Promise<void>;
+  /**
+   * Model scorecard §2.2: from the target's `thinking_parameter` /
+   * `thinking_levels` (`providerTargetGatewayControls`). Absent = the
+   * connection is DEFAULT_ONLY.
+   */
+  readonly thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
+  /** Model scorecard §2.10: from the target's `context_window_tokens`. Absent = no window check. */
+  readonly contextWindowTokens?: number;
 }
 
 /**
