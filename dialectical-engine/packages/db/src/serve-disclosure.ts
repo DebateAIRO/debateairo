@@ -20,8 +20,7 @@ import { normalizeRunOwnership } from "./index.js";
  * The rules below are the table's CHECKs, held here too so a record the table
  * would refuse is refused typed, before the INSERT (`SERVE_DISCLOSURE_RECORD_INVALID`).
  *
- * THE READS (Task M5). `readForAnswerVersion` is the plain one by answer
- * version. `readLatestForAnswer` is the owner-scoped one behind
+ * THE READS (Task M5). `readLatestForAnswer` is the owner-scoped one behind
  * GET /v1/answers/{id}/disclosure: the answer's LATEST version that HAS a row
  * (a DR-184 review catch-up version runs no answer-writing step, so it has
  * none, and the version before it is read), under the run's ownership
@@ -400,20 +399,6 @@ export class ServeDisclosureRepository {
       ]
     );
     return inserted.rowCount === 1 ? "INSERTED" : "ALREADY_PRESENT";
-  }
-
-  /** The row of one answer version, or null when none was written. */
-  async readForAnswerVersion(answerId: string, answerVersion: number): Promise<StoredServeDisclosure | null> {
-    if (!UUID_TEXT.test(answerId) || !isCount(answerVersion, COLUMN_LIMITS.integer) || answerVersion < 1) {
-      return null;
-    }
-    const result = await this.pool.query<ServeDisclosureRow>(
-      `${SELECT_ROW}
-        WHERE disclosure.answer_id = $1 AND disclosure.answer_version = $2`,
-      [answerId, answerVersion]
-    );
-    const row = result.rows[0];
-    return row === undefined ? null : storedFrom(row);
   }
 
   /**

@@ -23,19 +23,14 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * Nothing else in this package depends on it passing; everything above the seam
  * does not touch a database.
  *
- * RE-REVIEW: it also carries the two whole-run properties nothing else can
- * prove, both marked below — that a money refusal raised DURING EXPANSION (and
- * during root authoring at M=2) ends in the envelope terminal with the produced
- * components kept, rather than as a FAILED work item. The joints are unit-tested
- * (`expansionPhaseStop`, `reviewFailureOutcome`, `envelopeStopPendingAttempts`,
- * `isRunLevelSpendStop`) and the terminal they route into is unit-tested; what
- * only a real run shows is that the joints are wired into the loops that matter.
- *
- * ENGINE MONEY RULE (spec §14.4.1), TASK M2: that contract is amended — a stop
- * while arguing no longer ends in the envelope terminal, the run stops arguing
- * and still writes its answer — and most of it is now WIRED, in
- * `tests/integration/database.test.ts` ("Engine money rule M2 …"). See the
- * sketch below for what is and is not.
+ * The whole-run properties — a money refusal while the debate is argued (on a
+ * second root, during expansion, on the first root's panel, on the author's
+ * own first call) — are driven through the production runner in
+ * `tests/integration/database.test.ts` ("Engine money rule M2 …"). Since the
+ * engine money rule (spec §14.4.1, Task M2) such a stop ends the arguing only,
+ * and the run still writes its answer. The `describe.skip` sketch that used to
+ * close this file, a numbered contract for a harness nobody wired, was deleted
+ * in the final review (Minor 9): those cases cover it.
  */
 let database: TestDatabase;
 
@@ -331,79 +326,5 @@ describe("M1 migration 0075 — ledger.model_spend.spend_phase", () => {
       .toEqual(["model_spend_phase_is_a_run_charge", "model_spend_spend_phase_check"]);
     await expect(database.pool.query("UPDATE ledger.model_spend SET spend_phase = 'BODY'"))
       .rejects.toThrowError(/append-only or immutable table model_spend rejects UPDATE/u);
-  });
-});
-
-/**
- * RE-REVIEW C1/C2(a) — THE WHOLE-RUN PROPERTY. **NOT RUN — an unwired sketch.**
- *
- * ENGINE MONEY RULE, TASK M2 — THIS CONTRACT IS AMENDED, AND MOSTLY WIRED. At a
- * stop while arguing the run stops ARGUING and still answers (V-28 amended by
- * spec §14.4.1). Item 3 therefore now reads: the run reaches a SERVED (or
- * DOWNGRADED) answer, its condition marks still include `ENVELOPE_EXHAUSTED`,
- * and that record's reason is the stop's own code. Items 1-4, 6, 7, 8 and 9 are
- * driven through the production runner by `tests/integration/database.test.ts`
- * ("Engine money rule M2 …"), together with the attempt ceiling in review, a
- * stop on the first root's panel (author-only, single voice) and the typed
- * `RUN_CEILING_BELOW_FIRST_CALL` failure on the author's own first call. Still
- * unwired, and still owed: 5 (the money seam there is a test double, so no
- * `ledger.model_spend` rows exist to count), 10 (M = 3), 11 (a stop on the
- * first review call; the attempt case stops there, but not on money) and 12.
- *
- * Sketched rather than finished on purpose: standing a run up to the point where
- * a second root is authored needs the runner's full settings object, a fake
- * provider panel and a seeded register, all of which the acceptance harness
- * already builds. The coordinator should wire this to that harness rather than
- * to a second, private copy of it — a private copy is how test doubles rot.
- *
- * WHAT MUST BE TRUE, written down so the assertion is not re-derived later:
- *
- *  1. M = 2. Root 0 is authored and panelled normally. The provider seam refuses
- *     `RUN_COST_ENVELOPE_MONEY_REACHED` on the FIRST call of root 1.
- *  2. The work item does NOT fail: `executeWorkItem` resolves.
- *  3. The run reaches `SERVE_CRASH_CLASSES.ENVELOPE_EXHAUSTED.terminal`, its
- *     condition marks include `ENVELOPE_EXHAUSTED`, and the condition-mark
- *     record's reason is `RUN_COST_ENVELOPE_MONEY_REACHED` — not
- *     `RUN_COST_ENVELOPE_EXHAUSTED`, which would send the operator to raise the
- *     wrong ceiling.
- *  4. Root 0's node is among the served node ids: the run KEPT what it produced.
- *  5. `ledger.model_spend` holds the charges for root 0's calls and nothing for
- *     the call that was refused before it was made.
- *
- *  6. The same, with the refusal raised during EXPANSION rather than root
- *     authoring, which is the case the temporary 0.25 USD ceiling actually
- *     produces on every run.
- *  7. The same, with `PROVIDER_USAGE_UNREPORTED`, whose reason must be its own
- *     code (ruling R2) and whose terminal must fire even though the run has
- *     attempts to spare (C3).
- *
- * ROUND 4 (rulings R-A / R-B), added to the contract above:
- *
- *  8. In case 1 no review ever ran (the review guard returns on a stop, and
- *     none may be re-opened), yet root 0 is NOT hidden: `ledger.node_review`
- *     holds no row for this run and the answer still serves root 0 — the
- *     spend-stopped run is projected on the single-maker footing (R-A). This
- *     is the property three rounds moved downstream and never closed; the
- *     pure decision is proven in `tests/unit/v28-spend-stopped-serve-decision.test.ts`
- *     and the wiring is pinned in `tests/architecture/v28-serve-decision-wiring.test.ts`,
- *     so what this case adds is the run through the real pool.
- *  9. In case 1 the answer's condition marks include `SINGLE-LINEAGE`, with a
- *     persisted record whose reason is `RUN_COST_ENVELOPE_MONEY_REACHED` (case 7:
- *     `PROVIDER_USAGE_UNREPORTED`) — never `MONO_MAKER_RUN` — and no
- *     `UNSERVED-MAKER-POSITION` mark, because no second position exists (R-B).
- * 10. M = 3 with the refusal on root 2: the work item resolves, the stronger of
- *     roots 0 and 1 is served, the other is disclosed `UNSERVED-MAKER-POSITION`,
- *     and `SINGLE-LINEAGE` is ABSENT, because two lineages exist.
- * 11. M = 2 with the refusal on the FIRST review call (root 0's): both roots
- *     authored, zero reviews landed, the work item resolves and serves the
- *     stronger root. (The round-3 re-review's "a review has landed by then"
- *     holds from the second review onward only.)
- * 12. In case 6, a child whose review LANDED `cannot-assess` before the stop
- *     keeps its `HIDDEN-UNJUDGEABLE` record; a child the stop denied a review
- *     is not hidden.
- */
-describe.skip("V-28 / M2 a spend stop mid-run stops the arguing and still answers (NOT RUN — the unwired remainder: items 5, 10, 11, 12)", () => {
-  it("keeps root 0 when root 1 is refused on money at M=2, and says it rests on one lineage", () => {
-    expect.unreachable("wire to the acceptance harness; see the numbered contract above");
   });
 });

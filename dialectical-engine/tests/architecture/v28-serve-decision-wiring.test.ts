@@ -30,7 +30,8 @@ import { describe, expect, it } from "vitest";
  * …") runs the real runner on the embedded Postgres through a money stop on
  * root 1, a usage stop, an attempt stop in review, a stop on the first root's
  * panel and one on its author's own call. That suite is not in the CI gate, so
- * the source pins below still stand guard in the gate.
+ * the source pins below still stand guard in the gate. (Final review, Minor 9:
+ * the `describe.skip` sketch in v28-model-spend is deleted; those cases cover it.)
  */
 const RUNNER = new URL("../../apps/runner/src/index.ts", import.meta.url);
 

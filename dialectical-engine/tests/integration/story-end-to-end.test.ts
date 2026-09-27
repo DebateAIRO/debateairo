@@ -928,7 +928,11 @@ describe("verdict story — end to end, after the debate is settled", () => {
       if (rootNodeId === undefined) throw new Error("STORY_E2E_ROOT_UNRESOLVED");
       // M5 review, I2: one maker, so the label had neither a margin nor a
       // disagreement measure — its receipt says so, and so does the floor.
-      expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
+      // Read as the owner reads it: the latest version with a row, under the run's ownership.
+      expect((await new ServeDisclosureRepository(database.pool).readLatestForAnswer({
+        answerId: result.answerId, ownership: { ownerRef: null, legacyAskerId: debate.askerId }
+      }))?.row).toMatchObject({
+        answerVersion: 1,
         floorVerdictState: "CONTESTED", floorLeadingNodeId: rootNodeId, floorReason: "DIGEST_CANNOT_EXIST",
         floorBasisIncomplete: true
       });

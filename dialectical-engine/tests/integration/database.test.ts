@@ -5048,7 +5048,7 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(JSON.stringify(projection?.composed_text)).not.toContain("(n1)");
       expect(provider.calls()).toBe(4);
 
-      expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
+      expect(await disclosureRowOf(result.answerId)).toMatchObject({
         runId: work.runId,
         digestRung: DIGEST_LADDER.compactRung,
         digestPointsOmitted: 0
@@ -5788,7 +5788,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
 
     // Disclosed on the owner-side row — never in the verdict text — and the
     // lost diversity with it (R9): both roles ended on one maker.
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+    expect(await disclosureRowOf(answerId)).toMatchObject({
       answerId,
       answerVersion: 1,
       runId: scenario.runId,
@@ -5870,7 +5870,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
         round: 1, writer: THIRD_REF, checker: SECONDARY_REF,
         candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
       }]);
-      expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
+      expect(await disclosureRowOf(result.answerId)).toMatchObject({
         writerPlannedRef: PRIMARY_REF,
         checkerPlannedRef: PRIMARY_REF,
         writerServedRef: THIRD_REF,
@@ -5959,7 +5959,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
         round: 1, writer: SECONDARY_REF, checker: THIRD_REF,
         candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
       }]);
-      expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
+      expect(await disclosureRowOf(result.answerId)).toMatchObject({
         writerPlannedRef: PRIMARY_REF,
         checkerPlannedRef: THIRD_REF,
         writerServedRef: SECONDARY_REF,
@@ -6001,7 +6001,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
     expect((scenario.answer?.condition_mark_records ?? []).filter((record) => record.mark === "ENVELOPE_EXHAUSTED"))
       .toHaveLength(1);
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+    expect(await disclosureRowOf(answerId)).toMatchObject({
       writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
       bodyStop: "MONEY", pointsWithoutReview: 1, serveStop: "MONEY"
     });
@@ -6043,7 +6043,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect((scenario.answer?.condition_mark_records ?? [])
       .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
       .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+    expect(await disclosureRowOf(answerId)).toMatchObject({
       writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
       writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: true,
       bodyStop: null, pointsWithoutReview: null,
@@ -6085,7 +6085,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.answer?.condition_marks).not.toContain("DEFECT");
     expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
     // The death leaves no mark on the answer; the owner's record keeps it.
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+    expect(await disclosureRowOf(answerId)).toMatchObject({
       writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF, writerFallback: false, checkerFallback: false,
       serveStop: "TRANSPORT_DEATH"
     });
@@ -6120,7 +6120,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     // One writer call, three attempts: the two refused drafts are on the ledger, the third served.
     expect((await serveLedger(scenario.runId)).filter((entry) => entry.call_site_key.startsWith("COMPOSER:"))
       .map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "OK"]);
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerIdOf(scenario), 1))
+    expect(await disclosureRowOf(answerIdOf(scenario)))
       .toMatchObject({ serveStop: null, writerServedRef: PRIMARY_REF });
   });
 
@@ -6195,7 +6195,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
       candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
     }]);
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1))
+    expect(await disclosureRowOf(answerId))
       .toMatchObject({ serveStop: "NO_ARTIFACT", writerServedRef: PRIMARY_REF });
   });
 
@@ -6263,7 +6263,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.answer?.condition_marks).toContain("DEFECT");
     expect(scenario.answer?.composed_text).toEqual([]);
     expect(await servedRoundMakers(answerId)).toEqual([]);
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+    expect(await disclosureRowOf(answerId)).toMatchObject({
       writerServedRef: null, checkerServedRef: null, writerFallback: false, checkerFallback: false,
       serveStop: "TRANSPORT_DEATH"
     });
@@ -6394,7 +6394,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.error).toBeNull();
     const answerId = answerIdOf(scenario);
     expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
-    const row = await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1);
+    const row = await disclosureRowOf(answerId);
     expect(row).toMatchObject({
       answerId, answerVersion: 1, runId: scenario.runId,
       writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
@@ -6423,7 +6423,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
     expect(scenario.answer?.condition_marks).toContain("DEFECT");
     expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
-    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1)).toMatchObject({
+    expect(await disclosureRowOf(answerId)).toMatchObject({
       writerServedRef: null, checkerServedRef: null, bodyStop: "MONEY", pointsWithoutReview: 1,
       serveStop: "TRANSPORT_DEATH"
     });
@@ -6485,13 +6485,13 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     });
     const answerId = answerIdOf(scenario);
     const repository = new ServeDisclosureRepository(database.pool);
-    const written = await repository.readForAnswerVersion(answerId, 1);
+    const written = await disclosureRowOf(answerId);
     expect(written).not.toBeNull();
     const { createdAt: _createdAt, ...record } = written!;
 
     // Insert-once: a second write for the same answer version changes nothing.
     await expect(repository.insert({ ...record, bodyStop: null })).resolves.toBe("ALREADY_PRESENT");
-    expect((await repository.readForAnswerVersion(answerId, 1))?.bodyStop).toBe("MONEY");
+    expect((await disclosureRowOf(answerId))?.bodyStop).toBe("MONEY");
     // UPDATE and DELETE are closed for every role, the owner included.
     await expect(database.pool.query("UPDATE serve.serve_disclosure SET body_stop=NULL WHERE answer_id=$1", [answerId]))
       .rejects.toMatchObject({ code: "55000" });
@@ -6544,7 +6544,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     await expect(repository.insert({ ...record, answerId: unwrittenAnswerId, runId: unwritten.runId,
       writerPlannedRef: "\u{1F4B0}".repeat(257) })).rejects.toMatchObject({ code: "SERVE_DISCLOSURE_RECORD_INVALID" });
     await rawRow(unwrittenAnswerId, { writerRef: astralRef, serveStop: "NO_ARTIFACT" });
-    expect(await repository.readForAnswerVersion(unwrittenAnswerId, 1)).toMatchObject({
+    expect(await disclosureRowOf(unwrittenAnswerId)).toMatchObject({
       writerPlannedRef: astralRef, writerServedRef: astralRef, checkerSameAsWriter: true, serveStop: "NO_ARTIFACT"
     });
     const otherRunId = await createRun(`m3-row-table-other-${randomUUID()}`);
@@ -6560,7 +6560,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
         WHERE tgrelid = 'serve.serve_disclosure'::regclass AND NOT tgisinternal AND tgenabled IN ('O','A')`
     );
     expect(guards.rows[0]?.count).toBe("3");
-    expect(await repository.readForAnswerVersion(answerId, 1)).toEqual(written);
+    expect(await disclosureRowOf(answerId)).toEqual(written);
   });
 });
 
@@ -6596,7 +6596,7 @@ async function expectFloor(
   scenario: Readonly<{ runId: string; result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null;
     answer: Awaited<ReturnType<ServeRepository["readAnswerProjection"]>> | null; error: unknown }>,
   reason: string
-): Promise<NonNullable<Awaited<ReturnType<ServeDisclosureRepository["readForAnswerVersion"]>>>> {
+): Promise<StoredServeDisclosure> {
   expect(scenario.error).toBeNull();
   const answerId = answerIdOf(scenario);
   // The sealed answer stays components-only: no label, no prose, no checked round.
@@ -6605,7 +6605,7 @@ async function expectFloor(
   expect(scenario.answer?.composed_text).toEqual([]);
   expect(await servedRoundMakers(answerId)).toEqual([]);
   const receipt = await labelledRoot(scenario.runId);
-  const row = await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1);
+  const row = await disclosureRowOf(answerId);
   expect(row).toMatchObject({
     writerServedRef: null, checkerServedRef: null,
     floorVerdictState: receipt.label, floorLeadingNodeId: receipt.servedNodeId, floorReason: reason,
@@ -6814,7 +6814,10 @@ describe("Engine money rule M5 — the disclosure read over the runner's own row
       "SELECT max(answer_version) AS version FROM serve.answer WHERE answer_id=$1", [answerId]
     );
     expect(latest.rows[0]?.version).toBe(2);
-    expect(await repository.readForAnswerVersion(answerId, 2)).toBeNull();
+    const versionTwo = await database.pool.query(
+      "SELECT 1 FROM serve.serve_disclosure WHERE answer_id=$1 AND answer_version=2", [answerId]
+    );
+    expect(versionTwo.rowCount).toBe(0);
     expect(await repository.readLatestForAnswer({ answerId, ownership })).toEqual(read);
 
     // Anyone else reads nothing: another asker, an unknown owner, a doubled or
