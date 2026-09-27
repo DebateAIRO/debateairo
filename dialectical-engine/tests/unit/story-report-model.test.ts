@@ -400,6 +400,51 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
   });
 });
 
+describe("the cover's line of the models that took part, in every interface language", () => {
+  // Measured with Node 26's ICU: CLDR's short unit list puts no mark between its items in zh ("{0}{1}") and
+  // only a space in ja, ko, ru, lt and tr, so three model names ran together on the cover.
+  const RAN_TOGETHER = ["ja", "ko", "lt", "ru", "tr", "zh"];
+  const catalogsFor = (locale: string): ReportCatalogs => ({
+    locale: locale as ReportCatalogs["locale"],
+    publicCatalog: JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages", locale, "public.json"), "utf8")) as Record<string, string>,
+    composeCatalog: JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages", locale, "compose.json"), "utf8")) as Record<string, string>,
+    metadataCatalog: JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages/en/public.json"), "utf8")) as Record<string, string>
+  });
+  const modelsLine = (locale: string) =>
+    buildReportModel(STORY_FIXTURE_ANSWER, storyFixture("READY"), GENERATED, catalogsFor(locale)).cover.modelsLine;
+
+  it("separates the three names with a visible mark in all 35 languages", () => {
+    expect(LOCALES).toHaveLength(35);
+    for (const { code } of LOCALES) {
+      const line = modelsLine(code);
+      const first = line.indexOf(OPENAI);
+      const second = line.indexOf(ANTHROPIC, first + OPENAI.length);
+      const third = line.indexOf(XAI, second + ANTHROPIC.length);
+      expect([first, second, third].every((at) => at >= 0), `${code}: ${line}`).toBe(true);
+      expect(line.slice(first + OPENAI.length, second), `${code}: ${line}`).toMatch(/\S/u);
+      expect(line.slice(second + ANTHROPIC.length, third), `${code}: ${line}`).toMatch(/\S/u);
+    }
+  });
+
+  it("keeps the approved line exactly as it was wherever the names were already apart", () => {
+    expect(modelsLine("en")).toBe(`Models that took part: ${OPENAI}, ${ANTHROPIC}, ${XAI}`);
+    expect(modelsLine("ro")).toBe(`Modele care au participat: ${OPENAI}, ${ANTHROPIC}, ${XAI}`);
+    for (const { code } of LOCALES.filter(({ code }) => !RAN_TOGETHER.includes(code))) {
+      const unitList = new Intl.ListFormat(code, { style: "short", type: "unit" }).format([OPENAI, ANTHROPIC, XAI]);
+      expect(modelsLine(code), code).toBe(message(code, "public", "public.report.models").replace("{models}", unitList));
+    }
+  });
+
+  it("lists the names with the language's own \"and\" list where the short list ran them together", () => {
+    for (const code of RAN_TOGETHER) {
+      const andList = new Intl.ListFormat(code, { style: "short", type: "conjunction" }).format([OPENAI, ANTHROPIC, XAI]);
+      expect(modelsLine(code), code).toBe(message(code, "public", "public.report.models").replace("{models}", andList));
+    }
+    expect(modelsLine("zh")).toBe(`参与的模型：${OPENAI}、${ANTHROPIC}和${XAI}`);
+    expect(modelsLine("ja")).toBe(`参加したモデル：${OPENAI}、${ANTHROPIC}、${XAI}`);
+  });
+});
+
 describe("the report's language (lib/report/reportLanguage.ts)", () => {
   it("prints every locale's script but Arabic, which it cannot print correctly yet", () => {
     const refused = LOCALES.map(({ code }) => code).filter((code) => !reportSupportedForLocale(code)).sort();

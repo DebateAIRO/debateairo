@@ -6,7 +6,9 @@
  * glyph: its advance, and for a mark (a vowel sign, a nukta, a Hebrew point, a
  * combining accent) an offset that puts it over or under its letter.
  * @react-pdf/renderer 4.9.0 (textkit 7.0.1, render 4.7.0, fontkit 2.0.4) gets
- * two of these wrong, measured in the installed source:
+ * two of these wrong, measured in the installed source. Those versions are
+ * caret ranges under the renderer, held by the lockfile; fonts.test.mjs fails
+ * when any of them changes, so this is re-measured before a bump:
  *
  * 1. The characters. fontkit keeps one glyph object per glyph id for the life
  *    of the font (`getGlyph` caches it), with the characters of the FIRST text
@@ -139,6 +141,13 @@ function withoutMirroredForms(features: unknown): Record<string, boolean> {
 }
 
 /**
+ * The mark a font handed to react-pdf by reportPlacedFont answers to (true),
+ * so a test can prove every face a report printed with went through it. A
+ * registry symbol, so a second copy of this module sees the same one.
+ */
+export const REPORT_PLACED_FONT: unique symbol = Symbol.for("debateai.report.placedFont");
+
+/**
  * The font as react-pdf should see it: every run it lays out comes back with
  * a glyph object of its own for every glyph, right-to-left runs shaped right
  * to left, and its x offsets moved into its advances. Everything else passes
@@ -148,6 +157,7 @@ export function reportPlacedFont<T extends object>(font: T): T {
   const target = font as T & ShapingFont;
   return new Proxy(target, {
     get(object, key) {
+      if (key === REPORT_PLACED_FONT) return true;
       if (key === "layout") {
         return (text: string, features?: unknown, script?: unknown, language?: unknown, direction?: unknown): ShapedRun => {
           if (typeof text === "string" && RIGHT_TO_LEFT.test(text)) {

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { openSync } from "fontkit";
 import { LOCALES } from "../i18n/locales.ts";
 import { STORY_FIXTURE_ANSWER, storyFixture } from "../v3/storyFixture.ts";
@@ -51,20 +53,105 @@ const LETTERS = Object.freeze({
 const missing = (font, characters) => characters.filter((character) => !open(font).hasGlyphForCodePoint(character.codePointAt(0)));
 
 /**
+ * The packages react-pdf's text pipeline is made of, found the way Node finds
+ * them for the renderer: each from the package that depends on it.
+ */
+const fromUi = createRequire(import.meta.url);
+const pipelineEntry = (() => {
+  const renderer = fromUi.resolve("@react-pdf/renderer");
+  const fromRenderer = createRequire(renderer);
+  const layout = fromRenderer.resolve("@react-pdf/layout");
+  const render = fromRenderer.resolve("@react-pdf/render");
+  const font = fromRenderer.resolve("@react-pdf/font");
+  const pdfkit = fromRenderer.resolve("pdfkit");
+  const textkit = createRequire(layout).resolve("@react-pdf/textkit");
+  return Object.freeze({
+    "@react-pdf/renderer": renderer,
+    "@react-pdf/layout": layout,
+    "@react-pdf/render": render,
+    "@react-pdf/font": font,
+    "@react-pdf/textkit": textkit,
+    "@react-pdf/textkit (for render)": createRequire(render).resolve("@react-pdf/textkit"),
+    "fontkit": createRequire(font).resolve("fontkit"),
+    "fontkit (for pdfkit)": createRequire(pdfkit).resolve("fontkit"),
+    "pdfkit": pdfkit,
+    "bidi-js": createRequire(textkit).resolve("bidi-js")
+  });
+})();
+
+/** The version in the nearest package.json named `name` above a resolved entry file. */
+function installedVersion(entry, name) {
+  for (let directory = dirname(entry); directory !== dirname(directory); directory = dirname(directory)) {
+    let manifest = null;
+    try {
+      manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
+    } catch {
+      continue;
+    }
+    if (manifest.name === name) return manifest.version;
+  }
+  throw new Error(`no package.json for ${name} above ${entry}`);
+}
+
+/**
+ * The faces react-pdf itself prints each family in: its own font store
+ * (@react-pdf/font, FontFamily.resolve), with the report's faces registered.
+ * A weight a family lacks resolves the way CSS does (600 prints in the bold);
+ * a style a family lacks throws, as it does when a report renders.
+ */
+const { default: FontStore } = await import(pathToFileURL(pipelineEntry["@react-pdf/font"]).href);
+const fontStore = new FontStore();
+for (const [family, faces] of Object.entries(REPORT_FONT_FACES)) {
+  fontStore.register({ family, fonts: faces.map(({ file, fontWeight, fontStyle }) => ({ src: file, fontWeight, fontStyle })) });
+}
+const faceFile = (family, fontWeight, fontStyle) => fontStore.getFont({ fontFamily: family, fontWeight, fontStyle }).src;
+
+/**
  * The characters of `text` that none of `families` can print in the given
  * weight and style: react-pdf takes each character from the first family in
  * the list that has it, and prints .notdef (an empty box) when none has.
  */
 function uncovered(families, text, fontWeight, fontStyle) {
-  const files = families.map((family) => {
-    const faces = REPORT_FONT_FACES[family];
-    const exact = faces.find((face) => face.fontWeight === fontWeight && face.fontStyle === fontStyle);
-    return (exact ?? faces.find((face) => face.fontStyle === fontStyle) ?? faces[0]).file;
-  });
+  const files = families.map((family) => faceFile(family, fontWeight, fontStyle));
   return [...new Set(text)].filter((character) => character !== "\n" && !files.some((file) => open(file).hasGlyphForCodePoint(character.codePointAt(0))));
 }
 
 const STYLES = [[400, "normal"], [700, "normal"], [400, "italic"]];
+
+test("checks each weight in the face react-pdf prints it in: a 600 heading prints in a family's bold when it has no 600", () => {
+  assert.equal(faceFile("ReportSerif", 600, "normal"), "fraunces/Fraunces9pt-SemiBold.ttf");
+  assert.equal(faceFile("ReportSans", 600, "normal"), "plus-jakarta-sans/PlusJakartaSans-Bold.ttf");
+  assert.equal(faceFile("ReportNotoSans", 600, "normal"), "noto-sans/NotoSans-Bold.ttf");
+  assert.equal(faceFile("ReportNotoSans", 400, "italic"), "noto-sans/NotoSans-Italic.ttf");
+  // A script without an italic prints the italic style in its regular face.
+  assert.equal(faceFile("ReportNotoSC", 400, "italic"), "noto-sans-sc/NotoSansSC-Regular.otf");
+  assert.throws(() => faceFile("ReportSerif", 400, "italic"), /Could not resolve font/u);
+});
+
+// What reportGlyphs.ts (fontkit's glyph cache, the doubled x offset, the dropped y offset, right-to-left shaping),
+// reportLineBreaks.ts (textkit's runs, hyphenation points and zero-width breaks) and renderReport.ts (the font store)
+// were measured against, and the report's render tests check. Only @react-pdf/renderer is pinned exactly, in
+// package.json; the rest are caret ranges under it, held by the lockfile alone.
+const MEASURED_PIPELINE = Object.freeze({
+  "@react-pdf/renderer": "4.9.0",
+  "@react-pdf/layout": "5.2.0",
+  "@react-pdf/render": "4.7.0",
+  "@react-pdf/font": "4.1.2",
+  "@react-pdf/textkit": "7.0.1",
+  "@react-pdf/textkit (for render)": "7.0.1",
+  "fontkit": "2.0.4",
+  "fontkit (for pdfkit)": "2.0.4",
+  "pdfkit": "0.20.1",
+  "bidi-js": "1.0.3"
+});
+
+test("react-pdf's text pipeline is the one the report's workarounds were measured against", () => {
+  const installed = Object.fromEntries(Object.entries(pipelineEntry).map(([key, entry]) => [key, installedVersion(entry, key.split(" ")[0])]));
+  assert.deepEqual(installed, MEASURED_PIPELINE,
+    "react-pdf's text pipeline changed. Before bumping, re-measure lib/report/reportGlyphs.ts, reportLineBreaks.ts and " +
+      "renderReport.ts against the new source (the task R-fonts notes say what each works around), run the report's " +
+      "render tests (tests/render/story-report-pdf.test.tsx) and look at a rendered page per script; then update MEASURED_PIPELINE.");
+});
 
 test("every Latin face prints Romanian letters and quotes", () => {
   for (const font of LATIN_FACES) assert.deepEqual(missing(font, ROMANIAN), [], font);
@@ -82,9 +169,9 @@ test("the faces chosen for each language print its letters; Arabic has none, and
       assert.equal(reportSupportedForLocale(code), false);
       continue;
     }
-    const { body, heading } = reportFaces(code, LETTERS[code]);
+    const { body, heading, headingWeight } = reportFaces(code, LETTERS[code]);
     for (const [fontWeight, fontStyle] of STYLES) assert.deepEqual(uncovered(body, LETTERS[code], fontWeight, fontStyle), [], `${code} ${fontWeight} ${fontStyle}`);
-    assert.deepEqual(uncovered(heading, LETTERS[code], 600, "normal"), [], `${code} heading`);
+    assert.deepEqual(uncovered(heading, LETTERS[code], headingWeight, "normal"), [], `${code} heading`);
   }
 });
 
@@ -119,9 +206,9 @@ test("every catalogue value and every formatted value a report prints has a glyp
   assert.ok(printed.length >= 30, printed.join(" "));
   for (const locale of printed) {
     const text = printable(locale);
-    const { body, heading } = reportFaces(locale, text);
+    const { body, heading, headingWeight } = reportFaces(locale, text);
     for (const [fontWeight, fontStyle] of STYLES) assert.deepEqual(uncovered(body, text, fontWeight, fontStyle), [], `${locale} ${fontWeight} ${fontStyle}`);
-    assert.deepEqual(uncovered(heading, text, 600, "normal"), [], `${locale} heading`);
+    assert.deepEqual(uncovered(heading, text, headingWeight, "normal"), [], `${locale} heading`);
   }
 });
 

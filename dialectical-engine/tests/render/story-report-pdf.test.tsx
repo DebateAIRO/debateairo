@@ -7,9 +7,13 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { Answer, AnswerStory } from "@debateai/contract";
 // The same module instance renderReport.ts loads (pnpm keeps react-pdf under apps/ui only).
 import { Font } from "../../apps/ui/node_modules/@react-pdf/renderer";
+import { createRequire } from "node:module";
 import { loadNamespace } from "../../apps/ui/lib/i18n/server.js";
 import { loadReportCatalogs, type ReportCatalogs } from "../../apps/ui/lib/report/reportLanguage.js";
 import { renderReportPdf, reportHyphenation, resolveReportFontDirectory } from "../../apps/ui/lib/report/renderReport.js";
+import { REPORT_PLACED_FONT, reportPlacedFont } from "../../apps/ui/lib/report/reportGlyphs.js";
+import { reportLayout, reportPrintedText } from "../../apps/ui/lib/report/reportLayout.js";
+import { buildReportModel } from "../../apps/ui/lib/report/reportModel.js";
 import {
   STORY_FIXTURE_ANSWER,
   storyFixture,
@@ -23,6 +27,27 @@ import {
   type StoryScriptSampleLocale
 } from "../../apps/ui/lib/v3/storyScriptSamples.js";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
+
+/**
+ * The fontkit the renderer shapes with, loaded by Node the way @react-pdf/font
+ * loads it. Imported through vite instead, fontkit and its own dependencies
+ * resolve to other builds, and those shape Devanagari differently (the i sign
+ * stays after its consonant), so the expected glyphs would be wrong.
+ */
+const fromRenderer = createRequire(createRequire(resolve(process.cwd(), "apps/ui/package.json")).resolve("@react-pdf/renderer"));
+const fromFontPackage = createRequire(fromRenderer.resolve("@react-pdf/font"));
+const { create: fontkitCreate, openSync: fontkitOpenSync } = fromFontPackage("fontkit") as {
+  create(data: Buffer): unknown;
+  openSync(path: string): unknown;
+};
+
+/** The part of a fontkit font this file reads. */
+interface OpenedFont {
+  readonly numGlyphs: number;
+  getGlyph(id: number): { readonly advanceWidth: number; readonly path: { toSVG(): string } };
+  hasGlyphForCodePoint(codePoint: number): boolean;
+  layout(text: string): { readonly glyphs: readonly { readonly id: number }[] };
+}
 
 function answerWithPoints(roots: number, childrenPerRoot: number): Answer {
   const nodes: Answer["nodes"] = [];
@@ -98,35 +123,35 @@ function embeddedFonts(raw: string): string[] {
   return [...new Set(Array.from(raw.matchAll(/\/BaseFont \/(?:[A-Z]{6}\+)?([A-Za-z0-9-]+)/gu), (match) => match[1]!))].sort();
 }
 
-/**
- * The text each page draws, line by line, left to right as it stands on the
- * page: every glyph read back through its font's ToUnicode map, every run
- * placed through the page's transformation and text matrices. A right-to-left
- * line reads here in the order it is printed.
- */
-function drawnLines(pdf: Buffer): string[][] {
+/** The decompressed bytes of one indirect object's stream (pdfkit writes each as `N 0 obj << /Length … /Filter /FlateDecode >>`). */
+function objectStream(pdf: Buffer, object: string): Buffer {
   const raw = pdf.toString("latin1");
-  const streamOf = (object: string): string => {
-    const start = new RegExp(`\\n${object} 0 obj\\n<<\\n/Length \\d+\\n/Filter /FlateDecode\\n>>\\nstream\\n`, "u").exec(raw);
-    if (start === null) return "";
-    const from = start.index + start[0].length;
-    return inflateSync(pdf.subarray(from, raw.indexOf("endstream", from))).toString("latin1");
-  };
-  // pdfkit writes a glyph that stands for several characters as <0915 094d 0937>.
-  const text = (hex: string) => String.fromCharCode(...hex.split(" ").filter(Boolean).map((unit) => parseInt(unit, 16)));
-  // Each embedded font's glyph → text map, from its ToUnicode CMap.
-  const maps = new Map<string, Map<number, string>>();
-  for (const font of raw.matchAll(/\n(\d+) 0 obj\n<<\n\/Type \/Font\n\/Subtype \/Type0\n[^>]*?\/ToUnicode (\d+) 0 R/gu)) {
-    const glyphs = new Map<number, string>();
-    for (const range of streamOf(font[2]!).matchAll(/<([0-9a-f]+)> <[0-9a-f]+> \[([^\]]*)\]/giu)) {
-      const first = parseInt(range[1]!, 16);
-      Array.from(range[2]!.matchAll(/<([0-9a-f ]*)>/giu)).forEach((unicode, index) => glyphs.set(first + index, text(unicode[1]!)));
-    }
-    maps.set(font[1]!, glyphs);
-  }
+  const start = new RegExp(`\\n${object} 0 obj\\n<<\\n/Length \\d+\\n/Filter /FlateDecode\\n>>\\nstream\\n`, "u").exec(raw);
+  if (start === null) return Buffer.alloc(0);
+  const from = start.index + start[0].length;
+  return inflateSync(pdf.subarray(from, raw.indexOf("endstream", from)));
+}
+
+/** One run of glyphs a page draws: where it starts, the embedded font's object and name, and its glyph ids in that font. */
+interface DrawnPiece {
+  readonly x: number;
+  readonly y: number;
+  readonly fontObject: string;
+  readonly font: string;
+  readonly glyphs: readonly number[];
+}
+
+/**
+ * Every run of glyphs each page draws, in drawing order, each placed through
+ * the page's transformation and text matrices: one TJ, or one glyph that
+ * render 4.7.0 moved with its own text matrix (a mark with an offset).
+ */
+function drawnPieces(pdf: Buffer): DrawnPiece[][] {
+  const raw = pdf.toString("latin1");
+  const names = new Map(Array.from(raw.matchAll(/\n(\d+) 0 obj\n<<\n\/Type \/Font\n\/Subtype \/Type0\n\/BaseFont \/(?:[A-Z]{6}\+)?([^\n]+)/gu), (match) => [match[1]!, match[2]!]));
   // pdfkit names its fonts F1, F2… once for the whole document.
-  const fonts = new Map(Array.from(raw.matchAll(/\/(F\d+) (\d+) 0 R/gu), (match) => [match[1]!, maps.get(match[2]!)]));
-  const pages: string[][] = [];
+  const fonts = new Map(Array.from(raw.matchAll(/\/(F\d+) (\d+) 0 R/gu), (match) => [match[1]!, match[2]!]));
+  const pages: DrawnPiece[][] = [];
   for (const page of raw.matchAll(/\/Type \/Page\n\/Parent \d+ 0 R\n[\s\S]*?\/Contents (\d+) 0 R/gu)) {
     type Matrix = [number, number, number, number, number, number];
     const times = (m: Matrix, n: Matrix): Matrix => [
@@ -136,32 +161,102 @@ function drawnLines(pdf: Buffer): string[][] {
     ];
     let ctm: Matrix = [1, 0, 0, 1, 0, 0];
     const saved: Matrix[] = [];
-    let font: Map<number, string> | undefined;
+    let fontObject: string | undefined;
     let at = { x: 0, y: 0 };
-    const pieces: { x: number; y: number; text: string }[] = [];
+    const pieces: DrawnPiece[] = [];
     const number = "(-?[\\d.]+)";
     const operators = new RegExp(`(?<save>\\bq\\b)|(?<restore>\\bQ\\b)|(?<cm>${number} ${number} ${number} ${number} ${number} ${number} cm)|\\/(?<font>F\\d+) [\\d.]+ Tf|(?<tm>${number} ${number} ${number} ${number} ${number} ${number} Tm)|\\[(?<tj>[^\\]]*)\\] TJ`, "gu");
-    for (const token of streamOf(page[1]!).matchAll(operators)) {
+    for (const token of objectStream(pdf, page[1]!).toString("latin1").matchAll(operators)) {
       const groups = token.groups!;
       const values = token.slice(1).filter((value) => value !== undefined && /^-?[\d.]+$/u.test(value)).map(Number);
       if (groups.save !== undefined) saved.push(ctm);
       else if (groups.restore !== undefined) ctm = saved.pop() ?? [1, 0, 0, 1, 0, 0];
       else if (groups.cm !== undefined) ctm = times(values as Matrix, ctm);
-      else if (groups.font !== undefined) font = fonts.get(groups.font);
+      else if (groups.font !== undefined) fontObject = fonts.get(groups.font);
       else if (groups.tm !== undefined) {
         const [x, y] = [values[4]!, values[5]!];
         at = { x: ctm[0] * x + ctm[2] * y + ctm[4], y: ctm[1] * x + ctm[3] * y + ctm[5] };
-      } else if (groups.tj !== undefined && font !== undefined) {
-        const glyphs = Array.from(groups.tj.matchAll(/<([0-9a-f]*)>/giu), (hex) => hex[1]!.match(/.{4}/gu) ?? []).flat();
-        pieces.push({ ...at, text: glyphs.map((glyph) => font!.get(parseInt(glyph, 16)) ?? "\uFFFD").join("") });
+      } else if (groups.tj !== undefined && fontObject !== undefined) {
+        const glyphs = Array.from(groups.tj.matchAll(/<([0-9a-f]*)>/giu), (hex) => hex[1]!.match(/.{4}/gu) ?? []).flat().map((glyph) => parseInt(glyph, 16));
+        pieces.push({ ...at, fontObject, font: names.get(fontObject) ?? "", glyphs });
       }
     }
-    const lines = new Map<number, typeof pieces>();
-    for (const piece of pieces) lines.set(Math.round(piece.y), [...(lines.get(Math.round(piece.y)) ?? []), piece]);
-    pages.push([...lines.entries()].sort(([a], [b]) => b - a)
-      .map(([, line]) => line.sort((a, b) => a.x - b.x).map((piece) => piece.text).join("")));
+    pages.push(pieces);
   }
   return pages;
+}
+
+/** Each page's pieces, grouped into lines from the top, each line's pieces from the left. */
+function piecesByLine(pieces: readonly DrawnPiece[]): DrawnPiece[][] {
+  const lines = new Map<number, DrawnPiece[]>();
+  for (const piece of pieces) lines.set(Math.round(piece.y), [...(lines.get(Math.round(piece.y)) ?? []), piece]);
+  return [...lines.entries()].sort(([a], [b]) => b - a).map(([, line]) => [...line].sort((a, b) => a.x - b.x));
+}
+
+/**
+ * The text each page draws, line by line, left to right as it stands on the
+ * page: every glyph read back through its font's ToUnicode map, every run
+ * placed through the page's transformation and text matrices. A right-to-left
+ * line reads here in the order it is printed.
+ */
+function drawnLines(pdf: Buffer): string[][] {
+  const raw = pdf.toString("latin1");
+  // pdfkit writes a glyph that stands for several characters as <0915 094d 0937>.
+  const text = (hex: string) => String.fromCharCode(...hex.split(" ").filter(Boolean).map((unit) => parseInt(unit, 16)));
+  // Each embedded font's glyph → text map, from its ToUnicode CMap.
+  const maps = new Map<string, Map<number, string>>();
+  for (const font of raw.matchAll(/\n(\d+) 0 obj\n<<\n\/Type \/Font\n\/Subtype \/Type0\n[^>]*?\/ToUnicode (\d+) 0 R/gu)) {
+    const glyphs = new Map<number, string>();
+    for (const range of objectStream(pdf, font[2]!).toString("latin1").matchAll(/<([0-9a-f]+)> <[0-9a-f]+> \[([^\]]*)\]/giu)) {
+      const first = parseInt(range[1]!, 16);
+      Array.from(range[2]!.matchAll(/<([0-9a-f ]*)>/giu)).forEach((unicode, index) => glyphs.set(first + index, text(unicode[1]!)));
+    }
+    maps.set(font[1]!, glyphs);
+  }
+  return drawnPieces(pdf).map((pieces) => piecesByLine(pieces).map((line) => line
+    .map((piece) => piece.glyphs.map((glyph) => maps.get(piece.fontObject)?.get(glyph) ?? "�").join("")).join("")));
+}
+
+/**
+ * A font's glyphs by outline: each glyph id to the lowest id with the same
+ * outline and advance, so two copies of one drawing count as one glyph.
+ */
+const canonicalGlyphs = new WeakMap<OpenedFont, Readonly<{ ofId: (id: number) => number; ofOutline: Map<string, number> }>>();
+function glyphIdentity(font: OpenedFont): Readonly<{ ofId: (id: number) => number; ofOutline: Map<string, number> }> {
+  const known = canonicalGlyphs.get(font);
+  if (known !== undefined) return known;
+  const ofOutline = new Map<string, number>();
+  const byId: number[] = [];
+  for (let id = 0; id < font.numGlyphs; id += 1) {
+    const glyph = font.getGlyph(id);
+    const key = `${glyph.advanceWidth}|${glyph.path.toSVG()}`;
+    if (!ofOutline.has(key)) ofOutline.set(key, id);
+    byId.push(ofOutline.get(key)!);
+  }
+  const identity = { ofId: (id: number) => byId[id] ?? -1, ofOutline };
+  canonicalGlyphs.set(font, identity);
+  return identity;
+}
+
+/**
+ * The runs of glyphs the pages draw in one embedded font, one per TJ (a text
+ * run of one line; render 4.7.0 also gives a glyph with an offset a TJ of its
+ * own), each as glyphs of the vendored font file it was cut from (`original`,
+ * each glyph as its outline's lowest id). pdfkit renumbers a font's glyphs
+ * when it subsets it, so each glyph of the embedded subset is matched to the
+ * original glyph with the same outline and advance (-1 when none).
+ */
+function drawnGlyphRuns(pdf: Buffer, fontName: string, original: OpenedFont): (readonly number[])[] {
+  const raw = pdf.toString("latin1");
+  const descriptor = new RegExp(`/FontName /[A-Z]{6}\\+${fontName}\\n[\\s\\S]*?/FontFile2 (\\d+) 0 R`, "u").exec(raw);
+  if (descriptor === null) return [];
+  const subset = fontkitCreate(objectStream(pdf, descriptor[1]!)) as unknown as OpenedFont;
+  const { ofOutline } = glyphIdentity(original);
+  const toOriginal = (id: number) => {
+    const glyph = subset.getGlyph(id);
+    return ofOutline.get(`${glyph.advanceWidth}|${glyph.path.toSVG()}`) ?? -1;
+  };
+  return drawnPieces(pdf).flat().filter((piece) => piece.font === fontName).map((piece) => piece.glyphs.map(toOriginal));
 }
 
 /**
@@ -305,6 +400,7 @@ describe("renderReportPdf (spec §10)", () => {
 });
 
 describe("the report in the question's own script (R-fonts)", () => {
+  const GENERATED = new Date("2026-09-26T12:00:00.000Z");
   const catalogs = (locale: string) => loadReportCatalogs({ questionTag: locale, interfaceLocale: "en", load: loadNamespace });
   const render = async (locale: StoryScriptSampleLocale) => {
     const { answer, story } = storyScriptSample(locale);
@@ -347,8 +443,13 @@ describe("the report in the question's own script (R-fonts)", () => {
 
   it("prints Hebrew right to left: each line in reading order from the right, a Latin name, a number and [Pn] in their own order, the fates on the right, the page numbers on the left", async () => {
     const hebrew = await catalogs("he");
-    const pages = drawnLines(await render("he"));
+    const pdf = await render("he");
+    const pages = drawnLines(pdf);
     const all = pages.flat().join("\n");
+    // No direction mark, embedding or isolate reaches the PDF's text: the report adds none, and its words carry none.
+    expect(inflatedStreams(pdf)).not.toMatch(/[< ](200e|200f|061c|202[a-e]|206[6-9])[ >]/u);
+    const controls = [0x200e, 0x200f, 0x061c, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069];
+    expect([...all].filter((character) => controls.includes(character.codePointAt(0)!))).toEqual([]);
     /** How a run of Hebrew words stands on the page: its letters from the right. */
     const printed = (words: string) => [...words].reverse().join("");
     // The headline, as printed on the page, from its first words at the right edge.
@@ -374,6 +475,76 @@ describe("the report in the question's own script (R-fonts)", () => {
     }));
     const romanianFooter = romanian[0]!.at(-1)!;
     expect(romanianFooter.indexOf("DebateAI")).toBeLessThan(romanianFooter.indexOf("1"));
+  }, 120_000);
+
+  it.each(["hi", "he"] as const)("hands react-pdf every face of the %s report through the glyph fix (reportGlyphs.ts), never the bare font", async (locale) => {
+    const { answer, story } = storyScriptSample(locale);
+    const reportCatalogs = await catalogs(locale);
+    await renderReportPdf({ answer, story, generatedAt: GENERATED, catalogs: reportCatalogs });
+    const { faces } = reportLayout(locale, reportPrintedText(buildReportModel(answer, story, GENERATED, reportCatalogs)));
+    const registered = Font.getRegisteredFonts();
+    const sources = [...new Set([...faces.body, ...faces.heading])].flatMap((family) => registered[family]?.sources ?? []);
+    // Noto Sans, the script's own face and Plus Jakarta Sans, each regular, italic and bold.
+    expect(sources.length).toBe(9);
+    for (const source of sources) {
+      expect(source.data, source.src).not.toBeNull();
+      expect((source.data as unknown as Record<symbol, unknown>)[REPORT_PLACED_FONT], source.src).toBe(true);
+    }
+  }, 120_000);
+
+  it("draws every Devanagari word of a Hindi report glyph for glyph as fontkit shapes it: none lost at a line end, none moved, no dotted circle", async () => {
+    // textkit 7.0.1 finds where a line ends in the glyphs by counting each glyph's characters; fontkit's glyph
+    // cache gave some glyphs the characters of their first use, so lines lost or moved glyphs (reportGlyphs.ts, 1).
+    const { answer, story } = storyScriptSample("hi");
+    const reportCatalogs = await catalogs("hi");
+    const pdf = await renderReportPdf({ answer, story, generatedAt: GENERATED, catalogs: reportCatalogs });
+    const directory = resolveReportFontDirectory();
+    const open = (file: string) => fontkitOpenSync(join(directory, file)) as unknown as OpenedFont;
+    const noto = open("noto-sans/NotoSans-Regular.ttf");
+    const faces = {
+      "NotoSansDevanagari-Regular": open("noto-sans-devanagari/NotoSansDevanagari-Regular.ttf"),
+      "NotoSansDevanagari-Bold": open("noto-sans-devanagari/NotoSansDevanagari-Bold.ttf")
+    };
+    const devanagari = faces["NotoSansDevanagari-Regular"];
+    // The stretches of a text the Devanagari face prints: what Noto Sans, first in the Hindi list, has no glyph for.
+    const stretches = (text: string): string[] => {
+      const found: string[] = [];
+      let stretch = "";
+      for (const character of text) {
+        const codePoint = character.codePointAt(0)!;
+        if (!noto.hasGlyphForCodePoint(codePoint) && devanagari.hasGlyphForCodePoint(codePoint)) {
+          stretch += character;
+          continue;
+        }
+        if (stretch.length > 0) found.push(stretch);
+        stretch = "";
+      }
+      if (stretch.length > 0) found.push(stretch);
+      return found;
+    };
+    // fontkit's shaping of each stretch (textkit decomposes Devanagari first), in each face, as outlines. The
+    // shaping font is a font object of its own, each glyph built with its own characters (reportPlacedFont): a font
+    // whose glyph cache already holds glyphs, as glyphIdentity's does, shapes Devanagari wrongly (reportGlyphs.ts, 1).
+    const shapers = new Map(Object.entries(faces).map(([name, font]) => [font, reportPlacedFont(open(
+      name === "NotoSansDevanagari-Bold" ? "noto-sans-devanagari/NotoSansDevanagari-Bold.ttf" : "noto-sans-devanagari/NotoSansDevanagari-Regular.ttf"
+    ))]));
+    const shaped = (font: OpenedFont, stretch: string) =>
+      shapers.get(font)!.layout(stretch.normalize("NFD")).glyphs.map((glyph) => glyphIdentity(font).ofId(glyph.id)).join(" ");
+    const printed = [...new Set(stretches(reportPrintedText(buildReportModel(answer, story, GENERATED, reportCatalogs))))];
+    const drawn = Object.entries(faces).map(([name, font]) => ({
+      font,
+      runs: drawnGlyphRuns(pdf, name, font).map((run) => run.join(" ")),
+      expected: new Set(printed.map((stretch) => shaped(font, stretch)))
+    }));
+    expect(drawn.reduce((sum, face) => sum + face.runs.length, 0)).toBeGreaterThan(200);
+    const dottedCircle = shaped(devanagari, "\u25CC");
+    expect(drawn.flatMap((face) => face.runs.filter((run) => run.split(" ").includes(dottedCircle)))).toEqual([]);
+    // Every run drawn in a Devanagari face is one of the printed stretches, shaped in that face, glyph for glyph.
+    expect(drawn.flatMap((face) => face.runs.filter((run) => !face.expected.has(run)))).toEqual([]);
+    // And every stretch of the sample is drawn whole, in one face or the other.
+    const sample = [...new Set(stretches(storyScriptSampleText("hi")))];
+    expect(sample.length).toBeGreaterThan(200);
+    expect(sample.filter((stretch) => !drawn.some((face) => face.runs.includes(shaped(face.font, stretch))))).toEqual([]);
   }, 120_000);
 
   it.each(["he", "hi", "ru", "zh"] as const)("prints punctuation next to a point number the %s text names, where a span starts inside a fallback stretch, with no empty box", async (locale) => {

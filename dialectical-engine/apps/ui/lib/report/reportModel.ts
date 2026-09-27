@@ -201,12 +201,33 @@ function lineageWords(lineage: MakerLineage | null): string | null {
   return lineage === null ? null : `${lineage.maker} · ${lineage.model_id}`;
 }
 
+/**
+ * The models, listed the way the report's language lists things. The short
+ * unit list is the approved look, but CLDR puts no mark between its items in
+ * some languages: none at all in zh, a bare space in ja, ko, ru, lt and tr
+ * (measured with Node 26's ICU), so model names ran together on the cover.
+ * A list whose every gap holds a visible character is kept as it is;
+ * otherwise the language's own "and" list, which marks each gap; a comma
+ * when neither does (or the locale is unknown).
+ */
+const LIST_TYPES: readonly Intl.ListFormatType[] = Object.freeze(["unit", "conjunction"]);
+
+/** Every two items have a visible character between them (zh's list has no part at all there). */
+function namesApart(parts: ReturnType<Intl.ListFormat["formatToParts"]>): boolean {
+  const between = parts.map((part) => (part.type === "element" ? "|" : /\S/u.test(part.value) ? "v" : "")).join("");
+  return !between.includes("||");
+}
+
 function listWords(locale: string, items: readonly string[]): string {
-  try {
-    return new Intl.ListFormat(locale, { style: "short", type: "unit" }).format(items);
-  } catch {
-    return items.join(", ");
+  for (const type of LIST_TYPES) {
+    try {
+      const parts = new Intl.ListFormat(locale, { style: "short", type }).formatToParts(items);
+      if (namesApart(parts)) return parts.map((part) => part.value).join("");
+    } catch {
+      // A locale Intl does not know: try the next list, then the comma.
+    }
   }
+  return items.join(", ");
 }
 
 function uniqueModels(answer: Answer): string[] {
