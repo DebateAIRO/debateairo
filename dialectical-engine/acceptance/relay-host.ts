@@ -359,8 +359,15 @@ export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHo
     // Pre-flight fix F37: each relay printed its overhead by maker; the host knows
     // which CANDIDATE each relay serves, so it prints the figures once more,
     // attributed to the candidate's providerRef.
+    // D8: informational, never a gate — a line that cannot be written is dropped
+    // and never fails the start (RELAYS SERVING below keeps its A12 behaviour).
     for (const { candidate, relay } of started) {
-      if (relay.harnessOverhead !== undefined) emit(harnessOverheadLine(relay.harnessOverhead, candidate.providerRef));
+      if (relay.harnessOverhead === undefined) continue;
+      try {
+        emit(harnessOverheadLine(relay.harnessOverhead, candidate.providerRef));
+      } catch {
+        // Dropped: the figures are information only.
+      }
     }
     emit(`RELAYS SERVING ${endpoints.length} ${endpointsPath}`);
   } catch (error) {

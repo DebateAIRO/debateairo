@@ -1202,17 +1202,25 @@ export async function startCliRelayServer(options: CliRelayServerOptions): Promi
     await workspace.close();
     throw new Error("CLI_RELAY_ADDRESS_FAILED");
   }
+  // D8 fix round 1: ONE close for every caller. A second close must not see
+  // `listening === false` and remove the workspace while the first is still
+  // waiting for an in-flight call, whose child would lose its cwd (or pi its
+  // @file) mid-call. The workspace goes only after the server has fully closed.
+  let closing: Promise<void> | undefined;
   return {
     port: address.port,
     baseUrl: `http://127.0.0.1:${address.port}`,
     authorizationHeader,
-    async close() {
-      if (server.listening) {
-        server.close();
-        await once(server, "close");
-      }
-      // D8: the workspace goes with the relay, whatever a call left in it.
-      await workspace.close();
+    close() {
+      closing ??= (async () => {
+        if (server.listening) {
+          server.close();
+          await once(server, "close");
+        }
+        // D8: the workspace goes with the relay, whatever a call left in it.
+        await workspace.close();
+      })();
+      return closing;
     }
   };
 }

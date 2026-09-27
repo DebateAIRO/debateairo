@@ -1967,3 +1967,37 @@ describe("D8 the workspace also holds the file transport's prompt, and a failed 
       .toEqual([]);
   });
 });
+
+describe("D8 fix round 1: close() is one close, however many callers ask", () => {
+  it("removes the workspace only after an in-flight call has finished, when two closes race it", async () => {
+    const markerDirectory = await pathDirectory();
+    const started = join(markerDirectory, "started");
+    const probe = [
+      'const { existsSync, writeFileSync } = require("node:fs");',
+      "const cwd = process.cwd();",
+      `writeFileSync(${JSON.stringify(started)}, cwd);`,
+      "setTimeout(() => process.stdout.write(JSON.stringify({ cwd, cwdStillThere: existsSync(cwd) })), 400);"
+    ].join("");
+    const handle = await startFixtureRelay(fixtureAdapter("racing-close-fixture"), probe);
+
+    const inFlight = postRelay(handle, userTurn("Racing close probe."));
+    await expect.poll(() => existsSync(started)).toBe(true);
+    const workspace = dirname(await readFile(started, "utf8"));
+    const first = handle.close();
+    const second = handle.close();
+
+    // One close for every caller: the second never races ahead of the first.
+    expect(second).toBe(first);
+    const response = await inFlight;
+    expect(response.status).toBe(200);
+    const observed = JSON.parse((await response.json() as RelayBody).choices[0]!.message.content) as {
+      readonly cwd: string;
+      readonly cwdStillThere: boolean;
+    };
+    expect(observed.cwdStillThere).toBe(true);
+    await Promise.all([first, second]);
+    expect(existsSync(workspace)).toBe(false);
+    // The first close waits for the caller's kept-alive connection to go (seconds, as
+    // before this fix), so this case gets more than the default five-second budget.
+  }, 15_000);
+});

@@ -266,8 +266,6 @@ function createCodexAdapter(sessionsRoot: string, model?: string): CliRelayAdapt
   };
 }
 
-export const codexAdapter: CliRelayAdapter = createCodexAdapter(defaultCodexSessionsRoot());
-
 export async function startModelShim(options: ModelShimOptions): Promise<ModelShimHandle> {
   // Codex is the only maker with a SECOND test-only seam, so it is the only
   // one where baseline ordering has to be made explicit. At base the default

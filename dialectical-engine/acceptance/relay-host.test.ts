@@ -689,28 +689,40 @@ describe("D8 / A20b: a grok candidate may name the id grok's -m selects (Task A1
   });
 });
 
-describe("D8: the attributed overhead lines are one more emit the host survives (Task A12b)", () => {
-  it("removes the endpoints file and closes every relay when emit throws on a RELAY OVERHEAD line", async () => {
+describe("D8: the attributed overhead lines are informational, never a gate (Task A12b)", () => {
+  it("still starts, and still says RELAYS SERVING, when emit throws on a RELAY OVERHEAD line: that line is dropped", async () => {
     const directory = await workspace();
     const endpointsPath = join(directory, "endpoints.json");
-    const before = listeningServers();
+    const seen: string[] = [];
 
-    const failure = await serveRelayHost({
+    const outcome = await serveRelayHost({
       candidatesPath: await candidatesFile(directory, [PI_CANDIDATE]),
       endpointsPath,
       environment: LOCAL,
       seams: SEAMS,
-      emit: (line) => { if (line.startsWith("RELAY OVERHEAD ")) throw new Error("EMIT_BROKEN OVERHEAD"); }
+      emit: (line) => {
+        seen.push(line);
+        if (line.startsWith("RELAY OVERHEAD ")) throw new Error("EMIT_BROKEN OVERHEAD");
+      }
     }).then((host) => {
-      // A host that wrongly served is still stopped, so a regression here strands nothing.
       hosts.push(host);
-      return null;
+      return host;
     }, (error: unknown) => error);
 
-    expect(failure).toEqual(new Error("EMIT_BROKEN OVERHEAD"));
-
-    expect(existsSync(endpointsPath)).toBe(false);
-    await expect.poll(() => listeningServers()).toBe(before);
+    // D8 (brief: "nothing about it can refuse a start"): the start is not failed by the line.
+    expect(outcome instanceof Error ? outcome.message : null).toBeNull();
+    expect(seen.map((line) => line.split(" ").slice(0, 4).join(" "))).toEqual([
+      "RELAY OVERHEAD Z.AI local:pi-glm",
+      `RELAYS SERVING 1 ${endpointsPath}`
+    ]);
+    expect(existsSync(endpointsPath)).toBe(true);
+    const [pi] = (outcome as RelayHostHandle).endpoints;
+    const response = await fetch(`${pi!.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${pi!.bearerToken}` },
+      body: JSON.stringify({ model: pi!.modelId, messages: [{ role: "user", content: "Serving probe." }] })
+    });
+    expect(response.status).toBe(200);
   });
 
   it("prints the candidate's figures after the maker: reported, own and overhead, as the relay measured them", async () => {
