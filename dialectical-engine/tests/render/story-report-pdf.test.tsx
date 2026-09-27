@@ -90,6 +90,72 @@ function embeddedFonts(raw: string): string[] {
 }
 
 /**
+ * The text each page draws, line by line, left to right as it stands on the
+ * page: every glyph read back through its font's ToUnicode map, every run
+ * placed through the page's transformation and text matrices. A right-to-left
+ * line reads here in the order it is printed.
+ */
+function drawnLines(pdf: Buffer): string[][] {
+  const raw = pdf.toString("latin1");
+  const streamOf = (object: string): string => {
+    const start = new RegExp(`\\n${object} 0 obj\\n<<\\n/Length \\d+\\n/Filter /FlateDecode\\n>>\\nstream\\n`, "u").exec(raw);
+    if (start === null) return "";
+    const from = start.index + start[0].length;
+    return inflateSync(pdf.subarray(from, raw.indexOf("endstream", from))).toString("latin1");
+  };
+  // pdfkit writes a glyph that stands for several characters as <0915 094d 0937>.
+  const text = (hex: string) => String.fromCharCode(...hex.split(" ").filter(Boolean).map((unit) => parseInt(unit, 16)));
+  // Each embedded font's glyph → text map, from its ToUnicode CMap.
+  const maps = new Map<string, Map<number, string>>();
+  for (const font of raw.matchAll(/\n(\d+) 0 obj\n<<\n\/Type \/Font\n\/Subtype \/Type0\n[^>]*?\/ToUnicode (\d+) 0 R/gu)) {
+    const glyphs = new Map<number, string>();
+    for (const range of streamOf(font[2]!).matchAll(/<([0-9a-f]+)> <[0-9a-f]+> \[([^\]]*)\]/giu)) {
+      const first = parseInt(range[1]!, 16);
+      Array.from(range[2]!.matchAll(/<([0-9a-f ]*)>/giu)).forEach((unicode, index) => glyphs.set(first + index, text(unicode[1]!)));
+    }
+    maps.set(font[1]!, glyphs);
+  }
+  // pdfkit names its fonts F1, F2… once for the whole document.
+  const fonts = new Map(Array.from(raw.matchAll(/\/(F\d+) (\d+) 0 R/gu), (match) => [match[1]!, maps.get(match[2]!)]));
+  const pages: string[][] = [];
+  for (const page of raw.matchAll(/\/Type \/Page\n\/Parent \d+ 0 R\n[\s\S]*?\/Contents (\d+) 0 R/gu)) {
+    type Matrix = [number, number, number, number, number, number];
+    const times = (m: Matrix, n: Matrix): Matrix => [
+      m[0] * n[0] + m[1] * n[2], m[0] * n[1] + m[1] * n[3],
+      m[2] * n[0] + m[3] * n[2], m[2] * n[1] + m[3] * n[3],
+      m[4] * n[0] + m[5] * n[2] + n[4], m[4] * n[1] + m[5] * n[3] + n[5]
+    ];
+    let ctm: Matrix = [1, 0, 0, 1, 0, 0];
+    const saved: Matrix[] = [];
+    let font: Map<number, string> | undefined;
+    let at = { x: 0, y: 0 };
+    const pieces: { x: number; y: number; text: string }[] = [];
+    const number = "(-?[\\d.]+)";
+    const operators = new RegExp(`(?<save>\\bq\\b)|(?<restore>\\bQ\\b)|(?<cm>${number} ${number} ${number} ${number} ${number} ${number} cm)|\\/(?<font>F\\d+) [\\d.]+ Tf|(?<tm>${number} ${number} ${number} ${number} ${number} ${number} Tm)|\\[(?<tj>[^\\]]*)\\] TJ`, "gu");
+    for (const token of streamOf(page[1]!).matchAll(operators)) {
+      const groups = token.groups!;
+      const values = token.slice(1).filter((value) => value !== undefined && /^-?[\d.]+$/u.test(value)).map(Number);
+      if (groups.save !== undefined) saved.push(ctm);
+      else if (groups.restore !== undefined) ctm = saved.pop() ?? [1, 0, 0, 1, 0, 0];
+      else if (groups.cm !== undefined) ctm = times(values as Matrix, ctm);
+      else if (groups.font !== undefined) font = fonts.get(groups.font);
+      else if (groups.tm !== undefined) {
+        const [x, y] = [values[4]!, values[5]!];
+        at = { x: ctm[0] * x + ctm[2] * y + ctm[4], y: ctm[1] * x + ctm[3] * y + ctm[5] };
+      } else if (groups.tj !== undefined && font !== undefined) {
+        const glyphs = Array.from(groups.tj.matchAll(/<([0-9a-f]*)>/giu), (hex) => hex[1]!.match(/.{4}/gu) ?? []).flat();
+        pieces.push({ ...at, text: glyphs.map((glyph) => font!.get(parseInt(glyph, 16)) ?? "\uFFFD").join("") });
+      }
+    }
+    const lines = new Map<number, typeof pieces>();
+    for (const piece of pieces) lines.set(Math.round(piece.y), [...(lines.get(Math.round(piece.y)) ?? []), piece]);
+    pages.push([...lines.entries()].sort(([a], [b]) => b - a)
+      .map(([, line]) => line.sort((a, b) => a.x - b.x).map((piece) => piece.text).join("")));
+  }
+  return pages;
+}
+
+/**
  * The PDF's outline titles, decoded: pdfkit writes an ASCII title as a plain
  * string and any other as UTF-16BE with a byte order mark, escaped.
  */
@@ -188,6 +254,8 @@ describe("renderReportPdf (spec §10)", () => {
     // The rule the renderer registers: ordinary words stay whole; the address gets zero-width break
     // points (empty syllables) between pieces of at most 20 characters, and not one character is added.
     expect(reportHyphenation("Anunțurile")).toEqual(["Anunțurile"]);
+    // Chinese and Japanese text breaks between its characters, with the same zero-width break points.
+    expect(reportHyphenation("我们的")).toEqual(["我", "", "们", "", "的"]);
     const parts = reportHyphenation(url);
     expect(parts.join("")).toBe(url);
     expect(parts.filter((part) => part === "").length).toBeGreaterThan(7);
@@ -245,7 +313,10 @@ describe("the report in the question's own script (R-fonts)", () => {
   it.each([
     ["ru", ["NotoSans-Bold", "NotoSans-Italic", "NotoSans-Regular"]],
     ["el", ["NotoSans-Bold", "NotoSans-Italic", "NotoSans-Regular"]],
-    ["hi", ["NotoSans-Regular", "NotoSansDevanagari-Bold", "NotoSansDevanagari-Regular"]]
+    ["hi", ["NotoSans-Regular", "NotoSansDevanagari-Bold", "NotoSansDevanagari-Regular"]],
+    ["zh", ["NotoSansSC-Bold", "NotoSansSC-Regular"]],
+    ["ja", ["NotoSansJP-Bold", "NotoSansJP-Regular"]],
+    ["ko", ["NotoSansKR-Bold", "NotoSansKR-Regular"]]
   ] as const)("prints the %s sample in its own Noto face, with no empty box and no fallback to the standard fonts", async (locale, faces) => {
     const pdf = await render(locale);
     const raw = pdf.toString("latin1");
@@ -262,6 +333,27 @@ describe("the report in the question's own script (R-fonts)", () => {
     const sample = storyScriptSampleText(locale);
     const missing = letters(sample).filter((codePoint) => !maps.includes(codePoint));
     expect(missing, locale).toEqual([]);
+  }, 120_000);
+
+  it.each(["zh", "ja", "ko"] as const)("breaks %s lines without printing a hyphen the text does not have, and fills the lines", async (locale) => {
+    // No model names (they hold hyphens): every hyphen on these pages would be one the line breaking printed.
+    const { answer, story } = storyScriptSample(locale);
+    const unnamed: Answer = { ...answer, nodes: answer.nodes.map((node) => ({ ...node, maker_lineage: null, review: node.review === null ? null : { ...node.review, reviewer_lineage: null } })) };
+    const pdf = await renderReportPdf({
+      answer: unnamed,
+      story: { ...story, storyteller: null, checker: null },
+      generatedAt: new Date("2026-09-26T12:00:00.000Z"),
+      catalogs: await catalogs(locale)
+    });
+    const pages = drawnLines(pdf);
+    const text = pages.flat().join("\n");
+    expect(text).toContain(locale === "ko" ? "하이브리드" : locale === "ja" ? "ハイブリッド" : "混合办公");
+    expect(text.match(/-/gu) ?? [], locale).toEqual([]);
+    // The long story's paragraphs wrap into many lines. Chinese and Japanese lines are filled: a full line
+    // holds about 44 fullwidth characters (471 pt at 10.5 pt), where cutting only every 20 characters, the
+    // long-word rule alone, leaves at most 40.
+    expect(pages[1]!.length, locale).toBeGreaterThan(15);
+    if (locale !== "ko") expect(pages[1]!.filter((line) => [...line].length > 40).length, locale).toBeGreaterThanOrEqual(5);
   }, 120_000);
 });
 

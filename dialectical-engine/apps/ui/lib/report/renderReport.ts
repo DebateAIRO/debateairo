@@ -7,7 +7,8 @@ import { reportPlacedFont } from "./reportGlyphs.js";
 import { REPORT_FONT_FACES, type ReportFontFamily } from "./reportFonts.js";
 import { reportSupportedForLocale, type ReportCatalogs } from "./reportLanguage.js";
 import { reportLayout, reportPrintedText } from "./reportLayout.js";
-import { buildReportModel, reportWordPieces } from "./reportModel.js";
+import { reportBreakPieces } from "./reportLineBreaks.js";
+import { buildReportModel } from "./reportModel.js";
 
 /**
  * The vendored OFL fonts (apps/ui/assets/fonts, with each family's OFL.txt and
@@ -32,13 +33,15 @@ export function resolveReportFontDirectory(cwd: string = process.cwd()): string 
  * The report's line-break rule, registered as react-pdf's hyphenation callback. An ordinary word is never
  * split: the story is in the question's language, so English hyphenation would be wrong. A word longer
  * than REPORT_WORD_BREAK.longerThan (a web address a model copied, say) may break between the pieces
- * reportWordPieces cuts. The pieces come back with an empty string between each two. @react-pdf/textkit
- * 7.0.1 turns an empty syllable into a zero-width space it may break at and prints nothing there, while a
- * break between two plain syllables would print a hyphen. Not one character is added to the text, so a
- * copied address stays exactly as the model wrote it.
+ * reportWordPieces cuts, and Chinese and Japanese text between its characters (reportBreakPieces). The
+ * pieces come back with an empty string between each two. @react-pdf/textkit 7.0.1 turns an empty
+ * syllable into a zero-width space it may break at and prints nothing there, while a break between two
+ * plain syllables would print a hyphen. Not one character is added to the text, so a copied address
+ * stays exactly as the model wrote it. Each of the report's own texts passes textkit the fuller rule
+ * reportLineBreaker builds from its whole text; this one serves any other.
  */
 export function reportHyphenation(word: string): string[] {
-  return reportWordPieces(word).flatMap((piece, index) => (index === 0 ? [piece] : ["", piece]));
+  return reportBreakPieces(word).flatMap((piece, index) => (index === 0 ? [piece] : ["", piece]));
 }
 
 let registeredFontDirectory: string | null = null;

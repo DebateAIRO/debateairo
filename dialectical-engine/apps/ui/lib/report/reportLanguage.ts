@@ -9,18 +9,18 @@ import type { MessageCatalog } from "../i18n/translate.js";
  * FONTS (Task R-fonts, owner decision 2026-09-27: "A: add them"): the vendored
  * faces (apps/ui/assets/fonts, SOURCES.md; the choice per language is
  * lib/report/reportFonts.ts) print the 25 Latin-script locales, Cyrillic and
- * Greek (Noto Sans) and Devanagari (Noto Sans Devanagari); fonts.test.mjs
- * checks every catalogue value against them. A locale stays in this list, and
- * its report is refused (the panel hides the download and says the report is
- * not available in that language yet), only while the report cannot print it
+ * Greek (Noto Sans), Devanagari (Noto Sans Devanagari) and Chinese, Japanese
+ * and Korean (Noto Sans SC, JP, KR; lines break between Chinese and Japanese
+ * characters, lib/report/reportLineBreaks.ts); fonts.test.mjs checks every
+ * catalogue value against them. A locale stays in this list, and its report
+ * is refused (the panel hides the download and says the report is not
+ * available in that language yet), only while the report cannot print it
  * correctly:
  * - he: right-to-left layout is not wired yet;
- * - zh, ja, ko: CJK text breaks between runs of different scripts with a
- *   printed hyphen until its own line-break rule is wired;
  * - ar: react-pdf 4.9.0 drops the vertical mark positions the Noto Arabic
  *   fonts need for every dotted letter (lib/report/reportGlyphs.ts).
  */
-export const REPORT_UNPRINTABLE_LOCALES: readonly LocaleCode[] = Object.freeze(["he", "ar", "zh", "ja", "ko"]);
+export const REPORT_UNPRINTABLE_LOCALES: readonly LocaleCode[] = Object.freeze(["he", "ar"]);
 
 export function reportSupportedForLocale(locale: string): boolean {
   return !(REPORT_UNPRINTABLE_LOCALES as readonly string[]).includes(locale);

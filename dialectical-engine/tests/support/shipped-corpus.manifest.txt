@@ -443,6 +443,7 @@ apps/ui/lib/report/reportFonts.ts
 apps/ui/lib/report/reportGlyphs.ts
 apps/ui/lib/report/reportLanguage.ts
 apps/ui/lib/report/reportLayout.ts
+apps/ui/lib/report/reportLineBreaks.ts
 apps/ui/lib/report/reportModel.ts
 apps/ui/lib/report/reportRoute.ts
 apps/ui/lib/returnPath.ts

@@ -4,6 +4,7 @@ import type { Answer, AnswerStory } from "@debateai/contract";
 import { formatNumber } from "../i18n/translate.js";
 import { REPORT_FONT_FAMILIES } from "./reportFonts.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
+import { reportLineBreaker } from "./reportLineBreaks.js";
 import { reportLayout, reportPrintedText, type ReportLayout } from "./reportLayout.js";
 import { buildReportModel, reportPageWords, type ReportModel, type ReportParagraph } from "./reportModel.js";
 
@@ -40,8 +41,9 @@ const LINK = "#3D5A80";
 const FATE_COLUMN = 108;
 const BODY = 10.5;
 // textkit's own infinity (linebreak.infinity in @react-pdf/textkit 7.0.1): a penalty this high is never a
-// line break. Every run boundary in story text (a word, then a [Pn] citation or an in-text P5 link) is a
-// hyphenation point to textkit, and a break there would print a stray "-"; at this penalty it never breaks.
+// line break. Every run boundary in a text (a word, then a [Pn] citation or an in-text P5 link; a change of
+// script or font, as Japanese changes between Han and kana) is a hyphenation point to textkit, and a break
+// there would print a stray "-"; at this penalty it never breaks. Every text of the report sets it.
 const NEVER_BREAK_BETWEEN_RUNS = 10000;
 
 const styles = StyleSheet.create({
@@ -123,6 +125,7 @@ function capitals(model: ReportModel, text: string): string {
 }
 
 type Style = Styles[string];
+type TextStyle = Style | Style[];
 
 /** What a report's language adds to the shared styles (lib/report/reportLayout.ts). */
 interface Look {
@@ -144,16 +147,53 @@ function lookOf(model: ReportModel, layout: ReportLayout): Look {
   };
 }
 
+/**
+ * One text of the report. textkit 7.0.1 splits a text into runs wherever its
+ * style, font or script changes (a [Pn] citation, a Greek letter in Romanian,
+ * every switch between Han and kana in Japanese) and treats each run boundary
+ * as a hyphenation point, where a break prints a hyphen. At textkit's own
+ * infinity, NEVER_BREAK_BETWEEN_RUNS, it never breaks there. It breaks inside
+ * a run only where reportLineBreaker allows, and that rule is built from the
+ * whole text, so it knows what stands on both sides of a run boundary.
+ */
+function Words({ style, text, fixed = false, wrap = true }: {
+  style: TextStyle;
+  text: string;
+  fixed?: boolean;
+  wrap?: boolean;
+}): JSX.Element {
+  return (
+    <Text
+      style={style}
+      fixed={fixed}
+      wrap={wrap}
+      hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}
+      hyphenationCallback={reportLineBreaker(text)}
+    >
+      {text}
+    </Text>
+  );
+}
+
+/** A paragraph's text as it is printed: its own words, the P-numbers it names, and the [Pn] citations. */
+function citationText(label: string): string {
+  // A no-break space before each marker keeps "[P5]" with the word before it and with the marker before it.
+  return `\u00A0[${label}]`;
+}
+
+function paragraphText(paragraph: ReportParagraph): string {
+  return paragraph.spans.map((span) => (span.kind === "text" ? span.text : span.kind === "mention" ? span.label : citationText(span.label))).join("");
+}
+
 // StyleSheet.create keeps each style's literal shape, so the caller picks a variant rather than passing a style.
 function StoryText({ paragraph, variant }: { paragraph: ReportParagraph; variant: "paragraph" | "pathLine" | "box" }): JSX.Element {
   const style = variant === "pathLine" ? styles.pathLine : variant === "box" ? styles.boxText : styles.paragraph;
   return (
-    <Text style={style} hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}>
+    <Text style={style} hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS} hyphenationCallback={reportLineBreaker(paragraphText(paragraph))}>
       {paragraph.spans.map((span, index) => {
         if (span.kind === "text") return <Text key={index}>{span.text}</Text>;
         if (span.kind === "mention") return <Link key={index} src={`#${span.anchor}`} style={styles.mention}>{span.label}</Link>;
-        // A no-break space before each marker keeps "[P5]" with the word before it and with the marker before it.
-        return <Link key={index} src={`#${span.anchor}`} style={styles.cite}>{`\u00A0[${span.label}]`}</Link>;
+        return <Link key={index} src={`#${span.anchor}`} style={styles.cite}>{citationText(span.label)}</Link>;
       })}
     </Text>
   );
@@ -176,7 +216,7 @@ function KeepWithNext({ ahead, style, id, children }: {
 function Heading({ look, title, first = false }: { look: Look; title: string; first?: boolean }): JSX.Element {
   return (
     <KeepWithNext ahead={60} style={first ? styles.headingFirstBox : styles.headingBox}>
-      <Text style={[styles.heading, look.heading]}>{title}</Text>
+      <Words style={[styles.heading, look.heading]} text={title} />
     </KeepWithNext>
   );
 }
@@ -184,7 +224,7 @@ function Heading({ look, title, first = false }: { look: Look; title: string; fi
 function Subheading({ text }: { text: string }): JSX.Element {
   return (
     <KeepWithNext ahead={30} style={styles.subheadingBox}>
-      <Text style={styles.subheading}>{text}</Text>
+      <Words style={styles.subheading} text={text} />
     </KeepWithNext>
   );
 }
@@ -193,10 +233,11 @@ function Footer({ look }: { look: Look }): JSX.Element {
   const { model } = look;
   return (
     <>
-      <Text style={styles.footerLeft} fixed>{model.footer.text}</Text>
+      <Words style={styles.footerLeft} fixed text={model.footer.text} />
       <Text
         style={styles.footerRight}
         fixed
+        hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}
         render={({ pageNumber, totalPages }) => reportPageWords(model, pageNumber, totalPages)}
       />
     </>
@@ -208,29 +249,29 @@ function CoverAndShort({ look }: { look: Look }): JSX.Element {
   const { cover, inShort } = model;
   return (
     <>
-      <Text style={[styles.eyebrow, look.tracked]}>{capitals(model, cover.eyebrow)}</Text>
-      <Text style={styles.question}>{cover.question}</Text>
+      <Words style={[styles.eyebrow, look.tracked]} text={capitals(model, cover.eyebrow)} />
+      <Words style={styles.question} text={cover.question} />
       {cover.labelWords === null ? null : (
         <View style={styles.labelRow}>
-          <Text style={[styles.label, look.tracked]}>{capitals(model, cover.labelWords)}</Text>
+          <Words style={[styles.label, look.tracked]} text={capitals(model, cover.labelWords)} />
         </View>
       )}
-      <Text style={styles.confidence}>{cover.confidence}</Text>
-      <Text style={styles.meta}>{cover.generatedLine}</Text>
-      <Text style={styles.meta}>{cover.modelsLine}</Text>
+      <Words style={styles.confidence} text={cover.confidence} />
+      <Words style={styles.meta} text={cover.generatedLine} />
+      <Words style={styles.meta} text={cover.modelsLine} />
       <View style={styles.disclosure}>
-        <Text style={styles.disclosureLine}>{cover.disclosure}</Text>
+        <Words style={styles.disclosureLine} text={cover.disclosure} />
       </View>
       <Heading look={look} title={inShort.title} />
-      <Text style={styles.headline}>{inShort.headline}</Text>
-      <Text style={styles.paragraph}>{inShort.summary}</Text>
+      <Words style={styles.headline} text={inShort.headline} />
+      <Words style={styles.paragraph} text={inShort.summary} />
       {inShort.paths.map((path, index) => (
         <View key={index} style={styles.pathRow} wrap={false}>
-          <Text style={[styles.fate, look.tracked]}>{capitals(model, path.fateWords)}</Text>
+          <Words style={[styles.fate, look.tracked]} text={capitals(model, path.fateWords)} />
           <StoryText paragraph={path.line} variant="pathLine" />
         </View>
       ))}
-      {inShort.morePaths === null ? null : <Text style={styles.morePaths}>{inShort.morePaths}</Text>}
+      {inShort.morePaths === null ? null : <Words style={styles.morePaths} text={inShort.morePaths} />}
     </>
   );
 }
@@ -240,11 +281,11 @@ function LongStory({ look }: { look: Look }): JSX.Element {
   return (
     <>
       <Heading look={look} title={model.storyTitle} first />
-      <Text style={styles.intro}>{model.storyIntro}</Text>
+      <Words style={styles.intro} text={model.storyIntro} />
       {model.sections.map((section, index) => (
         <Fragment key={index}>
           <KeepWithNext ahead={48} style={styles.sectionTitleBox}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Words style={styles.sectionTitle} text={section.title} />
           </KeepWithNext>
           {section.paragraphs.map((item, itemIndex) => (
             <StoryText key={itemIndex} paragraph={item} variant="paragraph" />
@@ -253,11 +294,11 @@ function LongStory({ look }: { look: Look }): JSX.Element {
       ))}
       {model.reviewerNote === null ? null : (
         <View style={styles.box} wrap={false}>
-          <Text style={[styles.boxTitle, look.tracked]}>{capitals(model, model.reviewerNote.title)}</Text>
+          <Words style={[styles.boxTitle, look.tracked]} text={capitals(model, model.reviewerNote.title)} />
           <StoryText paragraph={model.reviewerNote.paragraph} variant="box" />
         </View>
       )}
-      {model.reservation === null ? null : <Text style={styles.reservation} wrap={false}>{model.reservation}</Text>}
+      {model.reservation === null ? null : <Words style={styles.reservation} wrap={false} text={model.reservation} />}
     </>
   );
 }
@@ -275,7 +316,7 @@ function Why({ look }: { look: Look }): JSX.Element {
       <Heading look={look} title={why.title} first />
       {why.reasons.map((reason, index) => (
         <View key={index} style={styles.reasonRow}>
-          <Text style={styles.reasonNumber}>{reasonNumber(model, index)}</Text>
+          <Words style={styles.reasonNumber} text={reasonNumber(model, index)} />
           <View style={styles.reasonText}>
             <StoryText paragraph={reason} variant="paragraph" />
           </View>
@@ -292,21 +333,25 @@ function Appendix({ look }: { look: Look }): JSX.Element {
   return (
     <>
       <Heading look={look} title={model.appendix.title} first />
-      <Text style={styles.intro}>{model.appendix.intro}</Text>
+      <Words style={styles.intro} text={model.appendix.intro} />
       {model.appendix.entries.map((entry) => (
         <Fragment key={entry.anchor}>
           <KeepWithNext ahead={52} style={styles.entryHeadBox} id={entry.anchor}>
-            <Text style={styles.entryHead}>
+            <Text
+              style={styles.entryHead}
+              hyphenationPenalty={NEVER_BREAK_BETWEEN_RUNS}
+              hyphenationCallback={reportLineBreaker(`${entry.number}   ${entry.stance}`)}
+            >
               <Text style={styles.entryNumber}>{entry.number}</Text>
               <Text style={styles.entryStance}>{`   ${entry.stance}`}</Text>
             </Text>
           </KeepWithNext>
-          <Text style={styles.entryClaim}>{entry.claim}</Text>
-          <Text style={styles.entryMeta}>{`${entry.strength} · ${entry.wayOfKnowing}`}</Text>
-          <Text style={styles.entryMeta}>{entry.author}</Text>
-          <Text style={styles.entryMeta}>{entry.review}</Text>
-          {entry.setAsideLine === null ? null : <Text style={styles.entryMeta}>{entry.setAsideLine}</Text>}
-          {entry.notesLine === null ? null : <Text style={styles.entryMeta}>{entry.notesLine}</Text>}
+          <Words style={styles.entryClaim} text={entry.claim} />
+          <Words style={styles.entryMeta} text={`${entry.strength} · ${entry.wayOfKnowing}`} />
+          <Words style={styles.entryMeta} text={entry.author} />
+          <Words style={styles.entryMeta} text={entry.review} />
+          {entry.setAsideLine === null ? null : <Words style={styles.entryMeta} text={entry.setAsideLine} />}
+          {entry.notesLine === null ? null : <Words style={styles.entryMeta} text={entry.notesLine} />}
         </Fragment>
       ))}
     </>
@@ -320,8 +365,8 @@ function About({ look }: { look: Look }): JSX.Element {
       <Heading look={look} title={model.about.title} first />
       {model.about.rows.map((row, index) => (
         <View key={index} style={styles.aboutRow} wrap={false}>
-          <Text style={styles.aboutLabel}>{row.label}</Text>
-          <Text style={styles.aboutValue}>{row.value}</Text>
+          <Words style={styles.aboutLabel} text={row.label} />
+          <Words style={styles.aboutValue} text={row.value} />
         </View>
       ))}
     </>

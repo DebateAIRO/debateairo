@@ -401,12 +401,12 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
 });
 
 describe("the report's language (lib/report/reportLanguage.ts)", () => {
-  it("prints the Latin, Cyrillic, Greek and Devanagari locales, and refuses the scripts it cannot print correctly yet", () => {
+  it("prints the Latin, Cyrillic, Greek, Devanagari and CJK locales, and refuses the scripts it cannot print correctly yet", () => {
     const refused = LOCALES.map(({ code }) => code).filter((code) => !reportSupportedForLocale(code)).sort();
-    expect(refused).toEqual(["ar", "he", "ja", "ko", "zh"]);
+    expect(refused).toEqual(["ar", "he"]);
     expect([...REPORT_UNPRINTABLE_LOCALES].sort()).toEqual(refused);
-    // One per script group: Latin (with and without diacritics, Vietnamese), Cyrillic, Greek, Devanagari.
-    expect(["ro", "en", "vi", "pl", "tr", "ru", "bg", "uk", "el", "hi"].every(reportSupportedForLocale)).toBe(true);
+    // One per script group: Latin (with and without diacritics, Vietnamese), Cyrillic, Greek, Devanagari, CJK.
+    expect(["ro", "en", "vi", "pl", "tr", "ru", "bg", "uk", "el", "hi", "zh", "ja", "ko"].every(reportSupportedForLocale)).toBe(true);
   });
 
   it("loads the question's catalogues, and the English public catalogue for the metadata only", async () => {
@@ -531,14 +531,19 @@ describe("the PDF's text styles (apps/ui/lib/report/ReportDocument.tsx)", () => 
   it("underlines a point number the text names, and keeps each [Pn] citation with the word before it", () => {
     expect(styles.get("mention")).toMatch(/textDecoration:\s*"underline"/u);
     // A no-break space before each citation marker, so "[P5]" never starts a line on its own.
-    expect(source).toContain("`\\u00A0[${span.label}]`");
+    expect(source).toContain("`\\u00A0[${label}]`");
   });
 
-  it("never lets story text break between runs (where textkit would print a stray hyphen)", () => {
-    // textkit 7.0.1 treats every run boundary (a word, then a [Pn] marker or an underlined P5) as a
-    // hyphenation point; at its own infinity, 10000, a penalty is never a line break.
+  it("never lets a text break between runs (where textkit would print a stray hyphen)", () => {
+    // textkit 7.0.1 treats every run boundary (a word, then a [Pn] marker or an underlined P5; a change of
+    // script, as Japanese changes between Han and kana) as a hyphenation point; at its own infinity, 10000,
+    // a penalty is never a line break. The report has four kinds of text and each sets it: Words (every
+    // plain text), StoryText, an appendix entry's head, and the page numbers.
     expect(source).toMatch(/^const NEVER_BREAK_BETWEEN_RUNS = 10000;$/mu);
-    expect(source).toMatch(/<Text style=\{style\} hyphenationPenalty=\{NEVER_BREAK_BETWEEN_RUNS\}>/u);
-    expect(source.match(/hyphenationPenalty=/gu)).toHaveLength(1);
+    expect(source.match(/hyphenationPenalty=/gu)).toHaveLength(4);
+    expect(source.match(/hyphenationPenalty=\{NEVER_BREAK_BETWEEN_RUNS\}/gu)).toHaveLength(4);
+    // Seven Text elements: those four, and the three nested in StoryText and in the entry head. A new one comes here first.
+    expect(source.match(/<Text\b/gu)).toHaveLength(7);
+    expect(source.match(/hyphenationCallback=\{reportLineBreaker\(/gu)).toHaveLength(3);
   });
 });
