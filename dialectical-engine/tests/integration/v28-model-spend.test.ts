@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../packages/db/src/index.js";
 import { CostEnvelopeGuard, PostgresModelSpendStore, costEnvelopeDay } from "@debateai/budget";
@@ -218,6 +219,112 @@ describe("V-28 the persisted totals answer the two envelope questions", () => {
       [day]
     );
     expect(reserved.rows[0]?.count).toBe("1");
+  });
+});
+
+/**
+ * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1, risk R12) — MIGRATION
+ * 0075, the spend phase. The first paid runs must show what was spent while the
+ * debate was argued apart from what was spent writing the answer, so every RUN
+ * charge written from here on names its phase; SUPPORT and STORY charges carry
+ * none, and the rows written before this file stay NULL.
+ */
+describe("M1 migration 0075 — ledger.model_spend.spend_phase", () => {
+  const PRICE = { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 };
+  const PROJECTION = { requestBytes: 800, completionTokenCeiling: 64 };
+
+  async function phasesOf(runId: string): Promise<readonly (readonly [string, string | null])[]> {
+    const rows = await database.pool.query<{ spend_source: string; spend_phase: string | null }>(
+      `SELECT spend_source, spend_phase FROM ledger.model_spend
+       WHERE run_id = $1 ORDER BY recorded_at, spend_source`,
+      [runId]
+    );
+    return rows.rows.map((row) => [row.spend_source, row.spend_phase] as const);
+  }
+
+  it("adds a nullable text column", async () => {
+    const column = await database.pool.query<{ data_type: string; is_nullable: string }>(
+      `SELECT data_type, is_nullable FROM information_schema.columns
+       WHERE table_schema='ledger' AND table_name='model_spend' AND column_name='spend_phase'`
+    );
+    expect(column.rows).toEqual([{ data_type: "text", is_nullable: "YES" }]);
+  });
+
+  it("records one BODY and one SERVE call as two RUN rows with their phases, and a STORY row with none", async () => {
+    const runId = await createLegacyRun();
+    const store = new PostgresModelSpendStore(database.pool);
+    const guard = new CostEnvelopeGuard({
+      store,
+      policy: {
+        perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000,
+        serveReserveBasisPoints: 3_000, serveOverrunBasisPoints: 2_000, perStoryCeilingMicros: 50_000
+      }
+    });
+    const usage = { prompt_tokens: 10, completion_tokens: 5 };
+    await guard.providerSeam({ runId, price: PRICE, requireReportedUsage: true, phase: "BODY" })
+      .recordCall({ providerRef: "provider-1", usage, projection: PROJECTION });
+    await guard.providerSeam({ runId, price: PRICE, requireReportedUsage: true, phase: "SERVE" })
+      .recordCall({ providerRef: "provider-1", usage, projection: PROJECTION });
+    await guard.storySeam({ runId, price: PRICE, requireReportedUsage: true })
+      .recordCall({ providerRef: "provider-1", usage, projection: PROJECTION });
+
+    expect([...await phasesOf(runId)].sort()).toEqual([
+      ["RUN", "BODY"], ["RUN", "SERVE"], ["STORY", null]
+    ]);
+    // Both phases count toward the ONE run total; the story's charge does not.
+    expect(await store.readRunSpentMicros(runId)).toBe(30);
+  });
+
+  it("keeps a row written without a phase (every row before this migration) as NULL", async () => {
+    const runId = await createLegacyRun();
+    await database.pool.query(
+      `INSERT INTO ledger.model_spend
+         (spend_id, spend_source, run_id, provider_ref, charged_on, charge_micros, input_tokens, output_tokens)
+       VALUES ($1,'RUN',$2,'provider-1',current_date,1,1,1)`,
+      [randomUUID(), runId]
+    );
+    expect(await phasesOf(runId)).toEqual([["RUN", null]]);
+  });
+
+  it("refuses a phase outside BODY and SERVE, and a phase on a charge that is not a RUN charge", async () => {
+    const runId = await createLegacyRun();
+    await expect(database.pool.query(
+      `INSERT INTO ledger.model_spend
+         (spend_id, spend_source, run_id, provider_ref, charged_on, charge_micros, input_tokens, output_tokens, spend_phase)
+       VALUES ($1,'RUN',$2,'provider-1',current_date,1,1,1,'PREPARE')`,
+      [randomUUID(), runId]
+    )).rejects.toThrowError(/model_spend_spend_phase_check/u);
+    for (const [source, run] of [["STORY", runId], ["SUPPORT", null]] as const) {
+      await expect(database.pool.query(
+        `INSERT INTO ledger.model_spend
+           (spend_id, spend_source, run_id, provider_ref, charged_on, charge_micros, input_tokens, output_tokens, spend_phase)
+         VALUES ($1,$2,$3,'provider-1',current_date,1,1,1,'SERVE')`,
+        [randomUUID(), source, run]
+      ), source).rejects.toThrowError(/model_spend_phase_is_a_run_charge/u);
+    }
+  });
+
+  it("refuses a phase on a non-RUN charge in the store too, before it reaches the database", async () => {
+    await expect(new PostgresModelSpendStore(database.pool).recordSpend({
+      spendId: randomUUID(), spendSource: "SUPPORT", runId: null, providerRef: "provider-1",
+      chargedOn: costEnvelopeDay(new Date()), chargeMicros: 1, inputTokens: 1, outputTokens: 1,
+      spendPhase: "BODY"
+    })).rejects.toThrowError(expect.objectContaining({ code: "MODEL_SPEND_PHASE_NOT_A_RUN_CHARGE" }));
+  });
+
+  it("is replay-safe: applying the file's text again changes nothing and the table stays append-only", async () => {
+    const sql = await readFile(
+      new URL("../../migrations/0075_model_spend_phase.sql", import.meta.url), "utf8"
+    );
+    await database.pool.query(sql);
+    const constraints = await database.pool.query<{ conname: string }>(
+      `SELECT conname FROM pg_catalog.pg_constraint
+       WHERE conrelid = 'ledger.model_spend'::regclass AND conname LIKE '%phase%' ORDER BY conname`
+    );
+    expect(constraints.rows.map((row) => row.conname))
+      .toEqual(["model_spend_phase_is_a_run_charge", "model_spend_spend_phase_check"]);
+    await expect(database.pool.query("UPDATE ledger.model_spend SET spend_phase = 'BODY'"))
+      .rejects.toThrowError(/append-only or immutable table model_spend rejects UPDATE/u);
   });
 });
 

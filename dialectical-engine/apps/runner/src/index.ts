@@ -50,7 +50,8 @@ import {
   BudgetRepository,
   BATTERY_BUDGET_CONTRACTS,
   parseCostEnvelopeBasis,
-  type BudgetPressureDecision
+  type BudgetPressureDecision,
+  type CostEnvelopePhase
 } from "@debateai/budget";
 import {
   countMeasuredEdges,
@@ -6387,6 +6388,24 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
   return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
 }
 
+/**
+ * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1) — WHICH CEILING A CALL
+ * SEES. An answer-writing call is the synthesizer or the evaluator on the
+ * served lane, and only that pair: the judges use the served lane too, so the
+ * lane alone would put every judge call on the answer's money, and the role
+ * alone would put the story's storyteller and checker there. Every other call
+ * a run makes is BODY. The phase picks the ceiling (the money seam's and the
+ * attempt ceiling's) and is recorded on the charge; it never changes a
+ * refusal's code.
+ */
+export function providerCallCostEnvelopePhase(
+  request: Pick<ProviderCallRequest, "role" | "lane">
+): CostEnvelopePhase {
+  return (request.role === "SYNTHESIZER" || request.role === "EVALUATOR") && request.lane === "served"
+    ? "SERVE"
+    : "BODY";
+}
+
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction">
@@ -6397,8 +6416,12 @@ export function createPostgresProviderGateway(
        * target's — but the spend belongs to the run, and one gateway serves
        * every run that reaches it, so the seam cannot be a construction-time
        * value. Absent = no money bound, which is local mode byte-for-byte.
+       *
+       * Task M1: and from the call's PHASE (`providerCallCostEnvelopePhase`),
+       * because an answer-writing call and a call made while the debate is
+       * argued are held to different ceilings over the same run total.
        */
-      readonly buildCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
+      readonly buildCostEnvelopeSeam?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
       /**
        * Verdict story (spec §8): the STORY's own money bound, built per call
        * from the leased run exactly as the run's is. A story call on a metered
@@ -6479,13 +6502,19 @@ export function createPostgresProviderGateway(
           );
         }
       }
+      /**
+       * Task M1: decided once, from the request, and used for both run-wide
+       * ceilings below — the attempt ceiling and the money seam — so the two
+       * can never disagree about which part of the run a call belongs to.
+       */
+      const costEnvelopePhase = providerCallCostEnvelopePhase(request);
       return withRunContentLease(pool,[leasedRunId],async () => {
       // Verdict story: the story's attempts are its own. Each STORY: call site
       // is bounded by its sealed call bound (the per-site count below), and the
       // rounds by `storyLoopMaxRounds`; the RUN's ceiling is never consulted,
       // so a debate that used every attempt still gets its story.
       if (!authenticatedEvaluatorScope && !storyScope) {
-        await budget.assertModelAttemptAllowed(leasedRunId);
+        await budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase);
       }
       const consumed = await ledger.countModelAttempts({
         runId: request.runId,
@@ -6506,7 +6535,7 @@ export function createPostgresProviderGateway(
           // run's own RUN_COST_ENVELOPE_EXHAUSTED and no ledger row is written for it. The
           // run id is the leased one the S06 seam bound above, not a re-read of the request.
           ...(authenticatedEvaluatorScope || storyScope ? {} : {
-            assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId)
+            assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase)
           }),
           /**
            * V-28: the money envelope binds EVERY call, the authenticated evaluator
@@ -6519,13 +6548,16 @@ export function createPostgresProviderGateway(
            *
            * Verdict story: a story call is bound by the STORY's seam instead —
            * its own ceiling, summed over STORY charges only.
+           *
+           * Task M1: the run's seam is built for the call's phase, so an
+           * answer-writing call is compared with the answer's ceiling.
            */
           ...(storyScope
             ? (buildStoryCostEnvelopeSeam === undefined ? {} : {
               costEnvelope: buildStoryCostEnvelopeSeam(leasedRunId)
             })
             : (buildCostEnvelopeSeam === undefined ? {} : {
-              costEnvelope: buildCostEnvelopeSeam(leasedRunId)
+              costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase)
             }))
         });
       } catch (error) {

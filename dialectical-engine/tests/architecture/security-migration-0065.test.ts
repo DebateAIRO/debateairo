@@ -409,7 +409,11 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // Verdict story (spec 2026-09-26 §7): serve.answer_story and the STORY spend
         // source. Written as 0072 on the feature branch; renamed to the next free
         // prefix after dev's 0072/0073 when origin/dev merged in. No pair.
-        "0074_answer_story.sql"
+        "0074_answer_story.sql",
+        // Engine money rule, Task M1 (spec 2026-09-26 §14.4.1, risk R12): the
+        // spend phase (BODY | SERVE) on ledger.model_spend's RUN charges. The
+        // next free prefix, no pair.
+        "0075_model_spend_phase.sql"
       ]);
   });
 });

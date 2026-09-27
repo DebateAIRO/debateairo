@@ -105,7 +105,7 @@ describe("the story's money seam counts STORY spend only", () => {
 describe("the run's money seam never sees STORY spend", () => {
   it("admits a debate call whatever the story has spent", async () => {
     const { spendStore } = store({ run: 0, story: 10_000_000 });
-    const seam = guard(spendStore, 50_000).providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true });
+    const seam = guard(spendStore, 50_000).providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" });
     await expect(seam.assertCallAllowed(PROJECTION)).resolves.toBeUndefined();
   });
 });

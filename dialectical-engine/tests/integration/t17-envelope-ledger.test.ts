@@ -773,6 +773,12 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
       // "tight" was false by three attempts (F-T17T9-3, P5).
       expect(ceiling).toBe(106);
       expect(ceiling).toBe(observed);
+      // (3b) Engine money rule, Task M1: the receipt holds the serve leg back
+      //      from the body — 6 sites x 3 attempts — and the maximum-path body
+      //      spends EXACTLY the share it is left, so the reserve stops no lawful
+      //      body early and this run completed with its answer.
+      expect(ceilingBasis.serve_reserve_attempts).toBe(SERVE_SITES * ATTEMPTS_PER_SERVE_SITE);
+      expect(ceiling - ceilingBasis.serve_reserve_attempts).toBe(observed - roleAttempts);
 
       // (4) …and the DR-184-v2 ceiling for this exact topology would have been
       //     BREACHED by this same run. Without this arm, (3) is satisfiable by
@@ -882,7 +888,18 @@ describe("T17B · a provider attempt REFUSED at the equality boundary reaches th
       // The undercounting receipt. Only the ceiling moves; the serve-leg
       // disclosure is left exactly as the register minted it, so this is a
       // basis the parser accepts, not a malformed one.
-      const undercountingBasis = { ...ceilingBasis, max_model_attempts: PRE_SERVE_ATTEMPTS };
+      //
+      // Engine money rule, Task M1: it is a receipt minted BEFORE the answer's
+      // attempt reserve existed, so it carries no `serve_reserve_attempts` and
+      // every call sees the whole ceiling (the parser reads it as 0). A receipt
+      // that carries the reserve cannot reach this boundary at the serve's
+      // first call at all: its body is refused at the ceiling less the serve
+      // leg, which is what the reserve is for (pinned in
+      // tests/unit/money-serve-reserve.test.ts). A run admitted before M1 can
+      // still reach it, and this is that run.
+      const { serve_reserve_attempts: mintedReserve, ...preReserveBasis } = ceilingBasis;
+      expect(mintedReserve).toBe(SERVE_SITES * ATTEMPTS_PER_SERVE_SITE);
+      const undercountingBasis = { ...preReserveBasis, max_model_attempts: PRE_SERVE_ATTEMPTS };
       const runId = await runRepository.startRun({
         questionLine: question, principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
         sessionId: `session:${question}`, callerScope: "ASKER",

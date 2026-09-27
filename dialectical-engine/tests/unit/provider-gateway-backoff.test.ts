@@ -131,7 +131,9 @@ describe("L4-F8 — per-attempt ceiling hook", () => {
  * to catch.
  */
 describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook", () => {
-  const HOOK = "assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId)";
+  // Task M1: the hook also names the call's phase, the one the money seam below
+  // is built for, so a BODY call and a SERVE call see their own share.
+  const HOOK = "assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase)";
 
   function factoryBody(source: string): string {
     const start = source.indexOf("export function createPostgresProviderGateway");
@@ -198,7 +200,9 @@ describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook"
  * The seam closes over the LEASED run id, like the hook, and is written once.
  */
 describe("V-28 — the runner's gateway factory supplies the money seam", () => {
-  const SEAM = "costEnvelope: buildCostEnvelopeSeam(leasedRunId)";
+  // Task M1: built for the call's phase, the SAME phase the attempt hook above
+  // is asked with.
+  const SEAM = "costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase)";
 
   function factoryBody(source: string): string {
     const start = source.indexOf("export function createPostgresProviderGateway");

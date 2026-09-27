@@ -87,7 +87,9 @@ function meteredGatewayWith(
   }).providerSeam({
     runId: "run-1",
     price: deployment.price ?? METERED_PRICE,
-    requireReportedUsage: deployment.requireReportedUsage
+    requireReportedUsage: deployment.requireReportedUsage,
+    // Task M1: a run seam names its phase; the ceiling here is far above any call.
+    phase: "BODY"
   });
   const gateway = new OpenAICompatibleProviderGateway({
     endpoint: "http://fixture/v1", model: "configured/model", maker: "fixture",

@@ -6,6 +6,7 @@ import { SERVE_LEG } from "@debateai/register";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
+import { isCostEnvelopePhase, type CostEnvelopePhase } from "./cost-envelope.js";
 
 /**
  * V-28 (DL4-F2): the run-wide bound in MONEY, beside the attempt ceiling this
@@ -16,6 +17,7 @@ import { LedgerRepository } from "@debateai/ledger";
 export {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   COST_ENVELOPE_CURRENCY,
+  COST_ENVELOPE_PHASES,
   COST_MICROS_PER_USD,
   DAILY_COST_ENVELOPE_REACHED,
   MAX_REPORTED_USAGE_COUNTER,
@@ -29,12 +31,14 @@ export {
   dailyCostEnvelopeReached,
   decideDailyCostEnvelope,
   decideRunCostEnvelope,
+  isCostEnvelopePhase,
   projectedCallCeilingMicros,
   providerUsageUnreported,
   readReportedUsage,
   readUsageCounters,
   runCostEnvelopeReached,
   storyCostEnvelopeReached,
+  type CostEnvelopePhase,
   type DailyCostEnvelopeDecision,
   type ProviderTargetPrice,
   type ReportedUsage,
@@ -50,12 +54,14 @@ export {
   CostEnvelopeGuard,
   DEFAULT_RESERVATION_TTL_MS,
   PostgresModelSpendStore,
+  mostOneRunMaySpendMicros,
   type CostEnvelopeGuardInput,
   type ModelSpendEntry,
   type ModelSpendSource,
   type ModelSpendStore,
   type ProviderCostSeam,
-  type ProviderSeamInput
+  type ProviderSeamInput,
+  type RunProviderSeamInput
 } from "./model-spend.js";
 
 
@@ -122,6 +128,12 @@ const costEnvelopeBasisSchema = z.object({
     synthesis_loop_sites: z.number().int().positive(),
     selected: z.literal(SERVE_LEG.chain)
   }).strict(),
+  /**
+   * Engine money rule, Task M1 — the answer's calls, held back from the body
+   * (`computeStructuralCeilingBasis`). OPTIONAL: a receipt minted before the
+   * member existed parses, and has no reserve.
+   */
+  serve_reserve_attempts: z.number().int().nonnegative().optional(),
   hold_cap: z.number().int().positive(),
   final_retry_attempts: z.number().int().positive(),
   formula_version: z.string().trim().min(1),
@@ -163,6 +175,31 @@ const costEnvelopeBasisSchema = z.object({
         + `${basis.serve_leg.selected} arm ${billed}`
     });
   }
+  /**
+   * Task M1: the reserve is the serve leg priced in attempts, as the receipt
+   * itself bills it (`call_sites.serve x per_site_attempts.organ`), so a
+   * receipt cannot hold back a number its own legs do not support. And it is
+   * a share OF the ceiling: a reserve above it would leave the body a negative
+   * allowance.
+   */
+  const reserve = basis.serve_reserve_attempts;
+  if (reserve !== undefined) {
+    const serveLegAttempts = basis.call_sites.serve * basis.per_site_attempts.organ;
+    if (reserve !== serveLegAttempts) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["serve_reserve_attempts"],
+        message: `serve reserve ${reserve} disagrees with the serve leg's ${serveLegAttempts} attempts`
+      });
+    }
+    if (reserve > basis.max_model_attempts) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["serve_reserve_attempts"],
+        message: `serve reserve ${reserve} exceeds the ceiling ${basis.max_model_attempts}`
+      });
+    }
+  }
 });
 
 export interface CostEnvelopeBasis {
@@ -174,7 +211,24 @@ export interface CostEnvelopeBasis {
     readonly synthesisLoopSites: number;
     readonly selected: typeof SERVE_LEG.chain;
   };
+  /**
+   * Task M1: the attempts held back for the answer's calls. 0 for a receipt
+   * minted before the member existed, whose every call sees the whole ceiling.
+   */
+  readonly serveReserveAttempts: number;
   readonly wire: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Task M1 — THE ATTEMPT CEILING A CALL OF THIS PHASE SEES. A call made while
+ * the debate is argued (BODY) sees the pinned ceiling less the answer's
+ * reserve; an answer-writing call (SERVE) sees the whole ceiling. Both count
+ * the run's same attempts, so a body that uses up its calls leaves the answer
+ * its calls. With no reserve on the receipt both are the pinned ceiling.
+ */
+export function attemptCeilingForPhase(basis: CostEnvelopeBasis, phase: CostEnvelopePhase): number {
+  if (!isCostEnvelopePhase(phase)) throw new TypeError("MODEL_SPEND_PHASE_INVALID");
+  return phase === "SERVE" ? basis.maxModelAttempts : basis.maxModelAttempts - basis.serveReserveAttempts;
 }
 
 export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
@@ -209,6 +263,7 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
       synthesisLoopSites: parsed.data.serve_leg.synthesis_loop_sites,
       selected: parsed.data.serve_leg.selected
     }),
+    serveReserveAttempts: parsed.data.serve_reserve_attempts ?? 0,
     wire: Object.freeze(parsed.data)
   });
 }
@@ -464,12 +519,18 @@ export class BudgetRepository {
     return parseCostEnvelopeBasis(result.rows[0].envelope_basis);
   }
 
-  async assertModelAttemptAllowed(runId: string): Promise<void> {
+  /**
+   * Task M1: asked with the call's phase. A BODY call is refused at the pinned
+   * ceiling less the answer's reserve, a SERVE call at the whole ceiling
+   * (`attemptCeilingForPhase`); the code is the same for both.
+   */
+  async assertModelAttemptAllowed(runId: string, phase: CostEnvelopePhase): Promise<void> {
+    if (!isCostEnvelopePhase(phase)) throw new TypeError("MODEL_SPEND_PHASE_INVALID");
     const basis = await this.readPinnedBasis(runId);
-    if (await this.countRunModelAttempts(runId) >= basis.maxModelAttempts) {
+    if (await this.countRunModelAttempts(runId) >= attemptCeilingForPhase(basis, phase)) {
       throw new TypedDomainError(
         "RUN_COST_ENVELOPE_EXHAUSTED",
-        `Run ${runId} exhausted its pinned computed structural ceiling`
+        `Run ${runId} exhausted the ${phase} share of its pinned computed structural ceiling`
       );
     }
   }

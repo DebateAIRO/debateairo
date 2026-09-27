@@ -416,7 +416,7 @@ describe("C-I1 a 200 carrying a real vendor's usage block is charged", () => {
     });
     const { gateway } = gatewayWith(
       vendorReporting(OPENAI_USAGE, calls),
-      guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true })
+      guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" })
     );
 
     await expect(gateway.call()).resolves.toMatchObject({ model: MODEL });

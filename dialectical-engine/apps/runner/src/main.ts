@@ -17,7 +17,7 @@ import {
   readCostEnvelopePolicy,
   readStoryPolicyFromRegister
 } from "@debateai/register";
-import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
+import { CostEnvelopeGuard, PostgresModelSpendStore, type CostEnvelopePhase } from "@debateai/budget";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
@@ -191,8 +191,10 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       // The run is not known until a work item is claimed, so the seam is built
       // per call from the run the gateway was handed. Hosted requires the vendor
       // to report usage: a call that cannot be billed cannot be bounded.
-      buildCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.providerSeam({
-        runId, price, requireReportedUsage: true
+      // Task M1: the gateway also names the call's phase, so an answer-writing
+      // call is held to the answer's ceiling and every other call to the body's.
+      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase) => costEnvelopeGuard.providerSeam({
+        runId, price, requireReportedUsage: true, phase
       }),
       // Verdict story (spec §8): the story's calls spend its OWN envelope. With
       // no sealed story ceiling there is no story seam, and the gateway refuses

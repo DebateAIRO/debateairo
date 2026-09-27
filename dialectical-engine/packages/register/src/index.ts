@@ -306,6 +306,7 @@ export const SERVE_LEG = Object.freeze({
  */
 export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Readonly<Record<string, unknown>> & {
   readonly max_model_attempts: number;
+  readonly serve_reserve_attempts: number;
 } {
   for (const name of STRUCTURAL_CEILING_MEMBERS) {
     const value = input[name];
@@ -394,6 +395,19 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
       synthesis_loop_sites: synthesisLoopSites,
       selected: SERVE_LEG.chain
     }),
+    /**
+     * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1) — THE ANSWER'S
+     * CALLS, HELD BACK. The serve leg priced in attempts, exactly as it is
+     * billed into `max_model_attempts` above (`serveSites x organMaxAttempts`).
+     * A call made while the debate is argued sees `max_model_attempts` less
+     * this; an answer-writing call sees the whole ceiling. So a debate that
+     * uses up its own calls still leaves the answer its calls.
+     *
+     * Carried on the receipt rather than re-derived by the reader, so the rule
+     * is the one the run was ADMITTED under: a receipt minted before this
+     * member existed has no reserve (`parseCostEnvelopeBasis` reads it as 0).
+     */
+    serve_reserve_attempts: serveSites * input.organMaxAttempts,
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
     formula_version: "DR-184-v4",
@@ -828,8 +842,11 @@ export {
 export {
   COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
   COST_ENVELOPE_POLICY_ROW_KEY,
+  costEnvelopeCeilings,
   costEnvelopePolicyFromValue,
   readCostEnvelopePolicy,
+  type CostEnvelopeCeilings,
+  type CostEnvelopeCeilingTerms,
   type CostEnvelopePolicy,
   type CostEnvelopePolicyValue
 } from "./cost-envelope-policy.js";

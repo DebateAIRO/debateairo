@@ -37,6 +37,24 @@ export const COST_ENVELOPE_CURRENCY = "USD" as const;
 /** The refusal a gateway call gets when its own run's money envelope is spent. */
 export const RUN_COST_ENVELOPE_MONEY_REACHED = "RUN_COST_ENVELOPE_MONEY_REACHED" as const;
 
+/**
+ * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1) — WHICH PART OF A RUN A
+ * CALL BELONGS TO. `SERVE` is an answer-writing call (the synthesizer and the
+ * evaluator on the served lane); `BODY` is every other call a run makes while
+ * the debate is argued. The two see different ceilings over the SAME run total
+ * (`costEnvelopeCeilings` in `@debateai/register`, and the attempt ceiling's
+ * `attemptCeilingForPhase`), and a RUN charge records its phase
+ * (`ledger.model_spend.spend_phase`, migration 0075). Both refusals keep their
+ * codes: a phase changes which ceiling is compared, never what a refusal says.
+ */
+export type CostEnvelopePhase = "BODY" | "SERVE";
+
+export const COST_ENVELOPE_PHASES: readonly CostEnvelopePhase[] = Object.freeze(["BODY", "SERVE"]);
+
+export function isCostEnvelopePhase(value: unknown): value is CostEnvelopePhase {
+  return value === "BODY" || value === "SERVE";
+}
+
 /** The refusal a NEW run gets when the application's day is spent. */
 export const DAILY_COST_ENVELOPE_REACHED = "DAILY_COST_ENVELOPE_REACHED" as const;
 

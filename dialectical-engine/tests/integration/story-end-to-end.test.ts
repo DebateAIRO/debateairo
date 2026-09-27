@@ -463,7 +463,9 @@ describe("verdict story — end to end, after the debate is settled", () => {
       if (result.kind !== "COMPLETED") throw new Error(`STORY_E2E_EXPECTED_COMPLETION:${result.kind}`);
       const budget = new BudgetRepository(database.pool);
       expect(await budget.countRunModelAttempts(pinned.runId)).toBe(ceiling);
-      await expect(budget.assertModelAttemptAllowed(pinned.runId))
+      // Task M1: asked as an answer-writing call, which sees the WHOLE ceiling:
+      // even that is spent, so nothing of the run's allowance was left over.
+      await expect(budget.assertModelAttemptAllowed(pinned.runId, "SERVE"))
         .rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
       await expect(new StoryRepository(database.pool).readForAnswer({
         answerId: result.answerId, answerVersion: null, ownership: { legacyAskerId: pinned.askerId }
