@@ -126,6 +126,13 @@ export const CONDITION_MARKS = [
   // by `CONDITION_MARKS.slice(-4)`.
   "BRANCH-FROZEN-LOW-LEVERAGE",
   "DEGRADED-DIVERSITY",
+  // Model scorecard A16 (owner ruling R6, 2026-09-26): a seat's main model
+  // failed its call — transport exhausted after the normal retries, or a
+  // subscription usage cap — and its runner-up answered instead. Spelled with
+  // hyphens after its neighbour DEGRADED-DIVERSITY and placed HERE beside it,
+  // NOT appended: the DR-176 tail of this vocabulary is read positionally by
+  // `CONDITION_MARKS.slice(-4)`.
+  "BACKUP-MODEL-USED",
   "SINGLE-LINEAGE",
   "CRITIQUE-UNAVAILABLE",
   // S2-2 (goal-v4 T3) / confirm-item 5, ruling J13(b): the judge panel's two degradation

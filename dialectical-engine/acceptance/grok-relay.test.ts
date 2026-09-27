@@ -695,7 +695,8 @@ describe("F-GROK-SANDBOX-PROFILE the sandbox profile is probed, never assumed", 
     const kernel = await import("@debateai/kernel") as { readonly CONDITION_MARKS: readonly string[] };
     expect(SANDBOX_PROFILE_UNAVAILABLE).toBe("SANDBOX-PROFILE-UNAVAILABLE");
     expect(kernel.CONDITION_MARKS).not.toContain(SANDBOX_PROFILE_UNAVAILABLE);
-    expect(kernel.CONDITION_MARKS).toHaveLength(37);
+    // Model scorecard A16 minted BACKUP-MODEL-USED mid-list: 37 -> 38.
+    expect(kernel.CONDITION_MARKS).toHaveLength(38);
   });
 });
 

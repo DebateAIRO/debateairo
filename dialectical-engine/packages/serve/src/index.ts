@@ -605,6 +605,13 @@ export type AnswerForm =
  */
 export const DEGRADED_DIVERSITY_MARK = "DEGRADED-DIVERSITY" as const;
 
+/**
+ * Model scorecard A16 (R6): a seat moved to its runner-up. Minted by the
+ * RUNNER after the serve chain (it can happen at claim, while authoring or
+ * inside synthesis), always with one typed record per switch.
+ */
+export const BACKUP_MODEL_USED_MARK = "BACKUP-MODEL-USED" as const;
+
 /** The two synthesis seats, named once so a disclosure cannot name only one. */
 export const SYNTHESIS_ROLE_NAMES = Object.freeze(["SYNTHESIZER", "EVALUATOR"] as const);
 
@@ -1585,7 +1592,7 @@ export interface ConditionMarkRecord {
   // kernel mints unless the record union names it, so ALL THREE lanes' mints are
   // named here (T9B merge). Union order is not semantic; it mirrors the kernel's
   // mid-list placement.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1648,7 +1655,10 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "UNAUTHORED-BRANCH-HALTED",
   // T11: a label derived without a complete basis is disclosed on the answer it
   // labelled, with a typed record naming which limb of the basis was absent.
-  "LABEL-BASIS-INCOMPLETE"
+  "LABEL-BASIS-INCOMPLETE",
+  // Model scorecard A16: every seat that moved to its runner-up is named by a
+  // typed record — role, seat, both routes, the cause and the call site.
+  "BACKUP-MODEL-USED"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
