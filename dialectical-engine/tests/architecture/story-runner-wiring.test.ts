@@ -24,8 +24,14 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(completed).toBeGreaterThan(snapshot);
     expect(leaseClosed).toBeGreaterThan(completed);
     expect(runner.split("buildStoryRunSnapshot({")).toHaveLength(2);
-    // Task M5 (spec §14.4.4): a floor answer carries a label too.
-    expect(runner.slice(settle, completed)).toContain("storyWriter !== undefined && (answerCarriesLabel || floor !== null)");
+    // Task M5 (spec §14.4.4): a floor answer carries a label too — and, since
+    // the final review (Minor 2), only once the floor's row was written, since
+    // the pages learn the floor from that row alone.
+    const rowWritten = runner.indexOf("const disclosureRecorded = await this.#recordServeDisclosure(");
+    expect(rowWritten).toBeGreaterThan(-1);
+    expect(settle).toBeGreaterThan(rowWritten);
+    expect(runner.slice(settle, completed)).toContain("const floorRecorded = floor !== null && disclosureRecorded;");
+    expect(runner.slice(settle, completed)).toContain("storyWriter !== undefined && (answerCarriesLabel || floorRecorded)");
     // Never the gated-family shape: `story` stays optional for every other root.
     expect(runner).not.toMatch(/this\.settings\.story === undefined/u);
   });

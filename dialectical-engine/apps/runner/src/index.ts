@@ -3460,13 +3460,18 @@ export class WalkingSkeletonRunner {
    * sit behind the one catch, like the story hook, so the row can never change
    * the answer, the label, the run's outcome or the work item. A failure is
    * logged with its typed code (UNTYPED otherwise) and the ids, never text.
+   *
+   * Final review, Minor 2: it answers whether the answer version HAS its row
+   * now (written here, or already there), because a floor exists for the
+   * reader only through that row, and the floor's story waits for it.
    */
   async #recordServeDisclosure(
     ids: Readonly<{ runId: string; answerId: string }>,
     build: () => ServeDisclosureRecord
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await this.#serveDisclosure.insert(build());
+      return true;
     } catch (error) {
       try {
         (this.settings.serveDisclosure?.log ?? logServeDisclosure)("SERVE_DISCLOSURE_WRITE_FAILED", {
@@ -3479,6 +3484,7 @@ export class WalkingSkeletonRunner {
       } catch {
         // A log line can never cost the answer either.
       }
+      return false;
     }
   }
 
@@ -6324,7 +6330,7 @@ export class WalkingSkeletonRunner {
     // sealed persist, for every answer. It can never change the answer: the
     // writer logs a failure by code and carries on.
     const answeredRound = result.loopRounds.at(-1);
-    await this.#recordServeDisclosure({ runId: run.runId, answerId: persisted.answerId }, () => buildServeDisclosureRecord({
+    const disclosureRecorded = await this.#recordServeDisclosure({ runId: run.runId, answerId: persisted.answerId }, () => buildServeDisclosureRecord({
       answerId: persisted.answerId,
       answerVersion: persisted.answerVersion,
       runId: run.runId,
@@ -6372,9 +6378,17 @@ export class WalkingSkeletonRunner {
        * `executeWorkItem`'s catch), each step under its own short disclosure
        * lease on this runner's pool. Building the snapshot cannot fail the
        * settled run: a failure is kept and logged by code after the lease.
+       *
+       * Final review, Minor 2: a floor answer's story waits for the floor's
+       * ROW. The owner's page and the public page learn the floor from that row
+       * alone, so a story told from the in-memory floor after the row's write
+       * failed would state an answer beside a page that says the verdict is
+       * unavailable. The failed write is already logged by its code
+       * (SERVE_DISCLOSURE_WRITE_FAILED); there is then no floor story.
        */
       const storyWriter = this.settings.story;
-      if (storyWriter !== undefined && (answerCarriesLabel || floor !== null)) {
+      const floorRecorded = floor !== null && disclosureRecorded;
+      if (storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
         try {
           afterSettle.story = {
             kind: "SNAPSHOT",

@@ -115,7 +115,9 @@ describe("M5 · wired into the shipped runner", () => {
     const source = await runner();
     const write = source.indexOf("await this.#recordServeDisclosure(");
     expect(source.slice(write, source.indexOf("}));", write))).toContain("floor");
-    expect(source).toContain("storyWriter !== undefined && (answerCarriesLabel || floor !== null)");
+    // Final review, Minor 2: a floor's story waits for the floor's row.
+    expect(source).toContain("const floorRecorded = floor !== null && disclosureRecorded;");
+    expect(source).toContain("storyWriter !== undefined && (answerCarriesLabel || floorRecorded)");
     expect(source).toContain("servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }]");
   });
 });

@@ -292,7 +292,8 @@ const LABEL_DECISION = "const answerCarriesLabel =";
 const BODY_FACTS = "const serveDisclosureBody = serveDisclosureBodyFacts({ runBodyBudgetStop, decision: makerPositionServe });";
 const SERVE_DECISION = "const makerPositionServe = decideMakerPositionServe({";
 const BODY_FACTS_READ = "body: serveDisclosureBody";
-const DISCLOSURE_ROW_WRITE = "await this.#recordServeDisclosure(";
+// Final review, Minor 2: the write answers whether the row exists, for the floor's story.
+const DISCLOSURE_ROW_WRITE = "const disclosureRecorded = await this.#recordServeDisclosure(";
 
 /**
  * The catch block that follows `anchor`, sliced by the indentation of the line

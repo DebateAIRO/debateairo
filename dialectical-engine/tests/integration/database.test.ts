@@ -6655,6 +6655,66 @@ describe("Engine money rule M5 — the floor: the label and the leading position
     expect(await serveLedger(scenario.runId)).toEqual([]);
   });
 
+  /**
+   * FINAL REVIEW, Minor 2 — A FLOOR ANSWER'S STORY ONLY WHEN ITS ROW EXISTS.
+   * The owner's page and the public page learn a floor from its row alone. If
+   * the best-effort write of that row failed, a story told from the in-memory
+   * floor would state an answer beside a page that says the verdict is
+   * unavailable. So the floor's story waits for the row; a served answer's
+   * story does not need it (its label is the sealed answer's own).
+   */
+  it.each([
+    { name: "a floor answer whose row was written gets its story", served: false, failWrite: false, stories: 1 },
+    { name: "a floor answer whose row could not be written gets no story", served: false, failWrite: true, stories: 0 },
+    { name: "a served answer gets its story even when its row could not be written", served: true, failWrite: true, stories: 1 }
+  ])("$name", async (input) => {
+    const logs: Record<string, unknown>[] = [];
+    const written: { answerId: string; answerVersion: number }[] = [];
+    const snapshotFailures: unknown[] = [];
+    const label = `final-minor2-${input.served ? "served" : "floor"}-${input.failWrite ? "unwritten" : "written"}`;
+    const debate = fullDebate(`Primary ${label}`);
+    const secondaryDebate = fullDebate(`Secondary ${label}`);
+    const scenario = await executeResil01Scenario({
+      label,
+      primary: [...debate.judgements, ...debate.reviews, ...(input.served ? [resil01Composition, evaluatorSatisfied()] : [])],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      // The floor: no maker can pay for the answer-writer.
+      ...(input.served ? {} : {
+        primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+        secondaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build
+      }),
+      settings: {
+        story: {
+          writeAfterSettle: async (story) => { written.push({ answerId: story.answerId, answerVersion: story.answerVersion }); },
+          reportSnapshotFailure: (failure) => { snapshotFailures.push(failure); }
+        },
+        ...(input.failWrite ? {
+          serveDisclosure: {
+            store: { insert: async () => { throw new TypedDomainError("SERVE_DISCLOSURE_RECORD_INVALID", "test-layer: refused"); } },
+            log: (event: string, detail: Readonly<Record<string, unknown>>) => { logs.push({ event, ...detail }); }
+          }
+        } : {})
+      }
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    if (input.served) expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    else expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(snapshotFailures).toEqual([]);
+    expect(written).toEqual(Array.from({ length: input.stories }, () => ({ answerId, answerVersion: 1 })));
+    if (input.failWrite) {
+      // The write failure is logged by its typed code, as before; no row exists.
+      expect(logs).toEqual([{
+        event: "SERVE_DISCLOSURE_WRITE_FAILED", code: "SERVE_DISCLOSURE_RECORD_INVALID", sqlState: null,
+        runId: scenario.runId, answerId
+      }]);
+      expect(await disclosureRowOf(answerId)).toBeNull();
+    } else {
+      await expectFloor(scenario, "ENVELOPE_EXHAUSTED");
+    }
+  });
+
   it("records a floor when round 1's writer transport dies", async () => {
     const debate = fullDebate("Primary M5 writer death");
     const secondaryDebate = fullDebate("Secondary M5 writer death");
