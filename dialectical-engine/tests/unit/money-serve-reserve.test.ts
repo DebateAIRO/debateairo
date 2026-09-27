@@ -483,6 +483,31 @@ describe("M1 the attempt ceiling holds the answer's calls back from the body", (
     expect(await code(at(20).assertModelAttemptAllowed("run-1", "SERVE"))).toBe("RUN_COST_ENVELOPE_EXHAUSTED");
   });
 
+  /**
+   * M2 review polish — THE ATTEMPT REFUSAL CARRIES ITS COUNTS. The first-call
+   * failure (`RUN_CEILING_BELOW_FIRST_CALL`) keeps the refusal's message as its
+   * evidence; for money that evidence was always "spent X of Y", but for the
+   * attempt ceiling it named no number, so a ceiling set too low could not be
+   * told from a re-claim that inherited the earlier claim's attempts. Here a
+   * re-claim-like run already holds 14 attempts against a BODY share of 14.
+   */
+  it("names the attempt it refused, the phase's ceiling and the whole ceiling", async () => {
+    const basis = { ...fixtureStructuralCeiling(20), serve_reserve_attempts: 6 };
+    const pool = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes("SELECT envelope_basis")) return { rows: [{ envelope_basis: basis }] };
+        if (sql.includes("SELECT count(*)::text")) return { rows: [{ count: "14" }] };
+        throw new Error(`UNEXPECTED_QUERY:${sql}`);
+      })
+    } as unknown as Pool;
+    const refusal = await new BudgetRepository(pool).assertModelAttemptAllowed("run-1", "BODY")
+      .then(() => null, (error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
+    expect((refusal as Error).message).toContain("attempt 15 of a BODY ceiling of 14");
+    expect((refusal as Error).message).toContain("the whole ceiling is 20");
+  });
+
   it("does the same through the runner's gateway: the judge is refused, the answer-writer reaches the money seam", async () => {
     const basis = { ...fixtureStructuralCeiling(20), serve_reserve_attempts: 6 };
     const phases: CostEnvelopePhase[] = [];

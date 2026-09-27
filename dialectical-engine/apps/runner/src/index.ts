@@ -333,17 +333,19 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
  * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — WHAT A NODE'S PANEL DOES WITH A
  * STOP RAISED BY ONE OF ITS MEMBERS.
  *
- * `runJudgePanel` rethrows a run-level spend stop rather than noting it as a
- * member failure (C2(b)), so the stop reaches the caller of the panel.
+ * A run-level spend stop is never noted as a member failure (C2(b)): the panel
+ * asks no further member. Since the M2 polish that includes the attempt ceiling,
+ * which used to be noted as a PROVIDER_ERROR member failure.
  *
- *  · "TRAVEL" — every node but the first root: the stop leaves the panel as it
- *    always has, and the phase catch that authored the node records it (the
- *    node is not minted, and the run goes on to its answer with what it has).
+ *  · "TRAVEL" — every node but the first root: the panel rethrows the stop, and
+ *    the phase catch that authored the node records it (the node is not
+ *    minted, and the run goes on to its answer with what it has).
  *  · "AUTHOR_ONLY" — the first root's panel (`PANEL:root`). Nothing exists yet
  *    to answer from but this node, so letting the stop travel would fail the
- *    whole work item. The panel instead rests on the author's own judgement —
- *    exactly what a panel whose every other voice failed reduces to, with its
- *    single-voice disclosure — and hands the stop back for the caller to record.
+ *    whole work item. The panel returns the voices it had already heard
+ *    (`onRunLevelSpendStop: "RETURN_HEARD"`), the node rests on them — on the
+ *    author's own judgement alone when none was heard — and the stop is handed
+ *    back for the caller to record.
  *
  * `null` means "let it travel".
  */
@@ -3201,7 +3203,7 @@ export class WalkingSkeletonRunner {
       /**
        * Task M2 (spec §14.4.1): what a run-level spend stop raised by a panel
        * member does — see `panelSpendStop`. "AUTHOR_ONLY" on the first root's
-       * panel only; "TRAVEL" everywhere else, as before.
+       * panel only; "TRAVEL" on every other node's panel.
        */
       readonly onSpendStop: PanelSpendStopRule;
     }): Promise<{
@@ -3271,10 +3273,7 @@ export class WalkingSkeletonRunner {
         );
       }
 
-      let spendStop: EnvelopeStopKind | null = null;
-      let panel: Awaited<ReturnType<typeof runJudgePanel>>;
-      try {
-      panel = await runJudgePanel({
+      const panel = await runJudgePanel({
         artifactProducerRef: input.authorProviderRef,
         primary: {
           judgementRef: input.authorJudgementRef,
@@ -3300,29 +3299,32 @@ export class WalkingSkeletonRunner {
             });
             return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
           }
-        }))
+        })),
+        // Task M2: only the first root's panel keeps the voices it heard when a
+        // spend stop cuts it short; every other panel lets the stop travel.
+        onRunLevelSpendStop: input.onSpendStop === "AUTHOR_ONLY" ? "RETURN_HEARD" : "RETHROW"
       });
-      } catch (error) {
-        const stop = panelSpendStop(error, input.onSpendStop);
-        if (stop === null) throw error;
-        spendStop = stop;
-        // Task M2: the first root's panel was cut short by a spend stop. What is
-        // left is the author's own judgement — the author-only selection — and
-        // it goes through the SAME reduction as a panel whose every other voice
-        // failed, so it carries that panel's single-voice disclosure
-        // (PANEL-DEGRADED-SINGLE-VOICE, the declared step-down) rather than a
-        // new one. With one candidate the selection below is exactly
-        // `authorOnlySelection()`: the same judgement, tau and earned weight.
-        panel = Object.freeze({
-          judgements: Object.freeze([Object.freeze({
-            judgementRef: input.authorJudgementRef,
-            assessment: input.authorAssessment,
-            memberRole: input.authorMaker,
-            contractHash: null
-          })]),
-          notes: Object.freeze([])
-        });
-      }
+      /**
+       * Task M2 — THE FIRST ROOT'S PANEL, CUT SHORT BY A SPEND STOP.
+       *
+       * The panel ended where it stood and returned what it had gathered: the
+       * author, every member voice already heard (and paid for), and every
+       * note. They go through the SAME reduction as any panel whose remaining
+       * members could not speak, so the disclosure is the existing one:
+       *
+       *  · one or more member voices heard -> selection over the author and
+       *    those voices, PANEL-PARTIAL, exactly as a member failure degrades
+       *    the panel (no single-voice step-down);
+       *  · none heard -> the author alone; with one candidate the selection is
+       *    exactly `authorOnlySelection()` (same judgement, tau and earned
+       *    weight), with the single-voice disclosure and its step-down.
+       *
+       * Either way the stop is handed back for the caller to record.
+       */
+      const spendStop = Object.hasOwn(panel, "stoppedBy")
+        ? panelSpendStop(panel.stoppedBy, input.onSpendStop)
+        : null;
+      if (Object.hasOwn(panel, "stoppedBy") && spendStop === null) throw panel.stoppedBy;
 
       // Each member's assessment is reduced through the SAME ratified
       // composition as the author's, so the taus are commensurable.
@@ -3391,15 +3393,16 @@ export class WalkingSkeletonRunner {
       const memberFailures = panel.notes.filter((note) => note.kind === "MEMBER_FAILED");
       const marks: PanelDegradationMark[] = [];
       if (nonAuthorVoices === 0) marks.push(PANEL_DEGRADED_SINGLE_VOICE_MARK);
-      else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);
+      else if (memberFailures.length > 0 || spendStop !== null) marks.push(PANEL_PARTIAL_MARK);
       // The reason names WHICH members fell over and how — a disclosure that says only
       // "partial" tells a reader nothing they can act on. Task M2: a panel cut short
-      // by a spend stop names the stop, which is the true reason no other voice spoke.
-      const panelFailureReason = spendStop !== null
-        ? ENVELOPE_STOP_REASONS[spendStop]
-        : memberFailures.length === 0
-          ? null
-          : memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`).join("; ");
+      // by a spend stop also names the stop, which is why the members after it never
+      // spoke.
+      const panelFailureReasons = [
+        ...memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`),
+        ...(spendStop === null ? [] : [ENVELOPE_STOP_REASONS[spendStop]])
+      ];
+      const panelFailureReason = panelFailureReasons.length === 0 ? null : panelFailureReasons.join("; ");
 
       const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
@@ -3596,9 +3599,10 @@ export class WalkingSkeletonRunner {
       onSpendStop: "AUTHOR_ONLY"
     });
     // Task M2 (spec §14.4.1): a stop on the first root's panel no longer escapes
-    // the work item. Root 0 rests on its author's own judgement, with the
-    // single-voice disclosure, and the stop ends the arguing here: the run goes
-    // straight on to its answer.
+    // the work item. Root 0 rests on the voices its panel heard before the stop
+    // (PANEL-PARTIAL), or on its author's own judgement when none was heard
+    // (single voice), and the stop ends the arguing here: the run goes straight
+    // on to its answer.
     if (selection.spendStop !== null) runBodyBudgetStop = selection.spendStop;
     const nodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
       const created = await writer.addNode({
@@ -4181,9 +4185,12 @@ export class WalkingSkeletonRunner {
         edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
       });
       } catch (error) {
-        // C1: a spend refusal is not an expansion failure. Nothing is recorded
-        // as halted — the leg was never attempted against a vendor — and the
-        // branch simply stops being expanded.
+        // C1: a spend refusal is not an expansion failure, and nothing is
+        // recorded as halted: no transport failed. The refusal may have come on
+        // the leg's own author call (money and the attempt ceiling refuse before
+        // sending) or on its panel, after the author call was made and billed
+        // (a usage stop always comes after its call). Either way no node is
+        // minted for the leg, and the branch simply stops being expanded.
         const stop = expansionPhaseStop(error);
         if (stop === null) throw error;
         runBodyBudgetStop = stop;

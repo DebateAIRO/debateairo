@@ -61,59 +61,144 @@ const PANEL_CALL = Object.freeze({
   bound: Object.freeze({ maxAttempts: 1, tokenCeiling: 256, deadlineMs: 1_000 })
 });
 
+/** A panel member whose provider refuses with `code`, through the real `Judge.assess`. */
+function refusingMember(memberRole: string, code: string, reached: string[]) {
+  const refusing: ProviderGateway = {
+    call: async () => {
+      reached.push("refused member");
+      throw new TypedDomainError(code, "test-layer: refused before sending");
+    }
+  };
+  return {
+    memberRole, actorRef: `actor:${memberRole}`, contractHash: `c:${memberRole}`,
+    judge: async () => {
+      const assessed = await new Judge(refusing).assess(PANEL_CALL);
+      return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
+    }
+  };
+}
+
+/** A provider whose member answers with a valid assessment (as in t03-judge-panel). */
+function answering(): ProviderGateway {
+  return {
+    call: async () => ({
+      rawArtifactRef: "artifact:panel-member",
+      ledgerEntryRef: "ledger:panel-member",
+      content: JSON.stringify({
+        steelman: { summary: "The strongest reading of the node.", fidelity: 0.6 },
+        critic: { summary: "A plausible counter.", counterargumentStrength: 0.3, basis: "PLAUSIBLE_COUNTER" },
+        evidence: { quality: 0.55, relevance: 0.65 },
+        context: { fit: 0.7, ambiguityFlags: [] },
+        fallacy: { severity: 0.2, fatalFlags: [] }
+      }),
+      provider: "test",
+      model: "model-b",
+      maker: "house-b",
+      modelVersion: "model-b"
+    })
+  } as unknown as ProviderGateway;
+}
+
 /*
  * The phase half — every stop kind, the attempt ceiling included, stops the
  * arguing at the five author/review catches — is pinned where it always was,
  * in `tests/unit/v28-run-body-budget-stop.test.ts`.
  */
-describe("M2 — the first root's panel falls back to its author's own judgement", () => {
+describe("M2 — the first root's panel keeps what it heard, and falls back to its author when it heard nothing", () => {
   /**
    * THE REAL PATH, not a hand-made error (M2 review polish). A panel member's
    * call goes through `Judge.assess`, which rewrites every error it does not
    * know into a `PanelMemberFailure`, and `runJudgePanel`, which notes a member
-   * failure and asks the next member. Only what leaves BOTH reaches the runner's
-   * catch. Before the kernel's `RUN_LEVEL_SPEND_STOP_CODES` listed the attempt
+   * failure and asks the next member. Only what leaves BOTH reaches the runner.
+   * Before the kernel's `RUN_LEVEL_SPEND_STOP_CODES` listed the attempt
    * ceiling, an attempt refusal never left them: it became a PROVIDER_ERROR
    * note, so this row's first version asserted ATTEMPTS through a path the
-   * runtime could not take. It now drives the member call itself.
+   * runtime could not take. It drives the member call itself, in the mode the
+   * runner asks for on the first root's panel (`RETURN_HEARD`, round 2).
    */
   it("hands every stop kind back on the first root's panel, through the real member call", async () => {
     for (const code of STOP_CODES) {
       const reached: string[] = [];
-      const refusing: ProviderGateway = {
-        call: async () => {
-          reached.push("refused member");
-          throw new TypedDomainError(code, "test-layer: refused before sending");
-        }
-      };
-      const escaped = await runJudgePanel({
+      const panel = await runJudgePanel({
         artifactProducerRef: "actor:author",
         primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
         members: [
-          {
-            memberRole: "member-1", actorRef: "actor:one", contractHash: "c1",
-            judge: async () => {
-              const assessed = await new Judge(refusing).assess(PANEL_CALL);
-              return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
-            }
-          },
+          refusingMember("member-1", code, reached),
           {
             memberRole: "member-2", actorRef: "actor:two", contractHash: "c2",
             judge: async () => { reached.push("next member"); return { judgementRef: "j2", assessment: {} as never }; }
           }
-        ]
-      }).then(() => null, (error: unknown) => error);
+        ],
+        // What the runner asks for on the first root's panel only.
+        onRunLevelSpendStop: "RETURN_HEARD"
+      });
 
-      // It left the panel as itself — not a PROVIDER_ERROR note — and the panel
-      // asked nobody after it.
-      expect(escaped, code).toBeInstanceOf(TypedDomainError);
-      expect((escaped as TypedDomainError).code, code).toBe(code);
+      // It left the member call as itself — not a PROVIDER_ERROR note — and the
+      // panel asked nobody after it. With no member heard, the author is alone.
+      expect(panel.stoppedBy, code).toBeInstanceOf(TypedDomainError);
+      expect((panel.stoppedBy as TypedDomainError).code, code).toBe(code);
+      expect(panel.notes, code).toEqual([]);
+      expect(panel.judgements.map((entry) => entry.judgementRef), code).toEqual(["j0"]);
       expect(reached, code).toEqual(["refused member"]);
-      expect(panelSpendStop(escaped, "AUTHOR_ONLY"), code).toBe(ENVELOPE_STOP_CODES[code]);
+      expect(panelSpendStop(panel.stoppedBy, "AUTHOR_ONLY"), code).toBe(ENVELOPE_STOP_CODES[code]);
     }
   });
 
-  it("lets a stop travel from every other node's panel, exactly as before", () => {
+  /**
+   * M2 review polish, round 2 — THE VOICES ALREADY HEARD ARE KEPT. A stop that
+   * arrives after a member has answered used to throw that paid-for judgement
+   * away with the panel, and the node fell to the single-voice disclosure and
+   * its step-down. The first root's panel now returns what it heard: the
+   * runner selects over the author and those voices, with PANEL-PARTIAL.
+   */
+  it("keeps a member voice heard before the stop, with every note, and asks nobody after it", async () => {
+    for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED"] as const) {
+      const reached: string[] = [];
+      const panel = await runJudgePanel({
+        artifactProducerRef: "actor:author",
+        primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
+        members: [
+          // The author's own seat: the FX-HR-H6 bulkhead note, before anyone speaks.
+          {
+            memberRole: "author", actorRef: "actor:author", contractHash: "c0",
+            judge: async () => { reached.push("author seat"); return { judgementRef: "never", assessment: {} as never }; }
+          },
+          {
+            memberRole: "member-1", actorRef: "actor:one", contractHash: "c1",
+            judge: async () => {
+              reached.push("member-1");
+              const assessed = await new Judge(answering()).assess(PANEL_CALL);
+              return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
+            }
+          },
+          refusingMember("member-2", code, reached),
+          {
+            memberRole: "member-3", actorRef: "actor:three", contractHash: "c3",
+            judge: async () => { reached.push("member-3"); return { judgementRef: "j3", assessment: {} as never }; }
+          }
+        ],
+        onRunLevelSpendStop: "RETURN_HEARD"
+      });
+
+      expect((panel.stoppedBy as TypedDomainError).code, code).toBe(code);
+      expect(panel.judgements.map((entry) => entry.memberRole), code).toEqual(["author", "member-1"]);
+      expect(panel.judgements[1]!.judgementRef, code).toBe("artifact:panel-member");
+      expect(panel.notes.map((note) => note.kind), code).toEqual(["PRODUCER_GRADING_FORBIDDEN"]);
+      expect(reached, code).toEqual(["member-1", "refused member"]);
+    }
+  });
+
+  it("still rethrows by default, taking the heard voices with it, for every other panel", async () => {
+    const reached: string[] = [];
+    await expect(runJudgePanel({
+      artifactProducerRef: "actor:author",
+      primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
+      members: [refusingMember("member-1", "RUN_COST_ENVELOPE_EXHAUSTED", reached)]
+    })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
+    expect(reached).toEqual(["refused member"]);
+  });
+
+  it("lets a stop travel from every other node's panel", () => {
     // A child node's own authoring call is caught one level up, by the phase
     // that authored it, which records the stop and mints no node.
     for (const code of STOP_CODES) {

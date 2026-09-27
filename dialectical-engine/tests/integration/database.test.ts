@@ -5257,6 +5257,11 @@ describe("Engine money rule M2 — a stop while arguing never skips the answer (
     expect((scenario.answer?.condition_mark_records ?? [])
       .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
       .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    // No voice was heard before the stop, so — unlike the M = 3 case where one
+    // was — the single-voice disclosure steps the served band down one place.
+    const bandSettings = runnerSettings();
+    expect(scenario.answer?.confidence_band)
+      .toBe(bandSettings.panelPolicy!.oneStepDown[bandSettings.servePolicy!.candidateConfidenceBand]);
     // The node's receipt is the author-only selection: its own judgement, one
     // voice, and the stop that cut the panel short.
     const receipt = await database.pool.query<{
@@ -5272,6 +5277,119 @@ describe("Engine money rule M2 — a stop while arguing never skips the answer (
     expect(receipt.rows[0]!.selected).toBe(receipt.rows[0]!.raw);
     expect(receipt.rows[0]!.voices).toBe("1");
     expect(receipt.rows[0]!.stop).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+  });
+
+  /**
+   * M2 review polish, round 2 — THE VOICES ALREADY HEARD ARE KEPT. At M = 3 the
+   * first root's panel asks two members in turn. Here the second member's model
+   * answers and the third's call is refused for money before it is sent. That
+   * paid-for voice used to be thrown away with the panel (single voice, one
+   * band step down). It is now kept: the node is selected over the author and
+   * that voice, and the panel is disclosed PANEL-PARTIAL, exactly as when a
+   * member fails, with no single-voice step-down. The voice is made DECISIVE —
+   * it scores above the author — so "kept" cannot mean merely "recorded".
+   */
+  it("keeps a panel voice heard before a stop on the first root's panel, as PANEL-PARTIAL (M=3)", async () => {
+    const authorFidelity = 0.72;
+    const heardFidelity = 0.9;
+    const makerA = await startProviderDouble([
+      judgementDouble("Maker A M2 partial position", authorFidelity), resil01Composition, evaluatorSatisfied()
+    ]);
+    const makerB = await startProviderDouble(
+      [judgementDouble("Maker B M2 partial position")], panelAssessmentDouble(heardFidelity)
+    );
+    const makerC = await startProviderDouble([judgementDouble("Maker C M2 partial position")]);
+    const seamA = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const seamB = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const seamC = stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    try {
+      const question = `m2-root-panel-partial-${randomUUID()}`;
+      const runId = await createRun(question, 90, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A",
+        buildCostEnvelopeSeam: seamA.build
+      }), {
+        ...settings,
+        providerRef: "provider:test-layer",
+        maker: "Maker A",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B",
+            buildCostEnvelopeSeam: seamB.build
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Maker B"
+        },
+        additionalMakers: [{
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C",
+            buildCostEnvelopeSeam: seamC.build
+          }),
+          providerRef: "provider:test-layer:third",
+          maker: "Maker C"
+        }],
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const answer = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, `asker:${question}`);
+
+      // Served, and nothing more was argued after the stop.
+      expect(SERVED_TERMINALS).toContain(answer?.terminal);
+      expect(answer?.verdict_state).not.toBeNull();
+      expect(makerB.calls()).toBe(1);
+      expect(seamB.phases()).toEqual(["BODY"]);
+      expect(makerC.calls()).toBe(0);
+      expect(seamC.phases()).toEqual(["BODY"]);
+      expect(seamA.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+      const snapshot = await new GraphRepository(database.pool).materialiseSnapshot(runId);
+      expect(snapshot.nodes).toHaveLength(1);
+      const rootNodeId = snapshot.nodes[0]!.nodeId;
+
+      // PANEL-PARTIAL, naming the stop; never the single-voice disclosure, and
+      // so no single-voice step-down of the served band.
+      expect(answer?.condition_marks).toEqual(expect.arrayContaining(["PANEL-PARTIAL", "SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"]));
+      expect(answer?.condition_marks).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
+      const partial = (answer?.condition_mark_records ?? []).filter((record) => record.mark === "PANEL-PARTIAL");
+      expect(partial).toHaveLength(1);
+      expect(partial[0]).toMatchObject({ subject_ref: rootNodeId, reason: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+      expect(answer?.confidence_band).toBe(settings.servePolicy!.candidateConfidenceBand);
+
+      // The heard voice is IN the selection: it scored above the author, so it
+      // is the selected judgement, and the spread between the two was measured.
+      const receipt = await database.pool.query<{
+        tau: string; selected: string; author: string; dispersion: number | null;
+        voices: string; nonAuthor: string; stop: string | null; notes: string;
+      }>(
+        `SELECT tau::text AS tau, selected_judgement_ref::text AS selected, raw_artifact_ref::text AS author,
+                dispersion, disagreement #>> '{panel,voiceCount}' AS voices,
+                disagreement #>> '{panel,nonAuthorVoiceCount}' AS "nonAuthor",
+                disagreement #>> '{panel,spendStop}' AS stop,
+                disagreement #>> '{panel,notes}' AS notes
+           FROM ledger.reduced_judgement WHERE run_id=$1 AND node_id=$2`,
+        [runId, rootNodeId]
+      );
+      expect(receipt.rows).toHaveLength(1);
+      const row = receipt.rows[0]!;
+      expect(row.voices).toBe("2");
+      expect(row.nonAuthor).toBe("1");
+      expect(row.stop).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+      expect(row.selected).not.toBe(row.author);
+      expect(Number(row.tau)).toBeCloseTo(heardFidelity, 10);
+      expect(row.dispersion).toBeCloseTo(heardFidelity - authorFidelity, 10);
+      // The notes gathered before the stop are kept too: the author's own seat.
+      expect(JSON.parse(row.notes)).toEqual([expect.objectContaining({ kind: "PRODUCER_GRADING_FORBIDDEN" })]);
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
+    }
   });
 
   it("fails typed, as a ceiling below one call, when the author's own first call is refused", async () => {

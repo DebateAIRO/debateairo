@@ -122,9 +122,10 @@ describe("V-28 round 4 — the post-authoring serve decision is one function, ca
  * technical problem; money is never the reason") amends that. The stop now ends
  * the ARGUING only:
  *
- *  · it is still recorded at every catch — six now, because the first root's
- *    panel (`PANEL:root`) records it too instead of letting it escape the work
- *    item, and it is declared before root 0 so that catch can;
+ *  · it is still recorded at every catch, and now also on the first root's
+ *    panel (`PANEL:root`), which keeps the voices it heard, hands the stop back
+ *    instead of letting it escape the work item, and is recorded by its call
+ *    site — so the stop is declared before root 0;
  *  · a stop on the first root's panel stops everything after it: the secondary
  *    root is not authored;
  *  · the serve gate NEVER forces a hard stop from it — the envelope question is
@@ -196,21 +197,11 @@ interface RunBodyStopSite {
   readonly assignment: string;
 }
 
-/** The five author and panel catches share one guard; the review catch has its own. */
+/** The four author catches share one guard; the review catch has its own. */
 const PHASE_GUARD = "if (stop === null) throw error;";
 const REVIEW_GUARD = "if (outcome.kind === \"RETHROW\") throw error;";
 
 const RUN_BODY_STOP_SITES: readonly RunBodyStopSite[] = Object.freeze([
-  {
-    // Task M2: the panel's own catch. It hands the stop back only on the
-    // first root's panel (`onSpendStop: "AUTHOR_ONLY"`, pinned below); the
-    // root call site records it.
-    site: "the node panel",
-    anchor: "panel = await runJudgePanel({",
-    decides: "panelSpendStop(error, input.onSpendStop)",
-    guard: PHASE_GUARD,
-    assignment: "spendStop = stop;"
-  },
   {
     site: "the secondary root author",
     anchor: "callSiteKey: \"JUDGE:root:secondary\"",
@@ -260,6 +251,16 @@ const ROOT_PANEL_RULE = "onSpendStop: \"AUTHOR_ONLY\"";
 const CHILD_PANEL_CALL = "callSiteKey: `PANEL:${input.callSiteKey}`,";
 const CHILD_PANEL_RULE = "onSpendStop: \"TRAVEL\"";
 const ROOT_PANEL_RECORD = "if (selection.spendStop !== null) runBodyBudgetStop = selection.spendStop;";
+/**
+ * Task M2 polish: the node panel no longer catches the stop. The first root's
+ * panel asks `runJudgePanel` to RETURN the voices it heard with the stop; every
+ * other panel lets it rethrow. The returned stop is decided by `panelSpendStop`,
+ * and a panel cut short is disclosed as PANEL-PARTIAL when any voice was heard.
+ */
+const PANEL_STOP_MAPPING = "onRunLevelSpendStop: input.onSpendStop === \"AUTHOR_ONLY\" ? \"RETURN_HEARD\" : \"RETHROW\"";
+const PANEL_STOP_DECISION = "? panelSpendStop(panel.stoppedBy, input.onSpendStop)";
+const PANEL_STOP_GUARD = "if (Object.hasOwn(panel, \"stoppedBy\") && spendStop === null) throw panel.stoppedBy;";
+const PANEL_PARTIAL_RULE = "else if (memberFailures.length > 0 || spendStop !== null) marks.push(PANEL_PARTIAL_MARK);";
 /** Task M2: nothing more is argued after a stop on the first root's panel. */
 const SECONDARY_GUARD = "if (effectiveMakerCount > 1 && runBodyBudgetStop === null) {";
 /** The serve gate: the envelope question, asked on the attempt count alone. */
@@ -363,9 +364,19 @@ function assertRunBodyStopWiring(source: string): void {
   expect(statementOccurrences(source, "runBodyBudgetStop = stop;"), "four `= stop`").toBe(4);
   expect(statementOccurrences(source, "runBodyBudgetStop = outcome.stop;"), "one `= outcome.stop`").toBe(1);
 
-  // 3. The first root's panel: author-only on a stop, recorded, and nothing
-  //    more argued. Every other node's panel lets the stop travel to the phase
-  //    catch that authored it, exactly as before.
+  // 3. The first root's panel: the voices heard are kept, the stop is recorded,
+  //    and nothing more is argued. Every other node's panel lets the stop travel
+  //    to the phase catch that authored it.
+  expect(source.split(PANEL_STOP_MAPPING), "the panel keeps heard voices on AUTHOR_ONLY only").toHaveLength(2);
+  const panelCallAt = source.indexOf("const panel = await runJudgePanel({");
+  expect(panelCallAt, "the node panel call").toBeGreaterThanOrEqual(0);
+  expect(source.indexOf(PANEL_STOP_MAPPING), "the mapping is the panel call's")
+    .toBeGreaterThan(panelCallAt);
+  expect(source.split(PANEL_STOP_DECISION), "the returned stop is decided once").toHaveLength(2);
+  expect(statementOccurrences(source, PANEL_STOP_GUARD), PANEL_STOP_GUARD).toBe(1);
+  expect(source.indexOf(PANEL_STOP_DECISION), "decided after the panel returns")
+    .toBeGreaterThan(source.indexOf(PANEL_STOP_MAPPING));
+  expect(statementOccurrences(source, PANEL_PARTIAL_RULE), PANEL_PARTIAL_RULE).toBe(1);
   expect(callArgumentsAt(source, ROOT_PANEL_CALL), "the first root's panel").toContain(ROOT_PANEL_RULE);
   expect(callArgumentsAt(source, CHILD_PANEL_CALL), "every other node's panel").toContain(CHILD_PANEL_RULE);
   expect(source.split(ROOT_PANEL_RULE), "AUTHOR_ONLY is the first root's alone").toHaveLength(2);
@@ -376,7 +387,7 @@ function assertRunBodyStopWiring(source: string): void {
   expect(source.indexOf(ROOT_PANEL_RECORD), "recorded before the secondary root is considered")
     .toBeLessThan(source.indexOf(SECONDARY_GUARD));
   expect(source.indexOf(SECONDARY_GUARD), "the guard stands in front of the secondary root")
-    .toBeLessThan(source.indexOf(RUN_BODY_STOP_SITES[1]!.anchor));
+    .toBeLessThan(source.indexOf(RUN_BODY_STOP_SITES[0]!.anchor));
 
   // 4. The author's own first call: a ceiling below it is the typed
   //    configuration failure, on the root-0 author call and nowhere else.
@@ -436,7 +447,7 @@ function assertRunBodyStopWiring(source: string): void {
   expect(afterDisclosure, "nothing after the disclosure reads the stop").not.toContain("runBodyBudgetStop");
 }
 
-describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at six catches, and the serve gate never forces a hard stop from it", () => {
+describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at every catch and on the first root's panel, and the serve gate never forces a hard stop from it", () => {
   it("holds on the tree", async () => {
     assertRunBodyStopWiring(await readFile(RUNNER, "utf8"));
   });
@@ -444,9 +455,8 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at six catc
   /**
    * Each entry is a real defect written as a one-line edit of the tracked
    * source. `String.prototype.replace` takes the FIRST occurrence: for the
-   * `= stop` mutations that is the secondary-root catch, the site where the
-   * money refusal discarded a paid-for root 0; for the phase guard it is the
-   * node panel's catch, the first in the file.
+   * `= stop` mutations and the phase guard that is the secondary-root catch,
+   * the site where the money refusal discarded a paid-for root 0.
    *
    * The first six are V-28's (three added after the fix-wave review measured
    * them passing: the pin counted `throw error;` and the assignment as
@@ -493,10 +503,18 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at six catc
       `if (runBodyBudgetStop !== null) throw new TypedDomainError("RUN_BODY_STOPPED", "stopped");\n    ${DISCLOSURE_CALL}`],
     // ...or after it is disclosed, before the answer is persisted.
     ["the run fails on the stop after the disclosure", LABEL_DECISION,
-      `if (runBodyBudgetStop !== null) throw new TypedDomainError("RUN_BODY_STOPPED", "stopped");\n    ${LABEL_DECISION}`]
+      `if (runBodyBudgetStop !== null) throw new TypedDomainError("RUN_BODY_STOPPED", "stopped");\n    ${LABEL_DECISION}`],
+    // M2 polish round 2: the first root's panel throws away the voices it heard...
+    ["the panel never keeps the voices it heard", PANEL_STOP_MAPPING,
+      "onRunLevelSpendStop: \"RETHROW\""],
+    // ...or keeps them but discloses nothing partial about a panel cut short...
+    ["a panel cut short is not disclosed as partial", PANEL_PARTIAL_RULE,
+      "else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);"],
+    // ...or swallows a returned stop it cannot classify.
+    ["an unclassified returned stop is swallowed", PANEL_STOP_GUARD, ""]
   ]);
 
-  it("fails when any one of sixteen mutations is applied to that same source", async () => {
+  it("fails when any one of nineteen mutations is applied to that same source", async () => {
     const source = await readFile(RUNNER, "utf8");
 
     for (const [name, from, to] of MUTATIONS) {

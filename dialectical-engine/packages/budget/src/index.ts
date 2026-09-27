@@ -526,10 +526,17 @@ export class BudgetRepository {
   async assertModelAttemptAllowed(runId: string, phase: CostEnvelopePhase): Promise<void> {
     if (!isCostEnvelopePhase(phase)) throw new TypeError("MODEL_SPEND_PHASE_INVALID");
     const basis = await this.readPinnedBasis(runId);
-    if (await this.countRunModelAttempts(runId) >= attemptCeilingForPhase(basis, phase)) {
+    const ceiling = attemptCeilingForPhase(basis, phase);
+    const consumed = await this.countRunModelAttempts(runId);
+    if (consumed >= ceiling) {
+      // Engine money rule, Task M2 polish: the counts ride the refusal, as the
+      // money refusal's "spent X of Y" does, so a ceiling set below one call can
+      // be told from a re-claim that inherited an earlier claim's attempts.
       throw new TypedDomainError(
         "RUN_COST_ENVELOPE_EXHAUSTED",
-        `Run ${runId} exhausted the ${phase} share of its pinned computed structural ceiling`
+        `Run ${runId} exhausted the ${phase} share of its pinned computed structural ceiling:`
+          + ` the next call would be attempt ${consumed + 1} of a ${phase} ceiling of ${ceiling}`
+          + ` (the whole ceiling is ${basis.maxModelAttempts})`
       );
     }
   }
