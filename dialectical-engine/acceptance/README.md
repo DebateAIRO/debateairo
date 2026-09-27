@@ -92,6 +92,32 @@ lines of plain text — and that second file, handed to an interpreter which cou
 not execute it and so re-read it as a script, re-entered itself until the host's
 process table was full.
 
+**Prompt transport, thinking level, context window and usage caps (model scorecard, 2026-09-26).**
+Every relay runs through `relay-core.ts`, which now carries four more laws.
+*Transport*: an adapter says how its CLI receives the prompt — `argv` (the four
+original makers, unchanged), `stdin` (written, then closed) or `file` (a mode-0600
+file in its own private directory, deleted after the call; only its path reaches the
+command line). The agy and pi relays never put a prompt on the command line.
+*Thinking level*: a request may carry `x_thinking_level`, one lower-case token; a
+level the adapter does not declare is refused with 400
+`CLI_RELAY_THINKING_LEVEL_UNSUPPORTED` before any CLI starts. Every answer echoes
+`x_thinking_level`: the level asked for, or `DEFAULT_ONLY` when none was asked (the
+CLI then ran at its own default — for agy and pi, the relay's declared default).
+Thinking tokens a CLI reports are echoed as
+`usage.completion_tokens_details.reasoning_tokens`, and only then. *Context
+window*: an adapter that declares one refuses, with 413
+`CLI_RELAY_CONTEXT_WINDOW_EXCEEDED` and before any CLI starts, a prompt whose size
+at 2 bytes per token plus the request's `max_tokens` would not fit. *Usage caps*: a
+CLI that exits non-zero is shown to its adapter's cap classifier together with up to
+64 KiB of its stderr (kept in memory, never logged or returned); a recognised cap is
+answered 429 with `x_cli_relay_error: "CLI_RELAY_USAGE_CAP"`, so the runner switches
+the seat to its backup at once. Recognised today: Claude Code's recorded "You've
+reached your … limit" (2026-08-11). Codex, Grok, agy and pi have no recorded cap
+output yet, so their caps stay ordinary failures — retried, then absorbed by the
+backup — until one is captured. When a real cap happens, keep that call's stdout
+and stderr, remove anything credential-shaped, and add the exact signature to that
+maker's `classifyUsageCap` together with a test that replays the capture.
+
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size
 ceiling refuses a lawful nonempty debate. Grok's fixed relay port is

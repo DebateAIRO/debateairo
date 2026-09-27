@@ -1,14 +1,16 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { once } from "node:events";
 import {
   accessSync, closeSync, constants, lstatSync, openSync, readSync, statSync
 } from "node:fs";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
+import type { Readable, Writable } from "node:stream";
 import { z } from "zod";
+import { THINKING_LEVEL_DEFAULT_ONLY } from "@debateai/kernel";
 
 /**
  * FAIR-02 shared CLI-relay core. One OpenAI-compatible HTTP front (P4 gateway
@@ -26,7 +28,13 @@ export interface CommandSpec {
 }
 
 export class CliRelayFailure extends Error {
-  constructor(readonly kind: "FAILED" | "TIMEOUT", code: string) {
+  /**
+   * `USAGE_CAP` (R4, model scorecard 2026-09-26): the adapter recognised its
+   * CLI's own subscription-cap signature. The server answers it 429 with
+   * `x_cli_relay_error: CLI_RELAY_USAGE_CAP`, so the runner can switch the seat
+   * to its backup at once instead of retrying a wall.
+   */
+  constructor(readonly kind: "FAILED" | "TIMEOUT" | "USAGE_CAP", code: string) {
     super(code);
     this.name = "CliRelayFailure";
   }
@@ -38,6 +46,21 @@ export interface CliCompletion {
   readonly model: string;
   /** Observed CLI-reported usage only. Missing telemetry is represented by null. */
   readonly usage: CliUsage | null;
+  /**
+   * Pre-flight fix F37: "length" when the CLI reports that it stopped at its
+   * output bound. The relay then answers 200 with `finish_reason: "length"`,
+   * so the gateway's existing truncation path handles it (LENGTH_EXCEEDED,
+   * re-sent under a raised bound) — never a relay failure, never a reason to
+   * move a seat to its backup. Absent ⇒ "stop".
+   */
+  readonly finishReason?: "length";
+  /**
+   * §2.2: the level the REQUEST asked for, which the CLI was run at. Absent ⇒
+   * DEFAULT_ONLY: no level was asked and the connection ran at its own default
+   * (for an adapter with a `defaultThinkingLevel`, that one). invokeCli stamps
+   * it; an adapter sets it only if its CLI reports running at another level.
+   */
+  readonly thinkingLevel?: string;
 }
 
 export interface CliUsage {
@@ -45,11 +68,82 @@ export interface CliUsage {
   readonly completionTokens?: number;
   readonly totalTokens?: number;
   readonly costUsd?: number;
+  /**
+   * §2.3: thinking tokens, ONLY when the CLI itself reports them. Absent means
+   * "not reported", never a guessed zero. Echoed in OpenAI's spelling,
+   * `completion_tokens_details.reasoning_tokens`.
+   */
+  readonly reasoningTokens?: number;
+}
+
+/**
+ * The usage a relay reports, built from the counters a CLI printed. A total the
+ * CLI did not print is the sum of prompt and completion when both are known.
+ * Nothing is invented; null when the CLI printed no counter at all.
+ */
+export function buildCliUsage(observed: Readonly<{
+  promptTokens?: number | undefined;
+  completionTokens?: number | undefined;
+  totalTokens?: number | undefined;
+  reasoningTokens?: number | undefined;
+  costUsd?: number | undefined;
+}>): CliUsage | null {
+  const { promptTokens, completionTokens, reasoningTokens, costUsd } = observed;
+  const totalTokens = observed.totalTokens
+    ?? (promptTokens === undefined || completionTokens === undefined
+      ? undefined
+      : promptTokens + completionTokens);
+  const usage = {
+    ...(promptTokens === undefined ? {} : { promptTokens }),
+    ...(completionTokens === undefined ? {} : { completionTokens }),
+    ...(totalTokens === undefined ? {} : { totalTokens }),
+    ...(costUsd === undefined ? {} : { costUsd }),
+    ...(reasoningTokens === undefined ? {} : { reasoningTokens })
+  };
+  return Object.keys(usage).length === 0 ? null : Object.freeze(usage);
+}
+
+/** §2.10: how a maker's CLI receives the prompt. Absent on an adapter ⇒ "argv". */
+export type CliPromptTransport = "argv" | "stdin" | "file";
+
+/** What one relayed call hands the argument builder. */
+export interface CliInvocation {
+  /** "file" transport only: absolute, mode 0600, in its own 0700 directory, reaped after the call. */
+  readonly promptFile?: string;
+  /** Already checked against the adapter's `thinkingLevels`; absent ⇒ no level flag. */
+  readonly thinkingLevel?: string;
+}
+
+/** What a non-zero exit left behind — shown to the adapter's usage-cap classifier and to nothing else. */
+export interface CliFailureEvidence {
+  /** null when the child ended on a signal this relay did not send. */
+  readonly exitCode: number | null;
+  readonly stdout: string;
+  /** The first CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES bytes. Never logged, never returned. */
+  readonly stderr: string;
 }
 
 export const CLI_RELAY_SIGTERM_GRACE_MS = 250 as const;
 export const CLI_RELAY_STDOUT_MAX_BYTES = 1_048_576 as const;
 export const CLI_RELAY_STDOUT_LIMIT_CODE = "CLI_RELAY_STDOUT_LIMIT" as const;
+/** R4: a CLI cannot make the relay hold more stderr evidence than this. */
+export const CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES = 65_536 as const;
+/** §2.10: the "file" transport's prompt file, inside its private directory. */
+export const CLI_RELAY_PROMPT_FILE_NAME = "prompt.txt" as const;
+/** §2.2: a vendor level name is ONE lower-case code token — never a flag, never prose. */
+export const CLI_RELAY_THINKING_LEVEL_TOKEN = /^[a-z][a-z0-9_-]{0,31}$/u;
+export const CLI_RELAY_THINKING_LEVEL_UNSUPPORTED = "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED" as const;
+export const CLI_RELAY_CONTEXT_WINDOW_EXCEEDED = "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED" as const;
+export const CLI_RELAY_USAGE_CAP = "CLI_RELAY_USAGE_CAP" as const;
+/** §2.10: the gateway's own conservative floor (packages/budget: 2 bytes per token), restated. */
+const CONTEXT_WINDOW_BYTES_PER_TOKEN = 2;
+/**
+ * R4: the only thing a cap classifier may hand back is ONE upper-case code token
+ * (e.g. `CLAUDE_CLI_USAGE_CAP`). It becomes the 429's `error`, so anything else —
+ * a slice of the evidence, which can echo the prompt — is treated as "no cap
+ * recognised" and never leaves the relay.
+ */
+const CLI_RELAY_USAGE_CAP_CODE_TOKEN = /^[A-Z][A-Z0-9_]{0,63}$/u;
 
 /** P8 strategy: how one maker's CLI is invoked and how its output is parsed. */
 export interface CliRelayAdapter {
@@ -64,7 +158,28 @@ export interface CliRelayAdapter {
   readonly timeoutCode: string;
   /** Maker-specific fixed values applied after the ambient allowlist. */
   childEnvironment?(scratchDirectory: string): Readonly<Record<string,string>>;
-  buildArguments(prompt: string): readonly string[];
+  /**
+   * §2.10: how the prompt reaches the CLI. Absent ⇒ "argv", byte-for-byte what
+   * the four original makers do. "stdin" writes the prompt and CLOSES the pipe
+   * (DR-133 was about a stdin left OPEN). "file" writes it to a 0600 file in a
+   * private directory reaped after the call; only its path reaches argv.
+   */
+  readonly promptTransport?: CliPromptTransport;
+  /** "stdin" only: the exact text written; absent ⇒ the prompt itself. */
+  stdinPayload?(prompt: string): string;
+  /** §2.2: the vendor level names this CLI can be run at. Absent ⇒ DEFAULT_ONLY. */
+  readonly thinkingLevels?: readonly string[];
+  /** §2.2: the level an unasked call runs at. Absent ⇒ no level flag at all. */
+  readonly defaultThinkingLevel?: string;
+  /** §2.10: a declared context window; a request that cannot fit is refused (413) before any child exists. */
+  readonly contextWindowTokens?: number;
+  /**
+   * R4: this maker's usage-cap signature, read off a NON-ZERO exit. Returns the
+   * maker's typed cap code, or null. Absent, or null, keeps today's FAILED —
+   * the conservative default for a CLI whose cap output has not been captured.
+   */
+  classifyUsageCap?(evidence: CliFailureEvidence): string | null;
+  buildArguments(prompt: string, invocation?: CliInvocation): readonly string[];
   /** Throws CliRelayFailure instead of ever inventing content or lineage. */
   parseCompletion(stdout: string, prompt: string): CliCompletion | Promise<CliCompletion>;
 }
@@ -325,28 +440,107 @@ export function resolveConfiguredBinary(
   );
 }
 
+/** §2.2: stamps the level a REQUEST asked for; an unasked call stays DEFAULT_ONLY. */
+function withRequestedLevel(completion: CliCompletion, requestedLevel: string | undefined): CliCompletion {
+  return requestedLevel === undefined || completion.thinkingLevel !== undefined
+    ? completion
+    : Object.freeze({ ...completion, thinkingLevel: requestedLevel });
+}
+
+/** R4: a non-zero exit is FAILED unless the adapter recognises its own cap signature in it. */
+function nonZeroExitFailure(adapter: CliRelayAdapter, evidence: CliFailureEvidence): CliRelayFailure {
+  let usageCapCode: string | null = null;
+  try {
+    usageCapCode = adapter.classifyUsageCap?.(evidence) ?? null;
+  } catch {
+    // A classifier that cannot read the evidence has not recognised a cap.
+    usageCapCode = null;
+  }
+  return usageCapCode === null || !CLI_RELAY_USAGE_CAP_CODE_TOKEN.test(usageCapCode)
+    ? new CliRelayFailure("FAILED", adapter.failureCode)
+    : new CliRelayFailure("USAGE_CAP", usageCapCode);
+}
+
 export async function invokeCli(
   command: CommandSpec,
   adapter: CliRelayAdapter,
   prompt: string,
-  timeoutMs: number
+  timeoutMs: number,
+  options: Readonly<{ thinkingLevel?: string }> = {}
 ): Promise<CliCompletion> {
+  // §2.2: the level on the command line is the one asked for, else the
+  // adapter's own explicit default, else none. An undeclared level is refused
+  // here before any directory or child exists; the HTTP server has already
+  // answered 400 for a request that names one.
+  const thinkingLevel = options.thinkingLevel ?? adapter.defaultThinkingLevel;
+  if (thinkingLevel !== undefined && !(adapter.thinkingLevels ?? []).includes(thinkingLevel)) {
+    throw new TypeError(CLI_RELAY_THINKING_LEVEL_UNSUPPORTED);
+  }
+  const transport = adapter.promptTransport ?? "argv";
   const makerSlug = adapter.maker.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cli";
-  const scratchDirectory = await mkdtemp(join(await realpath(tmpdir()), `relay-${makerSlug}-`));
-  return new Promise((resolve, reject) => {
-    const child = spawn(command.binary, [...command.prefixArguments, ...adapter.buildArguments(prompt)], {
-      // CONT-01: vendor CLIs receive no project cwd. A fresh empty directory is
-      // the only ambient filesystem context for every handshake and relay call.
-      cwd: scratchDirectory,
-      // P4-01: model subprocesses never inherit the API environment. Only
-      // process basics plus this maker's exact auth locators cross the seam.
-      env: buildCliChildEnvironment(adapter, scratchDirectory),
-      // DR-133 (kept for every maker): a CLI left with an open stdin can hang;
-      // the prompt always travels as an argument, so stdin is closed.
-      stdio: ["ignore", "pipe", "pipe"]
+  const temporaryRoot = await realpath(tmpdir());
+  const scratchDirectory = await mkdtemp(join(temporaryRoot, `relay-${makerSlug}-`));
+  let promptDirectory: string | undefined;
+  // Vendor litter and the prompt file are not relay input: both directories are
+  // reaped exactly once, after the child has ended and before the call settles.
+  const reap = async (): Promise<void> => {
+    const directories = promptDirectory === undefined
+      ? [scratchDirectory]
+      : [scratchDirectory, promptDirectory];
+    await Promise.all(directories.map((directory) =>
+      rm(directory, { recursive: true, force: true }).catch(() => undefined)
+    ));
+  };
+  let argumentList: readonly string[];
+  let environment: NodeJS.ProcessEnv;
+  let stdinText: string | undefined;
+  try {
+    let promptFile: string | undefined;
+    if (transport === "file") {
+      // §2.10: the prompt lives in its OWN 0700 directory, never in the
+      // child's cwd, so every maker still starts in an empty scratch directory.
+      promptDirectory = await mkdtemp(join(temporaryRoot, `relay-${makerSlug}-prompt-`));
+      promptFile = join(promptDirectory, CLI_RELAY_PROMPT_FILE_NAME);
+      // `wx`: the directory is new and empty, so an existing file is an anomaly.
+      await writeFile(promptFile, prompt, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    }
+    const invocation: CliInvocation = Object.freeze({
+      ...(promptFile === undefined ? {} : { promptFile }),
+      ...(thinkingLevel === undefined ? {} : { thinkingLevel })
     });
+    argumentList = [...command.prefixArguments, ...adapter.buildArguments(prompt, invocation)];
+    // P4-01: model subprocesses never inherit the API environment. Only
+    // process basics plus this maker's exact auth locators cross the seam.
+    environment = buildCliChildEnvironment(adapter, scratchDirectory);
+    // The adapter's framing is built here too, so one that throws is refused
+    // before any child exists, exactly like a throwing argument builder.
+    if (transport === "stdin") stdinText = adapter.stdinPayload?.(prompt) ?? prompt;
+  } catch (error) {
+    await reap();
+    throw error;
+  }
+  return new Promise((resolve, reject) => {
+    // CONT-01: vendor CLIs receive no project cwd. A fresh empty directory is
+    // the only ambient filesystem context for every handshake and relay call.
+    // DR-133: a CLI left with an OPEN stdin can hang. "argv" and "file" keep
+    // stdin closed; "stdin" writes the prompt and closes the pipe at once.
+    const child: ChildProcessByStdio<Writable | null, Readable, Readable> = transport === "stdin"
+      ? spawn(command.binary, argumentList, {
+        cwd: scratchDirectory, env: environment, stdio: ["pipe", "pipe", "pipe"]
+      })
+      : spawn(command.binary, argumentList, {
+        cwd: scratchDirectory, env: environment, stdio: ["ignore", "pipe", "pipe"]
+      });
+    if (child.stdin !== null) {
+      // A child that exits before reading everything must not become an
+      // unhandled EPIPE; its exit status still decides the outcome.
+      child.stdin.on("error", () => undefined);
+      child.stdin.end(stdinText ?? "", "utf8");
+    }
     const stdout: Buffer[] = [];
     let stdoutBytes = 0;
+    const stderr: Buffer[] = [];
+    let stderrBytes = 0;
     let settled = false;
     let forceKillTimer: NodeJS.Timeout | undefined;
     let terminationFailure: CliRelayFailure | undefined;
@@ -369,7 +563,15 @@ export async function invokeCli(
       stdoutBytes += chunk.byteLength;
       stdout.push(chunk);
     });
-    child.stderr.resume();
+    // R4 evidence only: bounded, held in memory, shown to the adapter's cap
+    // classifier and dropped. It never reaches a response, a log or a prompt.
+    child.stderr.on("data", (chunk: Buffer) => {
+      const room = CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES - stderrBytes;
+      if (room <= 0) return;
+      const kept = chunk.byteLength > room ? chunk.subarray(0, room) : chunk;
+      stderrBytes += kept.byteLength;
+      stderr.push(kept);
+    });
     const deadlineTimer = setTimeout(() => {
       beginTermination(new CliRelayFailure("TIMEOUT", adapter.timeoutCode));
     }, timeoutMs);
@@ -378,11 +580,7 @@ export async function invokeCli(
       settled = true;
       clearTimeout(deadlineTimer);
       if (forceKillTimer !== undefined) clearTimeout(forceKillTimer);
-      // Vendor litter is not relay input. Reap it exactly once after the child
-      // terminates and before the request is allowed to settle.
-      void rm(scratchDirectory, { recursive: true, force: true })
-        .catch(() => undefined)
-        .then(settle);
+      void reap().then(settle);
     };
     child.once("error", () => {
       settleOnce(() => reject(
@@ -395,15 +593,18 @@ export async function invokeCli(
           reject(terminationFailure);
           return;
         }
+        const stdoutText = Buffer.concat(stdout).toString("utf8");
         if (code !== 0) {
-          reject(new CliRelayFailure("FAILED", adapter.failureCode));
+          reject(nonZeroExitFailure(adapter, Object.freeze({
+            exitCode: code,
+            stdout: stdoutText,
+            stderr: Buffer.concat(stderr).toString("utf8")
+          })));
           return;
         }
-        try {
-          resolve(adapter.parseCompletion(Buffer.concat(stdout).toString("utf8"), prompt));
-        } catch (error) {
-          reject(error);
-        }
+        Promise.resolve()
+          .then(() => adapter.parseCompletion(stdoutText, prompt))
+          .then((completion) => resolve(withRequestedLevel(completion, options.thinkingLevel)), reject);
       });
     });
   });
@@ -434,6 +635,9 @@ const relayMessageContentSchema = z.string()
 
 const requestSchema = z.object({
   model: z.string().min(1),
+  // §2.2: the engine's extension member. One lower-case token, so it can never
+  // become a flag or prose on a command line. Absent ⇒ DEFAULT_ONLY.
+  x_thinking_level: z.string().regex(CLI_RELAY_THINKING_LEVEL_TOKEN).optional(),
   messages: z.array(z.object({
     role: z.enum(["system", "user", "assistant"]),
     content: relayMessageContentSchema
@@ -529,6 +733,42 @@ function authorizationMatches(request: IncomingMessage, expectedDigest: Buffer):
   return timingSafeEqual(candidateDigest, expectedDigest);
 }
 
+/** A refusal the gateway can read by code, beside the maker-facing `error`. */
+function sendRelayRefusal(response: ServerResponse, status: 400 | 413, code: string): void {
+  sendJson(response, status, { error: code, x_cli_relay_error: code });
+}
+
+/**
+ * §2.10 and R1 (pre-flight fix F1): the gateway's floor (2 bytes per token) over the SAME bytes the
+ * gateway's `estimateWindowTokens` counts — each message's content, UTF-8 — plus the caller's own
+ * output bound. Never the bytes of the JSON transcript: its envelope, escaped quotes and newlines
+ * would make the relay stricter than the gateway, which would then send a prompt the relay refuses.
+ */
+function exceedsContextWindow(
+  messages: readonly { readonly content: string }[],
+  maxTokens: unknown,
+  contextWindowTokens: number | undefined
+): boolean {
+  if (contextWindowTokens === undefined) return false;
+  const outputBound = typeof maxTokens === "number" && Number.isSafeInteger(maxTokens) && maxTokens > 0
+    ? maxTokens
+    : 0;
+  let contentBytes = 0;
+  for (const message of messages) contentBytes += Buffer.byteLength(message.content, "utf8");
+  return Math.ceil(contentBytes / CONTEXT_WINDOW_BYTES_PER_TOKEN) + outputBound > contextWindowTokens;
+}
+
+/** An adapter's own declarations are checked once, at start, never per call. */
+function assertAdapterDeclarations(adapter: CliRelayAdapter): void {
+  const levels = adapter.thinkingLevels ?? [];
+  const invalid = levels.some((level) => !CLI_RELAY_THINKING_LEVEL_TOKEN.test(level))
+    || new Set(levels).size !== levels.length
+    || (adapter.defaultThinkingLevel !== undefined && !levels.includes(adapter.defaultThinkingLevel))
+    || (adapter.contextWindowTokens !== undefined
+      && (!Number.isSafeInteger(adapter.contextWindowTokens) || adapter.contextWindowTokens < 1));
+  if (invalid) throw new TypeError("CLI_RELAY_ADAPTER_DECLARATION_INVALID");
+}
+
 export async function startCliRelayServer(options: CliRelayServerOptions): Promise<CliRelayHandle> {
   if (!Number.isInteger(options.port) || options.port < 0 || options.port > 65_535) {
     throw new TypeError("CLI_RELAY_PORT_INVALID");
@@ -536,6 +776,7 @@ export async function startCliRelayServer(options: CliRelayServerOptions): Promi
   if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1) {
     throw new TypeError("CLI_RELAY_TIMEOUT_INVALID");
   }
+  assertAdapterDeclarations(options.adapter);
   const authorizationHeader = `Bearer ${randomBytes(32).toString("base64url")}`;
   const authorizationDigest = createHash("sha256").update(authorizationHeader, "utf8").digest();
   const server: Server = createServer(async (request, response) => {
@@ -549,24 +790,54 @@ export async function startCliRelayServer(options: CliRelayServerOptions): Promi
     }
     try {
       const parsed = requestSchema.parse(await readBody(request));
+      const requestedLevel = parsed.x_thinking_level;
+      // §2.2 / R7: an undeclared level is REFUSED before any child exists —
+      // never run silently at some other level.
+      if (requestedLevel !== undefined
+        && !(options.adapter.thinkingLevels ?? []).includes(requestedLevel)) {
+        sendRelayRefusal(response, 400, CLI_RELAY_THINKING_LEVEL_UNSUPPORTED);
+        return;
+      }
       const prompt = renderPromptTranscript(parsed.messages);
-      const completion = await invokeCli(options.command, options.adapter, prompt, options.timeoutMs);
+      if (exceedsContextWindow(parsed.messages, parsed.max_tokens, options.adapter.contextWindowTokens)) {
+        sendRelayRefusal(response, 413, CLI_RELAY_CONTEXT_WINDOW_EXCEEDED);
+        return;
+      }
+      const completion = await invokeCli(
+        options.command,
+        options.adapter,
+        prompt,
+        options.timeoutMs,
+        requestedLevel === undefined ? {} : { thinkingLevel: requestedLevel }
+      );
       sendJson(response, 200, {
         id: `chatcmpl-${randomUUID()}`,
         object: "chat.completion",
         created: Math.floor(Date.now() / 1_000),
         model: completion.model,
         maker: options.adapter.maker,
+        x_thinking_level: completion.thinkingLevel ?? THINKING_LEVEL_DEFAULT_ONLY,
         usage: completion.usage === null ? null : {
           prompt_tokens: completion.usage.promptTokens,
           completion_tokens: completion.usage.completionTokens,
           total_tokens: completion.usage.totalTokens,
-          x_cost_usd: completion.usage.costUsd
+          x_cost_usd: completion.usage.costUsd,
+          ...(completion.usage.reasoningTokens === undefined ? {} : {
+            completion_tokens_details: { reasoning_tokens: completion.usage.reasoningTokens }
+          })
         },
-        choices: [{ index: 0, message: { role: "assistant", content: completion.content }, finish_reason: "stop" }]
+        choices: [{
+          index: 0,
+          message: { role: "assistant", content: completion.content },
+          finish_reason: completion.finishReason ?? "stop"
+        }]
       });
     } catch (error) {
       if (error instanceof CliRelayFailure) {
+        if (error.kind === "USAGE_CAP") {
+          sendJson(response, 429, { error: error.message, x_cli_relay_error: CLI_RELAY_USAGE_CAP });
+          return;
+        }
         sendJson(response, error.kind === "TIMEOUT" ? 504 : 502, { error: error.message });
         return;
       }
