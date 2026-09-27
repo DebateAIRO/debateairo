@@ -45,6 +45,9 @@ grew too big. The story never changes the verdict. It only explains it.
 
 - A published debate shows the **short story**: the headline, the summary, the positions and what
   would change the answer. It shows no point numbers (those only make sense next to the PDF's list).
+- If the checker was not fully satisfied, the public page shows the same gentle line as your page:
+  "Parts of this summary could not be fully double-checked." The checker's own words never appear
+  there.
 - A debate published before its story was ready keeps its old summary until you publish it again.
 
 ### The full report (PDF)
@@ -74,9 +77,12 @@ grew too big. The story never changes the verdict. It only explains it.
   "We had less to compare than usual for this answer."
 - The honesty drawer still tells the true story underneath, for example "The page shows the
   debate's strongest position as the answer."
-- A floor answer gets its story too.
-- Only a real technical failure (a run that crashed) has no answer. It shows a plain failure
-  message.
+- A floor answer gets its story too, once its record is saved. If saving the record fails, there
+  is no story, so the page never tells an answer it cannot show.
+- Only a real technical failure (a run that crashed) has no answer. The page then shows `dev`'s
+  failure line with the engine's raw reason, for example "Debate generation failed:
+  RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL". It is not a plain message yet (see the
+  owner note "A failed debate still shows the engine's raw reason" below).
 
 ### A friendly daily-limit message
 
@@ -102,9 +108,11 @@ are never the reason.
   the answer from what it has.
 - **A cheaper model, if needed.** If the planned model cannot be paid, the same request goes to a
   cheaper model the debate is allowed to use. The checker then prefers a different model from the
-  writer. This is mentioned only in "About this report" (for example "A lower-cost AI model wrote
-  this answer, to stay within the debate's budget.") and in your own records. It never appears in
-  the verdict text.
+  writer. If the cheaper model's draft or check is unusable, the round already written and checked
+  is kept; in the first round, the floor answers. It never turns into a failed debate. The cheaper
+  model is mentioned only in "About this report" (for example "A lower-cost AI model wrote this
+  answer, to stay within the debate's budget.") and in your own records. It never appears in the
+  verdict text.
 - **A finished round is kept.** If a later round of answer-writing fails, the best round that was
   already written and checked is kept, instead of throwing it all away.
 - **Big debates fit.** A debate of about 195 points used to be too large for the answer-writer and
@@ -133,6 +141,9 @@ are never the reason.
 3. **The website and the API ship together.** The public list of debates now carries the floor
    label, and the old website insists on the exact old shape of that list. An old website in front
    of the new API would fail to show the list. (The new website reads an old API's list fine.)
+   The runner goes first: it must never be older than the API. To roll back, the API goes first.
+   The exact order is in `deploy/vps/README.md`, "Upgrading to the verdict-story release, and
+   rolling it back".
 4. **The day must hold one full debate plus its story.** With today's values that is
    $0.30 + $0.06 = $0.36. A daily limit below that is refused when you publish, and neither
    service will start.
@@ -189,6 +200,17 @@ are never the reason.
   the wait can last up to an hour.
 - **A small engine gap from before.** The judges' disagreement lowers a point's certainty in the
   records, but not the confidence shown for the answer.
+- **A failed debate still shows the engine's raw reason.** When a debate fails for a technical
+  reason, the page shows `dev`'s line "Debate generation failed: {reason}", and the reason is the
+  engine's own code, for example "RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL". That is
+  not plain language, and it breaks your no-engine-words rule. Turning each failure reason into a
+  plain line in all 35 languages is a follow-up. The new code `RUN_CEILING_BELOW_FIRST_CALL`
+  (the debate's money for arguing cannot pay for even its first call) shows up through this same
+  line.
+- **A question for you: the planned model's own unusable answer.** If the planned model (not a
+  cheaper stand-in) writes an unusable draft or check even after its retries, the debate still
+  fails, as before. For a cheaper stand-in the engine now keeps the checked round or uses the
+  floor instead. Whether the planned model should be treated the same way is your call.
 
 ## Wordings you can choose from later
 
@@ -215,3 +237,4 @@ Unless marked otherwise, the first wording of each is the one shipped.
 - A PDF for public readers, clickable point references on the site, and a "write the story again"
   button.
 - A web page for your records. Today the records are read with the server command above.
+- A plain message for a failed debate, in place of the engine's raw reason.

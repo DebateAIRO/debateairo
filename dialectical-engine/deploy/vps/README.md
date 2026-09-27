@@ -741,6 +741,36 @@ The API and runner units set `NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.c
 gRPC TLS chain verifies. The UI unit sets `DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1` and
 `DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret`.
 
+### Upgrading to the verdict-story release, and rolling it back
+
+This release (the verdict story and the engine money rule, spec 2026-09-26 §14) changes what the
+API hands the runner and the website, and older code reads the new shapes strictly. Keep to this
+order in both directions:
+
+- **The runner is never older than the API.** The API now writes a new member,
+  `serve_reserve_attempts` (the calls held back for the answer), into every new debate's cost
+  receipt (`envelope_basis`). An older runner reads that receipt strictly and fails the debate
+  with `RUN_COST_ENVELOPE_UNRESOLVED`. To upgrade, update the runner first (or both together), then
+  the API. To roll back, roll the API back first.
+- **Never roll the runner back on its own while debates admitted by the new API are still
+  queued or running.** Their receipts carry the new member. Roll the API back first. Right after,
+  run the command below and note `newest`. Roll the runner back once `unfinished` is 0, or
+  `oldest` is above the number you noted:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created_at_seq) AS oldest, max(created_at_seq) AS newest FROM core.work_item WHERE state IN ('READY', 'CLAIMED')"
+```
+
+- **The website and the API ship together**, in both directions. The public list now carries a
+  floor label (`floor_verdict`), and an older website refuses the list when its shape is not the
+  exact old one. (A newer website reads an older API's list fine.)
+- **Rolling the API back past this release hides the debates published under it.** Their public
+  snapshots carry the new members (`story_short`, `language`, `floor`), which the older API's
+  strict reader refuses. Those public pages then answer "not found" and leave the public list
+  until you roll forward again. Nothing is deleted.
+- After the upgrade, every story is stored as failed with `STORY_NOT_CONFIGURED` until the next
+  hosted register publish (§11, "What the runner's log says about answers and stories").
+
 ### Production floors the code itself enforces
 
 `assertProductionFloors` (`packages/register/src/runtime-environment.ts`) refuses to boot when
@@ -1241,6 +1271,34 @@ A refusal is one code on stderr: `SERVE_DISCLOSURE_USAGE` (not exactly one id), 
 `DATABASE_URL`: the `EnvironmentFile` was not loaded), `DATABASE_URL_TLS_REQUIRED:DATABASE_URL`,
 `SERVE_DISCLOSURE_CONNECTION_NOT_READ_ONLY`, `SERVE_DISCLOSURE_PRINCIPAL_INVALID` (not run as the
 runner, with `runner.env`), or `SERVE_DISCLOSURE_REPORT_FAILED`.
+
+#### What the runner's log says about answers and stories
+
+The runner writes one JSON line per event to its journal. Each line carries ids and codes only,
+never debate or model text, and none of these events changes an answer. Today's lines:
+
+```sh
+journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DISCLOSURE|DEBATEAI_STORY'
+```
+
+| Signal | What it means | What to do |
+|---|---|---|
+| `"kind":"DEBATEAI_SERVE_DISCLOSURE"`, `"event":"SERVE_DISCLOSURE_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `answerId` | The answer's owner-side record (above) could not be written. The answer itself is exactly what it would have been. What is lost is the record. **When no model could write the answer, its floor is lost**: the pages say the verdict is unavailable instead of showing "Our best answer:", the answer gets no story, and `pnpm ops:serve-disclosure` answers `SERVE_DISCLOSURE_NOT_FOUND`. For a written answer, the owner's record and the PDF's lower-cost note are missing. | Nothing writes the row later: it is written once, right after the answer. Keep the line. A typed `code` (for example `SERVE_DISCLOSURE_RECORD_INVALID`) is a defect to report. `UNTYPED` with a `sqlState` is the database refusing (for example `23503`) or a lost connection. More than one in a day is worth investigating. |
+| A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, shown on the owner's page as "Debate generation failed: …" and kept in `core.work_item.terminal_reason` | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
+| `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
+| `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
+| `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
+| `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
+
+The story's other events carry codes only: `STORY_STORED` (every story, with its outcome),
+`STORY_LATER_ROUND_FAILED`, `STORY_MATERIAL_TOO_LARGE`, `STORY_SNAPSHOT_FAILED`,
+`STORY_WRITE_FAILED` and `STORY_FAILURE_NOT_RECORDED`.
+
+**`DEBATEAI_STORY_SHAPES_DIR`** (optional, in `runner.env`) names the directory the story shapes
+are read from. Left unset, the runner finds `story-shapes/` in its own checkout, here
+`/opt/debateai/dialectical-engine/story-shapes`. A value that names no directory holding
+`pack.json` is refused when the runner starts: `STORY_PACK_INVALID` with the reason
+`STORY_PACK_DIR_UNRESOLVED`. Stories then fail; debates do not.
 
 ### Publishing the settings register on this host
 
