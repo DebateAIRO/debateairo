@@ -5,6 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  ASK_MODEL_ASSIGNMENT_INVALID,
+  ASK_MODEL_REFUSALS,
   askModelPickerSettings,
   askTargetFacts,
   debaterSeatCount,
@@ -84,6 +86,24 @@ describe("A20 · expected calls per role come from the admitted structure", () =
     expect(() => expectedCallsByRoleFromBasis({ max_model_attempts: 1 }))
       .toThrowError(expect.objectContaining({ name: "TypedDomainError", code: "ASK_MODEL_ASSIGNMENT_INVALID" }));
   });
+
+  // Carry 11 (A20.1 review M3): the second engine-fault branch, each half on its own.
+  it.each([
+    { name: "fewer author sites than P + CX and an odd synthesis count", author: 5, synthesis: 3 },
+    { name: "fewer author sites than P + CX", author: 5, synthesis: 6 },
+    { name: "an odd synthesis-site count", author: 9, synthesis: 3 }
+  ])("refuses a basis that does not split into roles: $name", ({ author, synthesis }) => {
+    const handBuilt = {
+      panel_size: 3,
+      call_sites: { author, panel: 0, reviewer: 0, serve: 0 },
+      serve_leg: { synthesis_loop_sites: synthesis }
+    };
+    expect(() => expectedCallsByRoleFromBasis(handBuilt)).toThrowError(expect.objectContaining({
+      name: "TypedDomainError",
+      code: "ASK_MODEL_ASSIGNMENT_INVALID",
+      message: "The admitted structural basis does not split into roles"
+    }));
+  });
 });
 
 describe("A20 · seats", () => {
@@ -95,6 +115,16 @@ describe("A20 · seats", () => {
       POSITION: 3, SUPPORT_ATTACK: 3, CROSS_EXCHANGE: 3, JUDGE: 3, REVIEWER: 3, ANSWER_WRITER: 1, ANSWER_CHECKER: 1
     });
   });
+
+  // Carry 11 (A20.1 review M2): "no debaters, but a writer and a checker" is never demanded.
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+    "refuses %s debaters as an engine fault",
+    (debaters) => {
+      expect(() => seatDemandForDebaters(debaters)).toThrowError(expect.objectContaining({
+        name: "TypedDomainError", code: "ASK_MODEL_ASSIGNMENT_INVALID"
+      }));
+    }
+  );
 
   it("seats the plan's number of debaters, capped by the distinct makers reachable", () => {
     const facts = new Map();
@@ -157,6 +187,57 @@ describe("A20 · deployment facts", () => {
     expect(askModelPickerSettings({
       scorecard: absent, deploymentMode: "local", targets: TARGETS, perRunCeilingMicros: 250_000
     })).toMatchObject({ mode: "LOCAL", perRunCeilingMicros: null });
+  });
+
+  // Carry 11 (A20.1 review M1): a hosted ceiling that bounds nothing would switch off the step-down silently.
+  it.each([null, 0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+    "refuses HOSTED settings at boot whose per-run ceiling is %s",
+    (perRunCeilingMicros) => {
+      expect(() => askModelPickerSettings({
+        scorecard: Object.freeze({ state: "ABSENT" as const }), deploymentMode: "hosted", targets: TARGETS, perRunCeilingMicros
+      })).toThrowError(new TypeError("ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED"));
+    }
+  );
+
+  it("keeps LOCAL settings without a ceiling: local mode has no money bound", () => {
+    expect(askModelPickerSettings({
+      scorecard: Object.freeze({ state: "ABSENT" as const }), deploymentMode: "local", targets: TARGETS, perRunCeilingMicros: null
+    })).toMatchObject({ mode: "LOCAL", perRunCeilingMicros: null });
+  });
+
+  // Carry 11 (A20.1 review M3): the settings carry the deployment's facts and the operator's log through.
+  it("passes the targets' facts and the operator log through, and adds no log when none is given", () => {
+    const log = (_line: string): void => undefined;
+    const scorecard = Object.freeze({ state: "ABSENT" as const });
+    const withLog = askModelPickerSettings({
+      scorecard, deploymentMode: "hosted", targets: TARGETS, perRunCeilingMicros: 250_000, log
+    });
+    expect(withLog.scorecard).toBe(scorecard);
+    expect([...withLog.targetFacts]).toEqual([...askTargetFacts(TARGETS)]);
+    expect(withLog.log).toBe(log);
+    const withoutLog = askModelPickerSettings({
+      scorecard, deploymentMode: "local", targets: TARGETS, perRunCeilingMicros: null
+    });
+    expect("log" in withoutLog).toBe(false);
+    expect(Object.isFrozen(withLog)).toBe(true);
+  });
+
+  // Carry 11 (A20.1 review M3): the two refusals the asker reads are constant sentences with typed codes.
+  it("keeps the picker refusals' codes and sentences constant", () => {
+    expect(ASK_MODEL_REFUSALS).toEqual({
+      BUDGET_TOO_SMALL: {
+        code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL",
+        message: "Even the Economy model strength costs more than one debate may spend here; a smaller tree depth costs less"
+      },
+      NO_REACHABLE_CANDIDATE: {
+        code: "ASK_MODEL_CANDIDATE_UNAVAILABLE",
+        message: "No model is reachable right now for one of this debate's jobs"
+      }
+    });
+    expect(Object.isFrozen(ASK_MODEL_REFUSALS)).toBe(true);
+    expect(Object.isFrozen(ASK_MODEL_REFUSALS.BUDGET_TOO_SMALL)).toBe(true);
+    expect(Object.isFrozen(ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE)).toBe(true);
+    expect(ASK_MODEL_ASSIGNMENT_INVALID).toBe("ASK_MODEL_ASSIGNMENT_INVALID");
   });
 
   it("says in one line which scorecard the deployment runs", () => {

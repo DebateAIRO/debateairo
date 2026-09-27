@@ -15,7 +15,8 @@ import type { ReachableTarget, RoleAssignment, TargetPrice } from "@debateai/sco
  *  - REACHABLE TARGETS in today's order — the plan roster's members first, in
  *    roster order (what the roster filter seats today), then every other
  *    healthy discovered target in discovery order — so a role the scorecard
- *    does not cover falls back to the model today's roster would seat;
+ *    does not cover falls back to the model today's roster would seat (debate
+ *    roles; the answer roles keep their sealed refs);
  *  - SEAT DEMAND — how many debaters the plan seats (its roster's LENGTH,
  *    capped by the distinct makers reachable) and a seat per debater in every
  *    debate role; one each for the two answer roles;
@@ -101,6 +102,13 @@ export function askModelPickerSettings(input: Readonly<{
   log?: (line: string) => void;
 }>): AskModelPickerSettings {
   const hosted = input.deploymentMode === "hosted";
+  // Carry 11 (A20.1 review M1): hosted always runs under sealed cost envelopes. A
+  // missing or non-positive ceiling here would switch off the picker's step-down
+  // and its BUDGET_TOO_SMALL refusal without a word, so boot refuses it instead.
+  const ceiling = input.perRunCeilingMicros;
+  if (hosted && (ceiling === null || !Number.isSafeInteger(ceiling) || ceiling < 1)) {
+    throw new TypeError("ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED");
+  }
   return Object.freeze({
     scorecard: input.scorecard,
     mode: hosted ? "HOSTED" : "LOCAL",
@@ -160,6 +168,12 @@ export function debaterSeatCount(reachable: readonly ReachableTarget[], planSeat
 
 /** A seat per debater in every debate role (none of them at one debater); one per answer role. */
 export function seatDemandForDebaters(debaters: number): Readonly<Record<DebateRole, number>> {
+  // Carry 11 (A20.1 review M2): "no debaters, but a writer and a checker" is not a
+  // debate. Admission refuses zero reachable makers before it gets here; this
+  // mirrors the basis schema's positive `panel_size`.
+  if (!Number.isSafeInteger(debaters) || debaters < 1) {
+    throw new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The seat demand needs at least one debater");
+  }
   const perDebater = debaters >= 2 ? debaters : 0;
   return Object.freeze({
     POSITION: debaters,
