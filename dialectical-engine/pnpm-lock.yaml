@@ -652,6 +652,9 @@ importers:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../scorecard
       zod:
         specifier: 4.4.3
         version: 4.4.3

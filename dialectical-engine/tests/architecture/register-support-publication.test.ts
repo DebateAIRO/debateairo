@@ -8,6 +8,7 @@ import {
   AUTH_POLICY_REGISTER_ROWS,
   AUTH_POLICY_ROW_KEYS,
   MFA_POLICY_REGISTER_ROW,
+  MODEL_SCORECARD_ROW_KEY,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
@@ -406,6 +407,12 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect(developmentRows).toHaveLength(51);
     expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(50);
     expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(50);
+    // A19 x MODEL SCORECARD: 51 stays 51, deliberately. `modelScorecard` is NOT a
+    // code-owned deployment row: local mode reads the bundled public file
+    // (scorecards/current.json), and the hosted scorecard is an ADDITIVE operator
+    // row published with `--scorecard`. A code-owned default would seal the
+    // one-version-behind public scorecard wherever an operator forgot the flag.
+    expect(developmentRows.map((row) => row.rowKey)).not.toContain(MODEL_SCORECARD_ROW_KEY);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
 

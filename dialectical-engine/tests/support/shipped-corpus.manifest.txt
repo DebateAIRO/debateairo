@@ -434,6 +434,7 @@ packages/register/src/cost-envelope-policy.ts
 packages/register/src/engine-shape.ts
 packages/register/src/index.ts
 packages/register/src/mfa-policy.ts
+packages/register/src/model-scorecard-policy.ts
 packages/register/src/product-role-policy.ts
 packages/register/src/recovery-policy.ts
 packages/register/src/register-publication.ts

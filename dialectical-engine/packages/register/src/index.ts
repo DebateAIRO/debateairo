@@ -930,6 +930,17 @@ export {
   type CostEnvelopePolicy,
   type CostEnvelopePolicyValue
 } from "./cost-envelope-policy.js";
+// A19: the optional model scorecard (absent -> the plan rosters choose the models).
+export {
+  BUNDLED_MODEL_SCORECARD_URL,
+  MODEL_SCORECARD_ROW_KEY,
+  modelScorecardFromValue,
+  readBundledModelScorecard,
+  readEngineVersion,
+  readModelScorecard,
+  type ModelScorecardReadResult,
+  type ModelScorecardRefusalReason
+} from "./model-scorecard-policy.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,

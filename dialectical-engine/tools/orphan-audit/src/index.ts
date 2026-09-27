@@ -17,7 +17,7 @@ const rows: readonly Row[] = [
   // per-role picker. Kernel only, so register, api and runner can all import it.
   ["scorecard", "packages/scorecard", ["kernel"]],
   ["db", "packages/db", ["kernel", "crypto"]],
-  ["register", "packages/register", ["kernel", "db", "contract"]],
+  ["register", "packages/register", ["kernel", "db", "contract", "scorecard"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
   ["providers", "packages/providers", ["kernel", "register", "ledger"]],
   ["graph", "packages/graph", ["kernel", "db", "ledger", "register"]],
