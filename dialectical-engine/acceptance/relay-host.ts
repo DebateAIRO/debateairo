@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { existsSync, realpathSync, rmSync } from "node:fs";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
 import { resolveDeploymentMode } from "@debateai/register";
 import { startAgyRelay } from "./agy-relay.js";
@@ -24,7 +25,10 @@ import {
  *
  * It REFUSES in the hosted deployment — V-9(c): the relays ARE the local mode
  * and the hosted site never runs them — before it reads a file or starts a CLI.
- * It never prints a bearer; the endpoints file is the only place one is written.
+ * It never prints a bearer; the endpoints file is the only place one is written,
+ * and that file never lands in the tracked tree: it defaults to
+ * RELAY_HOST_DEFAULT_ENDPOINTS_PATH under the engine root, and a path inside the
+ * repository that is not under a `.local/` directory (git-ignored) is refused.
  */
 
 export const RELAY_HOST_TOOLS = Object.freeze(["claude", "codex", "grok", "agy", "pi"] as const);
@@ -34,6 +38,10 @@ export type RelayHostTool = typeof RELAY_HOST_TOOLS[number];
 const RELAY_HOST_DEFAULT_TIMEOUT_MS = 180_000;
 /** The same ceiling the discovery-target parser holds its operator file to. */
 const RELAY_HOST_CANDIDATES_MAX_BYTES = 65_536;
+/** Where the endpoints file goes without `--endpoints`, relative to the engine root; `**\/.local/` is git-ignored. */
+export const RELAY_HOST_DEFAULT_ENDPOINTS_PATH = ".local/relays/endpoints.json";
+/** The engine root this module ships in (`acceptance/..`), deduced from its own location, never spelled. */
+const RELAY_HOST_ENGINE_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 const candidateSchema = z.object({
   providerRef: z.string().regex(/^[a-z][a-z0-9._:-]{0,127}$/u),
@@ -72,11 +80,18 @@ export interface RelayHostSeams {
   /** Test-only CLI doubles per tool. Each start function refuses them outside NODE_ENV=test. */
   readonly commands?: Readonly<Partial<Record<RelayHostTool, CommandSpec>>>;
   readonly codexSessionsRoot?: string;
+  /**
+   * Test-only stand-in for the engine root: where the default endpoints file goes,
+   * and where the search for the enclosing work tree starts. Refused outside
+   * NODE_ENV=test (RELAY_HOST_TEST_ONLY_REPOSITORY_ROOT_FORBIDDEN).
+   */
+  readonly repositoryRoot?: string;
 }
 
 export interface RelayHostOptions {
   readonly candidatesPath: string;
-  readonly endpointsPath: string;
+  /** Absent ⇒ RELAY_HOST_DEFAULT_ENDPOINTS_PATH under the engine root. */
+  readonly endpointsPath?: string;
   readonly timeoutMs?: number;
   readonly environment: Readonly<Record<string, string | undefined>>;
   readonly seams?: RelayHostSeams;
@@ -228,29 +243,85 @@ async function writeEndpointsFile(path: string, endpoints: readonly RelayHostEnd
   }
 }
 
+/** `path` with every symbolic link resolved, including when its last segments do not exist yet. */
+function canonicalPath(path: string): string {
+  let existing = resolve(path);
+  const missing: string[] = [];
+  while (!existsSync(existing)) {
+    const parent = dirname(existing);
+    if (parent === existing) break;
+    missing.unshift(basename(existing));
+    existing = parent;
+  }
+  return join(realpathSync(existing), ...missing);
+}
+
+/** The work tree around `root`: the nearest directory holding `.git` (a worktree's is a file), else `root`. */
+function repositoryBoundaryOf(root: string): string {
+  const canonicalRoot = canonicalPath(root);
+  for (let current = canonicalRoot; ; current = dirname(current)) {
+    if (existsSync(join(current, ".git"))) return current;
+    if (dirname(current) === current) return canonicalRoot;
+  }
+}
+
+/**
+ * Fix round 1: the endpoints file holds live bearers, so it may never land in the
+ * tracked tree — a bare `--endpoints e.json` resolves from the cwd, which `pnpm run`
+ * makes the engine root. Inside the repository it must sit under a `.local/`
+ * directory (git-ignored); outside, anywhere. Links are resolved first, so a path
+ * cannot reach into the tree through one.
+ */
+function assertEndpointsPathUntracked(endpointsPath: string, repositoryRoot: string): void {
+  const boundary = repositoryBoundaryOf(repositoryRoot);
+  const fromBoundary = relative(boundary, canonicalPath(endpointsPath));
+  const outside = isAbsolute(fromBoundary) || fromBoundary === ".." || fromBoundary.startsWith(`..${sep}`);
+  if (outside) return;
+  if (fromBoundary === "" || !fromBoundary.split(sep).slice(0, -1).includes(".local")) {
+    throw new TypeError("RELAY_HOST_ENDPOINTS_PATH_REFUSED");
+  }
+}
+
 export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHostHandle> {
   assertRelayHostRuntime(options.environment);
+  const seams = options.seams ?? {};
+  if (seams.repositoryRoot !== undefined && process.env.NODE_ENV !== "test") {
+    throw new TypeError("RELAY_HOST_TEST_ONLY_REPOSITORY_ROOT_FORBIDDEN");
+  }
   const timeoutMs = options.timeoutMs ?? RELAY_HOST_DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new TypeError("RELAY_HOST_TIMEOUT_INVALID");
   const emit = options.emit ?? ((line: string) => { process.stdout.write(`${line}\n`); });
+  const repositoryRoot = seams.repositoryRoot ?? RELAY_HOST_ENGINE_ROOT;
+  const endpointsPath = options.endpointsPath === undefined
+    ? join(resolve(repositoryRoot), RELAY_HOST_DEFAULT_ENDPOINTS_PATH)
+    : resolve(options.endpointsPath);
+  assertEndpointsPathUntracked(endpointsPath, repositoryRoot);
   const candidates = await readRelayHostCandidates(resolve(options.candidatesPath));
-  const endpointsPath = resolve(options.endpointsPath);
-  const seams = options.seams ?? {};
+  try {
+    await mkdir(dirname(endpointsPath), { recursive: true, mode: 0o700 });
+  } catch {
+    throw new TypeError("RELAY_HOST_ENDPOINTS_WRITE_FAILED");
+  }
   const settled = await Promise.allSettled(candidates.map((candidate) =>
     startVerifiedRelay(candidate, timeoutMs, seams)
   ));
-  const started: { readonly candidate: RelayHostCandidate; readonly relay: StartedRelay }[] = [];
-  settled.forEach((outcome, index) => {
-    const candidate = candidates[index]!;
-    if (outcome.status === "fulfilled") started.push({ candidate, relay: outcome.value });
-    else emit(`RELAY ABSENT ${candidate.providerRef} ${failureCodeOf(outcome.reason)}`);
-  });
+  // Fix round 1: every started relay is known, and closable, BEFORE any line is
+  // emitted — an `emit` that throws must not strand a relay it never reported.
+  const started = settled.flatMap((outcome, index) =>
+    outcome.status === "fulfilled" ? [{ candidate: candidates[index]!, relay: outcome.value }] : []
+  );
   const closeAll = async (): Promise<void> => {
     await Promise.allSettled(started.map(({ relay }) => relay.close()));
   };
-  if (started.length === 0) throw new TypeError("RELAY_HOST_NO_RELAY_STARTED");
+  let written = false;
   let endpoints: readonly RelayHostEndpoint[];
   try {
+    settled.forEach((outcome, index) => {
+      if (outcome.status === "rejected") {
+        emit(`RELAY ABSENT ${candidates[index]!.providerRef} ${failureCodeOf(outcome.reason)}`);
+      }
+    });
+    if (started.length === 0) throw new TypeError("RELAY_HOST_NO_RELAY_STARTED");
     endpoints = Object.freeze(started.map(({ candidate, relay }) => Object.freeze({
       providerRef: candidate.providerRef,
       maker: relay.maker,
@@ -262,28 +333,41 @@ export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHo
       contextWindowTokens: relay.contextWindowTokens ?? null
     })));
     await writeEndpointsFile(endpointsPath, endpoints);
+    written = true;
+    emit(`RELAYS SERVING ${endpoints.length} ${endpointsPath}`);
   } catch (error) {
+    if (written) await rm(endpointsPath, { force: true }).catch(() => undefined);
     await closeAll();
     throw error;
   }
-  emit(`RELAYS SERVING ${endpoints.length} ${endpointsPath}`);
   let stopping: Promise<void> | undefined;
   return Object.freeze({
     endpoints,
     stop() {
       stopping ??= (async () => {
+        // Fix round 1: the bearers go FIRST, synchronously on the call, before any
+        // relay is closed — a shutdown cut short never leaves the file behind.
+        let removal: unknown = null;
+        try {
+          rmSync(endpointsPath, { force: true });
+        } catch (error) {
+          removal = error;
+        }
         await closeAll();
-        await rm(endpointsPath, { force: true });
+        if (removal !== null) throw new TypeError("RELAY_HOST_ENDPOINTS_REMOVE_FAILED");
       })();
       return stopping;
     }
   });
 }
 
-/** `--candidates <file> --endpoints <file> [--timeout-ms <n>]`; a leading `--` (pnpm) is ignored. */
+/**
+ * `--candidates <file> [--endpoints <file>] [--timeout-ms <n>]`; a leading `--` (pnpm) is
+ * ignored. Without `--endpoints` the file goes to RELAY_HOST_DEFAULT_ENDPOINTS_PATH.
+ */
 export function parseRelayHostArguments(argv: readonly string[]): Readonly<{
   candidatesPath: string;
-  endpointsPath: string;
+  endpointsPath?: string;
   timeoutMs?: number;
 }> {
   const tokens = argv[0] === "--" ? argv.slice(1) : argv;
@@ -300,33 +384,40 @@ export function parseRelayHostArguments(argv: readonly string[]): Readonly<{
   const candidatesPath = values.get("--candidates");
   const endpointsPath = values.get("--endpoints");
   const timeoutText = values.get("--timeout-ms");
-  if (candidatesPath === undefined || endpointsPath === undefined
+  if (candidatesPath === undefined
     || (timeoutText !== undefined && !/^[1-9][0-9]{0,8}$/u.test(timeoutText))) {
     throw new TypeError("RELAY_HOST_ARGUMENTS_INVALID");
   }
   return Object.freeze({
     candidatesPath,
-    endpointsPath,
+    ...(endpointsPath === undefined ? {} : { endpointsPath }),
     ...(timeoutText === undefined ? {} : { timeoutMs: Number(timeoutText) })
   });
 }
 
 export async function main(
   argv: readonly string[],
-  signals: Pick<NodeJS.EventEmitter, "once" | "off"> = process,
+  signals: Pick<NodeJS.EventEmitter, "on" | "off"> = process,
   environment: Readonly<Record<string, string | undefined>> = process.env
 ): Promise<void> {
-  const host = await serveRelayHost({ ...parseRelayHostArguments(argv), environment });
-  await new Promise<void>((resolveStop) => {
-    const stop = (): void => {
-      signals.off("SIGTERM", stop);
-      signals.off("SIGINT", stop);
-      resolveStop();
-    };
-    signals.once("SIGTERM", stop);
-    signals.once("SIGINT", stop);
-  });
-  await host.stop();
+  const options = parseRelayHostArguments(argv);
+  // Fix round 1: the handlers go in BEFORE the start-up handshakes and stay in
+  // until the stop has FINISHED. A signal during start-up still ends in a clean
+  // stop, and a second Ctrl-C cannot fall through to the default handler and
+  // exit before the endpoints file is deleted.
+  let requestStop: () => void = () => undefined;
+  const stopRequested = new Promise<void>((resolveStop) => { requestStop = resolveStop; });
+  const onSignal = (): void => { requestStop(); };
+  signals.on("SIGTERM", onSignal);
+  signals.on("SIGINT", onSignal);
+  try {
+    const host = await serveRelayHost({ ...options, environment });
+    await stopRequested;
+    await host.stop();
+  } finally {
+    signals.off("SIGTERM", onSignal);
+    signals.off("SIGINT", onSignal);
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

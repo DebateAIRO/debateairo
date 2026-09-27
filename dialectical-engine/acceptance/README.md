@@ -128,16 +128,21 @@ maker's `classifyUsageCap` together with a test that replays the capture.
 Local and operator-only: it refuses in the hosted deployment before it reads a
 file. Write a candidates file, `{"candidates":[{"providerRef":"local:pi-glm","tool":"pi","modelId":"glm-5.3-flash","thinkingLevels":["low","high"]}]}`,
 where `tool` is one of `claude`, `codex`, `grok`, `agy`, `pi`, then run
-`pnpm run relays:serve -- --candidates <file> --endpoints <file>`. One relay starts
+`pnpm run relays:serve -- --candidates <file>`. One relay starts
 per candidate on its own loopback port with its own bearer. A candidate whose CLI
 answers as a different model than `modelId`, or cannot run one of its
 `thinkingLevels`, is left out with a `RELAY ABSENT <providerRef> <code>` line. For
 `agy`, `modelId` is the base id without the level suffix and `thinkingLevels` lists
-the suffixes to serve. The endpoints file is written with mode 0600:
+the suffixes to serve. The endpoints file is written with mode 0600, by default to
+`.local/relays/endpoints.json` under this engine directory (git-ignored). Add
+`--endpoints <file>` to put it elsewhere: outside the repository, or under any
+`.local/` directory inside it. Any other path inside the repository is refused
+(`RELAY_HOST_ENDPOINTS_PATH_REFUSED`), because the file holds live bearers. Its shape is
 `{relays:[{providerRef, maker, tool, modelId, baseUrl, bearerToken, thinkingLevels, contextWindowTokens}]}`,
 where `baseUrl` already ends in `/v1` and `bearerToken` is the value after `Bearer `.
-The host runs until SIGTERM or Ctrl-C, then closes every relay and deletes the
-endpoints file.
+The host runs until SIGTERM or Ctrl-C, even one that arrives during start-up. It
+then deletes the endpoints file first and closes every relay; a second Ctrl-C
+does not cut that short.
 
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size

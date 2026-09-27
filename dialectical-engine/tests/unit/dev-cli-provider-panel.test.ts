@@ -1,6 +1,8 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { createServer, type AddressInfo, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import { canonicalRegisterJson, computeRegisterSnapshotSha256, parseRegisterVersionText } from "@debateai/register";
 import { describe, expect, it, vi } from "vitest";
@@ -11,8 +13,22 @@ import {
   type DevelopmentCliProviderPanelOperations,
   type DevelopmentCliRelay
 } from "../../apps/runner/src/dev-cli-provider-panel.js";
-import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+import {
+  DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE,
+  type DevelopmentAuthStackProfile
+} from "../../apps/runner/src/dev-auth-stack-profile.js";
 import { parseDevelopmentProviderPanelTargets } from "../../apps/runner/src/dev-provider-panel.js";
+import { AGY_DEFAULT_MODEL, AGY_MODEL_LEVEL_SUFFIXES, startAgyRelay } from "../../acceptance/agy-relay.js";
+import { CLAUDE_THINKING_LEVELS, startClaudeRelay } from "../../acceptance/claude-relay.js";
+import { GROK_THINKING_LEVELS, startGrokRelay } from "../../acceptance/grok-relay.js";
+import { CODEX_THINKING_LEVELS, startModelShim } from "../../acceptance/model-shim.js";
+import {
+  PI_DEFAULT_MODEL,
+  PI_GLM_CONTEXT_WINDOW_TOKENS,
+  PI_THINKING_LEVELS,
+  startPiRelay
+} from "../../acceptance/pi-relay.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 function relay(port: number, maker: string, model: string): DevelopmentCliRelay & {
@@ -281,5 +297,107 @@ describe("§2.2/§2.10 the development panel declares each healthy relay's level
 
     expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(foreign)))
       .toThrow("DEV_CLI_PROVIDER_PANEL_THINKING_PARAMETER_INVALID");
+  });
+
+  it("refuses an ABSENT slot that declares levels or a window, because nothing answered to declare them", () => {
+    const rows = JSON.parse(TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+    // Rows 4 (grok), 5 (agy) and 6 (pi) are absent in the fixture.
+    const withAbsent = (index: number, declaration: Readonly<Record<string, unknown>>) =>
+      JSON.stringify(rows.map((row, at) => at === index ? { ...row, ...declaration } : row));
+
+    expect(rows[4]).toMatchObject({ model: "CLI_HANDSHAKE_UNAVAILABLE" });
+    expect(() => parseDevelopmentProviderPanelTargets(withAbsent(4, {
+      thinking_parameter: "x_thinking_level", thinking_levels: ["low"]
+    }))).toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_INVALID");
+    expect(() => parseDevelopmentProviderPanelTargets(withAbsent(6, { context_window_tokens: 1_000_000 })))
+      .toThrow("DEV_CLI_PROVIDER_PANEL_TARGET_INVALID");
+    // Control: the same declarations on a HEALTHY row round-trip.
+    expect(() => parseDevelopmentProviderPanelTargets(withAbsent(0, {
+      thinking_parameter: "x_thinking_level", thinking_levels: ["low"], context_window_tokens: 1_000_000
+    }))).not.toThrow();
+  });
+});
+
+describe("§2.2/§2.10 the REAL relay start functions' declarations reach the dev targets", () => {
+  const fixture = (name: string): string =>
+    fileURLToPath(new URL(`../../acceptance/test-fixtures/${name}`, import.meta.url));
+  const fake = (name: string) => ({ binary: process.execPath, prefixArguments: [fixture(name)] });
+  const CALL_TIMEOUT_MS = 10_000;
+
+  /** Seven distinct free loopback ports, held together so none repeats, then released. */
+  async function freePorts(): Promise<DevelopmentAuthStackProfile["providerPorts"]> {
+    const servers = await Promise.all(Array.from({ length: 7 }, () => new Promise<Server>((resolve, reject) => {
+      const server = createServer();
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => resolve(server));
+    })));
+    const ports = servers.map((server) => (server.address() as AddressInfo).port);
+    await Promise.all(servers.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
+    return Object.freeze([ports[0]!, ports[1]!, ports[2]!, ports[3]!, ports[4]!, ports[5]!, ports[6]!] as const);
+  }
+
+  it("writes each relay's OWN level list and pi's OWN window, with no hand-supplied value in between", async () => {
+    // A profile on free ports, so this never collides with a running dev stack.
+    const profile: DevelopmentAuthStackProfile = Object.freeze({
+      ...DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+      providerPorts: await freePorts()
+    });
+    const absent = async (): Promise<DevelopmentCliRelay> => { throw new Error("not started in this test"); };
+    // The production wiring's start functions, reached through their test-only
+    // CLI seams (refused outside NODE_ENV=test); nothing here restates a level.
+    const handle = await startDevelopmentCliProviderPanel(Object.freeze({
+      starts: Object.freeze([
+        (port: number) => startModelShim({
+          port,
+          timeoutMs: CALL_TIMEOUT_MS,
+          model: "gpt-5.6-sol",
+          testOnlyCommand: fake("fake-codex-cli.mjs"),
+          testOnlySessionsRoot: fixture("codex-sessions")
+        }),
+        absent,
+        (port: number) => startClaudeRelay({
+          port, timeoutMs: CALL_TIMEOUT_MS, testOnlyCommand: fake("fake-claude-cli.mjs")
+        }),
+        absent,
+        (port: number) => startGrokRelay({
+          port, timeoutMs: CALL_TIMEOUT_MS, sandboxProfile: "none", testOnlyCommand: fake("fake-grok-cli.mjs")
+        }),
+        (port: number) => startAgyRelay({
+          port, timeoutMs: CALL_TIMEOUT_MS, model: AGY_DEFAULT_MODEL, testOnlyCommand: fake("fake-agy-cli.mjs")
+        }),
+        (port: number) => startPiRelay({
+          port, timeoutMs: CALL_TIMEOUT_MS, model: PI_DEFAULT_MODEL, testOnlyCommand: fake("fake-pi-cli.mjs")
+        })
+      ] as const)
+    }), profile);
+    try {
+      const rows = JSON.parse(handle.panel.targetsJson) as readonly Readonly<Record<string, unknown>>[];
+      const declared = rows.map((row) => ({
+        provider_ref: row.provider_ref,
+        thinking_parameter: row.thinking_parameter,
+        thinking_levels: row.thinking_levels,
+        context_window_tokens: row.context_window_tokens
+      }));
+      const levels = (list: readonly string[]) => ({ thinking_parameter: "x_thinking_level", thinking_levels: [...list] });
+      expect(declared).toEqual([
+        { provider_ref: "development:codex-cli", ...levels(CODEX_THINKING_LEVELS) },
+        { provider_ref: "development:codex-premium-cli" },
+        { provider_ref: "development:claude-cli", ...levels(CLAUDE_THINKING_LEVELS) },
+        { provider_ref: "development:claude-premium-cli" },
+        { provider_ref: "development:grok-cli", ...levels(GROK_THINKING_LEVELS) },
+        { provider_ref: "development:agy-cli", ...levels(AGY_MODEL_LEVEL_SUFFIXES) },
+        { provider_ref: "development:pi-glm-cli", ...levels(PI_THINKING_LEVELS), context_window_tokens: PI_GLM_CONTEXT_WINDOW_TOKENS }
+      ]);
+      expect(rows[6]!.context_window_tokens).toBe(1_000_000);
+      // The parsed target the gateway is built from carries the same three facts.
+      expect(handle.panel.targets[6]).toMatchObject({
+        providerRef: "development:pi-glm-cli",
+        thinkingParameter: "x_thinking_level",
+        thinkingLevels: [...PI_THINKING_LEVELS],
+        contextWindowTokens: 1_000_000
+      });
+    } finally {
+      await handle.stop();
+    }
   });
 });
