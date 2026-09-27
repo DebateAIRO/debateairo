@@ -119,7 +119,6 @@ export function LanguageSwitcher() {
           }
         }}
       >
-        <span className="languageSwitcherFlag" aria-hidden>{current.flag}</span>
         <span className="languageSwitcherCode">{current.code.toUpperCase()}</span>
         <span className="languageSwitcherCaret" aria-hidden>{languageSwitcherCaret(open)}</span>
       </button>
@@ -136,7 +135,6 @@ export function LanguageSwitcher() {
             <span className="languageSwitcherTitle">{t(catalog, "chrome.interfaceLanguage")}</span>
             <span className="languageSwitcherCount">{LOCALES.length}</span>
             <span className="languageSwitcherCurrent">
-              <span aria-hidden>{current.flag}</span>
               <span>{current.code.toUpperCase()}</span>
             </span>
           </div>
@@ -187,7 +185,6 @@ export function LanguageSwitcher() {
                           onFocus={() => setHighlightedCode(candidate.code as LocaleCode)}
                           onClick={() => select(candidate.code as LocaleCode)}
                         >
-                          <span className="languageSwitcherFlag" aria-hidden>{candidate.flag}</span>
                           <span className="languageSwitcherRowCode">{candidate.code.toUpperCase()}</span>
                           <span className="languageSwitcherName">{candidate.nativeName}</span>
                           <span className="languageSwitcherCheck" aria-hidden />
