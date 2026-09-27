@@ -13,7 +13,7 @@ import {
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
 import { BudgetRepository, type CostEnvelopePhase } from "@debateai/budget";
-import { ProviderProbeRepository, RunRepository, ServeDisclosureRepository, migrate } from "@debateai/db";
+import { ProviderProbeRepository, RunRepository, ServeDisclosureRepository, migrate, type StoredServeDisclosure } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
 import {
@@ -5699,6 +5699,15 @@ async function serveLedger(runId: string): Promise<readonly Readonly<{ call_site
   return rows.rows;
 }
 
+/**
+ * The answer's disclosure row, through the repository's own read (the operator
+ * report's: the latest version that has a row, no ownership). Every runner case
+ * here writes one answer version, so that is version 1's row.
+ */
+async function disclosureRowOf(answerId: string): Promise<StoredServeDisclosure | null> {
+  return (await new ServeDisclosureRepository(database.pool).readLatestForOperator(answerId))?.row ?? null;
+}
+
 function answerIdOf(scenario: Readonly<{ result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null }>): string {
   if (scenario.result?.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
   return scenario.result.answerId;
@@ -6260,6 +6269,117 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
     });
     // Task M5: round 1's checker died after its draft was written; the floor keeps the label.
     await expectFloor(scenario, "TRANSPORT_DEATH");
+  });
+
+  /**
+   * FINAL REVIEW, Important 1 (spec §14.4.2, §14.4.9) — A CHEAPER MAKER'S
+   * CONTENT FAILURE IS "NO ARTIFACT", NEVER A FAILED RUN. The planned maker is
+   * refused for money, the cheaper one answers, and its draft or verdict is
+   * refused for its content after its repairs (the fixture's bound allows one
+   * attempt). Before, that contract error travelled as itself and the run
+   * FAILED — in round 2 losing the complete round 1 as well. Now round 1 ends
+   * components-only and the floor answers; round 2 keeps round 1. The PLANNED
+   * maker's own contract failure still fails the run ("writes no floor, and no
+   * row, for a run that FAILED on a contract error …", Task M5 below).
+   */
+  it.each([
+    {
+      role: "writer",
+      primarySeam: () => moneySeam({ refuseServe: "ALL" }),
+      primaryServe: [] as readonly string[],
+      secondaryServe: ["this is not a composition"],
+      ledger: [{ call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: SECONDARY_REF, outcome: "FAILED" }]
+    },
+    {
+      role: "checker",
+      primarySeam: () => moneySeam({ refuseServe: [2] }),
+      primaryServe: [resil01Composition],
+      secondaryServe: ["this is not a verdict"],
+      ledger: [
+        { call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: PRIMARY_REF, outcome: "OK" },
+        { call_site_key: "POST_COMPOSE_R9:EVALUATOR:1", actor_ref: SECONDARY_REF, outcome: "FAILED" }
+      ]
+    }
+  ])("ends round 1 components-only with the floor, never FAILED, when the cheaper $role's content fails after a money refusal (final review I-1)", async (input) => {
+    const debate = fullDebate(`Primary final I-1 round-one ${input.role}`);
+    const secondaryDebate = fullDebate(`Secondary final I-1 round-one ${input.role}`);
+    const primarySeam = input.primarySeam();
+    const scenario = await executeResil01Scenario({
+      label: `final-i1-round-one-${input.role}`,
+      primary: [...debate.judgements, ...debate.reviews, ...input.primaryServe],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews, ...input.secondaryServe],
+      primaryCostEnvelope: primarySeam.build
+    });
+
+    // Not FAILED: the sealed answer is components-only and the floor keeps the label.
+    const row = await expectFloor(scenario, "NO_ARTIFACT");
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    // The planned maker was refused before sending; the cheaper one answered and was refused for its content.
+    expect(await serveLedger(scenario.runId)).toEqual(input.ledger);
+    expect(row).toMatchObject({
+      writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
+      writerServedRef: null, checkerServedRef: null,
+      writerFallback: false, checkerFallback: false, fallbackReason: null,
+      serveStop: "NO_ARTIFACT", digestRung: 0, digestPointsOmitted: 0
+    });
+  });
+
+  it.each([
+    {
+      role: "writer",
+      refused: 3,
+      primaryServe: [resil01Composition, evaluatorObjecting("Round one is unfair to the losing side.")],
+      secondaryServe: ["this is not a composition"],
+      roundTwo: [{ call_site_key: "COMPOSER:SYNTHESIZER:RETRY:2", actor_ref: SECONDARY_REF, outcome: "FAILED" }]
+    },
+    {
+      role: "checker",
+      refused: 4,
+      primaryServe: [resil01Composition, evaluatorObjecting("Round one is unfair to the losing side."), m3RoundTwoComposition],
+      secondaryServe: ["this is not a verdict"],
+      roundTwo: [
+        { call_site_key: "COMPOSER:SYNTHESIZER:RETRY:2", actor_ref: PRIMARY_REF, outcome: "OK" },
+        { call_site_key: "POST_COMPOSE_R9:EVALUATOR:2", actor_ref: SECONDARY_REF, outcome: "FAILED" }
+      ]
+    }
+  ])("keeps the complete round 1 when round 2's cheaper $role fails its content after a money refusal (final review I-1)", async (input) => {
+    const debate = fullDebate(`Primary final I-1 round-two ${input.role}`);
+    const secondaryDebate = fullDebate(`Secondary final I-1 round-two ${input.role}`);
+    const scenario = await executeResil01Scenario({
+      label: `final-i1-round-two-${input.role}`,
+      primary: [...debate.judgements, ...debate.reviews, ...input.primaryServe],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews, ...input.secondaryServe],
+      primaryCostEnvelope: moneySeam({ refuseServe: [input.refused] }).build
+    });
+
+    // Served — before, the round-2 contract error failed the run and round 1 was lost.
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.serve_state).toBe("COMPOSED");
+    const texts = scenario.answer?.composed_text.map((segment) => segment.text) ?? [];
+    expect(texts).toContain("The judged position survives.");
+    expect(texts).not.toContain("A round-two rewrite nobody checked.");
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    // Round 1's own objection stands; no draft is invented and no spend stop is claimed.
+    expect(scenario.answer?.condition_marks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(scenario.answer?.condition_marks).not.toContain("DEFECT");
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    expect(await serveLedger(scenario.runId)).toEqual([
+      { call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: PRIMARY_REF, outcome: "OK" },
+      { call_site_key: "POST_COMPOSE_R9:EVALUATOR:1", actor_ref: PRIMARY_REF, outcome: "OK" },
+      ...input.roundTwo
+    ]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
+      writerFallback: false, checkerFallback: false, fallbackReason: null,
+      serveStop: "NO_ARTIFACT",
+      ...WHOLE_DIGEST_NO_FLOOR
+    });
   });
 
   it("records the stop while arguing and the points it left unreviewed, for a served answer with no fallback", async () => {

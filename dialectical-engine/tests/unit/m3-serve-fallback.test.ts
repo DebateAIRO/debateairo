@@ -30,6 +30,7 @@ import {
   buildServeDisclosureRecord,
   buildSynthesizerPromptPacket,
   callServeRoleWithFallback,
+  fallbackContentRefusal,
   serveDisclosureBodyFacts,
   servePhaseFallbackOrder,
   serveLoopStopOf,
@@ -473,6 +474,110 @@ describe("M3 · the answer-writer and checker adapters: a money refusal tries th
       call
     })).rejects.toBe(death);
     expect(calls.map((entry) => entry.providerRef)).toEqual(["provider:planned", "provider:dies"]);
+  });
+
+  /**
+   * FINAL REVIEW, Important 1 (spec §14.4.2, §14.4.9). A cheaper maker is only
+   * ever asked because the planned one could not be paid. When its draft or
+   * verdict is then refused for its CONTENT after its own repairs, it has left
+   * nothing the engine may serve: SYNTHESIS_NO_ARTIFACT, the sealed chain's own
+   * class. Round 1 then ends components-only and the floor answers; a later
+   * round keeps the complete round before it. Before this, the contract error
+   * travelled as itself, the run ended FAILED, and a complete round 1 was lost.
+   */
+  it.each([
+    ["the writer's contract error", "COMPOSITION_CONTRACT_ERROR"],
+    ["the checker's contract error", "EVALUATOR_CONTRACT_ERROR"],
+    ["an incoherent verdict", "EVALUATOR_VERDICT_INCOHERENT"],
+    ["a verdict with no objection", "EVALUATOR_OBJECTION_MISSING"]
+  ] as const)("turns %s from a FALLBACK into SYNTHESIS_NO_ARTIFACT, which keeps a round and names NO_ARTIFACT (final review I-1)", async (_name, code) => {
+    const calls: Recorded[] = [];
+    const planned = maker("provider:planned", "REFUSES_MONEY", calls);
+    const refused = new TypedDomainError(code, "test-layer: the fallback's content");
+    const request = synthesizerCall("Short.");
+    const failure = await callServeRoleWithFallback({
+      planned,
+      claimEligible: [planned, maker("provider:refused", refused, calls), maker("provider:fits", "ANSWERS", calls)],
+      prices: new Map(),
+      preferNot: null,
+      request,
+      call,
+      onFallbackFailure: fallbackContentRefusal
+    }).then(() => null, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(TypedDomainError);
+    expect((failure as TypedDomainError).code).toBe("SYNTHESIS_NO_ARTIFACT");
+    // Codes and call sites only: never the model's words.
+    expect((failure as TypedDomainError).message).toBe(
+      `The cost fallback's SYNTHESIZER at ${request.callSiteKey} left nothing to serve: ${code}`
+    );
+    expect((failure as TypedDomainError).cause).toBe(refused);
+    // The search still ends at that maker: no third maker is asked.
+    expect(calls.map((entry) => entry.providerRef)).toEqual(["provider:planned", "provider:refused"]);
+    // It is a failure the loop keeps a complete round for, and the owner's row names it.
+    expect(keepsCompleteSynthesisRounds(failure)).toBe(true);
+    expect(serveLoopStopOf(failure)).toBe("NO_ARTIFACT");
+  });
+
+  it("leaves the PLANNED maker's own contract error as it is, even with the mapping wired (an owner question)", async () => {
+    const calls: Recorded[] = [];
+    const contract = new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "test-layer: the planned maker's content");
+    const planned = maker("provider:planned", contract, calls);
+    await expect(callServeRoleWithFallback({
+      planned,
+      claimEligible: [planned, maker("provider:healthy", "ANSWERS", calls)],
+      prices: new Map(),
+      preferNot: null,
+      request: synthesizerCall("Short."),
+      call,
+      onFallbackFailure: fallbackContentRefusal
+    })).rejects.toBe(contract);
+    expect(calls.map((entry) => entry.providerRef)).toEqual(["provider:planned"]);
+  });
+
+  it.each([
+    ["a dead transport", new TypedDomainError("SYNTHESIS_TRANSPORT_DEATH", "dead")],
+    ["the attempt ceiling", new TypedDomainError("RUN_COST_ENVELOPE_EXHAUSTED", "attempts")],
+    ["an untyped failure", new Error("boom")],
+    ["a code-shaped object", { code: "COMPOSITION_CONTRACT_ERROR" }]
+  ])("lets %s from a fallback travel as itself: only a content refusal is mapped", async (_name, failure) => {
+    const calls: Recorded[] = [];
+    const planned = maker("provider:planned", "REFUSES_MONEY", calls);
+    const fallback: ServeRoleMaker = Object.freeze({
+      providerRef: "provider:fails",
+      provider: { call: async (request: ProviderCallRequest) => { calls.push({ providerRef: "provider:fails", request }); throw failure; } }
+    });
+    await expect(callServeRoleWithFallback({
+      planned,
+      claimEligible: [planned, fallback],
+      prices: new Map(),
+      preferNot: null,
+      request: synthesizerCall("Short."),
+      call,
+      onFallbackFailure: fallbackContentRefusal
+    })).rejects.toBe(failure);
+  });
+
+  it("maps nothing when the caller names no mapping (the story's own fallback)", async () => {
+    const calls: Recorded[] = [];
+    const planned = maker("provider:planned", "REFUSES_MONEY", calls);
+    const contract = new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "test-layer: content");
+    await expect(callServeRoleWithFallback({
+      planned,
+      claimEligible: [planned, maker("provider:refused", contract, calls)],
+      prices: new Map(),
+      preferNot: null,
+      request: synthesizerCall("Short."),
+      call
+    })).rejects.toBe(contract);
+  });
+
+  it("is wired into BOTH answer-writing adapters of the shipped runner, with each draft and verdict read inside the try", async () => {
+    const runner = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    expect(runner.split("onFallbackFailure: fallbackContentRefusal").length - 1).toBe(2);
+    // The draft and the verdict are parsed inside the call a fallback makes, so
+    // a fallback's content that fails the engine's own reading is mapped too.
+    expect(runner).toContain("return Object.freeze({ response, composedSegments: composedSegmentsOf(response.content) });");
+    expect(runner).toContain("return Object.freeze({ response, verdict: evaluatorVerdictOf(response.content) });");
   });
 });
 

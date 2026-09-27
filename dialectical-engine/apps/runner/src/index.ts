@@ -101,6 +101,7 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 import {
+  assertEvaluatorVerdict,
   buildFactBundle,
   compositionEvidenceRequired,
   createEnvelopeExhaustedResult,
@@ -1963,6 +1964,10 @@ function buildComposedRepairPacket(framed: FramedPrompt, rejected: {
  * is `SYNTHESIS_NO_ARTIFACT`, the sealed chain's own class. A later round then
  * keeps the complete round before it (M3), and a first round ends
  * components-only (which the M5 floor answers) — never a FAILED run.
+ *
+ * Final review I-1: a CHEAPER maker's content refusal (its organ code here) is
+ * mapped to `SYNTHESIS_NO_ARTIFACT` one level up, by `fallbackContentRefusal`,
+ * because only there is it known that the maker was a fallback.
  */
 async function callSynthesisRole(
   provider: ProviderGateway,
@@ -2146,6 +2151,11 @@ export interface ServeRoleCallOutcome<T> {
  * (STORY_COST_ENVELOPE_REACHED), not the run's, so the caller may name which
  * refusal is money (`refusedForMoney`); the answer-writer's default is the
  * run's money stop, as before.
+ *
+ * FINAL REVIEW, Important 1: a FALLBACK try's own failure passes through
+ * `onFallbackFailure` before it ends the search. The answer-writer and the
+ * checker hand it `fallbackContentRefusal`; the story hands nothing, so its
+ * failures travel as they are. The planned maker's failure is never mapped.
  */
 export async function callServeRoleWithFallback<T>(input: Readonly<{
   planned: ServeRoleMaker;
@@ -2155,6 +2165,7 @@ export async function callServeRoleWithFallback<T>(input: Readonly<{
   request: ProviderCallRequest;
   call: (maker: ServeRoleMaker, request: ProviderCallRequest) => Promise<T>;
   refusedForMoney?: (error: unknown) => boolean;
+  onFallbackFailure?: (error: unknown, request: ProviderCallRequest) => unknown;
 }>): Promise<ServeRoleCallOutcome<T>> {
   const refusedForMoney = input.refusedForMoney ?? ((error: unknown) => envelopeStopKind(error) === "MONEY");
   try {
@@ -2168,15 +2179,59 @@ export async function callServeRoleWithFallback<T>(input: Readonly<{
       request: input.request,
       preferNot: input.preferNot
     })) {
+      const fallbackRequest = { ...input.request, providerRef: maker.providerRef };
       try {
-        const result = await input.call(maker, { ...input.request, providerRef: maker.providerRef });
+        const result = await input.call(maker, fallbackRequest);
         return Object.freeze({ result, servedBy: maker, fallback: true });
       } catch (error) {
-        if (!refusedForMoney(error)) throw error;
+        if (!refusedForMoney(error)) {
+          throw input.onFallbackFailure === undefined ? error : input.onFallbackFailure(error, fallbackRequest);
+        }
       }
     }
     throw refusal;
   }
+}
+
+/**
+ * FINAL REVIEW, Important 1 (spec §14.4.2, §14.4.9) — A CHEAPER MAKER THAT
+ * LEAVES NOTHING TO SERVE.
+ *
+ * A cheaper maker is asked only because the planned one could not be paid.
+ * When its draft or verdict is then refused for its CONTENT after its own
+ * repairs — the writer's or the checker's contract, or a verdict whose
+ * criteria disagree with it — it has produced nothing the engine may serve:
+ * `SYNTHESIS_NO_ARTIFACT`, the sealed chain's own class, exactly as a writer
+ * whose repairs never stop naming an id (Task M4, I-1). A later round then
+ * keeps the complete round before it (M3), and round 1 ends components-only,
+ * which the floor answers (M5). Money is never the reason a run FAILS, and a
+ * complete round is never thrown away for it. The owner's row names the stop
+ * (`serve_stop` NO_ARTIFACT).
+ *
+ * The PLANNED maker's own contract failure keeps today's handling: the run
+ * fails (pinned in tests/integration/database.test.ts, "writes no floor, and
+ * no row, for a run that FAILED on a contract error"). Whether it should also
+ * count as NO_ARTIFACT is an owner question. Any other failure — a dead
+ * transport, a spend stop, anything untyped — travels as itself.
+ */
+export const FALLBACK_CONTENT_REFUSAL_CODES: readonly string[] = Object.freeze([
+  "COMPOSITION_CONTRACT_ERROR",
+  "EVALUATOR_CONTRACT_ERROR",
+  "EVALUATOR_VERDICT_INCOHERENT",
+  "EVALUATOR_OBJECTION_MISSING"
+]);
+
+export function fallbackContentRefusal(
+  error: unknown,
+  request: Pick<ProviderCallRequest, "role" | "callSiteKey">
+): unknown {
+  if (!(error instanceof TypedDomainError) || !FALLBACK_CONTENT_REFUSAL_CODES.includes(error.code)) return error;
+  const noArtifact = new TypedDomainError(
+    "SYNTHESIS_NO_ARTIFACT",
+    `The cost fallback's ${request.role} at ${request.callSiteKey} left nothing to serve: ${error.code}`
+  );
+  noArtifact.cause = error;
+  return noArtifact;
 }
 
 /**
@@ -5822,6 +5877,46 @@ export class WalkingSkeletonRunner {
         // engine's own `instructions`, with nothing saying which was which.
         const framed = buildSynthesizerFramedPrompt(request,run.argumentLanguageName);
         const packet = framed.packet;
+        /**
+         * The draft as the engine reads it. Final review I-1: it is read INSIDE
+         * the call each maker makes, so a cheaper maker's draft that this
+         * reading refuses is that maker's content failure (`fallbackContentRefusal`).
+         * For the planned maker nothing changes: the same codes end the run.
+         */
+        const composedSegmentsOf = (content: string): readonly ComposedSegment[] => {
+          const parsed = parseComposerOutput(content);
+          const segments = parsed.segments.map((segment) => {
+            if (segment.segment_id === "memory:disclosure") {
+              throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "The memory disclosure segment id is reserved for the typed renderer");
+            }
+            return Object.freeze({
+            segmentId: segment.segment_id,
+            text: segment.text,
+            loadBearing: false,
+            // J23: a citation may name ANY node the digest carries, by the ref the
+            // digest showed it under — its real id at rungs 0-5, its short ref at
+            // the compact and spine rungs (Task M4) — and is mapped back to the
+            // real id HERE, the one mapping point, before the sealed checks.
+            // `"primary"` stays admissible as the served root's alias so sealed
+            // prompts and fixtures written against the one-node set keep working;
+            // an unknown ref is still a loud contract error.
+            assertedNodeRefs: Object.freeze(segment.node_refs.map((ref) => composedNodeIdOf({
+              ref,
+              digest: request.digest,
+              servedRootNodeId: servedRoot.nodeId,
+              servedNodes
+            }))),
+            servedNumberRefs: Object.freeze([...segment.served_number_refs])
+            });
+          });
+          // The sealed chain refuses repeated segment ids with this same code;
+          // read here first, so a fallback's draft that repeats one is its content
+          // failure too. The planned maker's run ends exactly as it did.
+          if (new Set(segments.map((segment) => segment.segmentId)).size !== segments.length) {
+            throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composed segment ids must be stable and unique");
+          }
+          return segments;
+        };
         // Task M3 (spec §14.4.2): refused for MONEY, this SAME request — call
         // site, framed prompt, bound — is offered to the cheaper claim-eligible
         // makers; only the provider changes, and the seam decides what fits.
@@ -5833,7 +5928,11 @@ export class WalkingSkeletonRunner {
           claimEligible: synthesisMakers,
           prices: servePrices,
           preferNot: synthesisRoles.evaluatorRoleRef,
-          call: (maker, call) => callSynthesisRole(maker.provider, call, "COMPOSITION_CONTRACT_ERROR"),
+          call: async (maker, call) => {
+            const response = await callSynthesisRole(maker.provider, call, "COMPOSITION_CONTRACT_ERROR");
+            return Object.freeze({ response, composedSegments: composedSegmentsOf(response.content) });
+          },
+          onFallbackFailure: fallbackContentRefusal,
           request: {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
@@ -5866,32 +5965,7 @@ export class WalkingSkeletonRunner {
           buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)
           }
         }));
-        const response = served.result;
-        const parsed = parseComposerOutput(response.content);
-        const composedSegments = parsed.segments.map((segment) => {
-          if (segment.segment_id === "memory:disclosure") {
-            throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "The memory disclosure segment id is reserved for the typed renderer");
-          }
-          return Object.freeze({
-          segmentId: segment.segment_id,
-          text: segment.text,
-          loadBearing: false,
-          // J23: a citation may name ANY node the digest carries, by the ref the
-          // digest showed it under — its real id at rungs 0-5, its short ref at
-          // the compact and spine rungs (Task M4) — and is mapped back to the
-          // real id HERE, the one mapping point, before the sealed checks.
-          // `"primary"` stays admissible as the served root's alias so sealed
-          // prompts and fixtures written against the one-node set keep working;
-          // an unknown ref is still a loud contract error.
-          assertedNodeRefs: Object.freeze(segment.node_refs.map((ref) => composedNodeIdOf({
-            ref,
-            digest: request.digest,
-            servedRootNodeId: servedRoot.nodeId,
-            servedNodes
-          }))),
-          servedNumberRefs: Object.freeze([...segment.served_number_refs])
-          });
-        });
+        const { response, composedSegments } = served.result;
         const renderedMemory = renderMemorySentence(factBundle.memoryDisclosure);
         validateMemorySentence(factBundle.memoryDisclosure, renderedMemory);
         const partitioned = partitionServedSegments(composedSegments, renderedMemory);
@@ -5938,6 +6012,26 @@ export class WalkingSkeletonRunner {
         const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
         const framed = buildEvaluatorFramedPrompt(request,run.argumentLanguageName);
         const packet = framed.packet;
+        /**
+         * The verdict as the engine reads it, its coherence included (the loop
+         * checks it again, unchanged). Final review I-1: read INSIDE the call
+         * each maker makes, like the writer's draft, so a cheaper checker whose
+         * verdict this reading refuses has left nothing to serve.
+         */
+        const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
+          const parsed = parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+          return assertEvaluatorVerdict(Object.freeze({
+            satisfied: parsed.satisfied,
+            objection: parsed.objection,
+            criteria: Object.freeze({
+              fairnessToLosers: parsed.criteria.fairness_to_losers,
+              statementLabelAgreement: parsed.criteria.statement_label_agreement,
+              noOverstatement: parsed.criteria.no_overstatement,
+              restatement: parsed.criteria.restatement,
+              citationTracing: parsed.criteria.citation_tracing
+            })
+          }));
+        };
         // Task M3 (spec §14.4.2): the checker's cost fallback prefers a maker
         // other than the one that wrote the draft it checks, and takes that one
         // only when nothing else fits (the disclosure row records it, R9).
@@ -5946,7 +6040,11 @@ export class WalkingSkeletonRunner {
           claimEligible: synthesisMakers,
           prices: servePrices,
           preferNot: draftWriterByRound.get(request.round) ?? null,
-          call: (maker, call) => callSynthesisRole(maker.provider, call, "EVALUATOR_CONTRACT_ERROR"),
+          call: async (maker, call) => {
+            const response = await callSynthesisRole(maker.provider, call, "EVALUATOR_CONTRACT_ERROR");
+            return Object.freeze({ response, verdict: evaluatorVerdictOf(response.content) });
+          },
+          onFallbackFailure: fallbackContentRefusal,
           request: {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
@@ -5967,22 +6065,11 @@ export class WalkingSkeletonRunner {
           buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
           }
         }));
-        const response = served.result;
+        const { response, verdict } = served.result;
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
         servedChecks.set(response.rawArtifactRef, served.servedBy.providerRef);
-        const parsed = parseContent(response.content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
         return Object.freeze({
-          verdict: Object.freeze({
-            satisfied: parsed.satisfied,
-            objection: parsed.objection,
-            criteria: Object.freeze({
-              fairnessToLosers: parsed.criteria.fairness_to_losers,
-              statementLabelAgreement: parsed.criteria.statement_label_agreement,
-              noOverstatement: parsed.criteria.no_overstatement,
-              restatement: parsed.criteria.restatement,
-              citationTracing: parsed.criteria.citation_tracing
-            })
-          }),
+          verdict,
           // J29: the evaluator's own recorded artifact, so the round's verdict
           // and objection resolve through `ledger.raw_artifact` rather than
           // being duplicated into a second plaintext table.
