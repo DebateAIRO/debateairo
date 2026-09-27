@@ -27,7 +27,9 @@ export default function DebatePageGate({
   composeCatalog,
   homeCatalog,
   newDebateCatalog,
-  questionLocale = null
+  questionLocale = null,
+  storyLocale,
+  storyCatalog
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -45,6 +47,10 @@ export default function DebatePageGate({
   newDebateCatalog: MessageCatalog;
   /** The question's locale (spec 2026-09-26 §14.3), for the offer to switch the page to it. */
   questionLocale?: LocaleCode | null;
+  /** The verdict story strip's locale: the question's, or the interface's when the server learned none. */
+  storyLocale: LocaleCode;
+  /** The `public` catalogue of `storyLocale`. */
+  storyCatalog: MessageCatalog;
 }) {
   return (
     <>
@@ -64,6 +70,8 @@ export default function DebatePageGate({
           composeCatalog={composeCatalog}
           homeCatalog={homeCatalog}
           questionLocale={questionLocale}
+          storyLocale={storyLocale}
+          storyCatalog={storyCatalog}
         />
       )}
       </AuthGate>

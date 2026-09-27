@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ContractHttpError, RunProjectionSchema, type Answer, type ContractClient } from "@debateai/contract";
 import { RunRepository } from "@debateai/db";
 import { PostgresAskApplication } from "../../apps/api/src/index.js";
+import { getDebateBundle } from "../../apps/ui/lib/api.js";
 import { getDebateServer, questionLanguageTagOf } from "../../apps/ui/lib/serverApi.js";
 import { languageOfferLocale, localeDirection, questionLocale } from "../../apps/ui/lib/i18n/questionLocale.js";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
@@ -169,5 +170,46 @@ describe("the debate page's server read learns the question's language (serverAp
     expect(loading).toMatchObject({ ok: false, kind: "loading" });
     expect(questionLanguageTagOf(loading)).toBe("de");
     expect(questionLanguageTagOf({ ok: false, kind: "not_found" })).toBeNull();
+  });
+});
+
+describe("the debate page's own run read carries the question's language (api.ts getDebateBundle)", () => {
+  // Task 14: the "starting" render straight after an ask does no server read,
+  // so the page learns the question's language from the run read its refresh makes.
+  const answer: Answer = buildFairShapedAnswer({ run_ref: "run:settled" });
+  const ROMANIAN = Object.freeze({ tag: "ro", name: "Romanian" });
+  const clientFor = (state: "RUNNING" | "SETTLED" | "FAILED", language: unknown) => ({
+    readRun: async () => ({
+      ...RUN,
+      state,
+      terminal_reason: state === "FAILED" ? "TOTAL_REVIEW_COVERAGE_UNSATISFIED" : null,
+      ...(language === undefined ? {} : { argument_language: language })
+    }),
+    readRunAnswer: async () => answer
+  }) as unknown as ContractClient;
+
+  it("hands on the run's language with a loading, a failed and a served bundle", async () => {
+    await expect(getDebateBundle("run:settled", "token:test", clientFor("RUNNING", ROMANIAN)))
+      .resolves.toMatchObject({ kind: "loading", questionLanguage: ROMANIAN });
+    await expect(getDebateBundle("run:settled", "token:test", clientFor("FAILED", ROMANIAN)))
+      .resolves.toMatchObject({ kind: "failed", questionLanguage: ROMANIAN });
+    await expect(getDebateBundle("run:settled", "token:test", clientFor("SETTLED", ROMANIAN)))
+      .resolves.toMatchObject({ kind: "served", run: null, questionLanguage: ROMANIAN });
+    // An answer the page already holds wins over a lagging run, and keeps the run's language.
+    await expect(getDebateBundle("run:settled", "token:test", clientFor("RUNNING", ROMANIAN), { currentAnswer: answer }))
+      .resolves.toMatchObject({ kind: "served", questionLanguage: ROMANIAN });
+  });
+
+  it("has none when the run records none, or when no run was read (an answer id)", async () => {
+    for (const recorded of [null, undefined]) {
+      await expect(getDebateBundle("run:settled", "token:test", clientFor("SETTLED", recorded)))
+        .resolves.toMatchObject({ kind: "served", questionLanguage: null });
+    }
+    const byAnswerId = {
+      readRun: async () => { throw new ContractHttpError("NOT_FOUND", 404, "RUN_NOT_FOUND"); },
+      readAnswer: async () => answer
+    } as unknown as ContractClient;
+    await expect(getDebateBundle(answer.answer_id, "token:test", byAnswerId))
+      .resolves.toMatchObject({ kind: "served", questionLanguage: null });
   });
 });

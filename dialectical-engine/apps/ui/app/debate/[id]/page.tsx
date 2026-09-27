@@ -65,6 +65,8 @@ export default async function DebatePage({
         composeCatalog={composeCatalog}
         homeCatalog={homeCatalog}
         newDebateCatalog={newDebateCatalog}
+        storyLocale={locale}
+        storyCatalog={publicCatalog}
       />
     );
   }
@@ -110,6 +112,12 @@ export default async function DebatePage({
       notFound();
     }
   }
+  // The verdict story strip speaks the question's language (spec 2026-09-26
+  // §14.3): its fixed words come from that locale's `public` catalogue. With no
+  // language learned (no read, or none recorded) it keeps the reader's; `und`
+  // and unknown tags already name the reader's locale.
+  const storyLocale = questionLanguage ?? locale;
+  const storyCatalog = storyLocale === locale ? publicCatalog : await loadNamespace(storyLocale, "public");
 
   return (
     <DebatePageGate
@@ -127,6 +135,8 @@ export default async function DebatePage({
       homeCatalog={homeCatalog}
       newDebateCatalog={newDebateCatalog}
       questionLocale={questionLanguage}
+      storyLocale={storyLocale}
+      storyCatalog={storyCatalog}
     />
   );
 }

@@ -138,6 +138,8 @@ export function PublicDebatePageClient({
       homeCatalog={homeCatalog}
       publicMode
       questionLocale={storyLocale}
+      storyLocale={storyLocale}
+      storyCatalog={storyCatalog}
       publicNodesById={projection.nodesById}
       publicExport={publicExport}
       publicHeader={publicHeader}

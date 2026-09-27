@@ -71,6 +71,10 @@ import { DebateMap } from "@/components/DebateMap";
 import { SynthesisPanel } from "@/components/SynthesisPanel";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { QuestionLanguageOffer } from "@/components/QuestionLanguageOffer";
+import { StoryPanel } from "@/components/StoryPanel";
+import { toStoryView } from "@/lib/v3/storyView";
+import { useAnswerStory } from "@/lib/v3/useAnswerStory";
+import { useStoryLocaleReady } from "@/lib/v3/useStoryLocaleReady";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
 import { ChallengePopover } from "@/components/ChallengePopover";
@@ -80,6 +84,7 @@ import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import type { LocaleCode } from "@/lib/i18n/locales";
+import { questionLocale as questionLocaleOf } from "@/lib/i18n/questionLocale";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
 import {
@@ -572,7 +577,9 @@ export default function DebatePageClient({
   renderPublicHonesty = null,
   publicOverview = null,
   publicHeader = null,
-  questionLocale = null
+  questionLocale = null,
+  storyLocale,
+  storyCatalog
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -626,6 +633,13 @@ export default function DebatePageClient({
    * to switch to it.
    */
   questionLocale?: LocaleCode | null;
+  /**
+   * The locale the owner's verdict story strip speaks (spec 2026-09-26 §14.3):
+   * the question's, or the interface's when the server's render learned none.
+   */
+  storyLocale: LocaleCode;
+  /** The `public` catalogue of `storyLocale`: the story strip's fixed words. */
+  storyCatalog: MessageCatalog;
 }) {
   const { catalog: chromeCatalog, locale } = useChromeI18n();
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
@@ -687,6 +701,9 @@ export default function DebatePageClient({
   const debateHeaderControlsRef = useRef<HTMLDivElement | null>(null);
   const debateHeaderInlineActionsRef = useRef<HTMLDivElement | null>(null);
   const [headerActionsCollapsed, setHeaderActionsCollapsed] = useState(false);
+  // The question's locale as the page's own run read recorded it (spec
+  // 2026-09-26 §14.3); null until that read answers.
+  const [readQuestionLocale, setReadQuestionLocale] = useState<LocaleCode | null>(null);
 
   const refresh = useCallback(async (answerExpected = false) => {
     if (privateDeletionRef.current!==null) return;
@@ -698,6 +715,7 @@ export default function DebatePageClient({
         locale
       });
       if (privateDeletionRef.current!==null) return;
+      setReadQuestionLocale(questionLocaleOf(bundle.questionLanguage?.tag, locale));
       if (bundle.kind === "served") {
         answerRef.current = bundle.answer;
         setAnswer(bundle.answer);
@@ -973,6 +991,18 @@ export default function DebatePageClient({
       active = false;
     };
   }, [answer]);
+
+  // Verdict story (spec 2026-09-26 §10): owner-only. Polls its own route while
+  // the story is being written; the public page reads nothing here. The strip
+  // speaks the question's language, so it waits for that language's catalogue.
+  const story = useAnswerStory(publicMode ? null : answer?.answer_id ?? null, {
+    answerVersion: answer?.answer_version
+  });
+  const storyLocaleReady = useStoryLocaleReady({ questionLocale, readQuestionLocale, storyLocale });
+  const storyView = useMemo(
+    () => (publicMode || answer === null || !storyLocaleReady ? null : toStoryView(answer, story, id, storyLocale)),
+    [publicMode, answer, storyLocaleReady, story, id, storyLocale]
+  );
 
   const showInspection = useCallback(async () => {
     if (answerRef.current === null) return;
@@ -1536,6 +1566,9 @@ export default function DebatePageClient({
       {!publicMode && process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} catalog={debateDrawersCatalog} debateChromeCatalog={debateChromeCatalog} /> : null}
 
       <QuestionLanguageOffer questionLocale={questionLocale} interfaceLocale={locale} catalog={chromeCatalog} />
+
+      {/* ---- verdict story strip (owner only; spec 2026-09-26 §10) ---- */}
+      {storyView === null ? null : <StoryPanel view={storyView} catalog={storyCatalog} locale={storyLocale} />}
 
       <ScoringErrorBoundary catalog={miscCatalog}>
         {scoringInsightsExpandable ? (
