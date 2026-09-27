@@ -43,9 +43,9 @@
   "chrome.help": "Βοήθεια",
   "chrome.signedInAsker": "Συνδεδεμένος ερωτών",
   "chrome.guestSession": "Συνεδρία επισκέπτη",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Γλώσσα σελίδας",
+  "chrome.languageOffer.text": "Αυτή η αντιπαράθεση είναι στα {language} ({nativeName}). Να εμφανιστεί η σελίδα στα {language};",
+  "chrome.languageOffer.textNative": "Αυτή η αντιπαράθεση είναι στη γλώσσα {language}. Να εμφανιστεί η σελίδα στη γλώσσα {language};",
+  "chrome.languageOffer.switch": "Μετάβαση στα {language}",
+  "chrome.languageOffer.dismiss": "Όχι, ευχαριστώ"
 }

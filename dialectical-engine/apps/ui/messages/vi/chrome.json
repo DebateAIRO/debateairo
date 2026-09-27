@@ -43,9 +43,9 @@
   "chrome.help": "Trợ giúp",
   "chrome.signedInAsker": "Người đặt câu hỏi đã đăng nhập",
   "chrome.guestSession": "Phiên khách",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Ngôn ngữ của trang",
+  "chrome.languageOffer.text": "Cuộc tranh luận này được viết bằng {language} ({nativeName}). Bạn có muốn hiển thị trang bằng {language} không?",
+  "chrome.languageOffer.textNative": "Cuộc tranh luận này được viết bằng {language}. Bạn có muốn hiển thị trang bằng {language} không?",
+  "chrome.languageOffer.switch": "Chuyển sang {language}",
+  "chrome.languageOffer.dismiss": "Không, cảm ơn"
 }

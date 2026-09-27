@@ -43,9 +43,9 @@
   "chrome.help": "المساعدة",
   "chrome.signedInAsker": "صاحب سؤال مسجل الدخول",
   "chrome.guestSession": "جلسة ضيف",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "لغة الصفحة",
+  "chrome.languageOffer.text": "هذه المناظرة باللغة {language} ({nativeName}). هل تودّ عرض الصفحة باللغة {language}؟",
+  "chrome.languageOffer.textNative": "هذه المناظرة باللغة {language}. هل تودّ عرض الصفحة باللغة {language}؟",
+  "chrome.languageOffer.switch": "التبديل إلى {language}",
+  "chrome.languageOffer.dismiss": "لا، شكرًا"
 }

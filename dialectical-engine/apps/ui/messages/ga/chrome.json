@@ -43,9 +43,9 @@
   "chrome.help": "Cabhair",
   "chrome.signedInAsker": "Fiafraitheoir sínithe isteach",
   "chrome.guestSession": "Seisiún aoi",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Teanga an leathanaigh",
+  "chrome.languageOffer.text": "Tá an díospóireacht seo as {language} ({nativeName}). Ar mhaith leat an leathanach a thaispeáint as {language}?",
+  "chrome.languageOffer.textNative": "Tá an díospóireacht seo as {language}. Ar mhaith leat an leathanach a thaispeáint as {language}?",
+  "chrome.languageOffer.switch": "Taispeáin as {language}",
+  "chrome.languageOffer.dismiss": "Níor mhaith, go raibh maith agat"
 }

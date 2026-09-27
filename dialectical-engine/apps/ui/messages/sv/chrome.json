@@ -43,9 +43,9 @@
   "chrome.help": "Hjälp",
   "chrome.signedInAsker": "Inloggad frågeställare",
   "chrome.guestSession": "Gästsession",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Sidans språk",
+  "chrome.languageOffer.text": "Den här debatten är på {language} ({nativeName}). Vill du visa sidan på {language}?",
+  "chrome.languageOffer.textNative": "Den här debatten är på {language}. Vill du visa sidan på {language}?",
+  "chrome.languageOffer.switch": "Byt till {language}",
+  "chrome.languageOffer.dismiss": "Nej tack"
 }

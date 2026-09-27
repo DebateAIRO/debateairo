@@ -43,9 +43,9 @@
   "chrome.help": "Abi",
   "chrome.signedInAsker": "Sisselogitud küsija",
   "chrome.guestSession": "Külalisseanss",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Lehe keel",
+  "chrome.languageOffer.text": "See väitlus on {language} keeles ({nativeName}). Kas soovite lehte näha {language} keeles?",
+  "chrome.languageOffer.textNative": "See väitlus on {language} keeles. Kas soovite lehte näha {language} keeles?",
+  "chrome.languageOffer.switch": "Lülituge ümber {language} keelele",
+  "chrome.languageOffer.dismiss": "Ei, aitäh"
 }

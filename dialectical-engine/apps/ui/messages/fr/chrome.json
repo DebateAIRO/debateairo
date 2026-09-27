@@ -43,9 +43,9 @@
   "chrome.help": "Aide",
   "chrome.signedInAsker": "Demandeur connecté",
   "chrome.guestSession": "Session invitée",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Langue de la page",
+  "chrome.languageOffer.text": "Ce débat se déroule en {language} ({nativeName}). Voulez-vous afficher la page en {language} ?",
+  "chrome.languageOffer.textNative": "Ce débat se déroule en {language}. Voulez-vous afficher la page en {language} ?",
+  "chrome.languageOffer.switch": "Passer en {language}",
+  "chrome.languageOffer.dismiss": "Non merci"
 }

@@ -43,9 +43,9 @@
   "chrome.help": "Palīdzība",
   "chrome.signedInAsker": "Pierakstījies jautātājs",
   "chrome.guestSession": "Viesa sesija",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Lapas valoda",
+  "chrome.languageOffer.text": "Šīs debates notiek {language} valodā ({nativeName}). Vai rādīt lapu {language} valodā?",
+  "chrome.languageOffer.textNative": "Šīs debates notiek {language} valodā. Vai rādīt lapu {language} valodā?",
+  "chrome.languageOffer.switch": "Pārslēgt uz {language} valodu",
+  "chrome.languageOffer.dismiss": "Nē, paldies"
 }

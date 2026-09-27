@@ -43,9 +43,9 @@
   "chrome.help": "Pomoć",
   "chrome.signedInAsker": "Prijavljeni postavljač pitanja",
   "chrome.guestSession": "Gostujuća sesija",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Jezik stranice",
+  "chrome.languageOffer.text": "Jezik ove rasprave: {language} ({nativeName}). Želite li prikazati stranicu na jeziku: {language}?",
+  "chrome.languageOffer.textNative": "Jezik ove rasprave: {language}. Želite li prikazati stranicu na jeziku: {language}?",
+  "chrome.languageOffer.switch": "Prebacite na jezik: {language}",
+  "chrome.languageOffer.dismiss": "Ne, hvala"
 }

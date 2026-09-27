@@ -82,7 +82,7 @@ describe("the story's fixed words speak to the person, never about the engine (R
     expect(copied).toEqual([]);
   });
 
-  it("carries every story key in all 35 locales (English copies until R3 translates them)", () => {
+  it("carries every story key in all 35 locales", () => {
     const locales = readdirSync(MESSAGES, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
     expect(locales).toHaveLength(35);
     const keysOf = (locale: string) => storyEntries(locale).map(([key]) => key.replace(/\.(zero|one|two|few|many|other)$/u, ".#")).sort();
@@ -241,8 +241,9 @@ describe("label, fate and plural words come from the catalogue handed in", () =>
     };
     expect([1, 3, 5, 22, 25].map((count) => morePathsWords(count, probe, "pl")))
       .toEqual(["ONE 1", "FEW 3", "MANY 5", "FEW 22", "MANY 25"]);
-    // The real Polish catalogue answers every count (English copies until R3).
-    for (const count of [1, 3, 5]) expect(tPlural(pl, "public.story.morePaths", count, "pl")).toBe(`and ${count} more`);
+    // The real Polish catalogue answers every count, in the right form (translated in R3).
+    expect([1, 3, 5].map((count) => tPlural(pl, "public.story.morePaths", count, "pl")))
+      .toEqual(["i jeszcze 1 stanowisko", "i jeszcze 3 stanowiska", "i jeszcze 5 stanowisk"]);
   });
 });
 

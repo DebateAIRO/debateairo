@@ -43,9 +43,9 @@
   "chrome.help": "Pomoc",
   "chrome.signedInAsker": "Prihlásený pýtajúci sa",
   "chrome.guestSession": "Relácia hosťa",
-  "chrome.languageOffer.label": "Page language",
-  "chrome.languageOffer.text": "This debate is in {language} ({nativeName}). Show the page in {language}?",
-  "chrome.languageOffer.textNative": "This debate is in {language}. Show the page in {language}?",
-  "chrome.languageOffer.switch": "Switch to {language}",
-  "chrome.languageOffer.dismiss": "No, thanks"
+  "chrome.languageOffer.label": "Jazyk stránky",
+  "chrome.languageOffer.text": "Jazyk tejto debaty: {language} ({nativeName}). Zobraziť stránku v jazyku: {language}?",
+  "chrome.languageOffer.textNative": "Jazyk tejto debaty: {language}. Zobraziť stránku v jazyku: {language}?",
+  "chrome.languageOffer.switch": "Prepnúť na jazyk: {language}",
+  "chrome.languageOffer.dismiss": "Nie, ďakujem"
 }
