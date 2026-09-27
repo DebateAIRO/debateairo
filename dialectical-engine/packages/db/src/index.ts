@@ -25,7 +25,8 @@ export {
 } from "./legacy-claim.js";
 
 // Engine money rule, Task M3 (spec 2026-09-26 §14.4.5): the owner-side,
-// content-free disclosure row beside each served answer (migration 0076).
+// content-free disclosure row beside each served answer (migration 0076), and
+// its owner and operator reads (Task M5).
 export {
   SERVE_DISCLOSURE_BODY_STOPS,
   SERVE_DISCLOSURE_FLOOR_STATES,
@@ -33,6 +34,8 @@ export {
   ServeDisclosureRepository,
   type ServeDisclosureBodyStop,
   type ServeDisclosureFloorState,
+  type ServeDisclosureModel,
+  type ServeDisclosureRead,
   type ServeDisclosureRecord,
   type ServeDisclosureServeStop,
   type StoredServeDisclosure

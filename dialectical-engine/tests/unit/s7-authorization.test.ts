@@ -10,6 +10,7 @@ import {
   testSessionApplication,testSessionHeaders
 } from "../support/httpSession.js";
 import type { AnswerStoryApplication } from "../../apps/api/src/stories.js";
+import type { AnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
 import { storedStoryRecord } from "../support/storyApiFixtures.js";
 
 const OWNED_RUN_ID = "11111111-1111-4111-8111-111111111111";
@@ -60,6 +61,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/answers/{id}/nodes/{nodeId}", auth: "user", resource: "run-owner", action: "read-node" },
   { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
   { route: "GET /v1/answers/{id}/story", auth: "user", resource: "run-owner", action: "read-story" },
+  { route: "GET /v1/answers/{id}/disclosure", auth: "user", resource: "run-owner", action: "read-disclosure" },
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
@@ -144,6 +146,25 @@ function servingStories(reads: unknown[]): AnswerStoryApplication {
     readStory: async (input) => {
       reads.push(input);
       return storedStoryRecord();
+    }
+  };
+}
+/**
+ * Engine money rule, Task M5: a composed disclosure reader that WOULD serve a
+ * record, for the same reason as `servingStories`: every read past the route's
+ * own gates turns the denied and malformed rows red.
+ */
+function servingDisclosures(reads: unknown[]): AnswerDisclosureApplication {
+  return {
+    readDisclosure: async (input) => {
+      reads.push(input);
+      return {
+        answer_id: ANSWER_ID, answer_version: 1,
+        floor: { verdict_state: "CONTESTED", leading_node_id: NODE_ID },
+        writer: null, checker: null, checker_same_as_writer: false,
+        digest: { compacted: false, points_left_out: 0 },
+        cut_short: { arguing: null, answer_writing: "MONEY" }
+      };
     }
   };
 }
@@ -354,6 +375,7 @@ describe("S7 deny-by-default authorization", () => {
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/inspection`, error: "INSPECTION_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/ledger-digest`, error: "LEDGER_DIGEST_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/story`, error: "STORY_NOT_FOUND" },
+    { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/disclosure`, error: "DISCLOSURE_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/nodes/${NODE_ID}`, error: "NODE_NOT_FOUND" },
     {
       method: "POST" as const, url: `/v1/answers/${ANSWER_ID}/investigations/gap:test`,
@@ -368,9 +390,11 @@ describe("S7 deny-by-default authorization", () => {
     application.unlinkMemoryLink = async () => null;
     const foreignIdentity=testHttpIdentity("s7-foreign");
     const storyReads: unknown[] = [];
+    const disclosureReads: unknown[] = [];
     const api = buildApi({
       application,sessions:testSessionApplication([foreignIdentity]),allowedOrigin:TEST_APP_ORIGIN,
-      stories: servingStories(storyReads)
+      stories: servingStories(storyReads),
+      disclosures: servingDisclosures(disclosureReads)
     });
     const foreign = await api.inject({
       ...route, headers:testSessionHeaders(foreignIdentity,route.method==="POST")
@@ -378,6 +402,7 @@ describe("S7 deny-by-default authorization", () => {
     expect(foreign.statusCode).toBe(404);
     expect(foreign.json()).toEqual({ error: route.error });
     expect(storyReads).toEqual([]);
+    expect(disclosureReads).toEqual([]);
     await api.close();
   });
 
@@ -386,6 +411,7 @@ describe("S7 deny-by-default authorization", () => {
     { method: "GET" as const, url: "/v1/answers/not-a-uuid/inspection", error: "INSPECTION_NOT_FOUND" },
     { method: "GET" as const, url: "/v1/answers/not-a-uuid/ledger-digest", error: "LEDGER_DIGEST_NOT_FOUND" },
     { method: "GET" as const, url: "/v1/answers/not-a-uuid/story", error: "STORY_NOT_FOUND" },
+    { method: "GET" as const, url: "/v1/answers/not-a-uuid/disclosure", error: "DISCLOSURE_NOT_FOUND" },
     { method: "GET" as const, url: `/v1/answers/${ANSWER_ID}/nodes/not-a-uuid`, error: "NODE_NOT_FOUND" },
     {
       method: "POST" as const, url: "/v1/answers/not-a-uuid/investigations/gap:test",
@@ -397,10 +423,12 @@ describe("S7 deny-by-default authorization", () => {
     { method: "GET" as const, url: "/v1/runs/not-a-uuid/events", error: "RUN_NOT_FOUND" }
   ])("maps malformed resource IDs on $method $url to the closed 404 face", async (route) => {
     const storyReads: unknown[] = [];
+    const disclosureReads: unknown[] = [];
     const api = buildApi({
       application: fixtureApplication(),
       sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN,
-      stories: servingStories(storyReads)
+      stories: servingStories(storyReads),
+      disclosures: servingDisclosures(disclosureReads)
     });
     const response = await api.inject({
       ...route, headers: route.method==="POST" ? USER_MUTATION_HEADERS : USER_HEADERS
@@ -408,6 +436,7 @@ describe("S7 deny-by-default authorization", () => {
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: route.error });
     expect(storyReads).toEqual([]);
+    expect(disclosureReads).toEqual([]);
     await api.close();
   });
 

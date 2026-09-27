@@ -5,6 +5,7 @@ import {
   AnswerSchema,
   AnswerIndexSchema,
   AnswerStorySchema,
+  AnswerDisclosureSchema,
   AskAcceptedSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
@@ -26,6 +27,7 @@ import {
   type Answer,
   type AnswerIndex,
   type AnswerStory,
+  type AnswerDisclosure,
   type AskAccepted,
   type AskRequest,
   type Deployment,
@@ -300,6 +302,7 @@ export interface ContractClient {
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
   readAnswerStory(answerId: string): Promise<AnswerStory>;
+  readAnswerDisclosure(answerId: string): Promise<AnswerDisclosure>;
   readNode(answerId: string, nodeId: string): Promise<Node>;
   recordInvestigation(answerId: string, gapRef: string, input: InvestigationRequest): Promise<InvestigationAccepted>;
   unlinkMemory(answerId: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
@@ -521,6 +524,7 @@ export function createContractClient(
     readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),
     readAnswerStory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/story`, AnswerStorySchema),
+    readAnswerDisclosure: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/disclosure`, AnswerDisclosureSchema),
     readNode: (answerId: string, nodeId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/nodes/${encodeURIComponent(nodeId)}`, NodeSchema),
     recordInvestigation: (answerId: string, gapRef: string, input: InvestigationRequest) => request(`/v1/answers/${encodeURIComponent(answerId)}/investigations/${encodeURIComponent(gapRef)}`, InvestigationAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     unlinkMemory: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/memory-link/unlink`, UnlinkSchema, { method: "POST" }),

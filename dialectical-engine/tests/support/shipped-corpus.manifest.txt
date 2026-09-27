@@ -14,6 +14,7 @@ apps/api/src/account-erasure.ts
 apps/api/src/admission.ts
 apps/api/src/boot-custody.ts
 apps/api/src/client-ip.ts
+apps/api/src/disclosures.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
 apps/api/src/legacy-claim.ts
@@ -500,6 +501,7 @@ packages/budget/src/cost-envelope.ts
 packages/budget/src/index.ts
 packages/budget/src/model-spend.ts
 packages/contract/src/client.ts
+packages/contract/src/disclosure.ts
 packages/contract/src/generate.ts
 packages/contract/src/index.ts
 packages/contract/src/lineage.ts

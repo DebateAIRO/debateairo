@@ -63,6 +63,7 @@ import {
   type ServeGateResult
 } from "@debateai/serve";
 import {
+  AnswerDisclosureSchema,
   AnswerSchema,
   PLAN_TIER_ROSTERS,
   type AskRequest,
@@ -76,6 +77,7 @@ import {
   type AskApplication,
   type RunCreationSettings
 } from "@debateai/api";
+import { buildAnswerDisclosure } from "../../apps/api/src/disclosures.js";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
 import {
@@ -6564,6 +6566,162 @@ describe("Engine money rule M5 — the floor: the label and the leading position
     expect((scenario.error as TypedDomainError).code).toBe("RUN_CEILING_BELOW_FIRST_CALL");
     const rows = await database.pool.query("SELECT 1 FROM serve.serve_disclosure WHERE run_id=$1", [scenario.runId]);
     expect(rows.rowCount).toBe(0);
+  });
+});
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M5 — the owner's and the operator's
+ * READ of the record, over rows the production runner wrote. The route itself
+ * (session, answer gate, closed 404) is proven over the real database in
+ * tests/integration/story-api.test.ts.
+ */
+describe("Engine money rule M5 — the disclosure read over the runner's own rows", () => {
+  async function askerOf(runId: string): Promise<string> {
+    const asker = await database.pool.query<{ asker_id: string }>("SELECT asker_id FROM core.run WHERE run_id=$1", [runId]);
+    return asker.rows[0]!.asker_id;
+  }
+
+  /** A DR-184 review catch-up version: what `prepareVersion` persists, and it runs no answer-writing step. */
+  async function catchUpVersion(runId: string): Promise<number> {
+    const serve = new ServeRepository(database.pool);
+    const source = await serve.readReviewCatchUpSource(runId);
+    const records = source.answer.condition_mark_records.map((record): PreservedConditionMarkRecord => ({
+      mark: record.mark as ConditionMarkRecord["mark"], scope: record.scope, subjectRef: record.subject_ref,
+      reason: record.reason, liftPath: record.lift_path, servedRootRule: record.served_root_rule,
+      affectedNodeIds: record.affected_node_ids, callSiteKey: record.call_site_key,
+      plannedLegCount: record.planned_leg_count,
+      terminalTransportOutcome: record.terminal_transport_outcome,
+      hiddenStrength: record.hidden_strength, hiddenScoreThreshold: record.hidden_score_threshold,
+      hiddenScoreThresholdSourceRef: record.hidden_score_threshold_source_ref,
+      excludedFromServedNumber: record.excluded_from_served_number,
+      judgedBasisCount: record.judged_basis_count
+    }));
+    const persisted = await serve.persist({
+      runId, workItemId: source.workItemId, factBundleVersion: source.factBundleVersion,
+      factBundleContentHash: createHash("sha256").update(JSON.stringify(source.factBundle)).digest("hex"),
+      factBundle: source.factBundle,
+      result: {
+        terminal: source.answer.terminal, answerForm: source.answer.answer_form,
+        factBundle: source.factBundle, gateTrace: [], conditionMarks: source.answer.condition_marks,
+        conformance: [], coverageMode: "NOT_RUN", segments: [],
+        compositionBudget: { tier: "low", bound: 1, registerRowKey: "test", registerVersion: 1, sourceRef: "test" },
+        confidenceBand: source.answer.confidence_band,
+        bandCeiling: source.answer.band_ceiling === null ? null : {
+          label: source.answer.band_ceiling.label, basis: source.answer.band_ceiling.basis,
+          registerRowKey: source.answer.band_ceiling.register_row_key,
+          registerVersion: source.answer.band_ceiling.register_version,
+          sourceRef: source.answer.band_ceiling.source_ref,
+          liftPath: source.answer.band_ceiling.lift_path
+        },
+        digest: null, loopRounds: [], standingObjection: null, crashClass: null,
+        projections: { reversalPoint: source.answer.reversal_point,
+          buildsOnPrevious: source.factBundle.buildsOnPrevious,
+          memoryDisclosure: source.factBundle.memoryDisclosure }
+      } as never,
+      segments: source.answer.composed_text.map((segment) => ({
+        segmentId: segment.segment_id, text: segment.text, loadBearing: segment.load_bearing,
+        assertedNodeRefs: [], servedNumberRefs: segment.served_number_refs
+      })),
+      compositionRawArtifactRef: null, compositionAttempt: 0, conformanceRawArtifactRefs: [],
+      conditionMarkRecords: records,
+      servedNumber: source.servedNumber === null ? null : {
+        numberRef: source.servedNumber.numberRef, value: source.servedNumber.value,
+        numberKind: source.servedNumber.numberKind, sourceRef: source.servedNumber.sourceRef,
+        producer: source.servedNumber.producer, replayHandle: source.servedNumber.replayHandle,
+        propagationRunId: source.servedNumber.propagationRunId
+      },
+      supersedes: { answerId: source.answerId }
+    });
+    return persisted.answerVersion;
+  }
+
+  const PRIMARY_MODEL = { maker: "Primary test maker", model_id: "test-layer/primary-model", transport: "openai-compatible-http", provider_ref: PRIMARY_REF };
+  const SECONDARY_MODEL = { maker: "Secondary test maker", model_id: "test-layer/secondary-model", transport: "openai-compatible-http", provider_ref: SECONDARY_REF };
+
+  it("reads the latest version that HAS a record — a catch-up version newer than it reads the one before — with each model named from its own calls", async () => {
+    const primaryDebate = fullDebate("Primary M5 read fallback");
+    const secondaryDebate = fullDebate("Secondary M5 read fallback");
+    const scenario = await executeResil01Scenario({
+      label: "m5-read-fallback",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews, resil01Composition, evaluatorSatisfied()],
+      primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      secondaryCostEnvelope: moneySeam().build
+    });
+    const answerId = answerIdOf(scenario);
+    const ownership = { ownerRef: null, legacyAskerId: await askerOf(scenario.runId) };
+    const repository = new ServeDisclosureRepository(database.pool);
+    const read = await repository.readLatestForAnswer({ answerId, ownership });
+    expect(read?.row).toMatchObject({ answerId, answerVersion: 1, writerServedRef: SECONDARY_REF, writerFallback: true });
+    // The planned maker never wrote the answer, but it judged points in this
+    // run: its model is read from those calls; the served one from the round.
+    const disclosure = AnswerDisclosureSchema.parse(buildAnswerDisclosure(read!));
+    expect(disclosure).toEqual({
+      answer_id: answerId,
+      answer_version: 1,
+      floor: null,
+      writer: { planned_model: PRIMARY_MODEL, served_model: SECONDARY_MODEL, lower_cost: true },
+      checker: { planned_model: PRIMARY_MODEL, served_model: SECONDARY_MODEL, lower_cost: true },
+      checker_same_as_writer: true,
+      digest: { compacted: false, points_left_out: 0 },
+      cut_short: { arguing: null, answer_writing: null }
+    });
+
+    // DR-184: a review catch-up appends version 2, which runs no answer-writing
+    // step and so has no record. The read returns version 1's.
+    expect(await catchUpVersion(scenario.runId)).toBe(2);
+    const latest = await database.pool.query<{ version: number }>(
+      "SELECT max(answer_version) AS version FROM serve.answer WHERE answer_id=$1", [answerId]
+    );
+    expect(latest.rows[0]?.version).toBe(2);
+    expect(await repository.readForAnswerVersion(answerId, 2)).toBeNull();
+    expect(await repository.readLatestForAnswer({ answerId, ownership })).toEqual(read);
+
+    // Anyone else reads nothing: another asker, an unknown owner, a doubled or
+    // missing key, a malformed id.
+    for (const foreign of [
+      { ownerRef: null, legacyAskerId: `asker:someone-else-${randomUUID()}` },
+      { ownerRef: randomUUID(), legacyAskerId: null },
+      { ownerRef: randomUUID(), legacyAskerId: ownership.legacyAskerId },
+      { ownerRef: null, legacyAskerId: null }
+    ]) expect(await repository.readLatestForAnswer({ answerId, ownership: foreign })).toBeNull();
+    expect(await repository.readLatestForAnswer({ answerId: "not-a-uuid", ownership })).toBeNull();
+
+    // The operator reads the same record by the answer or by the run.
+    expect(await repository.readLatestForOperator(answerId)).toEqual(read);
+    expect(await repository.readLatestForOperator(scenario.runId)).toEqual(read);
+    expect(await repository.readLatestForOperator(randomUUID())).toBeNull();
+  });
+
+  it("reads a floor answer's record: its floor, no roles, and what cut it short", async () => {
+    const primaryDebate = fullDebate("Primary M5 read floor");
+    const secondaryDebate = fullDebate("Secondary M5 read floor");
+    const scenario = await executeResil01Scenario({
+      label: "m5-read-floor",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      secondaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build
+    });
+    const answerId = answerIdOf(scenario);
+    const receipt = await labelledRoot(scenario.runId);
+    const read = await new ServeDisclosureRepository(database.pool).readLatestForAnswer({
+      answerId, ownership: { ownerRef: null, legacyAskerId: await askerOf(scenario.runId) }
+    });
+    expect(AnswerDisclosureSchema.parse(buildAnswerDisclosure(read!))).toEqual({
+      answer_id: answerId,
+      answer_version: 1,
+      floor: { verdict_state: receipt.label, leading_node_id: receipt.servedNodeId },
+      writer: null,
+      checker: null,
+      checker_same_as_writer: false,
+      digest: { compacted: false, points_left_out: 0 },
+      cut_short: { arguing: null, answer_writing: "MONEY" }
+    });
+    // Both planned makers judged points, so the record can still name them.
+    expect(read?.models).toMatchObject({
+      writerPlanned: { providerRef: PRIMARY_REF, maker: "Primary test maker" }, writerServed: null, checkerServed: null
+    });
   });
 });
 

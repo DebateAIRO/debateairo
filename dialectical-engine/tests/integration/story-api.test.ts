@@ -1,11 +1,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresAskApplication, SESSION_COOKIE_NAME, buildApi } from "@debateai/api";
-import { AnswerSchema, AnswerStorySchema, type Session } from "@debateai/contract";
-import { migrate, withRunContentLease } from "@debateai/db";
+import { AnswerDisclosureSchema, AnswerSchema, AnswerStorySchema, type Session } from "@debateai/contract";
+import { ServeDisclosureRepository, migrate, withRunContentLease } from "@debateai/db";
 import { StoryRepository, type StoryRecordInput } from "@debateai/story";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
 import { RepositoryAnswerStoryApplication } from "../../apps/api/src/stories.js";
+import { RepositoryAnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun,
@@ -39,6 +40,9 @@ let foreignAuth: AuthenticatedSession;
 let storiedAnswerId: string;
 let storiedRunId: string;
 let storylessAnswerId: string;
+let flooredAnswerId: string;
+let flooredRunId: string;
+const FLOOR_LEADING_NODE_ID = randomUUID();
 
 function theOwner(): StoryEncryptedOwner {
   if (owner === undefined) throw new Error("STORY_TEST_OWNER_UNPROVISIONED");
@@ -155,6 +159,18 @@ beforeAll(async () => {
   const storylessRunId = await createEncryptedStoryRun(database.pool, theOwnerNow, "story api storyless answer");
   storylessAnswerId = await answerFor(storylessRunId, `storyless-${randomUUID()}`);
 
+  // Engine money rule, Task M5: a components-only answer whose record keeps a
+  // FLOOR (its label, its leading position, the sealed cause), and no story yet.
+  flooredRunId = await createEncryptedStoryRun(database.pool, theOwnerNow, "story api floored answer");
+  flooredAnswerId = await answerFor(flooredRunId, `floored-${randomUUID()}`);
+  await expect(new ServeDisclosureRepository(database.pool).insert({
+    answerId: flooredAnswerId, answerVersion: 1, runId: flooredRunId,
+    writerPlannedRef: "provider:a", checkerPlannedRef: "provider:a", writerServedRef: null, checkerServedRef: null,
+    writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false,
+    bodyStop: "MONEY", pointsWithoutReview: 1, serveStop: "MONEY", digestRung: 7, digestPointsOmitted: 12,
+    floorVerdictState: "SUPPORTED", floorLeadingNodeId: FLOOR_LEADING_NODE_ID, floorReason: "ENVELOPE_EXHAUSTED"
+  })).resolves.toBe("INSERTED");
+
   const sessionsByToken = new Map([[OWNER_TOKEN, ownerAuth], [FOREIGN_TOKEN, foreignAuth]]);
   const sessions = {
     authenticate: async (token: string) => sessionsByToken.get(token) ?? null,
@@ -167,7 +183,8 @@ beforeAll(async () => {
     ),
     sessions,
     allowedOrigin: ORIGIN,
-    stories: new RepositoryAnswerStoryApplication(new StoryRepository(database.pool))
+    stories: new RepositoryAnswerStoryApplication(new StoryRepository(database.pool)),
+    disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(database.pool))
   });
 }, 180_000);
 
@@ -252,6 +269,67 @@ describe("GET /v1/answers/{id}/story over the real database (spec §11)", () => 
     expect(response.statusCode).toBe(200);
     expect(AnswerStorySchema.parse(response.json())).toMatchObject({
       answer_id: storylessAnswerId, status: "UNAVAILABLE", unavailable_reason: "NO_VERDICT", story: null
+    });
+  });
+});
+
+describe("GET /v1/answers/{id}/disclosure over the real database (engine money rule, Task M5)", () => {
+  it("returns the owner's record: the floor, no roles, the digest and what cut the debate short", async () => {
+    const response = await theApi().inject({
+      method: "GET", url: `/v1/answers/${flooredAnswerId}/disclosure`, headers: headersFor(OWNER_TOKEN)
+    });
+    expect(response.statusCode).toBe(200);
+    expect(AnswerDisclosureSchema.parse(response.json())).toEqual({
+      answer_id: flooredAnswerId,
+      answer_version: 1,
+      floor: { verdict_state: "SUPPORTED", leading_node_id: FLOOR_LEADING_NODE_ID },
+      writer: null,
+      checker: null,
+      checker_same_as_writer: false,
+      digest: { compacted: true, points_left_out: 12 },
+      cut_short: { arguing: "MONEY", answer_writing: "MONEY" }
+    });
+  });
+
+  it("gives a different active account, and an answer with no record, exactly the closed 404 an absent answer gets", async () => {
+    const [foreign, absent, unrecorded] = await Promise.all([
+      theApi().inject({ method: "GET", url: `/v1/answers/${flooredAnswerId}/disclosure`, headers: headersFor(FOREIGN_TOKEN) }),
+      theApi().inject({ method: "GET", url: `/v1/answers/${randomUUID()}/disclosure`, headers: headersFor(OWNER_TOKEN) }),
+      theApi().inject({ method: "GET", url: `/v1/answers/${storylessAnswerId}/disclosure`, headers: headersFor(OWNER_TOKEN) })
+    ]);
+    for (const response of [foreign, absent, unrecorded]) {
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "DISCLOSURE_NOT_FOUND" });
+    }
+    expect(foreign.body).not.toContain(FLOOR_LEADING_NODE_ID);
+  });
+
+  it("refuses the foreigner at the repository too, not only at the answer gate", async () => {
+    const reader = new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(database.pool));
+    await expect(reader.readDisclosure({
+      answerId: flooredAnswerId, ownership: { ownerRef: foreignAuth.ownerRef, legacyAskerId: null }
+    })).resolves.toBeNull();
+    await expect(reader.readDisclosure({
+      answerId: flooredAnswerId, ownership: { ownerRef: ownerAuth.ownerRef, legacyAskerId: null }
+    })).resolves.toMatchObject({ floor: { verdict_state: "SUPPORTED" } });
+  });
+
+  it("reports a floor answer's story as WRITING while it is written — never NO_VERDICT, never a 404 — and READY once stored", async () => {
+    const writing = await theApi().inject({
+      method: "GET", url: `/v1/answers/${flooredAnswerId}/story`, headers: headersFor(OWNER_TOKEN)
+    });
+    expect(writing.statusCode).toBe(200);
+    expect(AnswerStorySchema.parse(writing.json())).toMatchObject({
+      answer_id: flooredAnswerId, status: "WRITING", unavailable_reason: null, story: null
+    });
+    await expect(withRunContentLease(database.pool, [flooredRunId], () =>
+      new StoryRepository(database.pool).insert(readyRecord(flooredRunId, flooredAnswerId)))).resolves.toBe("INSERTED");
+    const ready = await theApi().inject({
+      method: "GET", url: `/v1/answers/${flooredAnswerId}/story`, headers: headersFor(OWNER_TOKEN)
+    });
+    expect(ready.statusCode).toBe(200);
+    expect(AnswerStorySchema.parse(ready.json())).toMatchObject({
+      answer_id: flooredAnswerId, status: "READY", story: STORY_TEST_BODY
     });
   });
 });

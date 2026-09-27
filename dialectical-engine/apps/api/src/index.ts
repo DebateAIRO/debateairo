@@ -8,6 +8,7 @@ import {
   AnswerSchema,
   AnswerIndexSchema,
   AnswerStorySchema,
+  AnswerDisclosureSchema,
   ArgumentLanguageSchema,
   AskAcceptedSchema,
   AskRequestSchema,
@@ -63,7 +64,7 @@ import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serv
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
 import { detectArgumentLanguage, TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
-import { STORY_UNREADABLE, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
+import { STORY_UNREADABLE, answerCarriesStoryLabel, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
 import type {
   EvaluatorConsumerSelectionResult,
@@ -80,6 +81,7 @@ import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
 import type { AnswerStoryApplication } from "./stories.js";
+import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { RecoveryApplication } from "./recovery.js";
@@ -1111,6 +1113,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/answers/{id}/nodes/{nodeId}", auth: "user", resource: "run-owner", action: "read-node" },
   { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
   { route: "GET /v1/answers/{id}/story", auth: "user", resource: "run-owner", action: "read-story" },
+  { route: "GET /v1/answers/{id}/disclosure", auth: "user", resource: "run-owner", action: "read-disclosure" },
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
@@ -1296,6 +1299,12 @@ export interface ApiOptions {
   readonly stories?: AnswerStoryApplication;
   /** The clock the story route measures its waiting window with; tests pin it. */
   readonly storyClock?: () => Date;
+  /**
+   * Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
+   * the disclosure record. Optional like `stories`; the route answers its
+   * closed 404 when it is absent, and the story route then knows no floor.
+   */
+  readonly disclosures?: AnswerDisclosureApplication;
   readonly accountErasure?: AccountErasureApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
   readonly allowedOrigin?: string;
@@ -2196,9 +2205,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         answerVersion: answer.answer_version,
         ownership
       });
+      // Task M5 (spec §14.4.4): a components-only answer with a FLOOR gets a
+      // story too, so it waits like a served one instead of "no verdict". Read
+      // only when it can matter: no stored story, and no label of its own.
+      const floor = stored === null && answer.verdict_state === null && options.disclosures !== undefined
+        ? (await options.disclosures.readDisclosure({ answerId: answer.answer_id, ownership }))?.floor ?? null
+        : null;
       const derived = deriveStoryStatus({
         stored,
-        answerHasVerdict: answer.verdict_state !== null,
+        answerHasVerdict: answerCarriesStoryLabel({
+          verdictState: answer.verdict_state,
+          floorVerdictState: floor?.verdict_state ?? null
+        }),
         answerCreatedAt: new Date(answer.relevant_as_of),
         now: options.storyClock?.() ?? new Date()
       });
@@ -2226,6 +2244,27 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }));
     }
     return reply.send(body);
+  });
+
+  // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
+  // the answer's disclosure record — the floor, the models planned and used,
+  // the digest, and what cut the debate short. The story's gate: the answer
+  // read is the ownership check, and "not yours", "malformed", "not composed"
+  // and "no record" share one closed 404. The repository picks the latest
+  // answer version that HAS a record and applies the ownership predicate again.
+  api.get<{ Params: { id: string } }>("/v1/answers/:id/disclosure", routePolicy("GET /v1/answers/{id}/disclosure"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    const disclosures = options.disclosures;
+    if (!answerId.success || disclosures === undefined) {
+      return reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" });
+    }
+    const ownership = ownershipFor(request);
+    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
+    if (answer === null) return reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" });
+    const disclosure = await disclosures.readDisclosure({ answerId: answer.answer_id, ownership });
+    return disclosure === null
+      ? reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" })
+      : reply.send(AnswerDisclosureSchema.parse(disclosure));
   });
 
   api.get<{ Params: { id: string; nodeId: string } }>("/v1/answers/:id/nodes/:nodeId", routePolicy("GET /v1/answers/{id}/nodes/{nodeId}"), async (request, reply) => {

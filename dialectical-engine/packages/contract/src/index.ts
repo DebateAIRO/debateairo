@@ -3,6 +3,7 @@ import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
+import { AnswerDisclosureSchema } from "./disclosure.js"; export * from "./disclosure.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -763,6 +764,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/answers/{id}/nodes/{nodeId}",
     "GET /v1/answers/{id}/ledger-digest",
     "GET /v1/answers/{id}/story",
+    "GET /v1/answers/{id}/disclosure",
     "POST /v1/answers/{id}/investigations/{gapRef}",
     "POST /v1/answers/{id}/memory-link/unlink",
     "GET /v1/runs/{id}",
@@ -787,6 +789,6 @@ export const contractInventory = Object.freeze({
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
-    AnswerStorySchema
+    AnswerStorySchema, AnswerDisclosureSchema
   })
 });

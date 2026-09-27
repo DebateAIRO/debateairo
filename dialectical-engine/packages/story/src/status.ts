@@ -34,11 +34,26 @@ export const STORY_UNREADABLE: DerivedStoryStatus = Object.freeze({
 });
 
 /**
+ * Whether an answer carries a label a story is written for (spec §3; §14.4.4,
+ * Task M5): its own served verdict, or — for an answer that ended
+ * components-only while its arithmetic label existed — its FLOOR. The runner
+ * writes a story for exactly these answers, so the route treats a floor answer
+ * like a served one: WRITING, then READY or UNAVAILABLE, never "no verdict".
+ */
+export function answerCarriesStoryLabel(input: {
+  readonly verdictState: string | null;
+  readonly floorVerdictState: string | null;
+}): boolean {
+  return input.verdictState !== null || input.floorVerdictState !== null;
+}
+
+/**
  * A stored row reports its own outcome (FAILED becomes UNAVAILABLE at once,
  * with its failure code, so the site stops waiting). With no row: no verdict
  * means no story will ever be written; a verdict younger than the window means
  * WRITING; anything older means the story was lost (for example the runner
- * died mid-story).
+ * died mid-story). `answerHasVerdict` is `answerCarriesStoryLabel`: a served
+ * verdict or a floor.
  */
 export function deriveStoryStatus(input: {
   readonly stored: StoredStory | null;

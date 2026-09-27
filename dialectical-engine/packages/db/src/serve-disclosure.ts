@@ -17,8 +17,16 @@ import { TypedDomainError } from "@debateai/kernel";
  *
  * The rules below are the table's CHECKs, held here too so a record the table
  * would refuse is refused typed, before the INSERT (`SERVE_DISCLOSURE_RECORD_INVALID`).
- * The read is the plain one by answer version; the owner-scoped API read, the
- * PDF line and the operator report are Task M5's.
+ *
+ * THE READS (Task M5). `readForAnswerVersion` is the plain one by answer
+ * version. `readLatestForAnswer` is the owner-scoped one behind
+ * GET /v1/answers/{id}/disclosure: the answer's LATEST version that HAS a row
+ * (a DR-184 review catch-up version runs no answer-writing step, so it has
+ * none, and the version before it is read), under the run's ownership
+ * predicate. `readLatestForOperator` is the operator report's: by answer id or
+ * run id, no ownership. Both return, beside the row, the model each named maker
+ * answered as, read from the run's own recorded calls (`ledger.raw_artifact`:
+ * maker, model id, transport, provider ref — never text).
  */
 export const SERVE_DISCLOSURE_BODY_STOPS = Object.freeze(["MONEY", "ATTEMPTS", "USAGE", "DAILY"] as const);
 export type ServeDisclosureBodyStop = typeof SERVE_DISCLOSURE_BODY_STOPS[number];
@@ -74,6 +82,35 @@ export interface ServeDisclosureRecord {
 
 export interface StoredServeDisclosure extends ServeDisclosureRecord {
   readonly createdAt: Date;
+}
+
+/**
+ * The model a maker answered as in this run, read from one of its recorded
+ * calls: the fields the answer's own node lineage and the story's "Written by"
+ * are built from. Never a provider address, a credential or any text.
+ */
+export interface ServeDisclosureModel {
+  readonly providerRef: string;
+  readonly maker: string;
+  readonly modelId: string;
+  readonly transport: string;
+}
+
+/**
+ * A row and the model behind each maker it names. A served maker is read from
+ * the served round's own artifacts; a planned maker that differs from the one
+ * that served is read from the latest call it made in the run. Null when the
+ * record holds no call by that maker (a planned maker refused before sending
+ * on every call), or when the row names no maker for that seat.
+ */
+export interface ServeDisclosureRead {
+  readonly row: StoredServeDisclosure;
+  readonly models: Readonly<{
+    writerPlanned: ServeDisclosureModel | null;
+    writerServed: ServeDisclosureModel | null;
+    checkerPlanned: ServeDisclosureModel | null;
+    checkerServed: ServeDisclosureModel | null;
+  }>;
 }
 
 const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -180,6 +217,65 @@ interface ServeDisclosureRow {
   readonly created_at: Date;
 }
 
+/** Every column, as the typed read takes it. */
+const SELECT_ROW = `SELECT answer_id::text AS answer_id, answer_version, run_id::text AS run_id,
+              writer_planned_ref, checker_planned_ref, writer_served_ref, checker_served_ref,
+              writer_fallback, checker_fallback, fallback_reason, checker_same_as_writer,
+              body_stop, points_without_review, serve_stop, digest_rung, digest_points_omitted,
+              floor_verdict_state, floor_leading_node_id::text AS floor_leading_node_id, floor_reason,
+              created_at
+         FROM serve.serve_disclosure`;
+
+/** A stored row, held to the same rules as a record before its INSERT. */
+function storedFrom(row: ServeDisclosureRow): StoredServeDisclosure {
+  const stored: StoredServeDisclosure = {
+    answerId: row.answer_id,
+    answerVersion: row.answer_version,
+    runId: row.run_id,
+    writerPlannedRef: row.writer_planned_ref,
+    checkerPlannedRef: row.checker_planned_ref,
+    writerServedRef: row.writer_served_ref,
+    checkerServedRef: row.checker_served_ref,
+    writerFallback: row.writer_fallback,
+    checkerFallback: row.checker_fallback,
+    fallbackReason: row.fallback_reason,
+    checkerSameAsWriter: row.checker_same_as_writer,
+    bodyStop: row.body_stop,
+    pointsWithoutReview: row.points_without_review,
+    serveStop: row.serve_stop,
+    digestRung: row.digest_rung,
+    digestPointsOmitted: row.digest_points_omitted,
+    floorVerdictState: row.floor_verdict_state,
+    floorLeadingNodeId: row.floor_leading_node_id,
+    floorReason: row.floor_reason,
+    createdAt: row.created_at
+  };
+  const violation = recordViolation(stored);
+  if (violation !== null) {
+    throw new TypedDomainError(
+      "SERVE_DISCLOSURE_ROW_INVALID",
+      `The stored serve disclosure does not match its declared shape: ${violation}`
+    );
+  }
+  return Object.freeze(stored);
+}
+
+interface ModelRow {
+  readonly provider_ref: string;
+  readonly maker: string;
+  readonly model_id: string;
+  readonly provider: string;
+}
+
+function modelFrom(row: ModelRow): ServeDisclosureModel {
+  return Object.freeze({
+    providerRef: row.provider_ref,
+    maker: row.maker,
+    modelId: row.model_id,
+    transport: row.provider
+  });
+}
+
 export class ServeDisclosureRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -217,47 +313,107 @@ export class ServeDisclosureRepository {
       return null;
     }
     const result = await this.pool.query<ServeDisclosureRow>(
-      `SELECT answer_id::text AS answer_id, answer_version, run_id::text AS run_id,
-              writer_planned_ref, checker_planned_ref, writer_served_ref, checker_served_ref,
-              writer_fallback, checker_fallback, fallback_reason, checker_same_as_writer,
-              body_stop, points_without_review, serve_stop, digest_rung, digest_points_omitted,
-              floor_verdict_state, floor_leading_node_id::text AS floor_leading_node_id, floor_reason,
-              created_at
-         FROM serve.serve_disclosure
+      `${SELECT_ROW}
         WHERE answer_id = $1 AND answer_version = $2`,
       [answerId, answerVersion]
     );
     const row = result.rows[0];
-    if (row === undefined) return null;
-    const stored: StoredServeDisclosure = {
-      answerId: row.answer_id,
-      answerVersion: row.answer_version,
-      runId: row.run_id,
-      writerPlannedRef: row.writer_planned_ref,
-      checkerPlannedRef: row.checker_planned_ref,
-      writerServedRef: row.writer_served_ref,
-      checkerServedRef: row.checker_served_ref,
-      writerFallback: row.writer_fallback,
-      checkerFallback: row.checker_fallback,
-      fallbackReason: row.fallback_reason,
-      checkerSameAsWriter: row.checker_same_as_writer,
-      bodyStop: row.body_stop,
-      pointsWithoutReview: row.points_without_review,
-      serveStop: row.serve_stop,
-      digestRung: row.digest_rung,
-      digestPointsOmitted: row.digest_points_omitted,
-      floorVerdictState: row.floor_verdict_state,
-      floorLeadingNodeId: row.floor_leading_node_id,
-      floorReason: row.floor_reason,
-      createdAt: row.created_at
+    return row === undefined ? null : storedFrom(row);
+  }
+
+  /**
+   * The owner's read: the answer's LATEST version that has a row, only when the
+   * caller owns the answer's run (`core.run_is_owned_by`, the predicate every
+   * owner read uses). Exactly one of the two ownership keys is set; anything
+   * else — a malformed id, a missing or doubled key, an answer that is not the
+   * caller's, an answer with no row — is null, so the route answers ONE closed
+   * 404 for all of them.
+   */
+  async readLatestForAnswer(input: Readonly<{
+    answerId: string;
+    ownership: Readonly<{ ownerRef: string | null; legacyAskerId: string | null }>;
+  }>): Promise<ServeDisclosureRead | null> {
+    const { ownerRef, legacyAskerId } = input.ownership;
+    if (!UUID_TEXT.test(input.answerId)) return null;
+    if ((ownerRef === null) === (legacyAskerId === null)) return null;
+    if (ownerRef !== null && !UUID_TEXT.test(ownerRef)) return null;
+    if (legacyAskerId !== null && legacyAskerId.trim().length === 0) return null;
+    const result = await this.pool.query<ServeDisclosureRow>(
+      `${SELECT_ROW}
+        WHERE answer_id = $1 AND core.run_is_owned_by(run_id, $2::uuid, $3)
+        ORDER BY answer_version DESC
+        LIMIT 1`,
+      [input.answerId, ownerRef, legacyAskerId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : this.#withModels(storedFrom(row));
+  }
+
+  /**
+   * The operator report's read (`pnpm ops:serve-disclosure`): by an answer id
+   * or a run id, the latest version that has a row. No ownership: the command
+   * runs on the host, with the runner's own database principal.
+   */
+  async readLatestForOperator(answerOrRunId: string): Promise<ServeDisclosureRead | null> {
+    if (!UUID_TEXT.test(answerOrRunId)) return null;
+    const result = await this.pool.query<ServeDisclosureRow>(
+      `${SELECT_ROW}
+        WHERE answer_id = $1 OR run_id = $1
+        ORDER BY (answer_id = $1) DESC, answer_version DESC, created_at DESC
+        LIMIT 1`,
+      [answerOrRunId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : this.#withModels(storedFrom(row));
+  }
+
+  /** The model behind each maker the row names (see `ServeDisclosureRead`). */
+  async #withModels(row: StoredServeDisclosure): Promise<ServeDisclosureRead> {
+    const served = await this.pool.query<ModelRow & { seat: "WRITER" | "CHECKER" }>(
+      `WITH served AS (
+         SELECT round.candidate_artifact_ref, round.evaluator_artifact_ref
+           FROM serve.synthesis_round AS round
+          WHERE round.answer_id = $1 AND round.answer_version = $2
+          ORDER BY round.round DESC
+          LIMIT 1
+       )
+       SELECT 'WRITER' AS seat, artifact.provider_ref, artifact.maker, artifact.model_id, artifact.provider
+         FROM served JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = served.candidate_artifact_ref
+       UNION ALL
+       SELECT 'CHECKER' AS seat, artifact.provider_ref, artifact.maker, artifact.model_id, artifact.provider
+         FROM served JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = served.evaluator_artifact_ref`,
+      [row.answerId, row.answerVersion]
+    );
+    const servedBySeat = new Map(served.rows.map((model) => [model.seat, modelFrom(model)] as const));
+    const servedModel = (seat: "WRITER" | "CHECKER", ref: string | null): ServeDisclosureModel | null => {
+      const model = servedBySeat.get(seat) ?? null;
+      return ref !== null && model !== null && model.providerRef === ref ? model : null;
     };
-    const violation = recordViolation(stored);
-    if (violation !== null) {
-      throw new TypedDomainError(
-        "SERVE_DISCLOSURE_ROW_INVALID",
-        `The stored serve disclosure does not match its declared shape: ${violation}`
+    const writerServed = servedModel("WRITER", row.writerServedRef);
+    const checkerServed = servedModel("CHECKER", row.checkerServedRef);
+    const known = [writerServed, checkerServed].filter((model): model is ServeDisclosureModel => model !== null);
+    const unknownRefs = [...new Set([row.writerPlannedRef, row.checkerPlannedRef])]
+      .filter((ref) => !known.some((model) => model.providerRef === ref));
+    const byRef = new Map(known.map((model) => [model.providerRef, model] as const));
+    if (unknownRefs.length > 0) {
+      const inRun = await this.pool.query<ModelRow>(
+        `SELECT DISTINCT ON (artifact.provider_ref)
+                artifact.provider_ref, artifact.maker, artifact.model_id, artifact.provider
+           FROM ledger.raw_artifact AS artifact
+          WHERE artifact.run_id = $1 AND artifact.provider_ref = ANY($2::text[])
+          ORDER BY artifact.provider_ref, artifact.at_seq DESC`,
+        [row.runId, unknownRefs]
       );
+      for (const model of inRun.rows) byRef.set(model.provider_ref, modelFrom(model));
     }
-    return Object.freeze(stored);
+    return Object.freeze({
+      row,
+      models: Object.freeze({
+        writerPlanned: byRef.get(row.writerPlannedRef) ?? null,
+        writerServed,
+        checkerPlanned: byRef.get(row.checkerPlannedRef) ?? null,
+        checkerServed
+      })
+    });
   }
 }
