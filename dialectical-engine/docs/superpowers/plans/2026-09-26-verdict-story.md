@@ -16012,3 +16012,690 @@ EOF
 ```
 
 No push. The owner authorizes pushes.
+
+---
+
+# Addendum (2026-09-27): look-gate revision and the engine money rule
+
+The owner's look gate (2026-09-26) and answers (2026-09-27) added the tasks below. Spec §14 is their authority. Built already: R1 (the story talks to the person, 80c918a0..9f40e6f0), R2 (panel, public page and PDF in the question's language, 9f40e6f0..c7a8bb5e), R3 (translations into 33 locales, c7a8bb5e..63e2b906). Tasks 14 and 15 above run with controller notes that update their stale anchors to the i18n code. The tasks below are written as requirements, interfaces and named tests, not pre-drafted code, because the code moved faster than pre-drafted code could follow.
+
+Order: Task 14 → Task 15 → R-fonts → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 → Task 16.
+
+### Task R-fonts: the full report (PDF) prints in every one of the 35 languages
+
+**Owner decision (2026-09-27): "A: add them".** Script fonts are vendored server-side, about 30–60 MB accepted, with right-to-left layout for Hebrew and Arabic. Then `reportSupportedForLocale` becomes true for every locale.
+
+**Base:** the feature branch after Task 15. Read the COMMITTED code first:
+- `apps/ui/lib/report/*`: `renderReport.ts` (`REPORT_FONT_FILES`, `resolveReportFontDirectory`, `registerReportFonts`, `reportHyphenation`), `ReportDocument.tsx`, `reportModel.ts` (`reportWordPieces`, `REPORT_WORD_BREAK`), `reportLanguage.ts` (`REPORT_UNPRINTABLE_LOCALES`, `reportSupportedForLocale`), `fonts.test.mjs`
+- `apps/ui/assets/fonts/` (the Latin faces, each with its OFL.txt)
+- the Task 13 notes in `task-13-carry.md` items 5, 6 and 8 (how the Latin fonts were vendored and verified; the react-pdf pitfalls)
+- `apps/ui/components/StoryPanel.tsx` (download button hidden when unsupported) and the Task 15 route (404 `reportUnsupported`)
+
+#### Requirements
+
+##### 1. Fonts
+- **Scripts to cover.** Add static TTF/OTF faces for the ten locales the report cannot print today:
+
+  | Script | Locales |
+  |---|---|
+  | Cyrillic | bg, ru, uk |
+  | Greek | el |
+  | Hebrew | he |
+  | Arabic | ar |
+  | Devanagari | hi |
+  | Simplified Chinese | zh |
+  | Japanese | ja |
+  | Korean | ko |
+
+- **Family and weights.** Use the Noto family (SIL OFL 1.1). Use only the weights the report uses: regular, bold, and italic only where the script has one. Where a script has no italic, the report's italic style falls back to regular for that script. Pick the smallest faithful sources:
+  - Noto Sans covers Latin, Cyrillic and Greek in one face. Prefer it for bg/ru/uk/el over three separate files.
+  - Use per-language CJK faces (Noto Sans SC / JP / KR).
+  - Use Noto Sans Hebrew, Noto Naskh Arabic or Noto Sans Arabic (say which, and why), and Noto Sans Devanagari.
+- **Provenance and verification.** Get each file from the upstream repositories at pinned commits (google/fonts or notofonts), exactly as Task 13 did for the Latin faces:
+  - verify each sha256;
+  - include each family's OFL.txt;
+  - record the source URL, commit and sha256 per file in a `SOURCES.md` beside the fonts;
+  - never use a CDN at runtime;
+  - never ship the fonts to the browser bundle (server-side only, read at render time).
+- **Size.** Report the total added size. If it exceeds 60 MB, stop and report NEEDS_CONTEXT with the numbers and options (for example: subset CJK to the characters in common use, or keep one weight). Do not subset silently.
+- **Variable fonts.** Do not use them unless you prove react-pdf 4.9.0 renders the right weight. Static instances are the default.
+
+##### 2. Choosing the face
+- **Per locale.** Register the new faces with react-pdf. The report picks its body and heading faces from the report's locale (the question's locale).
+  - A Latin locale keeps today's look exactly: Plus Jakarta Sans body, Fraunces headings where they are used today. Nothing changes for en/ro/…, and the existing fonts tests stay green.
+  - A non-Latin locale uses its Noto face for body and headings (bold for headings).
+- **Mixed text.** Model text can mix scripts: a Russian story quoting an English product name, or a Romanian story with a Greek letter.
+  - Use react-pdf's font-family fallback list if 4.9.0 supports it; measure, do not assume. Otherwise segment text runs by script in code.
+  - Either way, no glyph in the report's catalogues or in the per-script samples (below) may render as `.notdef`.
+  - Add a test that checks cmap coverage of every catalogue value the report prints, for every locale, against the face chosen for it plus its fallbacks.
+
+##### 3. Line breaking
+- Chinese and Japanese text has no spaces. Allow a break between any two CJK ideographs, kana or fullwidth characters (UAX #14 style), without printing a hyphen, using the same zero-width mechanism `reportHyphenation` uses.
+- Korean breaks at spaces, as today.
+- Latin behaviour is unchanged, and so are its tests.
+
+##### 4. Right-to-left (ar, he)
+- **Direction.** Text runs right to left, paragraphs are right-aligned, and the page layout mirrors: list markers and the point-number column go on the right; page numbers follow the reading side.
+- **Shaping and bidi order.**
+  - Arabic letters must join correctly (shaped initial/medial/final forms).
+  - Mixed runs keep the correct visual order: a Latin model name, a number, `[P3]` inside Arabic or Hebrew text.
+- **Research first.** Find out what `@react-pdf/renderer` 4.9.0 / `@react-pdf/textkit` actually does for bidi and Arabic shaping, from the installed source, not from memory.
+  - If it does bidi reordering and shaping, use it.
+  - If it does not, the allowed route is a small code-owned step that splits a paragraph into directional runs and lays them out in visual order, with shaping left to fontkit per run.
+  - A new dependency (for example a UAX #9 bidi library) is allowed only under the dependency policy: exact pin, published ≥7 days ago, MIT/Apache/BSD/OFL, clean `pnpm audit --audit-level=moderate`, `strictDepBuilds`. Say why it was needed.
+- **No control characters.** Never insert bidi control characters (U+202A–U+202E, U+2066–U+2069) into the text. The repository's bidi scan must stay clean. If you need direction marks internally, keep them out of the PDF text and out of the source files.
+
+##### 5. Flip support
+- **The list becomes empty.** `REPORT_UNPRINTABLE_LOCALES` is empty only for scripts proven by the tests below. Update the doc comment.
+- **A script that cannot be printed correctly.** If a script cannot be printed correctly (for example Devanagari conjuncts, or Arabic joining that react-pdf breaks), leave that locale in the list, and report it with evidence (a rendered image and what is wrong). Do not ship a report that prints the language wrongly. The controller takes it to the owner.
+- **Keep the machinery working when the list is empty.** Keep `reportSupportedForLocale` and the hidden-button path, and keep their tests green: inject a predicate or keep one test locale.
+
+##### 6. Proof
+- **Per-script sample stories.** For each of the seven scripts, a small test fixture (committed test data, not a shipped file): a short story in that language, 3–4 sentences per field, with one `[P1]` reference, one number and one embedded Latin word. Put it beside the Romanian fixture pattern, used only by tests and the sample script. You write the text yourself, offline, in plain calm words.
+- **Tests:**
+  - every locale's report renders without throwing, including the 150-point stress render for one CJK and one RTL locale;
+  - no `.notdef` glyph for any character in the catalogue values or the samples;
+  - the chosen face per locale;
+  - CJK break opportunities;
+  - an RTL layout assertion at the model or style level (alignment and marker side);
+  - for Arabic, a shaping check that the glyph ids for a joined word differ from the isolated forms.
+- **Images for the look.**
+  - Render one sample PDF per script (Russian, Greek, Hebrew, Arabic, Hindi, Chinese, Japanese, Korean) into `out="$(mktemp -d)"`.
+  - Rasterize the cover page and one appendix page of each to PNG with a tool already on the machine (for example macOS `sips` or `qlmanage`, or `pdftoppm` if present), and never install new system software.
+  - LOOK at each image yourself: boxes, joins, direction, overflow. Say in the report what you saw per script.
+  - Report the absolute paths of the PDFs and images. Do not commit them.
+
+##### 7. Housekeeping
+- Add every new shipped file to `tests/support/shipped-corpus.manifest.txt`, and every new node test to `apps/ui/scripts/node-test-manifest.json`.
+- Check `.gitattributes` for the new font files: binary, no EOL normalisation. Also check the build output: Next must not bundle the fonts into client chunks.
+- Every commit leaves `pnpm run test:ci-gate` at new=0. Run on every commit:
+  - `pnpm --filter dialectical-engine-v2ui typecheck`, `test` and `build`
+  - the report render tests, explicitly
+  - the bidi scan
+
+#### Out of scope
+- the website's own fonts (the browser renders non-Latin scripts with system fonts today; unchanged);
+- any change to the report's content or wording;
+- money.
+
+#### Commits
+Commit in logical steps: fonts and provenance; face choice and fallback; CJK breaks; RTL; flip and tests. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+### Task M1: money for the answer is set aside, and the answer may go a little over
+
+**Authority.** Spec `dialectical-engine/docs/superpowers/specs/2026-09-26-verdict-story-design.md` §14.4 (read all of it; this task is §14.4.1, first half).
+
+**Code map.** `.superpowers/sdd/2026-09-26-verdict-story/money-map.md`, sections B, C, H, K and risks R3, R6, R7 and R12. Every file:line there was measured at 63e2b906. Re-verify each one before you rely on it.
+
+**Owner rule.** No debate ends without a final verdict unless there is a technical problem. Money is never the reason. This task makes sure money is always left for the answer.
+
+#### Requirements
+
+##### 1. The policy (`packages/register/src/cost-envelope-policy.ts`)
+- **Two optional members in the strict schema and the type.** Old rows (without them) must still parse, and their meaning is 0.
+  - `serve_reserve_basis_points`: an integer, 0 ≤ value < 10000.
+  - `serve_overrun_basis_points`: an integer, 0 ≤ value ≤ 10000.
+- **The refinement.** Daily ≥ per-run becomes daily ≥ `ceil(perRun × (10000 + overrun) / 10000)`.
+- **The code-owned row.** `COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW` gains `serve_reserve_basis_points: 3000` and `serve_overrun_basis_points: 2000`. Editing this code constant is the approved way to make a NEW version (see the comment at :117-120). No sealed snapshot file is touched: never edit `register.bootstrap.json`, `tests/support/fixtures/register-development-v4.json` or acceptance register v3.
+  - Update the test pins that hash or count the builder output (`tests/architecture/register-support-publication.test.ts` sha256 literals and counts) to the new values.
+  - Say in the report which pins moved and why.
+- **Hosted.** `costEnvelopePolicy` stays operator-owned.
+  - The example file `deploy/vps/register/hosted-register.example.json` gets both members (3000 and 2000).
+  - The runbook ceilings table (`deploy/vps/README.md` ~1150-1210) explains them in plain words, including this: until the operator publishes a register version with them, they are 0 and the margin is off.
+  - **Ruling:** the file format string stays `debateai.hosted-register.v1`, because every existing v1 file stays valid and keeps its meaning (missing = 0). Confirm that the operator-file parser accepts the new members; if it is stricter, extend it.
+  - `GO-LIVE-CHECKLIST.md` (find it) gets one line: publish the reserve and overrun values.
+- **No literals where the T16 scanner looks.** Values live in `packages/register` rows only. No `0.05`-style literals in the runner or the API. Basis-point arithmetic uses a module-private denominator or a frozen object, never `export const X = 10000;`.
+
+##### 2. Two ceilings over the one run total (`packages/budget`, the runner's gateway wrapper)
+- **A seam knows its phase.** The per-call seam builder (`buildCostEnvelopeSeam`, runner ~:6522) gains a phase argument, `"BODY" | "SERVE"`.
+  - The gateway wrapper decides it from the request: SERVE when `role` is SYNTHESIZER or EVALUATOR AND `lane === "served"`; BODY otherwise.
+  - The judges also use lane `served`, so the role check is required. Pin that with a test.
+  - Story calls keep their own seam, unchanged.
+- **The ceilings** (integer µUSD, rounded down):
+  - BODY: `perRun × (10000 − reserve) / 10000`;
+  - SERVE: `perRun × (10000 + overrun) / 10000`.
+
+  Both compare the run's TOTAL spend, the same total as today (RUN rows; STORY excluded). The refusal code stays `RUN_COST_ENVELOPE_MONEY_REACHED` for both. What happens after a refusal is Task M2's concern (continue to serve) and Task M3's (a cheaper model).
+- **Local mode.** It has no money envelope today; keep it that way.
+
+##### 3. The attempt ceiling gets the same reserve
+- The T17 attempt ceiling (`RUN_COST_ENVELOPE_EXHAUSTED`) counts calls, and it already prices a serve leg in calls: `serveSites × organMaxAttempts`, with `SERVE_LEG` at `packages/register/src/index.ts` ~224-250 and ~364-366.
+- Make BODY calls see `ceiling − serveLeg` and SERVE calls see the full ceiling, so a body that uses up its calls leaves the answer its calls.
+- Find where the attempt ceiling is asserted, and make it phase-aware in the same way as the money seam. If the stored `envelope_basis` does not carry the serve leg separately, derive it from what the basis does carry, or add it in a backwards-compatible way (old runs: serve leg 0). Say which in the report.
+
+##### 4. The daily admission reserve (`CostEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun`, `model-spend.ts` ~389-411)
+- It reserves `ceil(perRun × (10000 + overrun) / 10000) + perStory`.
+- Task M6 adds the story's own margin to the second term. Leave a clear seam for it: one function computes "the most one run may spend".
+- Update `tests/unit/v28-model-spend-ledger.test.ts` and the other pins of the old amount.
+
+##### 5. Spend phase for the measurement run (R12)
+- A new migration `migrations/0075_model_spend_phase.sql`:
+  - it adds a nullable `spend_phase text` to `ledger.model_spend`, with a CHECK of `spend_phase IN ('BODY','SERVE')`;
+  - RUN rows written after this migration carry it; SUPPORT and STORY rows carry NULL.
+  - It must be idempotent (`IF NOT EXISTS`). It must never `CREATE OR REPLACE` a function another migration defines, and never edit an applied migration.
+  - Respect any append-only trigger or grant on the table. Read how 0066 and 0074 did it.
+  - Append the migration to the pinned list in `tests/architecture/security-migration-0065.test.ts` (0070 is reserved).
+- `recordCall` writes the phase it was given.
+- Test: one BODY and one SERVE call leave two rows with the right phases.
+
+#### Tests (write them first; RED then GREEN)
+- **Policy:**
+  - an old row without the members parses, with both meaning 0;
+  - a row with them parses;
+  - out-of-range values are refused;
+  - the new daily refinement refuses daily < per-run × (1 + overrun).
+- **Ceilings:**
+  - BODY sees the reduced ceiling and SERVE the raised one;
+  - a judge call on lane `served` is BODY;
+  - boundary arithmetic (exact equality admitted, one µUSD over refused), with rounding down;
+  - missing members give today's behaviour exactly.
+- **Attempts:** a BODY call is refused at `ceiling − serveLeg`, while a SERVE call still passes.
+- **Daily:** the reservation amount with and without the overrun.
+- **Spend phase:** recorded per phase, as above.
+- **Existing suites:** keep them green, adapting only what this task changes: `v28-cost-envelope`, `v28-gateway-cost-envelope`, `v28-model-spend-ledger`, `v28-envelope-wiring`, `hosted-register-publish`, `register-support-publication`, `story-policy` (if touched) and `deployment-register-family-wiring`.
+  - Behaviour that Task M2 changes (a body stop continuing to serve) is NOT changed here. Those tests stay as they are.
+
+#### Run
+Run all of these:
+- `pnpm run generate:contract`
+- both typechecks
+- the unit and architecture suites you touched, plus `pnpm run test:ci-gate` (new=0; the known baseline is 8)
+- the integration suites `tests/integration/v28-model-spend.test.ts`, `t17-envelope-ledger.test.ts` and `database.test.ts`, the story integration suites, and any integration suite covering migrations. Name each one run, with its result. The known pre-existing reds (`dev-api-environment`, `dev-api-process`, `support-routes`) are not yours.
+- a bidi scan (U+202A–E, U+2066–9) over every touched file
+
+#### Never
+- Edit `packages/serve/src/index.ts` or `packages/propagation/src/index.ts`. They are hash-sealed.
+- Put prices in the register. A test bans the word `price` in sealed rows.
+- Put `process.env` in `packages/`, `apps/` or `tools/` (outside the one allowed file).
+
+#### Out of scope
+- continuing to serve after a stop (M2);
+- the cheaper model (M3);
+- the digest (M4);
+- the floor (M5);
+- the story's margin (M6);
+- the daily-limit message (M7).
+
+#### Commits
+Commit in logical steps. Every message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+### Task M2: A stop while arguing never skips the answer
+
+**Authority.** Spec §14.4. This task implements §14.4.1, second half: "A stop while arguing never skips the answer" and "The first root's panel".
+
+**Code map.** `.superpowers/sdd/2026-09-26-verdict-story/money-map.md`, sections A and E, and risk R8. Re-verify every anchor.
+
+**Base.** The branch after Task M1. The BODY/SERVE ceilings and the attempt reserve exist.
+
+#### Requirements
+
+##### 1. The answer follows every stop while arguing (A1, A6, A8)
+Today, a run-body stop sets `runBodyBudgetStop` (runner ~:3704, caught at ~3719-4055). At the serve gate, `evaluateEnvelope(0, runBodyBudgetStop !== null)` then forces HARD_STOP, and `makeEnvelopeTerminal` makes the run COMPONENTS_ONLY without ever calling the answer-writer (runner ~:4737-4751).
+
+The change:
+- A body stop of kind MONEY, the attempt ceiling (`RUN_COST_ENVELOPE_EXHAUSTED`, which today propagates and FAILS the run; see `RUN_BODY_STOP_KINDS` ~:278 and `REVIEW_RETHROWN_CODES` ~:297-303) or USAGE (`PROVIDER_USAGE_UNREPORTED`) now stops ARGUING only.
+- Nothing more is argued. The run goes on to serve with the tree as it stands.
+- The recorded stop stays in the run's facts, so the honesty drawer can still say the debate was cut short. Keep whatever record or mark exists today for "stopped early for budget" wherever it does not force the terminal.
+- Every catch that records a body stop keeps recording it. Only the serve-gate decision changes.
+- `tests/architecture/v28-serve-decision-wiring.test.ts` pins the wiring "recorded at five catches and read at the envelope". Rewrite it to pin the NEW wiring: the stop is recorded at every catch, and the serve gate does NOT force a hard stop from it. Keep the mutation style.
+- A serve-phase refusal is Task M3's concern. After this task, a serve refusal still ends as today; M3 adds the fallback.
+
+##### 2. The first root's panel (A4 and R8)
+- Hoist the body-stop record above the root-0 calls (runner ~:3348-3392). Today it is declared at ~:3704.
+- **A money, attempts or usage stop on `PANEL:root`** (via `runNodePanel` → `runJudgePanel`, which rethrows spend stops at `packages/judgement/src/s04.ts:375`) no longer escapes the work item. The run takes the author-only selection (`authorOnlySelection()`, runner ~:3087-3107) with its existing single-voice disclosure (`PANEL-DEGRADED-SINGLE-VOICE`), records the body stop, and continues straight to serve.
+- **A stop on the author's own root-0 JUDGE call** (~:3348-3368) leaves nothing to answer from. It becomes a typed terminal failure with its own reason code, for example `RUN_CEILING_BELOW_FIRST_CALL`.
+  - Add the code to `KNOWN_DOMAIN_CODES`.
+  - The sweep in `tests/unit/api-operational-error.test.ts` must stay green.
+  - The UI already shows a plain failure line; do not add English text.
+  - This is a configuration fault (a ceiling below one call), which the owner's rule counts as technical.
+- Test the root-0 panel stop end to end (unit and integration): the run is served, carries the single-voice disclosure, and records the stop.
+
+##### 3. What the person sees
+- A run stopped while arguing but then served shows a normal answer, with its label and prose.
+- The honesty drawer keeps any truthful "stopped early" wording.
+- Check the adapter (`apps/ui/lib/v3/adapter.ts` ~90-95, ~240-250). If a served run with a recorded body stop showed "Components-only" anywhere, fix that mapping.
+- The story hook runs for these runs, since they are served.
+
+##### 4. Tests to rewrite
+- Rewrite the tests that pin the old "end at the limit" behaviour to the new behaviour. Keep each test's intent, one assertion per behaviour, and do not delete coverage: money-map §E lists them.
+- The ones this task owns:
+  - `v28-run-money-terminal`
+  - `v28-run-body-budget-stop`
+  - `v28-spend-stopped-serve-decision`
+  - `v28-truncated-maker-panel`
+  - `v28-serve-decision-wiring`
+  - `t17-envelope-ledger` (integration)
+  - the `database.test.ts` cases :4718/:4739/:4781-4790 (`serve-gate:COMPONENTS_ONLY_ENVELOPE` after a body stop) and :4981/:4993 (TERMINAL_FAILED) where they concern body stops.
+- For each rewritten test, the report lists: the file:name, the old assertion, the new assertion, and why.
+- A test for behaviour M3 will change (a serve refusal → COMPONENTS_ONLY) stays as it is.
+
+##### 5. New tests (RED first)
+Unit or integration, as fits:
+- a money stop at root 1 → served answer;
+- an attempt-ceiling stop in review → served answer (no longer FAILED);
+- a usage stop → served answer;
+- a root-0 panel money stop → author-only, served, single-voice disclosure;
+- a root-0 author judge money stop → the typed terminal failure;
+- the serve gate never forces a hard stop from a body stop (a mutation-style architecture pin).
+
+#### Run
+Run all of these:
+- `pnpm run generate:contract` and both typechecks
+- the unit and architecture suites touched
+- `pnpm run test:ci-gate` (new=0; the known baseline is 8)
+- the integration suites `database.test.ts`, `t17-envelope-ledger.test.ts`, `v28-model-spend.test.ts` and the story integration suites, named with their results
+- the bidi scan
+
+Never edit `packages/serve/src/index.ts` or `packages/propagation/src/index.ts`. They are hash-sealed. If a behaviour change seems to require editing either file, stop and report NEEDS_CONTEXT.
+
+#### Out of scope
+- the cheaper model and keeping drafts (M3)
+- the digest (M4)
+- the floor (M5)
+- the story (M6)
+- messages (M7)
+
+#### Commits
+Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+### Task M3: a cheaper model when the planned one cannot be paid, and drafts are kept
+
+**Authority:** spec §14.4, specifically §14.4.2 and §14.4.5 (the table only).
+**Code map:** `money-map.md`, sections A2, A3, C, D, G and K, and risks R2, R4 and R9. Re-verify every anchor.
+**Base:** the branch after Task M2. Body stops continue to serve, and the SERVE ceiling carries the overrun.
+
+#### Requirements
+
+##### 1. A runner price map (hosted only)
+- Build the map in `apps/runner/src/main.ts` from the provider targets' prices. The single reader is `providerTargetPrice` (`packages/providers/src/index.ts` ~185-197). Today the prices are captured only inside each gateway closure (~180-205).
+- Pass it to the runner in settings as a frozen map, providerRef → `{ inputMicrosPerMillion, outputMicrosPerMillion }`.
+- **Local mode** has no prices. The map is empty, and the fallback order falls back to the roster order (irrelevant in local mode, which has no money ceiling).
+- A new REQUIRED runner setting must be supplied by both `apps/runner/src/main.ts` and `acceptance/main.ts` (`tests/unit/deployment-register-family-wiring.test.ts`). Make it optional with an empty default if that is the cleaner fit, and say which you chose.
+- Never put prices in the register.
+
+##### 2. The fallback in the answer-writer and checker adapters
+- **Trigger.** A serve call (SYNTHESIZER or EVALUATOR, lane `served`) refused for MONEY (`RUN_COST_ENVELOPE_MONEY_REACHED`, before sending).
+- **Order of tries.**
+  - The adapter retries the SAME call site with the SAME framed prompt on the other claim-eligible makers (`synthesisMakers`, runner ~2965-2991), cheapest first by the price map. Cost is the projected cost of THIS request on that target: input bytes/2 × input price + max_tokens × output price, the same projection the seam uses. Reuse its function; do not copy it.
+  - The seam refuses before sending and writes no ledger row, so a refused try is free. "Fits" is decided by the seam itself.
+- **The checker's choice.** Prefer, among those that fit, a maker different from the model that wrote the candidate under check. Only if none fits, the same maker is allowed.
+- **No new prompt sites.** The prompt-surface guard (`tests/unit/prompt-surface-guard.test.ts`) pins exactly 2× `toSynthesisPromptMaterial(request)` and 2× `buildFramedPrompt({` in the runner. The fallback changes the PROVIDER, never the prompt. Those counts stay.
+- **What stays refused.** J24's refusals for any reason OTHER than money remain as they are: an absent role provider at claim, or a vanished provider.
+  - Rewrite the J24 test `tests/integration/database.test.ts` ~:5453 ("never substitutes the healthy maker") so that it pins exactly this.
+  - Add a new test showing that a money refusal DOES substitute, and that the substitution is disclosed.
+- **Persistence.** The sealed persist checks run, work item, call site and artifact, not the provider (serve ~2296-2317). A fallback call at the same call-site key therefore persists unchanged. Prove this with an integration test through the sealed persist.
+
+##### 3. Keep the best complete round (A2, A3, R4)
+- **After a COMPLETE round.** Once at least one round (writer plus checker verdict) is complete, a later round that fails keeps the best complete round instead of discarding everything. This covers a money refusal after all fallbacks, and `SYNTHESIS_TRANSPORT_DEATH`.
+  - Serve that round as the sealed chain would serve a finished loop, using the rules the sealed file applies to the last complete round.
+  - The sealed file reads `loop.rounds.at(-1)!` (serve ~950). The rounds you hand it must END with a complete round. Never hand it an incomplete one, and never invent a checker verdict.
+  - Today `makeEnvelopeTerminal` clears `finalSegments = []` (runner ~4609), and `runSynthesisLoop` (`packages/serve/src/synthesis.ts` ~640-715, not hashed) has no catch. The change belongs in `synthesis.ts` and in the runner.
+- **Before any complete round.** A round-1 checker refusal (after the fallbacks) keeps today's COMPONENTS_ONLY outcome for now; Task M5 adds the floor.
+- **Contract errors.** A content or contract error (`COMPOSITION_CONTRACT_ERROR`, `EVALUATOR_CONTRACT_ERROR`) keeps today's handling. It is not money.
+
+##### 4. The disclosure table (§14.4.5), `migrations/0076_serve_disclosure.sql`
+- **Table.** `serve.serve_disclosure`, one row per served answer, insert-once, content-free. Mirror `0074_answer_story.sql` for grants, replay safety, and what happens on answer erasure (follow the answer's own deletion path).
+- **Columns:**
+  - `answer_id` (primary key, same type and reference as `answer_story`'s answer key)
+  - `run_id`
+  - `writer_planned_ref`, `checker_planned_ref`
+  - `writer_served_ref`, `checker_served_ref` (NULL when the served result has no checked round)
+  - `writer_fallback`, `checker_fallback` (boolean)
+  - `fallback_reason` (NULL, or `'MONEY'`)
+  - `checker_same_as_writer` (boolean)
+  - `digest_rung` (smallint NULL; filled by M4)
+  - `digest_points_omitted` (integer NULL; M4)
+  - `floor_verdict_state` (text NULL, CHECK in SUPPORTED/CONTESTED/UNSUPPORTED; M5)
+  - `floor_leading_node_id` (NULL; M5)
+  - `floor_reason` (text NULL; M5)
+  - `created_at`
+- **The writer.** The runner writes the row once, after the sealed persist, for every answer: served, or COMPONENTS_ONLY with the facts known.
+  - A failure to write it never changes the answer. Log it with a typed code and continue, like the story hook.
+  - Add a repository in `packages/db` (or wherever `answer_story`'s repository lives) with a typed insert and read.
+- **Wiring.** Append the migration to the pinned list in `tests/architecture/security-migration-0065.test.ts`. Add every new `.ts` file to `tests/support/shipped-corpus.manifest.txt`. Add package edges if a new import crosses packages (`tools/orphan-audit`).
+- **Out of this task.** The READ of this row (API, PDF, CLI) is Task M5.
+
+##### 5. Diversity (R9)
+- `DEGRADED-DIVERSITY` is derived from the SEALED refs in the sealed file, so a fallback that puts writer and checker on one maker is not marked there. The `checker_same_as_writer` column records it instead.
+- Test that the column is true in that case.
+
+#### Tests (RED first)
+- The price map is built from the targets in hosted mode, and is empty in local mode.
+- The fallback:
+  - takes the cheapest-first order;
+  - skips a maker that does not fit;
+  - lets the checker prefer a different maker;
+  - uses the same call site and the same prompt, asserting on the framed request bytes;
+  - persists through the sealed chain.
+- J24 still refuses non-money substitution.
+- Keep-best-round:
+  - round 2 is refused after round 1 completed → round 1 is served;
+  - transport death in round 2 → round 1 is served;
+  - a round-1 refusal → COMPONENTS_ONLY, as today.
+- The disclosure row is written for a served answer with and without a fallback, and a failure to write it does not change the answer.
+- Update `tests/unit/t09-synthesis.test.ts` crash classes (~566-683) where this task changes behaviour, with a report line per test (old assertion → new assertion → why).
+
+#### Run
+Run all of these:
+- `generate:contract`, and both typechecks
+- the unit and architecture suites you touched
+- `pnpm run test:ci-gate` (new=0)
+- these integration suites, each named with its result: `database.test.ts`, `t17-envelope-ledger.test.ts`, `v28-model-spend.test.ts`, the story integration suites, and any integration suite covering migrations
+- the bidi scan
+
+Never edit `packages/serve/src/index.ts` or `packages/propagation/src/index.ts`. Never change the synthesizer or evaluator prompt TEXT: the composer and conformance contract hashes are pinned.
+
+#### Out of scope
+- the digest (M4)
+- the floor and every READ of the disclosure (M5)
+- the story (M6)
+- messages (M7)
+
+#### Commits
+Commit in logical steps. Every message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+### Task M4: deep debates fit the answer-writer's input (a shrinking digest)
+
+**Authority:** spec §14.4, specifically §14.4.3.
+**Code map:** `money-map.md` section F, risk R5, and K3/K4.
+**Base:** the branch after Task M3. The disclosure table exists with `digest_rung` and `digest_points_omitted`.
+
+#### The problem
+The composition byte budget (sealed row `compositionBundleBudget`) is 10,000, 20,000 or 30,000 bytes for the low, medium and high tiers. The tier is the asker's choice. `buildSynthesisDigest` (`packages/serve/src/synthesis.ts` ~218-257; this file is NOT hashed) sends one JSON entry per materialized node, with full UUIDs and full-precision floats. It shrinks only the summaries (`DIGEST_COMPRESSION_LEVELS` ~96-97).
+
+Measured: 195 nodes take 57,470 bytes at maximum compression. They can never fit any tier, so a deep debate ends COMPONENTS_ONLY (`DIGEST-CANNOT-EXIST`).
+
+#### Requirements
+
+##### 1. The ladder (all inside `buildSynthesisDigest` and its helpers in `synthesis.ts`)
+Each rung is tried only when every earlier rung is over the budget.
+
+- **Rungs 0–5.** Today's compression levels, unchanged: every node kept, with summaries shrinking.
+- **Rung 6 (compact).** Every node kept.
+  - Ids become short refs (for example `n1`, `n2`, … in a deterministic order: positions first, then tree order).
+  - `finalStrength` is rounded to 4 decimals.
+  - Relation targets use the same short refs.
+  - The summary takes the smallest compression level.
+  - The digest's key names stay exactly as today, so the prompt contract TEXT does not change and the composer and conformance hashes stay.
+- **Rung 7 (spine).** Membership drops, and this is the ONLY rung where it may.
+  - Keep the positions, their direct children, and the most decisive points, each with its chain up to its position. Everything else becomes counts.
+  - **Most decisive** reuses the definition the story's ladder uses (`packages/story/src/material.ts` ~583-601, ~626-715, "top-20 by leverage with the chain up"), mirrored in `serve`. `serve` may NOT import `story` (`tools/orphan-audit` boundary table), so copy the definition and pin the two against each other with a test that feeds both the same tree.
+  - If leverage cannot be computed from what the digest builder receives, use the closest deterministic quantity the runner already hands in, and say what you used and why.
+  - If the spine is still over budget, shrink the decisive set step by step (20 → 10 → 5 → 0 extra points). Positions and direct children stay to the end.
+  - The omitted points appear as counts in a digest field whose name explains itself (for example per position: `omitted_points: n`).
+  - Check that adding a field inside the digest is allowed by the prompt-surface guard (`tests/unit/prompt-surface-guard.test.ts`: it pins the payload's TOP-level keys `digest, code_label`) and by the fixture.
+- **Only when even the smallest spine is over budget** does the result stay `DIGEST_CANNOT_EXIST`. Task M5's floor then answers.
+
+##### 2. Mapping short refs back
+- The answer-writer and checker cite nodes (`node_refs`). With short refs, the runner maps each cited ref back to its real node id BEFORE the response reaches the sealed checks.
+- This includes `SERVED_STATEMENT_CITES_NO_VERIFIED_NODE` (serve ~1037-1045), and the served node and label ids.
+- The runner already maps the `"primary"` alias (runner ~4836-4845). Extend that one mapping point; do not add a second.
+- An unknown ref is refused exactly as an unknown node id is refused today.
+- A cited node that was omitted at the spine rung cannot be cited, because it is not in the digest.
+
+##### 3. T9's membership law, amended
+- The doc comment at the top of `synthesis.ts` (~9-16) and the runner comment (~4755-4757, "the byte budget may not shorten it") state the amended law: membership may drop only at the last rung, only when every earlier rung is over budget, and the drop is disclosed.
+- `tests/unit/t09-synthesis.test.ts` ~:266, "keeps every node at every compression level", becomes: every node is kept at rungs 0–6, and rung 7 is reached only when rungs 0–6 are all over budget.
+
+##### 4. Disclosure
+- The runner passes `digest_rung` (0–7) and `digest_points_omitted` (0 unless rung 7) into the M3 disclosure row.
+- The sealed outcome's `.marks` pass-through is unchanged. No new sealed mark.
+
+#### Tests (RED first)
+- The measured case: 195 nodes (UUIDs, one relation each, 300-character statements) at each tier.
+  - Low reaches rung 7, and so does medium. High reaches rung 6 or 7; assert what it actually reaches and say why.
+  - Each result is `kind: "DIGEST"` and within budget.
+- 50 nodes on medium stays at the rung it uses today (no regression).
+- Determinism: the same tree gives the same bytes.
+- Short refs map back. An unknown ref is refused. A citation of an omitted node is refused.
+- The spine keeps positions and direct children to the last step.
+- The story-versus-serve "most decisive" parity test.
+- The byte budget is never exceeded on any rung (a property-style test over random trees; keep it fast).
+- The disclosure row carries the rung.
+
+#### Run
+Run all of these:
+- `generate:contract` and both typechecks
+- the unit and architecture suites
+- `pnpm run test:ci-gate` (new=0)
+- the prompt-surface guard and `prompt-text-pins`, which must be UNCHANGED (no pin edits)
+- the integration suites `database.test.ts` and `t17-envelope-ledger.test.ts`, plus the story integration suites, each named with its result
+- the bidi scan
+- the depth scanner: `tests/support/depthOracle.ts` fails any line matching `/depth/i` with a bare `5` or `<6`. Name rungs and levels without such lines.
+
+Never edit `packages/serve/src/index.ts` or `packages/propagation/src/index.ts`. Never change the synthesizer or evaluator prompt TEXT.
+
+#### Out of scope
+- the floor (M5)
+- the story (M6)
+- messages (M7)
+
+#### Commits
+Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+### Task M5: the floor answer and the disclosure read (engine and API)
+
+**Authority.** Spec §14.4, parts §14.4.4 and §14.4.5 (the reads).
+**Code map.** `money-map.md` sections G and J, and risk R1.
+**Base.** The branch after Task M4. The disclosure table exists and is written for every answer, with the writer, checker, fallback and digest facts.
+
+#### Requirements
+
+##### 1. Writing the floor (runner)
+- **When a floor is written.** A run's sealed result is COMPONENTS_ONLY, and the arithmetic label exists. The runner computes `verdictLabel` BEFORE synthesis (runner ~4768-4774). The cause does not matter: money after all fallbacks, `DIGEST-CANNOT-EXIST`, transport death, NO_ARTIFACT, or a round-1 checker refusal. In that case the disclosure row carries:
+  - `floor_verdict_state`: the label;
+  - `floor_leading_node_id`: the position the label rests on, the same node the label's `servedNodeId` names;
+  - `floor_reason`: the sealed components-only cause, as a code.
+- **The sealed answer stays COMPONENTS_ONLY.** Nothing is faked: no raw artifact, no invented checker verdict (R1 route (a)).
+- **No label means no floor.** A FAILED run, or a run with no label at all, gets none.
+
+##### 2. A story for floor answers
+- Today the story hook runs only when `answerCarriesLabel` is true (SERVED or DOWNGRADED; runner ~5050-5051, ~5133), and `verdictLabelBasis` is persisted only then (~5098).
+- Extend both so a floor answer gets a story too:
+  - the story snapshot's label basis is the same basis the label was computed from;
+  - its `served_statement` is the leading position's statement.
+- If persisting the basis for a floor answer needs a column, add it in a NEW migration `0077_…`. Never edit 0074, 0075 or 0076. Say where the basis lives.
+- The story API's status derivation (`packages/story/src/status.ts`, `apps/api/src/stories.ts`) treats a floor answer like a served one: WRITING, then READY or UNAVAILABLE. It must never report NOT_FOUND for a floor answer that has a story.
+- The story package's checks (the arithmetic label is fixed and the story may not change it) apply unchanged.
+
+##### 3. The contract and the owner-scoped read
+- **The schema.** In `packages/contract` (not the sealed serve file), add a strict `AnswerDisclosureSchema` with:
+  - `floor`: `{ verdict_state, leading_node_id }` or null;
+  - `writer`: `{ planned_model, served_model, lower_cost: boolean }` or null;
+  - `checker`: the same shape, or null;
+  - `checker_same_as_writer: boolean`;
+  - `digest`: `{ compacted: boolean, points_left_out: number }`.
+- **Model names.** A model is shown by the same display rule the story's "Written by" uses (`lineageOf` in `packages/story/src/writer.ts` ~164-171). Never a provider URL or key.
+- **The route.** `GET /v1/answers/{id}/disclosure`, owner-scoped with the same answer gate as `/story`. A missing row gives a closed 404 `DISCLOSURE_NOT_FOUND`. Add it to the contract client (`readAnswerDisclosure`) and to the generated contract (`pnpm run generate:contract`).
+- **Tests.** Follow the story route's tests: owner allowed, foreign 404, no session 401.
+
+##### 4. The public snapshot
+- `PublicDebateSchema` stays `.strict()`. It gains an optional `floor` (`{ verdict_state, leading_node_id }`), copied at publish time from the disclosure row, the same way `language` was added in R2.
+- Old snapshots still parse. Update the s8 guard.
+
+##### 5. The operator command
+- A runner CLI prints a run's or an answer's disclosure row in plain words, one line per fact. Follow the `apps/runner/src/support-status-cli.ts` pattern and its package script naming (for example `pnpm ops:serve-disclosure <answerId|runId>`).
+- It needs database access, as the support CLI does. No `process.env` outside the allowed file.
+- Document it in `deploy/vps/README.md`, in the runbook section on money.
+
+##### 6. Out of this task
+- Showing the floor on the page and the public page, the story panel's label for a floor answer, and the PDF's "About" lines are Task M6 (UI).
+- Here the UI stays unchanged, except for the generated contract.
+
+#### Tests (RED first)
+- The floor is written for each COMPONENTS_ONLY cause that has a label: a money refusal after the fallbacks, DIGEST-CANNOT-EXIST, transport death in round 1, and a round-1 checker refusal.
+- No floor for a FAILED run.
+- A floor answer gets a story (story end-to-end integration), and its snapshot carries the leading statement.
+- The disclosure route (owner, foreign, none) and the contract parse.
+- The public snapshot with and without `floor`, and the s8 guard.
+- The CLI prints a row.
+
+#### Run
+- `generate:contract` and both typechecks.
+- The unit and architecture suites.
+- `pnpm run test:ci-gate` (new=0).
+- The integration suites, each named with its result: `database.test.ts`, `t17-envelope-ledger.test.ts`, every `story-*` suite, the API suites that cover answers and publication, and any migration suite.
+- The bidi scan.
+- Never edit `packages/serve/src/index.ts` or `packages/propagation/src/index.ts`.
+
+#### Commits
+Logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+### Task M6: the person sees the floor answer, and the report names a lower-cost model
+
+**Authority:** spec §14.4, specifically §14.4.4 ("What the person sees") and §14.4.5 (the PDF's "About").
+
+**Owner rules:**
+- A cheaper model is mentioned ONLY in "About this report" and in the owner's records, never in the verdict text.
+- The user always gets an answer.
+- There are no engine words in anything the user reads, and the story panel and the PDF are in the question's language.
+
+**Base:** the branch after Task M5, which built:
+- the disclosure read `readAnswerDisclosure`;
+- the public snapshot's optional `floor`;
+- a floor answer's story.
+
+#### Requirements
+
+##### 1. The owner's page
+- **The floor replaces the "Components-only" line.** When the answer is COMPONENTS_ONLY and its disclosure has a `floor`, the page's verdict area no longer shows the "Components-only…" line (`compose.v3.componentsOnlyVerdict`, via `apps/ui/lib/v3/adapter.ts` ~240-250). It shows instead:
+  - the label in human words;
+  - a lead-in, "Our best answer:" (new key);
+  - the leading position's own statement, which is already in the question's language.
+- **Language of the parts.** The verdict area's fixed words follow the page's usual rule: the interface locale, like every other fixed word in that area. The statement is the debate's own text. The honesty drawer keeps the true marks.
+- **Where the disclosure is read.** Read it where the page reads the answer, on the server for the first render and in the client refresh, without adding a sequential server round-trip if it can run in parallel.
+  - A 404 `DISCLOSURE_NOT_FOUND` or a failed read means no floor, and the page behaves as today.
+- **The story strip.** For a floor answer:
+  - the label comes from the floor when the answer itself carries none;
+  - before the story arrives, the interim text is the floor sentence in the QUESTION's locale (new `public.story.*` key for "Our best answer:").
+- **Tests:**
+  - a floor answer renders label + lead-in + statement and never "Components-only";
+  - a COMPONENTS_ONLY answer without a floor renders as today;
+  - the story strip's label for a floor answer.
+
+##### 2. The public page
+- A public snapshot with `floor` shows the same floor answer, with its fixed words in the question's language, like the public short story.
+- A snapshot without `floor` renders as today.
+
+##### 3. The PDF's "About this report"
+The report pipeline reads the disclosure as well. The Task 15 route gains the read, and a failed or missing read means none of the lines below. Rows and lines, all catalogue keys, in the question's language:
+- **"Answer written by"**: the served writer model. **"Answer checked by"**: the served checker model. Show them only when the disclosure has them.
+- **A lower-cost model:** when `writer.lower_cost` or `checker.lower_cost` is true, one plain sentence, for example "A lower-cost AI model wrote this answer, to stay within the debate's budget." (or "…checked…", or "…wrote and checked…"). Pick the plainest wording in English and Romanian, and offer 3 phrasings in the report for the owner to choose from later. Ship the first.
+- **A floor answer:** one plain sentence, for example "No AI model could write the full answer within the budget, so this answer is the debate's leading position."
+- **A spine digest** (`digest.points_left_out > 0`): one plain sentence without numbers from the engine, for example "The debate was very large, so the answer was written from its most important points."
+- **Engine words.** No engine words (judge, evaluator, checker, reviewer, score, threshold, margin, band, runner-up). The existing ban test `tests/unit/story-i18n.test.ts` covers `public.report.*`. "Checked by" is already used in the report, so reuse its wording pattern.
+
+##### 4. Catalogues
+- New keys go in all 35 locales, with real, natural translations. You translate them yourself, offline: no web and no translation services. Use a calm, polite tone.
+- Placeholders are identical to English. Plurals follow each locale's CLDR categories if any key is a plural.
+- Every i18n guard stays green with no allowlist entries: `no-hardcoded-english`, `public.test.mjs`, `debateDrawers.test.mjs`, `catalogThreading`, `catalogNamespaces`, `catalogContractAssertions`, `story-i18n`, `debate-page-catalogs`.
+- List every new key with its English and Romanian values in the report.
+
+##### 5. The look
+Regenerate the owner mock and the sample PDF with a FLOOR variant and a LOWER-COST variant of the Romanian fixture. Use `tools/story-mock.tsx` and the sample script, writing into `out="$(mktemp -d)"`. Report the absolute paths, and do not commit the artifacts. The controller shows them to the owner.
+
+#### Run
+- `generate:contract` and both typechecks.
+- `pnpm --filter dialectical-engine-v2ui test`, `typecheck` and `build`.
+- The story and report render tests, explicitly.
+- `pnpm run test:ci-gate` (new=0).
+- The bidi scan over every touched file, including the 35 catalogues.
+
+Known unrelated reds:
+- the integration suites `dev-api-environment`, `dev-api-process` and `support-routes`;
+- the render suites `load01`, `t1-canvas` and `t3-library`.
+
+#### Out of scope
+- engine changes (M1–M5)
+- the story's margin (M7)
+- the daily message (M8)
+
+#### Commits
+Commit in logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+### Task M7: the story's margin and its cheaper model
+
+**Authority.** Spec §14.4, §14.4.6 and §14.2 ("The story has a small money margin and a fallback").
+**Code map.** `money-map.md` section I and risk R11.
+**Base.** The branch after Task M6. The runner price map exists (Task M3).
+
+#### Requirements
+
+##### 1. The story's cap and margin
+- The code-owned story row (`packages/register/src/story-policy.ts`, `buildStoryRegisterRows`, hosted only, ~175-187) gains the optional `per_story_overrun_basis_points: 2000`.
+  - It goes into the strict schema and the type.
+  - A missing value means 0.
+  - This is a new version, published through the usual code-owned row path, so no sealed snapshot file is touched.
+- The story ceiling becomes `perStory × (10000 + overrun) / 10000`, rounded down: 60,000 µUSD with today's values. This is computed in `#envelopeFor` (`packages/budget/src/model-spend.ts` ~352-379).
+- The daily admission reserve (M1's "the most one run may spend") uses the story's raised ceiling in its second term.
+- Update the pins: `tests/unit/story-policy.test.ts` ~70-92, `hosted-register-publish.test.ts` ~251, `register-support-publication` (hash literals and counts), and `v28-model-spend-ledger`. Report each moved pin.
+
+##### 2. A cheaper model for the story
+- When a story call is refused for money (`STORY_COST_ENVELOPE_REACHED` from the story seam, before sending), the writer retries the same call site (`STORY:STORYTELLER:{round}` or `STORY:CHECKER:{round}`) with the same framed prompt on the run's other claim-eligible makers, cheapest first by the runner's price map.
+  - Reuse the projection function M3 used; do not copy it.
+  - The story's checker prefers a maker different from the one that wrote the draft, when one fits.
+- Only after every maker is refused does the loop map the refusal to `STORY_ENVELOPE_EXHAUSTED` (`packages/story/src/loop.ts` ~131-146), with today's rules: an earlier checked draft is kept as READY_WITH_RESERVATION, otherwise FAILED.
+- The story's `lineageOf` (`writer.ts` ~164-171, ~258-275) already records the model actually used, so the PDF's "Written by / Checked by" shows it. Verify this with a test.
+- **Ruling:** the story's own rule of no fallback for an ABSENT role (`STORY_ROLE_UNAVAILABLE`, `writer.ts` ~388-392; runner `main.ts` ~222) stays. The fallback is for money only, the same exception as J24's (§14.4.2).
+- `buildFramedPrompt(` stays callable only from `packages/story`, and its count in `apps/runner/src/index.ts` stays 2.
+
+##### 3. Tests (RED first)
+- The story ceiling with and without the overrun, and a missing member meaning 0.
+- The daily reservation's second term.
+- The fallback:
+  - cheapest first;
+  - the checker prefers a different maker;
+  - the same call site and prompt bytes;
+  - a refused try writes no ledger row.
+- All refused leads to STORY_ENVELOPE_EXHAUSTED, as today (story-loop ~330 keeps the first draft).
+- The lineage records the fallback model.
+- The existing story suites stay green: `story-budget`, `story-writer`, `story-loop`, `story-policy`, and the integration `story-end-to-end` and `story-budget`.
+
+#### Run
+- `generate:contract` and both typechecks
+- the unit and architecture suites
+- `pnpm run test:ci-gate` (new=0)
+- every `story-*` integration suite and `v28-model-spend`, named with their results
+- the bidi scan
+
+#### Out of scope
+- the daily message (M8)
+- anything in the UI
+
+#### Commits
+Commit in logical steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
+### Task M8: A friendly message when today's capacity for new debates is used up
+
+**Authority:** spec §14.4.7.
+**Owner choice:** the daily limit for NEW debates stays. The person sees a friendly "try again tomorrow".
+**Code map:** `money-map.md`, section H.
+
+#### Requirements
+- **A new failure kind.** `apps/ui/lib/v3/requestFailure.ts` gains a kind for a refusal whose `serverCode` is `DAILY_COST_ENVELOPE_REACHED`. Today every 429 maps to `BUSY` (~110-111), which shows "The coordinator is rate-limiting requests right now. Retry shortly." That is jargon, and it is wrong about the timing.
+  - The hourly per-owner limit (`ADMISSION_RATE_LIMITED`) keeps its own mapping, reworded only if it also says "coordinator". If you reword it, keep its meaning ("wait a little").
+- **The message.** It says, in plain calm words, that today's capacity for new debates is used up and to try again tomorrow. Examples of tone:
+  - EN: "We've reached today's limit for new debates. Please try again tomorrow."
+  - RO: „Am atins limita de azi pentru dezbateri noi. Vă rugăm să încercați din nou mâine."
+
+  The message:
+  - never says "coordinator", "rate-limiting", "envelope", "budget ceiling" or any figure;
+  - never promises an hour.
+  - The limit resets at UTC midnight, and the API sends `Retry-After`. "Tomorrow" is close enough; do not compute a local time.
+- **Catalogues.** New keys go in all 35 locales (`newDebate` namespace, or wherever `requestFailure` reads), with real, natural translations. You translate them yourself, offline: no web or translation services. Use polite forms. Every i18n guard stays green, with no allowlist entries.
+- **The home composer.** `apps/ui/components/LibraryComposer.tsx` (~36-38) swallows every error and redirects to /new. For this refusal it shows the same friendly message where the person typed. Follow how /new shows it (`NewDebatePageClient.tsx` ~181-184).
+- **Tests:**
+  - the mapping by server code;
+  - the message in en and ro;
+  - the composer shows it and does not redirect;
+  - the old BUSY tests (`tests/unit/v2ui-banner-copy.test.ts` ~38, ~73-74; `v2ui-data-layer.test.ts` ~1082, ~1102) are updated to the new wording where they pin it.
+
+#### Run
+- `pnpm --filter dialectical-engine-v2ui test`, `typecheck` and `build`
+- the unit suites you touched
+- `pnpm run test:ci-gate` (new=0)
+- the bidi scan over every touched file, including the 35 catalogues
+
+#### Commits
+Commit in one or two steps. Each message ends with "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Never push.
+
