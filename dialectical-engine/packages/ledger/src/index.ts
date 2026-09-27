@@ -617,6 +617,15 @@ export class LedgerRepository {
     readonly ledgerEntryRef: string;
     readonly attemptId: string | null;
     readonly artifactRef: string | null;
+    /**
+     * Model scorecard A16c (controller carry 14a): WHO answered — the route and
+     * the candidate on the row. A site's `:seat:` marker is the KEY it is
+     * counted under, and a cross-exchange keeps the one key it already holds
+     * even when its root's writer changed, so the marker is never read as the
+     * answerer.
+     */
+    readonly actorRef: string;
+    readonly candidateId: string | null;
   }[]> {
     const result = await this.pool.query<{
       call_site_key: string;
@@ -624,8 +633,11 @@ export class LedgerRepository {
       ledger_entry_id: string;
       attempt_id: string | null;
       raw_artifact_ref: string | null;
+      actor_ref: string;
+      candidate_id: string | null;
     }>(
-      `SELECT call_site_key, outcome, ledger_entry_id, attempt_id, raw_artifact_ref FROM ledger.ledger_entry
+      `SELECT call_site_key, outcome, ledger_entry_id, attempt_id, raw_artifact_ref, actor_ref, candidate_id
+       FROM ledger.ledger_entry
        WHERE run_id = $1 AND subject_item_id = $2
          AND action_kind = 'MODEL_CALL' AND contract_hash = $3
          AND (call_site_key LIKE '%:seat:main' OR call_site_key LIKE '%:seat:runnerUp')
@@ -637,7 +649,9 @@ export class LedgerRepository {
       outcome: row.outcome,
       ledgerEntryRef: row.ledger_entry_id,
       attemptId: row.attempt_id,
-      artifactRef: row.raw_artifact_ref
+      artifactRef: row.raw_artifact_ref,
+      actorRef: row.actor_ref,
+      candidateId: row.candidate_id
     })));
   }
 

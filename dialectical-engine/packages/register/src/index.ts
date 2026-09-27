@@ -347,6 +347,20 @@ export const SERVE_LEG = Object.freeze({
  *  · the runner calls at most `panelSize - 1` judges per node and refuses an
  *    assignment that seats more than `panelSize` debaters, so the four site
  *    counts are v4's.
+ * PRECONDITION (controller ruling A14; A16c, controller carries 11 and 14a):
+ * these bounds are exact provided every run pass derives a site's eligible
+ * members, their order and — for a cross-exchange — the root's writer from the
+ * site's identity and the ledger alone, never from in-memory visit order: the
+ * pinned assignment, the site-pure 80-20 ordinal (`seatSiteOrdinal`), and the
+ * ledger's per-key history (A15d's restoration, A16a's preference and
+ * hand-off), so a resumed pass meets the same members in the same order at
+ * every site it re-authors. A15d and A16a guarantee this; the per-key gateway
+ * caps plus A15d's final-retry check (carry 3) are what bound the site across
+ * any number of passes. Caveat (carry 14a): a cross-exchange site keeps the ONE
+ * key the ledger already holds for it, so after a resumed root is written by
+ * its other slot the key's `:seat:` marker no longer names the member that
+ * answers — the bound still holds, because it counts per KEY, but the marker is
+ * never a record of who answered; read the ledger row's actor and candidate.
  * A run with no runner-up can never spend a backup sequence, so admission
  * passes `backupSequencesProvisioned: 0` (or nothing) for it and the ceiling
  * stays DR-184-v4, the TRUE maximum V ruled on 2026-09-05 to seal without

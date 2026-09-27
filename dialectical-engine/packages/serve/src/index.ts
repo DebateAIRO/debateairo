@@ -606,9 +606,17 @@ export type AnswerForm =
 export const DEGRADED_DIVERSITY_MARK = "DEGRADED-DIVERSITY" as const;
 
 /**
- * Model scorecard A16 (R6): a seat moved to its runner-up. Minted by the
- * RUNNER after the serve chain (it can happen at claim, while authoring or
- * inside synthesis), always with one typed record per switch.
+ * Model scorecard A16 (R6): a member the assignment did not plan for a call
+ * answered it because the planned one was unavailable — a runner-up in place of
+ * its main (a switch during a call, a main absent at claim, a resumed pass), a
+ * main in place of a runner-up the 80-20 split chose (A16c, controller carry
+ * 12), or the debaters in place of a role whose pinned seats were all absent.
+ * Minted by the RUNNER after the serve chain (a switch can happen at claim,
+ * while authoring or inside synthesis), always with a typed record. A16c
+ * (carry 15): the record is what the answer drawer shows END USERS, so it says
+ * this in plain words and is aggregated per kind; the internals (role, seat,
+ * routes, cause, key) live in the progress stream's switch events and on the
+ * ledger rows, never in the record.
  */
 export const BACKUP_MODEL_USED_MARK = "BACKUP-MODEL-USED" as const;
 
@@ -1656,8 +1664,11 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   // T11: a label derived without a complete basis is disclosed on the answer it
   // labelled, with a typed record naming which limb of the basis was absent.
   "LABEL-BASIS-INCOMPLETE",
-  // Model scorecard A16: every seat that moved to its runner-up is named by a
-  // typed record — role, seat, both routes, the cause and the call site.
+  // Model scorecard A16: an answer that a stand-in model (partly) wrote carries
+  // a typed record, in plain words (A16c, carry 15). Its call_site_key and
+  // transport outcome stay NULL — 0021/0025 refuse both on this mark — so the
+  // role, seat, routes, cause and key live in the progress stream's switch
+  // events and on the ledger rows, not here.
   "BACKUP-MODEL-USED"
 ] as const);
 

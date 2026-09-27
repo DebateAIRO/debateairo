@@ -1278,6 +1278,48 @@ export interface RunSynthesisRoleRefusalValue {
 
 export type RunLifecycleEventValue = RunCooldownLifecycleValue | RunSynthesisRoleRefusalValue;
 
+/**
+ * Model scorecard A16 (owner ruling R4): a seat moved to its other member. Kept
+ * OUT of `RunLifecycleEventValue` on purpose — that union is the set of shapes
+ * 0069 admits for a content-encrypted run, and this one is not among them (see
+ * `RunRepository.recordBackupSwitchEvent`). This is the OWNER/ADMIN side of the
+ * disclosure: it names routes, keys and causes, which the answer's own
+ * BACKUP-MODEL-USED record may not (A16c, controller carry 15).
+ */
+export interface RunBackupSwitchLifecycleValue {
+  readonly state: "BACKUP_MODEL_ENGAGED";
+  readonly role: string;
+  /** The seat index the assignment PINNED. */
+  readonly seat_index: number;
+  readonly from_provider_ref: string;
+  readonly to_provider_ref: string;
+  /**
+   * TRANSPORT_FAILURE / USAGE_CAP: during a call (R4). ABSENT_AT_CLAIM: the main
+   * was not claim-eligible, so its runner-up sits in the seat. SPENT_ON_EARLIER_PASS:
+   * a resumed pass found the planned member's key at this site already at its
+   * allowance (A16c, carry 8c) — the ledger rows under `call_site_key` say why.
+   */
+  readonly cause: "TRANSPORT_FAILURE" | "USAGE_CAP" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
+  /** The planned member's key at the site; null for a switch made at claim. */
+  readonly call_site_key: string | null;
+}
+
+/**
+ * Model scorecard A16c (controller carry 8d): every seat the assignment pinned
+ * for a multi-seat role was absent at claim, so the DEBATERS sit in that role
+ * (today's rule, A15d's `fallbackRoles`). Not a per-seat switch — the planned
+ * seats and the debaters need not pair up — so it has its own shape.
+ */
+export interface RunRoleFallbackLifecycleValue {
+  readonly state: "ROLE_FELL_BACK_TO_DEBATERS";
+  readonly role: "SUPPORT_ATTACK" | "JUDGE" | "REVIEWER";
+  /** Every route the role's pinned seats named (mains, then their runner-ups, seat by seat). */
+  readonly from_provider_refs: readonly string[];
+  /** Every route now sitting in the role (the debaters' members, seat by seat). */
+  readonly to_provider_refs: readonly string[];
+  readonly cause: "ABSENT_AT_CLAIM";
+}
+
 export interface CompletionActivationResolution {
   readonly batteryRowId: string;
   readonly state: Exclude<ActivationState, "WAIT">;
@@ -1313,6 +1355,49 @@ export class RunRepository {
          VALUES ($1,$2,$3,$4::jsonb)`,
         [input.runId, await allocateSequence(client), input.kind, JSON.stringify(input.value)]
       );
+    });
+  }
+
+  /**
+   * Model scorecard A16 — the lifecycle event for a backup switch, or for a
+   * role that fell back to the debaters, on the `ledger.could_not_do` stream the UI
+   * already reads. WITHHELD — never refused — for a content-encrypted run:
+   * 0069's `core.progress_value_is_code_shaped` admits a closed set of value
+   * shapes there and may never be redefined, so a new shape would turn a
+   * disclosure into a crashed run. Every run discloses the switch on its answer
+   * through the BACKUP-MODEL-USED records.
+   *
+   * A16c (controller carry 8: one disclosure per real switch): a value this run
+   * already holds is not written twice — `ALREADY_RECORDED`. A resumed pass
+   * re-makes its claim, so a seat switched at claim would otherwise be told
+   * once per pass, and a pass that died between the announcement and the
+   * backup's call would tell its successor's switch again. Two genuinely
+   * distinct switches never share a value: an in-call switch names the site's
+   * failed key, and a site switches at most once per direction (DR-184-v5).
+   */
+  async recordBackupSwitchEvent(input: {
+    readonly runId: string;
+    readonly value: RunBackupSwitchLifecycleValue | RunRoleFallbackLifecycleValue;
+  }): Promise<"RECORDED" | "ALREADY_RECORDED" | "WITHHELD_ENCRYPTED_RUN"> {
+    return withWriteTransaction(this.pool, async (client) => {
+      const encryption = await client.query<{ encrypted: boolean | null }>(
+        "SELECT core.run_uses_content_encryption($1::uuid) AS encrypted",
+        [input.runId]
+      );
+      if (encryption.rows[0]?.encrypted !== false) return "WITHHELD_ENCRYPTED_RUN" as const;
+      const value = JSON.stringify(input.value);
+      const existing = await client.query(
+        `SELECT 1 FROM core.run_progress_event
+          WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json=$2::jsonb`,
+        [input.runId, value]
+      );
+      if ((existing.rowCount ?? 0) > 0) return "ALREADY_RECORDED" as const;
+      await client.query(
+        `INSERT INTO core.run_progress_event (run_id, at_seq, kind, value_json)
+         VALUES ($1,$2,'ledger.could_not_do',$3::jsonb)`,
+        [input.runId, await allocateSequence(client), value]
+      );
+      return "RECORDED" as const;
     });
   }
 

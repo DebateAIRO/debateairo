@@ -81,6 +81,7 @@ import {
   type FramedPrompt,
   type PromptContract,
   OpenAICompatibleProviderGateway,
+  PROVIDER_USAGE_CAP,
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
   type CallBound,
@@ -94,6 +95,7 @@ import {
 } from "@debateai/providers";
 import { RoleAssignmentSchema, canonicalPromptFingerprint, type RoleAssignment, type SeatCandidate } from "@debateai/scorecard";
 import {
+  BACKUP_MODEL_USED_MARK,
   buildFactBundle,
   compositionEvidenceRequired,
   createEnvelopeExhaustedResult,
@@ -128,16 +130,25 @@ import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, exhaustive, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import {
+  backupModelUsedRecords,
+  backupSwitchEventValue,
   buildAssignedRunSeatBook,
   buildLegacyRunSeatBook,
   createSeatCaller,
+  effectiveSynthesisCollapse,
   legacySynthesisSeat,
+  plannedSeatSlot,
   roleAssignmentSeatProblem,
+  roleFallbackEventValue,
+  seatSiteOrdinal,
+  withEffectiveDegradedDiversity,
   type AssignedRunSeatBook,
   type ConfiguredSeatMaker,
+  type LedgerSeatMove,
   type RouteHealth,
   type RunSeat,
   type RunSeatBook,
+  type SeatIdentity,
   type SeatMember,
   type SeatSlot
 } from "./run-seats.js";
@@ -1629,6 +1640,17 @@ async function callSynthesisRole<T>(
       throw new TypedDomainError(
         "SYNTHESIS_TRANSPORT_DEATH",
         `${site.role} transport exhausted after ${String(error.attempts)} attempts at ${site.callSiteKey}`
+      );
+    }
+    // A16: a usage cap that reached a synthesis role through BOTH members of its
+    // seat (or a seat without a runner-up) is a dead transport for the serve
+    // chain — the components-only TRANSPORT_DEATH class — never a crash. The
+    // gateway wraps a cap as ProviderCallFailedError (pre-flight ruling F11), so
+    // the branch above takes it; this one keeps a bare cap from a double safe.
+    if (error instanceof TypedDomainError && error.code === PROVIDER_USAGE_CAP) {
+      throw new TypedDomainError(
+        "SYNTHESIS_TRANSPORT_DEATH",
+        `${site.role} hit a subscription usage cap at ${site.callSiteKey}`
       );
     }
     throw error;
@@ -3293,13 +3315,41 @@ export class WalkingSkeletonRunner {
       );
     }
     const seatBook: RunSeatBook = assignedSeats?.book ?? buildLegacyRunSeatBook(configuredMakers);
+    /**
+     * Model scorecard A16c (R4; controller carries 8 and 15) — the progress
+     * stream's side of every switch: the owner/admin record that names the
+     * role, the seat, both routes, the cause and the key (the answer's own
+     * record says it in plain words, below, before `serve.persist`). Withheld,
+     * never refused, on a content-encrypted run (0069's closed progress shapes),
+     * and told once per run however many passes make it.
+     */
+    const announceSwitch = async (
+      value: Parameters<RunRepository["recordBackupSwitchEvent"]>[0]["value"]
+    ): Promise<void> => {
+      await this.#runs.recordBackupSwitchEvent({ runId: run.runId, value });
+    };
     // A16a: the run id is part of every site's 80-20 ordinal (controller carry 1),
-    // and the switches made at claim open the caller's switch record.
+    // and the switches made at claim open the caller's switch record. A16c: each
+    // switch made during a call, or through the ledger on a resumed pass, is told
+    // BEFORE the other member is called.
     const seatCaller = createSeatCaller({
       assigned: seatBook.assigned,
       runId: run.runId,
-      claimSwitches: assignedSeats?.claimSwitches ?? []
+      claimSwitches: assignedSeats?.claimSwitches ?? [],
+      onSwitch: (record) => announceSwitch(backupSwitchEventValue(record))
     });
+    // A16c (carries 8b and 8d): the switches made at claim, and the roles whose
+    // pinned seats were ALL absent, so the debaters sit in them (A15d's
+    // `fallbackRoles`) — only a role the assignment pinned seats for: a role it
+    // left empty planned no model that could be unavailable.
+    const fellBackRoles = (assignedSeats?.fallbackRoles ?? [])
+      .filter((role) => (roleAssignment?.roles[role] ?? []).length > 0);
+    for (const record of assignedSeats?.claimSwitches ?? []) await announceSwitch(backupSwitchEventValue(record));
+    for (const role of fellBackRoles) {
+      await announceSwitch(roleFallbackEventValue(role, roleAssignment?.roles[role] ?? [], role === "SUPPORT_ATTACK"
+        ? seatBook.supportAttack
+        : role === "JUDGE" ? seatBook.judge : seatBook.reviewer));
+    }
     const effectiveMakerCount = seatBook.position.length;
     /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct
@@ -3310,19 +3360,18 @@ export class WalkingSkeletonRunner {
      * shared POSITION maker, runner-ups included; this keeps the law where the
      * call is made. The legacy book is not re-validated.
      */
-    const positionMakerIsFree = (seat: RunSeat, member: SeatMember): boolean => !seatBook.assigned
+    const positionMakerIsFree = (seat: RunSeat, member: SeatIdentity): boolean => !seatBook.assigned
       || seatBook.position.every((other) => other === seat
         || [other.main, other.runnerUp].every((rival) => rival === null || rival.maker !== member.maker));
-    /** A15 (R5): the member that actually wrote each root; its cross-exchanges are that member's. */
-    const positionAnswerers = new Map<number, SeatMember>();
     /**
-     * A15d (controller carries 1 and 2): a root the LEDGER says a member already
-     * answered on an earlier pass is answered by that member again, so the root
-     * and its cross-exchanges keep their writer and their seat marker on every
-     * pass. Filled from the ledger before the first root is written; empty on a
-     * first pass and on the legacy book.
+     * A15 (R5): the member that actually wrote each root; its cross-exchanges are
+     * that member's. A15d (controller carries 1 and 2) seeds it from the LEDGER
+     * before the first root: a root an earlier pass answered starts with the
+     * member that answered it (the root call itself prefers that slot through
+     * `ledgerSeatRule`). A16c (carry 14b): the separate `restoredRootMembers`
+     * map this seeding used to go through was written and never read.
      */
-    const restoredRootMembers = new Map<number, SeatMember>();
+    const positionAnswerers = new Map<number, SeatMember>();
     /**
      * A16a (controller rulings on carry 1 and on the resume gaps) — what
      * EARLIER passes of this work item recorded under each seat-marked key of
@@ -3336,6 +3385,13 @@ export class WalkingSkeletonRunner {
     const seatKeyHistory = new Map<string, {
       readonly attempts: number;
       readonly lastAnsweredAt: number | null;
+      /**
+       * A16c (controller carry 14a): the routes that ACTUALLY answered or
+       * attempted under this key — the rows' actors. A cross-exchange keeps the
+       * one key it holds when its root's writer changes, so a key's marker is
+       * never read as who ran there.
+       */
+      readonly actors: ReadonlySet<string>;
       /** The key's latest row with an attempt id, and its latest failed one, each with its ledger order. */
       readonly latest: { readonly row: SeatKeyRow; readonly at: number } | null;
       readonly latestFailure: { readonly row: SeatKeyRow; readonly at: number } | null;
@@ -3394,7 +3450,8 @@ export class WalkingSkeletonRunner {
      * halt, and null when they hold no failure at all (every attempt answered):
      * a halt names a transport outcome, and the database admits only those two,
      * so such a site is never halted on a made-up one. `latest` is the keys'
-     * latest row, which a terminal cites (its record names no outcome).
+     * latest row; a terminal cites `failure ?? latest` (A16c, controller carry
+     * 14c: an OK row would settle a FAILED work item on an answer's attempt).
      */
     const spentSiteRow = (slots: readonly SeatSlot[], baseKey: string, bound: number): {
       readonly failure: (SeatKeyRow & { readonly outcome: "FAILED" | "TIMED_OUT" }) | null;
@@ -3418,6 +3475,41 @@ export class WalkingSkeletonRunner {
     const membersOf = (seat: RunSeat): readonly SeatMember[] =>
       seat.runnerUp === null ? [seat.main] : [seat.main, seat.runnerUp];
     /**
+     * Model scorecard A16c (controller carries 8c, 13 and 14a) — the switch a
+     * RESUMED pass makes through the ledger rather than inside a call. It exists
+     * when the member R3's split plans for the site (`plannedSeatSlot`) is one
+     * the call's fairness rule allows but the LEDGER bars (`eligible`: carry 6's
+     * spent slot, or `ledgerSeatRule`'s slot at its bound), and the other member
+     * can answer and never ran at the site on an earlier pass. "Ran" is read off
+     * the rows' ACTORS (carry 14a), never a key's marker. When the other member
+     * DID run there, an earlier pass already switched the site and told the
+     * stream; this pass only re-asks the member that answered (node ids are
+     * rebuilt), so there is no second switch to record (carry 13) — the answer
+     * still discloses the stand-in from who answered (`BackupAnswer`).
+     */
+    const newLedgerMove = (input: {
+      readonly seat: RunSeat;
+      readonly siteKey: string;
+      readonly baseKeyOf: (member: SeatMember) => string;
+      readonly fair: (candidate: SeatIdentity) => boolean;
+      readonly eligible: (member: SeatMember) => boolean;
+      readonly ordinal?: number;
+    }): LedgerSeatMove | undefined => {
+      const { seat } = input;
+      if (!seatBook.assigned || seat.runnerUp === null) return undefined;
+      const plannedSlot = plannedSeatSlot(seat, input.siteKey, {
+        runId: run.runId, ...(input.ordinal === undefined ? {} : { ordinal: input.ordinal })
+      });
+      const planned = plannedSlot === seat.main.pinnedAs ? seat.main : seat.runnerUp;
+      const other = planned === seat.main ? seat.runnerUp : seat.main;
+      if (!input.fair(planned) || !input.fair(other) || input.eligible(planned) || !input.eligible(other)) return undefined;
+      const otherRanHere = [planned, other].some((member) =>
+        seatKeyHistory.get(seatKeyOf(input.baseKeyOf(member), member))?.actors.has(other.providerRef) === true);
+      return otherRanHere
+        ? undefined
+        : Object.freeze({ from: plannedSlot, callSiteKey: seatKeyOf(input.baseKeyOf(planned), planned) });
+    };
+    /**
      * A15: who may answer ONE seat call at `siteKey` on this pass — the call's
      * own fairness rule, minus a member whose key the preflight found spent
      * (carry 6), then the ledger's record of earlier passes (A16a,
@@ -3425,18 +3517,23 @@ export class WalkingSkeletonRunner {
      * first; it is undefined on the legacy book, which keeps today's cooldown
      * path, and null when no member can be called. A16a (resume gap 2): when
      * every usable key is already spent, `spent` is the row the site cites and
-     * the site halts through `spentSiteHalts` without a call.
+     * the site halts through `spentSiteHalts` without a call. A16c: the options
+     * also carry the fairness rule alone (`fair`), so a member it bars is never
+     * counted as a stand-in, and the switch the ledger itself makes, `newLedgerMove`.
      */
-    const seatCallPlan = (seat: RunSeat, siteKey: string, rule?: (member: SeatMember) => boolean) => {
+    const seatCallPlan = (seat: RunSeat, siteKey: string, rule?: (candidate: SeatIdentity) => boolean) => {
       const judgeAttempts = this.settings.judgeBound.maxAttempts;
-      const allowed = (member: SeatMember): boolean => (rule === undefined || rule(member))
-        && spentSeatSlots.get(siteKey) !== member.pinnedAs;
+      const fair = (candidate: SeatIdentity): boolean => rule === undefined || rule(candidate);
+      const allowed = (member: SeatMember): boolean => fair(member) && spentSeatSlots.get(siteKey) !== member.pinnedAs;
       const fromLedger = ledgerSeatRule(seat, () => siteKey, allowed, judgeAttempts);
       const eligible = (member: SeatMember): boolean => allowed(member) && fromLedger.eligible(member);
+      const ledgerMove = newLedgerMove({ seat, siteKey, baseKeyOf: () => siteKey, fair, eligible });
       // What every seat call at this site passes: who may answer, and the slot a resumed pass prefers.
       const options = Object.freeze({
         eligible,
-        ...(fromLedger.prefer === undefined ? {} : { prefer: fromLedger.prefer })
+        fair,
+        ...(fromLedger.prefer === undefined ? {} : { prefer: fromLedger.prefer }),
+        ...(ledgerMove === undefined ? {} : { ledgerMove })
       });
       const spent = spentSiteRow(membersOf(seat).filter(eligible).map((member) => member.pinnedAs), siteKey, judgeAttempts);
       // A16a fix round 1: a halt cites a real failure with its own outcome; a site whose spent
@@ -3456,8 +3553,28 @@ export class WalkingSkeletonRunner {
     };
     // A16a fix round 1: the root a resumed pass restores is PREFERRED through the
     // ledger rule (`seatCallPlan`'s `prefer`), no longer a filter, so its seat
-    // keeps its backup; `restoredRootMembers` still seeds `positionAnswerers`.
-    const positionRule = (seat: RunSeat) => (member: SeatMember): boolean => positionMakerIsFree(seat, member);
+    // keeps its backup; the ledger read still seeds `positionAnswerers`.
+    const positionRule = (seat: RunSeat) => (member: SeatIdentity): boolean => positionMakerIsFree(seat, member);
+    /**
+     * Model scorecard A16c (controller carries 12 and 16) — THE SYNTHESIS SEATS
+     * TAKE PART IN R3's 80-20 SPLIT, through the same site-pure ordinal every
+     * other seat call reads (`seatSiteOrdinal`), hashed over the role's
+     * RUN-LEVEL site — `COMPOSER:SYNTHESIZER` / `POST_COMPOSE_R9:EVALUATOR`, the
+     * sites the serve chain's role controls are planned at — rather than a
+     * round's own key. The writer and the checker are called once per ROUND, so
+     * a per-round ordinal would flip identities mid-loop; one ordinal per run and
+     * role makes a whole debate's synthesis use either the main or the runner-up
+     * (R3), the same one on every resumed pass. Excluding them would make their
+     * runner-ups backups only and silently drop the diversity the assignment
+     * pinned for them. There is no second ordinal path (no run-wide hash, no
+     * call index, no per-POSITION hash).
+     */
+    const synthesisOrdinal = (seat: RunSeat): number => seatSiteOrdinal({
+      runId: run.runId,
+      role: seat.role,
+      pinnedSeatIndex: seat.pinnedSeatIndex,
+      callSiteKey: seat.role === "ANSWER_CHECKER" ? "POST_COMPOSE_R9:EVALUATOR" : "COMPOSER:SYNTHESIZER"
+    });
     /**
      * A16a (controller ruling on resume gap 1; fix round 1): who may answer a
      * synthesis site on this pass, and the slot it prefers — the ledger's record
@@ -3469,11 +3586,16 @@ export class WalkingSkeletonRunner {
       const rule = ledgerSeatRule(seat, () => siteKey, () => true, role === "SYNTHESIZER"
         ? this.settings.synthesisRolePolicy.synthesizerBound.maxAttempts
         : this.settings.synthesisRolePolicy.evaluatorBound.maxAttempts);
-      return rule.prefer === undefined ? { eligible: rule.eligible } : { eligible: rule.eligible, prefer: rule.prefer };
+      const ordinal = synthesisOrdinal(seat);
+      // A16c (carry 8c): a spent main's synthesis handed to its backup on a resumed pass is a switch.
+      const ledgerMove = newLedgerMove({ seat, siteKey, baseKeyOf: () => siteKey, fair: () => true, eligible: rule.eligible, ordinal });
+      return {
+        ordinal,
+        eligible: rule.eligible,
+        ...(rule.prefer === undefined ? {} : { prefer: rule.prefer }),
+        ...(ledgerMove === undefined ? {} : { ledgerMove })
+      };
     };
-    // The explicit 80-20 ordinal of the two single-call-per-run roles; A16c
-    // replaces it with `diversityOrdinalForRun(run.runId)`.
-    const synthesisOrdinal = 0;
     const panelPolicy = this.settings.panelPolicy;
     // S2-2 / J13(b): one record per node whose panel degraded, bound to the node the
     // graph minted — the same discipline `bindWayOfKnowingDowngrade` follows. Declared
@@ -3578,7 +3700,7 @@ export class WalkingSkeletonRunner {
       // runJudgePanel and the database enforce it — so the seat caller never
       // pays for a call the panel would refuse, and a seat whose main shares the
       // author's maker is answered by its runner-up instead of being lost.
-      const notTheAuthor = (member: SeatMember): boolean => member.maker !== input.authorMaker;
+      const notTheAuthor = (member: SeatIdentity): boolean => member.maker !== input.authorMaker;
       const panelCallCap = Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1;
       let panelCallsPlanned = 0;
       const panelKeyFor = (member: SeatMember): string => `${input.callSiteKey}:${member.providerRef}`;
@@ -3588,7 +3710,17 @@ export class WalkingSkeletonRunner {
         // other member stays its backup (`ledgerSeatRule`).
         const fromLedger = ledgerSeatRule(seat, panelKeyFor, notTheAuthor, this.settings.judgeBound.maxAttempts);
         const eligible = (member: SeatMember): boolean => notTheAuthor(member) && fromLedger.eligible(member);
-        const panelOptions = fromLedger.prefer === undefined ? { eligible } : { eligible, prefer: fromLedger.prefer };
+        // A16c: the author rule alone (`fair`), so a member it bars is never a stand-in, and the
+        // ledger's own switch at this panel site (carry 8c), keyed by each member's route.
+        const ledgerMove = newLedgerMove({
+          seat, siteKey: input.callSiteKey, baseKeyOf: panelKeyFor, fair: notTheAuthor, eligible
+        });
+        const panelOptions = {
+          eligible,
+          fair: notTheAuthor,
+          ...(fromLedger.prefer === undefined ? {} : { prefer: fromLedger.prefer }),
+          ...(ledgerMove === undefined ? {} : { ledgerMove })
+        };
         const planned = seatCaller.plan(seat, input.callSiteKey, panelOptions);
         if (planned === null) {
           return [{
@@ -3915,6 +4047,7 @@ export class WalkingSkeletonRunner {
           seatKeyHistory.set(row.callSiteKey, {
             attempts: (seen?.attempts ?? 0) + 1,
             lastAnsweredAt: row.outcome === "OK" ? order : seen?.lastAnsweredAt ?? null,
+            actors: new Set([...(seen?.actors ?? []), row.actorRef]),
             latest: cited ?? seen?.latest ?? null,
             latestFailure: row.outcome !== "OK" && cited !== null ? cited : seen?.latestFailure ?? null
           });
@@ -3927,7 +4060,6 @@ export class WalkingSkeletonRunner {
         const restored = [seat.main, seat.runnerUp].find((member): member is SeatMember => member !== null
           && member.pinnedAs === slot && spentSeatSlots.get(siteKey) !== slot);
         if (restored === undefined) return;
-        restoredRootMembers.set(rootIndex, restored);
         positionAnswerers.set(rootIndex, restored);
       });
       /**
@@ -3943,7 +4075,10 @@ export class WalkingSkeletonRunner {
       for (const [rootIndex, siteKey] of [[0, "JUDGE"], [1, "JUDGE:root:secondary"]] as const) {
         const seat = seatBook.position[rootIndex];
         const spent = seat === undefined ? null : seatCallPlan(seat, siteKey, positionRule(seat)).spent;
-        if (spent !== null) spentSites.push({ row: spent.latest });
+        // A16c (controller carry 14c): the terminal cites the site's latest FAILURE — an OK row
+        // would settle a FAILED work item on an answer's attempt. Only a site whose spent keys hold
+        // no failure at all cites its latest row.
+        if (spent !== null) spentSites.push({ row: spent.failure ?? spent.latest });
       }
       for (const synthesis of [
         {
@@ -3965,7 +4100,8 @@ export class WalkingSkeletonRunner {
               .filter(ledgerSeatRule(synthesis.seat, () => siteKey, () => true, synthesis.bound).eligible)
               .map((member) => member.pinnedAs);
           const spent = spentSiteRow(slots, siteKey, synthesis.bound);
-          if (spent !== null) spentSites.push({ row: spent.latest });
+          // A16c (carry 14c): the same rule for a synthesis site.
+          if (spent !== null) spentSites.push({ row: spent.failure ?? spent.latest });
         }
       }
       const cited = spentSites.find((entry) => entry.row.attemptId !== null)?.row;
@@ -4463,7 +4599,7 @@ export class WalkingSkeletonRunner {
         // A15 (R5): reviewers come from the REVIEWER seats, and a seat may review
         // only through a member of a different maker than the author — checked
         // per member, so whichever member answers is held to the same rule.
-        const differentMaker = (member: SeatMember): boolean => member.maker !== authoredNode.maker;
+        const differentMaker = (member: SeatIdentity): boolean => member.maker !== authoredNode.maker;
         const reviewer = selectDifferentMakerReviewer(authoredNode.maker, seatBook.reviewer.flatMap((seat) => {
           const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
           const first = seatCaller.plan(seat, reviewCallSiteKey, planned.options);
@@ -4724,7 +4860,13 @@ export class WalkingSkeletonRunner {
     // `judge + final`), so a site the ledger already holds under one marker
     // keeps that key on every later pass; the row's actor and candidate still
     // name the member that answered. That differs from the writer's own slot
-    // only when a claim re-probe seated the root differently (carry 3's class).
+    // whenever a later pass's root was written by the OTHER slot: a claim
+    // re-probe seated the root differently (carry 3's class), or — since A16a
+    // made the restored slot a preference — the slot an earlier pass restored
+    // failed on this pass and its backup wrote the root. So a cross-exchange's
+    // `:seat:` marker is the KEY the site is counted under, never a record of
+    // who answered it: every disclosure reads the answering member or the
+    // row's actor (A16c, controller carry 14a).
     const crossExchangeSeatFor = (exchange: CrossRootExchangeLeg): RunSeat => {
       const rootIndex = exchange.authorRootIndex;
       const siteKey = `JUDGE:cross-root:${exchange.authorRootIndex}->${exchange.targetRootIndex}`;
@@ -5515,7 +5657,6 @@ export class WalkingSkeletonRunner {
         synthesizerRoleRef: seatBook.answerWriter === null
           ? synthesisRoles.synthesizerRoleRef
           : seatCaller.plan(seatBook.answerWriter, "COMPOSER:SYNTHESIZER", {
-            ordinal: synthesisOrdinal,
             ...synthesisSeatOptions("SYNTHESIZER", seatBook.answerWriter,
               synthesisCallSiteKey({ role: "SYNTHESIZER", stage: "INITIAL", round: 1 }))
           })?.providerRef
@@ -5523,7 +5664,6 @@ export class WalkingSkeletonRunner {
         evaluatorRoleRef: seatBook.answerChecker === null
           ? synthesisRoles.evaluatorRoleRef
           : seatCaller.plan(seatBook.answerChecker, "POST_COMPOSE_R9:EVALUATOR", {
-            ordinal: synthesisOrdinal,
             ...synthesisSeatOptions("EVALUATOR", seatBook.answerChecker, synthesisCallSiteKey({ role: "EVALUATOR", round: 1 }))
           })?.providerRef
             ?? seatBook.answerChecker.main.providerRef,
@@ -5557,7 +5697,6 @@ export class WalkingSkeletonRunner {
         const answered = await callSynthesisRole(() => seatCaller.callSeat({
           seat: writerSeat,
           callSiteKey: writerSiteKey,
-          ordinal: synthesisOrdinal,
           ...synthesisSeatOptions("SYNTHESIZER", writerSeat, writerSiteKey),
           call: (member, callSiteKey) => member.provider.call({
             runId: run.runId,
@@ -5651,7 +5790,6 @@ export class WalkingSkeletonRunner {
         const answered = await callSynthesisRole(() => seatCaller.callSeat({
           seat: checkerSeat,
           callSiteKey: checkerSiteKey,
-          ordinal: synthesisOrdinal,
           ...synthesisSeatOptions("EVALUATOR", checkerSeat, checkerSiteKey),
           call: (member, callSiteKey) => member.provider.call({
             runId: run.runId,
@@ -5845,6 +5983,58 @@ export class WalkingSkeletonRunner {
       if (!result.conditionMarks.includes(LABEL_BASIS_INCOMPLETE_MARK)) {
         result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, LABEL_BASIS_INCOMPLETE_MARK]) };
       }
+    }
+    /**
+     * Model scorecard A16c (R4/R6; controller carries 8, 9, 12, 13 and 15) —
+     * every stand-in this answer's content came from is disclosed ON THE ANSWER,
+     * whatever the terminal: this point is reached by the envelope, crash and
+     * served paths alike (the owed-check pattern above).
+     *
+     * WHO answered is exact here although it is read off this pass: a resumed
+     * pass re-authors every site (node ids are rebuilt, so no earlier answer is
+     * reused), and the ledger decided who this pass asked — the slot an earlier
+     * pass's switch left the site with is preferred, a spent one is handed over
+     * — so a switch made on an earlier pass still shows as its stand-in answering
+     * here, counted once (carry 13). A role whose pinned seats were all absent
+     * counts when the debaters answered any of its calls (carry 8d). Plain words
+     * only (carry 15); the internals rode the progress stream.
+     */
+    const backupRecords = backupModelUsedRecords({
+      answers: seatCaller.backupAnswers(),
+      fallbackRoles: fellBackRoles.filter((role) => seatCaller.answered(role).length > 0)
+    }, servedRoot.nodeId);
+    if (backupRecords.length > 0) {
+      conditionMarkRecords = Object.freeze([...conditionMarkRecords, ...backupRecords]);
+      if (!result.conditionMarks.includes(BACKUP_MODEL_USED_MARK)) {
+        result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, BACKUP_MODEL_USED_MARK]) };
+      }
+    }
+    /**
+     * A16c (carry 9) — on an assigned run DEGRADED-DIVERSITY follows the writer
+     * and checker that ACTUALLY answered: the ledger's seat-marked rows, read by
+     * the ACTOR on each row (carry 14a), for exactly the artifacts this answer's
+     * rounds cite — so a writer an earlier pass switched to and this pass asked
+     * again counts, and a discarded pass's rounds never do. A crash answer is
+     * left alone (W2). The legacy run keeps the sealed-ref rule.
+     */
+    if (seatBook.assigned && result.crashClass === null) {
+      const actorByArtifact = new Map<string, string>();
+      for (const contractHash of [this.settings.composerContractHash, this.settings.conformanceContractHash]) {
+        const rows = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#ledger.readSeatMarkedModelCalls({
+          runId: run.runId, workItemId: claimed.workItemId, contractHash
+        }));
+        for (const row of rows) {
+          if (row.outcome === "OK" && row.artifactRef !== null) actorByArtifact.set(row.artifactRef, row.actorRef);
+        }
+      }
+      const actorsOf = (artifactRefs: readonly string[]): readonly string[] => artifactRefs.flatMap((ref) => {
+        const actor = actorByArtifact.get(ref);
+        return actor === undefined ? [] : [actor];
+      });
+      result = withEffectiveDegradedDiversity(result, effectiveSynthesisCollapse(
+        actorsOf(result.loopRounds.map((round) => round.candidateRef)),
+        actorsOf(result.loopRounds.map((round) => round.verdictRef))
+      ));
     }
     const persisted = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#serve.persist({
       runId: run.runId,

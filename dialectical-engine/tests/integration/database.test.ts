@@ -34,6 +34,7 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   applySingleLineageBandCap,
+  BACKUP_MODEL_USED_WORDING,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
   EVALUATOR_CONTRACT_TEXT,
@@ -6669,6 +6670,9 @@ async function executeSeatScenario(input: {
          FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY sequence`,
       [runId]
     );
+    // A16c: the hold/halt/refusal stream every earlier scenario pins. A backup
+    // switch rides the same `ledger.could_not_do` kind, so its events are read
+    // on their own below (`switchEvents`) rather than joining this list.
     const lifecycle = await database.pool.query<{
       state: string; call_site_key: string; attempts_spent: number;
     }>(
@@ -6676,10 +6680,21 @@ async function executeSeatScenario(input: {
               (value_json->>'attempts_spent')::integer AS attempts_spent
          FROM core.run_progress_event
         WHERE run_id=$1 AND kind IN ('node.retrying', 'ledger.could_not_do')
+          AND value_json->>'state' NOT IN ('BACKUP_MODEL_ENGAGED', 'ROLE_FELL_BACK_TO_DEBATERS')
         ORDER BY at_seq`,
       [runId]
     );
-    return { runId, workItemId, result, error, answer, calls: calls.rows, lifecycle: lifecycle.rows };
+    const switchEvents = await database.pool.query<{ value_json: Record<string, unknown> }>(
+      `SELECT value_json FROM core.run_progress_event
+        WHERE run_id=$1 AND kind='ledger.could_not_do'
+          AND value_json->>'state' IN ('BACKUP_MODEL_ENGAGED', 'ROLE_FELL_BACK_TO_DEBATERS')
+        ORDER BY at_seq`,
+      [runId]
+    );
+    return {
+      runId, workItemId, result, error, answer, calls: calls.rows, lifecycle: lifecycle.rows,
+      switchEvents: switchEvents.rows.map((row) => row.value_json)
+    };
   } finally {
     await doubles.third.stop();
     await doubles.secondary.stop();
@@ -7381,8 +7396,11 @@ describe("A16a · carry 7 — a partner at EXACTLY judge attempts next to a spen
       label: "a16a-leg-partner-at-judge",
       judgeMaxAttempts,
       assignment: legRunnerUpAssignment(),
+      // A16c (controller carry 14d): the main's LAST row is a timeout and the partner's rows are
+      // failures recorded after it, so the halt's cited outcome is pinned to the exhausted key's own.
       beforeExecute: (context) => seedEarlierPass(context, [
-        [`${callSiteKey}:seat:main`, "FAILED", 3, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:main`, "TIMED_OUT", 1, SEAT_ROUTES.third.providerRef],
         [`${callSiteKey}:seat:runnerUp`, "FAILED", 2, SEAT_ROUTES.primary.providerRef]
       ]),
       primary: [
@@ -7407,6 +7425,17 @@ describe("A16a · carry 7 — a partner at EXACTLY judge attempts next to a spen
     expect(scenario.lifecycle.every((event) => !event.call_site_key.includes(":seat:"))).toBe(true);
     expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
       mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
+    // A16c (carry 14d): the halt cites the exhausted main's own last outcome — TIMED_OUT — never
+    // the partner's later FAILED rows and never a flattened FAILED.
+    const halted = await database.pool.query<{ outcome: string }>(
+      `SELECT value_json->>'transport_outcome' AS outcome FROM core.run_progress_event
+        WHERE run_id=$1 AND value_json->>'state'='EXPANSION_HALTED' AND value_json->>'call_site_key'=$2`,
+      [scenario.runId, callSiteKey]
+    );
+    expect(halted.rows.map((row) => row.outcome)).toEqual(["TIMED_OUT"]);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey, terminal_transport_outcome: "TIMED_OUT"
     }));
   });
 });
@@ -8147,5 +8176,692 @@ describe("A16a fix round 1 · a spent site's halt cites its ledger truthfully", 
     expect(await haltOutcome(scenario.runId)).toEqual([]);
     expect(scenario.error).toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
     expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(4);
+  });
+});
+
+/**
+ * Model scorecard A16c — every switch to a backup is DISCLOSED: on the answer, in
+ * plain words (controller carry 15: the answer drawer shows a record's scope,
+ * subject, reason and lift path to END USERS), and on the progress stream, where
+ * the internals — role, seat, both routes, the cause, the failed key — live for
+ * the owners. DEGRADED-DIVERSITY follows the writer and checker that ACTUALLY
+ * answered, read off the ledger rows the answer's rounds cite.
+ */
+const A16C_INTERNALS = [
+  /provider:/u, /candidate:/u, /seat/iu, /runner-?up/iu, /\bmain\b/iu, /\brole\b/iu,
+  /POSITION|SUPPORT_ATTACK|CROSS_EXCHANGE|JUDGE|REVIEWER|ANSWER_WRITER|ANSWER_CHECKER/u,
+  /TRANSPORT_FAILURE|USAGE_CAP|ABSENT_AT_CLAIM|SPENT_ON_EARLIER_PASS/u, /[A-Z]+_[A-Z_]+/u
+] as const;
+
+type A16cAnswer = Awaited<ReturnType<typeof executeSeatScenario>>["answer"];
+
+/** The answer's BACKUP-MODEL-USED records, each checked for plain words and NULL internals columns. */
+function plainBackupRecords(answer: A16cAnswer) {
+  const records = (answer?.condition_mark_records ?? []).filter((record) => record.mark === "BACKUP-MODEL-USED");
+  for (const record of records) {
+    expect(record).toMatchObject({ scope: "answer", call_site_key: null, terminal_transport_outcome: null });
+    for (const text of [record.scope, record.subject_ref, record.reason, record.lift_path ?? ""]) {
+      for (const forbidden of A16C_INTERNALS) expect(text).not.toMatch(forbidden);
+    }
+  }
+  return records.map((record) => [record.subject_ref, record.reason, record.lift_path]);
+}
+
+/** The two plain records the answer may carry (read lazily, so the file loads before the runner exports them). */
+const standInRecord = () => [
+  BACKUP_MODEL_USED_WORDING.STAND_IN.subject, BACKUP_MODEL_USED_WORDING.STAND_IN.reason, BACKUP_MODEL_USED_WORDING.STAND_IN.liftPath
+];
+const usualRecord = () => [
+  BACKUP_MODEL_USED_WORDING.USUAL.subject, BACKUP_MODEL_USED_WORDING.USUAL.reason, BACKUP_MODEL_USED_WORDING.USUAL.liftPath
+];
+
+/** A route no deployment configures: absent at every claim (CLAIM_GATEWAY_UNRESOLVED). */
+const SEAT_GHOST = Object.freeze({
+  candidateId: "candidate:ghost", providerRef: "provider:test-layer:ghost", maker: "Ghost test maker",
+  modelId: "test-layer/ghost-model", thinkingLevel: "DEFAULT_ONLY"
+});
+
+/** A15's two-debater doubles: roots and cross-exchanges by the debaters, legs by the third route. */
+const A15_DOUBLES = Object.freeze({
+  primary: [
+    ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16c position ${index + 1}`, 0.5)),
+    ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16c review ${index + 1}`))
+  ],
+  secondary: [
+    ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c position ${index + 1}`, 0.5)),
+    resil01Composition
+  ],
+  third: [
+    ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c leg ${index + 1}`, 0.5)),
+    ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c review ${index + 1}`)),
+    evaluatorSatisfied()
+  ]
+});
+
+describe("A16 · a seat whose main fails is answered by its runner-up, and the answer says so", () => {
+  // Share 0 on POSITION seat 0 (and its aligned CROSS_EXCHANGE seat): the runner-up is the BACKUP only, so root 0
+  // always tries the main first (carry 16: with a share, the site's own ordinal would start root 0 on the runner-up
+  // in about one run in five, and a random run id would make these scenarios flaky).
+  const assignment = pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary", "third", 0), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third"), pinnedSeat(1, "secondary")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary", "third", 0), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "secondary"), pinnedSeat(1, "third")],
+    REVIEWER: [pinnedSeat(0, "secondary"), pinnedSeat(1, "third")],
+    ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+    ANSWER_CHECKER: [pinnedSeat(0, "third")]
+  });
+  const debaterDoubles = {
+    secondary: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary A16 node ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Secondary A16 review ${index + 1}`)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16 node ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16 review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  };
+
+  it("8a: switches root 0 to its runner-up on a dead transport, marks the answer in plain words and tells the progress stream", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16-backup-engaged",
+      assignment,
+      primary: [{ status: 500 }],
+      ...debaterDoubles
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const rowsAt = (key: string) => scenario.calls.filter((call) => call.call_site_key === key)
+      .map((call) => [call.outcome, call.actor_ref, call.candidate_id]);
+    // The main's one attempt failed under ITS key; the runner-up answered under its own.
+    expect(rowsAt("JUDGE:seat:main")).toEqual([["FAILED", SEAT_ROUTES.primary.providerRef, "candidate:primary"]]);
+    expect(rowsAt("JUDGE:seat:runnerUp")).toEqual([["OK", SEAT_ROUTES.third.providerRef, "candidate:third"]]);
+    // R5: the root's cross-exchange is written by the member that wrote the root.
+    expect(rowsAt("JUDGE:cross-root:0->1:seat:runnerUp")).toEqual([["OK", SEAT_ROUTES.third.providerRef, "candidate:third"]]);
+    // R6 + carry 15: the mark, with exactly one record, in plain words.
+    expect(scenario.answer?.condition_marks).toContain("BACKUP-MODEL-USED");
+    expect(scenario.answer?.condition_marks).not.toContain("DEGRADED-DIVERSITY");
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+    // The internals ride the progress stream (this run is not content-encrypted).
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "POSITION", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.primary.providerRef, to_provider_ref: SEAT_ROUTES.third.providerRef,
+      cause: "TRANSPORT_FAILURE", call_site_key: "JUDGE:seat:main"
+    }]);
+  });
+
+  it("keeps today's behaviour when the runner-up fails too: the retry goes back to the main's own key and the position halts", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16-backup-exhausted",
+      assignment,
+      // A16a: the post-cooldown retry never switches; it returns to the member that ran the site's
+      // first sequence (the main), so the main's key holds j + f and the runner-up's j (2j + f).
+      primary: [{ status: 500 }, { status: 500 }],
+      secondary: [],
+      third: [{ status: 500 }]
+    });
+    expect(scenario.error).toMatchObject({ code: "MAKER_POSITION_UNAVAILABLE" });
+    const outcomesAt = (key: string) => scenario.calls.filter((call) => call.call_site_key === key).map((call) => call.outcome);
+    expect(outcomesAt("JUDGE:seat:main")).toEqual(["FAILED", "FAILED"]);
+    expect(outcomesAt("JUDGE:seat:runnerUp")).toEqual(["FAILED"]);
+    const events = await database.pool.query<{ state: string; call_site_key: string | null }>(
+      `SELECT value_json->>'state' AS state, value_json->>'call_site_key' AS call_site_key
+         FROM core.run_progress_event WHERE run_id=$1 AND kind IN ('node.retrying','ledger.could_not_do') ORDER BY at_seq`,
+      [scenario.runId]
+    );
+    // One switch, announced before the runner-up was called; the cooldown and the halt name the SITE by its bare key.
+    expect(events.rows).toEqual([
+      { state: "BACKUP_MODEL_ENGAGED", call_site_key: "JUDGE:seat:main" },
+      { state: "COOLDOWN_HOLD", call_site_key: "JUDGE" },
+      { state: "COOLDOWN_RETRY", call_site_key: "JUDGE" },
+      { state: "MAKER_POSITION_HALTED", call_site_key: "JUDGE" }
+    ]);
+  });
+
+  it("8b: a main absent at claim is replaced by its runner-up at claim — announced once, disclosed on the answer", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-claim-switch",
+      assignment,
+      settings: {
+        claimTimeProbe: async (member) => member.provider_ref === SEAT_ROUTES.primary.providerRef
+          ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+          : { state: "HEALTHY", modelId: member.model_id, failureCode: null }
+      },
+      primary: [],
+      ...debaterDoubles
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.actor_ref === SEAT_ROUTES.primary.providerRef)).toEqual([]);
+    expect(scenario.calls.filter((call) => call.call_site_key === "JUDGE:seat:runnerUp").map((call) => call.actor_ref))
+      .toEqual([SEAT_ROUTES.third.providerRef]);
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "POSITION", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.primary.providerRef, to_provider_ref: SEAT_ROUTES.third.providerRef,
+      cause: "ABSENT_AT_CLAIM", call_site_key: null
+    }]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+    // The runner-up SAVED the seat, so no maker position was lost at claim.
+    expect(scenario.answer?.condition_marks).not.toContain("CRITIQUE-UNAVAILABLE");
+  });
+
+  it("8a: a usage cap moves a leg to its runner-up at once — the cap's own cause on the stream", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-leg-usage-cap",
+      assignment: legRunnerUpAssignment(),
+      primary: [
+        judgementDouble("Primary A16c cap root", 0.5),
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary A16c cap leg ${index + 1}`, 0.5)),
+        judgementDouble("Primary A16c cap cross-exchange", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16c cap review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c cap ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        { status: 429, body: JSON.stringify({ x_cli_relay_error: "CLI_RELAY_USAGE_CAP" }) },
+        judgementDouble("Third A16c never", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c cap review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const capped = scenario.calls.find((call) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+:seat:main$/u.test(call.call_site_key));
+    expect(capped).toMatchObject({ outcome: "FAILED", actor_ref: SEAT_ROUTES.third.providerRef });
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "SUPPORT_ATTACK", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.primary.providerRef,
+      cause: "USAGE_CAP", call_site_key: capped!.call_site_key
+    }]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+});
+
+describe("A16c · switches a RESUMED pass makes or inherits (carries 8c, 9, 13)", () => {
+  const judgeMaxAttempts = 2;
+  const callSiteKey = "JUDGE:defender:root0:r1:p0";
+  const legDoubles = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  });
+
+  it("8c/13: a leg whose answering main has no attempt left goes to its runner-up — a NEW switch, announced once, with the ledger's key", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-resume-new-switch",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // The main answered on its last allowed attempt; the runner-up never ran at the site.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 1, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:main`, "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      ...legDoubles("A16c resume new")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key === `${callSiteKey}:seat:runnerUp`).map((call) => [call.outcome, call.actor_ref]))
+      .toEqual([["OK", SEAT_ROUTES.primary.providerRef]]);
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "SUPPORT_ATTACK", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.primary.providerRef,
+      cause: "SPENT_ON_EARLIER_PASS", call_site_key: `${callSiteKey}:seat:main`
+    }]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("9/13: a site an EARLIER pass switched is disclosed on the answer from the ledger — and never announced a second time", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-resume-carried-switch",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // The earlier pass switched in-call (and told the stream then): the main spent its first sequence,
+      // the runner-up answered. Nothing in THIS pass's memory says so.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      ...legDoubles("A16c resume carried")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key === `${callSiteKey}:seat:runnerUp`).map((call) => call.outcome))
+      .toEqual(["OK", "OK"]);
+    expect(scenario.switchEvents).toEqual([]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("14a: disclosure reads who ANSWERED, never the key's marker — a cross-exchange kept under the runner-up's marker but written by the main discloses nothing", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-actor-not-marker",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      // The earlier pass: root 1 and its cross-exchange were written by the runner-up (third).
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 1, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "OK", 1, SEAT_ROUTES.third.providerRef],
+        ["JUDGE:cross-root:1->0:seat:runnerUp", "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16c marker ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16c marker review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c marker ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        // The preferred runner-up has an outage on this pass; the main writes root 1.
+        { status: 503 },
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c marker leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c marker review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // The cross-exchange site keeps the ONE key it holds (DR-184-v5), so its marker still says runnerUp —
+    // while the row's actor is the main's route, the member that wrote root 1 on this pass.
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:1->0"))
+      .map((call) => [call.call_site_key, call.actor_ref])).toEqual([
+      ["JUDGE:cross-root:1->0:seat:runnerUp", SEAT_ROUTES.third.providerRef],
+      ["JUDGE:cross-root:1->0:seat:runnerUp", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    // Every node of this answer was written by the member planned for it, so the answer owes no disclosure.
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("BACKUP-MODEL-USED");
+    // The call-level switch (runner-up -> main) is still announced, owner/admin side.
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "POSITION", seat_index: 1,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.secondary.providerRef,
+      cause: "TRANSPORT_FAILURE", call_site_key: "JUDGE:root:secondary:seat:runnerUp"
+    }]);
+  });
+});
+
+describe("A16c · roles and directions (carries 8d and 12)", () => {
+  it("8d: a role whose planned models are all absent at claim falls back to the debaters — announced, and disclosed on the answer", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-fallback-role",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [{ seatIndex: 0, main: SEAT_GHOST, runnerUp: null, diversityShare: 0, source: "SCORECARD" }],
+        // A role the assignment left EMPTY planned no model: the debaters sit in it as today, and
+        // that is not a stand-in — it is neither announced nor disclosed.
+        REVIEWER: [],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      primary: A15_DOUBLES.primary,
+      secondary: [
+        ...A15_DOUBLES.secondary,
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Secondary A16c fallback review ${index + 1}`))
+      ],
+      third: A15_DOUBLES.third
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // The debaters judge instead: every panel call is answered by a POSITION route.
+    const panel = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
+    expect(panel.length).toBeGreaterThan(0);
+    expect(new Set(panel.map((call) => call.actor_ref))).toEqual(new Set([SEAT_ROUTES.primary.providerRef, SEAT_ROUTES.secondary.providerRef]));
+    expect(scenario.switchEvents).toEqual([{
+      state: "ROLE_FELL_BACK_TO_DEBATERS", role: "JUDGE",
+      from_provider_refs: [SEAT_GHOST.providerRef],
+      to_provider_refs: [SEAT_ROUTES.primary.providerRef, SEAT_ROUTES.secondary.providerRef],
+      cause: "ABSENT_AT_CLAIM"
+    }]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("12: a runner-up the split planned for a site is absent, so its main answers there — the answer's own wording for that direction", async () => {
+    const legSeat: RoleSeat = {
+      seatIndex: 0, main: seatCandidateOf("third"), runnerUp: SEAT_GHOST, diversityShare: 0.5, source: "SCORECARD"
+    };
+    // The run id is random, so which legs the split plans for the runner-up is too (share 0.5: each leg
+    // one time in two). Every run is checked EXACTLY both ways, and runs repeat until one planned the
+    // runner-up somewhere, so the USUAL path is always exercised (four runs all missing it: ~1.5e-5).
+    const observed: boolean[] = [];
+    for (let run = 0; run < 4 && !observed.includes(true); run += 1) {
+      const scenario = await executeSeatScenario({
+        label: `a16c-variety-absent-${String(run)}`,
+        assignment: pinnedAssignment({
+          POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+          SUPPORT_ATTACK: [legSeat],
+          CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+          JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+          REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+          ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+          ANSWER_CHECKER: [pinnedSeat(0, "third")]
+        }),
+        ...A15_DOUBLES
+      });
+      expect(scenario.error).toBeNull();
+      expect(scenario.result?.kind).toBe("COMPLETED");
+      const legSites = scenario.calls
+        .filter((call) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+:seat:main$/u.test(call.call_site_key))
+        .map((call) => call.call_site_key.replace(/:seat:main$/u, ""));
+      expect(legSites).toHaveLength(4);
+      // Exact either way: the USUAL record appears iff some leg's own site ordinal planned the (absent) runner-up.
+      const plannedRunnerUp = legSites.some((site) => selectSeatCandidate(legSeat, seatSiteOrdinal({
+        runId: scenario.runId, role: "SUPPORT_ATTACK", pinnedSeatIndex: 0, callSiteKey: site
+      })).via === "RUNNER_UP");
+      expect(plainBackupRecords(scenario.answer)).toEqual(plannedRunnerUp ? [usualRecord()] : []);
+      // Nothing moved during a call and no main was absent: the stream has no switch to tell.
+      expect(scenario.switchEvents).toEqual([]);
+      observed.push(plannedRunnerUp);
+    }
+    expect(observed).toContain(true);
+  });
+});
+
+describe("A16c · DEGRADED-DIVERSITY follows the writer and checker that ACTUALLY answered (carry 9)", () => {
+  const COMPOSER_SITE = "COMPOSER:SYNTHESIZER:INITIAL:1";
+  const synthesisAssignment = (writer: PinnedSeat, checker: PinnedSeat) => pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    ANSWER_WRITER: [writer],
+    ANSWER_CHECKER: [checker]
+  });
+  const composerRows = (calls: readonly { readonly call_site_key: string; readonly outcome: string; readonly actor_ref: string }[]) =>
+    calls.filter((call) => call.call_site_key.startsWith(`${COMPOSER_SITE}:seat:`)).map((call) => [call.call_site_key, call.outcome, call.actor_ref]);
+
+  it("adds the mark when the writer's backup IS the checker's route — a collapse the plan did not predict", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-diversity-collapsed",
+      assignment: synthesisAssignment(pinnedSeat(0, "secondary", "third", 0), pinnedSeat(0, "third")),
+      primary: A15_DOUBLES.primary,
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c collapse ${index + 1}`, 0.5)),
+        { status: 503 },
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c collapse leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c collapse review ${index + 1}`)),
+        resil01Composition,
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(composerRows(scenario.calls)).toEqual([
+      [`${COMPOSER_SITE}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef],
+      [`${COMPOSER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef]
+    ]);
+    expect(scenario.answer?.condition_marks).toContain("DEGRADED-DIVERSITY");
+    expect(scenario.answer?.condition_marks).toContain("BACKUP-MODEL-USED");
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "ANSWER_WRITER", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.secondary.providerRef, to_provider_ref: SEAT_ROUTES.third.providerRef,
+      cause: "TRANSPORT_FAILURE", call_site_key: `${COMPOSER_SITE}:seat:main`
+    }]);
+  });
+
+  it("removes a collapse the plan predicted when the writer's backup answered instead", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-diversity-restored",
+      assignment: synthesisAssignment(pinnedSeat(0, "third", "secondary", 0), pinnedSeat(0, "third")),
+      primary: A15_DOUBLES.primary,
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c restored ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c restored leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c restored review ${index + 1}`)),
+        { status: 503 },
+        resil01Composition,
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(composerRows(scenario.calls)).toEqual([
+      [`${COMPOSER_SITE}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef],
+      [`${COMPOSER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    // The plan named the third route for both roles; the writer that answered was the secondary.
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("DEGRADED-DIVERSITY");
+    expect(scenario.answer?.condition_marks).toContain("BACKUP-MODEL-USED");
+  });
+
+  it("9: a resumed pass that asks the earlier pass's backup writer again derives the collapse from the ledger's rows", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-diversity-resumed",
+      assignment: synthesisAssignment(pinnedSeat(0, "secondary", "third", 0), pinnedSeat(0, "third")),
+      settings: {
+        synthesisRolePolicy: {
+          ...runnerSettings().synthesisRolePolicy!,
+          synthesizerBound: { ...runnerSettings().synthesisRolePolicy!.synthesizerBound, maxAttempts: 2 }
+        }
+      },
+      beforeExecute: async (context) => {
+        await appendEarlierPassCall(context, `${COMPOSER_SITE}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef, "contract:composer:test-layer");
+        await appendEarlierPassCall(context, `${COMPOSER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef, "contract:composer:test-layer");
+      },
+      primary: A15_DOUBLES.primary,
+      secondary: Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c resumed ${index + 1}`, 0.5)),
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c resumed leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c resumed review ${index + 1}`)),
+        resil01Composition,
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // This pass made no switch (the backup was preferred from the ledger), yet the answer knows who wrote it.
+    expect(scenario.switchEvents).toEqual([]);
+    expect(scenario.answer?.condition_marks).toContain("DEGRADED-DIVERSITY");
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("9/8c: a discarded earlier pass's writer never counts, and a spent main's synthesis handed to its backup is a new switch", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-diversity-discarded-pass",
+      // The plan collapses the writer onto the checker's route (third/third)...
+      assignment: synthesisAssignment(pinnedSeat(0, "third", "secondary", 0), pinnedSeat(0, "third")),
+      beforeExecute: async (context) => {
+        // ...and an earlier pass's writer (the third route, on the synthesizer's one allowed attempt)
+        // answered round 1 before that pass died: its composition was never served.
+        await appendEarlierPassArtifactCall(context, `${COMPOSER_SITE}:seat:main`, "OK", SEAT_ROUTES.third.providerRef, "contract:composer:test-layer");
+      },
+      primary: A15_DOUBLES.primary,
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c discarded ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c discarded leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c discarded review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // The main's key is at its allowance, so this pass hands the writer's site to the backup — a switch
+    // THIS pass makes through the ledger (carry 8c), told once with the main's key.
+    expect(composerRows(scenario.calls)).toEqual([
+      [`${COMPOSER_SITE}:seat:main`, "OK", SEAT_ROUTES.third.providerRef],
+      [`${COMPOSER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "ANSWER_WRITER", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.secondary.providerRef,
+      cause: "SPENT_ON_EARLIER_PASS", call_site_key: `${COMPOSER_SITE}:seat:main`
+    }]);
+    // The served rounds were written by the secondary and checked by the third: no collapse. The earlier
+    // pass's third-route writer is in the ledger too, but no round of THIS answer cites it (carry 9).
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("DEGRADED-DIVERSITY");
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("carry 16: a synthesis seat takes part in the split with ONE site-pure ordinal per run and role", async () => {
+    // Share 0.5 (the schema's maximum): each run's writer is the runner-up one time in two. Every run is
+    // checked EXACTLY against the formula, and runs repeat until one sent the writer to its runner-up,
+    // so both members are always exercised (twelve runs all on the main: ~2.4e-4). The evaluator objects
+    // once, so the writer is called in TWO rounds — under two different keys — and must be the same
+    // member both times: one ordinal per run and role, never one per round (R3).
+    const writer = pinnedSeat(0, "secondary", "third", 0.5);
+    const evaluatorObjecting = JSON.stringify({
+      satisfied: false,
+      objection: "Restate the served position so a stranger could check it.",
+      criteria: {
+        fairness_to_losers: true, statement_label_agreement: true,
+        no_overstatement: true, restatement: false, citation_tracing: true
+      }
+    });
+    const observed: ("MAIN" | "RUNNER_UP")[] = [];
+    for (let run = 0; run < 12 && !observed.includes("RUNNER_UP"); run += 1) {
+      const scenario = await executeSeatScenario({
+        label: `a16c-synthesis-split-${String(run)}`,
+        assignment: synthesisAssignment(writer, pinnedSeat(0, "primary")),
+        primary: [...A15_DOUBLES.primary, evaluatorObjecting, evaluatorSatisfied()],
+        secondary: [
+          ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c split ${index + 1}`, 0.5)),
+          resil01Composition,
+          resil01Composition
+        ],
+        third: [
+          ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c split leg ${index + 1}`, 0.5)),
+          ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c split review ${index + 1}`)),
+          resil01Composition,
+          resil01Composition
+        ]
+      });
+      expect(scenario.error).toBeNull();
+      expect(scenario.result?.kind).toBe("COMPLETED");
+      const via = selectSeatCandidate(writer, seatSiteOrdinal({
+        runId: scenario.runId, role: "ANSWER_WRITER", pinnedSeatIndex: 0, callSiteKey: "COMPOSER:SYNTHESIZER"
+      })).via;
+      const route = via === "MAIN" ? SEAT_ROUTES.secondary.providerRef : SEAT_ROUTES.third.providerRef;
+      const marker = via === "MAIN" ? "main" : "runnerUp";
+      expect(scenario.calls.filter((call) => call.call_site_key.startsWith("COMPOSER:SYNTHESIZER:"))
+        .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+        [`${COMPOSER_SITE}:seat:${marker}`, "OK", route],
+        [`COMPOSER:SYNTHESIZER:RETRY:2:seat:${marker}`, "OK", route]
+      ]);
+      // A split is not a stand-in.
+      expect(scenario.answer?.condition_marks ?? []).not.toContain("BACKUP-MODEL-USED");
+      expect(scenario.switchEvents).toEqual([]);
+      observed.push(via);
+    }
+    expect(observed).toContain("RUNNER_UP");
+  });
+});
+
+/** An earlier pass's MODEL_CALL row WITH its raw artifact, so a terminal that cites it is observable. */
+async function appendEarlierPassArtifactCall(
+  context: { readonly runId: string; readonly workItemId: string },
+  callSiteKey: string,
+  outcome: "OK" | "FAILED" | "TIMED_OUT",
+  actorRef: string,
+  contractHash = "contract:judge:test-layer"
+): Promise<{ readonly attemptId: string; readonly artifactRef: string }> {
+  const ledger = new LedgerRepository(database.pool);
+  const attemptId = randomUUID();
+  const artifactRef = randomUUID();
+  await ledger.appendRawArtifact({
+    artifactId: artifactRef, attemptId, runId: context.runId, providerRef: actorRef,
+    provider: "test", model: "model:a16c", maker: "maker:a16c", modelVersion: "v1",
+    rawText: "a16c earlier pass", metadata: { fixture: "A16c" }, parseStatus: "PARSED",
+    inputHash: "a".repeat(64), contractHash: "b".repeat(64), contentHash: "c".repeat(64)
+  });
+  const now = new Date();
+  await ledger.append({
+    runId: context.runId, attemptId, actionKind: "MODEL_CALL", callSiteKey,
+    subjectItemId: context.workItemId, stanceAtAction: "UNASSIGNED", outcome,
+    actorRef, inputHash: `input:earlier-pass:${randomUUID()}`, contractHash, rawArtifactRef: artifactRef,
+    startedAt: now, finishedAt: now
+  });
+  return { attemptId, artifactRef };
+}
+
+describe("A16c · carry 14c — a site no slot can answer fails terminally citing its FAILURE, never an answer", () => {
+  it("a root: the latest row is an OK answer, yet the work item cites the site's latest failure", async () => {
+    let failure: { readonly attemptId: string; readonly artifactRef: string } | undefined;
+    const scenario = await executeSeatScenario({
+      label: "a16c-root-cites-failure",
+      judgeMaxAttempts: 2,
+      assignment: runnerUpAssignment(),
+      beforeExecute: async (context) => {
+        for (let index = 0; index < 2; index += 1) {
+          await appendEarlierPassArtifactCall(context, "JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef);
+        }
+        failure = await appendEarlierPassArtifactCall(context, "JUDGE:root:secondary:seat:runnerUp", "FAILED", SEAT_ROUTES.third.providerRef);
+        await appendEarlierPassArtifactCall(context, "JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef);
+      },
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result).toEqual({ kind: "TERMINAL_FAILED", artifactRef: failure!.artifactRef });
+    expect(scenario.calls).toHaveLength(4);
+    const work = await database.pool.query<{ state: string; terminal_reason: string; settled_attempt_id: string; settled_artifact_ref: string }>(
+      "SELECT state, terminal_reason, settled_attempt_id::text, settled_artifact_ref::text FROM core.work_item WHERE work_item_id=$1",
+      [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{
+      state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED",
+      settled_attempt_id: failure!.attemptId, settled_artifact_ref: failure!.artifactRef
+    }]);
+  });
+
+  it("a synthesis site: the same rule", async () => {
+    const COMPOSER_CONTRACT = "contract:composer:test-layer";
+    const site = "COMPOSER:SYNTHESIZER:INITIAL:1";
+    let failure: { readonly attemptId: string; readonly artifactRef: string } | undefined;
+    const base = runnerSettings();
+    const scenario = await executeSeatScenario({
+      label: "a16c-synthesis-cites-failure",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary", "third", 0)],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      settings: {
+        synthesisRolePolicy: {
+          ...base.synthesisRolePolicy!,
+          synthesizerBound: { ...base.synthesisRolePolicy!.synthesizerBound, maxAttempts: 2 }
+        }
+      },
+      beforeExecute: async (context) => {
+        for (let index = 0; index < 2; index += 1) {
+          await appendEarlierPassArtifactCall(context, `${site}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef, COMPOSER_CONTRACT);
+        }
+        failure = await appendEarlierPassArtifactCall(context, `${site}:seat:runnerUp`, "FAILED", SEAT_ROUTES.third.providerRef, COMPOSER_CONTRACT);
+        await appendEarlierPassArtifactCall(context, `${site}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef, COMPOSER_CONTRACT);
+      },
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result).toEqual({ kind: "TERMINAL_FAILED", artifactRef: failure!.artifactRef });
+    const work = await database.pool.query<{ settled_attempt_id: string; settled_artifact_ref: string }>(
+      "SELECT settled_attempt_id::text, settled_artifact_ref::text FROM core.work_item WHERE work_item_id=$1",
+      [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ settled_attempt_id: failure!.attemptId, settled_artifact_ref: failure!.artifactRef }]);
   });
 });

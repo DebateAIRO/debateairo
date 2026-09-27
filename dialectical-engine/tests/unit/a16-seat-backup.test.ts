@@ -814,6 +814,9 @@ describe("A16 · carry 1 in the runner — its one seat caller salts every site'
   it("builds the caller with the run's id and the switches made at claim", () => {
     const source = readFileSync(fileURLToPath(new URL("../../apps/runner/src/index.ts", import.meta.url)), "utf8");
     const built = [...source.matchAll(/createSeatCaller\(\{([^}]*)\}\)/gu)].map((match) => match[1]!.replace(/\s+/gu, " ").trim());
-    expect(built).toEqual(["assigned: seatBook.assigned, runId: run.runId, claimSwitches: assignedSeats?.claimSwitches ?? []"]);
+    // A16c: the same one caller, now also telling the progress stream of each switch it makes (R4).
+    expect(built).toEqual([
+      "assigned: seatBook.assigned, runId: run.runId, claimSwitches: assignedSeats?.claimSwitches ?? [], onSwitch: (record) => announceSwitch(backupSwitchEventValue(record))"
+    ]);
   });
 });

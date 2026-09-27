@@ -7,8 +7,17 @@ import {
   type ProviderCallRequest,
   type ProviderGateway
 } from "@debateai/providers";
+import type { RunBackupSwitchLifecycleValue, RunRoleFallbackLifecycleValue } from "@debateai/db";
 import { selectSeatCandidate, type RoleAssignment, type RoleSeat, type SeatCandidate } from "@debateai/scorecard";
-import { seatBaseCallSiteKey, seatCallSiteKey } from "@debateai/serve";
+import {
+  BACKUP_MODEL_USED_MARK,
+  DEGRADED_DIVERSITY_MARK,
+  SYNTHESIS_ROLE_NAMES,
+  seatBaseCallSiteKey,
+  seatCallSiteKey,
+  type ConditionMarkRecord,
+  type ServeGateResult
+} from "@debateai/serve";
 
 /**
  * Model scorecard A15 (spec §2.7; owner rulings R3-R5 of 2026-09-26) — WHO SITS
@@ -77,12 +86,20 @@ export type RouteHealth =
   | { readonly state: "HEALTHY" }
   | { readonly state: "ABSENT"; readonly failureCode: string };
 
-export type BackupSwitchCause = "TRANSPORT_FAILURE" | "USAGE_CAP" | "ABSENT_AT_CLAIM";
+/**
+ * Why a seat moved to its other member: during a call (R4 — a transport failure
+ * after the normal retries, or a usage cap at once), at claim (the main was not
+ * claim-eligible), or on a RESUMED pass whose ledger holds the planned member's
+ * key at this site already at its allowance (A16c, controller carry 8c).
+ */
+export type BackupSwitchCause = "TRANSPORT_FAILURE" | "USAGE_CAP" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
 
 /**
- * One seat moving to its runner-up. Disclosed on the answer as a
- * `BACKUP-MODEL-USED` record, and as a lifecycle event where the run's progress
- * stream may carry one (A16).
+ * One seat moving to its other member — main to runner-up, or back from a
+ * runner-up the split picked to its main (carry 12). Told on the run's progress
+ * stream where it may carry one (A16c, `backupSwitchEventValue`); the ANSWER
+ * discloses who actually answered in place of the planned member
+ * (`BackupAnswer`), in plain words.
  */
 export interface BackupSwitchRecord {
   readonly role: DebateRole;
@@ -95,6 +112,48 @@ export interface BackupSwitchRecord {
   readonly cause: BackupSwitchCause;
   /** The key the failed call was recorded under; null for a switch made at claim. */
   readonly callSiteKey: string | null;
+}
+
+/** What a fairness rule reads of a member — so a pinned candidate that never sat (absent at claim) can be judged by it too. */
+export type SeatIdentity = Pick<SeatCandidate, "maker" | "providerRef">;
+
+/**
+ * A16c (controller carries 8c and 13) — a switch a RESUMED pass makes through
+ * the ledger rather than inside a call: the member R3 planned for the site
+ * (`from`) holds a key the ledger shows already at its allowance there, and the
+ * other member never ran at the site on an earlier pass, so this pass hands the
+ * site over NOW. The runner computes it from the ledger; the seat caller records
+ * and announces it before the other member is called — only when that member
+ * really is the one called. A site an earlier pass already switched carries no
+ * move: its switch was announced then, and the answer discloses the stand-in
+ * from who answered (`BackupAnswer`), never as a second switch.
+ */
+export interface LedgerSeatMove {
+  readonly from: SeatSlot;
+  /** The planned member's key at the site — where the ledger rows that spent it are. */
+  readonly callSiteKey: string;
+}
+
+/**
+ * A16c — one call a member answered IN PLACE of the member the assignment
+ * planned for its site (the pinned seat's own 80-20 choice), for a reason that
+ * is not a fairness rule: a switch during the call, a main absent at claim, a
+ * runner-up absent at claim, or a resumed pass's ledger. The answer's
+ * BACKUP-MODEL-USED disclosure is built from these, so it counts what the
+ * answer's content actually came from — a switch whose planned member answered
+ * after all discloses nothing, and a site an earlier pass switched is counted
+ * from this pass's answer (carries 9 and 13).
+ */
+export interface BackupAnswer {
+  readonly role: DebateRole;
+  /** The PINNED seat index. */
+  readonly seatIndex: number;
+  /** The key the answer was recorded under, seat marker included. */
+  readonly callSiteKey: string;
+  readonly plannedSlot: SeatSlot;
+  readonly answeredSlot: SeatSlot;
+  /** The route that answered. */
+  readonly providerRef: string;
 }
 
 /**
@@ -359,7 +418,11 @@ export interface SeatCall<T> {
    * (`seatSiteOrdinal`), and the cooldown/hold records name it.
    */
   readonly callSiteKey: string;
-  /** An explicit 80-20 ordinal (the synthesis roles pass `diversityOrdinalForRun`). */
+  /**
+   * An explicit 80-20 ordinal. The synthesis roles pass one: `seatSiteOrdinal`
+   * over their role's run-level site, so every round of one run uses the same
+   * member (A16c, controller carry 16).
+   */
   readonly ordinal?: number;
   /**
    * A16a fix round 1: the slot a resumed pass restores — the one the ledger
@@ -369,6 +432,14 @@ export interface SeatCall<T> {
   readonly prefer?: SeatSlot;
   /** A fairness rule a member must pass to answer THIS call (R5). */
   readonly eligible?: (member: SeatMember) => boolean;
+  /**
+   * A16c: the call's own FAIRNESS rule alone (R5 maker rules), without the
+   * ledger's restrictions that `eligible` also carries — a planned member it
+   * bars is passed over, never counted as a stand-in. Absent, every member is fair.
+   */
+  readonly fair?: (candidate: SeatIdentity) => boolean;
+  /** A16c: a switch this resumed pass makes through the ledger (carry 8c). */
+  readonly ledgerMove?: LedgerSeatMove;
   /** The member-specific base key (the panel names the answering route in its key). */
   readonly keyFor?: (member: SeatMember) => string;
   readonly call: (member: SeatMember, callSiteKey: string) => Promise<T>;
@@ -386,6 +457,9 @@ export interface SeatPlanOptions {
   readonly eligible?: (member: SeatMember) => boolean;
   readonly ordinal?: number;
   readonly prefer?: SeatSlot;
+  /** Carried with a call's options; `plan` reads neither (A16c). */
+  readonly fair?: (candidate: SeatIdentity) => boolean;
+  readonly ledgerMove?: LedgerSeatMove;
 }
 
 export interface SeatCaller {
@@ -394,8 +468,13 @@ export interface SeatCaller {
   callSeat<T>(input: SeatCall<T>): Promise<SeatAnswer<T>>;
   /** The routes that answered this role's calls, in call order. */
   answered(role: DebateRole): readonly string[];
-  /** Every switch of this run pass: the ones made at claim, then the ones made during calls. */
+  /**
+   * Every switch of this run pass: the ones made at claim, then the ones made
+   * during calls or through the ledger — exactly what this pass announces.
+   */
   switches(): readonly BackupSwitchRecord[];
+  /** A16c: every call a member answered in place of the one the assignment planned (see `BackupAnswer`). */
+  backupAnswers(): readonly BackupAnswer[];
 }
 
 export interface SeatCallerOptions {
@@ -408,7 +487,7 @@ export interface SeatCallerOptions {
   readonly runId?: string | null;
   /** Switches already made at claim (a main absent, its runner-up promoted). */
   readonly claimSwitches?: readonly BackupSwitchRecord[];
-  /** Called once per switch made during a call, BEFORE the other member is called. */
+  /** Called once per switch made during a call or through the ledger, BEFORE the other member is called. */
   readonly onSwitch?: (record: BackupSwitchRecord) => Promise<void>;
 }
 
@@ -480,12 +559,34 @@ export function seatSiteOrdinal(site: {
 }
 
 /**
+ * A16c — the member R3's 80-20 split PLANS for one call site: the pinned
+ * seat's choice at the site's ordinal (`seatSiteOrdinal`, or the explicit one a
+ * synthesis call passes), read off the CLAIMED seat's share — exactly the member
+ * `createSeatCaller` puts first when no resumed-pass preference, down mark or
+ * fairness rule intervenes. A seat with no runner-up plans its only member.
+ */
+export function plannedSeatSlot(
+  seat: RunSeat,
+  callSiteKey: string,
+  options: { readonly runId: string | null; readonly ordinal?: number }
+): SeatSlot {
+  if (seat.runnerUp === null || seat.pinned === null) return seat.main.pinnedAs;
+  return selectSeatCandidate(
+    { ...seat.pinned, diversityShare: seat.diversityShare },
+    options.ordinal ?? seatSiteOrdinal({
+      runId: options.runId, role: seat.role, pinnedSeatIndex: seat.pinnedSeatIndex, callSiteKey
+    })
+  ).via;
+}
+
+/**
  * A15/A16: every seat call goes through here.
  *
  * R3 — THE 80-20 SPLIT. A seat with a runner-up and a share sends a
  * deterministic share of its sites to the runner-up: `selectSeatCandidate`
  * reads the site's own ordinal (`seatSiteOrdinal`), or an explicit one (the
- * synthesis roles pass `diversityOrdinalForRun`). The split only ORDERS the
+ * synthesis roles pass `seatSiteOrdinal` over their role's run-level site —
+ * A16c, carry 16). The split only ORDERS the
  * members the call's fairness rule leaves (A15d's spent slot, restored root
  * writer, maker rules); it never adds one. A seat without a runner-up — every
  * legacy seat and every cross-exchange seat, which mirrors its root's writer —
@@ -521,10 +622,19 @@ export function seatSiteOrdinal(site: {
  * A15b fix round 1 (M5): a bare-key caller records every member of a seat
  * under ONE key, so a main and its runner-up would share one per-key allowance
  * and one lineage row; such a caller refuses a two-member seat.
+ *
+ * A16c — DISCLOSURE. A `ledgerMove` the runner passes (a resumed pass's own
+ * hand-off, carry 8c) is recorded and announced before the other member is
+ * called, once per seat slot per pass, never on a post-cooldown retry. Every
+ * answer given by a member other than the one the ASSIGNMENT planned for the
+ * site — the pinned seat's own share, so a runner-up absent at claim still owns
+ * its sites — is a `BackupAnswer`, unless the call's fairness rule (`fair`)
+ * barred the planned member.
  */
 export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
   const answeredRefs = new Map<DebateRole, string[]>();
   const switchRecords: BackupSwitchRecord[] = [...(options.claimSwitches ?? [])];
+  const backupAnswerRecords: BackupAnswer[] = [];
   const runId = options.runId ?? null;
   // Pre-flight fix F12: why each downed slot went down, and which slots a switch record already names.
   const downFailures = new Map<string, Readonly<{ cause: BackupSwitchCause; callSiteKey: string }>>();
@@ -552,10 +662,9 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
     if (seat.runnerUp === null) return [seat.main].filter(eligible);
     // A16a fix round 1: a slot the ledger restores goes first; the other stays its backup.
     // Otherwise the CLAIMED seat's share decides (M2: no runner-up, no share); the pinned seat only names the candidates.
-    const toRunnerUp = plan.prefer !== undefined ? plan.prefer === "RUNNER_UP" : seat.pinned !== null && selectSeatCandidate(
-      { ...seat.pinned, diversityShare: seat.diversityShare },
-      plan.ordinal ?? seatSiteOrdinal({ runId, role: seat.role, pinnedSeatIndex: seat.pinnedSeatIndex, callSiteKey })
-    ).via === "RUNNER_UP";
+    const toRunnerUp = plan.prefer !== undefined
+      ? plan.prefer === "RUNNER_UP"
+      : plannedSeatSlot(seat, callSiteKey, { runId, ...(plan.ordinal === undefined ? {} : { ordinal: plan.ordinal }) }) === "RUNNER_UP";
     return (toRunnerUp ? [seat.runnerUp, seat.main] : [seat.main, seat.runnerUp]).filter(eligible);
   };
   const cappedAt = (seat: RunSeat, member: SeatMember): boolean =>
@@ -595,10 +704,27 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
       const site = siteId(input.seat, input.callSiteKey);
       const retry = firstSlotAt.has(site);
       if (!retry) firstSlotAt.set(site, first.pinnedAs);
+      // A16c: the member the ASSIGNMENT planned here (its own share), and whether the call's fairness rule allows it.
+      const pinned = options.assigned ? input.seat.pinned : null;
+      const plannedVia = pinned === null ? null : selectSeatCandidate(pinned, input.ordinal ?? seatSiteOrdinal({
+        runId, role: input.seat.role, pinnedSeatIndex: input.seat.pinnedSeatIndex, callSiteKey: input.callSiteKey
+      })).via;
+      const plannedCandidate = pinned === null ? null : plannedVia === "RUNNER_UP" ? pinned.runnerUp : pinned.main;
+      const plannedIsFair = plannedCandidate !== null && (input.fair?.(plannedCandidate) ?? true);
       const answer = async (member: SeatMember): Promise<SeatAnswer<T>> => {
         const callSiteKey = keyOf(input, member);
         const value = await input.call(member, callSiteKey);
         answeredRefs.set(input.seat.role, [...(answeredRefs.get(input.seat.role) ?? []), member.providerRef]);
+        if (plannedVia !== null && plannedIsFair && member.pinnedAs !== plannedVia) {
+          backupAnswerRecords.push(Object.freeze({
+            role: input.seat.role,
+            seatIndex: input.seat.pinnedSeatIndex,
+            callSiteKey,
+            plannedSlot: plannedVia,
+            answeredSlot: member.pinnedAs,
+            providerRef: member.providerRef
+          }));
+        }
         return Object.freeze({ value, member, callSiteKey });
       };
       const recordSwitch = async (
@@ -630,6 +756,16 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
         const downed = downFailures.get(slotId(input.seat, skipped));
         if (downed !== undefined) await recordSwitch(skipped, first, downed.cause, downed.callSiteKey);
       }
+      // A16c (carry 8c): a resumed pass's own hand-off, made through the ledger — recorded and
+      // announced before the other member answers, once per seat slot per pass, never on a retry.
+      const moved = input.ledgerMove;
+      if (!retry && moved !== undefined && first.pinnedAs !== moved.from) {
+        const from = [input.seat.main, input.seat.runnerUp]
+          .find((member): member is SeatMember => member !== null && member.pinnedAs === moved.from);
+        if (from !== undefined && !switchedFrom.has(slotId(input.seat, from))) {
+          await recordSwitch(from, first, "SPENT_ON_EARLIER_PASS", moved.callSiteKey);
+        }
+      }
       /** R4: a member that fails with a switching cause stays down for the rest of this pass. */
       const failed = (member: SeatMember, error: unknown): BackupSwitchCause | null => {
         const cause = seatFailureCause(error);
@@ -659,6 +795,144 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
       }
     },
     answered: (role: DebateRole) => Object.freeze([...(answeredRefs.get(role) ?? [])]),
-    switches: () => Object.freeze([...switchRecords])
+    switches: () => Object.freeze([...switchRecords]),
+    backupAnswers: () => Object.freeze([...backupAnswerRecords])
   });
+}
+
+/**
+ * A16c (owner rule; controller carries 10 and 15) — WHAT THE ANSWER DRAWER
+ * SHOWS END USERS for BACKUP-MODEL-USED. `AnswerHonestyDrawer` renders a
+ * record's scope, subject, reason and lift path word for word, so these are
+ * plain words only: no seat, role, runner-up, route, call-site key or cause
+ * code. Those live on the ledger rows and in the progress stream's switch
+ * events, the owner/admin side. Each kind has its own subject, because the
+ * drawer keys its list on mark + subject. English, like every condition-mark
+ * text today; the owners choose the final wording (three phrasings per
+ * sentence in the A16c report).
+ */
+export const BACKUP_MODEL_USED_WORDING = Object.freeze({
+  /**
+   * A planned model was replaced: a main answered by its runner-up (during a
+   * call, at claim or on a resumed pass), or a role whose planned models were
+   * all unavailable, answered by the debaters.
+   */
+  STAND_IN: Object.freeze({
+    subject: "Planned AI models",
+    reason: "One or more AI models planned for this debate were unavailable, so other AI models answered in their place.",
+    liftPath: "Ask again later, when the planned AI models are available."
+  }),
+  /** Carry 12: a runner-up the 80-20 split chose for a call was unavailable, so the main answered it. */
+  USUAL: Object.freeze({
+    subject: "Extra AI model",
+    reason: "An AI model chosen to add variety to this debate was unavailable, so the usual AI model answered in its place.",
+    liftPath: "Ask again later if you want that extra variety."
+  })
+});
+
+/**
+ * A16c (R6; carries 8, 12, 15) — the answer's BACKUP-MODEL-USED records, one per
+ * KIND of stand-in this answer's content came from, whatever its terminal.
+ * Aggregated per run, never per switch: the user-facing text may name nothing a
+ * per-switch record could tell apart, and the drawer keys on mark + subject.
+ * `call_site_key` and the transport outcome stay NULL — migrations 0021/0025
+ * refuse them on this mark — so the internals stay in the progress stream.
+ */
+export function backupModelUsedRecords(
+  input: {
+    readonly answers: readonly BackupAnswer[];
+    /** Roles whose pinned seats were all absent at claim and whose calls the debaters answered (carry 8d). */
+    readonly fallbackRoles: readonly string[];
+  },
+  servedRootNodeId: string
+): readonly ConditionMarkRecord[] {
+  const record = (wording: (typeof BACKUP_MODEL_USED_WORDING)[keyof typeof BACKUP_MODEL_USED_WORDING]): ConditionMarkRecord =>
+    Object.freeze({
+      mark: BACKUP_MODEL_USED_MARK,
+      scope: "answer" as const,
+      subjectRef: wording.subject,
+      reason: wording.reason,
+      liftPath: wording.liftPath,
+      servedRootRule: null,
+      affectedNodeIds: Object.freeze([servedRootNodeId]),
+      callSiteKey: null,
+      terminalTransportOutcome: null
+    });
+  const standIn = input.fallbackRoles.length > 0 || input.answers.some((answer) => answer.answeredSlot === "RUNNER_UP");
+  const usual = input.answers.some((answer) => answer.answeredSlot === "MAIN");
+  return Object.freeze([
+    ...(standIn ? [record(BACKUP_MODEL_USED_WORDING.STAND_IN)] : []),
+    ...(usual ? [record(BACKUP_MODEL_USED_WORDING.USUAL)] : [])
+  ]);
+}
+
+/** A16 (R4): the progress-stream value for one switch; see `RunRepository.recordBackupSwitchEvent`. */
+export function backupSwitchEventValue(record: BackupSwitchRecord): RunBackupSwitchLifecycleValue {
+  return Object.freeze({
+    state: "BACKUP_MODEL_ENGAGED" as const,
+    role: record.role,
+    seat_index: record.seatIndex,
+    from_provider_ref: record.fromProviderRef,
+    to_provider_ref: record.toProviderRef,
+    cause: record.cause,
+    call_site_key: record.callSiteKey
+  });
+}
+
+/**
+ * A16c (carry 8d): the progress-stream value for a role whose pinned seats
+ * were all absent at claim, so the debaters sit in it (`fallbackRoles`).
+ */
+export function roleFallbackEventValue(
+  role: "SUPPORT_ATTACK" | "JUDGE" | "REVIEWER",
+  pinnedSeats: readonly RoleSeat[],
+  seats: readonly RunSeat[]
+): RunRoleFallbackLifecycleValue {
+  const routes = (entries: readonly { readonly main: SeatIdentity; readonly runnerUp: SeatIdentity | null }[]): readonly string[] =>
+    Object.freeze(entries.flatMap((entry) => entry.runnerUp === null
+      ? [entry.main.providerRef]
+      : [entry.main.providerRef, entry.runnerUp.providerRef]));
+  return Object.freeze({
+    state: "ROLE_FELL_BACK_TO_DEBATERS" as const,
+    role,
+    from_provider_refs: routes(pinnedSeats),
+    to_provider_refs: routes(seats),
+    cause: "ABSENT_AT_CLAIM" as const
+  });
+}
+
+/** A16: the one route that answered for BOTH synthesis roles in this run, or null (smallest ref wins). */
+export function effectiveSynthesisCollapse(
+  writerRefs: readonly string[],
+  checkerRefs: readonly string[]
+): string | null {
+  return [...new Set(writerRefs)].sort().find((ref) => checkerRefs.includes(ref)) ?? null;
+}
+
+/**
+ * A16: on an assigned run DEGRADED-DIVERSITY is decided by who ACTUALLY
+ * answered — a backup can collapse the writer and the checker onto one
+ * identity, or undo a collapse the plan predicted. An existing mark keeps its
+ * place in the answer's list. The legacy run keeps the sealed-ref rule the
+ * serve chain applies (W2 / F-VS11-1) and never reaches this function.
+ * A16c: a CRASH answer (components-only, envelope) is returned unchanged — the
+ * mark is a property of a served answer, and the serve chain never puts it on
+ * a crash class (W2).
+ */
+export function withEffectiveDegradedDiversity(result: ServeGateResult, collapsedIdentity: string | null): ServeGateResult {
+  if ((result.crashClass ?? null) !== null) return result;
+  if (collapsedIdentity === null) {
+    return {
+      ...result,
+      conditionMarks: Object.freeze(result.conditionMarks.filter((mark) => mark !== DEGRADED_DIVERSITY_MARK)),
+      degradedDiversity: null
+    };
+  }
+  return {
+    ...result,
+    conditionMarks: result.conditionMarks.includes(DEGRADED_DIVERSITY_MARK)
+      ? result.conditionMarks
+      : Object.freeze([...result.conditionMarks, DEGRADED_DIVERSITY_MARK]),
+    degradedDiversity: Object.freeze({ roles: SYNTHESIS_ROLE_NAMES, identity: collapsedIdentity })
+  };
 }
