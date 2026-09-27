@@ -401,6 +401,8 @@ describe("the owner page's server render loads the question's catalogue (page.ts
     expect(page.props.publicCatalog).toEqual(publicEnglish);
     // The server reads no story, so it shows no strip: never "being written" before the first reply.
     const markup = renderToStaticMarkup(page);
+    // The page body itself did render (a page that rendered nothing would pass every absence below).
+    expect(markup).toContain("debateAiDisclosure");
     expect(markup).not.toContain("storyPanel");
     expect(markup).not.toContain(html(publicRomanian["public.story.writing"]));
     expect(markup).not.toContain(html(publicEnglish["public.story.writing"]));
@@ -411,7 +413,9 @@ describe("the owner page's server render loads the question's catalogue (page.ts
     expect(page.props.storyLocale).toBe("en");
     expect(page.props.storyCatalog).toBe(page.props.publicCatalog);
     expect(page.props.storyCatalog).toEqual(publicEnglish);
-    expect(renderToStaticMarkup(page)).not.toContain("storyPanel");
+    const markup = renderToStaticMarkup(page);
+    expect(markup).toContain("debateAiDisclosure");
+    expect(markup).not.toContain("storyPanel");
   });
 
   it("reuses the interface's public catalogue when the question speaks the interface's language", async () => {
@@ -427,6 +431,9 @@ describe("the owner page's server render loads the question's catalogue (page.ts
     expect(page.props.storyLocale).toBe("en");
     expect(page.props.storyCatalog).toBe(page.props.publicCatalog);
     expect(page.props.questionLocale ?? null).toBeNull();
-    expect(renderToStaticMarkup(page)).not.toContain("storyPanel");
+    const markup = renderToStaticMarkup(page);
+    // The starting render is the waiting line (nothing is read yet), and it did render.
+    expect(markup).toContain('role="status"');
+    expect(markup).not.toContain("storyPanel");
   });
 });

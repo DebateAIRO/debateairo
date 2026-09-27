@@ -220,5 +220,7 @@ describe("the home page hands the composer the newDebate catalogue of the interf
     const handed = mocks.composerProps[0]!.newDebateCatalog as Record<string, string>;
     expect(handed["requestFailure.kind.DAILY_LIMIT_REACHED"]).toBe(catalogue("ro", "newDebate")["requestFailure.kind.DAILY_LIMIT_REACHED"]);
     expect(handed["requestFailure.subject.DEBATE_CREATE"]).toBe("Pornirea acestei dezbateri nu s-a finalizat.");
+    // Only the two values the message prints: the composer's props ship to the browser (Task 16, M8 review).
+    expect(Object.keys(handed).sort()).toEqual(["requestFailure.kind.DAILY_LIMIT_REACHED", "requestFailure.subject.DEBATE_CREATE"]);
   });
 });

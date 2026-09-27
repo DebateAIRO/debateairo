@@ -3,10 +3,12 @@ import { buildApi, type AskApplication } from "@debateai/api";
 import {
   AnswerDisclosureSchema,
   AnswerStorySchema,
+  FloorReasonSchema,
   contractInventory,
   type Answer,
   type AnswerDisclosure
 } from "@debateai/contract";
+import { SERVE_CRASH_CLASSES } from "@debateai/serve";
 import type { ServeDisclosureModel, ServeDisclosureRead, StoredServeDisclosure } from "@debateai/db";
 import { answerCarriesStoryLabel } from "@debateai/story";
 import {
@@ -217,6 +219,18 @@ describe("M5 · the disclosure contract", () => {
     const disclosure = buildAnswerDisclosure(FLOOR_READ);
     expect(AnswerDisclosureSchema.safeParse({ ...disclosure, floor_reason: null }).success).toBe(false);
     expect(AnswerDisclosureSchema.safeParse({ ...disclosure, floor: null }).success).toBe(false);
+  });
+
+  /**
+   * Task 16 (M5 review): `FloorReasonSchema` is a hand copy of the sealed
+   * serve file's crash classes (`SERVE_CRASH_CLASSES` in packages/serve; the
+   * contract depends on the kernel and zod only, so it cannot import them). A
+   * crash class added there without the copy here would make the owner's
+   * /disclosure read throw on a floor that names it: an untyped 500 instead of
+   * the record.
+   */
+  it("keeps the owner-only floor_reason list equal to the sealed crash classes, member for member", () => {
+    expect([...FloorReasonSchema.options].sort()).toEqual(Object.keys(SERVE_CRASH_CLASSES).sort());
   });
 
   it("stays strict: an unknown member, a label outside the three, or a leading node that is not an id is refused", () => {

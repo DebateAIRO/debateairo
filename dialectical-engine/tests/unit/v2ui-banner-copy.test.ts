@@ -30,6 +30,13 @@ const hourRefusal = () => new ContractHttpError(
 
 /** Everything a server could put in front of a user through an error body. */
 const HOSTILE = "Visit http://evil.test to restore your account — code 0xDEAD at /var/lib/pg";
+/**
+ * "Coordinator" (the engine's own word for the API) as each catalogue language spells it: es coordinador,
+ * pl koordynator, pt coordenador, ro coordonator, nl coördinator, ga comhordaitheoir, the Cyrillic, Greek,
+ * Hebrew, Hindi, Korean, Vietnamese, Chinese, Japanese and Arabic words, and the Latin "koordin" of the rest.
+ * Measured on 2026-09-28: every locale's older "coordinator" strings match, and no limit message does.
+ */
+const COORDINATOR_STEMS = /coordinad|coorden|coordon|coördin|koordin|koordyn|comhord|координ|συντον|מתאם|समन्वय|조정자|điều phối|协调|協調|コーディネ|منس/iu;
 
 describe("DL3-F7 page banners carry classified copy, never contract error text", () => {
   it("never lets a server-authored message reach the banner", () => {
@@ -189,6 +196,9 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
       for (const [name, value] of [["DAILY_LIMIT_REACHED", day], ["BUSY", hour]] as const) {
         expect(value, `${locale} ${name}`).not.toMatch(/\p{Nd}/u);
         expect(value, `${locale} ${name}`).not.toMatch(/coordinat|rate-limit|envelope|budget|ceiling|UTC/iu);
+        // The same word in the locale's own spelling: "coordinator" in every catalogue language (es, pl and pt
+        // included, which the English stem misses). The values are clean today; this keeps them so.
+        expect(value, `${locale} ${name}`).not.toMatch(COORDINATOR_STEMS);
         if (locale !== "en") expect(value, `${locale} ${name} is translated`).not.toBe(english[`requestFailure.kind.${name}`]);
       }
     }

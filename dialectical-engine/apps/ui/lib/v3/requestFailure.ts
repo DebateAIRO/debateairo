@@ -95,10 +95,11 @@ export const REQUEST_FAILURE_KINDS: readonly RequestFailureKind[] = Object.freez
 );
 
 /**
- * Task M8 (spec 2026-09-26 §14.4.7). The only refusal a 429 names by its own
- * code: the day's spend would not admit one more run (`apps/api` answers 429
- * for this code alone, with the figures withheld). Every other 429, the hourly
- * per-owner limit (`ADMISSION_RATE_LIMITED`) included, stays BUSY.
+ * Task M8 (spec 2026-09-26 §14.4.7). The only ask refusal answered with 429:
+ * the day's spend would not admit one more run (`askRefusalStatus` in
+ * `apps/api`; every other ask refusal is a 422, and the figures are withheld).
+ * Every other 429, the hourly per-owner limit (`ADMISSION_RATE_LIMITED`)
+ * included, stays BUSY.
  */
 const DAILY_LIMIT_SERVER_CODE = "DAILY_COST_ENVELOPE_REACHED";
 
@@ -167,4 +168,26 @@ export function requestFailureMessage(
   return `${t(catalog,`requestFailure.subject.${classified.subject}`)} ${
     t(catalog,`requestFailure.kind.${classified.kind}`)
   }`;
+}
+
+/**
+ * The only keys of the `newDebate` catalogue the home composer prints: today's
+ * limit for new debates, in the words /new uses (Task M8, spec 2026-09-26
+ * §14.4.7) — `requestFailureMessage("DEBATE_CREATE", …)` for DAILY_LIMIT_REACHED.
+ */
+const DAILY_LIMIT_MESSAGE_KEYS = Object.freeze([
+  "requestFailure.subject.DEBATE_CREATE",
+  "requestFailure.kind.DAILY_LIMIT_REACHED"
+] as const);
+
+/**
+ * The part of a `newDebate` catalogue the home composer needs, and nothing
+ * more. The composer is a client component, so every prop it is handed ships
+ * to the browser: the home page hands it these two values, not the whole
+ * catalogue.
+ */
+export function dailyLimitMessageCatalog(catalog: MessageCatalog): MessageCatalog {
+  return Object.freeze(Object.fromEntries(
+    DAILY_LIMIT_MESSAGE_KEYS.flatMap((key) => (Object.hasOwn(catalog, key) ? [[key, catalog[key]!]] : []))
+  ));
 }

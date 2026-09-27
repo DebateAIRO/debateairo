@@ -106,7 +106,8 @@ test("the project home confirms a real session before exposing its debate compos
   // Task M8 (spec 2026-09-26 §14.4.7): the composer also reads the newDebate
   // catalogue, to say today's limit for new debates where the person typed.
   assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>/);
-  assert.match(home, /const newDebateCatalog = await loadNamespace\(locale, "newDebate"\);/);
+  // Task 16 (M8 review): only the two values the daily-limit message prints ship to the browser.
+  assert.match(home, /const newDebateCatalog = dailyLimitMessageCatalog\(await loadNamespace\(locale, "newDebate"\)\);/);
   assert.match(home, /id="start-a-debate"/);
   assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>[\s\S]*?\{error \?/);
 });

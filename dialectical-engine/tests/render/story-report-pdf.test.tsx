@@ -11,7 +11,7 @@ import { createRequire } from "node:module";
 import { loadNamespace } from "../../apps/ui/lib/i18n/server.js";
 import { loadReportCatalogs, type ReportCatalogs } from "../../apps/ui/lib/report/reportLanguage.js";
 import { renderReportPdf, reportHyphenation, resolveReportFontDirectory } from "../../apps/ui/lib/report/renderReport.js";
-import { REPORT_PLACED_FONT, reportPlacedFont } from "../../apps/ui/lib/report/reportGlyphs.js";
+import { REPORT_PLACED_FONT } from "../../apps/ui/lib/report/reportGlyphs.js";
 import { reportLayout, reportPrintedText } from "../../apps/ui/lib/report/reportLayout.js";
 import { buildReportModel } from "../../apps/ui/lib/report/reportModel.js";
 import {
@@ -214,7 +214,7 @@ function drawnLines(pdf: Buffer): string[][] {
     maps.set(font[1]!, glyphs);
   }
   return drawnPieces(pdf).map((pieces) => piecesByLine(pieces).map((line) => line
-    .map((piece) => piece.glyphs.map((glyph) => maps.get(piece.fontObject)?.get(glyph) ?? "�").join("")).join("")));
+    .map((piece) => piece.glyphs.map((glyph) => maps.get(piece.fontObject)?.get(glyph) ?? "\uFFFD").join("")).join("")));
 }
 
 /**
@@ -522,12 +522,13 @@ describe("the report in the question's own script (R-fonts)", () => {
       if (stretch.length > 0) found.push(stretch);
       return found;
     };
-    // fontkit's shaping of each stretch (textkit decomposes Devanagari first), in each face, as outlines. The
-    // shaping font is a font object of its own, each glyph built with its own characters (reportPlacedFont): a font
-    // whose glyph cache already holds glyphs, as glyphIdentity's does, shapes Devanagari wrongly (reportGlyphs.ts, 1).
-    const shapers = new Map(Object.entries(faces).map(([name, font]) => [font, reportPlacedFont(open(
+    // fontkit's own shaping of each stretch (textkit decomposes Devanagari first), in each face, as outlines. The
+    // shaping font is a plain fontkit font, freshly opened and never wrapped by the code under test
+    // (reportPlacedFont), so the expectation does not come from the fix it checks. It is a font object of its own:
+    // glyphIdentity's fonts are not used to shape, as their glyph caches fill while the drawn runs are read.
+    const shapers = new Map(Object.entries(faces).map(([name, font]) => [font, open(
       name === "NotoSansDevanagari-Bold" ? "noto-sans-devanagari/NotoSansDevanagari-Bold.ttf" : "noto-sans-devanagari/NotoSansDevanagari-Regular.ttf"
-    ))]));
+    )]));
     const shaped = (font: OpenedFont, stretch: string) =>
       shapers.get(font)!.layout(stretch.normalize("NFD")).glyphs.map((glyph) => glyphIdentity(font).ofId(glyph.id)).join(" ");
     const printed = [...new Set(stretches(reportPrintedText(buildReportModel(answer, story, GENERATED, reportCatalogs))))];

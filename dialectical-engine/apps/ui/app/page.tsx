@@ -11,6 +11,7 @@ import type { DebateSummary } from "@/lib/types";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
+import { dailyLimitMessageCatalog } from "@/lib/v3/requestFailure";
 
 export const dynamic = "force-dynamic";
 
@@ -42,8 +43,9 @@ export default async function HomePage({
   const userAgent = (await headers()).get("user-agent") ?? undefined;
   const clientIp = readTrustedClientIp(await headers());
   // Task M8 (spec 2026-09-26 §14.4.7): the composer says today's limit for new
-  // debates in the words /new uses, so it reads that catalogue too.
-  const newDebateCatalog = await loadNamespace(locale, "newDebate");
+  // debates in the words /new uses, so it reads that catalogue too — only the
+  // two values that message prints, as the composer's props ship to the browser.
+  const newDebateCatalog = dailyLimitMessageCatalog(await loadNamespace(locale, "newDebate"));
   let debates: DebateSummary[] = [];
   let error: string | null = null;
   let sessionConfirmed = false;

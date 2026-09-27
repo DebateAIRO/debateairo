@@ -245,7 +245,12 @@ const STOP_DECLARATION = "let runBodyBudgetStop: EnvelopeStopKind | null = null;
 const ROOT_0_AUTHOR = "const primaryAttempt = await cooldownAttempt({";
 /** Task M2: a ceiling below the first call fails typed; anything else travels as itself. */
 const FIRST_CALL_FAILURE = "throw firstCallCeilingFailure(error) ?? error;";
-/** Task M2: the first root's panel falls back to its author instead of escaping the work item. */
+/**
+ * Task M2: the first root's panel keeps the voices it heard (the author alone
+ * only when no member had answered) instead of escaping the work item. The
+ * rule's name, AUTHOR_ONLY, is older than keeping the heard voices; it now
+ * means "this panel may not end the work item", not "the author only".
+ */
 const ROOT_PANEL_CALL = "callSiteKey: \"PANEL:root\",";
 const ROOT_PANEL_RULE = "onSpendStop: \"AUTHOR_ONLY\"";
 const CHILD_PANEL_CALL = "callSiteKey: `PANEL:${input.callSiteKey}`,";

@@ -130,8 +130,9 @@ test("checks each weight in the face react-pdf prints it in: a 600 heading print
 
 // What reportGlyphs.ts (fontkit's glyph cache, the doubled x offset, the dropped y offset, right-to-left shaping),
 // reportLineBreaks.ts (textkit's runs, hyphenation points and zero-width breaks) and renderReport.ts (the font store)
-// were measured against, and the report's render tests check. Only @react-pdf/renderer is pinned exactly, in
-// package.json; the rest are caret ranges under it, held by the lockfile alone.
+// were measured against, and the report's render tests check. Two are pinned exactly: @react-pdf/renderer in
+// package.json, and pdfkit by the renderer itself. The rest (layout, render, font, both textkits, both fontkits and
+// bidi-js) are caret ranges under them, held by the lockfile alone.
 const MEASURED_PIPELINE = Object.freeze({
   "@react-pdf/renderer": "4.9.0",
   "@react-pdf/layout": "5.2.0",

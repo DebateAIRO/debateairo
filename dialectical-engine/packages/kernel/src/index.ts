@@ -412,8 +412,9 @@ export function exhaustive(value: never): never {
  * the attempt ceiling reported as a vendor fault, while the panel went on
  * asking the next member (refused again, before sending). M2 made the attempt
  * ceiling a run-body stop like money, so it travels like money: out of the
- * panel, to the phase that records the stop — or, on the first root's panel, to
- * the author-only fallback.
+ * panel, to the phase that records the stop — or, on the first root's panel,
+ * back to the runner with the voices already heard (the author alone only when
+ * no member had answered yet).
  */
 export const RUN_LEVEL_SPEND_STOP_CODES = Object.freeze([
   "RUN_COST_ENVELOPE_MONEY_REACHED",

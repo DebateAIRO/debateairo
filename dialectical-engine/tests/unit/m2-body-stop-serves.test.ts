@@ -188,14 +188,41 @@ describe("M2 — the first root's panel keeps what it heard, and falls back to i
     }
   });
 
-  it("still rethrows by default, taking the heard voices with it, for every other panel", async () => {
-    const reached: string[] = [];
-    await expect(runJudgePanel({
-      artifactProducerRef: "actor:author",
-      primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
-      members: [refusingMember("member-1", "RUN_COST_ENVELOPE_EXHAUSTED", reached)]
-    })).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_EXHAUSTED" });
-    expect(reached).toEqual(["refused member"]);
+  /**
+   * Every other panel (the default rule, RETHROW): the stop leaves as itself,
+   * and a voice heard before it is dropped with the panel — the caller's phase
+   * discards the node anyway. A member answers first here, so the test shows
+   * that voice is NOT carried, and that nobody after the stop is asked.
+   */
+  it("still rethrows by default for every other panel, dropping a voice heard before the stop, and asks nobody after it", async () => {
+    for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED"] as const) {
+      const reached: string[] = [];
+      const thrown: unknown = await runJudgePanel({
+        artifactProducerRef: "actor:author",
+        primary: { judgementRef: "j0", assessment: {} as never, memberRole: "author" },
+        members: [
+          {
+            memberRole: "member-1", actorRef: "actor:one", contractHash: "c1",
+            judge: async () => {
+              reached.push("member-1");
+              const assessed = await new Judge(answering()).assess(PANEL_CALL);
+              return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
+            }
+          },
+          refusingMember("member-2", code, reached),
+          {
+            memberRole: "member-3", actorRef: "actor:three", contractHash: "c3",
+            judge: async () => { reached.push("member-3"); return { judgementRef: "j3", assessment: {} as never }; }
+          }
+        ]
+      }).then(() => null, (error: unknown) => error);
+
+      // The stop itself, as the member call raised it: no panel result, so no voice rides along.
+      expect(thrown, code).toBeInstanceOf(TypedDomainError);
+      expect((thrown as TypedDomainError).code, code).toBe(code);
+      expect(thrown, code).not.toHaveProperty("judgements");
+      expect(reached, code).toEqual(["member-1", "refused member"]);
+    }
   });
 
   it("lets a stop travel from every other node's panel", () => {
