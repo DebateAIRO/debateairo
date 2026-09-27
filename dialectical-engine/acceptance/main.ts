@@ -3,7 +3,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import { z } from "zod";
 import type { Pool } from "pg";
 import {
-  buildApi,PostgresAskApplication,type Dispatcher
+  askModelPickerSettings,buildApi,PostgresAskApplication,type Dispatcher
 } from "@debateai/api";
 import type { AuthenticatedSession, SessionApplication } from "../apps/api/src/sessions.js";
 import {
@@ -31,7 +31,10 @@ import {
 } from "@debateai/crypto";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import {
-  resolveEffectiveRiskTier
+  readBundledModelScorecard,
+  readEngineVersion,
+  resolveEffectiveRiskTier,
+  type ModelScorecardReadResult
 } from "@debateai/register";
 import {
   RUNNER_MAX_RECOMPOSE,
@@ -397,6 +400,12 @@ export async function createAcceptanceRuntime(input: {
   readonly environment: AcceptanceEnvironment;
   readonly makerRelays: readonly AcceptanceMakerRelay[];
   readonly serviceCredential:string;
+  /**
+   * A20: the scorecard this runtime's admission runs under. Default: the bundled
+   * public file, exactly as the local API reads it. A test that must not depend
+   * on the checked-in file injects one (or `{ state: "ABSENT" }`).
+   */
+  readonly modelScorecard?: ModelScorecardReadResult;
   readonly testOnlyTerminalEvaluator?: (input: {
     readonly runId: string;
     readonly waitingRows: readonly string[];
@@ -407,6 +416,7 @@ export async function createAcceptanceRuntime(input: {
     throw new Error("TEST_ONLY_TERMINAL_EVALUATOR_FORBIDDEN");
   }
   const policy = await readAcceptanceRuntimePolicy(input.pool);
+  const modelScorecard = input.modelScorecard ?? await readBundledModelScorecard(await readEngineVersion());
   const scoringOperator = await readOptionalScoringOperator(input.pool);
   const runRepository = new RunRepository(input.pool);
   const relaysByProviderRef = new Map(input.makerRelays.map((relay) => [relay.providerRef, relay]));
@@ -444,7 +454,7 @@ export async function createAcceptanceRuntime(input: {
     policy.bounds.COMPOSER.deadlineMs,
     policy.bounds.CONFORMANCE.deadlineMs
   );
-  const maximumRunAttempts = computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5)
+  const maximumRunAttempts = computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5, 1)
     .max_model_attempts;
   const probes = new ProviderProbeRepository(input.pool);
   const runner = new WalkingSkeletonRunner(input.pool, provider, {
@@ -598,6 +608,14 @@ export async function createAcceptanceRuntime(input: {
     registerVersion: ACCEPTANCE_REGISTER_VERSION,
     batteryVersion: input.environment.BATTERY_VERSION,
     settlementWatchHandle: input.environment.SETTLEMENT_WATCH_HANDLE,
+    // A20: the same picker as the local API. The acceptance relays declare no
+    // thinking levels, windows or prices, so only DEFAULT_ONLY candidates reach it.
+    modelPicker: askModelPickerSettings({
+      scorecard: modelScorecard,
+      deploymentMode: "local",
+      targets: [],
+      perRunCeilingMicros: null
+    }),
     resolveDiscoveredPanel: async () => {
       const latest = await probes.readLatest(policy.providers.map((provider) => provider.providerRef));
       const latestRecords: DiscoveredProvider[] = latest.map((record) => {
@@ -657,7 +675,7 @@ export async function createAcceptanceRuntime(input: {
       return toDiscoveredPanel(resolved.panel);
     },
     resolveEnvelopeBasis: async (basis) =>
-      computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth)),
+      computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth), basis.backupSequencesProvisioned),
     resolveRisk: (askerRiskTier, askerProvenanceRef) => resolveAcceptanceRisk(
       askerRiskTier,
       askerProvenanceRef,

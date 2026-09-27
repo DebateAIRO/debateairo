@@ -66,6 +66,7 @@ export {
   debaterSeatCount,
   describeModelScorecard,
   expectedCallsByRoleFromBasis,
+  isUsablePerRunCeiling,
   reachableInTodaysOrder,
   seatDemandForDebaters,
   targetPricesOf,
@@ -79,6 +80,7 @@ import {
   ASK_MODEL_REFUSALS,
   debaterSeatCount,
   expectedCallsByRoleFromBasis,
+  isUsablePerRunCeiling,
   reachableInTodaysOrder,
   seatDemandForDebaters,
   targetPricesOf,
@@ -2492,6 +2494,22 @@ function makerAvailabilityFor(panel: readonly DiscoveredPanelMember[]) {
 }
 
 /**
+ * Carry 15 m1 / carry 16 m3–m4. `askModelPickerSettings` refuses a HOSTED boot
+ * with no usable per-run ceiling, but the settings are a plain interface: ones
+ * built any other way would switch the picker's step-down and its
+ * BUDGET_TOO_SMALL refusal off without a word. Admission refuses them as an
+ * engine fault (a 500), through the same test the boot guard asks.
+ */
+function assertHostedPickerCeiling(picker: AskModelPickerSettings): void {
+  if (picker.mode === "HOSTED" && !isUsablePerRunCeiling(picker.perRunCeilingMicros)) {
+    throw new TypedDomainError(
+      ASK_MODEL_ASSIGNMENT_INVALID,
+      "Hosted admission needs a positive safe-integer per-run money ceiling"
+    );
+  }
+}
+
+/**
  * A20 — ADMISSION WITH A MODEL SCORECARD (spec 2026-09-26 §2.4–2.6).
  *
  * Replaces ONLY the roster filter. The day's money (asked first), the risk
@@ -2512,20 +2530,9 @@ async function admitWithScorecard(input: Readonly<{
   scorecard: Scorecard;
 }>): Promise<AskAdmission> {
   const { settings, ask, risk, discoveredPanel, picker } = input;
-  // Carry 15 (A20.2 review m1): `askModelPickerSettings` refuses this at boot, but
-  // the settings are a plain interface. Settings built any other way with a HOSTED
-  // mode and no usable ceiling would switch the picker's step-down and its
-  // BUDGET_TOO_SMALL refusal off without a word, so admission refuses them too,
-  // first, as an engine fault (a 500).
-  if (picker.mode === "HOSTED") {
-    const ceiling = picker.perRunCeilingMicros;
-    if (ceiling === null || !Number.isSafeInteger(ceiling) || ceiling < 1) {
-      throw new TypedDomainError(
-        ASK_MODEL_ASSIGNMENT_INVALID,
-        "Hosted admission needs a positive safe-integer per-run money ceiling"
-      );
-    }
-  }
+  // Carry 15 (A20.2 review m1): first, as an engine fault. `evaluateAskAdmission`
+  // already asked it before discovery (carry 16 m3); this keeps the promise local.
+  assertHostedPickerCeiling(picker);
   const reachable = reachableInTodaysOrder(discoveredPanel, input.rosterModelIds, picker.targetFacts);
   const plannedDebaters = debaterSeatCount(reachable, input.rosterModelIds.length);
   // Carry 10: zero reachable makers (only an empty discovery) is refused HERE,
@@ -2592,9 +2599,6 @@ async function admitWithScorecard(input: Readonly<{
       `The picker applied ${outcome.appliedStrength} but built its assignment at ${outcome.assignment.strength}`
     );
   }
-  for (const note of outcome.notes) picker.log?.(`MODEL_PICKER note ${note}`);
-  picker.log?.(`MODEL_PICKER assigned strength=${outcome.appliedStrength} stepped_down=${String(outcome.steppedDown)}`
-    + ` estimate_money_micros=${String(outcome.estimate.moneyMicros)} estimate_seconds=${String(outcome.estimate.seconds)}`);
   const byProviderRef = new Map(discoveredPanel.map((member) => [member.provider_ref, member] as const));
   const discovered = (seated: Readonly<{ providerRef: string }>): DiscoveredPanelMember => {
     const member = byProviderRef.get(seated.providerRef);
@@ -2647,6 +2651,12 @@ async function admitWithScorecard(input: Readonly<{
       "The attempt ceiling was minted without the backup sequence a runner-up needs"
     );
   }
+  // Carry 16 (A20.3 review m2): "assigned" means ADMITTED. It is written only
+  // now, after every check above has passed, so an engine fault (m2, m3) or a
+  // maker refusal never reads in the operator's log as an assignment.
+  for (const note of outcome.notes) picker.log?.(`MODEL_PICKER note ${note}`);
+  picker.log?.(`MODEL_PICKER assigned strength=${outcome.appliedStrength} stepped_down=${String(outcome.steppedDown)}`
+    + ` estimate_money_micros=${String(outcome.estimate.moneyMicros)} estimate_seconds=${String(outcome.estimate.seconds)}`);
   return {
     risk,
     envelopeBasis,
@@ -2691,11 +2701,17 @@ export async function evaluateAskAdmission(
       "The plan tier must be free or premium"
     ));
   }
-  const discoveredPanel = await settings.resolveDiscoveredPanel();
-  const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
   // A20: a VALID scorecard replaces the roster filter below; anything else
   // (no picker, ABSENT, REFUSED) keeps it byte for byte.
   const modelPicker = settings.modelPicker;
+  // Carry 16 (A20.3 review m3): in HOSTED mode discovery probes paid vendors, so
+  // a picker with no usable per-run ceiling is refused BEFORE it, not after a
+  // paid probe round. Only a picker that will be asked is checked.
+  if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
+    assertHostedPickerCeiling(modelPicker);
+  }
+  const discoveredPanel = await settings.resolveDiscoveredPanel();
+  const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
   if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
     return admitWithScorecard({
       settings, ask, risk, discoveredPanel, rosterModelIds: roster,

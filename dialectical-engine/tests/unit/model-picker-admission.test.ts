@@ -546,6 +546,50 @@ describe("A20 · admission re-checks what the picker and the composition promise
   });
 });
 
+describe("A20 · hardening before the picker goes live (carry 16, A20.3 review m2–m3)", () => {
+  it("m2: writes no note and no 'assigned' line for an assignment a later check refuses", async () => {
+    const two = [candidate(at("development:codex-cli")), candidate(at("development:claude-cli"))];
+    for (const [outcome, dropsBackupProvision] of [
+      // The carry-15 m2 fault: a runner-up discovery never returned.
+      [withJudgeRunnerUp(assigned(two), GHOST), false],
+      // The carry-15 m3 fault: a v4 ceiling for a run with a runner-up.
+      [withJudgeRunnerUp(assigned(two), candidate(at("development:grok-cli"))), true]
+    ] as const) {
+      picker.outcome = outcome;
+      const lines: string[] = [];
+      await expectEngineFault(evaluateAskAdmission(settingsWith({
+        modelPicker: valid({ log: (line) => lines.push(line) }), dropsBackupProvision
+      }), ask("free")));
+      expect(lines.filter((line) => /^MODEL_PICKER (?:assigned|note) /u.test(line))).toEqual([]);
+    }
+    // An assignment admission keeps still logs its notes, then 'assigned', last.
+    picker.outcome = assigned(two);
+    const lines: string[] = [];
+    await evaluateAskAdmission(settingsWith({ modelPicker: valid({ log: (line) => lines.push(line) }) }), ask("free"));
+    expect(lines).toContain("MODEL_PICKER note REVIEWER: no scorecard entry reachable; discovery order used");
+    expect(lines.at(-1)).toMatch(/^MODEL_PICKER assigned strength=BALANCED stepped_down=false /u);
+  });
+
+  it("m3: refuses HOSTED picker settings without a usable ceiling BEFORE discovery, so no paid probe round runs", async () => {
+    for (const perRunCeilingMicros of [null, 0, 1.5]) {
+      const discoveries = { count: 0 };
+      await expectEngineFault(evaluateAskAdmission(
+        settingsWith({ modelPicker: valid({ mode: "HOSTED", perRunCeilingMicros }), discoveries }), ask("premium")
+      ));
+      expect(discoveries.count).toBe(0);
+    }
+    expect(picker.calls).toEqual([]);
+    // No VALID scorecard, no picker: the roster path is unchanged and still discovers.
+    const discoveries = { count: 0 };
+    const roster = await evaluateAskAdmission(settingsWith({
+      modelPicker: valid({ mode: "HOSTED", perRunCeilingMicros: null, scorecard: Object.freeze({ state: "ABSENT" as const }) }),
+      discoveries
+    }), ask("free"));
+    expect(discoveries.count).toBe(1);
+    expect("modelAssignment" in roster).toBe(false);
+  });
+});
+
 describe("A20 · the grok roster drift (pre-existing; A20b fixes it with the owner's OK)", () => {
   it("PRE-EXISTING: the premium roster names grok-4.6-build while the grok CLI answers grok-4.7-build", async () => {
     await expect(evaluateAskAdmission(settingsWith({}), ask("premium"))).rejects.toMatchObject({

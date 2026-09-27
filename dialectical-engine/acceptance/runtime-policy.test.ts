@@ -105,16 +105,18 @@ describe("ACC-01 acceptance runtime policy", () => {
     expect(mainSource).toContain("resolveFreshDiscovery({");
     expect(mainSource).toContain("return toDiscoveredPanel(resolved.panel);");
     expect(mainSource).not.toMatch(/\.slice\(0,\s*2\)/);
-    expect(mainSource).toContain("computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5)");
+    // Model scorecard A20.4 (pre-flight ruling F17): the claim window covers a backup at every seat call, and
+    // admission threads its backup provision into the run's ceiling.
+    expect(mainSource).toContain("computeAcceptanceStructuralCeiling(policy, policy.providers.length, 5, 1)");
     expect(mainSource).toContain(
-      "computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth))"
+      "computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth), basis.backupSequencesProvisioned)"
     );
     expect(mainSource).not.toContain("computeStructuralCeilingBasis");
     expect(mainSource).not.toContain("deploymentMakerCapability: true");
     expect(policySource).toContain("panelDiscoveryPolicy");
     expect(policySource).not.toContain("const totalAttempts");
     expect(policySource).not.toContain("max_model_attempts: totalAttempts");
-    expect(computeAcceptanceStructuralCeiling({
+    const ceilingPolicy: Parameters<typeof computeAcceptanceStructuralCeiling>[0] = {
       bounds: {
         JUDGE: { maxAttempts: 3, tokenCeiling: 1, deadlineMs: 1 },
         COMPOSER: { maxAttempts: 3, tokenCeiling: 1, deadlineMs: 1 },
@@ -137,12 +139,21 @@ describe("ACC-01 acceptance runtime policy", () => {
         maxDepth: 5,
         sourceRefs: { envelopeFormulaInputs: "test-layer:envelope" }
       }
-    }, 2, 1)).toMatchObject({
+    };
+    expect(computeAcceptanceStructuralCeiling(ceilingPolicy, 2, 1)).toMatchObject({
       max_model_attempts: 106,
       per_site_attempts: { judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 },
       call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 },
       formula_version: "DR-184-v4"
     });
+    // Model scorecard A20.4 (pre-flight ruling F17): a provision of 1 reaches the formula, so the claim
+    // window and a run with a runner-up are sized on DR-184-v5 (106 + 66 + 18, as t17-envelope pins).
+    expect(computeAcceptanceStructuralCeiling(ceilingPolicy, 2, 1, 1)).toMatchObject({
+      max_model_attempts: 190,
+      call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 },
+      formula_version: "DR-184-v5"
+    });
+    expect(computeAcceptanceStructuralCeiling(ceilingPolicy, 2, 1, 0)).toEqual(computeAcceptanceStructuralCeiling(ceilingPolicy, 2, 1));
     for (const proofSource of [panelProofSource, reviewProofSource]) {
       expect(proofSource).toContain("structuralCeilingMaxModelAttempts");
       expect(proofSource).toContain("providerProbeEvidenceCount");

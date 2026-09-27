@@ -31,6 +31,9 @@ import {
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
+  readBundledModelScorecard,
+  readEngineVersion,
+  readModelScorecard,
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
@@ -74,6 +77,7 @@ import {
   resolveProviderTargetCredentials
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
+import { askModelPickerSettings, describeModelScorecard } from "./ask-model-picker.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
 import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
@@ -235,13 +239,13 @@ await boot.run("support-admission-scopes", async () => {
  * `assertDailyCostEnvelope` is absent below and every ask is admitted exactly as
  * it is today.
  */
-const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
-  ? new CostEnvelopeGuard({
-      store: new PostgresModelSpendStore(pool),
-      policy: await boot.run("cost-envelope-policy",
-        () => readCostEnvelopePolicy(pool, environment.REGISTER_VERSION))
-    })
+const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
+  ? await boot.run("cost-envelope-policy",
+      () => readCostEnvelopePolicy(pool, environment.REGISTER_VERSION))
   : undefined;
+const costEnvelopeGuard = costEnvelopePolicy === undefined
+  ? undefined
+  : new CostEnvelopeGuard({ store: new PostgresModelSpendStore(pool), policy: costEnvelopePolicy });
 await boot.run("product-role-policy", () => readProductRolePolicy(pool, environment.REGISTER_VERSION));
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
@@ -316,6 +320,35 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
 // it resolves each vendor's file through the same custody-checked seam.
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
   resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
+/**
+ * A20 — THE MODEL SCORECARD IN FORCE, read once. Hosted: the sealed
+ * `modelScorecard` row at REGISTER_VERSION. Local: the bundled public file
+ * (scorecards/current.json). ABSENT or REFUSED never stops the boot — asks keep
+ * the plan rosters — and the line below says which, on stderr, where the dev
+ * supervisor shows it. An engine version that cannot be read
+ * (ENGINE_VERSION_UNRESOLVED) does stop it, as this stage.
+ */
+const modelScorecard = await boot.run("model-scorecard", async () => {
+  const engineVersion = await readEngineVersion();
+  return environment.DEPLOYMENT_MODE === "hosted"
+    ? readModelScorecard(pool, environment.REGISTER_VERSION, engineVersion)
+    : readBundledModelScorecard(engineVersion);
+});
+console.error(describeModelScorecard(modelScorecard, environment.DEPLOYMENT_MODE));
+/**
+ * A20: the per-role model picker, asked only when the scorecard above is VALID.
+ * Hosted: the per-run ceiling is the sealed cost envelope's, and the settings
+ * refuse a boot without a positive one (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED).
+ * That is a synchronous decision, so it answers to the boot ledger (DL7-F7).
+ * The targets are the DECLARED ones: levels, windows and prices, no credential.
+ */
+const modelPicker = boot.runSync("model-picker", () => askModelPickerSettings({
+  scorecard: modelScorecard,
+  deploymentMode: environment.DEPLOYMENT_MODE,
+  targets: declaredProviderTargets,
+  perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,
+  log: (line) => console.error(line)
+}));
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: providerDiscoveryTargets,
@@ -413,6 +446,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
   }),
   resolveDiscoveredPanel: resolveProviderPanel,
+  // A20: the per-role model picker (built above, under the boot ledger).
+  modelPicker,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,
@@ -424,7 +459,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     reviewerCallsPerNode: envelopeFormulaInputs.reviewerCallsPerNode,
     synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
     evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
-    maxDepth: envelopeFormulaInputs.maxDepth
+    maxDepth: envelopeFormulaInputs.maxDepth,
+    // A14/A20 (F17): DR-184-v5 only when the pinned assignment has a runner-up.
+    backupSequencesProvisioned: input.backupSequencesProvisioned
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({

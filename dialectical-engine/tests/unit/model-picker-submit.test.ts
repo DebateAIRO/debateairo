@@ -10,7 +10,7 @@ import type { PickerOutcome, RoleAssignment, RoleSeat, Scorecard, SeatCandidate 
 
 const picker = vi.hoisted(() => ({ outcome: null as unknown }));
 /** `insertRunRoleAssignment` is a module function (P2 A6), so it is recorded through a module mock, not a spy. */
-const pinning = vi.hoisted(() => ({ calls: [] as unknown[], order: [] as string[] }));
+const pinning = vi.hoisted(() => ({ calls: [] as unknown[], order: [] as string[], reject: null as Error | null }));
 
 vi.mock("@debateai/scorecard", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@debateai/scorecard")>()),
@@ -22,6 +22,7 @@ vi.mock("@debateai/db", async (importOriginal) => ({
   insertRunRoleAssignment: async (_executor: unknown, input: unknown) => {
     pinning.order.push("insertRunRoleAssignment");
     pinning.calls.push(input);
+    if (pinning.reject !== null) throw pinning.reject;
   }
 }));
 
@@ -157,6 +158,7 @@ function recordRunStart(order: string[]) {
   const started: StartRunInput[] = [];
   pinning.calls.length = 0;
   pinning.order = order;
+  pinning.reject = null;
   const pinned = pinning.calls;
   vi.spyOn(RunRepository.prototype, "startRun").mockImplementation(async (input) => {
     order.push("startRun");
@@ -222,5 +224,20 @@ describe("A20 · the role assignment is pinned at run creation", () => {
     expect(pinned).toEqual([]);
     expect(order).not.toContain("insertRunRoleAssignment");
     expect(accepted).toEqual({ run_ref: RUN_ID, status: "QUEUED" });
+  });
+
+  // Carry 16 (A20.3 review m1): a pin that fails queues nothing. A later change that caught the
+  // insert and carried on would queue a scorecard-admitted run with no pin, and the runner would
+  // seat it from the legacy seat book, ignoring the picked judges, reviewers and answer roles.
+  it("queues nothing when the pin fails: submit rejects with the insert's error and stops there", async () => {
+    picker.outcome = assigned();
+    const order: string[] = [];
+    recordRunStart(order);
+    const failure = new Error("the pin insert was refused");
+    pinning.reject = failure;
+    await expect(application(settings(VALID), order)
+      .submit(ask(), session(), { kind: "server", userId: "a20-user", ownerRef: OWNER_REF }))
+      .rejects.toBe(failure);
+    expect(order).toEqual(["startRun", "insertRunRoleAssignment"]);
   });
 });

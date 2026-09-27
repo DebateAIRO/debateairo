@@ -97,6 +97,15 @@ export function targetPricesOf(facts: ReadonlyMap<string, AskTargetFacts>): Read
   return new Map([...facts].flatMap(([providerRef, fact]) => fact.price === null ? [] : [[providerRef, fact.price] as const]));
 }
 
+/**
+ * Carry 16 (A20.3 review m4): THE one test of a hosted per-run money ceiling —
+ * a positive safe integer of micros. The boot guard below and ask admission
+ * (`evaluateAskAdmission` in ./index.ts) both ask it; each keeps its own failure.
+ */
+export function isUsablePerRunCeiling(micros: number | null): micros is number {
+  return micros !== null && Number.isSafeInteger(micros) && micros >= 1;
+}
+
 export function askModelPickerSettings(input: Readonly<{
   scorecard: ModelScorecardReadResult;
   deploymentMode: "hosted" | "local";
@@ -108,8 +117,7 @@ export function askModelPickerSettings(input: Readonly<{
   // Carry 11 (A20.1 review M1): hosted always runs under sealed cost envelopes. A
   // missing or non-positive ceiling here would switch off the picker's step-down
   // and its BUDGET_TOO_SMALL refusal without a word, so boot refuses it instead.
-  const ceiling = input.perRunCeilingMicros;
-  if (hosted && (ceiling === null || !Number.isSafeInteger(ceiling) || ceiling < 1)) {
+  if (hosted && !isUsablePerRunCeiling(input.perRunCeilingMicros)) {
     throw new TypeError("ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED");
   }
   return Object.freeze({

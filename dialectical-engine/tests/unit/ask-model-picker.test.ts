@@ -3,6 +3,7 @@
  * hands the picker. Nothing here decides a seat; every row pins how one
  * deployment fact becomes one picker input.
  */
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   ASK_MODEL_ASSIGNMENT_INVALID,
@@ -12,6 +13,7 @@ import {
   debaterSeatCount,
   describeModelScorecard,
   expectedCallsByRoleFromBasis,
+  isUsablePerRunCeiling,
   reachableInTodaysOrder,
   seatDemandForDebaters,
   targetPricesOf
@@ -198,6 +200,22 @@ describe("A20 · deployment facts", () => {
       })).toThrowError(new TypeError("ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED"));
     }
   );
+
+  // Carry 16 (A20.3 review m4): ONE test of a usable per-run ceiling, asked by boot and by admission.
+  it("judges a per-run ceiling in one place, for the boot guard and for admission alike", async () => {
+    for (const usable of [1, 250_000, Number.MAX_SAFE_INTEGER]) expect(isUsablePerRunCeiling(usable)).toBe(true);
+    for (const unusable of [null, 0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(isUsablePerRunCeiling(unusable)).toBe(false);
+    }
+    const [admission, settings] = await Promise.all([
+      readFile("apps/api/src/index.ts", "utf8"),
+      readFile("apps/api/src/ask-model-picker.ts", "utf8")
+    ]);
+    expect(admission).toContain("isUsablePerRunCeiling(picker.perRunCeilingMicros)");
+    expect(settings).toContain("!isUsablePerRunCeiling(input.perRunCeilingMicros)");
+    // Neither restates the test.
+    for (const source of [admission, settings]) expect(source).not.toContain("Number.isSafeInteger(ceiling)");
+  });
 
   it("keeps LOCAL settings without a ceiling: local mode has no money bound", () => {
     expect(askModelPickerSettings({
