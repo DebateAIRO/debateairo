@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderGateway } from "@debateai/providers";
-import type { StoryStepLease } from "@debateai/story";
+import type { StoryCostFallback, StoryStepLease } from "@debateai/story";
 import { buildStoryRunSnapshot, type StorySnapshotSource } from "../../apps/runner/src/story-snapshot.js";
 
 /**
@@ -15,6 +15,10 @@ const ARROW_CHILD = "44444444-4444-4444-8444-444444444444";
 const ARROW_FROZEN = "55555555-5555-4555-8555-555555555555";
 const provider: ProviderGateway = { call: async () => { throw new Error("unused"); } };
 const stepLease: StoryStepLease = (use) => use();
+/** Task M7: the run's cost fallback travels to the writer untouched. */
+const costFallback: StoryCostFallback = async ({ planned, request, call }) => ({
+  result: await call(planned, request), servedBy: planned
+});
 const UUID_SHAPED = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu;
 /** What the story reads for a frozen branch: the runner's own reason names node ids, so it is replaced. */
 const FROZEN_REASON = "BRANCH-FROZEN-LOW-LEVERAGE: Adaptive stopping froze this branch: its leverage on the positions "
@@ -79,7 +83,8 @@ function source(): StorySnapshotSource {
       }
     ],
     resolveProvider: (roleRef) => (roleRef === "provider:a" ? { provider, providerRef: roleRef } : null),
-    stepLease
+    stepLease,
+    costFallback
   };
 }
 
@@ -203,5 +208,7 @@ describe("buildStoryRunSnapshot", () => {
     ]);
     expect(snapshot.resolveProvider?.("provider:a")).toEqual({ provider, providerRef: "provider:a" });
     expect(snapshot.resolveProvider?.("provider:b")).toBeNull();
+    // Task M7: and the run's cost fallback over the same makers, untouched.
+    expect(snapshot.costFallback).toBe(costFallback);
   });
 });

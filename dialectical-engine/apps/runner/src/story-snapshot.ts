@@ -1,6 +1,7 @@
 import type { CompositionBudgetTier, WayOfKnowing } from "@debateai/kernel";
 import {
   withoutStoryNodeIds,
+  type StoryCostFallback,
   type StoryRoleResolver,
   type StoryStepLease,
   type StoryWriteInput
@@ -109,6 +110,12 @@ export interface StorySnapshotSource {
   readonly resolveProvider: StoryRoleResolver;
   /** One story step under the run's disclosure lease (the story runs after the run's own lease). */
   readonly stepLease: StoryStepLease;
+  /**
+   * Engine money rule, Task M7 (spec §14.4.6): the run's cost fallback over the
+   * SAME claim-eligible makers `resolveProvider` answers from, cheapest first
+   * by the runner's price map (`storyCostFallback`).
+   */
+  readonly costFallback: StoryCostFallback;
 }
 
 /**
@@ -190,6 +197,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
       .map((record) => Object.freeze({ nodeId: record.subjectRef, reason: storyReason(record) }))),
     judgeArtifactRefs: new Map(source.authored.map((node) => [node.nodeId, node.provenanceRef] as const)),
     resolveProvider: source.resolveProvider,
-    stepLease: source.stepLease
+    stepLease: source.stepLease,
+    costFallback: source.costFallback
   });
 }

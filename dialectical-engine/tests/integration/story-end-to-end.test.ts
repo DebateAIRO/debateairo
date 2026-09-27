@@ -3,11 +3,12 @@ import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
-import { BudgetRepository, CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
+import { BudgetRepository, CostEnvelopeGuard, PostgresModelSpendStore, type ProviderTargetPrice } from "@debateai/budget";
 import { SESSION_COOKIE_NAME, PostgresAskApplication, buildApi } from "@debateai/api";
 import { AnswerDisclosureSchema, AnswerStorySchema, StoryBodySchema, type Session } from "@debateai/contract";
 import { RunRepository, ServeDisclosureRepository, migrate } from "@debateai/db";
 import { argumentLanguageDirective } from "@debateai/kernel";
+import type { ProviderCallRequest, ProviderGateway } from "@debateai/providers";
 import { CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY, type StoryPolicy } from "@debateai/register";
 import {
   createPostgresProviderGateway,
@@ -140,6 +141,8 @@ async function startStoryDebateProvider(input: {
   readonly checker?: "satisfied" | "objects-then-invalid";
   /** Task M5: the position's own statement, when a test must tell it from the answer-writer's prose. */
   readonly positionStatement?: string;
+  /** Task M7: report usage on every answer, as a hosted vendor must, so the story's charges are written. */
+  readonly reportUsage?: boolean;
 }): Promise<{
   readonly endpoint: string;
   storyCalls(): number;
@@ -196,7 +199,8 @@ async function startStoryDebateProvider(input: {
       const id = `story-e2e-${String(served)}`;
       contentFor(body).then((content) => {
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
-          id, model: requestedModel(body), choices: [{ message: { content } }]
+          id, model: requestedModel(body), choices: [{ message: { content } }],
+          ...(input.reportUsage === true ? { usage: { prompt_tokens: 1_000, completion_tokens: 200 } } : {})
         }));
       }, () => {
         response.writeHead(500, { "content-type": "application/json" })
@@ -434,6 +438,79 @@ async function storyCallSites(runId: string): Promise<readonly string[]> {
   return rows.rows.map((row) => row.call_site_key);
 }
 
+/**
+ * Task M7: a runner with a SECOND claim-eligible maker — the answer's checker,
+ * outside the one-maker panel — so the story has a cheaper maker to fall back
+ * on. A runner configured with more than one maker needs the sealed
+ * panel-weighting, stopping and scoring rows (J12, T7, DR-074): provisioning
+ * only, the database suite's own fixture values.
+ */
+function twoMakerSettings(input: Readonly<{
+  secondRef: string;
+  secondModel: string;
+  secondMaker: string;
+  secondProvider: ProviderGateway;
+  story: StoryWriter;
+  providerPrices: ReadonlyMap<string, ProviderTargetPrice>;
+}>): WalkingSkeletonSettings {
+  const settings = runnerSettings();
+  return {
+    ...settings,
+    story: input.story,
+    scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+    panelPolicy: {
+      registerVersion: 1,
+      dispersionScale: 1,
+      repeatedFamilyMultiplier: 0.5,
+      disagreementThreshold: 0.25,
+      oneStepDown: { TEST_CAPPED_BAND: "TEST_CAPPED_BAND", TEST_TOP_BAND: "TEST_CAPPED_BAND" },
+      providerFamilies: [
+        { familyRef: "test-layer:family:primary", providerRefs: [settings.providerRef] },
+        { familyRef: "test-layer:family:secondary", providerRefs: [input.secondRef] }
+      ],
+      unmappedReason: "PROVIDER_FAMILY_UNMAPPED",
+      sourceRefs: {
+        dispersionScale: "test-layer:J1",
+        repeatedFamilyMultiplier: "test-layer:J1",
+        disagreementThreshold: "test-layer:J1",
+        downgradeBands: "test-layer:J1",
+        providerFamilyMap: "test-layer:J1"
+      }
+    },
+    stoppingPolicy: {
+      registerVersion: 1,
+      delta: 0,
+      epsilon: 0,
+      sourceRefs: { globalStopDelta: "test-layer:T7", branchFreezeEpsilon: "test-layer:T7" }
+    },
+    additionalMakers: [{ provider: input.secondProvider, providerRef: input.secondRef, maker: input.secondMaker }],
+    // The answer's checker is the second maker, outside the one-maker panel,
+    // so the run has two claim-eligible makers.
+    synthesisRolePolicy: { ...settings.synthesisRolePolicy, evaluatorRoleRef: input.secondRef, identicalRoleRefs: false },
+    claimTimeSynthesisRoleProbe: async () => ({ state: "HEALTHY" as const, modelId: input.secondModel, failureCode: null }),
+    providerPrices: input.providerPrices
+  };
+}
+
+/** Task M7: who each ledgered story call was made by, and what each story charge was charged to. */
+async function storyLedger(runId: string): Promise<{
+  readonly calls: readonly { call_site_key: string; actor_ref: string; outcome: string }[];
+  readonly charges: readonly { provider_ref: string; spend_source: string }[];
+}> {
+  const calls = await database.pool.query<{ call_site_key: string; actor_ref: string; outcome: string }>(
+    `SELECT call_site_key, actor_ref, outcome FROM ledger.ledger_entry
+     WHERE run_id = $1 AND action_kind = 'MODEL_CALL' AND call_site_key LIKE 'STORY:%'
+     ORDER BY call_site_key`,
+    [runId]
+  );
+  const charges = await database.pool.query<{ provider_ref: string; spend_source: string }>(
+    `SELECT provider_ref, spend_source FROM ledger.model_spend
+     WHERE run_id = $1 AND spend_source = 'STORY' ORDER BY provider_ref`,
+    [runId]
+  );
+  return { calls: calls.rows, charges: charges.rows };
+}
+
 async function nonStoryAttempts(runId: string): Promise<number> {
   const result = await database.pool.query<{ count: string }>(
     `SELECT count(*)::text AS count FROM ledger.ledger_entry
@@ -627,6 +704,162 @@ describe("verdict story — end to end, after the debate is settled", () => {
       expect(workItem.rows[0]?.state).toBe("DONE");
     } finally {
       await provider.stop();
+    }
+  });
+
+  /**
+   * Engine money rule, Task M7 (spec §14.4.6): the story's planned model cannot
+   * be paid and a cheaper claim-eligible one can — through the REAL gateway,
+   * the REAL story seam (with the story's 20% margin) and the REAL ledger. The
+   * planned maker's tries are refused before sending, so its server never sees
+   * a story request, and nothing is ledgered or charged to it.
+   */
+  it("writes the story on a cheaper claim-eligible maker when the planned one cannot be paid, at the same call sites, and names it (Task M7)", async () => {
+    const debate = await createStoryDebate("story-e2e-m7-fallback");
+    const planned = await startStoryDebateProvider({ storyteller: "valid", reportUsage: true });
+    const cheaper = await startStoryDebateProvider({ storyteller: "valid", reportUsage: true });
+    const CHEAPER_REF = "provider:test-layer:secondary";
+    // 1 000 micro-units a token: no story call on the planned maker fits 60 000.
+    const dear: ProviderTargetPrice = { inputMicrosPerMillionTokens: 1_000_000_000, outputMicrosPerMillionTokens: 1_000_000_000 };
+    const cheap: ProviderTargetPrice = { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 };
+    const guard = new CostEnvelopeGuard({
+      store: new PostgresModelSpendStore(database.pool),
+      policy: {
+        perRunCeilingMicros: 1_000_000, dailyCeilingMicros: 1_000_000_000,
+        perStoryCeilingMicros: 50_000, perStoryOverrunBasisPoints: 2_000
+      }
+    });
+    const seen: { maker: "planned" | "cheaper"; request: ProviderCallRequest }[] = [];
+    const gatewayFor = (
+      maker: "planned" | "cheaper", endpoint: string, model: string, makerName: string,
+      price: ProviderTargetPrice
+    ): ProviderGateway => {
+      const inner = createPostgresProviderGateway(database.pool, {
+        endpoint, model, maker: makerName,
+        buildStoryCostEnvelopeSeam: (runId: string) => guard.storySeam({ runId, price, requireReportedUsage: true })
+      });
+      return { call: (request) => { if (request.lane === "story") seen.push({ maker, request }); return inner.call(request); } };
+    };
+    try {
+      const settings = runnerSettings();
+      const writer = new StoryWriter({
+        pool: database.pool, pack: PACK,
+        policy: { ...LOCAL_STORY_POLICY, perStoryCeilingMicros: 50_000, perStoryOverrunBasisPoints: 2_000 },
+        hosted: true, resolveProvider: () => null, log: () => undefined
+      });
+      const runner = new WalkingSkeletonRunner(
+        database.pool,
+        gatewayFor("planned", planned.endpoint, "test-layer/model", "test-layer", dear),
+        twoMakerSettings({
+          secondRef: CHEAPER_REF,
+          secondModel: "test-layer/cheaper-model",
+          secondMaker: "Cheaper story maker",
+          secondProvider: gatewayFor("cheaper", cheaper.endpoint, "test-layer/cheaper-model", "Cheaper story maker", cheap),
+          story: writer,
+          providerPrices: new Map([[settings.providerRef, dear], [CHEAPER_REF, cheap]])
+        })
+      );
+      const result = await runner.executeWorkItem(debate.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error(`STORY_E2E_EXPECTED_COMPLETION:${result.kind}`);
+
+      // Written and checked by the cheaper maker, and the stored lineage — what
+      // the PDF's "Written by / Checked by" prints — names it.
+      const stored = await new StoryRepository(database.pool).readForAnswer({
+        answerId: result.answerId, answerVersion: null, ownership: { legacyAskerId: debate.askerId }
+      });
+      expect(stored).toMatchObject({
+        outcome: "READY", failureCode: null, rounds: 1,
+        storytellerLineage: { provider_ref: CHEAPER_REF, maker: "Cheaper story maker", model_id: "test-layer/cheaper-model" },
+        checkerLineage: { provider_ref: CHEAPER_REF, maker: "Cheaper story maker", model_id: "test-layer/cheaper-model" }
+      });
+
+      // The planned maker was asked first for each call, and the cheaper one
+      // then took the SAME request: the same call site and the same framed bytes.
+      expect(seen.map((entry) => `${entry.maker}:${entry.request.callSiteKey}`)).toEqual([
+        "planned:STORY:STORYTELLER:1", "cheaper:STORY:STORYTELLER:1",
+        "planned:STORY:CHECKER:1", "cheaper:STORY:CHECKER:1"
+      ]);
+      for (const [first, second] of [[seen[0]!, seen[1]!], [seen[2]!, seen[3]!]] as const) {
+        expect(first.request.providerRef).toBe(settings.providerRef);
+        expect(second.request.providerRef).toBe(CHEAPER_REF);
+        expect(second.request.callSiteKey).toBe(first.request.callSiteKey);
+        expect(second.request.contractHash).toBe(first.request.contractHash);
+        expect(JSON.stringify(second.request.packet)).toBe(JSON.stringify(first.request.packet));
+      }
+
+      // Refused before sending: the planned maker's server saw no story request,
+      // and the ledger and the spend hold the cheaper maker's two calls only.
+      expect(planned.storyCalls()).toBe(0);
+      expect(cheaper.storyCalls()).toBe(2);
+      expect(await storyLedger(debate.runId)).toEqual({
+        calls: [
+          { call_site_key: "STORY:CHECKER:1", actor_ref: CHEAPER_REF, outcome: "OK" },
+          { call_site_key: "STORY:STORYTELLER:1", actor_ref: CHEAPER_REF, outcome: "OK" }
+        ],
+        charges: [
+          { provider_ref: CHEAPER_REF, spend_source: "STORY" },
+          { provider_ref: CHEAPER_REF, spend_source: "STORY" }
+        ]
+      });
+      // The served answer is the debate's, untouched.
+      expect(await servedAnswers(result.answerId)).toEqual([{ answer_version: 1, verdict_state: "CONTESTED" }]);
+    } finally {
+      await cheaper.stop();
+      await planned.stop();
+    }
+  });
+
+  it("still ends FAILED/STORY_ENVELOPE_EXHAUSTED when no claim-eligible maker can pay for the story (Task M7)", async () => {
+    const debate = await createStoryDebate("story-e2e-m7-none-fits");
+    const planned = await startStoryDebateProvider({ storyteller: "valid", reportUsage: true });
+    const other = await startStoryDebateProvider({ storyteller: "valid", reportUsage: true });
+    const OTHER_REF = "provider:test-layer:secondary";
+    const dear: ProviderTargetPrice = { inputMicrosPerMillionTokens: 1_000_000_000, outputMicrosPerMillionTokens: 1_000_000_000 };
+    const guard = new CostEnvelopeGuard({
+      store: new PostgresModelSpendStore(database.pool),
+      policy: {
+        perRunCeilingMicros: 1_000_000, dailyCeilingMicros: 1_000_000_000,
+        perStoryCeilingMicros: 50_000, perStoryOverrunBasisPoints: 2_000
+      }
+    });
+    const gatewayFor = (endpoint: string, model: string, makerName: string): ProviderGateway =>
+      createPostgresProviderGateway(database.pool, {
+        endpoint, model, maker: makerName,
+        buildStoryCostEnvelopeSeam: (runId: string) => guard.storySeam({ runId, price: dear, requireReportedUsage: true })
+      });
+    try {
+      const settings = runnerSettings();
+      const writer = new StoryWriter({
+        pool: database.pool, pack: PACK,
+        policy: { ...LOCAL_STORY_POLICY, perStoryCeilingMicros: 50_000, perStoryOverrunBasisPoints: 2_000 },
+        hosted: true, resolveProvider: () => null, log: () => undefined
+      });
+      const result = await new WalkingSkeletonRunner(
+        database.pool,
+        gatewayFor(planned.endpoint, "test-layer/model", "test-layer"),
+        twoMakerSettings({
+          secondRef: OTHER_REF,
+          secondModel: "test-layer/other-model",
+          secondMaker: "Other story maker",
+          secondProvider: gatewayFor(other.endpoint, "test-layer/other-model", "Other story maker"),
+          story: writer,
+          providerPrices: new Map([[settings.providerRef, dear], [OTHER_REF, dear]])
+        })
+      ).executeWorkItem(debate.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error(`STORY_E2E_EXPECTED_COMPLETION:${result.kind}`);
+      await expect(new StoryRepository(database.pool).readForAnswer({
+        answerId: result.answerId, answerVersion: null, ownership: { legacyAskerId: debate.askerId }
+      })).resolves.toMatchObject({
+        outcome: "FAILED", failureCode: "STORY_ENVELOPE_EXHAUSTED", rounds: 0, artifactRefs: [],
+        storytellerLineage: null, checkerLineage: null
+      });
+      expect(planned.storyCalls()).toBe(0);
+      expect(other.storyCalls()).toBe(0);
+      expect(await storyLedger(debate.runId)).toEqual({ calls: [], charges: [] });
+      expect(await servedAnswers(result.answerId)).toEqual([{ answer_version: 1, verdict_state: "CONTESTED" }]);
+    } finally {
+      await other.stop();
+      await planned.stop();
     }
   });
 

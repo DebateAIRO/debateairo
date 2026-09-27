@@ -1,3 +1,4 @@
+import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
 import { StoryLanguageTagSchema, type MakerLineage, type StoryBody } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
@@ -51,10 +52,46 @@ import { classifyCheckerContent, classifyStoryContent, parseCheckerVerdict, pars
  * against a work item that is already DONE.
  */
 
-export type StoryRoleResolver = (roleRef: string) => {
+export type StoryRoleResolver = (roleRef: string) => StoryRoleMaker | null;
+
+/** One of the run's claim-eligible makers, as a story call can be sent to it. */
+export interface StoryRoleMaker {
   readonly provider: ProviderGateway;
   readonly providerRef: string;
-} | null;
+}
+
+/**
+ * ENGINE MONEY RULE (spec 2026-09-26 §14.4.6), TASK M7 — THE RUNNER'S COST
+ * FALLBACK FOR ONE STORY CALL.
+ *
+ * The runner hands every run's story ONE function over that run's
+ * claim-eligible makers and its price map: its own answer-writing fallback
+ * (Task M3, `callServeRoleWithFallback`), not a copy of it. The planned maker is
+ * asked first with the request exactly as built; only a refusal the WRITER names
+ * as money (`refusedForMoney`: the story seam's STORY_COST_ENVELOPE_REACHED,
+ * raised before sending, so the try cost nothing and wrote nothing) moves the
+ * SAME request — call site, framed prompt, bound, contract — to the run's other
+ * makers, cheapest first by the seam's own projection, `preferNot` last. The
+ * first that goes through serves; nothing fits → the planned call's own refusal
+ * travels; any other failure, planned or fallback, travels untouched.
+ */
+export type StoryCostFallback = (input: Readonly<{
+  planned: StoryRoleMaker;
+  /** The maker offered last: for the checker, the one that wrote the draft it checks. */
+  preferNot: string | null;
+  request: ProviderCallRequest;
+  refusedForMoney: (error: unknown) => boolean;
+  call: (maker: StoryRoleMaker, request: ProviderCallRequest) => Promise<ProviderCallResult>;
+}>) => Promise<Readonly<{ result: ProviderCallResult; servedBy: StoryRoleMaker }>>;
+
+/**
+ * The story's one money refusal: its own seam's, raised before sending. The
+ * attempt allowance, a dead transport, an unusable answer and everything else
+ * are not money, and are never a reason to change the maker (J24).
+ */
+function isStoryMoneyRefusal(error: unknown): boolean {
+  return error instanceof TypedDomainError && error.code === STORY_COST_ENVELOPE_REACHED;
+}
 
 export interface StoryRecordSink {
   insert(record: StoryRecordInput): Promise<"INSERTED" | "ALREADY_PRESENT" | "RUN_ERASED">;
@@ -96,11 +133,15 @@ export type StoryStepLease = <T>(use: () => Promise<T>) => Promise<T>;
  * run's OWN role resolver (its claim-eligible providers), which REPLACES the
  * boot-time one for that run, and the step lease. With no step lease each step
  * runs bare, and each store and gateway takes its own lease on the run.
+ *
+ * Task M7: and, optionally, the run's cost fallback (`StoryCostFallback`). With
+ * none, a story call refused for money ends the loop at once, as before.
  */
 export type StoryWriteInput = StoryRunSnapshot & {
   readonly judgeArtifactRefs: ReadonlyMap<string, string>;
   readonly resolveProvider?: StoryRoleResolver;
   readonly stepLease?: StoryStepLease;
+  readonly costFallback?: StoryCostFallback;
 };
 
 /** What the runner reports when it could not even build the snapshot. */
@@ -437,6 +478,25 @@ export class StoryWriter {
     const checkerContract = storyContractInArgumentLanguage(buildStoryCheckerContract(pack), languageName);
     const storytellerHash = storyContractHash(storytellerContract);
     const checkerHash = storyContractHash(checkerContract);
+    /**
+     * Engine money rule, Task M7 (spec §14.4.6): one story call, with the
+     * run's cost fallback when the runner handed one over. Each try is one
+     * provider call, so each takes its own short step lease. The ROLE rule
+     * above is untouched: an absent role never reaches here, so a maker is only
+     * ever substituted for money.
+     */
+    const callStoryRole = async (
+      planned: StoryRoleMaker,
+      request: ProviderCallRequest,
+      preferNot: string | null
+    ): Promise<Readonly<{ result: ProviderCallResult; servedBy: StoryRoleMaker }>> => {
+      const send = (maker: StoryRoleMaker, sent: ProviderCallRequest) => stepLease(() => maker.provider.call(sent));
+      const costFallback = input.costFallback;
+      if (costFallback === undefined) return { result: await send(planned, request), servedBy: planned };
+      return costFallback({ planned, preferNot, request, refusedForMoney: isStoryMoneyRefusal, call: send });
+    };
+    /** Who actually wrote each round's draft: its checker prefers another maker. */
+    const draftWriterByRound = new Map<number, string>();
     const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds }, {
       writeStory: async ({ round, priorObjection }) => {
         const request = storyCallRequest({
@@ -450,14 +510,19 @@ export class StoryWriter {
           material: toStoryPromptMaterial(built.material, priorObjection),
           classifyContent: (content) => classifyStoryContent(content, built.index)
         });
-        const result = await stepLease(() => storyteller.provider.call(request));
+        // Task M7: a fallback writer keeps the planned CHECKER's maker for last,
+        // as the answer-writer's does (M3), so the checker is not handed a draft
+        // its own maker wrote whenever another maker fits.
+        const { result, servedBy } = await callStoryRole(storyteller, request, checker.providerRef);
+        draftWriterByRound.set(round, servedBy.providerRef);
         // Short refs on purpose: the checker judges this body against the SAME
         // material the storyteller read. Real ids are restored only for storage.
         const body: StoryBody = parseStoryBody(result.content, built.index);
         return {
           artifactRef: result.rawArtifactRef,
           callSiteKey: request.callSiteKey,
-          lineage: lineageOf(result, storyteller.providerRef),
+          // The maker ACTUALLY used, so "Written by" names a fallback model.
+          lineage: lineageOf(result, servedBy.providerRef),
           body
         };
       },
@@ -473,11 +538,13 @@ export class StoryWriter {
           material: toCheckerPromptMaterial(built.material, candidate),
           classifyContent: (content) => classifyCheckerContent(content)
         });
-        const result = await stepLease(() => checker.provider.call(request));
+        // Task M7: the planned checker is always asked first; a fallback checker
+        // prefers a maker other than the one that wrote this round's draft.
+        const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
         return {
           artifactRef: result.rawArtifactRef,
           callSiteKey: request.callSiteKey,
-          lineage: lineageOf(result, checker.providerRef),
+          lineage: lineageOf(result, servedBy.providerRef),
           verdict: parseCheckerVerdict(result.content)
         };
       }

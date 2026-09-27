@@ -147,7 +147,7 @@ import {
   type WayOfKnowing
 } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
-import type { StorySnapshotFailure, StoryWriteInput } from "@debateai/story";
+import type { StoryCostFallback, StorySnapshotFailure, StoryWriteInput } from "@debateai/story";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { buildStoryRunSnapshot } from "./story-snapshot.js";
 
@@ -2137,6 +2137,12 @@ export interface ServeRoleCallOutcome<T> {
  * provider, a contract error, anything untyped — travels UNTOUCHED from the
  * planned call, and a fallback that fails for any reason but money ends the
  * search with its own failure. A sealed identity is substituted for cost only.
+ *
+ * TASK M7 (spec §14.4.6): the VERDICT STORY's calls take this same fallback
+ * (`storyCostFallback`). Their money refusal is the story seam's own
+ * (STORY_COST_ENVELOPE_REACHED), not the run's, so the caller may name which
+ * refusal is money (`refusedForMoney`); the answer-writer's default is the
+ * run's money stop, as before.
  */
 export async function callServeRoleWithFallback<T>(input: Readonly<{
   planned: ServeRoleMaker;
@@ -2145,11 +2151,13 @@ export async function callServeRoleWithFallback<T>(input: Readonly<{
   preferNot: string | null;
   request: ProviderCallRequest;
   call: (maker: ServeRoleMaker, request: ProviderCallRequest) => Promise<T>;
+  refusedForMoney?: (error: unknown) => boolean;
 }>): Promise<ServeRoleCallOutcome<T>> {
+  const refusedForMoney = input.refusedForMoney ?? ((error: unknown) => envelopeStopKind(error) === "MONEY");
   try {
     return Object.freeze({ result: await input.call(input.planned, input.request), servedBy: input.planned, fallback: false });
   } catch (refusal) {
-    if (envelopeStopKind(refusal) !== "MONEY") throw refusal;
+    if (!refusedForMoney(refusal)) throw refusal;
     for (const maker of servePhaseFallbackOrder({
       planned: input.planned.providerRef,
       claimEligible: input.claimEligible,
@@ -2161,11 +2169,27 @@ export async function callServeRoleWithFallback<T>(input: Readonly<{
         const result = await input.call(maker, { ...input.request, providerRef: maker.providerRef });
         return Object.freeze({ result, servedBy: maker, fallback: true });
       } catch (error) {
-        if (envelopeStopKind(error) !== "MONEY") throw error;
+        if (!refusedForMoney(error)) throw error;
       }
     }
     throw refusal;
   }
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.6), TASK M7 — THE STORY'S COST FALLBACK, over
+ * one run's claim-eligible makers and the runner's price map. It IS the
+ * answer-writer's fallback (`callServeRoleWithFallback`, with its order and
+ * the seam's projection), handed to the story writer rather than copied into
+ * it; the story names its own money refusal. Built per run at the post-settle
+ * hook, beside the run's own role resolver, so a story never falls back onto a
+ * maker the claim did not find healthy.
+ */
+export function storyCostFallback(
+  claimEligible: readonly ServeRoleMaker[],
+  prices: ProviderPriceMap
+): StoryCostFallback {
+  return (input) => callServeRoleWithFallback({ ...input, claimEligible, prices });
 }
 
 /**
@@ -6309,6 +6333,10 @@ export class WalkingSkeletonRunner {
                 const maker = synthesisMakers.find((candidate) => candidate.providerRef === roleRef);
                 return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
               },
+              // Task M7 (spec §14.4.6): a story call refused for money is offered
+              // to the SAME claim-eligible makers, cheapest first by this runner's
+              // price map — the answer-writer's own fallback (Task M3).
+              costFallback: storyCostFallback(synthesisMakers, servePrices),
               // Each story step re-takes the SAME disclosure lease the debate held
               // (this run and its memory-linked prior run), briefly, on this
               // runner's pool: every store and gateway inside it borrows it, and
