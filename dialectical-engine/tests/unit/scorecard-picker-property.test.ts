@@ -165,7 +165,25 @@ function violationsOf(input: PickerInput, outcome: Extract<PickerOutcome, { stat
           || (member.thinkingLevel !== THINKING_LEVEL_DEFAULT_ONLY && !target.thinkingLevels.includes(member.thinkingLevel))) {
           found.push(`${role} seats ${member.providerRef}, which is not reachable as recorded`);
         }
-        if (role === "CROSS_EXCHANGE" || seat.source !== "SCORECARD" || input.scorecard === null) continue;
+        if (seat.source !== "SCORECARD" || input.scorecard === null) continue;
+        if (role === "CROSS_EXCHANGE") {
+          // R5 (fix round 1): CROSS_EXCHANGE mirrors POSITION, but a candidate with its OWN
+          // CROSS_EXCHANGE entry must still clear that entry's tier and window — a missing
+          // entry stands in on the POSITION entry (F28) and is not itself a violation here.
+          const crossEntry = input.scorecard.roles.CROSS_EXCHANGE.find((listed) => listed.candidateId === member.candidateId);
+          if (crossEntry === undefined) continue;
+          if (crossEntry.tier === "AVOID" || crossEntry.tier === "UNTESTED") {
+            found.push(`CROSS_EXCHANGE seats ${crossEntry.tier} ${String(member.candidateId)} on its own cross-exchange entry`);
+          }
+          const crossCandidate = input.scorecard.candidates.find((listed) => listed.candidateId === member.candidateId);
+          const crossWindows = [crossCandidate?.contextWindowTokens ?? null, target?.contextWindowTokens ?? null]
+            .filter((size): size is number => size !== null);
+          const crossTokens = crossEntry.typicalCall.inputTokens + crossEntry.typicalCall.outputTokens + (crossEntry.typicalCall.thinkingTokens ?? 0);
+          if (crossWindows.length > 0 && crossTokens > Math.min(...crossWindows)) {
+            found.push(`CROSS_EXCHANGE seats ${String(member.candidateId)} past its own cross-exchange context window`);
+          }
+          continue;
+        }
         const candidate = input.scorecard.candidates.find((listed) => listed.candidateId === member.candidateId);
         const entry = input.scorecard.roles[role].find((listed) => listed.candidateId === member.candidateId);
         if (candidate === undefined || entry === undefined) {
@@ -230,7 +248,8 @@ describe("pickRoleAssignment — property: 400 seeded inputs", () => {
       if (outcome.assignment.roles.POSITION.length >= 2) seen.multiPosition += 1;
     }
     expect(failures).toEqual([]);
-    // Non-vacuity: measured on this generator at 364 / 321 / 122 / 215 / 166 / 36; floors sit well below.
+    // Non-vacuity: measured on this generator (fix round 1, CROSS_EXCHANGE eligibility) at
+    // 356 / 313 / 117 / 229 / 152 / 43; floors sit well below.
     expect(seen.assigned).toBeGreaterThanOrEqual(300);
     expect(seen.scorecardSeat).toBeGreaterThanOrEqual(250);
     expect(seen.runnerUp).toBeGreaterThanOrEqual(80);

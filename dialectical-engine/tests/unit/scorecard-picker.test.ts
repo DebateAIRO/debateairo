@@ -271,6 +271,65 @@ describe("pickRoleAssignment — R5 fairness", () => {
   });
 });
 
+describe("pickRoleAssignment — CROSS_EXCHANGE eligibility (fix round 1, R5)", () => {
+  it("excludes a POSITION candidate the scorecard marks AVOID for its own cross-exchange call, and says why (probe)", () => {
+    const z1 = testCandidate("z1", "OpenAI", { contextWindowTokens: 4000 });
+    const a1 = testCandidate("a1", "Anthropic");
+    const outcome = assignedOutcome(pickRoleAssignment(testPickerInput({
+      scorecard: testScorecard([z1, a1], {
+        POSITION: [testEntry("z1", 95, 10, { inputTokens: 2000 }), testEntry("a1", 90, 10)],
+        CROSS_EXCHANGE: [testEntry("z1", 95, 10, { tier: "AVOID", inputTokens: 9000 })]
+      }),
+      reachable: [targetFor(z1), targetFor(a1)],
+      seatDemand: roleNumbers({ POSITION: 1, CROSS_EXCHANGE: 1 }),
+      strength: "BEST"
+    })));
+    // z1 is the higher-quality POSITION candidate and its own POSITION entry (2000 input) fits
+    // its 4000-token window, so without the fix it would be seated despite being AVOID for
+    // cross-exchange (its CX entry asks for 9000 input, which would also overflow the window).
+    expect(mainIds(outcome.assignment.roles.POSITION)).toEqual(["a1"]);
+    expect(outcome.assignment.roles.CROSS_EXCHANGE).toEqual(outcome.assignment.roles.POSITION);
+    expect(outcome.notes).toContain("CROSS_EXCHANGE_INELIGIBLE:z1");
+  });
+
+  it("excludes a POSITION candidate whose own cross-exchange typical call overflows its window", () => {
+    const z1 = testCandidate("z1", "OpenAI", { contextWindowTokens: 5000 });
+    const a1 = testCandidate("a1", "Anthropic");
+    const outcome = assignedOutcome(pickRoleAssignment(testPickerInput({
+      scorecard: testScorecard([z1, a1], {
+        POSITION: [testEntry("z1", 95, 10, { inputTokens: 2000 }), testEntry("a1", 90, 10)],
+        // TOP tier, but 6000 input overflows the 5000-token window on its own cross-exchange call.
+        CROSS_EXCHANGE: [testEntry("z1", 95, 10, { inputTokens: 6000 })]
+      }),
+      reachable: [targetFor(z1), targetFor(a1)],
+      seatDemand: roleNumbers({ POSITION: 1, CROSS_EXCHANGE: 1 }),
+      strength: "BEST"
+    })));
+    expect(mainIds(outcome.assignment.roles.POSITION)).toEqual(["a1"]);
+    expect(outcome.assignment.roles.CROSS_EXCHANGE).toEqual(outcome.assignment.roles.POSITION);
+    expect(outcome.notes).toContain("CROSS_EXCHANGE_INELIGIBLE:z1");
+  });
+
+  it("still seats a POSITION candidate with no cross-exchange entry of its own (F28 stand-in)", () => {
+    const z1 = testCandidate("z1", "OpenAI");
+    const a1 = testCandidate("a1", "Anthropic");
+    const outcome = assignedOutcome(pickRoleAssignment(testPickerInput({
+      scorecard: testScorecard([z1, a1], {
+        POSITION: [testEntry("z1", 95, 10), testEntry("a1", 80, 10)],
+        // Only a1 has a CROSS_EXCHANGE entry; z1 has none, so its POSITION entry stands in (F28)
+        // and it remains eligible.
+        CROSS_EXCHANGE: [testEntry("a1", 80, 10)]
+      }),
+      reachable: [targetFor(z1), targetFor(a1)],
+      seatDemand: roleNumbers({ POSITION: 1, CROSS_EXCHANGE: 1 }),
+      strength: "BEST"
+    })));
+    expect(mainIds(outcome.assignment.roles.POSITION)).toEqual(["z1"]);
+    expect(outcome.assignment.roles.CROSS_EXCHANGE).toEqual(outcome.assignment.roles.POSITION);
+    expect(outcome.notes).not.toContain("CROSS_EXCHANGE_INELIGIBLE:z1");
+  });
+});
+
 describe("pickRoleAssignment — FALLBACK reproduces today's roster", () => {
   const today: readonly ReachableTarget[] = [
     { providerRef: "provider:openai", maker: "OpenAI", modelId: "model-openai", thinkingLevels: [], contextWindowTokens: null },

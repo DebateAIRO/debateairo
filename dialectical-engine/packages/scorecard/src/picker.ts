@@ -28,6 +28,7 @@ import { estimateRunCost, typicalCallMicros } from "./estimate.js";
  *   ECONOMY_CAP_UNMET:<role>                  nothing was under the cap; the cheapest sits
  *   PRICE_UNUSABLE:<providerRef>              a hosted route without a usable price
  *   ESTIMATE_UNAVAILABLE                      a called seat has no typical call or no price
+ *   CROSS_EXCHANGE_INELIGIBLE:<candidateId>   a POSITION candidate could not also take its own cross-exchange call
  */
 
 export type ReachableTarget = Readonly<{
@@ -269,13 +270,39 @@ function seatDemandOf(input: PickerInput, role: DebateRole): number {
 }
 
 /**
+ * R5 (fix round 1, Important finding): when the run also asks for CROSS_EXCHANGE seats,
+ * CROSS_EXCHANGE mirrors POSITION exactly (R5), so a POSITION candidate — whether it would sit
+ * as a main or as a runner-up — must ALSO be able to take its own cross-exchange call. A
+ * candidate with no CROSS_EXCHANGE entry of its own stands in on its POSITION entry (the same
+ * rule the estimate applies, F28) and is eligible. A candidate WITH a CROSS_EXCHANGE entry is
+ * eligible only when that entry is not AVOID/UNTESTED and its typical call (input + output +
+ * thinking tokens) fits the smaller of its own and its route's window — the identical test
+ * `eligiblePool` applies to the role's own entry.
+ */
+function crossExchangeEligible(scorecard: Scorecard, candidate: ScorecardCandidate, target: ReachableTarget): boolean {
+  const entry = scorecard.roles.CROSS_EXCHANGE.find((listed) => listed.candidateId === candidate.candidateId);
+  if (entry === undefined) return true;
+  if (entry.tier === "AVOID" || entry.tier === "UNTESTED") return false;
+  const contextWindow = smallestWindow(candidate.contextWindowTokens, target.contextWindowTokens);
+  return contextWindow === null || typicalCallWindowTokens(entry.typicalCall) <= contextWindow;
+}
+
+/**
  * Every scorecard candidate that may sit in `role`: listed for it, not AVOID or UNTESTED,
  * reachable at its own thinking level, on an API route in HOSTED mode (relays never run
  * hosted), and whose typical call (input + output + thinking tokens) fits the smaller of its own
- * and its route's window.
+ * and its route's window. For POSITION, when the run also demands CROSS_EXCHANGE seats
+ * (`requireCrossExchangeEligible`), a candidate that cannot also take its own cross-exchange
+ * call is excluded too (`crossExchangeEligible`), noted `CROSS_EXCHANGE_INELIGIBLE`.
  * Entries are walked in candidateId order so the notes do not depend on the file's order.
  */
-function eligiblePool(input: PickerInput, scorecard: Scorecard, role: DebateRole, notes: string[]): Ranked[] {
+function eligiblePool(
+  input: PickerInput,
+  scorecard: Scorecard,
+  role: DebateRole,
+  notes: string[],
+  requireCrossExchangeEligible = false
+): Ranked[] {
   const candidates = new Map(scorecard.candidates.map((candidate) => [candidate.candidateId, candidate] as const));
   const entries = [...scorecard.roles[role]].sort((left, right) => pickerCompareIds(left.candidateId, right.candidateId));
   const pool: Ranked[] = [];
@@ -289,6 +316,10 @@ function eligiblePool(input: PickerInput, scorecard: Scorecard, role: DebateRole
     const contextWindow = smallestWindow(candidate.contextWindowTokens, target.contextWindowTokens);
     if (contextWindow !== null && typicalCallWindowTokens(entry.typicalCall) > contextWindow) {
       notes.push(`CONTEXT_WINDOW_SKIP:${role}:${candidate.candidateId}`);
+      continue;
+    }
+    if (requireCrossExchangeEligible && !crossExchangeEligible(scorecard, candidate, target)) {
+      notes.push(`CROSS_EXCHANGE_INELIGIBLE:${candidate.candidateId}`);
       continue;
     }
     let cost = entry.typicalCall.seconds;
@@ -378,13 +409,14 @@ function coversAuthorMakers(makers: readonly string[], authors: ReadonlySet<stri
 function assignAtStrength(input: PickerInput, strength: ModelStrength): Readonly<{ assignment: RoleAssignment; notes: readonly string[] }> {
   const notes: string[] = [];
   const scorecard = input.scorecard;
+  const crossExchangeDemanded = seatDemandOf(input, "CROSS_EXCHANGE") > 0;
   const fill = (role: DebateRole, count: number, rule: SeatRule): readonly RoleSeat[] => {
     if (count === 0) return Object.freeze([]);
     if (scorecard === null) return fallbackSeats(input.reachable, count, rule.fallback);
     const settings = scorecard.pickerSettings;
     const economyCap = settings.economyCap[role];
     const cap = input.mode === "HOSTED" ? economyCap.moneyMicrosPerCall : economyCap.secondsPerCall;
-    const pool = eligiblePool(input, scorecard, role, notes);
+    const pool = eligiblePool(input, scorecard, role, notes, role === "POSITION" && crossExchangeDemanded);
     const mains = chooseMains(pool, count, strength, settings, cap, rule);
     if (mains.length === 0) {
       notes.push(`ROLE_FALLBACK:${role}:NO_ELIGIBLE_CANDIDATE`);
