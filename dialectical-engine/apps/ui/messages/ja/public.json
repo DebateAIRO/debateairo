@@ -172,6 +172,6 @@
   "public.report.about.notRecorded": "記録なし",
   "public.report.error.signIn": "このレポートをダウンロードするには、ログインしてください。",
   "public.report.error.notAvailable": "このレポートはご利用いただけません。",
-  "public.report.error.tryAgain": "ただいまレポートを作成できませんでした。しばらくしてから、もう一度お試しください。",
+  "public.report.error.tryAgain": "レポートを作成できませんでした。しばらくしてから、もう一度お試しください。",
   "public.story.morePaths.other": "ほか{count}件の立場"
 }

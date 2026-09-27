@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError, type Answer, type AnswerStory, type RunProjection } from "@debateai/contract";
-import { GET } from "../../apps/ui/app/debate/[id]/report/route.js";
+import { GET, HEAD } from "../../apps/ui/app/debate/[id]/report/route.js";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import { reportSupportedForLocale, type ReportCatalogLoader } from "../../apps/ui/lib/report/reportLanguage.js";
 import {
+  handleReportHeadRequest,
   handleReportRequest,
   interfaceLocaleFromCookieHeader,
   reportContentDisposition,
@@ -91,6 +92,7 @@ function textHeaders(response: Response): void {
 afterEach(() => {
   delete process.env.DIALECTICAL_API_BASE;
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("PDF download route helpers (spec §10)", () => {
@@ -248,6 +250,30 @@ describe("handleReportRequest", () => {
     expect(body).not.toContain("secret socket detail");
   });
 
+  it("logs an upstream failure as a fixed tag and its typed code, never the caught message", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await handle(reader({
+      readAnswerStory: async () => { throw new ContractHttpError("SERVER_FAILURE", 500, "secret upstream detail"); }
+    }));
+    await handle(reader({ readRun: async () => { throw new Error("secret socket detail"); } }));
+    expect(log.mock.calls).toEqual([
+      ["[STORY_REPORT_UPSTREAM_FAILED]", "SERVER_FAILURE"],
+      ["[STORY_REPORT_UPSTREAM_FAILED]", "UNKNOWN"]
+    ]);
+    const logged = JSON.stringify(log.mock.calls);
+    expect(logged).not.toContain("secret upstream detail");
+    expect(logged).not.toContain("secret socket detail");
+  });
+
+  it("logs nothing for a refusal that is not a failure", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const notFound = async (): Promise<Answer> => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND"); };
+    await handle(reader({ readAnswer: notFound, readRunAnswer: notFound }));
+    await handle(reader({ readAnswerStory: async () => { throw new ContractHttpError("SESSION_REQUIRED", 401, "SESSION_REQUIRED"); } }));
+    await handle(reader({ readAnswerStory: async () => storyFixture("WRITING") }));
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it("streams a ready story as a PDF attachment", async () => {
     const story: AnswerStory = storyFixture("READY_WITH_RESERVATION");
     const readAnswerStory = vi.fn(async () => story);
@@ -332,6 +358,81 @@ describe("handleReportRequest", () => {
     const body = await response.text();
     expect(body).toBe(words("en", "public.report.error.tryAgain"));
     expect(body).not.toContain("catalogue exploded");
+  });
+});
+
+describe("HEAD: the same answer as GET, without making the PDF (review polish)", () => {
+  async function both(client: ReportReader, options: HandleOptions = {}): Promise<{ get: Response; head: Response; render: ReturnType<typeof vi.fn<ReportRenderer>> }> {
+    const get = await handle(client, options);
+    const render = vi.fn<ReportRenderer>(async () => FAKE_PDF);
+    const head = await handleReportHeadRequest({
+      id: STORY_FIXTURE_DEBATE_ID,
+      sessionCookie: options.sessionCookie === undefined ? SESSION : options.sessionCookie,
+      interfaceLocale: options.interfaceLocale ?? "en",
+      client: () => client,
+      now: NOW,
+      render,
+      ...(options.supported === undefined ? {} : { supported: options.supported })
+    });
+    return { get, head, render };
+  }
+
+  it("answers a ready story with GET's status and headers, no body, and never calls the renderer", async () => {
+    const { get, head, render } = await both(reader({ readAnswerStory: async () => storyFixture("READY_WITH_RESERVATION") }));
+    expect(head.status).toBe(200);
+    expect(get.status).toBe(200);
+    for (const name of ["content-type", "content-disposition", "cache-control", "x-content-type-options"]) {
+      expect(head.headers.get(name), name).toBe(get.headers.get(name));
+    }
+    expect(head.headers.get("content-type")).toBe("application/pdf");
+    expect(head.body).toBeNull();
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("answers 401 without a session, with no body, and never builds a client", async () => {
+    const client = vi.fn(() => reader());
+    const render = vi.fn<ReportRenderer>(async () => FAKE_PDF);
+    const head = await handleReportHeadRequest({
+      id: STORY_FIXTURE_DEBATE_ID, sessionCookie: null, interfaceLocale: "de", client, now: NOW, render
+    });
+    expect(head.status).toBe(401);
+    textHeaders(head);
+    expect(head.body).toBeNull();
+    expect(client).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("gives every refusal GET's status and headers, with no body", async () => {
+    const notFound = async (): Promise<Answer> => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND"); };
+    const cases: Array<[string, ReportReader, HandleOptions]> = [
+      ["session no longer accepted", reader({ readAnswer: async () => { throw new ContractHttpError("SESSION_REQUIRED", 401, "x"); } }), {}],
+      ["foreign debate", reader({ readAnswer: notFound, readRunAnswer: notFound }), {}],
+      ["story being written", reader({ readAnswerStory: async () => storyFixture("WRITING") }), {}],
+      ["story unavailable", reader({ readAnswerStory: async () => storyFixture("UNAVAILABLE") }), {}],
+      ["run read failed", reader({ readRun: async () => { throw new Error("down"); } }), {}],
+      ["story read failed", reader({ readAnswerStory: async () => { throw new ContractHttpError("SERVER_FAILURE", 500, "x"); } }), {}],
+      ["unprintable language", reader({ readRun: async () => runWithTag("ja") }), { supported: (locale: string) => locale !== "ja" }]
+    ];
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    for (const [name, client, options] of cases) {
+      const { get, head, render } = await both(client, options);
+      expect(head.status, name).toBe(get.status);
+      expect(head.status, name).not.toBe(200);
+      expect(head.headers.get("content-type"), name).toBe(get.headers.get("content-type"));
+      expect(head.headers.get("cache-control"), name).toBe(get.headers.get("cache-control"));
+      expect(head.body, name).toBeNull();
+      expect(render, name).not.toHaveBeenCalled();
+    }
+  });
+
+  it("is exported by the route: a HEAD with no session answers 401 with no body", async () => {
+    const response = await HEAD(new Request(`http://localhost/debate/${STORY_FIXTURE_DEBATE_ID}/report`, {
+      method: "HEAD",
+      headers: { cookie: "debateai.locale=de" }
+    }), { params: Promise.resolve({ id: STORY_FIXTURE_DEBATE_ID }) });
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(response.body).toBeNull();
   });
 });
 

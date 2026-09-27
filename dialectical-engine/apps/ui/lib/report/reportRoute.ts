@@ -36,11 +36,21 @@ export type ReportRenderer = (input: Readonly<{
 const SLUG_LIMITS = Object.freeze({ characters: 60, utf8Bytes: 180 });
 const SLUG_FALLBACK = "report";
 
+function textHeaders(): Record<string, string> {
+  return { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" };
+}
+
 function textResponse(status: number, body: string): Response {
-  return new Response(body, {
-    status,
-    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" }
-  });
+  return new Response(body, { status, headers: textHeaders() });
+}
+
+function pdfHeaders(question: string, now: Date): Record<string, string> {
+  return {
+    "content-type": "application/pdf",
+    "content-disposition": reportContentDisposition(question, now),
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff"
+  };
 }
 
 /**
@@ -170,41 +180,56 @@ async function refusalCatalog(load: ReportCatalogLoader, locale: LocaleCode): Pr
   }
 }
 
-function signInResponse(publicCatalog: MessageCatalog): Response {
-  return textResponse(401, t(publicCatalog, "public.report.error.signIn"));
+function signInLine(publicCatalog: MessageCatalog): string {
+  return t(publicCatalog, "public.report.error.signIn");
 }
 
-function notAvailableResponse(publicCatalog: MessageCatalog): Response {
-  return textResponse(404, t(publicCatalog, "public.report.error.notAvailable"));
+function notAvailableLine(publicCatalog: MessageCatalog): string {
+  return t(publicCatalog, "public.report.error.notAvailable");
 }
 
-function unsupportedResponse(publicCatalog: MessageCatalog): Response {
-  return textResponse(404, t(publicCatalog, "public.story.reportUnsupported"));
+function unsupportedLine(publicCatalog: MessageCatalog): string {
+  return t(publicCatalog, "public.story.reportUnsupported");
 }
 
-function tryAgainResponse(status: 500 | 502, publicCatalog: MessageCatalog): Response {
-  return textResponse(status, t(publicCatalog, "public.report.error.tryAgain"));
+function tryAgainLine(publicCatalog: MessageCatalog): string {
+  return t(publicCatalog, "public.report.error.tryAgain");
 }
 
-function upstreamFailureResponse(failure: unknown, publicCatalog: MessageCatalog): Response {
-  if (failure instanceof ContractHttpError && failure.code === "SESSION_REQUIRED") return signInResponse(publicCatalog);
-  if (failure instanceof ContractHttpError && failure.code === "NOT_FOUND") return notAvailableResponse(publicCatalog);
-  return tryAgainResponse(502, publicCatalog);
+/** A refusal: its status, the locale its line speaks, and how to word that line. */
+interface Refusal {
+  readonly kind: "refused";
+  readonly status: 401 | 404 | 500 | 502;
+  readonly locale: LocaleCode;
+  readonly line: (publicCatalog: MessageCatalog) => string;
+}
+
+/** Everything a report needs from the API, read and checked. */
+interface ReadyReport {
+  readonly kind: "ready";
+  readonly answer: Answer;
+  readonly story: AnswerStory;
+  readonly questionTag: string | null;
+  readonly locale: LocaleCode;
+}
+
+function refuse(status: Refusal["status"], locale: LocaleCode, line: Refusal["line"]): Refusal {
+  return { kind: "refused", status, locale, line };
 }
 
 /**
- * The report for debate `id`, read with the owner's session:
- *  1. the answer (by answer id, then by run id) and its run, whose
- *     `argument_language` names the question's language;
- *  2. the question's locale (`und` or unknown falls back to the interface
- *     locale); a locale the fonts cannot print yet is refused before any
- *     further read;
- *  3. the story, which must be READY or READY_WITH_RESERVATION with a body;
- *  4. the PDF, rendered in memory in that locale.
- * A refusal speaks the question's locale once the run has named it, the
- * interface locale before that.
+ * An API read that failed. Only a real failure (502) is logged, as a fixed tag
+ * and the typed contract code: never the caught message, which may carry
+ * upstream detail.
  */
-export async function handleReportRequest(input: Readonly<{
+function upstreamRefusal(failure: unknown, locale: LocaleCode): Refusal {
+  if (failure instanceof ContractHttpError && failure.code === "SESSION_REQUIRED") return refuse(401, locale, signInLine);
+  if (failure instanceof ContractHttpError && failure.code === "NOT_FOUND") return refuse(404, locale, notAvailableLine);
+  console.error("[STORY_REPORT_UPSTREAM_FAILED]", failure instanceof ContractHttpError ? failure.code : "UNKNOWN");
+  return refuse(502, locale, tryAgainLine);
+}
+
+export type ReportRequestInput = Readonly<{
   id: string;
   sessionCookie: string | null;
   interfaceLocale: LocaleCode;
@@ -213,9 +238,21 @@ export async function handleReportRequest(input: Readonly<{
   load?: ReportCatalogLoader;
   render?: ReportRenderer;
   supported?: (locale: string) => boolean;
-}>): Promise<Response> {
-  const load = input.load ?? loadNamespace;
-  if (input.sessionCookie === null) return signInResponse(await refusalCatalog(load, input.interfaceLocale));
+}>;
+
+/**
+ * What GET and HEAD share, read with the owner's session:
+ *  1. the answer (by answer id, then by run id) and its run, whose
+ *     `argument_language` names the question's language;
+ *  2. the question's locale (`und` or unknown falls back to the interface
+ *     locale); a locale the fonts cannot print yet is refused before any
+ *     further read;
+ *  3. the story, which must be READY or READY_WITH_RESERVATION with a body.
+ * A refusal speaks the question's locale once the run has named it, the
+ * interface locale before that.
+ */
+async function prepareReport(input: ReportRequestInput): Promise<Refusal | ReadyReport> {
+  if (input.sessionCookie === null) return refuse(401, input.interfaceLocale, signInLine);
 
   let client: ReportReader;
   let answer: Answer;
@@ -225,46 +262,66 @@ export async function handleReportRequest(input: Readonly<{
     answer = await readAnswerByIdOrRun(client, input.id);
     questionTag = (await client.readRun(answer.run_ref)).argument_language?.tag ?? null;
   } catch (failure) {
-    return upstreamFailureResponse(failure, await refusalCatalog(load, input.interfaceLocale));
+    return upstreamRefusal(failure, input.interfaceLocale);
   }
 
   const locale = questionLocale(questionTag, input.interfaceLocale);
-  if (!(input.supported ?? reportSupportedForLocale)(locale)) {
-    return unsupportedResponse(await refusalCatalog(load, locale));
-  }
-  let catalogs: ReportCatalogs;
-  try {
-    catalogs = await loadReportCatalogs({ questionTag, interfaceLocale: input.interfaceLocale, load });
-  } catch {
-    console.error("[STORY_REPORT_CATALOGS_FAILED]");
-    return tryAgainResponse(500, await refusalCatalog(load, locale));
-  }
-  const publicCatalog = catalogs.publicCatalog;
+  if (!(input.supported ?? reportSupportedForLocale)(locale)) return refuse(404, locale, unsupportedLine);
 
   let story: AnswerStory;
   try {
     story = await client.readAnswerStory(answer.answer_id);
   } catch (failure) {
-    return upstreamFailureResponse(failure, publicCatalog);
+    return upstreamRefusal(failure, locale);
   }
   if (story.story === null || (story.status !== "READY" && story.status !== "READY_WITH_RESERVATION")) {
-    return notAvailableResponse(publicCatalog);
+    return refuse(404, locale, notAvailableLine);
+  }
+  return { kind: "ready", answer, story, questionTag, locale };
+}
+
+/**
+ * GET: the report, rendered in memory in the question's locale and streamed as
+ * an attachment. Nothing is stored; a refusal is one plain catalogue line.
+ */
+export async function handleReportRequest(input: ReportRequestInput): Promise<Response> {
+  const load = input.load ?? loadNamespace;
+  const prepared = await prepareReport(input);
+  if (prepared.kind === "refused") {
+    return textResponse(prepared.status, prepared.line(await refusalCatalog(load, prepared.locale)));
+  }
+
+  let catalogs: ReportCatalogs;
+  try {
+    catalogs = await loadReportCatalogs({ questionTag: prepared.questionTag, interfaceLocale: input.interfaceLocale, load });
+  } catch {
+    console.error("[STORY_REPORT_CATALOGS_FAILED]");
+    return textResponse(500, tryAgainLine(await refusalCatalog(load, prepared.locale)));
   }
 
   let pdf: Buffer;
   try {
-    pdf = await (input.render ?? renderReportPdf)({ answer, story, generatedAt: input.now, catalogs });
+    pdf = await (input.render ?? renderReportPdf)({
+      answer: prepared.answer,
+      story: prepared.story,
+      generatedAt: input.now,
+      catalogs
+    });
   } catch {
     console.error("[STORY_REPORT_RENDER_FAILED]");
-    return tryAgainResponse(500, publicCatalog);
+    return textResponse(500, tryAgainLine(catalogs.publicCatalog));
   }
-  return new Response(new Uint8Array(pdf), {
-    status: 200,
-    headers: {
-      "content-type": "application/pdf",
-      "content-disposition": reportContentDisposition(answer.question_line, input.now),
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff"
-    }
-  });
+  return new Response(new Uint8Array(pdf), { status: 200, headers: pdfHeaders(prepared.answer.question_line, input.now) });
+}
+
+/**
+ * HEAD: the same session check and the same three reads as GET, answered with
+ * GET's status and headers and no body. The PDF is never made (Next would
+ * otherwise answer HEAD by running GET and dropping the bytes), so a render
+ * failure, which only making it can reveal, is GET's alone.
+ */
+export async function handleReportHeadRequest(input: ReportRequestInput): Promise<Response> {
+  const prepared = await prepareReport(input);
+  if (prepared.kind === "refused") return new Response(null, { status: prepared.status, headers: textHeaders() });
+  return new Response(null, { status: 200, headers: pdfHeaders(prepared.answer.question_line, input.now) });
 }
