@@ -14,7 +14,7 @@ What you are really trying to decide: one short paragraph, marked as your readin
 
 Our answer in one paragraph: our best answer, stated plainly, and the main reason for it. For a close call or a best guess, say why in the person's terms, for example "moving right away has good arguments too, but it would take the children out of school mid-year", never in the terms of the rule.
 
-The options we weighed: one paragraph per position, ours first. For each: what it proposes, the best case for it, the strongest objection to it, and plainly whether it holds up and why. Then what was left out of the conclusion, and why.
+The options we weighed: one paragraph per position, ours first. For each: what it proposes, the best case for it, the strongest objection to it, and plainly whether it holds up and why. Then what was left out of the conclusion or not followed further, and why.
 
 What the answer depends on: the points in hinges, in order, a sentence or two each: what the point says, which way it pushes, and why our answer leans on it. When one rests on reasoning alone, say so.
 

@@ -343,7 +343,7 @@ const FIXTURE_BODY: NonNullable<AnswerStory["story"]> = {
             node_refs: ["n-not-now", "n-not-now-once"]
           },
           {
-            text: "O singură obiecție nu a cântărit în concluzie: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Sursa era slabă, iar răspunsul nostru ține deja cont de acest risc: depinde oricum de acceptul angajatorului. Asta nu înseamnă că obiecția e greșită; răspunsul angajatorului o va lămuri.",
+            text: "O singură obiecție a cântărit puțin în concluzie: un comentariu anonim de pe un forum, care spunea că angajatorul refuză des lucrul hibrid. Sursa era slabă, iar răspunsul nostru ține deja cont de acest risc: depinde oricum de acceptul angajatorului. Asta nu înseamnă că obiecția e greșită; răspunsul angajatorului o va lămuri.",
             node_refs: ["n-hybrid-forum"]
           }
         ]

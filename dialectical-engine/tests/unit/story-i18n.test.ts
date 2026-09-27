@@ -178,7 +178,7 @@ describe("the report's list of points speaks to the person too (fix round 1)", (
 
   it("says a point the debate did not follow further carried little weight, never that it was left out (round 2)", async () => {
     // BRANCH-FROZEN-LOW-LEVERAGE: the point still counts; the debate only did not follow it further.
-    expect((await entryFor(markedAnswer([]), "ro")).setAsideLine).toBe("Nu a cântărit în concluzie: nu ar fi putut schimba răspunsul.");
+    expect((await entryFor(markedAnswer([]), "ro")).setAsideLine).toBe("A cântărit puțin în concluzie: nu ar fi putut schimba răspunsul.");
     expect((await entryFor(markedAnswer([]), "en")).setAsideLine)
       .toBe("Carried little weight in the conclusion: it could not have changed the answer.");
   });

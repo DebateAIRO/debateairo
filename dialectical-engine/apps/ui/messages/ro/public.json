@@ -158,7 +158,7 @@
   "public.report.point.notChecked": "Niciun al doilea model AI nu a verificat acest punct.",
   "public.report.point.setAsideUnweighed": "Lăsat în afara concluziei: nu a putut fi cântărit.",
   "public.report.point.setAsideWeak": "Lăsat în afara concluziei: era prea slab ca să conteze.",
-  "public.report.point.littleWeight": "Nu a cântărit în concluzie: nu ar fi putut schimba răspunsul.",
+  "public.report.point.littleWeight": "A cântărit puțin în concluzie: nu ar fi putut schimba răspunsul.",
   "public.report.point.noteOneModel": "Un singur model AI a putut cântări acest punct.",
   "public.report.point.noteFewerModels": "Mai puține modele AI decât de obicei l-au putut cântări.",
   "public.report.point.noteSourceUnconfirmed": "Sursa lui nu a putut fi confirmată, așa că a contat doar ca raționament.",

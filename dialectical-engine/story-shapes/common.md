@@ -74,7 +74,7 @@ The material is for you to understand the debate. Its names, codes and numbers n
 - positions: the opening positions, from the highest final score to the lowest, with the model that argued each and whether it won.
 - points: every point of the debate or, in a very large debate, the ones that matter most. id; supports or attacks, the ids of the points it argues for or against; claim; known_by: LOOKED_UP (checked against a source), RAN (computed or run) or REASONING (argument only); base, the point's own score from 0 to 1; final, its score once everything for and against it is counted; set_aside, if present: why it was left out, or why the debate did not follow it further; best_case and objection, the strongest case for it and against it; review and review_reasons, a second model's double-check: agree, dispute or cannot-assess (it could not be checked); author, the model that wrote it; judge_spread, how far its assessments were apart; leverage, how much our answer leans on it.
 - hinges: the points our answer leans on most, most important first.
-- set_aside: branches the debate did not follow further, and why. What they hold still counts, with little weight.
+- set_aside: branches the debate did not follow further, and why; what they hold still counts. One stopped because it could not have changed the answer carried little weight.
 - omitted: in a very large debate, how many more points argued for or against each position without being shown here. Speak only of the points you can see; you may say that more were argued.
 - prior_objection: present only on a second draft; see "A second draft".
 
@@ -100,7 +100,7 @@ Each path also carries a fate, a code the site turns into words, chosen from its
 - HELD_UP: final score at or above high_cut.
 - PARTLY_HELD: at or above low_cut and below high_cut.
 - FELL: below low_cut.
-- SET_ASIDE: the debate did not follow the position further before it was fully tested; it carried little weight in the conclusion.
+- SET_ASIDE: the debate did not follow the position further before it was fully tested. If that was because it could not have changed the answer, it carried little weight in the conclusion.
 
 Keep the fate even when it looks at odds with the label: the winning position can be HELD_UP in a close call, for example because another option finished almost level. Let the words explain the difference.
 

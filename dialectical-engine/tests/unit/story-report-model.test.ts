@@ -322,7 +322,7 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
     expect(byNumber.get("P7")?.review).toBe(`Un al doilea model AI (${XAI}) l-a verificat, dar nu s-a putut pronunța. Nu există date despre școala copiilor.`);
     expect(byNumber.get("P8")?.stance).toBe("Contestă P3");
     // The forum objection was not followed further: it still counts, with little weight (round 2).
-    expect(byNumber.get("P8")?.setAsideLine).toBe("Nu a cântărit în concluzie: nu ar fi putut schimba răspunsul.");
+    expect(byNumber.get("P8")?.setAsideLine).toBe("A cântărit puțin în concluzie: nu ar fi putut schimba răspunsul.");
     expect(byNumber.get("P8")?.review).toBe("Niciun al doilea model AI nu a verificat acest punct.");
     expect(byNumber.get("P1")?.setAsideLine).toBeNull();
   });
