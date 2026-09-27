@@ -2341,7 +2341,9 @@ export const CONTENT_CARRIERS = Object.freeze([
   "core.value_hinge",
   "ledger.overlay_run",
   "core.run_progress_event",
-  "memory.alias_row"
+  "memory.alias_row",
+  // Model scorecard (migration 0072): the exact prompt of one model-call attempt.
+  "ledger.call_prompt"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

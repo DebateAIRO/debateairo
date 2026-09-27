@@ -400,7 +400,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0069_remaining_content_carriers.sql",
         // DL7-F9 (Task 14): the threshold operator principal; the daemon loses INSERT on the
         // policy that rules it. 0069 and 0070 are reserved for V-6. A new prefix, no pair.
-        "0071_observation_threshold_operator.sql"
+        "0071_observation_threshold_operator.sql",
+        // Model scorecard (spec 2026-09-26, ruling R8): the per-call record columns, the
+        // encrypted prompt carrier and the pinned role assignment. A new prefix, no pair.
+        "0072_model_scorecard.sql"
       ]);
   });
 });
