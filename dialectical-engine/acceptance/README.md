@@ -142,7 +142,8 @@ the suffixes to serve. The endpoints file is written with mode 0600, by default 
 where `baseUrl` already ends in `/v1` and `bearerToken` is the value after `Bearer `.
 The host runs until SIGTERM or Ctrl-C, even one that arrives during start-up. It
 then deletes the endpoints file first and closes every relay; a second Ctrl-C
-does not cut that short.
+does not cut that short. If the file cannot be deleted, the host says so with
+`RELAY_HOST_ENDPOINTS_REMOVE_FAILED` and the path, so you can delete it yourself.
 
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size

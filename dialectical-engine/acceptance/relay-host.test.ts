@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -76,6 +76,11 @@ async function hostBinary(directory: string, name: string, fixturePath: string):
  */
 function listeningServers(): number {
   return process.getActiveResourcesInfo().filter((resource) => resource === "TCPServerWrap").length;
+}
+
+/** Child processes this process has running: a relay spawns one CLI per call. */
+function childProcesses(): number {
+  return process.getActiveResourcesInfo().filter((resource) => resource === "ProcessWrap").length;
 }
 
 /** A stand-in work tree (it holds `.git`) with the engine one level down, as in this repository. */
@@ -233,6 +238,83 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
     expect(existsSync(endpointsPath)).toBe(false);
     await expect.poll(() => listeningServers()).toBe(before);
     await expect(fetch(`${served[0]!.baseUrl}/chat/completions`, { method: "POST" })).rejects.toThrow();
+  });
+
+  it("rejects stop() with RELAY_HOST_ENDPOINTS_REMOVE_FAILED when the file cannot go, and still closes every relay", async () => {
+    const directory = await workspace();
+    const endpointsDirectory = join(directory, "endpoints");
+    await mkdir(endpointsDirectory);
+    const endpointsPath = join(endpointsDirectory, "endpoints.json");
+    const before = listeningServers();
+    const host = await serveRelayHost({
+      candidatesPath: await candidatesFile(directory, [PI_CANDIDATE]),
+      endpointsPath,
+      environment: LOCAL,
+      seams: SEAMS,
+      emit: () => undefined
+    });
+    const { baseUrl } = host.endpoints[0]!;
+    await chmod(endpointsDirectory, 0o500);
+    try {
+      await expect(host.stop()).rejects.toThrow("RELAY_HOST_ENDPOINTS_REMOVE_FAILED");
+
+      expect(existsSync(endpointsPath)).toBe(true);
+      await expect.poll(() => listeningServers()).toBe(before);
+      await expect(fetch(`${baseUrl}/chat/completions`, { method: "POST" })).rejects.toThrow();
+    } finally {
+      await chmod(endpointsDirectory, 0o700);
+    }
+  });
+
+  it("names a start-up deletion that failed, and still throws the original error", async () => {
+    const directory = await workspace();
+    const before = listeningServers();
+    const locked: string[] = [];
+    /** Serves pi, then fails its RELAYS SERVING emit with the file written and undeletable. */
+    const attempt = async (name: string, emitAlwaysFails: boolean) => {
+      const endpointsDirectory = join(directory, name);
+      await mkdir(endpointsDirectory);
+      const endpointsPath = join(endpointsDirectory, "endpoints.json");
+      const lines: string[] = [];
+      const failure = await serveRelayHost({
+        candidatesPath: await candidatesFile(directory, [PI_CANDIDATE]),
+        endpointsPath,
+        environment: LOCAL,
+        seams: SEAMS,
+        emit: (line) => {
+          lines.push(line);
+          if (line.startsWith("RELAYS SERVING")) {
+            // The file is written; from here on the cleanup cannot delete it.
+            chmodSync(endpointsDirectory, 0o500);
+            locked.push(endpointsDirectory);
+            throw new Error("EMIT_BROKEN RELAYS SERVING");
+          }
+          if (emitAlwaysFails) throw new Error("EMIT_BROKEN AGAIN");
+        }
+      }).then(() => null, (error: unknown) => error);
+      return { endpointsPath, lines, failure };
+    };
+    try {
+      const reported = await attempt("reported", false);
+      expect(reported.failure).toEqual(new Error("EMIT_BROKEN RELAYS SERVING"));
+      expect(reported.lines).toEqual([
+        `RELAYS SERVING 1 ${reported.endpointsPath}`,
+        `RELAY_HOST_ENDPOINTS_REMOVE_FAILED ${reported.endpointsPath}`
+      ]);
+      expect(existsSync(reported.endpointsPath)).toBe(true);
+      await expect.poll(() => listeningServers()).toBe(before);
+
+      // An emit that fails on that line too cannot replace the original error.
+      const unreported = await attempt("unreported", true);
+      expect(unreported.failure).toEqual(new Error("EMIT_BROKEN RELAYS SERVING"));
+      expect(unreported.lines).toEqual([
+        `RELAYS SERVING 1 ${unreported.endpointsPath}`,
+        `RELAY_HOST_ENDPOINTS_REMOVE_FAILED ${unreported.endpointsPath}`
+      ]);
+      await expect.poll(() => listeningServers()).toBe(before);
+    } finally {
+      for (const lockedDirectory of locked) await chmod(lockedDirectory, 0o700);
+    }
   });
 
   it("serves the candidates that started and names each one that did not", async () => {
@@ -407,6 +489,34 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
     })).rejects.toThrow("RELAY_HOST_CANDIDATES_UNREADABLE");
   });
 
+  it("refuses a tracked path spelled in another letter case, on a case-insensitive volume", async (context) => {
+    // Fix round 2: a folder ABOVE the work tree spelled in another case used to
+    // compare as "outside" the tree and be admitted, bearers and all.
+    const outer = join(await workspace(), "CaseFold");
+    const tree = join(outer, "Tree");
+    const engine = join(tree, "engine");
+    await mkdir(join(tree, ".git"), { recursive: true });
+    await mkdir(engine);
+    const flippedOuter = join(dirname(outer), "cASEfOLD");
+    // The probe: on a case-sensitive volume the flipped spelling names no folder at all.
+    if (!existsSync(flippedOuter)) {
+      context.skip("the temporary volume is case-sensitive: there a flipped-case path is a different path");
+    }
+    const refused = async (endpointsPath: string): Promise<void> => {
+      await expect(serveRelayHost({
+        candidatesPath: join(tree, "absent-candidates.json"),
+        endpointsPath,
+        environment: LOCAL,
+        seams: { ...SEAMS, repositoryRoot: engine },
+        emit: () => undefined
+      }), endpointsPath).rejects.toThrow("RELAY_HOST_ENDPOINTS_PATH_REFUSED");
+    };
+
+    await refused(join(flippedOuter, "Tree", "engine", "endpoints.json"));
+    await refused(join(outer, "tREE", "engine", "endpoints.json"));
+    await refused(join(outer, "Tree", "ENGINE", "endpoints.json"));
+  });
+
   it("refuses a bare endpoints file name, which would resolve into this repository's tracked tree", async () => {
     // No repositoryRoot seam: the module's OWN engine root and work tree decide.
     // Relative paths resolve from the cwd, which is the engine root here, as under `pnpm run`.
@@ -480,12 +590,32 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
       );
       await expect.poll(() => existsSync(endpointsPath), { timeout: 15_000 }).toBe(true);
       const written = JSON.parse(await readFile(endpointsPath, "utf8")) as { relays: RelayHostEndpoint[] };
+      const pi = written.relays[0]!;
+      // Fix round 2: a call the fake pi answers only after 2 s. While it is in
+      // flight the relay cannot finish closing, so the stop is held OPEN and its
+      // inside can be looked at.
+      const spawnedBefore = childProcesses();
+      let callSettled = false;
+      const inFlight = fetch(`${pi.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${pi.bearerToken}` },
+        body: JSON.stringify({
+          model: pi.modelId,
+          messages: [{ role: "user", content: "TIMEOUT_CLI — hold the stop open." }]
+        })
+      }).finally(() => { callSettled = true; });
+      await expect.poll(() => childProcesses()).toBeGreaterThan(spawnedBefore);
 
       signals.emit("SIGINT");
+      // The stop has BEGUN — it deletes the file first — and has not ended.
+      await expect.poll(() => existsSync(endpointsPath)).toBe(false);
+      expect(callSettled).toBe(false);
       // Still handled while the stop runs: with no handler, a real second Ctrl-C
-      // would reach Node's default and exit before the file was deleted.
+      // would reach Node's default and exit before the relays were closed.
       expect(signals.listenerCount("SIGINT")).toBe(1);
+      expect(signals.listenerCount("SIGTERM")).toBe(1);
       signals.emit("SIGINT");
+      expect((await inFlight).status).toBe(200);
       await running;
 
       expect(existsSync(endpointsPath)).toBe(false);

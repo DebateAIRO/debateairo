@@ -243,7 +243,13 @@ async function writeEndpointsFile(path: string, endpoints: readonly RelayHostEnd
   }
 }
 
-/** `path` with every symbolic link resolved, including when its last segments do not exist yet. */
+/**
+ * `path` with every symbolic link resolved and every existing segment in its ON-DISK
+ * letter case, including when its last segments do not exist yet. Fix round 2: the
+ * native realpath, because the JavaScript one keeps the caller's spelling, and on a
+ * case-insensitive volume (the macOS default) a folder above the work tree spelled
+ * in another case would then compare as "outside" it and be admitted.
+ */
 function canonicalPath(path: string): string {
   let existing = resolve(path);
   const missing: string[] = [];
@@ -253,7 +259,7 @@ function canonicalPath(path: string): string {
     missing.unshift(basename(existing));
     existing = parent;
   }
-  return join(realpathSync(existing), ...missing);
+  return join(realpathSync.native(existing), ...missing);
 }
 
 /** The work tree around `root`: the nearest directory holding `.git` (a worktree's is a file), else `root`. */
@@ -336,7 +342,20 @@ export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHo
     written = true;
     emit(`RELAYS SERVING ${endpoints.length} ${endpointsPath}`);
   } catch (error) {
-    if (written) await rm(endpointsPath, { force: true }).catch(() => undefined);
+    if (written) {
+      try {
+        await rm(endpointsPath, { force: true });
+      } catch {
+        // Fix round 2: bearers left on disk are never silent. The line is best
+        // effort — the emit may be what failed — and the ORIGINAL error stays the
+        // one thrown; the relays are closed either way, so the bearers are dead.
+        try {
+          emit(`RELAY_HOST_ENDPOINTS_REMOVE_FAILED ${endpointsPath}`);
+        } catch {
+          // The original error below is still the one the caller sees.
+        }
+      }
+    }
     await closeAll();
     throw error;
   }
