@@ -6,7 +6,7 @@ export type DevelopmentAuthStackProfile = Readonly<{
   publicPort: number;
   uiPort: number;
   apiPort: number;
-  providerPorts: readonly [number, number, number, number, number];
+  providerPorts: readonly [number, number, number, number, number, number, number];
   supportModelPort: number;
   postgresPort: number;
   hatchetGrpcPort: number;
@@ -20,7 +20,7 @@ export const DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE: DevelopmentAuthStackProfile
   publicPort: 3000,
   uiPort: 3001,
   apiPort: 8790,
-  providerPorts: Object.freeze([8791, 8795, 8792, 8796, 8793] as const),
+  providerPorts: Object.freeze([8791, 8795, 8792, 8796, 8793, 8797, 8798] as const),
   supportModelPort: 8794,
   postgresPort: 55432,
   hatchetGrpcPort: 7077,
@@ -35,7 +35,7 @@ export const SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE: DevelopmentAuthStac
     publicPort: 3100,
     uiPort: 3101,
     apiPort: 8890,
-    providerPorts: Object.freeze([8891, 8895, 8892, 8896, 8893] as const),
+    providerPorts: Object.freeze([8891, 8895, 8892, 8896, 8893, 8897, 8898] as const),
     supportModelPort: 8894,
     postgresPort: 55433,
     hatchetGrpcPort: 7177,

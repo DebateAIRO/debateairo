@@ -1,7 +1,9 @@
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+import { AGY_DEFAULT_MODEL, startAgyRelay } from "../../../acceptance/agy-relay.js";
 import { startClaudeRelay } from "../../../acceptance/claude-relay.js";
 import { startGrokRelay } from "../../../acceptance/grok-relay.js";
 import { startModelShim } from "../../../acceptance/model-shim.js";
+import { PI_DEFAULT_MODEL, startPiRelay } from "../../../acceptance/pi-relay.js";
 import {
   buildDevelopmentProviderPanel,
   developmentCliProviderRoster,
@@ -31,6 +33,8 @@ type DevelopmentCliRelayStart = (port: number) => Promise<DevelopmentCliRelay>;
 
 export type DevelopmentCliProviderPanelOperations = Readonly<{
   starts: readonly [
+    DevelopmentCliRelayStart,
+    DevelopmentCliRelayStart,
     DevelopmentCliRelayStart,
     DevelopmentCliRelayStart,
     DevelopmentCliRelayStart,
@@ -151,6 +155,15 @@ export function createDevelopmentCliProviderPanelOperations(): DevelopmentCliPro
       }),
       (port: number) => startGrokRelay({
         port, timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS, sandboxProfile: DEVELOPMENT_CLI_MODEL_PINS.grokSandboxProfile
+      }),
+      // Spec §2.10: the two appended subscription slots. Their ids are the relays'
+      // own pins (no plan-tier roster names them); ask admission seats them once
+      // the picker replaces the roster filter.
+      (port: number) => startAgyRelay({
+        port, timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS, model: AGY_DEFAULT_MODEL
+      }),
+      (port: number) => startPiRelay({
+        port, timeoutMs: DEVELOPMENT_CLI_CALL_TIMEOUT_MS, model: PI_DEFAULT_MODEL
       })
     ] as const)
   });

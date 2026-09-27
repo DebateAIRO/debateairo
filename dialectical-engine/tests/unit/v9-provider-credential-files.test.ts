@@ -332,8 +332,8 @@ describe("V-9 the local dev stack refuses a credential file it cannot honour", (
   // refusal under test is then the credential file, not the panel's set guards.
   //
   // SYNC3: dev's debate tiers grew the roster from three slots to five — one per
-  // plan-tier roster member (DEVELOPMENT_CLI_PROVIDER_ROSTER) — so the fixture
-  // names all five, or the set-mismatch guard answers before the credential rule.
+  // plan-tier roster member — and model scorecard §2.10 appended agy and pi, so
+  // the fixture names all seven, or the set-mismatch guard answers first.
   const roster = (first: Readonly<Record<string, unknown>>) => JSON.stringify([
     {
       provider_ref: "development:codex-cli",
@@ -364,6 +364,18 @@ describe("V-9 the local dev stack refuses a credential file it cannot honour", (
       base_url: "http://127.0.0.1:8793/v1",
       model: "grok-4",
       authorization_header: "Bearer local-relay-grok"
+    },
+    {
+      provider_ref: "development:agy-cli",
+      base_url: "http://127.0.0.1:8797/v1",
+      model: "gemini-3.8-flash",
+      authorization_header: "Bearer local-relay-agy"
+    },
+    {
+      provider_ref: "development:pi-glm-cli",
+      base_url: "http://127.0.0.1:8798/v1",
+      model: "glm-5.3-flash",
+      authorization_header: "Bearer local-relay-pi"
     }
   ]);
 

@@ -447,13 +447,15 @@ describe("DEV-05 complete development deployment register", () => {
     expect(roles.roles.slice(2).every((role) => role.grants.length === 0)).toBe(true);
     expect(makers).toMatchObject({
       deploymentMakerCapability: true,
-      configuredMakers: ["Anthropic", "OpenAI", "xAI"],
+      configuredMakers: ["Anthropic", "Google", "OpenAI", "Z.AI", "xAI"],
       configuredProviders: [
         { providerRef: "development:codex-cli", maker: "OpenAI" },
         { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
         { providerRef: "development:claude-cli", maker: "Anthropic" },
         { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
-        { providerRef: "development:grok-cli", maker: "xAI" }
+        { providerRef: "development:grok-cli", maker: "xAI" },
+        { providerRef: "development:agy-cli", maker: "Google" },
+        { providerRef: "development:pi-glm-cli", maker: "Z.AI" }
       ]
     });
     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });

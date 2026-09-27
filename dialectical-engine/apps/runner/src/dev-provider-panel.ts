@@ -22,10 +22,13 @@ export const REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON = JSON.stringify([{
 
 /**
  * One slot per plan-tier roster member (V, 2026-09-12: "Both free and premium need to be
- * accessible at the same time"). Discovery is 1:1 with the configured provider set — one
- * target per provider_ref, checked in parseProviderDiscoveryTargets — so a maker that
- * serves two tiers needs two slots. The order is the order of the discovery targets and
- * of the sealed configuredProviderSet row; appending is safe, reordering is not.
+ * accessible at the same time"), then the two subscription makers of the owner's model
+ * scorecard ruling (spec §2.10, 2026-09-26): Google through `agy` and Z.AI (GLM) through
+ * `pi`. Discovery is 1:1 with the configured provider set — one target per provider_ref,
+ * checked in parseProviderDiscoveryTargets — so a maker that serves two tiers needs two
+ * slots. The order is the order of the discovery targets and of the sealed
+ * configuredProviderSet row; appending is safe, reordering is not. A grown set reaches
+ * the register as a NEW version (the seed step, or dev:auth:publish-provider-set).
  */
 export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
   Object.freeze({
@@ -57,6 +60,18 @@ export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
     adapterKind: "openai-compatible-http" as const,
     maker: "xAI",
     port: 8_793
+  }),
+  Object.freeze({
+    providerRef: "development:agy-cli",
+    adapterKind: "openai-compatible-http" as const,
+    maker: "Google",
+    port: 8_797
+  }),
+  Object.freeze({
+    providerRef: "development:pi-glm-cli",
+    adapterKind: "openai-compatible-http" as const,
+    maker: "Z.AI",
+    port: 8_798
   })
 ] as const);
 

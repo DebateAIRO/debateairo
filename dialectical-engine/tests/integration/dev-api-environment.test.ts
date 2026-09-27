@@ -272,6 +272,16 @@ describe("DEV-09 private local API environment", () => {
         baseUrl: "http://127.0.0.1:8793/v1",
         model: "grok-live-model-refreshed",
         authorizationHeader: "Bearer grok-relay-refreshed"
+      },
+      {
+        providerRef: "development:agy-cli",
+        baseUrl: "http://127.0.0.1:8797/v1",
+        model: "CLI_HANDSHAKE_UNAVAILABLE"
+      },
+      {
+        providerRef: "development:pi-glm-cli",
+        baseUrl: "http://127.0.0.1:8798/v1",
+        model: "CLI_HANDSHAKE_UNAVAILABLE"
       }
     ]);
 

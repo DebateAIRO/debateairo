@@ -31,7 +31,7 @@ describe("development auth stack profiles", () => {
       publicPort: 3000,
       uiPort: 3001,
       apiPort: 8790,
-      providerPorts: [8791, 8795, 8792, 8796, 8793],
+      providerPorts: [8791, 8795, 8792, 8796, 8793, 8797, 8798],
       supportModelPort: 8794,
       postgresPort: 55432,
       hatchetGrpcPort: 7077,
@@ -50,7 +50,7 @@ describe("development auth stack profiles", () => {
       publicPort: 3100,
       uiPort: 3101,
       apiPort: 8890,
-      providerPorts: [8891, 8895, 8892, 8896, 8893],
+      providerPorts: [8891, 8895, 8892, 8896, 8893, 8897, 8898],
       supportModelPort: 8894,
       postgresPort: 55433,
       hatchetGrpcPort: 7177,
@@ -58,7 +58,7 @@ describe("development auth stack profiles", () => {
       composeProjectName: "debateai-v3-support-preview"
     });
     expect(new Set(ports(SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE)).size)
-      .toBe(12);
+      .toBe(14);
     expect(ports(SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE)
       .some((port) => ports(DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE).includes(port)))
       .toBe(false);

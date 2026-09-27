@@ -33,7 +33,7 @@ function operations(results: readonly (DevelopmentCliRelay | Error)[]): Developm
     return result;
   });
   return Object.freeze({
-    starts: Object.freeze([start(0), start(1), start(2), start(3), start(4)] as const)
+    starts: Object.freeze([start(0), start(1), start(2), start(3), start(4), start(5), start(6)] as const)
   });
 }
 
@@ -43,19 +43,25 @@ describe("development real CLI provider panel", () => {
     const codexSol = relay(8795, "OpenAI", "gpt-premium-real");
     const claude = relay(8792, "Anthropic", "claude-real");
     const claudeOpus = relay(8796, "Anthropic", "claude-premium-real");
-    const runtime = operations([codex, codexSol, claude, claudeOpus, new Error("logged out")]);
+    const agy = relay(8797, "Google", "gemini-3.8-flash");
+    const runtime = operations([
+      codex, codexSol, claude, claudeOpus, new Error("logged out"), agy, new Error("logged out")
+    ]);
 
     const handle = await startDevelopmentCliProviderPanel(runtime);
     expect(handle.healthyProviderRefs).toEqual([
       "development:codex-cli", "development:codex-premium-cli",
-      "development:claude-cli", "development:claude-premium-cli"
+      "development:claude-cli", "development:claude-premium-cli",
+      "development:agy-cli"
     ]);
     expect(handle.panel.configuredProviders).toEqual([
       { providerRef: "development:codex-cli", adapterKind: "openai-compatible-http", maker: "OpenAI" },
       { providerRef: "development:codex-premium-cli", adapterKind: "openai-compatible-http", maker: "OpenAI" },
       { providerRef: "development:claude-cli", adapterKind: "openai-compatible-http", maker: "Anthropic" },
       { providerRef: "development:claude-premium-cli", adapterKind: "openai-compatible-http", maker: "Anthropic" },
-      { providerRef: "development:grok-cli", adapterKind: "openai-compatible-http", maker: "xAI" }
+      { providerRef: "development:grok-cli", adapterKind: "openai-compatible-http", maker: "xAI" },
+      { providerRef: "development:agy-cli", adapterKind: "openai-compatible-http", maker: "Google" },
+      { providerRef: "development:pi-glm-cli", adapterKind: "openai-compatible-http", maker: "Z.AI" }
     ]);
     expect(handle.panel.targets.map(({ providerRef, model, authorizationHeader }) => ({
       providerRef, model, authorizationHeader
@@ -64,7 +70,9 @@ describe("development real CLI provider panel", () => {
       { providerRef: "development:codex-premium-cli", model: "gpt-premium-real", authorizationHeader: "Bearer openai-test" },
       { providerRef: "development:claude-cli", model: "claude-real", authorizationHeader: "Bearer anthropic-test" },
       { providerRef: "development:claude-premium-cli", model: "claude-premium-real", authorizationHeader: "Bearer anthropic-test" },
-      { providerRef: "development:grok-cli", model: "CLI_HANDSHAKE_UNAVAILABLE", authorizationHeader: undefined }
+      { providerRef: "development:grok-cli", model: "CLI_HANDSHAKE_UNAVAILABLE", authorizationHeader: undefined },
+      { providerRef: "development:agy-cli", model: "gemini-3.8-flash", authorizationHeader: "Bearer google-test" },
+      { providerRef: "development:pi-glm-cli", model: "CLI_HANDSHAKE_UNAVAILABLE", authorizationHeader: undefined }
     ]);
     for (const [index, start] of runtime.starts.entries()) {
       expect(start).toHaveBeenCalledWith(DEVELOPMENT_CLI_PROVIDER_ROSTER[index]!.port);
@@ -75,17 +83,19 @@ describe("development real CLI provider panel", () => {
     expect(claude.close).toHaveBeenCalledTimes(1);
     expect(codexSol.close).toHaveBeenCalledTimes(1);
     expect(claudeOpus.close).toHaveBeenCalledTimes(1);
+    expect(agy.close).toHaveBeenCalledTimes(1);
   });
 
   it("allows the one real CLI that answered without fabricating another maker", async () => {
     const codex = relay(8791, "OpenAI", "gpt-real");
     const handle = await startDevelopmentCliProviderPanel(operations([
-      codex, new Error("logged out"), new Error("logged out"),
-      new Error("logged out"), new Error("logged out")
+      codex, new Error("logged out"), new Error("logged out"), new Error("logged out"),
+      new Error("logged out"), new Error("logged out"), new Error("logged out")
     ]));
     expect(handle.healthyProviderRefs).toEqual(["development:codex-cli"]);
     expect(handle.panel.targets.map(({ model }) => model)).toEqual([
       "gpt-real", "CLI_HANDSHAKE_UNAVAILABLE", "CLI_HANDSHAKE_UNAVAILABLE",
+      "CLI_HANDSHAKE_UNAVAILABLE", "CLI_HANDSHAKE_UNAVAILABLE",
       "CLI_HANDSHAKE_UNAVAILABLE", "CLI_HANDSHAKE_UNAVAILABLE"
     ]);
     await handle.stop();
@@ -94,8 +104,8 @@ describe("development real CLI provider panel", () => {
 
   it("refuses when no real CLI answers", async () => {
     await expect(startDevelopmentCliProviderPanel(operations([
-      new Error("logged out"), new Error("logged out"), new Error("logged out"),
-      new Error("logged out"), new Error("logged out")
+      new Error("logged out"), new Error("logged out"), new Error("logged out"), new Error("logged out"),
+      new Error("logged out"), new Error("logged out"), new Error("logged out")
     ]))).rejects.toThrow("DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS");
   });
 
@@ -106,7 +116,9 @@ describe("development real CLI provider panel", () => {
       relay(ports[1], "OpenAI", "gpt-premium-real"),
       relay(ports[2], "Anthropic", "claude-real"),
       relay(ports[3], "Anthropic", "claude-premium-real"),
-      relay(ports[4], "xAI", "grok-real")
+      relay(ports[4], "xAI", "grok-real"),
+      relay(ports[5], "Google", "gemini-3.8-flash"),
+      relay(ports[6], "Z.AI", "glm-5.3-flash")
     ]);
     const handle = await startDevelopmentCliProviderPanel(
       runtime,
@@ -120,16 +132,23 @@ describe("development real CLI provider panel", () => {
 });
 
 describe("development CLI model pins", () => {
-  it("carries one slot per roster member so BOTH plan tiers are admissible from one panel", () => {
+  it("carries one slot per plan-tier roster member, then the two §2.10 subscription slots, appended", () => {
     // V, 2026-09-12: "Both free and premium need to be accessible at the same time."
     // Discovery is 1:1 with the configured provider set, so every roster model of every
-    // tier needs its own slot; one slot per maker could only ever serve one tier.
+    // tier needs its own slot. The owner's §2.10 ruling (2026-09-26) then APPENDED the
+    // agy (Google) and pi (Z.AI) slots: appended, never interleaved, because this order
+    // is the sealed configuredProviderSet order.
     const rosterModels = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium];
-    expect(DEVELOPMENT_CLI_PROVIDER_ROSTER).toHaveLength(rosterModels.length);
-    expect([...new Set(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ port }) => port))])
-      .toHaveLength(rosterModels.length);
-    expect([...new Set(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ providerRef }) => providerRef))])
-      .toHaveLength(rosterModels.length);
+    expect(DEVELOPMENT_CLI_PROVIDER_ROSTER).toHaveLength(rosterModels.length + 2);
+    expect(DEVELOPMENT_CLI_PROVIDER_ROSTER.slice(rosterModels.length)
+      .map(({ providerRef, maker, port }) => ({ providerRef, maker, port }))).toEqual([
+      { providerRef: "development:agy-cli", maker: "Google", port: 8_797 },
+      { providerRef: "development:pi-glm-cli", maker: "Z.AI", port: 8_798 }
+    ]);
+    expect(new Set(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ port }) => port)).size)
+      .toBe(DEVELOPMENT_CLI_PROVIDER_ROSTER.length);
+    expect(new Set(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ providerRef }) => providerRef)).size)
+      .toBe(DEVELOPMENT_CLI_PROVIDER_ROSTER.length);
     expect(DEVELOPMENT_CLI_MODEL_PINS.grokSandboxProfile).toBe("none");
   });
 

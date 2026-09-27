@@ -38,6 +38,20 @@ export const TEST_DEVELOPMENT_PROVIDER_DOCUMENT = Object.freeze({
       maker: "xAI",
       base_url: "http://127.0.0.1:8793/v1",
       model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+    }),
+    // Model scorecard §2.10: the two appended subscription slots, absent here so
+    // every consumer's healthy set is unchanged.
+    Object.freeze({
+      provider_ref: "development:agy-cli",
+      maker: "Google",
+      base_url: "http://127.0.0.1:8797/v1",
+      model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
+    }),
+    Object.freeze({
+      provider_ref: "development:pi-glm-cli",
+      maker: "Z.AI",
+      base_url: "http://127.0.0.1:8798/v1",
+      model: DEVELOPMENT_UNAVAILABLE_CLI_MODEL
     })
   ])
 });
