@@ -2261,11 +2261,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // read is the ownership check, and "not yours", "malformed", "not composed"
   // and "no record" share one closed 404. The repository picks the latest
   // answer version that HAS a record and applies the ownership predicate again.
-  // Final review, Minor 6: a record that cannot be read — a corrupt row (a
-  // floor without its label receipt, a cause outside the closed list) or a
-  // failed read — degrades the way the story route does: the same closed 404,
-  // and one log line with the bounded diagnostic (a typed code or a class
-  // category), never the message and never a generic 500.
+  // Final review, Minor 6: a CORRUPT record — a floor without its label
+  // receipt (the repository's SERVE_DISCLOSURE_ROW_INVALID) or a cause outside
+  // the closed list (the contract parse) — degrades to the same closed 404,
+  // with one log line carrying the bounded diagnostic, never the message. An
+  // operational failure (the database unreachable, say) is NOT a missing
+  // record: it keeps the closed 500, so the owner page can tell "no record"
+  // from "could not read" and keep a floor it already shows (floorAnswer.ts).
   api.get<{ Params: { id: string } }>("/v1/answers/:id/disclosure", routePolicy("GET /v1/answers/{id}/disclosure"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     const disclosures = options.disclosures;
@@ -2280,6 +2282,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const read = await disclosures.readDisclosure({ answerId: answer.answer_id, ownership });
       disclosure = read === null ? null : AnswerDisclosureSchema.parse(read);
     } catch (error) {
+      const corruptRecord = (error instanceof TypedDomainError && error.code === "SERVE_DISCLOSURE_ROW_INVALID")
+        || (error instanceof Error && error.name === "ZodError");
+      if (!corruptRecord) throw error;
       console.error(JSON.stringify(Object.freeze({
         event: "api.disclosure.unreadable",
         requestId: request.id,

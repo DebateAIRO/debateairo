@@ -764,10 +764,11 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created
 - **The website and the API ship together**, in both directions. The public list now carries a
   floor label (`floor_verdict`), and an older website refuses the list when its shape is not the
   exact old one. (A newer website reads an older API's list fine.)
-- **Rolling the API back past this release hides the debates published under it.** Their public
-  snapshots carry the new members (`story_short`, `language`, `floor`), which the older API's
-  strict reader refuses. Those public pages then answer "not found" and leave the public list
-  until you roll forward again. Nothing is deleted.
+- **Rolling the API back past this release hides the debates published under it that carry a
+  story, a language or a floor.** Such public snapshots carry at least one new member
+  (`story_short`, `language`, `floor`), which the older API's strict reader refuses. Those public
+  pages then answer "not found" and drop out of the public list (the older list's total still
+  counts them) until you roll forward again. Nothing is deleted.
 - After the upgrade, every story is stored as failed with `STORY_NOT_CONFIGURED` until the next
   hosted register publish (§11, "What the runner's log says about answers and stories").
 
@@ -1289,6 +1290,14 @@ journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DIS
 | `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
 | `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
 | `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
+
+The API writes two related lines to its own journal (`journalctl -u debateai-api`), again with
+ids and a bounded diagnostic only:
+
+| Signal | What it means | What to do |
+|---|---|---|
+| `"event":"api.disclosure.unreadable"`, with `diagnostic` | An answer's owner-side record exists but is corrupt: a floor without its label receipt (`SERVE_DISCLOSURE_ROW_INVALID`) or a stored cause outside the closed list (`SCHEMA_VALIDATION_ERROR`). The owner's page and the PDF then behave as if there were no record: no floor, no lower-cost note. A database outage is not this line; it stays a 500. | A defect to report, with the answer id from `pnpm ops:serve-disclosure`. |
+| `"event":"api.story.unreadable"`, with `diagnostic` | The story of an answer the caller owns could not be read, decrypted or derived (a database hiccup included). The route answers "unavailable" rather than an error; the owner's page asks again a few times, then shows the answer without its story. | A single one during a database hiccup is harmless. Repeated ones for the same answer are a defect to report. |
 
 The story's other events carry codes only: `STORY_STORED` (every story, with its outcome),
 `STORY_LATER_ROUND_FAILED`, `STORY_MATERIAL_TOO_LARGE`, `STORY_SNAPSHOT_FAILED`,

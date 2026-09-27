@@ -389,11 +389,6 @@ describe("GET /v1/answers/{id}/disclosure — a corrupt row degrades to the clos
       async (): Promise<ServeDisclosureRead | null> => ({ ...FLOOR_READ, row: storedRow({ floorReason: "BUDGET_BLOWN" }) }),
       "SCHEMA_VALIDATION_ERROR"
     ],
-    [
-      "an untyped read failure",
-      async (): Promise<ServeDisclosureRead | null> => { throw new Error(DETAIL); },
-      "ERROR"
-    ]
   ] as const)("answers DISCLOSURE_NOT_FOUND for %s, logging the diagnostic and never the detail", async (_name, readLatestForAnswer, diagnostic) => {
     const { response, logged } = await readThrough({ readLatestForAnswer, readLatestFloorForAnswer: async () => null });
     expect(response.statusCode).toBe(404);
@@ -410,6 +405,17 @@ describe("GET /v1/answers/{id}/disclosure — a corrupt row degrades to the clos
       route: "/v1/answers/:id/disclosure",
       diagnostic
     });
+  });
+
+  it("keeps an operational read failure a closed 500, not a missing record, so the page can keep a floor it shows", async () => {
+    const { response, logged } = await readThrough({
+      readLatestForAnswer: async () => { throw new Error(DETAIL); },
+      readLatestFloorForAnswer: async () => null
+    });
+    expect(response.statusCode).toBe(500);
+    expect(response.body).not.toContain("rent");
+    expect(response.body).not.toContain("DISCLOSURE_NOT_FOUND");
+    expect(logged.mock.calls.map((call) => String(call[0])).join("\n")).not.toContain("api.disclosure.unreadable");
   });
 
   it("still answers a sound row with 200, and logs nothing", async () => {
