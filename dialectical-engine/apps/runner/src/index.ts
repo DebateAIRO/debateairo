@@ -125,6 +125,9 @@ import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, exhaustive, type Composit
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
+// Model scorecard A15/A16: the seat book and the seat caller live in their own module.
+export * from "./run-seats.js";
+
 /**
  * T9 / J24 — the two sealed synthesis roles, named ONCE. Every check that has
  * to refuse "without substitution" iterates this, so a role can never be

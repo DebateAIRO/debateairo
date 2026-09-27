@@ -222,6 +222,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       .sort();
     expect(providerFiles).toEqual([
       "apps/runner/src/index.ts",
+      // Model scorecard A15: the seat caller's candidate stamp forwards the leased runner's request.
+      "apps/runner/src/run-seats.ts",
       "packages/evaluator/src/index.ts",
       "packages/judgement/src/index.ts"
     ]);
