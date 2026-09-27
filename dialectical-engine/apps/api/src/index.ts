@@ -57,6 +57,21 @@ import {
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
+export {
+  ASK_MODEL_ASSIGNMENT_INVALID,
+  ASK_MODEL_REFUSALS,
+  askModelPickerSettings,
+  askTargetFacts,
+  debaterSeatCount,
+  describeModelScorecard,
+  expectedCallsByRoleFromBasis,
+  reachableInTodaysOrder,
+  seatDemandForDebaters,
+  targetPricesOf,
+  type AdmittedModelAssignment,
+  type AskModelPickerSettings,
+  type AskTargetFacts
+} from "./ask-model-picker.js";
 import { TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
