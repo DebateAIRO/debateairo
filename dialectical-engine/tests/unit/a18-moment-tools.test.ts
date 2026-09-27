@@ -35,6 +35,7 @@ import {
   replyContentOf,
   type TypedMomentBuilder
 } from "../../acceptance/moment-tools.js";
+import { absolutePathOf } from "../../acceptance/untracked-path.js";
 
 /**
  * Model scorecard A18 — the SAME-PROMPT property, offline. For every debate
@@ -385,6 +386,30 @@ describe("A18 · output paths never land in the tracked tree (carry 4)", () => {
     await mkdir(ignoredEngine);
     expect(() => assertMomentOutputPathUntracked(join(ignoredEngine, "x.json"), "file", ignoredEngine)).toThrowError(refused);
     expect(() => assertMomentOutputPathUntracked(join(ignoredEngine, ".local", "x.json"), "file", ignoredEngine)).not.toThrow();
+  });
+
+  it("reads a trailing or doubled slash without hiding a dangling link (fix round 2, N1)", async () => {
+    const { engine } = await workTree();
+    const outside = await workspace();
+    // Both point at folders the tree does not have yet: `mkdir("<link>/")` creates a dangling link's target.
+    const danglingLink = join(outside, "dlink");
+    await symlink(join(engine, "newdir"), danglingLink);
+    await symlink(join(engine, "src-new"), join(engine, ".local"));
+    expect(() => assertMomentOutputPathUntracked(`${danglingLink}${sep}`, "directory", engine)).toThrowError(refused);
+    expect(() => assertMomentOutputPathUntracked(`${danglingLink}${sep}${sep}m.json`, "file", engine)).toThrowError(refused);
+    expect(() => assertMomentOutputPathUntracked(`${join(engine, ".local")}${sep}`, "directory", engine)).toThrowError(refused);
+    expect(() => assertMomentOutputPathUntracked(`${join(engine, ".local")}${sep}${sep}m.json`, "file", engine)).toThrowError(refused);
+    // Spelled without the extra slashes, each was already refused.
+    expect(() => assertMomentOutputPathUntracked(danglingLink, "directory", engine)).toThrowError(refused);
+    expect(existsSync(join(engine, "newdir"))).toBe(false);
+    expect(existsSync(join(engine, "src-new"))).toBe(false);
+  });
+
+  it("makes a path absolute by collapsing slashes only: `.` and `..` stay for the kernel (fix round 2, N1)", () => {
+    expect(absolutePathOf(`${sep}a${sep}${sep}b${sep}`)).toBe(`${sep}a${sep}b`);
+    expect(absolutePathOf(`${sep}a${sep}.${sep}b${sep}..${sep}${sep}c`)).toBe(`${sep}a${sep}.${sep}b${sep}..${sep}c`);
+    expect(absolutePathOf(sep)).toBe(sep);
+    expect(absolutePathOf(`x${sep}${sep}y${sep}`)).toBe(`${process.cwd()}${sep}x${sep}y`);
   });
 
   it("refuses a tracked path spelled in another letter case, on a case-insensitive volume", async (context) => {

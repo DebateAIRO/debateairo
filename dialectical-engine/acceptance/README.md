@@ -137,7 +137,13 @@ the suffixes to serve. The endpoints file is written with mode 0600, by default 
 `.local/relays/endpoints.json` under this engine directory (git-ignored). Add
 `--endpoints <file>` to put it elsewhere: outside the repository, or under any
 `.local/` directory inside it. Any other path inside the repository is refused
-(`RELAY_HOST_ENDPOINTS_PATH_REFUSED`), because the file holds live bearers. Its shape is
+(`RELAY_HOST_ENDPOINTS_PATH_REFUSED`), because the file holds live bearers. The
+path is judged where it really leads: a link on the way is followed to what it
+points at, and `..` after a link climbs from there, as the system itself does.
+So a link cannot carry the file into the repository. The file itself may not be
+a link, and a link that points at nothing is refused, wherever it sits in the
+path. "The repository" includes every git checkout around the engine, such as a
+main checkout that holds this one as a worktree. Its shape is
 `{relays:[{providerRef, maker, tool, modelId, baseUrl, bearerToken, thinkingLevels, contextWindowTokens}]}`,
 where `baseUrl` already ends in `/v1` and `bearerToken` is the value after `Bearer `.
 The host runs until SIGTERM or Ctrl-C, even one that arrives during start-up. It

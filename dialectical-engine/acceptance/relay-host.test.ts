@@ -602,6 +602,26 @@ describe("relays:serve — the local relay host for step replay (§2.9/§2.10)",
     expect(existsSync(join(outer, "apps"))).toBe(false);
   });
 
+  it("reads a doubled slash in an endpoints path without hiding a dangling link, and makes nothing in the tree", async () => {
+    // A18a fix round 2 (re-review N1): `mkdir("<dangling link>/")` creates the link's target.
+    const { engine } = await workTree();
+    const outside = await workspace();
+    const danglingLink = join(outside, "dlink");
+    await symlink(join(engine, "relays"), danglingLink);
+    const endpointsPath = `${danglingLink}${sep}${sep}endpoints.json`;
+    // A candidate that never starts: an admitted path would have had its folder made first.
+    await expect(serveRelayHost({
+      candidatesPath: await candidatesFile(outside, [
+        { providerRef: "local:claude", tool: "claude", modelId: "claude-other-model", thinkingLevels: [] }
+      ]),
+      endpointsPath,
+      environment: LOCAL,
+      seams: { ...SEAMS, repositoryRoot: engine },
+      emit: () => undefined
+    }), endpointsPath).rejects.toThrow("RELAY_HOST_ENDPOINTS_PATH_REFUSED");
+    expect(existsSync(join(engine, "relays"))).toBe(false);
+  });
+
   it("refuses a bare endpoints file name, which would resolve into this repository's tracked tree", async () => {
     // No repositoryRoot seam: the module's OWN engine root and work tree decide.
     // Relative paths resolve from the cwd, which is the engine root here, as under `pnpm run`.

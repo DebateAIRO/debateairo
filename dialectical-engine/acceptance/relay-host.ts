@@ -255,7 +255,9 @@ async function writeEndpointsFile(path: string, endpoints: readonly RelayHostEnd
     });
     await rename(temporary, path);
   } catch {
-    await rm(temporary, { force: true });
+    // A18a fix round 2: a cleanup that fails as well must never replace the
+    // write's own code.
+    await rm(temporary, { force: true }).catch(() => undefined);
     throw new TypeError("RELAY_HOST_ENDPOINTS_WRITE_FAILED");
   }
 }
@@ -289,8 +291,10 @@ export async function serveRelayHost(options: RelayHostOptions): Promise<RelayHo
   const repositoryRoot = seams.repositoryRoot ?? RELAY_HOST_ENGINE_ROOT;
   const endpointsPath = options.endpointsPath === undefined
     ? join(resolve(repositoryRoot), RELAY_HOST_DEFAULT_ENDPOINTS_PATH)
-    // A18a fix round 1: made absolute WITHOUT normalising, so the guard, the
-    // writer and the removal all read `..` after a link as the kernel does.
+    // A18a fix round 1: made absolute WITHOUT folding `..`, so the guard, the
+    // writer and the removal all read `..` after a link as the kernel does. Fix
+    // round 2: slashes ARE collapsed, and the mkdir, the writer and the removal
+    // below use this one string, so a trailing slash can never hide a dangling link.
     : absolutePathOf(options.endpointsPath);
   assertEndpointsPathUntracked(endpointsPath, repositoryRoot);
   const candidates = await readRelayHostCandidates(resolve(options.candidatesPath));

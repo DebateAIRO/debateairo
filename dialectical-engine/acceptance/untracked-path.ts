@@ -24,6 +24,20 @@ import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
  *  - NESTED CHECKOUTS. A worktree sits inside its main checkout. Every
  *    enclosing folder holding `.git` (a folder or a worktree's file) is a
  *    tracked tree, and the path must be admissible in each one.
+ *
+ * Fix round 2 closed a fourth: A SLASH THAT HIDES A DANGLING LINK. `lstat` of
+ * `<link>/` follows the link, so a dangling link spelled with a trailing slash
+ * never showed as a link — and `mkdir("<dangling link>/")` creates the link's
+ * TARGET (macOS, Node 26). `path.dirname` keeps that slash for a doubled one
+ * (`dirname("/o/dlink//e.json")` is `"/o/dlink/"`). `absolutePathOf` now
+ * collapses separator runs and drops a trailing separator, and every caller
+ * checks, creates, writes and removes at the string it returns.
+ *
+ * ASSUMPTION (re-review N2, a ruling, not a check): every enclosing checkout
+ * ignores `.local/`. This branch's root `.gitignore` adds that rule (line 55
+ * ignores a `.local/` folder at any depth); a main checkout that holds this
+ * one as a worktree is assumed to carry it too. Only `.local/` folders are
+ * exempted here, and nothing in this module reads a checkout's ignore rules.
  */
 export type UntrackedPathKind = "file" | "directory";
 
@@ -32,13 +46,19 @@ export type TrackedPathRefusal =
   | "LAST_SEGMENT_IS_A_LINK"
   | "DANGLING_LINK_ON_THE_WAY";
 
+/** One or more separators in a row (either spelling on a platform that has two). */
+const SEPARATOR_RUN = sep === "/" ? /\/+/gu : /[\\/]+/gu;
+
 /**
- * `path` made absolute with NO lexical normalisation: a relative path is
- * joined to the cwd as a string, so every `..` is left for the kernel to read
- * after the links before it.
+ * `path` made absolute, normalised by SLASHES ONLY: a relative path is joined
+ * to the cwd as a string, runs of separators collapse to one, and a trailing
+ * separator is dropped (fix round 2). `.` and `..` are never touched: each is
+ * left for the kernel to read after the links before it (fix round 1). Every
+ * caller checks, creates, writes and removes at the string this returns.
  */
 export function absolutePathOf(path: string): string {
-  return isAbsolute(path) ? path : `${process.cwd()}${sep}${path}`;
+  const absolute = (isAbsolute(path) ? path : `${process.cwd()}${sep}${path}`).replace(SEPARATOR_RUN, sep);
+  return absolute.length > 1 && absolute.endsWith(sep) ? absolute.slice(0, -1) : absolute;
 }
 
 /** The entry itself, never followed; undefined when the kernel cannot reach it. */
