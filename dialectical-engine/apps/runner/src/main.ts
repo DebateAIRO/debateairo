@@ -30,7 +30,7 @@ import {
   resolveStoryPackDir,
   type StoryPack
 } from "@debateai/story";
-import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
+import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -308,6 +308,10 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   synthesisRolePolicy: policy.synthesisRolePolicy,
   // Verdict story (spec §3): written after each settled debate; never inside it.
   story: storyWriter,
+  // Engine money rule, Task M3 (spec §14.4.2): each target's price, so an
+  // answer-writing call refused for money tries the cheaper claim-eligible
+  // makers first. Hosted only (local mode's map is empty); never sealed.
+  providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
   claimTimeSynthesisRoleProbe: async (providerRef) => {
     const target = providerTargets.find((candidate) => candidate.providerRef === providerRef);
     if (target === undefined) {

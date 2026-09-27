@@ -276,6 +276,18 @@ const DISCLOSURE_CALL = "const runBodyStopRecord = runBodyStopDisclosure({";
 const DISCLOSURE_APPEND = "conditionMarkRecords = Object.freeze([...conditionMarkRecords, runBodyStopRecord]);";
 const FINAL_DECISION = "const finalEnvelopeDecision = await evaluateEnvelope();";
 const LABEL_DECISION = "const answerCarriesLabel =";
+/**
+ * Task M3 (spec §14.4.5): the stop is ALSO kept on the owner-side disclosure
+ * row, for every answer — a DEFECT answer included, which carries no envelope
+ * record. The row is written after the persist, far past the gate, so the stop
+ * is captured once where the body ends (beside the serve decision that reads
+ * it) and only that capture travels. Pin 8 keeps the capture from becoming a
+ * way around pin 7.
+ */
+const BODY_FACTS = "const serveDisclosureBody = serveDisclosureBodyFacts({ runBodyBudgetStop, decision: makerPositionServe });";
+const SERVE_DECISION = "const makerPositionServe = decideMakerPositionServe({";
+const BODY_FACTS_READ = "body: serveDisclosureBody";
+const DISCLOSURE_ROW_WRITE = "await this.#recordServeDisclosure(";
 
 /**
  * The catch block that follows `anchor`, sliced by the indentation of the line
@@ -445,6 +457,23 @@ function assertRunBodyStopWiring(source: string): void {
   expect(afterGate, "the serve chain reads no stop while arguing").not.toContain("runBodyBudgetStop");
   const afterDisclosure = source.slice(disclosedAt + disclosureArgs.length);
   expect(afterDisclosure, "nothing after the disclosure reads the stop").not.toContain("runBodyBudgetStop");
+
+  // 8. Task M3 — THE DISCLOSURE ROW'S COPY OF THE STOP IS A RECORD, NEVER A
+  //    DECISION. It is taken once, right after the serve decision and before
+  //    the gate; from the gate's end it is read exactly once, as the `body` of
+  //    the row the runner writes after the persist — so no statement between
+  //    the gate and the settle can end the run on it.
+  expect(statementOccurrences(source, BODY_FACTS), BODY_FACTS).toBe(1);
+  expect(source.indexOf(BODY_FACTS), "captured after the serve decision").toBeGreaterThan(source.indexOf(SERVE_DECISION));
+  expect(source.indexOf(BODY_FACTS), "captured before the gate").toBeLessThan(source.indexOf(EVALUATE_DEFINITION));
+  const afterGateAll = source.slice(source.indexOf(GATE_END));
+  expect(afterGateAll.split("serveDisclosureBody"), "read once after the gate").toHaveLength(2);
+  expect(afterGateAll.split(BODY_FACTS_READ), "as the row's body").toHaveLength(2);
+  const rowWrittenAt = source.indexOf(DISCLOSURE_ROW_WRITE);
+  expect(statementOccurrences(source, DISCLOSURE_ROW_WRITE), DISCLOSURE_ROW_WRITE).toBe(1);
+  expect(source.indexOf(BODY_FACTS_READ), "inside the row write").toBeGreaterThan(rowWrittenAt);
+  expect(rowWrittenAt, "the row is written after the persist")
+    .toBeGreaterThan(source.indexOf("const persisted = await runnerStage(\"ANSWER_PERSIST_FAILED\""));
 }
 
 describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at every catch and on the first root's panel, and the serve gate never forces a hard stop from it", () => {
@@ -511,10 +540,16 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at every ca
     ["a panel cut short is not disclosed as partial", PANEL_PARTIAL_RULE,
       "else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);"],
     // ...or swallows a returned stop it cannot classify.
-    ["an unclassified returned stop is swallowed", PANEL_STOP_GUARD, ""]
+    ["an unclassified returned stop is swallowed", PANEL_STOP_GUARD, ""],
+    // Task M3: the disclosure row's copy of the stop becomes a way to fail the
+    // run after the gate...
+    ["the run fails on the row's copy of the stop", LABEL_DECISION,
+      `if (serveDisclosureBody.bodyStop !== null) throw new TypedDomainError("RUN_BODY_STOPPED", "stopped");\n    ${LABEL_DECISION}`],
+    // ...or the row stops receiving it...
+    ["the row no longer records the stop", BODY_FACTS_READ, "body: { bodyStop: null, pointsWithoutReview: null }"]
   ]);
 
-  it("fails when any one of nineteen mutations is applied to that same source", async () => {
+  it("fails when any one of twenty-one mutations is applied to that same source", async () => {
     const source = await readFile(RUNNER, "utf8");
 
     for (const [name, from, to] of MUTATIONS) {
@@ -522,5 +557,14 @@ describe("Task M2 / FW-F / C1 — the stop while arguing is recorded at every ca
       expect(mutated, `${name}: the mutation changed the source`).not.toBe(source);
       expect(() => assertRunBodyStopWiring(mutated), name).toThrow();
     }
+  });
+
+  it("fails when the disclosure row's capture of the stop moves past the gate (Task M3)", async () => {
+    const source = await readFile(RUNNER, "utf8");
+    const moved = source
+      .replace(BODY_FACTS, "")
+      .replace(GATE_END, `${GATE_END}\n      ${BODY_FACTS}`);
+    expect(moved).not.toBe(source);
+    expect(() => assertRunBodyStopWiring(moved)).toThrow();
   });
 });

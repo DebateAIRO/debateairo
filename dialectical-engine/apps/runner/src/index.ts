@@ -4,11 +4,13 @@ import type { Pool } from "pg";
 import {
   ProviderProbeRepository,
   RunRepository,
+  ServeDisclosureRepository,
   assertNoOpenWriteTransaction,
   withRunContentLease,
   withWriteTransaction,
   type CompletionActivationResolution,
-  type DiscoveredPanelMember
+  type DiscoveredPanelMember,
+  type ServeDisclosureRecord
 } from "@debateai/db";
 import {
   WorkItemRepository,
@@ -51,8 +53,10 @@ import {
   BATTERY_BUDGET_CONTRACTS,
   attemptCeilingForPhase,
   parseCostEnvelopeBasis,
+  projectedCallCeilingMicros,
   type BudgetPressureDecision,
-  type CostEnvelopePhase
+  type CostEnvelopePhase,
+  type ProviderTargetPrice
 } from "@debateai/budget";
 import {
   countMeasuredEdges,
@@ -83,6 +87,8 @@ import {
   OpenAICompatibleProviderGateway,
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
+  lengthRetryTokenCeiling,
+  providerTargetPrice,
   type CallBound,
   type ContentClassification,
   type OpenAICompatibleGatewayOptions,
@@ -90,6 +96,7 @@ import {
   type ProviderCallRequest,
   type ProviderCallResult,
   type ProviderCostEnvelopeSeam,
+  type ProviderDiscoveryTarget,
   type ProviderGateway
 } from "@debateai/providers";
 import {
@@ -98,6 +105,7 @@ import {
   createEnvelopeExhaustedResult,
   deriveBandCeiling,
   deriveVerdictLabel,
+  keepsCompleteSynthesisRounds,
   LABEL_BASIS_INCOMPLETE_MARK,
   PROTECTED_CORE_GUARD_RETIRED_MARK,
   runServeGateChain,
@@ -1630,6 +1638,27 @@ export interface WalkingSkeletonSettings {
     writeAfterSettle(input: StoryWriteInput): Promise<void>;
     reportSnapshotFailure(failure: StorySnapshotFailure): void;
   };
+  /**
+   * ENGINE MONEY RULE (spec 2026-09-26 §14.4.2), TASK M3: each provider
+   * target's price (`buildProviderPriceMap`), so a MONEY refusal of an
+   * answer-writing call tries the cheaper claim-eligible makers first. Never
+   * sealed. OPTIONAL with an EMPTY default rather than a required family: local
+   * mode has no prices and no money ceiling (so it can never need the order),
+   * the acceptance root runs local, and a missing map only changes the ORDER of
+   * the tries — the per-call seam still decides what fits. The shipped runner
+   * passes it (pinned by `tests/unit/m3-serve-fallback.test.ts`).
+   */
+  readonly providerPrices?: ProviderPriceMap;
+  /**
+   * ENGINE MONEY RULE (spec §14.4.5), TASK M3: where the owner-side disclosure
+   * row goes (default: `ServeDisclosureRepository` on the runner's pool) and
+   * where a failure to write it is logged (default: one code-only JSON line).
+   * The row can never change the answer: its writer never throws.
+   */
+  readonly serveDisclosure?: Readonly<{
+    store?: Pick<ServeDisclosureRepository, "insert">;
+    log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
+  }>;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1744,6 +1773,309 @@ async function callSynthesisRole(
     }
     throw error;
   }
+}
+
+/**
+ * ENGINE MONEY RULE (spec 2026-09-26 §14.4.2), TASK M3 — THE RUNNER'S PRICE MAP.
+ *
+ * providerRef → the target's price, in the shape `@debateai/budget` charges
+ * with. It exists so a cheaper maker can be tried FIRST when the planned
+ * answer-writing call is refused for money; it never decides whether a call
+ * fits (the per-call money seam does, before sending) and it is never sealed:
+ * prices live with the provider targets, and no register row may carry one.
+ *
+ * HOSTED only. Local mode is the relays and loopback model servers, which cost
+ * nothing and have no money ceiling, so its map is empty and a fallback — which
+ * a local run can never need — would follow the roster order. A target with no
+ * declared price is left out rather than priced at a guess; in hosted mode
+ * `assertPricedProviderTargets` has already refused one.
+ *
+ * The one price reader is `providerTargetPrice`. Each price is a frozen copy,
+ * and the map is handed over typed read-only: nothing in the runner writes it.
+ */
+export type ProviderPriceMap = ReadonlyMap<string, ProviderTargetPrice>;
+
+const EMPTY_PROVIDER_PRICES: ProviderPriceMap = Object.freeze(new Map<string, ProviderTargetPrice>());
+
+export function buildProviderPriceMap(
+  targets: readonly ProviderDiscoveryTarget[],
+  mode: "hosted" | "local"
+): ProviderPriceMap {
+  if (mode !== "hosted") return EMPTY_PROVIDER_PRICES;
+  const prices = new Map<string, ProviderTargetPrice>();
+  for (const target of targets) {
+    const price = providerTargetPrice(target);
+    if (price !== null) prices.set(target.providerRef, Object.freeze({ ...price }));
+  }
+  return Object.freeze(prices);
+}
+
+/** A claim-eligible maker, as the serve chain's two roles can call it. */
+export interface ServeRoleMaker {
+  readonly provider: ProviderGateway;
+  readonly providerRef: string;
+}
+
+/**
+ * What THIS request would cost on a target, by the seam's own projection
+ * (`projectedCallCeilingMicros`: bytes/2 × input price + max_tokens × output
+ * price). The body measured is the one the gateway sends, less the target's
+ * own `model` member — a few bytes, alike for every target — so the ORDER is
+ * the seam's; whether a call FITS is always the seam's exact decision.
+ *
+ * A price the projection cannot use (malformed, or a charge too large to
+ * represent) ranks the maker as unpriced rather than failing the search: the
+ * order can never be the reason an answer is not written, and the seam still
+ * refuses whatever does not fit.
+ */
+function projectedServeCallMicros(
+  request: Pick<ProviderCallRequest, "packet" | "bound">,
+  price: ProviderTargetPrice
+): number | null {
+  try {
+    const completionTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, 0);
+    return projectedCallCeilingMicros(price, {
+      requestBytes: Buffer.byteLength(JSON.stringify({
+        max_tokens: completionTokenCeiling,
+        messages: request.packet.messages
+      }), "utf8"),
+      completionTokenCeiling
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — WHO IS TRIED AFTER A MONEY
+ * REFUSAL, AND IN WHICH ORDER.
+ *
+ * Every OTHER claim-eligible maker, once each, cheapest first by the projected
+ * cost of this exact request; a maker the map has no price for comes after
+ * every priced one; ties, and the whole list when the map is empty (local
+ * mode), keep the roster order. For the checker, every maker other than the
+ * one that wrote the draft under check comes first (`preferNot`); the writer
+ * itself is offered last, so it checks its own draft only when nothing else
+ * fits — and the disclosure row says so.
+ */
+export function servePhaseFallbackOrder(input: Readonly<{
+  planned: string;
+  claimEligible: readonly ServeRoleMaker[];
+  prices: ProviderPriceMap;
+  request: Pick<ProviderCallRequest, "packet" | "bound">;
+  preferNot: string | null;
+}>): readonly ServeRoleMaker[] {
+  const seen = new Set<string>([input.planned]);
+  const candidates: { readonly maker: ServeRoleMaker; readonly index: number; readonly micros: number | null }[] = [];
+  for (const maker of input.claimEligible) {
+    if (seen.has(maker.providerRef)) continue;
+    seen.add(maker.providerRef);
+    const price = input.prices.get(maker.providerRef);
+    candidates.push({
+      maker,
+      index: candidates.length,
+      micros: price === undefined ? null : projectedServeCallMicros(input.request, price)
+    });
+  }
+  const rank = (entry: typeof candidates[number]): readonly number[] => [
+    input.preferNot !== null && entry.maker.providerRef === input.preferNot ? 1 : 0,
+    entry.micros === null ? 1 : 0,
+    entry.micros ?? 0,
+    entry.index
+  ];
+  return Object.freeze([...candidates].sort((left, right) => {
+    const a = rank(left);
+    const b = rank(right);
+    for (let position = 0; position < a.length; position += 1) {
+      if (a[position] !== b[position]) return a[position]! - b[position]!;
+    }
+    return 0;
+  }).map((entry) => entry.maker));
+}
+
+export interface ServeRoleCallOutcome<T> {
+  readonly result: T;
+  readonly servedBy: ServeRoleMaker;
+  readonly fallback: boolean;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — ONE ANSWER-WRITING CALL, WITH
+ * THE COST FALLBACK J24 NOW ALLOWS.
+ *
+ * The planned maker (the sealed role ref) is always asked first. Only a MONEY
+ * refusal (`RUN_COST_ENVELOPE_MONEY_REACHED`, raised by the per-call seam BEFORE
+ * sending, so the refused try wrote nothing and cost nothing) moves the SAME
+ * request — the same call site, the same framed prompt object, the same bound
+ * and contract — to the next maker in `servePhaseFallbackOrder`. The provider
+ * is the only thing that changes; the prompt is never rebuilt. The seam decides
+ * what fits: a maker it refuses for money is skipped, and the first that goes
+ * through serves. Nothing fits → the planned call's own refusal travels, as it
+ * always has.
+ *
+ * J24 AMENDED, not repealed: every other refusal — the attempt ceiling, a
+ * vendor with no usage, a spent day, a dead transport, a vanished role
+ * provider, a contract error, anything untyped — travels UNTOUCHED from the
+ * planned call, and a fallback that fails for any reason but money ends the
+ * search with its own failure. A sealed identity is substituted for cost only.
+ */
+export async function callServeRoleWithFallback<T>(input: Readonly<{
+  planned: ServeRoleMaker;
+  claimEligible: readonly ServeRoleMaker[];
+  prices: ProviderPriceMap;
+  preferNot: string | null;
+  request: ProviderCallRequest;
+  call: (maker: ServeRoleMaker, request: ProviderCallRequest) => Promise<T>;
+}>): Promise<ServeRoleCallOutcome<T>> {
+  try {
+    return Object.freeze({ result: await input.call(input.planned, input.request), servedBy: input.planned, fallback: false });
+  } catch (refusal) {
+    if (envelopeStopKind(refusal) !== "MONEY") throw refusal;
+    for (const maker of servePhaseFallbackOrder({
+      planned: input.planned.providerRef,
+      claimEligible: input.claimEligible,
+      prices: input.prices,
+      request: input.request,
+      preferNot: input.preferNot
+    })) {
+      try {
+        const result = await input.call(maker, { ...input.request, providerRef: maker.providerRef });
+        return Object.freeze({ result, servedBy: maker, fallback: true });
+      } catch (error) {
+        if (envelopeStopKind(error) !== "MONEY") throw error;
+      }
+    }
+    throw refusal;
+  }
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — A ROUND KEPT AFTER A SPEND STOP
+ * SAYS SO ON THE ANSWER.
+ *
+ * When an answer-writing call is stopped by a spend bound after a complete
+ * round (money only after every cheaper maker was refused), the loop now keeps
+ * that round (`keepsCompleteSynthesisRounds`) and the answer is SERVED instead
+ * of taking the envelope terminal. The stop is not dropped: the answer carries
+ * the same answer-scope `ENVELOPE_EXHAUSTED` record the envelope terminal (and,
+ * since M2, a stop while arguing) carries, naming the bound that stopped it.
+ * Minted after the chain, like `runBodyStopDisclosure`.
+ *
+ * `null` — nothing to add: no failure escaped a role call; no round was kept
+ * (a round-1 refusal still takes the terminal, which has its own record); the
+ * failure was a dead transport, which is not a spend bound; the answer already
+ * carries the mark; or the answer is DEFECT.
+ */
+export function servePhaseStopDisclosure(input: Readonly<{
+  servePhaseFailure: unknown;
+  keptRounds: number;
+  resultConditionMarks: readonly string[];
+  runId: string;
+  servedRootNodeId: string;
+}>): ConditionMarkRecord | null {
+  if (input.servePhaseFailure === null || input.keptRounds < 1) return null;
+  const stop = envelopeStopKind(input.servePhaseFailure);
+  if (stop === null) return null;
+  if (input.resultConditionMarks.includes("ENVELOPE_EXHAUSTED")) return null;
+  if (input.resultConditionMarks.includes("DEFECT")) return null;
+  return Object.freeze({
+    mark: "ENVELOPE_EXHAUSTED" as const,
+    scope: "answer" as const,
+    subjectRef: input.runId,
+    reason: ENVELOPE_STOP_REASONS[stop],
+    liftPath: null,
+    servedRootRule: null,
+    affectedNodeIds: Object.freeze([input.servedRootNodeId])
+  } satisfies ConditionMarkRecord);
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M3 — WHAT THE ARGUING LEFT FOR THE
+ * OWNER'S RECORD, taken where the body ends (the serve decision), never later.
+ *
+ *  · `bodyStop` — the stop that ended the arguing early, if any. The answer
+ *    carries it as its envelope record, except on a DEFECT answer, where
+ *    nothing did (M2 review): the row keeps it for every answer.
+ *  · `pointsWithoutReview` — how many points the stop left without a
+ *    cross-review, each seeded from its own panel with UNKNOWN edges (R-A). Only
+ *    the spend-stopped footing has such points; a mono-maker run never
+ *    cross-reviews and a run never stopped reviewed what it could, so both are
+ *    null rather than a zero that would claim a count was taken.
+ */
+export function serveDisclosureBodyFacts(input: Readonly<{
+  runBodyBudgetStop: EnvelopeStopKind | null;
+  decision: Readonly<{ footing: MakerPositionServeFooting; seededWithoutReview: readonly string[] }>;
+}>): Readonly<{ bodyStop: EnvelopeStopKind | null; pointsWithoutReview: number | null }> {
+  return Object.freeze({
+    bodyStop: input.runBodyBudgetStop,
+    pointsWithoutReview: input.decision.footing === "SPEND_STOPPED" ? input.decision.seededWithoutReview.length : null
+  });
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M3 — THE OWNER-SIDE DISCLOSURE ROW.
+ *
+ * Content-free: provider refs, codes and counts. The served refs are the
+ * makers that wrote and checked the round the answer serves (null when the
+ * answer has no checked round). A served maker other than the planned one can
+ * only be the money fallback — every other substitution is refused — so the
+ * fallback flags and the reason are derived from the refs, and migration 0076
+ * refuses a row where they disagree. `checkerSameAsWriter` is R9's disclosure:
+ * DEGRADED-DIVERSITY reads the SEALED refs, so a fallback that put both roles
+ * on one maker is recorded here instead. The digest (M4) and floor (M5) fields
+ * are null until their tasks fill them.
+ */
+export function buildServeDisclosureRecord(input: Readonly<{
+  answerId: string;
+  answerVersion: number;
+  runId: string;
+  planned: Readonly<{ writerRef: string; checkerRef: string }>;
+  served: Readonly<{ writerRef: string; checkerRef: string }> | null;
+  body: Readonly<{ bodyStop: EnvelopeStopKind | null; pointsWithoutReview: number | null }>;
+}>): ServeDisclosureRecord {
+  const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
+  const checkerFallback = input.served !== null && input.served.checkerRef !== input.planned.checkerRef;
+  return Object.freeze({
+    answerId: input.answerId,
+    answerVersion: input.answerVersion,
+    runId: input.runId,
+    writerPlannedRef: input.planned.writerRef,
+    checkerPlannedRef: input.planned.checkerRef,
+    writerServedRef: input.served?.writerRef ?? null,
+    checkerServedRef: input.served?.checkerRef ?? null,
+    writerFallback,
+    checkerFallback,
+    fallbackReason: writerFallback || checkerFallback ? "MONEY" as const : null,
+    checkerSameAsWriter: input.served !== null && input.served.checkerRef === input.served.writerRef,
+    bodyStop: input.body.bodyStop,
+    pointsWithoutReview: input.body.pointsWithoutReview,
+    digestRung: null,
+    digestPointsOmitted: null,
+    floorVerdictState: null,
+    floorLeadingNodeId: null,
+    floorReason: null
+  });
+}
+
+/** The maker a served round's role call recorded, or the typed defect of a round no call recorded. */
+function servedRoleRef(providerRef: string | undefined, role: "writer" | "checker"): string {
+  if (providerRef === undefined) {
+    throw new TypedDomainError(
+      "SERVE_DRAFT_UNRESOLVED",
+      `The served round names a ${role} artifact this run's ${role} call did not record`
+    );
+  }
+  return providerRef;
+}
+
+function databaseStateOf(error: unknown): string | null {
+  const code = typeof error === "object" && error !== null ? (error as { readonly code?: unknown }).code : undefined;
+  return typeof code === "string" && /^[0-9A-Z]{5}$/u.test(code) ? code : null;
+}
+
+/** Codes and ids only: a disclosure log line never carries debate or model text. */
+function logServeDisclosure(event: string, detail: Readonly<Record<string, unknown>>): void {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_SERVE_DISCLOSURE", event }));
 }
 
 export function parseComposerOutput(content: string): z.infer<typeof compositionSchema> {
@@ -2189,6 +2521,12 @@ export interface MakerPositionServeDecision<T extends MakerPositionDisclosureRoo
   readonly footing: MakerPositionServeFooting;
   /** The node ids that seeded `projectJudgedStanding` — what "reviewed" meant on this footing. */
   readonly judgedStandingSeed: readonly string[];
+  /**
+   * Engine money rule, Task M3 (spec §14.4.5; M2 review Minor 1): the seeds the
+   * stop DENIED a cross-review — each stands on its own panel, with UNKNOWN
+   * edges. Empty on every footing but SPEND_STOPPED.
+   */
+  readonly seededWithoutReview: readonly string[];
   readonly standing: ReturnType<typeof projectJudgedStanding>;
   readonly propagation: PropagationOutcome;
   readonly servableMakerPositions: readonly T[];
@@ -2251,20 +2589,20 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
   const footing: MakerPositionServeFooting = input.effectiveMakerCount <= 1
     ? "MONO_MAKER"
     : input.runBodyBudgetStop === null ? "CROSS_REVIEWED" : "SPEND_STOPPED";
+  const seededWithoutReview: readonly string[] = (() => {
+    if (footing !== "SPEND_STOPPED") return Object.freeze([]);
+    const reviewed = new Set(input.reviewedNodeIds);
+    const unjudged = new Set(input.unjudgedReviewNodeIds);
+    return Object.freeze(input.materialisedNodeIds.filter((nodeId) => !reviewed.has(nodeId) && !unjudged.has(nodeId)));
+  })();
   const judgedStandingSeed: readonly string[] = (() => {
     switch (footing) {
       case "MONO_MAKER":
         return input.materialisedNodeIds;
       case "CROSS_REVIEWED":
         return input.reviewedNodeIds;
-      case "SPEND_STOPPED": {
-        const reviewed = new Set(input.reviewedNodeIds);
-        const unjudged = new Set(input.unjudgedReviewNodeIds);
-        return Object.freeze([
-          ...input.reviewedNodeIds,
-          ...input.materialisedNodeIds.filter((nodeId) => !reviewed.has(nodeId) && !unjudged.has(nodeId))
-        ]);
-      }
+      case "SPEND_STOPPED":
+        return Object.freeze([...input.reviewedNodeIds, ...seededWithoutReview]);
       default: return exhaustive(footing);
     }
   })();
@@ -2294,6 +2632,7 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
   return Object.freeze({
     footing,
     judgedStandingSeed: Object.freeze([...judgedStandingSeed]),
+    seededWithoutReview,
     standing,
     propagation,
     servableMakerPositions,
@@ -2622,6 +2961,7 @@ export class WalkingSkeletonRunner {
   readonly #valuation: ValuationRepository;
   readonly #memory: MemoryRepository;
   readonly #providerProbes: ProviderProbeRepository;
+  readonly #serveDisclosure: Pick<ServeDisclosureRepository, "insert">;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly provider: ProviderGateway;
@@ -2645,6 +2985,7 @@ export class WalkingSkeletonRunner {
     this.#valuation = new ValuationRepository(pool);
     this.#memory = new MemoryRepository(pool);
     this.#providerProbes = new ProviderProbeRepository(pool);
+    this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
     this.#configuredMakers = Object.freeze([
       Object.freeze({ judge: this.#judge, provider, providerRef: settings.providerRef, maker: settings.maker }),
       ...(settings.critique === undefined ? [] : [Object.freeze({
@@ -2664,6 +3005,34 @@ export class WalkingSkeletonRunner {
 
   async executeNext(): Promise<RunnerExecutionResult> {
     return this.execute();
+  }
+
+  /**
+   * ENGINE MONEY RULE (spec §14.4.5), TASK M3 — THE DISCLOSURE ROW'S WRITER.
+   * It never throws: building the row, storing it and logging a failure each
+   * sit behind the one catch, like the story hook, so the row can never change
+   * the answer, the label, the run's outcome or the work item. A failure is
+   * logged with its typed code (UNTYPED otherwise) and the ids, never text.
+   */
+  async #recordServeDisclosure(
+    ids: Readonly<{ runId: string; answerId: string }>,
+    build: () => ServeDisclosureRecord
+  ): Promise<void> {
+    try {
+      await this.#serveDisclosure.insert(build());
+    } catch (error) {
+      try {
+        (this.settings.serveDisclosure?.log ?? logServeDisclosure)("SERVE_DISCLOSURE_WRITE_FAILED", {
+          code: error instanceof TypedDomainError ? error.code : "UNTYPED",
+          // A database refusal's SQLSTATE (five characters, never a message).
+          sqlState: databaseStateOf(error),
+          runId: ids.runId,
+          answerId: ids.answerId
+        });
+      } catch {
+        // A log line can never cost the answer either.
+      }
+    }
   }
 
   async executeWorkItem(workItemId: string): Promise<RunnerExecutionResult> {
@@ -4335,6 +4704,11 @@ export class WalkingSkeletonRunner {
       monoMakerConditionMarks,
       monoMakerRecords
     });
+    // Task M3 (spec §14.4.5): what the arguing left for the owner's disclosure
+    // row, taken HERE, where the body ends and the serve decision reads the same
+    // stop. Nothing from the serve gate on reads the stop itself
+    // (`tests/architecture/v28-serve-decision-wiring.test.ts`, pins 5 and 7).
+    const serveDisclosureBody = serveDisclosureBodyFacts({ runBodyBudgetStop, decision: makerPositionServe });
     const standing = makerPositionServe.standing;
     snapshot = makerPositionServe.standing.snapshot;
     const classHNodeIds = new Set(standing.hiddenNodeIds);
@@ -4565,6 +4939,31 @@ export class WalkingSkeletonRunner {
     let compositionRawArtifactRef: string | null = null;
     let compositionAttempt = 0;
     const conformanceRawArtifactRefs: string[] = [];
+    /**
+     * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — what each answer-writing call
+     * left, keyed by the artifact it recorded: the draft a KEPT round is
+     * persisted from (after a kept round, the last draft written is not the one
+     * served), the maker that actually wrote each draft and checked each one,
+     * and the last failure that escaped a role call and can end the loop on a
+     * complete round. Read after the chain; never by the prompt.
+     */
+    const servedDrafts = new Map<string, Readonly<{
+      segments: readonly ComposedSegment[];
+      round: number;
+      providerRef: string;
+    }>>();
+    const servedChecks = new Map<string, string>();
+    const draftWriterByRound = new Map<number, string>();
+    let servePhaseFailure: unknown = null;
+    const servePrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+    const whileServing = async <T>(call: () => Promise<T>): Promise<T> => {
+      try {
+        return await call();
+      } catch (error) {
+        if (keepsCompleteSynthesisRounds(error)) servePhaseFailure = error;
+        throw error;
+      }
+    };
     let conditionMarkRecords: readonly ConditionMarkRecord[] = makerPositionServe.disclosure.records;
     conditionMarkRecords = Object.freeze([
       ...conditionMarkRecords,
@@ -5010,7 +5409,16 @@ export class WalkingSkeletonRunner {
         // engine's own `instructions`, with nothing saying which was which.
         const framed = buildSynthesizerFramedPrompt(request,run.argumentLanguageName);
         const packet = framed.packet;
-        const response = await callSynthesisRole(role.provider, {
+        // Task M3 (spec §14.4.2): refused for MONEY, this SAME request — call
+        // site, framed prompt, bound — is offered to the cheaper claim-eligible
+        // makers; only the provider changes, and the seam decides what fits.
+        const served = await whileServing(() => callServeRoleWithFallback({
+          planned: role,
+          claimEligible: synthesisMakers,
+          prices: servePrices,
+          preferNot: null,
+          call: (maker, call) => callSynthesisRole(maker.provider, call, "COMPOSITION_CONTRACT_ERROR"),
+          request: {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           // CALL SITE vs ROLE. The `role` is the T9 identity making the call;
@@ -5035,7 +5443,9 @@ export class WalkingSkeletonRunner {
           packet,
           classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
           buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
-        }, "COMPOSITION_CONTRACT_ERROR");
+          }
+        }));
+        const response = served.result;
         const parsed = parseComposerOutput(response.content);
         const composedSegments = parsed.segments.map((segment) => {
           if (segment.segment_id === "memory:disclosure") {
@@ -5067,6 +5477,12 @@ export class WalkingSkeletonRunner {
         // `serve_state` reads this: round 1 COMPOSED, a later round
         // RECOMPOSED_ONCE. The loop round IS the composition attempt now.
         compositionAttempt = request.round;
+        servedDrafts.set(response.rawArtifactRef, Object.freeze({
+          segments: partitioned.persistedSegments,
+          round: request.round,
+          providerRef: served.servedBy.providerRef
+        }));
+        draftWriterByRound.set(request.round, served.servedBy.providerRef);
         return {
           candidate: partitioned.conformanceSegments,
           // codex r1 B2: the RECORDED artifact for THIS round. `compositionRawArtifactRef`
@@ -5089,7 +5505,16 @@ export class WalkingSkeletonRunner {
         const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
         const framed = buildEvaluatorFramedPrompt(request,run.argumentLanguageName);
         const packet = framed.packet;
-        const response = await callSynthesisRole(role.provider, {
+        // Task M3 (spec §14.4.2): the checker's cost fallback prefers a maker
+        // other than the one that wrote the draft it checks, and takes that one
+        // only when nothing else fits (the disclosure row records it, R9).
+        const served = await whileServing(() => callServeRoleWithFallback({
+          planned: role,
+          claimEligible: synthesisMakers,
+          prices: servePrices,
+          preferNot: draftWriterByRound.get(request.round) ?? null,
+          call: (maker, call) => callSynthesisRole(maker.provider, call, "EVALUATOR_CONTRACT_ERROR"),
+          request: {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           // Same contract as the synthesizer's key above: `POST_COMPOSE_R9:%`
@@ -5107,8 +5532,11 @@ export class WalkingSkeletonRunner {
           packet,
           classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
           buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
-        }, "EVALUATOR_CONTRACT_ERROR");
+          }
+        }));
+        const response = served.result;
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
+        servedChecks.set(response.rawArtifactRef, served.servedBy.providerRef);
         const parsed = parseContent(response.content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
         return Object.freeze({
           verdict: Object.freeze({
@@ -5165,6 +5593,31 @@ export class WalkingSkeletonRunner {
         if (exhausted.kind !== "HARD_STOP") throw error;
         result = await makeEnvelopeTerminal(exhausted, stop);
       }
+      // Task M3 (spec §14.4.2): the answer serves the chain's LAST round, and
+      // after a kept round that is not the last draft written. The persist takes
+      // that round's own draft, artifact and attempt, never a later draft its
+      // checker did not read — and, for a result that serves NO round (a crash
+      // class the chain returned after a draft was written, e.g. round 1's
+      // checker transport dying), no draft at all: the sealed persist refuses a
+      // components-only answer that carries one, which failed the whole run.
+      const servedRound = result.loopRounds.at(-1);
+      if (servedRound === undefined) {
+        finalSegments = [];
+        compositionRawArtifactRef = null;
+        compositionAttempt = 0;
+        conformanceRawArtifactRefs.length = 0;
+      } else {
+        const draft = servedDrafts.get(servedRound.candidateRef);
+        if (draft === undefined || draft.round !== servedRound.round) {
+          throw new TypedDomainError(
+            "SERVE_DRAFT_UNRESOLVED",
+            `The served round ${String(servedRound.round)} names a draft this run's writer did not record`
+          );
+        }
+        finalSegments = draft.segments;
+        compositionRawArtifactRef = servedRound.candidateRef;
+        compositionAttempt = draft.round;
+      }
       if (!result.conditionMarks.includes("DEFECT") && !result.conditionMarks.includes("ENVELOPE_EXHAUSTED")) {
         const finalEnvelopeDecision = await evaluateEnvelope();
         if (finalEnvelopeDecision.kind === "HARD_STOP") {
@@ -5186,6 +5639,20 @@ export class WalkingSkeletonRunner {
     if (runBodyStopRecord !== null) {
       conditionMarkRecords = Object.freeze([...conditionMarkRecords, runBodyStopRecord]);
       result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, runBodyStopRecord.mark]) };
+    }
+    // Task M3 (spec §14.4.2): a round kept after a spend stop on an
+    // answer-writing call is served, and the stop rides it the same way. When
+    // the arguing was stopped too, the record above already names a bound.
+    const servePhaseStopRecord = servePhaseStopDisclosure({
+      servePhaseFailure,
+      keptRounds: result.loopRounds.length,
+      resultConditionMarks: result.conditionMarks,
+      runId: run.runId,
+      servedRootNodeId: servedRoot.nodeId
+    });
+    if (servePhaseStopRecord !== null) {
+      conditionMarkRecords = Object.freeze([...conditionMarkRecords, servePhaseStopRecord]);
+      result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, servePhaseStopRecord.mark]) };
     }
     // The served number is the POSITION node's final strength — selected by
     // node identity, never by array position (a multi-node graph reorders).
@@ -5318,6 +5785,21 @@ export class WalkingSkeletonRunner {
       // above and the persisted label cannot disagree, and serve stops loudly if
       // they ever do.
       verdictLabelBasis: answerCarriesLabel ? verdictLabelBasis : null
+    }));
+    // Task M3 (spec §14.4.5): the owner-side disclosure row, once, after the
+    // sealed persist, for every answer. It can never change the answer: the
+    // writer logs a failure by code and carries on.
+    const answeredRound = result.loopRounds.at(-1);
+    await this.#recordServeDisclosure({ runId: run.runId, answerId: persisted.answerId }, () => buildServeDisclosureRecord({
+      answerId: persisted.answerId,
+      answerVersion: persisted.answerVersion,
+      runId: run.runId,
+      planned: { writerRef: synthesisRoles.synthesizerRoleRef, checkerRef: synthesisRoles.evaluatorRoleRef },
+      served: answeredRound === undefined ? null : {
+        writerRef: servedRoleRef(servedDrafts.get(answeredRound.candidateRef)?.providerRef, "writer"),
+        checkerRef: servedRoleRef(servedChecks.get(answeredRound.verdictRef), "checker")
+      },
+      body: serveDisclosureBody
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",
@@ -5904,6 +6386,9 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SERVED_ROOT_STRENGTH_UNRESOLVED",
   "SERVED_ROOT_UNRESOLVED",
   "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE",
+  "SERVE_DISCLOSURE_RECORD_INVALID",
+  "SERVE_DISCLOSURE_ROW_INVALID",
+  "SERVE_DRAFT_UNRESOLVED",
   "SERVE_GATE_CHAIN_FAILED",
   "SERVE_ITEMS_NOT_A_LIST",
   "SERVE_ITEM_INVALID",

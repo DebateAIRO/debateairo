@@ -121,6 +121,8 @@ describe("R-A / R-B — M = 2, the second root's first call refused", () => {
 
     expect(decision.footing).toBe("SPEND_STOPPED");
     expect(decision.judgedStandingSeed).toEqual([ROOT_0.nodeId]);
+    // Task M3 (§14.4.5): the one root the stop denied a review, counted for the owner's record.
+    expect(decision.seededWithoutReview).toEqual([ROOT_0.nodeId]);
     expect(decision.standing.hiddenNodeIds).toEqual([]);
     expect(decision.servableMakerPositions).toEqual([ROOT_0]);
     expect(decision.servedRoot).toBe(ROOT_0);
@@ -264,6 +266,9 @@ describe("R-A — a stop after reviews have landed keeps every review's outcome"
 
     expect(decision.footing).toBe("SPEND_STOPPED");
     expect([...decision.judgedStandingSeed].sort()).toEqual([ROOT_0.nodeId, ROOT_1.nodeId, CHILD_0A].sort());
+    // Task M3 (§14.4.5): only the node the stop DENIED a review — never a reviewed
+    // one, never the one whose review landed as cannot-assess.
+    expect(decision.seededWithoutReview).toEqual([CHILD_0A]);
     expect(decision.standing.hiddenNodeIds).toEqual([CHILD_0B]);
     expect(decision.standing.snapshot.nodes.map((node) => node.nodeId)).toContain(CHILD_0A);
     expect(decision.servableMakerPositions).toEqual([ROOT_0, ROOT_1]);
@@ -284,6 +289,7 @@ describe("R-A — a stop after reviews have landed keeps every review's outcome"
 
     expect(decision.footing).toBe("CROSS_REVIEWED");
     expect(decision.judgedStandingSeed).toEqual([ROOT_0.nodeId, ROOT_1.nodeId]);
+    expect(decision.seededWithoutReview).toEqual([]);
     expect([...decision.standing.hiddenNodeIds].sort()).toEqual([CHILD_0A, CHILD_0B].sort());
     expect(decision.disclosure.conditionMarks).toEqual(["UNSERVED-MAKER-POSITION"]);
   });
@@ -305,6 +311,8 @@ describe("the two footings that already existed are exactly as they were", () =>
 
     expect(decision.footing).toBe("MONO_MAKER");
     expect(decision.judgedStandingSeed).toEqual(nodeIds(EXPANDED));
+    // A mono run never cross-reviews: nothing was left unreviewed BY a stop.
+    expect(decision.seededWithoutReview).toEqual([]);
     expect(decision.standing.hiddenNodeIds).toEqual([]);
     expect(decision.disclosure.conditionMarks).toEqual([...MONO_MARKS]);
     expect(decision.disclosure.records.map((record) => record.reason)).toEqual(["MONO_MAKER_RUN", "MONO_MAKER_RUN"]);
