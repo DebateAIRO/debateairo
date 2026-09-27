@@ -37,7 +37,7 @@ import {
   SYNTHESIS_OBJECTION_STANDING_MARK,
   buildSynthesisDigest,
   runSynthesisLoop,
-  synthesisCallSiteKey,
+  acceptedSynthesisCallSiteKeys,
   type DigestSourceNode,
   type SynthesisCodeLabel,
   type SynthesisDigest,
@@ -2268,7 +2268,7 @@ export class ServeRepository {
             ref: round.candidateRef,
             callSiteKey: round.candidateCallSiteKey,
             role: "SYNTHESIZER" as const,
-            expected: synthesisCallSiteKey({
+            expected: acceptedSynthesisCallSiteKeys({
               role: "SYNTHESIZER",
               stage: round.synthesizerRequest.stage,
               round: round.round
@@ -2278,16 +2278,18 @@ export class ServeRepository {
             ref: round.verdictRef,
             callSiteKey: round.verdictCallSiteKey,
             role: "EVALUATOR" as const,
-            expected: synthesisCallSiteKey({ role: "EVALUATOR", round: round.round })
+            expected: acceptedSynthesisCallSiteKeys({ role: "EVALUATOR", round: round.round })
           }
         ]) {
-          // EQUALITY, not a suffix. This subsumes the round check it replaces —
-          // the round is part of the derived key — and it is what refuses a
-          // real artifact recorded under the other role's call site.
-          if (bound.callSiteKey !== bound.expected) {
+          // EQUALITY with one of the round's own keys, not a suffix. This
+          // subsumes the round check it replaces — the round is part of every
+          // derived key — and it is what refuses a real artifact recorded under
+          // the other role's call site. A15: a seat marker is admitted, a
+          // different role or round never is.
+          if (!bound.expected.includes(bound.callSiteKey)) {
             throw new TypedDomainError(
               "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
-              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected}`
+              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected[0]!}`
             );
           }
           const producer = await client.query<{ raw_artifact_ref: string }>(
@@ -2299,7 +2301,7 @@ export class ServeRepository {
               WHERE entry.run_id=$1 AND entry.subject_item_id=$2
                 AND entry.action_kind='MODEL_CALL' AND entry.outcome='OK'
                 AND entry.call_site_key=$3 AND entry.raw_artifact_ref=$4::uuid`,
-            [input.runId, input.workItemId, bound.expected, bound.ref]
+            [input.runId, input.workItemId, bound.callSiteKey, bound.ref]
           );
           if (producer.rows.length !== 1) {
             throw new TypedDomainError(
