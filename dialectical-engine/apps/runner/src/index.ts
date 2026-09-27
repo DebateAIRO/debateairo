@@ -6,6 +6,7 @@ import {
   RunRepository,
   assertNoOpenWriteTransaction,
   insertCallPrompt,
+  readRunRoleAssignment,
   withRunContentLease,
   withWriteTransaction,
   type CompletionActivationResolution,
@@ -91,7 +92,7 @@ import {
   type ProviderCostEnvelopeSeam,
   type ProviderGateway
 } from "@debateai/providers";
-import { canonicalPromptFingerprint } from "@debateai/scorecard";
+import { RoleAssignmentSchema, canonicalPromptFingerprint, type RoleAssignment, type SeatCandidate } from "@debateai/scorecard";
 import {
   buildFactBundle,
   compositionEvidenceRequired,
@@ -109,6 +110,9 @@ import {
   type ComposedSegment,
   type CompositionBudgetResolution,
   type ConditionMarkRecord,
+  seatBaseCallSiteKey,
+  seatCallSiteKey,
+  seatOfCallSiteKey,
   synthesisCallSiteKey,
   type DigestSourceNode,
   type EvaluatorRequest,
@@ -123,6 +127,20 @@ import {
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { SERVED_ROOT_SELECTION_RULE, TypedDomainError, exhaustive, type CompositionBudgetTier, type ServedRootRule, type WayOfKnowing } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
+import {
+  buildAssignedRunSeatBook,
+  buildLegacyRunSeatBook,
+  createSeatCaller,
+  legacySynthesisSeat,
+  roleAssignmentSeatProblem,
+  type AssignedRunSeatBook,
+  type ConfiguredSeatMaker,
+  type RouteHealth,
+  type RunSeat,
+  type RunSeatBook,
+  type SeatMember,
+  type SeatSlot
+} from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 
 // Model scorecard A15/A16: the seat book and the seat caller live in their own module.
@@ -479,6 +497,59 @@ export type PanelDegradationMark =
   | typeof PANEL_PARTIAL_MARK
   | typeof PANEL_DEGRADED_SINGLE_VOICE_MARK;
 
+type JudgePanelNote = Awaited<ReturnType<typeof runJudgePanel>>["notes"][number];
+
+/**
+ * confirm-item 5 and A15d (controller carry 10) — the marks and the reason a
+ * panel's LOST voices earn. Two notes are lost paid voices: a member that fell
+ * over (`MEMBER_FAILED`), and a seat whose answer came back from the author's
+ * own maker or route and was refused after the call
+ * (`PRODUCER_GRADING_REFUSED_AFTER_CALL`, A15c). The author's own seat skipped
+ * before any call (`PRODUCER_GRADING_FORBIDDEN`) is expected and lost nothing.
+ * The reason names WHICH members were lost and how — a disclosure that says
+ * only "partial" tells a reader nothing they can act on.
+ */
+export function panelDegradationOf(
+  nonAuthorVoices: number,
+  notes: readonly JudgePanelNote[]
+): { readonly marks: readonly PanelDegradationMark[]; readonly panelFailureReason: string | null } {
+  const lost = notes.filter((note) => note.kind === "MEMBER_FAILED" || note.kind === "PRODUCER_GRADING_REFUSED_AFTER_CALL");
+  const marks: PanelDegradationMark[] = [];
+  if (nonAuthorVoices === 0) marks.push(PANEL_DEGRADED_SINGLE_VOICE_MARK);
+  else if (lost.length > 0) marks.push(PANEL_PARTIAL_MARK);
+  return Object.freeze({
+    marks: Object.freeze(marks),
+    panelFailureReason: lost.length === 0
+      ? null
+      : lost.map((note) => note.kind === "PRODUCER_GRADING_REFUSED_AFTER_CALL"
+        ? `${note.memberRole}: ${note.failureKind} (answered by ${note.answeringMemberRole})`
+        : `${note.memberRole}: ${note.failureKind}`).join("; ")
+  });
+}
+
+/**
+ * A15d (controller carry 15) — the panel notes as the reduced judgement's
+ * `disagreement.panel.notes` stores them. The post-call refusal keeps the maker
+ * that ANSWERED beside the seat it answered for; every other note keeps its
+ * exact stored shape.
+ */
+export function panelNoteRecords(notes: readonly JudgePanelNote[]): readonly Readonly<Record<string, string>>[] {
+  return Object.freeze(notes.map((note) => Object.freeze(note.kind === "PRODUCER_GRADING_REFUSED_AFTER_CALL"
+    ? {
+      memberRole: note.memberRole,
+      answeringMemberRole: note.answeringMemberRole,
+      kind: note.kind,
+      failureKind: note.failureKind,
+      reason: note.reason
+    }
+    : {
+      memberRole: note.memberRole,
+      kind: note.kind,
+      failureKind: note.failureKind,
+      reason: note.reason
+    })));
+}
+
 /** One node's panel degradation, bound to the node id the graph minted. */
 interface PanelDegradationRecord {
   readonly subjectRef: string;
@@ -560,6 +631,17 @@ export async function withCooldownRetry<T>(input: {
   readonly policy: RunDeathPolicy;
   readonly hold: HoldRecorder;
   readonly attempt: (maxAttempts: number) => Promise<T>;
+  /**
+   * Model scorecard A15d (controller carry 3). DR-184-v5 provisions ONE
+   * post-cooldown final retry per SITE — `2 * judge + final` across a seat's
+   * two keys — but route health is re-probed at every claim, so a resumed pass
+   * can seat the site's other member, whose key still holds a final retry of
+   * its own. An assigned run's caller asks the ledger here whether the site's
+   * OTHER seat key already spent one; if it did, the site halts on this
+   * sequence's failure, with no hold and no wait. Absent (every legacy run),
+   * the final retry is granted exactly as before.
+   */
+  readonly finalRetryPermitted?: () => Promise<boolean>;
 }): Promise<
   | { readonly kind: "AUTHORED"; readonly value: T }
   | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
@@ -603,6 +685,9 @@ export async function withCooldownRetry<T>(input: {
     return { kind: "AUTHORED", value: await input.attempt(input.baseMaxAttempts) };
   } catch (error) {
     if (!(error instanceof ProviderCallFailedError)) throw error;
+    if (input.finalRetryPermitted !== undefined && !(await input.finalRetryPermitted())) {
+      return halted(error, error.attempts);
+    }
     // DR-186(8): review gets every ruled provider attempt plus the final
     // attempt, but never holds the in-run loading page open.
     if (input.failureScope === "REVIEW") return finalAttempt(error);
@@ -1515,13 +1600,16 @@ function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
  * existing organ code: a provider that answered with unusable content is a
  * contract error, not a dead transport.
  */
-async function callSynthesisRole(
-  provider: ProviderGateway,
-  request: ProviderCallRequest,
+async function callSynthesisRole<T>(
+  call: () => Promise<T>,
+  site: { readonly role: SynthesisRoleName; readonly callSiteKey: string },
   organFailureCode: string
-): Promise<ProviderCallResult> {
+): Promise<T> {
+  // A15: the call is a SEAT call, so this translation sits OUTSIDE it — the
+  // seat caller sees the raw provider failure (A16 decides a backup on it) and
+  // only what finally leaves the seat is typed for the serve chain.
   try {
-    return await provider.call(request);
+    return await call();
   } catch (error) {
     if (error instanceof ProviderContentUnacceptedError) {
       throw new TypedDomainError(organFailureCode, error.lastParseError);
@@ -1529,7 +1617,7 @@ async function callSynthesisRole(
     if (error instanceof ProviderCallFailedError) {
       throw new TypedDomainError(
         "SYNTHESIS_TRANSPORT_DEATH",
-        `${request.role} transport exhausted after ${String(error.attempts)} attempts at ${request.callSiteKey}`
+        `${site.role} transport exhausted after ${String(error.attempts)} attempts at ${site.callSiteKey}`
       );
     }
     throw error;
@@ -2721,16 +2809,41 @@ export class WalkingSkeletonRunner {
       readonly outcome: "TIMED_OUT" | "FAILED";
       readonly ledgerEntryRef: string;
     }>();
+    /**
+     * A15d (controller carry 6) — a resumed pass's SPENT seat keys, by bare
+     * site. A `<site>:seat:<slot>` key the preflight found at its allowance,
+     * whose partner key was never tried, is not a halt: the member in that slot
+     * is ineligible for the site on this pass and its partner answers instead
+     * (`spentSeatSlots`). Should the site's seat hold no such partner after all,
+     * the site halts exactly as today (`spentSiteHalts`, the same record the
+     * preflight would have made).
+     */
+    const spentSeatSlots = new Map<string, SeatSlot>();
+    const spentSiteHalts = new Map<string, {
+      readonly outcome: "TIMED_OUT" | "FAILED";
+      readonly ledgerEntryRef: string;
+    }>();
     const cooldownAttempt = async <T>(input: {
       readonly callSiteKey: string;
       readonly parentNodeId: string | null;
       readonly plannedLegCount: number;
       readonly failureScope: "MAKER_POSITION" | "EXPANSION" | "REVIEW";
       readonly attempt: (maxAttempts: number) => Promise<T>;
+      /**
+       * A15: on an assigned run, the seat member this site calls first, or null
+       * when the ledger left the site no member to call. Absent on the legacy
+       * book, which keeps today's path byte for byte.
+       */
+      readonly seatMember?: SeatMember | null | undefined;
     }): Promise<
       | { readonly kind: "AUTHORED"; readonly value: T }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
     > => {
+      // A15a (controller carry 4): holds, halts and their records name the SITE —
+      // 0069's `core.progress_value_is_code_shaped` refuses a seat suffix on an
+      // encrypted run, and the halt list is keyed by site. Callers already pass
+      // the bare site; this keeps a marked key from ever reaching the record.
+      const siteKey = seatBaseCallSiteKey(input.callSiteKey);
       const policy = this.settings.runDeathPolicy;
       if (policy === undefined) {
         return { kind: "AUTHORED", value: await input.attempt(this.settings.judgeBound.maxAttempts) };
@@ -2739,10 +2852,11 @@ export class WalkingSkeletonRunner {
       if (hold === undefined) {
         throw new TypedDomainError("RUN_HOLD_RECORDER_UNRESOLVED", "runDeathPolicy requires a production hold recorder");
       }
-      const preflight = preflightHaltedSites.get(input.callSiteKey);
+      const preflight = preflightHaltedSites.get(siteKey)
+        ?? (input.seatMember === null ? spentSiteHalts.get(siteKey) : undefined);
       if (preflight !== undefined) {
         const record = Object.freeze({
-          callSiteKey: input.callSiteKey,
+          callSiteKey: siteKey,
           parentNodeId: input.parentNodeId,
           plannedLegCount: input.plannedLegCount,
           terminalTransportOutcome: preflight.outcome,
@@ -2754,7 +2868,7 @@ export class WalkingSkeletonRunner {
             ? "EXPANSION_HALTED"
             : input.failureScope === "REVIEW" ? "REVIEW_HALTED" : "MAKER_POSITION_HALTED",
           runId: run.runId,
-          callSiteKey: input.callSiteKey,
+          callSiteKey: siteKey,
           parentNodeId: input.parentNodeId,
           holdMs: policy.cooldownMs,
           holdUntil: null,
@@ -2764,16 +2878,28 @@ export class WalkingSkeletonRunner {
         });
         return { kind: "HALTED", record };
       }
+      const seatMember = input.seatMember;
       return withCooldownRetry({
         runId: run.runId,
-        callSiteKey: input.callSiteKey,
+        callSiteKey: siteKey,
         parentNodeId: input.parentNodeId,
         plannedLegCount: input.plannedLegCount,
         baseMaxAttempts: this.settings.judgeBound.maxAttempts,
         failureScope: input.failureScope,
         policy,
         hold,
-        attempt: input.attempt
+        attempt: input.attempt,
+        // A15d (controller carry 3, the ruling's preferred option): the site's
+        // ONE final retry. A seat key past the sequence bound has spent it, so
+        // the member answering here gets none when its partner's key has.
+        ...(seatMember === undefined || seatMember === null ? {} : {
+          finalRetryPermitted: async () => await this.#ledger.countModelAttempts({
+            runId: run.runId,
+            workItemId: claimed.workItemId,
+            contractHash: this.settings.judgeContractHash,
+            callSiteKey: seatCallSiteKey(siteKey, seatMember.pinnedAs === "MAIN" ? "runnerUp" : "main")
+          }) <= this.settings.judgeBound.maxAttempts
+        })
       });
     };
     let envelopeBasis: ReturnType<typeof parseCostEnvelopeBasis>;
@@ -2786,6 +2912,42 @@ export class WalkingSkeletonRunner {
       );
     }
     const expansionDepth = resolveExpansionDepth(run.depthParams);
+    /**
+     * Model scorecard A15 (spec §2.7) — the role assignment the picker pinned at
+     * ask admission, or null. Null is today's run exactly: the legacy seat book
+     * below seats every claim-eligible debater in every role and keeps the
+     * sealed synthesis refs. A pinned assignment that cannot seat a debate is a
+     * TERMINAL refusal, like the other claim-time refusals: only a new ask can
+     * repair it.
+     */
+    const pinnedRoleAssignment = await readRunRoleAssignment(this.pool, run.runId);
+    let roleAssignment: RoleAssignment | null = null;
+    if (pinnedRoleAssignment !== null) {
+      const parsedAssignment = RoleAssignmentSchema.safeParse(pinnedRoleAssignment.assignment);
+      const seatProblem = parsedAssignment.success
+        ? roleAssignmentSeatProblem(parsedAssignment.data)
+        : "the pinned assignment does not parse";
+      if (!parsedAssignment.success || seatProblem !== null) {
+        await this.#work.recordTerminalFailure({
+          runId: run.runId,
+          workItemId: claimed.workItemId,
+          reason: "RUN_ROLE_ASSIGNMENT_INVALID"
+        });
+        throw new TypedDomainError(
+          "RUN_ROLE_ASSIGNMENT_INVALID",
+          `The run's pinned role assignment cannot seat a debate: ${seatProblem ?? "unparseable"}`
+        );
+      }
+      // A14: the frozen ceiling provisions `panel_size` maker positions. More
+      // debaters would author nodes the envelope never counted.
+      if (parsedAssignment.data.roles.POSITION.length > envelopeBasis.panelSize) {
+        throw new TypedDomainError(
+          "RUN_ENVELOPE_BASIS_INVALID",
+          `The frozen envelope provisions ${String(envelopeBasis.panelSize)} maker positions and the pinned assignment seats ${String(parsedAssignment.data.roles.POSITION.length)}`
+        );
+      }
+      roleAssignment = parsedAssignment.data;
+    }
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));
     const absentAtClaim: Array<{ readonly member: DiscoveredPanelMember; readonly failureCode: string }> = [];
     const configuredMakers: Array<{
@@ -2843,7 +3005,92 @@ export class WalkingSkeletonRunner {
       }
       configuredMakers.push(configured!);
     }
-    if (configuredMakers.length === 0) {
+    /**
+     * A15: an assigned run's seats may name routes OUTSIDE the pinned debate
+     * panel (a judge from a maker that is not debating, a runner-up). Each gets
+     * the same one no-hold probe an out-of-panel synthesis role gets, pinned to
+     * the candidate's model id; a route this deployment never configured is
+     * ABSENT for the same reason a pinned member is. Routes the panel loop above
+     * already probed reuse its verdict.
+     */
+    let assignedSeats: AssignedRunSeatBook | null = null;
+    // A15d: the panel's own absences, kept before an assigned run re-reads
+    // `absentAtClaim` as its dropped POSITION seats below; J24 (3) names a
+    // sealed ref's failure from here. A legacy run's copy is the list itself.
+    const panelAbsentAtClaim = Object.freeze([...absentAtClaim]);
+    if (roleAssignment !== null) {
+      const routeHealth = new Map<string, RouteHealth>();
+      for (const member of configuredMakers) routeHealth.set(member.providerRef, Object.freeze({ state: "HEALTHY" as const }));
+      for (const absent of absentAtClaim) {
+        routeHealth.set(absent.member.provider_ref, Object.freeze({ state: "ABSENT" as const, failureCode: absent.failureCode }));
+      }
+      const assignmentRoutes = new Map<string, SeatCandidate>();
+      for (const seats of Object.values(roleAssignment.roles)) {
+        for (const pinned of seats) {
+          for (const candidate of [pinned.main, pinned.runnerUp]) {
+            if (candidate !== null && !assignmentRoutes.has(candidate.providerRef)) {
+              assignmentRoutes.set(candidate.providerRef, candidate);
+            }
+          }
+        }
+      }
+      for (const candidate of assignmentRoutes.values()) {
+        if (routeHealth.has(candidate.providerRef)) continue;
+        const configured = configuredByProviderRef.get(candidate.providerRef);
+        if (configured === undefined) {
+          routeHealth.set(candidate.providerRef, Object.freeze({ state: "ABSENT" as const, failureCode: "CLAIM_GATEWAY_UNRESOLVED" }));
+          continue;
+        }
+        if (this.settings.claimTimeSynthesisRoleProbe === undefined) {
+          routeHealth.set(candidate.providerRef, Object.freeze({ state: "HEALTHY" as const }));
+          continue;
+        }
+        let observation: {
+          readonly state: "HEALTHY" | "ABSENT";
+          readonly modelId: string | null;
+          readonly failureCode: string | null;
+        };
+        try {
+          observation = await this.settings.claimTimeSynthesisRoleProbe(candidate.providerRef);
+        } catch (error) {
+          observation = {
+            state: "ABSENT", modelId: null,
+            failureCode: error instanceof TypedDomainError ? error.code : "CLAIM_PROVIDER_PROBE_FAILED"
+          };
+        }
+        const failureCode = observation.state === "HEALTHY" && observation.modelId === candidate.modelId
+          ? null
+          : observation.state === "HEALTHY"
+            ? "CLAIM_MODEL_IDENTITY_CHANGED"
+            : observation.failureCode ?? "CLAIM_PROVIDER_ABSENT";
+        await this.#providerProbes.record({
+          probeEvidenceRef: randomUUID(), providerRef: candidate.providerRef, maker: configured.maker,
+          state: failureCode === null ? "HEALTHY" : "ABSENT",
+          modelId: failureCode === null ? observation.modelId : null, failureCode, probedAt: new Date()
+        });
+        routeHealth.set(candidate.providerRef, failureCode === null
+          ? Object.freeze({ state: "HEALTHY" as const })
+          : Object.freeze({ state: "ABSENT" as const, failureCode }));
+      }
+      assignedSeats = buildAssignedRunSeatBook({
+        assignment: roleAssignment, configured: configuredByProviderRef, routeHealth
+      });
+      // A POSITION seat with neither candidate claim-eligible is today's absent
+      // maker: dropped, compacted and disclosed through the same
+      // CLAIM_PANEL_REVISED record. A seat its runner-up saved is NOT absent —
+      // its switch is disclosed as BACKUP-MODEL-USED (A16).
+      absentAtClaim.splice(0, absentAtClaim.length, ...assignedSeats.droppedPositionSeats.map(({ candidate, failureCode }) => Object.freeze({
+        member: Object.freeze({
+          provider_ref: candidate.providerRef,
+          maker: candidate.maker,
+          model_id: candidate.modelId,
+          probe_evidence_ref: "role-assignment",
+          probed_at: "role-assignment"
+        }),
+        failureCode
+      })));
+    }
+    if ((assignedSeats === null ? configuredMakers.length : assignedSeats.book.position.length) === 0) {
       // J26(b): this refusal is TERMINAL for the work item, for the same reason
       // the sealed-role refusal below is — every pinned provider being absent is
       // a condition only a deployment change can fix, so leaving the item
@@ -2874,9 +3121,24 @@ export class WalkingSkeletonRunner {
     const synthesisMakers = [...configuredMakers];
     const synthesisFailures = new Map<string, string>();
     const panelRefs = new Set(run.discoveredPanel.map((member) => member.provider_ref));
-    for (const roleRef of new Set([
-      synthesisRolePolicy.synthesizerRoleRef, synthesisRolePolicy.evaluatorRoleRef
-    ])) {
+    // A15: an assigned run takes a synthesis role from its ANSWER_WRITER /
+    // ANSWER_CHECKER seat (spec §2.7; the owner relaxed J24's "never substitute"
+    // for them on 2026-09-26), so THAT role's sealed ref is neither probed nor
+    // enforced. A role the assignment leaves to its sealed ref — a FALLBACK seat
+    // (pre-flight ruling F18) — keeps both exactly as today: skipping them would
+    // call an out-of-panel sealed ref unprobed, and its absence would surface as
+    // a mid-run death after the debate was paid for. A role whose pinned seat has
+    // neither member claim-eligible is refused below, by its seat. The pre-claim
+    // J24 (2) check above is unchanged.
+    const sealedRefRoles = SYNTHESIS_ROLES.filter((role) => {
+      if (assignedSeats === null) return true;
+      const seatRole = role === "SYNTHESIZER" ? "ANSWER_WRITER" as const : "ANSWER_CHECKER" as const;
+      return (role === "SYNTHESIZER" ? assignedSeats.book.answerWriter : assignedSeats.book.answerChecker) === null
+        && !assignedSeats.unavailableSynthesis.some((entry) => entry.role === seatRole);
+    });
+    for (const roleRef of new Set(sealedRefRoles.map((role) => role === "SYNTHESIZER"
+      ? synthesisRolePolicy.synthesizerRoleRef
+      : synthesisRolePolicy.evaluatorRoleRef))) {
       if (panelRefs.has(roleRef)) continue;
       const configured = configuredByProviderRef.get(roleRef);
       if (configured === undefined || this.settings.claimTimeSynthesisRoleProbe === undefined) continue;
@@ -2908,12 +3170,12 @@ export class WalkingSkeletonRunner {
     // costume of a runtime accident. Refuse instead, without substitution, and
     // leave a durable event naming the ROLE (J25: a disclosure a reader cannot
     // see is not a disclosure).
-    for (const role of SYNTHESIS_ROLES) {
+    for (const role of sealedRefRoles) {
       const roleRef = role === "SYNTHESIZER"
         ? synthesisRolePolicy.synthesizerRoleRef
         : synthesisRolePolicy.evaluatorRoleRef;
       if (synthesisMakers.some((maker) => maker.providerRef === roleRef)) continue;
-      const absent = absentAtClaim.find((entry) => entry.member.provider_ref === roleRef);
+      const absent = panelAbsentAtClaim.find((entry) => entry.member.provider_ref === roleRef);
       // J26(c): a refusal's own shape. No hold, no attempts, no legs — the three
       // zeros the first draft wrote were measurements nobody took.
       await this.#runs.recordRunLifecycleEvent({
@@ -2942,8 +3204,76 @@ export class WalkingSkeletonRunner {
         `J24: the sealed ${role} role ref ${roleRef} was ${absent === undefined ? "not claim-eligible" : `absent at claim (${absent.failureCode})`}; the run refuses rather than serving from a provider the sealed row did not name`
       );
     }
-    const effectiveMakerCount = configuredMakers.length;
-    const primaryMaker = configuredMakers[0]!;
+    // A15: the same refusal for an assigned run's synthesis seats — neither the
+    // main nor the runner-up claim-eligible. Same event shape (0069 admits it
+    // for encrypted runs), same terminal reason, no substitution.
+    for (const unavailable of assignedSeats?.unavailableSynthesis ?? []) {
+      const role = unavailable.role === "ANSWER_WRITER" ? "SYNTHESIZER" as const : "EVALUATOR" as const;
+      await this.#runs.recordRunLifecycleEvent({
+        runId: run.runId,
+        kind: "ledger.could_not_do",
+        value: {
+          state: "SYNTHESIS_ROLE_PROVIDER_ABSENT",
+          call_site_key: `${role}:${unavailable.candidate.providerRef}`,
+          role_ref: unavailable.candidate.providerRef,
+          role,
+          absent_failure_code: unavailable.failureCode
+        }
+      });
+      await this.#work.recordTerminalFailure({
+        runId: run.runId,
+        workItemId: claimed.workItemId,
+        reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`
+      });
+      throw new TypedDomainError(
+        "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM",
+        `The pinned ${unavailable.role} seat had neither its main nor its runner-up claim-eligible (${unavailable.failureCode}); the run refuses rather than serving from a route the assignment did not name`
+      );
+    }
+    const seatBook: RunSeatBook = assignedSeats?.book ?? buildLegacyRunSeatBook(configuredMakers);
+    const seatCaller = createSeatCaller({ assigned: seatBook.assigned });
+    const effectiveMakerCount = seatBook.position.length;
+    /**
+     * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct
+     * makers. On an assigned run a POSITION member may answer only when no OTHER
+     * POSITION seat holds its maker — read off the CLAIMED book, never off who
+     * happened to answer earlier on this pass, so a resumed pass finds the same
+     * members eligible at every root. RoleAssignmentSchema already forbids a
+     * shared POSITION maker, runner-ups included; this keeps the law where the
+     * call is made. The legacy book is not re-validated.
+     */
+    const positionMakerIsFree = (seat: RunSeat, member: SeatMember): boolean => !seatBook.assigned
+      || seatBook.position.every((other) => other === seat
+        || [other.main, other.runnerUp].every((rival) => rival === null || rival.maker !== member.maker));
+    /** A15 (R5): the member that actually wrote each root; its cross-exchanges are that member's. */
+    const positionAnswerers = new Map<number, SeatMember>();
+    /**
+     * A15d (controller carries 1 and 2): a root the LEDGER says a member already
+     * answered on an earlier pass is answered by that member again, so the root
+     * and its cross-exchanges keep their writer and their seat marker on every
+     * pass. Filled from the ledger before the first root is written; empty on a
+     * first pass and on the legacy book.
+     */
+    const restoredRootMembers = new Map<number, SeatMember>();
+    /**
+     * A15: who may answer ONE seat call at `siteKey` on this pass — the call's
+     * own fairness rule, minus a member whose key the preflight found spent
+     * (carry 6). `seatMember` is the member the seat caller will call first; it
+     * is undefined on the legacy book, which keeps today's cooldown path.
+     */
+    const seatCallPlan = (seat: RunSeat, siteKey: string, rule?: (member: SeatMember) => boolean) => {
+      const eligible = (member: SeatMember): boolean => (rule === undefined || rule(member))
+        && spentSeatSlots.get(siteKey) !== member.pinnedAs;
+      return Object.freeze({
+        eligible,
+        seatMember: seatBook.assigned ? seatCaller.plan(seat, siteKey, { eligible }) : undefined
+      });
+    };
+    const positionRule = (seat: RunSeat) => (member: SeatMember): boolean => positionMakerIsFree(seat, member)
+      && (restoredRootMembers.get(seat.seatIndex) ?? member) === member;
+    // The explicit 80-20 ordinal of the two single-call-per-run roles; A16c
+    // replaces it with `diversityOrdinalForRun(run.runId)`.
+    const synthesisOrdinal = 0;
     const panelPolicy = this.settings.panelPolicy;
     // S2-2 / J13(b): one record per node whose panel degraded, bound to the node the
     // graph minted — the same discipline `bindWayOfKnowingDowngrade` follows. Declared
@@ -3036,6 +3366,71 @@ export class WalkingSkeletonRunner {
         );
       }
 
+      // A15 (R5): the panel is the JUDGE seats. A seat whose every member is the
+      // author's own maker is still handed over — under its main's maker and
+      // route — so runJudgePanel records the FX-HR-H6 refusal exactly as it
+      // always has. The seats that CAN judge are capped at `panel_size - 1` per
+      // node, the panel basis (PANEL_SIZE_MINUS_ONE) the frozen ceiling was
+      // minted for; on the legacy book the cap never binds.
+      //
+      // A15d (controller carry 9): "not the author" is the author's MAKER, not
+      // its route — FX-HR-H6 is "no maker grades its own artifact", as A15c's
+      // runJudgePanel and the database enforce it — so the seat caller never
+      // pays for a call the panel would refuse, and a seat whose main shares the
+      // author's maker is answered by its runner-up instead of being lost.
+      const notTheAuthor = (member: SeatMember): boolean => member.maker !== input.authorMaker;
+      const panelCallCap = Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1;
+      let panelCallsPlanned = 0;
+      const panelMembers = seatBook.judge.flatMap((seat) => {
+        const planned = seatCaller.plan(seat, input.callSiteKey, { eligible: notTheAuthor });
+        if (planned === null) {
+          return [{
+            memberRole: seat.main.maker,
+            actorRef: seat.main.providerRef,
+            contractHash: judgeContractHash,
+            judge: async (): Promise<never> => {
+              throw new TypedDomainError(
+                "PRODUCER_GRADING_FORBIDDEN",
+                `${seat.role} seat ${String(seat.pinnedSeatIndex)} holds only the author's own maker`
+              );
+            }
+          }];
+        }
+        if (panelCallsPlanned >= panelCallCap) return [];
+        panelCallsPlanned += 1;
+        return [{
+          memberRole: planned.maker,
+          actorRef: planned.providerRef,
+          contractHash: judgeContractHash,
+          judge: async () => {
+            const answered = await seatCaller.callSeat({
+              seat,
+              callSiteKey: input.callSiteKey,
+              eligible: notTheAuthor,
+              keyFor: (member) => `${input.callSiteKey}:${member.providerRef}`,
+              call: (member, callSiteKey) => member.judge.assess({
+                runId: run.runId,
+                subjectItemId: claimed.workItemId,
+                callSiteKey,
+                questionLine: input.questionLine,
+                statement: input.statement,
+                authorMaker: input.authorMaker,
+                providerRef: member.providerRef,
+                contractHash: judgeContractHash,
+                bound: this.settings.judgeBound
+              })
+            });
+            // A15c (controller carry 7): the member that ANSWERED, route and
+            // maker together — never one without the other.
+            return {
+              judgementRef: answered.value.judgementRef,
+              assessment: answered.value.assessment,
+              actorRef: answered.member.providerRef,
+              memberRole: answered.member.maker
+            };
+          }
+        }];
+      });
       const panel = await runJudgePanel({
         artifactProducerRef: input.authorProviderRef,
         primary: {
@@ -3043,25 +3438,7 @@ export class WalkingSkeletonRunner {
           assessment: input.authorAssessment,
           memberRole: input.authorMaker
         },
-        members: configuredMakers.map((member) => ({
-          memberRole: member.maker,
-          actorRef: member.providerRef,
-          contractHash: judgeContractHash,
-          judge: async () => {
-            const assessed = await member.judge.assess({
-              runId: run.runId,
-              subjectItemId: claimed.workItemId,
-              callSiteKey: `${input.callSiteKey}:${member.providerRef}`,
-              questionLine: input.questionLine,
-              statement: input.statement,
-              authorMaker: input.authorMaker,
-              providerRef: member.providerRef,
-              contractHash: judgeContractHash,
-              bound: this.settings.judgeBound
-            });
-            return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
-          }
-        }))
+        members: panelMembers
       });
 
       // Each member's assessment is reduced through the SAME ratified
@@ -3091,11 +3468,12 @@ export class WalkingSkeletonRunner {
         }
       );
 
-      const familyOf = (memberRole: string): JudgeFamily => {
-        const member = configuredMakers.find((candidate) => candidate.maker === memberRole);
-        const entry = member === undefined
-          ? undefined
-          : panelPolicy.providerFamilies.find((family) => family.providerRefs.includes(member.providerRef));
+      // A15 (R5; controller carry 7 — lands with E8): the discount keys on the
+      // ROUTE THAT ANSWERED — `actorRef` on each panel entry — never on a maker
+      // name looked up in a list, which could not tell two seats of one maker,
+      // or a backup from another family, apart.
+      const familyOf = (actorRef: string): JudgeFamily => {
+        const entry = panelPolicy.providerFamilies.find((family) => family.providerRefs.includes(actorRef));
         return entry === undefined
           ? { kind: "UNKNOWN", reason: panelPolicy.unmappedReason }
           : { kind: "KNOWN", familyRef: entry.familyRef };
@@ -3104,7 +3482,7 @@ export class WalkingSkeletonRunner {
         reducedMembers.map((entry) => ({
           memberRole: entry.memberRole,
           earnedWeight: judgementPolicy.earnedWeight,
-          family: familyOf(entry.memberRole)
+          family: familyOf(entry.actorRef)
         })),
         {
           repeatedFamilyMultiplier: panelPolicy.repeatedFamilyMultiplier,
@@ -3128,15 +3506,9 @@ export class WalkingSkeletonRunner {
       // confirm-item 5. The author is always judgement[0]; every other entry is
       // a non-author voice that actually parsed.
       const nonAuthorVoices = reducedMembers.length - 1;
-      const memberFailures = panel.notes.filter((note) => note.kind === "MEMBER_FAILED");
-      const marks: PanelDegradationMark[] = [];
-      if (nonAuthorVoices === 0) marks.push(PANEL_DEGRADED_SINGLE_VOICE_MARK);
-      else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);
-      // The reason names WHICH members fell over and how — a disclosure that says only
-      // "partial" tells a reader nothing they can act on.
-      const panelFailureReason = memberFailures.length === 0
-        ? null
-        : memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`).join("; ");
+      // A15d (controller carry 10): a paid voice the panel refused after the
+      // call is lost exactly as a failed member is, and is disclosed with it.
+      const { marks, panelFailureReason } = panelDegradationOf(nonAuthorVoices, panel.notes);
 
       const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
@@ -3181,12 +3553,9 @@ export class WalkingSkeletonRunner {
               earnedWeight: judgementPolicy.earnedWeight,
               effectiveWeight: entry.effectiveWeight
             }))),
-            notes: Object.freeze(panel.notes.map((note) => Object.freeze({
-              memberRole: note.memberRole,
-              kind: note.kind,
-              failureKind: note.failureKind,
-              reason: note.reason
-            })))
+            // A15d (controller carry 15): a refusal after the call keeps the
+            // maker that answered; every other note keeps its stored shape.
+            notes: panelNoteRecords(panel.notes)
           })
         })
       });
@@ -3225,10 +3594,51 @@ export class WalkingSkeletonRunner {
       });
       if (exhausted !== null) {
         if (exhausted.outcome === "OK") continue;
-        if (callSite.contractHash === this.settings.judgeContractHash
-          && exhausted.callSiteKey !== "JUDGE"
-          && exhausted.callSiteKey !== "JUDGE:root:secondary") {
-          preflightHaltedSites.set(exhausted.callSiteKey, {
+        // A15 (controller carry 5): an assigned run records `:seat:<main|runnerUp>`
+        // keys, while the cooldown wrapper (and so this halt list) and the two
+        // root exceptions name the SITE by its bare key.
+        const exhaustedSite = seatBaseCallSiteKey(exhausted.callSiteKey);
+        const isJudgeSite = callSite.contractHash === this.settings.judgeContractHash;
+        const isExemptRoot = exhaustedSite === "JUDGE" || exhaustedSite === "JUDGE:root:secondary";
+        /**
+         * A15d (controller carry 6): a judge seat key at its allowance whose
+         * PARTNER key was never tried does not end the site — the partner answers
+         * it on this pass. DR-184-v5 provisions a first sequence on both of a
+         * seat's keys; the site's ONE final retry is guarded in cooldownAttempt
+         * (carry 3). Only where a final retry exists: a key passes the sequence
+         * bound only through the post-cooldown retry, which follows a TRANSPORT
+         * failure, so the partner answers a transport failure and never a schema
+         * one (R4). Synthesis sites stay terminal on a re-claim: their ledger
+         * cannot tell a transport exhaustion from a schema one.
+         */
+        const exhaustedMarker = seatOfCallSiteKey(exhausted.callSiteKey);
+        if (isJudgeSite && exhaustedMarker !== null && (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0) >= 1) {
+          const spentSlot: SeatSlot = exhaustedMarker === "main" ? "MAIN" : "RUNNER_UP";
+          const rootSeat = exhaustedSite === "JUDGE"
+            ? seatBook.position[0]
+            : exhaustedSite === "JUDGE:root:secondary" ? seatBook.position[1] : undefined;
+          // A root that would otherwise fail terminally needs its partner seated
+          // now; any other site halts as today if it turns out to have none.
+          const partnerSeated = !isExemptRoot || (rootSeat !== undefined
+            && [rootSeat.main, rootSeat.runnerUp].some((member) => member !== null && member.pinnedAs !== spentSlot));
+          const partnerAttempts = partnerSeated
+            ? await this.#ledger.countModelAttempts({
+              runId: run.runId,
+              workItemId: claimed.workItemId,
+              contractHash: callSite.contractHash,
+              callSiteKey: seatCallSiteKey(exhaustedSite, exhaustedMarker === "main" ? "runnerUp" : "main")
+            })
+            : null;
+          if (partnerAttempts === 0) {
+            spentSeatSlots.set(exhaustedSite, spentSlot);
+            if (!isExemptRoot) {
+              spentSiteHalts.set(exhaustedSite, { outcome: exhausted.outcome, ledgerEntryRef: exhausted.ledgerEntryRef });
+            }
+            continue;
+          }
+        }
+        if (isJudgeSite && !isExemptRoot) {
+          preflightHaltedSites.set(exhaustedSite, {
             outcome: exhausted.outcome,
             ledgerEntryRef: exhausted.ledgerEntryRef
           });
@@ -3237,6 +3647,35 @@ export class WalkingSkeletonRunner {
         await this.#work.failFromExhaustedAttempt({ workItemId: claimed.workItemId, ...exhausted });
         return { kind: "TERMINAL_FAILED", artifactRef: exhausted.artifactRef };
       }
+    }
+    /**
+     * A15d (controller carries 1 and 2) — what earlier passes of this work item
+     * recorded under seat keys, read once, before the first root. A root one of
+     * them answered is answered by the SAME member again (and its cross-exchanges
+     * with it), and a cross-exchange site keeps the one key it already holds.
+     * Nothing here is in-memory state from an earlier pass: every choice below is
+     * the site's identity plus this ledger.
+     */
+    const recordedSlotBySite = new Map<string, SeatSlot>();
+    if (seatBook.assigned) {
+      const answeredSlotBySite = new Map<string, SeatSlot>();
+      for (const row of await this.#ledger.readSeatMarkedModelCalls({
+        runId: run.runId, workItemId: claimed.workItemId, contractHash: this.settings.judgeContractHash
+      })) {
+        const site = seatBaseCallSiteKey(row.callSiteKey);
+        const slot: SeatSlot = seatOfCallSiteKey(row.callSiteKey) === "main" ? "MAIN" : "RUNNER_UP";
+        if (!recordedSlotBySite.has(site)) recordedSlotBySite.set(site, slot);
+        if (row.outcome === "OK") answeredSlotBySite.set(site, slot);
+      }
+      seatBook.position.forEach((seat, rootIndex) => {
+        const siteKey = rootIndex === 0 ? "JUDGE" : rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
+        const slot = answeredSlotBySite.get(siteKey);
+        const restored = [seat.main, seat.runnerUp].find((member): member is SeatMember => member !== null
+          && member.pinnedAs === slot && spentSeatSlots.get(siteKey) !== slot);
+        if (restored === undefined) return;
+        restoredRootMembers.set(rootIndex, restored);
+        positionAnswerers.set(rootIndex, restored);
+      });
     }
 
     const judgementScheduledAt = new Date();
@@ -3253,22 +3692,30 @@ export class WalkingSkeletonRunner {
       startedAt: judgementScheduledAt,
       finishedAt: new Date()
     });
+    const primarySeat = seatBook.position[0]!;
+    const primaryPlan = seatCallPlan(primarySeat, "JUDGE", positionRule(primarySeat));
     const primaryAttempt = await cooldownAttempt({
       callSiteKey: "JUDGE",
       parentNodeId: null,
       plannedLegCount: 1,
       failureScope: "MAKER_POSITION",
-      attempt: (maxAttempts) => primaryMaker.judge.judge({
-        runId: run.runId,
-        subjectItemId: claimed.workItemId,
+      seatMember: primaryPlan.seatMember,
+      attempt: (maxAttempts) => seatCaller.callSeat({
+        seat: primarySeat,
         callSiteKey: "JUDGE",
-        // DL4-F4: the question travels as the question, in its own fenced
-        // field; the leg's directive is code's and rides the system message.
-        questionLine: run.questionLine,
-        leg: { kind: "primary-root" },
-        providerRef: primaryMaker.providerRef,
-        contractHash: this.settings.judgeContractHash,
-        bound: { ...this.settings.judgeBound, maxAttempts }
+        eligible: primaryPlan.eligible,
+        call: (member, callSiteKey) => member.judge.judge({
+          runId: run.runId,
+          subjectItemId: claimed.workItemId,
+          callSiteKey,
+          // DL4-F4: the question travels as the question, in its own fenced
+          // field; the leg's directive is code's and rides the system message.
+          questionLine: run.questionLine,
+          leg: { kind: "primary-root" },
+          providerRef: member.providerRef,
+          contractHash: this.settings.judgeContractHash,
+          bound: { ...this.settings.judgeBound, maxAttempts }
+        })
       })
     });
     if (primaryAttempt.kind === "HALTED") {
@@ -3277,7 +3724,11 @@ export class WalkingSkeletonRunner {
         "The primary maker position failed after the full cooldown and final-retry courtesy"
       );
     }
-    const judged = primaryAttempt.value;
+    const judged = primaryAttempt.value.value;
+    // A15: the member that ANSWERED root 0 — its lineage, its panel's author
+    // (controller carry 8), and the writer of its cross-exchanges.
+    const primaryMaker = primaryAttempt.value.member;
+    positionAnswerers.set(0, primaryMaker);
     const reduced = reduceAssessment({
       claimType: judged.normalizedClaim.claimType,
       assessment: judged.assessment,
@@ -3360,6 +3811,8 @@ export class WalkingSkeletonRunner {
       readonly reversalPoint: string;
       readonly authorIndex: number;
       readonly maker: string;
+      /** A15: the seat member that actually wrote this node (main or runner-up). */
+      readonly member: SeatMember;
       /**
        * S6-1 / T11: the panel dispersion recorded on THIS node's reduced
        * judgement (T3's `dispersion`), carried so the winning root's
@@ -3391,7 +3844,8 @@ export class WalkingSkeletonRunner {
       reversalPoint: judged.assessment.critic.summary,
       panelDispersion: selection.dispersion,
       authorIndex: 0,
-      maker: primaryMaker.maker
+      maker: primaryMaker.maker,
+      member: primaryMaker
     })]]);
     const haltedExpansionRecords: HaltedExpansionRecord[] = [];
     // S2-3 / J5: way-of-knowing downgrades are bound to the node the graph
@@ -3420,6 +3874,8 @@ export class WalkingSkeletonRunner {
 
     const authorPosition = async (input: {
       readonly authorIndex: number;
+      /** A15: the seat that writes this node — POSITION, SUPPORT_ATTACK or a cross-exchange seat. */
+      readonly seat: RunSeat;
       /**
        * DL4-F4: the authoring leg, TYPED. This parameter used to be a
        * `questionLine: string` that the four call sites below built by
@@ -3445,10 +3901,6 @@ export class WalkingSkeletonRunner {
       | { readonly kind: "AUTHORED"; readonly value: AuthoredDebateNode }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
     > => {
-      const selectedMaker = configuredMakers[input.authorIndex];
-      if (selectedMaker === undefined) {
-        throw new TypedDomainError("DEBATE_MAKER_UNRESOLVED", `No configured maker exists at index ${input.authorIndex}`);
-      }
         await this.#ledger.append({
           runId: run.runId,
           attemptId: runnerAttemptId,
@@ -3462,24 +3914,40 @@ export class WalkingSkeletonRunner {
           startedAt: new Date(),
           finishedAt: new Date()
         });
+      const childPlan = seatCallPlan(
+        input.seat,
+        input.callSiteKey,
+        input.seat.role === "POSITION" ? positionRule(input.seat) : undefined
+      );
       const childAttempt = await cooldownAttempt({
         callSiteKey: input.callSiteKey,
         parentNodeId: input.parentNodeId,
         plannedLegCount: input.plannedLegCount,
         failureScope: input.parentNodeId === null ? "MAKER_POSITION" : "EXPANSION",
-        attempt: (maxAttempts) => selectedMaker.judge.judge({
-          runId: run.runId,
-          subjectItemId: claimed.workItemId,
+        seatMember: childPlan.seatMember,
+        attempt: (maxAttempts) => seatCaller.callSeat({
+          seat: input.seat,
           callSiteKey: input.callSiteKey,
-          questionLine: run.questionLine,
-          leg: input.leg,
-          providerRef: selectedMaker.providerRef,
-          contractHash: this.settings.judgeContractHash,
-          bound: { ...this.settings.judgeBound, maxAttempts }
+          eligible: childPlan.eligible,
+          call: (member, callSiteKey) => member.judge.judge({
+            runId: run.runId,
+            subjectItemId: claimed.workItemId,
+            callSiteKey,
+            questionLine: run.questionLine,
+            leg: input.leg,
+            providerRef: member.providerRef,
+            contractHash: this.settings.judgeContractHash,
+            bound: { ...this.settings.judgeBound, maxAttempts }
+          })
         })
       });
       if (childAttempt.kind === "HALTED") return childAttempt;
-      const childJudged = childAttempt.value;
+      const childJudged = childAttempt.value.value;
+      // A15: the member that ANSWERED — main or runner-up — is the node's maker
+      // lineage, the panel's author (controller carry 8) and the reviewer rule's
+      // author.
+      const selectedMaker = childAttempt.value.member;
+      if (input.seat.role === "POSITION") positionAnswerers.set(input.seat.seatIndex, selectedMaker);
       const childReduced = reduceAssessment({
           claimType: childJudged.normalizedClaim.claimType,
           assessment: childJudged.assessment,
@@ -3587,7 +4055,8 @@ export class WalkingSkeletonRunner {
           reversalPoint: childJudged.assessment.critic.summary,
           panelDispersion: childSelection.dispersion,
           authorIndex: input.authorIndex,
-          maker: selectedMaker.maker
+          maker: selectedMaker.maker,
+          member: selectedMaker
         }) };
     };
 
@@ -3613,6 +4082,7 @@ export class WalkingSkeletonRunner {
       try {
       secondary = await authorPosition({
         authorIndex: 1,
+        seat: seatBook.position[1]!,
         leg: { kind: "independent-root" },
         callSiteKey: "JUDGE:root:secondary",
         role: "secondary root author",
@@ -3648,6 +4118,7 @@ export class WalkingSkeletonRunner {
       try {
       additionalRoot = await authorPosition({
         authorIndex: makerIndex,
+        seat: seatBook.position[makerIndex]!,
         leg: { kind: "independent-root" },
         callSiteKey: `JUDGE:root:${makerIndex}`,
         role: "additional maker root author",
@@ -3687,33 +4158,48 @@ export class WalkingSkeletonRunner {
         if (reviewScheduledNodeIds.has(authoredNode.nodeId)) continue;
         reviewScheduledNodeIds.add(authoredNode.nodeId);
         const latestReviewerMaker = await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker);
-        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, configuredMakers, latestReviewerMaker);
+        const reviewCallSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+        // A15 (R5): reviewers come from the REVIEWER seats, and a seat may review
+        // only through a member of a different maker than the author — checked
+        // per member, so whichever member answers is held to the same rule.
+        const differentMaker = (member: SeatMember): boolean => member.maker !== authoredNode.maker;
+        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, seatBook.reviewer.flatMap((seat) => {
+          const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
+          const first = seatCaller.plan(seat, reviewCallSiteKey, { eligible: planned.eligible });
+          return first === null ? [] : [{ seat, maker: first.maker, plan: planned }];
+        }), latestReviewerMaker);
         try {
-          const callSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+          const callSiteKey = reviewCallSiteKey;
           const reviewAttempt = await cooldownAttempt({
             callSiteKey,
             parentNodeId: authoredNode.nodeId,
             plannedLegCount: 1,
             failureScope: "REVIEW",
-            attempt: (maxAttempts) => reviewer.judge.review({
-              runId: run.runId,
-              subjectItemId: claimed.workItemId,
+            seatMember: reviewer.plan.seatMember,
+            attempt: (maxAttempts) => seatCaller.callSeat({
+              seat: reviewer.seat,
               callSiteKey,
-              questionLine: run.questionLine,
-              statement: authoredNode.statement,
-              authorMaker: authoredNode.maker,
-              providerRef: reviewer.providerRef,
-              contractHash: this.settings.judgeContractHash,
-              bound: { ...this.settings.judgeBound, maxAttempts },
-              // S3-1: this ONE call measures every edge the node sources.
-              edges: authoredNode.sourcedEdges
+              eligible: reviewer.plan.eligible,
+              call: (member, memberCallSiteKey) => member.judge.review({
+                runId: run.runId,
+                subjectItemId: claimed.workItemId,
+                callSiteKey: memberCallSiteKey,
+                questionLine: run.questionLine,
+                statement: authoredNode.statement,
+                authorMaker: authoredNode.maker,
+                providerRef: member.providerRef,
+                contractHash: this.settings.judgeContractHash,
+                bound: { ...this.settings.judgeBound, maxAttempts },
+                // S3-1: this ONE call measures every edge the node sources.
+                edges: authoredNode.sourcedEdges
+              })
             })
           });
           if (reviewAttempt.kind === "HALTED") {
             hiddenReviewRecords.push({ nodeId: authoredNode.nodeId, record: reviewAttempt.record });
             continue;
           }
-          const review = reviewAttempt.value;
+          const review = reviewAttempt.value.value;
           // T5 / S3-1 + codex r2 B1: the review and the magnitudes it already
           // returned are ONE fact, committed in ONE transaction. Writing the
           // review alone is irreversible and would remove this node from every
@@ -3731,7 +4217,8 @@ export class WalkingSkeletonRunner {
           // can never name an outcome the ledger does not hold.
           if (review.outcome === "cannot-assess") {
             unassessedReviewRecords.push({
-              nodeId: authoredNode.nodeId, callSiteKey, outcome: review.outcome
+              // A15: the key the ledger holds for this review, seat marker included.
+              nodeId: authoredNode.nodeId, callSiteKey: reviewAttempt.value.callSiteKey, outcome: review.outcome
             });
           }
         } catch (error) {
@@ -3874,6 +4361,10 @@ export class WalkingSkeletonRunner {
       try {
       authored = await authorPosition({
         authorIndex: leg.authorIndex,
+        // A15 (R5): the legs come from the SUPPORT_ATTACK seats, rotating as
+        // today — `(rootIndex + round) % seatCount`, which on the legacy book
+        // (one seat per debater) is exactly `leg.authorIndex`.
+        seat: seatBook.supportAttack[(leg.rootIndex + leg.round) % seatBook.supportAttack.length]!,
         // DL4-F4, the leg that carried the injection: `parent.statement` is the
         // PREVIOUS model's output. It is material, it gets its own fenced
         // field, and the directive it used to be glued to is code's.
@@ -3921,6 +4412,36 @@ export class WalkingSkeletonRunner {
     // per other maker root. Each real response node defends its own root and
     // attacks its named target; both S07 edges carry UNKNOWN magnitude until
     // independently judged.
+    //
+    // A15 (R5; controller carries 2 and 11): a cross-exchange defends a root, so
+    // it is written by the SAME member that ACTUALLY wrote that root — main or
+    // runner-up, this pass's answer or the one the ledger restored — never by
+    // the POSITION seat's main by default. The CROSS_EXCHANGE seats mirror the
+    // claimed POSITION seats (A15b), so that member is already the right
+    // candidate. A cross-exchange has no backup of its own (DR-184-v5: one key,
+    // `judge + final`), so a site the ledger already holds under one marker
+    // keeps that key on every later pass; the row's actor and candidate still
+    // name the member that answered. That differs from the writer's own slot
+    // only when a claim re-probe seated the root differently (carry 3's class).
+    const crossExchangeSeatFor = (exchange: CrossRootExchangeLeg): RunSeat => {
+      const rootIndex = exchange.authorRootIndex;
+      const siteKey = `JUDGE:cross-root:${exchange.authorRootIndex}->${exchange.targetRootIndex}`;
+      const positionSeat = seatBook.position[rootIndex]!;
+      const writer = positionAnswerers.get(rootIndex);
+      if (writer === undefined) {
+        throw new TypedDomainError("DEBATE_ROOT_MISSING", `Cross-exchange ${siteKey} has no written root ${String(rootIndex)}`);
+      }
+      const recorded = recordedSlotBySite.get(siteKey);
+      return Object.freeze({
+        role: "CROSS_EXCHANGE" as const,
+        seatIndex: rootIndex,
+        pinnedSeatIndex: positionSeat.pinnedSeatIndex,
+        main: recorded === undefined || recorded === writer.pinnedAs ? writer : Object.freeze({ ...writer, pinnedAs: recorded }),
+        runnerUp: null,
+        diversityShare: 0,
+        pinned: null
+      });
+    };
     for (const exchange of buildCrossRootExchangePlan(effectiveMakerCount)) {
       // C1: same rule as the expansion loop above.
       if (runBodyBudgetStop !== null) break;
@@ -3933,6 +4454,7 @@ export class WalkingSkeletonRunner {
       try {
       authored = await authorPosition({
         authorIndex: exchange.authorIndex,
+        seat: crossExchangeSeatFor(exchange),
         leg: {
           kind: "cross-root",
           ownPosition: authorRoot.statement,
@@ -4412,7 +4934,7 @@ export class WalkingSkeletonRunner {
     const resolveSynthesisRoleMaker = (
       roleRef: string,
       role: SynthesisRoleName
-    ): { readonly provider: ProviderGateway; readonly providerRef: string } => {
+    ): ConfiguredSeatMaker => {
       // codex r1 B1: this looked the ref up in `this.#configuredMakers` — the
       // UNFILTERED set — so a role provider that claim-time probing had already
       // found absent was still called here. It resolves against the
@@ -4426,7 +4948,7 @@ export class WalkingSkeletonRunner {
           `${role} role ref ${roleRef} (register version ${String(synthesisRoles.registerVersion)}) is not among the claim-eligible providers`
         );
       }
-      return { provider: configured.provider, providerRef: configured.providerRef };
+      return configured;
     };
     const strengthByNodeId = new Map(propagation.strengths.map((row) => [row.nodeId, row.strength] as const));
     const makerPositionNodeIds = new Set(authoredMakerPositions.map((root) => root.nodeId));
@@ -4682,9 +5204,18 @@ export class WalkingSkeletonRunner {
       }),
       // J8: the role refs and the loop bound are SEALED rows. Nothing here
       // defaults, derives or re-declares them.
+      // A15: an assigned run names the members its seat caller will call first
+      // (A16's 80-20 ordinal chooses between main and runner-up); the loop bound
+      // stays the sealed row's.
       synthesisRoleControls: Object.freeze({
-        synthesizerRoleRef: synthesisRoles.synthesizerRoleRef,
-        evaluatorRoleRef: synthesisRoles.evaluatorRoleRef,
+        synthesizerRoleRef: seatBook.answerWriter === null
+          ? synthesisRoles.synthesizerRoleRef
+          : seatCaller.plan(seatBook.answerWriter, "COMPOSER:SYNTHESIZER", { ordinal: synthesisOrdinal })?.providerRef
+            ?? seatBook.answerWriter.main.providerRef,
+        evaluatorRoleRef: seatBook.answerChecker === null
+          ? synthesisRoles.evaluatorRoleRef
+          : seatCaller.plan(seatBook.answerChecker, "POST_COMPOSE_R9:EVALUATOR", { ordinal: synthesisOrdinal })?.providerRef
+            ?? seatBook.answerChecker.main.providerRef,
         evaluatorLoopMaxRounds: synthesisRoles.evaluatorLoopMaxRounds
       })
     }, {
@@ -4696,8 +5227,11 @@ export class WalkingSkeletonRunner {
        * VERBATIM — the loop converges by feedback, never by accident.
        */
       synthesize: async (request: SynthesizerRequest) => {
-        const role = resolveSynthesisRoleMaker(request.roleRef, "SYNTHESIZER");
-        const synthesizerCallSiteKey = synthesisCallSiteKey({
+        // A15: an assigned run's ANSWER_WRITER seat; otherwise the sealed ref,
+        // resolved against the claim-eligible set exactly as before (J8/J24).
+        const writerSeat = seatBook.answerWriter
+          ?? legacySynthesisSeat("ANSWER_WRITER", resolveSynthesisRoleMaker(request.roleRef, "SYNTHESIZER"));
+        const writerSiteKey = synthesisCallSiteKey({
           role: "SYNTHESIZER", stage: request.stage, round: request.round
         });
         // DL4-F4 / L4-F11: the packet used to be a bare instruction plus one
@@ -4709,32 +5243,42 @@ export class WalkingSkeletonRunner {
           material: toSynthesisPromptMaterial(request)
         });
         const packet = framed.packet;
-        const response = await callSynthesisRole(role.provider, {
-          runId: run.runId,
-          subjectItemId: claimed.workItemId,
-          // CALL SITE vs ROLE. The `role` is the T9 identity making the call;
-          // the call-site KEY names the SLOT in the serve chain, and
-          // `core.read_terminal_recorded_facts` (migrations/0049) counts
-          // `COMPOSER:%` into `composer_calls`, which five battery-row
-          // PREDICATES read as `>= 1`. T9 moved WHO calls and WHAT is asked,
-          // not where the slot is, so the prefix stays and the role is named
-          // inside it. Renaming the slots needs a migration that redefines
-          // that function — filed as a follow-up, not smuggled in here.
-          callSiteKey: synthesizerCallSiteKey,
-          role: "SYNTHESIZER",
-          lane: "served",
-          modelRole: "ANSWER_WRITER",
-          // W10/3: the SYNTHESIZER's own sealed bound. It used to be
-          // `composerBound` — an organ T9 retired — which is how the longest
-          // generation in the system ended up with a 60-second clock while the
-          // judge, answering about ONE node, had 180.
-          bound: this.settings.synthesisRolePolicy.synthesizerBound,
-          contractHash: this.settings.composerContractHash,
-          providerRef: role.providerRef,
-          packet,
-          classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
-          buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
-        }, "COMPOSITION_CONTRACT_ERROR");
+        const answered = await callSynthesisRole(() => seatCaller.callSeat({
+          seat: writerSeat,
+          callSiteKey: writerSiteKey,
+          ordinal: synthesisOrdinal,
+          call: (member, callSiteKey) => member.provider.call({
+            runId: run.runId,
+            subjectItemId: claimed.workItemId,
+            // CALL SITE vs ROLE. The `role` is the T9 identity making the call;
+            // the call-site KEY names the SLOT in the serve chain, and
+            // `core.read_terminal_recorded_facts` (migrations/0049) counts
+            // `COMPOSER:%` into `composer_calls`, which five battery-row
+            // PREDICATES read as `>= 1`. T9 moved WHO calls and WHAT is asked,
+            // not where the slot is, so the prefix stays and the role is named
+            // inside it. Renaming the slots needs a migration that redefines
+            // that function — filed as a follow-up, not smuggled in here.
+            // A15: an assigned run appends the seat marker; the prefix stays.
+            callSiteKey,
+            role: "SYNTHESIZER",
+            lane: "served",
+            modelRole: "ANSWER_WRITER",
+            // W10/3: the SYNTHESIZER's own sealed bound. It used to be
+            // `composerBound` — an organ T9 retired — which is how the longest
+            // generation in the system ended up with a 60-second clock while the
+            // judge, answering about ONE node, had 180.
+            bound: this.settings.synthesisRolePolicy.synthesizerBound,
+            contractHash: this.settings.composerContractHash,
+            providerRef: member.providerRef,
+            packet,
+            classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
+            buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
+          })
+        }), { role: "SYNTHESIZER", callSiteKey: writerSiteKey }, "COMPOSITION_CONTRACT_ERROR");
+        const response = answered.value;
+        // codex r3 B2: the key the call was RECORDED under, seat marker included;
+        // persistence binds this round's reference to exactly that ledger row.
+        const synthesizerCallSiteKey = answered.callSiteKey;
         const parsed = parseComposerOutput(response.content);
         const composedSegments = parsed.segments.map((segment) => {
           if (segment.segment_id === "memory:disclosure") {
@@ -4784,32 +5328,40 @@ export class WalkingSkeletonRunner {
        * whole candidate can weigh them against each other.
        */
       evaluate: async (request: EvaluatorRequest) => {
-        const role = resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR");
-        const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
+        const checkerSeat = seatBook.answerChecker
+          ?? legacySynthesisSeat("ANSWER_CHECKER", resolveSynthesisRoleMaker(request.roleRef, "EVALUATOR"));
+        const checkerSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
         const framed = buildFramedPrompt({
           contract: EVALUATOR_PROMPT_CONTRACT,
           material: toSynthesisPromptMaterial(request)
         });
         const packet = framed.packet;
-        const response = await callSynthesisRole(role.provider, {
-          runId: run.runId,
-          subjectItemId: claimed.workItemId,
-          // Same contract as the synthesizer's key above: `POST_COMPOSE_R9:%`
-          // feeds `r9_calls`, which the R9 battery row prints in its executed
-          // check ref. The evaluator IS the restatement check now, so the slot
-          // is still occupied and the ref still names something that happened.
-          callSiteKey: evaluatorCallSiteKey,
-          role: "EVALUATOR",
-          lane: "served",
-          modelRole: "ANSWER_CHECKER",
-          // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
-          bound: this.settings.synthesisRolePolicy.evaluatorBound,
-          contractHash: this.settings.conformanceContractHash,
-          providerRef: role.providerRef,
-          packet,
-          classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
-          buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
-        }, "EVALUATOR_CONTRACT_ERROR");
+        const answered = await callSynthesisRole(() => seatCaller.callSeat({
+          seat: checkerSeat,
+          callSiteKey: checkerSiteKey,
+          ordinal: synthesisOrdinal,
+          call: (member, callSiteKey) => member.provider.call({
+            runId: run.runId,
+            subjectItemId: claimed.workItemId,
+            // Same contract as the synthesizer's key above: `POST_COMPOSE_R9:%`
+            // feeds `r9_calls`, which the R9 battery row prints in its executed
+            // check ref. The evaluator IS the restatement check now, so the slot
+            // is still occupied and the ref still names something that happened.
+            callSiteKey,
+            role: "EVALUATOR",
+            lane: "served",
+            modelRole: "ANSWER_CHECKER",
+            // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
+            bound: this.settings.synthesisRolePolicy.evaluatorBound,
+            contractHash: this.settings.conformanceContractHash,
+            providerRef: member.providerRef,
+            packet,
+            classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
+            buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
+          })
+        }), { role: "EVALUATOR", callSiteKey: checkerSiteKey }, "EVALUATOR_CONTRACT_ERROR");
+        const response = answered.value;
+        const evaluatorCallSiteKey = answered.callSiteKey;
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
         const parsed = parseContent(response.content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
         return Object.freeze({
@@ -5491,6 +6043,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_OWNER_RAW_ID_FORBIDDEN",
   "RUN_OWNER_REF_INVALID",
   "RUN_PRINCIPAL_SESSION_MISMATCH",
+  "RUN_ROLE_ASSIGNMENT_INVALID",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",

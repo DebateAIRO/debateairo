@@ -593,6 +593,31 @@ export class LedgerRepository {
     };
   }
 
+  /**
+   * Model scorecard A15 — the seat-marked MODEL_CALL rows of one work item
+   * (`…:seat:main` / `…:seat:runnerUp`, A15a), in ledger order. A RESUMED pass
+   * re-authors every site, so it reads what earlier passes recorded here to
+   * seat each root and each cross-exchange exactly as they were seated: who
+   * answered a root, and which marker a cross-exchange site already holds
+   * (controller ruling A14 — DR-184-v5 is exact only if both hold across
+   * restarts). A run without a pinned assignment records no such key.
+   */
+  async readSeatMarkedModelCalls(input: {
+    readonly runId: string;
+    readonly workItemId: string;
+    readonly contractHash: string;
+  }): Promise<readonly { readonly callSiteKey: string; readonly outcome: "OK" | "FAILED" | "TIMED_OUT" }[]> {
+    const result = await this.pool.query<{ call_site_key: string; outcome: "OK" | "FAILED" | "TIMED_OUT" }>(
+      `SELECT call_site_key, outcome FROM ledger.ledger_entry
+       WHERE run_id = $1 AND subject_item_id = $2
+         AND action_kind = 'MODEL_CALL' AND contract_hash = $3
+         AND (call_site_key LIKE '%:seat:main' OR call_site_key LIKE '%:seat:runnerUp')
+       ORDER BY sequence`,
+      [input.runId, input.workItemId, input.contractHash]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({ callSiteKey: row.call_site_key, outcome: row.outcome })));
+  }
+
   async countModelAttempts(input: {
     readonly runId: string | null;
     readonly workItemId: string;

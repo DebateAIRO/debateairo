@@ -168,6 +168,14 @@ export function roleAssignmentSeatProblem(assignment: RoleAssignment): string | 
 export interface AssignedRunSeatBook {
   readonly book: RunSeatBook;
   readonly claimSwitches: readonly BackupSwitchRecord[];
+  /**
+   * A15d (controller carry 12): the multi-seat roles left with no claim-eligible
+   * pinned seat, now sat by the DEBATERS — POSITION runner-ups and shares
+   * included. No such role changes who answers until A16 lets a runner-up
+   * answer; from then on A16's disclosure (BACKUP-MODEL-USED / degraded
+   * diversity) owes the reader these roles, so the book names them.
+   */
+  readonly fallbackRoles: readonly ("SUPPORT_ATTACK" | "JUDGE" | "REVIEWER")[];
   readonly droppedPositionSeats: readonly { readonly candidate: SeatCandidate; readonly failureCode: string }[];
   readonly unavailableSynthesis: readonly {
     readonly role: "ANSWER_WRITER" | "ANSWER_CHECKER";
@@ -273,6 +281,7 @@ export function buildAssignedRunSeatBook(input: {
       droppedPositionSeats.push(Object.freeze({ candidate: pinned.main, failureCode: resolved.failureCode }));
     }
   }
+  const fallbackRoles: ("SUPPORT_ATTACK" | "JUDGE" | "REVIEWER")[] = [];
   const multiSeat = (role: "SUPPORT_ATTACK" | "JUDGE" | "REVIEWER"): readonly RunSeat[] => {
     const seats: RunSeat[] = [];
     for (const pinned of seatsOf(assignment, role)) {
@@ -283,6 +292,7 @@ export function buildAssignedRunSeatBook(input: {
     // debaters sit in it (spec §2.4, "a role the scorecard does not cover
     // falls back to today's").
     if (seats.length > 0) return Object.freeze(seats);
+    fallbackRoles.push(role);
     return Object.freeze(position.map((debater) => Object.freeze({ ...debater, role })));
   };
   // A15b fix round 1 (M3): a cross-exchange defends a root, so it is written by
@@ -330,6 +340,7 @@ export function buildAssignedRunSeatBook(input: {
   return Object.freeze({
     book,
     claimSwitches: Object.freeze(claimSwitches),
+    fallbackRoles: Object.freeze(fallbackRoles),
     droppedPositionSeats: Object.freeze(droppedPositionSeats),
     unavailableSynthesis: Object.freeze(unavailableSynthesis)
   });
