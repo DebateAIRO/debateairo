@@ -279,12 +279,26 @@ function selectEmphasis(
  *    never a position, the node id breaking a tie), each with its chain up to
  *    its position; the rest become `omittedPoints` counts. The decisive set
  *    shrinks through `spineDecisiveCounts` (the first is the story's 20) before
- *    the digest is declared impossible. Three more kinds of node stay to the
+ *    the digest is declared impossible. The spine's refs are numbered
+ *    contiguously, `n1` to `nK` over its own members (review fix M-3), so no
+ *    gap invites a citation of a point it left out. Three more kinds of node stay to the
  *    last step, as the positions and their direct children do: the served root,
  *    the emphasised objections (S6-2 says they are members, and the synthesizer
  *    is told to stress them), each with its chain, and a node with no relation
  *    at all, which has no position to be counted under (the story keeps those
  *    too).
+ *
+ * THE SPINE USES ITS ROOM (review fix I-2). The first spine that fits is
+ * built at the tightest summary, which is about four words. After it, and at
+ * the spine rung ONLY, the builder walks `spineWidenings` in order — more
+ * points, then longer summaries, alternately — and serves the LAST step that
+ * still fits. Sizes only grow along the walk (each step keeps every member and
+ * every summary character of the one before), so the walk stops at the first
+ * step over budget. When the spine that fit keeps fewer decisive points than
+ * the walk's first step, the walk first widens that spine's own summaries to
+ * the first step's cap (`(K, 60)` for the K that fit), so a tight budget gets
+ * longer summaries before it could ever afford more points. `decisiveCount`
+ * null is every ranked point; `summaryCap` null is the statement verbatim.
  *
  * Both rungs keep the compressed mark the summary levels ride on; no new mark
  * exists, so the sealed chain's `.marks` pass-through is unchanged. The disclosure
@@ -293,13 +307,28 @@ function selectEmphasis(
 export const DIGEST_LADDER = Object.freeze({
   compactRung: DIGEST_COMPRESSION_LEVELS.length,
   spineRung: DIGEST_COMPRESSION_LEVELS.length + 1,
-  spineDecisiveCounts: Object.freeze([20, 10, 5, 0]) as readonly number[]
+  spineDecisiveCounts: Object.freeze([20, 10, 5, 0]) as readonly number[],
+  spineWidenings: Object.freeze([
+    Object.freeze({ decisiveCount: 20, summaryCap: 60 }),
+    Object.freeze({ decisiveCount: 30, summaryCap: 60 }),
+    Object.freeze({ decisiveCount: 30, summaryCap: 120 }),
+    Object.freeze({ decisiveCount: 40, summaryCap: 120 }),
+    Object.freeze({ decisiveCount: 60, summaryCap: 120 }),
+    Object.freeze({ decisiveCount: 60, summaryCap: 240 }),
+    Object.freeze({ decisiveCount: 80, summaryCap: 240 }),
+    Object.freeze({ decisiveCount: 80, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 120, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: null, summaryCap: null })
+  ]) as readonly Readonly<{ decisiveCount: number | null; summaryCap: number | null }>[]
 });
 
 /** What the ladder tried at one rung, in order; the builder serves the first that fits. */
 export interface SynthesisDigestAttempt {
   readonly digest: SynthesisDigest;
-  /** At the spine rung, how many most-decisive points this spine keeps; null below it. */
+  /**
+   * At the spine rung, how many most-decisive points this spine keeps (every
+   * ranked point's count for a widening step with no limit); null below it.
+   */
   readonly spineDecisiveCount: number | null;
 }
 
@@ -508,14 +537,16 @@ function compactAt(input: {
   /** The spine's members, or null for the compact rung's every node. */
   readonly members: ReadonlySet<string> | null;
   readonly rung: number;
+  /** The summary cap: the tightest level's, or a spine widening's (null: verbatim). */
+  readonly cap: number | null;
 }): SynthesisDigest {
-  const cap = DIGEST_COMPRESSION_LEVELS.at(-1) ?? null;
-  const { tree, members } = input;
+  const { tree, members, cap } = input;
   const isMember = (nodeId: string): boolean => members === null ? tree.refOf.has(nodeId) : members.has(nodeId);
+  // Contiguous refs over this digest's own members, in the tree's order: the
+  // compact rung's are the tree's refs; the spine's leave no gap (M-3).
   const refOf = new Map<string, string>();
   for (const node of tree.nodesInRefOrder) {
-    const ref = tree.refOf.get(node.nodeId);
-    if (ref !== undefined && isMember(node.nodeId)) refOf.set(node.nodeId, ref);
+    if (isMember(node.nodeId)) refOf.set(node.nodeId, `n${String(refOf.size + 1)}`);
   }
   const ref = (nodeId: string): string => refOf.get(nodeId) ?? nodeId;
   const kept = tree.nodesInRefOrder.filter((node) => refOf.has(node.nodeId));
@@ -577,6 +608,38 @@ function assertDigestSource(input: {
   }
 }
 
+/** What every spine of one debate is built from, computed once per ladder. */
+interface DigestSpineSource {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly tree: DigestTree;
+  readonly emphasis: DigestEmphasis;
+  readonly byLeverage: readonly string[];
+  readonly keptToTheEnd: readonly string[];
+}
+
+function digestSpineSourceOf(input: {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+}, emphasis: DigestEmphasis): DigestSpineSource {
+  return {
+    nodes: input.nodes,
+    tree: digestTreeOf(input.nodes),
+    emphasis,
+    byLeverage: digestPointsByLeverage(input.nodes),
+    keptToTheEnd: [input.servedRootNodeId, ...emphasis.topSurvivingObjectionNodeIds]
+  };
+}
+
+function spineMembersOf(source: DigestSpineSource, decisiveCount: number): ReadonlySet<string> {
+  return digestSpineOf({
+    nodes: source.nodes,
+    tree: source.tree,
+    byLeverage: source.byLeverage,
+    decisiveCount,
+    keptToTheEnd: source.keptToTheEnd
+  });
+}
+
 function* digestLadderFrom(input: {
   readonly nodes: readonly DigestSourceNode[];
   readonly servedRootNodeId: string;
@@ -585,22 +648,49 @@ function* digestLadderFrom(input: {
   for (let level = 0; level < DIGEST_COMPRESSION_LEVELS.length; level += 1) {
     yield Object.freeze({ digest: compressAt(input.nodes, emphasis, level), spineDecisiveCount: null });
   }
-  const tree = digestTreeOf(input.nodes);
+  const tightest = DIGEST_COMPRESSION_LEVELS.at(-1) ?? null;
+  const source = digestSpineSourceOf(input, emphasis);
   yield Object.freeze({
-    digest: compactAt({ tree, emphasis, members: null, rung: DIGEST_LADDER.compactRung }),
+    digest: compactAt({ tree: source.tree, emphasis, members: null, rung: DIGEST_LADDER.compactRung, cap: tightest }),
     spineDecisiveCount: null
   });
-  const byLeverage = digestPointsByLeverage(input.nodes);
-  const keptToTheEnd = [input.servedRootNodeId, ...emphasis.topSurvivingObjectionNodeIds];
   let previous: ReadonlySet<string> | null = null;
   for (const decisiveCount of DIGEST_LADDER.spineDecisiveCounts) {
-    const members = digestSpineOf({ nodes: input.nodes, tree, byLeverage, decisiveCount, keptToTheEnd });
+    const members = spineMembersOf(source, decisiveCount);
     // A spine that leaves nothing out is the compact rung again, and a spine no
     // smaller than the step before it is that step again: neither is tried.
     if (members.size === input.nodes.length || (previous !== null && sameMembers(previous, members))) continue;
     previous = members;
     yield Object.freeze({
-      digest: compactAt({ tree, emphasis, members, rung: DIGEST_LADDER.spineRung }),
+      digest: compactAt({ tree: source.tree, emphasis, members, rung: DIGEST_LADDER.spineRung, cap: tightest }),
+      spineDecisiveCount: decisiveCount
+    });
+  }
+}
+
+function* digestSpineWideningsFrom(
+  input: { readonly nodes: readonly DigestSourceNode[]; readonly servedRootNodeId: string },
+  fitted: SynthesisDigestAttempt
+): Generator<SynthesisDigestAttempt, void, undefined> {
+  const source = digestSpineSourceOf(input, selectEmphasis(input.nodes, input.servedRootNodeId));
+  const fittedCount = fitted.spineDecisiveCount ?? 0;
+  const [first] = DIGEST_LADDER.spineWidenings;
+  const walk = first !== undefined && first.decisiveCount !== null && fittedCount < first.decisiveCount
+    ? [{ decisiveCount: fittedCount, summaryCap: first.summaryCap }, ...DIGEST_LADDER.spineWidenings]
+    : DIGEST_LADDER.spineWidenings;
+  let previous: { readonly members: ReadonlySet<string>; readonly cap: number | null } = {
+    members: spineMembersOf(source, fittedCount),
+    cap: fitted.digest.summaryCharacterCap
+  };
+  for (const step of walk) {
+    const decisiveCount = step.decisiveCount ?? source.byLeverage.length;
+    const members = spineMembersOf(source, decisiveCount);
+    // Never a spine that leaves nothing out, and never the step before again.
+    if (members.size === input.nodes.length) break;
+    if (sameMembers(previous.members, members) && previous.cap === step.summaryCap) continue;
+    previous = { members, cap: step.summaryCap };
+    yield Object.freeze({
+      digest: compactAt({ tree: source.tree, emphasis: source.emphasis, members, rung: DIGEST_LADDER.spineRung, cap: step.summaryCap }),
       spineDecisiveCount: decisiveCount
     });
   }
@@ -618,6 +708,20 @@ export function synthesisDigestLadder(input: {
 }): Iterable<SynthesisDigestAttempt> {
   assertDigestSource(input);
   return digestLadderFrom(input);
+}
+
+/**
+ * The spine widenings walked after `fitted`, the first spine that fit (review
+ * fix I-2; see `DIGEST_LADDER`), in order and built lazily. The builder serves
+ * the last one that fits and stops at the first that does not. Empty for an
+ * attempt below the spine rung: only the spine is ever widened.
+ */
+export function synthesisDigestSpineWidenings(input: {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+}, fitted: SynthesisDigestAttempt): Iterable<SynthesisDigestAttempt> {
+  assertDigestSource(input);
+  return fitted.digest.compressionLevel === DIGEST_LADDER.spineRung ? digestSpineWideningsFrom(input, fitted) : [];
 }
 
 /**
@@ -644,10 +748,16 @@ export function buildSynthesisDigest(input: {
   for (const attempt of ladder) {
     lastTried = attempt.digest.byteSize;
     if (attempt.digest.byteSize <= input.budgetBound) {
+      // I-2: a spine that fits then uses its room — the last widening that fits.
+      let served = attempt.digest;
+      for (const widened of synthesisDigestSpineWidenings(input, attempt)) {
+        if (widened.digest.byteSize > input.budgetBound) break;
+        served = widened.digest;
+      }
       return Object.freeze({
         kind: "DIGEST" as const,
-        digest: attempt.digest,
-        marks: Object.freeze(attempt.digest.compressionLevel === 0 ? [] : [DIGEST_COMPRESSED_MARK])
+        digest: served,
+        marks: Object.freeze(served.compressionLevel === 0 ? [] : [DIGEST_COMPRESSED_MARK])
       });
     }
   }
@@ -672,6 +782,31 @@ export function resolveDigestNodeRef(digest: SynthesisDigest, ref: string): stri
   const table = DIGEST_REF_TABLES.get(digest);
   if (table !== undefined) return table.nodeIdOf.get(ref) ?? null;
   return digest.nodes.some((entry) => entry.nodeId === ref) ? ref : null;
+}
+
+/** A whole-token short ref: `n`, then a number from 1, with no letter, digit or underscore on either side. */
+const DIGEST_SHORT_REF_TOKEN = /(?<![\p{L}\p{N}_])n[1-9][0-9]*(?![\p{L}\p{N}_])/gu;
+/** A node id as the engine mints them: a UUID, in either case. */
+const UUID_SHAPED_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
+
+/**
+ * REVIEW FIX I-1 (the owner's rule: no internals in the answer). Every internal
+ * node name a text states: each short ref THIS digest carries, as a whole token
+ * (`(n12)`, `n3.`), and any UUID-shaped id at any rung. Ordinary text is left
+ * alone: `n12` when the digest has no `n12`, `N1 highway`, `n-type`. The
+ * runner's writer classifier refuses a draft whose prose names one, so the
+ * provider's own repair re-asks; nothing ever rewrites the model's words.
+ */
+export function nodeIdsNamedInText(digest: SynthesisDigest, text: string): readonly string[] {
+  const named: string[] = [];
+  const table = DIGEST_REF_TABLES.get(digest);
+  if (table !== undefined) {
+    for (const match of text.matchAll(DIGEST_SHORT_REF_TOKEN)) {
+      if (table.nodeIdOf.has(match[0])) named.push(match[0]);
+    }
+  }
+  for (const match of text.matchAll(UUID_SHAPED_ID)) named.push(match[0]);
+  return Object.freeze(named);
 }
 
 /** The ref this digest shows a node by (its id at rungs 0-5), or null when the digest does not carry it. */

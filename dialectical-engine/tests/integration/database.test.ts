@@ -4965,8 +4965,8 @@ describe("apps/runner — legal command lifecycle", () => {
         material: material.fields.map((field) => field.content).join("\n")
       };
     };
-    const compositionCiting = (ref: string): string => JSON.stringify({ segments: [
-      { segment_id: "segment:verdict", text: "A compact answer.", node_refs: [ref], served_number_refs: ["number:final-strength"] },
+    const compositionCiting = (ref: string, text = "A compact answer."): string => JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text, node_refs: [ref], served_number_refs: ["number:final-strength"] },
       { segment_id: "segment:research", text: "Measure it before relying on it.", node_refs: [], served_number_refs: [] }
     ] });
 
@@ -4992,11 +4992,19 @@ describe("apps/runner — legal command lifecycle", () => {
       compactBound = smallest.byteSizeAtMaxCompression;
     } finally { await calibration.stop(); }
 
-    const provider = await startProviderDouble([judge, compositionCiting("n1"), evaluatorSatisfied()]);
+    // Review fix I-1: the writer's first draft names the node in its prose; the
+    // classifier refuses it and the provider's repair re-asks the same call.
+    const provider = await startProviderDouble([
+      judge, compositionCiting("n1", "A compact answer (n1)."), compositionCiting("n1"), evaluatorSatisfied()
+    ]);
     const settings = runnerSettings();
     const servePolicy = settings.servePolicy!;
     const compactSettings: WalkingSkeletonSettings = {
       ...settings,
+      synthesisRolePolicy: {
+        ...settings.synthesisRolePolicy,
+        synthesizerBound: { ...settings.synthesisRolePolicy.synthesizerBound, maxAttempts: 2 }
+      },
       servePolicy: {
         ...servePolicy,
         compositionBudgets: { ...servePolicy.compositionBudgets, low: { ...servePolicy.compositionBudgets.low, bound: compactBound } }
@@ -5021,7 +5029,17 @@ describe("apps/runner — legal command lifecycle", () => {
       expect(SERVED_TERMINALS).toContain(projection?.terminal);
       expect(projection?.condition_marks).toContain("DIGEST-COMPRESSED");
       expect(projection?.band_ceiling).toMatchObject({ basis: { LOOKED_UP: 0, RAN: 0, REASONING: 1 } });
-      expect(provider.calls()).toBe(3);
+      // I-1: two writer attempts on the wire — the second is the repair turn,
+      // naming what to fix and where — and the served prose is the model's own
+      // clean words, never an edited copy of the first draft.
+      const writerAttempts = provider.bodies().map((body) => readFramedMaterial(wirePacket(body)))
+        .filter((material) => material.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId);
+      expect(writerAttempts).toHaveLength(2);
+      expect(framedField(writerAttempts[1]!, "machine_rejection_code")).toBe("COMPOSED_TEXT_NAMES_A_NODE");
+      expect(framedField(writerAttempts[1]!, "machine_rejection_path")).toBe("segments.0.text");
+      expect(projection?.composed_text.map((segment) => segment.text)).toContain("A compact answer.");
+      expect(JSON.stringify(projection?.composed_text)).not.toContain("(n1)");
+      expect(provider.calls()).toBe(4);
 
       expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
         runId: work.runId,
@@ -5599,6 +5617,18 @@ const m3RoundTwoComposition = JSON.stringify({ segments: [
   { segment_id: "segment:research", text: "Check a second independent source.", node_refs: [], served_number_refs: [] }
 ] });
 
+/** Task M4 review fix I-1: a writer draft with the given prose and citations. */
+const m4Composition = (text: string, nodeRefs: readonly string[] = ["primary"]): string => JSON.stringify({ segments: [
+  { segment_id: "segment:verdict", text, node_refs: nodeRefs, served_number_refs: ["number:final-strength"] },
+  { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
+] });
+
+/** The writer's attempt bound raised so its repair can re-ask (the fixture's sealed bound allows one attempt). */
+function m4WriterAttempts(maxAttempts: number): Partial<WalkingSkeletonSettings> {
+  const policy = runnerSettings().synthesisRolePolicy;
+  return { synthesisRolePolicy: { ...policy, synthesizerBound: { ...policy.synthesizerBound, maxAttempts } } };
+}
+
 /** A full two-maker debate at depth 1, every review agreeing (T6's C-5 shape). */
 function fullDebate(label: string): Readonly<{ judgements: readonly string[]; reviews: readonly string[] }> {
   return Object.freeze({
@@ -6022,6 +6052,91 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF, writerFallback: false, checkerFallback: false,
       serveStop: "TRANSPORT_DEATH"
     });
+  });
+
+  /**
+   * Task M4 review fix I-1 — THE WRITER'S CITATIONS, CHECKED AS CONTENT. A
+   * draft whose prose names an internal id, or that cites a node the digest
+   * does not carry, is refused by the writer's classifier and re-asked by the
+   * provider's own repair on the SAME call. Before, the unknown ref ended the
+   * run FAILED and the leaked id reached the person.
+   */
+  it("re-asks a draft that names a UUID in its prose, then one citing an unknown node, and serves the clean third draft (Task M4 I-1)", async () => {
+    const debate = fullDebate("Primary M4 citation repair");
+    const secondaryDebate = fullDebate("Secondary M4 citation repair");
+    const scenario = await executeResil01Scenario({
+      label: "m4-citation-repair",
+      primary: [
+        ...debate.judgements, ...debate.reviews,
+        m4Composition("The judged position survives (00000000-0000-4000-8000-00000000abcd)."),
+        m4Composition("The judged position survives.", ["node:nowhere"]),
+        resil01Composition,
+        evaluatorSatisfied()
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: m4WriterAttempts(3)
+    });
+    expect(scenario.error).toBeNull();
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    expect(JSON.stringify(scenario.answer?.composed_text)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/u);
+    // One writer call, three attempts: the two refused drafts are on the ledger, the third served.
+    expect((await serveLedger(scenario.runId)).filter((entry) => entry.call_site_key.startsWith("COMPOSER:"))
+      .map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "OK"]);
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerIdOf(scenario), 1))
+      .toMatchObject({ serveStop: null, writerServedRef: PRIMARY_REF });
+  });
+
+  it("ends a first round that never stops naming an id components-only, never FAILED, and records NO_ARTIFACT (Task M4 I-1)", async () => {
+    const debate = fullDebate("Primary M4 citation exhausted round one");
+    const secondaryDebate = fullDebate("Secondary M4 citation exhausted round one");
+    const scenario = await executeResil01Scenario({
+      label: "m4-citation-exhausted-one",
+      primary: [
+        ...debate.judgements, ...debate.reviews,
+        m4Composition("The judged position survives (00000000-0000-4000-8000-00000000abcd)."),
+        m4Composition("The judged position survives, per 00000000-0000-4000-8000-00000000abcd.")
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: m4WriterAttempts(2)
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(scenario.answer?.composed_text).toEqual([]);
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(await servedRoundMakers(answerIdOf(scenario))).toEqual([]);
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerIdOf(scenario), 1)).toMatchObject({
+      writerServedRef: null, checkerServedRef: null, serveStop: "NO_ARTIFACT", ...WHOLE_DIGEST_NO_FLOOR
+    });
+  });
+
+  it("keeps round 1 when every round-2 draft names an id, and serves it with its objection (Task M4 I-1)", async () => {
+    const debate = fullDebate("Primary M4 citation exhausted round two");
+    const secondaryDebate = fullDebate("Secondary M4 citation exhausted round two");
+    const scenario = await executeResil01Scenario({
+      label: "m4-citation-exhausted-two",
+      primary: [
+        ...debate.judgements, ...debate.reviews,
+        resil01Composition, evaluatorObjecting("Round one overstates the margin."),
+        m4Composition("A rewrite citing 00000000-0000-4000-8000-00000000abcd."),
+        m4Composition("Another rewrite citing 00000000-0000-4000-8000-00000000abcd.")
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: m4WriterAttempts(2)
+    });
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    expect(scenario.answer?.condition_marks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(scenario.answer?.condition_marks).not.toContain("DEFECT");
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(answerId, 1))
+      .toMatchObject({ serveStop: "NO_ARTIFACT", writerServedRef: PRIMARY_REF });
   });
 
   it("keeps today's components-only outcome when round 1's checker cannot be paid by any maker, and still writes the row", async () => {

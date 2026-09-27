@@ -52,7 +52,20 @@ export interface ServeDisclosureRecord {
   readonly bodyStop: ServeDisclosureBodyStop | null;
   readonly pointsWithoutReview: number | null;
   readonly serveStop: ServeDisclosureServeStop | null;
+  /**
+   * The digest built for the answer-writer, SERVED OR NOT (Task M4): its ladder
+   * rung, 0-5 the summary levels, 6 the compact rung, 7 the spine. It is set
+   * whenever the writer was handed a digest — also when the writer's call was
+   * then refused and the answer ended components-only — and null when no digest
+   * existed (DIGEST-CANNOT-EXIST, or a terminal before the answer-writing step).
+   */
   readonly digestRung: number | null;
+  /**
+   * How many points that same digest left out: 0 below the spine rung. Like
+   * the rung, it describes the digest built for the writer, served or not; a
+   * reader who mentions left-out points only for a served answer applies that
+   * rule itself.
+   */
   readonly digestPointsOmitted: number | null;
   readonly floorVerdictState: ServeDisclosureFloorState | null;
   readonly floorLeadingNodeId: string | null;

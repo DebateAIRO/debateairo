@@ -108,6 +108,7 @@ import {
   digestLeverageByNodeId,
   digestPointsOmitted,
   keepsCompleteSynthesisRounds,
+  nodeIdsNamedInText,
   LABEL_BASIS_INCOMPLETE_MARK,
   PROTECTED_CORE_GUARD_RETIRED_MARK,
   resolveDigestNodeRef,
@@ -1751,12 +1752,115 @@ function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
 }
 
 /**
+ * ENGINE MONEY RULE, TASK M4 review fix I-1 — THE WRITER'S CITATIONS, CHECKED
+ * AS CONTENT. Two ways a draft can name the engine's internals, each refused by
+ * the writer's content classifier so the provider's own repair re-asks the
+ * SAME call (the model's words are never rewritten):
+ *
+ *  · `COMPOSED_TEXT_NAMES_A_NODE` — a segment's prose names a node the way the
+ *    digest does (`(n12)`) or by a UUID. The person reads the prose; the
+ *    engine's ids are not theirs to read (the owner's rule: no internals in
+ *    the answer). The checker reads only the prose and its objections return
+ *    word for word, so "cite the digest node" is exactly what invites this.
+ *  · `COMPOSED_REF_NOT_IN_DIGEST` — a `node_refs` entry the digest does not
+ *    carry: unknown, a real id where the digest showed short refs, or a point
+ *    the spine left out. It used to end the run FAILED; now it is re-asked.
+ *
+ * Each is reported the way the story's checks report theirs: `SCHEMA_FAILED`
+ * with a JSON array of issues whose `path` is the member's machine address and
+ * whose `message` is the code — never a byte the model wrote.
+ */
+export const COMPOSED_CITATION_REJECTIONS = Object.freeze([
+  "COMPOSED_TEXT_NAMES_A_NODE",
+  "COMPOSED_REF_NOT_IN_DIGEST"
+] as const);
+type ComposedCitationRejection = typeof COMPOSED_CITATION_REJECTIONS[number];
+
+interface ComposedCitationIssue {
+  readonly path: readonly (string | number)[];
+  readonly message: ComposedCitationRejection;
+}
+
+/** A node ref the writer may cite: `"primary"`, or a node the digest carries that is in the serve set. */
+function composedRefResolves(ref: string, citation: ComposedCitationContext): boolean {
+  if (ref === "primary") return true;
+  const nodeId = resolveDigestNodeRef(citation.digest, ref);
+  return nodeId !== null && citation.servedNodes.some((node) => node.nodeId === nodeId);
+}
+
+interface ComposedCitationContext {
+  readonly digest: SynthesisDigest;
+  readonly servedNodes: readonly Readonly<{ nodeId: string }>[];
+}
+
+/**
+ * The writer's content classifier: the composition schema first (unchanged),
+ * then every segment's prose and every cited ref (I-1). Deterministic, and it
+ * never throws on model content.
+ */
+export function classifyComposedContent(content: string, citation: ComposedCitationContext): ContentClassification {
+  const structured = classifyStructuredContent(content, compositionSchema);
+  if (structured.parseStatus !== "PARSED") return structured;
+  const composed = compositionSchema.parse(JSON.parse(content));
+  const issues: ComposedCitationIssue[] = [];
+  for (const [segmentIndex, segment] of composed.segments.entries()) {
+    if (nodeIdsNamedInText(citation.digest, segment.text).length > 0) {
+      issues.push({ path: ["segments", segmentIndex, "text"], message: "COMPOSED_TEXT_NAMES_A_NODE" });
+    }
+    for (const [refIndex, ref] of segment.node_refs.entries()) {
+      if (!composedRefResolves(ref, citation)) {
+        issues.push({ path: ["segments", segmentIndex, "node_refs", refIndex], message: "COMPOSED_REF_NOT_IN_DIGEST" });
+      }
+    }
+  }
+  return issues.length === 0
+    ? { parseStatus: "PARSED", parseError: null }
+    : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
+}
+
+/** The citation rejection a classifier error names first, or null for any other rejection. */
+export function composedCitationRejectionOf(parseError: string): ComposedCitationRejection | null {
+  try {
+    const issues = JSON.parse(parseError) as unknown;
+    const first = Array.isArray(issues) ? issues[0] as { readonly message?: unknown } | undefined : undefined;
+    const code = first?.message;
+    return typeof code === "string" && (COMPOSED_CITATION_REJECTIONS as readonly string[]).includes(code)
+      ? code as ComposedCitationRejection
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The writer's repair turn: the machine path of the rejected member, and — for
+ * a citation rejection — its own code (the engine's constant, which says what
+ * to fix) in place of the generic `SCHEMA_FAILED`. Anything else is the shared
+ * schema repair, unchanged.
+ */
+function buildComposedRepairPacket(framed: FramedPrompt, rejected: {
+  readonly parseStatus: string;
+  readonly parseError: string;
+}): PromptPacket {
+  const locator = schemaFailureLocator(rejected);
+  const citation = rejected.parseStatus === "SCHEMA_FAILED" ? composedCitationRejectionOf(rejected.parseError) : null;
+  return buildFramedRepairPrompt(framed, citation === null ? locator : { code: citation, path: locator.path });
+}
+
+/**
  * T9 (goal 263-266): a SYNTHESIZER or EVALUATOR call whose transport dies is
  * one of the four enumerated COMPONENTS_ONLY crash classes — a death, not a
  * quality judgement. It is typed HERE, at the seam, so the serve chain can name
  * the class without catching every error it sees. Content refusals keep their
  * existing organ code: a provider that answered with unusable content is a
  * contract error, not a dead transport.
+ *
+ * Task M4 review fix I-1: ONE content refusal is typed differently. A writer
+ * whose every repair still named an internal id in its prose, or cited a node
+ * the digest does not carry, has produced no draft the engine may serve: that
+ * is `SYNTHESIS_NO_ARTIFACT`, the sealed chain's own class. A later round then
+ * keeps the complete round before it (M3), and a first round ends
+ * components-only (which the M5 floor answers) — never a FAILED run.
  */
 async function callSynthesisRole(
   provider: ProviderGateway,
@@ -1767,6 +1871,15 @@ async function callSynthesisRole(
     return await provider.call(request);
   } catch (error) {
     if (error instanceof ProviderContentUnacceptedError) {
+      const citation = request.role === "SYNTHESIZER" && error.lastParseStatus === "SCHEMA_FAILED"
+        ? composedCitationRejectionOf(error.lastParseError)
+        : null;
+      if (citation !== null) {
+        throw new TypedDomainError(
+          "SYNTHESIS_NO_ARTIFACT",
+          `The synthesizer's last repair at ${request.callSiteKey} was still refused: ${citation}`
+        );
+      }
       throw new TypedDomainError(organFailureCode, error.lastParseError);
     }
     if (error instanceof ProviderCallFailedError) {
@@ -2040,8 +2153,11 @@ export function serveLoopStopOf(failure: unknown): ServeLoopStop | null {
  *    against the one-node serve set);
  *  · a ref the digest does not carry — an unknown ref, a real id where the
  *    digest showed short refs, or a point the spine left out, which is not in
- *    the digest and so cannot be cited — is refused exactly as an unknown node
- *    id always was: COMPOSITION_CONTRACT_ERROR, "Unknown composition node ref".
+ *    the digest and so cannot be cited — is refused before it gets here: the
+ *    writer's classifier (`classifyComposedContent`, review fix I-1) re-asks
+ *    the call, and a writer that never stops ends as SYNTHESIS_NO_ARTIFACT.
+ *    This refusal (COMPOSITION_CONTRACT_ERROR, "Unknown composition node
+ *    ref") stays as the backstop behind that check.
  */
 export function composedNodeIdOf(input: Readonly<{
   ref: string;
@@ -2058,9 +2174,11 @@ export function composedNodeIdOf(input: Readonly<{
 }
 
 /**
- * ENGINE MONEY RULE (spec §14.4.5), TASK M4 — the digest the answer-writer was
- * handed, for the owner's record: its ladder rung (0-7) and how many points it
- * left out (0 below the spine rung). Null when no digest was handed over — the
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M4 — the digest built for the
+ * answer-writer, SERVED OR NOT, for the owner's record: its ladder rung (0-7)
+ * and how many points it left out (0 below the spine rung). Set whenever the
+ * writer was handed a digest, including when its call was then refused and the
+ * answer ended components-only; null when no digest was handed over — the
  * digest could not exist, or the run took a terminal before the chain.
  */
 export function serveDisclosureDigestFacts(
@@ -2117,7 +2235,7 @@ export function buildServeDisclosureRecord(input: Readonly<{
   body: Readonly<{ bodyStop: EnvelopeStopKind | null; pointsWithoutReview: number | null }>;
   /** What ended the answer-writing loop early (`serveLoopStopOf`), or null. */
   serveStop: ServeLoopStop | null;
-  /** The digest the answer-writer was handed (`serveDisclosureDigestFacts`), or null. */
+  /** The digest built for the answer-writer, served or not (`serveDisclosureDigestFacts`), or null. */
   digest: Readonly<{ rung: number; pointsOmitted: number }> | null;
 }>): ServeDisclosureRecord {
   const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
@@ -5552,8 +5670,9 @@ export class WalkingSkeletonRunner {
           argumentLanguageName: run.argumentLanguageName,
           providerRef: role.providerRef,
           packet,
-          classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
-          buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
+          // Task M4 review fix I-1: the schema, then the prose and the cited refs.
+          classifyContent: (content) => classifyComposedContent(content, { digest: request.digest, servedNodes }),
+          buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)
           }
         }));
         const response = served.result;

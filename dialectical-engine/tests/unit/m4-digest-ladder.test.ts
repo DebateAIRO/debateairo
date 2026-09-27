@@ -10,9 +10,11 @@ import {
   digestLeverageByNodeId,
   digestNodeRefOf,
   digestPointsOmitted,
+  nodeIdsNamedInText,
   resolveDigestNodeRef,
   runServeGateChain,
   synthesisDigestLadder,
+  synthesisDigestSpineWidenings,
   toSynthesisPromptMaterial,
   type ComposedSegment,
   type DigestSourceNode,
@@ -26,7 +28,10 @@ import {
   type StoryRunSnapshot
 } from "@debateai/story";
 import {
+  COMPOSED_CITATION_REJECTIONS,
   buildServeDisclosureRecord,
+  classifyComposedContent,
+  composedCitationRejectionOf,
   composedNodeIdOf,
   serveDisclosureDigestFacts
 } from "../../apps/runner/src/index.js";
@@ -167,14 +172,30 @@ describe("M4 · the measured case: 195 points fit every tier", () => {
     expect(compact.digest.byteSize).toBeGreaterThan(TIERS.high);
   });
 
-  it("the tighter the tier, the fewer decisive points the spine keeps", () => {
-    const decisive = (budget: number): number => {
-      const digest = fitted(buildSynthesisDigest({ nodes, servedRootNodeId: uuid(0), budgetBound: budget }));
-      const attempt = ladderOf(nodes).find((candidate) => JSON.stringify(candidate.digest) === JSON.stringify(digest));
-      return attempt!.spineDecisiveCount!;
-    };
-    expect(decisive(TIERS.high)).toBeGreaterThanOrEqual(decisive(TIERS.medium));
-    expect(decisive(TIERS.medium)).toBeGreaterThanOrEqual(decisive(TIERS.low));
+  /**
+   * Review fix I-2: a spine that fits then uses its room — the last step of
+   * `DIGEST_LADDER.spineWidenings` that fits. Measured with this generator:
+   * the walk after the 20-point spine is (20,60) 14,009 B / 55 points,
+   * (30,60) 19,036 B / 75, (30,120) 23,537 B / 75, (40,120) 30,077 B / 96, …;
+   * the low tier's spine fitted at 10 points, and widens its own summaries
+   * first: (10,60) 9,231 B / 36, then (20,60) is over.
+   */
+  it.each([
+    ["low", TIERS.low, 36, 60, 9_231],
+    ["medium", TIERS.medium, 75, 60, 19_036],
+    ["high", TIERS.high, 75, 120, 23_537]
+  ] as const)("%s uses its room: %i points at %i-character summaries", (_tier, budget, kept, cap, bytes) => {
+    const digest = fitted(buildSynthesisDigest({ nodes, servedRootNodeId: uuid(0), budgetBound: budget }));
+    expect(digest.compressionLevel).toBe(SPINE);
+    expect(digest.nodes).toHaveLength(kept);
+    expect(digest.summaryCharacterCap).toBe(cap);
+    expect(digest.byteSize).toBe(bytes);
+  });
+
+  it("high no longer gets exactly what medium gets", () => {
+    const medium = fitted(buildSynthesisDigest({ nodes, servedRootNodeId: uuid(0), budgetBound: TIERS.medium }));
+    const high = fitted(buildSynthesisDigest({ nodes, servedRootNodeId: uuid(0), budgetBound: TIERS.high }));
+    expect(JSON.stringify(high)).not.toBe(JSON.stringify(medium));
   });
 });
 
@@ -339,6 +360,14 @@ describe("M4 · the spine rung", () => {
     expect(spine.digest.omittedPoints).toEqual([{ positionNodeId: "n1", supporting: 1, attacking: 1 }]);
   });
 
+  it("numbers its refs contiguously, n1 to nK, so no gap invites a citation (review fix M-3)", () => {
+    for (const attempt of spines()) {
+      expect(attempt.digest.nodes.map((entry) => entry.nodeId))
+        .toEqual(attempt.digest.nodes.map((_entry, index) => `n${String(index + 1)}`));
+      expect(resolveDigestNodeRef(attempt.digest, `n${String(attempt.digest.nodes.length + 1)}`)).toBeNull();
+    }
+  });
+
   it("drops a relation onto a left-out point instead of naming it", () => {
     const attempt = spines().at(-1)!;
     const refs = new Set(attempt.digest.nodes.map((entry) => entry.nodeId));
@@ -370,6 +399,57 @@ describe("M4 · the spine rung", () => {
     if (outcome.kind !== "DIGEST_CANNOT_EXIST") throw new Error("unreachable");
     expect(outcome.byteSizeAtMaxCompression).toBe(smallest);
     expect(fitted(buildSynthesisDigest({ nodes, servedRootNodeId: uuid(0), budgetBound: smallest })).compressionLevel).toBe(SPINE);
+  });
+});
+
+describe("M4 · the spine uses its room (review fix I-2)", () => {
+  const nodes = measuredTree(195);
+  const input = { nodes, servedRootNodeId: uuid(0) };
+  const spineAt = (decisive: number): SynthesisDigestAttempt =>
+    ladderOf(nodes).find((attempt) => attempt.spineDecisiveCount === decisive && attempt.digest.compressionLevel === SPINE)!;
+
+  it("walks the fixed schedule, members and content alternately, and sizes only grow", () => {
+    expect(DIGEST_LADDER.spineWidenings.map((step) => [step.decisiveCount, step.summaryCap])).toEqual([
+      [20, 60], [30, 60], [30, 120], [40, 120], [60, 120], [60, 240], [80, 240], [80, 480], [120, 480], [null, null]
+    ]);
+    const walk = [...synthesisDigestSpineWidenings(input, spineAt(20))];
+    expect(walk.map((attempt) => [attempt.spineDecisiveCount, attempt.digest.summaryCharacterCap])).toEqual([
+      [20, 60], [30, 60], [30, 120], [40, 120], [60, 120], [60, 240], [80, 240], [80, 480], [120, 480]
+    ]);
+    let previous = spineAt(20).digest;
+    for (const attempt of walk) {
+      expect(attempt.digest.compressionLevel).toBe(SPINE);
+      expect(attempt.digest.byteSize).toBeGreaterThanOrEqual(previous.byteSize);
+      const members = new Set(memberIds(attempt.digest));
+      for (const nodeId of memberIds(previous)) expect(members.has(nodeId)).toBe(true);
+      previous = attempt.digest;
+    }
+  });
+
+  it("stops before a step that would keep every point: that is no longer a spine", () => {
+    const walk = [...synthesisDigestSpineWidenings(input, spineAt(20))];
+    for (const attempt of walk) expect(attempt.digest.nodes.length).toBeLessThan(nodes.length);
+  });
+
+  it("widens a smaller spine's own summaries first", () => {
+    const walk = [...synthesisDigestSpineWidenings(input, spineAt(10))];
+    expect([walk[0]!.spineDecisiveCount, walk[0]!.digest.summaryCharacterCap]).toEqual([10, 60]);
+    expect(walk[0]!.digest.nodes).toHaveLength(spineAt(10).digest.nodes.length);
+  });
+
+  it("never widens below the spine rung", () => {
+    for (const attempt of ladderOf(nodes).filter((candidate) => candidate.digest.compressionLevel < SPINE)) {
+      expect([...synthesisDigestSpineWidenings(input, attempt)]).toEqual([]);
+    }
+  });
+
+  it("serves the last step that fits and stops at the first that does not", () => {
+    const walk = [...synthesisDigestSpineWidenings(input, spineAt(20))];
+    const third = walk[2]!.digest;
+    // A budget exactly at the third step's size serves the third step.
+    expect(fitted(buildSynthesisDigest({ ...input, budgetBound: third.byteSize })).byteSize).toBe(third.byteSize);
+    // One byte under it serves the second.
+    expect(fitted(buildSynthesisDigest({ ...input, budgetBound: third.byteSize - 1 })).byteSize).toBe(walk[1]!.digest.byteSize);
   });
 });
 
@@ -427,7 +507,7 @@ function randomTree(random: () => number): readonly DigestSourceNode[] {
 }
 
 describe("M4 · the byte budget is never exceeded, on any rung", () => {
-  it("holds for random trees and random budgets, and the result is the first rung that fits", () => {
+  it("holds for random trees and random budgets: the first rung that fits, then (at the spine) the largest widening that fits", () => {
     const random = seeded(20_260_927);
     let spineResults = 0;
     for (let trial = 0; trial < 250; trial += 1) {
@@ -445,7 +525,18 @@ describe("M4 · the byte budget is never exceeded, on any rung", () => {
       }
       const digest = fitted(outcome);
       expect(digest.byteSize).toBeLessThanOrEqual(budget);
-      expect(JSON.stringify(digest)).toBe(JSON.stringify(firstFit.digest));
+      // I-2: after the first spine that fits, the widenings in order, stopping at
+      // the first over budget; sizes only grow along the walk.
+      let expected = firstFit.digest;
+      let previousSize = firstFit.digest.byteSize;
+      for (const widened of synthesisDigestSpineWidenings({ nodes, servedRootNodeId: "node:0" }, firstFit)) {
+        expect(measuredBytes(widened.digest)).toBe(widened.digest.byteSize);
+        expect(widened.digest.byteSize).toBeGreaterThanOrEqual(previousSize);
+        previousSize = widened.digest.byteSize;
+        if (widened.digest.byteSize > budget) break;
+        expected = widened.digest;
+      }
+      expect(JSON.stringify(digest)).toBe(JSON.stringify(expected));
       if (digest.compressionLevel < SPINE) {
         expect(digest.nodes).toHaveLength(nodes.length);
       } else {
@@ -453,6 +544,10 @@ describe("M4 · the byte budget is never exceeded, on any rung", () => {
         const members = new Set(memberIds(digest));
         for (const nodeId of [...nodes.filter((node) => node.isPosition).map((node) => node.nodeId), ...directChildren(nodes)]) {
           expect(members.has(nodeId)).toBe(true);
+        }
+        // M-1: a point with no relation has no position to be counted under, so it stays.
+        for (const node of nodes.filter((candidate) => candidate.polarityRelations.length === 0)) {
+          expect(members.has(node.nodeId)).toBe(true);
         }
         expect(digestPointsOmitted(digest)).toBe(nodes.length - members.size);
         // Rung 7 only when every rung before it is over budget.
@@ -539,7 +634,10 @@ function serveSpineAt(nodes: readonly DigestSourceNode[], decisive: number): Rea
 
 describe("M4 · 'most decisive' is the story's definition, mirrored in serve", () => {
   it.each([
-    ["the measured binary tree", measuredTree(195, { survivingObjection: (_index, parent) => parent < 3 })],
+    ["the measured binary tree, with a point that answers nothing (M-1)", [
+      ...measuredTree(195, { survivingObjection: (_index, parent) => parent < 3 }),
+      { ...measuredTree(4)[3]!, nodeId: "loose:point", polarityRelations: [], isSurvivingObjection: false, leverage: null }
+    ]],
     ["leverage ties broken by id", measuredTree(120, { survivingObjection: () => false, leverage: (index) => (index % 4) / 4 })],
     ["points with no leverage are never ranked", measuredTree(150, {
       survivingObjection: () => false,
@@ -550,6 +648,10 @@ describe("M4 · 'most decisive' is the story's definition, mirrored in serve", (
     const serve = serveSpineAt(nodes, 20);
     expect([...serve].sort()).toEqual([...story].sort());
     expect(serve.size).toBeLessThan(nodes.length);
+    // A non-position point with no relation stays in both, by that rule alone (M-1).
+    for (const loose of nodes.filter((node) => !node.isPosition && node.polarityRelations.length === 0)) {
+      expect(serve.has(loose.nodeId)).toBe(true);
+    }
   });
 
   it("parity holds on a tree where some points answer two points", () => {
@@ -605,15 +707,14 @@ describe("M4 · the runner maps each cited ref back before the sealed checks", (
     }
   });
 
-  it("refuses a citation of a point the spine left out, by any name", () => {
+  it("refuses a citation of a point the spine left out: it has no ref, and its id is not one", () => {
     expect(omittedIndex).toBeGreaterThan(0);
     const omitted = nodes[omittedIndex]!.nodeId;
     expect(digestNodeRefOf(spine, omitted)).toBeNull();
-    // Its real id is not in the digest; nor is the ref it held at the compact rung.
-    const compact = ladderOf(nodes).find((attempt) => attempt.digest.compressionLevel === COMPACT)!.digest;
-    for (const ref of [omitted, digestNodeRefOf(compact, omitted)!]) {
-      expect(refusalOf(() => map(ref)).code).toBe("COMPOSITION_CONTRACT_ERROR");
-    }
+    expect(refusalOf(() => map(omitted)).code).toBe("COMPOSITION_CONTRACT_ERROR");
+    // The spine's refs are n1…nK with no gap (M-3): the next one names nothing.
+    expect(refusalOf(() => map(`n${String(spine.nodes.length + 1)}`)).code).toBe("COMPOSITION_CONTRACT_ERROR");
+    for (const entry of spine.nodes) expect(members.has(map(entry.nodeId))).toBe(true);
   });
 
   it("at rungs 0-5 a real id is still the citation, unchanged", () => {
@@ -635,6 +736,71 @@ describe("M4 · the runner maps each cited ref back before the sealed checks", (
     const codeLabel = JSON.parse(fields.find((field) => field.name === "code_label")!.content) as { servedNodeId: string };
     expect(codeLabel.servedNodeId).toBe(digestNodeRefOf(spine, uuid(0)));
     expect(fields.map((field) => field.content).join("\n")).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/u);
+  });
+});
+
+/* ------------------------------------- review fix I-1: no internals in the prose */
+
+describe("M4 · the answer's prose never names an internal id (review fix I-1)", () => {
+  const nodes = measuredTree(195);
+  const spine = fitted(buildSynthesisDigest({ nodes, servedRootNodeId: uuid(0), budgetBound: TIERS.low }));
+  const wide = fitted(buildSynthesisDigest({ nodes: measuredTree(10), servedRootNodeId: uuid(0), budgetBound: TIERS.high }));
+  const citation = { digest: spine, servedNodes: nodes };
+  const composition = (text: string, refs: readonly string[] = ["n1"]): string => JSON.stringify({ segments: [
+    { segment_id: "segment:verdict", text, node_refs: refs, served_number_refs: ["number:final-strength"] },
+    { segment_id: "segment:plan", text: "Measure it before relying on it.", node_refs: [], served_number_refs: [] }
+  ] });
+  const issuesOf = (classified: ReturnType<typeof classifyComposedContent>): unknown =>
+    classified.parseStatus === "PARSED" ? [] : JSON.parse(classified.parseError);
+
+  it("finds a short ref the digest carries, whole-token, and any UUID-shaped id at any rung", () => {
+    expect(nodeIdsNamedInText(spine, "The strongest case (n12) holds.")).toEqual(["n12"]);
+    expect(nodeIdsNamedInText(spine, "See n3. Then n1, n2-n4.")).toEqual(["n3", "n1", "n2", "n4"]);
+    expect(nodeIdsNamedInText(wide, `It rests on ${uuid(3)}.`)).toEqual([uuid(3)]);
+    expect(nodeIdsNamedInText(spine, `It rests on ${uuid(3).toUpperCase()}.`)).toEqual([uuid(3).toUpperCase()]);
+  });
+
+  it("leaves ordinary text alone", () => {
+    const beyond = `n${String(spine.nodes.length + 1)}`;
+    for (const text of [
+      `Route ${beyond} is closed.`, "The N1 highway is congested.", "An n-type semiconductor.", "Design n12x and xn12.",
+      "Plan B, not plan n0.", "Nothing internal here."
+    ]) expect(nodeIdsNamedInText(spine, text), text).toEqual([]);
+    // Below the compact rung the digest has no short refs, so "n12" is just text.
+    expect(nodeIdsNamedInText(wide, "Road n1 and n12.")).toEqual([]);
+  });
+
+  it("the writer's classifier re-asks a draft whose prose names a node, pointing at that segment", () => {
+    const leaked = classifyComposedContent(composition("The answer holds (n12)."), citation);
+    expect(leaked.parseStatus).toBe("SCHEMA_FAILED");
+    expect(issuesOf(leaked)).toEqual([{ path: ["segments", 0, "text"], message: "COMPOSED_TEXT_NAMES_A_NODE" }]);
+    expect(composedCitationRejectionOf(leaked.parseError ?? "")).toBe("COMPOSED_TEXT_NAMES_A_NODE");
+    const uuidLeak = classifyComposedContent(composition(`The answer rests on ${uuid(0)}.`), citation);
+    expect(issuesOf(uuidLeak)).toEqual([{ path: ["segments", 0, "text"], message: "COMPOSED_TEXT_NAMES_A_NODE" }]);
+  });
+
+  it("re-asks a cited ref the digest does not carry — unknown, a real id, or a left-out point", () => {
+    const members = new Set(memberIds(spine));
+    const omitted = nodes.find((node) => !members.has(node.nodeId))!.nodeId;
+    for (const ref of ["n9999", uuid(0), omitted]) {
+      const classified = classifyComposedContent(composition("The answer holds.", ["n1", ref]), citation);
+      expect(issuesOf(classified), ref).toEqual([{ path: ["segments", 0, "node_refs", 1], message: "COMPOSED_REF_NOT_IN_DIGEST" }]);
+    }
+  });
+
+  it("accepts a clean draft, the primary alias, and ordinary words", () => {
+    for (const text of ["The answer holds.", "The N1 highway is congested.", "An n-type semiconductor."]) {
+      expect(classifyComposedContent(composition(text, ["n1", "primary"]), citation)).toEqual({ parseStatus: "PARSED", parseError: null });
+    }
+  });
+
+  it("keeps the schema's own rejections exactly as before", () => {
+    const broken = classifyComposedContent("{not json", citation);
+    expect(broken.parseStatus).toBe("PARSE_FAILED");
+    const schema = classifyComposedContent(JSON.stringify({ segments: [] }), citation);
+    expect(schema.parseStatus).toBe("SCHEMA_FAILED");
+    expect(composedCitationRejectionOf(schema.parseError ?? "")).toBeNull();
+    expect(COMPOSED_CITATION_REJECTIONS).toEqual(["COMPOSED_TEXT_NAMES_A_NODE", "COMPOSED_REF_NOT_IN_DIGEST"]);
   });
 });
 
