@@ -55,7 +55,7 @@ import {
   type ServeGateResult
 } from "@debateai/serve";
 import { AnswerSchema } from "@debateai/contract";
-import type { ServedRootRuleHistory } from "@debateai/kernel";
+import { DEBATE_ROLES, debateRoleFromCallSiteKey, type ServedRootRuleHistory } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -6455,5 +6455,46 @@ describe("F-H-2 · liveness refresh with content encryption off", () => {
     const archived = await liveness.sweep(new Date("2030-06-02T00:00:00.000Z"), retirementPolicy);
 
     expect(archived).not.toContain(runId);
+  });
+});
+
+describe("A13 · the ledger names the debate role of every model call", () => {
+  it("writes model_role on every MODEL_CALL row, equal to the role its call site names, for all seven roles", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "a13-model-role",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary A13 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary A13 review ${index + 1}`)),
+        resil01Composition,
+        evaluatorSatisfied()
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary A13 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Secondary A13 review ${index + 1}`))
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+
+    const rows = await database.pool.query<{ call_site_key: string; model_role: string | null }>(
+      `SELECT DISTINCT call_site_key, model_role FROM ledger.ledger_entry
+        WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY call_site_key`,
+      [scenario.runId]
+    );
+    expect(rows.rows.length).toBeGreaterThan(0);
+    for (const row of rows.rows) {
+      expect({ key: row.call_site_key, role: row.model_role })
+        .toEqual({ key: row.call_site_key, role: debateRoleFromCallSiteKey(row.call_site_key) });
+    }
+    // Every family the runner opens is in this one run: roots, legs, the
+    // cross-exchange, the panel, the review, the writer and the checker.
+    expect(new Set(rows.rows.map((row) => row.model_role))).toEqual(new Set(DEBATE_ROLES));
+    // Non-debate rows (JUDGEMENT_SCHEDULED, PROPAGATION, SERVE) carry no role.
+    const other = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM ledger.ledger_entry
+        WHERE run_id=$1 AND action_kind <> 'MODEL_CALL' AND model_role IS NOT NULL`,
+      [scenario.runId]
+    );
+    expect(other.rows[0]?.count).toBe("0");
   });
 });

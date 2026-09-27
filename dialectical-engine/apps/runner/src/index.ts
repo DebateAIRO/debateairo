@@ -4720,6 +4720,7 @@ export class WalkingSkeletonRunner {
           callSiteKey: synthesizerCallSiteKey,
           role: "SYNTHESIZER",
           lane: "served",
+          modelRole: "ANSWER_WRITER",
           // W10/3: the SYNTHESIZER's own sealed bound. It used to be
           // `composerBound` — an organ T9 retired — which is how the longest
           // generation in the system ended up with a 60-second clock while the
@@ -4797,6 +4798,7 @@ export class WalkingSkeletonRunner {
           callSiteKey: evaluatorCallSiteKey,
           role: "EVALUATOR",
           lane: "served",
+          modelRole: "ANSWER_CHECKER",
           // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
           bound: this.settings.synthesisRolePolicy.evaluatorBound,
           contractHash: this.settings.conformanceContractHash,

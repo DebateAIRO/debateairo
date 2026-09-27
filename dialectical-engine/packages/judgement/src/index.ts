@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { CLAIM_TYPES, REVIEW_OUTCOMES, TypedDomainError, isRunLevelSpendStop, type ReviewOutcome, type WayOfKnowing } from "@debateai/kernel";
+import {
+  CLAIM_TYPES,
+  REVIEW_OUTCOMES,
+  TypedDomainError,
+  exhaustive,
+  isRunLevelSpendStop,
+  type DebateRole,
+  type ReviewOutcome,
+  type WayOfKnowing
+} from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -312,6 +321,29 @@ function judgeLegMaterial(
   return Object.freeze(fields);
 }
 
+/**
+ * Model scorecard A13 (spec §2.1) — THE DEBATE JOB ONE AUTHORING LEG DOES.
+ *
+ * The T9 `role` stays `JUDGE` on every judgement call: it names the provider
+ * identity, not the job. The scorecard grades JOBS, and before this field the
+ * job could only be recovered by parsing `call_site_key`. A leg's kind decides
+ * it, so the mapping lives next to the leg type and nowhere else.
+ */
+export function judgeLegModelRole(leg: JudgeLeg): DebateRole {
+  switch (leg.kind) {
+    case "primary-root":
+    case "independent-root":
+      return "POSITION";
+    case "support":
+    case "attack":
+      return "SUPPORT_ATTACK";
+    case "cross-root":
+      return "CROSS_EXCHANGE";
+    default:
+      return exhaustive(leg);
+  }
+}
+
 export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 
@@ -341,6 +373,7 @@ export class Judge {
         callSiteKey: input.callSiteKey,
         role: "JUDGE",
         lane: "served",
+        modelRole: judgeLegModelRole(input.leg),
         bound: input.bound,
         contractHash: input.contractHash,
         providerRef: input.providerRef,
@@ -437,6 +470,7 @@ export class Judge {
         callSiteKey: input.callSiteKey,
         role: "JUDGE",
         lane: "served",
+        modelRole: "REVIEWER",
         bound: input.bound,
         contractHash: input.contractHash,
         providerRef: input.providerRef,
@@ -511,6 +545,7 @@ export class Judge {
         callSiteKey: input.callSiteKey,
         role: "JUDGE",
         lane: "served",
+        modelRole: "JUDGE",
         bound: input.bound,
         contractHash: input.contractHash,
         providerRef: input.providerRef,
