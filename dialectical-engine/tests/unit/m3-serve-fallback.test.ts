@@ -759,7 +759,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       planned: { writerRef: "provider:a", checkerRef: "provider:b" },
       served: { writerRef: "provider:a", checkerRef: "provider:b" },
       body: { bodyStop: null, pointsWithoutReview: null },
-      serveStop: null
+      serveStop: null,
+      digest: null
     })).toEqual({
       ...ids,
       writerPlannedRef: "provider:a",
@@ -787,7 +788,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       planned: { writerRef: "provider:a", checkerRef: "provider:b" },
       served: { writerRef: "provider:c", checkerRef: "provider:c" },
       body: { bodyStop: "MONEY", pointsWithoutReview: 3 },
-      serveStop: null
+      serveStop: null,
+      digest: null
     });
     expect(record).toMatchObject({
       writerFallback: true,
@@ -805,7 +807,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       planned: { writerRef: "provider:a", checkerRef: "provider:b" },
       served: { writerRef: "provider:b", checkerRef: "provider:b" },
       body: { bodyStop: null, pointsWithoutReview: null },
-      serveStop: null
+      serveStop: null,
+      digest: null
     });
     expect(record).toMatchObject({ writerFallback: true, checkerFallback: false, fallbackReason: "MONEY", checkerSameAsWriter: true });
   });
@@ -816,7 +819,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       planned: { writerRef: "provider:a", checkerRef: "provider:a" },
       served: null,
       body: { bodyStop: "ATTEMPTS", pointsWithoutReview: 0 },
-      serveStop: "MONEY"
+      serveStop: "MONEY",
+      digest: null
     });
     expect(record).toMatchObject({
       writerServedRef: null,
@@ -837,7 +841,8 @@ describe("M3 · the owner-side disclosure row (§14.4.5), built by code from fac
       planned: { writerRef: "provider:a", checkerRef: "provider:a" },
       served: { writerRef: "provider:a", checkerRef: "provider:a" },
       body: { bodyStop: "MONEY", pointsWithoutReview: 1 },
-      serveStop: "NO_ARTIFACT"
+      serveStop: "NO_ARTIFACT",
+      digest: null
     });
     expect(record).toMatchObject({ bodyStop: "MONEY", serveStop: "NO_ARTIFACT", writerServedRef: "provider:a" });
   });

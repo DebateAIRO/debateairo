@@ -105,9 +105,12 @@ import {
   createEnvelopeExhaustedResult,
   deriveBandCeiling,
   deriveVerdictLabel,
+  digestLeverageByNodeId,
+  digestPointsOmitted,
   keepsCompleteSynthesisRounds,
   LABEL_BASIS_INCOMPLETE_MARK,
   PROTECTED_CORE_GUARD_RETIRED_MARK,
+  resolveDigestNodeRef,
   runServeGateChain,
   ServeRepository,
   toSynthesisPromptMaterial,
@@ -125,6 +128,7 @@ import {
   type PreservedConditionMarkRecord,
   type ServeGateResult,
   type ServeNode,
+  type SynthesisDigest,
   type SynthesizerRequest,
   type VerdictLabelBasis
 } from "@debateai/serve";
@@ -2016,6 +2020,52 @@ export function serveLoopStopOf(failure: unknown): ServeLoopStop | null {
 }
 
 /**
+ * ENGINE MONEY RULE (spec §14.4.3), TASK M4 — THE ONE POINT WHERE A CITATION
+ * BECOMES A NODE ID.
+ *
+ * The answer-writer cites the nodes a segment rests on (`node_refs`) by the
+ * refs the digest showed it: node ids at rungs 0-5, short refs (`n1`, …) at the
+ * compact and spine rungs. Each is mapped back HERE, in the writer's adapter,
+ * before the segment reaches the sealed chain — whose own checks (the serve
+ * set, the load-bearing flag, SERVED_STATEMENT_CITES_NO_VERIFIED_NODE, the
+ * cited set the answer's form and band are read from) therefore only ever see
+ * real node ids.
+ *
+ *  · `"primary"` stays the served root's alias (fixtures and prompts written
+ *    against the one-node serve set);
+ *  · a ref the digest does not carry — an unknown ref, a real id where the
+ *    digest showed short refs, or a point the spine left out, which is not in
+ *    the digest and so cannot be cited — is refused exactly as an unknown node
+ *    id always was: COMPOSITION_CONTRACT_ERROR, "Unknown composition node ref".
+ */
+export function composedNodeIdOf(input: Readonly<{
+  ref: string;
+  digest: SynthesisDigest;
+  servedRootNodeId: string;
+  servedNodes: readonly Readonly<{ nodeId: string }>[];
+}>): string {
+  if (input.ref === "primary") return input.servedRootNodeId;
+  const nodeId = resolveDigestNodeRef(input.digest, input.ref);
+  if (nodeId === null || !input.servedNodes.some((node) => node.nodeId === nodeId)) {
+    throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", `Unknown composition node ref ${input.ref}`);
+  }
+  return nodeId;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M4 — the digest the answer-writer was
+ * handed, for the owner's record: its ladder rung (0-7) and how many points it
+ * left out (0 below the spine rung). Null when no digest was handed over — the
+ * digest could not exist, or the run took a terminal before the chain.
+ */
+export function serveDisclosureDigestFacts(
+  digest: SynthesisDigest | null
+): Readonly<{ rung: number; pointsOmitted: number }> | null {
+  if (digest === null) return null;
+  return Object.freeze({ rung: digest.compressionLevel, pointsOmitted: digestPointsOmitted(digest) });
+}
+
+/**
  * ENGINE MONEY RULE (spec §14.4.5), TASK M3 — WHAT THE ARGUING LEFT FOR THE
  * OWNER'S RECORD, taken where the body ends (the serve decision), never later.
  *
@@ -2048,8 +2098,10 @@ export function serveDisclosureBodyFacts(input: Readonly<{
  * fallback flags and the reason are derived from the refs, and migration 0076
  * refuses a row where they disagree. `checkerSameAsWriter` is R9's disclosure:
  * DEGRADED-DIVERSITY reads the SEALED refs, so a fallback that put both roles
- * on one maker is recorded here instead. The digest (M4) and floor (M5) fields
- * are null until their tasks fill them.
+ * on one maker is recorded here instead. The digest fields (Task M4) are the
+ * rung and the points left out of the digest the answer-writer was handed
+ * (`serveDisclosureDigestFacts`); the floor fields (M5) are null until that
+ * task fills them.
  */
 export function buildServeDisclosureRecord(input: Readonly<{
   answerId: string;
@@ -2060,6 +2112,8 @@ export function buildServeDisclosureRecord(input: Readonly<{
   body: Readonly<{ bodyStop: EnvelopeStopKind | null; pointsWithoutReview: number | null }>;
   /** What ended the answer-writing loop early (`serveLoopStopOf`), or null. */
   serveStop: ServeLoopStop | null;
+  /** The digest the answer-writer was handed (`serveDisclosureDigestFacts`), or null. */
+  digest: Readonly<{ rung: number; pointsOmitted: number }> | null;
 }>): ServeDisclosureRecord {
   const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
   const checkerFallback = input.served !== null && input.served.checkerRef !== input.planned.checkerRef;
@@ -2078,8 +2132,8 @@ export function buildServeDisclosureRecord(input: Readonly<{
     bodyStop: input.body.bodyStop,
     pointsWithoutReview: input.body.pointsWithoutReview,
     serveStop: input.serveStop,
-    digestRung: null,
-    digestPointsOmitted: null,
+    digestRung: input.digest?.rung ?? null,
+    digestPointsOmitted: input.digest?.pointsOmitted ?? null,
     floorVerdictState: null,
     floorLeadingNodeId: null,
     floorReason: null
@@ -4799,7 +4853,10 @@ export class WalkingSkeletonRunner {
     // J23: the citable set follows the DIGEST — same source, same membership,
     // so "every load-bearing claim traces to a digest node" is satisfiable by
     // construction rather than by the synthesizer guessing. Exactly one node is
-    // load-bearing (DR-159 B2-A clause 1); the rest are citable evidence.
+    // load-bearing (DR-159 B2-A clause 1); the rest are citable evidence. At
+    // the digest's spine rung (Task M4) a left-out point stays in this set but
+    // is not in the digest, and the writer's one mapping point
+    // (`composedNodeIdOf`) refuses a citation of it.
     const servedNodes = buildDigestFollowingServeNodes({
       authored: authoredNodeList,
       servedRootNodeId: servedRoot.nodeId
@@ -4989,6 +5046,8 @@ export class WalkingSkeletonRunner {
     const servedChecks = new Map<string, string>();
     const draftWriterByRound = new Map<number, string>();
     let servePhaseFailure: unknown = null;
+    /** Task M4: the digest the answer-writer was handed (every round's is the same), for the owner's row. */
+    let writerDigest: SynthesisDigest | null = null;
     const servePrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
     const whileServing = async <T>(call: () => Promise<T>): Promise<T> => {
       try {
@@ -5174,7 +5233,12 @@ export class WalkingSkeletonRunner {
      * everything the debate authored. A node with no propagated strength keeps
      * its place with a null number; dropping it would be exactly the silent
      * subset the goal forbids.
+     *
+     * Task M4 (spec §14.4.3): each node also carries its LEVERAGE, from the
+     * same sensitivity records the story reads, so the digest's spine rung
+     * ranks "most decisive" by the story's own number. It is never sent.
      */
+    const digestLeverage = digestLeverageByNodeId(propagation.sensitivityRecords);
     const digestNodes: readonly DigestSourceNode[] = Object.freeze(authoredNodeList.map((node) => Object.freeze({
       nodeId: node.nodeId,
       statement: node.statement,
@@ -5192,7 +5256,8 @@ export class WalkingSkeletonRunner {
       // A SURVIVING objection: it attacks something and it still carries a
       // propagated number at the end of the debate.
       isSurvivingObjection: strengthByNodeId.has(node.nodeId)
-        && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack")
+        && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack"),
+      leverage: digestLeverage.get(node.nodeId) ?? null
     })));
     const serveStartedAt = new Date();
     /**
@@ -5403,8 +5468,11 @@ export class WalkingSkeletonRunner {
       // downgrade a disputed cross-maker review fires.
       candidateConfidenceBand,
       // T9: EVERY materialized node, with its number, its polarity relations,
-      // its way of knowing and its marks. This list is the digest's membership
-      // and the byte budget may not shorten it — only the summaries inside it.
+      // its way of knowing and its marks. This list is the digest's membership.
+      // The byte budget shortens the summaries, then each entry's shape; T9's
+      // law as amended by Task M4 (spec §14.4.3) lets it drop membership at the
+      // LAST rung only, only when every earlier rung is over budget, and the
+      // drop is disclosed (the compressed mark, the owner's row).
       digestNodes,
       servedRootNodeId: servedRoot.nodeId,
       // T10/T11's numbers, derived BEFORE synthesis, handed to both roles so
@@ -5433,6 +5501,7 @@ export class WalkingSkeletonRunner {
        * VERBATIM — the loop converges by feedback, never by accident.
        */
       synthesize: async (request: SynthesizerRequest) => {
+        writerDigest ??= request.digest;
         const role = resolveSynthesisRoleMaker(request.roleRef, "SYNTHESIZER");
         const synthesizerCallSiteKey = synthesisCallSiteKey({
           role: "SYNTHESIZER", stage: request.stage, round: request.round
@@ -5492,17 +5561,19 @@ export class WalkingSkeletonRunner {
           segmentId: segment.segment_id,
           text: segment.text,
           loadBearing: false,
-          // J23: a citation may name ANY node in the digest-following set by its
-          // real id. `"primary"` stays admissible as the served root's alias so
-          // sealed prompts and fixtures written against the one-node set keep
-          // working; an unknown ref is still a loud contract error.
-          assertedNodeRefs: Object.freeze(segment.node_refs.map((ref) => {
-            if (ref === "primary") return servedRoot.nodeId;
-            if (!servedNodes.some((node) => node.nodeId === ref)) {
-              throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", `Unknown composition node ref ${ref}`);
-            }
-            return ref;
-          })),
+          // J23: a citation may name ANY node the digest carries, by the ref the
+          // digest showed it under — its real id at rungs 0-5, its short ref at
+          // the compact and spine rungs (Task M4) — and is mapped back to the
+          // real id HERE, the one mapping point, before the sealed checks.
+          // `"primary"` stays admissible as the served root's alias so sealed
+          // prompts and fixtures written against the one-node set keep working;
+          // an unknown ref is still a loud contract error.
+          assertedNodeRefs: Object.freeze(segment.node_refs.map((ref) => composedNodeIdOf({
+            ref,
+            digest: request.digest,
+            servedRootNodeId: servedRoot.nodeId,
+            servedNodes
+          }))),
           servedNumberRefs: Object.freeze([...segment.served_number_refs])
           });
         });
@@ -5851,7 +5922,8 @@ export class WalkingSkeletonRunner {
         checkerRef: servedRoleRef(servedChecks.get(answeredRound.verdictRef), "checker")
       },
       body: serveDisclosureBody,
-      serveStop: serveLoopStopOf(servePhaseFailure)
+      serveStop: serveLoopStopOf(servePhaseFailure),
+      digest: serveDisclosureDigestFacts(writerDigest)
     }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",

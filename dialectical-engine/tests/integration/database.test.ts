@@ -16,8 +16,15 @@ import { BudgetRepository, type CostEnvelopePhase } from "@debateai/budget";
 import { ProviderProbeRepository, RunRepository, ServeDisclosureRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
-import { EVALUATOR_INSTRUCTIONS, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
-import { framedFixturePacket, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
+import {
+  DIGEST_LADDER,
+  EVALUATOR_INSTRUCTIONS,
+  SYNTHESIZER_PROMPT_CONTRACT,
+  buildSynthesisDigest,
+  type DigestSourceNode,
+  type SynthesisDigest
+} from "@debateai/serve";
+import { framedField, framedFixturePacket, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { requestedReviewEdges, type RequestedReviewEdge } from "../support/reviewBearings.js";
 import {
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
@@ -4926,6 +4933,104 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await provider.stop(); }
   });
 
+  /**
+   * ENGINE MONEY RULE (spec §14.4.3), TASK M4 — the compact rung through the
+   * REAL runner. The writer is handed a digest whose node is named `n1`, cites
+   * `n1`, and the runner's one mapping point turns that back into the node's
+   * real id before the sealed chain checks it (an unmapped `n1` is not in the
+   * serve set: the chain would refuse it and the run would fail). The owner's
+   * row records the rung.
+   *
+   * The bound is MEASURED, never guessed: a first run of the same one-node
+   * debate at the default budget shows the node exactly as the writer is
+   * handed it (rung 0, every field verbatim); the shipped builder then gives
+   * the compact rung's size for that node, and the second run gets exactly
+   * that many bytes. One node has nothing a spine could leave out, so the
+   * compact rung is the ladder's last.
+   */
+  it("answers at the compact rung, maps the writer's short ref back before the sealed checks, and records the rung on the owner's row (Task M4)", async () => {
+    const judge = JSON.stringify({
+      statement: "A compact answer.", way_of_knowing: "REASONING", locator: null,
+      restatement_text: "A compact answer.", restatement_status: "PASS", value_laden: false,
+      steelman: { summary: "A compact answer.", fidelity: 0.6 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.4, basis: "PLAUSIBLE_COUNTER" },
+      evidence: { quality: 0.6, relevance: 0.6 }, context: { fit: 0.6, ambiguityFlags: [] }, fallacy: { severity: 0.4, fatalFlags: [] }
+    });
+    const writerDigestIn = (bodies: readonly string[]): { readonly digest: SynthesisDigest; readonly codeLabel: string; readonly material: string } => {
+      const material = bodies.map((body) => readFramedMaterial(wirePacket(body)))
+        .find((candidate) => candidate.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId);
+      if (material === undefined) throw new Error("the writer was never called");
+      return {
+        digest: JSON.parse(framedField(material, "digest")) as SynthesisDigest,
+        codeLabel: framedField(material, "code_label"),
+        material: material.fields.map((field) => field.content).join("\n")
+      };
+    };
+    const compositionCiting = (ref: string): string => JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text: "A compact answer.", node_refs: [ref], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Measure it before relying on it.", node_refs: [], served_number_refs: [] }
+    ] });
+
+    let compactBound = 0;
+    const calibration = await startProviderDouble([judge, compositionCiting("primary"), evaluatorSatisfied()]);
+    try {
+      const work = await createRunnerWork("m4-compact-calibration");
+      expect((await runnerWithEndpoint(calibration.endpoint).executeWorkItem(work.workItemId)).kind).toBe("COMPLETED");
+      const seen = writerDigestIn(calibration.bodies()).digest;
+      expect(seen.compressionLevel).toBe(0);
+      const nodes: DigestSourceNode[] = seen.nodes.map((entry) => ({
+        nodeId: entry.nodeId,
+        statement: entry.statementSummary,
+        finalStrength: entry.finalStrength,
+        wayOfKnowing: entry.wayOfKnowing,
+        marks: entry.marks,
+        polarityRelations: entry.polarityRelations,
+        isPosition: true,
+        isSurvivingObjection: false
+      }));
+      const smallest = buildSynthesisDigest({ nodes, servedRootNodeId: nodes[0]!.nodeId, budgetBound: 0 });
+      if (smallest.kind !== "DIGEST_CANNOT_EXIST") throw new Error("unreachable");
+      compactBound = smallest.byteSizeAtMaxCompression;
+    } finally { await calibration.stop(); }
+
+    const provider = await startProviderDouble([judge, compositionCiting("n1"), evaluatorSatisfied()]);
+    const settings = runnerSettings();
+    const servePolicy = settings.servePolicy!;
+    const compactSettings: WalkingSkeletonSettings = {
+      ...settings,
+      servePolicy: {
+        ...servePolicy,
+        compositionBudgets: { ...servePolicy.compositionBudgets, low: { ...servePolicy.compositionBudgets.low, bound: compactBound } }
+      }
+    };
+    try {
+      const work = await createRunnerWork("m4-compact-rung");
+      const result = await runnerWithEndpoint(provider.endpoint, compactSettings).executeWorkItem(work.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      // The writer saw refs, never a real id — in the digest or in the code label.
+      const handed = writerDigestIn(provider.bodies());
+      expect(handed.digest.compressionLevel).toBe(DIGEST_LADDER.compactRung);
+      expect(handed.digest.byteSize).toBeLessThanOrEqual(compactBound);
+      expect(handed.digest.nodes.map((entry) => entry.nodeId)).toEqual(["n1"]);
+      expect(JSON.parse(handed.codeLabel)).toMatchObject({ servedNodeId: "n1" });
+      expect(handed.material).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/u);
+
+      // Served — the cited `n1` reached the sealed checks as the real node: the
+      // band's basis counts it (an empty cited set would have been refused).
+      const projection = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, "asker:m4-compact-rung");
+      expect(SERVED_TERMINALS).toContain(projection?.terminal);
+      expect(projection?.condition_marks).toContain("DIGEST-COMPRESSED");
+      expect(projection?.band_ceiling).toMatchObject({ basis: { LOOKED_UP: 0, RAN: 0, REASONING: 1 } });
+      expect(provider.calls()).toBe(3);
+
+      expect(await new ServeDisclosureRepository(database.pool).readForAnswerVersion(result.answerId, 1)).toMatchObject({
+        runId: work.runId,
+        digestRung: DIGEST_LADDER.compactRung,
+        digestPointsOmitted: 0
+      });
+    } finally { await provider.stop(); }
+  });
+
   it("completes redelivery from an existing serve artifact without another provider call", async () => {
     const provider = await startProviderDouble([
       JSON.stringify({ statement: "Replayable answer.", way_of_knowing: "REASONING", locator: null,
@@ -5542,9 +5647,14 @@ function answerIdOf(scenario: Readonly<{ result: Awaited<ReturnType<WalkingSkele
   return scenario.result.answerId;
 }
 
-const NO_DIGEST_OR_FLOOR = Object.freeze({
-  digestRung: null,
-  digestPointsOmitted: null,
+/**
+ * Task M4: every M3 debate below is small, and in each the writer was called
+ * (paid or refused), so the row records the digest it was handed — whole, at
+ * rung 0, nothing left out. The floor fields are M5's and still null.
+ */
+const WHOLE_DIGEST_NO_FLOOR = Object.freeze({
+  digestRung: 0,
+  digestPointsOmitted: 0,
   floorVerdictState: null,
   floorLeadingNodeId: null,
   floorReason: null
@@ -5627,7 +5737,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       pointsWithoutReview: null,
       // The fallback FIT: the loop was never cut short.
       serveStop: null,
-      ...NO_DIGEST_OR_FLOOR
+      ...WHOLE_DIGEST_NO_FLOOR
     });
   });
 
@@ -5942,7 +6052,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
       writerServedRef: null, checkerServedRef: null,
       writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false,
-      bodyStop: null, pointsWithoutReview: null, serveStop: "MONEY", ...NO_DIGEST_OR_FLOOR
+      bodyStop: null, pointsWithoutReview: null, serveStop: "MONEY", ...WHOLE_DIGEST_NO_FLOOR
     });
   });
 
@@ -6005,7 +6115,7 @@ describe("Engine money rule M3 — a cheaper maker when the planned one cannot b
       // Root 1 was refused: root 0 is the one point, and nobody cross-reviewed it.
       bodyStop: "MONEY", pointsWithoutReview: 1,
       serveStop: null,
-      ...NO_DIGEST_OR_FLOOR
+      ...WHOLE_DIGEST_NO_FLOOR
     });
     expect(row?.createdAt).toBeInstanceOf(Date);
   });

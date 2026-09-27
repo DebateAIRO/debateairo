@@ -3,6 +3,7 @@ import {
   DIGEST_CANNOT_EXIST_MARK,
   DIGEST_COMPRESSED_MARK,
   DIGEST_COMPRESSION_LEVELS,
+  DIGEST_LADDER,
   RETIRED_GATE_TRACE,
   SERVE_CRASH_CLASSES,
   SYNTHESIS_OBJECTION_STANDING_MARK,
@@ -13,6 +14,7 @@ import {
   createEnvelopeExhaustedResult,
   isRetiredGateTrace,
   runServeGateChain,
+  synthesisDigestLadder,
   type ComposedSegment,
   type DigestSourceNode,
   type EvaluatorRequest,
@@ -235,7 +237,7 @@ function recorder(script: {
   };
 }
 
-describe("T9 digest — membership is total; the byte budget governs summary LENGTH only", () => {
+describe("T9 digest — membership is total at rungs 0-6; only the last rung may drop it (Task M4)", () => {
   it("carries a decisive node that is neither a root nor a top-2 objection into the recorded synthesizer request", async () => {
     // The RED the goal names (223-231): a decisive node outside roots/top-2
     // must PROVABLY reach the synthesizer. It is neither a position nor one of
@@ -263,12 +265,50 @@ describe("T9 digest — membership is total; the byte budget governs summary LEN
     expect(result.terminal).toBe("SERVED");
   });
 
-  it("keeps every node at every compression level and shortens summaries instead", () => {
+  /**
+   * ENGINE MONEY RULE (spec §14.4.3), TASK M4 — T9's membership law, AMENDED.
+   * The law was "the byte budget never changes membership". Measured: 195 nodes
+   * cannot fit the low or medium tier with every node kept, in any entry shape
+   * that keeps the key names. So membership may now drop at the LAST rung only
+   * (the spine), only when every earlier rung is over budget, and the drop is
+   * disclosed (DIGEST-COMPRESSED on the answer, the rung and the count on the
+   * owner's row). Rungs 0-6 keep every node, as the law always said.
+   */
+  it("keeps every node at rungs 0-6, and reaches rung 7 only when rungs 0-6 are all over budget", () => {
     const long = "x".repeat(4_000);
     const nodes = digestNodes().map((node) => digestNode({ ...node, statement: long }));
-    // The ladder is widest-first and ends at maximum compression.
+    // The summary levels are widest-first and end at the tightest cap; two rungs follow them.
     expect(DIGEST_COMPRESSION_LEVELS[0]).toBeNull();
     expect(DIGEST_COMPRESSION_LEVELS.at(-1)).toBe(24);
+    expect(DIGEST_LADDER.compactRung).toBe(DIGEST_COMPRESSION_LEVELS.length);
+    expect(DIGEST_LADDER.spineRung).toBe(DIGEST_COMPRESSION_LEVELS.length + 1);
+
+    // A tree deep enough for the spine to leave something out: a chain under root:A.
+    const chain = Array.from({ length: 12 }, (_unused, index) => digestNode({
+      nodeId: `chain:${String(index)}`,
+      statement: long,
+      polarityRelations: [{ polarity: "support", targetNodeId: index === 0 ? "root:A" : `chain:${String(index - 1)}` }]
+    }));
+    const deep = [...nodes, ...chain];
+    const attempts = [...synthesisDigestLadder({ nodes: deep, servedRootNodeId: "root:A" })];
+    for (const attempt of attempts.filter((candidate) => candidate.digest.compressionLevel < DIGEST_LADDER.spineRung)) {
+      expect(attempt.digest.nodes).toHaveLength(deep.length);
+    }
+    const spines = attempts.filter((candidate) => candidate.digest.compressionLevel === DIGEST_LADDER.spineRung);
+    expect(spines.length).toBeGreaterThan(0);
+    for (const spine of spines) expect(spine.digest.nodes.length).toBeLessThan(deep.length);
+    const smallestFullMembership = Math.min(...attempts
+      .filter((candidate) => candidate.digest.compressionLevel < DIGEST_LADDER.spineRung)
+      .map((candidate) => candidate.digest.byteSize));
+    // One byte under the smallest full digest: the spine answers, and only then.
+    const atSpine = buildSynthesisDigest({ nodes: deep, servedRootNodeId: "root:A", budgetBound: smallestFullMembership - 1 });
+    if (atSpine.kind !== "DIGEST") throw new Error("the spine must fit one byte under the compact rung");
+    expect(atSpine.digest.compressionLevel).toBe(DIGEST_LADDER.spineRung);
+    expect(atSpine.marks).toEqual([DIGEST_COMPRESSED_MARK]);
+    const atCompact = buildSynthesisDigest({ nodes: deep, servedRootNodeId: "root:A", budgetBound: smallestFullMembership });
+    if (atCompact.kind !== "DIGEST") throw new Error("unreachable");
+    expect(atCompact.digest.compressionLevel).toBeLessThan(DIGEST_LADDER.spineRung);
+    expect(atCompact.digest.nodes).toHaveLength(deep.length);
 
     // Membership is invariant under tightening: same ids, in the same order,
     // at the widest and the tightest level a real budget can select.
