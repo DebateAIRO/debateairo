@@ -30,6 +30,12 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * (`expansionPhaseStop`, `reviewFailureOutcome`, `envelopeStopPendingAttempts`,
  * `isRunLevelSpendStop`) and the terminal they route into is unit-tested; what
  * only a real run shows is that the joints are wired into the loops that matter.
+ *
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2: that contract is amended — a stop
+ * while arguing no longer ends in the envelope terminal, the run stops arguing
+ * and still writes its answer — and most of it is now WIRED, in
+ * `tests/integration/database.test.ts` ("Engine money rule M2 …"). See the
+ * sketch below for what is and is not.
  */
 let database: TestDatabase;
 
@@ -331,6 +337,19 @@ describe("M1 migration 0075 — ledger.model_spend.spend_phase", () => {
 /**
  * RE-REVIEW C1/C2(a) — THE WHOLE-RUN PROPERTY. **NOT RUN — an unwired sketch.**
  *
+ * ENGINE MONEY RULE, TASK M2 — THIS CONTRACT IS AMENDED, AND MOSTLY WIRED. At a
+ * stop while arguing the run stops ARGUING and still answers (V-28 amended by
+ * spec §14.4.1). Item 3 therefore now reads: the run reaches a SERVED (or
+ * DOWNGRADED) answer, its condition marks still include `ENVELOPE_EXHAUSTED`,
+ * and that record's reason is the stop's own code. Items 1-4, 6, 7, 8 and 9 are
+ * driven through the production runner by `tests/integration/database.test.ts`
+ * ("Engine money rule M2 …"), together with the attempt ceiling in review, a
+ * stop on the first root's panel (author-only, single voice) and the typed
+ * `RUN_CEILING_BELOW_FIRST_CALL` failure on the author's own first call. Still
+ * unwired, and still owed: 5 (the money seam there is a test double, so no
+ * `ledger.model_spend` rows exist to count), 10 (M = 3), 11 (a stop on the
+ * first review call; the attempt case stops there, but not on money) and 12.
+ *
  * Sketched rather than finished on purpose: standing a run up to the point where
  * a second root is authored needs the runner's full settings object, a fake
  * provider panel and a seeded register, all of which the acceptance harness
@@ -383,7 +402,7 @@ describe("M1 migration 0075 — ledger.model_spend.spend_phase", () => {
  *     keeps its `HIDDEN-UNJUDGEABLE` record; a child the stop denied a review
  *     is not hidden.
  */
-describe.skip("V-28 a spend stop mid-run ends in the envelope terminal (NOT RUN — unwired sketch)", () => {
+describe.skip("V-28 / M2 a spend stop mid-run stops the arguing and still answers (NOT RUN — the unwired remainder: items 5, 10, 11, 12)", () => {
   it("keeps root 0 when root 1 is refused on money at M=2, and says it rests on one lineage", () => {
     expect.unreachable("wire to the acceptance harness; see the numbered contract above");
   });

@@ -988,3 +988,129 @@ describe("T17B · a provider attempt REFUSED at the equality boundary reaches th
     }
   }, 240_000);
 });
+
+/**
+ * T17C · ENGINE MONEY RULE (spec §14.4.1), TASK M2 — THE ATTEMPT CEILING STOPS
+ * THE ARGUING, AND THE ANSWER'S RESERVE PAYS FOR THE WHOLE ANSWER.
+ *
+ * Before M2 an attempt-ceiling refusal while the debate was argued travelled out
+ * of the phase and FAILED the run: nothing served. Task M1 holds back the serve
+ * leg's attempts on the receipt (`serve_reserve_attempts`), so the arguing is
+ * refused at `ceiling - reserve`; Task M2 turns that refusal into a stop of the
+ * ARGUING, and the run goes on to write its answer.
+ *
+ * This drives it on the MAXIMUM path, where every site is driven to its last
+ * allowed attempt — the serve leg included (three synthesis rounds, three
+ * attempts at each of six sites). The receipt keeps the minted reserve and
+ * lowers only the ceiling, so the arguing has forty attempts: far short of the
+ * eighty-eight a full debate on this topology needs, so it is stopped in the
+ * middle of expansion, wherever the forty-first attempt falls. The answer then
+ * has EXACTLY the reserve to spend, and spends all of it.
+ */
+describe("T17C · Task M2 — an attempt stop while arguing is answered out of the reserve, on the maximum path", () => {
+  it("stops the arguing at the ceiling less the reserve, serves, and spends exactly the reserve", async () => {
+    const BODY_ATTEMPTS = 40;
+    const reserve = ceilingBasis.serve_reserve_attempts;
+    expect(reserve).toBe(SERVE_SITES * ATTEMPTS_PER_SERVE_SITE);
+    // Short of the full debate, so the stop really is mid-debate.
+    expect(BODY_ATTEMPTS).toBeLessThan(PRE_SERVE_ATTEMPTS);
+
+    const primary = await startMaximumPathProvider("primary");
+    const secondary = await startMaximumPathProvider("secondary");
+    try {
+      const question = `t17c-body-attempt-stop-${randomUUID()}`;
+      const runRepository = new RunRepository(database.pool);
+      // Only the ceiling moves; the reserve and the serve-leg disclosure stay
+      // exactly as the register minted them, so the parser's self-consistency
+      // check (reserve = serve sites x organ attempts, reserve <= ceiling) holds.
+      const runId = await runRepository.startRun({
+        questionLine: question, principal: { kind: "legacy", legacyAskerId: `asker:${question}` },
+        sessionId: `session:${question}`, callerScope: "ASKER",
+        asOf: new Date("2026-09-03T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
+        tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${question}`,
+        compositionBudgetTier: "low", depthParams: { depth: 1 },
+        discoveredPanel: fixtureDiscoveredPanel(PANEL_SIZE), strangerSampleRate: 1,
+        envelopeBasis: { ...ceilingBasis, max_model_attempts: BODY_ATTEMPTS + reserve },
+        registerVersion: 1, batteryVersion: "s00", batteryRows
+      });
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t17c:${runId}`
+      });
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      }), {
+        ...runnerSettings(),
+        runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: FINAL_RETRY_ATTEMPTS, maxCooldownHoldsPerRun: 2 },
+        hiddenNodeScoreThreshold: { value: 0.35, sourceRef: "acceptance:DR-176:V-approved" },
+        holdRecorder: {
+          countCooldownHolds: (candidate) => runRepository.countCooldownHolds(candidate),
+          record: (event) => runRepository.recordRunLifecycleEvent({
+            runId: event.runId, kind: event.kind,
+            value: {
+              state: event.state, call_site_key: event.callSiteKey, parent_node_ref: event.parentNodeId,
+              hold_ms: event.holdMs, hold_until: event.holdUntil, attempts_spent: event.attemptsSpent,
+              transport_outcome: event.transportOutcome, planned_leg_count: event.plannedLegCount
+            }
+          }),
+          wait: async () => undefined
+        },
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Secondary test maker"
+        }
+      });
+
+      // (1) THE RUN IS ANSWERED. Before M2 the refusal travelled out of the
+      //     phase that met it and this line threw RUN_COST_ENVELOPE_EXHAUSTED.
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+
+      // (2) MEASURED ON THE LEDGER: the arguing stopped at the ceiling less the
+      //     reserve, and the answer spent the reserve and nothing more — the
+      //     maximum-path serve leg fits it exactly.
+      const ledger = await database.pool.query<{ total: string; serve: string }>(
+        `SELECT count(*)::text AS total,
+                count(*) FILTER (WHERE call_site_key LIKE 'COMPOSER:%'
+                              OR call_site_key LIKE 'POST_COMPOSE_R9:%')::text AS serve
+         FROM ledger.ledger_entry
+         WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
+        [runId]
+      );
+      expect(Number(ledger.rows[0]!.total) - Number(ledger.rows[0]!.serve)).toBe(BODY_ATTEMPTS);
+      expect(Number(ledger.rows[0]!.serve)).toBe(reserve);
+
+      // (3) THE ENVELOPE IS WITHIN: the run spent exactly what its receipt
+      //     allows, which J28 reports as WITHIN, and it kept its answer.
+      const envelopeState = await database.pool.query<{ value_json: unknown }>(
+        `SELECT DISTINCT ON (kind) value_json
+         FROM core.run_progress_event
+         WHERE run_id=$1 AND kind='ENVELOPE_STATE' ORDER BY kind, at_seq DESC`,
+        [runId]
+      );
+      expect(envelopeState.rows[0]?.value_json).toBe("WITHIN");
+
+      // (4) THE PERSISTED ANSWER IS SERVED, and still says the debate was cut
+      //     short, naming the ATTEMPT ceiling.
+      const answer = await database.pool.query<{ answer_id: string; terminal: string; condition_marks: readonly string[] }>(
+        `SELECT answer_id::text, terminal, condition_marks FROM serve.answer
+         WHERE run_id=$1 ORDER BY answer_version DESC LIMIT 1`,
+        [runId]
+      );
+      expect(answer.rows).toHaveLength(1);
+      expect(["SERVED", "DOWNGRADED"]).toContain(answer.rows[0]!.terminal);
+      expect(answer.rows[0]!.condition_marks).toContain("ENVELOPE_EXHAUSTED");
+      const envelopeRecords = await database.pool.query<{ reason: string }>(
+        `SELECT reason FROM serve.condition_mark
+         WHERE answer_id=$1 AND mark='ENVELOPE_EXHAUSTED'`,
+        [answer.rows[0]!.answer_id]
+      );
+      expect(envelopeRecords.rows.map((row) => row.reason)).toEqual(["RUN_COST_ENVELOPE_EXHAUSTED"]);
+    } finally {
+      await secondary.stop();
+      await primary.stop();
+    }
+  }, 240_000);
+});

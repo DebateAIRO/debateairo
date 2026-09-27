@@ -12,7 +12,7 @@ import {
   WorkItemRepository
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
-import { BudgetRepository } from "@debateai/budget";
+import { BudgetRepository, type CostEnvelopePhase } from "@debateai/budget";
 import { ProviderProbeRepository, RunRepository, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
@@ -40,11 +40,12 @@ import {
   EVALUATOR_PROMPT_CONTRACT,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
+  runnerTerminalFailureReason,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
 } from "@debateai/runner";
-import type { ProviderCallRequest, ProviderGateway } from "@debateai/providers";
+import type { ProviderCallRequest, ProviderCostEnvelopeSeam, ProviderGateway } from "@debateai/providers";
 import { evaluate } from "@debateai/propagation";
 import { agg, σ } from "@debateai/published-arithmetic";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
@@ -60,7 +61,7 @@ import {
   type AskRequest,
   type Session
 } from "@debateai/contract";
-import { argumentLanguageDirective, type ServedRootRuleHistory } from "@debateai/kernel";
+import { argumentLanguageDirective, TypedDomainError, type ServedRootRuleHistory } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -287,7 +288,8 @@ async function createRun(
   maxModelAttempts = 10,
   agentCount = 1,
   depth = 1,
-  askerId = `asker:${questionLine}`
+  askerId = `asker:${questionLine}`,
+  envelopeBasis: Readonly<Record<string, unknown>> = fixtureStructuralCeiling(maxModelAttempts, agentCount, Math.min(depth, 5))
 ): Promise<string> {
   return new RunRepository(database.pool).startRun({
     questionLine, principal: { kind: "legacy", legacyAskerId: askerId },
@@ -295,7 +297,7 @@ async function createRun(
     asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${questionLine}`, compositionBudgetTier: "low",
     depthParams: { depth }, discoveredPanel: fixtureDiscoveredPanel(agentCount), strangerSampleRate: 1,
-    envelopeBasis: fixtureStructuralCeiling(maxModelAttempts, agentCount, Math.min(depth, 5)),
+    envelopeBasis,
     registerVersion: 1, batteryVersion: "s00", batteryRows
   });
 }
@@ -582,19 +584,27 @@ async function executeResil01Scenario(input: {
   readonly secondary: readonly ProviderDoubleResponse[];
   readonly depth?: number;
   readonly beforeExecute?: (context: { runId: string; workItemId: string }) => Promise<void>;
+  /** Engine money rule, Task M2: the run's receipt, when a test pins its own. */
+  readonly envelopeBasis?: Readonly<Record<string, unknown>>;
+  /** Engine money rule, Task M2: each maker's money seam, as a hosted runner builds one per call. */
+  readonly primaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  readonly secondaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
 }) {
   const primary = await startProviderDouble(input.primary);
   const secondary = await startProviderDouble(input.secondary);
   try {
     const question = `${input.label}-${randomUUID()}`;
-    const runId = await createRun(question, 100, 2, input.depth ?? 1);
+    const runId = input.envelopeBasis === undefined
+      ? await createRun(question, 100, 2, input.depth ?? 1)
+      : await createRun(question, 100, 2, input.depth ?? 1, `asker:${question}`, input.envelopeBasis);
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `${input.label}:${runId}`
     });
     await input.beforeExecute?.({ runId, workItemId });
     const runRepository = new RunRepository(database.pool);
     const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
-      endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
+      endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker",
+      ...(input.primaryCostEnvelope === undefined ? {} : { buildCostEnvelopeSeam: input.primaryCostEnvelope })
     }), {
       ...runnerSettings(),
       claimMs: 1_204_000,
@@ -615,7 +625,8 @@ async function executeResil01Scenario(input: {
       },
       critique: {
         provider: createPostgresProviderGateway(database.pool, {
-          endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
+          endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker",
+          ...(input.secondaryCostEnvelope === undefined ? {} : { buildCostEnvelopeSeam: input.secondaryCostEnvelope })
         }),
         providerRef: "provider:test-layer:secondary",
         maker: "Secondary test maker"
@@ -4997,6 +5008,292 @@ describe("apps/runner — legal command lifecycle", () => {
       );
       expect(state.rows[0]).toEqual({ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" });
     } finally { await provider.stop(); }
+  });
+});
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — A STOP WHILE ARGUING NEVER SKIPS
+ * THE ANSWER, through the PRODUCTION runner on the embedded Postgres.
+ *
+ * The owner's rule: "No debate ends without a final verdict unless there is a
+ * technical problem; money is never the reason." Before M2 every case below
+ * ended without an answer: a stop while the debate was argued forced the
+ * components-only envelope terminal at the serve gate (the answer-writer was
+ * never called), an attempt-ceiling stop FAILED the run, and a stop on the first
+ * root's panel escaped the work item and FAILED it too. Now the stop ends the
+ * ARGUING only: the run goes on to write its answer with the tree as it stands,
+ * and the stop stays on the answer's record.
+ *
+ * Doubles only at the provider boundary. A money or usage stop is raised the way
+ * a hosted deployment raises one — by the per-call money seam the gateway builds
+ * for the call's phase (`buildCostEnvelopeSeam`) — and the attempt stop by the
+ * run's own pinned receipt, through the real `BudgetRepository` hook. The seam
+ * refuses ONE chosen BODY call of one maker's gateway and allows every other,
+ * the SERVE calls included, and it records the phase of every call it was built
+ * for, so each case can show that the answer was written through the SERVE
+ * ceiling and that nothing more was argued after the stop.
+ *
+ * The call order these ordinals rely on (M = 2, depth 1): the primary authors
+ * root 0 (primary BODY 1); the secondary assesses it on the root panel
+ * (secondary BODY 1; the primary's own panel voice is the FX-HR-H6 bulkhead and
+ * makes no call); the secondary authors root 1 (secondary BODY 2); the primary
+ * assesses root 1 (primary BODY 2); the roots are reviewed across makers
+ * (secondary BODY 3, primary BODY 3); expansion follows.
+ */
+function stopOnBodyCall(input: Readonly<{
+  /** Which BODY call of this gateway is refused (1-based); 0 refuses none. */
+  ordinal: number;
+  code: "RUN_COST_ENVELOPE_MONEY_REACHED" | "PROVIDER_USAGE_UNREPORTED";
+}>): Readonly<{
+  build: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  phases(): readonly CostEnvelopePhase[];
+}> {
+  let bodyCalls = 0;
+  const phases: CostEnvelopePhase[] = [];
+  return Object.freeze({
+    phases: () => Object.freeze([...phases]),
+    build: (_runId: string, phase: CostEnvelopePhase): ProviderCostEnvelopeSeam => {
+      phases.push(phase);
+      if (phase === "BODY") bodyCalls += 1;
+      const refused = phase === "BODY" && bodyCalls === input.ordinal;
+      return {
+        // A money refusal is raised BEFORE sending: the call is never made.
+        assertCallAllowed: () => {
+          if (refused && input.code === "RUN_COST_ENVELOPE_MONEY_REACHED") {
+            throw new TypedDomainError(input.code, "test-layer: the run's ceiling for arguing is reached");
+          }
+        },
+        recordCall: () => undefined,
+        // A usage refusal is raised AFTER the vendor answered without usage.
+        assertUsageReported: () => {
+          if (refused && input.code === "PROVIDER_USAGE_UNREPORTED") {
+            throw new TypedDomainError(input.code, "test-layer: the vendor answered without usage");
+          }
+        }
+      };
+    }
+  });
+}
+
+const SERVED_TERMINALS: readonly string[] = Object.freeze(["SERVED", "DOWNGRADED"]);
+
+async function reviewCount(runId: string): Promise<number> {
+  const reviews = await database.pool.query<{ count: string }>(
+    "SELECT count(*)::text AS count FROM ledger.node_review WHERE run_id=$1",
+    [runId]
+  );
+  return Number(reviews.rows[0]?.count);
+}
+
+describe("Engine money rule M2 — a stop while arguing never skips the answer (production runner)", () => {
+  it("serves root 0 after a money stop on root 1, saying it rests on one lineage and was cut short", async () => {
+    const primarySeam = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-root-1-money",
+      primary: [judgementDouble("Primary M2 money position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M2 money position")],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    // The run is ANSWERED — before M2 it ended components-only, answer unwritten.
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    expect(scenario.answer?.composed_text.length).toBeGreaterThan(0);
+    // Root 1 was refused before it was sent, and nothing more was argued: the
+    // only other calls are the answer-writer's, on the SERVE ceiling.
+    expect(scenario.snapshot.nodes).toHaveLength(1);
+    expect(secondarySeam.phases()).toEqual(["BODY", "BODY"]);
+    expect(scenario.secondaryCalls).toBe(1);
+    expect(primarySeam.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+    expect(await reviewCount(scenario.runId)).toBe(0);
+    // The stop stays on the record: one lineage, and the envelope record naming
+    // the money ceiling, which the honesty drawer shows as "Run envelope exhausted".
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining(["SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"]));
+    expect(scenario.answer?.condition_marks).not.toContain("UNSERVED-MAKER-POSITION");
+    const reasonsOf = (mark: string) => (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === mark).map((record) => record.reason);
+    expect(reasonsOf("SINGLE-LINEAGE")).toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    expect(reasonsOf("ENVELOPE_EXHAUSTED")).toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+  });
+
+  it("serves root 0 after a usage stop on root 1, under the vendor's own reason", async () => {
+    const primarySeam = stopOnBodyCall({ ordinal: 0, code: "PROVIDER_USAGE_UNREPORTED" });
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "PROVIDER_USAGE_UNREPORTED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-root-1-usage",
+      primary: [judgementDouble("Primary M2 usage position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M2 usage position")],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    // A usage stop is raised AFTER the vendor answered, so root 1's call WAS
+    // made — and its node is still not minted: the arguing stopped there.
+    expect(scenario.secondaryCalls).toBe(2);
+    expect(scenario.snapshot.nodes).toHaveLength(1);
+    expect(primarySeam.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+    const reasonsOf = (mark: string) => (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === mark).map((record) => record.reason);
+    // Never the money reason: an operator told "raise the ceiling" would lift
+    // the wrong thing (rulings R2, R-C).
+    expect(reasonsOf("SINGLE-LINEAGE")).toEqual(["PROVIDER_USAGE_UNREPORTED"]);
+    expect(reasonsOf("ENVELOPE_EXHAUSTED")).toEqual(["PROVIDER_USAGE_UNREPORTED"]);
+  });
+
+  it("serves an answer after the attempt ceiling stops a review, where it used to FAIL the run", async () => {
+    // A receipt that holds the answer's reserve (Task M1): the serve leg's six
+    // sites at one attempt each. The arguing may spend ten less six = four:
+    // root 0, its panel, root 1, its panel. The FIRST review is the fifth.
+    const scenario = await executeResil01Scenario({
+      label: "m2-review-attempts",
+      primary: [
+        judgementDouble("Primary M2 attempts position"),
+        reviewDouble("agree", "never reached"),
+        resil01Composition,
+        evaluatorSatisfied()
+      ],
+      secondary: [judgementDouble("Secondary M2 attempts position"), reviewDouble("dispute", "never reached")],
+      envelopeBasis: { ...fixtureStructuralCeiling(10, 2, 1), serve_reserve_attempts: 6 }
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    // Measured on the ledger: four calls argued, no review landed, and the
+    // answer was written with the reserve the arguing could not touch.
+    const calls = await database.pool.query<{ serve: string; total: string }>(
+      `SELECT count(*)::text AS total,
+              count(*) FILTER (WHERE call_site_key LIKE 'COMPOSER:%'
+                            OR call_site_key LIKE 'POST_COMPOSE_R9:%')::text AS serve
+         FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
+      [scenario.runId]
+    );
+    expect(Number(calls.rows[0]!.total) - Number(calls.rows[0]!.serve)).toBe(4);
+    expect(Number(calls.rows[0]!.serve)).toBeGreaterThan(0);
+    expect(await reviewCount(scenario.runId)).toBe(0);
+    // Both roots exist, so the answer names the one it did not serve, and the
+    // envelope record names the ATTEMPT ceiling, not money.
+    expect(scenario.snapshot.nodes).toHaveLength(2);
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining(["UNSERVED-MAKER-POSITION", "ENVELOPE_EXHAUSTED"]));
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_EXHAUSTED"]);
+  });
+
+  it("serves an answer after a money stop during expansion, keeping the reviews that landed", async () => {
+    // The primary's fourth BODY call is its first in the expansion phase: both
+    // roots are authored, panelled and reviewed before it.
+    const primarySeam = stopOnBodyCall({ ordinal: 4, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-expansion-money",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary M2 expansion position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary M2 expansion review ${index + 1}`)),
+        resil01Composition,
+        evaluatorSatisfied()
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary M2 expansion position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Secondary M2 expansion review ${index + 1}`))
+      ],
+      primaryCostEnvelope: primarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    expect(await reviewCount(scenario.runId)).toBe(2);
+    expect(primarySeam.phases().filter((phase) => phase === "BODY")).toHaveLength(4);
+    expect(primarySeam.phases().slice(-2)).toEqual(["SERVE", "SERVE"]);
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining(["UNSERVED-MAKER-POSITION", "ENVELOPE_EXHAUSTED"]));
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+  });
+
+  it("serves root 0 on its author's judgement when the first root's panel is refused, instead of failing the run", async () => {
+    const primarySeam = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const secondarySeam = stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-root-panel-money",
+      primary: [judgementDouble("Primary M2 panel position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M2 panel position")],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    // Before M2 the refusal escaped the work item: FAILED, nothing served.
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    // The panel call was refused before it was sent, and the run went straight
+    // to its answer: no secondary root, no review, only the SERVE calls after.
+    expect(scenario.secondaryCalls).toBe(0);
+    expect(secondarySeam.phases()).toEqual(["BODY"]);
+    expect(primarySeam.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+    expect(scenario.snapshot.nodes).toHaveLength(1);
+    expect(await reviewCount(scenario.runId)).toBe(0);
+    // Root 0 carries the existing single-voice disclosure, whose reason is the
+    // stop, and the answer says it rests on one lineage and was cut short.
+    const rootNodeId = scenario.snapshot.nodes[0]!.nodeId;
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining([
+      "PANEL-DEGRADED-SINGLE-VOICE", "SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"
+    ]));
+    const singleVoice = (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "PANEL-DEGRADED-SINGLE-VOICE");
+    expect(singleVoice).toHaveLength(1);
+    expect(singleVoice[0]).toMatchObject({ subject_ref: rootNodeId, reason: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    // The node's receipt is the author-only selection: its own judgement, one
+    // voice, and the stop that cut the panel short.
+    const receipt = await database.pool.query<{
+      selected: string; raw: string; voices: string; stop: string | null;
+    }>(
+      `SELECT selected_judgement_ref::text AS selected, raw_artifact_ref::text AS raw,
+              disagreement #>> '{panel,voiceCount}' AS voices,
+              disagreement #>> '{panel,spendStop}' AS stop
+         FROM ledger.reduced_judgement WHERE run_id=$1 AND node_id=$2`,
+      [scenario.runId, rootNodeId]
+    );
+    expect(receipt.rows).toHaveLength(1);
+    expect(receipt.rows[0]!.selected).toBe(receipt.rows[0]!.raw);
+    expect(receipt.rows[0]!.voices).toBe("1");
+    expect(receipt.rows[0]!.stop).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+  });
+
+  it("fails typed, as a ceiling below one call, when the author's own first call is refused", async () => {
+    const primarySeam = stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-first-call-money",
+      primary: [judgementDouble("Primary M2 never-authored position")],
+      secondary: [judgementDouble("Secondary M2 never-authored position")],
+      primaryCostEnvelope: primarySeam.build
+    });
+
+    // Nothing exists to answer from: the one stop that still ends without an
+    // answer, and it says so under its own code rather than as a money stop.
+    expect(scenario.result).toBeNull();
+    expect(scenario.error).toBeInstanceOf(TypedDomainError);
+    expect((scenario.error as TypedDomainError).code).toBe("RUN_CEILING_BELOW_FIRST_CALL");
+    expect(runnerTerminalFailureReason(scenario.error)).toBe("RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL");
+    expect(scenario.primaryCalls).toBe(0);
+    expect(scenario.secondaryCalls).toBe(0);
+    expect(scenario.snapshot.nodes).toHaveLength(0);
+    const answers = await database.pool.query("SELECT 1 FROM serve.answer WHERE run_id=$1", [scenario.runId]);
+    expect(answers.rowCount).toBe(0);
   });
 });
 
