@@ -26,6 +26,10 @@ export type DevelopmentCliRelay = Readonly<{
   authorizationHeader: string;
   maker: string;
   model: string;
+  /** §2.2: the levels this relay's CLI can run at; absent or empty ⇒ DEFAULT_ONLY. */
+  thinkingLevels?: readonly string[];
+  /** §2.10: a declared context window (the pi relay: 1 000 000). */
+  contextWindowTokens?: number;
   close(): Promise<void>;
 }>;
 
@@ -79,7 +83,11 @@ export async function startDevelopmentCliProviderPanel(
           providerRef: provider.providerRef,
           baseUrl: `${outcome.value.baseUrl}/v1`,
           model: outcome.value.model,
-          authorizationHeader: outcome.value.authorizationHeader
+          authorizationHeader: outcome.value.authorizationHeader,
+          ...(outcome.value.thinkingLevels === undefined || outcome.value.thinkingLevels.length === 0
+            ? {} : { thinkingLevels: outcome.value.thinkingLevels }),
+          ...(outcome.value.contextWindowTokens === undefined
+            ? {} : { contextWindowTokens: outcome.value.contextWindowTokens })
         });
       }
       return Object.freeze({

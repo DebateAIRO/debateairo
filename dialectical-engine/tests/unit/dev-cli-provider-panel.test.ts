@@ -12,6 +12,8 @@ import {
   type DevelopmentCliRelay
 } from "../../apps/runner/src/dev-cli-provider-panel.js";
 import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+import { parseDevelopmentProviderPanelTargets } from "../../apps/runner/src/dev-provider-panel.js";
+import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 function relay(port: number, maker: string, model: string): DevelopmentCliRelay & {
   close: ReturnType<typeof vi.fn>;
@@ -225,5 +227,59 @@ describe("development provider-set publication", () => {
     await expect(readDevelopmentDeploymentRegisterReceipt(repositoryRoot))
       .resolves.toMatchObject({ registerVersion: "9", rowCount: published.rows.length });
     await rm(repositoryRoot, { recursive: true, force: true });
+  });
+});
+
+describe("§2.2/§2.10 the development panel declares each healthy relay's levels and window", () => {
+  function levelled(
+    port: number,
+    maker: string,
+    model: string,
+    thinkingLevels: readonly string[],
+    contextWindowTokens?: number
+  ): DevelopmentCliRelay & { close: ReturnType<typeof vi.fn> } {
+    return Object.freeze({
+      ...relay(port, maker, model),
+      thinkingLevels,
+      ...(contextWindowTokens === undefined ? {} : { contextWindowTokens })
+    });
+  }
+
+  it("writes x_thinking_level, the relay's levels and pi's window onto healthy rows only", async () => {
+    const handle = await startDevelopmentCliProviderPanel(operations([
+      levelled(8791, "OpenAI", "gpt-real", ["low", "high"]),
+      new Error("logged out"),
+      relay(8792, "Anthropic", "claude-real"),
+      new Error("logged out"),
+      new Error("logged out"),
+      levelled(8797, "Google", "gemini-3.8-flash", ["low", "medium", "high"]),
+      levelled(8798, "Z.AI", "glm-5.3-flash", ["low", "high"], 1_000_000)
+    ]));
+    const rows = JSON.parse(handle.panel.targetsJson) as readonly Readonly<Record<string, unknown>>[];
+
+    expect(rows[0]).toMatchObject({ thinking_parameter: "x_thinking_level", thinking_levels: ["low", "high"] });
+    expect(rows[0]).not.toHaveProperty("context_window_tokens");
+    expect(rows[1]).not.toHaveProperty("thinking_parameter");
+    // A relay that declares no level stays DEFAULT_ONLY: nothing is written.
+    expect(rows[2]).not.toHaveProperty("thinking_parameter");
+    expect(rows[5]).toMatchObject({
+      thinking_parameter: "x_thinking_level", thinking_levels: ["low", "medium", "high"]
+    });
+    expect(rows[6]).toMatchObject({
+      thinking_parameter: "x_thinking_level", thinking_levels: ["low", "high"], context_window_tokens: 1_000_000
+    });
+    expect(parseDevelopmentProviderPanelTargets(handle.panel.targetsJson).targetsJson)
+      .toBe(handle.panel.targetsJson);
+    await handle.stop();
+  });
+
+  it("refuses a development target that names any other thinking parameter", () => {
+    const rows = JSON.parse(TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+    const foreign = rows.map((row, index) => index === 0
+      ? { ...row, thinking_parameter: "reasoning_effort", thinking_levels: ["low"] }
+      : row);
+
+    expect(() => parseDevelopmentProviderPanelTargets(JSON.stringify(foreign)))
+      .toThrow("DEV_CLI_PROVIDER_PANEL_THINKING_PARAMETER_INVALID");
   });
 });
