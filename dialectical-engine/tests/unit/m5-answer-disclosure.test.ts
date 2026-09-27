@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import {
   AnswerDisclosureSchema,
@@ -11,6 +11,7 @@ import {
 import { SERVE_CRASH_CLASSES } from "@debateai/serve";
 import type { ServeDisclosureModel, ServeDisclosureRead, StoredServeDisclosure } from "@debateai/db";
 import { answerCarriesStoryLabel } from "@debateai/story";
+import { TypedDomainError } from "@debateai/kernel";
 import {
   RepositoryAnswerDisclosureApplication,
   buildAnswerDisclosure,
@@ -352,6 +353,72 @@ describe("GET /v1/answers/{id}/disclosure (spec §14.4.5)", () => {
     await expect(absent.readFloor({
       answerId: STORY_TEST_ANSWER_ID, ownership: { ownerRef: null, legacyAskerId: "asker:legacy" }
     })).resolves.toBeNull();
+  });
+});
+
+/**
+ * FINAL REVIEW, Minor 6 — A CORRUPT ROW IS THE CLOSED 404, NEVER A 500. A floor
+ * whose label receipt is gone, or a stored cause outside the closed list, used
+ * to reach the global 500. The route now degrades the way the story route
+ * does: the owner sees the same closed 404 as "no record", and the log carries
+ * one bounded diagnostic (a typed code or a class category), never a message.
+ */
+describe("GET /v1/answers/{id}/disclosure — a corrupt row degrades to the closed 404", () => {
+  const DETAIL = "row for the question about my rent";
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function readThrough(repository: ConstructorParameters<typeof RepositoryAnswerDisclosureApplication>[0]) {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const server = api({ answer: answerOf(FLOOR_ANSWER_OVERRIDES), disclosures: new RepositoryAnswerDisclosureApplication(repository) });
+    const response = await server.inject({ method: "GET", url: URL_OF, headers: HEADERS });
+    await server.close();
+    return { response, logged };
+  }
+
+  it.each([
+    [
+      "a floor without its label receipt (the repository's typed refusal)",
+      async (): Promise<ServeDisclosureRead | null> => { throw new TypedDomainError("SERVE_DISCLOSURE_ROW_INVALID", DETAIL); },
+      "SERVE_DISCLOSURE_ROW_INVALID"
+    ],
+    [
+      "a floor whose stored cause is outside the closed list",
+      async (): Promise<ServeDisclosureRead | null> => ({ ...FLOOR_READ, row: storedRow({ floorReason: "BUDGET_BLOWN" }) }),
+      "SCHEMA_VALIDATION_ERROR"
+    ],
+    [
+      "an untyped read failure",
+      async (): Promise<ServeDisclosureRead | null> => { throw new Error(DETAIL); },
+      "ERROR"
+    ]
+  ] as const)("answers DISCLOSURE_NOT_FOUND for %s, logging the diagnostic and never the detail", async (_name, readLatestForAnswer, diagnostic) => {
+    const { response, logged } = await readThrough({ readLatestForAnswer, readLatestFloorForAnswer: async () => null });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: "DISCLOSURE_NOT_FOUND" });
+    expect(response.body).not.toContain("rent");
+    expect(response.body).not.toContain("BUDGET_BLOWN");
+    expect(logged).toHaveBeenCalledTimes(1);
+    const line = String(logged.mock.calls[0]?.[0]);
+    expect(line).not.toContain("rent");
+    expect(line).not.toContain("BUDGET_BLOWN");
+    expect(JSON.parse(line)).toEqual({
+      event: "api.disclosure.unreadable",
+      requestId: expect.any(String),
+      route: "/v1/answers/:id/disclosure",
+      diagnostic
+    });
+  });
+
+  it("still answers a sound row with 200, and logs nothing", async () => {
+    const { response, logged } = await readThrough({
+      readLatestForAnswer: async () => FLOOR_READ, readLatestFloorForAnswer: async () => null
+    });
+    expect(response.statusCode).toBe(200);
+    expect(AnswerDisclosureSchema.parse(response.json()).floor_reason).toBe("ENVELOPE_EXHAUSTED");
+    expect(logged).not.toHaveBeenCalled();
   });
 });
 

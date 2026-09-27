@@ -35,6 +35,7 @@ import {
   UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
+  type AnswerDisclosure,
   type AnswerStory,
   type ArgumentLanguage,
   type AskAccepted,
@@ -2260,6 +2261,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // read is the ownership check, and "not yours", "malformed", "not composed"
   // and "no record" share one closed 404. The repository picks the latest
   // answer version that HAS a record and applies the ownership predicate again.
+  // Final review, Minor 6: a record that cannot be read — a corrupt row (a
+  // floor without its label receipt, a cause outside the closed list) or a
+  // failed read — degrades the way the story route does: the same closed 404,
+  // and one log line with the bounded diagnostic (a typed code or a class
+  // category), never the message and never a generic 500.
   api.get<{ Params: { id: string } }>("/v1/answers/:id/disclosure", routePolicy("GET /v1/answers/{id}/disclosure"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     const disclosures = options.disclosures;
@@ -2269,10 +2275,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const ownership = ownershipFor(request);
     const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
     if (answer === null) return reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" });
-    const disclosure = await disclosures.readDisclosure({ answerId: answer.answer_id, ownership });
+    let disclosure: AnswerDisclosure | null;
+    try {
+      const read = await disclosures.readDisclosure({ answerId: answer.answer_id, ownership });
+      disclosure = read === null ? null : AnswerDisclosureSchema.parse(read);
+    } catch (error) {
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.disclosure.unreadable",
+        requestId: request.id,
+        route: request.routeOptions.url,
+        diagnostic: apiOperationalErrorDiagnostic(error)
+      })));
+      disclosure = null;
+    }
     return disclosure === null
       ? reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" })
-      : reply.send(AnswerDisclosureSchema.parse(disclosure));
+      : reply.send(disclosure);
   });
 
   api.get<{ Params: { id: string; nodeId: string } }>("/v1/answers/:id/nodes/:nodeId", routePolicy("GET /v1/answers/{id}/nodes/{nodeId}"), async (request, reply) => {
