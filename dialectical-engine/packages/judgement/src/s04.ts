@@ -351,6 +351,17 @@ function boundedMemberFailureReason(error: unknown): string {
   return MEMBER_FAILURE_CODES.get(code) ?? UNCLASSIFIED_MEMBER_ERROR;
 }
 
+/**
+ * One panel note. `MEMBER_FAILED` is a member that fell over; the two FX-HR-H6
+ * kinds are the author's own maker or route: `PRODUCER_GRADING_FORBIDDEN` is
+ * the expected skip BEFORE any call, and `PRODUCER_GRADING_REFUSED_AFTER_CALL`
+ * is a seat whose answer came back from the author (a backup) — a billed call
+ * and a lost voice — naming the seat (`memberRole`) and who answered.
+ */
+type PanelNote =
+  | { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }
+  | { readonly memberRole: string; readonly answeringMemberRole: string; readonly contractHash: string; readonly kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL"; readonly failureKind: "PRODUCER_GRADING_FORBIDDEN"; readonly reason: string };
+
 export async function runJudgePanel(input: {
   readonly artifactProducerRef: string;
   readonly primary: { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string };
@@ -371,13 +382,22 @@ export async function runJudgePanel(input: {
       readonly memberRole?: string;
     }>;
   }[];
-}): Promise<{ readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly actorRef: string; readonly contractHash: string | null }[]; readonly notes: readonly { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }[] }> {
+}): Promise<{ readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly actorRef: string; readonly contractHash: string | null }[]; readonly notes: readonly PanelNote[] }> {
   const judgements: { judgementRef: string; assessment: JudgeAssessment; memberRole: string; actorRef: string; contractHash: string | null }[] = [
     { ...input.primary, actorRef: input.artifactProducerRef, contractHash: null }
   ];
-  const notes: { memberRole: string; contractHash: string; kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; failureKind: PanelMemberFailureKind; reason: string }[] = [];
+  const notes: PanelNote[] = [];
+  // FX-HR-H6 is "no MAKER grades its own artifact" — the law the database
+  // enforces by maker (migrations 0019/0023/0026) and the evaluator checks by
+  // maker. `memberRole` is the maker here, so the author's maker is
+  // `input.primary.memberRole`; the author's route is `artifactProducerRef`.
+  // A seat is refused on EITHER: the author's maker on another route (a second
+  // endpoint a deployment configured, or a picker's runner-up of that maker)
+  // is still the author's maker, and the author's route is the author.
+  const isTheAuthor = (actorRef: string, memberRole: string): boolean =>
+    actorRef === input.artifactProducerRef || memberRole === input.primary.memberRole;
   for (const member of input.members) {
-    if (member.actorRef === input.artifactProducerRef) {
+    if (isTheAuthor(member.actorRef, member.memberRole)) {
       notes.push({ memberRole: member.memberRole, contractHash: member.contractHash, kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN", reason: "FX-HR-H6" });
       continue;
     }
@@ -385,10 +405,19 @@ export async function runJudgePanel(input: {
       const judged = await member.judge();
       const actorRef = judged.actorRef ?? member.actorRef;
       const memberRole = judged.memberRole ?? member.memberRole;
-      // FX-HR-H6 holds for WHOEVER answered: a backup on the producer's own
-      // route is refused exactly as the producer's own seat is.
-      if (actorRef === input.artifactProducerRef) {
-        notes.push({ memberRole, contractHash: member.contractHash, kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN", reason: "FX-HR-H6" });
+      // FX-HR-H6 holds for WHOEVER answered: a backup on the author's route or
+      // of the author's maker is refused as the author's own seat is. It is not
+      // the expected skip above — a call was made and a voice was lost — so it
+      // has its own kind, naming the seat AND the maker that answered.
+      if (isTheAuthor(actorRef, memberRole)) {
+        notes.push({
+          memberRole: member.memberRole,
+          answeringMemberRole: memberRole,
+          contractHash: member.contractHash,
+          kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL",
+          failureKind: "PRODUCER_GRADING_FORBIDDEN",
+          reason: "FX-HR-H6"
+        });
         continue;
       }
       judgements.push({
