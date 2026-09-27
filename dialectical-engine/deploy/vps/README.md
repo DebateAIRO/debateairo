@@ -1034,6 +1034,7 @@ The paid-vendor probe spends `max_tokens: 8` per target per staleness window; th
 | `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:` the provider ref, then the reason | the credential file is there but cannot be used: it failed custody (`SECRET_CUSTODY_INVALID`), the custody group could not be resolved (`CUSTODY_GROUP_UNRESOLVED`), or its contents are not one printable header line (`PROVIDER_CREDENTIAL_FILE_INVALID`). Neither the path nor a byte of the credential appears in the message. |
 | `COST_ENVELOPE_POLICY_UNRESOLVED` | the register version in force (`REGISTER_VERSION`) carries no `costEnvelopePolicy` row — the one an operator actually meets, by pinning a version published before the envelopes existed. Both services refuse. |
 | `COST_ENVELOPE_POLICY_INVALID` | that row exists but is malformed. |
+| `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling cannot hold one full debate plus its verdict story: the per-debate ceiling with the answer's overrun, plus the story's own cap with the story's overrun (0.36 USD with the values below). The `costEnvelopePolicy` row alone cannot see the story's row, so this is checked over both, here and when the register is published. Raise `daily_ceiling_micros` in a new register version. Both services refuse. |
 | `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows above. |
 | `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` | the API only: the `admissionPolicy` row in force lacks any of the support chat's three budgets (`support_reads`, `support_sessions`, `support_model_calls`). Local mode runs without them; hosted does not. |
 | `PROVIDER_TARGET_PRICE_REQUIRED:` and the provider ref | a debate target declares no price. Both `input_price_micros_per_million` and `output_price_micros_per_million` are required in hosted mode. |
@@ -1163,6 +1164,11 @@ the calls made while a debate is argued may spend up to 70% of the per-debate ce
 arguing may not touch. The daily ceiling must hold one debate at its new maximum (per-debate
 ceiling plus the overrun, here 0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`);
 each new debate then reserves that maximum, plus the story's own ceiling, against the day.
+The verdict story's cap is a code-owned row the publication seals for you (`storyCostEnvelopePolicy`:
+0.05 USD per story, and since engine money rule task M7 a 20% margin over it,
+`per_story_overrun_basis_points` `2000`, so 0.06 USD). The day must hold one debate AND its story
+at their maxima, here 0.30 + 0.06 = 0.36 USD; a day below that is refused when you publish and
+when either service starts (`STORY_DAILY_CEILING_INSUFFICIENT`).
 Every debate charge written from now on is recorded with the part of the debate that spent it
 (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer;
 empty for the support chat, the story and older rows), so the first paid run shows the two
@@ -1290,6 +1296,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `PROVIDER_TARGET_LOOPBACK_REFUSED:` / `PROVIDER_BASE_URL_TLS_REQUIRED:` / `PROVIDER_INLINE_CREDENTIAL_REFUSED:` + ref | a relay, a local or private address, cleartext, or a credential written into the file |
 | `PROVIDER_VENDOR_NOT_VETTED:` + ref | the vendor's V-9(4) record is missing or incomplete |
 | `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000 |
+| `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin, 0.06 USD); raise `daily_ceiling_micros` |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |

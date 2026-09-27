@@ -65,7 +65,7 @@ describe("verdict story register rows — optional, strict, provisional", () => 
     for (const row of rows) expect(row.sourceRef.startsWith("test-layer:story+"), row.rowKey).toBe(true);
   });
 
-  it("adds the hosted money row: 50 000 micro-units per story", () => {
+  it("adds the hosted money row: 50 000 micro-units per story, and 20% over it (Task M7)", () => {
     const rows = buildStoryRegisterRows(HOSTED);
     expect(rows.map((row) => row.rowKey)).toEqual([...STORY_ROW_KEYS]);
     expect(rows.find((row) => row.rowKey === "storyCostEnvelopePolicy")?.value).toEqual({
@@ -73,6 +73,8 @@ describe("verdict story register rows — optional, strict, provisional", () => 
       currency: "USD",
       minor_units_per_unit: 1_000_000,
       per_story_ceiling_micros: 50_000,
+      // Engine money rule (spec §14.4.6): the story's margin, 50 000 x 1.2 = 60 000.
+      per_story_overrun_basis_points: 2_000,
       provisional: true,
       provisional_reason: expect.stringContaining("NEW version")
     });
@@ -87,9 +89,11 @@ describe("verdict story register rows — optional, strict, provisional", () => 
       checkerBound: { maxAttempts: 2, tokenCeiling: 2_048, deadlineMs: 180_000 },
       materialBudget: { low: 40_000, medium: 80_000, high: 120_000 },
       perStoryCeilingMicros: null,
+      perStoryOverrunBasisPoints: 0,
       registerVersion: 9
     });
     expect(readStoryPolicy(buildStoryRegisterRows(HOSTED), 9)?.perStoryCeilingMicros).toBe(50_000);
+    expect(readStoryPolicy(buildStoryRegisterRows(HOSTED), 9)?.perStoryOverrunBasisPoints).toBe(2_000);
   });
 
   it("reads a register with NO story row as null: the story is off, never a refused debate", () => {

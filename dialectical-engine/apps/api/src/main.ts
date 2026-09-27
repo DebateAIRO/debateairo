@@ -42,7 +42,7 @@ import {
 } from "@debateai/register";
 // V-28 (DL4-F2): the application-wide daily spending ceiling, over the persisted
 // model-spend ledger migration 0066 created.
-import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
+import { CostEnvelopeGuard, PostgresModelSpendStore, costEnvelopeGuardPolicy } from "@debateai/budget";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
@@ -258,9 +258,11 @@ const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
             }));
             return null;
           });
-        return storyPolicy === null || storyPolicy.perStoryCeilingMicros === null
-          ? runPolicy
-          : { ...runPolicy, perStoryCeilingMicros: storyPolicy.perStoryCeilingMicros };
+        // Engine money rule, Task M7 (spec §14.4.1, §14.4.6): the story's
+        // overrun travels with its ceiling, and the ONE check over both money
+        // rows refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT) when the
+        // day cannot hold one full run plus its story.
+        return costEnvelopeGuardPolicy(runPolicy, storyPolicy);
       })
     })
   : undefined;

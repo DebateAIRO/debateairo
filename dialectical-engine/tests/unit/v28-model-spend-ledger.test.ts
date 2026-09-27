@@ -3,11 +3,17 @@ import { describe, expect, it } from "vitest";
 import {
   CostEnvelopeGuard,
   costEnvelopeDay,
+  costEnvelopeGuardPolicy,
   DEFAULT_RESERVATION_TTL_MS,
   type ModelSpendEntry,
   type ModelSpendStore
 } from "@debateai/budget";
-import { costEnvelopePolicyFromValue, COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW } from "@debateai/register";
+import {
+  buildStoryRegisterRows,
+  costEnvelopePolicyFromValue,
+  COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
+  readStoryPolicy
+} from "@debateai/register";
 import {
   DEVELOPMENT_ORGAN_COST_BOUNDS,
   DEVELOPMENT_RUN_DEATH_POLICY
@@ -355,6 +361,28 @@ describe("I1 — the daily gate reserves what it admits", () => {
 
     expect(POLICY.serveOverrunBasisPoints).toBe(2_000);
     expect(reservations.map((reservation) => reservation.reservedMicros)).toEqual([300_000, 350_000]);
+  });
+
+  /**
+   * Task M7 (spec 2026-09-26 §14.4.6): the shipped HOSTED story row lets the
+   * story go 20% over its 50 000 cap too, so the day reserves 60 000 for the
+   * story beside the debate's 300 000. The row above hands the guard a bare
+   * 50 000 with no story overrun and still reserves 350 000, as before.
+   */
+  it("reserves the shipped story row's cap plus the story's overrun beside the run's", async () => {
+    const { store, reservations } = fakeStore();
+    const story = readStoryPolicy(buildStoryRegisterRows({
+      synthesizerRoleRef: "provider:synthesizer", evaluatorRoleRef: "provider:evaluator",
+      sourceRef: "test-layer:v28", hosted: true
+    }), 9);
+    expect(story?.perStoryOverrunBasisPoints).toBe(2_000);
+    await new CostEnvelopeGuard({
+      store,
+      policy: costEnvelopeGuardPolicy(POLICY, story),
+      clock: () => new Date("2026-09-22T11:00:00.000Z")
+    }).assertDailyEnvelopeAdmitsNewRun();
+
+    expect(reservations.map((reservation) => reservation.reservedMicros)).toEqual([360_000]);
   });
 
   it("admits two runs into a two-run day", async () => {

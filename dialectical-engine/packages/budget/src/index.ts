@@ -53,6 +53,7 @@ export {
   CostEnvelopeGuard,
   DEFAULT_RESERVATION_TTL_MS,
   PostgresModelSpendStore,
+  costEnvelopeGuardPolicy,
   mostOneRunMaySpendMicros,
   type CostEnvelopeGuardInput,
   type ModelSpendEntry,

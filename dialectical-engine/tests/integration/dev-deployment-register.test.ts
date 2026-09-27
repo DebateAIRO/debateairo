@@ -639,6 +639,7 @@ describe("DEV-05 complete development deployment register", () => {
       checkerBound: { maxAttempts: 2, tokenCeiling: 2_048, deadlineMs: 180_000 },
       materialBudget: { low: 40_000, medium: 80_000, high: 120_000 },
       perStoryCeilingMicros: null,
+      perStoryOverrunBasisPoints: 0,
       registerVersion
     });
     // The sealed historical bootstrap never carried them, and still reads as "no story".

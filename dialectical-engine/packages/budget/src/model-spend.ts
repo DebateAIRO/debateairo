@@ -21,7 +21,13 @@
  */
 import { randomUUID } from "node:crypto";
 import { TypedDomainError, exhaustive } from "@debateai/kernel";
-import { costEnvelopeCeilings, type CostEnvelopeCeilings } from "@debateai/register";
+import {
+  costEnvelopeCeilings,
+  storyEnvelopeCeilings,
+  type CostEnvelopeCeilings,
+  type CostEnvelopePolicy,
+  type StoryPolicy
+} from "@debateai/register";
 import type { Pool } from "pg";
 import {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
@@ -139,6 +145,12 @@ export interface CostEnvelopeGuardInput {
      */
     perStoryCeilingMicros?: number;
     /**
+     * Engine money rule, Task M7: the story row's `per_story_overrun_basis_points`,
+     * how far a story may go over `perStoryCeilingMicros`. Absent means 0:
+     * today's cap. Meaningless, and ignored, without a story ceiling.
+     */
+    perStoryOverrunBasisPoints?: number;
+    /**
      * Engine money rule, Task M1: the `costEnvelopePolicy` row's reserve and
      * overrun (`serve_reserve_basis_points`, `serve_overrun_basis_points`).
      * Absent means 0: one ceiling for every call, exactly as before.
@@ -201,8 +213,9 @@ export const DEFAULT_RESERVATION_TTL_MS = 1_800_000 as const;
  *  - The DEBATE: its per-run ceiling plus the answer's overrun, rounded up
  *    (`costEnvelopeCeilings(...).runMaximumMicros`). The reserve moves money
  *    inside that ceiling and changes nothing here.
- *  - The STORY written after it settles: its own ceiling. (Task M6 adds the
- *    story's own margin to this term.)
+ *  - The STORY written after it settles: its own ceiling plus the story's
+ *    overrun, rounded up (`storyEnvelopeCeilings(...).storyMaximumMicros`,
+ *    Task M7). No story ceiling, no story, nothing reserved for one.
  *
  * Without an overrun and without a story row this is `perRunCeilingMicros`,
  * exactly what the day reserved before either existed.
@@ -210,10 +223,62 @@ export const DEFAULT_RESERVATION_TTL_MS = 1_800_000 as const;
 export function mostOneRunMaySpendMicros(policy: Readonly<{
   perRunCeilingMicros: number;
   perStoryCeilingMicros?: number;
+  perStoryOverrunBasisPoints?: number;
   serveReserveBasisPoints?: number;
   serveOverrunBasisPoints?: number;
 }>): number {
-  return costEnvelopeCeilings(policy).runMaximumMicros + (policy.perStoryCeilingMicros ?? 0);
+  const story = policy.perStoryCeilingMicros === undefined
+    ? 0
+    : storyEnvelopeCeilings({
+        perStoryCeilingMicros: policy.perStoryCeilingMicros,
+        ...(policy.perStoryOverrunBasisPoints === undefined
+          ? {} : { perStoryOverrunBasisPoints: policy.perStoryOverrunBasisPoints })
+      }).storyMaximumMicros;
+  return costEnvelopeCeilings(policy).runMaximumMicros + story;
+}
+
+/**
+ * ENGINE MONEY RULE (spec 2026-09-26 §14.4.1), TASK M7 — THE ONE CHECK OVER
+ * BOTH MONEY ROWS, and the guard policy both boots build from them.
+ *
+ * The `costEnvelopePolicy` row's own refinement holds its day to ONE run (the
+ * per-run ceiling plus the answer's overrun). It cannot see the story, whose
+ * cap and overrun live in another row (`storyCostEnvelopePolicy`), so a day
+ * that holds one run and not its story passes it. This reads BOTH, and refuses
+ * a day below the most one run may spend with its story
+ * (`mostOneRunMaySpendMicros`) — STORY_DAILY_CEILING_INSUFFICIENT, with no
+ * figure in the message: the operator's plan line and the rows carry them.
+ *
+ * Called where both rows are already read: the hosted publication's plan
+ * (`planHostedRegisterPublication`, before anything is sealed) and the hosted
+ * boots of the runner and the API (the policy their `CostEnvelopeGuard` is
+ * built from). `story` is the story family as `readStoryPolicy` returns it, or
+ * null when the version sealed none (or it could not be read): a story with no
+ * money ceiling cannot be written in hosted mode, so the day holds only the run.
+ */
+export function costEnvelopeGuardPolicy(
+  run: Pick<CostEnvelopePolicy,
+    "perRunCeilingMicros" | "dailyCeilingMicros" | "serveReserveBasisPoints" | "serveOverrunBasisPoints">,
+  story: Pick<StoryPolicy, "perStoryCeilingMicros" | "perStoryOverrunBasisPoints"> | null
+): CostEnvelopeGuardInput["policy"] {
+  const policy: CostEnvelopeGuardInput["policy"] = Object.freeze({
+    perRunCeilingMicros: run.perRunCeilingMicros,
+    dailyCeilingMicros: run.dailyCeilingMicros,
+    serveReserveBasisPoints: run.serveReserveBasisPoints,
+    serveOverrunBasisPoints: run.serveOverrunBasisPoints,
+    ...(story === null || story.perStoryCeilingMicros === null ? {} : {
+      perStoryCeilingMicros: story.perStoryCeilingMicros,
+      perStoryOverrunBasisPoints: story.perStoryOverrunBasisPoints
+    })
+  });
+  if (policy.dailyCeilingMicros < mostOneRunMaySpendMicros(policy)) {
+    throw new TypedDomainError(
+      "STORY_DAILY_CEILING_INSUFFICIENT",
+      "The daily ceiling cannot hold one full run plus its story: the answer's overrun and the story's own"
+        + " ceiling and overrun must fit in one day"
+    );
+  }
+  return policy;
 }
 
 /** The two spend sources a gateway money seam charges (the support chat keeps its own accounting). */
@@ -260,6 +325,8 @@ export class CostEnvelopeGuard {
   readonly #policy: CostEnvelopeGuardInput["policy"];
   /** Task M1: the body's and the answer's ceilings, computed once from the policy. */
   readonly #ceilings: CostEnvelopeCeilings;
+  /** Task M7: the story's ceiling with its overrun; null without a story ceiling (no story seam). */
+  readonly #storyCeilingMicros: number | null;
   readonly #clock: () => Date;
   readonly #reservationTtlMs: number;
 
@@ -276,6 +343,12 @@ export class CostEnvelopeGuard {
     // A reserve or an overrun the policy row would refuse is refused here too,
     // at construction, so a guard can never run on shares nobody could seal.
     this.#ceilings = costEnvelopeCeilings(input.policy);
+    // Task M7: the story's overrun likewise (STORY_ENVELOPE_POLICY_INVALID).
+    this.#storyCeilingMicros = storyCeiling === undefined ? null : storyEnvelopeCeilings({
+      perStoryCeilingMicros: storyCeiling,
+      ...(input.policy.perStoryOverrunBasisPoints === undefined
+        ? {} : { perStoryOverrunBasisPoints: input.policy.perStoryOverrunBasisPoints })
+    }).storyMicros;
     this.#clock = input.clock ?? (() => new Date());
     const ttl = input.reservationTtlMs ?? DEFAULT_RESERVATION_TTL_MS;
     if (!Number.isInteger(ttl) || ttl < 1) throw new TypeError("COST_ENVELOPE_RESERVATION_TTL_INVALID");
@@ -306,7 +379,8 @@ export class CostEnvelopeGuard {
    * VERDICT STORY — THE STORY'S OWN MONEY SEAM (spec §8), in the shape the
    * gateway consumes. The per-run seam's rules, built by the same body, with
    * the four differences `#envelopeFor` names and no others: it sums STORY
-   * charges only, compares them with `perStoryCeilingMicros`, refuses with
+   * charges only, compares them with `perStoryCeilingMicros` plus the story's
+   * overrun (Task M7), refuses with
    * STORY_COST_ENVELOPE_REACHED, and charges STORY rows. So a debate that has
    * spent its whole envelope does not stop its story, and a story can never
    * spend the debate's envelope. With no sealed story ceiling there is no
@@ -422,6 +496,11 @@ export class CostEnvelopeGuard {
    * (per-run less the answer's reserve) or the answer's (per-run plus its
    * overrun) — over the same run total, with the same refusal. With neither
    * policy member both are the per-run ceiling, as before.
+   *
+   * Task M7 (spec §14.4.6): the STORY envelope's ceiling is the story's cap
+   * plus its own overrun, `perStory x (10000 + overrun) / 10000` rounded down
+   * (`storyEnvelopeCeilings`, computed once at construction). Without the
+   * member it is the cap, as before.
    */
   #envelopeFor(spendSource: MeteredSpendSource, phase: CostEnvelopePhase | null): MeteredEnvelope {
     switch (spendSource) {
@@ -433,8 +512,8 @@ export class CostEnvelopeGuard {
           refusal: runCostEnvelopeReached
         });
       case "STORY": {
-        const ceilingMicros = this.#policy.perStoryCeilingMicros;
-        if (ceilingMicros === undefined) {
+        const ceilingMicros = this.#storyCeilingMicros;
+        if (ceilingMicros === null) {
           throw new TypedDomainError(
             "STORY_ENVELOPE_MISSING",
             "A metered story seam needs the sealed storyCostEnvelopePolicy row"
@@ -467,6 +546,7 @@ export class CostEnvelopeGuard {
       // counts toward the day, so the day reserves both ceilings at once.
       // Task M1: and the answer may go over the per-run ceiling by its
       // overrun, so the day reserves that too (`mostOneRunMaySpendMicros`).
+      // Task M7: and the story over its own cap by its overrun.
       reservedMicros: mostOneRunMaySpendMicros(this.#policy),
       now,
       expiresAt: new Date(now.getTime() + this.#reservationTtlMs),

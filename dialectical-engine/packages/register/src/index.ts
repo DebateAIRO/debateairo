@@ -847,10 +847,13 @@ export {
   costEnvelopeCeilings,
   costEnvelopePolicyFromValue,
   readCostEnvelopePolicy,
+  storyEnvelopeCeilings,
   type CostEnvelopeCeilings,
   type CostEnvelopeCeilingTerms,
   type CostEnvelopePolicy,
-  type CostEnvelopePolicyValue
+  type CostEnvelopePolicyValue,
+  type StoryEnvelopeCeilings,
+  type StoryEnvelopeCeilingTerms
 } from "./cost-envelope-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {

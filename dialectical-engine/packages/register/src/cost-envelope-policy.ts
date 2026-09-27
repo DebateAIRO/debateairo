@@ -64,6 +64,12 @@ const BASIS_POINTS = Object.freeze({ whole: 10_000 });
 const reserveBasisPoints = z.number().int().nonnegative().lt(BASIS_POINTS.whole);
 /** An overrun may double the ceiling for the answer, and no more. */
 const overrunBasisPoints = z.number().int().nonnegative().max(BASIS_POINTS.whole);
+/**
+ * Task M7: the story's own overrun has the same range — it may double the
+ * story's cap, and no more. The story row's schema (story-policy.ts) takes it
+ * from here, so the range is written once, beside the one denominator.
+ */
+export const storyOverrunBasisPointsSchema = overrunBasisPoints;
 
 const costEnvelopePolicyValueSchema = z.object({
   kind: z.literal("COST_ENVELOPE_POLICY"),
@@ -196,6 +202,55 @@ export function costEnvelopeCeilings(terms: CostEnvelopeCeilingTerms): CostEnvel
     bodyMicros: narrowed(shareOfCeiling(perRun.data, BASIS_POINTS.whole - reserve.data, "DOWN")),
     serveMicros: narrowed(shareOfCeiling(perRun.data, BASIS_POINTS.whole + overrun.data, "DOWN")),
     runMaximumMicros: narrowed(shareOfCeiling(perRun.data, BASIS_POINTS.whole + overrun.data, "UP"))
+  });
+}
+
+/** The terms the story's ceiling is computed from: the story row's members, camelCase. */
+export type StoryEnvelopeCeilingTerms = Readonly<{
+  perStoryCeilingMicros: number;
+  perStoryOverrunBasisPoints?: number;
+}>;
+
+/**
+ * Engine money rule, Task M7 (spec 2026-09-26 §14.4.6) — THE STORY'S CEILING
+ * WITH ITS MARGIN, in this file for the reason `costEnvelopeCeilings` is: one
+ * denominator, and nobody restates it.
+ *
+ *  - `storyMicros`: what one story may spend — `perStory x (10000 + overrun) /
+ *    10000`, rounded DOWN (a story stops earlier, never later).
+ *  - `storyMaximumMicros`: what the day must hold for it — the same share
+ *    rounded UP (the day reserves more, never less).
+ *
+ * With no overrun both are `perStory` exactly: a story row sealed before the
+ * member existed keeps today's cap.
+ */
+export type StoryEnvelopeCeilings = Readonly<{
+  storyMicros: number;
+  storyMaximumMicros: number;
+}>;
+
+export function storyEnvelopeCeilings(terms: StoryEnvelopeCeilingTerms): StoryEnvelopeCeilings {
+  const perStory = microAmount.safeParse(terms?.perStoryCeilingMicros);
+  const overrun = overrunBasisPoints.safeParse(terms?.perStoryOverrunBasisPoints ?? 0);
+  if (!perStory.success || !overrun.success) {
+    throw new TypedDomainError(
+      "STORY_ENVELOPE_POLICY_INVALID",
+      "The story's ceiling or its overrun is out of range"
+    );
+  }
+  const narrowed = (share: bigint): number => {
+    const value = Number(share);
+    if (!Number.isSafeInteger(value)) {
+      throw new TypedDomainError(
+        "STORY_ENVELOPE_POLICY_INVALID",
+        "The story's ceiling with its overrun cannot be represented exactly in micro-units"
+      );
+    }
+    return value;
+  };
+  return Object.freeze({
+    storyMicros: narrowed(shareOfCeiling(perStory.data, BASIS_POINTS.whole + overrun.data, "DOWN")),
+    storyMaximumMicros: narrowed(shareOfCeiling(perStory.data, BASIS_POINTS.whole + overrun.data, "UP"))
   });
 }
 

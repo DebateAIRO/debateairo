@@ -297,8 +297,38 @@ describe("Task 14b · the operator's hosted register file", () => {
       rowKey: row.rowKey, value: JSON.parse(row.valueJsonText) as unknown, sourceRef: row.sourceRef
     })), 9);
     expect(policy?.perStoryCeilingMicros).toBe(50_000);
+    // Task M7 (spec §14.4.6): the code-owned row carries the story's margin.
+    expect(policy?.perStoryOverrunBasisPoints).toBe(2_000);
     expect(policy?.storytellerRoleRef).toBe(plan.synthesisRoles.synthesizerRoleRef);
     expect(policy?.storyCheckerRoleRef).toBe(plan.synthesisRoles.evaluatorRoleRef);
+  });
+
+  /**
+   * Engine money rule, Task M7 (spec §14.4.1, the M1 review carry). The
+   * operator's cost row can only check its day against ONE run; the story row
+   * is code-owned and lands in the same publication, so the plan checks the
+   * day against one run AND its story, over both rows, before anything is
+   * sealed: 250 000 x 1.2 + 50 000 x 1.2 = 360 000.
+   */
+  it("refuses a day that cannot hold one full run plus its story, before anything is sealed", async () => {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      serve_overrun_basis_points: 2_000, daily_ceiling_micros: 359_999
+    });
+    await expect(planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file))))
+      .rejects.toThrowError(expect.objectContaining({ code: "STORY_DAILY_CEILING_INSUFFICIENT" }));
+    expect(await planCode(file)).toBe("STORY_DAILY_CEILING_INSUFFICIENT");
+    // A day of exactly one run plus its story plans.
+    (file.costEnvelopePolicy as Record<string, unknown>).daily_ceiling_micros = 360_000;
+    await expect(planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)))).resolves.toBeDefined();
+  });
+
+  it("counts the story beside a run with no overrun too: 250 000 + 60 000", async () => {
+    const file = validFile();
+    (file.costEnvelopePolicy as Record<string, unknown>).daily_ceiling_micros = 309_999;
+    expect(await planCode(file)).toBe("STORY_DAILY_CEILING_INSUFFICIENT");
+    (file.costEnvelopePolicy as Record<string, unknown>).daily_ceiling_micros = 310_000;
+    expect(await planCode(file)).toBe("NO_REFUSAL");
   });
 
   it("derives the publication id from content, so the same file replays the same publication", async () => {

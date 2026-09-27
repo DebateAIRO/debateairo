@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AlgorithmRegisterRow, SealedCallBound } from "./algorithm-policy.js";
+import { storyOverrunBasisPointsSchema } from "./cost-envelope-policy.js";
 
 /**
  * VERDICT STORY — the story's OWN register rows
@@ -22,6 +23,15 @@ import type { AlgorithmRegisterRow, SealedCallBound } from "./algorithm-policy.j
  * Local mode spends no money and has no money envelope. The hosted writer
  * refuses to run without it (STORY_ENVELOPE_MISSING), so omitting it in hosted
  * mode switches the story off. It can never let the story spend unbounded.
+ *
+ * ENGINE MONEY RULE (spec §14.4.6), TASK M7: that row now also carries
+ * `per_story_overrun_basis_points`, how far a story may go OVER its cap
+ * (2000: 20%, so 50 000 x 1.2 = 60 000). OPTIONAL: a row sealed before the
+ * member existed still parses, and a missing member means 0 — today's cap. The
+ * ceiling itself is computed beside the run's (`storyEnvelopeCeilings`,
+ * cost-envelope-policy.ts), and the day must hold one run plus its story
+ * (`costEnvelopeGuardPolicy`, @debateai/budget). Changing the value below is a
+ * NEW version of the row: every version already sealed keeps the row it sealed.
  *
  * Every number below is PROVISIONAL (spec §8, owner 2026-09-26: "we will adjust
  * based on real costs") and module-private: a number leaves this file only
@@ -71,6 +81,12 @@ export interface StoryPolicy {
   readonly materialBudget: Readonly<Record<"low" | "medium" | "high", number>>;
   /** Null when the version sealed no `storyCostEnvelopePolicy` (local mode). */
   readonly perStoryCeilingMicros: number | null;
+  /**
+   * Task M7: the money row's `per_story_overrun_basis_points`. 0 when the row
+   * predates the member, and 0 when there is no money row at all (nothing to
+   * go over).
+   */
+  readonly perStoryOverrunBasisPoints: number;
   readonly registerVersion: number;
 }
 
@@ -119,6 +135,8 @@ const storyFamilySchema = z.object({
     currency: z.literal("USD"),
     minor_units_per_unit: z.literal(1_000_000),
     per_story_ceiling_micros: positiveInteger.max(Number.MAX_SAFE_INTEGER),
+    /** Task M7: optional; a missing member means 0 (no margin). */
+    per_story_overrun_basis_points: storyOverrunBasisPointsSchema.optional(),
     provisional: z.boolean(),
     provisional_reason: nonemptyText
   }).strict().optional()
@@ -179,6 +197,9 @@ export function buildStoryRegisterRows(input: StoryRegisterRowsInput): readonly 
         currency: "USD",
         minor_units_per_unit: 1_000_000,
         per_story_ceiling_micros: 50_000,
+        // Engine money rule (spec §14.4.6), Task M7: the story may go 20% over
+        // its cap. PROVISIONAL, like the cap: a new version seals the real one.
+        per_story_overrun_basis_points: 2_000,
         provisional: true,
         provisional_reason: "TEMPORARY story cap under the verdict-story spec: the owner seals the real value"
           + " as a NEW version of this row after the first measured hosted stories"
@@ -257,6 +278,8 @@ export function readStoryPolicy(
       high: family.storyMaterialBudget.high
     }),
     perStoryCeilingMicros: family.storyCostEnvelopePolicy?.per_story_ceiling_micros ?? null,
+    // A row sealed before the member existed, or no money row at all, means 0.
+    perStoryOverrunBasisPoints: family.storyCostEnvelopePolicy?.per_story_overrun_basis_points ?? 0,
     registerVersion
   });
 }

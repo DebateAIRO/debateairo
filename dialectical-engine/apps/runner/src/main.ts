@@ -17,7 +17,12 @@ import {
   readCostEnvelopePolicy,
   readStoryPolicyFromRegister
 } from "@debateai/register";
-import { CostEnvelopeGuard, PostgresModelSpendStore, type CostEnvelopePhase } from "@debateai/budget";
+import {
+  CostEnvelopeGuard,
+  PostgresModelSpendStore,
+  costEnvelopeGuardPolicy,
+  type CostEnvelopePhase
+} from "@debateai/budget";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
@@ -169,11 +174,14 @@ const hatchet = new Hatchet({
 const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
   ? new CostEnvelopeGuard({
       store: new PostgresModelSpendStore(pool),
-      policy: {
-        ...(await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)),
-        // Verdict story: the story's OWN ceiling, when the register sealed one.
-        ...(storyCeilingMicros === null ? {} : { perStoryCeilingMicros: storyCeilingMicros })
-      }
+      // Verdict story: the story's OWN ceiling and overrun, when the register
+      // sealed them. Engine money rule, Task M7: built by the one check over
+      // BOTH money rows, which refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT)
+      // when the day cannot hold one full run plus its story.
+      policy: costEnvelopeGuardPolicy(
+        await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION),
+        storyPolicy
+      )
     })
   : undefined;
 const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
