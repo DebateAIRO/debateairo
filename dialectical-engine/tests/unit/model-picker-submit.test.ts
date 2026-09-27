@@ -64,7 +64,7 @@ function member(providerRef: string, maker: string, modelId: string): Discovered
 const PANEL = Object.freeze([
   member("development:codex-premium-cli", "OpenAI", "gpt-5.6-sol"),
   member("development:claude-premium-cli", "Anthropic", "claude-opus-5"),
-  member("development:agy-cli", "Google", "gemini-3.8-flash-high")
+  member("development:agy-cli", "Google", "gemini-3.8-flash")
 ]);
 
 function stubPool(): Pool {
@@ -218,7 +218,7 @@ describe("A20 · the role assignment is pinned at run creation", () => {
       resolveDiscoveredPanel: async () => Object.freeze([
         member("development:codex-premium-cli", "OpenAI", "gpt-5.6-sol"),
         member("development:claude-premium-cli", "Anthropic", "claude-opus-5"),
-        member("development:grok-cli", "xAI", "grok-4.6-build")
+        member("development:grok-cli", "xAI", "grok-4.7-build")
       ])
     }, order).submit(ask(), session(), { kind: "server", userId: "a20-user", ownerRef: OWNER_REF });
     expect(pinned).toEqual([]);

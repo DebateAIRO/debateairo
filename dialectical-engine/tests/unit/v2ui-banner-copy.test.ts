@@ -86,7 +86,7 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
    * (which names the unavailable models) still never reaches the page.
    */
   it("names dev's plan-tier refusals as refusals, in copy the server never wrote", () => {
-    const server = "The premium plan needs grok-4.6-build, and it is not available right now";
+    const server = "The premium plan needs grok-4.7-build, and it is not available right now";
     const invalid = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
       "UNPROCESSABLE", 422, `ASK_PLAN_TIER_INVALID: ${server}`, "ASK_PLAN_TIER_INVALID"
     ));

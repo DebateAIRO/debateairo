@@ -225,8 +225,8 @@ describe("A20 · with a VALID scorecard the picker replaces the roster filter", 
     ]);
     await evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("premium"));
     expect(lastInput().reachable.map((target) => target.modelId)).toEqual([
-      "gpt-5.6-sol", "claude-opus-5",
-      "gpt-5.6-luna", "claude-sonnet-5", "grok-4.7-build", "gemini-3.8-flash", "glm-5.3-flash"
+      "gpt-5.6-sol", "claude-opus-5", "grok-4.7-build",
+      "gpt-5.6-luna", "claude-sonnet-5", "gemini-3.8-flash", "glm-5.3-flash"
     ]);
     expect(lastInput().reachable.find((target) => target.providerRef === "development:pi-glm-cli")).toEqual({
       providerRef: "development:pi-glm-cli", maker: "Z.AI", modelId: "glm-5.3-flash",
@@ -590,23 +590,21 @@ describe("A20 · hardening before the picker goes live (carry 16, A20.3 review m
   });
 });
 
-describe("A20 · the grok roster drift (pre-existing; A20b fixes it with the owner's OK)", () => {
-  it("PRE-EXISTING: the premium roster names grok-4.6-build while the grok CLI answers grok-4.7-build", async () => {
-    await expect(evaluateAskAdmission(settingsWith({}), ask("premium"))).rejects.toMatchObject({
-      name: "AskRefusal",
-      code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE",
-      message: "The premium plan needs grok-4.6-build, and it is not available right now"
-    });
+describe("A20b · the premium roster names the grok id the CLI answers as", () => {
+  it("admits a premium ask on the roster path with grok-4.7-build, in roster order", async () => {
+    const result = await evaluateAskAdmission(settingsWith({}), ask("premium"));
+    expect(result.discoveredPanel.map((entry) => entry.model_id))
+      .toEqual(["gpt-5.6-sol", "claude-opus-5", "grok-4.7-build"]);
   });
 
-  it("with a VALID scorecard the roster ids no longer gate admission: grok-4.7-build reaches the picker", async () => {
+  it("with a VALID scorecard grok-4.7-build still reaches the picker, now as a roster member", async () => {
     picker.outcome = assigned([
       candidate(at("development:grok-cli")),
       candidate(at("development:claude-premium-cli")),
       candidate(at("development:codex-premium-cli"))
     ]);
-    const result = await evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("premium"));
-    expect(lastInput().reachable.map((target) => target.modelId)).toContain("grok-4.7-build");
-    expect(result.discoveredPanel.map((entry) => entry.model_id)).toContain("grok-4.7-build");
+    await evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("premium"));
+    expect(lastInput().reachable.slice(0, 3).map((target) => target.modelId))
+      .toEqual(["gpt-5.6-sol", "claude-opus-5", "grok-4.7-build"]);
   });
 });
