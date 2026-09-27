@@ -1065,6 +1065,12 @@ export interface ProviderCostEnvelopeSeam {
     usage: unknown;
     /** This attempt's own pre-send maximum, the two facts `assertCallAllowed` got. */
     projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
+    /**
+     * Model scorecard §2.3: the gateway attempt this charge pays for — the id
+     * its artifact already carries and its ledger row will carry
+     * (`ledger.model_spend.attempt_id`). The gateway always passes it.
+     */
+    attemptId?: string;
   }>) => void | Promise<void>;
   /**
    * The HOSTED requirement, asked only of a SUCCESSFUL completion: a vendor that
@@ -1733,7 +1739,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           projection: {
             requestBytes: Buffer.byteLength(body, "utf8"),
             completionTokenCeiling: attemptTokenCeiling
-          }
+          },
+          attemptId
         });
         /**
          * Model scorecard R4: a subscription tool at its usage cap answers 429
