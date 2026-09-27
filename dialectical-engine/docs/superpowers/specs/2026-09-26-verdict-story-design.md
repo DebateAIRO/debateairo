@@ -562,7 +562,7 @@ The owner reviewed the panel mock and the sample PDF and asked for these changes
 - **The first root's panel.** A money stop on its panel falls back to the author's own judgement (the existing author-only selection with its single-voice disclosure) instead of failing the run.
   - If the author's own first call cannot be paid, nothing exists to answer from. That is a typed configuration failure: the ceiling is below one call.
 - **The daily admission reserve grows to cover the margins.** It reserves `perRun × (1 + overrun) + perStory × (1 + storyOverrun)`. The policy refinement checks daily ≥ that sum.
-- **Measurement.** `ledger.model_spend` gains a nullable `spend_phase` column (`BODY` | `SERVE`) for RUN rows, so the first paid runs show the spend while arguing separately from the spend on the answer.
+- **Measurement.** `ledger.model_spend` gains (migration 0075) a nullable `spend_phase` column (`BODY` | `SERVE`) for RUN rows, so the first paid runs show the spend while arguing separately from the spend on the answer.
 
 #### 14.4.2 A cheaper model when the planned one cannot be paid
 - **A runner price map.** It is built in `apps/runner/src/main.ts` from the provider targets' prices, hosted only, and passed in settings. Prices are never sealed in the register.
@@ -594,7 +594,7 @@ The owner reviewed the panel mock and the sample PDF and asked for these changes
 - **A run that FAILED for a technical reason** has no label and no floor. It shows a plain failure message.
 
 #### 14.4.5 Disclosure: the new owner-side record
-- **A new table `serve.serve_disclosure`** (migration 0075, insert-once, content-free: ids, codes and counts). One row per answer holds:
+- **A new table `serve.serve_disclosure`** (migration 0076, insert-once, content-free: ids, codes and counts). One row per answer holds:
   - the planned and actual writer and checker per round;
   - whether a fallback was used, and why;
   - the digest rung and the number of points left out;
