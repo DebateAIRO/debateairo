@@ -210,6 +210,13 @@ describe("Task 14b · the operator's hosted register file", () => {
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)));
     expect(plan.costEnvelope).toMatchObject({ serveReserveBasisPoints: 0, serveOverrunBasisPoints: 0 });
     expect(renderHostedRegisterPlan(plan)).toContain("serve_reserve_basis_points=0 serve_overrun_basis_points=0");
+    // The SEALED row is the operator's value verbatim: the code-owned row's 3000
+    // and 2000 can never slip into a hosted version the operator did not write.
+    const envelope = plan.rows.find((row) => row.rowKey === COST_ENVELOPE_POLICY_ROW_KEY);
+    expect(envelope).toBeDefined();
+    const sealed = JSON.parse(envelope!.valueJsonText) as Record<string, unknown>;
+    expect(sealed).not.toHaveProperty("serve_reserve_basis_points");
+    expect(sealed).not.toHaveProperty("serve_overrun_basis_points");
   });
 
   it("refuses an overrun the day cannot hold, by the register's own code", async () => {

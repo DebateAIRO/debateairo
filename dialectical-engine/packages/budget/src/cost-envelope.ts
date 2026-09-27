@@ -49,8 +49,6 @@ export const RUN_COST_ENVELOPE_MONEY_REACHED = "RUN_COST_ENVELOPE_MONEY_REACHED"
  */
 export type CostEnvelopePhase = "BODY" | "SERVE";
 
-export const COST_ENVELOPE_PHASES: readonly CostEnvelopePhase[] = Object.freeze(["BODY", "SERVE"]);
-
 export function isCostEnvelopePhase(value: unknown): value is CostEnvelopePhase {
   return value === "BODY" || value === "SERVE";
 }

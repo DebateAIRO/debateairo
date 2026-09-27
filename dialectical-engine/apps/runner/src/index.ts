@@ -49,6 +49,7 @@ import {
 import {
   BudgetRepository,
   BATTERY_BUDGET_CONTRACTS,
+  attemptCeilingForPhase,
   parseCostEnvelopeBasis,
   type BudgetPressureDecision,
   type CostEnvelopePhase
@@ -1021,6 +1022,7 @@ export interface ReviewCatchUpDependencies {
     readonly measurements: readonly { readonly edgeId: string; readonly bearing: number | null }[];
   }): Promise<string>;
   countRunModelAttempts(runId: string): Promise<number>;
+  /** The pinned attempt ceiling the catch-up's own (BODY) calls are held to (Task M1). */
   readPinnedMaximumAttempts(runId: string): Promise<number>;
   prepareVersion(input: {
     readonly runId: string;
@@ -1231,7 +1233,10 @@ export function createPostgresReviewCatchUpDependencies(input: {
     readLatestReviewerMaker: (runId, maker) => judgements.readLatestReviewerMaker(runId, maker),
     recordReviewWithMeasurements: (record) => recordReviewWithMeasurements(input.pool, record),
     countRunModelAttempts: (runId) => budget.countRunModelAttempts(runId),
-    readPinnedMaximumAttempts: async (runId) => (await budget.readPinnedBasis(runId)).maxModelAttempts,
+    // Task M1: the catch-up's JUDGE calls are BODY calls, refused at the pinned
+    // ceiling less the answer's reserve, so what is left is measured against
+    // that same ceiling (a receipt with no reserve gives the whole ceiling).
+    readPinnedMaximumAttempts: async (runId) => attemptCeilingForPhase(await budget.readPinnedBasis(runId), "BODY"),
     prepareVersion: async ({ runId, answerId, fromVersion }) => {
       const source = await serve.readReviewCatchUpSource(runId);
       if (source.answerId !== answerId || source.answerVersion !== fromVersion) {

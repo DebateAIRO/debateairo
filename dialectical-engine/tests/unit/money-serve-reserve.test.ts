@@ -20,7 +20,11 @@ import {
   costEnvelopePolicyFromValue
 } from "@debateai/register";
 import { TypedDomainError } from "@debateai/kernel";
-import { createPostgresProviderGateway, providerCallCostEnvelopePhase } from "@debateai/runner";
+import {
+  createPostgresProviderGateway,
+  createPostgresReviewCatchUpDependencies,
+  providerCallCostEnvelopePhase
+} from "@debateai/runner";
 import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { framedFixturePacket } from "../support/framed-packet.js";
 
@@ -490,6 +494,36 @@ describe("M1 the attempt ceiling holds the answer's calls back from the body", (
     })))).toBe(SENT_NOTHING);
     // The judge was refused before any seam was built; the answer-writer got a SERVE seam.
     expect(phases).toEqual(["SERVE"]);
+  });
+});
+
+/**
+ * M1 review, item 1: the review catch-up's calls are JUDGE calls on the served
+ * lane, so they are BODY calls and are refused at the ceiling less the
+ * answer's reserve. The catch-up's report (`envelopeRemaining`) must be taken
+ * against that same ceiling, or it overstates what is left by the reserve.
+ */
+describe("M1 the review catch-up measures what is left against the BODY ceiling", () => {
+  function catchUpOver(basis: unknown) {
+    const pool = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes("SELECT envelope_basis")) return { rows: [{ envelope_basis: basis }] };
+        throw new Error(`UNEXPECTED_QUERY:${sql}`);
+      })
+    } as unknown as Pool;
+    // Only the pinned-ceiling read is exercised; nothing else is touched.
+    return createPostgresReviewCatchUpDependencies({ pool, reviewers: [] } as unknown as
+      Parameters<typeof createPostgresReviewCatchUpDependencies>[0]);
+  }
+
+  it("reads the pinned ceiling less the answer's reserve", async () => {
+    const basis = { ...fixtureStructuralCeiling(20), serve_reserve_attempts: 6 };
+    await expect(catchUpOver(basis).readPinnedMaximumAttempts("run-1")).resolves.toBe(14);
+    expect(attemptCeilingForPhase(parseCostEnvelopeBasis(basis), "BODY")).toBe(14);
+  });
+
+  it("reads the whole ceiling for a receipt minted before the reserve existed", async () => {
+    await expect(catchUpOver(fixtureStructuralCeiling(20)).readPinnedMaximumAttempts("run-1")).resolves.toBe(20);
   });
 });
 
