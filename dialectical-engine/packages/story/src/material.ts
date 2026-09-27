@@ -310,21 +310,6 @@ function storyStatedFigures(texts: readonly string[]): ReadonlySet<string> {
 }
 
 /**
- * Every score the fitted material shows (each point's base and final, each
- * position's final, the verdict's winner, runner-up, margin and disagreement)
- * and every threshold, as a story might print them. Only what the material
- * shows: a point the last ladder step left out adds nothing. Leverage and the
- * judges' spread are not scores and are not held.
- *
- * A form the person's side of the debate also states as a figure is left out
- * (fix round 1, I-1): the question, every claim, every best case, objection and
- * review reason. "0,70 lei/kWh" in a claim is the question's own price, and the
- * story must be free to repeat it even when a threshold is 0.7. The served
- * statement and the set-aside and exclusion reasons free nothing: the first is
- * written from a digest that carries the scores, the others are code's words,
- * which can quote a score ("Recorded strength 0.21 ...").
- */
-/**
  * The engine tokens this material's story may not use: every one, less those
  * the question or a claim itself uses as a whole, case-sensitive token (fix
  * round 3 ruling, mirroring the person's own figures). "Open RAN" in the
@@ -342,6 +327,21 @@ function storyEngineTokens(material: StoryMaterial): ReadonlySet<string> {
     !new RegExp(`(?<![\\p{L}\\p{N}_])${token}(?![\\p{L}\\p{N}_])`, "u").test(own)));
 }
 
+/**
+ * Every score the fitted material shows (each point's base and final, each
+ * position's final, the verdict's winner, runner-up, margin and disagreement)
+ * and every threshold, as a story might print them. Only what the material
+ * shows: a point the last ladder step left out adds nothing. Leverage and the
+ * judges' spread are not scores and are not held.
+ *
+ * A form the person's side of the debate also states as a figure is left out
+ * (fix round 1, I-1): the question, every claim, every best case, objection and
+ * review reason. "0,70 lei/kWh" in a claim is the question's own price, and the
+ * story must be free to repeat it even when a threshold is 0.7. The served
+ * statement and the set-aside and exclusion reasons free nothing: the first is
+ * written from a digest that carries the scores, the others are code's words,
+ * which can quote a score ("Recorded strength 0.21 ...").
+ */
 function storyScoreTexts(material: StoryMaterial): ReadonlySet<string> {
   const stated = storyStatedFigures([
     material.question,

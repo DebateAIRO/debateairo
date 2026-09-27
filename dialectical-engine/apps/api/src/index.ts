@@ -8,6 +8,7 @@ import {
   AnswerSchema,
   AnswerIndexSchema,
   AnswerStorySchema,
+  ArgumentLanguageSchema,
   AskAcceptedSchema,
   AskRequestSchema,
   DeploymentSchema,
@@ -34,6 +35,7 @@ import {
   type Answer,
   type AnswerIndex,
   type AnswerStory,
+  type ArgumentLanguage,
   type AskAccepted,
   type AskRequest,
   type Deployment,
@@ -2564,6 +2566,18 @@ export async function evaluateAskAdmission(
   };
 }
 
+/**
+ * The run's question language for the run read (spec 2026-09-26 §14.3). A
+ * stored value the contract cannot carry (the column's CHECK allows longer tags
+ * than BCP-47's practical 35 characters) reads as none, so the run read itself
+ * never fails over it.
+ */
+function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> | null): ArgumentLanguage | null {
+  if (language === null) return null;
+  const parsed = ArgumentLanguageSchema.safeParse({ tag: language.tag, name: language.name });
+  return parsed.success ? parsed.data : null;
+}
+
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
@@ -2700,7 +2714,8 @@ export class PostgresAskApplication implements AskApplication {
       question_line: run.questionLine,
       state: run.state,
       terminal_reason: run.terminalReason,
-      hold_until: run.holdUntil?.toISOString() ?? null
+      hold_until: run.holdUntil?.toISOString() ?? null,
+      argument_language: runArgumentLanguage(run.argumentLanguage)
     });
   }
 

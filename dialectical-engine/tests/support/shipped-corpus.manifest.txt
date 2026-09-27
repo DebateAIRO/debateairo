@@ -344,6 +344,7 @@ apps/ui/lib/i18n/debateViews.test.mjs
 apps/ui/lib/i18n/locales.ts
 apps/ui/lib/i18n/misc.test.mjs
 apps/ui/lib/i18n/public.test.mjs
+apps/ui/lib/i18n/questionLocale.ts
 apps/ui/lib/i18n/server.ts
 apps/ui/lib/i18n/settings.test.mjs
 apps/ui/lib/i18n/support.test.mjs

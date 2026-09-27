@@ -1,4 +1,11 @@
-import { ContractHttpError, createContractClient, type Answer, type ContractClient, type RunProjection } from "@debateai/contract";
+import {
+  ContractHttpError,
+  createContractClient,
+  type Answer,
+  type ArgumentLanguage,
+  type ContractClient,
+  type RunProjection
+} from "@debateai/contract";
 import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../trusted-client-ip.mjs";
 import type { DebateDetail, DebateSummary } from "./types.js";
 import { debateDetailFromAnswer, debateSummariesFromIndex } from "./v3/adapter.js";
@@ -105,7 +112,7 @@ export async function listDebatesPageServer(
 }
 
 export type GetDebateServerResult =
-  | { ok: true; debate: DebateDetail; answer: Answer }
+  | { ok: true; debate: DebateDetail; answer: Answer; questionLanguage: ArgumentLanguage | null }
   | { ok: false; kind: "loading"; run: RunProjection }
   | { ok: false; kind: "failed"; run: RunProjection; reason: string }
   | { ok: false; kind: "not_found" }
@@ -157,5 +164,35 @@ export async function getDebateServer(
       return { ok: false, kind: "pending", message: runFailure instanceof Error ? runFailure.message : "Unable to load run" };
     }
   }
-  return { ok: true, debate: debateDetailFromAnswer(answer, catalog), answer };
+  return {
+    ok: true,
+    debate: debateDetailFromAnswer(answer, catalog),
+    answer,
+    questionLanguage: await readQuestionLanguage(resolvedClient, answer.run_ref)
+  };
+}
+
+/**
+ * The question's language for a served answer (spec 2026-09-26 §14.3), from the
+ * run read: the answer projection does not carry it, and the verdict story's
+ * row is null until the story is written. One bounded read; any failure means
+ * no language, never a failed page (the page then keeps the interface locale).
+ */
+async function readQuestionLanguage(client: ContractClient, runRef: string): Promise<ArgumentLanguage | null> {
+  try {
+    return (await client.readRun(runRef)).argument_language ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The question's language tag a debate page's server read learned: from the
+ * run read of a served answer, or from the run a loading or failed debate
+ * already read. Null when there was none to read.
+ */
+export function questionLanguageTagOf(result: GetDebateServerResult): string | null {
+  if (result.ok) return result.questionLanguage?.tag ?? null;
+  if (result.kind === "loading" || result.kind === "failed") return result.run.argument_language?.tag ?? null;
+  return null;
 }

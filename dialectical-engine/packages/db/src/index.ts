@@ -1084,6 +1084,12 @@ export interface RunLoadingProjection {
   readonly state: "QUEUED" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
   readonly terminalReason: string | null;
   readonly holdUntil: Date | null;
+  /**
+   * The question's language (migration 0072's argument_language_tag and
+   * _name), read for the verdict story's fixed text (spec 2026-09-26 §14.3);
+   * null on a database without those columns.
+   */
+  readonly argumentLanguage: Readonly<{ tag: string; name: string }> | null;
 }
 
 /**
@@ -1522,16 +1528,23 @@ export class RunRepository {
     const contentCiphertextProjection = encryptionSchemaApplied
       ? ", run.content_encryption_version, run.content_ciphertext"
       : "";
+    // The question's language is operational metadata, not private content:
+    // it is plaintext, kept after erasure, and read outside the content lease.
+    const argumentLanguageProjection = await argumentLanguageColumnsAreApplied(this.pool)
+      ? ", run.argument_language_tag, run.argument_language_name"
+      : "";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
       content_encryption_version?: number | null;
       content_ciphertext?: CryptoEnvelope | null;
+      argument_language_tag?: string;
+      argument_language_name?: string;
       state: RunLoadingProjection["state"];
       terminal_reason: string | null;
       hold_until: Date | null;
     }>(
-      `SELECT run.run_id, run.question_line${contentCiphertextProjection},
+      `SELECT run.run_id, run.question_line${contentCiphertextProjection}${argumentLanguageProjection},
          CASE
            WHEN count(work.work_item_id) = 0 THEN 'QUEUED'
            WHEN bool_or(work.state = 'FAILED') THEN 'FAILED'
@@ -1557,7 +1570,7 @@ export class RunRepository {
        FROM core.run AS run
        LEFT JOIN core.work_item AS work ON work.run_id = run.run_id
        WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)
-       GROUP BY run.run_id, run.question_line${contentCiphertextProjection}`,
+       GROUP BY run.run_id, run.question_line${contentCiphertextProjection}${argumentLanguageProjection}`,
       [runId, access.ownerRef, access.legacyAskerId]
     );
     const row = result.rows[0];
@@ -1578,7 +1591,10 @@ export class RunRepository {
       questionLine: content.questionLine,
       state: row.state,
       terminalReason: row.terminal_reason,
-      holdUntil: row.hold_until
+      holdUntil: row.hold_until,
+      argumentLanguage: row.argument_language_tag === undefined || row.argument_language_name === undefined
+        ? null
+        : Object.freeze({ tag: row.argument_language_tag, name: row.argument_language_name })
     });
     });
   }

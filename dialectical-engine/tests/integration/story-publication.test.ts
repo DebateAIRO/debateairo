@@ -7,7 +7,7 @@ import {
   loadKek,
   type AuditContextHasher
 } from "../../packages/crypto/src/index.js";
-import { PostgresPublicationRepository, migrate, withRunContentLease } from "@debateai/db";
+import { PostgresPublicationRepository, RunRepository, migrate, withRunContentLease } from "@debateai/db";
 import { StoryRepository, type StoryRecordInput } from "@debateai/story";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
@@ -119,9 +119,12 @@ function storyRecord(runId: string, answerId: string, outcome: StoredOutcome): S
 }
 
 /** One owner's run with a settled answer and a stored story of the given outcome. */
-async function storiedRun(outcome: StoredOutcome): Promise<{ runId: string; answerId: string }> {
+async function storiedRun(
+  outcome: StoredOutcome,
+  language?: Readonly<{ tag: string; name: string }>
+): Promise<{ runId: string; answerId: string }> {
   const marker = `${outcome.toLowerCase()}-${randomUUID()}`;
-  const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story publication ${marker}`);
+  const runId = await createEncryptedStoryRun(database.pool, theOwner(), `story publication ${marker}`, language);
   const { answerId } = await persistTerminalRun({
     pool: database.pool,
     runId,
@@ -197,5 +200,31 @@ describe("publishing copies story_short over the real database (spec §11)", () 
     expect(debate).not.toBeNull();
     expect("story_short" in debate!).toBe(false);
     expect(debate!.answer.summary_segments).toEqual([{ text: "The served answer prose." }]);
+  });
+});
+
+describe("publishing copies the question's language from the run over the real database (R2, spec §14.3)", () => {
+  it("copies the run's argument_language_tag into the snapshot", async () => {
+    const { runId, answerId } = await storiedRun("READY", { tag: "ro", name: "Romanian" });
+    const debate = await application.readPublicDebate(await publish(runId, answerId));
+    expect(debate?.language).toBe("ro");
+    expect(debate?.story_short).toEqual(PUBLIC_SHORT);
+  });
+
+  it("copies und for a run whose language was not detected, with or without a story", async () => {
+    const storied = await storiedRun("READY");
+    expect((await application.readPublicDebate(await publish(storied.runId, storied.answerId)))?.language).toBe("und");
+    const failed = await storiedRun("FAILED", { tag: "de", name: "German" });
+    const debate = await application.readPublicDebate(await publish(failed.runId, failed.answerId));
+    expect(debate?.language).toBe("de");
+    expect("story_short" in debate!).toBe(false);
+  });
+
+  it("reads the language on the owner's run read too (GET /v1/runs/{id})", async () => {
+    const runId = await createEncryptedStoryRun(database.pool, theOwner(), "story publication run read", { tag: "ro", name: "Romanian" });
+    const projection = await new RunRepository(database.pool).readLoadingProjection(runId, {
+      ownerRef: theOwner().ownerRef, legacyAskerId: null
+    });
+    expect(projection?.argumentLanguage).toEqual({ tag: "ro", name: "Romanian" });
   });
 });

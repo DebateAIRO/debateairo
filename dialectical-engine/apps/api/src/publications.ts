@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   PublicDebateSchema,
   PublicStoryShortSchema,
+  StoryLanguageTagSchema,
   type Answer,
   type Edge,
   type Node,
@@ -163,6 +164,39 @@ async function readPublishableStory(
   return null;
 }
 
+/**
+ * The question's language tag for the snapshot (spec 2026-09-26 §14.3), copied
+ * from the run so the public page can show the short story's fixed text in it.
+ * Like the story, it never blocks publishing: a failed read, or a stored tag the
+ * snapshot schema refuses, publishes no language, and the log records only a
+ * bounded diagnostic.
+ */
+async function readPublishableLanguage(
+  repository: PostgresPublicationRepository,
+  input: Readonly<{ runId: string; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+): Promise<string | null> {
+  let tag: string | null;
+  try {
+    tag = await repository.readArgumentLanguageTag(input.runId, input.authenticated.userId, input.authenticated.ownerRef);
+  } catch (error) {
+    logLanguageNotPublished(input.source.requestId, storyReadDiagnostic(error));
+    return null;
+  }
+  if (tag === null) return null;
+  const parsed = StoryLanguageTagSchema.safeParse(tag);
+  if (parsed.success) return parsed.data;
+  logLanguageNotPublished(input.source.requestId, "LANGUAGE_TAG_REFUSED");
+  return null;
+}
+
+function logLanguageNotPublished(requestId: string, diagnostic: string): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.publication.language_not_published",
+    requestId,
+    diagnostic
+  })));
+}
+
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
   reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
@@ -292,6 +326,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     );
     if (pseudonym === null) return null;
     const storyShort = await readPublishableStory(this.stories, input);
+    const language = await readPublishableLanguage(this.repository, input);
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
     if (!await this.repository.prepareKeyProvision({
@@ -321,7 +356,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
         edges: input.answer.edges.map(redactEdgeForPublic),
         tree_included: true
       },
-      ...(storyShort === null ? {} : { story_short: storyShort })
+      ...(storyShort === null ? {} : { story_short: storyShort }),
+      ...(language === null ? {} : { language })
     });
     let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;
     try {

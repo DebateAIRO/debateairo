@@ -144,6 +144,12 @@ describe("Accounts S8 publication architecture", () => {
     // note; the checker's reservation, the point numbers, the verdict basis, the
     // lineages, the pack and the reasons (full report only) stay owner-only.
     expect(schema).toContain("story_short: PublicStoryShortSchema.optional()");
+    // R2 (spec §14.3): the question's language tag rides on the snapshot, not in
+    // the short story: optional (old snapshots parse), the story's own bounded
+    // tag schema, copied at publish time from the run by the owner-scoped read.
+    expect(schema).toContain("language: StoryLanguageTagSchema.optional()");
+    expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language"]);
     const storyStart = story.indexOf("export const PublicStoryShortSchema");
     const storyEnd = story.indexOf("export type PublicStoryShort =");
     expect(storyStart).toBeGreaterThan(-1);
@@ -156,8 +162,8 @@ describe("Accounts S8 publication architecture", () => {
       ...ownerOnly, "answer_version", "reservation", "point_numbers", "verdict_basis", "storyteller",
       "checker", "lineage", "pack", "fingerprint", "shape_id", "long", "rounds", "written_at", "why"
     ]) expect(storySchema).not.toContain(forbidden);
-    // The question's language is not private. It is simply not published with
-    // the short story yet: a later task decides how the public page learns it.
+    // The question's language is not private; it is published once, on the
+    // snapshot itself (above), never inside the short story.
     expect(storySchema).not.toContain("language");
     expect(api).toContain('GET /v1/public/debates/{id}');
     expect(api).not.toContain('GET /v1/public/debates/{id}/inspection');

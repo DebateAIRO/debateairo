@@ -68,9 +68,13 @@ function storyRunInput(input: {
   readonly principal: StartRunInput["principal"];
   readonly sessionId: string;
   readonly maxModelAttempts: number;
+  readonly language?: Readonly<{ tag: string; name: string }>;
 }): StartRunInput {
   return {
     questionLine: input.questionLine,
+    ...(input.language === undefined
+      ? {}
+      : { argumentLanguageTag: input.language.tag, argumentLanguageName: input.language.name }),
     askContract: { audience: "story-test" },
     principal: input.principal,
     sessionId: input.sessionId,
@@ -91,16 +95,19 @@ function storyRunInput(input: {
   };
 }
 
+/** `language` is the run's question language (core.run.argument_language_*); dev's default "und" when absent. */
 export function createEncryptedStoryRun(
   pool: Pool,
   owner: StoryEncryptedOwner,
-  questionLine: string
+  questionLine: string,
+  language?: Readonly<{ tag: string; name: string }>
 ): Promise<string> {
   return new RunRepository(pool).startRun(storyRunInput({
     questionLine,
     principal: { kind: "server", userId: owner.userId, ownerRef: owner.ownerRef },
     sessionId: owner.sessionId,
-    maxModelAttempts: 10
+    maxModelAttempts: 10,
+    ...(language === undefined ? {} : { language })
   }));
 }
 

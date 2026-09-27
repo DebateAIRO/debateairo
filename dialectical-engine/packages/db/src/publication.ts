@@ -415,6 +415,25 @@ export class PostgresPublicationRepository {
     return result.rows[0]?.pseudonym ?? null;
   }
 
+  /**
+   * The question's language tag (migration 0072's argument_language_tag) of a
+   * run the active user owns, for the public snapshot (spec 2026-09-26
+   * §14.3). Operational metadata, not private content: plaintext, kept after
+   * erasure, so it needs no content lease. Null for a run that is not theirs.
+   */
+  async readArgumentLanguageTag(runId: string, userId: string, ownerRef: string): Promise<string | null> {
+    const result = await this.pool.query<{ tag: string }>(`
+      SELECT run.argument_language_tag AS tag
+      FROM core.run AS run
+      JOIN identity."user" AS identity_user
+        ON identity_user.user_id=$2 AND identity_user.owner_ref=$3
+          AND identity_user.state='active'
+      WHERE run.run_id=$1
+        AND core.run_is_owned_by($1,$3,NULL)
+    `, [runId, userId, ownerRef]);
+    return result.rows[0]?.tag ?? null;
+  }
+
   async readOwnedVisibility(
     runId: string,
     userId: string,

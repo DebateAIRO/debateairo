@@ -73,12 +73,19 @@ const authenticated = Object.freeze({
   authKind: "cookie" as const
 }) satisfies AuthenticatedSession;
 
-async function publishWith(stories: PublicationStoryReader | undefined) {
+/** The run's question language as the publication repository reads it (core.run.argument_language_tag). */
+type LanguageTagReader = (runId: string, userId: string, ownerRef: string) => Promise<string | null>;
+
+async function publishWith(
+  stories: PublicationStoryReader | undefined,
+  readArgumentLanguageTag: LanguageTagReader = async () => "ro"
+) {
   const cipher = new PublicationCipher(new MemoryPublicationKeyStore(loadKek(Buffer.alloc(32, 0xd3))));
   let stored: Readonly<{ publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }> | null = null;
   const repository = {
     preflightGrant: async () => true,
     readAuthorPseudonym: async () => "Stable Public Name",
+    readArgumentLanguageTag,
     prepareKeyProvision: async () => true,
     publish: async (input: Readonly<{ publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }>) => {
       stored = { publicationRef: input.publicationRef, runId: input.runId, contentCiphertext: input.contentCiphertext };
@@ -125,6 +132,17 @@ describe("public short story contract (spec §10)", () => {
   it("refuses a short story without its confidence sentence (R1)", () => {
     const { confidence: _left, ...withoutConfidence } = SHORT;
     expect(PublicStoryShortSchema.safeParse(withoutConfidence).success).toBe(false);
+  });
+
+  it("parses an old snapshot without a language and a new one with the question's language (R2)", () => {
+    expect(PublicDebateSchema.parse(OLD_SNAPSHOT).language).toBeUndefined();
+    expect(PublicDebateSchema.parse({ ...OLD_SNAPSHOT, language: "ro" }).language).toBe("ro");
+    expect(PublicDebateSchema.parse({ ...OLD_SNAPSHOT, language: "und", story_short: SHORT }).language).toBe("und");
+    // Still strict, and the tag is a bounded string, never an object or an empty value.
+    expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, language: "" }).success).toBe(false);
+    expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, language: "x".repeat(36) }).success).toBe(false);
+    expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, language: { tag: "ro" } }).success).toBe(false);
+    expect(PublicDebateSchema.safeParse({ ...OLD_SNAPSHOT, argument_language: "ro" }).success).toBe(false);
   });
 
   it("refuses the checker's reservation: it stays owner-only", () => {
@@ -273,6 +291,49 @@ describe("publish copies the short story", () => {
   it("publishes exactly as before when no reader is composed", async () => {
     const debate = await publishWith(undefined);
     expect("story_short" in debate).toBe(false);
+  });
+});
+
+describe("publish copies the question's language from the run (R2, spec §14.3)", () => {
+  it("copies the run's tag into the snapshot, read for the published run and its owner", async () => {
+    const readArgumentLanguageTag = vi.fn(async () => "ro");
+    const debate = await publishWith({ readStoryShort: async () => SHORT }, readArgumentLanguageTag);
+    expect(debate.language).toBe("ro");
+    expect(readArgumentLanguageTag).toHaveBeenCalledWith(RUN_ID, authenticated.userId, authenticated.ownerRef);
+  });
+
+  it("copies the language even when there is no story yet, and keeps und as it is", async () => {
+    expect((await publishWith(undefined, async () => "ro")).language).toBe("ro");
+    expect((await publishWith(undefined, async () => "und")).language).toBe("und");
+  });
+
+  it("publishes without a language when the run has none", async () => {
+    const debate = await publishWith(undefined, async () => null);
+    expect("language" in debate).toBe(false);
+  });
+
+  it("never lets a language read failure block publishing, and logs a code, never text", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const debate = await publishWith({ readStoryShort: async () => SHORT }, async () => {
+      throw new TypeError("could not read the language of my rent question");
+    });
+    expect("language" in debate).toBe(false);
+    expect(debate.story_short).toEqual(SHORT);
+    expect(logged).toHaveBeenCalledTimes(1);
+    const line = String(logged.mock.calls[0]?.[0]);
+    expect(line).not.toContain("rent");
+    expect(JSON.parse(line)).toEqual({
+      event: "api.publication.language_not_published", requestId: REQUEST_ID, diagnostic: "TypeError"
+    });
+  });
+
+  it("publishes without a language when the stored tag is not one the snapshot can carry", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const debate = await publishWith(undefined, async () => "x".repeat(40));
+    expect("language" in debate).toBe(false);
+    expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toEqual({
+      event: "api.publication.language_not_published", requestId: REQUEST_ID, diagnostic: "LANGUAGE_TAG_REFUSED"
+    });
   });
 });
 
