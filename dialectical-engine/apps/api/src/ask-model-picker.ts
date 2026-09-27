@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError, type DebateRole, type ModelStrength } from "@debateai/kernel";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
-import type { ModelScorecardReadResult } from "@debateai/register";
+import { BUNDLED_MODEL_SCORECARD_SOURCE_REF, type ModelScorecardReadResult } from "@debateai/register";
 import type { ReachableTarget, RoleAssignment, TargetPrice } from "@debateai/scorecard";
 
 /**
@@ -129,14 +129,25 @@ export function askModelPickerSettings(input: Readonly<{
   });
 }
 
-/** The one start-up line saying which scorecard this deployment runs. Never the refusal's detail. */
+/**
+ * The one start-up line saying which scorecard this deployment runs. Never the
+ * refusal's detail, never the sourceRef's text (it can carry operator words).
+ *
+ * A20.4 review M1: a VALID scorecard's `source=` names what was READ, from its
+ * sourceRef, not what the mode should have read; when the two differ the line
+ * says so in plain words. ABSENT and REFUSED carry no sourceRef, so they name
+ * where this mode looked.
+ */
 export function describeModelScorecard(
   result: ModelScorecardReadResult,
   deploymentMode: "hosted" | "local"
 ): string {
   const source = deploymentMode === "hosted" ? "register" : "bundled-file";
   if (result.state === "VALID") {
-    return `MODEL_SCORECARD state=VALID scorecard_version=${result.scorecard.scorecardVersion} source=${source}`;
+    const read = result.sourceRef === BUNDLED_MODEL_SCORECARD_SOURCE_REF ? "bundled-file" : "register";
+    const wrongSource = read === source ? ""
+      : ` (wrong source: ${deploymentMode} mode reads ${source === "register" ? "the register" : "the bundled file"})`;
+    return `MODEL_SCORECARD state=VALID scorecard_version=${result.scorecard.scorecardVersion} source=${read}${wrongSource}`;
   }
   if (result.state === "REFUSED") {
     return `MODEL_SCORECARD state=REFUSED reason=${result.reason} source=${source} (asks keep the plan rosters)`;

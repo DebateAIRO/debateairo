@@ -3,7 +3,10 @@
  * hands the picker. Nothing here decides a seat; every row pins how one
  * deployment fact becomes one picker input.
  */
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   ASK_MODEL_ASSIGNMENT_INVALID,
@@ -21,8 +24,14 @@ import {
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import type { ProviderDiscoveryTarget } from "@debateai/providers";
-import { computeStructuralCeilingBasis } from "@debateai/register";
+import {
+  BUNDLED_MODEL_SCORECARD_SOURCE_REF,
+  computeStructuralCeilingBasis,
+  readBundledModelScorecard,
+  readEngineVersion
+} from "@debateai/register";
 import type { Scorecard } from "@debateai/scorecard";
+import { compatibleExampleScorecard } from "../support/modelScorecardFixture.js";
 
 const CEILING_TERMS = Object.freeze({
   judgeMaxAttempts: 3,
@@ -260,11 +269,45 @@ describe("A20 · deployment facts", () => {
 
   it("says in one line which scorecard the deployment runs", () => {
     const scorecard = Object.freeze({ scorecardVersion: 4 }) as unknown as Scorecard;
-    expect(describeModelScorecard({ state: "VALID", scorecard, sourceRef: "x" }, "local"))
+    expect(describeModelScorecard({ state: "VALID", scorecard, sourceRef: BUNDLED_MODEL_SCORECARD_SOURCE_REF }, "local"))
       .toBe("MODEL_SCORECARD state=VALID scorecard_version=4 source=bundled-file");
     expect(describeModelScorecard({ state: "ABSENT" }, "hosted"))
       .toBe("MODEL_SCORECARD state=ABSENT source=register (asks keep the plan rosters)");
     expect(describeModelScorecard({ state: "REFUSED", reason: "ENGINE_INCOMPATIBLE", detail: "long text" }, "hosted"))
       .toBe("MODEL_SCORECARD state=REFUSED reason=ENGINE_INCOMPATIBLE source=register (asks keep the plan rosters)");
+  });
+
+  // A20.4 review M1: for a VALID scorecard the line names what was READ (its sourceRef), not only the
+  // mode, and says in plain words when that is not what this mode reads. The sourceRef itself, which
+  // can carry operator text, is never printed.
+  it("names the source a VALID scorecard was read from, and flags one this mode must not read", async () => {
+    const scorecard = Object.freeze({ scorecardVersion: 4 }) as unknown as Scorecard;
+    const fromRegister = {
+      state: "VALID" as const, scorecard, sourceRef: "operator:hosted-2026-09 | modelScorecard v4 sha256:ab12"
+    };
+    const fromFile = { state: "VALID" as const, scorecard, sourceRef: BUNDLED_MODEL_SCORECARD_SOURCE_REF };
+    expect(describeModelScorecard(fromRegister, "hosted"))
+      .toBe("MODEL_SCORECARD state=VALID scorecard_version=4 source=register");
+    expect(describeModelScorecard(fromFile, "local"))
+      .toBe("MODEL_SCORECARD state=VALID scorecard_version=4 source=bundled-file");
+    expect(describeModelScorecard(fromFile, "hosted"))
+      .toBe("MODEL_SCORECARD state=VALID scorecard_version=4 source=bundled-file (wrong source: hosted mode reads the register)");
+    expect(describeModelScorecard(fromRegister, "local"))
+      .toBe("MODEL_SCORECARD state=VALID scorecard_version=4 source=register (wrong source: local mode reads the bundled file)");
+    for (const mode of ["hosted", "local"] as const) {
+      expect(describeModelScorecard(fromRegister, mode)).not.toContain("operator:");
+    }
+    // Tied to the real reader: what readBundledModelScorecard returns is labelled bundled-file.
+    const root = await mkdtemp(join(tmpdir(), "a204-scorecard-line-"));
+    try {
+      const location = pathToFileURL(join(root, "current.json"));
+      await writeFile(location, JSON.stringify(await compatibleExampleScorecard(4)));
+      const read = await readBundledModelScorecard(await readEngineVersion(), location);
+      expect(describeModelScorecard(read, "local"))
+        .toBe("MODEL_SCORECARD state=VALID scorecard_version=4 source=bundled-file");
+      expect(describeModelScorecard(read, "hosted")).toMatch(/source=bundled-file \(wrong source: /u);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

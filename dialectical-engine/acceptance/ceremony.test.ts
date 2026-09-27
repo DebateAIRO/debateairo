@@ -365,6 +365,8 @@ describe("ACC-01 dry-run ceremony", () => {
     // TERM-01: no test-only evaluator — the dry ceremony now runs the REAL
     // DR-139 terminal activation evaluator wired by createAcceptanceRuntime.
     const runtime = await createAcceptanceRuntime({
+      // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
+      modelScorecard: { state: "ABSENT" },
       pool: database.pool,
       serviceCredential:"a".repeat(43),
       environment: {

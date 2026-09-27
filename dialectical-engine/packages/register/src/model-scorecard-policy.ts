@@ -33,7 +33,12 @@ export const MODEL_SCORECARD_ROW_KEY = "modelScorecard" as const;
 /** The public, one-version-behind scorecard local mode reads. Absent until the owners approve the first. */
 export const BUNDLED_MODEL_SCORECARD_URL = new URL("../../../scorecards/current.json", import.meta.url);
 
-const BUNDLED_MODEL_SCORECARD_SOURCE_REF = "bundled:scorecards/current.json";
+/**
+ * The one `sourceRef` the bundled reader stamps on what it reads. A hosted row's
+ * sourceRef is the publication's own (`<file> | modelScorecard v<n> sha256:<hex>`),
+ * so this exact value says a scorecard came from the file (A20.4 review M1).
+ */
+export const BUNDLED_MODEL_SCORECARD_SOURCE_REF = "bundled:scorecards/current.json";
 
 export type ModelScorecardRefusalReason = ScorecardRefusalReason | "PROVENANCE_MISSING" | "FILE_UNREADABLE";
 

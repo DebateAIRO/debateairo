@@ -136,6 +136,8 @@ afterAll(async () => {
 describe("DR-182 live mono-panel composition", () => {
   it("boots and serves high-stakes depth 4 with the ruled cap and disclosures", async () => {
     const runtime = await createAcceptanceRuntime({
+      // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
+      modelScorecard: { state: "ABSENT" },
       pool: database.pool,
       serviceCredential:"m".repeat(43),
       environment: {

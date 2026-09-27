@@ -221,6 +221,9 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
       "assertPricedProviderTargets(",
       "resolveProviderTargetCredentials(",
       "parseSupportModelTargetJson(",
+      // Model scorecard A20.4: the picker settings refuse a hosted boot without
+      // a usable per-run ceiling (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED).
+      "askModelPickerSettings(",
       // Every key load and every store construction: each one refuses a
       // mis-provisioned file, and the refusal must reach the ledger.
       "loadKekRing(",

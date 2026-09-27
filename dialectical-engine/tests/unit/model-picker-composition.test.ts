@@ -5,7 +5,7 @@
  * scorecard). Source pins, the precedent of tests/unit/api-provider-discovery.test.ts;
  * the behaviour itself is tests/unit/model-picker-admission.test.ts.
  */
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 describe("A20 · the picker is composed where runs are created", () => {
@@ -14,6 +14,10 @@ describe("A20 · the picker is composed where runs are created", () => {
     expect(source).toContain('await boot.run("model-scorecard", async () => {');
     expect(source).toContain("readModelScorecard(pool, environment.REGISTER_VERSION, engineVersion)");
     expect(source).toContain("readBundledModelScorecard(engineVersion)");
+    // A20.4 review I1: HOSTED reads the sealed row, LOCAL the public file — in that direction.
+    expect(source).toMatch(
+      /environment\.DEPLOYMENT_MODE === "hosted"\s*\?\s*readModelScorecard\(pool, environment\.REGISTER_VERSION, engineVersion\)\s*:\s*readBundledModelScorecard\(engineVersion\)/u
+    );
     expect(source).toContain("console.error(describeModelScorecard(modelScorecard, environment.DEPLOYMENT_MODE));");
     // DL7-F7: the settings refuse a hosted boot without a per-run ceiling
     // (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED), a synchronous decision, so
@@ -21,6 +25,8 @@ describe("A20 · the picker is composed where runs are created", () => {
     expect(source).toContain('const modelPicker = boot.runSync("model-picker", () => askModelPickerSettings({');
     expect(source).toMatch(/\n {2}resolveDiscoveredPanel: resolveProviderPanel,\n(?: {2}\/\/[^\n]*\n)* {2}modelPicker,\n/u);
     expect(source).toContain("perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,");
+    // A20.4 review I1: the API's picker runs in the deployment's own mode, never a fixed one.
+    expect(source).toContain("  deploymentMode: environment.DEPLOYMENT_MODE,\n  targets: declaredProviderTargets,");
     expect(source.indexOf('boot.run("model-scorecard"')).toBeLessThan(source.indexOf('boot.runSync("model-picker"'));
     expect(source.indexOf('boot.runSync("model-picker"')).toBeLessThan(source.indexOf("new PostgresAskApplication("));
     // Pre-flight ruling F17: admission's backup provision reaches the ceiling.
@@ -37,5 +43,22 @@ describe("A20 · the picker is composed where runs are created", () => {
     expect(source).toContain(
       "computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth), basis.backupSequencesProvisioned)"
     );
+  });
+
+  // A20.4 review M3: the default is the checked-in `scorecards/current.json`, which the owners' A22 run
+  // places. A suite that relied on the default would move from the plan rosters to the picker the day
+  // that file lands, so every acceptance suite that builds the runtime names its scorecard itself.
+  it("has every acceptance suite that builds the runtime name its scorecard, never the checked-in default", async () => {
+    const suites = (await readdir("acceptance")).filter((name) => name.endsWith(".test.ts"));
+    const builds: string[] = [];
+    for (const name of suites) {
+      const source = await readFile(`acceptance/${name}`, "utf8");
+      for (const match of source.matchAll(/createAcceptanceRuntime\(\{\n(?:[ ]*\/\/[^\n]*\n)*(?<first>[^\n]*)\n/gu)) {
+        builds.push(`${name}: ${match.groups?.first?.trim() ?? ""}`);
+      }
+    }
+    expect(builds.length).toBeGreaterThan(0);
+    // `modelScorecard: …` or the shorthand `modelScorecard,` — either names it.
+    expect(builds.filter((build) => !/: modelScorecard(?::|,)/u.test(build))).toEqual([]);
   });
 });
