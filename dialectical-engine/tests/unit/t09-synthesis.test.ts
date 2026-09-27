@@ -662,6 +662,11 @@ describe("T9 crash classes — the ONLY four ways COMPONENTS_ONLY still exists",
     expect(result.loopRounds.map((round) => round.round)).toEqual([1]);
     expect(result.segments.map((segment) => segment.text)).toEqual(segments("candidate 1").map((segment) => segment.text));
     expect(result.standingObjection).toBe("Round one is unfair.");
+    // Served exactly as a finished loop's last round: one round composed, the loop exhausted, no recompose.
+    const composedAt = result.gateTrace.indexOf("COMPOSED");
+    expect(composedAt).toBeGreaterThanOrEqual(0);
+    expect(result.gateTrace.indexOf("SYNTHESIS_LOOP_EXHAUSTED")).toBeGreaterThan(composedAt);
+    expect(result.gateTrace).not.toContain("RECOMPOSED_ONCE");
   });
 
   it("TRANSPORT_DEATH before any complete round: a dead role transport ends in components-only, not a thrown run", async () => {

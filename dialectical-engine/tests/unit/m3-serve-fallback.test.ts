@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
-import { TypedDomainError } from "@debateai/kernel";
+import { RUN_LEVEL_SPEND_STOP_CODES, TypedDomainError } from "@debateai/kernel";
 import {
   lengthRetryTokenCeiling,
   type ProviderCallRequest,
@@ -10,6 +10,7 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 import {
+  ROUND_KEEPING_TECHNICAL_FAILURES,
   SYNTHESIS_OBJECTION_STANDING_MARK,
   buildFactBundle,
   buildSynthesisDigest,
@@ -695,6 +696,23 @@ describe("M3 polish · what ended the answer-writing loop early, for the owner's
     ["SYNTHESIS_NO_ARTIFACT", "NO_ARTIFACT"]
   ] as const)("names %s as %s", (code, stop) => {
     expect(serveLoopStopOf(new TypedDomainError(code, "x"))).toBe(stop);
+  });
+
+  /**
+   * M3 review carry (Task M4): the loop keeps a round for every run-level spend
+   * stop and for each code on its exported technical list. Each of those ends
+   * the loop early, so each must name a `serve_stop` — a code added to either
+   * list later fails here instead of silently recording NULL on the owner's row.
+   */
+  it("names a stop for every code the answer-writing loop keeps a round for", () => {
+    const kept = [...RUN_LEVEL_SPEND_STOP_CODES, ...ROUND_KEEPING_TECHNICAL_FAILURES];
+    for (const code of kept) {
+      const failure = new TypedDomainError(code, "x");
+      expect(keepsCompleteSynthesisRounds(failure), code).toBe(true);
+      expect(serveLoopStopOf(failure), code).not.toBeNull();
+    }
+    // Today's list, so a change to it is seen here too.
+    expect(ROUND_KEEPING_TECHNICAL_FAILURES).toEqual(["SYNTHESIS_TRANSPORT_DEATH", "SYNTHESIS_NO_ARTIFACT"]);
   });
 
   it("names nothing for no failure, a failure that ends no loop early, or a code-shaped object", () => {

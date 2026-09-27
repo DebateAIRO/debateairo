@@ -1995,6 +1995,9 @@ export function servePhaseStopDisclosure(input: Readonly<{
   } satisfies ConditionMarkRecord);
 }
 
+/** The kinds of stop that can end the answer-writing loop early (`serve.serve_disclosure.serve_stop`). */
+export type ServeLoopStop = EnvelopeStopKind | "TRANSPORT_DEATH" | "NO_ARTIFACT";
+
 /**
  * ENGINE MONEY RULE (spec §14.4.5), TASK M3 review polish — WHAT ENDED THE
  * ANSWER-WRITING LOOP EARLY, for the owner's record (`serve_stop`).
@@ -2007,9 +2010,11 @@ export function servePhaseStopDisclosure(input: Readonly<{
  * terminal. It is recorded either way, and it is the only durable trace of a
  * transport death after a kept round and of a serve-leg stop whose envelope
  * record the stop while arguing already took. `null` for anything else.
+ *
+ * Every code the loop keeps a round for (the kernel's spend stops and serve's
+ * `ROUND_KEEPING_TECHNICAL_FAILURES`) names a stop here; a unit row pins that,
+ * so a new code cannot silently record NULL (M3 review carry, Task M4).
  */
-export type ServeLoopStop = EnvelopeStopKind | "TRANSPORT_DEATH" | "NO_ARTIFACT";
-
 export function serveLoopStopOf(failure: unknown): ServeLoopStop | null {
   const stop = envelopeStopKind(failure);
   if (stop !== null) return stop;

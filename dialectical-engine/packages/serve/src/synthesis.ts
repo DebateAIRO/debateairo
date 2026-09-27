@@ -1109,8 +1109,12 @@ export interface SynthesisLoopDependencies<TCandidate> {
  * `EVALUATOR_CONTRACT_ERROR`, an incoherent verdict) is NOT on this list: it
  * keeps today's handling. Only a `TypedDomainError` is trusted — a code-shaped
  * object is not a refusal.
+ *
+ * Exported (M3 review carry, Task M4) so the runner's `serveLoopStopOf` is
+ * pinned against it: every code the loop keeps a round for must name a stop on
+ * the owner's record, or a new code would silently record NULL there.
  */
-const ROUND_KEEPING_TECHNICAL_FAILURES: readonly string[] = Object.freeze([
+export const ROUND_KEEPING_TECHNICAL_FAILURES: readonly string[] = Object.freeze([
   "SYNTHESIS_TRANSPORT_DEATH",
   "SYNTHESIS_NO_ARTIFACT"
 ]);
