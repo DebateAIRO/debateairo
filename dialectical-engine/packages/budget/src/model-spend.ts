@@ -247,7 +247,10 @@ export function mostOneRunMaySpendMicros(policy: Readonly<{
  * that holds one run and not its story passes it. This reads BOTH, and refuses
  * a day below the most one run may spend with its story
  * (`mostOneRunMaySpendMicros`) — STORY_DAILY_CEILING_INSUFFICIENT, with no
- * figure in the message: the operator's plan line and the rows carry them.
+ * figure in the message. The operator sees that code on stderr (the publish
+ * command prints it; a refused boot prints the error), and the runbook's row
+ * for it (deploy/vps/README.md) gives the figures and the fix: raise
+ * `daily_ceiling_micros` in a new register version.
  *
  * Called where both rows are already read: the hosted publication's plan
  * (`planHostedRegisterPublication`, before anything is sealed) and the hosted

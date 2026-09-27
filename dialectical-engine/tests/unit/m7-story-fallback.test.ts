@@ -180,8 +180,12 @@ const price = (perToken: number) => Object.freeze({
   inputMicrosPerMillionTokens: perToken * 1_000_000, outputMicrosPerMillionTokens: perToken * 1_000_000
 });
 
-/** B is the dearest fallback, C the cheapest; D (the planned checker) is cheaper still. */
-const PRICES: ProviderPriceMap = new Map([[A, price(9)], [B, price(5)], [C, price(1)], [D, price(1)]]);
+/**
+ * Every price strictly different, so an order is never a tie broken by the
+ * roster: D (the planned checker) is the cheapest, then C, then B; A (the
+ * planned storyteller) is the dearest.
+ */
+const PRICES: ProviderPriceMap = new Map([[A, price(9)], [B, price(5)], [C, price(2)], [D, price(1)]]);
 
 function run(makers: readonly Maker[], options: {
   readonly prices?: ProviderPriceMap;
@@ -228,32 +232,42 @@ describe("M7 · the story's cheaper model: a money refusal tries the run's other
     expect([sites(a), sites(b), sites(c), sites(d)]).toEqual([["STORY:STORYTELLER:1"], [], [], ["STORY:CHECKER:1"]]);
   });
 
-  it("tries the cheapest maker first, keeps the planned checker's maker last, and the lineage names the maker that wrote", async () => {
+  /**
+   * M7 review ruling: the storyteller's fallback is STRICTLY cheapest first,
+   * the planned checker's maker included. The storyteller and the checker
+   * share ONE story total (60 000), so steering the storyteller to a dearer
+   * maker can leave the checker unpaid and fail a story that cheapest-first
+   * would have made READY. Diversity is preferred on the checker's side only,
+   * and the lineage shows when one maker did both jobs.
+   */
+  it("tries the cheapest maker first, even the planned checker's, and the lineage names the maker that wrote", async () => {
     const a = makerDouble(A, refusesEverything);
     const [b, c, d] = [makerDouble(B, satisfied), makerDouble(C, satisfied), makerDouble(D, satisfied)];
     const { write, inserted } = run([a, b, c, d]);
     await write();
-    // A was asked first and refused before sending; C — the cheapest that is not
-    // the planned checker — wrote; B, dearer, was never asked; D only checked.
+    // A was asked first and refused before sending; D — the cheapest, and the
+    // planned checker's maker — wrote; C and B, dearer, were never asked. The
+    // planned checker is still asked first for the check, and D fits.
     expect(sites(a)).toEqual(["STORY:STORYTELLER:1"]);
     expect(a.sent).toEqual([]);
-    expect(sites(c)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(sites(d)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
+    expect(sites(c)).toEqual([]);
     expect(sites(b)).toEqual([]);
-    expect(sites(d)).toEqual(["STORY:CHECKER:1"]);
-    // The stored lineage is the model ACTUALLY used, so the PDF's "Written by" names it.
+    // The stored lineage is the model ACTUALLY used, so the PDF's "Written by"
+    // names it — and shows that one maker did both jobs.
     expect(inserted[0]).toMatchObject({
       outcome: "READY",
-      storytellerLineage: { provider_ref: C, maker: `maker of ${C}`, model_id: `${C}/model`, transport: "openai-compatible-http" },
+      storytellerLineage: { provider_ref: D, maker: `maker of ${D}`, model_id: `${D}/model`, transport: "openai-compatible-http" },
       checkerLineage: { provider_ref: D, maker: `maker of ${D}` },
-      artifactRefs: [`artifact:${C}:1`, `artifact:${D}:1`]
+      artifactRefs: [`artifact:${D}:1`, `artifact:${D}:2`]
     });
   });
 
   it("follows the price map, not the roster order", async () => {
     const a = makerDouble(A, refusesEverything);
     const [b, c, d] = [makerDouble(B, satisfied), makerDouble(C, satisfied), makerDouble(D, satisfied)];
-    // Now B is the cheaper of the two.
-    const { write, inserted } = run([a, c, b, d], { prices: new Map([[A, price(9)], [B, price(1)], [C, price(5)], [D, price(1)]]) });
+    // Now B is the cheapest, listed after C.
+    const { write, inserted } = run([a, c, b, d], { prices: new Map([[A, price(9)], [B, price(1)], [C, price(5)], [D, price(3)]]) });
     await write();
     expect(sites(b)).toEqual(["STORY:STORYTELLER:1"]);
     expect(sites(c)).toEqual([]);
@@ -265,7 +279,7 @@ describe("M7 · the story's cheaper model: a money refusal tries the run's other
     const b = makerDouble(B, refusesEverything);
     const [c, d] = [makerDouble(C, satisfied), makerDouble(D, satisfied)];
     // B, the cheapest fallback, is refused too, so C writes on the second try.
-    const { write, inserted } = run([a, b, c, d], { prices: new Map([[A, price(9)], [B, price(1)], [C, price(5)], [D, price(1)]]) });
+    const { write, inserted } = run([a, b, c, d], { prices: new Map([[A, price(9)], [B, price(1)], [C, price(5)], [D, price(7)]]) });
     await write();
     expect(inserted[0]?.storytellerLineage?.provider_ref).toBe(C);
     const planned = a.tried[0]!;
@@ -295,10 +309,11 @@ describe("M7 · the story's cheaper model: a money refusal tries the run's other
     const [b, c] = [makerDouble(B, satisfied), makerDouble(C, satisfied)];
     const { write, inserted } = run([a, b, c, d]);
     await write();
-    // C, the cheapest, wrote. D, the planned checker, was refused; C is cheaper
-    // than B but wrote the draft, so B checked it (and A, dearer, was not asked).
+    // D, the cheapest, was refused, so C wrote. D, the planned checker, was
+    // refused again; C is cheaper than B but wrote the draft, so B checked it
+    // (and A, dearer, was not asked).
     expect(sites(c)).toEqual(["STORY:STORYTELLER:1"]);
-    expect(sites(d)).toEqual(["STORY:CHECKER:1"]);
+    expect(sites(d)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
     expect(sites(b)).toEqual(["STORY:CHECKER:1"]);
     expect(sites(a)).toEqual(["STORY:STORYTELLER:1"]);
     expect(inserted[0]).toMatchObject({
@@ -319,10 +334,10 @@ describe("M7 · the story's cheaper model: a money refusal tries the run's other
     const c = makerDouble(C, satisfied);
     const { write, inserted } = run([a, b, c, d]);
     await write();
-    // C wrote on the first fallback. The check: D (planned) refused, then B and A
+    // D refused, so C wrote. The check: D (planned) refused, then B and A
     // (cheapest first) refused, and only then C, the draft's own writer.
     expect(sites(c)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
-    expect(sites(d)).toEqual(["STORY:CHECKER:1"]);
+    expect(sites(d)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
     expect(sites(b)).toEqual(["STORY:CHECKER:1"]);
     expect(sites(a)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
     expect(inserted[0]).toMatchObject({
@@ -353,7 +368,7 @@ describe("M7 · the story's cheaper model: a money refusal tries the run's other
     await write();
     expect(inserted[0]?.outcome).toBe("READY");
     expect(outside).toEqual([]);
-    // enrichment + A (refused) + C (wrote) + D (checked) + insert.
+    // enrichment + A (refused) + D (wrote) + D (checked) + insert.
     expect(entries).toBe(5);
   });
 });
@@ -427,14 +442,15 @@ describe("M7 · the fallback is for the story's MONEY refusal only (J24's one ex
 
   it("stops at the first fallback that fails for any reason but money, with that failure", async () => {
     const a = makerDouble(A, refusesEverything);
-    const c = makerDouble(C, () => new ProviderCallFailedError(new Error("socket hang up"), 2, "TIMED_OUT", "ledger:dead"));
-    const [b, d] = [makerDouble(B, satisfied), makerDouble(D, satisfied)];
+    // D, the cheapest fallback, has a dead transport; C and B would have fit.
+    const d = makerDouble(D, () => new ProviderCallFailedError(new Error("socket hang up"), 2, "TIMED_OUT", "ledger:dead"));
+    const [b, c] = [makerDouble(B, satisfied), makerDouble(C, satisfied)];
     const { write, inserted } = run([a, b, c, d]);
     await write();
     expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH" });
-    expect(sites(c)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(sites(d)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(sites(c)).toEqual([]);
     expect(sites(b)).toEqual([]);
-    expect(sites(d)).toEqual([]);
   });
 
   it("an ABSENT story role is still STORY_ROLE_UNAVAILABLE, with every other maker healthy and the fallback wired", async () => {

@@ -69,15 +69,23 @@ export interface StoryRoleMaker {
  * (Task M3, `callServeRoleWithFallback`), not a copy of it. The planned maker is
  * asked first with the request exactly as built; only a refusal the WRITER names
  * as money (`refusedForMoney`: the story seam's STORY_COST_ENVELOPE_REACHED,
- * raised before sending, so the try cost nothing and wrote nothing) moves the
- * SAME request — call site, framed prompt, bound, contract — to the run's other
- * makers, cheapest first by the seam's own projection, `preferNot` last. The
- * first that goes through serves; nothing fits → the planned call's own refusal
- * travels; any other failure, planned or fallback, travels untouched.
+ * raised before an attempt is sent) moves the SAME request — call site, framed
+ * prompt, bound, contract — to the run's other makers, cheapest first by the
+ * seam's own projection, `preferNot` last. The first that goes through serves;
+ * nothing fits → the planned call's own refusal travels; any other failure,
+ * planned or fallback, travels untouched.
+ *
+ * A refused try costs nothing only when the refusal comes on its FIRST attempt:
+ * the seam decides before each attempt, so a later repair or length retry that
+ * is refused for money also starts the fallback, and the attempts that maker
+ * already made stay charged and ledgered (inherited from Task M3).
  */
 export type StoryCostFallback = (input: Readonly<{
   planned: StoryRoleMaker;
-  /** The maker offered last: for the checker, the one that wrote the draft it checks. */
+  /**
+   * The maker offered last: for the checker, the one that wrote the draft it
+   * checks. Null for the storyteller, whose fallback is strictly cheapest first.
+   */
   preferNot: string | null;
   request: ProviderCallRequest;
   refusedForMoney: (error: unknown) => boolean;
@@ -510,10 +518,13 @@ export class StoryWriter {
           material: toStoryPromptMaterial(built.material, priorObjection),
           classifyContent: (content) => classifyStoryContent(content, built.index)
         });
-        // Task M7: a fallback writer keeps the planned CHECKER's maker for last,
-        // as the answer-writer's does (M3), so the checker is not handed a draft
-        // its own maker wrote whenever another maker fits.
-        const { result, servedBy } = await callStoryRole(storyteller, request, checker.providerRef);
+        // Task M7 (review ruling): a fallback storyteller is STRICTLY cheapest
+        // first, the planned checker's maker included. Both calls spend ONE
+        // story total, so a dearer storyteller could leave the checker unpaid
+        // and fail a story cheapest-first would have made READY. Diversity is
+        // preferred on the checker's side only; the lineage shows one maker
+        // doing both jobs.
+        const { result, servedBy } = await callStoryRole(storyteller, request, null);
         draftWriterByRound.set(round, servedBy.providerRef);
         // Short refs on purpose: the checker judges this body against the SAME
         // material the storyteller read. Real ids are restored only for storage.

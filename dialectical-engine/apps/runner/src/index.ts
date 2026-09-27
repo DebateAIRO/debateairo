@@ -2124,9 +2124,12 @@ export interface ServeRoleCallOutcome<T> {
  *
  * The planned maker (the sealed role ref) is always asked first. Only a MONEY
  * refusal (`RUN_COST_ENVELOPE_MONEY_REACHED`, raised by the per-call seam BEFORE
- * sending, so the refused try wrote nothing and cost nothing) moves the SAME
- * request — the same call site, the same framed prompt object, the same bound
- * and contract — to the next maker in `servePhaseFallbackOrder`. The provider
+ * an attempt is sent) moves the SAME request — the same call site, the same
+ * framed prompt object, the same bound and contract — to the next maker in
+ * `servePhaseFallbackOrder`. A refused try costs nothing only when the refusal
+ * comes on its FIRST attempt: the seam decides before each attempt, so a later
+ * repair or length retry refused for money also moves the request on, and the
+ * attempts that maker already made stay charged and ledgered. The provider
  * is the only thing that changes; the prompt is never rebuilt. The seam decides
  * what fits: a maker it refuses for money is skipped, and the first that goes
  * through serves. Nothing fits → the planned call's own refusal travels, as it
