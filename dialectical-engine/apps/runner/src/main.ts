@@ -102,6 +102,15 @@ const storyLog = (event: string, detail: Record<string, unknown>): void => {
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_STORY", event }));
 };
 /**
+ * Engine money rule, Task M3 (spec §14.4.5): the owner-side disclosure row is
+ * written after every answer and can never change it; a failure to write it is
+ * this one line. Codes and ids only — the detail goes FIRST, so no detail key
+ * can overwrite the line's kind or event.
+ */
+const serveDisclosureLog = (event: string, detail: Readonly<Record<string, unknown>>): void => {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_SERVE_DISCLOSURE", event }));
+};
+/**
  * The shape pack is loaded ONCE, here (spec §5.1). An invalid pack never stops
  * the runner: every story is then FAILED/STORY_PACK_INVALID, and this line says
  * exactly which rule failed. ANY error counts — a typed pack refusal, an
@@ -312,6 +321,9 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
   providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
+  // Engine money rule, Task M3 (spec §14.4.5): the row goes to the runner's own
+  // pool (the default store); a failure to write it is logged here.
+  serveDisclosure: { log: serveDisclosureLog },
   claimTimeSynthesisRoleProbe: async (providerRef) => {
     const target = providerTargets.find((candidate) => candidate.providerRef === providerRef);
     if (target === undefined) {
