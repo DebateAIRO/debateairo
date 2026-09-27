@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Más acciones del debate",
   "chrome.help": "Ayuda",
   "chrome.signedInAsker": "Autor de la pregunta con sesión iniciada",
-  "chrome.guestSession": "Sesión de invitado"
+  "chrome.guestSession": "Sesión de invitado",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

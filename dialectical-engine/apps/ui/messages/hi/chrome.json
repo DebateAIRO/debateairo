@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "वाद-विवाद से जुड़ी अन्य कार्रवाइयाँ",
   "chrome.help": "सहायता",
   "chrome.signedInAsker": "साइन-इन किया हुआ प्रश्नकर्ता",
-  "chrome.guestSession": "अतिथि सत्र"
+  "chrome.guestSession": "अतिथि सत्र",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

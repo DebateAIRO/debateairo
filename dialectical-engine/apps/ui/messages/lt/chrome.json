@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Daugiau debatų veiksmų",
   "chrome.help": "Pagalba",
   "chrome.signedInAsker": "Prisijungęs klausėjas",
-  "chrome.guestSession": "Svečio seansas"
+  "chrome.guestSession": "Svečio seansas",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

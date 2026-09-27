@@ -27,6 +27,7 @@ import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 export function PublicDebatePageClient({
   debate,
   locale,
+  storyLocale,
   publicCatalog,
   timeCatalog,
   debateChromeCatalog,
@@ -37,6 +38,8 @@ export function PublicDebatePageClient({
 }: {
   debate: PublicDebate;
   locale: LocaleCode;
+  /** The locale of the language the debate was argued in (spec 2026-09-26 §14.3); the reader's own when the snapshot does not say. */
+  storyLocale: LocaleCode;
   publicCatalog: MessageCatalog;
   timeCatalog: MessageCatalog;
   debateChromeCatalog: MessageCatalog;
@@ -131,6 +134,7 @@ export function PublicDebatePageClient({
       composeCatalog={composeCatalog}
       homeCatalog={homeCatalog}
       publicMode
+      questionLocale={storyLocale}
       publicNodesById={projection.nodesById}
       publicExport={publicExport}
       publicHeader={publicHeader}

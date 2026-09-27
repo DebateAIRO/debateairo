@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "更多辩论操作",
   "chrome.help": "帮助",
   "chrome.signedInAsker": "已登录的提问者",
-  "chrome.guestSession": "访客会话"
+  "chrome.guestSession": "访客会话",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

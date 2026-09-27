@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Ďalšie akcie debaty",
   "chrome.help": "Pomoc",
   "chrome.signedInAsker": "Prihlásený pýtajúci sa",
-  "chrome.guestSession": "Relácia hosťa"
+  "chrome.guestSession": "Relácia hosťa",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

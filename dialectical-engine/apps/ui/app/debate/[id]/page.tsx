@@ -2,10 +2,11 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Answer } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
-import { getDebateServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
+import { getDebateServer, questionLanguageTagOf, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
-import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
+import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
+import { questionLocale } from "@/lib/i18n/questionLocale";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 
@@ -77,6 +78,9 @@ export default async function DebatePage({
   let initialAnswer: Answer | null = null;
   let initialPending = true;
   let initialError: string | null = null;
+  // The language the debate was argued in (spec 2026-09-26 §14.3); the page
+  // offers to switch to it when it differs from the reader's.
+  let questionLanguage: LocaleCode | null = null;
 
   if (token !== null) {
     const result = await getDebateServer(
@@ -87,6 +91,8 @@ export default async function DebatePage({
       readTrustedClientIp(await headers()),
       composeCatalog
     );
+    const questionTag = questionLanguageTagOf(result);
+    questionLanguage = questionTag === null ? null : questionLocale(questionTag, locale);
     if (result.ok) {
       initialDebate = result.debate;
       initialAnswer = result.answer;
@@ -120,6 +126,7 @@ export default async function DebatePage({
       composeCatalog={composeCatalog}
       homeCatalog={homeCatalog}
       newDebateCatalog={newDebateCatalog}
+      questionLocale={questionLanguage}
     />
   );
 }

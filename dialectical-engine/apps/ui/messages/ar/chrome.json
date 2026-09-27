@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "المزيد من إجراءات المناظرة",
   "chrome.help": "المساعدة",
   "chrome.signedInAsker": "صاحب سؤال مسجل الدخول",
-  "chrome.guestSession": "جلسة ضيف"
+  "chrome.guestSession": "جلسة ضيف",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

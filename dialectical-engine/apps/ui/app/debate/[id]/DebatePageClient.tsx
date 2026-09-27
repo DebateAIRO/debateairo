@@ -70,6 +70,7 @@ import { DebateSplit } from "@/components/DebateSplit";
 import { DebateMap } from "@/components/DebateMap";
 import { SynthesisPanel } from "@/components/SynthesisPanel";
 import { VerdictBanner } from "@/components/VerdictBanner";
+import { QuestionLanguageOffer } from "@/components/QuestionLanguageOffer";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
 import { ChallengePopover } from "@/components/ChallengePopover";
@@ -78,6 +79,7 @@ import { GuideModal } from "@/components/GuideModal";
 import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
 import {
@@ -569,7 +571,8 @@ export default function DebatePageClient({
   publicExport = null,
   renderPublicHonesty = null,
   publicOverview = null,
-  publicHeader = null
+  publicHeader = null,
+  questionLocale = null
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -616,6 +619,13 @@ export default function DebatePageClient({
    * chrome.
    */
   publicHeader?: ReactNode;
+  /**
+   * The locale of the language the debate was argued in (spec 2026-09-26
+   * §14.3), from the run read (owner) or the snapshot (public); null when it
+   * is not known. When it differs from the interface locale the page offers
+   * to switch to it.
+   */
+  questionLocale?: LocaleCode | null;
 }) {
   const { catalog: chromeCatalog, locale } = useChromeI18n();
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
@@ -1524,6 +1534,8 @@ export default function DebatePageClient({
 
       {/* ---- verdict-first banner (flag-gated: NEXT_PUBLIC_VERDICT_FIRST_UI) ---- */}
       {!publicMode && process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} catalog={debateDrawersCatalog} debateChromeCatalog={debateChromeCatalog} /> : null}
+
+      <QuestionLanguageOffer questionLocale={questionLocale} interfaceLocale={locale} catalog={chromeCatalog} />
 
       <ScoringErrorBoundary catalog={miscCatalog}>
         {scoringInsightsExpandable ? (

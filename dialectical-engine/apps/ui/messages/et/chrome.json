@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Rohkem väitlustoiminguid",
   "chrome.help": "Abi",
   "chrome.signedInAsker": "Sisselogitud küsija",
-  "chrome.guestSession": "Külalisseanss"
+  "chrome.guestSession": "Külalisseanss",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

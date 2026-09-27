@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Aktar azzjonijiet tad-dibattitu",
   "chrome.help": "Għajnuna",
   "chrome.signedInAsker": "Persuna li tistaqsi u li daħlet fil-kont",
-  "chrome.guestSession": "Sessjoni ta’ mistieden"
+  "chrome.guestSession": "Sessjoni ta’ mistieden",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

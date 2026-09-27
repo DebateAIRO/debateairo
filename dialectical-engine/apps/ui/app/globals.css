@@ -8676,6 +8676,46 @@ a:focus-visible {
   .storyPanelStory .storyPaths { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
   .storyPanelStory .storyPathMore { grid-column: 1 / -1; }
 }
+/* The offer to show the debate page in the language the debate was argued in
+   (components/QuestionLanguageOffer.tsx, spec 2026-09-26 §14.3): a slim strip
+   under the AI notice, in the page's own quiet colours, with the switch as the
+   one filled button. Logical properties only, so it mirrors in Arabic and
+   Hebrew. */
+.languageOffer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--shell);
+  font-family: var(--font-sans);
+}
+.languageOfferText { margin: 0; min-width: 0; color: var(--text); font-size: 12.5px; line-height: 1.5; }
+.languageOfferActions { display: flex; flex-wrap: wrap; gap: 8px; margin-inline-start: auto; }
+.languageOfferSwitch,
+.languageOfferDismiss {
+  padding: 5px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.languageOfferSwitch { border-color: var(--ink); background: var(--ink); color: var(--core); }
+.languageOfferSwitch:hover { border-color: var(--ink-hover); background: var(--ink-hover); }
+.languageOfferDismiss:hover { border-color: var(--line-strong); color: var(--text); }
+.languageOfferSwitch:focus-visible,
+.languageOfferDismiss:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .languageOffer { padding: 8px 12px; }
+  .languageOfferActions { margin-inline-start: 0; }
+}
 /* === end verdict-story === */
 
 /* === consent-ui S01 === */

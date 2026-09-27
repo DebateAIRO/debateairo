@@ -5,6 +5,7 @@ import DebatePageClient from "./DebatePageClient";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import type { DebateDetail } from "@/lib/types";
+import type { LocaleCode } from "@/lib/i18n/locales";
 import type { MessageCatalog } from "@/lib/i18n/translate";
 
 /**
@@ -25,7 +26,8 @@ export default function DebatePageGate({
   publicCatalog,
   composeCatalog,
   homeCatalog,
-  newDebateCatalog
+  newDebateCatalog,
+  questionLocale = null
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -41,6 +43,8 @@ export default function DebatePageGate({
   homeCatalog: MessageCatalog;
   /** The session gate's copy lives in `newDebate` (review F2). */
   newDebateCatalog: MessageCatalog;
+  /** The question's locale (spec 2026-09-26 §14.3), for the offer to switch the page to it. */
+  questionLocale?: LocaleCode | null;
 }) {
   return (
     <>
@@ -59,6 +63,7 @@ export default function DebatePageGate({
           publicCatalog={publicCatalog}
           composeCatalog={composeCatalog}
           homeCatalog={homeCatalog}
+          questionLocale={questionLocale}
         />
       )}
       </AuthGate>

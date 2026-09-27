@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Tuilleadh gníomhartha díospóireachta",
   "chrome.help": "Cabhair",
   "chrome.signedInAsker": "Fiafraitheoir sínithe isteach",
-  "chrome.guestSession": "Seisiún aoi"
+  "chrome.guestSession": "Seisiún aoi",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

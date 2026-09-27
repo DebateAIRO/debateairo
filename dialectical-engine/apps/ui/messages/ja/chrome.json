@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "その他のディベート操作",
   "chrome.help": "ヘルプ",
   "chrome.signedInAsker": "ログイン済みの質問者",
-  "chrome.guestSession": "ゲストセッション"
+  "chrome.guestSession": "ゲストセッション",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

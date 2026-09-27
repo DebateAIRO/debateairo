@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Fler debattåtgärder",
   "chrome.help": "Hjälp",
   "chrome.signedInAsker": "Inloggad frågeställare",
-  "chrome.guestSession": "Gästsession"
+  "chrome.guestSession": "Gästsession",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

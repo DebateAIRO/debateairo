@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Autres commandes du débat",
   "chrome.help": "Aide",
   "chrome.signedInAsker": "Demandeur connecté",
-  "chrome.guestSession": "Session invitée"
+  "chrome.guestSession": "Session invitée",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }

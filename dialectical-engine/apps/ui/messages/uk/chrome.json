@@ -42,5 +42,9 @@
   "chrome.moreDebateActions": "Інші дії з дебатами",
   "chrome.help": "Довідка",
   "chrome.signedInAsker": "Автор запитання, який увійшов у систему",
-  "chrome.guestSession": "Гостьовий сеанс"
+  "chrome.guestSession": "Гостьовий сеанс",
+  "chrome.languageOffer.label": "Page language",
+  "chrome.languageOffer.text": "This debate is in {language}. Show the page in {language}?",
+  "chrome.languageOffer.switch": "Switch to {language}",
+  "chrome.languageOffer.dismiss": "No, thanks"
 }
