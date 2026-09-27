@@ -44,8 +44,8 @@
   "chrome.signedInAsker": "Kirjautunut kysyjä",
   "chrome.guestSession": "Vierasistunto",
   "chrome.languageOffer.label": "Sivun kieli",
-  "chrome.languageOffer.text": "Tämä väittely on kielellä {language} ({nativeName}). Näytetäänkö sivu kielellä {language}?",
-  "chrome.languageOffer.textNative": "Tämä väittely on kielellä {language}. Näytetäänkö sivu kielellä {language}?",
+  "chrome.languageOffer.text": "Tämän väittelyn kieli on {language} ({nativeName}). Näytetäänkö sivu kielellä {language}?",
+  "chrome.languageOffer.textNative": "Tämän väittelyn kieli on {language}. Näytetäänkö sivu kielellä {language}?",
   "chrome.languageOffer.switch": "Vaihda kieleksi {language}",
   "chrome.languageOffer.dismiss": "Ei kiitos"
 }
