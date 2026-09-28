@@ -21,7 +21,7 @@
 **Spec.** `dialectical-engine/docs/superpowers/specs/2026-09-26-model-scorecard-and-picker-design.md`. The binding interface contract and the measured tool facts are Appendices A and B at the end of this plan.
 
 **Where everything runs.**
-- Worktree: `/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/model-scorecard-design`, branch `design/2026-09-26-model-scorecard`, which is off `origin/dev` `bf4e3dde` with its upstream unset on purpose.
+- Worktree: `<your engine checkout>`, branch `design/2026-09-26-model-scorecard`, which is off `origin/dev` `bf4e3dde` with its upstream unset on purpose.
 - Every command runs from `dialectical-engine/` inside the worktree.
 - Before Task A1: `pnpm install --frozen-lockfile && pnpm run generate:contract`. The worktree ships neither `node_modules/` nor `packages/contract/generated/`. If the install needs a network download, **stop: OWNER GO NEEDED**.
 
@@ -132,7 +132,7 @@ These are the conditions most likely to bite a real user, with where each is pin
 
 ### Part notes
 **Where commands run.** Every command below runs from `dialectical-engine/` in the worktree
-`/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/model-scorecard-design`. Before the first
+`<your engine checkout>`. Before the first
 task: `pnpm install --frozen-lockfile && pnpm run generate:contract` (M3: the worktree ships neither
 `node_modules/` nor `packages/contract/generated/`; `@debateai/contract` exports `./generated/client.ts`).
 
@@ -3698,7 +3698,7 @@ Expected `git diff --cached --name-only`: exactly the seven paths above.
 ## Part 2 — Migration 0072 and the gateway records (A5–A7d)
 
 ### Part notes
-All paths are relative to `dialectical-engine/` in the worktree `/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/model-scorecard-design`. Line numbers are at HEAD `19551cd8`. Where a task edits code an earlier task in this fragment added, the step names the anchor text rather than a line number.
+All paths are relative to `dialectical-engine/` in the worktree `<your engine checkout>`. Line numbers are at HEAD `19551cd8`. Where a task edits code an earlier task in this fragment added, the step names the anchor text rather than a line number.
 
 **Assumptions**
 
@@ -16452,7 +16452,7 @@ Afterwards you may remove `"$check_dir"`. Nothing from it enters the repository.
 ## Part 4 — Runner seats, backups, synthesis builder, moment export/replay (A13–A18d)
 
 All paths are relative to `dialectical-engine/` in the worktree
-`/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/model-scorecard-design`. Line numbers are those of the
+`<your engine checkout>`. Line numbers are those of the
 worktree at `19551cd8` BEFORE this plan runs; every modification also quotes the exact old text, which is what the
 executor matches (earlier tasks in this fragment move later line numbers).
 
@@ -24022,7 +24022,7 @@ git commit -m "test(integration): every role's recorded call exports and replays
 ## Part 5 — Register, admission, UI and the owner's end-to-end check (A19.1–A22)
 
 All paths are relative to `dialectical-engine/` in the worktree
-`/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/model-scorecard-design`.
+`<your engine checkout>`.
 Run every command from `dialectical-engine/`.
 
 ### Part notes
@@ -29588,7 +29588,7 @@ Send these, and no debate text:
 This file is BINDING. Every plan fragment must use exactly these names, paths and types. If a fragment needs something new, it adds it within its own task and names it in that task's **Produces** block. It must never rename anything below.
 
 - Engine root: `dialectical-engine/`. All paths below are relative to it unless stated otherwise.
-- Worktree: `/Users/stefannour/DebateAIRO/debateairo/.claude/worktrees/model-scorecard-design`, branch `design/2026-09-26-model-scorecard`.
+- Worktree: `<your engine checkout>`, branch `design/2026-09-26-model-scorecard`.
 
 #### Owner rulings (2026-09-26) that bind the code
 
