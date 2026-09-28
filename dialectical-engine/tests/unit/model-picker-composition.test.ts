@@ -10,30 +10,45 @@ import { describe, expect, it } from "vitest";
 
 describe("A20 · the picker is composed where runs are created", () => {
   it("reads the scorecard once under the boot ledger and hands the API's admission the picker", async () => {
+    // Final review I5: the two stages are one exported function, `composeAskModelPicker`
+    // (apps/api/src/ask-model-picker.ts), which main.ts runs under ITS OWN boot ledger. Its
+    // behaviour is tests/unit/model-picker-boot-stages.test.ts; these pins keep the wiring.
     const source = await readFile("apps/api/src/main.ts", "utf8");
-    expect(source).toContain('await boot.run("model-scorecard", async () => {');
-    expect(source).toContain("readModelScorecard(pool, environment.REGISTER_VERSION, engineVersion)");
-    expect(source).toContain("readBundledModelScorecard(engineVersion)");
-    // A20.4 review I1: HOSTED reads the sealed row, LOCAL the public file — in that direction.
-    expect(source).toMatch(
-      /environment\.DEPLOYMENT_MODE === "hosted"\s*\?\s*readModelScorecard\(pool, environment\.REGISTER_VERSION, engineVersion\)\s*:\s*readBundledModelScorecard\(engineVersion\)/u
-    );
-    expect(source).toContain("console.error(describeModelScorecard(modelScorecard, environment.DEPLOYMENT_MODE));");
-    // DL7-F7: the settings refuse a hosted boot without a per-run ceiling
-    // (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED), a synchronous decision, so
-    // they are built under the boot ledger and handed to admission by name.
-    expect(source).toContain('const modelPicker = boot.runSync("model-picker", () => askModelPickerSettings({');
-    expect(source).toMatch(/\n {2}resolveDiscoveredPanel: resolveProviderPanel,\n(?: {2}\/\/[^\n]*\n)* {2}modelPicker,\n/u);
-    expect(source).toContain("perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,");
-    // A20.4 review I1: the API's picker runs in the deployment's own mode, never a fixed one,
-    // on the scorecard the boot actually read (never a fixed ABSENT that silently turns it off).
     expect(source).toContain(
-      "  scorecard: modelScorecard,\n  deploymentMode: environment.DEPLOYMENT_MODE,\n  targets: declaredProviderTargets,"
+      "const modelPicker = await composeAskModelPicker({\n  boot,\n  pool,\n"
+      + "  deploymentMode: environment.DEPLOYMENT_MODE,\n  registerVersion: environment.REGISTER_VERSION,\n"
+      + "  targets: declaredProviderTargets,\n  perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,\n"
     );
-    expect(source.indexOf('boot.run("model-scorecard"')).toBeLessThan(source.indexOf('boot.runSync("model-picker"'));
-    expect(source.indexOf('boot.runSync("model-picker"')).toBeLessThan(source.indexOf("new PostgresAskApplication("));
+    expect(source).toContain("  log: (line) => console.error(line)\n});");
+    expect(source).toMatch(/\n {2}resolveDiscoveredPanel: resolveProviderPanel,\n(?: {2}\/\/[^\n]*\n)* {2}modelPicker,\n/u);
+    expect(source.indexOf("const declaredProviderTargets = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
+    expect(source.indexOf("await composeAskModelPicker({")).toBeLessThan(source.indexOf("new PostgresAskApplication("));
+    // The stages live in the function now, never beside it in main.ts.
+    expect(source).not.toContain("readModelScorecard(");
+    expect(source).not.toContain("askModelPickerSettings(");
     // Pre-flight ruling F17: admission's backup provision reaches the ceiling.
     expect(source).toContain("backupSequencesProvisioned: input.backupSequencesProvisioned");
+
+    const composer = await readFile("apps/api/src/ask-model-picker.ts", "utf8");
+    const body = composer.slice(composer.indexOf("export async function composeAskModelPicker("));
+    expect(body.length).toBeGreaterThan(0);
+    expect(body).toContain('const modelScorecard = await input.boot.run("model-scorecard", async () => {');
+    // A20.4 review I1: HOSTED reads the sealed row, LOCAL the public file — in that direction.
+    expect(body).toMatch(
+      /input\.deploymentMode === "hosted"\s*\?\s*readModelScorecard\(input\.pool, input\.registerVersion, engineVersion\)\s*:\s*readBundledModelScorecard\(engineVersion, input\.bundledScorecard\)/u
+    );
+    expect(body).toContain("input.log(describeModelScorecard(modelScorecard, input.deploymentMode));");
+    // DL7-F7: the settings refuse a hosted boot without a per-run ceiling
+    // (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED), a synchronous decision, so they
+    // are built under the ledger's runSync.
+    expect(body).toContain('return input.boot.runSync("model-picker", () => askModelPickerSettings({');
+    // A20.4 review I1: the picker runs in the deployment's own mode, never a fixed one, on the
+    // scorecard the boot actually read (never a fixed ABSENT that silently turns it off).
+    expect(body).toContain(
+      "    scorecard: modelScorecard,\n    deploymentMode: input.deploymentMode,\n    targets: input.targets,"
+    );
+    expect(body).toContain("    perRunCeilingMicros: input.perRunCeilingMicros,");
+    expect(body.indexOf('input.boot.run("model-scorecard"')).toBeLessThan(body.indexOf('input.boot.runSync("model-picker"'));
   });
 
   it("composes the same picker in the acceptance runtime, reading the bundled file unless a test injects one", async () => {

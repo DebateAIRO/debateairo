@@ -31,9 +31,6 @@ import {
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
-  readBundledModelScorecard,
-  readEngineVersion,
-  readModelScorecard,
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
@@ -77,7 +74,7 @@ import {
   resolveProviderTargetCredentials
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
-import { askModelPickerSettings, describeModelScorecard } from "./ask-model-picker.js";
+import { composeAskModelPicker } from "./ask-model-picker.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
 import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
@@ -321,34 +318,26 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
   resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
 /**
- * A20 — THE MODEL SCORECARD IN FORCE, read once. Hosted: the sealed
- * `modelScorecard` row at REGISTER_VERSION. Local: the bundled public file
+ * A20 — THE MODEL SCORECARD IN FORCE and the per-role model picker, read and
+ * built once, as the boot stages "model-scorecard" and "model-picker" under this
+ * boot's own ledger (DL7-F7). Final review I5: both stages are one function,
+ * `composeAskModelPicker` (./ask-model-picker.ts), so the hosted path is tested
+ * without Postgres. Hosted: the sealed `modelScorecard` row at REGISTER_VERSION,
+ * and a boot without a positive per-run ceiling is refused
+ * (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED). Local: the bundled public file
  * (scorecards/current.json). ABSENT or REFUSED never stops the boot — asks keep
- * the plan rosters — and the line below says which, on stderr, where the dev
- * supervisor shows it. An engine version that cannot be read
- * (ENGINE_VERSION_UNRESOLVED) does stop it, as this stage.
+ * the plan rosters — and one line on stderr says which. The targets are the
+ * DECLARED ones: levels, windows and prices, no credential.
  */
-const modelScorecard = await boot.run("model-scorecard", async () => {
-  const engineVersion = await readEngineVersion();
-  return environment.DEPLOYMENT_MODE === "hosted"
-    ? readModelScorecard(pool, environment.REGISTER_VERSION, engineVersion)
-    : readBundledModelScorecard(engineVersion);
-});
-console.error(describeModelScorecard(modelScorecard, environment.DEPLOYMENT_MODE));
-/**
- * A20: the per-role model picker, asked only when the scorecard above is VALID.
- * Hosted: the per-run ceiling is the sealed cost envelope's, and the settings
- * refuse a boot without a positive one (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED).
- * That is a synchronous decision, so it answers to the boot ledger (DL7-F7).
- * The targets are the DECLARED ones: levels, windows and prices, no credential.
- */
-const modelPicker = boot.runSync("model-picker", () => askModelPickerSettings({
-  scorecard: modelScorecard,
+const modelPicker = await composeAskModelPicker({
+  boot,
+  pool,
   deploymentMode: environment.DEPLOYMENT_MODE,
+  registerVersion: environment.REGISTER_VERSION,
   targets: declaredProviderTargets,
   perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,
   log: (line) => console.error(line)
-}));
+});
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: providerDiscoveryTargets,

@@ -1,9 +1,17 @@
+import type { Pool } from "pg";
 import { z } from "zod";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError, type DebateRole, type ModelStrength } from "@debateai/kernel";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
-import { BUNDLED_MODEL_SCORECARD_SOURCE_REF, type ModelScorecardReadResult } from "@debateai/register";
+import {
+  BUNDLED_MODEL_SCORECARD_SOURCE_REF,
+  readBundledModelScorecard,
+  readEngineVersion,
+  readModelScorecard,
+  type ModelScorecardReadResult
+} from "@debateai/register";
 import type { ReachableTarget, RoleAssignment, TargetPrice } from "@debateai/scorecard";
+import type { BootCustody } from "./boot-custody.js";
 
 /**
  * A20 — WHAT ASK ADMISSION HANDS THE MODEL PICKER, stated once.
@@ -135,6 +143,56 @@ export function askModelPickerSettings(input: Readonly<{
     perRunCeilingMicros: hosted ? input.perRunCeilingMicros : null,
     ...(input.log === undefined ? {} : { log: input.log })
   });
+}
+
+/**
+ * A20 / final review I5 — THE API'S TWO MODEL-PICKER BOOT STAGES, as one
+ * function the boot ledger runs and a test can drive without Postgres.
+ *
+ *  - "model-scorecard": the scorecard in force, read once. Hosted: the sealed
+ *    `modelScorecard` row at REGISTER_VERSION. Local: the bundled public file
+ *    (scorecards/current.json). ABSENT or REFUSED never stops the boot — asks
+ *    keep the plan rosters — and one line says which (`describeModelScorecard`).
+ *    An engine version that cannot be read (ENGINE_VERSION_UNRESOLVED) does stop
+ *    it, as this stage.
+ *  - "model-picker": the per-role picker settings, asked only when that
+ *    scorecard is VALID. Hosted: the per-run ceiling is the sealed cost
+ *    envelope's, and a boot without a positive one is refused
+ *    (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED). That is a synchronous decision,
+ *    so it runs under the ledger's `runSync` (DL7-F7). The targets are the
+ *    DECLARED ones: levels, windows and prices, no credential.
+ *
+ * `boot` is the API boot's own ledger (`installBootCustody`), so a failure in
+ * either stage closes everything the boot holds and names the stage, exactly as
+ * when these stages were written out in apps/api/src/main.ts. The two file
+ * locations default to the engine's own manifest and bundled scorecard; only a
+ * test passes others.
+ */
+export async function composeAskModelPicker(input: Readonly<{
+  boot: Pick<BootCustody, "run" | "runSync">;
+  pool: Pool;
+  deploymentMode: "hosted" | "local";
+  registerVersion: number;
+  targets: readonly ProviderDiscoveryTarget[];
+  perRunCeilingMicros: number | null;
+  log: (line: string) => void;
+  engineManifest?: URL;
+  bundledScorecard?: URL;
+}>): Promise<AskModelPickerSettings> {
+  const modelScorecard = await input.boot.run("model-scorecard", async () => {
+    const engineVersion = await readEngineVersion(input.engineManifest);
+    return input.deploymentMode === "hosted"
+      ? readModelScorecard(input.pool, input.registerVersion, engineVersion)
+      : readBundledModelScorecard(engineVersion, input.bundledScorecard);
+  });
+  input.log(describeModelScorecard(modelScorecard, input.deploymentMode));
+  return input.boot.runSync("model-picker", () => askModelPickerSettings({
+    scorecard: modelScorecard,
+    deploymentMode: input.deploymentMode,
+    targets: input.targets,
+    perRunCeilingMicros: input.perRunCeilingMicros,
+    log: input.log
+  }));
 }
 
 /**
