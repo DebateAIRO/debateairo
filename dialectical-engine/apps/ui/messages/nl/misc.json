@@ -82,7 +82,7 @@
   "misc.answerHonesty.weights": "wegingen {source}",
   "misc.answerHonesty.weightsBy": "wegingen {source} door {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "Wat zou dit omkeren",
-  "misc.model.houseUnavailable": "Modelmaker niet beschikbaar",
+  "misc.model.houseUnavailable": "Modelmaker niet vastgelegd",
   "misc.model.noRecordedHouse": "Voor dit argument is geen modelmaker vastgelegd.",
   "misc.scoring.unavailable": "Score-interface niet beschikbaar."
 }
