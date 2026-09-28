@@ -33,7 +33,8 @@ const ENGLISH = Object.freeze({
 
 test("every code family lands in its group, whether or not the runner wrapped it", () => {
   const cases = [
-    // The API records these after creating the run (PostgresAskApplication.submit).
+    // The API records these after creating the run (PostgresAskApplication.submit);
+    // MODEL_ASSIGNMENT is the model-scorecard line's extra step, not yet on dev.
     ["RUN_SETUP_FAILED:ADMISSION_RELEASE", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:MEMORY_QUESTION", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:WORK_QUEUE", "NOT_STARTED"],
@@ -155,16 +156,36 @@ test("retires the sentences that printed the code", () => {
 });
 
 test("maps only codes their writers still produce", () => {
-  // A renamed code would silently fall to STOPPED; this names it instead. The
-  // runner's own codes must be in its operational alphabet (KNOWN_DOMAIN_CODES),
-  // or the Hatchet catch would store UNRECOGNIZED_DOMAIN_ERROR in their place.
+  // A code renamed where it is written would silently fall to STOPPED; this
+  // names it instead. Each check reads the write site itself, not merely some
+  // mention of the code: every runner code also sits in lookup tables.
   const runner = readFileSync(join(appRoot, "..", "runner", "src", "index.ts"), "utf8");
   const api = readFileSync(join(appRoot, "..", "api", "src", "index.ts"), "utf8");
   assert.ok(runner.includes("return `RUNNER_EXECUTION_FAILED:${operationalDiagnosticOf(error)}`;"), "runner wrapper");
-  assert.ok(api.includes("`RUN_SETUP_FAILED:${"), "api setup failure");
+  // The Hatchet catch stores a thrown code as RUNNER_EXECUTION_FAILED:<code>
+  // only when it is in the runner's operational alphabet; any other typed code
+  // is stored as UNRECOGNIZED_DOMAIN_ERROR.
+  const alphabetStart = runner.indexOf("const KNOWN_DOMAIN_CODES");
+  assert.notEqual(alphabetStart, -1, "runner alphabet");
+  const alphabet = runner.slice(alphabetStart, runner.indexOf("\n]);", alphabetStart));
+  const inAlphabet = (code) => alphabet.includes(`"${code}"`);
+  const thrown = (code) => new RegExp(`new TypedDomainError\\(\\s*"${code}"`, "u").test(runner);
+  const writers = {
+    RUN_SETUP_FAILED: () => api.includes("const reason = `RUN_SETUP_FAILED:${step}`;"),
+    RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM: (code) =>
+      runner.includes(`reason: "${code}"`) && thrown(code) && inAlphabet(code),
+    SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM: (code) =>
+      runner.includes(`reason: \`${code}:\${role}\``) && thrown(code) && inAlphabet(code),
+    RUN_CEILING_BELOW_FIRST_CALL: (code) => thrown(code) && inAlphabet(code),
+    // Not reachable today: the day's limit is asked only when a NEW run is
+    // admitted (the asker then sees requestFailure's DAILY_LIMIT_REACHED), never
+    // mid-run. The runner keeps it as a stop of its own kind all the same, and so
+    // does this table, so the day it is raised under way the asker reads its sentence.
+    DAILY_COST_ENVELOPE_REACHED: (code) => runner.includes(`${code}: "DAILY"`) && inAlphabet(code)
+  };
+  assert.deepEqual(Object.keys(RUN_FAILURE_CODES).sort(), Object.keys(writers).sort(), "a writer check per mapped code");
   for (const [code, kind] of Object.entries(RUN_FAILURE_CODES)) {
     assert.ok(RUN_FAILURE_KINDS.includes(kind), `${code} → ${kind}`);
-    const writer = code === "RUN_SETUP_FAILED" ? api : runner;
-    assert.ok(writer.includes(code === "RUN_SETUP_FAILED" ? `${code}:` : `"${code}"`), `${code} is still written`);
+    assert.ok(writers[code](code), `${code} is still written where this table expects`);
   }
 });

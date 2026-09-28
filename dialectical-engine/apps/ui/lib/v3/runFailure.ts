@@ -23,7 +23,11 @@ export const RUN_FAILURE_KINDS = Object.freeze([
   "MODELS_UNAVAILABLE",
   /** The run's own ceiling refused its very first call. */
   "RUN_LIMIT_REACHED",
-  /** The day's spend refused the run's very first call. */
+  /**
+   * The day's spend stopped a run under way. Not reachable today: the day is
+   * asked only when a NEW run is admitted (a refused ask never becomes a run).
+   * The runner keeps it as a stop of its own kind, and so does this list.
+   */
   "DAILY_LIMIT_REACHED",
   /** Anything else, a code nobody has mapped, or no code at all. */
   "STOPPED"

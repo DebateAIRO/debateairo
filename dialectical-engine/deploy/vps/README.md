@@ -1325,11 +1325,12 @@ to look for:
 | "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, any step (see the row above) |
 | "This debate could not start because the AI models it needs were unavailable. Please try again in a while." | `MODELS_UNAVAILABLE` | `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` and `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:<role>`. The runner writes these first, then its job catch overwrites them with `RUNNER_EXECUTION_FAILED:<the same code>` (the role is lost there). Both forms read the same. |
 | "This debate reached its limit before it could produce an answer." | `RUN_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL` (see the row above) |
-| "Today's limit for debates ran out while this one was starting. Please ask again tomorrow." | `DAILY_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED` |
+| "Today's limit for debates ran out while this one was starting. Please ask again tomorrow." | `DAILY_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED`. **Not reachable today**: the day's limit is checked only when a question is asked, and a refused question never becomes a debate (the asker sees "We've reached today's limit for new debates…" instead). The runner keeps the code as a stop of its own, so it keeps its sentence here too. |
 | "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
 
 A code added to the engine lands in `STOPPED` until it is given a group of its own. The UI's test
-(`apps/ui/lib/v3/runFailure.test.mjs`) fails if a code named in this table stops being written.
+(`apps/ui/lib/v3/runFailure.test.mjs`) reads each code's write site in the runner and the API, and
+fails if one named in this table is renamed or stops being written there.
 
 ### Publishing the settings register on this host
 
