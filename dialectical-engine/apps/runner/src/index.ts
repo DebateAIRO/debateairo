@@ -144,6 +144,7 @@ import {
   rotatedSeatSelection,
   seatRotationOffset,
   seatSiteOrdinal,
+  stampCandidateGateway,
   withEffectiveDegradedDiversity,
   type AssignedRunSeatBook,
   type ConfiguredSeatMaker,
@@ -1069,11 +1070,47 @@ export interface ReviewCatchUpVersionCandidate {
   persist(): Promise<{ readonly answerVersion: number }>;
 }
 
+/**
+ * One member review catch-up may ask. On an ASSIGNED run it is a pinned REVIEWER
+ * seat's member and carries the candidate it answers as, so its calls go out at
+ * that candidate's thinking level and are recorded under its candidate id and
+ * scorecard version, exactly as the run's own reviews were (final review m5). A
+ * legacy run's pinned panel members carry no candidate.
+ */
+export interface ReviewCatchUpPinnedMember {
+  readonly maker: string;
+  readonly providerRef: string;
+  readonly candidate?: SeatCandidate;
+  readonly scorecardVersion?: number | null;
+}
+
+/**
+ * Final review m5: the members of an assignment's pinned REVIEWER seats, in seat
+ * order, each main before its runner-up, each with its candidate and the
+ * assignment's scorecard version. These are the models the drawer lists under
+ * "Reviewing the arguments", and the only ones an assigned run's catch-up asks.
+ */
+export function pinnedReviewerMembers(assignment: RoleAssignment): readonly ReviewCatchUpPinnedMember[] {
+  return Object.freeze((assignment.roles.REVIEWER ?? []).flatMap((seat) =>
+    [seat.main, ...(seat.runnerUp === null ? [] : [seat.runnerUp])].map((candidate) => Object.freeze({
+      maker: candidate.maker,
+      providerRef: candidate.providerRef,
+      candidate,
+      scorecardVersion: assignment.scorecardVersion
+    }))));
+}
+
 export interface ReviewCatchUpDependencies {
   withContentLease<T>(runId: string, use: () => Promise<T>): Promise<T>;
+  /**
+   * Final review m5: the run's pinned REVIEWER seats (`pinnedReviewerMembers`),
+   * or null when the run pinned no role assignment — the legacy run, whose
+   * catch-up keeps its pinned panel. An unreadable pin refuses loudly.
+   */
+  readPinnedReviewers(runId: string): Promise<readonly ReviewCatchUpPinnedMember[] | null>;
   /** The composition root probes these pinned members before any model spend. */
   probePinnedPanel(
-    pinnedPanel: readonly { readonly maker: string; readonly providerRef: string }[]
+    pinnedPanel: readonly ReviewCatchUpPinnedMember[]
   ): Promise<readonly ReviewCatchUpReviewer[]>;
   readUnreviewedNodes(runId: string): Promise<readonly ReviewCatchUpNode[]>;
   readDisclosedNodeIds(answerId: string, answerVersion: number): Promise<readonly string[]>;
@@ -1145,7 +1182,12 @@ export async function runReviewCatchUp(input: {
   return input.dependencies.withContentLease(input.runId,async () => {
   const beforeAttempts = await input.dependencies.countRunModelAttempts(input.runId);
   const maximumAttempts = await input.dependencies.readPinnedMaximumAttempts(input.runId);
-  const reviewers = await input.dependencies.probePinnedPanel(input.pinnedPanel);
+  // Final review m5: an assigned run's catch-up reviews come from its pinned
+  // REVIEWER seats — the models the drawer lists for reviewing — never from the
+  // pinned panel, which on such a run is the POSITION mains. A legacy run keeps
+  // its pinned panel exactly as before.
+  const pinnedReviewers = await input.dependencies.readPinnedReviewers(input.runId);
+  const reviewers = await input.dependencies.probePinnedPanel(pinnedReviewers ?? input.pinnedPanel);
   const work = await input.dependencies.readUnreviewedNodes(input.runId);
   const disclosed = await input.dependencies.readDisclosedNodeIds(input.answerId, input.fromVersion);
   const sameSet = work.length === disclosed.length
@@ -1255,6 +1297,8 @@ export function createPostgresReviewCatchUpDependencies(input: {
     readonly providerRef: string;
     probe(): Promise<boolean>;
     readonly judge: Judge;
+    /** Final review m5: the route's own gateway, which a pinned candidate's stamp wraps. */
+    readonly provider: ProviderGateway;
   }[];
   readonly scoringOperator: ScoringOperatorRegisterInput;
   readonly propagationContractHash: string;
@@ -1286,15 +1330,36 @@ export function createPostgresReviewCatchUpDependencies(input: {
   };
   const dependencies: ReviewCatchUpDependencies = {
     withContentLease: (runId,use) => withRunContentLease(input.pool,[runId],async () => use()),
+    readPinnedReviewers: async (runId) => {
+      const pinned = await readRunRoleAssignment(input.pool, runId);
+      if (pinned === null) return null;
+      const parsed = RoleAssignmentSchema.safeParse(pinned.assignment);
+      if (!parsed.success) {
+        throw new TypedDomainError(
+          "RUN_ROLE_ASSIGNMENT_INVALID",
+          "The run's pinned role assignment does not parse, so its reviewer seats cannot be named"
+        );
+      }
+      return pinnedReviewerMembers(parsed.data);
+    },
     probePinnedPanel: async (pinnedPanel) => {
-      const pinnedRefs = new Set(pinnedPanel.map((member) => member.providerRef));
-      const candidates = input.reviewers.filter((reviewer) => pinnedRefs.has(reviewer.providerRef));
+      const pinnedByRef = new Map(pinnedPanel.map((member) => [member.providerRef, member] as const));
+      const candidates = input.reviewers.filter((reviewer) => pinnedByRef.has(reviewer.providerRef));
       const health = await Promise.all(candidates.map(async (reviewer) => ({ reviewer, healthy: await reviewer.probe() })));
-      return Object.freeze(health.filter(({ healthy }) => healthy).map(({ reviewer }) => Object.freeze({
-        maker: reviewer.maker,
-        providerRef: reviewer.providerRef,
-        review: reviewer.judge.review.bind(reviewer.judge)
-      })));
+      return Object.freeze(health.filter(({ healthy }) => healthy).map(({ reviewer }) => {
+        // Final review m5: a pinned REVIEWER seat's member answers as its candidate
+        // (A15 R1: the level on the wire, the candidate id and version on the ledger
+        // row), through the same stamp the run's own seats use. A legacy member has none.
+        const pinned = pinnedByRef.get(reviewer.providerRef);
+        const judge = pinned?.candidate === undefined
+          ? reviewer.judge
+          : new Judge(stampCandidateGateway(reviewer.provider, pinned.candidate, pinned.scorecardVersion ?? null));
+        return Object.freeze({
+          maker: reviewer.maker,
+          providerRef: reviewer.providerRef,
+          review: judge.review.bind(judge)
+        });
+      }));
     },
     readUnreviewedNodes: (runId) => judgements.readUnreviewedNodes(runId),
     readDisclosedNodeIds: (answerId, answerVersion) =>

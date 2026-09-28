@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { RunRepository } from "@debateai/db";
+import { RunRepository, readRunRoleAssignment } from "@debateai/db";
 import { Judge } from "@debateai/judgement";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
+  pinnedReviewerMembers,
   runReviewCatchUp
 } from "@debateai/runner";
+import { RoleAssignmentSchema } from "@debateai/scorecard";
 import { ServeRepository } from "@debateai/serve";
 import { probeRelay } from "./discovery.js";
 import { readAcceptanceRuntimePolicy, readOptionalScoringOperator } from "./runtime-policy.js";
@@ -71,31 +73,47 @@ async function main(): Promise<void> {
       new ServeRepository(pool).readReviewCatchUpSource(runId)
     ]);
     if (scoringOperator === undefined) throw new TypedDomainError("SCORING_OPERATOR_UNRESOLVED", runId);
-    const reviewers = run.discoveredPanel.flatMap((member) => {
-      const configuredUrl = relays.get(member.provider_ref);
+    // Final review m5: an assigned run's catch-up reviews with its pinned REVIEWER
+    // seats, which need not be debaters, so their routes can be reached too. The
+    // runner decides who reviews; this only makes every pinned route callable.
+    const pinned = await readRunRoleAssignment(pool, runId);
+    const parsedPin = pinned === null ? null : RoleAssignmentSchema.safeParse(pinned.assignment);
+    if (parsedPin !== null && !parsedPin.success) throw new TypedDomainError("RUN_ROLE_ASSIGNMENT_INVALID", runId);
+    const routes = [
+      ...run.discoveredPanel.map((member) => ({
+        providerRef: member.provider_ref, maker: member.maker, modelId: member.model_id
+      })),
+      ...(parsedPin === null ? [] : pinnedReviewerMembers(parsedPin.data).flatMap((member) =>
+        member.candidate === undefined ? [] : [{
+          providerRef: member.providerRef, maker: member.maker, modelId: member.candidate.modelId
+        }]))
+    ].filter((route, index, all) => all.findIndex((other) => other.providerRef === route.providerRef) === index);
+    const reviewers = routes.flatMap((member) => {
+      const configuredUrl = relays.get(member.providerRef);
       if (configuredUrl === undefined) return [];
-      const authorizationHeader = relayAuthorizations.get(member.provider_ref);
+      const authorizationHeader = relayAuthorizations.get(member.providerRef);
       if (authorizationHeader === undefined) {
-        throw new Error(`RELAY_AUTHORIZATION_HEADER_REQUIRED:${member.provider_ref}`);
+        throw new Error(`RELAY_AUTHORIZATION_HEADER_REQUIRED:${member.providerRef}`);
       }
       const baseUrl = relayRoot(configuredUrl);
       const gateway = createPostgresProviderGateway(pool, {
-        endpoint: `${baseUrl}/v1`,model: member.model_id,maker: member.maker,authorizationHeader
+        endpoint: `${baseUrl}/v1`,model: member.modelId,maker: member.maker,authorizationHeader
       });
       return [{
         maker: member.maker,
-        providerRef: member.provider_ref,
+        providerRef: member.providerRef,
         judge: new Judge(gateway),
+        provider: gateway,
         probe: async () => {
           try {
             const observation = await probeRelay({
-              providerRef: member.provider_ref,
+              providerRef: member.providerRef,
               maker: member.maker,
               baseUrl,
-              model: member.model_id,
+              model: member.modelId,
               authorizationHeader
             });
-            return observation.modelId === member.model_id;
+            return observation.modelId === member.modelId;
           } catch {
             return false;
           }
