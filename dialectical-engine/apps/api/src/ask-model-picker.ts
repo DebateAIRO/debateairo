@@ -41,15 +41,18 @@ export const ASK_MODEL_ASSIGNMENT_INVALID = "ASK_MODEL_ASSIGNMENT_INVALID" as co
  * picker's own detail can carry the per-run ceiling — a capacity oracle (I6) —
  * so it reaches only the operator's log.
  *
- * A21.3 fix round 1: BUDGET_TOO_SMALL is neutral and always true, and names no
- * remedy — a Free asker cannot change the tree depth, and a Premium asker at the
- * minimum depth cannot lower it. The UI's banner clause
- * (apps/ui/lib/v3/requestFailure.ts, MODEL_BUDGET_TOO_SMALL) is the same sentence.
+ * A21.3 fix rounds 1-2: BUDGET_TOO_SMALL says only what the picker established:
+ * the debate's ESTIMATED cost — a deliberate over-estimate on the planned tree,
+ * at the Economy strength (the best models under a cost cap, not the cheapest) —
+ * is over the hosted per-run limit. It names no remedy (a Free asker cannot
+ * change the tree depth) and no figure. The UI's banner clause
+ * (apps/ui/lib/v3/requestFailure.ts, MODEL_BUDGET_TOO_SMALL) is a separate,
+ * visitor-facing text that happens to read the same today.
  */
 export const ASK_MODEL_REFUSALS = Object.freeze({
   BUDGET_TOO_SMALL: Object.freeze({
     code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL",
-    message: "Even the most economical choice of models costs more than this site allows for one debate"
+    message: "This debate would cost more than this site allows for one debate"
   }),
   NO_REACHABLE_CANDIDATE: Object.freeze({
     code: "ASK_MODEL_CANDIDATE_UNAVAILABLE",

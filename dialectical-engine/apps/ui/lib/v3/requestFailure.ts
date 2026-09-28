@@ -47,7 +47,7 @@ export type RequestFailureKind =
   | "PLAN_TIER_INVALID"
   /** SYNC3: the coordinator refused the ask: a model its plan needs is not available (422). */
   | "PLAN_TIER_UNAVAILABLE"
-  /** A21: the coordinator refused the ask: even the most economical models cost more than one debate may spend (422). */
+  /** A21: the ask was refused (422): its estimated cost, even at the Economy model strength, is over this site's limit for one debate. */
   | "MODEL_BUDGET_TOO_SMALL"
   /** A21: the coordinator refused the ask: no model is reachable for one of the debate's jobs (422). */
   | "MODEL_UNAVAILABLE"
@@ -80,10 +80,12 @@ const KIND_CLAUSE: Readonly<Record<RequestFailureKind, string>> = Object.freeze(
     "The coordinator refused it: a model this plan needs is not available right now. "
     + "Retry later, or choose the other plan.",
   // A21.3 carry 12: constant clauses the page owns; English for now (owner decision O2) — this map
-  // is the one place the port reads. Fix round 1: the budget clause is neutral and always true (no
-  // remedy: Free fixes the tree depth), and is the same sentence as apps/api ASK_MODEL_REFUSALS.
+  // is the one place the port reads. Fix rounds 1-2: the budget clause says only that the debate
+  // WOULD cost more than this site allows (the refusal rests on an estimate): no remedy (Free fixes
+  // the tree depth) and no claim about the cheapest models. It is visitor copy, separate from the
+  // server's English API sentence (apps/api ASK_MODEL_REFUSALS), which reads the same today.
   MODEL_BUDGET_TOO_SMALL:
-    "Even the most economical choice of models costs more than this site allows for one debate.",
+    "This debate would cost more than this site allows for one debate.",
   MODEL_UNAVAILABLE:
     "The coordinator refused it: one of the debate's jobs has no AI model it can reach right now. Retry later.",
   UNCLASSIFIED:

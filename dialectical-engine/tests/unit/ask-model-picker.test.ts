@@ -254,16 +254,20 @@ describe("A20 · deployment facts", () => {
     expect(ASK_MODEL_REFUSALS).toEqual({
       BUDGET_TOO_SMALL: {
         code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL",
-        // A21.3 fix round 1 (review Important 1): neutral and always true. No remedy: a Free asker
-        // cannot change the tree depth, and a Premium asker at the minimum depth cannot lower it.
-        message: "Even the most economical choice of models costs more than this site allows for one debate"
+        // A21.3 fix rounds 1-2: only what the picker established — the ESTIMATE, even at Economy, is
+        // over the per-run limit. No remedy (a Free asker cannot change the tree depth), and no claim
+        // about the cheapest models (Economy is the best model under a cost cap, not the cheapest).
+        message: "This debate would cost more than this site allows for one debate"
       },
       NO_REACHABLE_CANDIDATE: {
         code: "ASK_MODEL_CANDIDATE_UNAVAILABLE",
         message: "No model is reachable right now for one of this debate's jobs"
       }
     });
-    for (const refusal of Object.values(ASK_MODEL_REFUSALS)) expect(refusal.message).not.toMatch(/tree depth/iu);
+    for (const refusal of Object.values(ASK_MODEL_REFUSALS)) {
+      expect(refusal.message).not.toMatch(/tree depth/iu);
+      expect(refusal.message).not.toMatch(/most economical|least costly|whichever/iu);
+    }
     expect(Object.isFrozen(ASK_MODEL_REFUSALS)).toBe(true);
     expect(Object.isFrozen(ASK_MODEL_REFUSALS.BUDGET_TOO_SMALL)).toBe(true);
     expect(Object.isFrozen(ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE)).toBe(true);

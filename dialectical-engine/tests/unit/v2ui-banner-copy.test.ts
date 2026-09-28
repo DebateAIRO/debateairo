@@ -113,11 +113,13 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
    * A21.3 (carry 12 of task-A19-A20-carries.md). The model picker's two ask
    * refusals arrive as a 422 with their own typed code, and each gets a constant
    * clause the page owns: never the server's error text (whose detail can carry
-   * a figure). Fix round 1 (review Important 1): the budget clause is neutral and
-   * always true — no remedy, no internal word — and the controller chose the SAME
-   * sentence for the server's constant, so the two stay consistent.
+   * a figure). Fix rounds 1-2 (review Important 1, re-review N1-N2): the budget
+   * clause states only what the picker established — the estimate is over this
+   * site's limit — with no remedy, no internal word and no claim about the
+   * cheapest models. The server's constant is a SEPARATE text (an English API
+   * sentence); the two coincide today by choice, and only this clause is ported.
    */
-  it("A21 names the model-strength refusals as refusals, in copy the server never wrote", () => {
+  it("A21 maps the model-strength refusals to the page's own constant copy, never the server's error text", () => {
     const tooSmall = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
       "UNPROCESSABLE", 422, "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL: estimate 912345 over 250000",
       "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL"
@@ -134,14 +136,15 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
       expect(classified.message).not.toMatch(/\d|scorecard|picker|ceiling|deployment/iu);
       // Fix round 1: never a remedy the asker may be unable to act on (Free fixes the tree depth).
       expect(classified.message).not.toMatch(/tree depth/iu);
+      // Fix round 2 (re-review N1): Economy is the best model under a cost cap, not the cheapest.
+      expect(classified.message).not.toMatch(/most economical|least costly|whichever/iu);
     }
     expect(tooSmall.message).not.toBe(unavailable.message);
-    // Fix round 1: neutral, no internal word, and the server's own sentence, word for word.
+    // Fix rounds 1-2: neutral, no internal word; pinned exactly here, and not tied to the server text.
     expect(tooSmall.message).toBe(
-      "Starting this debate did not complete. Even the most economical choice of models costs more than this site allows for one debate."
+      "Starting this debate did not complete. This debate would cost more than this site allows for one debate."
     );
     expect(tooSmall.message).not.toMatch(/coordinator/iu);
-    expect(tooSmall.message.endsWith(` ${ASK_MODEL_REFUSALS.BUDGET_TOO_SMALL.message}.`)).toBe(true);
     expect(unavailable.message).toMatch(/refused/u);
     // Carry 12: the unavailable clause is not the server's sentence word for word.
     expect(unavailable.message.toLowerCase())

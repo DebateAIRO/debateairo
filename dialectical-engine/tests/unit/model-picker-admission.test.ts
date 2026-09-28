@@ -372,8 +372,10 @@ describe("A20 · refusals", () => {
     }), ask("premium")).catch((failure: unknown) => failure);
     expect(error).toMatchObject({ name: "AskRefusal", code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
     expect((error as Error).message).not.toMatch(/250000|912345/u);
-    // A21.3 fix round 1: no remedy the asker may be unable to act on.
+    // A21.3 fix rounds 1-2: no remedy the asker may be unable to act on, and no overclaim.
+    expect((error as Error).message).toBe("This debate would cost more than this site allows for one debate");
     expect((error as Error).message).not.toMatch(/tree depth/iu);
+    expect((error as Error).message).not.toMatch(/most economical|least costly|whichever/iu);
     expect(lines.some((line) => line.includes("912345"))).toBe(true);
   });
 
