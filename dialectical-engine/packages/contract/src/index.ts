@@ -597,7 +597,10 @@ export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 /**
  * A21 — WHICH MODELS WERE CHOSEN FOR EACH DEBATE JOB, projected from the run's
  * pinned role assignment (core.run_role_assignment); absent when the run pinned
- * none (no scorecard was in force). Owner decisions O1/O3: the honesty drawer
+ * none (no scorecard was in force) OR its pin could not be read (A21.1 fix
+ * round 1: omitted whole and reported to the operator as
+ * ANSWER_MODEL_ASSIGNMENT_INVALID), so an absent field never proves which of
+ * the two happened. Owner decisions O1/O3: the honesty drawer
  * shows visitors only the model names per job and never the step-down; this
  * full detail is for the JSON export and audit. Engine identifiers only —
  * makers, model ids, thinking levels — never a provider route, a candidate id,
