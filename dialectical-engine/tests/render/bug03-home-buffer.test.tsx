@@ -59,7 +59,9 @@ describe("BUG-03 home debates buffer", () => {
     expect(html).toContain("The generating debate");
     expect(html).toContain("Generating");
     expect(html).toContain('href="/debate/run:failed"');
-    expect(html).toContain("Debate generation failed: TOTAL_REVIEW_COVERAGE_UNSATISFIED");
+    // The row says what happened in plain words; the stored code is for operators only.
+    expect(html).toContain("This debate stopped partway because of a problem on our side. Please ask your question again.");
+    expect(html).not.toContain("TOTAL_REVIEW_COVERAGE_UNSATISFIED");
     const failedDebate = debates.find((debate) => debate.id === "run:failed");
     expect(failedDebate).toMatchObject({ status: "failed" });
     const failedCardHtml = renderToStaticMarkup(<DebatesBuffer debates={[failedDebate!]} />);
