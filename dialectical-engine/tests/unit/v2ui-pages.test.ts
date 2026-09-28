@@ -740,9 +740,11 @@ describe("XREV-01 — node review uses the existing V2 card and drawer vocabular
     // ADDRESS CHANGE, not a relaxation (V's ruling of 2026-09-28, wording
     // column C). The card's words now go through the debateViews catalogue in
     // 35 languages, as the drawer's already do (the pins below), so the English
-    // literals "REVIEW N/A" and outcome.toUpperCase() became one key per state;
-    // debateViews.test.mjs forbids the literals on this file. Every state keeps
-    // its own pin, and absence keeps its own words.
+    // literals "REVIEW N/A" and outcome.toUpperCase() became one key per state.
+    // Every state keeps its own pin, absence keeps its own words, and the
+    // outcome-to-words mapping itself is pinned by behaviour in t1-canvas
+    // ("labels every review state in plain words…"), which also refuses any
+    // "REVIEW" engine wording on the card.
     expect(canvas).toContain('t(catalog, "debateViews.secondOpinionAgrees")');
     expect(canvas).toContain('t(catalog, "debateViews.secondOpinionDisagrees")');
     expect(canvas).toContain('t(catalog, "debateViews.secondOpinionUnsure")');

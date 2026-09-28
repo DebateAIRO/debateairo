@@ -2,8 +2,9 @@
 #
 # The gate is `pnpm run test:ci-gate` (tools/ci-known-red.mjs). It runs
 # `vitest run tests/unit tests/architecture tests/render` and fails ONLY on failures that are not
-# listed here. A listed test that PASSES is reported as a stale entry (warning, exit 0)
-# so this list can only shrink: delete the entry in the commit that turns it green.
+# listed here. A listed test that PASSES is re-run twice more: passing all three times it is a
+# CONFIRMED stale entry and fails the gate (V-4); passing only sometimes it is a flake and only
+# warns. So this list can only shrink: delete the entry in the commit that turns it green.
 #
 # Format: one exact vitest full name per line — `<file path> > <describe…> > <it>`,
 # exactly as vitest prints it. `#` lines are comments. Every active entry is followed

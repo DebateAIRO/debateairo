@@ -7584,7 +7584,6 @@ a:focus-visible {
   min-width: 0;
   gap: 4px 6px;
 }
-.nodeReviewBadges .reviewerPill { max-width: 100%; }
 .nodeReviewLabel {
   flex: 0 0 auto;
   font-size: 10.5px;
@@ -7594,7 +7593,7 @@ a:focus-visible {
 }
 .nodeReviewBadges[data-review="agreed"] .nodeReviewLabel { color: var(--agree-text); }
 .nodeReviewBadges[data-review="disputed"] .nodeReviewLabel { color: var(--dispute-text); }
-.nodeReviewBadges .reviewerPill { background: var(--shell); border-color: var(--line-strong); }
+.nodeReviewBadges .reviewerPill { max-width: 100%; background: var(--shell); border-color: var(--line-strong); }
 .roleBadge {
   gap: 5px;
   padding: 3px 9px;
