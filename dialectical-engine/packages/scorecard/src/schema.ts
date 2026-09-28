@@ -22,10 +22,11 @@ import { DEBATE_ROLES, MODEL_STRENGTHS } from "@debateai/kernel";
  * TOKEN UNITS (final review I3). A role entry's `typicalCall` counts VENDOR-STYLE tokens, as a
  * vendor's usage block reports them: about 4 characters of text each. The engine's context-window
  * wall counts differently — UTF-8 bytes / 2 (`estimateWindowTokens` in @debateai/providers), plus
- * the attempt's answer bound. The picker converts with ONE constant,
- * `WINDOW_TOKENS_PER_VENDOR_TOKEN` = 4: the worst case of the wall's rule for about 4 characters
- * per token at no more than 2 UTF-8 bytes per character (Romanian diacritics included), so the
- * picker never seats a candidate the gateway would then refuse on every call.
+ * the attempt's answer bound. The picker converts with ONE constant (./picker.ts,
+ * `WINDOW_TOKENS_PER_VENDOR_TOKEN` = 4, read through `typicalCallWindowTokens`): the worst case of
+ * the wall's rule for about 4 characters per token at no more than 2 UTF-8 bytes per character
+ * (Romanian diacritics included), so the picker never seats a candidate the gateway would then
+ * refuse on every call.
  */
 export const TIERS = ["TOP", "GOOD_VALUE", "AVOID", "UNTESTED"] as const;
 export type Tier = typeof TIERS[number];
@@ -91,12 +92,6 @@ export const ScorecardCandidateSchema = z.object({
   /** Optional in the file (spec Part 1); an omitted window reads as null, "no window declared". */
   contextWindowTokens: z.number().int().min(1).nullable().default(null)
 });
-
-/**
- * Final review I3: how many of the window wall's tokens (UTF-8 bytes / 2) one vendor-style
- * `typicalCall` token can take — 4 characters of at most 2 bytes each. See TOKEN UNITS above.
- */
-export const WINDOW_TOKENS_PER_VENDOR_TOKEN = 4;
 
 /** One typical call of a role, in VENDOR-STYLE tokens (see TOKEN UNITS above) and seconds. */
 const TypicalCallSchema = z.object({

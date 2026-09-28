@@ -7,13 +7,7 @@ import {
   type DebateRole,
   type ModelStrength
 } from "@debateai/kernel";
-import {
-  WINDOW_TOKENS_PER_VENDOR_TOKEN,
-  type PickerSettings,
-  type Scorecard,
-  type ScorecardCandidate,
-  type ScorecardRoleEntry
-} from "./schema.js";
+import type { PickerSettings, Scorecard, ScorecardCandidate, ScorecardRoleEntry } from "./schema.js";
 import { estimateRunCost, typicalCallMicros } from "./estimate.js";
 
 /**
@@ -239,6 +233,14 @@ function matchTarget(reachable: readonly ReachableTarget[], candidate: Scorecard
     && target.modelId === candidate.modelId
     && (candidate.thinkingLevel === THINKING_LEVEL_DEFAULT_ONLY || target.thinkingLevels.includes(candidate.thinkingLevel))) ?? null;
 }
+
+/**
+ * Final review I3: how many of the window wall's tokens (UTF-8 bytes / 2) one vendor-style
+ * `typicalCall` token can take — about 4 characters of at most 2 bytes each (schema.ts, TOKEN
+ * UNITS). Module-private like the gateway's own `WINDOW_BYTES_PER_TOKEN`: a unit of the wall's
+ * rule, not a policy value, so it is read only through `typicalCallWindowTokens`.
+ */
+const WINDOW_TOKENS_PER_VENDOR_TOKEN = 4;
 
 /**
  * R1 applied to a typical call — THE GATEWAY'S OWN WALL (final review I3, replacing pre-flight

@@ -4,7 +4,6 @@ import { DEBATE_ROLES, MODEL_STRENGTHS, THINKING_LEVEL_DEFAULT_ONLY, type Debate
 import { estimatePromptTokens, estimateWindowTokens } from "@debateai/providers";
 import {
   RoleAssignmentSchema,
-  WINDOW_TOKENS_PER_VENDOR_TOKEN,
   backupFor,
   diversityOrdinalForRun,
   pickRoleAssignment,
@@ -534,7 +533,8 @@ describe("pickRoleAssignment — reachability", () => {
     // The typical call as a scorecard records it: vendor-style tokens, about 4 characters each.
     const inputTokens = estimatePromptTokens(messages);
     const typicalCall = { inputTokens, outputTokens: 0, thinkingTokens: null, seconds: 1 };
-    expect(WINDOW_TOKENS_PER_VENDOR_TOKEN).toBe(4);
+    // ONE conversion: a vendor-style token is 4 of the wall's tokens.
+    expect(typicalCallWindowTokens({ inputTokens: 1, outputTokens: 0, thinkingTokens: null, seconds: 0 }, 0)).toBe(4);
     for (const answerBound of [0, 2048]) {
       expect(typicalCallWindowTokens(typicalCall, answerBound))
         .toBeGreaterThanOrEqual(estimateWindowTokens(messages) + answerBound);
