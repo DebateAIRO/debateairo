@@ -13,7 +13,7 @@ import {
   roleOf,
   type PlacedClaim
 } from "@/lib/debatePresentation";
-import { ModelMetaLine } from "@/components/ModelPresentation";
+import { ModelBadge, ModelMetaLine } from "@/components/ModelPresentation";
 import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
 import {
   formatIndependencePill,
@@ -300,6 +300,24 @@ function CanvasCard({
   // Evidence sourcing breadth. Null below one distinct source, so a card with
   // no record stays silent rather than printing "sources: 0".
   const independencePill = formatIndependencePill(node.evidence_independence, debateChromeCatalog, locale);
+  // XREV-01 / T1-C2-5: the compact second-maker review mark. Built by 8230bc27,
+  // deleted by 2b670d30, restored by V's rulings of 2026-09-20 (the card shows
+  // it) and 2026-09-28 (these words). The full reviewer line stays in the drawer.
+  const v3Review = v3NodesById?.get(node.id)?.review ?? null;
+  const compactReview = v3Review?.outcome === "agree"
+    ? "agreed"
+    : v3Review?.outcome === "dispute"
+      ? "disputed"
+      : v3Review?.outcome === "cannot-assess"
+        ? "unassessed"
+        : "absent";
+  const reviewLabel = compactReview === "agreed"
+    ? t(catalog, "debateViews.secondOpinionAgrees")
+    : compactReview === "disputed"
+      ? t(catalog, "debateViews.secondOpinionDisagrees")
+      : compactReview === "unassessed"
+        ? t(catalog, "debateViews.secondOpinionUnsure")
+        : t(catalog, "debateViews.noSecondOpinionYet");
 
   // Additive, flag-gated low-strength dimming (Phase 9 Task 4). Never replaces
   // the existing abandoned/scoreFilterMatch terms -- a node can be abandoned
@@ -495,6 +513,36 @@ function CanvasCard({
                 ) : null}
                 {v3Scores ? (
                   <V3ScoreBadges node={node} presentation={v3Scores} openNodeDetails={openNodeDetails} catalog={catalog} />
+                ) : null}
+                {v3NodesById !== undefined ? (
+                  <span
+                    className="nodeReviewBadges"
+                    data-node-review={v3Review?.outcome ?? "absent"}
+                    data-review={compactReview}
+                  >
+                    <span
+                      className="nodeReviewDot"
+                      aria-hidden="true"
+                      style={{
+                        display: "inline-block",
+                        width: 6,
+                        height: 6,
+                        borderRadius: "var(--r-dot)",
+                        background: compactReview === "agreed"
+                          ? "var(--agree-text)"
+                          : compactReview === "disputed"
+                            ? "var(--dispute-text)"
+                            : "var(--muted)"
+                      }}
+                    />
+                    <ModelBadge
+                      modelId={v3Review?.reviewer_lineage.model_id ?? null}
+                      maker={v3Review?.reviewer_lineage.maker ?? null}
+                      catalog={miscCatalog}
+                      composeCatalog={composeCatalog}
+                    />
+                    <span className={`scoreBadge ${v3Review === null ? "unavailable" : "v3"}`}>{reviewLabel}</span>
+                  </span>
                 ) : null}
               </ScoringErrorBoundary>
               {independencePill ? (

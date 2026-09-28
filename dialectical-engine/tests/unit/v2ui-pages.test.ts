@@ -737,8 +737,20 @@ describe("XREV-01 — node review uses the existing V2 card and drawer vocabular
   it("shows typed review outcome and reviewer house on cards, including honest absence", () => {
     expect(canvas).toContain('data-node-review={v3Review?.outcome ?? "absent"}');
     expect(canvas).toContain("v3Review?.reviewer_lineage.maker ?? null");
-    expect(canvas).toContain('"REVIEW N/A"');
-    expect(canvas).toContain("v3Review.outcome.toUpperCase()");
+    // ADDRESS CHANGE, not a relaxation (V's ruling of 2026-09-28, wording
+    // column C). The card's words now go through the debateViews catalogue in
+    // 35 languages, as the drawer's already do (the pins below), so the English
+    // literals "REVIEW N/A" and outcome.toUpperCase() became one key per state;
+    // debateViews.test.mjs forbids the literals on this file. Every state keeps
+    // its own pin, and absence keeps its own words.
+    expect(canvas).toContain('t(catalog, "debateViews.secondOpinionAgrees")');
+    expect(canvas).toContain('t(catalog, "debateViews.secondOpinionDisagrees")');
+    expect(canvas).toContain('t(catalog, "debateViews.secondOpinionUnsure")');
+    expect(canvas).toContain('t(catalog, "debateViews.noSecondOpinionYet")');
+    expect(english.debateViews["debateViews.secondOpinionAgrees"]).toBe("Second opinion: agrees");
+    expect(english.debateViews["debateViews.secondOpinionDisagrees"]).toBe("Second opinion: disagrees");
+    expect(english.debateViews["debateViews.secondOpinionUnsure"]).toBe("Second opinion: unsure");
+    expect(english.debateViews["debateViews.noSecondOpinionYet"]).toBe("No second opinion yet");
   });
 
   it("shows reviewer lineage, reasons, and typed absence in the existing drawer", () => {
