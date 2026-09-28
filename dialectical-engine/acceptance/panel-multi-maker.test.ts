@@ -11,6 +11,12 @@ import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { bearingsForRequest } from "../tests/support/reviewBearings.js";
 import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
+import {
+  ACCEPTANCE_PLAN_TIER,
+  FREE_ROSTER_ANTHROPIC_MODEL,
+  FREE_ROSTER_OPENAI_MODEL,
+  requestedModel
+} from "./test-fixtures/plan-roster-double.js";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
 import { PANEL_PROMPT_CONTRACT, judgePromptContract, reviewPromptContract } from "@debateai/judgement";
@@ -161,6 +167,13 @@ async function startProviderDouble(input: {
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
       calls += 1;
+      // Tiers S02: the double answers as the model its relay declared.
+      const model = requestedModel(body);
+      if (model === null) {
+        response.writeHead(500, { "content-type": "application/json" })
+          .end(JSON.stringify({ error: "PANEL_DOUBLE_MODEL_UNREQUESTED" }));
+        return;
+      }
       // Classification: `classifyRequest` (directive-stripped, structural keys).
       const requestClass = classifyRequest(body);
       let content: string;
@@ -219,7 +232,7 @@ async function startProviderDouble(input: {
       }
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
         id: `${input.label}-${calls}`,
-        model: "test-layer/model",
+        model,
         choices: [{ message: { content } }]
       }));
     });
@@ -281,13 +294,13 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
         {
           providerRef: "acceptance:codex-cli",
           baseUrl: primaryProvider.endpoint,
-          model: "test-layer/model",
+          model: FREE_ROSTER_OPENAI_MODEL,
           authorizationHeader: "Bearer test-panel-primary"
         },
         {
           providerRef: "acceptance:claude-cli",
           baseUrl: secondProvider.endpoint,
-          model: "test-layer/model",
+          model: FREE_ROSTER_ANTHROPIC_MODEL,
           authorizationHeader: "Bearer test-panel-second"
         }
       ]
@@ -308,6 +321,7 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
           decision_scope: "acceptance-test",
           as_of: "2026-09-01T00:00:00.000Z",
           steering_presets: [],
+          plan_tier: ACCEPTANCE_PLAN_TIER,
           steering_annotations: []
         }
       });
@@ -418,13 +432,13 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
         {
           providerRef: "acceptance:codex-cli",
           baseUrl: primaryProvider.endpoint,
-          model: "test-layer/model",
+          model: FREE_ROSTER_OPENAI_MODEL,
           authorizationHeader: "Bearer test-panel-primary"
         },
         {
           providerRef: "acceptance:claude-cli",
           baseUrl: secondProvider.endpoint,
-          model: "test-layer/model",
+          model: FREE_ROSTER_ANTHROPIC_MODEL,
           authorizationHeader: "Bearer test-panel-second"
         }
       ]
@@ -445,11 +459,19 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
           decision_scope: "acceptance-test",
           as_of: "2026-09-01T00:00:00.000Z",
           steering_presets: [],
+          plan_tier: ACCEPTANCE_PLAN_TIER,
           steering_annotations: []
         }
       });
       if (ask.statusCode !== 202) throw new Error(`PANEL_DEGRADED_ASK_REJECTED:${ask.statusCode}:${ask.body}`);
       const runId = (ask.json() as { run_ref: string }).run_ref;
+      // Every panel leg of this run is refused on purpose, and the gateway
+      // retries each refusal after its real backoff (L4-F8: 250 ms, then 500 ms),
+      // so the run takes seconds (6.8 s measured on 2026-09-28), not the one
+      // second `vi.waitFor` allows by default. Timing out early closed the
+      // runtime, which destroys the test user's key while the run still holds
+      // it, so the run died as RUN_CONTENT_KEY_UNRESOLVED instead of this
+      // row failing at its own assertion.
       await vi.waitFor(async () => {
         const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
           "SELECT state, terminal_reason FROM core.work_item WHERE run_id=$1",
@@ -457,7 +479,7 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
         );
         if (work.rows[0]?.state === "FAILED") throw new Error(`PANEL_DEGRADED_WORK_FAILED:${work.rows[0].terminal_reason}`);
         expect(work.rows[0]?.state).toBe("DONE");
-      });
+      }, { timeout: 30_000, interval: 100 });
 
       const receipts = await database.pool.query<{
         dispersion: number | null;
@@ -536,10 +558,11 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
 });
 
 describe("S-LANG — the panel provider double classifies a packet the same with or without the argument-language directive", () => {
-  // This file's end-to-end rows are red on clean origin/dev for dev's own
-  // reason (the ask is refused 400 MALFORMED_REQUEST before any provider call),
-  // so the double's routing is proven HERE, on real framed packets of every
-  // shipped contract it serves, built exactly as the gateway sends them.
+  // This file's end-to-end rows were red on origin/dev from 2026-09-10 to
+  // 2026-09-28 (the ask was refused 400 MALFORMED_REQUEST before any provider
+  // call), so the double's routing is proven HERE as well, on real framed
+  // packets of every shipped contract it serves, built exactly as the gateway
+  // sends them — independent of whether an end-to-end row can reach a call.
   const CONTRACTS: readonly (readonly [RequestClass, PromptContract])[] = [
     ["PANEL", PANEL_PROMPT_CONTRACT],
     ["REVIEW", reviewPromptContract(1)],

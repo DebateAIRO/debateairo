@@ -37,7 +37,9 @@ import {
   buildValueOverlay,
   createWeightSource
 } from "@debateai/valuation";
+import { OpenAICompatibleProviderGateway } from "@debateai/providers";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import { framedFixturePacket } from "../support/framed-packet.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createTestAskAdmissionPoolFacades,
@@ -750,6 +752,51 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
     const legacyRunId = await createLegacyRun(`v6 legacy metadata ${marker}`, `legacy-v6-${randomUUID()}`);
     await expect(ledger.appendRawArtifact({ ...artifact({ fixture: "legacy free text" }), runId: legacyRunId }))
       .resolves.toBeDefined();
+  }, 180_000);
+
+  /**
+   * The row above HAND-WRITES "the provider gateway's real shape", so it went on
+   * passing when the gateway's shape grew: f76e47f9 (2026-09-26) added the debate's
+   * language name to every artifact's metadata, a key this rule does not admit,
+   * and from then on every model reply of an encrypted run was refused at
+   * persistence (RAW_ARTIFACT_METADATA_NOT_CODE_SHAPED) — found by the acceptance
+   * ceremony, which no CI job runs. This row persists through the SHIPPED gateway
+   * instead, so the next key the gateway adds meets the rule here, not in a debate.
+   */
+  it("persists the provider gateway's own artifact metadata for an encrypted run", async () => {
+    const runId = await createEncryptedRun(`v6 gateway metadata ${randomUUID()}`);
+    const ledger = new LedgerRepository(database.pool);
+    const persisted: string[] = [];
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://fixture/v1", model: "model:v6-gateway", maker: "maker:v6-gateway",
+      fetchImplementation: async () => new Response(JSON.stringify({
+        id: "call", model: "model:v6-gateway",
+        choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 }
+      })),
+      persistRawArtifact: async (artifact) => {
+        const ref = await ledger.appendRawArtifact(artifact);
+        persisted.push(artifact.artifactId);
+        return ref;
+      },
+      appendLedgerEntry: async () => "ledger:v6-gateway",
+      assertNoOpenWriteTransaction: () => undefined
+    });
+    await gateway.call({
+      runId, subjectItemId: "node:v6-gateway", callSiteKey: "fixture", role: "EVALUATOR",
+      lane: "served", bound: { maxAttempts: 1, tokenCeiling: 8, deadlineMs: 1000 },
+      contractHash: "sealed-evaluator-contract", providerRef: "provider:v6-gateway",
+      packet: framedFixturePacket("x")
+    });
+    expect(persisted).toHaveLength(1);
+    const stored = await database.pool.query<{ metadata_json: Record<string, unknown> }>(
+      "SELECT metadata_json FROM ledger.raw_artifact WHERE raw_artifact_id=$1", [persisted[0]]
+    );
+    expect(stored.rows[0]?.metadata_json).toEqual({
+      status: 200, attempt: 1,
+      usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 },
+      finish_reason: "stop", token_ceiling: 8
+    });
   }, 180_000);
 
   it("refuses object- and array-smuggled prose in every code-only progress kind and in artifact metadata (closed allow-lists)", async () => {

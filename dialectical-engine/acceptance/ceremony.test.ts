@@ -14,6 +14,12 @@ import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { withRequestDerivedBearings, type ReviewBearingPolicy } from "../tests/support/reviewBearings.js";
 import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
+import {
+  ACCEPTANCE_PLAN_TIER,
+  FREE_ROSTER_ANTHROPIC_MODEL,
+  FREE_ROSTER_OPENAI_MODEL,
+  requestedModel
+} from "./test-fixtures/plan-roster-double.js";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
 import { PANEL_PROMPT_CONTRACT, judgePromptContract, reviewPromptContract } from "@debateai/judgement";
@@ -108,6 +114,14 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       const body = Buffer.concat(chunks).toString("utf8");
+      // Tiers S02: the double answers as the model its relay declared, and a
+      // call that names none is refused before it can consume a scripted entry.
+      const model = requestedModel(body);
+      if (model === null) {
+        response.writeHead(500, { "content-type": "application/json" })
+          .end(JSON.stringify({ error: "PROVIDER_DOUBLE_MODEL_UNREQUESTED" }));
+        return;
+      }
       // T3 / S2-2: the judge panel asks every NON-AUTHOR maker to assess each
       // authored node. That leg is answered straight from the contract rather
       // than from `pending`, so every authoring/review/compose fixture below
@@ -118,7 +132,7 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
         calls += 1;
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `acceptance-panel-${calls}`,
-          model: "test-layer/model",
+          model,
           choices: [{ message: { content: panelAssessmentDouble() } }]
         }));
         return;
@@ -158,7 +172,7 @@ async function startProviderDouble(contents: readonly string[]): Promise<{
       }
       response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
         id: `acceptance-test-${calls}`,
-        model: "test-layer/model",
+        model,
         choices: [{ message: { content } }]
       }));
     });
@@ -408,13 +422,14 @@ describe("ACC-01 dry-run ceremony", () => {
       },
       // FAIR-01: the second maker's relay endpoint plus its honestly-reported
       // model id (live: the claude CLI handshake reports it; here: the double).
+      // Tiers S02: the ids are the free roster's, so the plan admits both.
       makerRelays: [
         {
-          providerRef: "acceptance:codex-cli",baseUrl: provider.endpoint,model: "test-layer/model",
+          providerRef: "acceptance:codex-cli",baseUrl: provider.endpoint,model: FREE_ROSTER_OPENAI_MODEL,
           authorizationHeader: "Bearer test-primary-relay"
         },
         {
-          providerRef: "acceptance:claude-cli",baseUrl: criticProvider.endpoint,model: "test-layer/model",
+          providerRef: "acceptance:claude-cli",baseUrl: criticProvider.endpoint,model: FREE_ROSTER_ANTHROPIC_MODEL,
           authorizationHeader: "Bearer test-critic-relay"
         },
       ]
@@ -435,6 +450,7 @@ describe("ACC-01 dry-run ceremony", () => {
         decision_scope: "acceptance-test",
         as_of: "2026-08-09T00:00:00.000Z",
         steering_presets: [],
+        plan_tier: ACCEPTANCE_PLAN_TIER,
         steering_annotations: []
       }
     });
@@ -910,10 +926,11 @@ describe("ACC-01 dry-run ceremony", () => {
 });
 
 describe("S-LANG — the ceremony's provider double classifies a packet the same with or without the argument-language directive", () => {
-  // The ceremony's end-to-end rows are red on clean origin/dev for dev's own
-  // reason (the ask is refused 400 MALFORMED_REQUEST before any provider call),
-  // so the double's routing is proven HERE, on real framed packets of every
-  // shipped contract it serves, built exactly as the gateway sends them.
+  // The ceremony's end-to-end rows were red on origin/dev from 2026-09-10 to
+  // 2026-09-28 (the ask was refused 400 MALFORMED_REQUEST before any provider
+  // call), so the double's routing is proven HERE as well, on real framed
+  // packets of every shipped contract it serves, built exactly as the gateway
+  // sends them — independent of whether an end-to-end row can reach a call.
   const CONTRACTS: readonly (readonly [RequestClass, PromptContract])[] = [
     ["PANEL", PANEL_PROMPT_CONTRACT],
     ["REVIEW", reviewPromptContract(1)],

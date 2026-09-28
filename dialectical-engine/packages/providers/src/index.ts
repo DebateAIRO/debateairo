@@ -73,7 +73,6 @@ export interface RejectedProviderContent {
 }
 
 export interface ProviderCallRequest {
-  readonly argumentLanguageName?: string;
   readonly runId: string | null;
   readonly subjectItemId: string;
   readonly callSiteKey: string;
@@ -1309,8 +1308,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // W10/2: the bound this attempt actually asked for. Without it the
             // ledger cannot tell a raised retry from a repeat of the attempt
             // that was just cut off.
-            token_ceiling: attemptTokenCeiling,
-            argument_language_name: request.argumentLanguageName ?? null
+            token_ceiling: attemptTokenCeiling
+            // Nothing else. For an encrypted run this object stays readable and
+            // migration 0069 (V-6) admits only these code / number keys; a key
+            // outside them refuses the artifact, and with it the model reply.
+            // The debate's language is the RUN's (core.run.argument_language_name,
+            // which every call of the run is told to write in), so the artifact
+            // reaches it through its run_id rather than carrying a readable copy.
           },
           parseStatus: classifiedContent.parseStatus,
           parseError: classifiedContent.parseError,

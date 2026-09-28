@@ -52,7 +52,8 @@ const supportedArguments = new Set([
   "--decision-scope",
   "--as-of",
   "--steering-presets",
-  "--steering-annotations"
+  "--steering-annotations",
+  "--plan-tier"
 ]);
 
 /** The shape of a service credential: 43 characters of `[A-Za-z0-9_-]`. */
@@ -166,6 +167,10 @@ export function parseAcceptanceArguments(
     decision_scope: values.get("--decision-scope") ?? "prototype-acceptance",
     as_of: values.get("--as-of") ?? now.toISOString(),
     steering_presets: parseJson(values.get("--steering-presets") ?? "[]", "--steering-presets"),
+    // Tiers S01/S02: the plan is an asker input (the /new page's Free/Premium
+    // choice, Free by default there too) and admission keeps only that plan's
+    // roster models, so a live ceremony must run relays that answer as them.
+    plan_tier: values.get("--plan-tier") ?? "free",
     steering_annotations: parseJson(values.get("--steering-annotations") ?? "[]", "--steering-annotations")
   });
   return Object.freeze({ serviceCredential, ask, serve: serveCount === 1 });

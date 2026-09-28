@@ -372,6 +372,9 @@ Ask-input defaults (all overrideable by the named CLI flag) are:
 - `--decision-scope`: `prototype-acceptance`
 - `--as-of`: invocation time in ISO-8601 form
 - `--steering-presets` and `--steering-annotations`: `[]`
+- `--plan-tier`: `free` (or `premium`). Admission keeps only that plan's roster
+  models (`packages/contract/src/plan-tiers.ts`) and refuses the ask naming any
+  roster model no relay answers as, so the relays must report exactly those ids.
 
 Point both browser and server-side web clients at the acceptance API:
 

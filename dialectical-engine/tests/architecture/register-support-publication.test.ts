@@ -359,8 +359,9 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
   it("pins the exact pre-migration legacy v1 and deterministic test-panel v4 snapshots", () => {
     expect(LEGACY_REGISTER_V1_SNAPSHOT_SHA256)
       .toBe("8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b");
+    // The sealed three-slot v4 of the P3-02 runbook; see `tests/support/registerFixtures.ts`.
     expect(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256)
-      .toBe("42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb");
+      .toBe("120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96");
   });
 
   /**
@@ -474,13 +475,14 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
   });
 
   /**
-   * dev's own expectation, alone in its row (6a05a0d0): dev moved
-   * DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 from 120bdfea… to 42b90bca…
-   * but not the sealed fixture it describes, which still hashes to 120bdfea….
-   * Red on dev itself and listed in tests/ci-known-red.txt; which side is right
-   * is a ruling on a sealed value. Listing it blinds nothing of this line's.
+   * The sealed development-v4 fixture hashes to the pinned v4 snapshot. This row
+   * was split out at SYNC3 fix round 1 while dev's 6a05a0d0 had moved the pin to
+   * 42b90bca… (the five-slot panel, published as version 9) and the fixture still
+   * hashed to 120bdfea…; it was red on dev and listed known-red. The frozen bytes
+   * and the P3-02 runbook both say 120bdfea…, so the pin was restored to it on
+   * 2026-09-28 and the row is green and unlisted.
    */
-  it("dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant", async () => {
+  it("the sealed development-v4 fixture hashes to the pinned v4 snapshot constant", async () => {
     expect(computeRegisterSnapshotSha256(await readLegacyDevelopmentV4Rows()))
       .toBe(DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256);
   });
