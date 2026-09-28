@@ -47,32 +47,34 @@ function LibraryRow({
 }) {
   const [byBefore, byAfter] = t(catalog, "home.by", { name: "\u0000" }).split("\u0000");
   return (
-    <Link className="libRow" href={href} data-library-row>
-      <div className="libRowBody">
-        <div className="libRowClaim">{claim}</div>
-        <p className="libRowMeta">
-          {by === undefined ? null : <>{byBefore}<span className="libRowBy">{by}</span>{byAfter} · </>}
-          {meta}
-          {confidenceBand ? <> · <span data-ai-generated="true">{confidenceBand}</span></> : null}
-        </p>
-      </div>
-      {models.length > 0 ? (
-        <div className="libDots" aria-hidden>
-          {models.slice(0, 5).map((model) => {
-            const meta = modelMeta(model, composeCatalog);
-            return (
-              <span
-                key={model}
-                className="libDot"
-                title={meta.name}
-                style={{ "--dot": meta.dot } as CSSProperties}
-              />
-            );
-          })}
+    <Link className="libRow" href={href} data-library-row data-bezel="shell" style={{ background: "var(--shell)" }}>
+      <div className="libRowCore" data-bezel="core" style={{ background: "var(--core)" }}>
+        <div className="libRowBody">
+          <div className="libRowClaim">{claim}</div>
+          <p className="libRowMeta">
+            {by === undefined ? null : <>{byBefore}<span className="libRowBy">{by}</span>{byAfter} · </>}
+            {meta}
+            {confidenceBand ? <> · <span data-ai-generated="true">{confidenceBand}</span></> : null}
+          </p>
         </div>
-      ) : null}
-      <span className="libStatus" data-state={state} data-ai-generated={generatedStatus ? "true" : undefined}>{status}</span>
-      <span className="libArrow" aria-hidden>→</span>
+        {models.length > 0 ? (
+          <div className="libDots" aria-hidden>
+            {models.slice(0, 5).map((model) => {
+              const meta = modelMeta(model, composeCatalog);
+              return (
+                <span
+                  key={model}
+                  className="libDot"
+                  title={meta.name}
+                  style={{ "--dot": meta.dot } as CSSProperties}
+                />
+              );
+            })}
+          </div>
+        ) : null}
+        <span className="libStatus" data-state={state} data-ai-generated={generatedStatus ? "true" : undefined}>{status}</span>
+        <span className="libArrow" aria-hidden>→</span>
+      </div>
     </Link>
   );
 }
