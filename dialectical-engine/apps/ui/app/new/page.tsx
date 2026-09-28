@@ -17,8 +17,10 @@ import type { ModelStrength } from "@debateai/kernel";
 import {
   MODEL_STRENGTH_COPY,
   MODEL_STRENGTH_OPTIONS,
+  PLAN_CARD_COPY,
   isModelStrength,
   modelStrengthControl,
+  planCardNamesRoster,
   type ScorecardSignal
 } from "@/lib/modelStrength";
 import {
@@ -215,18 +217,7 @@ function NewDebateForm({ token }: { token: string }) {
               >
                 <span className="ndTierName">{option.name}</span>
                 <span className="ndTierPromise">{option.promise}</span>
-                <span className="ndTierModels">
-                  {PLAN_TIER_ROSTERS[option.value].map((modelId) => (
-                    <span key={modelId} className="ndTierModel">
-                      <span
-                        className="modelDot"
-                        style={{ "--dot": modelMeta(modelId).dot } as CSSProperties}
-                        aria-hidden
-                      />
-                      {modelId}
-                    </span>
-                  ))}
-                </span>
+                <PlanCardModels plan={option.value} scorecard={modelScorecard} />
               </button>
             ))}
           </div>
@@ -412,6 +403,34 @@ function NewDebateForm({ token }: { token: string }) {
       </div>
       <SupportWidget />
     </div>
+  );
+}
+
+/* Final review C1: a plan card names its plan's usual models only while the
+   session says no scored model list is in force — the one state in which that
+   list is what a debate is seated with. Otherwise (in force, pending, failed)
+   it carries one plain line, true in every one of those states. */
+function PlanCardModels({ plan, scorecard }: { plan: PlanTier; scorecard: ScorecardSignal }) {
+  if (!planCardNamesRoster(scorecard)) {
+    return (
+      <span className="ndTierModels">
+        <span className="ndTierModelsNote">{PLAN_CARD_COPY.modelsChosenPerPart}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="ndTierModels">
+      {PLAN_TIER_ROSTERS[plan].map((modelId) => (
+        <span key={modelId} className="ndTierModel">
+          <span
+            className="modelDot"
+            style={{ "--dot": modelMeta(modelId).dot } as CSSProperties}
+            aria-hidden
+          />
+          {modelId}
+        </span>
+      ))}
+    </span>
   );
 }
 

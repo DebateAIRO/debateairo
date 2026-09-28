@@ -64,6 +64,22 @@ const SESSION_STATES = [
   ["no scored model list is in force", { ...SESSION_WITH_SCORECARD, model_scorecard_in_force: false }, NOT_IN_EFFECT_HINT]
 ] as const;
 
+/*
+ * Final review C1: a plan card names the plan's usual models ONLY when the session says no scored
+ * model list is in force — the one state in which that list is what a debate is seated with. Once
+ * one is in force, the models are chosen for each debate job instead, so the list would be untrue;
+ * while the session read is pending or has failed, the page cannot vouch for it either. In those
+ * three states each card carries one plain line instead (interim phrasing #1).
+ */
+const SESSION_WITHOUT_SCORECARD = Object.freeze({ ...SESSION_WITH_SCORECARD, model_scorecard_in_force: false });
+const MODELS_CHOSEN_PER_PART = "The AI models are chosen for each part of the debate.";
+const PLAN_CARD_STATES = [
+  ["a scored model list is in force", () => mocks.readSession.mockResolvedValue(SESSION_WITH_SCORECARD), false],
+  ["no scored model list is in force", () => mocks.readSession.mockResolvedValue(SESSION_WITHOUT_SCORECARD), true],
+  ["the session read is pending", () => mocks.readSession.mockReturnValue(new Promise(() => {})), false],
+  ["the session read failed", () => mocks.readSession.mockRejectedValue(new Error("session unavailable")), false]
+] as const;
+
 async function settle(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
@@ -113,6 +129,12 @@ describe("S01 /new plan tier", () => {
 
   async function renderPageWithScorecardInForce(): Promise<void> {
     mocks.readSession.mockResolvedValue(SESSION_WITH_SCORECARD);
+    await renderPage();
+  }
+
+  /** C1: the one session state in which the plan cards still name the plan's usual models. */
+  async function renderPageWithoutScorecard(): Promise<void> {
+    mocks.readSession.mockResolvedValue(SESSION_WITHOUT_SCORECARD);
     await renderPage();
   }
 
@@ -212,7 +234,8 @@ describe("S01 /new plan tier", () => {
   });
 
   it("S01-25 R3 names each tier's models from the roster declaration", async () => {
-    await renderPage();
+    // C1: the legacy view — the session says no scored model list is in force.
+    await renderPageWithoutScorecard();
 
     expect(document.querySelector('#planTier-free')?.textContent).toContain("gpt-5.6-luna");
     expect(document.querySelector('#planTier-free')?.textContent).toContain("claude-sonnet-5");
@@ -230,7 +253,8 @@ describe("S01 /new plan tier", () => {
   });
 
   it("S01-26 R3 renders ordered roster ids with their existing family dots", async () => {
-    await renderPage();
+    // C1: the legacy view — the session says no scored model list is in force.
+    await renderPageWithoutScorecard();
 
     const freeModels = [...document.querySelectorAll<HTMLElement>('#planTier-free .ndTierModel')];
     const premiumModels = [...document.querySelectorAll<HTMLElement>('#planTier-premium .ndTierModel')];
@@ -265,6 +289,8 @@ describe("S01 /new plan tier", () => {
     }));
     try {
       const { default: PageWithProbeRoster } = await import("../../apps/ui/app/new/page.js");
+      // C1: the legacy view — the session says no scored model list is in force.
+      mocks.readSession.mockResolvedValue(SESSION_WITHOUT_SCORECARD);
       await act(async () => root!.render(<PageWithProbeRoster />));
       await settle();
       expect([...document.querySelectorAll<HTMLElement>('.ndTierModel .modelDot')].map((dot) =>
@@ -287,6 +313,34 @@ describe("S01 /new plan tier", () => {
       vi.resetModules();
     }
   });
+
+  it.each(PLAN_CARD_STATES)(
+    "C1 · a plan card names the plan's usual models only when no scored model list is in force — %s",
+    async (_state, arrange, namesRoster) => {
+      arrange();
+      await renderPage();
+      for (const plan of ["free", "premium"] as const) {
+        const card = document.querySelector<HTMLElement>(`#planTier-${plan}`)!;
+        const models = card.querySelector<HTMLElement>(".ndTierModels")!;
+        const listed = [...card.querySelectorAll<HTMLElement>(".ndTierModel")].map((model) => model.textContent?.trim());
+        if (namesRoster) {
+          // The legacy view, unchanged: the plan roster, in order, and no line.
+          expect(listed).toEqual([...PLAN_TIER_ROSTERS[plan]]);
+          expect(card.textContent).not.toContain(MODELS_CHOSEN_PER_PART);
+        } else {
+          expect(listed).toEqual([]);
+          expect(models.querySelectorAll(".modelDot")).toHaveLength(0);
+          for (const modelId of PLAN_TIER_ROSTERS[plan]) expect(card.textContent).not.toContain(modelId);
+          expect(models.textContent?.trim()).toBe(MODELS_CHOSEN_PER_PART);
+        }
+        // The plan's name and promise read the same in every state.
+        expect(card.querySelector(".ndTierName")?.textContent).toBe(plan === "free" ? "Free" : "Premium");
+        expect(card.querySelector(".ndTierPromise")?.textContent).toBe(
+          plan === "free" ? "Every gauge fixed. The question is yours." : "Every gauge yours to set."
+        );
+      }
+    }
+  );
 
   it.each(SESSION_STATES)("S01-27 R4 locks all fifteen controls while Free is chosen, when %s", async (_state, session, hint) => {
     mocks.readSession.mockResolvedValue(session);

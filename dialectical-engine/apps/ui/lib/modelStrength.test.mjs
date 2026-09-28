@@ -5,11 +5,13 @@ import {
   MODEL_ASSIGNMENT_COPY,
   MODEL_STRENGTH_COPY,
   MODEL_STRENGTH_OPTIONS,
+  PLAN_CARD_COPY,
   debateRoleLabel,
   isModelStrength,
   modelAssignmentJobs,
   modelStrengthControl,
-  modelStrengthLabel
+  modelStrengthLabel,
+  planCardNamesRoster
 } from "./modelStrength.ts";
 
 test("A21: offers the kernel's three strengths, in its order, with plain labels", () => {
@@ -82,6 +84,26 @@ test("A21 O2: every visitor-facing string is in one place and names no figure or
   }
   assert.deepEqual(MODEL_STRENGTH_OPTIONS.map((option) => option.label), MODEL_STRENGTHS.map((strength) =>
     MODEL_STRENGTH_COPY.options[strength]));
+});
+
+/*
+ * Final review C1 — the /new plan cards name the plan's usual models only in the one state in
+ * which that list is what a debate is seated with: the session says no scored model list is in
+ * force. In force, pending or failed, each card carries one plain line instead. O2: the line
+ * lives beside MODEL_STRENGTH_COPY, in one place, for the port to the site's language catalogs.
+ */
+test("C1: a plan card names the plan's models only when the session says no scored model list is in force", () => {
+  assert.deepEqual(
+    ["IN_FORCE", "NOT_IN_FORCE", "PENDING", "READ_FAILED"].map((scorecard) => planCardNamesRoster(scorecard)),
+    [false, true, false, false]
+  );
+  assert.deepEqual(Object.keys(PLAN_CARD_COPY), ["modelsChosenPerPart"]);
+  assert.equal(PLAN_CARD_COPY.modelsChosenPerPart, "The AI models are chosen for each part of the debate.");
+  assert.doesNotMatch(PLAN_CARD_COPY.modelsChosenPerPart, /[$€\d]|USD/u);
+  assert.doesNotMatch(
+    PLAN_CARD_COPY.modelsChosenPerPart,
+    /scorecard|scored|deployment|tier|picker|roster|seat|strength|plan|free|premium|role/iu
+  );
 });
 
 /*

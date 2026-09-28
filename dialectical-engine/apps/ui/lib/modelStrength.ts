@@ -38,6 +38,28 @@ export const MODEL_STRENGTH_COPY = Object.freeze({
  */
 export type ScorecardSignal = "IN_FORCE" | "NOT_IN_FORCE" | "PENDING" | "READ_FAILED";
 
+/**
+ * Final review C1 — the /new plan cards, true in every state. A card names its
+ * plan's usual models (`PLAN_TIER_ROSTERS`) only when the session says NO scored
+ * model list is in force: that is the one state in which that list is what a
+ * debate is seated with. With one in force the models are chosen for each debate
+ * job, from every reachable scored model, and the plan only caps the strength —
+ * so the list would be untrue; while the session read is pending or has failed,
+ * the page cannot vouch for it either. In those three states each card carries
+ * this one plain line instead.
+ *
+ * Owner decision O2: English for now, kept here beside the control's copy so
+ * the port to the site's language catalogs has one place to read.
+ */
+export const PLAN_CARD_COPY = Object.freeze({
+  modelsChosenPerPart: "The AI models are chosen for each part of the debate."
+});
+
+/** C1: whether a plan card lists its plan's usual models, or shows `PLAN_CARD_COPY` instead. */
+export function planCardNamesRoster(scorecard: ScorecardSignal): boolean {
+  return scorecard === "NOT_IN_FORCE";
+}
+
 export const MODEL_STRENGTH_OPTIONS: ReadonlyArray<{ readonly value: ModelStrength; readonly label: string }> =
   Object.freeze(MODEL_STRENGTHS.map((value) => Object.freeze({ value, label: MODEL_STRENGTH_COPY.options[value] })));
 
