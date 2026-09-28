@@ -49,8 +49,10 @@ const SESSION_WITH_SCORECARD = Object.freeze({
 const NOT_IN_EFFECT_HINT =
   "How strong the models doing each debate job are · not in effect until the models have been scored";
 const FIXED_BY_FREE_HINT = "How strong the models doing each debate job are · fixed by the Free plan";
-// A21.3 carry 14 (A21.2 review Minor 2): a failed or pending session read claims no reason.
+// A21.3 carry 14 (A21.2 review Minor 2): a FAILED session read claims no reason.
 const NOT_AVAILABLE_HINT = "How strong the models doing each debate job are · not available right now";
+// A21.3 fix round 1 (review Minor 3): while the read is PENDING, the plain description alone.
+const PENDING_HINT = "How strong the models doing each debate job are";
 
 /*
  * A21.3 carry 14 (A21.2 review Minor 1): the Free lock of EVERY gauge is pinned in both
@@ -688,20 +690,21 @@ describe("S01 /new plan tier", () => {
 
   // A21.3 carry 14 (A21.2 review Minor 2): a failed read is not the session saying no. The page
   // does not know whether a scored model list is in force, so the note claims no reason.
+  // Fix round 1 (review Minor 3): while the read is still pending, no note at all.
   it.each([
-    ["has failed", () => mocks.readSession.mockRejectedValue(new Error("session unavailable"))],
-    ["has not answered yet", () => mocks.readSession.mockReturnValue(new Promise(() => {}))]
-  ] as const)("A21-O4d says only that Model strength is not available right now when the session read %s", async (_case, arrange) => {
+    ["has failed", () => mocks.readSession.mockRejectedValue(new Error("session unavailable")), NOT_AVAILABLE_HINT],
+    ["has not answered yet", () => mocks.readSession.mockReturnValue(new Promise(() => {})), PENDING_HINT]
+  ] as const)("A21-O4d locks Model strength and claims no reason when the session read %s", async (_case, arrange, hint) => {
     arrange();
     await renderPage();
     await inputValue('#topic', "a debatable claim");
     const pills = () => [...document.querySelectorAll<HTMLButtonElement>('[data-field="modelStrength"]')];
 
     expect(pills().every((pill) => pill.disabled)).toBe(true);
-    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_AVAILABLE_HINT);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(hint);
     await click('#planTier-premium');
     expect(pills().every((pill) => pill.disabled)).toBe(true);
-    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_AVAILABLE_HINT);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(hint);
 
     await submitForm();
     expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium" });

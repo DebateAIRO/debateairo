@@ -372,6 +372,8 @@ describe("A20 · refusals", () => {
     }), ask("premium")).catch((failure: unknown) => failure);
     expect(error).toMatchObject({ name: "AskRefusal", code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
     expect((error as Error).message).not.toMatch(/250000|912345/u);
+    // A21.3 fix round 1: no remedy the asker may be unable to act on.
+    expect((error as Error).message).not.toMatch(/tree depth/iu);
     expect(lines.some((line) => line.includes("912345"))).toBe(true);
   });
 

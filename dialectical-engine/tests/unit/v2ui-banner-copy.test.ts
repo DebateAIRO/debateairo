@@ -111,10 +111,11 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
 
   /**
    * A21.3 (carry 12 of task-A19-A20-carries.md). The model picker's two ask
-   * refusals arrive as a 422 with their own typed code. They are OBSERVED
-   * refusals, so each is named as one, in a constant clause the page owns: never
-   * the server's sentence (whose detail can carry a figure), and not the
-   * server's own words copied either, unless the owners pick them.
+   * refusals arrive as a 422 with their own typed code, and each gets a constant
+   * clause the page owns: never the server's error text (whose detail can carry
+   * a figure). Fix round 1 (review Important 1): the budget clause is neutral and
+   * always true — no remedy, no internal word — and the controller chose the SAME
+   * sentence for the server's constant, so the two stay consistent.
    */
   it("A21 names the model-strength refusals as refusals, in copy the server never wrote", () => {
     const tooSmall = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
@@ -127,15 +128,22 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
     expect(tooSmall.kind).toBe("MODEL_BUDGET_TOO_SMALL");
     expect(unavailable.kind).toBe("MODEL_UNAVAILABLE");
     for (const classified of [tooSmall, unavailable]) {
-      expect(classified.message).toMatch(/refused/u);
       expect(classified.message).not.toMatch(/unknown|912345|250000|glm/u);
       expect(classified.message).not.toContain("ASK_MODEL");
       // Owner rules: no figure, no internal term.
       expect(classified.message).not.toMatch(/\d|scorecard|picker|ceiling|deployment/iu);
+      // Fix round 1: never a remedy the asker may be unable to act on (Free fixes the tree depth).
+      expect(classified.message).not.toMatch(/tree depth/iu);
     }
     expect(tooSmall.message).not.toBe(unavailable.message);
-    // Carry 12: not the server's sentence word for word.
-    expect(tooSmall.message.toLowerCase()).not.toContain(ASK_MODEL_REFUSALS.BUDGET_TOO_SMALL.message.toLowerCase());
+    // Fix round 1: neutral, no internal word, and the server's own sentence, word for word.
+    expect(tooSmall.message).toBe(
+      "Starting this debate did not complete. Even the most economical choice of models costs more than this site allows for one debate."
+    );
+    expect(tooSmall.message).not.toMatch(/coordinator/iu);
+    expect(tooSmall.message.endsWith(` ${ASK_MODEL_REFUSALS.BUDGET_TOO_SMALL.message}.`)).toBe(true);
+    expect(unavailable.message).toMatch(/refused/u);
+    // Carry 12: the unavailable clause is not the server's sentence word for word.
     expect(unavailable.message.toLowerCase())
       .not.toContain(ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE.message.toLowerCase());
     // Only the 422 that carries the code is a refusal; the same code on another status is not.

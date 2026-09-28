@@ -24,11 +24,19 @@ export const MODEL_STRENGTH_COPY = Object.freeze({
     notInEffect: "How strong the models doing each debate job are · not in effect until the models have been scored",
     fixedByFree: "How strong the models doing each debate job are · fixed by the Free plan",
     yoursToChoose: "How strong the models doing each debate job are · this site's usual setting applies until you choose",
-    // A21.3 carry 14 (A21.2 review Minor 2): the session read failed or has not answered, so the
-    // page does not know whether a scored model list is in force, and claims no reason.
-    notAvailable: "How strong the models doing each debate job are · not available right now"
+    // A21.3 carry 14 (A21.2 review Minor 2): the session read FAILED, so the page does not know
+    // whether a scored model list is in force, and claims no reason.
+    notAvailable: "How strong the models doing each debate job are · not available right now",
+    // A21.3 fix round 1 (review Minor 3): while the session read is PENDING, the description alone.
+    pending: "How strong the models doing each debate job are"
   })
 });
+
+/**
+ * What /new knows about the scored model list: the session's yes or no, or that
+ * the session read is still pending or has failed (A21.3 carry 14, fix round 1).
+ */
+export type ScorecardSignal = "IN_FORCE" | "NOT_IN_FORCE" | "PENDING" | "READ_FAILED";
 
 export const MODEL_STRENGTH_OPTIONS: ReadonlyArray<{ readonly value: ModelStrength; readonly label: string }> =
   Object.freeze(MODEL_STRENGTHS.map((value) => Object.freeze({ value, label: MODEL_STRENGTH_COPY.options[value] })));
@@ -48,16 +56,17 @@ export function modelStrengthLabel(strength: ModelStrength): string {
  * (controller default on O-6) and Premium leaves the choice to the asker. A
  * locked control sends nothing: the ask then carries no `model_strength`.
  *
- * `scorecardInForce: null` means the page does not know — the session read
- * failed or has not answered (A21.3 carry 14). The control stays locked, and
- * its note gives no reason the page cannot vouch for.
+ * While the page does not know, the control stays locked and its note gives no
+ * reason the page cannot vouch for: a PENDING read shows the description alone,
+ * and a FAILED read says only "not available right now" (A21.3 carry 14).
  */
 export function modelStrengthControl(input: Readonly<{
-  scorecardInForce: boolean | null;
+  scorecard: ScorecardSignal;
   planTier: PlanTier;
 }>): Readonly<{ locked: boolean; hint: string }> {
-  if (input.scorecardInForce === null) return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.notAvailable });
-  if (!input.scorecardInForce) return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.notInEffect });
+  if (input.scorecard === "PENDING") return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.pending });
+  if (input.scorecard === "READ_FAILED") return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.notAvailable });
+  if (input.scorecard === "NOT_IN_FORCE") return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.notInEffect });
   if (input.planTier === "free") return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.fixedByFree });
   return Object.freeze({ locked: false, hint: MODEL_STRENGTH_COPY.hint.yoursToChoose });
 }
@@ -82,8 +91,8 @@ export function modelStrengthControl(input: Readonly<{
 export const MODEL_ASSIGNMENT_COPY = Object.freeze({
   // Carry 6: the drawer shows the PINNED choice, not a record of use (a backup may answer some calls).
   title: "Models chosen for this debate",
-  // Carry 13: true both when no scored model list was in force and when the run's record could not be read.
-  notRecorded: "The models for this debate were not recorded.",
+  // Carry 13 / fix round 1: exact both when no scored model list was in force and when the run's record is unreadable.
+  notRecorded: "No record of the models for this debate is available.",
   // O1: the one sentence about stand-ins, in the words of the committed backup-mark label.
   standIn: "Where a chosen model was unavailable, another AI model may have stepped in.",
   // Carry 4: a FALLBACK answer-writer or answer-checker seat is never sat; the site's configured model answers.

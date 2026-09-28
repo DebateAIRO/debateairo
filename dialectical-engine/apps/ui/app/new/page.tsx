@@ -14,7 +14,13 @@ import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { ModelStrength } from "@debateai/kernel";
-import { MODEL_STRENGTH_COPY, MODEL_STRENGTH_OPTIONS, isModelStrength, modelStrengthControl } from "@/lib/modelStrength";
+import {
+  MODEL_STRENGTH_COPY,
+  MODEL_STRENGTH_OPTIONS,
+  isModelStrength,
+  modelStrengthControl,
+  type ScorecardSignal
+} from "@/lib/modelStrength";
 import {
   buildNewDebateAskConfig,
   DECISION_SCOPE_DEFAULT,
@@ -90,9 +96,9 @@ function NewDebateForm({ token }: { token: string }) {
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
   // A21: null = the asker has not chosen; the ask then omits model_strength.
   const [modelStrength, setModelStrength] = useState<ModelStrength | null>(null);
-  // A21 O4: true only once the session says a scored model list is in force; until then the control is locked.
-  // A21.3 carry 14: null while the page does not know (the read failed or has not answered) — no reason is claimed.
-  const [modelScorecardInForce, setModelScorecardInForce] = useState<boolean | null>(null);
+  // A21 O4: the control unlocks only once the session says a scored model list is in force.
+  // A21.3 carry 14 / fix round 1: PENDING until the session answers, READ_FAILED if it cannot be read.
+  const [modelScorecard, setModelScorecard] = useState<ScorecardSignal>("PENDING");
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
@@ -105,13 +111,13 @@ function NewDebateForm({ token }: { token: string }) {
     void contractClient.readSession().then((session) => {
       if (!active) return;
       const defaults = deriveSessionAskDefaults(session);
-      setModelScorecardInForce(session.model_scorecard_in_force === true);
+      setModelScorecard(session.model_scorecard_in_force === true ? "IN_FORCE" : "NOT_IN_FORCE");
       setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);
       setAsOf(defaults.asOf);
       setSessionDefaultsError(null);
     }).catch((failure: unknown) => {
       if (!active) return;
-      setModelScorecardInForce(null);
+      setModelScorecard("READ_FAILED");
       // DL3-F7: classified copy, never the contract client's server-authored text.
       setSessionDefaultsError(requestFailureMessage("SESSION_DEFAULTS", failure));
     });
@@ -133,7 +139,7 @@ function NewDebateForm({ token }: { token: string }) {
     setMaxTokens(800);
   }
 
-  const strengthControl = modelStrengthControl({ scorecardInForce: modelScorecardInForce, planTier });
+  const strengthControl = modelStrengthControl({ scorecard: modelScorecard, planTier });
   const askAsOf = new Date(asOf);
   // The button becomes ready only for the complete ask that will be submitted.
   // UX-01 makes machine-derived values visible and editable rather than hidden.

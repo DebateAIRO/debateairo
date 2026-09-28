@@ -29,17 +29,20 @@ test("A21: no option carries a price or a figure the API never sent", () => {
 
 // A21 · owner decision O4: shown, but greyed out and marked "not in effect" while no
 // scored model list is in force — on either plan. The Free lock applies only once it is.
-// A21.3 carry 14 (A21.2 review Minor 2): when the page could not learn the answer
-// (null: the session read failed or has not answered), the note claims no reason.
-test("A21 O4: not in effect outranks the plan; Free locks; Premium leaves the choice open; unknown claims no reason", () => {
+// A21.3 carry 14 (A21.2 review Minor 2): when the session read FAILED, the page does not know,
+// so the note claims no reason. Fix round 1 (review Minor 3): while the read is still PENDING the
+// note is the plain description alone — nothing is said until the session answers.
+test("A21 O4: not in effect outranks the plan; Free locks; Premium chooses; a failed or pending read claims no reason", () => {
   assert.deepEqual(
     [
-      modelStrengthControl({ scorecardInForce: false, planTier: "free" }),
-      modelStrengthControl({ scorecardInForce: false, planTier: "premium" }),
-      modelStrengthControl({ scorecardInForce: true, planTier: "free" }),
-      modelStrengthControl({ scorecardInForce: true, planTier: "premium" }),
-      modelStrengthControl({ scorecardInForce: null, planTier: "free" }),
-      modelStrengthControl({ scorecardInForce: null, planTier: "premium" })
+      modelStrengthControl({ scorecard: "NOT_IN_FORCE", planTier: "free" }),
+      modelStrengthControl({ scorecard: "NOT_IN_FORCE", planTier: "premium" }),
+      modelStrengthControl({ scorecard: "IN_FORCE", planTier: "free" }),
+      modelStrengthControl({ scorecard: "IN_FORCE", planTier: "premium" }),
+      modelStrengthControl({ scorecard: "READ_FAILED", planTier: "free" }),
+      modelStrengthControl({ scorecard: "READ_FAILED", planTier: "premium" }),
+      modelStrengthControl({ scorecard: "PENDING", planTier: "free" }),
+      modelStrengthControl({ scorecard: "PENDING", planTier: "premium" })
     ],
     [
       { locked: true, hint: MODEL_STRENGTH_COPY.hint.notInEffect },
@@ -47,12 +50,19 @@ test("A21 O4: not in effect outranks the plan; Free locks; Premium leaves the ch
       { locked: true, hint: MODEL_STRENGTH_COPY.hint.fixedByFree },
       { locked: false, hint: MODEL_STRENGTH_COPY.hint.yoursToChoose },
       { locked: true, hint: MODEL_STRENGTH_COPY.hint.notAvailable },
-      { locked: true, hint: MODEL_STRENGTH_COPY.hint.notAvailable }
+      { locked: true, hint: MODEL_STRENGTH_COPY.hint.notAvailable },
+      { locked: true, hint: MODEL_STRENGTH_COPY.hint.pending },
+      { locked: true, hint: MODEL_STRENGTH_COPY.hint.pending }
     ]
   );
   assert.match(MODEL_STRENGTH_COPY.hint.notInEffect, /not in effect/u);
   assert.match(MODEL_STRENGTH_COPY.hint.notAvailable, / · not available right now$/u);
   assert.doesNotMatch(MODEL_STRENGTH_COPY.hint.notAvailable, /scored|Free|plan|choose/u);
+  // Pending: the shared description every other hint starts with, and no note after it.
+  assert.doesNotMatch(MODEL_STRENGTH_COPY.hint.pending, /·/u);
+  for (const [name, hint] of Object.entries(MODEL_STRENGTH_COPY.hint)) {
+    if (name !== "pending") assert.ok(hint.startsWith(`${MODEL_STRENGTH_COPY.hint.pending} · `), name);
+  }
 });
 
 // Owner rules: plain words, no internals, no prices. O2: every new string lives in
@@ -63,8 +73,9 @@ test("A21 O2: every visitor-facing string is in one place and names no figure or
     ...Object.values(MODEL_STRENGTH_COPY.options),
     ...Object.values(MODEL_STRENGTH_COPY.hint)
   ];
-  // 7 from A21.2, plus A21.3's "not available right now" (carry 14).
-  assert.equal(strings.length, 8);
+  // 7 from A21.2, plus A21.3's "not available right now" (carry 14) and the bare description
+  // shown while the session read is pending (fix round 1).
+  assert.equal(strings.length, 9);
   for (const text of strings) {
     assert.doesNotMatch(text, /[$€\d]|USD/u);
     assert.doesNotMatch(text, /scorecard|deployment|tier|picker|roster|seat/iu);

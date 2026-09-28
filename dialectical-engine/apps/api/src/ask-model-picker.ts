@@ -40,11 +40,16 @@ export const ASK_MODEL_ASSIGNMENT_INVALID = "ASK_MODEL_ASSIGNMENT_INVALID" as co
  * The two picker refusals as the ASKER reads them: constant sentences. The
  * picker's own detail can carry the per-run ceiling — a capacity oracle (I6) —
  * so it reaches only the operator's log.
+ *
+ * A21.3 fix round 1: BUDGET_TOO_SMALL is neutral and always true, and names no
+ * remedy — a Free asker cannot change the tree depth, and a Premium asker at the
+ * minimum depth cannot lower it. The UI's banner clause
+ * (apps/ui/lib/v3/requestFailure.ts, MODEL_BUDGET_TOO_SMALL) is the same sentence.
  */
 export const ASK_MODEL_REFUSALS = Object.freeze({
   BUDGET_TOO_SMALL: Object.freeze({
     code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL",
-    message: "Even the Economy model strength costs more than one debate may spend here; a smaller tree depth costs less"
+    message: "Even the most economical choice of models costs more than this site allows for one debate"
   }),
   NO_REACHABLE_CANDIDATE: Object.freeze({
     code: "ASK_MODEL_CANDIDATE_UNAVAILABLE",

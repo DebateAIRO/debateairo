@@ -58,7 +58,8 @@ function escaped(text: string): string {
 
 const TITLE = "Models chosen for this debate";
 const STAND_IN = "Where a chosen model was unavailable, another AI model may have stepped in.";
-const NOT_RECORDED = "The models for this debate were not recorded.";
+// Fix round 1 (review Minor 1): exact both when no scorecard was in force and when the run's record is unreadable.
+const NOT_RECORDED = "No record of the models for this debate is available.";
 const SITE_SETTING = "This site's usual setting chooses the model for this job.";
 const CROSS_EXCHANGE = "The model that wrote each opening position also writes its replies to the other positions.";
 
