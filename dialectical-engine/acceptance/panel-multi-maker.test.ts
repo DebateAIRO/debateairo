@@ -337,7 +337,8 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
             + JSON.stringify([...primaryProvider.unclassifiedCalls(), ...secondProvider.unclassifiedCalls()]));
         }
         expect(work.rows[0]?.state).toBe("DONE");
-      });
+        // Explicit bound, for the reason the degraded row below gives.
+      }, { timeout: 30_000, interval: 100 });
 
       // The RECEIPT, re-read from the ledger: one reduced judgement per node,
       // each naming >= 2 panel members with a measured dispersion.

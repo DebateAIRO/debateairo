@@ -1302,8 +1302,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             ...(tripwires.length === 0 ? {} : { prompt_tripwires: tripwires }),
             usage: reportedUsage,
             // W10/1: the reason this completion stopped, recorded on EVERY
-            // attempt. `raw_artifact.metadata` is unconstrained jsonb, so the
-            // truncation is durable even though `parse_status` cannot name it.
+            // attempt, so the truncation is durable even though `parse_status`
+            // cannot name it (a code token; see recordableFinishReason).
             finish_reason: recordableFinishReason(finishReason),
             // W10/2: the bound this attempt actually asked for. Without it the
             // ledger cannot tell a raised retry from a repeat of the attempt

@@ -467,7 +467,9 @@ describe("ACC-01 dry-run ceremony", () => {
       workState = work.rows[0];
       if (workState?.state === "FAILED") throw new Error(`ACCEPTANCE_WORK_FAILED:${workState.terminal_reason}`);
       expect(workState?.state).toBe("DONE");
-    });
+      // An explicit bound: vi.waitFor's default is one second, and giving up
+      // early closes the runtime (destroying the test user's key) mid-run.
+    }, { timeout: 30_000, interval: 100 });
     expect(workState).toEqual({ state: "DONE", terminal_reason: null });
 
     // The DR-135 64-row refusal is replaced by honest per-row transitions:

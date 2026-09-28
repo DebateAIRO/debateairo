@@ -12,21 +12,23 @@ import { PLAN_TIER_ROSTERS } from "@debateai/contract";
  * refused — first 400 MALFORMED_REQUEST for the missing field, and behind it the
  * roster, because every double answered as `test-layer/model`.
  *
- * The fixtures ask on the FREE plan, and their two relays declare the free
- * roster's two models in roster order: the OpenAI relay first, the Anthropic
- * relay second. The ids are read from the roster itself, so a roster change
- * moves the fixtures with it instead of refusing them.
+ * The fixtures ask on the FREE plan: the OpenAI relay declares the roster's
+ * OpenAI model and the Anthropic relay its Anthropic one. The ids are read from
+ * the roster itself, picked by family rather than by position, so a roster
+ * change moves the fixtures with it, and a roster that no longer has one model
+ * per family refuses them by name instead of quietly mislabelling a maker
+ * (admission matches ids only, so it would not notice).
  */
 export const ACCEPTANCE_PLAN_TIER = "free" as const;
 
-function freeRosterMember(index: number): string {
-  const model = PLAN_TIER_ROSTERS[ACCEPTANCE_PLAN_TIER][index];
-  if (model === undefined) throw new Error(`TEST_FREE_ROSTER_MEMBER_MISSING:${String(index)}`);
-  return model;
+function freeRosterMember(family: "gpt-" | "claude-"): string {
+  const matches = PLAN_TIER_ROSTERS[ACCEPTANCE_PLAN_TIER].filter((model) => model.startsWith(family));
+  if (matches.length !== 1) throw new Error(`TEST_FREE_ROSTER_FAMILY_NOT_UNIQUE:${family}:${String(matches.length)}`);
+  return matches[0]!;
 }
 
-export const FREE_ROSTER_OPENAI_MODEL = freeRosterMember(0);
-export const FREE_ROSTER_ANTHROPIC_MODEL = freeRosterMember(1);
+export const FREE_ROSTER_OPENAI_MODEL = freeRosterMember("gpt-");
+export const FREE_ROSTER_ANTHROPIC_MODEL = freeRosterMember("claude-");
 
 /**
  * The model id a request asked for, which a double answers AS.

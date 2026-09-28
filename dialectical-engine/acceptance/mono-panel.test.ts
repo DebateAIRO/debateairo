@@ -4,6 +4,7 @@ import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { ProviderProbeRepository } from "@debateai/db";
 import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
@@ -218,7 +219,8 @@ const monoEnvironment = () => ({
 });
 
 describe("DR-182 live mono-panel composition", () => {
-  // Runs FIRST: it must spend none of the served row's scripted responses.
+  // The refusal comes before any provider call, so this row spends none of the
+  // served row's scripted responses and the two rows do not depend on order.
   it("refuses a day with one maker at the door, naming the plan's missing model (tiers S02 C1)", async () => {
     const runtime = await createAcceptanceRuntime({
       pool: database.pool,
@@ -279,7 +281,12 @@ describe("DR-182 live mono-panel composition", () => {
       );
       if (work.rows[0]?.state === "FAILED") throw new Error(`MONO_WORK_FAILED:${work.rows[0].terminal_reason}`);
       expect(work.rows[0]?.state).toBe("DONE");
-    });
+      // An explicit bound: vi.waitFor's default is one second, and giving up
+      // early closes the runtime (destroying the test user's key) mid-run.
+    }, { timeout: 30_000, interval: 100 });
+    // DR-182(6): the lost maker's absence is RECORDED, with its evidence.
+    const [criticProbe] = await new ProviderProbeRepository(database.pool).readLatest([CRITIC_PROVIDER_REF]);
+    expect(criticProbe).toMatchObject({ state: "ABSENT", failureCode: "PROVIDER_PROBE_FAILED", modelId: null });
     const answer = await runtime.api.inject({
       method: "GET",
       url: `/v1/runs/${runId}/answer`,
