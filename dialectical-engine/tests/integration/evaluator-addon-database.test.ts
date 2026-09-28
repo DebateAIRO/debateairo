@@ -142,11 +142,12 @@ async function seedGradableRun(input: {
 
 function successfulGateway(
   graderRawArtifactRef: string,
-  delayMs = 0
+  delay: number | Promise<unknown> = 0
 ): ProviderGateway & { readonly call: ReturnType<typeof vi.fn> } {
   return {
     call: vi.fn(async () => {
-      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      if (typeof delay !== "number") await delay;
+      else if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
       return {
         rawArtifactRef: graderRawArtifactRef,
         ledgerEntryRef: randomUUID(),
@@ -437,10 +438,22 @@ describe("persisted judge-grading add-on", () => {
     expect(versionedGateway.call).toHaveBeenCalledTimes(1);
   });
 
-  it("serializes twelve same-run invocations above pool max with one provider call", async () => {
+  // PROG-06 (2026-08-15): same-run losers never wait for the winner - they record
+  // ADDON_PASS_IN_FLIGHT and release their client. Between 2026-08-25 and 2026-09-13
+  // the then-exclusive run content lease queued them behind the winner, so they saw
+  // ADDON_ALREADY_GRADED instead; the lease is shared since 2026-09-13 and is not a
+  // mutex between callers.
+  it("keeps twelve same-run invocations above pool max bounded to one provider call", async () => {
     const registerVersion = 7005;
     const fixture = await seedGradableRun({ registerVersion });
-    const gateway = successfulGateway(fixture.differentGraderArtifact, 40);
+    // The grader's provider call stays open until the other eleven have returned, so
+    // every one of them meets the pass in flight whatever the host's speed. Callers
+    // that waited for the pass instead could not return first; the fallback then
+    // lets this fail on the assertions below rather than hang.
+    let releaseGrader!: () => void;
+    const othersReturned = new Promise<void>((resolve) => { releaseGrader = resolve; });
+    const fallback = setTimeout(releaseGrader, 5_000);
+    const gateway = successfulGateway(fixture.differentGraderArtifact, othersReturned);
     const concurrent = concurrencyPool(database.connectionString);
     const { pool } = concurrent;
     const input = {
@@ -450,24 +463,45 @@ describe("persisted judge-grading add-on", () => {
       deployment: { configuredProviders: [{ providerRef: "provider:judge", maker: "maker:judge" }] },
       provider: gateway
     };
+    let returned = 0;
     let results: Awaited<ReturnType<typeof runEvaluatorJudgeGradingAddon>>[];
     try {
       results = await Promise.all(Array.from({ length: 12 }, () =>
-        runEvaluatorJudgeGradingAddon(input)));
+        runEvaluatorJudgeGradingAddon(input).finally(() => {
+          returned += 1;
+          if (returned === 11) releaseGrader();
+        })));
       await expect(pool.query("SELECT 1 AS recovered")).resolves.toMatchObject({ rowCount: 1 });
     } finally {
+      clearTimeout(fallback);
       await concurrent.stop();
     }
     expect(gateway.call).toHaveBeenCalledTimes(1);
     expect(results.filter((result) => result.state === "GRADED")).toHaveLength(1);
     expect(results.filter((result) =>
-      result.state === "SKIPPED" && result.reason === "ADDON_ALREADY_GRADED")).toHaveLength(11);
-    const serializedReceipts = await database.pool.query<{ count: string }>(`
-      SELECT count(*)::text AS count FROM evaluator.pipeline_event
-      WHERE run_id=$1 AND pipeline='ADDON' AND state='SKIPPED'
-        AND reason='ADDON_ALREADY_GRADED'
+      result.state === "SKIPPED" && result.reason === "ADDON_PASS_IN_FLIGHT")).toHaveLength(11);
+    const receipts = await database.pool.query<{
+      state: string; reason: string; rows: number; attempts: number;
+    }>(`
+      SELECT state,reason,count(*)::int AS rows,count(DISTINCT attempt_id)::int AS attempts
+      FROM evaluator.pipeline_event
+      WHERE run_id=$1 AND pipeline='ADDON'
+      GROUP BY state,reason ORDER BY state,reason
     `, [fixture.runId]);
-    expect(serializedReceipts.rows[0]!.count).toBe("11");
+    // One terminal receipt per invocation; only the grader claimed an attempt.
+    expect(receipts.rows).toEqual([
+      { state: "SKIPPED", reason: "ADDON_PASS_IN_FLIGHT", rows: 11, attempts: 11 },
+      { state: "STARTED", reason: "BLIND_JUDGE_GRADE_STARTED", rows: 1, attempts: 1 },
+      { state: "SUCCEEDED", reason: "BLIND_JUDGE_GRADE_SUCCEEDED", rows: 1, attempts: 1 }
+    ]);
+    const grades = await database.pool.query<{ count: string }>(`
+      SELECT count(*)::text AS count FROM evaluator.observation
+      WHERE run_id=$1 AND source_kind='BLIND_JUDGE_GRADE'
+    `, [fixture.runId]);
+    expect(grades.rows[0]!.count).toBe("1");
+    await expect(runEvaluatorJudgeGradingAddon({ ...input, pool: database.pool }))
+      .resolves.toEqual({ state: "SKIPPED", reason: "ADDON_ALREADY_GRADED" });
+    expect(gateway.call).toHaveBeenCalledTimes(1);
   }, 15_000);
 
   it("completes twelve distinct-run passes above pool max and leaves the pool usable", async () => {

@@ -185,10 +185,13 @@ before `STARTED`, so configuration faults never consume that lifetime budget.
 A family/register mismatch is recoverable by retrying with the matching family.
 An absent policy records an explicit `ADDON_POLICY_UNAVAILABLE` skip. Each
 invocation can make exactly one gateway call, with the exact `runId`, an
-`evaluator:addon-attempt:*` subject, and the evaluator lane/call-site. A
-session advisory content lease guards the per-run candidate/provider pass on
-one connection. Same-run followers serialize, then observe
-`ADDON_ALREADY_GRADED`; every repository operation uses the lease-owning
+`evaluator:addon-attempt:*` subject, and the evaluator lane/call-site. The pass
+runs on the connection holding the run's content lease, which is shared and
+only keeps account erasure out; it does not serialize callers. A non-blocking
+session advisory lock on that connection guards the per-run candidate/provider
+pass: same-run losers do not wait, but record `ADDON_PASS_IN_FLIGHT`, claim no
+attempt, and release their connection, so a later invocation observes
+`ADDON_ALREADY_GRADED`. Every repository operation uses the lease-owning
 client. This preserves the one-call ceiling without nested pool checkout or
 pool starvation. The product run's attempt accounting is never used as a retry
 bound.
