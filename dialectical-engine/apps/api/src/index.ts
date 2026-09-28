@@ -2652,6 +2652,9 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
   return parsed.success ? parsed.data : null;
 }
 
+/** The step of `submit` after the run row exists; its failure reason is `RUN_SETUP_FAILED:<step>`. */
+type RunSetupStep = "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH";
+
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
@@ -2749,23 +2752,56 @@ export class PostgresAskApplication implements AskApplication {
       }
       throw error;
     }
-    await this.#serve.recordMemoryQuestion({
-      runId,
-      questionLine: ask.question_line,
-      callerScope: session.caller_scope,
-      askerScope: session.asker_id,
-      asOf: ask.as_of,
-      policyVersion: this.settings.registerVersion,
-      ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
-    }, ownership);
-    const workItemId=await this.#work.enqueue({
-      runId,
-      batteryRowId: "Q1",
-      nodeSet: [],
-      commandKey: `S00:${runId}:Q1`
-    });
-    await this.dispatcher.dispatch({ runId, workItemId });
+    // The run row now exists, and only this method ever queues its first job:
+    // start-up recovery re-sends existing jobs and no sweep looks at runs. So a
+    // throw from here on records the run FAILED, naming the step, before the
+    // asker's 500 — otherwise the owner's list shows it generating forever.
+    let setupStep: RunSetupStep = "MEMORY_QUESTION";
+    try {
+      await this.#serve.recordMemoryQuestion({
+        runId,
+        questionLine: ask.question_line,
+        callerScope: session.caller_scope,
+        askerScope: session.asker_id,
+        asOf: ask.as_of,
+        policyVersion: this.settings.registerVersion,
+        ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+      }, ownership);
+      setupStep = "WORK_QUEUE";
+      const workItemId=await this.#work.enqueue({
+        runId,
+        batteryRowId: "Q1",
+        nodeSet: [],
+        commandKey: `S00:${runId}:Q1`
+      });
+      setupStep = "DISPATCH";
+      await this.dispatcher.dispatch({ runId, workItemId });
+    } catch (error) {
+      await this.#recordRunSetupFailure(runId, setupStep);
+      throw error;
+    }
     return { run_ref: runId, status: "QUEUED" };
+  }
+
+  /**
+   * Never masks the asker's error. If the failure cannot be recorded either —
+   * most likely the same outage — the run keeps reading QUEUED, so the one
+   * line that names it goes to the operator's log (ids and codes only).
+   */
+  async #recordRunSetupFailure(runId: string, step: RunSetupStep): Promise<void> {
+    const reason = `RUN_SETUP_FAILED:${step}`;
+    try {
+      await this.#work.recordSetupFailure({
+        runId, batteryRowId: "Q1", commandKey: `S00:${runId}:Q1`, reason
+      });
+    } catch (recordError) {
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.run.setup_failure_unrecorded",
+        runId,
+        reason,
+        diagnostic: apiOperationalErrorDiagnostic(recordError)
+      })));
+    }
   }
 
   async unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null> {
