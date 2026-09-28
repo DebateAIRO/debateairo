@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
@@ -594,6 +594,38 @@ export const PublicDebateSchema = z.object({
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
+/**
+ * A21 — WHICH MODELS WERE CHOSEN FOR EACH DEBATE JOB, projected from the run's
+ * pinned role assignment (core.run_role_assignment); absent when the run pinned
+ * none (no scorecard was in force). Owner decisions O1/O3: the honesty drawer
+ * shows visitors only the model names per job and never the step-down; this
+ * full detail is for the JSON export and audit. Engine identifiers only —
+ * makers, model ids, thinking levels — never a provider route, a candidate id,
+ * a price or a prompt.
+ */
+const AnswerModelSeatSchema = z.object({
+  maker: z.string().min(1),
+  model_id: z.string().min(1),
+  thinking_level: z.string().min(1)
+}).strict();
+
+export const AnswerModelAssignmentSchema = z.object({
+  strength: ModelStrengthSchema,
+  stepped_down: z.boolean(),
+  scorecard_version: z.number().int().positive().nullable(),
+  roles: z.array(z.object({
+    role: z.enum(DEBATE_ROLES),
+    seats: z.array(z.object({
+      seat_index: z.number().int().nonnegative(),
+      source: z.enum(["SCORECARD", "FALLBACK"]),
+      main: AnswerModelSeatSchema,
+      runner_up: AnswerModelSeatSchema.nullable(),
+      runner_up_share: z.number().min(0).max(1)
+    }).strict())
+  }).strict())
+}).strict();
+export type AnswerModelAssignment = z.infer<typeof AnswerModelAssignmentSchema>;
+
 export const AnswerSchema = z.object({
   answer_id: z.string().min(1),
   answer_version: z.number().int().positive(),
@@ -664,7 +696,9 @@ export const AnswerSchema = z.object({
   inspection_handle: z.string().min(1),
   as_of: z.iso.datetime(),
   staleness_state: StalenessStateSchema,
-  relevant_as_of: z.iso.datetime()
+  relevant_as_of: z.iso.datetime(),
+  // A21: optional, so every stored and fixture answer without it still parses.
+  model_assignment: AnswerModelAssignmentSchema.optional()
 }).strict().superRefine((answer, context) => {
   if ((answer.confidence_band === null) !== (answer.band_ceiling === null)) {
     context.addIssue({ code: "custom", message: "confidence_band and band_ceiling must be present together" });

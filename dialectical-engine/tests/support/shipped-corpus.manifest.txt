@@ -451,6 +451,7 @@ packages/scorecard/src/parse.ts
 packages/scorecard/src/picker.ts
 packages/scorecard/src/schema.ts
 packages/serve/src/index.ts
+packages/serve/src/model-assignment.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
 packages/support-kb/src/catalog.ts

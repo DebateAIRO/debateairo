@@ -23,6 +23,8 @@ import {
   type RunOwnershipInput
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
+import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
+export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   MemoryRepository,
@@ -2690,6 +2692,9 @@ export class ServeRepository {
       sealed_at_seq: number | string;
       as_of: Date;
       relevant_as_of: Date;
+      // A21, ruling F20 (the one R2 exception): the pinned core.run_role_assignment row rides this
+      // single SELECT as a subselect instead of a second readRunRoleAssignment query per answer read.
+      role_assignment_row: PinnedRoleAssignmentRow | null;
     }>(
       `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line,
               run.content_ciphertext AS run_content_ciphertext,
@@ -2714,7 +2719,13 @@ export class ServeRepository {
               conformance.coverage_mode AS conformance_coverage_mode,
               conformance.conformance_record_id,
               conformance.content_ciphertext AS conformance_content_ciphertext,
-              run.as_of, answer.relevant_as_of
+              run.as_of, answer.relevant_as_of,
+              (SELECT jsonb_build_object(
+                        'assignment', pinned.assignment,
+                        'strength', pinned.strength,
+                        'stepped_down', pinned.stepped_down)
+                 FROM core.run_role_assignment AS pinned
+                WHERE pinned.run_id = run.run_id) AS role_assignment_row
        FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id = answer.run_id
        JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
@@ -2729,6 +2740,8 @@ export class ServeRepository {
     );
     const row = answer.rows[0];
     if (row === undefined) return null;
+    // A21: which models did each job — undefined when the run pinned no assignment.
+    const modelAssignment = projectModelAssignment(row.role_assignment_row);
     return this.#memory.withDisclosureContentLease([row.run_id],async () => {
     const [runContent, factContent, composedContent, answerContent, conformanceContent] = await Promise.all([
       decryptContentForRun<{ questionLine: string }>(
@@ -2996,7 +3009,8 @@ export class ServeRepository {
       inspection_handle: `inspection:${row.answer_id}`,
       as_of: row.as_of.toISOString(),
       staleness_state: staleness.state,
-      relevant_as_of: staleness.relevantAsOf
+      relevant_as_of: staleness.relevantAsOf,
+      ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment })
     };
     });
   }

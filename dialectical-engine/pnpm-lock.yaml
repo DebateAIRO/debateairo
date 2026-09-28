@@ -703,6 +703,9 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../scorecard
       '@debateai/valuation':
         specifier: workspace:*
         version: link:../valuation

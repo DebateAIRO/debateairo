@@ -30,7 +30,7 @@ const rows: readonly Row[] = [
   ["valuation", "packages/valuation", ["kernel", "db", "ledger", "register", "graph", "propagation"]],
   ["budget", "packages/budget", ["kernel", "db", "ledger", "register", "contract"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
-  ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
+  ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness", "scorecard"]],
   // `support-kb` is DECLARED, not a violation: V's support program depends on
   // the package in shipped code. `@debateai/support-kb` entered apps/api's and
   // apps/runner's manifests on the second merge parent at 9c68ceb3 ("feat(support):
