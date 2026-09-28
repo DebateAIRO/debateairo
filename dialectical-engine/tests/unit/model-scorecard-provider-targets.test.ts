@@ -94,3 +94,26 @@ describe("model scorecard — a provider target declares its thinking levels and
     expect(factory).toContain("...providerTargetGatewayControls(target),");
   });
 });
+
+/*
+ * Final review m6 (an A7a carry that was never done): the operator kit's §11 is where a hosted
+ * operator adds a vendor, so it names the three new target members and the two refusals the
+ * parser can now raise for them, in plain words. The codes are read from the parser itself.
+ */
+describe("final review m6 · deploy/vps/README.md §11 documents the thinking and window members", () => {
+  it("names thinking_parameter, thinking_levels and context_window_tokens, and the two refusals the parser raises", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const section = readme.slice(readme.indexOf("## 11. Providers and vendors"), readme.indexOf("## 12. "));
+    expect(section.length).toBeGreaterThan(0);
+    for (const member of ["`thinking_parameter`", "`thinking_levels`", "`context_window_tokens`"]) {
+      expect(section, member).toContain(`| ${member} |`);
+    }
+    for (const parameter of THINKING_PARAMETERS) expect(section, parameter).toContain(`\`${parameter}\``);
+    const refusals = [
+      (() => { try { parse({ thinking_parameter: "reasoning_effort" }); } catch (error) { return (error as Error).message; } return null; })(),
+      (() => { try { parse({ context_window_tokens: 0 }); } catch (error) { return (error as Error).message; } return null; })()
+    ];
+    expect(refusals).toEqual(["PROVIDER_DISCOVERY_TARGET_THINKING_INVALID", "PROVIDER_DISCOVERY_TARGET_CONTEXT_WINDOW_INVALID"]);
+    for (const code of refusals) expect(section, String(code)).toContain(`| \`${String(code)}\` |`);
+  });
+});
