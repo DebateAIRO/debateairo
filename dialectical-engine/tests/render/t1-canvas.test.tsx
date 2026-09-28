@@ -468,7 +468,7 @@ describe("card anatomy", () => {
       expect(mark, `${nodeId} review mark`).not.toBeNull();
       expect(mark?.textContent).toContain(label);
       expect(mark?.textContent).not.toMatch(/REVIEW/);
-      const checker = mark?.querySelector<HTMLElement>(".modelBadge");
+      const checker = mark?.querySelector<HTMLElement>(".modelPill.reviewerPill");
       expect(checker, `${nodeId} checking model`).not.toBeNull();
       expect(checker?.dataset.makerAbsence).toBe(reviewed ? undefined : "true");
     }

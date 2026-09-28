@@ -13,7 +13,7 @@ import {
   roleOf,
   type PlacedClaim
 } from "@/lib/debatePresentation";
-import { ModelBadge, ModelMetaLine } from "@/components/ModelPresentation";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
 import {
   formatIndependencePill,
@@ -535,13 +535,14 @@ function CanvasCard({
                             : "var(--muted)"
                       }}
                     />
-                    <ModelBadge
+                    <span className="nodeReviewLabel">{reviewLabel}</span>
+                    <ModelMetaLine
                       modelId={v3Review?.reviewer_lineage.model_id ?? null}
                       maker={v3Review?.reviewer_lineage.maker ?? null}
+                      className="modelPill reviewerPill metaLine"
                       catalog={miscCatalog}
                       composeCatalog={composeCatalog}
                     />
-                    <span className={`scoreBadge ${v3Review === null ? "unavailable" : "v3"}`}>{reviewLabel}</span>
                   </span>
                 ) : null}
               </ScoringErrorBoundary>
