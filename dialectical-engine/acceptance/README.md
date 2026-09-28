@@ -92,6 +92,14 @@ lines of plain text — and that second file, handed to an interpreter which cou
 not execute it and so re-read it as a script, re-entered itself until the host's
 process table was full.
 
+The hosted-mode fixture (`pes-s02-fake-vendor.ts`) holds its two host tools to
+the same rule: `openssl`, which makes its run-time certificate, and `lsof`, which
+measures its port free, are named by `ACCEPTANCE_OPENSSL_BINARY` and
+`ACCEPTANCE_LSOF_BINARY` or found by name on `PATH`, pass the same check, and are
+started directly. A tool that is missing or refused stops the hosted acceptance
+as `UNVERIFIED tls-material openssl-unavailable` or `UNVERIFIED port
+lsof-unavailable`, with the resolver's reason and path on the error's `cause`.
+
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size
 ceiling refuses a lawful nonempty debate. Grok's fixed relay port is
