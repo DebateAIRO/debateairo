@@ -65,8 +65,10 @@ function runHostTool(binary: string, args: readonly string[], captureStdout: boo
       settle(null, (error as NodeJS.ErrnoException).code ?? "SPAWN_FAILED");
       return;
     }
+    const fail = (error: NodeJS.ErrnoException): void => settle(null, error.code ?? "SPAWN_FAILED");
     child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.once("error", (error: NodeJS.ErrnoException) => settle(null, error.code ?? "SPAWN_FAILED"));
+    child.stdout?.on("error", fail);
+    child.on("error", fail);
     child.once("close", (status) => settle(status, undefined));
   });
 }

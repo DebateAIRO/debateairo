@@ -158,7 +158,7 @@ it("reaches the fixture when the resolver answers ::1 before 127.0.0.1", async (
 });
 
 // Property: openssl and lsof are deduced by NAME, and a file that is not a program is refused, never started.
-// Breaks: spawn a bare name, spawn a candidate before admitting it, or let a shell read it as a script (2026-09-17).
+// Breaks: spawn a candidate before admitting it, or let a shell read it as a script (2026-09-17).
 it("refuses an openssl or lsof on PATH that is not a program, and never starts it", async () => {
   const bin = await scratch();
   const marker = join(bin, "ran");
@@ -176,6 +176,25 @@ it("refuses an openssl or lsof on PATH that is not a program, and never starts i
   });
   expect(existsSync(marker)).toBe(false);
   expect(await readdir(material)).toEqual([]);
+});
+
+// Property: the file admitted is the file started, found on the PATH handed in and never re-resolved by name.
+// Breaks: admit the tool, then spawn its bare name (the child would start the host's own copy instead).
+it("starts exactly the openssl and lsof it admitted from the PATH it was handed", async () => {
+  const bin = await scratch();
+  const marker = (name: string) => join(bin, `${name}-ran`);
+  for (const [name, status] of [["lsof", 1], ["openssl", 3]] as const) {
+    await writeFile(join(bin, name), [
+      `#!${process.execPath}`,
+      `require("node:fs").writeFileSync(${JSON.stringify(marker(name))}, "");`,
+      `process.exit(${status});`
+    ].join("\n") + "\n", { mode: 0o755 });
+  }
+  expect(await isPortListening(4460, { PATH: bin })).toBe(false);
+  await expect(createFixtureCertificate(await scratch(), { PATH: bin }))
+    .rejects.toMatchObject({ message: "PES_S02_OPENSSL_RC_3" });
+  expect(existsSync(marker("lsof"))).toBe(true);
+  expect(existsSync(marker("openssl"))).toBe(true);
 });
 
 // Property: a host without the tool fails with the tool's own code and names what it looked for.
