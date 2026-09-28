@@ -1,7 +1,7 @@
 # tests/ci-known-red.txt — recorded known-red allowlist for the CI `verify` job (B31).
 #
 # The gate is `pnpm run test:ci-gate` (tools/ci-known-red.mjs). It runs
-# `vitest run tests/unit tests/architecture` and fails ONLY on failures that are not
+# `vitest run tests/unit tests/architecture tests/render` and fails ONLY on failures that are not
 # listed here. A listed test that PASSES is reported as a stale entry (warning, exit 0)
 # so this list can only shrink: delete the entry in the commit that turns it green.
 #
@@ -130,15 +130,19 @@
 #     coordinator amended on 2026-09-22 (Task 3) — worst of at least ten rounds plus one
 #     32 MiB increment — after 14 rounds measured a 22.6 MiB spread that left the original
 #     rule 0.7 MiB of margin.
-#   - the four `tests/render` rows of dev's twelve (t1-canvas ×2, t3-library, ui02e): that
-#     directory is in neither `test:ci-gate` nor `test:s00`, so nothing here gates them.
 #
-# SHRUNK 2026-09-28 (branch fix/2026-09-28-render-reds, off origin/dev@24be86f5): V ruled
-# to BUILD the canvas review mark (built 8230bc27, deleted 2b670d30, D79 (c)(1) "ruled,
-# not yet built") with V's wording. Three entries it held red are green and deleted:
-# role-token-map "DebateCanvas agreed review mark…" and "…disputed review mark…", and
-# v2ui-pages XREV-01 "shows typed review outcome and reviewer house on cards…" (its two
-# English literal pins re-pointed to the debateViews keys V's wording goes through).
+# JOINED + SHRUNK 2026-09-28 (branch fix/2026-09-28-render-reds, off origin/dev@24be86f5):
+#   - `tests/render` joined this gate (V's ruling of 2026-09-28). Until then the directory
+#     was in neither `test:ci-gate` nor `test:s00`, and its four rows of dev's twelve
+#     (t1-canvas ×2, t3-library, ui02e) were red and gated by nothing.
+#   - V ruled the same day to BUILD both deferred surfaces, so all four are green and none
+#     is listed: the canvas review mark (built 8230bc27, deleted 2b670d30, D79 (c)(1)
+#     "ruled, not yet built") with V's wording, and the library row's shell/core frame
+#     (built fd82d84e, dropped by merge 690ebe14). The same build turned green three
+#     entries that were listed for the review mark, deleted here: role-token-map
+#     "DebateCanvas agreed review mark…" and "…disputed review mark…", and v2ui-pages
+#     XREV-01 "shows typed review outcome and reviewer house on cards…" (its two English
+#     literal pins re-pointed to the debateViews keys V's wording goes through).
 
 tests/architecture/scaffold.test.ts > P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law > dev's F31 debt: apps/api, apps/runner and apps/scheduler declare their obs-capture edge
 #   source: dev's closing four-count at a61206dc, row 3; split out at SYNC3 fix round 1 from

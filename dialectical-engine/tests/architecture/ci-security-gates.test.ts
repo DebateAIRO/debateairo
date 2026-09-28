@@ -31,7 +31,10 @@ describe("CI security gates (F-03)", () => {
     expect(wf).toContain("pnpm run test:ci-gate");
     expect(wf).not.toContain("vitest run tests/unit tests/architecture");
     const scripts = JSON.parse(read("dialectical-engine/package.json")).scripts as Record<string, string>;
-    expect(scripts["test:ci-gate"]).toBe("node tools/ci-known-red.mjs tests/unit tests/architecture");
+    // tests/render joined the gate by V's ruling of 2026-09-28: it is the only
+    // suite that draws the pages, and the review marks and library frame it
+    // pinned were lost for weeks while CI never ran it.
+    expect(scripts["test:ci-gate"]).toBe("node tools/ci-known-red.mjs tests/unit tests/architecture tests/render");
     expect(existsSync(resolve(gitRoot, "dialectical-engine/tests/ci-known-red.txt"))).toBe(true);
   });
   it("dependabot watches npm and actions weekly", () => {
