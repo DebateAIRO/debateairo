@@ -42,7 +42,8 @@ test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
   assert.equal(authMessages["auth.login.backToSignIn"], "Back to sign in");
   assert.match(login, /replacement_recovery_code/);
   assert.match(login, /role="alert"/);
-  assert.match(login, /window\.location\.assign\(safeReturnPath\(next\)\)/);
+  // Age gate (8k): an account that still owes its one-time check goes to the interstitial first.
+  assert.match(login, /window\.location\.assign\(await ageConfirmationRequired\(\) \? ageConfirmationHref\(next\) : safeReturnPath\(next\)\)/);
   assert.doesNotMatch(login, /localStorage|sessionStorage|Bearer|keep me signed|forgot/i);
 });
 
@@ -51,7 +52,12 @@ test("sign-up exposes only fields backed by the registration contract", () => {
   assert.doesNotMatch(signUp, /client\.resendVerification/);
   assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
   assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
-  assert.match(signUp, /name="adult-affirmed"[\s\S]*?required/);
+  // Age gate (Turn 8): the date of birth replaced the 18+ tick box, and the separate age
+  // check runs before register — a refusal never reaches it.
+  assert.doesNotMatch(signUp, /adult-affirmed/);
+  assert.match(signUp, /<DateOfBirthField/);
+  assert.ok(signUp.indexOf("await client.checkAge") > 0);
+  assert.ok(signUp.indexOf("await client.checkAge") < signUp.indexOf("await client.register"));
   assert.match(signUp, /await client\.register/);
   assert.match(signUp, /successMessage\(catalog, messageKey\)/);
   assert.equal(

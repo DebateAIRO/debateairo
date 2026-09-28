@@ -46,7 +46,12 @@ import {
   type InvestigationAccepted,
   type Node,
   type RunProjection,
-  type Session
+  type Session,
+  AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
+  AGE_REFUSAL_COOKIE_NAME,
+  AGE_REFUSAL_COOKIE_VALUE,
+  AgeCheckRequestSchema,
+  DateOfBirthSchema
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
@@ -63,7 +68,17 @@ import {
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
-import { detectArgumentLanguage, TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
+import {
+  AGE_RULE_VERSION,
+  checkDob,
+  detectArgumentLanguage,
+  dobFromIso,
+  meetsMinimumAge,
+  MIN_AGE,
+  TypedDomainError,
+  type RiskTier,
+  type TierSource
+} from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import { STORY_UNREADABLE, answerCarriesStoryLabel, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
@@ -1067,6 +1082,8 @@ export function apiOperationalErrorDiagnostic(error: unknown): string {
 }
 
 export const authorizationPolicyInventory = Object.freeze([
+  // Age gate (Turn 8): the browser-only pre-register check, like login held to the exact Origin.
+  { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
@@ -1081,6 +1098,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
   { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
+  { route: "GET /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "read-age-confirmation" },
+  { route: "POST /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "confirm-age" },
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
@@ -1454,6 +1473,51 @@ function expiredCookies(): readonly string[] {
   ]);
 }
 
+/**
+ * Age gate (8j): the 30-day lockout a refusal leaves behind. It carries no personal data —
+ * one constant value — and only decides which screen is shown and that a new check or
+ * registration from this browser is refused while it lasts.
+ */
+function ageRefusalCookie(): string {
+  return `${AGE_REFUSAL_COOKIE_NAME}=${AGE_REFUSAL_COOKIE_VALUE}; Path=/; `
+    + `Max-Age=${AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+function ageRefusalCookiePresent(raw: unknown): boolean {
+  if (typeof raw !== "string" || /[\r\n\0]/.test(raw)) return false;
+  return raw.split(";").some((member) => {
+    const index = member.indexOf("=");
+    return index > 0 && member.slice(0, index).trim() === AGE_REFUSAL_COOKIE_NAME
+      && member.slice(index + 1).trim() === AGE_REFUSAL_COOKIE_VALUE;
+  });
+}
+
+/** The country the edge reported for this request, when it reported one (recorded, never decisive). */
+function edgeCountry(headers: Readonly<Record<string, unknown>>): string | null {
+  const value = headers["cf-ipcountry"];
+  return typeof value === "string" && /^[A-Z]{2}$/.test(value) && value !== "XX" && value !== "T1"
+    ? value : null;
+}
+
+/** A `YYYY-MM-DD` value, when it is a real calendar date that is not in the future. */
+function dateOfBirthValue(value: unknown): ReturnType<typeof dobFromIso> {
+  const parsed = DateOfBirthSchema.safeParse(value);
+  if (!parsed.success) return null;
+  const parts = dobFromIso(parsed.data);
+  return parts !== null && checkDob(parts).code === "ok" ? parts : null;
+}
+
+/** An age-check body's `date_of_birth` (the body carries nothing else). */
+function requestDateOfBirth(body: unknown): ReturnType<typeof dobFromIso> {
+  const parsed = AgeCheckRequestSchema.safeParse(body);
+  return parsed.success ? dateOfBirthValue(parsed.data.date_of_birth) : null;
+}
+
+function ageRefused(reply: FastifyReply): FastifyReply {
+  return reply.status(403).header("set-cookie", ageRefusalCookie())
+    .send({ error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" });
+}
+
 function refreshedCookies(input: Readonly<{
   sessionToken: string;
   csrfToken: string | null;
@@ -1507,16 +1571,21 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     readonly id: string;
     readonly headers: Readonly<Record<string, unknown>>;
     readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
-  }) => Object.freeze({
-    // Registration, MFA and sessions share T2's one canonical public source.
-    ip: normalizeClientIp(request.ip)
-      ?? normalizeClientIp(request.raw.socket.remoteAddress)
-      ?? "unknown",
-    userAgent: typeof request.headers["user-agent"] === "string"
-      ? request.headers["user-agent"] as string
-      : "unknown",
-    requestId: request.id
-  });
+  }) => {
+    const countryCode = edgeCountry(request.headers);
+    return Object.freeze({
+      // Registration, MFA and sessions share T2's one canonical public source.
+      ip: normalizeClientIp(request.ip)
+        ?? normalizeClientIp(request.raw.socket.remoteAddress)
+        ?? "unknown",
+      userAgent: typeof request.headers["user-agent"] === "string"
+        ? request.headers["user-agent"] as string
+        : "unknown",
+      requestId: request.id,
+      // Age gate: the edge's country for the source, only when it reported one.
+      ...(countryCode === null ? {} : { countryCode })
+    });
+  };
   const admissionRefusalAuditedUntil = new Map<string, number>();
   const ADMISSION_ALLOWED: AdmissionDecision = Object.freeze({ allowed: true as const });
   /**
@@ -1638,6 +1707,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return;
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
+  });
+  /**
+   * Age gate (8d → 8j) in front of register. The registration mount region is frozen (S04), so
+   * the date is decided here: a browser inside its 30-day lockout, or an under-age date, is
+   * refused with the lockout cookie and the service is never called; a malformed or impossible
+   * date is invalid input. Only a date of at least MIN_AGE affirms adulthood for the region,
+   * and it overwrites anything the client claimed. The date itself goes no further.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (ageRefusalCookiePresent(request.headers.cookie)) return ageRefused(reply);
+    const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown>
+      : null;
+    const dateOfBirth = body === null ? null : dateOfBirthValue(body.date_of_birth);
+    if (body === null || dateOfBirth === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    if (!meetsMinimumAge(dateOfBirth)) return ageRefused(reply);
+    body.adult_affirmed = true;
   });
   /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
@@ -1788,6 +1875,37 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const revoked = await options.sessions!.revokeAllSessions(authenticated, sourceFor(request));
       reply.header("set-cookie", expiredCookies());
       return reply.send({ revoked });
+    });
+    // Age gate (8k): the one-time check for accounts created before the date-of-birth field.
+    api.get("/v1/auth/age-confirmation", routePolicy("GET /v1/auth/age-confirmation"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.readAgeConfirmation === undefined) {
+        return reply.status(503).send({ error: "AGE_CHECK_UNAVAILABLE", message: "AGE_CHECK_UNAVAILABLE" });
+      }
+      return reply.send({ status: await options.sessions!.readAgeConfirmation(authenticated) });
+    });
+    api.post("/v1/auth/age-confirmation", credentialRoutePolicy("POST /v1/auth/age-confirmation"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.confirmAccountAge === undefined) {
+        return reply.status(503).send({ error: "AGE_CHECK_UNAVAILABLE", message: "AGE_CHECK_UNAVAILABLE" });
+      }
+      const dateOfBirth = requestDateOfBirth(request.body);
+      if (dateOfBirth === null) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      const outcome = await options.sessions!.confirmAccountAge(authenticated, {
+        passed: meetsMinimumAge(dateOfBirth),
+        minAgeApplied: MIN_AGE,
+        countryCode: edgeCountry(request.headers),
+        ruleVersion: AGE_RULE_VERSION
+      }, sourceFor(request));
+      if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (outcome === "passed") return reply.send({ outcome: "allowed" });
+      // Frozen: every session of the account is gone; this browser keeps the refusal.
+      reply.header("set-cookie", [...expiredCookies(), ageRefusalCookie()]);
+      return reply.send({ outcome: "refused" });
     });
     api.post("/v1/auth/step-up", credentialRoutePolicy("POST /v1/auth/step-up"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
@@ -2015,6 +2133,21 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         email: typeof body.email === "string" ? body.email : ""
       }, sourceFor(request));
       return reply.status(202).send(response);
+    });
+  }
+  // Age gate (8d → 8j). Stateless: the date is checked and dropped. The UI calls this before
+  // register and never calls register on a refusal; register's own hook re-checks every caller.
+  const registrationMounted = options.registration !== undefined;
+  if (registrationMounted) {
+    api.post("/v1/auth/age-check", credentialRoutePolicy("POST /v1/auth/age-check"), async (request, reply) => {
+      if (ageRefusalCookiePresent(request.headers.cookie)) return reply.send({ outcome: "refused" });
+      const dateOfBirth = requestDateOfBirth(request.body);
+      if (dateOfBirth === null) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      if (meetsMinimumAge(dateOfBirth)) return reply.send({ outcome: "allowed" });
+      reply.header("set-cookie", ageRefusalCookie());
+      return reply.send({ outcome: "refused" });
     });
   }
 

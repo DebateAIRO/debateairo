@@ -241,6 +241,8 @@ apps/ui/app/sign-up/page.tsx
 apps/ui/app/verify-email/layout.tsx
 apps/ui/app/verify-email/page.tsx
 apps/ui/components/AccountErasureControls.tsx
+apps/ui/components/AgeConfirmationFlow.tsx
+apps/ui/components/AgeRefusal.tsx
 apps/ui/components/AiNotice.tsx
 apps/ui/components/AnswerHonestyDrawer.tsx
 apps/ui/components/ArgumentFocusView.tsx
@@ -248,6 +250,7 @@ apps/ui/components/AuthGate.tsx
 apps/ui/components/AuthShell.tsx
 apps/ui/components/CanvasViewport.tsx
 apps/ui/components/ChallengePopover.tsx
+apps/ui/components/DateOfBirthField.tsx
 apps/ui/components/DebateCanvas.tsx
 apps/ui/components/DebateMap.tsx
 apps/ui/components/DebateOutline.tsx
@@ -324,6 +327,7 @@ apps/ui/components/support/supportConversation.test.mjs
 apps/ui/content-security-policy.d.mts
 apps/ui/content-security-policy.mjs
 apps/ui/edge-upgrade.mjs
+apps/ui/lib/ageConfirmation.ts
 apps/ui/lib/aiDisclosure.ts
 apps/ui/lib/api.ts
 apps/ui/lib/authNavigationGuard.ts
@@ -333,6 +337,7 @@ apps/ui/lib/contentSecurityPolicy.test.mjs
 apps/ui/lib/debateHeaderOverflow.ts
 apps/ui/lib/debatePresentation.ts
 apps/ui/lib/debateTreeUtils.ts
+apps/ui/lib/dob/dobLocale.ts
 apps/ui/lib/edgeUpgrade.test.mjs
 apps/ui/lib/format.ts
 apps/ui/lib/i18n/I18nProvider.tsx
@@ -541,6 +546,7 @@ packages/judgement/src/index.ts
 packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
 packages/kernel/src/argument-language.ts
+packages/kernel/src/date-of-birth.ts
 packages/kernel/src/index.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts

@@ -48,6 +48,7 @@
 
   /* brand and elevation */
   --accent: #C15F3C; --link: #3D5A80; --focus: #C15F3C;
+  --focus-halo: rgba(193,95,60,.2);
   --shadow-card: 0 18px 40px -20px rgba(41,38,31,.24);
   --shadow-pop: 0 30px 60px -26px rgba(41,38,31,.32);
   --shadow-drawer: -22px 0 54px -22px rgba(41,38,31,.32);
@@ -153,6 +154,7 @@ html[data-mode="chamber"] {
   --m-default-bg: #2A2723; --m-default-border: #504E4C;
 
   --accent: #C8834F; --link: #C8A055; --focus: #C8834F;
+  --focus-halo: rgba(200,131,79,.32);
   --shadow-card: 0 22px 48px -22px rgba(0,0,0,.8);
   --shadow-pop: 0 36px 70px -30px rgba(0,0,0,.9);
   --shadow-drawer: -26px 0 62px -26px rgba(0,0,0,.9);
@@ -1947,6 +1949,179 @@ a:focus-visible {
 .authRule { font-size: 10px; font-weight: 600; color: var(--muted); }
 .authRule[data-met="true"] { color: var(--ok-text); }
 .authRule[data-met="false"] { color: var(--dispute-text); }
+
+/* Date of birth — design document Turn 8 · 8d/8f/8g/8l. Typed + select: three
+   inputs, each with a ▾ grid picker at its inline end. Order and direction come
+   from the locale; digits stay left to right inside every input. */
+.dobFieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.dobFieldset .dobLegend {
+  padding: 0;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+}
+.dobFieldset .dobRow { display: flex; flex-wrap: wrap; gap: 8px; }
+.dobFieldset .dobPart { display: flex; flex-direction: column; gap: 4px; }
+.dobFieldset .dobPartLabel {
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+}
+.dobFieldset .dobControl { position: relative; }
+.dobFieldset .dobInput {
+  display: block;
+  min-height: 0;
+  width: 72px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  outline: none;
+  background: var(--shell);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.dobFieldset .dobPart[data-part="y"] .dobInput { width: 96px; }
+.dobFieldset .dobInput[aria-invalid="true"] { border-color: var(--dispute); }
+.dobFieldset .dobInput:focus, 
+.dobFieldset .dobInput[aria-invalid="true"]:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.dobFieldset .dobPickerToggle {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  inset-inline-end: 4px;
+  width: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+.dobFieldset .dobPickerToggle:hover { background: var(--surface-2); }
+.dobFieldset .dobPickerToggle:focus-visible, 
+.dobFieldset .dobDecadeButton:focus-visible, 
+.dobFieldset .dobCell:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.dobFieldset .dobPopover {
+  position: absolute;
+  top: 46px;
+  inset-inline-start: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--core);
+  box-shadow: var(--shadow-pop);
+}
+.dobFieldset .dobPopover[data-anchor="end"] { inset-inline-start: auto; inset-inline-end: 0; }
+.dobFieldset .dobPopover[data-part="d"] { width: 244px; }
+.dobFieldset .dobPopover[data-part="m"] { width: 222px; }
+.dobFieldset .dobPopover[data-part="y"] { width: 262px; }
+.dobFieldset .dobDecade { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.dobFieldset .dobDecadeButton {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  cursor: pointer;
+}
+.dobFieldset .dobDecadeButton:disabled { opacity: 0.3; cursor: default; }
+.dobFieldset .dobDecadeLabel {
+  flex: 1;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.dobFieldset .dobGrid { display: grid; gap: 3px; }
+.dobFieldset .dobCell {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+}
+.dobFieldset .dobCell:hover { background: var(--surface-sunken); }
+.dobFieldset .dobCell[data-selected="true"] { background: var(--ink); color: var(--bg); }
+.dobFieldset .dobCell[aria-disabled="true"] { opacity: 0.3; cursor: default; }
+.dobFieldset .dobCell[aria-disabled="true"]:hover { background: transparent; }
+.dobFieldset .dobMessage { min-height: 13px; text-wrap: pretty; }
+.dobFieldset .dobMessage[data-state="ok"] { color: var(--agree); }
+.dobFieldset .dobMessage[data-state="bad"] { color: var(--dispute); }
+
+/* Age-gate refusal — 8j. The panel follows the brand directly; one heading, one link. */
+.authBrand + .authPanel { margin-top: 0; }
+.authPanelCore.ageRefusal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 36px 26px 32px;
+}
+.ageRefusalMark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+.ageRefusalMark > span {
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--muted);
+}
+.ageRefusalTitle {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+.ageRefusalHome {
+  align-self: flex-start;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ageRefusalHome:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 3px; }
 
 .authFieldHint {
   display: block;
@@ -4611,6 +4786,20 @@ a:focus-visible {
   .authPrimary {
     min-height: 58px;
   }
+  /* 8h: 84/84/120 × 52. Inside the auth card's bezel a 375px screen leaves ~226px, so the
+     three keep that ratio and shrink together instead of wrapping the year onto a new line. */
+  .dobFieldset .dobRow { gap: 10px; flex-wrap: nowrap; }
+  .dobFieldset .dobPart { gap: 5px; flex: 0 1 84px; min-width: 0; }
+  .dobFieldset .dobPart[data-part="y"] { flex: 0 1 120px; }
+  .dobFieldset .dobPartLabel { font-size: 11px; }
+  .dobFieldset .dobInput,
+  .dobFieldset .dobPart[data-part="y"] .dobInput {
+    width: 100%; height: 52px; min-height: 0; padding: 0 26px 0 6px; border-radius: 10px; font-size: 18px;
+  }
+  .dobFieldset[dir="rtl"] .dobInput,
+  .dobFieldset[dir="rtl"] .dobPart[data-part="y"] .dobInput { padding: 0 6px 0 26px; }
+  .dobFieldset .dobPickerToggle { inset-inline-end: 6px; font-size: 11px; }
+  .dobFieldset .dobPopover { top: 58px; }
   .authCheckEmail,
   .authSuccessWarning {
     padding: 22px;
