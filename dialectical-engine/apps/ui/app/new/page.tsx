@@ -90,8 +90,9 @@ function NewDebateForm({ token }: { token: string }) {
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
   // A21: null = the asker has not chosen; the ask then omits model_strength.
   const [modelStrength, setModelStrength] = useState<ModelStrength | null>(null);
-  // A21 O4: false until the session says a scored model list is in force; until then the control is not in effect.
-  const [modelScorecardInForce, setModelScorecardInForce] = useState(false);
+  // A21 O4: true only once the session says a scored model list is in force; until then the control is locked.
+  // A21.3 carry 14: null while the page does not know (the read failed or has not answered) — no reason is claimed.
+  const [modelScorecardInForce, setModelScorecardInForce] = useState<boolean | null>(null);
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
@@ -110,7 +111,7 @@ function NewDebateForm({ token }: { token: string }) {
       setSessionDefaultsError(null);
     }).catch((failure: unknown) => {
       if (!active) return;
-      setModelScorecardInForce(false);
+      setModelScorecardInForce(null);
       // DL3-F7: classified copy, never the contract client's server-authored text.
       setSessionDefaultsError(requestFailureMessage("SESSION_DEFAULTS", failure));
     });

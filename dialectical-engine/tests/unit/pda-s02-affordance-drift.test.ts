@@ -85,8 +85,11 @@ describe("S02 owner/public affordance drift pins", () => {
   });
 
   it("pins and classifies every owner honesty section", () => {
-    const sections = [...ownerHonesty.matchAll(/<section className="wsSection" aria-label="([^"]+)"/g)]
-      .map((match) => match[1]);
+    // A21.3: a section whose visitor text lives in one copy object (owner decision O2, for the
+    // port to the site's language catalogs) names it by that constant; it is pinned by the name.
+    const sections = [...ownerHonesty.matchAll(
+      /<section className="wsSection" aria-label=(?:"([^"]+)"|\{([A-Za-z_][A-Za-z0-9_.]*)\})/g
+    )].map((match) => match[1] ?? `{${match[2]}}`);
     const expectedSections = [
       // PUBLIC DRAWER — rendered from the public answer state.
       "Answer state",
@@ -100,6 +103,9 @@ describe("S02 owner/public affordance drift pins", () => {
       "Per-item freshness",
       // TYPED ABSENCE — named explicitly as not included in the public snapshot.
       "Cost envelope",
+      // N/A — the model assignment is not in the public envelope (A21.1): the owner's own answer
+      // routes and the JSON export only. Title: "Models chosen for this debate" (carry 6).
+      "{MODEL_ASSIGNMENT_COPY.title}",
       // TREE SURFACE — public edges are projected into the shared reading views.
       "Graph edges",
       // NODE DRAWER — public nodes retain labeled numbers with owner pointers redacted.
@@ -131,6 +137,6 @@ describe("S02 owner/public affordance drift pins", () => {
     ];
 
     expect(sections).toEqual(expectedSections);
-    expect(sections).toHaveLength(20);
+    expect(sections).toHaveLength(21);
   });
 });

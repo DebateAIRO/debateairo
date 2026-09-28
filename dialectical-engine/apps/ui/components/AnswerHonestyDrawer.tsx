@@ -5,6 +5,8 @@ import type { LiveRunState } from "@/lib/v3/liveEvents";
 import type { AnswerExport } from "@/lib/v3/answerExport";
 import { unrepresentedEdges } from "@/lib/v3/adapter";
 import { abstentionKindLabel, conditionMarkLabel, riskTierSourceLabel, summarizeFreshness } from "@/lib/v3/labels";
+import { MODEL_ASSIGNMENT_COPY, modelAssignmentJobs } from "@/lib/modelStrength";
+import { ModelMetaLine } from "@/components/ModelPresentation";
 
 /**
  * UI-01 honesty surface (additive, V2 drawer vocabulary). V2's workspace has
@@ -202,6 +204,38 @@ export function AnswerHonestyDrawer({
             </div>
             <div className="drawerFindingText">Protected core: {answer.cost_envelope.protected_core}</div>
             <div className="drawerFindingText">Basis: {JSON.stringify(answer.cost_envelope.basis)}</div>
+          </section>
+
+          {/* A21.3 · owner decisions O1-O3: a plain list of the models chosen per debate job,
+              named as the node badges name them. No seat, thinking level, share, strength,
+              step-down or scorecard version; that detail stays in the JSON export. */}
+          <section className="wsSection" aria-label={MODEL_ASSIGNMENT_COPY.title}>
+            <div className="drawerSectionTitle">{MODEL_ASSIGNMENT_COPY.title}</div>
+            {answer.model_assignment === undefined ? (
+              <div className="drawerHintMuted">{MODEL_ASSIGNMENT_COPY.notRecorded}</div>
+            ) : (
+              <>
+                <ul className="drawerFindingList">
+                  {modelAssignmentJobs(answer.model_assignment).map((job) => (
+                    <li key={job.role} className="drawerFindingItem">
+                      <div className="drawerFindingMeta">
+                        <span>{job.label}</span>
+                      </div>
+                      {job.note !== null ? (
+                        <div className="drawerFindingText">{job.note}</div>
+                      ) : (
+                        <div className="roleChips">
+                          {job.models.map((model) => (
+                            <ModelMetaLine key={JSON.stringify([model.maker, model.modelId])} modelId={model.modelId} maker={model.maker} />
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <div className="drawerHintMuted">{MODEL_ASSIGNMENT_COPY.standIn}</div>
+              </>
+            )}
           </section>
 
           <section className="wsSection" aria-label="Graph edges">

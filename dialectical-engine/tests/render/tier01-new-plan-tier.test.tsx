@@ -48,6 +48,19 @@ const SESSION_WITH_SCORECARD = Object.freeze({
 });
 const NOT_IN_EFFECT_HINT =
   "How strong the models doing each debate job are · not in effect until the models have been scored";
+const FIXED_BY_FREE_HINT = "How strong the models doing each debate job are · fixed by the Free plan";
+// A21.3 carry 14 (A21.2 review Minor 2): a failed or pending session read claims no reason.
+const NOT_AVAILABLE_HINT = "How strong the models doing each debate job are · not available right now";
+
+/*
+ * A21.3 carry 14 (A21.2 review Minor 1): the Free lock of EVERY gauge is pinned in both
+ * production states. With a scored model list in force, the model-strength lock seen is the
+ * plan's; with none, it is the not-in-effect one — and the other twelve gauges must still lock.
+ */
+const SESSION_STATES = [
+  ["a scored model list is in force", SESSION_WITH_SCORECARD, FIXED_BY_FREE_HINT],
+  ["no scored model list is in force", { ...SESSION_WITH_SCORECARD, model_scorecard_in_force: false }, NOT_IN_EFFECT_HINT]
+] as const;
 
 async function settle(): Promise<void> {
   await act(async () => {
@@ -273,9 +286,9 @@ describe("S01 /new plan tier", () => {
     }
   });
 
-  it("S01-27 R4 locks all fifteen controls while Free is chosen", async () => {
-    // A21 O4: with a scored model list in force, so the model-strength lock seen here is Free's.
-    await renderPageWithScorecardInForce();
+  it.each(SESSION_STATES)("S01-27 R4 locks all fifteen controls while Free is chosen, when %s", async (_state, session, hint) => {
+    mocks.readSession.mockResolvedValue(session);
+    await renderPage();
     await click('.ndOptionsToggle');
 
     const lockedIds = [
@@ -303,13 +316,12 @@ describe("S01 /new plan tier", () => {
       const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
       return [visualLock.style.opacity, visualLock.style.cursor];
     })).toEqual(Array.from({ length: 15 }, () => ["", ""]));
-    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(
-      "How strong the models doing each debate job are · fixed by the Free plan"
-    );
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(hint);
   });
 
-  it("S01-28 R4 forwards the Free lock to every native control family and keeps its description", async () => {
-    await renderPageWithScorecardInForce();
+  it.each(SESSION_STATES)("S01-28 R4 forwards the Free lock to every native control family and keeps its description, when %s", async (_state, session) => {
+    mocks.readSession.mockResolvedValue(session);
+    await renderPage();
     await click('.ndOptionsToggle');
 
     const locked = [...document.querySelectorAll<HTMLElement>(
@@ -638,14 +650,9 @@ describe("S01 /new plan tier", () => {
     expect(mocks.createDebate.mock.calls[0]?.[1]).not.toHaveProperty("model_strength");
   });
 
-  it.each([
-    ["the session cannot be read", () => mocks.readSession.mockRejectedValue(new Error("session unavailable"))],
-    ["the session carries no signal", () => {
-      const { model_scorecard_in_force: _signal, ...withoutSignal } = SESSION_WITH_SCORECARD;
-      mocks.readSession.mockResolvedValue(withoutSignal);
-    }]
-  ] as const)("A21-O4b reads Model strength as not in effect when %s", async (_case, arrange) => {
-    arrange();
+  it("A21-O4b reads Model strength as not in effect when the session carries no signal", async () => {
+    const { model_scorecard_in_force: _signal, ...withoutSignal } = SESSION_WITH_SCORECARD;
+    mocks.readSession.mockResolvedValue(withoutSignal);
     await renderPage();
     await click('#planTier-premium');
 
@@ -673,6 +680,28 @@ describe("S01 /new plan tier", () => {
     expect(pills.every((pill) => pill.disabled)).toBe(true);
     expect(pills.filter((pill) => pill.getAttribute("aria-checked") === "true")).toEqual([]);
     expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_IN_EFFECT_HINT);
+
+    await submitForm();
+    expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium" });
+    expect(mocks.createDebate.mock.calls[0]?.[1]).not.toHaveProperty("model_strength");
+  });
+
+  // A21.3 carry 14 (A21.2 review Minor 2): a failed read is not the session saying no. The page
+  // does not know whether a scored model list is in force, so the note claims no reason.
+  it.each([
+    ["has failed", () => mocks.readSession.mockRejectedValue(new Error("session unavailable"))],
+    ["has not answered yet", () => mocks.readSession.mockReturnValue(new Promise(() => {}))]
+  ] as const)("A21-O4d says only that Model strength is not available right now when the session read %s", async (_case, arrange) => {
+    arrange();
+    await renderPage();
+    await inputValue('#topic', "a debatable claim");
+    const pills = () => [...document.querySelectorAll<HTMLButtonElement>('[data-field="modelStrength"]')];
+
+    expect(pills().every((pill) => pill.disabled)).toBe(true);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_AVAILABLE_HINT);
+    await click('#planTier-premium');
+    expect(pills().every((pill) => pill.disabled)).toBe(true);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_AVAILABLE_HINT);
 
     await submitForm();
     expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium" });

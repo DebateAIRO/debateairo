@@ -47,6 +47,10 @@ export type RequestFailureKind =
   | "PLAN_TIER_INVALID"
   /** SYNC3: the coordinator refused the ask: a model its plan needs is not available (422). */
   | "PLAN_TIER_UNAVAILABLE"
+  /** A21: the coordinator refused the ask: even the Economy model strength costs more than one debate may spend (422). */
+  | "MODEL_BUDGET_TOO_SMALL"
+  /** A21: the coordinator refused the ask: no model is reachable for one of the debate's jobs (422). */
+  | "MODEL_UNAVAILABLE"
   /** Something failed that this seam cannot classify; say exactly that. */
   | "UNCLASSIFIED";
 
@@ -75,6 +79,13 @@ const KIND_CLAUSE: Readonly<Record<RequestFailureKind, string>> = Object.freeze(
   PLAN_TIER_UNAVAILABLE:
     "The coordinator refused it: a model this plan needs is not available right now. "
     + "Retry later, or choose the other plan.",
+  // A21.3 carry 12: the page's own words, not the server's sentence (apps/api ASK_MODEL_REFUSALS);
+  // English for now (owner decision O2) — this map is the one place the port reads.
+  MODEL_BUDGET_TOO_SMALL:
+    "The coordinator refused it: even the most economical choice of models costs more than this site "
+    + "allows for one debate. A smaller tree depth costs less.",
+  MODEL_UNAVAILABLE:
+    "The coordinator refused it: one of the debate's jobs has no AI model it can reach right now. Retry later.",
   UNCLASSIFIED:
     "It failed before any answer arrived, so the outcome is unknown. "
     + "This is not a decision the coordinator made."
@@ -91,11 +102,25 @@ const PLAN_TIER_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.
   ASK_PLAN_TIER_MODEL_UNAVAILABLE: "PLAN_TIER_UNAVAILABLE"
 });
 
+/**
+ * A21: the model picker's ask refusals (apps/api ASK_MODEL_REFUSALS). Observed
+ * refusals, named as refusals in constant clauses; the server's sentence never
+ * reaches the page.
+ */
+const MODEL_STRENGTH_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.freeze({
+  ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL: "MODEL_BUDGET_TOO_SMALL",
+  ASK_MODEL_CANDIDATE_UNAVAILABLE: "MODEL_UNAVAILABLE"
+});
+
 function kindOf(error: unknown): RequestFailureKind {
   if (!(error instanceof ContractHttpError)) return "UNCLASSIFIED";
   if (error.status === 422 && error.serverCode !== null
     && Object.hasOwn(PLAN_TIER_REFUSALS, error.serverCode)) {
     return PLAN_TIER_REFUSALS[error.serverCode]!;
+  }
+  if (error.status === 422 && error.serverCode !== null
+    && Object.hasOwn(MODEL_STRENGTH_REFUSALS, error.serverCode)) {
+    return MODEL_STRENGTH_REFUSALS[error.serverCode]!;
   }
   if (error.serverCode === "API_UPSTREAM_UNREACHABLE" || [502, 503, 504].includes(error.status)) {
     return "UNREACHABLE";

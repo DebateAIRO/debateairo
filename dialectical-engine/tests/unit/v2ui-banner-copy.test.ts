@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
+import { ASK_MODEL_REFUSALS } from "../../apps/api/src/ask-model-picker.js";
 import {
   REQUEST_FAILURE_SUBJECTS,
   classifyRequestFailure,
@@ -106,6 +107,41 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
     expect(classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
       "UNPROCESSABLE", 422, "OTHER: x", "OTHER"
     )).kind).toBe("UNREADABLE");
+  });
+
+  /**
+   * A21.3 (carry 12 of task-A19-A20-carries.md). The model picker's two ask
+   * refusals arrive as a 422 with their own typed code. They are OBSERVED
+   * refusals, so each is named as one, in a constant clause the page owns: never
+   * the server's sentence (whose detail can carry a figure), and not the
+   * server's own words copied either, unless the owners pick them.
+   */
+  it("A21 names the model-strength refusals as refusals, in copy the server never wrote", () => {
+    const tooSmall = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
+      "UNPROCESSABLE", 422, "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL: estimate 912345 over 250000",
+      "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL"
+    ));
+    const unavailable = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
+      "UNPROCESSABLE", 422, "ASK_MODEL_CANDIDATE_UNAVAILABLE: glm-5.3-flash is down", "ASK_MODEL_CANDIDATE_UNAVAILABLE"
+    ));
+    expect(tooSmall.kind).toBe("MODEL_BUDGET_TOO_SMALL");
+    expect(unavailable.kind).toBe("MODEL_UNAVAILABLE");
+    for (const classified of [tooSmall, unavailable]) {
+      expect(classified.message).toMatch(/refused/u);
+      expect(classified.message).not.toMatch(/unknown|912345|250000|glm/u);
+      expect(classified.message).not.toContain("ASK_MODEL");
+      // Owner rules: no figure, no internal term.
+      expect(classified.message).not.toMatch(/\d|scorecard|picker|ceiling|deployment/iu);
+    }
+    expect(tooSmall.message).not.toBe(unavailable.message);
+    // Carry 12: not the server's sentence word for word.
+    expect(tooSmall.message.toLowerCase()).not.toContain(ASK_MODEL_REFUSALS.BUDGET_TOO_SMALL.message.toLowerCase());
+    expect(unavailable.message.toLowerCase())
+      .not.toContain(ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE.message.toLowerCase());
+    // Only the 422 that carries the code is a refusal; the same code on another status is not.
+    expect(classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
+      "SERVER_FAILURE", 500, "x", "ASK_MODEL_CANDIDATE_UNAVAILABLE"
+    )).kind).toBe("SERVER_FAILED");
   });
 
   it("leaves no contract error text in a page's error banner", async () => {
