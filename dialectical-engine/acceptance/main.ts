@@ -686,6 +686,8 @@ export async function createAcceptanceRuntime(input: {
   }));
   const api=buildApi({
     application,
+    // A21 (owner decision O4): /new's yes/no, from the scorecard this runtime's picker runs on.
+    modelScorecardInForce:modelScorecard.state==="VALID",
     sessions:initializedSession.application,
     allowedOrigin:`http://${input.environment.API_HOST}:${input.environment.API_PORT}`
   });

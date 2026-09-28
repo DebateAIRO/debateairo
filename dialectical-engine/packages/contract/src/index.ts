@@ -189,7 +189,16 @@ const ServerSessionSchema = z.object({
   session_id: z.uuid(),
   caller_scope: z.literal("ASKER"),
   ownership_provenance: z.literal("server_session"),
-  provisional_identity_model: z.literal(false)
+  provisional_identity_model: z.literal(false),
+  /**
+   * A21 (owner decision O4, 2026-09-28): ONE yes/no for the /new page, which reads this
+   * response already — is a VALID model scorecard in force for this deployment? When it is
+   * not, the model-strength control is shown greyed out and marked not in effect. Never the
+   * scorecard's version, source, state name or refusal reason. GET /v1/session always sends
+   * it; it is optional so every other session (the login answer, the API's own) reads
+   * exactly as before.
+   */
+  model_scorecard_in_force: z.boolean().optional()
 }).strict();
 
 export const SessionSchema = ServerSessionSchema;

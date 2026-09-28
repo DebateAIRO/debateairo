@@ -722,6 +722,9 @@ const supportAnswers = createSupportAnswerService({
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
 const api = buildApi({
   application,
+  // A21 (owner decision O4): /new's yes/no, from the very picker admission asks — the
+  // same test `evaluateAskAdmission` makes before it lets the scorecard choose.
+  modelScorecardInForce: modelPicker.scorecard.state === "VALID",
   accountErasure:erasureApplication,
   registration,
   recovery,

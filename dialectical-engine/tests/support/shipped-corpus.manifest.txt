@@ -312,6 +312,8 @@ apps/ui/lib/format.ts
 apps/ui/lib/legalDocument.ts
 apps/ui/lib/makerIdentity.ts
 apps/ui/lib/mfaEnrollment.ts
+apps/ui/lib/modelStrength.test.mjs
+apps/ui/lib/modelStrength.ts
 apps/ui/lib/models.ts
 apps/ui/lib/observability/index.ts
 apps/ui/lib/observability/logger.ts

@@ -9,7 +9,9 @@ import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 const mocks = vi.hoisted(() => ({
   createDebate: vi.fn(),
   push: vi.fn(),
-  readSession: vi.fn()
+  readSession: vi.fn(),
+  // A21-O4c: the session token the page receives; a new one re-reads the session.
+  token: "test-token"
 }));
 
 vi.mock("next/navigation", () => ({
@@ -18,7 +20,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/components/AuthGate", () => ({
-  AuthGate: ({ children }: { children: (token: string) => unknown }) => children("test-token")
+  AuthGate: ({ children }: { children: (token: string) => unknown }) => children(mocks.token)
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -29,6 +31,23 @@ vi.mock("@/lib/api", () => ({
 import NewDebatePage from "../../apps/ui/app/new/page.js";
 
 const pageSource = readFileSync("apps/ui/app/new/page.tsx", "utf8");
+
+/*
+ * A21 · owner decision O4: the session /new already reads says, yes or no, whether a
+ * scored model list is in force. Until it says yes, Model strength is greyed out and
+ * marked "not in effect" on either plan. Rows that exercise the control itself therefore
+ * run with it in force, so a lock they see is the PLAN's, never the not-in-effect one.
+ */
+const SESSION_WITH_SCORECARD = Object.freeze({
+  asker_id: "owner:11111111-1111-4111-8111-111111111111",
+  session_id: "22222222-2222-4222-8222-222222222222",
+  caller_scope: "ASKER",
+  ownership_provenance: "server_session",
+  provisional_identity_model: false,
+  model_scorecard_in_force: true
+});
+const NOT_IN_EFFECT_HINT =
+  "How strong the models doing each debate job are · not in effect until the models have been scored";
 
 async function settle(): Promise<void> {
   await act(async () => {
@@ -59,6 +78,7 @@ describe("S01 /new plan tier", () => {
     mocks.createDebate.mockReset().mockResolvedValue({ id: "run-tier" });
     mocks.push.mockReset();
     mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
+    mocks.token = "test-token";
     const container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -74,6 +94,11 @@ describe("S01 /new plan tier", () => {
   async function renderPage(): Promise<void> {
     await act(async () => root!.render(<NewDebatePage />));
     await settle();
+  }
+
+  async function renderPageWithScorecardInForce(): Promise<void> {
+    mocks.readSession.mockResolvedValue(SESSION_WITH_SCORECARD);
+    await renderPage();
   }
 
   async function click(selector: string): Promise<void> {
@@ -248,8 +273,9 @@ describe("S01 /new plan tier", () => {
     }
   });
 
-  it("S01-27 R4 locks all twelve controls while Free is chosen", async () => {
-    await renderPage();
+  it("S01-27 R4 locks all fifteen controls while Free is chosen", async () => {
+    // A21 O4: with a scored model list in force, so the model-strength lock seen here is Free's.
+    await renderPageWithScorecardInForce();
     await click('.ndOptionsToggle');
 
     const lockedIds = [
@@ -260,6 +286,10 @@ describe("S01 /new plan tier", () => {
       "budgetTier-medium",
       "budgetTier-high",
       "treeDepth",
+      // A21: the model-strength row joins the Free lock — the Free plan fixes every gauge.
+      "modelStrength-ECONOMY",
+      "modelStrength-BALANCED",
+      "modelStrength-BEST",
       "depthMode",
       "scrutinyDepth",
       "branchingWidth",
@@ -267,16 +297,19 @@ describe("S01 /new plan tier", () => {
       "maxTokens"
     ];
     const locked = lockedIds.map((id) => document.querySelector<HTMLElement>(`#${id}`)!);
-    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(12);
+    expect(locked.filter((control) => control.hasAttribute("disabled"))).toHaveLength(15);
     expect(locked.filter((control) => control.hasAttribute("aria-disabled"))).toEqual([]);
     expect(locked.map((control) => {
       const visualLock = control.tagName === "SELECT" ? control.closest<HTMLElement>('.ndSelect')! : control;
       return [visualLock.style.opacity, visualLock.style.cursor];
-    })).toEqual(Array.from({ length: 12 }, () => ["", ""]));
+    })).toEqual(Array.from({ length: 15 }, () => ["", ""]));
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(
+      "How strong the models doing each debate job are · fixed by the Free plan"
+    );
   });
 
   it("S01-28 R4 forwards the Free lock to every native control family and keeps its description", async () => {
-    await renderPage();
+    await renderPageWithScorecardInForce();
     await click('.ndOptionsToggle');
 
     const locked = [...document.querySelectorAll<HTMLElement>(
@@ -287,14 +320,15 @@ describe("S01 /new plan tier", () => {
       document.querySelectorAll('.ndSlider:disabled').length,
       document.querySelectorAll('.ndSteerInput:disabled').length,
       document.querySelectorAll('.ndSelect select:disabled').length
-    ]).toEqual([6, 4, 0, 2]);
+    // A21: the three model-strength pills are segmented items too (6 -> 9).
+    ]).toEqual([9, 4, 0, 2]);
     expect(locked.every((control) => (control as HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).disabled)).toBe(true);
     expect(locked.map((control) => control.getAttribute("aria-describedby")).every(Boolean)).toBe(true);
     expect(locked.every((control) => document.getElementById(control.getAttribute("aria-describedby")!))).toBe(true);
   });
 
   it("S01-29 R4 rejects focus and activation at the native Free lock", async () => {
-    await renderPage();
+    await renderPageWithScorecardInForce();
     await click('.ndOptionsToggle');
 
     await click('#riskTier-high-stakes');
@@ -304,6 +338,7 @@ describe("S01 /new plan tier", () => {
       "riskTier-casual", "riskTier-standard", "riskTier-high-stakes",
       "budgetTier-low", "budgetTier-medium", "budgetTier-high",
       "treeDepth",
+      "modelStrength-ECONOMY", "modelStrength-BALANCED", "modelStrength-BEST",
       "depthMode", "scrutinyDepth", "branchingWidth", "concurrency", "maxTokens"
     ];
     const focusAccepted = lockedIds.filter((id) => {
@@ -365,12 +400,15 @@ describe("S01 /new plan tier", () => {
   });
 
   it("S01-34 R8 re-pins every Free value on choosing Free, whatever was on screen", async () => {
-    await renderPage();
+    await renderPageWithScorecardInForce();
     await inputValue('#topic', "a debatable claim");
     await click('#planTier-premium');
     await click('#riskTier-high-stakes');
     await click('#budgetTier-high');
     await inputValue('#treeDepth', "4");
+    await click('#modelStrength-BEST');
+    // A21 O4: the choice really landed, so the reset below is proven, not vacuous.
+    expect(document.querySelector('#modelStrength-BEST')?.getAttribute("aria-checked")).toBe("true");
     await click('.ndOptionsToggle');
     await selectValue('#depthMode', "adaptive");
     await selectValue('#scrutinyDepth', "deep");
@@ -380,6 +418,7 @@ describe("S01 /new plan tier", () => {
 
     await click('#planTier-free');
 
+    expect(document.querySelectorAll('[data-field="modelStrength"][aria-checked="true"]')).toHaveLength(0);
     expect(document.querySelector('#riskTier-standard')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#budgetTier-low')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("2");
@@ -413,7 +452,7 @@ describe("S01 /new plan tier", () => {
       (Number(max) - Number(min)) % Number(step) === 0
     )).toBe(true);
     expect(document.querySelector<HTMLTextAreaElement>('#topic')?.value).toBe("a debatable claim");
-    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(12);
+    expect(document.querySelectorAll('.ndSegItem:disabled,.ndSlider:disabled,.ndSteerInput:disabled,.ndSelect select:disabled')).toHaveLength(15);
   });
 
   it("S01-35 R8 restores nothing from a remembered pre-Free state", async () => {
@@ -442,7 +481,7 @@ describe("S01 /new plan tier", () => {
   });
 
   it("S01-36 R9 unlocks every gauge in Premium and each control family accepts a change", async () => {
-    await renderPage();
+    await renderPageWithScorecardInForce();
     await click('#planTier-premium');
     await click('.ndOptionsToggle');
 
@@ -454,6 +493,9 @@ describe("S01 /new plan tier", () => {
       "budgetTier-medium",
       "budgetTier-high",
       "treeDepth",
+      "modelStrength-ECONOMY",
+      "modelStrength-BALANCED",
+      "modelStrength-BEST",
       "depthMode",
       "scrutinyDepth",
       "branchingWidth",
@@ -469,6 +511,8 @@ describe("S01 /new plan tier", () => {
     await click('#budgetTier-high');
     await inputValue('#treeDepth', "4");
     await selectValue('#scrutinyDepth', "deep");
+    await click('#modelStrength-BEST');
+    expect(document.querySelector('#modelStrength-BEST')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#riskTier-high-stakes')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector('#budgetTier-high')?.getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector<HTMLInputElement>('#treeDepth')?.value).toBe("4");
@@ -519,5 +563,119 @@ describe("S01 /new plan tier", () => {
     await submitForm();
     expect(mocks.createDebate).toHaveBeenCalledTimes(1);
     expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium" });
+  });
+
+  it("S01-41 A21 places Model strength beside Tree depth, with nothing chosen and no price", async () => {
+    await renderPageWithScorecardInForce();
+
+    const markup = document.body.innerHTML;
+    expect(markup.indexOf('id="treeDepth"')).toBeGreaterThan(-1);
+    expect(markup.indexOf('id="treeDepth"')).toBeLessThan(markup.indexOf('id="modelStrength-label"'));
+    expect(markup.indexOf('id="modelStrength-label"')).toBeLessThan(markup.indexOf('class="ndProvenance"'));
+    expect(document.querySelector('#modelStrength-label')?.textContent).toBe("Model strength");
+    const options = [...document.querySelectorAll<HTMLElement>('[data-field="modelStrength"]')];
+    expect(options.map((option) => [option.dataset.value, option.textContent])).toEqual([
+      ["ECONOMY", "Economy"], ["BALANCED", "Balanced"], ["BEST", "Best"]
+    ]);
+    expect(options.filter((option) => option.getAttribute("aria-checked") === "true")).toEqual([]);
+    const row = document.querySelector('#modelStrength-label')!.closest('.ndRow')!;
+    expect(row.textContent).not.toMatch(/[$€\d]|USD/u);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(
+      "How strong the models doing each debate job are · fixed by the Free plan"
+    );
+  });
+
+  it("S01-42 A21 sends a chosen strength on Premium, none on Free, and forgets it on returning to Free", async () => {
+    await renderPageWithScorecardInForce();
+    await inputValue('#topic', "a debatable claim");
+    await submitForm();
+    expect(mocks.createDebate.mock.calls[0]?.[1]).not.toHaveProperty("model_strength");
+
+    mocks.createDebate.mockClear();
+    await click('#planTier-premium');
+    // Carry 7 / preflight U4: committed phrasing #1 (the brief's "the deployment decides" is jargon).
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(
+      "How strong the models doing each debate job are · this site's usual setting applies until you choose"
+    );
+    await submitForm();
+    expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium" });
+    expect(mocks.createDebate.mock.calls[0]?.[1]).not.toHaveProperty("model_strength");
+
+    mocks.createDebate.mockClear();
+    await click('#modelStrength-BEST');
+    await submitForm();
+    expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium", model_strength: "BEST" });
+
+    mocks.createDebate.mockClear();
+    await click('#planTier-free');
+    expect(document.querySelectorAll('[data-field="modelStrength"][aria-checked="true"]')).toHaveLength(0);
+    await submitForm();
+    expect(mocks.createDebate.mock.calls[0]?.[1]).not.toHaveProperty("model_strength");
+  });
+
+  it("A21-O4a greys Model strength out and marks it not in effect, on both plans, while no scorecard is in force", async () => {
+    mocks.readSession.mockResolvedValue({ ...SESSION_WITH_SCORECARD, model_scorecard_in_force: false });
+    await renderPage();
+    await inputValue('#topic', "a debatable claim");
+    const pills = () => [...document.querySelectorAll<HTMLButtonElement>('[data-field="modelStrength"]')];
+
+    expect(pills().map((pill) => pill.textContent)).toEqual(["Economy", "Balanced", "Best"]);
+    expect(pills().every((pill) => pill.disabled)).toBe(true);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_IN_EFFECT_HINT);
+
+    await click('#planTier-premium');
+    // Premium unlocks the plan's gauges; this one stays greyed out, and says why.
+    expect(document.querySelector<HTMLButtonElement>('#riskTier-casual')?.disabled).toBe(false);
+    expect(pills().every((pill) => pill.disabled)).toBe(true);
+    expect(pills().every((pill) => pill.getAttribute("aria-describedby") === "modelStrength-hint")).toBe(true);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_IN_EFFECT_HINT);
+    await click('#modelStrength-BEST');
+    expect(pills().filter((pill) => pill.getAttribute("aria-checked") === "true")).toEqual([]);
+
+    await submitForm();
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium" });
+    expect(mocks.createDebate.mock.calls[0]?.[1]).not.toHaveProperty("model_strength");
+  });
+
+  it.each([
+    ["the session cannot be read", () => mocks.readSession.mockRejectedValue(new Error("session unavailable"))],
+    ["the session carries no signal", () => {
+      const { model_scorecard_in_force: _signal, ...withoutSignal } = SESSION_WITH_SCORECARD;
+      mocks.readSession.mockResolvedValue(withoutSignal);
+    }]
+  ] as const)("A21-O4b reads Model strength as not in effect when %s", async (_case, arrange) => {
+    arrange();
+    await renderPage();
+    await click('#planTier-premium');
+
+    const pills = [...document.querySelectorAll<HTMLButtonElement>('[data-field="modelStrength"]')];
+    expect(pills).toHaveLength(3);
+    expect(pills.every((pill) => pill.disabled)).toBe(true);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_IN_EFFECT_HINT);
+  });
+
+  it("A21-O4c sends no strength once a later session read says no scorecard is in force", async () => {
+    mocks.readSession
+      .mockResolvedValueOnce(SESSION_WITH_SCORECARD)
+      .mockResolvedValueOnce({ ...SESSION_WITH_SCORECARD, model_scorecard_in_force: false });
+    await renderPage();
+    await inputValue('#topic', "a debatable claim");
+    await click('#planTier-premium');
+    await click('#modelStrength-BEST');
+    expect(document.querySelector('#modelStrength-BEST')?.getAttribute("aria-checked")).toBe("true");
+
+    // A new session (a new token) is read again, and this time the answer is no.
+    mocks.token = "second-test-token";
+    await renderPage();
+    expect(mocks.readSession).toHaveBeenCalledTimes(2);
+    const pills = [...document.querySelectorAll<HTMLButtonElement>('[data-field="modelStrength"]')];
+    expect(pills.every((pill) => pill.disabled)).toBe(true);
+    expect(pills.filter((pill) => pill.getAttribute("aria-checked") === "true")).toEqual([]);
+    expect(document.querySelector('#modelStrength-hint')?.textContent).toBe(NOT_IN_EFFECT_HINT);
+
+    await submitForm();
+    expect(mocks.createDebate.mock.calls[0]?.[1]).toMatchObject({ plan_tier: "premium" });
+    expect(mocks.createDebate.mock.calls[0]?.[1]).not.toHaveProperty("model_strength");
   });
 });

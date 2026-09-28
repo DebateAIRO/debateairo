@@ -1327,6 +1327,13 @@ export interface ApiOptions {
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
   readonly support?: SupportApplication;
+  /**
+   * A21 (owner decision O4): whether a VALID model scorecard is in force — the yes/no
+   * GET /v1/session tells the /new page, which marks the model-strength control "not in
+   * effect" when it is not. Composed from the same scorecard read admission runs under
+   * (apps/api/src/main.ts, acceptance/main.ts). Absent means no.
+   */
+  readonly modelScorecardInForce?: boolean;
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -2087,7 +2094,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.get("/v1/session", routePolicy("GET /v1/session"), async (request, reply) => {
-    return reply.send(request.session);
+    // A21 (owner decision O4): the one deployment fact /new reads with the session — a strict
+    // boolean, so nothing but yes or no can leave here, whatever a composition passed in.
+    return reply.send({ ...request.session, model_scorecard_in_force: options.modelScorecardInForce === true });
   });
 
   api.get("/v1/deployment", routePolicy("GET /v1/deployment"), async (request, reply) => {

@@ -13,6 +13,8 @@ import { requestFailureMessage } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+import type { ModelStrength } from "@debateai/kernel";
+import { MODEL_STRENGTH_COPY, MODEL_STRENGTH_OPTIONS, isModelStrength, modelStrengthControl } from "@/lib/modelStrength";
 import {
   buildNewDebateAskConfig,
   DECISION_SCOPE_DEFAULT,
@@ -86,6 +88,10 @@ function NewDebateForm({ token }: { token: string }) {
   const [maxTokens, setMaxTokens] = useState(800);
   const [riskTier, setRiskTier] = useState("standard");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
+  // A21: null = the asker has not chosen; the ask then omits model_strength.
+  const [modelStrength, setModelStrength] = useState<ModelStrength | null>(null);
+  // A21 O4: false until the session says a scored model list is in force; until then the control is not in effect.
+  const [modelScorecardInForce, setModelScorecardInForce] = useState(false);
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
@@ -98,11 +104,13 @@ function NewDebateForm({ token }: { token: string }) {
     void contractClient.readSession().then((session) => {
       if (!active) return;
       const defaults = deriveSessionAskDefaults(session);
+      setModelScorecardInForce(session.model_scorecard_in_force === true);
       setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);
       setAsOf(defaults.asOf);
       setSessionDefaultsError(null);
     }).catch((failure: unknown) => {
       if (!active) return;
+      setModelScorecardInForce(false);
       // DL3-F7: classified copy, never the contract client's server-authored text.
       setSessionDefaultsError(requestFailureMessage("SESSION_DEFAULTS", failure));
     });
@@ -114,6 +122,7 @@ function NewDebateForm({ token }: { token: string }) {
     if (value !== "free") return;
     setRiskTier("standard");
     setRiskTierWasEdited(false);
+    setModelStrength(null);
     setBudgetTier(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
     setDepth(2);
     setDepthMode("fixed");
@@ -123,6 +132,7 @@ function NewDebateForm({ token }: { token: string }) {
     setMaxTokens(800);
   }
 
+  const strengthControl = modelStrengthControl({ scorecardInForce: modelScorecardInForce, planTier });
   const askAsOf = new Date(asOf);
   // The button becomes ready only for the complete ask that will be submitted.
   // UX-01 makes machine-derived values visible and editable rather than hidden.
@@ -151,7 +161,9 @@ function NewDebateForm({ token }: { token: string }) {
         asOf,
         depth,
         asOfWasEdited: false,
-        riskTierWasEdited
+        riskTierWasEdited,
+        // A21 O4: a locked control sends nothing, so the deployment's own default applies.
+        modelStrength: strengthControl.locked ? null : modelStrength
       }, submitTime);
       const debate = await createDebate(topic.trim(), config, token);
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
@@ -274,6 +286,17 @@ function NewDebateForm({ token }: { token: string }) {
               value={depth}
               disabled={planTier === "free"}
               onChange={setDepth}
+            />
+            <SegmentedRow
+              field="modelStrength"
+              label={MODEL_STRENGTH_COPY.label}
+              hint={strengthControl.hint}
+              options={MODEL_STRENGTH_OPTIONS}
+              value={strengthControl.locked ? "" : modelStrength ?? ""}
+              disabled={strengthControl.locked}
+              onChange={(value) => {
+                if (isModelStrength(value)) setModelStrength(value);
+              }}
             />
             {/* S1-2 · V ruling 2026-09-03: the two steering textareas that stood
                 here are removed. Their values were collected and discarded — no

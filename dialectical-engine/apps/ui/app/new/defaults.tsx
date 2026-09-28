@@ -1,5 +1,5 @@
 import type { Deployment, PlanTier, Session } from "@debateai/contract";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, type ModelStrength } from "@debateai/kernel";
 
 export type RiskTier = "casual" | "standard" | "high-stakes";
 export type CompositionBudgetTier = "low" | "medium" | "high";
@@ -51,6 +51,8 @@ export type NewDebateAskDefaults = {
   readonly asOfWasEdited: boolean;
   readonly planTier?: PlanTier;
   readonly riskTierWasEdited?: boolean;
+  /** A21: the asker's choice, or null/absent — then the ask omits it and the deployment's default applies. */
+  readonly modelStrength?: ModelStrength | null;
 };
 
 export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTime: Date): Record<string, unknown> {
@@ -71,6 +73,9 @@ export function buildNewDebateAskConfig(defaults: NewDebateAskDefaults, submitTi
     // are always empty. The two contract fields stay PRESENT rather than being
     // dropped, so the submitted ask and every already-stored ask stay valid.
     steering_presets: [],
-    steering_annotations: []
+    steering_annotations: [],
+    ...(defaults.modelStrength === undefined || defaults.modelStrength === null
+      ? {}
+      : { model_strength: defaults.modelStrength })
   };
 }
