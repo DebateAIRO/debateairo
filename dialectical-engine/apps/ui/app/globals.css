@@ -8409,6 +8409,365 @@ a:focus-visible {
   .debateAiDisclosure { padding: 8px 12px; }
 }
 
+/* === verdict-story === */
+/* The verdict story (spec 2026-09-26 §10): the short-story blocks
+   (components/StoryShortBlocks.tsx) the public overview and the owner's story
+   strip share. The headline and summary are styled per surface; this block
+   styles the public one (.publicStory). The consent blocks below must stay the
+   last blocks in this file, so this one sits before them. Every colour is a
+   var(--token) reference, as outside the two token blocks everywhere in this
+   file. The story carries its question's `lang` and `dir` (R2, spec §14.3),
+   so every side and edge here is a logical property: an Arabic or Hebrew
+   story mirrors. */
+.publicStory {
+  display: grid;
+  gap: 10px;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.publicStory > p + p { margin-top: 0; }
+.publicStory .storyHeadline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -.01em;
+  color: var(--text-strong);
+}
+.publicStory .storySummary {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+/* The storyteller's own sentence on how sure we are (spec §14.2): set apart
+   under the headline, quieter than the summary, never a generic line. */
+.storyConfidence {
+  margin: 0;
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid var(--gold-border);
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.storyPaths {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.storyPath {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.storyPathMore {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.storyFate {
+  justify-self: start;
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.storyFate[data-fate="HELD_UP"] { border-color: var(--agree-border); background: var(--agree-bg); color: var(--agree-text); }
+.storyFate[data-fate="PARTLY_HELD"] { border-color: var(--score-uncertainty-border); background: var(--score-uncertainty-bg); color: var(--score-uncertainty-text); }
+.storyFate[data-fate="FELL"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
+.storyFate[data-fate="SET_ASIDE"] { border-color: var(--muted-border); background: var(--muted-bg); color: var(--muted); }
+/* What would change the answer: a small label over the story's own sentence,
+   so no punctuation of one language joins the two. */
+.storyChange { display: grid; gap: 3px; }
+.storyChangeLead {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.storyChange p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.storyBox {
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  background: var(--core);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.storyBox p { margin: 0; }
+/* The gentle line for a story the checker kept a reservation about (spec
+   §14.2): a quiet aside, never an alarm, and never the checker's own words. */
+.storyBox[data-box="reservation"] { border-style: dashed; background: transparent; color: var(--text-2); font-size: 12.5px; font-style: italic; }
+.storyBoxTitle {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+/* The owner's strip (components/StoryPanel.tsx). A direct child of .debateView,
+   a 100dvh flex column with overflow hidden: the strip keeps its natural
+   height, its body scrolls inside a bounded height, and the reading views
+   below keep the rest. It is a plain section, not a section.card, which the
+   header-actions rule clips. It shows at every width, phones included. The
+   short-story blocks inside it are the shared ones above, scoped here under
+   .storyPanelStory. */
+.storyPanel {
+  flex: 0 0 auto;
+  min-height: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  font-family: var(--font-sans);
+}
+.storyPanelSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+.storyPanelSummary::-webkit-details-marker { display: none; }
+/* Hide/Show is decoration: the details element already exposes whether it is
+   open, so the alternative text after the slash keeps the word out of the
+   summary's accessible name. A browser without that syntax keeps the plain
+   declaration before it. The two words are the story's catalogue's, in the
+   question's language, carried by the summary's data attributes (R2). */
+.storyPanelSummary::after {
+  content: attr(data-hide-words);
+  content: attr(data-hide-words) / "";
+  margin-inline-start: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+}
+.storyPanelSummary:hover::after { border-color: var(--line-strong); color: var(--text); }
+.storyPanelDetails:not([open]) .storyPanelSummary::after { content: attr(data-show-words); content: attr(data-show-words) / ""; }
+.storyPanelSummary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.storyPanelEyebrow {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.storyPanelLabel {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--gold-border);
+  border-radius: var(--r-pill);
+  background: var(--gold-bg);
+  color: var(--gold-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.storyPanelLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
+.storyPanelLabel[data-verdict="contested"],
+.storyPanelLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
+/* A soft shade at the top or bottom edge shows that more text is there to
+   scroll to; the local covers hide it at either end. */
+.storyPanelBody {
+  max-height: min(40dvh, 380px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 20px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  background:
+    linear-gradient(var(--surface-2) 40%, transparent) top / 100% 24px no-repeat local,
+    linear-gradient(transparent, var(--surface-2) 60%) bottom / 100% 24px no-repeat local,
+    linear-gradient(var(--line-2), transparent) top / 100% 10px no-repeat scroll,
+    linear-gradient(transparent, var(--line-strong)) bottom / 100% 12px no-repeat scroll;
+  background-color: var(--surface-2);
+}
+.storyPanelInner { display: grid; gap: 12px; max-width: 760px; }
+.storyPanelStory { display: grid; gap: 12px; }
+.storyPanelStory .storyHeadline {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -.01em;
+  color: var(--text-strong);
+}
+.storyPanelStory .storySummary { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text); }
+.storyPanelStory .storyConfidence { font-size: 13.5px; }
+/* The fate words sit in one column, so the path lines start on one edge. */
+.storyPanelStory .storyPaths { grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; }
+.storyPanelStory .storyPath { grid-column: 1 / -1; grid-template-columns: subgrid; }
+.storyPanelStory .storyPathMore { grid-column: 2 / -1; }
+.storyPanelStatus { margin: 0; color: var(--text); font-size: 13.5px; font-weight: 600; }
+.storyPanelStatus[data-writing="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 9px;
+  border-radius: var(--r-dot);
+  background: var(--gold);
+  vertical-align: 1px;
+  animation: storyPanelPulse 1.6s ease-in-out infinite;
+}
+.storyPanelNote { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+.storyPanelFallback {
+  padding: 10px 14px;
+  border-inline-start: 2px solid var(--line-strong);
+  background: var(--core);
+  border-start-end-radius: var(--r-card);
+  border-end-end-radius: var(--r-card);
+}
+.storyPanelFallback p { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.6; }
+.storyPanelFallback p + p { margin-top: 8px; }
+.storyPanelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0;
+}
+.storyPanelDownload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-btn);
+  background: var(--ink);
+  color: var(--core);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.storyPanelDownload:hover { border-color: var(--ink-hover); background: var(--ink-hover); }
+.storyPanelDownload:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@keyframes storyPanelPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .storyPanelStatus[data-writing="true"]::before { animation: none; }
+}
+@media (max-width: 920px) {
+  .storyPanelBody { max-height: min(36dvh, 340px); }
+}
+@media (max-width: 600px) {
+  .storyPath { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .storyPanelSummary { padding: 9px 12px; }
+  .storyPanelBody { max-height: 38dvh; padding: 0 12px 12px; }
+  .storyPanelStory .storyHeadline { font-size: 17.5px; }
+  .storyPanelStory .storyPaths { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  .storyPanelStory .storyPathMore { grid-column: 1 / -1; }
+}
+/* The floor answer (components/FloorAnswer.tsx, spec 2026-09-26 §14.4.4):
+   when no answer could be written but the label was kept, the label in human
+   words, "Our best answer:" as a small lead, the leading position's own
+   statement, and a quiet line when the label rests on less than usual. It sits
+   in the owner's verdict card, in the owner's story strip while the story is
+   written, and in the public verdict. */
+.floorAnswer { display: grid; gap: 6px; justify-items: start; }
+.floorAnswerLabel {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border: 1px solid var(--gold-border);
+  border-radius: var(--r-pill);
+  background: var(--gold-bg);
+  color: var(--gold-text);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.floorAnswerLabel[data-verdict="supported"] { border-color: var(--ok-border); background: var(--ok-bg); color: var(--ok-text); }
+.floorAnswerLabel[data-verdict="contested"],
+.floorAnswerLabel[data-verdict="unsupported"] { border-color: var(--dispute-border); background: var(--dispute-bg); color: var(--dispute-text); }
+.floorAnswerLead { margin: 0; color: var(--text-2); font-size: 12.5px; font-weight: 600; line-height: 1.4; }
+.floorAnswerStatement { margin: 0; color: var(--text); font-size: 14px; line-height: 1.6; }
+.floorAnswerNote { margin: 0; color: var(--muted); font-size: 12.5px; font-style: italic; line-height: 1.55; }
+.publicVerdictText .floorAnswerNote { margin-block-start: 8px; }
+/* In the owner's verdict card the statement takes the card's own type and ink. */
+.synthVerdictBody .floorAnswerStatement { font-size: inherit; line-height: inherit; color: inherit; }
+.synthVerdictBody .floorAnswerLead,
+.synthVerdictBody .floorAnswerNote { font-size: 11px; }
+/* The offer to show the debate page in the language the debate was argued in
+   (components/QuestionLanguageOffer.tsx, spec 2026-09-26 §14.3): a slim strip
+   under the AI notice, in the page's own quiet colours, with the switch as the
+   one filled button. Logical properties only, so it mirrors in Arabic and
+   Hebrew. */
+.languageOffer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--shell);
+  font-family: var(--font-sans);
+}
+.languageOfferText { margin: 0; min-width: 0; color: var(--text); font-size: 12.5px; line-height: 1.5; }
+.languageOfferActions { display: flex; flex-wrap: wrap; gap: 8px; margin-inline-start: auto; }
+.languageOfferSwitch,
+.languageOfferDismiss {
+  padding: 5px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-btn);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.languageOfferSwitch { border-color: var(--ink); background: var(--ink); color: var(--core); }
+.languageOfferSwitch:hover { border-color: var(--ink-hover); background: var(--ink-hover); }
+.languageOfferDismiss:hover { border-color: var(--line-strong); color: var(--text); }
+.languageOfferSwitch:focus-visible,
+.languageOfferDismiss:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .languageOffer { padding: 8px 12px; }
+  .languageOfferActions { margin-inline-start: 0; }
+}
+/* === end verdict-story === */
 
 /* === consent-ui S01 === */
 /* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).

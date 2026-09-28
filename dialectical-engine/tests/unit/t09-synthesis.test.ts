@@ -3,6 +3,7 @@ import {
   DIGEST_CANNOT_EXIST_MARK,
   DIGEST_COMPRESSED_MARK,
   DIGEST_COMPRESSION_LEVELS,
+  DIGEST_LADDER,
   RETIRED_GATE_TRACE,
   SERVE_CRASH_CLASSES,
   SYNTHESIS_OBJECTION_STANDING_MARK,
@@ -13,6 +14,7 @@ import {
   createEnvelopeExhaustedResult,
   isRetiredGateTrace,
   runServeGateChain,
+  synthesisDigestLadder,
   type ComposedSegment,
   type DigestSourceNode,
   type EvaluatorRequest,
@@ -235,7 +237,7 @@ function recorder(script: {
   };
 }
 
-describe("T9 digest — membership is total; the byte budget governs summary LENGTH only", () => {
+describe("T9 digest — membership is total at rungs 0-6; only the last rung may drop it (Task M4)", () => {
   it("carries a decisive node that is neither a root nor a top-2 objection into the recorded synthesizer request", async () => {
     // The RED the goal names (223-231): a decisive node outside roots/top-2
     // must PROVABLY reach the synthesizer. It is neither a position nor one of
@@ -263,12 +265,50 @@ describe("T9 digest — membership is total; the byte budget governs summary LEN
     expect(result.terminal).toBe("SERVED");
   });
 
-  it("keeps every node at every compression level and shortens summaries instead", () => {
+  /**
+   * ENGINE MONEY RULE (spec §14.4.3), TASK M4 — T9's membership law, AMENDED.
+   * The law was "the byte budget never changes membership". Measured: 195 nodes
+   * cannot fit the low or medium tier with every node kept, in any entry shape
+   * that keeps the key names. So membership may now drop at the LAST rung only
+   * (the spine), only when every earlier rung is over budget, and the drop is
+   * disclosed (DIGEST-COMPRESSED on the answer, the rung and the count on the
+   * owner's row). Rungs 0-6 keep every node, as the law always said.
+   */
+  it("keeps every node at rungs 0-6, and reaches rung 7 only when rungs 0-6 are all over budget", () => {
     const long = "x".repeat(4_000);
     const nodes = digestNodes().map((node) => digestNode({ ...node, statement: long }));
-    // The ladder is widest-first and ends at maximum compression.
+    // The summary levels are widest-first and end at the tightest cap; two rungs follow them.
     expect(DIGEST_COMPRESSION_LEVELS[0]).toBeNull();
     expect(DIGEST_COMPRESSION_LEVELS.at(-1)).toBe(24);
+    expect(DIGEST_LADDER.compactRung).toBe(DIGEST_COMPRESSION_LEVELS.length);
+    expect(DIGEST_LADDER.spineRung).toBe(DIGEST_COMPRESSION_LEVELS.length + 1);
+
+    // A tree deep enough for the spine to leave something out: a chain under root:A.
+    const chain = Array.from({ length: 12 }, (_unused, index) => digestNode({
+      nodeId: `chain:${String(index)}`,
+      statement: long,
+      polarityRelations: [{ polarity: "support", targetNodeId: index === 0 ? "root:A" : `chain:${String(index - 1)}` }]
+    }));
+    const deep = [...nodes, ...chain];
+    const attempts = [...synthesisDigestLadder({ nodes: deep, servedRootNodeId: "root:A" })];
+    for (const attempt of attempts.filter((candidate) => candidate.digest.compressionLevel < DIGEST_LADDER.spineRung)) {
+      expect(attempt.digest.nodes).toHaveLength(deep.length);
+    }
+    const spines = attempts.filter((candidate) => candidate.digest.compressionLevel === DIGEST_LADDER.spineRung);
+    expect(spines.length).toBeGreaterThan(0);
+    for (const spine of spines) expect(spine.digest.nodes.length).toBeLessThan(deep.length);
+    const smallestFullMembership = Math.min(...attempts
+      .filter((candidate) => candidate.digest.compressionLevel < DIGEST_LADDER.spineRung)
+      .map((candidate) => candidate.digest.byteSize));
+    // One byte under the smallest full digest: the spine answers, and only then.
+    const atSpine = buildSynthesisDigest({ nodes: deep, servedRootNodeId: "root:A", budgetBound: smallestFullMembership - 1 });
+    if (atSpine.kind !== "DIGEST") throw new Error("the spine must fit one byte under the compact rung");
+    expect(atSpine.digest.compressionLevel).toBe(DIGEST_LADDER.spineRung);
+    expect(atSpine.marks).toEqual([DIGEST_COMPRESSED_MARK]);
+    const atCompact = buildSynthesisDigest({ nodes: deep, servedRootNodeId: "root:A", budgetBound: smallestFullMembership });
+    if (atCompact.kind !== "DIGEST") throw new Error("unreachable");
+    expect(atCompact.digest.compressionLevel).toBeLessThan(DIGEST_LADDER.spineRung);
+    expect(atCompact.digest.nodes).toHaveLength(deep.length);
 
     // Membership is invariant under tightening: same ids, in the same order,
     // at the widest and the tightest level a real budget can select.
@@ -592,7 +632,7 @@ describe("T9 crash classes — the ONLY four ways COMPONENTS_ONLY still exists",
     expect(result.digest).toBeNull();
   });
 
-  it("NO_ARTIFACT: the synthesizer answered with nothing to serve", async () => {
+  it("NO_ARTIFACT before any complete round: the synthesizer answered with nothing to serve", async () => {
     const double = recorder({ synthesize: async () => [] });
     const result = await runServeGateChain(chainInput(), double.dependencies);
     expect(result.terminal).toBe("COMPONENTS_ONLY");
@@ -602,7 +642,34 @@ describe("T9 crash classes — the ONLY four ways COMPONENTS_ONLY still exists",
     expect(double.evaluatorRequests).toHaveLength(0);
   });
 
-  it("TRANSPORT_DEATH: a dead role transport ends in components-only, not a thrown run", async () => {
+  /**
+   * ENGINE MONEY RULE, TASK M3 polish: like its sibling, a dead transport, an
+   * empty LATER draft is a technical failure of that round, and the complete
+   * round 1 before it is valid. The sealed chain raises NO_ARTIFACT inside the
+   * loop; the loop now ends on round 1 instead of crashing to components-only.
+   */
+  it("NO_ARTIFACT after a complete round keeps that round and serves it (Task M3)", async () => {
+    const double = recorder({
+      verdicts: [unsatisfied("Round one is unfair.", "fairnessToLosers"), SATISFIED],
+      synthesize: async (request) => request.round === 2 ? [] : segments(`candidate ${request.round}`)
+    });
+    const result = await runServeGateChain(chainInput(), double.dependencies);
+    expect(result.terminal).not.toBe("COMPONENTS_ONLY");
+    expect(result.crashClass).toBeNull();
+    expect(result.conditionMarks).not.toContain("DEFECT");
+    expect(double.synthesizerRequests.map((request) => request.round)).toEqual([1, 2]);
+    expect(double.evaluatorRequests.map((request) => request.round)).toEqual([1]);
+    expect(result.loopRounds.map((round) => round.round)).toEqual([1]);
+    expect(result.segments.map((segment) => segment.text)).toEqual(segments("candidate 1").map((segment) => segment.text));
+    expect(result.standingObjection).toBe("Round one is unfair.");
+    // Served exactly as a finished loop's last round: one round composed, the loop exhausted, no recompose.
+    const composedAt = result.gateTrace.indexOf("COMPOSED");
+    expect(composedAt).toBeGreaterThanOrEqual(0);
+    expect(result.gateTrace.indexOf("SYNTHESIS_LOOP_EXHAUSTED")).toBeGreaterThan(composedAt);
+    expect(result.gateTrace).not.toContain("RECOMPOSED_ONCE");
+  });
+
+  it("TRANSPORT_DEATH before any complete round: a dead role transport ends in components-only, not a thrown run", async () => {
     const double = recorder({});
     const result = await runServeGateChain(chainInput(), {
       ...double.dependencies,
@@ -613,6 +680,58 @@ describe("T9 crash classes — the ONLY four ways COMPONENTS_ONLY still exists",
     expect(result.terminal).toBe("COMPONENTS_ONLY");
     expect(result.crashClass).toBe("TRANSPORT_DEATH");
     expect(result.conditionMarks).toContain("DEFECT");
+  });
+
+  /**
+   * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — a death AFTER a complete round
+   * is no longer a crash class. Before M3 `runSynthesisLoop` had no catch, so a
+   * round-2 transport death reached this same components-only terminal and
+   * threw round 1 away — the draft AND the verdict its checker had given. Now
+   * the loop ends on round 1, which is served exactly as a finished loop's last
+   * round: its own draft, its own standing objection, nothing invented.
+   */
+  it("TRANSPORT_DEATH after a complete round keeps that round and serves it (Task M3)", async () => {
+    const double = recorder({ verdicts: [unsatisfied("Round one is unfair.", "fairnessToLosers"), SATISFIED] });
+    const result = await runServeGateChain(chainInput(), {
+      ...double.dependencies,
+      synthesize: async (request) => {
+        if (request.round === 2) {
+          throw new TypedDomainError("SYNTHESIS_TRANSPORT_DEATH", "SYNTHESIZER transport exhausted after 3 attempts");
+        }
+        return double.dependencies.synthesize(request);
+      }
+    });
+    expect(result.terminal).not.toBe("COMPONENTS_ONLY");
+    expect(result.crashClass).toBeNull();
+    expect(result.conditionMarks).not.toContain("DEFECT");
+    expect(result.loopRounds.map((round) => round.round)).toEqual([1]);
+    expect(result.segments.map((segment) => segment.text)).toEqual(segments("candidate 1").map((segment) => segment.text));
+    expect(result.standingObjection).toBe("Round one is unfair.");
+    expect(result.conditionMarks).toContain(SYNTHESIS_OBJECTION_STANDING_MARK);
+  });
+
+  it("a spend stop after a complete round keeps it too; before one, it still leaves the chain for the envelope terminal (Task M3)", async () => {
+    const money = new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "no maker fits");
+    const kept = recorder({ verdicts: [unsatisfied("Round one overstates.", "noOverstatement"), SATISFIED] });
+    const served = await runServeGateChain(chainInput(), {
+      ...kept.dependencies,
+      evaluate: async (request) => {
+        if (request.round === 2) throw money;
+        return kept.dependencies.evaluate(request);
+      }
+    });
+    expect(served.crashClass).toBeNull();
+    expect(served.loopRounds.map((round) => round.round)).toEqual([1]);
+    // Round 2's draft was written, but its checker never read it: round 1 is served.
+    expect(kept.synthesizerRequests.map((request) => request.round)).toEqual([1, 2]);
+    expect(served.segments.map((segment) => segment.text)).toEqual(segments("candidate 1").map((segment) => segment.text));
+    // Round 1 refused: nothing checked exists, so the refusal travels to the
+    // runner, which takes the ENVELOPE_EXHAUSTED terminal exactly as before.
+    const first = recorder({});
+    await expect(runServeGateChain(chainInput(), {
+      ...first.dependencies,
+      synthesize: async () => { throw money; }
+    })).rejects.toBe(money);
   });
 
   it("ENVELOPE_EXHAUSTED: the retired guard — an exhausted envelope with no served statement takes the envelope terminal even when restatement FAILED", () => {
@@ -723,6 +842,28 @@ describe("T9 DoD row 2 — no NON-CRASH path returns COMPONENTS_ONLY", () => {
       name: "post-compose restatement objected (former post-compose R9 gate)",
       run: async () => runServeGateChain(chainInput(), recorder({
         verdicts: [unsatisfied("Post-compose R9 objection.", "restatement")]
+      }).dependencies)
+    },
+    {
+      // Task M3: before M3 this reached TRANSPORT_DEATH and discarded round 1.
+      name: "a dead transport after round 1 completed",
+      run: async () => {
+        const double = recorder({ verdicts: [unsatisfied("one", "fairnessToLosers"), SATISFIED] });
+        return runServeGateChain(chainInput(), {
+          ...double.dependencies,
+          synthesize: async (request) => {
+            if (request.round === 2) throw new TypedDomainError("SYNTHESIS_TRANSPORT_DEATH", "dead");
+            return double.dependencies.synthesize(request);
+          }
+        });
+      }
+    },
+    {
+      // Task M3 polish: before it this reached NO_ARTIFACT and discarded round 1.
+      name: "an empty draft after round 1 completed",
+      run: async () => runServeGateChain(chainInput(), recorder({
+        verdicts: [unsatisfied("one", "fairnessToLosers"), SATISFIED],
+        synthesize: async (request) => request.round === 2 ? [] : segments(`candidate ${request.round}`)
       }).dependencies)
     },
     {

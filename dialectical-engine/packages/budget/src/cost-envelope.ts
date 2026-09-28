@@ -37,6 +37,22 @@ export const COST_ENVELOPE_CURRENCY = "USD" as const;
 /** The refusal a gateway call gets when its own run's money envelope is spent. */
 export const RUN_COST_ENVELOPE_MONEY_REACHED = "RUN_COST_ENVELOPE_MONEY_REACHED" as const;
 
+/**
+ * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1) — WHICH PART OF A RUN A
+ * CALL BELONGS TO. `SERVE` is an answer-writing call (the synthesizer and the
+ * evaluator on the served lane); `BODY` is every other call a run makes while
+ * the debate is argued. The two see different ceilings over the SAME run total
+ * (`costEnvelopeCeilings` in `@debateai/register`, and the attempt ceiling's
+ * `attemptCeilingForPhase`), and a RUN charge records its phase
+ * (`ledger.model_spend.spend_phase`, migration 0075). Both refusals keep their
+ * codes: a phase changes which ceiling is compared, never what a refusal says.
+ */
+export type CostEnvelopePhase = "BODY" | "SERVE";
+
+export function isCostEnvelopePhase(value: unknown): value is CostEnvelopePhase {
+  return value === "BODY" || value === "SERVE";
+}
+
 /** The refusal a NEW run gets when the application's day is spent. */
 export const DAILY_COST_ENVELOPE_REACHED = "DAILY_COST_ENVELOPE_REACHED" as const;
 
@@ -416,6 +432,27 @@ export function runCostEnvelopeReached(
   return new TypedDomainError(
     RUN_COST_ENVELOPE_MONEY_REACHED,
     `The run has spent ${decision.spentMicros} of ${decision.ceilingMicros} ${COST_ENVELOPE_CURRENCY} micro-units`
+      + ` and the next call could cost ${decision.projectedMicros} more`
+  );
+}
+
+/**
+ * Verdict story: the refusal the STORY'S own envelope raises. Its own code, not
+ * RUN_COST_ENVELOPE_MONEY_REACHED, because the operator's lift is different —
+ * the story's cap (`storyCostEnvelopePolicy`), never the debate's. The gateway
+ * raises it from `assertCallAllowed`, outside its attempt loop, so it is never
+ * retried and never recorded as an attempt. The story loop maps it to
+ * STORY_ENVELOPE_EXHAUSTED. Named STORY_… on purpose: the diagnostic sweep in
+ * tests/unit/api-operational-error.test.ts reads "COST_ENVELOPE_…" literals here.
+ */
+export const STORY_COST_ENVELOPE_REACHED = "STORY_COST_ENVELOPE_REACHED" as const;
+
+export function storyCostEnvelopeReached(
+  decision: Extract<RunCostEnvelopeDecision, { kind: "WOULD_CROSS" }>
+): TypedDomainError {
+  return new TypedDomainError(
+    STORY_COST_ENVELOPE_REACHED,
+    `The story has spent ${decision.spentMicros} of ${decision.ceilingMicros} ${COST_ENVELOPE_CURRENCY} micro-units`
       + ` and the next call could cost ${decision.projectedMicros} more`
   );
 }

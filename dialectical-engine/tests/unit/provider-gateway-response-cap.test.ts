@@ -77,6 +77,7 @@ function meteredGatewayWith(
   const store: ModelSpendStore = {
     recordSpend: async (entry) => { rows.push(entry); },
     readRunSpentMicros: async () => 0,
+    readRunStorySpentMicros: async () => 0,
     readDaySpentMicros: async () => 0,
     admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
   };
@@ -86,7 +87,9 @@ function meteredGatewayWith(
   }).providerSeam({
     runId: "run-1",
     price: deployment.price ?? METERED_PRICE,
-    requireReportedUsage: deployment.requireReportedUsage
+    requireReportedUsage: deployment.requireReportedUsage,
+    // Task M1: a run seam names its phase; the ceiling here is far above any call.
+    phase: "BODY"
   });
   const gateway = new OpenAICompatibleProviderGateway({
     endpoint: "http://fixture/v1", model: "configured/model", maker: "fixture",

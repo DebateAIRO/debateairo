@@ -38,6 +38,15 @@ import {
  * WHAT THIS FILE DOES NOT PROVE: that the three loops actually call them. That
  * is a run-through-the-whole-body property and belongs to the database-backed
  * suite; it is named as an open item in the report.
+ *
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2. The phase stop is unchanged; what
+ * the serve gate does with it is not. The stop used to FORCE the components-only
+ * envelope terminal there, so the answer-writer was never called. Now it stops
+ * the ARGUING only: the run goes on to write its answer with the tree it has,
+ * and the stop stays on the answer's record. And the attempt ceiling, which used
+ * to travel out of every phase and FAIL the run, is a phase stop too (the
+ * controller's ruling R10: all three are cost guards, not broken machinery).
+ * The serve-side half is `tests/unit/m2-body-stop-serves.test.ts`.
  */
 describe("C1 — a money stop halts the phase instead of failing the run", () => {
   it("names a money refusal and a usage refusal as phase stops", () => {
@@ -47,12 +56,13 @@ describe("C1 — a money stop halts the phase instead of failing the run", () =>
       .toBe("USAGE");
   });
 
-  it("leaves the ATTEMPT ceiling exactly as it was", () => {
-    // Not this package's to change: the attempt ceiling has always propagated
-    // from the expansion phase, and altering that would be a behaviour change
-    // nobody ruled. It is named here so the omission is deliberate and visible.
+  it("stops the phase on the ATTEMPT ceiling too (Task M2), instead of failing the run", () => {
+    // Before M2 this was `null`: the attempt ceiling propagated from every
+    // phase and the run was FAILED with nothing served. The owner's rule is
+    // that a cost bound never costs the person their answer, and the attempt
+    // ceiling is a cost bound by count, so it now stops the arguing like money.
     expect(expansionPhaseStop(new TypedDomainError("RUN_COST_ENVELOPE_EXHAUSTED", "x")))
-      .toBeNull();
+      .toBe("ATTEMPTS");
   });
 
   it("lets every real failure travel", () => {
@@ -79,11 +89,17 @@ describe("C1 — the node-review catch tells three outcomes apart", () => {
   });
 
   it("rethrows what it always rethrew, untouched", () => {
-    for (const code of [
-      "RUN_COST_ENVELOPE_EXHAUSTED", "CALL_BUDGET_EXHAUSTED", "PRODUCER_GRADING_FORBIDDEN"
-    ]) {
+    for (const code of ["CALL_BUDGET_EXHAUSTED", "PRODUCER_GRADING_FORBIDDEN"]) {
       expect(reviewFailureOutcome(new TypedDomainError(code, "x"))).toEqual({ kind: "RETHROW" });
     }
+  });
+
+  it("stops reviewing on the attempt ceiling (Task M2) instead of rethrowing it", () => {
+    // Before M2 `RUN_COST_ENVELOPE_EXHAUSTED` was in the rethrow list, so a
+    // review refused by the attempt ceiling FAILED the run. It is a budget stop
+    // now, recorded the same way a money stop in a review is.
+    expect(reviewFailureOutcome(new TypedDomainError("RUN_COST_ENVELOPE_EXHAUSTED", "x")))
+      .toEqual({ kind: "BUDGET_STOP", stop: "ATTEMPTS" });
   });
 
   it("still reports a genuine review failure as review-unavailable", () => {
@@ -96,10 +112,11 @@ describe("C1 — the node-review catch tells three outcomes apart", () => {
 /**
  * RULING R2 — a hosted vendor that reports no usage is a VENDOR OR CONFIGURATION
  * fault, not the asker's. The run therefore ends the same clean way a money stop
- * ends: the components-only envelope terminal, keeping what it produced. The
- * typed code stays the diagnostic, so the condition-mark record still names the
- * real cause and the operator is not told they ran out of money when they did
- * not.
+ * ends, keeping what it produced: since Task M2 that means it stops arguing and
+ * still writes its answer (on an answer-writing call it is still the
+ * components-only envelope terminal). The typed code stays the diagnostic, so
+ * the condition-mark record still names the real cause and the operator is not
+ * told they ran out of money when they did not.
  */
 describe("R2 — an unbillable vendor ends the run cleanly, under its own name", () => {
   it("is an envelope stop of its own kind", () => {
@@ -132,19 +149,22 @@ describe("R2 — an unbillable vendor ends the run cleanly, under its own name",
  * travel untouched through both.
  */
 describe("C2(b) — a run-level spend stop is never a panel member failure", () => {
-  it("names the three run-level stops, and nothing else", () => {
+  it("names the four run-level stops, the attempt ceiling included (Task M2), and nothing else", () => {
     expect([...RUN_LEVEL_SPEND_STOP_CODES].sort()).toEqual([
       "DAILY_COST_ENVELOPE_REACHED",
       "PROVIDER_USAGE_UNREPORTED",
+      "RUN_COST_ENVELOPE_EXHAUSTED",
       "RUN_COST_ENVELOPE_MONEY_REACHED"
     ]);
     for (const code of RUN_LEVEL_SPEND_STOP_CODES) {
       expect(isRunLevelSpendStop(new TypedDomainError(code, "x"))).toBe(true);
     }
-    // The ATTEMPT ceiling is a run-level bound too, but it is NOT in this set:
-    // it has always been a panel member failure and this package does not
-    // change what it does.
-    expect(isRunLevelSpendStop(new TypedDomainError("RUN_COST_ENVELOPE_EXHAUSTED", "x"))).toBe(false);
+    // Before Task M2 the ATTEMPT ceiling was deliberately NOT in this set: a
+    // panel member refused by it was noted as a PROVIDER_ERROR member failure.
+    // M2 made it a run-body stop like money, so the panel lets it travel like
+    // money — the four codes are exactly the four kinds the runner stops the
+    // arguing on (`ENVELOPE_STOP_CODES`).
+    expect([...RUN_LEVEL_SPEND_STOP_CODES].sort()).toEqual(Object.keys(ENVELOPE_STOP_CODES).sort());
     expect(isRunLevelSpendStop(new TypedDomainError("PROVIDER_CALL_FAILED", "x"))).toBe(false);
     expect(isRunLevelSpendStop(new TypeError("boom"))).toBe(false);
   });

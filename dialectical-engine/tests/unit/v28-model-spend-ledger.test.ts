@@ -3,11 +3,17 @@ import { describe, expect, it } from "vitest";
 import {
   CostEnvelopeGuard,
   costEnvelopeDay,
+  costEnvelopeGuardPolicy,
   DEFAULT_RESERVATION_TTL_MS,
   type ModelSpendEntry,
   type ModelSpendStore
 } from "@debateai/budget";
-import { costEnvelopePolicyFromValue, COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW } from "@debateai/register";
+import {
+  buildStoryRegisterRows,
+  costEnvelopePolicyFromValue,
+  COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
+  readStoryPolicy
+} from "@debateai/register";
 import {
   DEVELOPMENT_ORGAN_COST_BOUNDS,
   DEVELOPMENT_RUN_DEATH_POLICY
@@ -62,11 +68,15 @@ function fakeStore(seed: readonly ModelSpendEntry[] = []) {
     .filter((row) => row.chargedOn === day)
     .reduce((total, row) => total + row.chargeMicros, 0);
   const spentByRun = (runId: string) => rows
-    .filter((row) => row.runId === runId)
+    .filter((row) => row.runId === runId && row.spendSource !== "STORY")
+    .reduce((total, row) => total + row.chargeMicros, 0);
+  const storySpentByRun = (runId: string) => rows
+    .filter((row) => row.runId === runId && row.spendSource === "STORY")
     .reduce((total, row) => total + row.chargeMicros, 0);
   const store: ModelSpendStore = {
     recordSpend: async (entry) => { rows.push(entry); },
     readRunSpentMicros: async (runId) => spentByRun(runId),
+    readRunStorySpentMicros: async (runId) => storySpentByRun(runId),
     readDaySpentMicros: async (day) => spentOn(day),
     admitNewRun: async (input) => {
       const run = queue.then(async () => {
@@ -104,7 +114,7 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
   it("admits a call whose projected maximum fits in what the run has left", async () => {
     const { store } = fakeStore();
     const seam = guardWith(store).providerSeam({
-      runId: "run-1", price: PRICE, requireReportedUsage: true
+      runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY"
     });
 
     await expect(seam.assertCallAllowed({ requestBytes: 400, completionTokenCeiling: 64 }))
@@ -119,7 +129,7 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
       chargedOn: TODAY, chargeMicros: POLICY.perRunCeilingMicros, inputTokens: 1, outputTokens: 1
     }]);
     const seam = guardWith(store).providerSeam({
-      runId: "run-1", price: PRICE, requireReportedUsage: true
+      runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY"
     });
 
     await expect(seam.assertCallAllowed({ requestBytes: 400, completionTokenCeiling: 64 }))
@@ -129,7 +139,7 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
   it("charges vendor-reported usage to the run AND to the day, in one row", async () => {
     const { store, rows } = fakeStore();
     const seam = guardWith(store).providerSeam({
-      runId: "run-1", price: PRICE, requireReportedUsage: true
+      runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY"
     });
 
     await seam.recordCall({
@@ -155,7 +165,7 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
   it("refuses an unreported usage block when the deployment requires one", async () => {
     const { store, rows } = fakeStore();
     const seam = guardWith(store).providerSeam({
-      runId: "run-1", price: PRICE, requireReportedUsage: true
+      runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY"
     });
 
     // I4: the two duties are separate. CHARGING never refuses — it records money
@@ -189,7 +199,7 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
     ] as const) {
       const { store, rows } = fakeStore();
       const seam = guardWith(store).providerSeam({
-        runId: "run-1", price: PRICE, requireReportedUsage: true
+        runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY"
       });
 
       await seam.recordCall({ providerRef: "provider-1", usage, projection: PROJECTION });
@@ -214,7 +224,7 @@ describe("V-28 the per-run seam reads and writes the persisted spend", () => {
   it("records nothing and refuses nothing when reported usage is not required", async () => {
     const { store, rows } = fakeStore();
     const seam = guardWith(store).providerSeam({
-      runId: "run-1", price: PRICE, requireReportedUsage: false
+      runId: "run-1", price: PRICE, requireReportedUsage: false, phase: "BODY"
     });
 
     await expect(seam.recordCall({
@@ -232,7 +242,7 @@ describe("C2 — the guard refuses to build a hosted seam that cannot bound anyt
     expect(() => guardWith(store).providerSeam({
       runId: "run-1",
       price: { inputMicrosPerMillionTokens: 0, outputMicrosPerMillionTokens: 0 },
-      requireReportedUsage: true
+      requireReportedUsage: true, phase: "BODY"
     })).toThrowError(expect.objectContaining({ code: "COST_ENVELOPE_PRICE_UNPRICED" }));
   });
 
@@ -241,7 +251,7 @@ describe("C2 — the guard refuses to build a hosted seam that cannot bound anyt
     expect(() => guardWith(store).providerSeam({
       runId: "run-1",
       price: { inputMicrosPerMillionTokens: 0, outputMicrosPerMillionTokens: 0 },
-      requireReportedUsage: false
+      requireReportedUsage: false, phase: "BODY"
     })).not.toThrow();
   });
 });
@@ -275,7 +285,7 @@ describe("V-28 the daily envelope stops the NEXT run, never the running one", ()
       chargedOn: TODAY, chargeMicros: POLICY.dailyCeilingMicros, inputTokens: 1, outputTokens: 1
     }]);
     const seam = guardWith(store).providerSeam({
-      runId: "run-1", price: PRICE, requireReportedUsage: true
+      runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY"
     });
 
     await expect(seam.assertCallAllowed({ requestBytes: 400, completionTokenCeiling: 64 }))
@@ -334,6 +344,47 @@ describe("I1 — the daily gate reserves what it admits", () => {
     return { guard, reservations };
   }
 
+  /**
+   * Task M1 (spec 2026-09-26 §14.4.1): the reservation is what ONE run may
+   * spend at most. The shipped row lets the answer go 20% over its 250 000
+   * ceiling, so an admission reserves 300 000 for the debate — not the bare
+   * per-run ceiling the rows below (which carry no overrun) still reserve.
+   */
+  it("reserves the shipped row's per-run ceiling plus the answer's overrun", async () => {
+    const { store, reservations } = fakeStore();
+    await guardWith(store).assertDailyEnvelopeAdmitsNewRun();
+    await new CostEnvelopeGuard({
+      store,
+      policy: { ...POLICY, perStoryCeilingMicros: 50_000 },
+      clock: () => new Date("2026-09-22T11:00:00.000Z")
+    }).assertDailyEnvelopeAdmitsNewRun();
+
+    expect(POLICY.serveOverrunBasisPoints).toBe(2_000);
+    expect(reservations.map((reservation) => reservation.reservedMicros)).toEqual([300_000, 350_000]);
+  });
+
+  /**
+   * Task M7 (spec 2026-09-26 §14.4.6): the shipped HOSTED story row lets the
+   * story go 20% over its 50 000 cap too, so the day reserves 60 000 for the
+   * story beside the debate's 300 000. The row above hands the guard a bare
+   * 50 000 with no story overrun and still reserves 350 000, as before.
+   */
+  it("reserves the shipped story row's cap plus the story's overrun beside the run's", async () => {
+    const { store, reservations } = fakeStore();
+    const story = readStoryPolicy(buildStoryRegisterRows({
+      synthesizerRoleRef: "provider:synthesizer", evaluatorRoleRef: "provider:evaluator",
+      sourceRef: "test-layer:v28", hosted: true
+    }), 9);
+    expect(story?.perStoryOverrunBasisPoints).toBe(2_000);
+    await new CostEnvelopeGuard({
+      store,
+      policy: costEnvelopeGuardPolicy(POLICY, story),
+      clock: () => new Date("2026-09-22T11:00:00.000Z")
+    }).assertDailyEnvelopeAdmitsNewRun();
+
+    expect(reservations.map((reservation) => reservation.reservedMicros)).toEqual([360_000]);
+  });
+
   it("admits two runs into a two-run day", async () => {
     const { guard, reservations } = racingGuard();
     await expect(Promise.all([
@@ -364,7 +415,7 @@ describe("I1 — the daily gate reserves what it admits", () => {
     const { guard } = racingGuard();
     await guard.assertDailyEnvelopeAdmitsNewRun();
     const spendSeam = guard.providerSeam({
-      runId: "run-a", price: PRICE, requireReportedUsage: true
+      runId: "run-a", price: PRICE, requireReportedUsage: true, phase: "BODY"
     });
     await spendSeam.recordCall({
       providerRef: "provider-1",

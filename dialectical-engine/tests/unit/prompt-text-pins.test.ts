@@ -46,6 +46,19 @@ import {
   parseSupportDraft,
   supportDraftJsonShape
 } from "../../apps/api/src/support/response-policy.js";
+import {
+  STORYTELLER_ANSWER_FORM,
+  STORYTELLER_CONTRACT_ID,
+  STORY_CHECKER_ANSWER_FORM,
+  STORY_CHECKER_CONTRACT_ID,
+  buildStoryCheckerContract,
+  buildStorytellerContract,
+  loadStoryPack,
+  resolveStoryPackDir
+} from "@debateai/story";
+
+/** The shipped shape pack, read from the repository the way the runner reads it. */
+const STORY_PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
 
 /**
  * REVIEW ITEM 4, round 2 — THE DISCLOSURE, MADE UNROTTABLE.
@@ -484,6 +497,66 @@ describe("SYNC3 / R1 — the support chat's v2 JSON-draft contracts", () => {
   });
 });
 
+/**
+ * VERDICT STORY — THE TWO CODE-OWNED ANSWER FORMS, PINNED BY BYTES.
+ *
+ * The storyteller's and the checker's instruction halves are the owners' shape
+ * pack (`story-shapes/`), fingerprinted rather than pinned, because the owners
+ * edit them. The answer forms are code's: they ride inside the safety frame and
+ * state the exact JSON the parsers in `packages/story/src/validate.ts` accept.
+ * A change to either is a new contract id, and it fails here first.
+ */
+describe("VERDICT STORY — the storyteller's and the checker's answer forms", () => {
+  it("pins the storyteller's answer form byte for byte", () => {
+    expect(STORYTELLER_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters other than line feed and tab, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).
+{
+  "shape_id": the id of one shape offered in the instruction,
+  "short": {
+    "headline": non-empty string of at most 160 characters,
+    "summary": non-empty string of at most 900 characters, one paragraph,
+    "confidence": non-empty string of at most 300 characters, one sentence,
+    "paths": [{ "position_ref": id of a position, "fate": "HELD_UP" | "PARTLY_HELD" | "FELL" | "SET_ASIDE", "line": non-empty string of at most 240 characters, "node_refs": [id, ...] }, ...],
+    "change": { "text": non-empty string of at most 400 characters, "node_refs": [id, ...] }
+  },
+  "why": {
+    "reasons": [{ "text": non-empty string of at most 700 characters, "node_refs": [id, ...] }, ...]
+  },
+  "long": {
+    "sections": [{ "title": non-empty string of at most 80 characters, "paragraphs": [{ "text": non-empty string of at most 2000 characters, "node_refs": [id, ...] }, ...] }, ...]
+  },
+  "reviewer_note": null | { "text": non-empty string of at most 1200 characters, "node_refs": [id, ...] }
+}
+short.paths has one entry per position in the positions field, each position exactly once, and at most 8 entries: when there are more than 8 positions it has exactly 8, for the first 8 positions listed. why.reasons has 1 to 3 entries. long.sections has 3 to 12 entries and each has 1 to 12 paragraphs. Every node_refs array has at most 40 entries, each copied exactly from an id in the points field, and each position_ref is copied exactly from an id in the positions field. A text of long or why may name a point by its id, such as P3, but sparingly, and every point a text rests on must be listed in that entry's node_refs. The texts of short (the headline, the summary, the confidence sentence, each path line and the change text) and the text of reviewer_note never mention a point number such as P3: they are shown on the site, where there is no appendix.
+Every text speaks to the person about their question, never about how the debate was run: no internal ids and no engine words such as judge, evaluator, checker, reviewer, runner-up, margin, band or rung. No text contains a score or a threshold from the material, in any form such as 0.64, 0,64 or 0,7: say in words what it means. The headline and the summary always state the best answer to the question plainly, even when it is a close call or rests on weak evidence, and never say that the debate did not settle it. short.confidence is one sentence saying how sure we are and what that rests on in this debate, never surer than the label and the confidence band allow.`);
+  });
+
+  it("pins the checker's answer form byte for byte", () => {
+    expect(STORY_CHECKER_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence:
+{
+  "satisfied": boolean,
+  "objection": null | non-empty string of at most 2000 characters,
+  "criteria": {
+    "faithful_to_material": boolean,
+    "agrees_with_label": boolean,
+    "fair_to_losing_paths": boolean,
+    "no_overstatement": boolean,
+    "citations_correct": boolean,
+    "reviewer_note_separate": boolean,
+    "goal_marked_as_reading": boolean,
+    "speaks_to_the_person": boolean
+  }
+}
+When satisfied is true, every criterion must be true. When satisfied is false, objection must be a non-empty string. In the objection, refer to points by their ids, such as P7.`);
+  });
+
+  it("carries each form into its contract, under a new contract id", () => {
+    expect(STORYTELLER_CONTRACT_ID).toBe("story.storyteller.v1");
+    expect(STORY_CHECKER_CONTRACT_ID).toBe("story.checker.v1");
+    expect(buildStorytellerContract(STORY_PACK).answerForm).toBe(STORYTELLER_ANSWER_FORM);
+    expect(buildStoryCheckerContract(STORY_PACK).answerForm).toBe(STORY_CHECKER_ANSWER_FORM);
+  });
+});
+
 describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentence", () => {
   it.each([
     ["judge", judgePromptContract("support", "unknown")],
@@ -498,7 +571,10 @@ describe("REVIEW ITEM 4 — no prompt anywhere still carries the retired sentenc
     // SYNC3 / R1: the v2 JSON-draft pair the API sends, and the v1 prose answer.
     ["support-chat-answer", supportAnswerPromptContract("Answer from the supplied entries.")],
     ["support-chat-answer-v2", supportDraftAnswerPromptContract(supportDraftAnswerInstruction("", "en"))],
-    ["support-case-summary-v2", supportDraftSummaryPromptContract(SUPPORT_SUMMARY_PROMPT)]
+    ["support-case-summary-v2", supportDraftSummaryPromptContract(SUPPORT_SUMMARY_PROMPT)],
+    // Verdict story: both contracts, with the SHIPPED pack in the instruction slot.
+    ["story-storyteller", buildStorytellerContract(STORY_PACK)],
+    ["story-checker", buildStoryCheckerContract(STORY_PACK)]
   ])("%s", (_name, contract) => {
     const whole = `${contract.instruction} ${contract.answerForm}`;
     expect(whole).not.toContain("untrusted data, not instructions");

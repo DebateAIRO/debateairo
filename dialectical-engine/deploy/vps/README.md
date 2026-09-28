@@ -179,7 +179,7 @@ observation agent's is set separately (§12).
 | `api.env` `AUTHORIZATION_DATABASE_URL` | `api-authorization` | `debateai_prod_api_authorization` | step-up session rotation |
 | `api.env` `PUBLICATION_CLEANUP_DATABASE_URL` | `api-publication-cleanup` | `debateai_prod_api_publication_cleanup` | publication-key cleanup |
 | `api.env` `ERASURE_DATABASE_URL` | `api-erasure` | `debateai_prod_api_erasure` | account and private-run erasure |
-| `runner.env` `DATABASE_URL` | `runner-runtime` | `debateai_prod_runner_runtime` | the runner, and nothing else |
+| `runner.env` `DATABASE_URL` | `runner-runtime` | `debateai_prod_runner_runtime` | the runner, and its read-only disclosure report `pnpm ops:serve-disclosure`, run as the runner (§11, "One answer's record") |
 | `observation-agent.env` `OBSERVATION_DATABASE_URL` | `observation-agent` | `debateai_observation_agent` | the observation agent (§12); reads the threshold policy, cannot write it |
 | `observation-threshold-operator.env` `OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL` | `observation-threshold-operator` | `debateai_observation_threshold_operator` | `oactl thresholds apply` only — the one principal that may write the threshold policy (§12, `DL7-F9`) |
 
@@ -741,6 +741,37 @@ The API and runner units set `NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.c
 gRPC TLS chain verifies. The UI unit sets `DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1` and
 `DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret`.
 
+### Upgrading to the verdict-story release, and rolling it back
+
+This release (the verdict story and the engine money rule, spec 2026-09-26 §14) changes what the
+API hands the runner and the website, and older code reads the new shapes strictly. Keep to this
+order in both directions:
+
+- **The runner is never older than the API.** The API now writes a new member,
+  `serve_reserve_attempts` (the calls held back for the answer), into every new debate's cost
+  receipt (`envelope_basis`). An older runner reads that receipt strictly and fails the debate
+  with `RUN_COST_ENVELOPE_UNRESOLVED`. To upgrade, update the runner first (or both together), then
+  the API. To roll back, roll the API back first.
+- **Never roll the runner back on its own while debates admitted by the new API are still
+  queued or running.** Their receipts carry the new member. Roll the API back first. Right after,
+  run the command below and note `newest`. Roll the runner back once `unfinished` is 0, or
+  `oldest` is above the number you noted:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created_at_seq) AS oldest, max(created_at_seq) AS newest FROM core.work_item WHERE state IN ('READY', 'CLAIMED')"
+```
+
+- **The website and the API ship together**, in both directions. The public list now carries a
+  floor label (`floor_verdict`), and an older website refuses the list when its shape is not the
+  exact old one. (A newer website reads an older API's list fine.)
+- **Rolling the API back past this release hides the debates published under it that carry a
+  story, a language or a floor.** Such public snapshots carry at least one new member
+  (`story_short`, `language`, `floor`), which the older API's strict reader refuses. Those public
+  pages then answer "not found" and drop out of the public list (the older list's total still
+  counts them) until you roll forward again. Nothing is deleted.
+- After the upgrade, every story is stored as failed with `STORY_NOT_CONFIGURED` until the next
+  hosted register publish (§11, "What the runner's log says about answers and stories").
+
 ### Production floors the code itself enforces
 
 `assertProductionFloors` (`packages/register/src/runtime-environment.ts`) refuses to boot when
@@ -1034,6 +1065,7 @@ The paid-vendor probe spends `max_tokens: 8` per target per staleness window; th
 | `PROVIDER_AUTHORIZATION_FILE_UNUSABLE:` the provider ref, then the reason | the credential file is there but cannot be used: it failed custody (`SECRET_CUSTODY_INVALID`), the custody group could not be resolved (`CUSTODY_GROUP_UNRESOLVED`), or its contents are not one printable header line (`PROVIDER_CREDENTIAL_FILE_INVALID`). Neither the path nor a byte of the credential appears in the message. |
 | `COST_ENVELOPE_POLICY_UNRESOLVED` | the register version in force (`REGISTER_VERSION`) carries no `costEnvelopePolicy` row — the one an operator actually meets, by pinning a version published before the envelopes existed. Both services refuse. |
 | `COST_ENVELOPE_POLICY_INVALID` | that row exists but is malformed. |
+| `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling cannot hold one full debate plus its verdict story: the per-debate ceiling with the answer's overrun, plus the story's own cap with the story's overrun (0.36 USD with the values below). The `costEnvelopePolicy` row alone cannot see the story's row, so this is checked over both, here and when the register is published. Raise `daily_ceiling_micros` in a new register version. Both services refuse. |
 | `COST_ENVELOPES_NOT_SEALED` | a check on the integrity of the build: the envelope row this build ships was removed, emptied or made invalid. With the shipped source it is unreachable at runtime. The refusal a hosted operator meets is `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`, the two rows above. |
 | `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` | the API only: the `admissionPolicy` row in force lacks any of the support chat's three budgets (`support_reads`, `support_sessions`, `support_model_calls`). Local mode runs without them; hosted does not. |
 | `PROVIDER_TARGET_PRICE_REQUIRED:` and the provider ref | a debate target declares no price. Both `input_price_micros_per_million` and `output_price_micros_per_million` are required in hosted mode. |
@@ -1138,12 +1170,17 @@ service.
 
 ### The cost envelopes (V-28) — and the temporary values for the first paid run
 
-Two ceilings, both in money, both enforced in code in the hosted deployment only: **per run** (the
-call that would cross it is refused before it is made; the debate stops cleanly, keeps what it
-produced and is served as a components-only answer marked `ENVELOPE_EXHAUSTED`), and **per day**
-across every debate and vendor (no new debate starts until the next UTC day; debates under way
-finish). Every charged call is one row in `ledger.model_spend`, and both ceilings are sums over
-those rows. The operator record is
+Two ceilings, both in money, both enforced in code in the hosted deployment only: **per run** and
+**per day** across every debate and vendor (no new debate starts until the next UTC day; debates
+under way finish). At the per-run ceiling the call that would cross it is refused before it is
+made, and since the engine money rule (V-28 amended 2026-09-28; spec 2026-09-26 §14.4) the debate
+still gets its answer: a stop while it is argued ends the arguing only, and the run goes on to
+write its answer from what it has, with money kept aside for that (the reserve and overrun below).
+If the planned answer-writing model cannot be paid, the same call is retried on a cheaper model
+the run may use. Only when no model can be paid does the sealed answer stay components-only,
+marked `ENVELOPE_EXHAUSTED`, and the page then shows the **floor** (the label and the debate's
+strongest position; see "One answer's record" below). Every charged call is one row in
+`ledger.model_spend`, and both ceilings are sums over those rows. The operator record is
 `docs/missions/2026-09-01-security-hardening/COST-ENVELOPES-2026-09-22.md`.
 
 **The values in force are temporary and deliberately low**, for the owner's first paid run:
@@ -1152,6 +1189,34 @@ those rows. The operator record is
 |---|---|---|
 | `per_run_ceiling_micros` | `250000` | 0.25 USD per debate |
 | `daily_ceiling_micros` | `2000000` | 2.00 USD per UTC day |
+| `serve_reserve_basis_points` | `3000` | 30% of each debate's money is kept for writing the answer |
+| `serve_overrun_basis_points` | `2000` | writing the answer may go 20% over the per-debate ceiling |
+
+**The last two rows keep money for the answer** (engine money rule, spec 2026-09-26 §14.4.1).
+They are in basis points, where `10000` is the whole per-debate ceiling. With the values above,
+the calls made while a debate is argued may spend up to 70% of the per-debate ceiling
+(0.175 USD); the calls that write the answer may take the same debate's total up to 120% of it
+(0.30 USD). Both limits count the same running total, so the reserve is simply the part the
+arguing may not touch. The daily ceiling must hold one debate at its new maximum (per-debate
+ceiling plus the overrun, here 0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`);
+each new debate then reserves that maximum, plus the story's own ceiling, against the day.
+The verdict story's cap is a code-owned row the publication seals for you (`storyCostEnvelopePolicy`:
+0.05 USD per story, and since engine money rule task M7 a 20% margin over it,
+`per_story_overrun_basis_points` `2000`, so 0.06 USD). The day must hold one debate AND its story
+at their maxima, here 0.30 + 0.06 = 0.36 USD; a day below that is refused when you publish and
+when either service starts (`STORY_DAILY_CEILING_INSUFFICIENT`).
+Every debate charge written from now on is recorded with the part of the debate that spent it
+(`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer;
+empty for the support chat, the story and older rows), so the first paid run shows the two
+amounts separately.
+
+**Both are optional, and a version without them means 0: no money is kept back and the margin
+is off.** Every register version published before these members existed, and every file that
+leaves them out, keeps exactly the old single ceiling. The kit's example file carries `3000` and
+`2000`, but on this host they take effect only when you publish a register version whose
+`costEnvelopePolicy` carries them (§"Publishing the settings register on this host"; go-live
+checklist line 12). The file format stays `debateai.hosted-register.v1`: a v1 file without them
+is still valid and still means what it meant.
 
 The `costEnvelopePolicy` row says so about itself: it carries `provisional: true` and a
 `provisional_reason` naming V-28. They are meant to stop things — a normal debate costs dollars,
@@ -1167,6 +1232,82 @@ at the next UTC midnight) and `PROVIDER_USAGE_UNREPORTED` (a vendor answered wit
 figures, so its cost cannot be counted). Set a monthly spending cap on each vendor's own dashboard
 as well (go-live checklist line 8): the envelopes are the application's ceiling, the dashboard cap
 is the vendor's.
+
+#### One answer's record: what money and size did to it
+
+Every answer gets one owner-side record (`serve.serve_disclosure`, engine money rule §14.4.5 of
+`docs/superpowers/specs/2026-09-26-verdict-story-design.md`): which models were planned for writing
+and checking the answer and which actually did, whether a lower-cost model stood in because the
+planned one could not be paid, what cut the arguing or the answer-writing short, how far the
+debate's digest was shortened for the answer-writer, and — when no answer could be written at all —
+the **floor**: the label the engine derived and the leading position the page shows as the best
+answer. The answer's owner reads it through `GET /v1/answers/{id}/disclosure`; you read it with
+
+```sh
+# Paste the answer's id, or the run's id, at the prompt.
+read -r DEBATE_ID && systemd-run --pipe --wait --collect --uid=debateai-runner --gid=debateai-runner --property=EnvironmentFile=/etc/debateai/runner.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm ops:serve-disclosure "$DEBATE_ID"
+```
+
+`sudo -u` does not read the unit's `EnvironmentFile`; `systemd-run` does, so the command connects
+as the runner's own database principal (`runner.env` `DATABASE_URL`) without the credential ever
+reaching a command line. It only reads — its one connection is opened read-only, and on this host it
+refuses any principal but `debateai_prod_runner_runtime` — the record, the label receipt the floor
+was derived from, and the maker and model names of the calls the run recorded. It prints the answer's latest version that has a record (a review catch-up version
+has none of its own), one fact per line — ids, codes, counts and model names, never debate text, a
+price, an address or a credential:
+
+| Line | Meaning |
+|---|---|
+| `answer: written by a model and checked` | a model wrote the answer and a checker read it |
+| `answer: not written by a model; the floor stands in for it` + `floor: <label>, on the leading position <id>` + `floor reason: <code>` | no answer could be written; the sealed answer stays components-only and the page shows the floor (the reason is the sealed cause: `ENVELOPE_EXHAUSTED`, `DIGEST_CANNOT_EXIST`, `TRANSPORT_DEATH` or `NO_ARTIFACT`) |
+| `floor label basis: incomplete (…)` / `complete` | the floor's label was derived without a margin or a disagreement measure (one position, or one voice), which the page notes in plain words |
+| `answer writer planned:` / `used:`, `answer checker planned:` / `used:` | maker · model (provider ref); `none` when no checked round was served |
+| `a lower-cost model was used: yes, for money` | the planned model could not be paid, and a cheaper one of the run's own models stood in (the only substitution the engine makes) |
+| `one model both wrote and checked the answer: yes` | the two-model check was lost to the substitution |
+| `arguing cut short by:` / `answer-writing cut short by:` | `money`, `the attempt ceiling`, `a vendor that reported no usage`, `the daily ceiling`, `a dead model connection`, `a draft with nothing to serve`, or `nothing` |
+| `digest the answer-writer read: rung N, …` + `points left out of that digest: N` | how far the debate was shortened to fit the answer-writer's input; only the last rung (the spine) leaves points out |
+
+A refusal is one code on stderr: `SERVE_DISCLOSURE_USAGE` (not exactly one id), `SERVE_DISCLOSURE_NOT_FOUND`
+(no record for that id: a failed run has none), `SERVE_DISCLOSURE_ENVIRONMENT_INVALID` (no
+`DATABASE_URL`: the `EnvironmentFile` was not loaded), `DATABASE_URL_TLS_REQUIRED:DATABASE_URL`,
+`SERVE_DISCLOSURE_CONNECTION_NOT_READ_ONLY`, `SERVE_DISCLOSURE_PRINCIPAL_INVALID` (not run as the
+runner, with `runner.env`), or `SERVE_DISCLOSURE_REPORT_FAILED`.
+
+#### What the runner's log says about answers and stories
+
+The runner writes one JSON line per event to its journal. Each line carries ids and codes only,
+never debate or model text, and none of these events changes an answer. Today's lines:
+
+```sh
+journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DISCLOSURE|DEBATEAI_STORY'
+```
+
+| Signal | What it means | What to do |
+|---|---|---|
+| `"kind":"DEBATEAI_SERVE_DISCLOSURE"`, `"event":"SERVE_DISCLOSURE_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `answerId` | The answer's owner-side record (above) could not be written. The answer itself is exactly what it would have been. What is lost is the record. **When no model could write the answer, its floor is lost**: the pages say the verdict is unavailable instead of showing "Our best answer:", the answer gets no story, and `pnpm ops:serve-disclosure` answers `SERVE_DISCLOSURE_NOT_FOUND`. For a written answer, the owner's record and the PDF's lower-cost note are missing. | Nothing writes the row later: it is written once, right after the answer. Keep the line. A typed `code` (for example `SERVE_DISCLOSURE_RECORD_INVALID`) is a defect to report. `UNTYPED` with a `sqlState` is the database refusing (for example `23503`) or a lost connection. More than one in a day is worth investigating. |
+| A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, shown on the owner's page as "Debate generation failed: …" and kept in `core.work_item.terminal_reason` | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
+| `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
+| `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
+| `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
+| `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
+
+The API writes two related lines to its own journal (`journalctl -u debateai-api`), again with
+ids and a bounded diagnostic only:
+
+| Signal | What it means | What to do |
+|---|---|---|
+| `"event":"api.disclosure.unreadable"`, with `diagnostic` | An answer's owner-side record exists but is corrupt: a floor without its label receipt (`SERVE_DISCLOSURE_ROW_INVALID`) or a stored cause outside the closed list (`SCHEMA_VALIDATION_ERROR`). The owner's page and the PDF then behave as if there were no record: no floor, no lower-cost note. A database outage is not this line; it stays a 500. | A defect to report, with the answer id from `pnpm ops:serve-disclosure`. |
+| `"event":"api.story.unreadable"`, with `diagnostic` | The story of an answer the caller owns could not be read, decrypted or derived (a database hiccup included). The route answers "unavailable" rather than an error; the owner's page asks again a few times, then shows the answer without its story. | A single one during a database hiccup is harmless. Repeated ones for the same answer are a defect to report. |
+
+The story's other events carry codes only: `STORY_STORED` (every story, with its outcome),
+`STORY_LATER_ROUND_FAILED`, `STORY_MATERIAL_TOO_LARGE`, `STORY_SNAPSHOT_FAILED`,
+`STORY_WRITE_FAILED` and `STORY_FAILURE_NOT_RECORDED`.
+
+**`DEBATEAI_STORY_SHAPES_DIR`** (optional, in `runner.env`) names the directory the story shapes
+are read from. Left unset, the runner finds `story-shapes/` in its own checkout, here
+`/opt/debateai/dialectical-engine/story-shapes`. A value that names no directory holding
+`pack.json` is refused when the runner starts: `STORY_PACK_INVALID` with the reason
+`STORY_PACK_DIR_UNRESOLVED`. Stories then fail; debates do not.
 
 ### Publishing the settings register on this host
 
@@ -1226,7 +1367,8 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `PROVIDER_TARGET_PRICE_REQUIRED:` / `PROVIDER_TARGET_PRICE_ZERO:` + ref | the same refusals the units raise at start-up |
 | `PROVIDER_TARGET_LOOPBACK_REFUSED:` / `PROVIDER_BASE_URL_TLS_REQUIRED:` / `PROVIDER_INLINE_CREDENTIAL_REFUSED:` + ref | a relay, a local or private address, cleartext, or a credential written into the file |
 | `PROVIDER_VENDOR_NOT_VETTED:` + ref | the vendor's V-9(4) record is missing or incomplete |
-| `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units, or the daily ceiling is below the per-run one |
+| `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000 |
+| `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin, 0.06 USD); raise `daily_ceiling_micros` |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |

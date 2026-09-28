@@ -10,18 +10,32 @@ import {
 } from "@debateai/crypto";
 import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
+import { TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
   loadRunnerEnvironment,
-  readCostEnvelopePolicy
+  readCostEnvelopePolicy,
+  readStoryPolicyFromRegister
 } from "@debateai/register";
-import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
+import {
+  CostEnvelopeGuard,
+  PostgresModelSpendStore,
+  costEnvelopeGuardPolicy,
+  type CostEnvelopePhase
+} from "@debateai/budget";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
 import { assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
-import { createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, WalkingSkeletonRunner } from "./index.js";
+import {
+  STORY_SHAPES_DIR_ENV_KEY,
+  StoryWriter,
+  loadStoryPack,
+  resolveStoryPackDir,
+  type StoryPack
+} from "@debateai/story";
+import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logServeDisclosure, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -67,6 +81,58 @@ if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   ));
 }
 const policy = await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION);
+/**
+ * VERDICT STORY (spec 2026-09-26 §9): the story's register rows are OPTIONAL.
+ * A register that never sealed them — every version before this feature,
+ * acceptance v3 included — reads as `null`, and each story is then written as
+ * FAILED/STORY_NOT_CONFIGURED without a model call. A PARTLY sealed or
+ * malformed family is logged by code and treated the same way: the story can
+ * never stop this runner from claiming a debate.
+ */
+const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
+  .catch((error: unknown) => {
+    console.warn(JSON.stringify({
+      kind: "DEBATEAI_STORY",
+      event: "STORY_POLICY_UNREADABLE",
+      code: error instanceof TypedDomainError ? error.code : "UNTYPED"
+    }));
+    return null;
+  });
+const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
+/**
+ * Codes and ids only: a story log line never carries story or debate text. The
+ * detail goes FIRST, so no detail key can overwrite the line's kind or event.
+ */
+const storyLog = (event: string, detail: Record<string, unknown>): void => {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_STORY", event }));
+};
+/**
+ * The shape pack is loaded ONCE, here (spec §5.1). An invalid pack never stops
+ * the runner: every story is then FAILED/STORY_PACK_INVALID, and this line says
+ * exactly which rule failed. ANY error counts — a typed pack refusal, an
+ * unresolvable directory, or a raw file-system or URL error — so the story can
+ * never stop this runner from booting. The directory comes from the runner's
+ * environment shape, never from the process environment directly (the source
+ * audit's law).
+ */
+let storyPack: StoryPack | { readonly error: string };
+try {
+  storyPack = loadStoryPack(resolveStoryPackDir({
+    env: { [STORY_SHAPES_DIR_ENV_KEY]: environment.DEBATEAI_STORY_SHAPES_DIR },
+    moduleUrl: import.meta.url
+  }));
+} catch (error) {
+  // The rule the pack broke (a typed refusal names it), or, for a raw failure,
+  // the error's own code or class name — never a file's text.
+  const rawCode = typeof error === "object" && error !== null ? (error as { readonly code?: unknown }).code : undefined;
+  const cause = typeof rawCode === "string" && /^[A-Z][A-Z0-9_]{0,63}$/u.test(rawCode)
+    ? rawCode
+    : error instanceof Error ? error.name : "UNKNOWN";
+  storyPack = Object.freeze({
+    error: error instanceof TypedDomainError ? `${error.code}: ${error.message}` : `STORY_PACK_UNREADABLE: ${cause}`
+  });
+  storyLog("STORY_PACK_INVALID", { reason: storyPack.error });
+}
 const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
 if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
   throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
@@ -108,7 +174,14 @@ const hatchet = new Hatchet({
 const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
   ? new CostEnvelopeGuard({
       store: new PostgresModelSpendStore(pool),
-      policy: await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+      // Verdict story: the story's OWN ceiling and overrun, when the register
+      // sealed them. Engine money rule, Task M7: built by the one check over
+      // BOTH money rows, which refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT)
+      // when the day cannot hold one full run plus its story.
+      policy: costEnvelopeGuardPolicy(
+        await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION),
+        storyPolicy
+      )
     })
   : undefined;
 const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
@@ -126,8 +199,18 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       // The run is not known until a work item is claimed, so the seam is built
       // per call from the run the gateway was handed. Hosted requires the vendor
       // to report usage: a call that cannot be billed cannot be bounded.
-      buildCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.providerSeam({
-        runId, price, requireReportedUsage: true
+      // Task M1: the gateway also names the call's phase, so an answer-writing
+      // call is held to the answer's ceiling and every other call to the body's.
+      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase) => costEnvelopeGuard.providerSeam({
+        runId, price, requireReportedUsage: true, phase
+      }),
+      // Verdict story (spec §8): the story's calls spend its OWN envelope. With
+      // no sealed story ceiling there is no story seam, and the gateway refuses
+      // a metered story call (STORY_ENVELOPE_MISSING) rather than run it unbounded.
+      ...(storyCeilingMicros === null ? {} : {
+        buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({
+          runId, price, requireReportedUsage: true
+        })
       })
     })
   });
@@ -140,6 +223,29 @@ assertRunnerPrimaryProviderConfiguration({
   primary: providerTopology.primary,
   firstTarget: declaredProviderTargets[0],
   declared: environment
+});
+/**
+ * VERDICT STORY: one writer for this runner, on the runner's OWN pool (the
+ * content lease is borrowed by pool identity). Its boot resolver covers every
+ * configured provider, but the runner hands every run's story that run's own
+ * claim-eligible providers, and that resolver REPLACES the boot one for the
+ * run: a story role outside them is STORY_ROLE_UNAVAILABLE, never a fallback
+ * to a provider the run's claim did not probe.
+ */
+const storyWriter = new StoryWriter({
+  pool,
+  pack: storyPack,
+  policy: storyPolicy,
+  hosted: environment.DEPLOYMENT_MODE === "hosted",
+  resolveProvider: (roleRef) => {
+    const member = [
+      providerTopology.primary,
+      ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]),
+      ...providerTopology.additionalMakers
+    ].find((candidate) => candidate.providerRef === roleRef);
+    return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef };
+  },
+  log: storyLog
 });
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
@@ -208,6 +314,17 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // every register family the run reads. Without this line the claim-time
   // gate refuses every work item and no statement is ever synthesized.
   synthesisRolePolicy: policy.synthesisRolePolicy,
+  // Verdict story (spec §3): written after each settled debate; never inside it.
+  story: storyWriter,
+  // Engine money rule, Task M3 (spec §14.4.2): each target's price, so an
+  // answer-writing call refused for money tries the cheaper claim-eligible
+  // makers first. Hosted only (local mode's map is empty); never sealed.
+  providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
+  // Engine money rule, Task M3 (spec §14.4.5): the row goes to the runner's own
+  // pool (the default store); a failure to write it is the runner's one
+  // code-only DEBATEAI_SERVE_DISCLOSURE line, named here so the shipped wiring
+  // says where it goes.
+  serveDisclosure: { log: logServeDisclosure },
   claimTimeSynthesisRoleProbe: async (providerRef) => {
     const target = providerTargets.find((candidate) => candidate.providerRef === providerRef);
     if (target === undefined) {

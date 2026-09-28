@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Lisää väittelyn toimintoja",
   "chrome.help": "Ohje",
   "chrome.signedInAsker": "Kirjautunut kysyjä",
-  "chrome.guestSession": "Vierasistunto"
+  "chrome.guestSession": "Vierasistunto",
+  "chrome.languageOffer.label": "Sivun kieli",
+  "chrome.languageOffer.text": "Tämän väittelyn kieli on {language} ({nativeName}). Näytetäänkö sivu kielellä {language}?",
+  "chrome.languageOffer.textNative": "Tämän väittelyn kieli on {language}. Näytetäänkö sivu kielellä {language}?",
+  "chrome.languageOffer.switch": "Vaihda kieleksi {language}",
+  "chrome.languageOffer.dismiss": "Ei kiitos"
 }

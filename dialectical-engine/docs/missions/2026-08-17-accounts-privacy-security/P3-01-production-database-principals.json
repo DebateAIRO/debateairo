@@ -723,6 +723,14 @@
           "environmentKey": "DATABASE_URL",
           "purpose": "RUNNER_PRODUCT_RUNTIME",
           "binding": "WIRED"
+        },
+        {
+          "component": "apps/runner:serve-disclosure-cli",
+          "sourceFile": "apps/runner/src/serve-disclosure-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "SERVE_DISCLOSURE_OPERATOR_REPORT",
+          "binding": "WIRED",
+          "condition": "package script ops:serve-disclosure"
         }
       ]
     },

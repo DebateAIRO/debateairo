@@ -123,19 +123,85 @@ describe("Accounts S8 publication architecture", () => {
   });
 
   it("exposes a dedicated strict public contract and no anonymous owner-only carriers", async () => {
-    const [contract, api] = await Promise.all([
+    const [contract, story, api, disclosure] = await Promise.all([
       read("packages/contract/src/index.ts"),
-      read("apps/api/src/index.ts")
+      read("packages/contract/src/story.ts"),
+      read("apps/api/src/index.ts"),
+      read("packages/contract/src/disclosure.ts")
     ]);
     const schema = contract.slice(
       contract.indexOf("export const PublicDebateSchema"),
       contract.indexOf("export type PublicDebate =")
     );
-    expect(schema).toContain(".strict()");
-    for (const forbidden of [
+    const ownerOnly = [
       "asker_id", "owner_ref", "user_id", "run_ref", "answer_id", "memory_disclosure",
       "ledger_digest_handle", "inspection_handle", "cost_envelope", "tier_provenance_ref"
-    ]) expect(schema).not.toContain(forbidden);
+    ];
+    expect(schema).toContain(".strict()");
+    for (const forbidden of ownerOnly) expect(schema).not.toContain(forbidden);
+    // Verdict story (Task 11): the snapshot's short story is its own strict
+    // schema in story.ts, so the same guard reads it there. It names exactly
+    // the short version (R1: with its confidence sentence) and the reviewer's
+    // note; the checker's reservation, the point numbers, the verdict basis, the
+    // lineages, the pack and the reasons (full report only) stay owner-only.
+    expect(schema).toContain("story_short: PublicStoryShortSchema.optional()");
+    // R2 (spec §14.3): the question's language tag rides on the snapshot, not in
+    // the short story: optional (old snapshots parse), the story's own bounded
+    // tag schema, copied at publish time from the run by the owner-scoped read.
+    expect(schema).toContain("language: StoryLanguageTagSchema.optional()");
+    // Engine money rule, Task M5 (spec §14.4.4): a components-only answer's
+    // floor rides on the snapshot, optional (old snapshots parse), copied at
+    // publish time from the owner's record: the label, the published position
+    // it rests on and whether that label's basis was thin (M5 review, I2) —
+    // never the reason code (owner-only `floor_reason`), a model or a count.
+    expect(schema).toContain("floor: AnswerFloorSchema.optional()");
+    expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor"]);
+    const floorStart = disclosure.indexOf("export const AnswerFloorSchema");
+    const floorEnd = disclosure.indexOf("export type AnswerFloor =");
+    expect(floorStart).toBeGreaterThan(-1);
+    expect(floorEnd).toBeGreaterThan(floorStart);
+    const floorSchema = disclosure.slice(floorStart, floorEnd);
+    expect(floorSchema).toContain(".strict()");
+    expect([...floorSchema.matchAll(/^\s*([a-z_]+):/gmu)].map((match) => match[1]))
+      .toEqual(["verdict_state", "leading_node_id", "basis_incomplete"]);
+    for (const forbidden of [...ownerOnly, "reason", "model", "provider", "writer", "checker", "cut_short", "digest"]) {
+      expect(floorSchema).not.toContain(forbidden);
+    }
+    // Task M6 (fix round 2): the public list's summary is pinned the same way, so a new field needs a
+    // deliberate edit here. The floor rides on it as its label only (`floor_verdict`): never the
+    // position, the thin-basis flag or the owner-only cause.
+    const summaryStart = contract.indexOf("export const PublicDebateSummarySchema");
+    const summaryEnd = contract.indexOf("export type PublicDebateSummary =");
+    expect(summaryStart).toBeGreaterThan(-1);
+    expect(summaryEnd).toBeGreaterThan(summaryStart);
+    const summarySchema = contract.slice(summaryStart, summaryEnd);
+    expect(summarySchema).toContain(".strict()");
+    expect([...summarySchema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "models", "verdict", "confidence_band", "floor_verdict"]);
+    for (const forbidden of [...ownerOnly, "leading_node_id", "basis_incomplete", "floor_reason"]) {
+      expect(summarySchema).not.toContain(forbidden);
+    }
+    const storyStart = story.indexOf("export const PublicStoryShortSchema");
+    const storyEnd = story.indexOf("export type PublicStoryShort =");
+    expect(storyStart).toBeGreaterThan(-1);
+    expect(storyEnd).toBeGreaterThan(storyStart);
+    const storySchema = story.slice(storyStart, storyEnd);
+    expect(storySchema).toContain(".strict()");
+    // Final review, Important 2: `double_checked`, an optional boolean set only
+    // for a story the checker was not fully satisfied with, so the public page
+    // shows the same gentle catalogue line as the owner's page and the PDF. It
+    // is a flag, never the checker's own text.
+    expect([...storySchema.matchAll(/^\s*([a-z_]+):/gmu)].map((match) => match[1]))
+      .toEqual(["headline", "summary", "confidence", "paths", "change", "reviewer_note", "double_checked"]);
+    expect(storySchema).toContain("double_checked: z.boolean().optional()");
+    for (const forbidden of [
+      ...ownerOnly, "answer_version", "reservation", "point_numbers", "verdict_basis", "storyteller",
+      "checker", "lineage", "pack", "fingerprint", "shape_id", "long", "rounds", "written_at", "why"
+    ]) expect(storySchema).not.toContain(forbidden);
+    // The question's language is not private; it is published once, on the
+    // snapshot itself (above), never inside the short story.
+    expect(storySchema).not.toContain("language");
     expect(api).toContain('GET /v1/public/debates/{id}');
     expect(api).not.toContain('GET /v1/public/debates/{id}/inspection');
     expect(api).not.toContain('GET /v1/public/debates/{id}/ledger-digest');

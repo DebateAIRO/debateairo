@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Още действия с дебата",
   "chrome.help": "Помощ",
   "chrome.signedInAsker": "Питащ (влязъл в профила си)",
-  "chrome.guestSession": "Сесия като гост"
+  "chrome.guestSession": "Сесия като гост",
+  "chrome.languageOffer.label": "Език на страницата",
+  "chrome.languageOffer.text": "Този дебат е на {language} ({nativeName}). Да се покаже ли страницата на {language}?",
+  "chrome.languageOffer.textNative": "Този дебат е на {language}. Да се покаже ли страницата на {language}?",
+  "chrome.languageOffer.switch": "Превключване към {language}",
+  "chrome.languageOffer.dismiss": "Не, благодаря"
 }

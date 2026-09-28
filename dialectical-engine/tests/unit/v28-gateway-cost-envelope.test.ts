@@ -381,7 +381,8 @@ describe("C-I1 a 200 carrying a real vendor's usage block is charged", () => {
       kept.reduce((total, row) => total + row.chargeMicros, 0);
     const store: ModelSpendStore = {
       recordSpend: async (entry) => { rows.push(entry); },
-      readRunSpentMicros: async (runId) => sum(rows.filter((row) => row.runId === runId)),
+      readRunSpentMicros: async (runId) => sum(rows.filter((row) => row.runId === runId && row.spendSource !== "STORY")),
+      readRunStorySpentMicros: async (runId) => sum(rows.filter((row) => row.runId === runId && row.spendSource === "STORY")),
       readDaySpentMicros: async (day) => sum(rows.filter((row) => row.chargedOn === day)),
       admitNewRun: async (input) => {
         const held = reservations
@@ -415,7 +416,7 @@ describe("C-I1 a 200 carrying a real vendor's usage block is charged", () => {
     });
     const { gateway } = gatewayWith(
       vendorReporting(OPENAI_USAGE, calls),
-      guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true })
+      guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" })
     );
 
     await expect(gateway.call()).resolves.toMatchObject({ model: MODEL });

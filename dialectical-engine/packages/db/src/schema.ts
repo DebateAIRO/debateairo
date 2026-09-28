@@ -540,6 +540,27 @@ export const answer = serve.table("answer", {
   contentAttestation: bytea("content_attestation")
 });
 
+/** Verdict story (migration 0074): one insert-once, encrypted story per served answer version. */
+export const answerStory = serve.table("answer_story", {
+  storyId: uuid("story_id").primaryKey(),
+  runId: uuid("run_id").notNull(),
+  answerId: uuid("answer_id").notNull(),
+  answerVersion: integer("answer_version").notNull(),
+  outcome: text("outcome").notNull(),
+  failureCode: text("failure_code"),
+  shapeId: text("shape_id"),
+  packVersion: text("pack_version"),
+  packFingerprint: text("pack_fingerprint"),
+  storytellerLineage: jsonb("storyteller_lineage"),
+  checkerLineage: jsonb("checker_lineage"),
+  rounds: integer("rounds").notNull(),
+  artifactRefs: jsonb("artifact_refs").notNull(),
+  content: jsonb("content").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull()
+});
+
 export const segmentSuppression = serve.table("segment_suppression", {
   answerId: uuid("answer_id").notNull(),
   answerVersion: integer("answer_version").notNull(),

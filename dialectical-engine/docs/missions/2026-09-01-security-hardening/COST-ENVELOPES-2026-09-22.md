@@ -11,6 +11,8 @@ Two ceilings, both in money, both enforced in code:
 | Per run | What ONE debate may spend, across every vendor it touches | The call that would cross it is refused **before** it is made. The debate stops cleanly, keeps everything it has already produced, and is served as a components-only answer marked `ENVELOPE_EXHAUSTED`. It is not a crash. |
 | Per day | What the WHOLE application may spend in one UTC day | No **new** debate starts until the next UTC day. Debates already under way finish — stopping one would throw away work already paid for. |
 
+> **Amended 2026-09-28 (engine money rule, spec `docs/superpowers/specs/2026-09-26-verdict-story-design.md` §14.4; owner yes 2026-09-27).** The "Per run" row is no longer what happens. A debate that reaches its ceiling while it is being argued stops arguing and still writes its answer. The operator-owned `costEnvelopePolicy` gains two optional members: `serve_reserve_basis_points` (money kept for the answer; example 3000 = 30%) and `serve_overrun_basis_points` (how far the answer may go over; example 2000 = 20%). A refused answer call retries on a cheaper model, and the last resort is the floor (the label and the strongest position). The runbook (`deploy/vps/README.md`, the money section) says how to publish the two values. See "Amendment to V-28" in `V-DECISIONS-PACKET.md`.
+
 Both are enforced only in the **hosted** deployment. Local mode — the command-line relays and loopback model servers anyone can run on their own computer — is untouched and keeps the attempt ceiling it has always had. There is no money at stake there, and the subscription tools report no usage.
 
 ## The values in force today are TEMPORARY, and deliberately too small

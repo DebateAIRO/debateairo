@@ -13,10 +13,10 @@ import {
   filterLocales,
   getLocale,
   LOCALES,
-  LOCALE_COOKIE,
   type LocaleCode,
   type LocaleTier
 } from "@/lib/i18n/locales";
+import { writeLocaleCookie } from "@/lib/i18n/localeChoice";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/translate";
 import {
@@ -70,7 +70,7 @@ export function LanguageSwitcher() {
   }, [filteredCodes, highlightedCode]);
 
   function select(code: LocaleCode): void {
-    document.cookie = `${LOCALE_COOKIE}=${code}; Path=/; SameSite=Lax; Max-Age=31536000`;
+    writeLocaleCookie(code);
     close(false);
     window.location.reload();
   }

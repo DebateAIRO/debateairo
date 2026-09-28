@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Mai multe acțiuni pentru dezbatere",
   "chrome.help": "Ajutor",
   "chrome.signedInAsker": "Autor autentificat",
-  "chrome.guestSession": "Sesiune de invitat"
+  "chrome.guestSession": "Sesiune de invitat",
+  "chrome.languageOffer.label": "Limba paginii",
+  "chrome.languageOffer.text": "Această dezbatere este în limba {language} ({nativeName}). Afișați pagina în limba {language}?",
+  "chrome.languageOffer.textNative": "Această dezbatere este în limba {language}. Afișați pagina în limba {language}?",
+  "chrome.languageOffer.switch": "Treceți la limba {language}",
+  "chrome.languageOffer.dismiss": "Nu, mulțumesc"
 }

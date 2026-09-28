@@ -43,6 +43,7 @@ import { open, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Pool } from "pg";
 import { z } from "zod";
+import { costEnvelopeGuardPolicy } from "@debateai/budget";
 import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
@@ -55,6 +56,7 @@ import {
   ALGORITHM_REGISTER_ROW_KEYS,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
+  STORY_ROW_KEYS,
   admissionPolicyFromValue,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
@@ -76,6 +78,7 @@ import {
   readProductRolePolicy,
   readRecoveryPolicy,
   readSessionPolicy,
+  readStoryPolicy,
   readStructuralCeilingPolicyInputs,
   registerVersionToSafeLegacyNumber,
   warnOnIdenticalSynthesisRoleRefs,
@@ -488,7 +491,7 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     healthyProviderRefs: Object.freeze([]),
     targets,
     targetsJson
-  }, synthesisRoles);
+  }, synthesisRoles, "hosted");
   const operatorRows = new Map<string, RegisterPublicationRow>([
     [CONFIGURED_PROVIDER_SET_ROW_KEY, Object.freeze({
       rowKey: CONFIGURED_PROVIDER_SET_ROW_KEY,
@@ -514,6 +517,17 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   if (admission === undefined) refuse("HOSTED_REGISTER_ROW_MISSING:admissionPolicy");
   assertHostedSupportAdmissionSealed("hosted", admissionPolicyFromValue(
     JSON.parse(admission.valueJsonText) as unknown, admission.sourceRef
+  ));
+  // Engine money rule, Task M7 (spec §14.4.1): the operator's cost row checks
+  // its day against one run only; the code-owned story row lands in the same
+  // version, so the day is checked against one run AND its story, over both
+  // rows, by the check both boots run (STORY_DAILY_CEILING_INSUFFICIENT).
+  const storyKeys: readonly string[] = STORY_ROW_KEYS;
+  costEnvelopeGuardPolicy(costEnvelope, readStoryPolicy(
+    rows.filter((row) => storyKeys.includes(row.rowKey)).map((row) => Object.freeze({
+      rowKey: row.rowKey, value: JSON.parse(row.valueJsonText) as unknown, sourceRef: row.sourceRef
+    })),
+    bootstrap.registerVersion
   ));
 
   const exampleLiteralVendors = new Set(file.configuredProviderSet.providers
@@ -563,7 +577,10 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
     `cost_envelope currency=${plan.costEnvelope.currency}`
       + ` per_run_ceiling_micros=${plan.costEnvelope.perRunCeilingMicros}`
       + ` daily_ceiling_micros=${plan.costEnvelope.dailyCeilingMicros}`
-      + ` provisional=${plan.costEnvelope.provisional}`,
+      + ` provisional=${plan.costEnvelope.provisional}`
+      // Task M1: the answer's reserve and overrun, 0 when the file leaves them out.
+      + ` serve_reserve_basis_points=${plan.costEnvelope.serveReserveBasisPoints}`
+      + ` serve_overrun_basis_points=${plan.costEnvelope.serveOverrunBasisPoints}`,
     `synthesis_roles synthesizer=${plan.synthesisRoles.synthesizerRoleRef}`
       + ` evaluator=${plan.synthesisRoles.evaluatorRoleRef}`,
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`

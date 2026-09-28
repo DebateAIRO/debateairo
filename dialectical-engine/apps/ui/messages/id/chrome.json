@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Tindakan debat lainnya",
   "chrome.help": "Bantuan",
   "chrome.signedInAsker": "Penanya yang telah masuk",
-  "chrome.guestSession": "Sesi tamu"
+  "chrome.guestSession": "Sesi tamu",
+  "chrome.languageOffer.label": "Bahasa halaman",
+  "chrome.languageOffer.text": "Debat ini menggunakan bahasa {language} ({nativeName}). Tampilkan halaman dalam bahasa {language}?",
+  "chrome.languageOffer.textNative": "Debat ini menggunakan bahasa {language}. Tampilkan halaman dalam bahasa {language}?",
+  "chrome.languageOffer.switch": "Beralih ke bahasa {language}",
+  "chrome.languageOffer.dismiss": "Tidak, terima kasih"
 }

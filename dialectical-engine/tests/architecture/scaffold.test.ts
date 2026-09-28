@@ -37,9 +37,10 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
     "apps/scheduler -> obs-capture is not a declared edge"
   ]);
 
-  it("matches all 27 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
+  // 27 -> 28: the verdict story's `story` package row.
+  it("matches all 28 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
     const report = await auditArchitecture();
-    expect(report.edgeRowsChecked).toBe(27);
+    expect(report.edgeRowsChecked).toBe(28);
     expect(report.violations.filter((violation) => !DEV_F31_OBS_CAPTURE_EDGES.includes(violation)))
       .toEqual([]);
   });

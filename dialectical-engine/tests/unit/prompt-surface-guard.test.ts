@@ -11,11 +11,13 @@ import {
   type ProviderGateway
 } from "@debateai/providers";
 import {
+  DIGEST_LADDER,
   EVALUATOR_INSTRUCTIONS,
   SYNTHESIZER_INSTRUCTIONS,
   buildEvaluatorRequest,
   buildSynthesisDigest,
   buildSynthesizerRequest,
+  synthesisDigestLadder,
   toSynthesisPromptMaterial,
   type SynthesisCodeLabel,
   type SynthesisDigest,
@@ -514,6 +516,65 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
       expect(raw).not.toContain("RETRY");
     }
   );
+
+  /**
+   * ENGINE MONEY RULE, Task M4 review fix M-6: the digest's SPINE rung (short
+   * refs, `omittedPoints`) goes through the same projection, and is held to the
+   * same withholding, in each of the three payload shapes. The rows above render
+   * the guard's one-node digest, which never reaches that rung.
+   */
+  it("the spine rung's payload withholds the machinery too, in every shape (Task M4)", () => {
+    const chain = Array.from({ length: 12 }, (_unused, index) => ({
+      nodeId: `point:${String(index)}`,
+      statement: `${DIGEST_NODE_TEXT} Point ${String(index)} carries it further. `.repeat(4),
+      finalStrength: 0.4,
+      wayOfKnowing: "REASONING" as const,
+      marks: [],
+      polarityRelations: [{ polarity: "support" as const, targetNodeId: index === 0 ? SERVED_NODE_ID : `point:${String(index - 1)}` }],
+      isPosition: false,
+      isSurvivingObjection: false
+    }));
+    const nodes = [{
+      nodeId: SERVED_NODE_ID, statement: DIGEST_NODE_TEXT, finalStrength: SERVED_STRENGTH, wayOfKnowing: "RAN" as const,
+      marks: [], polarityRelations: [], isPosition: true, isSurvivingObjection: false
+    }, ...chain];
+    const firstSpine = [...synthesisDigestLadder({ nodes, servedRootNodeId: SERVED_NODE_ID })]
+      .find((attempt) => attempt.digest.compressionLevel === DIGEST_LADDER.spineRung)!;
+    const outcome = buildSynthesisDigest({ nodes, servedRootNodeId: SERVED_NODE_ID, budgetBound: firstSpine.digest.byteSize });
+    if (outcome.kind !== "DIGEST") throw new Error("the spine fixture must exist");
+    const spine = outcome.digest;
+    expect(spine.compressionLevel).toBe(DIGEST_LADDER.spineRung);
+    const shapes = [
+      { keys: ["code_label", "digest"], request: buildSynthesizerRequest({
+        controls: SYNTHESIS_CONTROLS, round: MACHINERY.round, digest: spine, codeLabel: SYNTHESIS_CODE_LABEL, prior: null
+      }) },
+      { keys: ["code_label", "digest", "prior_objection"], request: buildSynthesizerRequest({
+        controls: SYNTHESIS_CONTROLS, round: MACHINERY.round, digest: spine, codeLabel: SYNTHESIS_CODE_LABEL,
+        prior: { objection: PRIOR_OBJECTION, candidateRef: MACHINERY.priorCandidateRef }
+      }) },
+      { keys: ["candidate_statement", "code_label", "digest"], request: buildEvaluatorRequest({
+        controls: SYNTHESIS_CONTROLS, round: MACHINERY.round, digest: spine, codeLabel: SYNTHESIS_CODE_LABEL,
+        candidateStatement: CANDIDATE_STATEMENT
+      }) }
+    ];
+    for (const { keys, request } of shapes) {
+      const raw = renderMaterial(toSynthesisPromptMaterial(request));
+      const fields = parsedFields(raw);
+      expect(fields.map(({ name }) => name).sort()).toEqual(keys);
+      const digestField = JSON.parse(fields.find(({ name }) => name === "digest")!.content) as Record<string, unknown>;
+      expect(Array.isArray(digestField.omittedPoints)).toBe(true);
+      const leakedKeys = fields
+        .flatMap((field) => {
+          try { return everyKeyIn(JSON.parse(field.content) as unknown); } catch { return []; }
+        })
+        .filter((key) => (WITHHELD_SYNTHESIS_KEYS as readonly string[]).includes(key));
+      expect(leakedKeys).toEqual([]);
+      expect(Object.entries(MACHINERY).filter(([, sentinel]) => raw.includes(String(sentinel))).map(([field]) => field)).toEqual([]);
+      expect(raw).not.toContain("INITIAL");
+      expect(raw).not.toContain("RETRY");
+      expect(FOREIGN_ORGAN_TOKENS.filter((token) => raw.includes(token))).toEqual([]);
+    }
+  });
 
   it.each(SYNTHESIS_PAYLOADS.map(({ name, projectedKeys }) => [name, projectedKeys] as const))(
     "%s emits EXACTLY its projected key set",

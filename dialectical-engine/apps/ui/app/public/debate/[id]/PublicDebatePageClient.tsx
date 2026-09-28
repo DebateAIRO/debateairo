@@ -13,6 +13,7 @@ import {
   type TreeProjectableAnswer
 } from "@/lib/v3/adapter";
 import type { AnswerExport } from "@/lib/v3/answerExport";
+import { publicFloorHost, resolveFloor } from "@/lib/v3/floorAnswer";
 import { buildPublicAnswerExport } from "@/lib/v3/publicAnswerExport";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -27,6 +28,8 @@ import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 export function PublicDebatePageClient({
   debate,
   locale,
+  storyLocale,
+  storyCatalog,
   publicCatalog,
   timeCatalog,
   debateChromeCatalog,
@@ -37,6 +40,10 @@ export function PublicDebatePageClient({
 }: {
   debate: PublicDebate;
   locale: LocaleCode;
+  /** The locale of the language the debate was argued in (spec 2026-09-26 §14.3); the reader's own when the snapshot does not say. */
+  storyLocale: LocaleCode;
+  /** The `public` catalogue of `storyLocale`: the short story's fixed words. */
+  storyCatalog: MessageCatalog;
   publicCatalog: MessageCatalog;
   timeCatalog: MessageCatalog;
   debateChromeCatalog: MessageCatalog;
@@ -71,6 +78,10 @@ export function PublicDebatePageClient({
       nodesById: contractNodesById({ nodes: debate.answer.nodes ?? [] })
     };
   }, [composeCatalog, debate]);
+
+  // A components-only snapshot whose label the engine kept (spec 2026-09-26
+  // §14.4.4): its verdict area shows the floor answer, in the question's words.
+  const publicFloor = useMemo(() => resolveFloor(publicFloorHost(debate.answer), debate.floor), [debate]);
 
   // S14's dual gate, public edition: the label must never outrun the bytes.
   // buildPublicAnswerExport ships exactly what the public envelope carries, so
@@ -131,6 +142,10 @@ export function PublicDebatePageClient({
       composeCatalog={composeCatalog}
       homeCatalog={homeCatalog}
       publicMode
+      questionLocale={storyLocale}
+      storyLocale={storyLocale}
+      storyCatalog={storyCatalog}
+      publicFloor={publicFloor}
       publicNodesById={projection.nodesById}
       publicExport={publicExport}
       publicHeader={publicHeader}
@@ -138,6 +153,8 @@ export function PublicDebatePageClient({
         <PublicDebateOverview
           debate={debate}
           catalog={publicCatalog}
+          storyCatalog={storyCatalog}
+          storyLocale={storyLocale}
           composeCatalog={composeCatalog}
           onDetails={onDetails}
           onRead={onRead}
@@ -149,6 +166,7 @@ export function PublicDebatePageClient({
           catalog={publicCatalog}
           locale={locale}
           onClose={close}
+          floorShown={publicFloor !== null}
         />
       )}
       />

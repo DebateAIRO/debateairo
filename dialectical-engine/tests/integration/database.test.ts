@@ -12,16 +12,25 @@ import {
   WorkItemRepository
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
-import { BudgetRepository } from "@debateai/budget";
-import { ProviderProbeRepository, RunRepository, migrate } from "@debateai/db";
+import { BudgetRepository, type CostEnvelopePhase } from "@debateai/budget";
+import { ProviderProbeRepository, RunRepository, ServeDisclosureRepository, migrate, type StoredServeDisclosure } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
-import { EVALUATOR_INSTRUCTIONS, SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
-import { framedFixturePacket, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
+import {
+  DIGEST_LADDER,
+  EVALUATOR_INSTRUCTIONS,
+  SYNTHESIZER_PROMPT_CONTRACT,
+  buildSynthesisDigest,
+  type DigestSourceNode,
+  type SynthesisDigest
+} from "@debateai/serve";
+import { framedField, framedFixturePacket, readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { requestedReviewEdges, type RequestedReviewEdge } from "../support/reviewBearings.js";
 import {
+  ALGORITHM_REGISTER_ROW_FAMILIES,
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
   assertBootstrapEquality,
+  buildAlgorithmRegisterRows,
   loadBootstrapRegister,
   parseRegisterVersionText,
   persistBootstrapRegister,
@@ -34,17 +43,19 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   applySingleLineageBandCap,
+  catchUpFloorWouldMove,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
   EVALUATOR_CONTRACT_TEXT,
   EVALUATOR_PROMPT_CONTRACT,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
+  runnerTerminalFailureReason,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
 } from "@debateai/runner";
-import type { ProviderCallRequest, ProviderGateway } from "@debateai/providers";
+import type { ProviderCallRequest, ProviderCostEnvelopeSeam, ProviderGateway } from "@debateai/providers";
 import { evaluate } from "@debateai/propagation";
 import { agg, σ } from "@debateai/published-arithmetic";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
@@ -55,12 +66,13 @@ import {
   type ServeGateResult
 } from "@debateai/serve";
 import {
+  AnswerDisclosureSchema,
   AnswerSchema,
   PLAN_TIER_ROSTERS,
   type AskRequest,
   type Session
 } from "@debateai/contract";
-import { argumentLanguageDirective, type ServedRootRuleHistory } from "@debateai/kernel";
+import { argumentLanguageDirective, TypedDomainError, type ServedRootRuleHistory } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -68,6 +80,9 @@ import {
   type AskApplication,
   type RunCreationSettings
 } from "@debateai/api";
+import { buildAnswerDisclosure } from "../../apps/api/src/disclosures.js";
+import { openServeDisclosureReader, runServeDisclosureCli } from "../../apps/runner/src/serve-disclosure-cli.js";
+import { persistCatchUpVersion } from "../support/catchUpVersion.js";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
 import {
@@ -287,7 +302,8 @@ async function createRun(
   maxModelAttempts = 10,
   agentCount = 1,
   depth = 1,
-  askerId = `asker:${questionLine}`
+  askerId = `asker:${questionLine}`,
+  envelopeBasis: Readonly<Record<string, unknown>> = fixtureStructuralCeiling(maxModelAttempts, agentCount, Math.min(depth, 5))
 ): Promise<string> {
   return new RunRepository(database.pool).startRun({
     questionLine, principal: { kind: "legacy", legacyAskerId: askerId },
@@ -295,7 +311,7 @@ async function createRun(
     asOf: new Date("2026-08-07T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${questionLine}`, compositionBudgetTier: "low",
     depthParams: { depth }, discoveredPanel: fixtureDiscoveredPanel(agentCount), strangerSampleRate: 1,
-    envelopeBasis: fixtureStructuralCeiling(maxModelAttempts, agentCount, Math.min(depth, 5)),
+    envelopeBasis,
     registerVersion: 1, batteryVersion: "s00", batteryRows
   });
 }
@@ -582,20 +598,35 @@ async function executeResil01Scenario(input: {
   readonly secondary: readonly ProviderDoubleResponse[];
   readonly depth?: number;
   readonly beforeExecute?: (context: { runId: string; workItemId: string }) => Promise<void>;
+  /** Engine money rule, Task M2: the run's receipt, when a test pins its own. */
+  readonly envelopeBasis?: Readonly<Record<string, unknown>>;
+  /** Engine money rule, Task M2: each maker's money seam, as a hosted runner builds one per call. */
+  readonly primaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  readonly secondaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  /** Engine money rule, Task M3: settings a test adds on top of the scenario's own. */
+  readonly settings?: Partial<WalkingSkeletonSettings>;
+  /** Engine money rule, Task M3: every request each maker's gateway is handed, before the seam. */
+  readonly observe?: (maker: "primary" | "secondary", request: ProviderCallRequest) => void;
 }) {
   const primary = await startProviderDouble(input.primary);
   const secondary = await startProviderDouble(input.secondary);
+  const observed = (maker: "primary" | "secondary", gateway: ProviderGateway): ProviderGateway => input.observe === undefined
+    ? gateway
+    : { call: (request) => { input.observe!(maker, request); return gateway.call(request); } };
   try {
     const question = `${input.label}-${randomUUID()}`;
-    const runId = await createRun(question, 100, 2, input.depth ?? 1);
+    const runId = input.envelopeBasis === undefined
+      ? await createRun(question, 100, 2, input.depth ?? 1)
+      : await createRun(question, 100, 2, input.depth ?? 1, `asker:${question}`, input.envelopeBasis);
     const workItemId = await new WorkItemRepository(database.pool).enqueue({
       runId, batteryRowId: "Q1", nodeSet: [], commandKey: `${input.label}:${runId}`
     });
     await input.beforeExecute?.({ runId, workItemId });
     const runRepository = new RunRepository(database.pool);
-    const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
-      endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
-    }), {
+    const runner = new WalkingSkeletonRunner(database.pool, observed("primary", createPostgresProviderGateway(database.pool, {
+      endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker",
+      ...(input.primaryCostEnvelope === undefined ? {} : { buildCostEnvelopeSeam: input.primaryCostEnvelope })
+    })), {
       ...runnerSettings(),
       claimMs: 1_204_000,
       runDeathPolicy: { cooldownMs: 600_000, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 },
@@ -614,13 +645,15 @@ async function executeResil01Scenario(input: {
         wait: async () => undefined
       },
       critique: {
-        provider: createPostgresProviderGateway(database.pool, {
-          endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
-        }),
+        provider: observed("secondary", createPostgresProviderGateway(database.pool, {
+          endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker",
+          ...(input.secondaryCostEnvelope === undefined ? {} : { buildCostEnvelopeSeam: input.secondaryCostEnvelope })
+        })),
         providerRef: "provider:test-layer:secondary",
         maker: "Secondary test maker"
       },
-      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+      ...input.settings
     });
     let result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null = null;
     let error: unknown = null;
@@ -4907,6 +4940,142 @@ describe("apps/runner — legal command lifecycle", () => {
     } finally { await provider.stop(); }
   });
 
+  /**
+   * ENGINE MONEY RULE (spec §14.4.3), TASK M4 — the compact rung through the
+   * REAL runner. The writer is handed a digest whose node is named `n1`, cites
+   * `n1`, and the runner's one mapping point turns that back into the node's
+   * real id before the sealed chain checks it (an unmapped `n1` is not in the
+   * serve set: the chain would refuse it and the run would fail). The owner's
+   * row records the rung.
+   *
+   * The bound is MEASURED, never guessed: a first run of the same one-node
+   * debate at the default budget shows the node exactly as the writer is
+   * handed it (rung 0, every field verbatim); the shipped builder then gives
+   * the compact rung's size for that node, and the second run gets exactly
+   * that many bytes. One node has nothing a spine could leave out, so the
+   * compact rung is the ladder's last.
+   */
+  it("answers at the compact rung, maps the writer's short ref back before the sealed checks, and records the rung on the owner's row (Task M4)", async () => {
+    const judge = JSON.stringify({
+      statement: "A compact answer.", way_of_knowing: "REASONING", locator: null,
+      restatement_text: "A compact answer.", restatement_status: "PASS", value_laden: false,
+      steelman: { summary: "A compact answer.", fidelity: 0.6 }, critic: { summary: "Plausible counter.", counterargumentStrength: 0.4, basis: "PLAUSIBLE_COUNTER" },
+      evidence: { quality: 0.6, relevance: 0.6 }, context: { fit: 0.6, ambiguityFlags: [] }, fallacy: { severity: 0.4, fatalFlags: [] }
+    });
+    const writerDigestIn = (bodies: readonly string[]): { readonly digest: SynthesisDigest; readonly codeLabel: string; readonly material: string } => {
+      const material = bodies.map((body) => readFramedMaterial(wirePacket(body)))
+        .find((candidate) => candidate.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId);
+      if (material === undefined) throw new Error("the writer was never called");
+      return {
+        digest: JSON.parse(framedField(material, "digest")) as SynthesisDigest,
+        codeLabel: framedField(material, "code_label"),
+        material: material.fields.map((field) => field.content).join("\n")
+      };
+    };
+    const compositionCiting = (ref: string, text = "A compact answer."): string => JSON.stringify({ segments: [
+      { segment_id: "segment:verdict", text, node_refs: [ref], served_number_refs: ["number:final-strength"] },
+      { segment_id: "segment:research", text: "Measure it before relying on it.", node_refs: [], served_number_refs: [] }
+    ] });
+
+    let compactBound = 0;
+    const calibration = await startProviderDouble([judge, compositionCiting("primary"), evaluatorSatisfied()]);
+    try {
+      const work = await createRunnerWork("m4-compact-calibration");
+      expect((await runnerWithEndpoint(calibration.endpoint).executeWorkItem(work.workItemId)).kind).toBe("COMPLETED");
+      const seen = writerDigestIn(calibration.bodies()).digest;
+      expect(seen.compressionLevel).toBe(0);
+      const nodes: DigestSourceNode[] = seen.nodes.map((entry) => ({
+        nodeId: entry.nodeId,
+        statement: entry.statementSummary,
+        finalStrength: entry.finalStrength,
+        wayOfKnowing: entry.wayOfKnowing,
+        marks: entry.marks,
+        polarityRelations: entry.polarityRelations,
+        isPosition: true,
+        isSurvivingObjection: false
+      }));
+      const smallest = buildSynthesisDigest({ nodes, servedRootNodeId: nodes[0]!.nodeId, budgetBound: 0 });
+      if (smallest.kind !== "DIGEST_CANNOT_EXIST") throw new Error("unreachable");
+      compactBound = smallest.byteSizeAtMaxCompression;
+    } finally { await calibration.stop(); }
+
+    // Review fix I-1: the writer's first draft names the node in its prose; the
+    // classifier refuses it and the provider's repair re-asks the same call.
+    const provider = await startProviderDouble([
+      judge, compositionCiting("n1", "A compact answer (n1)."), compositionCiting("n1"), evaluatorSatisfied()
+    ]);
+    const settings = runnerSettings();
+    const servePolicy = settings.servePolicy!;
+    const compactSettings: WalkingSkeletonSettings = {
+      ...settings,
+      synthesisRolePolicy: {
+        ...settings.synthesisRolePolicy,
+        synthesizerBound: { ...settings.synthesisRolePolicy.synthesizerBound, maxAttempts: 2 }
+      },
+      servePolicy: {
+        ...servePolicy,
+        compositionBudgets: { ...servePolicy.compositionBudgets, low: { ...servePolicy.compositionBudgets.low, bound: compactBound } }
+      }
+    };
+    try {
+      const work = await createRunnerWork("m4-compact-rung");
+      const result = await runnerWithEndpoint(provider.endpoint, compactSettings).executeWorkItem(work.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+
+      // The writer saw refs, never a real id — in the digest or in the code label.
+      const handed = writerDigestIn(provider.bodies());
+      expect(handed.digest.compressionLevel).toBe(DIGEST_LADDER.compactRung);
+      expect(handed.digest.byteSize).toBeLessThanOrEqual(compactBound);
+      expect(handed.digest.nodes.map((entry) => entry.nodeId)).toEqual(["n1"]);
+      expect(JSON.parse(handed.codeLabel)).toMatchObject({ servedNodeId: "n1" });
+      expect(handed.material).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/u);
+
+      // Served — the cited `n1` reached the sealed checks as the real node: the
+      // band's basis counts it (an empty cited set would have been refused).
+      const projection = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, "asker:m4-compact-rung");
+      expect(SERVED_TERMINALS).toContain(projection?.terminal);
+      expect(projection?.condition_marks).toContain("DIGEST-COMPRESSED");
+      expect(projection?.band_ceiling).toMatchObject({ basis: { LOOKED_UP: 0, RAN: 0, REASONING: 1 } });
+      // I-1: two writer attempts on the wire — the second is the repair turn,
+      // naming what to fix and where — and the served prose is the model's own
+      // clean words, never an edited copy of the first draft.
+      const writerAttempts = provider.bodies().map((body) => readFramedMaterial(wirePacket(body)))
+        .filter((material) => material.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId);
+      expect(writerAttempts).toHaveLength(2);
+      expect(framedField(writerAttempts[1]!, "machine_rejection_code")).toBe("COMPOSED_TEXT_NAMES_A_NODE");
+      expect(framedField(writerAttempts[1]!, "machine_rejection_path")).toBe("segments.0.text");
+      expect(projection?.composed_text.map((segment) => segment.text)).toContain("A compact answer.");
+      expect(JSON.stringify(projection?.composed_text)).not.toContain("(n1)");
+      expect(provider.calls()).toBe(4);
+
+      expect(await disclosureRowOf(result.answerId)).toMatchObject({
+        runId: work.runId,
+        digestRung: DIGEST_LADDER.compactRung,
+        digestPointsOmitted: 0
+      });
+    } finally { await provider.stop(); }
+
+    // Review round 2 — THE PERSON'S OWN TOKENS. The same compact rung, but the
+    // question itself states "n1 = 120": the writer repeating the person's
+    // figure is served on its FIRST draft, although `n1` is also the digest's ref.
+    const personal = await startProviderDouble([
+      judge, compositionCiting("n1", "In the trial, n1 = 120 patients; a compact answer."), evaluatorSatisfied()
+    ]);
+    try {
+      const work = await createRunnerWork("m4 compact trial arm n1 = 120 patients");
+      const result = await runnerWithEndpoint(personal.endpoint, compactSettings).executeWorkItem(work.workItemId);
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      expect(writerDigestIn(personal.bodies()).digest.compressionLevel).toBe(DIGEST_LADDER.compactRung);
+      const writerAttempts = personal.bodies().map((body) => readFramedMaterial(wirePacket(body)))
+        .filter((material) => material.contractId === SYNTHESIZER_PROMPT_CONTRACT.contractId);
+      expect(writerAttempts).toHaveLength(1);
+      const projection = await new ServeRepository(database.pool)
+        .readAnswerProjection(result.answerId, "asker:m4 compact trial arm n1 = 120 patients");
+      expect(SERVED_TERMINALS).toContain(projection?.terminal);
+      expect(projection?.composed_text.map((segment) => segment.text)).toContain("In the trial, n1 = 120 patients; a compact answer.");
+    } finally { await personal.stop(); }
+  });
+
   it("completes redelivery from an existing serve artifact without another provider call", async () => {
     const provider = await startProviderDouble([
       JSON.stringify({ statement: "Replayable answer.", way_of_knowing: "REASONING", locator: null,
@@ -4997,6 +5166,1838 @@ describe("apps/runner — legal command lifecycle", () => {
       );
       expect(state.rows[0]).toEqual({ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" });
     } finally { await provider.stop(); }
+  });
+});
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — A STOP WHILE ARGUING NEVER SKIPS
+ * THE ANSWER, through the PRODUCTION runner on the embedded Postgres.
+ *
+ * The owner's rule: "No debate ends without a final verdict unless there is a
+ * technical problem; money is never the reason." Before M2 every case below
+ * ended without an answer: a stop while the debate was argued forced the
+ * components-only envelope terminal at the serve gate (the answer-writer was
+ * never called), an attempt-ceiling stop FAILED the run, and a stop on the first
+ * root's panel escaped the work item and FAILED it too. Now the stop ends the
+ * ARGUING only: the run goes on to write its answer with the tree as it stands,
+ * and the stop stays on the answer's record.
+ *
+ * Doubles only at the provider boundary. A money or usage stop is raised the way
+ * a hosted deployment raises one — by the per-call money seam the gateway builds
+ * for the call's phase (`buildCostEnvelopeSeam`) — and the attempt stop by the
+ * run's own pinned receipt, through the real `BudgetRepository` hook. The seam
+ * refuses ONE chosen BODY call of one maker's gateway and allows every other,
+ * the SERVE calls included, and it records the phase of every call it was built
+ * for, so each case can show that the answer was written through the SERVE
+ * ceiling and that nothing more was argued after the stop.
+ *
+ * The call order these ordinals rely on (M = 2, depth 1): the primary authors
+ * root 0 (primary BODY 1); the secondary assesses it on the root panel
+ * (secondary BODY 1; the primary's own panel voice is the FX-HR-H6 bulkhead and
+ * makes no call); the secondary authors root 1 (secondary BODY 2); the primary
+ * assesses root 1 (primary BODY 2); the roots are reviewed across makers
+ * (secondary BODY 3, primary BODY 3); expansion follows.
+ */
+function stopOnBodyCall(input: Readonly<{
+  /** Which BODY call of this gateway is refused (1-based); 0 refuses none. */
+  ordinal: number;
+  code: "RUN_COST_ENVELOPE_MONEY_REACHED" | "PROVIDER_USAGE_UNREPORTED";
+}>): Readonly<{
+  build: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  phases(): readonly CostEnvelopePhase[];
+}> {
+  let bodyCalls = 0;
+  const phases: CostEnvelopePhase[] = [];
+  return Object.freeze({
+    phases: () => Object.freeze([...phases]),
+    build: (_runId: string, phase: CostEnvelopePhase): ProviderCostEnvelopeSeam => {
+      phases.push(phase);
+      if (phase === "BODY") bodyCalls += 1;
+      const refused = phase === "BODY" && bodyCalls === input.ordinal;
+      return {
+        // A money refusal is raised BEFORE sending: the call is never made.
+        assertCallAllowed: () => {
+          if (refused && input.code === "RUN_COST_ENVELOPE_MONEY_REACHED") {
+            throw new TypedDomainError(input.code, "test-layer: the run's ceiling for arguing is reached");
+          }
+        },
+        recordCall: () => undefined,
+        // A usage refusal is raised AFTER the vendor answered without usage.
+        assertUsageReported: () => {
+          if (refused && input.code === "PROVIDER_USAGE_UNREPORTED") {
+            throw new TypedDomainError(input.code, "test-layer: the vendor answered without usage");
+          }
+        }
+      };
+    }
+  });
+}
+
+const SERVED_TERMINALS: readonly string[] = Object.freeze(["SERVED", "DOWNGRADED"]);
+
+async function reviewCount(runId: string): Promise<number> {
+  const reviews = await database.pool.query<{ count: string }>(
+    "SELECT count(*)::text AS count FROM ledger.node_review WHERE run_id=$1",
+    [runId]
+  );
+  return Number(reviews.rows[0]?.count);
+}
+
+describe("Engine money rule M2 — a stop while arguing never skips the answer (production runner)", () => {
+  it("serves root 0 after a money stop on root 1, saying it rests on one lineage and was cut short", async () => {
+    const primarySeam = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-root-1-money",
+      primary: [judgementDouble("Primary M2 money position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M2 money position")],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    // The run is ANSWERED — before M2 it ended components-only, answer unwritten.
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    expect(scenario.answer?.composed_text.length).toBeGreaterThan(0);
+    // Root 1 was refused before it was sent, and nothing more was argued: the
+    // only other calls are the answer-writer's, on the SERVE ceiling.
+    expect(scenario.snapshot.nodes).toHaveLength(1);
+    expect(secondarySeam.phases()).toEqual(["BODY", "BODY"]);
+    expect(scenario.secondaryCalls).toBe(1);
+    expect(primarySeam.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+    expect(await reviewCount(scenario.runId)).toBe(0);
+    // The stop stays on the record: one lineage, and the envelope record naming
+    // the money ceiling, which the honesty drawer shows as "Run envelope exhausted".
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining(["SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"]));
+    expect(scenario.answer?.condition_marks).not.toContain("UNSERVED-MAKER-POSITION");
+    const reasonsOf = (mark: string) => (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === mark).map((record) => record.reason);
+    expect(reasonsOf("SINGLE-LINEAGE")).toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    expect(reasonsOf("ENVELOPE_EXHAUSTED")).toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+  });
+
+  it("serves root 0 after a usage stop on root 1, under the vendor's own reason", async () => {
+    const primarySeam = stopOnBodyCall({ ordinal: 0, code: "PROVIDER_USAGE_UNREPORTED" });
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "PROVIDER_USAGE_UNREPORTED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-root-1-usage",
+      primary: [judgementDouble("Primary M2 usage position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M2 usage position")],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    // A usage stop is raised AFTER the vendor answered, so root 1's call WAS
+    // made — and its node is still not minted: the arguing stopped there.
+    expect(scenario.secondaryCalls).toBe(2);
+    expect(scenario.snapshot.nodes).toHaveLength(1);
+    expect(primarySeam.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+    const reasonsOf = (mark: string) => (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === mark).map((record) => record.reason);
+    // Never the money reason: an operator told "raise the ceiling" would lift
+    // the wrong thing (rulings R2, R-C).
+    expect(reasonsOf("SINGLE-LINEAGE")).toEqual(["PROVIDER_USAGE_UNREPORTED"]);
+    expect(reasonsOf("ENVELOPE_EXHAUSTED")).toEqual(["PROVIDER_USAGE_UNREPORTED"]);
+  });
+
+  it("serves an answer after the attempt ceiling stops a review, where it used to FAIL the run", async () => {
+    // A receipt that holds the answer's reserve (Task M1): the serve leg's six
+    // sites at one attempt each. The arguing may spend ten less six = four:
+    // root 0, its panel, root 1, its panel. The FIRST review is the fifth.
+    const scenario = await executeResil01Scenario({
+      label: "m2-review-attempts",
+      primary: [
+        judgementDouble("Primary M2 attempts position"),
+        reviewDouble("agree", "never reached"),
+        resil01Composition,
+        evaluatorSatisfied()
+      ],
+      secondary: [judgementDouble("Secondary M2 attempts position"), reviewDouble("dispute", "never reached")],
+      envelopeBasis: { ...fixtureStructuralCeiling(10, 2, 1), serve_reserve_attempts: 6 }
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    // Measured on the ledger: four calls argued, no review landed, and the
+    // answer was written with the reserve the arguing could not touch.
+    const calls = await database.pool.query<{ serve: string; total: string }>(
+      `SELECT count(*)::text AS total,
+              count(*) FILTER (WHERE call_site_key LIKE 'COMPOSER:%'
+                            OR call_site_key LIKE 'POST_COMPOSE_R9:%')::text AS serve
+         FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL'`,
+      [scenario.runId]
+    );
+    expect(Number(calls.rows[0]!.total) - Number(calls.rows[0]!.serve)).toBe(4);
+    expect(Number(calls.rows[0]!.serve)).toBeGreaterThan(0);
+    expect(await reviewCount(scenario.runId)).toBe(0);
+    // Both roots exist, so the answer names the one it did not serve, and the
+    // envelope record names the ATTEMPT ceiling, not money.
+    expect(scenario.snapshot.nodes).toHaveLength(2);
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining(["UNSERVED-MAKER-POSITION", "ENVELOPE_EXHAUSTED"]));
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_EXHAUSTED"]);
+  });
+
+  it("serves an answer after a money stop during expansion, keeping the reviews that landed", async () => {
+    // The primary's fourth BODY call is its first in the expansion phase: both
+    // roots are authored, panelled and reviewed before it.
+    const primarySeam = stopOnBodyCall({ ordinal: 4, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-expansion-money",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary M2 expansion position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary M2 expansion review ${index + 1}`)),
+        resil01Composition,
+        evaluatorSatisfied()
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary M2 expansion position ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Secondary M2 expansion review ${index + 1}`))
+      ],
+      primaryCostEnvelope: primarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    expect(await reviewCount(scenario.runId)).toBe(2);
+    expect(primarySeam.phases().filter((phase) => phase === "BODY")).toHaveLength(4);
+    expect(primarySeam.phases().slice(-2)).toEqual(["SERVE", "SERVE"]);
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining(["UNSERVED-MAKER-POSITION", "ENVELOPE_EXHAUSTED"]));
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+  });
+
+  it("serves root 0 on its author's judgement when the first root's panel is refused, instead of failing the run", async () => {
+    const primarySeam = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const secondarySeam = stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-root-panel-money",
+      primary: [judgementDouble("Primary M2 panel position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M2 panel position")],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    // Before M2 the refusal escaped the work item: FAILED, nothing served.
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    // The panel call was refused before it was sent, and the run went straight
+    // to its answer: no secondary root, no review, only the SERVE calls after.
+    expect(scenario.secondaryCalls).toBe(0);
+    expect(secondarySeam.phases()).toEqual(["BODY"]);
+    expect(primarySeam.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+    expect(scenario.snapshot.nodes).toHaveLength(1);
+    expect(await reviewCount(scenario.runId)).toBe(0);
+    // Root 0 carries the existing single-voice disclosure, whose reason is the
+    // stop, and the answer says it rests on one lineage and was cut short.
+    const rootNodeId = scenario.snapshot.nodes[0]!.nodeId;
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining([
+      "PANEL-DEGRADED-SINGLE-VOICE", "SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"
+    ]));
+    const singleVoice = (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "PANEL-DEGRADED-SINGLE-VOICE");
+    expect(singleVoice).toHaveLength(1);
+    expect(singleVoice[0]).toMatchObject({ subject_ref: rootNodeId, reason: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    // No voice was heard before the stop, so — unlike the M = 3 case where one
+    // was — the single-voice disclosure steps the served band down one place.
+    const bandSettings = runnerSettings();
+    expect(scenario.answer?.confidence_band)
+      .toBe(bandSettings.panelPolicy!.oneStepDown[bandSettings.servePolicy!.candidateConfidenceBand]);
+    // The node's receipt is the author-only selection: its own judgement, one
+    // voice, and the stop that cut the panel short.
+    const receipt = await database.pool.query<{
+      selected: string; raw: string; voices: string; stop: string | null;
+    }>(
+      `SELECT selected_judgement_ref::text AS selected, raw_artifact_ref::text AS raw,
+              disagreement #>> '{panel,voiceCount}' AS voices,
+              disagreement #>> '{panel,spendStop}' AS stop
+         FROM ledger.reduced_judgement WHERE run_id=$1 AND node_id=$2`,
+      [scenario.runId, rootNodeId]
+    );
+    expect(receipt.rows).toHaveLength(1);
+    expect(receipt.rows[0]!.selected).toBe(receipt.rows[0]!.raw);
+    expect(receipt.rows[0]!.voices).toBe("1");
+    expect(receipt.rows[0]!.stop).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+  });
+
+  /**
+   * M2 review polish, round 2 — THE VOICES ALREADY HEARD ARE KEPT. At M = 3 the
+   * first root's panel asks two members in turn. Here the second member's model
+   * answers and the third's call is refused for money before it is sent. That
+   * paid-for voice used to be thrown away with the panel (single voice, one
+   * band step down). It is now kept: the node is selected over the author and
+   * that voice, and the panel is disclosed PANEL-PARTIAL, exactly as when a
+   * member fails, with no single-voice step-down. The voice is made DECISIVE —
+   * it scores above the author — so "kept" cannot mean merely "recorded".
+   */
+  it("keeps a panel voice heard before a stop on the first root's panel, as PANEL-PARTIAL (M=3)", async () => {
+    const authorFidelity = 0.72;
+    const heardFidelity = 0.9;
+    const makerA = await startProviderDouble([
+      judgementDouble("Maker A M2 partial position", authorFidelity), resil01Composition, evaluatorSatisfied()
+    ]);
+    const makerB = await startProviderDouble(
+      [judgementDouble("Maker B M2 partial position")], panelAssessmentDouble(heardFidelity)
+    );
+    const makerC = await startProviderDouble([judgementDouble("Maker C M2 partial position")]);
+    const seamA = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const seamB = stopOnBodyCall({ ordinal: 0, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const seamC = stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    try {
+      const question = `m2-root-panel-partial-${randomUUID()}`;
+      const runId = await createRun(question, 90, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A",
+        buildCostEnvelopeSeam: seamA.build
+      }), {
+        ...settings,
+        providerRef: "provider:test-layer",
+        maker: "Maker A",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B",
+            buildCostEnvelopeSeam: seamB.build
+          }),
+          providerRef: "provider:test-layer:secondary",
+          maker: "Maker B"
+        },
+        additionalMakers: [{
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C",
+            buildCostEnvelopeSeam: seamC.build
+          }),
+          providerRef: "provider:test-layer:third",
+          maker: "Maker C"
+        }],
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" }
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const answer = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, `asker:${question}`);
+
+      // Served, and nothing more was argued after the stop.
+      expect(SERVED_TERMINALS).toContain(answer?.terminal);
+      expect(answer?.verdict_state).not.toBeNull();
+      expect(makerB.calls()).toBe(1);
+      expect(seamB.phases()).toEqual(["BODY"]);
+      expect(makerC.calls()).toBe(0);
+      expect(seamC.phases()).toEqual(["BODY"]);
+      expect(seamA.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+      const snapshot = await new GraphRepository(database.pool).materialiseSnapshot(runId);
+      expect(snapshot.nodes).toHaveLength(1);
+      const rootNodeId = snapshot.nodes[0]!.nodeId;
+
+      // PANEL-PARTIAL, naming the stop; never the single-voice disclosure, and
+      // so no single-voice step-down of the served band.
+      expect(answer?.condition_marks).toEqual(expect.arrayContaining(["PANEL-PARTIAL", "SINGLE-LINEAGE", "ENVELOPE_EXHAUSTED"]));
+      expect(answer?.condition_marks).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
+      const partial = (answer?.condition_mark_records ?? []).filter((record) => record.mark === "PANEL-PARTIAL");
+      expect(partial).toHaveLength(1);
+      expect(partial[0]).toMatchObject({ subject_ref: rootNodeId, reason: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+      expect(answer?.confidence_band).toBe(settings.servePolicy!.candidateConfidenceBand);
+
+      // The heard voice is IN the selection: it scored above the author, so it
+      // is the selected judgement, and the spread between the two was measured.
+      const receipt = await database.pool.query<{
+        tau: string; selected: string; author: string; dispersion: number | null;
+        voices: string; nonAuthor: string; stop: string | null; notes: string;
+      }>(
+        `SELECT tau::text AS tau, selected_judgement_ref::text AS selected, raw_artifact_ref::text AS author,
+                dispersion, disagreement #>> '{panel,voiceCount}' AS voices,
+                disagreement #>> '{panel,nonAuthorVoiceCount}' AS "nonAuthor",
+                disagreement #>> '{panel,spendStop}' AS stop,
+                disagreement #>> '{panel,notes}' AS notes
+           FROM ledger.reduced_judgement WHERE run_id=$1 AND node_id=$2`,
+        [runId, rootNodeId]
+      );
+      expect(receipt.rows).toHaveLength(1);
+      const row = receipt.rows[0]!;
+      expect(row.voices).toBe("2");
+      expect(row.nonAuthor).toBe("1");
+      expect(row.stop).toBe("RUN_COST_ENVELOPE_MONEY_REACHED");
+      expect(row.selected).not.toBe(row.author);
+      expect(Number(row.tau)).toBeCloseTo(heardFidelity, 10);
+      expect(row.dispersion).toBeCloseTo(heardFidelity - authorFidelity, 10);
+      // The notes gathered before the stop are kept too: the author's own seat.
+      expect(JSON.parse(row.notes)).toEqual([expect.objectContaining({ kind: "PRODUCER_GRADING_FORBIDDEN" })]);
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
+    }
+  });
+
+  it("fails typed, as a ceiling below one call, when the author's own first call is refused", async () => {
+    const primarySeam = stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m2-first-call-money",
+      primary: [judgementDouble("Primary M2 never-authored position")],
+      secondary: [judgementDouble("Secondary M2 never-authored position")],
+      primaryCostEnvelope: primarySeam.build
+    });
+
+    // Nothing exists to answer from: the one stop that still ends without an
+    // answer, and it says so under its own code rather than as a money stop.
+    expect(scenario.result).toBeNull();
+    expect(scenario.error).toBeInstanceOf(TypedDomainError);
+    expect((scenario.error as TypedDomainError).code).toBe("RUN_CEILING_BELOW_FIRST_CALL");
+    expect(runnerTerminalFailureReason(scenario.error)).toBe("RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL");
+    // M2 review polish: the refusal's own evidence survives the runner, verbatim
+    // and as the cause, so a ceiling set too low can be told from a re-claim.
+    expect((scenario.error as Error).message).toContain("test-layer: the run's ceiling for arguing is reached");
+    expect((scenario.error as Error).cause).toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    expect(scenario.primaryCalls).toBe(0);
+    expect(scenario.secondaryCalls).toBe(0);
+    expect(scenario.snapshot.nodes).toHaveLength(0);
+    const answers = await database.pool.query("SELECT 1 FROM serve.answer WHERE run_id=$1", [scenario.runId]);
+    expect(answers.rowCount).toBe(0);
+  });
+});
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.2 and §14.4.5), TASK M3 — A CHEAPER MAKER WHEN
+ * THE PLANNED ONE CANNOT BE PAID, DRAFTS KEPT, AND THE OWNER-SIDE RECORD,
+ * through the PRODUCTION runner on the embedded Postgres.
+ *
+ * Before M3 an answer-writing call refused for money took the components-only
+ * envelope terminal at once, and a round-2 failure threw away the round the
+ * checker had already read. Now the SAME call site and the SAME framed prompt
+ * are offered to the run's other claim-eligible makers (cheapest first by the
+ * runner's price map; the seam decides what fits), a later failure keeps the
+ * last complete round, and every answer gets one content-free disclosure row.
+ *
+ * Doubles only at the provider boundary. Money is refused the way a hosted
+ * deployment refuses it — by the per-call seam each maker's gateway builds for
+ * the call's phase — so a refused try is made BEFORE sending and leaves no
+ * ledger row, exactly as in production.
+ */
+function moneySeam(input: Readonly<{
+  /** Which BODY call of this gateway is refused (1-based). */
+  refuseBody?: number;
+  /** Which SERVE calls of this gateway are refused (1-based), or all of them. */
+  refuseServe?: "ALL" | readonly number[];
+}> = {}): Readonly<{
+  build: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  phases(): readonly CostEnvelopePhase[];
+}> {
+  let bodyCalls = 0;
+  let serveCalls = 0;
+  const phases: CostEnvelopePhase[] = [];
+  return Object.freeze({
+    phases: () => Object.freeze([...phases]),
+    build: (_runId: string, phase: CostEnvelopePhase): ProviderCostEnvelopeSeam => {
+      phases.push(phase);
+      const ordinal = phase === "BODY" ? (bodyCalls += 1) : (serveCalls += 1);
+      const refused = phase === "BODY"
+        ? ordinal === input.refuseBody
+        : input.refuseServe === "ALL" || (input.refuseServe ?? []).includes(ordinal);
+      return {
+        assertCallAllowed: () => {
+          if (refused) {
+            throw new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", `test-layer: ${phase} call ${String(ordinal)} does not fit`);
+          }
+        },
+        recordCall: () => undefined,
+        assertUsageReported: () => undefined
+      };
+    }
+  });
+}
+
+const evaluatorObjecting = (objection: string): string => JSON.stringify({
+  satisfied: false,
+  objection,
+  criteria: {
+    fairness_to_losers: false,
+    statement_label_agreement: true,
+    no_overstatement: true,
+    restatement: true,
+    citation_tracing: true
+  }
+});
+
+const m3RoundTwoComposition = JSON.stringify({ segments: [
+  { segment_id: "segment:verdict", text: "A round-two rewrite nobody checked.", node_refs: ["primary"], served_number_refs: ["number:final-strength"] },
+  { segment_id: "segment:research", text: "Check a second independent source.", node_refs: [], served_number_refs: [] }
+] });
+
+/** Task M4 review fix I-1: a writer draft with the given prose and citations. */
+const m4Composition = (text: string, nodeRefs: readonly string[] = ["primary"]): string => JSON.stringify({ segments: [
+  { segment_id: "segment:verdict", text, node_refs: nodeRefs, served_number_refs: ["number:final-strength"] },
+  { segment_id: "segment:research", text: "Check an independent source.", node_refs: [], served_number_refs: [] }
+] });
+
+/** The writer's attempt bound raised so its repair can re-ask (the fixture's sealed bound allows one attempt). */
+function m4WriterAttempts(maxAttempts: number): Partial<WalkingSkeletonSettings> {
+  const policy = runnerSettings().synthesisRolePolicy;
+  return { synthesisRolePolicy: { ...policy, synthesizerBound: { ...policy.synthesizerBound, maxAttempts } } };
+}
+
+/** A full two-maker debate at depth 1, every review agreeing (T6's C-5 shape). */
+function fullDebate(label: string): Readonly<{ judgements: readonly string[]; reviews: readonly string[] }> {
+  return Object.freeze({
+    judgements: Array.from({ length: 4 }, (_, index) => judgementDouble(`${label} position ${index + 1}`)),
+    reviews: Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `${label} review ${index + 1}`))
+  });
+}
+
+const PRIMARY_REF = "provider:test-layer";
+const SECONDARY_REF = "provider:test-layer:secondary";
+const THIRD_REF = "provider:test-layer:third";
+
+/** Which maker's recorded artifact each persisted round's draft and verdict resolve to. */
+async function servedRoundMakers(answerId: string): Promise<readonly Readonly<{
+  round: number; writer: string; checker: string; candidate_call_site_key: string; evaluator_call_site_key: string;
+}>[]> {
+  const rows = await database.pool.query<{
+    round: number; writer: string; checker: string; candidate_call_site_key: string; evaluator_call_site_key: string;
+  }>(
+    `SELECT synthesis.round, writer.provider_ref AS writer, checker.provider_ref AS checker,
+            synthesis.candidate_call_site_key, synthesis.evaluator_call_site_key
+       FROM serve.synthesis_round AS synthesis
+       JOIN ledger.raw_artifact AS writer ON writer.raw_artifact_id = synthesis.candidate_artifact_ref
+       JOIN ledger.raw_artifact AS checker ON checker.raw_artifact_id = synthesis.evaluator_artifact_ref
+      WHERE synthesis.answer_id = $1
+      ORDER BY synthesis.round`,
+    [answerId]
+  );
+  return rows.rows;
+}
+
+/** Every answer-writing MODEL_CALL the ledger holds for the run, and who made it. */
+async function serveLedger(runId: string): Promise<readonly Readonly<{ call_site_key: string; actor_ref: string; outcome: string }>[]> {
+  const rows = await database.pool.query<{ call_site_key: string; actor_ref: string; outcome: string }>(
+    `SELECT call_site_key, actor_ref, outcome FROM ledger.ledger_entry
+      WHERE run_id=$1 AND action_kind='MODEL_CALL'
+        AND (call_site_key LIKE 'COMPOSER:%' OR call_site_key LIKE 'POST_COMPOSE_R9:%')
+      ORDER BY sequence`,
+    [runId]
+  );
+  return rows.rows;
+}
+
+/**
+ * The answer's disclosure row, through the repository's own read (the operator
+ * report's: the latest version that has a row, no ownership). Every runner case
+ * here writes one answer version, so that is version 1's row.
+ */
+async function disclosureRowOf(answerId: string): Promise<StoredServeDisclosure | null> {
+  return (await new ServeDisclosureRepository(database.pool).readLatestForOperator(answerId))?.row ?? null;
+}
+
+function answerIdOf(scenario: Readonly<{ result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null }>): string {
+  if (scenario.result?.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+  return scenario.result.answerId;
+}
+
+/**
+ * Task M4: every M3 debate below is small, and in each the writer was called
+ * (paid or refused), so the row records the digest it was handed — whole, at
+ * rung 0, nothing left out. A SERVED answer carries its own label, so it has no
+ * floor (Task M5); the components-only cases assert theirs with `expectFloor`.
+ */
+const WHOLE_DIGEST_NO_FLOOR = Object.freeze({
+  digestRung: 0,
+  digestPointsOmitted: 0,
+  floorVerdictState: null,
+  floorLeadingNodeId: null,
+  floorReason: null
+});
+
+describe("Engine money rule M3 — a cheaper maker when the planned one cannot be paid, drafts kept, disclosed (production runner)", () => {
+  it("substitutes the healthy maker for MONEY at the same call site with the same framed prompt, persists it through the sealed chain, and discloses it", async () => {
+    const primaryDebate = fullDebate("Primary M3 fallback");
+    const secondaryDebate = fullDebate("Secondary M3 fallback");
+    const primarySeam = moneySeam({ refuseServe: "ALL" });
+    const secondarySeam = moneySeam();
+    const seen: { maker: "primary" | "secondary"; request: ProviderCallRequest }[] = [];
+    const scenario = await executeResil01Scenario({
+      label: "m3-money-fallback",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews, resil01Composition, evaluatorSatisfied()],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build,
+      observe: (maker, request) => {
+        if (request.lane === "served" && (request.role === "SYNTHESIZER" || request.role === "EVALUATOR")) {
+          seen.push({ maker, request });
+        }
+      }
+    });
+
+    // Answered — before M3 this ended components-only, the answer unwritten.
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    // The fallback FIT, so nothing was stopped: no envelope record.
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+
+    // The planned maker was asked first for each role and refused for money;
+    // the healthy maker then answered the SAME request.
+    expect(primarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(2);
+    expect(secondarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(2);
+    expect(seen.map((entry) => `${entry.maker}:${entry.request.role}`)).toEqual([
+      "primary:SYNTHESIZER", "secondary:SYNTHESIZER", "primary:EVALUATOR", "secondary:EVALUATOR"
+    ]);
+    for (const [planned, fallback] of [[seen[0]!, seen[1]!], [seen[2]!, seen[3]!]] as const) {
+      expect(planned.request.providerRef).toBe(PRIMARY_REF);
+      expect(fallback.request.providerRef).toBe(SECONDARY_REF);
+      expect(fallback.request.callSiteKey).toBe(planned.request.callSiteKey);
+      expect(fallback.request.contractHash).toBe(planned.request.contractHash);
+      expect(fallback.request.bound).toEqual(planned.request.bound);
+      // The framed request BYTES are the planned call's, unchanged.
+      expect(JSON.stringify(fallback.request.packet)).toBe(JSON.stringify(planned.request.packet));
+    }
+    expect(seen[0]!.request.callSiteKey).toBe("COMPOSER:SYNTHESIZER:INITIAL:1");
+    expect(seen[2]!.request.callSiteKey).toBe("POST_COMPOSE_R9:EVALUATOR:1");
+
+    // The refused tries left nothing in the ledger; the fallback's calls are
+    // there under the SAME call-site keys, and the sealed persist took them.
+    expect(await serveLedger(scenario.runId)).toEqual([
+      { call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: SECONDARY_REF, outcome: "OK" },
+      { call_site_key: "POST_COMPOSE_R9:EVALUATOR:1", actor_ref: SECONDARY_REF, outcome: "OK" }
+    ]);
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: SECONDARY_REF, checker: SECONDARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+
+    // Disclosed on the owner-side row — never in the verdict text — and the
+    // lost diversity with it (R9): both roles ended on one maker.
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      answerId,
+      answerVersion: 1,
+      runId: scenario.runId,
+      writerPlannedRef: PRIMARY_REF,
+      checkerPlannedRef: PRIMARY_REF,
+      writerServedRef: SECONDARY_REF,
+      checkerServedRef: SECONDARY_REF,
+      writerFallback: true,
+      checkerFallback: true,
+      fallbackReason: "MONEY",
+      checkerSameAsWriter: true,
+      bodyStop: null,
+      pointsWithoutReview: null,
+      // The fallback FIT: the loop was never cut short.
+      serveStop: null,
+      ...WHOLE_DIGEST_NO_FLOOR
+    });
+  });
+
+  it("tries the cheapest maker first by the price map, and lets the checker prefer a maker other than the writer (M=3)", async () => {
+    const makerA = await startProviderDouble([judgementDouble("Maker A M3 price-order position")]);
+    const makerB = await startProviderDouble([judgementDouble("Maker B M3 price-order position"), evaluatorSatisfied()]);
+    const makerC = await startProviderDouble([judgementDouble("Maker C M3 price-order position"), resil01Composition]);
+    // A's answer-writing calls cannot be paid. C's panel voice is refused too,
+    // so the arguing stops after the first root (M2) and the test is the serve leg.
+    const seamA = moneySeam({ refuseServe: "ALL" });
+    const seamB = moneySeam();
+    const seamC = moneySeam({ refuseBody: 1 });
+    try {
+      const question = `m3-price-order-${randomUUID()}`;
+      const runId = await createRun(question, 90, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A", buildCostEnvelopeSeam: seamA.build
+      }), {
+        ...settings,
+        providerRef: PRIMARY_REF,
+        maker: "Maker A",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B", buildCostEnvelopeSeam: seamB.build
+          }),
+          providerRef: SECONDARY_REF,
+          maker: "Maker B"
+        },
+        additionalMakers: [{
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C", buildCostEnvelopeSeam: seamC.build
+          }),
+          providerRef: THIRD_REF,
+          maker: "Maker C"
+        }],
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        // C is the cheapest and B the dearest: the roster order (B before C) is
+        // NOT the order a money refusal tries them in.
+        providerPrices: new Map([
+          [PRIMARY_REF, { inputMicrosPerMillionTokens: 3_000_000, outputMicrosPerMillionTokens: 3_000_000 }],
+          [SECONDARY_REF, { inputMicrosPerMillionTokens: 9_000_000, outputMicrosPerMillionTokens: 9_000_000 }],
+          [THIRD_REF, { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 }]
+        ])
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const answer = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, `asker:${question}`);
+      expect(SERVED_TERMINALS).toContain(answer?.terminal);
+
+      // The writer: A refused, then C — the cheapest — wrote; B was never asked.
+      // The checker: A refused, then B, because C wrote the draft; C, though
+      // cheaper, was never asked to check its own draft.
+      expect(seamA.phases()).toEqual(["BODY", "SERVE", "SERVE"]);
+      expect(seamC.phases()).toEqual(["BODY", "SERVE"]);
+      expect(seamB.phases()).toEqual(["BODY", "SERVE"]);
+      expect(await servedRoundMakers(result.answerId)).toEqual([{
+        round: 1, writer: THIRD_REF, checker: SECONDARY_REF,
+        candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+      }]);
+      expect(await disclosureRowOf(result.answerId)).toMatchObject({
+        writerPlannedRef: PRIMARY_REF,
+        checkerPlannedRef: PRIMARY_REF,
+        writerServedRef: THIRD_REF,
+        checkerServedRef: SECONDARY_REF,
+        writerFallback: true,
+        checkerFallback: true,
+        fallbackReason: "MONEY",
+        checkerSameAsWriter: false,
+        // The arguing stopped on the first root's panel: one point, never cross-reviewed.
+        bodyStop: "MONEY",
+        pointsWithoutReview: 1,
+        serveStop: null
+      });
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
+    }
+  });
+
+  it("keeps the writer's cheapest fallback off the planned checker's maker whenever another maker fits (M=3)", async () => {
+    const makerA = await startProviderDouble([judgementDouble("Maker A M3 writer-avoids-checker position")]);
+    const makerB = await startProviderDouble([judgementDouble("Maker B M3 writer-avoids-checker position"), resil01Composition]);
+    const makerC = await startProviderDouble([judgementDouble("Maker C M3 writer-avoids-checker position"), evaluatorSatisfied()]);
+    // A, the planned writer, cannot be paid. C — the planned CHECKER — is the
+    // cheapest maker; B is the dearest. C's panel voice is refused so the
+    // arguing stops after the first root (M2) and the test is the serve leg.
+    const seamA = moneySeam({ refuseServe: "ALL" });
+    const seamB = moneySeam();
+    const seamC = moneySeam({ refuseBody: 1 });
+    try {
+      const question = `m3-writer-avoids-checker-${randomUUID()}`;
+      const runId = await createRun(question, 90, 3, 1);
+      const workItemId = await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", nodeSet: [], commandKey: `runner-test:${question}`
+      });
+      const settings = runnerSettings();
+      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+        endpoint: makerA.endpoint, model: "test-layer/maker-a", maker: "Maker A", buildCostEnvelopeSeam: seamA.build
+      }), {
+        ...settings,
+        providerRef: PRIMARY_REF,
+        maker: "Maker A",
+        critique: {
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerB.endpoint, model: "test-layer/maker-b", maker: "Maker B", buildCostEnvelopeSeam: seamB.build
+          }),
+          providerRef: SECONDARY_REF,
+          maker: "Maker B"
+        },
+        additionalMakers: [{
+          provider: createPostgresProviderGateway(database.pool, {
+            endpoint: makerC.endpoint, model: "test-layer/maker-c", maker: "Maker C", buildCostEnvelopeSeam: seamC.build
+          }),
+          providerRef: THIRD_REF,
+          maker: "Maker C"
+        }],
+        scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+        // The sealed pair names two DIFFERENT makers: A writes, C checks.
+        synthesisRolePolicy: {
+          ...settings.synthesisRolePolicy,
+          synthesizerRoleRef: PRIMARY_REF,
+          evaluatorRoleRef: THIRD_REF,
+          identicalRoleRefs: false
+        },
+        providerPrices: new Map([
+          [PRIMARY_REF, { inputMicrosPerMillionTokens: 3_000_000, outputMicrosPerMillionTokens: 3_000_000 }],
+          [SECONDARY_REF, { inputMicrosPerMillionTokens: 9_000_000, outputMicrosPerMillionTokens: 9_000_000 }],
+          [THIRD_REF, { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 }]
+        ])
+      });
+
+      const result = await runner.executeWorkItem(workItemId);
+      expect(result.kind).toBe("COMPLETED");
+      if (result.kind !== "COMPLETED") throw new Error("TEST_EXPECTED_COMPLETION");
+      const answer = await new ServeRepository(database.pool).readAnswerProjection(result.answerId, `asker:${question}`);
+      expect(SERVED_TERMINALS).toContain(answer?.terminal);
+
+      // The writer's fallback skipped C, the cheapest, because C will check the
+      // draft; B, dearer, fitted and wrote it. C then checked as planned, so the
+      // two roles stayed on two makers.
+      expect(seamA.phases()).toEqual(["BODY", "SERVE"]);
+      expect(seamB.phases()).toEqual(["BODY", "SERVE"]);
+      expect(seamC.phases()).toEqual(["BODY", "SERVE"]);
+      expect(await servedRoundMakers(result.answerId)).toEqual([{
+        round: 1, writer: SECONDARY_REF, checker: THIRD_REF,
+        candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+      }]);
+      expect(await disclosureRowOf(result.answerId)).toMatchObject({
+        writerPlannedRef: PRIMARY_REF,
+        checkerPlannedRef: THIRD_REF,
+        writerServedRef: SECONDARY_REF,
+        checkerServedRef: THIRD_REF,
+        writerFallback: true,
+        checkerFallback: false,
+        fallbackReason: "MONEY",
+        checkerSameAsWriter: false,
+        serveStop: null
+      });
+      expect(answer?.condition_marks).not.toContain("DEGRADED-DIVERSITY");
+    } finally {
+      await makerC.stop();
+      await makerB.stop();
+      await makerA.stop();
+    }
+  });
+
+  it("keeps a serve-leg money stop on the owner's record when the answer's one envelope record already names the stop while arguing", async () => {
+    // The arguing is stopped on root 1 (money), and round 2's writer can then be
+    // paid by no maker. The answer carries ONE envelope record, the body stop's
+    // (`servePhaseStopDisclosure` adds none beside it); the row keeps both.
+    const primarySeam = moneySeam({ refuseServe: [3] });
+    const secondarySeam = moneySeam({ refuseBody: 2, refuseServe: "ALL" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-row-body-and-serve-stop",
+      primary: [
+        judgementDouble("Primary M3 two-stop position"),
+        resil01Composition, evaluatorObjecting("Round one leaves out the losing side."), m3RoundTwoComposition
+      ],
+      secondary: [judgementDouble("Secondary M3 two-stop position")],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    expect((scenario.answer?.condition_mark_records ?? []).filter((record) => record.mark === "ENVELOPE_EXHAUSTED"))
+      .toHaveLength(1);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
+      bodyStop: "MONEY", pointsWithoutReview: 1, serveStop: "MONEY"
+    });
+  });
+
+  it("keeps round 1 when round 2's writer cannot be paid by any maker, and serves it with the stop on its record", async () => {
+    const primaryDebate = fullDebate("Primary M3 keep-best money");
+    const secondaryDebate = fullDebate("Secondary M3 keep-best money");
+    // SERVE call 3 of the planned maker is round 2's writer; no other maker fits.
+    const primarySeam = moneySeam({ refuseServe: [3] });
+    const secondarySeam = moneySeam({ refuseServe: "ALL" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-keep-best-money",
+      primary: [
+        ...primaryDebate.judgements, ...primaryDebate.reviews,
+        resil01Composition, evaluatorObjecting("Round one is unfair to the losing side."), m3RoundTwoComposition
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    // Served — before M3 this discarded round 1 and ended components-only.
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.serve_state).toBe("COMPOSED");
+    const texts = scenario.answer?.composed_text.map((segment) => segment.text) ?? [];
+    expect(texts).toContain("The judged position survives.");
+    expect(texts).not.toContain("A round-two rewrite nobody checked.");
+    expect(primarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(3);
+    expect(secondarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(1);
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    // Round 1's own objection stands, and the stop rides the answer.
+    expect(scenario.answer?.condition_marks).toEqual(expect.arrayContaining(["SYNTHESIS-OBJECTION-STANDING", "ENVELOPE_EXHAUSTED"]));
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: true,
+      bodyStop: null, pointsWithoutReview: null,
+      // Round 2's writer could not be paid by any maker: the loop was cut short.
+      serveStop: "MONEY"
+    });
+  });
+
+  it("keeps round 1 when round 2's writer transport dies, and serves it without inventing a verdict", async () => {
+    const primaryDebate = fullDebate("Primary M3 keep-best death");
+    const secondaryDebate = fullDebate("Secondary M3 keep-best death");
+    const seen: string[] = [];
+    const scenario = await executeResil01Scenario({
+      label: "m3-keep-best-death",
+      primary: [
+        ...primaryDebate.judgements, ...primaryDebate.reviews,
+        resil01Composition, evaluatorObjecting("Round one overstates the margin."),
+        // Round 2's writer: a dead transport (the sealed bound allows one attempt).
+        { status: 500 }, m3RoundTwoComposition
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      observe: (maker, request) => {
+        if (request.lane === "served" && request.role === "SYNTHESIZER") seen.push(`${maker}:${request.callSiteKey}`);
+      }
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.serve_state).toBe("COMPOSED");
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    // A dead transport is not money: no maker was substituted for it.
+    expect(seen).toEqual(["primary:COMPOSER:SYNTHESIZER:INITIAL:1", "primary:COMPOSER:SYNTHESIZER:RETRY:2"]);
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    expect(scenario.answer?.condition_marks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(scenario.answer?.condition_marks).not.toContain("DEFECT");
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    // The death leaves no mark on the answer; the owner's record keeps it.
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF, writerFallback: false, checkerFallback: false,
+      serveStop: "TRANSPORT_DEATH"
+    });
+  });
+
+  /**
+   * Task M4 review fix I-1 — THE WRITER'S CITATIONS, CHECKED AS CONTENT. A
+   * draft whose prose names an internal id, or that cites a node the digest
+   * does not carry, is refused by the writer's classifier and re-asked by the
+   * provider's own repair on the SAME call. Before, the unknown ref ended the
+   * run FAILED and the leaked id reached the person.
+   */
+  it("re-asks a draft that names a UUID in its prose, then one citing an unknown node, and serves the clean third draft (Task M4 I-1)", async () => {
+    const debate = fullDebate("Primary M4 citation repair");
+    const secondaryDebate = fullDebate("Secondary M4 citation repair");
+    const scenario = await executeResil01Scenario({
+      label: "m4-citation-repair",
+      primary: [
+        ...debate.judgements, ...debate.reviews,
+        m4Composition("The judged position survives (00000000-0000-4000-8000-00000000abcd)."),
+        m4Composition("The judged position survives.", ["node:nowhere"]),
+        resil01Composition,
+        evaluatorSatisfied()
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: m4WriterAttempts(3)
+    });
+    expect(scenario.error).toBeNull();
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    expect(JSON.stringify(scenario.answer?.composed_text)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/u);
+    // One writer call, three attempts: the two refused drafts are on the ledger, the third served.
+    expect((await serveLedger(scenario.runId)).filter((entry) => entry.call_site_key.startsWith("COMPOSER:"))
+      .map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "OK"]);
+    expect(await disclosureRowOf(answerIdOf(scenario)))
+      .toMatchObject({ serveStop: null, writerServedRef: PRIMARY_REF });
+  });
+
+  it("serves, on its first draft, a writer that quotes a UUID-shaped order number a debater's statement states (Task M4 review round 2)", async () => {
+    const order = "3f2a9c1e-7b4d-4e8f-9a01-5c6d7e8f9a0b";
+    const debate = fullDebate(`Primary M4 order ${order} arrived late`);
+    const secondaryDebate = fullDebate("Secondary M4 order quoted");
+    const scenario = await executeResil01Scenario({
+      label: "m4-order-quoted",
+      primary: [
+        ...debate.judgements, ...debate.reviews,
+        m4Composition(`Order ${order} arrived late, and the position survives.`),
+        evaluatorSatisfied()
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: m4WriterAttempts(2)
+    });
+    expect(scenario.error).toBeNull();
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.composed_text.map((segment) => segment.text))
+      .toContain(`Order ${order} arrived late, and the position survives.`);
+    expect((await serveLedger(scenario.runId)).filter((entry) => entry.call_site_key.startsWith("COMPOSER:"))
+      .map((entry) => entry.outcome)).toEqual(["OK"]);
+  });
+
+  it("ends a first round that never stops naming an id components-only, never FAILED, and records NO_ARTIFACT (Task M4 I-1)", async () => {
+    const debate = fullDebate("Primary M4 citation exhausted round one");
+    const secondaryDebate = fullDebate("Secondary M4 citation exhausted round one");
+    const scenario = await executeResil01Scenario({
+      label: "m4-citation-exhausted-one",
+      primary: [
+        ...debate.judgements, ...debate.reviews,
+        m4Composition("The judged position survives (00000000-0000-4000-8000-00000000abcd)."),
+        m4Composition("The judged position survives, per 00000000-0000-4000-8000-00000000abcd.")
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: m4WriterAttempts(2)
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(scenario.answer?.composed_text).toEqual([]);
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(await servedRoundMakers(answerIdOf(scenario))).toEqual([]);
+    // Task M5: the label derived before the writer was asked is the floor.
+    expect(await expectFloor(scenario, "NO_ARTIFACT")).toMatchObject({
+      writerServedRef: null, checkerServedRef: null, serveStop: "NO_ARTIFACT", digestRung: 0, digestPointsOmitted: 0
+    });
+  });
+
+  it("keeps round 1 when every round-2 draft names an id, and serves it with its objection (Task M4 I-1)", async () => {
+    const debate = fullDebate("Primary M4 citation exhausted round two");
+    const secondaryDebate = fullDebate("Secondary M4 citation exhausted round two");
+    const scenario = await executeResil01Scenario({
+      label: "m4-citation-exhausted-two",
+      primary: [
+        ...debate.judgements, ...debate.reviews,
+        resil01Composition, evaluatorObjecting("Round one overstates the margin."),
+        m4Composition("A rewrite citing 00000000-0000-4000-8000-00000000abcd."),
+        m4Composition("Another rewrite citing 00000000-0000-4000-8000-00000000abcd.")
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: m4WriterAttempts(2)
+    });
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.composed_text.map((segment) => segment.text)).toContain("The judged position survives.");
+    expect(scenario.answer?.condition_marks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(scenario.answer?.condition_marks).not.toContain("DEFECT");
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    expect(await disclosureRowOf(answerId))
+      .toMatchObject({ serveStop: "NO_ARTIFACT", writerServedRef: PRIMARY_REF });
+  });
+
+  it("keeps today's components-only outcome when round 1's checker cannot be paid by any maker, and still writes the row", async () => {
+    const primaryDebate = fullDebate("Primary M3 round-one refusal");
+    const secondaryDebate = fullDebate("Secondary M3 round-one refusal");
+    const primarySeam = moneySeam({ refuseServe: [2] });
+    const secondarySeam = moneySeam({ refuseServe: "ALL" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-round-one-refusal",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews, resil01Composition, evaluatorSatisfied()],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: primarySeam.build,
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    // No checked round exists, so no verdict is invented: components-only, as
+    // before; Task M5's floor keeps the label on the owner's row instead.
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(scenario.answer?.composed_text).toEqual([]);
+    expect(secondarySeam.phases().filter((phase) => phase === "SERVE")).toHaveLength(1);
+    expect(await servedRoundMakers(answerId)).toEqual([]);
+    expect((scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason))
+      .toEqual(["RUN_COST_ENVELOPE_MONEY_REACHED"]);
+    expect(await expectFloor(scenario, "ENVELOPE_EXHAUSTED")).toMatchObject({
+      writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
+      writerServedRef: null, checkerServedRef: null,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false,
+      bodyStop: null, pointsWithoutReview: null, serveStop: "MONEY", digestRung: 0, digestPointsOmitted: 0
+    });
+  });
+
+  /**
+   * Found while proving the kept round (Task M3): once round 1's DRAFT was
+   * written, a crash class the sealed chain returns afterwards (here round 1's
+   * checker transport dying) was persisted with that draft's composition
+   * evidence still attached. With a composition artifact present the sealed
+   * persist writes the composed text and then a conformance record whose
+   * coverage mode is the crash result's `NOT_RUN`, which the database refuses
+   * (`serve.conformance_record.coverage_mode IN ('EXHAUSTIVE','SAMPLED')`,
+   * migrations/0000_s00.sql, SQLSTATE 23514). That surfaced as
+   * ANSWER_PERSIST_FAILED, so the run FAILED instead of ending
+   * components-only / DEFECT — and a failed run could never get Task M5's
+   * floor. The persist now takes the evidence of the round the result serves,
+   * and of none when it serves none.
+   */
+  it("ends components-only / DEFECT, not a failed run, when round 1's checker transport dies after its draft was written", async () => {
+    const primaryDebate = fullDebate("Primary M3 round-one checker death");
+    const secondaryDebate = fullDebate("Secondary M3 round-one checker death");
+    const scenario = await executeResil01Scenario({
+      label: "m3-round-one-checker-death",
+      primary: [
+        ...primaryDebate.judgements, ...primaryDebate.reviews,
+        resil01Composition, { status: 500 }, evaluatorSatisfied()
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews]
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(scenario.answer?.composed_text).toEqual([]);
+    expect(await servedRoundMakers(answerId)).toEqual([]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerServedRef: null, checkerServedRef: null, writerFallback: false, checkerFallback: false,
+      serveStop: "TRANSPORT_DEATH"
+    });
+    // Task M5: round 1's checker died after its draft was written; the floor keeps the label.
+    await expectFloor(scenario, "TRANSPORT_DEATH");
+  });
+
+  /**
+   * FINAL REVIEW, Important 1 (spec §14.4.2, §14.4.9) — A CHEAPER MAKER'S
+   * CONTENT FAILURE IS "NO ARTIFACT", NEVER A FAILED RUN. The planned maker is
+   * refused for money, the cheaper one answers, and its draft or verdict is
+   * refused for its content after its repairs (the fixture's bound allows one
+   * attempt). Before, that contract error travelled as itself and the run
+   * FAILED — in round 2 losing the complete round 1 as well. Now round 1 ends
+   * components-only and the floor answers; round 2 keeps round 1. The PLANNED
+   * maker's own contract failure still fails the run ("writes no floor, and no
+   * row, for a run that FAILED on a contract error …", Task M5 below).
+   */
+  it.each([
+    {
+      role: "writer",
+      primarySeam: () => moneySeam({ refuseServe: "ALL" }),
+      primaryServe: [] as readonly string[],
+      secondaryServe: ["this is not a composition"],
+      ledger: [{ call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: SECONDARY_REF, outcome: "FAILED" }]
+    },
+    {
+      role: "checker",
+      primarySeam: () => moneySeam({ refuseServe: [2] }),
+      primaryServe: [resil01Composition],
+      secondaryServe: ["this is not a verdict"],
+      ledger: [
+        { call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: PRIMARY_REF, outcome: "OK" },
+        { call_site_key: "POST_COMPOSE_R9:EVALUATOR:1", actor_ref: SECONDARY_REF, outcome: "FAILED" }
+      ]
+    }
+  ])("ends round 1 components-only with the floor, never FAILED, when the cheaper $role's content fails after a money refusal (final review I-1)", async (input) => {
+    const debate = fullDebate(`Primary final I-1 round-one ${input.role}`);
+    const secondaryDebate = fullDebate(`Secondary final I-1 round-one ${input.role}`);
+    const primarySeam = input.primarySeam();
+    const scenario = await executeResil01Scenario({
+      label: `final-i1-round-one-${input.role}`,
+      primary: [...debate.judgements, ...debate.reviews, ...input.primaryServe],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews, ...input.secondaryServe],
+      primaryCostEnvelope: primarySeam.build
+    });
+
+    // Not FAILED: the sealed answer is components-only and the floor keeps the label.
+    const row = await expectFloor(scenario, "NO_ARTIFACT");
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    // The planned maker was refused before sending; the cheaper one answered and was refused for its content.
+    expect(await serveLedger(scenario.runId)).toEqual(input.ledger);
+    expect(row).toMatchObject({
+      writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
+      writerServedRef: null, checkerServedRef: null,
+      writerFallback: false, checkerFallback: false, fallbackReason: null,
+      serveStop: "NO_ARTIFACT", digestRung: 0, digestPointsOmitted: 0
+    });
+  });
+
+  it.each([
+    {
+      role: "writer",
+      refused: 3,
+      primaryServe: [resil01Composition, evaluatorObjecting("Round one is unfair to the losing side.")],
+      secondaryServe: ["this is not a composition"],
+      roundTwo: [{ call_site_key: "COMPOSER:SYNTHESIZER:RETRY:2", actor_ref: SECONDARY_REF, outcome: "FAILED" }]
+    },
+    {
+      role: "checker",
+      refused: 4,
+      primaryServe: [resil01Composition, evaluatorObjecting("Round one is unfair to the losing side."), m3RoundTwoComposition],
+      secondaryServe: ["this is not a verdict"],
+      roundTwo: [
+        { call_site_key: "COMPOSER:SYNTHESIZER:RETRY:2", actor_ref: PRIMARY_REF, outcome: "OK" },
+        { call_site_key: "POST_COMPOSE_R9:EVALUATOR:2", actor_ref: SECONDARY_REF, outcome: "FAILED" }
+      ]
+    }
+  ])("keeps the complete round 1 when round 2's cheaper $role fails its content after a money refusal (final review I-1)", async (input) => {
+    const debate = fullDebate(`Primary final I-1 round-two ${input.role}`);
+    const secondaryDebate = fullDebate(`Secondary final I-1 round-two ${input.role}`);
+    const scenario = await executeResil01Scenario({
+      label: `final-i1-round-two-${input.role}`,
+      primary: [...debate.judgements, ...debate.reviews, ...input.primaryServe],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews, ...input.secondaryServe],
+      primaryCostEnvelope: moneySeam({ refuseServe: [input.refused] }).build
+    });
+
+    // Served — before, the round-2 contract error failed the run and round 1 was lost.
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.serve_state).toBe("COMPOSED");
+    const texts = scenario.answer?.composed_text.map((segment) => segment.text) ?? [];
+    expect(texts).toContain("The judged position survives.");
+    expect(texts).not.toContain("A round-two rewrite nobody checked.");
+    expect(await servedRoundMakers(answerId)).toEqual([{
+      round: 1, writer: PRIMARY_REF, checker: PRIMARY_REF,
+      candidate_call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", evaluator_call_site_key: "POST_COMPOSE_R9:EVALUATOR:1"
+    }]);
+    // Round 1's own objection stands; no draft is invented and no spend stop is claimed.
+    expect(scenario.answer?.condition_marks).toContain("SYNTHESIS-OBJECTION-STANDING");
+    expect(scenario.answer?.condition_marks).not.toContain("DEFECT");
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    expect(await serveLedger(scenario.runId)).toEqual([
+      { call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: PRIMARY_REF, outcome: "OK" },
+      { call_site_key: "POST_COMPOSE_R9:EVALUATOR:1", actor_ref: PRIMARY_REF, outcome: "OK" },
+      ...input.roundTwo
+    ]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
+      writerFallback: false, checkerFallback: false, fallbackReason: null,
+      serveStop: "NO_ARTIFACT",
+      ...WHOLE_DIGEST_NO_FLOOR
+    });
+  });
+
+  it("records the stop while arguing and the points it left unreviewed, for a served answer with no fallback", async () => {
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-row-body-stop",
+      primary: [judgementDouble("Primary M3 row position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M3 row position")],
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    const row = await disclosureRowOf(answerId);
+    expect(row).toMatchObject({
+      answerId, answerVersion: 1, runId: scenario.runId,
+      writerPlannedRef: PRIMARY_REF, checkerPlannedRef: PRIMARY_REF,
+      writerServedRef: PRIMARY_REF, checkerServedRef: PRIMARY_REF,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: true,
+      // Root 1 was refused: root 0 is the one point, and nobody cross-reviewed it.
+      bodyStop: "MONEY", pointsWithoutReview: 1,
+      serveStop: null,
+      ...WHOLE_DIGEST_NO_FLOOR
+    });
+    expect(row?.createdAt).toBeInstanceOf(Date);
+  });
+
+  it("keeps the stop while arguing on the row of a DEFECT answer, which carries no envelope record (M2 review carry)", async () => {
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-row-defect-body-stop",
+      // Round 1's writer transport dies: no checked round, a DEFECT answer.
+      primary: [judgementDouble("Primary M3 defect position"), { status: 500 }, resil01Composition],
+      secondary: [judgementDouble("Secondary M3 defect position")],
+      secondaryCostEnvelope: secondarySeam.build
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
+    expect(await disclosureRowOf(answerId)).toMatchObject({
+      writerServedRef: null, checkerServedRef: null, bodyStop: "MONEY", pointsWithoutReview: 1,
+      serveStop: "TRANSPORT_DEATH"
+    });
+    // Task M5: stopped while arguing AND no answer written: the floor still keeps the label.
+    await expectFloor(scenario, "TRANSPORT_DEATH");
+  });
+
+  it.each([
+    ["a typed refusal", "SERVE_DISCLOSURE_RECORD_INVALID", null],
+    ["the database's own refusal", "UNTYPED", "23503"]
+  ] as const)("never lets %s to write the row change the answer", async (_name, code, sqlState) => {
+    const logs: Record<string, unknown>[] = [];
+    const repository = new ServeDisclosureRepository(database.pool);
+    const otherRunId = await createRun(`m3-row-other-run-${randomUUID()}`);
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: `m3-row-failure-${code.toLowerCase()}`,
+      primary: [judgementDouble("Primary M3 row-failure position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M3 row-failure position")],
+      secondaryCostEnvelope: secondarySeam.build,
+      settings: {
+        serveDisclosure: {
+          store: {
+            insert: code === "UNTYPED"
+              // The real table's own guard: a row filed under another run.
+              ? (record) => repository.insert({ ...record, runId: otherRunId })
+              : async () => { throw new TypedDomainError("SERVE_DISCLOSURE_RECORD_INVALID", "test-layer: refused"); }
+          },
+          log: (event, detail) => { logs.push({ event, ...detail }); }
+        }
+      }
+    });
+
+    // The answer is served and the work item is settled, exactly as without the row.
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    const item = await database.pool.query<{ state: string; settled_artifact_ref: string | null }>(
+      "SELECT state, settled_artifact_ref::text AS settled_artifact_ref FROM core.work_item WHERE work_item_id=$1",
+      [scenario.workItemId]
+    );
+    expect(item.rows[0]).toEqual({ state: "DONE", settled_artifact_ref: answerId });
+    // The failure is logged by code, with ids only.
+    expect(logs).toEqual([{
+      event: "SERVE_DISCLOSURE_WRITE_FAILED", code, sqlState, runId: scenario.runId, answerId
+    }]);
+    const rows = await database.pool.query("SELECT 1 FROM serve.serve_disclosure WHERE answer_id=$1", [answerId]);
+    expect(rows.rowCount).toBe(0);
+  });
+
+  it("migration 0076: insert-once, closed to UPDATE and DELETE, coherent by CHECK, bound to its answer's run, replay-safe", async () => {
+    const secondarySeam = stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    const scenario = await executeResil01Scenario({
+      label: "m3-row-table",
+      primary: [judgementDouble("Primary M3 table position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M3 table position")],
+      secondaryCostEnvelope: secondarySeam.build
+    });
+    const answerId = answerIdOf(scenario);
+    const repository = new ServeDisclosureRepository(database.pool);
+    const written = await disclosureRowOf(answerId);
+    expect(written).not.toBeNull();
+    const { createdAt: _createdAt, ...record } = written!;
+
+    // Insert-once: a second write for the same answer version changes nothing.
+    await expect(repository.insert({ ...record, bodyStop: null })).resolves.toBe("ALREADY_PRESENT");
+    expect((await disclosureRowOf(answerId))?.bodyStop).toBe("MONEY");
+    // UPDATE and DELETE are closed for every role, the owner included.
+    await expect(database.pool.query("UPDATE serve.serve_disclosure SET body_stop=NULL WHERE answer_id=$1", [answerId]))
+      .rejects.toMatchObject({ code: "55000" });
+    await expect(database.pool.query("DELETE FROM serve.serve_disclosure WHERE answer_id=$1", [answerId]))
+      .rejects.toMatchObject({ code: "55000" });
+    // The repository refuses an incoherent record, typed, before the database…
+    await expect(repository.insert({ ...record, writerServedRef: SECONDARY_REF }))
+      .rejects.toMatchObject({ code: "SERVE_DISCLOSURE_RECORD_INVALID" });
+    // …and the table refuses it too, for a writer that bypasses the repository.
+    const rawInsert = (overrides: Readonly<{ runId?: string; writerFallback?: boolean; fallbackReason?: string | null }>) =>
+      database.pool.query(
+        `INSERT INTO serve.serve_disclosure (
+           answer_id, answer_version, run_id, writer_planned_ref, checker_planned_ref,
+           writer_served_ref, checker_served_ref, writer_fallback, checker_fallback,
+           fallback_reason, checker_same_as_writer
+         ) VALUES ($1, 1, $2, $3, $3, $4, $3, $5, false, $6, false)`,
+        [answerId, overrides.runId ?? scenario.runId, PRIMARY_REF, SECONDARY_REF,
+          overrides.writerFallback ?? true, overrides.fallbackReason === undefined ? "MONEY" : overrides.fallbackReason]
+      );
+    await expect(rawInsert({ writerFallback: false })).rejects.toMatchObject({ code: "23514" });
+    await expect(rawInsert({ fallbackReason: null })).rejects.toMatchObject({ code: "23514" });
+    // M3 polish: the repository's ref and code rules are the table's too, so a
+    // raw-inserted row can never pass the database and then fail the typed read.
+    const rawRow = (answer: string, overrides: Readonly<{ writerRef?: string; serveStop?: string | null }>) =>
+      database.pool.query(
+        `INSERT INTO serve.serve_disclosure (
+           answer_id, answer_version, run_id, writer_planned_ref, checker_planned_ref,
+           writer_served_ref, checker_served_ref, writer_fallback, checker_fallback,
+           fallback_reason, checker_same_as_writer, serve_stop
+         ) VALUES ($1, 1, $2, $3, $3, $3, $3, false, false, NULL, true, $4)`,
+        [answer, answer === answerId ? scenario.runId : unwritten.runId,
+          overrides.writerRef ?? PRIMARY_REF, overrides.serveStop ?? null]
+      );
+    const unwritten = await executeResil01Scenario({
+      label: "m3-row-table-unwritten",
+      primary: [judgementDouble("Primary M3 unwritten-row position"), resil01Composition, evaluatorSatisfied()],
+      secondary: [judgementDouble("Secondary M3 unwritten-row position")],
+      secondaryCostEnvelope: stopOnBodyCall({ ordinal: 2, code: "RUN_COST_ENVELOPE_MONEY_REACHED" }).build,
+      // The runner's own write is swallowed, so this answer has no row yet.
+      settings: { serveDisclosure: { store: { insert: async () => "INSERTED" as const }, log: () => undefined } }
+    });
+    const unwrittenAnswerId = answerIdOf(unwritten);
+    await expect(rawRow(unwrittenAnswerId, { writerRef: "p".repeat(257) })).rejects.toMatchObject({ code: "23514" });
+    await expect(rawRow(unwrittenAnswerId, { writerRef: ` ${PRIMARY_REF}` })).rejects.toMatchObject({ code: "23514" });
+    await expect(rawRow(unwrittenAnswerId, { writerRef: `${PRIMARY_REF}\t` })).rejects.toMatchObject({ code: "23514" });
+    await expect(rawRow(unwrittenAnswerId, { serveStop: "BUDGET" })).rejects.toMatchObject({ code: "23514" });
+    // 256 characters counted as the database counts them (code points), not as
+    // UTF-16 units: passes the table AND the typed read.
+    const astralRef = "\u{1F4B0}".repeat(256);
+    await expect(repository.insert({ ...record, answerId: unwrittenAnswerId, runId: unwritten.runId,
+      writerPlannedRef: "\u{1F4B0}".repeat(257) })).rejects.toMatchObject({ code: "SERVE_DISCLOSURE_RECORD_INVALID" });
+    await rawRow(unwrittenAnswerId, { writerRef: astralRef, serveStop: "NO_ARTIFACT" });
+    expect(await disclosureRowOf(unwrittenAnswerId)).toMatchObject({
+      writerPlannedRef: astralRef, writerServedRef: astralRef, checkerSameAsWriter: true, serveStop: "NO_ARTIFACT"
+    });
+    const otherRunId = await createRun(`m3-row-table-other-${randomUUID()}`);
+    await expect(rawInsert({ runId: otherRunId })).rejects.toMatchObject({
+      code: "23503", message: "SERVE_DISCLOSURE_RUN_MISMATCH"
+    });
+    // Replay-safe: the file applies again on a migrated database, its closing
+    // contract still holds, and the row is untouched.
+    const migration = await readFile(new URL("../../migrations/0076_serve_disclosure.sql", import.meta.url), "utf8");
+    await database.pool.query(migration);
+    const guards = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM pg_catalog.pg_trigger
+        WHERE tgrelid = 'serve.serve_disclosure'::regclass AND NOT tgisinternal AND tgenabled IN ('O','A')`
+    );
+    expect(guards.rows[0]?.count).toBe("3");
+    expect(await disclosureRowOf(answerId)).toEqual(written);
+  });
+});
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.4), TASK M5 — THE FLOOR, through the PRODUCTION
+ * runner on the embedded Postgres.
+ *
+ * The runner derives the arithmetic label BEFORE the answer-writing step. When
+ * the run still ends COMPONENTS_ONLY — for any cause — that label, the position
+ * it rests on and the sealed cause land on the owner's row. The sealed answer is
+ * untouched: COMPONENTS_ONLY, no label, no prose, no checked round.
+ */
+async function labelledRoot(runId: string): Promise<Readonly<{ servedNodeId: string; label: string; basisIncomplete: boolean }>> {
+  const receipt = await database.pool.query<{ served_node_id: string | null; label: string | null; basis_absence: unknown }>(
+    `SELECT propagation.served_root_selection ->> 'servedNodeId' AS served_node_id,
+            propagation.served_root_selection #>> '{verdictLabel,label}' AS label,
+            propagation.served_root_selection #> '{verdictLabel,basisAbsence}' AS basis_absence
+       FROM ledger.propagation_run AS propagation
+      WHERE propagation.run_id = $1 AND propagation.served_root_selection IS NOT NULL
+      ORDER BY propagation.at_seq DESC
+      LIMIT 1`,
+    [runId]
+  );
+  const row = receipt.rows[0];
+  if (row?.served_node_id == null || row.label == null || !Array.isArray(row.basis_absence)) {
+    throw new Error("TEST_LABEL_RECEIPT_ABSENT");
+  }
+  return Object.freeze({ servedNodeId: row.served_node_id, label: row.label, basisIncomplete: row.basis_absence.length > 0 });
+}
+
+/** The floor on the row IS the label on the receipt; the sealed answer invents nothing. */
+async function expectFloor(
+  scenario: Readonly<{ runId: string; result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null;
+    answer: Awaited<ReturnType<ServeRepository["readAnswerProjection"]>> | null; error: unknown }>,
+  reason: string
+): Promise<StoredServeDisclosure> {
+  expect(scenario.error).toBeNull();
+  const answerId = answerIdOf(scenario);
+  // The sealed answer stays components-only: no label, no prose, no checked round.
+  expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+  expect(scenario.answer?.verdict_state).toBeNull();
+  expect(scenario.answer?.composed_text).toEqual([]);
+  expect(await servedRoundMakers(answerId)).toEqual([]);
+  const receipt = await labelledRoot(scenario.runId);
+  const row = await disclosureRowOf(answerId);
+  expect(row).toMatchObject({
+    writerServedRef: null, checkerServedRef: null,
+    floorVerdictState: receipt.label, floorLeadingNodeId: receipt.servedNodeId, floorReason: reason,
+    // M5 review, I2: the floor's thin basis is the receipt's.
+    floorBasisIncomplete: receipt.basisIncomplete
+  });
+  // The leading position is a node of the answer the person reads.
+  expect(scenario.answer?.nodes.map((node) => node.node_id)).toContain(receipt.servedNodeId);
+  return row!;
+}
+
+describe("Engine money rule M5 — the floor: the label and the leading position when no answer could be written (production runner)", () => {
+  it("records a floor when round 1's writer cannot be paid by any maker", async () => {
+    const primaryDebate = fullDebate("Primary M5 writer refusal");
+    const secondaryDebate = fullDebate("Secondary M5 writer refusal");
+    const scenario = await executeResil01Scenario({
+      label: "m5-writer-refusal",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      secondaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build
+    });
+    const row = await expectFloor(scenario, "ENVELOPE_EXHAUSTED");
+    expect(scenario.answer?.condition_marks).toContain("ENVELOPE_EXHAUSTED");
+    expect(row).toMatchObject({ serveStop: "MONEY", digestRung: 0, digestPointsOmitted: 0 });
+    // Nothing was written for the answer: the ledger holds no answer-writing call.
+    expect(await serveLedger(scenario.runId)).toEqual([]);
+  });
+
+  it("records a floor when no digest can exist, before any answer-writing call", async () => {
+    const policy = runnerSettings().servePolicy!;
+    const tiny = (tier: "low" | "medium" | "high") => ({ ...policy.compositionBudgets[tier], bound: 1 });
+    const debate = fullDebate("Primary M5 digest cannot exist");
+    const secondaryDebate = fullDebate("Secondary M5 digest cannot exist");
+    const scenario = await executeResil01Scenario({
+      label: "m5-digest-cannot-exist",
+      primary: [...debate.judgements, ...debate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: {
+        servePolicy: { ...policy, compositionBudgets: { low: tiny("low"), medium: tiny("medium"), high: tiny("high") } }
+      }
+    });
+    const row = await expectFloor(scenario, "DIGEST_CANNOT_EXIST");
+    expect(scenario.answer?.condition_marks).toContain("DIGEST-CANNOT-EXIST");
+    // No digest was handed to a writer, and none was called.
+    expect(row).toMatchObject({ serveStop: null, digestRung: null, digestPointsOmitted: null });
+    expect(await serveLedger(scenario.runId)).toEqual([]);
+  });
+
+  /**
+   * FINAL REVIEW, Minor 2 — A FLOOR ANSWER'S STORY ONLY WHEN ITS ROW EXISTS.
+   * The owner's page and the public page learn a floor from its row alone. If
+   * the best-effort write of that row failed, a story told from the in-memory
+   * floor would state an answer beside a page that says the verdict is
+   * unavailable. So the floor's story waits for the row; a served answer's
+   * story does not need it (its label is the sealed answer's own).
+   */
+  it.each([
+    { name: "a floor answer whose row was written gets its story", served: false, failWrite: false, stories: 1 },
+    { name: "a floor answer whose row could not be written gets no story", served: false, failWrite: true, stories: 0 },
+    { name: "a served answer gets its story even when its row could not be written", served: true, failWrite: true, stories: 1 }
+  ])("$name", async (input) => {
+    const logs: Record<string, unknown>[] = [];
+    const written: { answerId: string; answerVersion: number }[] = [];
+    const snapshotFailures: unknown[] = [];
+    const label = `final-minor2-${input.served ? "served" : "floor"}-${input.failWrite ? "unwritten" : "written"}`;
+    const debate = fullDebate(`Primary ${label}`);
+    const secondaryDebate = fullDebate(`Secondary ${label}`);
+    const scenario = await executeResil01Scenario({
+      label,
+      primary: [...debate.judgements, ...debate.reviews, ...(input.served ? [resil01Composition, evaluatorSatisfied()] : [])],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      // The floor: no maker can pay for the answer-writer.
+      ...(input.served ? {} : {
+        primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+        secondaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build
+      }),
+      settings: {
+        story: {
+          writeAfterSettle: async (story) => { written.push({ answerId: story.answerId, answerVersion: story.answerVersion }); },
+          reportSnapshotFailure: (failure) => { snapshotFailures.push(failure); }
+        },
+        ...(input.failWrite ? {
+          serveDisclosure: {
+            store: { insert: async () => { throw new TypedDomainError("SERVE_DISCLOSURE_RECORD_INVALID", "test-layer: refused"); } },
+            log: (event: string, detail: Readonly<Record<string, unknown>>) => { logs.push({ event, ...detail }); }
+          }
+        } : {})
+      }
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    if (input.served) expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    else expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(snapshotFailures).toEqual([]);
+    expect(written).toEqual(Array.from({ length: input.stories }, () => ({ answerId, answerVersion: 1 })));
+    if (input.failWrite) {
+      // The write failure is logged by its typed code, as before; no row exists.
+      expect(logs).toEqual([{
+        event: "SERVE_DISCLOSURE_WRITE_FAILED", code: "SERVE_DISCLOSURE_RECORD_INVALID", sqlState: null,
+        runId: scenario.runId, answerId
+      }]);
+      expect(await disclosureRowOf(answerId)).toBeNull();
+    } else {
+      await expectFloor(scenario, "ENVELOPE_EXHAUSTED");
+    }
+  });
+
+  it("records a floor when round 1's writer transport dies", async () => {
+    const debate = fullDebate("Primary M5 writer death");
+    const secondaryDebate = fullDebate("Secondary M5 writer death");
+    const scenario = await executeResil01Scenario({
+      label: "m5-writer-death",
+      primary: [...debate.judgements, ...debate.reviews, { status: 500 }, resil01Composition],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews]
+    });
+    const row = await expectFloor(scenario, "TRANSPORT_DEATH");
+    expect(scenario.answer?.condition_marks).toContain("DEFECT");
+    expect(row).toMatchObject({ serveStop: "TRANSPORT_DEATH" });
+  });
+
+  it("writes no floor, and no row, for a run that FAILED on a contract error after its label was derived", async () => {
+    const debate = fullDebate("Primary M5 contract failure");
+    const secondaryDebate = fullDebate("Secondary M5 contract failure");
+    const scenario = await executeResil01Scenario({
+      label: "m5-contract-failure",
+      primary: [...debate.judgements, ...debate.reviews, "this is not a composition"],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews]
+    });
+    // A technical failure: the run failed, so it has no answer, no label and no floor.
+    expect(scenario.result).toBeNull();
+    expect(scenario.error).toBeInstanceOf(TypedDomainError);
+    const answers = await database.pool.query("SELECT 1 FROM serve.answer WHERE run_id=$1", [scenario.runId]);
+    expect(answers.rowCount).toBe(0);
+    const rows = await database.pool.query("SELECT 1 FROM serve.serve_disclosure WHERE run_id=$1", [scenario.runId]);
+    expect(rows.rowCount).toBe(0);
+  });
+
+  it("writes no floor, and no row, for a run that FAILED before any label existed", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "m5-first-call-money",
+      primary: [judgementDouble("Primary M5 never-authored position")],
+      secondary: [judgementDouble("Secondary M5 never-authored position")],
+      primaryCostEnvelope: stopOnBodyCall({ ordinal: 1, code: "RUN_COST_ENVELOPE_MONEY_REACHED" }).build
+    });
+    expect(scenario.result).toBeNull();
+    expect((scenario.error as TypedDomainError).code).toBe("RUN_CEILING_BELOW_FIRST_CALL");
+    const rows = await database.pool.query("SELECT 1 FROM serve.serve_disclosure WHERE run_id=$1", [scenario.runId]);
+    expect(rows.rowCount).toBe(0);
+  });
+});
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M5 — the owner's and the operator's
+ * READ of the record, over rows the production runner wrote. The route itself
+ * (session, answer gate, closed 404) is proven over the real database in
+ * tests/integration/story-api.test.ts.
+ */
+describe("Engine money rule M5 — the disclosure read over the runner's own rows", () => {
+  async function askerOf(runId: string): Promise<string> {
+    const asker = await database.pool.query<{ asker_id: string }>("SELECT asker_id FROM core.run WHERE run_id=$1", [runId]);
+    return asker.rows[0]!.asker_id;
+  }
+
+  /** A DR-184 review catch-up version: what `prepareVersion` persists, and it runs no answer-writing step. */
+  const catchUpVersion = (runId: string): Promise<number> => persistCatchUpVersion(database.pool, runId);
+
+  const PRIMARY_MODEL = { maker: "Primary test maker", model_id: "test-layer/primary-model", transport: "openai-compatible-http", provider_ref: PRIMARY_REF };
+  const SECONDARY_MODEL = { maker: "Secondary test maker", model_id: "test-layer/secondary-model", transport: "openai-compatible-http", provider_ref: SECONDARY_REF };
+
+  it("reads the latest version that HAS a record — a catch-up version newer than it reads the one before — with each model named from its own calls", async () => {
+    const primaryDebate = fullDebate("Primary M5 read fallback");
+    const secondaryDebate = fullDebate("Secondary M5 read fallback");
+    const scenario = await executeResil01Scenario({
+      label: "m5-read-fallback",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews, resil01Composition, evaluatorSatisfied()],
+      primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      secondaryCostEnvelope: moneySeam().build
+    });
+    const answerId = answerIdOf(scenario);
+    const ownership = { ownerRef: null, legacyAskerId: await askerOf(scenario.runId) };
+    const repository = new ServeDisclosureRepository(database.pool);
+    const read = await repository.readLatestForAnswer({ answerId, ownership });
+    expect(read?.row).toMatchObject({ answerId, answerVersion: 1, writerServedRef: SECONDARY_REF, writerFallback: true });
+    // The planned maker never wrote the answer, but it judged points in this
+    // run: its model is read from those calls; the served one from the round.
+    const disclosure = AnswerDisclosureSchema.parse(buildAnswerDisclosure(read!));
+    expect(disclosure).toEqual({
+      answer_id: answerId,
+      answer_version: 1,
+      floor: null,
+      floor_reason: null,
+      writer: { planned_model: PRIMARY_MODEL, served_model: SECONDARY_MODEL, lower_cost: true },
+      checker: { planned_model: PRIMARY_MODEL, served_model: SECONDARY_MODEL, lower_cost: true },
+      checker_same_as_writer: true,
+      digest: { compacted: false, points_left_out: 0 },
+      cut_short: { arguing: null, answer_writing: null }
+    });
+
+    // DR-184: a review catch-up appends version 2, which runs no answer-writing
+    // step and so has no record. The read returns version 1's.
+    expect(await catchUpVersion(scenario.runId)).toBe(2);
+    const latest = await database.pool.query<{ version: number }>(
+      "SELECT max(answer_version) AS version FROM serve.answer WHERE answer_id=$1", [answerId]
+    );
+    expect(latest.rows[0]?.version).toBe(2);
+    const versionTwo = await database.pool.query(
+      "SELECT 1 FROM serve.serve_disclosure WHERE answer_id=$1 AND answer_version=2", [answerId]
+    );
+    expect(versionTwo.rowCount).toBe(0);
+    expect(await repository.readLatestForAnswer({ answerId, ownership })).toEqual(read);
+
+    // Anyone else reads nothing: another asker, an unknown owner, a doubled or
+    // missing key, a malformed id.
+    for (const foreign of [
+      { ownerRef: null, legacyAskerId: `asker:someone-else-${randomUUID()}` },
+      { ownerRef: randomUUID(), legacyAskerId: null },
+      { ownerRef: randomUUID(), legacyAskerId: ownership.legacyAskerId },
+      { ownerRef: null, legacyAskerId: null }
+    ]) expect(await repository.readLatestForAnswer({ answerId, ownership: foreign })).toBeNull();
+    expect(await repository.readLatestForAnswer({ answerId: "not-a-uuid", ownership })).toBeNull();
+
+    // The operator reads the same record by the answer or by the run.
+    expect(await repository.readLatestForOperator(answerId)).toEqual(read);
+    expect(await repository.readLatestForOperator(scenario.runId)).toEqual(read);
+    expect(await repository.readLatestForOperator(randomUUID())).toBeNull();
+  });
+
+  it("reads a floor answer's record: its floor, no roles, and what cut it short", async () => {
+    const primaryDebate = fullDebate("Primary M5 read floor");
+    const secondaryDebate = fullDebate("Secondary M5 read floor");
+    const scenario = await executeResil01Scenario({
+      label: "m5-read-floor",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      secondaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build
+    });
+    const answerId = answerIdOf(scenario);
+    const receipt = await labelledRoot(scenario.runId);
+    const read = await new ServeDisclosureRepository(database.pool).readLatestForAnswer({
+      answerId, ownership: { ownerRef: null, legacyAskerId: await askerOf(scenario.runId) }
+    });
+    expect(AnswerDisclosureSchema.parse(buildAnswerDisclosure(read!))).toEqual({
+      answer_id: answerId,
+      answer_version: 1,
+      floor: { verdict_state: receipt.label, leading_node_id: receipt.servedNodeId, basis_incomplete: receipt.basisIncomplete },
+      floor_reason: "ENVELOPE_EXHAUSTED",
+      writer: null,
+      checker: null,
+      checker_same_as_writer: false,
+      digest: { compacted: false, points_left_out: 0 },
+      cut_short: { arguing: null, answer_writing: "MONEY" }
+    });
+    // Both planned makers judged points, so the record can still name them.
+    expect(read?.models).toMatchObject({
+      writerPlanned: { providerRef: PRIMARY_REF, maker: "Primary test maker" }, writerServed: null, checkerServed: null
+    });
+
+    // The operator's command prints the same record, by the run's id, one fact per line.
+    const printed: string[] = [];
+    const refused: string[] = [];
+    const repository = new ServeDisclosureRepository(database.pool);
+    expect(await runServeDisclosureCli([scenario.runId], {
+      stdout: (text) => printed.push(text), stderr: (text) => refused.push(text)
+    }, async () => ({ read: (id) => repository.readLatestForOperator(id), close: async () => undefined }))).toBe(0);
+    expect(refused).toEqual([]);
+    const lines = printed.join("").split("\n");
+    expect(lines).toEqual(expect.arrayContaining([
+      `answer: ${answerId} (version 1)`,
+      `run: ${scenario.runId}`,
+      "answer: not written by a model; the floor stands in for it",
+      `floor: ${receipt.label}, on the leading position ${receipt.servedNodeId}`,
+      "floor reason: ENVELOPE_EXHAUSTED",
+      `floor label basis: ${receipt.basisIncomplete
+        ? "incomplete (derived without a margin or a disagreement measure)" : "complete"}`,
+      `answer writer planned: Primary test maker · test-layer/primary-model (${PRIMARY_REF})`,
+      "answer writer used: none (no checked round was served)",
+      "answer-writing cut short by: money",
+      "digest the answer-writer read: rung 0, whole"
+    ]));
+  });
+});
+
+/**
+ * M5 review (M1) — a DR-184 catch-up version may not move a floor. A floor
+ * answer has no served number, so the number guard cannot see its label move;
+ * `prepareVersion` re-derives the floor from its own propagation and the label
+ * controls of the register version the floor's receipt names, and the catch-up
+ * refuses a version that would move it. The guard, the re-derivation's move
+ * cases and the refusal before persisting are unit rows
+ * (tests/unit/dr184-catch-up.test.ts, tests/unit/m5-serve-floor.test.ts); here
+ * the re-derivation reproduces the runner's own floor over real rows.
+ */
+describe("Engine money rule M5 review — a catch-up version re-derives the floor it would carry", () => {
+  /** A register version holding the sealed algorithm rows — the verdict-label family among them — as a deployment publishes them. */
+  async function labelRegisterVersion(): Promise<number> {
+    await persistBootstrapRegister(database.pool, await loadBootstrapRegister());
+    const rows = buildAlgorithmRegisterRows({
+      deploymentSourceRef: "test-layer:M5-review",
+      synthesizerRoleRef: PRIMARY_REF,
+      evaluatorRoleRef: PRIMARY_REF,
+      providerFamilies: [{ familyRef: "test-layer:family", providerRefs: [PRIMARY_REF, SECONDARY_REF] }]
+    }).map((row) => registerFixtureRow(row.rowKey, row.value, row.sourceRef));
+    const keys = new Set(rows.map((row) => row.rowKey));
+    for (const key of ALGORITHM_REGISTER_ROW_FAMILIES.verdictLabel) expect(keys.has(key)).toBe(true);
+    const receipt = await publishReplacementRegisterFixture(
+      database.pool, parseRegisterVersionText("1"), rows, `test-layer:M5-review:${randomUUID()}`
+    );
+    return registerVersionToSafeLegacyNumber(receipt.registerVersion);
+  }
+
+  function catchUpDependencies() {
+    const settings = runnerSettings();
+    return createPostgresReviewCatchUpDependencies({
+      pool: database.pool,
+      reviewers: [],
+      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+      propagationContractHash: settings.propagationContractHash,
+      propagationNumberKind: settings.propagationNumberKind,
+      propagationProducer: settings.propagationProducer,
+      judgementSelectionRule: { ...settings.judgementPolicy!.selectionRule },
+      compositionBudget: settings.servePolicy!.compositionBudgets.low
+    });
+  }
+
+  it("re-derives the same floor — the same leading position and label — when nothing it rests on moved", async () => {
+    const registerVersion = await labelRegisterVersion();
+    const primaryDebate = fullDebate("Primary M5 review floor stays");
+    const secondaryDebate = fullDebate("Secondary M5 review floor stays");
+    const scenario = await executeResil01Scenario({
+      label: "m5-review-floor-stays",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      primaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      secondaryCostEnvelope: moneySeam({ refuseServe: "ALL" }).build,
+      settings: { verdictLabelPolicy: { ...runnerSettings().verdictLabelPolicy!, registerVersion } }
+    });
+    const answerId = answerIdOf(scenario);
+    const receipt = await labelledRoot(scenario.runId);
+    const candidate = await catchUpDependencies().prepareVersion({ runId: scenario.runId, answerId, fromVersion: 1 });
+    expect(candidate.floorBefore).toEqual({ leadingNodeId: receipt.servedNodeId, verdictState: receipt.label });
+    expect(candidate.floorAfter).toEqual(candidate.floorBefore);
+    expect(catchUpFloorWouldMove(candidate.floorBefore, candidate.floorAfter)).toBe(false);
+  });
+
+  it("leaves a served answer's catch-up to the number guard: it has no floor to re-derive", async () => {
+    const primaryDebate = fullDebate("Primary M5 review served");
+    const secondaryDebate = fullDebate("Secondary M5 review served");
+    const scenario = await executeResil01Scenario({
+      label: "m5-review-served-no-floor",
+      primary: [...primaryDebate.judgements, ...primaryDebate.reviews, resil01Composition, evaluatorSatisfied()],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews]
+    });
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    const candidate = await catchUpDependencies().prepareVersion({
+      runId: scenario.runId, answerId: answerIdOf(scenario), fromVersion: 1
+    });
+    expect(candidate).toMatchObject({ floorBefore: null, floorAfter: null });
+  });
+});
+
+/**
+ * M5 review (M3) — the operator's report reads through a READ-ONLY connection
+ * and, in production, only as the runner's own principal. Over the embedded
+ * database's own connection (not the runner principal).
+ */
+describe("Engine money rule M5 review — the operator report's connection", () => {
+  it("opens read-only: a write through the report's connection is refused by the database", async () => {
+    const reader = await openServeDisclosureReader(database.connectionString, false);
+    try {
+      await expect(reader.read(randomUUID())).resolves.toBeNull();
+    } finally {
+      await reader.close();
+    }
+    // The same opening, with its pool in hand, refuses a write.
+    const { createPool } = await import("@debateai/db");
+    const pool = createPool(database.connectionString, { max: 1 });
+    pool.on("connect", (client) => { client.query("SET default_transaction_read_only = on").catch(() => undefined); });
+    try {
+      await expect(pool.query("CREATE TEMP TABLE m5_review_write_probe (x int)"))
+        .rejects.toMatchObject({ code: "25006" });
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it("refuses, in production, a connection that is not the runner's principal", async () => {
+    await expect(openServeDisclosureReader(database.connectionString, true))
+      .rejects.toThrowError(/^SERVE_DISCLOSURE_PRINCIPAL_INVALID$/u);
   });
 });
 
@@ -5449,8 +7450,16 @@ describe("T10/T11 · the served root and its label, through the production runne
    * run called an already-absent provider and recorded the result as an
    * ordinary transport death. It must refuse instead, without substituting the
    * still-healthy maker, and leave a durable event naming the ROLE (J25).
+   *
+   * ENGINE MONEY RULE, TASK M3 (spec §14.4.2): J24 now has ONE exception — a
+   * disclosed substitution for COST, when the planned maker's answer-writing
+   * call is refused for money ("Engine money rule M3 …" below). This case pins
+   * that the exception is exactly that wide: an absent role provider is not a
+   * money refusal, so the run still refuses at claim, even with the price map
+   * wired and a cheaper healthy maker right there, and nothing is served,
+   * spent or disclosed.
    */
-  it("T9/J24 refuses when a configured sealed role provider is absent at claim, and never substitutes the healthy maker", async () => {
+  it("T9/J24 refuses when a configured sealed role provider is absent at claim, and never substitutes the healthy maker for absence, even with the cost fallback wired (its money half: \"Engine money rule M3\")", async () => {
     const absentRolePrimary = await startProviderDouble([]);
     const healthySecondary = await startProviderDouble([
       judgementDouble("The healthy maker would have authored this", 0.4),
@@ -5505,7 +7514,13 @@ describe("T10/T11 · the served root and its label, through the production runne
         // forbids.
         claimTimeProbe: async (member) => member.provider_ref === primaryMember.provider_ref
           ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
-          : { state: "HEALTHY", modelId: member.model_id, failureCode: null }
+          : { state: "HEALTHY", modelId: member.model_id, failureCode: null },
+        // Task M3: the cost fallback is wired, with the healthy maker the
+        // cheaper one. It still may not stand in for an ABSENT provider.
+        providerPrices: new Map([
+          [primaryMember.provider_ref, { inputMicrosPerMillionTokens: 9_000_000, outputMicrosPerMillionTokens: 9_000_000 }],
+          [secondaryMember.provider_ref, { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 }]
+        ])
       });
 
       await expect(runner.executeWorkItem(workItemId))
@@ -5518,6 +7533,11 @@ describe("T10/T11 · the served root and its label, through the production runne
         "SELECT count(*)::text AS count FROM serve.answer WHERE run_id=$1", [runId]
       );
       expect(answers.rows[0]?.count).toBe("0");
+      // Task M3: and nothing to disclose — no answer, so no owner-side row.
+      const disclosures = await database.pool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM serve.serve_disclosure WHERE run_id=$1", [runId]
+      );
+      expect(disclosures.rows[0]?.count).toBe("0");
 
       // J25: the disclosure is DURABLE and names the role, so a reader of the
       // run sees why it stopped. Both live-event surfaces render this kind.

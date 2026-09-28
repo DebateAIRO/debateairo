@@ -22,6 +22,7 @@ import {
 import {
   ContractHttpError,
   type Answer,
+  type AnswerFloor,
   type ExecutionLedgerDigest,
   type Inspection,
   type InvestigationGap,
@@ -70,6 +71,13 @@ import { DebateSplit } from "@/components/DebateSplit";
 import { DebateMap } from "@/components/DebateMap";
 import { SynthesisPanel } from "@/components/SynthesisPanel";
 import { VerdictBanner } from "@/components/VerdictBanner";
+import { QuestionLanguageOffer } from "@/components/QuestionLanguageOffer";
+import { StoryPanel } from "@/components/StoryPanel";
+import { toStoryView } from "@/lib/v3/storyView";
+import { floorAnswerView, resolveFloor, type ResolvedFloor } from "@/lib/v3/floorAnswer";
+import { reportSupportedForLocale } from "@/lib/report/reportLanguage";
+import { useAnswerStory } from "@/lib/v3/useAnswerStory";
+import { useStoryLocaleReady } from "@/lib/v3/useStoryLocaleReady";
 import { DebateWorkspaceDrawer } from "@/components/DebateWorkspaceDrawer";
 import { NodeDetailDrawer } from "@/components/NodeDetailDrawer";
 import { ChallengePopover } from "@/components/ChallengePopover";
@@ -78,6 +86,8 @@ import { GuideModal } from "@/components/GuideModal";
 import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import type { LocaleCode } from "@/lib/i18n/locales";
+import { questionLocale as questionLocaleOf } from "@/lib/i18n/questionLocale";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { Toast } from "@/components/Toast";
 import {
@@ -569,7 +579,12 @@ export default function DebatePageClient({
   publicExport = null,
   renderPublicHonesty = null,
   publicOverview = null,
-  publicHeader = null
+  publicHeader = null,
+  questionLocale = null,
+  storyLocale,
+  storyCatalog,
+  initialFloor = null,
+  publicFloor = null
 }: {
   id: string;
   initialDebate: DebateDetail | null;
@@ -616,10 +631,36 @@ export default function DebatePageClient({
    * chrome.
    */
   publicHeader?: ReactNode;
+  /**
+   * The locale of the language the debate was argued in (spec 2026-09-26
+   * §14.3), from the run read (owner) or the snapshot (public); null when it
+   * is not known. When it differs from the interface locale the page offers
+   * to switch to it.
+   */
+  questionLocale?: LocaleCode | null;
+  /**
+   * The locale the owner's verdict story strip speaks (spec 2026-09-26 §14.3):
+   * the question's, or the interface's when the server's render learned none.
+   */
+  storyLocale: LocaleCode;
+  /** The `public` catalogue of `storyLocale`: the story strip's fixed words. */
+  storyCatalog: MessageCatalog;
+  /**
+   * The owner's floor (spec 2026-09-26 §14.4.4, Task M6), from the server's
+   * read of the answer's record: a components-only answer's kept label and
+   * leading position. The page's own refreshes read it again with the answer.
+   */
+  initialFloor?: AnswerFloor | null;
+  /**
+   * Public mode: the snapshot's floor, resolved by the public page against the
+   * snapshot's own points. The public page reads nothing else.
+   */
+  publicFloor?: ResolvedFloor | null;
 }) {
   const { catalog: chromeCatalog, locale } = useChromeI18n();
   const [debate, setDebate] = useState<DebateDetail | null>(initialDebate);
   const [answer, setAnswer] = useState<Answer | null>(initialAnswer);
+  const [floor, setFloor] = useState<AnswerFloor | null>(initialFloor);
   const [live, setLive] = useState<LiveRunState>(createLiveRunState);
   const [ledgerDigest, setLedgerDigest] = useState<ExecutionLedgerDigest | null>(null);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
@@ -677,6 +718,9 @@ export default function DebatePageClient({
   const debateHeaderControlsRef = useRef<HTMLDivElement | null>(null);
   const debateHeaderInlineActionsRef = useRef<HTMLDivElement | null>(null);
   const [headerActionsCollapsed, setHeaderActionsCollapsed] = useState(false);
+  // The question's locale as the page's own run read recorded it (spec
+  // 2026-09-26 §14.3); null until that read answers.
+  const [readQuestionLocale, setReadQuestionLocale] = useState<LocaleCode | null>(null);
 
   const refresh = useCallback(async (answerExpected = false) => {
     if (privateDeletionRef.current!==null) return;
@@ -688,7 +732,17 @@ export default function DebatePageClient({
         locale
       });
       if (privateDeletionRef.current!==null) return;
+      setReadQuestionLocale(questionLocaleOf(bundle.questionLanguage?.tag, locale));
       if (bundle.kind === "served") {
+        // The floor is read with the answer (spec §14.4.4). A read that failed
+        // keeps the floor the page already shows for this same answer version;
+        // a new answer, or a definite answer, replaces it.
+        const previous = answerRef.current;
+        const sameAnswer = previous !== null
+          && previous.answer_id === bundle.answer.answer_id
+          && previous.answer_version === bundle.answer.answer_version;
+        const floorRead = bundle.floorRead;
+        setFloor((current) => (floorRead.failed && sameAnswer ? current : floorRead.floor));
         answerRef.current = bundle.answer;
         setAnswer(bundle.answer);
         setDebate(bundle.detail);
@@ -964,6 +1018,39 @@ export default function DebatePageClient({
     };
   }, [answer]);
 
+  // Verdict story (spec 2026-09-26 §10): owner-only. Polls its own route while
+  // the story is being written; the public page reads nothing here. The strip
+  // shows only once the first reply is in, so a reload never announces a story
+  // "being written" that is already written, or never will be. It speaks the
+  // question's language, so it also waits for that language's catalogue.
+  const story = useAnswerStory(publicMode ? null : answer?.answer_id ?? null, {
+    answerVersion: answer?.answer_version
+  });
+  const storyLocaleReady = useStoryLocaleReady({ questionLocale, readQuestionLocale, storyLocale, hasAnswer: answer !== null });
+  // The floor answer (spec 2026-09-26 §14.4.4): a components-only answer whose
+  // label the engine kept shows that label, "Our best answer:" and the leading
+  // position's statement instead of the "Components-only…" line. The owner's
+  // verdict area words it in the interface's language, like every fixed word
+  // there; the public page in the question's, like its short story.
+  const resolvedFloor = useMemo(
+    () => (publicMode
+      ? publicFloor
+      : resolveFloor(answer === null ? null : { terminal: answer.terminal, verdict: answer.verdict_state, nodes: answer.nodes }, floor)),
+    [publicMode, publicFloor, answer, floor]
+  );
+  const floorView = useMemo(
+    () => (resolvedFloor === null
+      ? null
+      : floorAnswerView(resolvedFloor, publicMode ? storyCatalog : publicCatalog, publicMode ? storyLocale : locale, storyLocale)),
+    [resolvedFloor, publicMode, storyCatalog, publicCatalog, storyLocale, locale]
+  );
+  const storyView = useMemo(
+    () => (publicMode || answer === null || story === null || !storyLocaleReady
+      ? null
+      : toStoryView(answer, story, id, storyLocale, reportSupportedForLocale, resolvedFloor)),
+    [publicMode, answer, story, storyLocaleReady, id, storyLocale, resolvedFloor]
+  );
+
   const showInspection = useCallback(async () => {
     if (answerRef.current === null) return;
     try {
@@ -1089,6 +1176,10 @@ export default function DebatePageClient({
   const complete = debate ? isComplete(debate.status) : false;
   const generating = debate ? !complete && (debate.status || "").toLowerCase() !== "failed" : false;
   const hasTree = Boolean(debate?.tree);
+  // A floor answer is an answer (spec §14.4.4): the top bar's "Components-only"
+  // status gives way to it, as the verdict area's line does. The honesty
+  // drawer keeps the true marks.
+  const completionReason = floorView === null ? debate?.completion?.humanReason ?? null : null;
 
   const progress = useMemo(() => {
     if (!debate) return { pct: 0, label: "", count: "" };
@@ -1164,7 +1255,7 @@ export default function DebatePageClient({
       resizeTarget: window,
       measure: measureHeaderFit
     });
-  }, [answerExport.available, debate?.completion?.humanReason, debate?.status, debate?.topic, hasArtifacts, hasTree]);
+  }, [answerExport.available, completionReason, debate?.status, debate?.topic, hasArtifacts, hasTree]);
 
   const detailNode = findNode(debate?.tree ?? null, detailNodeId);
   const { scoringByNodeId, scoringErrorsByNodeId } = useMemo(
@@ -1399,9 +1490,9 @@ export default function DebatePageClient({
               <span className="dot" />
               {statusLabel(debate.run_state ?? debate.status, timeCatalog)}
             </span>
-            {debate.completion?.humanReason ? (
-              <span className="topSwitchStatus" role="status" title={debate.completion.humanReason}>
-                {debate.completion.humanReason}
+            {completionReason ? (
+              <span className="topSwitchStatus" role="status" title={completionReason}>
+                {completionReason}
               </span>
             ) : null}
           </div>
@@ -1524,6 +1615,11 @@ export default function DebatePageClient({
 
       {/* ---- verdict-first banner (flag-gated: NEXT_PUBLIC_VERDICT_FIRST_UI) ---- */}
       {!publicMode && process.env.NEXT_PUBLIC_VERDICT_FIRST_UI === "true" ? <VerdictBanner verdict={debate.verdict} catalog={debateDrawersCatalog} debateChromeCatalog={debateChromeCatalog} /> : null}
+
+      <QuestionLanguageOffer questionLocale={questionLocale} interfaceLocale={locale} catalog={chromeCatalog} />
+
+      {/* ---- verdict story strip (owner only; spec 2026-09-26 §10) ---- */}
+      {storyView === null ? null : <StoryPanel view={storyView} catalog={storyCatalog} locale={storyLocale} />}
 
       <ScoringErrorBoundary catalog={miscCatalog}>
         {scoringInsightsExpandable ? (
@@ -1743,6 +1839,7 @@ export default function DebatePageClient({
           meta={synthesisMeta}
           lean={lean}
           sections={synthesisSections}
+          floor={floorView}
           catalog={debateDrawersCatalog}
         />
       </div>}
@@ -1752,6 +1849,9 @@ export default function DebatePageClient({
         <NodeDetailDrawer
           node={detailNode}
           v3={v3NodeById?.get(detailNode.id)}
+          // Owner-only stop causes never reach a public pill, even if an answer
+          // were ever loaded in public mode: the public pill reads the neutral words.
+          conditionRecords={publicMode ? [] : answer?.condition_mark_records ?? []}
           scoring={scoringByNodeId.get(detailNode.id)}
           scoringError={scoringErrorsByNodeId.get(detailNode.id)}
           feedbackSummary={feedbackSummaryByNodeId.get(detailNode.id)}
@@ -1848,6 +1948,7 @@ export default function DebatePageClient({
           catalog={miscCatalog}
           debateChromeCatalog={debateChromeCatalog}
           composeCatalog={composeCatalog}
+          floorShown={floorView !== null}
         />
       ) : null}
 

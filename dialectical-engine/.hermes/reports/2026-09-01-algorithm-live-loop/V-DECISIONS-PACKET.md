@@ -330,3 +330,7 @@ The two thresholds (§C above), the seven confirm-items (§B above), the mono-ma
 **FINAL.** The judge's whole-goal verdict is attached: `agent-reports/w12-whole-goal-verdict-2026-09-18.md`
 — MET, with the mono-maker bullet UNWITNESSED by your waiver and the Node-26 caveat on every suite
 number. The rows of §A keep their recorded defaults and their veto windows.
+
+### D. Amendment (2026-09-28): V-ROLE-1 closed
+
+**V-ROLE-1 is closed as "disclosed failover for cost".** By the owner's rule at the verdict-story look gate (2026-09-26: no debate ends without a verdict for money or size reasons) and the owner's yes to the money design (2026-09-27; spec `docs/superpowers/specs/2026-09-26-verdict-story-design.md` §14.4). A serve call refused for MONEY retries the same call site and prompt on a cheaper claim-eligible maker, disclosed in the owner's record (`serve.serve_disclosure`) and the PDF's "About this report". Refusal for any other reason stays the default this row recorded (J24). Full entry: `DECISIONS.md`, "2026-09-28 · AMENDMENTS from the engine money rule". The row in §A is left as it was ruled.

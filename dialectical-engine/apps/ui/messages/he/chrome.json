@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "פעולות דיון נוספות",
   "chrome.help": "עזרה",
   "chrome.signedInAsker": "שואל מחובר",
-  "chrome.guestSession": "הפעלת אורח"
+  "chrome.guestSession": "הפעלת אורח",
+  "chrome.languageOffer.label": "שפת הדף",
+  "chrome.languageOffer.text": "הדיון הזה מתנהל ב{language} ({nativeName}). להציג את הדף ב{language}?",
+  "chrome.languageOffer.textNative": "הדיון הזה מתנהל ב-{language}. להציג את הדף ב-{language}?",
+  "chrome.languageOffer.switch": "מעבר ל{language}",
+  "chrome.languageOffer.dismiss": "לא, תודה"
 }

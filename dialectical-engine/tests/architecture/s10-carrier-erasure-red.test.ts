@@ -205,6 +205,13 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/memory/src/index.ts",
       "packages/serve/src/index.ts",
       "packages/settlement/src/index.ts",
+      // Verdict story: the enrichment reader decrypts the judge's raw artifact and
+      // the review reasons through prepareLeasedContentEncryptionForRun, which
+      // borrows the lease the runner's post-settle hook already holds.
+      "packages/story/src/enrichment.ts",
+      // Verdict story (0074): the story repository seals and reads serve.answer_story
+      // inside withRunContentLease, borrowed when the runner's hook already holds it.
+      "packages/story/src/repository.ts",
       "packages/valuation/src/index.ts"
     ]);
     for (const path of primitiveFiles.filter((path) => path !== "packages/db/src/index.ts")) {
@@ -223,10 +230,16 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     expect(providerFiles).toEqual([
       "apps/runner/src/index.ts",
       "packages/evaluator/src/index.ts",
-      "packages/judgement/src/index.ts"
+      "packages/judgement/src/index.ts",
+      // Verdict story: the writer calls ONLY the gateway the runner hands it (the
+      // run-required, leased gateway above), from the post-settle hook inside the
+      // runner's lease, and every request names the run it belongs to.
+      "packages/story/src/writer.ts"
     ]);
     expect(contents.get("apps/runner/src/index.ts")).toMatch(/withRunContentLease/);
     expect(contents.get("apps/runner/src/index.ts")).toMatch(/PROVIDER_RUN_REQUIRED/);
+    expect(contents.get("packages/story/src/writer.ts")).toMatch(/runId: input\.story\.runId,/);
+    expect(contents.get("packages/story/src/writer.ts")).toMatch(/lane: "story",/);
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/withPublicSampleLease\(sample/);
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/provider\.classify/);
     expect(contents.get("packages/evaluator/src/index.ts")).toMatch(/withRunContentLease/);

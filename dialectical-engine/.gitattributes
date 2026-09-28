@@ -1,0 +1,5 @@
+# The story shape pack refuses a carriage return (CONTROL_CHARACTER), so its files always check out with LF endings.
+story-shapes/** text eol=lf
+# The report's vendored fonts (apps/ui/assets/fonts, SOURCES.md) are binary: never diffed, never converted.
+apps/ui/assets/fonts/**/*.ttf binary
+apps/ui/assets/fonts/**/*.otf binary

@@ -12,6 +12,7 @@ import { ModelMetaLine } from "../../apps/ui/components/ModelPresentation.js";
 import { SynthesisPanel } from "../../apps/ui/components/SynthesisPanel.js";
 import type { DebateNode } from "../../apps/ui/lib/types.js";
 import debateViewsEnglish from "../../apps/ui/messages/en/debateViews.json" with { type: "json" };
+import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
 
 const mocks = vi.hoisted(() => ({
   getDebateBundle: vi.fn(),
@@ -86,6 +87,8 @@ async function mountDebate(initialAnswer: Answer | null): Promise<HTMLElement> {
           : treeLessDebate}
         initialAnswer={initialAnswer}
         initialPending={initialAnswer === null}
+        storyLocale="en"
+        storyCatalog={publicEnglish}
       />
     );
   });
@@ -114,7 +117,7 @@ describe("chrome and views", () => {
       _client: unknown,
       options?: { currentAnswer?: Answer | null }
     ) => options?.currentAnswer
-      ? { kind: "served", answer: options.currentAnswer, detail: debateDetailFromAnswer(options.currentAnswer), run: null }
+      ? { kind: "served", answer: options.currentAnswer, detail: debateDetailFromAnswer(options.currentAnswer), run: null, floorRead: { floor: null, failed: false } }
       : { kind: "loading", answer: null, detail: treeLessDebate, run: runningRun });
     mocks.readEvents.mockReset().mockResolvedValue([]);
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by T1 chrome tests"));
@@ -330,7 +333,7 @@ describe("card anatomy", () => {
       _client: unknown,
       options?: { currentAnswer?: Answer | null }
     ) => options?.currentAnswer
-      ? { kind: "served", answer: options.currentAnswer, detail: debateDetailFromAnswer(options.currentAnswer), run: null }
+      ? { kind: "served", answer: options.currentAnswer, detail: debateDetailFromAnswer(options.currentAnswer), run: null, floorRead: { floor: null, failed: false } }
       : { kind: "loading", answer: null, detail: treeLessDebate, run: runningRun });
     mocks.readEvents.mockReset().mockResolvedValue([]);
     mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by T1 card-anatomy tests"));

@@ -1,11 +1,12 @@
 import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
-import type { Answer } from "@debateai/contract";
+import type { Answer, AnswerFloor } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
-import { getDebateServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
+import { getDebateServer, questionLanguageTagOf, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
-import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
+import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
+import { questionLocale } from "@/lib/i18n/questionLocale";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 
@@ -64,6 +65,9 @@ export default async function DebatePage({
         composeCatalog={composeCatalog}
         homeCatalog={homeCatalog}
         newDebateCatalog={newDebateCatalog}
+        storyLocale={locale}
+        storyCatalog={publicCatalog}
+        initialFloor={null}
       />
     );
   }
@@ -77,6 +81,12 @@ export default async function DebatePage({
   let initialAnswer: Answer | null = null;
   let initialPending = true;
   let initialError: string | null = null;
+  // A components-only answer's floor (spec 2026-09-26 §14.4.4), read beside
+  // the answer; null when there is none or it could not be read.
+  let initialFloor: AnswerFloor | null = null;
+  // The language the debate was argued in (spec 2026-09-26 §14.3); the page
+  // offers to switch to it when it differs from the reader's.
+  let questionLanguage: LocaleCode | null = null;
 
   if (token !== null) {
     const result = await getDebateServer(
@@ -87,9 +97,12 @@ export default async function DebatePage({
       readTrustedClientIp(await headers()),
       composeCatalog
     );
+    const questionTag = questionLanguageTagOf(result);
+    questionLanguage = questionTag === null ? null : questionLocale(questionTag, locale);
     if (result.ok) {
       initialDebate = result.debate;
       initialAnswer = result.answer;
+      initialFloor = result.floor;
       initialPending = false;
     } else if (result.kind === "loading") {
       initialDebate = debateDetailFromRunProjection(result.run, composeCatalog, locale);
@@ -104,6 +117,12 @@ export default async function DebatePage({
       notFound();
     }
   }
+  // The verdict story strip speaks the question's language (spec 2026-09-26
+  // §14.3): its fixed words come from that locale's `public` catalogue. With no
+  // language learned (no read, or none recorded) it keeps the reader's; `und`
+  // and unknown tags already name the reader's locale.
+  const storyLocale = questionLanguage ?? locale;
+  const storyCatalog = storyLocale === locale ? publicCatalog : await loadNamespace(storyLocale, "public");
 
   return (
     <DebatePageGate
@@ -120,6 +139,10 @@ export default async function DebatePage({
       composeCatalog={composeCatalog}
       homeCatalog={homeCatalog}
       newDebateCatalog={newDebateCatalog}
+      questionLocale={questionLanguage}
+      storyLocale={storyLocale}
+      storyCatalog={storyCatalog}
+      initialFloor={initialFloor}
     />
   );
 }

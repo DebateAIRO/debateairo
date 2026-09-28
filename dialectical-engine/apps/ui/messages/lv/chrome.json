@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Citas debašu darbības",
   "chrome.help": "Palīdzība",
   "chrome.signedInAsker": "Pierakstījies jautātājs",
-  "chrome.guestSession": "Viesa sesija"
+  "chrome.guestSession": "Viesa sesija",
+  "chrome.languageOffer.label": "Lapas valoda",
+  "chrome.languageOffer.text": "Šīs debates notiek {language} valodā ({nativeName}). Vai rādīt lapu {language} valodā?",
+  "chrome.languageOffer.textNative": "Šīs debates notiek {language} valodā. Vai rādīt lapu {language} valodā?",
+  "chrome.languageOffer.switch": "Pārslēgt uz {language} valodu",
+  "chrome.languageOffer.dismiss": "Nē, paldies"
 }

@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Diğer tartışma işlemleri",
   "chrome.help": "Yardım",
   "chrome.signedInAsker": "Oturum açmış soru sahibi",
-  "chrome.guestSession": "Konuk oturumu"
+  "chrome.guestSession": "Konuk oturumu",
+  "chrome.languageOffer.label": "Sayfa dili",
+  "chrome.languageOffer.text": "Bu tartışmanın dili: {language} ({nativeName}). Sayfa {language} olarak gösterilsin mi?",
+  "chrome.languageOffer.textNative": "Bu tartışmanın dili: {language}. Sayfa {language} olarak gösterilsin mi?",
+  "chrome.languageOffer.switch": "Dili {language} olarak değiştir",
+  "chrome.languageOffer.dismiss": "Hayır, teşekkürler"
 }

@@ -1,5 +1,5 @@
 import type { WayOfKnowing } from "@debateai/kernel";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, isRunLevelSpendStop } from "@debateai/kernel";
 import type { PromptContract } from "@debateai/providers";
 
 /**
@@ -8,12 +8,25 @@ import type { PromptContract } from "@debateai/providers";
  *
  * Three things live here, in the order the goal states them.
  *
- * 1. DIGEST. A deterministic ALL-NODE schema. One entry per materialized node,
- *    always. The byte budget governs SUMMARY LENGTH per node and never
- *    membership, so a decisive node that is neither a root nor one of the two
- *    surviving objections still reaches the synthesizer. The top-2 surviving
- *    objections and the runner-up positions are EMPHASIS fields laid OVER that
- *    total membership (S6-2) — they select what to stress, never what to send.
+ * 1. DIGEST. A deterministic ALL-NODE schema. One entry per materialized node
+ *    at every rung but the last. The byte budget governs SUMMARY LENGTH per
+ *    node (rungs 0-5), then the SHAPE of each entry (the compact rung: short
+ *    refs, four-decimal strengths), so a decisive node that is neither a root
+ *    nor one of the two surviving objections still reaches the synthesizer.
+ *    The top-2 surviving objections and the runner-up positions are EMPHASIS
+ *    fields laid OVER that total membership (S6-2) — they select what to
+ *    stress, never what to send.
+ *
+ *    T9's MEMBERSHIP LAW, AMENDED (ENGINE MONEY RULE, spec §14.4.3, Task M4).
+ *    The law was "the byte budget never changes membership". Measured: a
+ *    debate of about 195 points cannot fit the low or medium tier with every
+ *    node kept, in any entry shape that keeps the key names. So membership MAY
+ *    drop, at the LAST rung only (the spine), ONLY when every earlier rung is
+ *    over budget, and the drop is DISCLOSED: the answer carries
+ *    DIGEST-COMPRESSED as at every compressed rung, the digest counts what it
+ *    left out per position (`omittedPoints`), and the owner's record keeps the
+ *    rung and the count. Only when even the smallest spine is over budget does
+ *    the digest not exist.
  * 2. ROLES. SYNTHESIZER and EVALUATOR are named provider roles whose refs are
  *    read from T16's sealed rows (J8). Each call is fresh-context: the recorded
  *    request carries the named artifacts and NOTHING else — no debate
@@ -39,7 +52,8 @@ export interface DigestSourceNode {
    * The propagated final strength, or `null` for a node the propagation run
    * produced no strength for (a hidden or excluded node). `null` is a real
    * value here, never a zero: a node with no number is still a MEMBER of the
-   * digest, because membership is what the byte budget may not touch.
+   * digest, because membership is what the byte budget may not touch before
+   * the last rung (Task M4).
    */
   readonly finalStrength: number | null;
   readonly wayOfKnowing: WayOfKnowing;
@@ -49,6 +63,16 @@ export interface DigestSourceNode {
   readonly isPosition: boolean;
   /** True for an objection that survived to the end of the debate. */
   readonly isSurvivingObjection: boolean;
+  /**
+   * ENGINE MONEY RULE (spec §14.4.3), TASK M4: the node's LEVERAGE — the most
+   * any other node's propagated strength moves when this node is taken out
+   * (propagation's sensitivity records, `digestLeverageByNodeId`). It is the
+   * number the story ranks its most decisive points by, and here it does the
+   * same: it chooses which points the spine rung keeps. It is never sent to a
+   * model. Absent or null: the node is not ranked (it can still be kept as a
+   * position, a direct child, or on a kept point's chain).
+   */
+  readonly leverage?: number | null;
 }
 
 export interface DigestPolarityRelation {
@@ -56,7 +80,13 @@ export interface DigestPolarityRelation {
   readonly targetNodeId: string;
 }
 
-/** One digest entry. Every field except `statementSummary` is verbatim. */
+/**
+ * One digest entry. At rungs 0-5 every field except `statementSummary` is
+ * verbatim. At the compact and spine rungs (Task M4) `nodeId` and each
+ * relation's `targetNodeId` are the digest's short refs (`n1`, `n2`, …; the
+ * runner maps a cited ref back, `resolveDigestNodeRef`), `finalStrength` is
+ * rounded to four decimals, and the key names are unchanged.
+ */
 export interface DigestNodeEntry {
   readonly nodeId: string;
   readonly statementSummary: string;
@@ -70,28 +100,52 @@ export interface DigestNodeEntry {
 
 /**
  * S6-2: emphasis over total membership. These node ids are ALSO present in
- * `nodes` — this field says which of them to stress, never which to send.
+ * `nodes` — this field says which of them to stress, never which to send. The
+ * spine rung keeps every emphasised node (with its chain), so that stays true.
  */
 export interface DigestEmphasis {
   readonly topSurvivingObjectionNodeIds: readonly string[];
   readonly runnerUpPositionNodeIds: readonly string[];
 }
 
+/**
+ * ENGINE MONEY RULE (spec §14.4.3), TASK M4: the points the spine rung left
+ * out, counted per position by their NET stance toward it — the relations on
+ * the chain that reached them, each attack flipping the sign (the story's
+ * `omitted` rule). `positionNodeId` is the position's digest ref, or null for
+ * points no position reaches; those count by their own first relation.
+ */
+export interface DigestOmittedPoints {
+  readonly positionNodeId: string | null;
+  readonly supporting: number;
+  readonly attacking: number;
+}
+
 export interface SynthesisDigest {
-  /** Total membership: one entry per materialized node, at every compression level. */
+  /**
+   * One entry per materialized node at rungs 0-6. At the spine rung (7) only
+   * the spine's nodes, and `omittedPoints` counts the rest.
+   */
   readonly nodes: readonly DigestNodeEntry[];
   readonly emphasis: DigestEmphasis;
-  /** Index into `DIGEST_COMPRESSION_LEVELS`; 0 = no compression applied. */
+  /**
+   * The ladder rung this digest was built at (`DIGEST_LADDER`): 0-5 index
+   * `DIGEST_COMPRESSION_LEVELS` (0 = no compression applied), then the compact
+   * rung and the spine rung.
+   */
   readonly compressionLevel: number;
   readonly summaryCharacterCap: number | null;
+  /** Present at the spine rung only (Task M4). */
+  readonly omittedPoints?: readonly DigestOmittedPoints[];
   readonly byteSize: number;
 }
 
 /**
  * The per-node summary caps the digest tightens through, widest first. `null`
- * is "the statement verbatim". The LAST entry is maximum compression: if the
- * digest still exceeds the budget there, the digest CANNOT EXIST and the
- * outcome is loud — never a silent subset of the membership.
+ * is "the statement verbatim". The LAST entry is the tightest summary; the
+ * compact and spine rungs (`DIGEST_LADDER`, Task M4) keep it. If even the
+ * smallest spine exceeds the budget, the digest CANNOT EXIST and the outcome
+ * is loud — never a silent subset of the membership.
  */
 export const DIGEST_COMPRESSION_LEVELS: readonly (number | null)[] =
   Object.freeze([null, 480, 240, 120, 60, 24]);
@@ -131,6 +185,10 @@ export type DigestOutcome =
   | { readonly kind: "DIGEST"; readonly digest: SynthesisDigest; readonly marks: readonly string[] }
   | {
       readonly kind: "DIGEST_CANNOT_EXIST";
+      /**
+       * The size of the LAST rung the ladder tried: the smallest spine, or the
+       * compact rung when no spine can leave anything out (Task M4).
+       */
       readonly byteSizeAtMaxCompression: number;
       readonly budgetBound: number;
       readonly marks: readonly string[];
@@ -141,7 +199,15 @@ function summarise(statement: string, cap: number | null): { text: string; trunc
   // Provenance-preserving: the summary says it is one, so a reader of the
   // digest can never mistake a shortened statement for the whole statement.
   const ellipsis = "…";
-  return { text: `${statement.slice(0, Math.max(0, cap - ellipsis.length))}${ellipsis}`, truncated: true };
+  let end = Math.max(0, cap - ellipsis.length);
+  // Task M4 review round 2: the cut falls on a code-point boundary. Cutting
+  // between the two halves of a character outside the basic plane (an emoji)
+  // left a lone half, which JSON escapes to six bytes — so a SHORTER summary
+  // could cost MORE bytes. The cut steps back one unit instead; every other
+  // summary is byte for byte what it was.
+  const lastUnit = statement.charCodeAt(end - 1);
+  if (end > 0 && lastUnit >= 0xd800 && lastUnit <= 0xdbff) end -= 1;
+  return { text: `${statement.slice(0, end)}${ellipsis}`, truncated: true };
 }
 
 function compressAt(
@@ -206,20 +272,344 @@ function selectEmphasis(
 }
 
 /**
- * Build the digest for a byte budget.
+ * ENGINE MONEY RULE (spec §14.4.3), TASK M4 — THE TWO RUNGS AFTER THE SUMMARY
+ * LEVELS. Each is tried only when every rung before it is over the budget.
  *
- * The budget tightens SUMMARIES. Membership is invariant: `digest.nodes` has
- * one entry per input node at every compression level, including the one that
- * finally fits. If the widest-fitting level is not level 0 the caller is told
- * to serve WITH the compression mark; if even maximum compression exceeds the
- * budget the outcome is DIGEST_CANNOT_EXIST — loud, with its enumerated crash
- * class and mark, never a subset of the nodes.
+ *  · `compactRung` — EVERY node kept. Node ids and relation targets become
+ *    short refs (`n1`, `n2`, …: the positions first, strongest first, then each
+ *    position's tree in order, then the rest in the order they were handed in),
+ *    each strength is rounded to four decimals, and the summary takes the
+ *    tightest cap. The key names are rung 0's, so the prompt contract TEXT —
+ *    and with it the composer and conformance hashes — does not change.
+ *  · `spineRung` — the ONLY rung where membership drops. It keeps the
+ *    positions, every point that answers a position directly, and the most
+ *    decisive points (the story's definition: the top points by leverage,
+ *    never a position, the node id breaking a tie), each with its chain up to
+ *    its position; the rest become `omittedPoints` counts. The decisive set
+ *    shrinks through `spineDecisiveCounts` (the first is the story's 20) before
+ *    the digest is declared impossible. The spine's refs are numbered
+ *    contiguously, `n1` to `nK` over its own members (review fix M-3), so no
+ *    gap invites a citation of a point it left out. Three more kinds of node stay to the
+ *    last step, as the positions and their direct children do: the served root,
+ *    the emphasised objections (S6-2 says they are members, and the synthesizer
+ *    is told to stress them), each with its chain, and a node with no relation
+ *    at all, which has no position to be counted under (the story keeps those
+ *    too).
+ *
+ * THE SPINE USES ITS ROOM (review fix I-2). The first spine that fits is
+ * built at the tightest summary, which is about four words. After it, and at
+ * the spine rung ONLY, the builder tries EVERY step of `spineWidenings` — more
+ * points, then longer summaries, alternately — and serves the LAST step, in
+ * schedule order, that fits. It does not stop at the first step over budget:
+ * sizes grow along the walk for ordinary text, but not for every text (a
+ * verbatim statement can be no longer in bytes than its clipped summary), so a
+ * fitting later step is never skipped (review round 2). When the spine that fit keeps fewer decisive points than
+ * the walk's first step, the walk first widens that spine's own summaries to
+ * the first step's cap (`(K, 60)` for the K that fit), so a tight budget gets
+ * longer summaries before it could ever afford more points. `decisiveCount`
+ * null is every ranked point; `summaryCap` null is the statement verbatim.
+ *
+ * Both rungs keep the compressed mark the summary levels ride on; no new mark
+ * exists, so the sealed chain's `.marks` pass-through is unchanged. The disclosure
+ * of a dropped membership is the owner's record (`digestPointsOmitted`).
  */
-export function buildSynthesisDigest(input: {
+export const DIGEST_LADDER = Object.freeze({
+  compactRung: DIGEST_COMPRESSION_LEVELS.length,
+  spineRung: DIGEST_COMPRESSION_LEVELS.length + 1,
+  spineDecisiveCounts: Object.freeze([20, 10, 5, 0]) as readonly number[],
+  spineWidenings: Object.freeze([
+    Object.freeze({ decisiveCount: 20, summaryCap: 60 }),
+    Object.freeze({ decisiveCount: 30, summaryCap: 60 }),
+    Object.freeze({ decisiveCount: 30, summaryCap: 120 }),
+    Object.freeze({ decisiveCount: 40, summaryCap: 120 }),
+    Object.freeze({ decisiveCount: 60, summaryCap: 120 }),
+    Object.freeze({ decisiveCount: 60, summaryCap: 240 }),
+    Object.freeze({ decisiveCount: 80, summaryCap: 240 }),
+    Object.freeze({ decisiveCount: 80, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 120, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: null, summaryCap: null })
+  ]) as readonly Readonly<{ decisiveCount: number | null; summaryCap: number | null }>[]
+});
+
+/** What the ladder tried at one rung, in order; the builder serves the first that fits. */
+export interface SynthesisDigestAttempt {
+  readonly digest: SynthesisDigest;
+  /**
+   * At the spine rung, how many most-decisive points this spine keeps (every
+   * ranked point's count for a widening step with no limit); null below it.
+   */
+  readonly spineDecisiveCount: number | null;
+}
+
+/** Strengths travel at four decimals at the compact and spine rungs, like the story's scores. */
+function digestStrength(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+/** Node ids compared by code unit, as the story compares them. */
+function compareDigestIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+interface DigestTreeEntry {
+  readonly parent: string;
+  readonly polarity: "support" | "attack";
+  readonly root: string;
+}
+
+/**
+ * The debate as a tree, mirrored from the story's `storyTreeOf`
+ * (packages/story/src/material.ts; `serve` may not import `story`, so the
+ * definition is copied and the two are pinned against each other by
+ * `tests/unit/m4-digest-ladder.test.ts`). Children are taken in the order the
+ * relations were handed in: node by node, each node's relations in turn.
+ */
+interface DigestTree {
+  /** node id -> short ref, over every node. */
+  readonly refOf: ReadonlyMap<string, string>;
+  readonly nodesInRefOrder: readonly DigestSourceNode[];
+  /** The positions, strongest first: the order they are numbered and counted in. */
+  readonly positionIds: readonly string[];
+  /** Every node a position reaches: the node it was reached through, the relation's polarity, the position. */
+  readonly tree: ReadonlyMap<string, DigestTreeEntry>;
+  /** node id -> the in-digest nodes it supports and attacks. */
+  readonly links: ReadonlyMap<string, { readonly supports: readonly string[]; readonly attacks: readonly string[] }>;
+}
+
+function digestTreeOf(nodes: readonly DigestSourceNode[]): DigestTree {
+  const byId = new Map(nodes.map((node) => [node.nodeId, node] as const));
+  const positions = nodes
+    .filter((node) => node.isPosition)
+    .sort((left, right) => (right.finalStrength ?? -Infinity) - (left.finalStrength ?? -Infinity)
+      || compareDigestIds(left.nodeId, right.nodeId));
+  const children = new Map<string, { readonly source: string; readonly polarity: "support" | "attack" }[]>();
+  const links = new Map<string, { readonly supports: string[]; readonly attacks: string[] }>();
+  for (const node of nodes) {
+    for (const relation of node.polarityRelations) {
+      // A relation onto a node outside this digest links no two of its points.
+      if (!byId.has(relation.targetNodeId)) continue;
+      const link = links.get(node.nodeId) ?? { supports: [], attacks: [] };
+      const list = relation.polarity === "support" ? link.supports : link.attacks;
+      if (list.includes(relation.targetNodeId)) continue;
+      list.push(relation.targetNodeId);
+      links.set(node.nodeId, link);
+      const below = children.get(relation.targetNodeId) ?? [];
+      below.push({ source: node.nodeId, polarity: relation.polarity });
+      children.set(relation.targetNodeId, below);
+    }
+  }
+  const refOf = new Map<string, string>();
+  const order: DigestSourceNode[] = [];
+  const tree = new Map<string, DigestTreeEntry>();
+  const assign = (nodeId: string): void => {
+    refOf.set(nodeId, `n${String(refOf.size + 1)}`);
+    const node = byId.get(nodeId);
+    if (node !== undefined) order.push(node);
+  };
+  for (const position of positions) assign(position.nodeId);
+  for (const position of positions) {
+    const stack = [...(children.get(position.nodeId) ?? [])].reverse()
+      .map((child) => ({ ...child, parent: position.nodeId }));
+    while (stack.length > 0) {
+      const next = stack.pop();
+      if (next === undefined || refOf.has(next.source)) continue;
+      assign(next.source);
+      tree.set(next.source, { parent: next.parent, polarity: next.polarity, root: position.nodeId });
+      const below = children.get(next.source) ?? [];
+      for (let index = below.length - 1; index >= 0; index -= 1) {
+        const child = below[index];
+        if (child !== undefined) stack.push({ ...child, parent: next.source });
+      }
+    }
+  }
+  for (const node of nodes) {
+    if (!refOf.has(node.nodeId)) assign(node.nodeId);
+  }
+  return {
+    refOf,
+    nodesInRefOrder: order,
+    positionIds: positions.map((node) => node.nodeId),
+    tree,
+    links
+  };
+}
+
+/**
+ * The story's "most decisive" order (material.ts `byLeverage`): the points —
+ * never a position — that carry a finite leverage, the most leverage first,
+ * the node id breaking a tie.
+ */
+function digestPointsByLeverage(nodes: readonly DigestSourceNode[]): readonly string[] {
+  const ranked: { readonly nodeId: string; readonly leverage: number }[] = [];
+  for (const node of nodes) {
+    if (node.isPosition || typeof node.leverage !== "number" || !Number.isFinite(node.leverage)) continue;
+    ranked.push({ nodeId: node.nodeId, leverage: node.leverage });
+  }
+  return ranked
+    .sort((left, right) => right.leverage - left.leverage || compareDigestIds(left.nodeId, right.nodeId))
+    .map((entry) => entry.nodeId);
+}
+
+/**
+ * The spine (the story's ladder step 7, `spine` in material.ts): the
+ * positions, every point that answers a position directly, the top
+ * `decisiveCount` points by leverage each with the chain that carries it up to
+ * its position, and every node with no relation at all. Then, serve's own
+ * additions, each with its chain: the served root and the emphasised
+ * objections.
+ */
+function digestSpineOf(input: {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly tree: DigestTree;
+  readonly byLeverage: readonly string[];
+  readonly decisiveCount: number;
+  readonly keptToTheEnd: readonly string[];
+}): ReadonlySet<string> {
+  const positionIds = new Set(input.tree.positionIds);
+  const spine = new Set<string>(positionIds);
+  for (const [source, link] of input.tree.links) {
+    if ([...link.supports, ...link.attacks].some((target) => positionIds.has(target))) spine.add(source);
+  }
+  const climb = (nodeId: string): void => {
+    let cursor: string | undefined = nodeId;
+    while (cursor !== undefined && !spine.has(cursor)) {
+      spine.add(cursor);
+      cursor = input.tree.tree.get(cursor)?.parent;
+    }
+  };
+  for (const nodeId of input.byLeverage.slice(0, input.decisiveCount)) climb(nodeId);
+  for (const node of input.nodes) {
+    if (node.polarityRelations.length === 0) spine.add(node.nodeId);
+  }
+  for (const nodeId of input.keptToTheEnd) climb(nodeId);
+  return spine;
+}
+
+/**
+ * A point's net stance toward the position its tree reaches (the story's
+ * `storyStanceTowardPosition`): walk up the chain and flip at every attack.
+ */
+function digestStanceTowardPosition(nodeId: string, tree: ReadonlyMap<string, DigestTreeEntry>): "support" | "attack" {
+  let supports = true;
+  for (let entry = tree.get(nodeId); entry !== undefined; entry = tree.get(entry.parent)) {
+    if (entry.polarity === "attack") supports = !supports;
+  }
+  return supports ? "support" : "attack";
+}
+
+function digestOmittedPointsOf(
+  tree: DigestTree,
+  members: ReadonlySet<string>,
+  /** The digest's OWN ref table (review round 2): the refs the model is shown. */
+  refOf: ReadonlyMap<string, string>
+): readonly DigestOmittedPoints[] {
+  const counts = new Map<string | null, { supporting: number; attacking: number }>();
+  for (const node of tree.nodesInRefOrder) {
+    if (members.has(node.nodeId)) continue;
+    const entry = tree.tree.get(node.nodeId);
+    // Under a position, a point counts by its net stance toward it. A point no
+    // position reaches has no position to take a stance on, so its own first
+    // relation counts (only nodes WITH a relation are ever left out).
+    const polarity = entry !== undefined
+      ? digestStanceTowardPosition(node.nodeId, tree.tree)
+      : node.polarityRelations[0]?.polarity ?? "support";
+    const key = entry === undefined ? null : entry.root;
+    const count = counts.get(key) ?? { supporting: 0, attacking: 0 };
+    if (polarity === "support") count.supporting += 1;
+    else count.attacking += 1;
+    counts.set(key, count);
+  }
+  const keys: (string | null)[] = [
+    ...tree.positionIds.filter((positionId) => counts.has(positionId)),
+    ...(counts.has(null) ? [null] : [])
+  ];
+  return Object.freeze(keys.map((key) => {
+    const count = counts.get(key) ?? { supporting: 0, attacking: 0 };
+    return Object.freeze({
+      positionNodeId: key === null ? null : refOf.get(key) ?? null,
+      supporting: count.supporting,
+      attacking: count.attacking
+    });
+  }));
+}
+
+/**
+ * Which node each short ref names, and the ref each member node carries, for a
+ * digest built at the compact or spine rung. Held beside the digest rather
+ * than in it: the model reads only the refs, and the byte budget pays only for
+ * them. A digest without an entry here (rungs 0-5) names its nodes by id.
+ */
+interface DigestRefTable {
+  readonly nodeIdOf: ReadonlyMap<string, string>;
+  readonly refOf: ReadonlyMap<string, string>;
+}
+const DIGEST_REF_TABLES = new WeakMap<SynthesisDigest, DigestRefTable>();
+
+function compactAt(input: {
+  readonly tree: DigestTree;
+  readonly emphasis: DigestEmphasis;
+  /** The spine's members, or null for the compact rung's every node. */
+  readonly members: ReadonlySet<string> | null;
+  readonly rung: number;
+  /** The summary cap: the tightest level's, or a spine widening's (null: verbatim). */
+  readonly cap: number | null;
+}): SynthesisDigest {
+  const { tree, members, cap } = input;
+  const isMember = (nodeId: string): boolean => members === null ? tree.refOf.has(nodeId) : members.has(nodeId);
+  // Contiguous refs over this digest's own members, in the tree's order: the
+  // compact rung's are the tree's refs; the spine's leave no gap (M-3).
+  const refOf = new Map<string, string>();
+  for (const node of tree.nodesInRefOrder) {
+    if (isMember(node.nodeId)) refOf.set(node.nodeId, `n${String(refOf.size + 1)}`);
+  }
+  const ref = (nodeId: string): string => refOf.get(nodeId) ?? nodeId;
+  const kept = tree.nodesInRefOrder.filter((node) => refOf.has(node.nodeId));
+  const entries: DigestNodeEntry[] = kept.map((node) => {
+    const summary = summarise(node.statement, cap);
+    return Object.freeze({
+      nodeId: ref(node.nodeId),
+      statementSummary: summary.text,
+      summaryTruncated: summary.truncated,
+      finalStrength: node.finalStrength === null ? null : digestStrength(node.finalStrength),
+      wayOfKnowing: node.wayOfKnowing,
+      marks: Object.freeze([...node.marks]),
+      // A relation onto a node this digest does not carry has nothing to name.
+      polarityRelations: Object.freeze(node.polarityRelations
+        .filter((relation) => refOf.has(relation.targetNodeId))
+        .map((relation) => Object.freeze({ polarity: relation.polarity, targetNodeId: ref(relation.targetNodeId) })))
+    });
+  });
+  const emphasis: DigestEmphasis = Object.freeze({
+    topSurvivingObjectionNodeIds: Object.freeze(input.emphasis.topSurvivingObjectionNodeIds.filter(isMember).map(ref)),
+    runnerUpPositionNodeIds: Object.freeze(input.emphasis.runnerUpPositionNodeIds.filter(isMember).map(ref))
+  });
+  const shape = {
+    nodes: entries,
+    emphasis,
+    compressionLevel: input.rung,
+    summaryCharacterCap: cap,
+    ...(members === null ? {} : { omittedPoints: digestOmittedPointsOf(tree, members, refOf) })
+  };
+  const digest: SynthesisDigest = Object.freeze({
+    ...shape,
+    nodes: Object.freeze(entries),
+    byteSize: Buffer.byteLength(JSON.stringify(shape), "utf8")
+  });
+  DIGEST_REF_TABLES.set(digest, Object.freeze({
+    nodeIdOf: new Map([...refOf.entries()].map(([nodeId, short]) => [short, nodeId] as const)),
+    refOf
+  }));
+  return digest;
+}
+
+function sameMembers(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  return left.size === right.size && [...left].every((nodeId) => right.has(nodeId));
+}
+
+function assertDigestSource(input: {
   readonly nodes: readonly DigestSourceNode[];
   readonly servedRootNodeId: string;
-  readonly budgetBound: number;
-}): DigestOutcome {
+}): void {
   if (input.nodes.length === 0) {
     throw new TypedDomainError("DIGEST_NODE_SET_EMPTY", "A digest requires at least one materialized node");
   }
@@ -230,27 +620,272 @@ export function buildSynthesisDigest(input: {
   if (!seen.has(input.servedRootNodeId)) {
     throw new TypedDomainError("DIGEST_SERVED_ROOT_ABSENT", input.servedRootNodeId);
   }
+}
+
+/** What every spine of one debate is built from, computed once per ladder. */
+interface DigestSpineSource {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly tree: DigestTree;
+  readonly emphasis: DigestEmphasis;
+  readonly byLeverage: readonly string[];
+  readonly keptToTheEnd: readonly string[];
+}
+
+function digestSpineSourceOf(input: {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+}, emphasis: DigestEmphasis): DigestSpineSource {
+  return {
+    nodes: input.nodes,
+    tree: digestTreeOf(input.nodes),
+    emphasis,
+    byLeverage: digestPointsByLeverage(input.nodes),
+    keptToTheEnd: [input.servedRootNodeId, ...emphasis.topSurvivingObjectionNodeIds]
+  };
+}
+
+function spineMembersOf(source: DigestSpineSource, decisiveCount: number): ReadonlySet<string> {
+  return digestSpineOf({
+    nodes: source.nodes,
+    tree: source.tree,
+    byLeverage: source.byLeverage,
+    decisiveCount,
+    keptToTheEnd: source.keptToTheEnd
+  });
+}
+
+function* digestLadderFrom(input: {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+}): Generator<SynthesisDigestAttempt, void, undefined> {
+  const emphasis = selectEmphasis(input.nodes, input.servedRootNodeId);
+  for (let level = 0; level < DIGEST_COMPRESSION_LEVELS.length; level += 1) {
+    yield Object.freeze({ digest: compressAt(input.nodes, emphasis, level), spineDecisiveCount: null });
+  }
+  const tightest = DIGEST_COMPRESSION_LEVELS.at(-1) ?? null;
+  const source = digestSpineSourceOf(input, emphasis);
+  yield Object.freeze({
+    digest: compactAt({ tree: source.tree, emphasis, members: null, rung: DIGEST_LADDER.compactRung, cap: tightest }),
+    spineDecisiveCount: null
+  });
+  let previous: ReadonlySet<string> | null = null;
+  for (const decisiveCount of DIGEST_LADDER.spineDecisiveCounts) {
+    const members = spineMembersOf(source, decisiveCount);
+    // A spine that leaves nothing out is the compact rung again, and a spine no
+    // smaller than the step before it is that step again: neither is tried.
+    if (members.size === input.nodes.length || (previous !== null && sameMembers(previous, members))) continue;
+    previous = members;
+    yield Object.freeze({
+      digest: compactAt({ tree: source.tree, emphasis, members, rung: DIGEST_LADDER.spineRung, cap: tightest }),
+      spineDecisiveCount: decisiveCount
+    });
+  }
+}
+
+function* digestSpineWideningsFrom(
+  input: { readonly nodes: readonly DigestSourceNode[]; readonly servedRootNodeId: string },
+  fitted: SynthesisDigestAttempt
+): Generator<SynthesisDigestAttempt, void, undefined> {
+  const source = digestSpineSourceOf(input, selectEmphasis(input.nodes, input.servedRootNodeId));
+  const fittedCount = fitted.spineDecisiveCount ?? 0;
+  const [first] = DIGEST_LADDER.spineWidenings;
+  const walk = first !== undefined && first.decisiveCount !== null && fittedCount < first.decisiveCount
+    ? [{ decisiveCount: fittedCount, summaryCap: first.summaryCap }, ...DIGEST_LADDER.spineWidenings]
+    : DIGEST_LADDER.spineWidenings;
+  let previous: { readonly members: ReadonlySet<string>; readonly cap: number | null } = {
+    members: spineMembersOf(source, fittedCount),
+    cap: fitted.digest.summaryCharacterCap
+  };
+  for (const step of walk) {
+    const decisiveCount = step.decisiveCount ?? source.byLeverage.length;
+    const members = spineMembersOf(source, decisiveCount);
+    // Never a spine that leaves nothing out, and never the step before again.
+    if (members.size === input.nodes.length) break;
+    if (sameMembers(previous.members, members) && previous.cap === step.summaryCap) continue;
+    previous = { members, cap: step.summaryCap };
+    yield Object.freeze({
+      digest: compactAt({ tree: source.tree, emphasis: source.emphasis, members, rung: DIGEST_LADDER.spineRung, cap: step.summaryCap }),
+      spineDecisiveCount: decisiveCount
+    });
+  }
+}
+
+/**
+ * Every rung the ladder tries for these nodes, widest first, built lazily: the
+ * six summary levels, the compact rung, then each distinct spine. The builder
+ * below serves the first whose bytes fit; this is the same sequence, exposed so
+ * the ladder's own laws can be tested rung by rung.
+ */
+export function synthesisDigestLadder(input: {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+}): Iterable<SynthesisDigestAttempt> {
+  assertDigestSource(input);
+  return digestLadderFrom(input);
+}
+
+/**
+ * The spine widenings walked after `fitted`, the first spine that fit (review
+ * fix I-2; see `DIGEST_LADDER`), in order and built lazily. The builder tries
+ * every one and serves the last, in this order, that fits. Empty for an
+ * attempt below the spine rung: only the spine is ever widened.
+ */
+export function synthesisDigestSpineWidenings(input: {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+}, fitted: SynthesisDigestAttempt): Iterable<SynthesisDigestAttempt> {
+  assertDigestSource(input);
+  return fitted.digest.compressionLevel === DIGEST_LADDER.spineRung ? digestSpineWideningsFrom(input, fitted) : [];
+}
+
+/**
+ * Build the digest for a byte budget.
+ *
+ * The budget tightens SUMMARIES first (rungs 0-5), then the SHAPE of each entry
+ * (the compact rung): `digest.nodes` has one entry per input node at each of
+ * them. Only if all of those are over the budget does the spine rung drop
+ * membership (T9's law as amended, Task M4; see the file header). If the rung
+ * that fits is not rung 0 the caller is told to serve WITH the compression
+ * mark; if even the smallest spine exceeds the budget the outcome is
+ * DIGEST_CANNOT_EXIST — loud, with its enumerated crash class and mark.
+ */
+export function buildSynthesisDigest(input: {
+  readonly nodes: readonly DigestSourceNode[];
+  readonly servedRootNodeId: string;
+  readonly budgetBound: number;
+}): DigestOutcome {
+  const ladder = synthesisDigestLadder(input);
   if (!Number.isFinite(input.budgetBound) || input.budgetBound < 0) {
     throw new TypedDomainError("COMPOSITION_BUDGET_UNRESOLVED", "A V-ratified composition budget is required");
   }
-  const emphasis = selectEmphasis(input.nodes, input.servedRootNodeId);
-  let tightest = compressAt(input.nodes, emphasis, 0);
-  for (let level = 0; level < DIGEST_COMPRESSION_LEVELS.length; level += 1) {
-    tightest = compressAt(input.nodes, emphasis, level);
-    if (tightest.byteSize <= input.budgetBound) {
+  let lastTried = 0;
+  for (const attempt of ladder) {
+    lastTried = attempt.digest.byteSize;
+    if (attempt.digest.byteSize <= input.budgetBound) {
+      // I-2: a spine that fits then uses its room — the last widening, in
+      // schedule order, that fits; every step is tried (review round 2).
+      let served = attempt.digest;
+      for (const widened of synthesisDigestSpineWidenings(input, attempt)) {
+        if (widened.digest.byteSize <= input.budgetBound) served = widened.digest;
+      }
       return Object.freeze({
         kind: "DIGEST" as const,
-        digest: tightest,
-        marks: Object.freeze(level === 0 ? [] : [DIGEST_COMPRESSED_MARK])
+        digest: served,
+        marks: Object.freeze(served.compressionLevel === 0 ? [] : [DIGEST_COMPRESSED_MARK])
       });
     }
   }
   return Object.freeze({
     kind: "DIGEST_CANNOT_EXIST" as const,
-    byteSizeAtMaxCompression: tightest.byteSize,
+    byteSizeAtMaxCompression: lastTried,
     budgetBound: input.budgetBound,
     marks: Object.freeze([DIGEST_CANNOT_EXIST_MARK])
   });
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.3), TASK M4 — A DIGEST CITATION, BACK TO ITS
+ * NODE. The real node id this digest names by `ref`, or null when the digest
+ * does not carry that node. At rungs 0-5 a node's ref IS its id. At the compact
+ * and spine rungs it is the short ref the digest showed: a real id is not a ref
+ * there, and a node the spine left out has no ref at all. The runner's one
+ * citation point (`composedNodeIdOf`) refuses null exactly as it refuses an
+ * unknown node id.
+ */
+export function resolveDigestNodeRef(digest: SynthesisDigest, ref: string): string | null {
+  const table = DIGEST_REF_TABLES.get(digest);
+  if (table !== undefined) return table.nodeIdOf.get(ref) ?? null;
+  return digest.nodes.some((entry) => entry.nodeId === ref) ? ref : null;
+}
+
+/**
+ * A whole-token short ref: `n`, then a number from 1, with no letter, digit or
+ * underscore on either side, and not the start of a decimal (`n3.5`).
+ */
+const DIGEST_SHORT_REF_TOKEN = /(?<![\p{L}\p{N}_])n[1-9][0-9]*(?![\p{L}\p{N}_]|[.,]\p{N})/gu;
+/** A node id as the engine mints them: a UUID, in either case, as a whole token. */
+const UUID_SHAPED_ID = /(?<![0-9a-z])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![0-9a-z])/giu;
+
+/** One spelling per token: a short ref as written, a UUID in lower case. */
+function idTokenKey(token: string): string {
+  return token.startsWith("n") ? token : token.toLowerCase();
+}
+
+/**
+ * REVIEW ROUND 2 — THE PERSON'S OWN TOKENS. Every token in these texts that
+ * LOOKS like an internal id — a short ref (`n1`, as a whole token) or a UUID.
+ * The runner passes the question and every node's FULL statement, so a figure
+ * the person or a debater wrote ("n1 = 120 patients", a study arm `n2`, a 5G
+ * band `n78`, an order number shaped like a UUID) is theirs to repeat, and
+ * `nodeIdsNamedInText` exempts it. The story's checks exempt what the question
+ * or a claim states the same way. The trade-off is accepted: a statement that
+ * literally contains `n12` lets `(n12)` through.
+ */
+export function idShapedTokensIn(texts: readonly string[]): ReadonlySet<string> {
+  const tokens = new Set<string>();
+  for (const text of texts) {
+    for (const match of text.matchAll(DIGEST_SHORT_REF_TOKEN)) tokens.add(idTokenKey(match[0]));
+    for (const match of text.matchAll(UUID_SHAPED_ID)) tokens.add(idTokenKey(match[0]));
+  }
+  return tokens;
+}
+
+const NO_EXEMPT_TOKENS: ReadonlySet<string> = new Set<string>();
+
+/**
+ * REVIEW FIX I-1 (the owner's rule: no internals in the answer). Every internal
+ * node name a text states: each short ref THIS digest carries, as a whole token
+ * (`(n12)`, `n3.`), and any UUID-shaped id at any rung. Ordinary text is left
+ * alone: `n12` when the digest has no `n12`, `N1 highway`, `n-type`, `n3.5`.
+ * So is every token in `exempt` (review round 2, `idShapedTokensIn`): the
+ * person's and the debaters' own words. The runner's writer classifier refuses
+ * a draft whose prose names one, so the provider's own repair re-asks; nothing
+ * ever rewrites the model's words.
+ */
+export function nodeIdsNamedInText(
+  digest: SynthesisDigest,
+  text: string,
+  exempt: ReadonlySet<string> = NO_EXEMPT_TOKENS
+): readonly string[] {
+  const named: string[] = [];
+  const table = DIGEST_REF_TABLES.get(digest);
+  if (table !== undefined) {
+    for (const match of text.matchAll(DIGEST_SHORT_REF_TOKEN)) {
+      if (table.nodeIdOf.has(match[0]) && !exempt.has(idTokenKey(match[0]))) named.push(match[0]);
+    }
+  }
+  for (const match of text.matchAll(UUID_SHAPED_ID)) {
+    if (!exempt.has(idTokenKey(match[0]))) named.push(match[0]);
+  }
+  return Object.freeze(named);
+}
+
+/** The ref this digest shows a node by (its id at rungs 0-5), or null when the digest does not carry it. */
+export function digestNodeRefOf(digest: SynthesisDigest, nodeId: string): string | null {
+  const table = DIGEST_REF_TABLES.get(digest);
+  if (table !== undefined) return table.refOf.get(nodeId) ?? null;
+  return digest.nodes.some((entry) => entry.nodeId === nodeId) ? nodeId : null;
+}
+
+/** How many points this digest left out: 0 below the spine rung. */
+export function digestPointsOmitted(digest: SynthesisDigest): number {
+  return (digest.omittedPoints ?? []).reduce((total, entry) => total + entry.supporting + entry.attacking, 0);
+}
+
+/**
+ * Each node's leverage from propagation's sensitivity records, as the story
+ * reads it (`storyLeverageByNode`): the largest finite value recorded for the
+ * node. The runner hands it in on each `DigestSourceNode`.
+ */
+export function digestLeverageByNodeId(
+  records: readonly { readonly removedNodeId: string; readonly leverage: number }[]
+): ReadonlyMap<string, number> {
+  const leverage = new Map<string, number>();
+  for (const record of records) {
+    if (!Number.isFinite(record.leverage)) continue;
+    leverage.set(record.removedNodeId, Math.max(leverage.get(record.removedNodeId) ?? record.leverage, record.leverage));
+  }
+  return leverage;
 }
 
 /* ------------------------------------------------------------------- roles */
@@ -494,7 +1129,11 @@ export function toSynthesisPromptMaterial(
 ): readonly { readonly name: string; readonly content: string }[] {
   const codeLabel = {
     verdictLabel: request.codeLabel.verdictLabel,
-    servedNodeId: request.codeLabel.servedNodeId,
+    // Task M4: the served node by the ref the digest shows it under — its short
+    // ref at the compact and spine rungs, its id below them — so the label and
+    // the digest name the same node the same way, and no real id reaches the
+    // model beside a digest of refs. The runner maps a cited ref back.
+    servedNodeId: digestNodeRefOf(request.digest, request.codeLabel.servedNodeId) ?? request.codeLabel.servedNodeId,
     servedStrength: request.codeLabel.servedStrength,
     margin: request.codeLabel.margin
   };
@@ -583,6 +1222,13 @@ export interface SynthesisLoopOutcome<TCandidate> {
   readonly standingObjection: string | null;
   /** `[SYNTHESIS-OBJECTION-STANDING]` when an objection stands, else empty. */
   readonly marks: readonly string[];
+  /**
+   * ENGINE MONEY RULE (spec §14.4.2), TASK M3: the code of the failure that
+   * ended the loop before its bound or a satisfied checker, when the loop kept
+   * its complete rounds instead of discarding them
+   * (`keepsCompleteSynthesisRounds`); null for a loop that finished.
+   */
+  readonly endedEarlyBy: string | null;
 }
 
 /**
@@ -632,10 +1278,83 @@ export interface SynthesisLoopDependencies<TCandidate> {
 }
 
 /**
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — THE FAILURES AFTER WHICH A
+ * COMPLETE ROUND IS KEPT RATHER THAN DISCARDED.
+ *
+ * Every run-level spend stop (the kernel's one list: money — after the
+ * runner's cheaper-maker fallback found nothing that fits — the attempt
+ * ceiling, a vendor that reports no usage, a spent day), a dead role transport,
+ * and a later draft with nothing to serve (`SYNTHESIS_NO_ARTIFACT`, the sealed
+ * chain's own check; M3 review polish). None of them says anything about the
+ * drafts already checked: the draft the checker read, and the verdict it gave,
+ * are as real as they were a call ago. The owner's rule is that money never
+ * costs the person an answer, and a technical failure of a LATER round is not a
+ * failure of the round before it.
+ *
+ * A contract or content error (`COMPOSITION_CONTRACT_ERROR`,
+ * `EVALUATOR_CONTRACT_ERROR`, an incoherent verdict) is NOT on this list: it
+ * keeps today's handling. Only a `TypedDomainError` is trusted — a code-shaped
+ * object is not a refusal.
+ *
+ * Exported (M3 review carry, Task M4) so the runner's `serveLoopStopOf` is
+ * pinned against it: every code the loop keeps a round for must name a stop on
+ * the owner's record, or a new code would silently record NULL there.
+ */
+export const ROUND_KEEPING_TECHNICAL_FAILURES: readonly string[] = Object.freeze([
+  "SYNTHESIS_TRANSPORT_DEATH",
+  "SYNTHESIS_NO_ARTIFACT"
+]);
+
+export function keepsCompleteSynthesisRounds(error: unknown): boolean {
+  return error instanceof TypedDomainError
+    && (isRunLevelSpendStop(error) || ROUND_KEEPING_TECHNICAL_FAILURES.includes(error.code));
+}
+
+/**
+ * The outcome a loop that ENDS on `rounds.at(-1)` serves: that round's draft,
+ * and whatever objection that round's own checker left standing. One rule for
+ * a loop that ran to its bound (or to a satisfied checker) and for a loop cut
+ * short after a complete round, so a kept round is served exactly as the
+ * sealed chain serves a finished loop's last round — the chain reads
+ * `loop.rounds.at(-1)!.verdict`, and the rounds handed to it always END with a
+ * complete round. No verdict is ever invented here.
+ */
+function loopOutcomeEndingOn<TCandidate>(input: {
+  readonly candidate: TCandidate;
+  readonly candidateStatement: string;
+  readonly rounds: readonly SynthesisLoopRound[];
+  readonly endedEarlyBy: string | null;
+}): SynthesisLoopOutcome<TCandidate> {
+  const standingObjection = input.rounds.at(-1)?.verdict.satisfied === true
+    ? null
+    : input.rounds.at(-1)?.verdict.objection ?? null;
+  return Object.freeze({
+    candidate: input.candidate,
+    candidateStatement: input.candidateStatement,
+    rounds: Object.freeze([...input.rounds]),
+    standingObjection,
+    marks: Object.freeze(standingObjection === null ? [] : [SYNTHESIS_OBJECTION_STANDING_MARK]),
+    endedEarlyBy: input.endedEarlyBy
+  });
+}
+
+/**
  * ≤ `evaluatorLoopMaxRounds` rounds, or evaluator satisfied — whichever comes
  * first. After the last round the statement is SERVED regardless: the loop
  * never returns "no answer", it returns the last candidate plus whatever
  * objection is still standing, and the caller serves it WITH the mark.
+ *
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — KEEP THE BEST COMPLETE ROUND.
+ * Once at least one round is COMPLETE (a draft and its checker's verdict), a
+ * later round that fails with a spend stop, a dead transport or no artifact
+ * (`keepsCompleteSynthesisRounds`) no longer throws the complete rounds away:
+ * the loop ends there, on its last complete round, as if its bound had been
+ * that round. "Best" is the loop's own rule — the latest complete draft, which
+ * answered every earlier objection verbatim — and it is the only draft the
+ * sealed chain can serve, because the chain reads the LAST round's verdict.
+ * A draft written in the failed round is never served: its checker never read
+ * it. Before any round is complete there is nothing checked to keep, and the
+ * failure travels exactly as it always has.
  */
 export async function runSynthesisLoop<TCandidate>(
   input: {
@@ -654,70 +1373,85 @@ export async function runSynthesisLoop<TCandidate>(
   }
   const rounds: SynthesisLoopRound[] = [];
   let prior: { objection: string; candidateRef: string } | null = null;
-  let candidate: TCandidate | null = null;
-  let candidateStatement = "";
+  /** The draft of the last COMPLETE round — never one its checker did not read. */
+  let complete: { readonly candidate: TCandidate; readonly candidateStatement: string } | null = null;
   for (let round = 1; round <= maxRounds; round += 1) {
-    const synthesizerRequest = buildSynthesizerRequest({
-      controls: input.controls,
-      round,
-      digest: input.digest,
-      codeLabel: input.codeLabel,
-      prior
-    });
-    const synthesized = await dependencies.synthesize(synthesizerRequest);
-    candidate = synthesized.candidate;
-    const candidateRef = synthesized.candidateRef;
-    if (candidateRef.trim().length === 0) {
-      throw new TypedDomainError(
-        "SYNTHESIS_CANDIDATE_REF_MISSING",
-        "A round's candidate must carry the reference of the artifact the provider call recorded"
-      );
+    let verdict: EvaluatorVerdict;
+    let candidate: TCandidate;
+    let candidateStatement: string;
+    let candidateRef: string;
+    try {
+      const synthesizerRequest = buildSynthesizerRequest({
+        controls: input.controls,
+        round,
+        digest: input.digest,
+        codeLabel: input.codeLabel,
+        prior
+      });
+      const synthesized = await dependencies.synthesize(synthesizerRequest);
+      candidate = synthesized.candidate;
+      candidateRef = synthesized.candidateRef;
+      if (candidateRef.trim().length === 0) {
+        throw new TypedDomainError(
+          "SYNTHESIS_CANDIDATE_REF_MISSING",
+          "A round's candidate must carry the reference of the artifact the provider call recorded"
+        );
+      }
+      candidateStatement = dependencies.readCandidateStatement(candidate);
+      const evaluatorRequest = buildEvaluatorRequest({
+        controls: input.controls,
+        round,
+        digest: input.digest,
+        codeLabel: input.codeLabel,
+        candidateStatement
+      });
+      const evaluated = await dependencies.evaluate(evaluatorRequest);
+      verdict = assertEvaluatorVerdict(evaluated.verdict);
+      if (evaluated.verdictRef.trim().length === 0) {
+        throw new TypedDomainError(
+          "SYNTHESIS_CANDIDATE_REF_MISSING",
+          "A round's verdict must carry the reference of the artifact the evaluator call recorded"
+        );
+      }
+      rounds.push(Object.freeze({
+        round,
+        synthesizerRequest,
+        candidateRef,
+        candidateStatement,
+        evaluatorRequest,
+        verdict,
+        verdictRef: evaluated.verdictRef,
+        candidateCallSiteKey: synthesized.candidateCallSiteKey,
+        verdictCallSiteKey: evaluated.verdictCallSiteKey
+      }));
+    } catch (error) {
+      // Task M3: a spend stop, a dead transport or an empty draft after a complete round keeps
+      // that round. `complete` is non-null exactly when `rounds` is non-empty.
+      if (complete !== null && keepsCompleteSynthesisRounds(error)) {
+        return loopOutcomeEndingOn({
+          candidate: complete.candidate,
+          candidateStatement: complete.candidateStatement,
+          rounds,
+          endedEarlyBy: (error as TypedDomainError).code
+        });
+      }
+      throw error;
     }
-    candidateStatement = dependencies.readCandidateStatement(candidate);
-    const evaluatorRequest = buildEvaluatorRequest({
-      controls: input.controls,
-      round,
-      digest: input.digest,
-      codeLabel: input.codeLabel,
-      candidateStatement
-    });
-    const evaluated = await dependencies.evaluate(evaluatorRequest);
-    const verdict = assertEvaluatorVerdict(evaluated.verdict);
-    if (evaluated.verdictRef.trim().length === 0) {
-      throw new TypedDomainError(
-        "SYNTHESIS_CANDIDATE_REF_MISSING",
-        "A round's verdict must carry the reference of the artifact the evaluator call recorded"
-      );
-    }
-    rounds.push(Object.freeze({
-      round,
-      synthesizerRequest,
-      candidateRef,
-      candidateStatement,
-      evaluatorRequest,
-      verdict,
-      verdictRef: evaluated.verdictRef,
-      candidateCallSiteKey: synthesized.candidateCallSiteKey,
-      verdictCallSiteKey: evaluated.verdictCallSiteKey
-    }));
+    complete = { candidate, candidateStatement };
     if (verdict.satisfied) {
       prior = null;
       break;
     }
     prior = { objection: verdict.objection!, candidateRef };
   }
-  if (candidate === null) {
+  if (complete === null) {
     throw new TypedDomainError("SYNTHESIS_LOOP_PRODUCED_NO_CANDIDATE", "The loop bound admitted no round");
   }
-  const standingObjection = rounds.at(-1)?.verdict.satisfied === true
-    ? null
-    : rounds.at(-1)?.verdict.objection ?? null;
-  return Object.freeze({
-    candidate,
-    candidateStatement,
-    rounds: Object.freeze(rounds),
-    standingObjection,
-    marks: Object.freeze(standingObjection === null ? [] : [SYNTHESIS_OBJECTION_STANDING_MARK])
+  return loopOutcomeEndingOn({
+    candidate: complete.candidate,
+    candidateStatement: complete.candidateStatement,
+    rounds,
+    endedEarlyBy: null
   });
 }
 

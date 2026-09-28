@@ -1,4 +1,5 @@
 import type { AbstentionKind, Answer, ConditionMark, StalenessState } from "@debateai/contract";
+import { RUN_LEVEL_SPEND_STOP_CODES } from "@debateai/kernel";
 import debateChromeEnglish from "../../messages/en/debateChrome.json" with { type: "json" };
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import type { LiveVerdictState } from "../types.js";
@@ -29,7 +30,8 @@ export function conditionMarkLabel(
     case "UNINSTRUMENTED": return t(catalog, "debateChrome.condition.uninstrumented");
     case "UNFALSIFIED-AFTER-ROTATION": return t(catalog, "debateChrome.condition.unfalsifiedAfterRotation");
     case "SKIPPED-BY-BUDGET": return t(catalog, "debateChrome.condition.skippedByBudget");
-    case "ENVELOPE_EXHAUSTED": return t(catalog, "debateChrome.condition.envelopeExhausted");
+    // Round 3: the bare mark names no cause; its record words the cause (conditionRecordLabel).
+    case "ENVELOPE_EXHAUSTED": return t(catalog, "debateChrome.condition.endedEarly");
     case "LEVERAGE_UNRESOLVED": return t(catalog, "debateChrome.condition.leverageUnresolved");
     case "BRANCH-FROZEN-LOW-LEVERAGE": return t(catalog, "debateChrome.condition.branchFrozenLowLeverage");
     case "DEGRADED-DIVERSITY": return t(catalog, "debateChrome.condition.degradedDiversity");
@@ -64,6 +66,75 @@ export function conditionMarkLabel(
     case "UNAUTHORED-BRANCH-HALTED": return t(catalog, "debateChrome.condition.unauthoredBranchHalted");
     case "LABEL-BASIS-INCOMPLETE": return t(catalog, "debateChrome.condition.labelBasisIncomplete");
   }
+}
+
+/**
+ * Task M6 (M2 review carry): a panel a spend stop cut short. Since Task M2 the
+ * runner names the stop code in the panel record's reason ("OpenAI:
+ * PROVIDER_ERROR; RUN_COST_ENVELOPE_MONEY_REACHED"), because the members after
+ * the stop never spoke. The runner's own remedy for the two panel marks ("Re-ask
+ * to collect the assessments the failed panel members owed", "Re-ask when
+ * another healthy maker can assess this node") does not fit such a panel: no
+ * member failed, and a re-ask under the same stop stops the same way. The
+ * honesty drawer then says, from the catalogue, why fewer models weighed the
+ * point. Only the reason's code is read, from the kernel's one list of stops.
+ *
+ * "SERVICE" is a vendor that reports no usage (fix round 1): that is a problem
+ * with an AI service, not the budget, so it is never worded as one. "BUDGET" is
+ * every other stop (money, the attempt ceiling, the day's spend). Null for any
+ * other record, which keeps the runner's own remedy.
+ */
+export type PanelSpendStopKind = "BUDGET" | "SERVICE";
+
+type MarkRecord = Pick<Answer["condition_mark_records"][number], "mark" | "reason">;
+
+/**
+ * The kind of spend stop a record's reason names (the runner writes the stop's
+ * code there, alone or after member failures, `;`-separated), from the kernel's
+ * one list: "SERVICE" for a vendor that reports no usage, "BUDGET" for money,
+ * the attempt ceiling and the day's spend; null when it names none.
+ */
+function spendStopKindOfReason(reason: string): PanelSpendStopKind | null {
+  const parts = reason.split(";").map((part) => part.trim());
+  const stop = RUN_LEVEL_SPEND_STOP_CODES.find((code) => parts.includes(code));
+  if (stop === undefined) return null;
+  return stop === "PROVIDER_USAGE_UNREPORTED" ? "SERVICE" : "BUDGET";
+}
+
+export function panelSpendStopKind(record: MarkRecord): PanelSpendStopKind | null {
+  if (record.mark !== "PANEL-PARTIAL" && record.mark !== "PANEL-DEGRADED-SINGLE-VOICE") return null;
+  return spendStopKindOfReason(record.reason);
+}
+
+/**
+ * A condition mark as its own record says it (Task M6, fix rounds 2 and 3,
+ * ruling R2). ENVELOPE_EXHAUSTED is minted with the same mark for every spend
+ * stop, its stop code as the reason: a vendor that reports no usage is a
+ * problem with an AI service (an operator told "budget" would raise the wrong
+ * ceiling); money, the attempt ceiling and the day's spend are the budget. A
+ * reason that names no stop, like the bare mark with no record at all (a public
+ * snapshot carries none), names no cause: "Ended early". Every other mark keeps
+ * its own words.
+ */
+export function conditionRecordLabel(record: MarkRecord, catalog: MessageCatalog): string {
+  if (record.mark === "ENVELOPE_EXHAUSTED") {
+    switch (spendStopKindOfReason(record.reason)) {
+      case "SERVICE": return t(catalog, "debateChrome.condition.envelopeExhaustedService");
+      case "BUDGET": return t(catalog, "debateChrome.condition.envelopeExhausted");
+      case null: return t(catalog, "debateChrome.condition.endedEarly");
+    }
+  }
+  return conditionMarkLabel(record.mark, catalog);
+}
+
+/**
+ * A bare mark (an answer's or a node's list of marks) worded by the first
+ * record of that mark in `records`, the answer's own; the mark's plain words
+ * when there is none (a public snapshot carries no records).
+ */
+export function markLabelFromRecords(mark: ConditionMark, records: readonly MarkRecord[], catalog: MessageCatalog): string {
+  const record = records.find((candidate) => candidate.mark === mark);
+  return record === undefined ? conditionMarkLabel(mark, catalog) : conditionRecordLabel(record, catalog);
 }
 
 /**

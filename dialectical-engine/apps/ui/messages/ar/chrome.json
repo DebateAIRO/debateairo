@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "المزيد من إجراءات المناظرة",
   "chrome.help": "المساعدة",
   "chrome.signedInAsker": "صاحب سؤال مسجل الدخول",
-  "chrome.guestSession": "جلسة ضيف"
+  "chrome.guestSession": "جلسة ضيف",
+  "chrome.languageOffer.label": "لغة الصفحة",
+  "chrome.languageOffer.text": "هذه المناظرة باللغة {language} ({nativeName}). هل تودّ عرض الصفحة باللغة {language}؟",
+  "chrome.languageOffer.textNative": "هذه المناظرة باللغة {language}. هل تودّ عرض الصفحة باللغة {language}؟",
+  "chrome.languageOffer.switch": "التبديل إلى {language}",
+  "chrome.languageOffer.dismiss": "لا، شكرًا"
 }

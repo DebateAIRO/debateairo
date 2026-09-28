@@ -405,7 +405,19 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // core.create_encrypted_run from 0067) and the support interface locale.
         // New prefixes after 0071, no pair.
         "0072_argument_language.sql",
-        "0073_support_interface_locale.sql"
+        "0073_support_interface_locale.sql",
+        // Verdict story (spec 2026-09-26 §7): serve.answer_story and the STORY spend
+        // source. Written as 0072 on the feature branch; renamed to the next free
+        // prefix after dev's 0072/0073 when origin/dev merged in. No pair.
+        "0074_answer_story.sql",
+        // Engine money rule, Task M1 (spec 2026-09-26 §14.4.1, risk R12): the
+        // spend phase (BODY | SERVE) on ledger.model_spend's RUN charges. The
+        // next free prefix, no pair.
+        "0075_model_spend_phase.sql",
+        // Engine money rule, Task M3 (spec 2026-09-26 §14.4.5): serve.serve_disclosure,
+        // the owner-side, content-free record beside each served answer. The next
+        // free prefix, no pair.
+        "0076_serve_disclosure.sql"
       ]);
   });
 });

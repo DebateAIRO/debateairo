@@ -7,6 +7,9 @@ import {
   AccountErasureStatusSchema,
   AnswerSchema,
   AnswerIndexSchema,
+  AnswerStorySchema,
+  AnswerDisclosureSchema,
+  ArgumentLanguageSchema,
   AskAcceptedSchema,
   AskRequestSchema,
   DeploymentSchema,
@@ -32,6 +35,9 @@ import {
   UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
+  type AnswerDisclosure,
+  type AnswerStory,
+  type ArgumentLanguage,
   type AskAccepted,
   type AskRequest,
   type Deployment,
@@ -59,6 +65,7 @@ import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serv
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
 import { detectArgumentLanguage, TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
+import { STORY_UNREADABLE, answerCarriesStoryLabel, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
 import type {
   EvaluatorConsumerSelectionResult,
@@ -74,6 +81,8 @@ import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admi
 import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
+import type { AnswerStoryApplication } from "./stories.js";
+import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { RecoveryApplication } from "./recovery.js";
@@ -497,6 +506,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RIVAL_CARVER_UNAVAILABLE",
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
+  "RUN_CEILING_BELOW_FIRST_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
@@ -529,6 +539,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SERVED_ROOT_STRENGTH_UNRESOLVED",
   "SERVED_ROOT_UNRESOLVED",
   "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE",
+  "SERVE_DISCLOSURE_RECORD_INVALID",
+  "SERVE_DISCLOSURE_ROW_INVALID",
+  "SERVE_DRAFT_UNRESOLVED",
+  "SERVE_FLOOR_REASON_UNRESOLVED",
   "SERVE_GATE_CHAIN_FAILED",
   "SERVE_ITEMS_NOT_A_LIST",
   "SERVE_ITEM_INVALID",
@@ -561,6 +575,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "STOPPING_ROOT_STRENGTH_UNRESOLVED",
   "STOPPING_ROUND_COUNT_INVALID",
   "STORED_RESULT_MISSING",
+  "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
+  "STORY_ROW_INVALID",
   "STRENGTH_LINEAGE_UNRESOLVED",
   "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
   "STRUCTURAL_CEILING_COMPOSITIONSEGMENTCAP_INVALID",
@@ -1098,6 +1114,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/answers/{id}/inspection", auth: "user", resource: "run-owner", action: "read-inspection" },
   { route: "GET /v1/answers/{id}/nodes/{nodeId}", auth: "user", resource: "run-owner", action: "read-node" },
   { route: "GET /v1/answers/{id}/ledger-digest", auth: "user", resource: "run-owner", action: "read-ledger-digest" },
+  { route: "GET /v1/answers/{id}/story", auth: "user", resource: "run-owner", action: "read-story" },
+  { route: "GET /v1/answers/{id}/disclosure", auth: "user", resource: "run-owner", action: "read-disclosure" },
   { route: "POST /v1/answers/{id}/investigations/{gapRef}", auth: "user", resource: "run-owner", action: "investigate" },
   { route: "POST /v1/answers/{id}/memory-link/unlink", auth: "user", resource: "run-owner", action: "unlink-memory" },
   { route: "GET /v1/runs/{id}", auth: "user", resource: "run-owner", action: "read-run" },
@@ -1275,6 +1293,20 @@ export interface ApiOptions {
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly publications?: PublicationApplication;
+  /**
+   * Verdict story (spec 2026-09-26 §10). Optional like `publications`: the
+   * many test compositions of AskApplication do not supply it, and the route
+   * answers its closed 404 when it is absent.
+   */
+  readonly stories?: AnswerStoryApplication;
+  /** The clock the story route measures its waiting window with; tests pin it. */
+  readonly storyClock?: () => Date;
+  /**
+   * Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
+   * the disclosure record. Optional like `stories`; the route answers its
+   * closed 404 when it is absent, and the story route then knows no floor.
+   */
+  readonly disclosures?: AnswerDisclosureApplication;
   readonly accountErasure?: AccountErasureApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
   readonly allowedOrigin?: string;
@@ -2154,6 +2186,118 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return digest === null ? reply.status(404).send({ error: "LEDGER_DIGEST_NOT_FOUND" }) : reply.send(ExecutionLedgerDigestSchema.parse(digest));
   });
 
+  // Verdict story (spec 2026-09-26 §10). Mounted outside the guarded
+  // registration zone. "Not yours", "malformed" and "not composed" share one
+  // closed 404. The answer read is the ownership gate and supplies the
+  // version and the verdict presence. M5 review, I1: the story read is the
+  // latest version at or below the answer's that HAS a story (a DR-184 catch-up
+  // version carries its predecessor's story forward), the response names the
+  // story's OWN version, and a story not stored yet is waited for from the
+  // version it is written for (the answer's first), never from a catch-up.
+  api.get<{ Params: { id: string } }>("/v1/answers/:id/story", routePolicy("GET /v1/answers/{id}/story"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    const stories = options.stories;
+    if (!answerId.success || stories === undefined) {
+      return reply.status(404).send({ error: "STORY_NOT_FOUND" });
+    }
+    const ownership = ownershipFor(request);
+    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
+    if (answer === null) return reply.status(404).send({ error: "STORY_NOT_FOUND" });
+    let body: AnswerStory;
+    try {
+      const stored = await stories.readStory({
+        answerId: answer.answer_id,
+        answerVersion: answer.answer_version,
+        ownership
+      });
+      // Task M5 (spec §14.4.4): a components-only answer with a FLOOR gets a
+      // story too, so it waits like a served one instead of "no verdict". Read
+      // only when it can matter — no stored story, and no label of its own —
+      // and through the floor-only read (M5 review, M6).
+      const floor = stored === null && answer.verdict_state === null && options.disclosures !== undefined
+        ? await options.disclosures.readFloor({ answerId: answer.answer_id, ownership })
+        : null;
+      const anchor = stored === null
+        ? await stories.readStoryAnchor({ answerId: answer.answer_id, ownership })
+        : null;
+      const derived = deriveStoryStatus({
+        stored,
+        answerHasVerdict: answerCarriesStoryLabel({
+          verdictState: answer.verdict_state,
+          floorVerdictState: floor?.verdict_state ?? null
+        }),
+        answerCreatedAt: anchor?.storedAt ?? new Date(answer.relevant_as_of),
+        now: options.storyClock?.() ?? new Date()
+      });
+      body = AnswerStorySchema.parse(buildAnswerStory({
+        answerId: answer.answer_id,
+        answerVersion: stored?.answerVersion ?? anchor?.answerVersion ?? answer.answer_version,
+        stored,
+        derived
+      }));
+    } catch (error) {
+      // The answer IS the caller's, so the failure is a status, never a 500:
+      // a fixed reason in the body, and only the bounded diagnostic (a typed
+      // code or a class category, never the message) in the log.
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.story.unreadable",
+        requestId: request.id,
+        route: request.routeOptions.url,
+        diagnostic: apiOperationalErrorDiagnostic(error)
+      })));
+      body = AnswerStorySchema.parse(buildAnswerStory({
+        answerId: answer.answer_id,
+        answerVersion: answer.answer_version,
+        stored: null,
+        derived: STORY_UNREADABLE
+      }));
+    }
+    return reply.send(body);
+  });
+
+  // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
+  // the answer's disclosure record — the floor, the models planned and used,
+  // the digest, and what cut the debate short. The story's gate: the answer
+  // read is the ownership check, and "not yours", "malformed", "not composed"
+  // and "no record" share one closed 404. The repository picks the latest
+  // answer version that HAS a record and applies the ownership predicate again.
+  // Final review, Minor 6: a CORRUPT record — a floor without its label
+  // receipt (the repository's SERVE_DISCLOSURE_ROW_INVALID) or a cause outside
+  // the closed list (the contract parse) — degrades to the same closed 404,
+  // with one log line carrying the bounded diagnostic, never the message. An
+  // operational failure (the database unreachable, say) is NOT a missing
+  // record: it keeps the closed 500, so the owner page can tell "no record"
+  // from "could not read" and keep a floor it already shows (floorAnswer.ts).
+  api.get<{ Params: { id: string } }>("/v1/answers/:id/disclosure", routePolicy("GET /v1/answers/{id}/disclosure"), async (request, reply) => {
+    const answerId = ResourceIdSchema.safeParse(request.params.id);
+    const disclosures = options.disclosures;
+    if (!answerId.success || disclosures === undefined) {
+      return reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" });
+    }
+    const ownership = ownershipFor(request);
+    const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
+    if (answer === null) return reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" });
+    let disclosure: AnswerDisclosure | null;
+    try {
+      const read = await disclosures.readDisclosure({ answerId: answer.answer_id, ownership });
+      disclosure = read === null ? null : AnswerDisclosureSchema.parse(read);
+    } catch (error) {
+      const corruptRecord = (error instanceof TypedDomainError && error.code === "SERVE_DISCLOSURE_ROW_INVALID")
+        || (error instanceof Error && error.name === "ZodError");
+      if (!corruptRecord) throw error;
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.disclosure.unreadable",
+        requestId: request.id,
+        route: request.routeOptions.url,
+        diagnostic: apiOperationalErrorDiagnostic(error)
+      })));
+      disclosure = null;
+    }
+    return disclosure === null
+      ? reply.status(404).send({ error: "DISCLOSURE_NOT_FOUND" })
+      : reply.send(disclosure);
+  });
+
   api.get<{ Params: { id: string; nodeId: string } }>("/v1/answers/:id/nodes/:nodeId", routePolicy("GET /v1/answers/{id}/nodes/{nodeId}"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     const nodeId = ResourceIdSchema.safeParse(request.params.nodeId);
@@ -2496,6 +2640,18 @@ export async function evaluateAskAdmission(
   };
 }
 
+/**
+ * The run's question language for the run read (spec 2026-09-26 §14.3). A
+ * stored value the contract cannot carry (the column's CHECK allows longer tags
+ * than BCP-47's practical 35 characters) reads as none, so the run read itself
+ * never fails over it.
+ */
+function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> | null): ArgumentLanguage | null {
+  if (language === null) return null;
+  const parsed = ArgumentLanguageSchema.safeParse({ tag: language.tag, name: language.name });
+  return parsed.success ? parsed.data : null;
+}
+
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
@@ -2632,7 +2788,8 @@ export class PostgresAskApplication implements AskApplication {
       question_line: run.questionLine,
       state: run.state,
       terminal_reason: run.terminalReason,
-      hold_until: run.holdUntil?.toISOString() ?? null
+      hold_until: run.holdUntil?.toISOString() ?? null,
+      argument_language: runArgumentLanguage(run.argumentLanguage)
     });
   }
 

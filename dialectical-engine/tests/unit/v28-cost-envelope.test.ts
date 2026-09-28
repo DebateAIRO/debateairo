@@ -456,18 +456,24 @@ describe("V-28 amendment: hosted start-up refuses an admission row without the s
 describe("C-I8 the daily ceiling claims only what it counts", () => {
   const source = (path: string) => readFile(new URL(path, import.meta.url), "utf8");
 
-  it("names the debate runs it covers and the two surfaces it does not", async () => {
+  it("names the debate runs and the verdict story it covers and the two surfaces it does not", async () => {
     const policy = await source("../../packages/register/src/cost-envelope-policy.ts");
     const header = policy.slice(0, policy.indexOf("export const COST_ENVELOPE_POLICY_ROW_KEY"));
     expect(header).not.toMatch(/across every run and every vendor/u);
     expect(header).toMatch(/debate/iu);
+    // Verdict story (Task 7 review, I-1): the story is the second counted
+    // surface, capped by its own row and reserved at admission with the run.
+    expect(header).toMatch(/story/iu);
+    expect(header).toMatch(/storyCostEnvelopePolicy/u);
+    expect(header).toMatch(/`STORY` rows/u);
     expect(header).toMatch(/support chat/iu);
     expect(header).toMatch(/probe/iu);
   });
 
-  it("agrees with the ledger's only shipped writer, which writes RUN rows", async () => {
+  it("agrees with the ledger's only shipped writer, which writes RUN and STORY rows", async () => {
     const spend = await source("../../packages/budget/src/model-spend.ts");
     expect(spend).toContain("spendSource: \"RUN\"");
+    expect(spend).toContain("spendSource: \"STORY\"");
     expect(spend).not.toContain("spendSource: \"SUPPORT\"");
   });
 

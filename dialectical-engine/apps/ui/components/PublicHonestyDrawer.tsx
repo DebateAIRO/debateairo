@@ -8,12 +8,19 @@ export function PublicHonestyDrawer({
   answer,
   catalog,
   locale,
-  onClose
+  onClose,
+  floorShown = false
 }: {
   answer: PublicDebate["answer"];
   catalog: MessageCatalog;
   locale: LocaleCode;
   onClose: () => void;
+  /**
+   * The page shows this components-only snapshot's floor as its answer (spec
+   * 2026-09-26 §14.4.4): "Verdict unavailable" stays, with one line saying
+   * what the page shows instead.
+   */
+  floorShown?: boolean;
 }) {
   return (
     <>
@@ -39,6 +46,7 @@ export function PublicHonestyDrawer({
           <section className="wsSection" aria-label={t(catalog, "public.honesty.verdict")}>
             <h3>{t(catalog, "public.honesty.verdict")}</h3>
             <p data-ai-generated={answer.verdict_available && answer.verdict !== null ? "true" : undefined}>{answer.verdict_available ? (answer.verdict ?? t(catalog, "public.honesty.verdictUnavailable")) : t(catalog, "public.honesty.verdictUnavailable")}</p>
+            {answer.verdict === null && floorShown ? <p>{t(catalog, "public.honesty.floorShown")}</p> : null}
             {answer.confidence_band ? <p data-ai-generated="true">{t(catalog, "public.honesty.confidence", { confidence: answer.confidence_band })}</p> : null}
           </section>
           {answer.badges.length > 0 ? (

@@ -573,7 +573,8 @@ export class Judge {
       // V-28: a run-level spend stop is the RUN's, not this member's. Rewriting
       // it as PROVIDER_ERROR misattributed a money ceiling as a transport fault
       // AND let the panel continue to the next member, which is another billed
-      // call. It leaves exactly as it arrived.
+      // call. It leaves exactly as it arrived. Task M2: the attempt ceiling is
+      // one of them now, so it is no longer reported as a vendor error either.
       if (isRunLevelSpendStop(error)) throw error;
       throw new PanelMemberFailure("PROVIDER_ERROR", error instanceof Error ? error.message : String(error));
     }

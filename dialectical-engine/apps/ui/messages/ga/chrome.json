@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Tuilleadh gníomhartha díospóireachta",
   "chrome.help": "Cabhair",
   "chrome.signedInAsker": "Fiafraitheoir sínithe isteach",
-  "chrome.guestSession": "Seisiún aoi"
+  "chrome.guestSession": "Seisiún aoi",
+  "chrome.languageOffer.label": "Teanga an leathanaigh",
+  "chrome.languageOffer.text": "Tá an díospóireacht seo as {language} ({nativeName}). Ar mhaith leat an leathanach a thaispeáint as {language}?",
+  "chrome.languageOffer.textNative": "Tá an díospóireacht seo as {language}. Ar mhaith leat an leathanach a thaispeáint as {language}?",
+  "chrome.languageOffer.switch": "Taispeáin as {language}",
+  "chrome.languageOffer.dismiss": "Níor mhaith, go raibh maith agat"
 }

@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Meer debatacties",
   "chrome.help": "Hulp",
   "chrome.signedInAsker": "Aangemelde vraagsteller",
-  "chrome.guestSession": "Gastsessie"
+  "chrome.guestSession": "Gastsessie",
+  "chrome.languageOffer.label": "Paginataal",
+  "chrome.languageOffer.text": "Dit debat is in het {language} ({nativeName}). Wilt u de pagina in het {language} weergeven?",
+  "chrome.languageOffer.textNative": "Dit debat is in het {language}. Wilt u de pagina in het {language} weergeven?",
+  "chrome.languageOffer.switch": "Overschakelen naar het {language}",
+  "chrome.languageOffer.dismiss": "Nee, bedankt"
 }

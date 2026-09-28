@@ -391,12 +391,13 @@ export function exhaustive(value: never): never {
 /**
  * V-28 (DL4-F2) — THE RUN-LEVEL SPEND STOPS.
  *
- * Three refusals that are the RUN's business and never one step's: the run has
- * reached its money ceiling, the application has reached its day, or a hosted
- * vendor answered without the usage figures its cost can be read from. Each must
- * travel UNTOUCHED through every layer that would otherwise translate it — the
- * panel, which turns a failure into a member note and carries on to the next
- * member; the node-review catch, which turns one into NODE_REVIEW_UNAVAILABLE —
+ * Refusals that are the RUN's business and never one step's: the run has
+ * reached its money ceiling or its attempt ceiling, the application has reached
+ * its day, or a hosted vendor answered without the usage figures its cost can be
+ * read from. Each must travel UNTOUCHED through every layer that would otherwise
+ * translate it — the panel, which turns a failure into a member note and carries
+ * on to the next member; the node-review catch, which turns one into
+ * NODE_REVIEW_UNAVAILABLE —
  * because every such translation costs another billed call and hides which
  * control spoke.
  *
@@ -405,11 +406,19 @@ export function exhaustive(value: never): never {
  * (`@debateai/judgement`, the runner) have no other package in common, and a
  * second copy of the list is a list that drifts.
  *
- * `RUN_COST_ENVELOPE_EXHAUSTED`, the ATTEMPT ceiling, is deliberately NOT here:
- * it has always been treated as a member failure and V-28 does not change it.
+ * Engine money rule (spec §14.4.1), Task M2: `RUN_COST_ENVELOPE_EXHAUSTED`, the
+ * ATTEMPT ceiling, is here too. V-28 deliberately left it out, and a panel
+ * member refused by it was noted as a member failure of kind PROVIDER_ERROR:
+ * the attempt ceiling reported as a vendor fault, while the panel went on
+ * asking the next member (refused again, before sending). M2 made the attempt
+ * ceiling a run-body stop like money, so it travels like money: out of the
+ * panel, to the phase that records the stop — or, on the first root's panel,
+ * back to the runner with the voices already heard (the author alone only when
+ * no member had answered yet).
  */
 export const RUN_LEVEL_SPEND_STOP_CODES = Object.freeze([
   "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "RUN_COST_ENVELOPE_EXHAUSTED",
   "DAILY_COST_ENVELOPE_REACHED",
   "PROVIDER_USAGE_UNREPORTED"
 ] as const);

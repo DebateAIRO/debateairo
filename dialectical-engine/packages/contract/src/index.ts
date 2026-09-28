@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
+import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
+import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
+import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -152,12 +155,28 @@ export const AskAcceptedSchema = z.object({
 }).strict();
 export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
 
+/**
+ * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
+ * `core.run.argument_language_tag` (a BCP-47 tag, "und" when detection was not
+ * confident) and `argument_language_name`, the English name the debate's model
+ * calls are told to write in. The UI reads the tag to show the verdict story's
+ * fixed text in the question's language and to offer switching the site to it.
+ */
+export const ArgumentLanguageSchema = z.object({
+  tag: StoryLanguageTagSchema,
+  name: z.string().trim().min(1).max(80)
+}).strict();
+export type ArgumentLanguage = z.infer<typeof ArgumentLanguageSchema>;
+
 export const RunProjectionSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
   state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
-  hold_until: z.iso.datetime().nullable()
+  hold_until: z.iso.datetime().nullable(),
+  // R2 (spec 2026-09-26 §14.3): null on a database without dev's migration
+  // 0072; optional, so a reader built before the field still parses.
+  argument_language: ArgumentLanguageSchema.nullable().optional()
 }).strict().superRefine((run, context) => {
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
@@ -284,7 +303,12 @@ export const PublicDebateSummarySchema = z.object({
   published_at: z.iso.datetime(),
   models: z.array(z.string().trim().min(1)).optional(),
   verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).nullable(),
-  confidence_band: z.string().trim().min(1).nullable()
+  confidence_band: z.string().trim().min(1).nullable(),
+  // Engine money rule, Task M6 (spec §14.4.4): a components-only snapshot's
+  // floor label (`PublicDebate.floor.verdict_state`), so the public library row
+  // shows the label the page shows instead of "verdict unavailable". Absent
+  // for every other snapshot; the floor's position and cause never ride here.
+  floor_verdict: z.enum(["SUPPORTED", "CONTESTED", "UNSUPPORTED"]).optional()
 }).strict();
 export type PublicDebateSummary = z.infer<typeof PublicDebateSummarySchema>;
 
@@ -440,14 +464,6 @@ export const AnswerIndexSchema = z.object({
 }).strict();
 export type AnswerIndex = z.infer<typeof AnswerIndexSchema>;
 
-export const MakerLineageSchema = z.object({
-  maker: z.string().min(1),
-  model_id: z.string().min(1),
-  transport: z.string().min(1),
-  provider_ref: z.string().min(1)
-}).strict();
-export type MakerLineage = z.infer<typeof MakerLineageSchema>;
-
 export const NodeReviewSchema = z.object({
   outcome: z.enum(["agree", "dispute", "cannot-assess"]),
   reasons: z.array(z.string().trim().min(1)).min(1),
@@ -577,7 +593,22 @@ export const PublicDebateSchema = z.object({
     nodes: z.array(PublicNodeSchema).optional(),
     edges: z.array(EdgeSchema).optional(),
     tree_included: z.boolean().optional()
-  }).strict()
+  }).strict(),
+  // Verdict story (spec 2026-09-26 §10): copied at publish time when the story
+  // is READY or READY_WITH_RESERVATION. Optional, so every snapshot published
+  // before it still parses.
+  story_short: PublicStoryShortSchema.optional(),
+  // The question's language tag (spec §14.3), copied at publish time from the
+  // run: the public page shows the short story's fixed text in it. Not private
+  // (low-entropy operational metadata dev keeps even after erasure); optional,
+  // so every snapshot published before it still parses.
+  language: StoryLanguageTagSchema.optional(),
+  // Engine money rule, Task M5 (spec §14.4.4): the floor of a components-only
+  // answer, copied at publish time from the owner's record: the label the
+  // engine derived and the published position it rests on, whose own
+  // statement the public page shows. No reason code, no model: optional, so
+  // every snapshot published before it still parses.
+  floor: AnswerFloorSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
@@ -743,6 +774,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/answers/{id}/inspection",
     "GET /v1/answers/{id}/nodes/{nodeId}",
     "GET /v1/answers/{id}/ledger-digest",
+    "GET /v1/answers/{id}/story",
+    "GET /v1/answers/{id}/disclosure",
     "POST /v1/answers/{id}/investigations/{gapRef}",
     "POST /v1/answers/{id}/memory-link/unlink",
     "GET /v1/runs/{id}",
@@ -766,6 +799,7 @@ export const contractInventory = Object.freeze({
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
-    InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema
+    InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
+    AnswerStorySchema, AnswerDisclosureSchema
   })
 });

@@ -33,7 +33,9 @@
     "per_run_ceiling_micros": 250000,
     "daily_ceiling_micros": 2000000,
     "provisional": true,
-    "provisional_reason": "PROVISIONAL first hosted run ceiling under V-28: the owner seals the real values as a NEW version of this row after the first measured paid run"
+    "provisional_reason": "PROVISIONAL first hosted run ceiling under V-28: the owner seals the real values as a NEW version of this row after the first measured paid run",
+    "serve_reserve_basis_points": 3000,
+    "serve_overrun_basis_points": 2000
   },
   "providerTargets": [
     {

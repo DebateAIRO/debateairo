@@ -200,6 +200,8 @@ Today the run-wide bound counts ATTEMPTS only (`packages/budget`, `assertModelAt
 
 **Amendment (2026-09-22, from Task 8's review):** the support chat's admission budgets (`support_reads`, `support_sessions`, `support_model_calls`, published by the `admissionPolicy` deployment row) are fail-OPEN when absent — a host pinned to an older `REGISTER_VERSION` silently runs unmetered support reads and an unshared model cap (`apps/api/src/index.ts`, the `admitSupport` bridge). In HOSTED mode, extend the sealed-envelopes start-up check (Task 10's seam, `readSealedCostEnvelopeStatus` → `assertHostedCostEnvelopesSealed`) so that start-up also refuses, with a typed code, unless the admission row in force carries all three support scopes; LOCAL mode keeps today's fail-open behaviour. RED first.
 
+**Amendment (2026-09-28, engine money rule):** Task 11's "the run ends cleanly and keeps what it produced" is superseded for the answer: a stop while arguing no longer skips the answer, part of the per-run ceiling is kept for it, and it may go over by a margin (spec `docs/superpowers/specs/2026-09-26-verdict-story-design.md` §14.4; built as tasks M1–M8 on the verdict-story branch). See "Amendment to V-28" in `V-DECISIONS-PACKET.md`.
+
 ---
 
 ## Task 12: SUPPORT-PROVIDER — the support chat reaches its model by configuration (V-30)

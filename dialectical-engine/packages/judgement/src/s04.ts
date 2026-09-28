@@ -352,11 +352,29 @@ function boundedMemberFailureReason(error: unknown): string {
   return MEMBER_FAILURE_CODES.get(code) ?? UNCLASSIFIED_MEMBER_ERROR;
 }
 
+/**
+ * Engine money rule (spec §14.4.1), Task M2 — what the panel does when a
+ * run-level spend stop arrives. Either way no further member is asked: every
+ * further member is another call for a run that has just been told it cannot
+ * make one.
+ *
+ *  · "RETHROW" (the default): the stop leaves the panel exactly as it arrived,
+ *    and whatever the panel had gathered is dropped with it — the caller's
+ *    phase discards the node anyway.
+ *  · "RETURN_HEARD": the panel ends where it stood and RETURNS what it had
+ *    gathered — the author, every member voice already heard (paid for) and
+ *    every note — with the stop as `stoppedBy`, so the caller can keep those
+ *    voices. The runner asks for it on the first root's panel only.
+ */
+export type PanelRunLevelSpendStopRule = "RETHROW" | "RETURN_HEARD";
+
 export async function runJudgePanel(input: {
   readonly artifactProducerRef: string;
   readonly primary: { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string };
   readonly members: readonly { readonly memberRole: string; readonly actorRef: string; readonly contractHash: string; readonly judge: () => Promise<{ readonly judgementRef: string; readonly assessment: JudgeAssessment }> }[];
-}): Promise<{ readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly contractHash: string | null }[]; readonly notes: readonly { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }[] }> {
+  readonly onRunLevelSpendStop?: PanelRunLevelSpendStopRule;
+}): Promise<{ readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly contractHash: string | null }[]; readonly notes: readonly { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }[]; readonly stoppedBy?: unknown }> {
+  let stoppedBy: { readonly error: unknown } | null = null;
   const judgements = [{ ...input.primary, contractHash: null as string | null }];
   const notes: { memberRole: string; contractHash: string; kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; failureKind: PanelMemberFailureKind; reason: string }[] = [];
   for (const member of input.members) {
@@ -372,7 +390,13 @@ export async function runJudgePanel(input: {
       // run's, and noting it would carry the panel on to the next member — one
       // more billed call for a run that has just been told it cannot pay. It
       // leaves untouched, keeping the code that says which control spoke.
-      if (isRunLevelSpendStop(error)) throw error;
+      // Task M2: or, when the caller asks, the panel ends here and returns the
+      // voices it already heard, with the stop beside them.
+      if (isRunLevelSpendStop(error)) {
+        if (input.onRunLevelSpendStop !== "RETURN_HEARD") throw error;
+        stoppedBy = { error };
+        break;
+      }
       notes.push({
         memberRole: member.memberRole,
         contractHash: member.contractHash,
@@ -384,7 +408,8 @@ export async function runJudgePanel(input: {
   }
   return Object.freeze({
     judgements: Object.freeze(judgements.map((entry) => Object.freeze(entry))),
-    notes: Object.freeze(notes.map((note) => Object.freeze(note)))
+    notes: Object.freeze(notes.map((note) => Object.freeze(note))),
+    ...(stoppedBy === null ? {} : { stoppedBy: stoppedBy.error })
   });
 }
 

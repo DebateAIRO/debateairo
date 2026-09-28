@@ -20,7 +20,14 @@
  * further migration.
  */
 import { randomUUID } from "node:crypto";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, exhaustive } from "@debateai/kernel";
+import {
+  costEnvelopeCeilings,
+  storyEnvelopeCeilings,
+  type CostEnvelopeCeilings,
+  type CostEnvelopePolicy,
+  type StoryPolicy
+} from "@debateai/register";
 import type { Pool } from "pg";
 import {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
@@ -30,15 +37,24 @@ import {
   dailyCostEnvelopeReached,
   decideDailyCostEnvelope,
   decideRunCostEnvelope,
+  isCostEnvelopePhase,
   projectedCallCeilingMicros,
   providerUsageUnreported,
   readReportedUsage,
   runCostEnvelopeReached,
-  type ProviderTargetPrice
+  storyCostEnvelopeReached,
+  type CostEnvelopePhase,
+  type ProviderTargetPrice,
+  type RunCostEnvelopeDecision
 } from "./cost-envelope.js";
 
-/** Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat. */
-export type ModelSpendSource = "RUN" | "SUPPORT";
+/**
+ * Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat;
+ * `STORY` is the verdict story written after a debate settled (migration 0074).
+ * A STORY charge names its run and counts toward the DAY, but never toward the
+ * run's own envelope: the story can never cost the verdict (spec §8).
+ */
+export type ModelSpendSource = "RUN" | "SUPPORT" | "STORY";
 
 export interface ModelSpendEntry {
   readonly spendId: string;
@@ -51,6 +67,13 @@ export interface ModelSpendEntry {
   readonly chargeMicros: number;
   readonly inputTokens: number;
   readonly outputTokens: number;
+  /**
+   * Engine money rule, Task M1 (risk R12, migration 0075): which part of the
+   * run spent a RUN charge — while the debate was argued, or writing the
+   * answer — so the first paid runs show the two apart. Absent on SUPPORT and
+   * STORY charges, and on every row written before the migration.
+   */
+  readonly spendPhase?: CostEnvelopePhase;
 }
 
 /**
@@ -60,8 +83,13 @@ export interface ModelSpendEntry {
  */
 export interface ModelSpendStore {
   recordSpend(entry: ModelSpendEntry): Promise<void>;
-  /** Everything this ONE run has been charged, across every vendor it touched. */
+  /**
+   * Everything this ONE run's DEBATE has been charged, across every vendor it
+   * touched. STORY charges are excluded: the story has its own envelope.
+   */
   readRunSpentMicros(runId: string): Promise<number>;
+  /** Everything this run's verdict STORY has been charged (spend source STORY only). */
+  readRunStorySpentMicros(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
   /**
@@ -107,7 +135,29 @@ export interface ProviderCostSeam {
 
 export interface CostEnvelopeGuardInput {
   readonly store: ModelSpendStore;
-  readonly policy: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number }>;
+  readonly policy: Readonly<{
+    perRunCeilingMicros: number;
+    dailyCeilingMicros: number;
+    /**
+     * Verdict story: the story's OWN money ceiling, from the optional
+     * `storyCostEnvelopePolicy` row. Absent means no story seam can be built,
+     * and the daily admission reserves the run's ceiling alone, as before.
+     */
+    perStoryCeilingMicros?: number;
+    /**
+     * Engine money rule, Task M7: the story row's `per_story_overrun_basis_points`,
+     * how far a story may go over `perStoryCeilingMicros`. Absent means 0:
+     * today's cap. Meaningless, and ignored, without a story ceiling.
+     */
+    perStoryOverrunBasisPoints?: number;
+    /**
+     * Engine money rule, Task M1: the `costEnvelopePolicy` row's reserve and
+     * overrun (`serve_reserve_basis_points`, `serve_overrun_basis_points`).
+     * Absent means 0: one ceiling for every call, exactly as before.
+     */
+    serveReserveBasisPoints?: number;
+    serveOverrunBasisPoints?: number;
+  }>;
   /** Seam for "now", so the day boundary is testable without waiting for midnight. */
   readonly clock?: () => Date;
   /**
@@ -156,6 +206,95 @@ export interface CostEnvelopeGuardInput {
 
 export const DEFAULT_RESERVATION_TTL_MS = 1_800_000 as const;
 
+/**
+ * THE MOST ONE RUN MAY SPEND — what the day reserves when it admits a new run,
+ * computed here and nowhere else.
+ *
+ *  - The DEBATE: its per-run ceiling plus the answer's overrun, rounded up
+ *    (`costEnvelopeCeilings(...).runMaximumMicros`). The reserve moves money
+ *    inside that ceiling and changes nothing here.
+ *  - The STORY written after it settles: its own ceiling plus the story's
+ *    overrun, rounded up (`storyEnvelopeCeilings(...).storyMaximumMicros`,
+ *    Task M7). No story ceiling, no story, nothing reserved for one.
+ *
+ * Without an overrun and without a story row this is `perRunCeilingMicros`,
+ * exactly what the day reserved before either existed.
+ */
+export function mostOneRunMaySpendMicros(policy: Readonly<{
+  perRunCeilingMicros: number;
+  perStoryCeilingMicros?: number;
+  perStoryOverrunBasisPoints?: number;
+  serveReserveBasisPoints?: number;
+  serveOverrunBasisPoints?: number;
+}>): number {
+  const story = policy.perStoryCeilingMicros === undefined
+    ? 0
+    : storyEnvelopeCeilings({
+        perStoryCeilingMicros: policy.perStoryCeilingMicros,
+        ...(policy.perStoryOverrunBasisPoints === undefined
+          ? {} : { perStoryOverrunBasisPoints: policy.perStoryOverrunBasisPoints })
+      }).storyMaximumMicros;
+  return costEnvelopeCeilings(policy).runMaximumMicros + story;
+}
+
+/**
+ * ENGINE MONEY RULE (spec 2026-09-26 §14.4.1), TASK M7 — THE ONE CHECK OVER
+ * BOTH MONEY ROWS, and the guard policy both boots build from them.
+ *
+ * The `costEnvelopePolicy` row's own refinement holds its day to ONE run (the
+ * per-run ceiling plus the answer's overrun). It cannot see the story, whose
+ * cap and overrun live in another row (`storyCostEnvelopePolicy`), so a day
+ * that holds one run and not its story passes it. This reads BOTH, and refuses
+ * a day below the most one run may spend with its story
+ * (`mostOneRunMaySpendMicros`) — STORY_DAILY_CEILING_INSUFFICIENT, with no
+ * figure in the message. The operator sees that code on stderr (the publish
+ * command prints it; a refused boot prints the error), and the runbook's row
+ * for it (deploy/vps/README.md) gives the figures and the fix: raise
+ * `daily_ceiling_micros` in a new register version.
+ *
+ * Called where both rows are already read: the hosted publication's plan
+ * (`planHostedRegisterPublication`, before anything is sealed) and the hosted
+ * boots of the runner and the API (the policy their `CostEnvelopeGuard` is
+ * built from). `story` is the story family as `readStoryPolicy` returns it, or
+ * null when the version sealed none (or it could not be read): a story with no
+ * money ceiling cannot be written in hosted mode, so the day holds only the run.
+ */
+export function costEnvelopeGuardPolicy(
+  run: Pick<CostEnvelopePolicy,
+    "perRunCeilingMicros" | "dailyCeilingMicros" | "serveReserveBasisPoints" | "serveOverrunBasisPoints">,
+  story: Pick<StoryPolicy, "perStoryCeilingMicros" | "perStoryOverrunBasisPoints"> | null
+): CostEnvelopeGuardInput["policy"] {
+  const policy: CostEnvelopeGuardInput["policy"] = Object.freeze({
+    perRunCeilingMicros: run.perRunCeilingMicros,
+    dailyCeilingMicros: run.dailyCeilingMicros,
+    serveReserveBasisPoints: run.serveReserveBasisPoints,
+    serveOverrunBasisPoints: run.serveOverrunBasisPoints,
+    ...(story === null || story.perStoryCeilingMicros === null ? {} : {
+      perStoryCeilingMicros: story.perStoryCeilingMicros,
+      perStoryOverrunBasisPoints: story.perStoryOverrunBasisPoints
+    })
+  });
+  if (policy.dailyCeilingMicros < mostOneRunMaySpendMicros(policy)) {
+    throw new TypedDomainError(
+      "STORY_DAILY_CEILING_INSUFFICIENT",
+      "The daily ceiling cannot hold one full run plus its story: the answer's overrun and the story's own"
+        + " ceiling and overrun must fit in one day"
+    );
+  }
+  return policy;
+}
+
+/** The two spend sources a gateway money seam charges (the support chat keeps its own accounting). */
+type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY">;
+
+/** What a metered seam spends against: see `CostEnvelopeGuard.#envelopeFor`. */
+interface MeteredEnvelope {
+  readonly spendSource: MeteredSpendSource;
+  readonly ceilingMicros: number;
+  readSpentMicros(runId: string): Promise<number>;
+  refusal(decision: Extract<RunCostEnvelopeDecision, { kind: "WOULD_CROSS" }>): TypedDomainError;
+}
+
 export interface ProviderSeamInput {
   readonly runId: string;
   readonly price: ProviderTargetPrice;
@@ -168,6 +307,16 @@ export interface ProviderSeamInput {
 }
 
 /**
+ * The RUN seam also needs the call's phase (Task M1): an answer-writing call
+ * and a call made while the debate is argued are compared with different
+ * ceilings, and the charge records which one it was. The story seam has no
+ * phase: it is its own envelope.
+ */
+export interface RunProviderSeamInput extends ProviderSeamInput {
+  readonly phase: CostEnvelopePhase;
+}
+
+/**
  * The two V-28 guards, over one store and one sealed policy.
  *
  * Both read the persisted total at the moment they decide rather than caching
@@ -176,7 +325,11 @@ export interface ProviderSeamInput {
  */
 export class CostEnvelopeGuard {
   readonly #store: ModelSpendStore;
-  readonly #policy: Readonly<{ perRunCeilingMicros: number; dailyCeilingMicros: number }>;
+  readonly #policy: CostEnvelopeGuardInput["policy"];
+  /** Task M1: the body's and the answer's ceilings, computed once from the policy. */
+  readonly #ceilings: CostEnvelopeCeilings;
+  /** Task M7: the story's ceiling with its overrun; null without a story ceiling (no story seam). */
+  readonly #storyCeilingMicros: number | null;
   readonly #clock: () => Date;
   readonly #reservationTtlMs: number;
 
@@ -186,6 +339,19 @@ export class CostEnvelopeGuard {
     }
     this.#store = input.store;
     this.#policy = input.policy;
+    const storyCeiling = input.policy.perStoryCeilingMicros;
+    if (storyCeiling !== undefined && (!Number.isSafeInteger(storyCeiling) || storyCeiling < 1)) {
+      throw new TypeError("STORY_ENVELOPE_POLICY_INVALID");
+    }
+    // A reserve or an overrun the policy row would refuse is refused here too,
+    // at construction, so a guard can never run on shares nobody could seal.
+    this.#ceilings = costEnvelopeCeilings(input.policy);
+    // Task M7: the story's overrun likewise (STORY_ENVELOPE_POLICY_INVALID).
+    this.#storyCeilingMicros = storyCeiling === undefined ? null : storyEnvelopeCeilings({
+      perStoryCeilingMicros: storyCeiling,
+      ...(input.policy.perStoryOverrunBasisPoints === undefined
+        ? {} : { perStoryOverrunBasisPoints: input.policy.perStoryOverrunBasisPoints })
+    }).storyMicros;
     this.#clock = input.clock ?? (() => new Date());
     const ttl = input.reservationTtlMs ?? DEFAULT_RESERVATION_TTL_MS;
     if (!Number.isInteger(ttl) || ttl < 1) throw new TypeError("COST_ENVELOPE_RESERVATION_TTL_INVALID");
@@ -200,11 +366,49 @@ export class CostEnvelopeGuard {
    * `recordCall` runs after a completed call and charges what the vendor
    * reported. Neither consults the DAILY ceiling: a run already under way
    * finishes, which is V-28(2) in as many words.
+   *
+   * Task M1: the ceiling is the PHASE's. A call made while the debate is argued
+   * (BODY) is compared with the per-run ceiling less the answer's reserve; an
+   * answer-writing call (SERVE) with the per-run ceiling plus its overrun. Both
+   * compare the run's WHOLE debate spend, so the body simply stops sooner and
+   * leaves the answer its money. The refusal code is the same for both.
    */
-  providerSeam(input: ProviderSeamInput): ProviderCostSeam {
+  providerSeam(input: RunProviderSeamInput): ProviderCostSeam {
+    if (!isCostEnvelopePhase(input?.phase)) throw new TypeError("MODEL_SPEND_PHASE_INVALID");
+    return this.#meteredSeam(input, "RUN", input.phase);
+  }
+
+  /**
+   * VERDICT STORY — THE STORY'S OWN MONEY SEAM (spec §8), in the shape the
+   * gateway consumes. The per-run seam's rules, built by the same body, with
+   * the four differences `#envelopeFor` names and no others: it sums STORY
+   * charges only, compares them with `perStoryCeilingMicros` plus the story's
+   * overrun (Task M7), refuses with
+   * STORY_COST_ENVELOPE_REACHED, and charges STORY rows. So a debate that has
+   * spent its whole envelope does not stop its story, and a story can never
+   * spend the debate's envelope. With no sealed story ceiling there is no
+   * story seam at all (STORY_ENVELOPE_MISSING).
+   */
+  storySeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "STORY", null);
+  }
+
+  /**
+   * THE ONE BODY OF BOTH MONEY SEAMS. The run-id guard, the price guard, the
+   * charge and the hosted usage requirement are the same rules for a debate
+   * call and a story call, so they are written once; only the envelope
+   * (`#envelopeFor`) differs. `phase` is the RUN seam's (Task M1) and null for
+   * the story.
+   */
+  #meteredSeam(
+    input: ProviderSeamInput,
+    spendSource: MeteredSpendSource,
+    phase: CostEnvelopePhase | null
+  ): ProviderCostSeam {
     if (typeof input?.runId !== "string" || input.runId.trim() === "") {
       throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
     }
+    const envelope = this.#envelopeFor(spendSource, phase);
     /**
      * C2 (review round 2), the second layer. `assertPricedProviderTargets`
      * refuses a zero-priced target at boot; this refuses to BUILD a metered
@@ -226,11 +430,11 @@ export class CostEnvelopeGuard {
     return {
       assertCallAllowed: async (projection) => {
         const decision = decideRunCostEnvelope({
-          spentMicros: await this.#store.readRunSpentMicros(input.runId),
+          spentMicros: await envelope.readSpentMicros(input.runId),
           projectedMicros: projectedCallCeilingMicros(input.price, projection),
-          ceilingMicros: this.#policy.perRunCeilingMicros
+          ceilingMicros: envelope.ceilingMicros
         });
-        if (decision.kind === "WOULD_CROSS") throw runCostEnvelopeReached(decision);
+        if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
       },
       // I4: charging never refuses. Nothing is written for a call whose vendor
       // said nothing at all about usage — a zero row would read as "this call
@@ -265,13 +469,15 @@ export class CostEnvelopeGuard {
         }
         await this.#store.recordSpend(Object.freeze({
           spendId: randomUUID(),
-          spendSource: "RUN",
+          spendSource: envelope.spendSource,
           runId: input.runId,
           providerRef: observed.providerRef,
           chargedOn: costEnvelopeDay(this.#clock()),
           chargeMicros,
           inputTokens: usage.promptTokens,
-          outputTokens: usage.completionTokens
+          outputTokens: usage.completionTokens,
+          // Task M1 (R12): a RUN charge says which part of the run spent it.
+          ...(phase === null ? {} : { spendPhase: phase })
         }));
       },
       assertUsageReported: async (observed) => {
@@ -281,6 +487,51 @@ export class CostEnvelopeGuard {
         }
       }
     };
+  }
+
+  /**
+   * Which envelope a metered seam spends — the ONLY four things the run's seam
+   * and the story's seam do differently: the spent total they read, the
+   * ceiling they compare it with, the refusal they raise, and the spend source
+   * they charge.
+   *
+   * Task M1: within the RUN envelope the ceiling is the phase's — the body's
+   * (per-run less the answer's reserve) or the answer's (per-run plus its
+   * overrun) — over the same run total, with the same refusal. With neither
+   * policy member both are the per-run ceiling, as before.
+   *
+   * Task M7 (spec §14.4.6): the STORY envelope's ceiling is the story's cap
+   * plus its own overrun, `perStory x (10000 + overrun) / 10000` rounded down
+   * (`storyEnvelopeCeilings`, computed once at construction). Without the
+   * member it is the cap, as before.
+   */
+  #envelopeFor(spendSource: MeteredSpendSource, phase: CostEnvelopePhase | null): MeteredEnvelope {
+    switch (spendSource) {
+      case "RUN":
+        return Object.freeze({
+          spendSource: "RUN",
+          ceilingMicros: phase === "SERVE" ? this.#ceilings.serveMicros : this.#ceilings.bodyMicros,
+          readSpentMicros: (runId: string) => this.#store.readRunSpentMicros(runId),
+          refusal: runCostEnvelopeReached
+        });
+      case "STORY": {
+        const ceilingMicros = this.#storyCeilingMicros;
+        if (ceilingMicros === null) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered story seam needs the sealed storyCostEnvelopePolicy row"
+          );
+        }
+        return Object.freeze({
+          spendSource: "STORY",
+          ceilingMicros,
+          readSpentMicros: (runId: string) => this.#store.readRunStorySpentMicros(runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      default:
+        return exhaustive(spendSource);
+    }
   }
 
   /**
@@ -294,7 +545,12 @@ export class CostEnvelopeGuard {
     const now = this.#clock();
     const outcome = await this.#store.admitNewRun({
       day: costEnvelopeDay(now),
-      reservedMicros: this.#policy.perRunCeilingMicros,
+      // Verdict story: an admitted run may also write its story, whose spend
+      // counts toward the day, so the day reserves both ceilings at once.
+      // Task M1: and the answer may go over the per-run ceiling by its
+      // overrun, so the day reserves that too (`mostOneRunMaySpendMicros`).
+      // Task M7: and the story over its own cap by its overrun.
+      reservedMicros: mostOneRunMaySpendMicros(this.#policy),
       now,
       expiresAt: new Date(now.getTime() + this.#reservationTtlMs),
       // ONE definition of the ceiling, passed in rather than restated in SQL.
@@ -325,24 +581,43 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   constructor(private readonly pool: Pool) {}
 
   async recordSpend(entry: ModelSpendEntry): Promise<void> {
-    if (entry.spendSource === "RUN" && entry.runId === null) {
-      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run charge must name its run");
+    if ((entry.spendSource === "RUN" || entry.spendSource === "STORY") && entry.runId === null) {
+      throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run or story charge must name its run");
+    }
+    // Task M1 (migration 0075): only a RUN charge has a phase. The CHECK
+    // `model_spend_phase_is_a_run_charge` says the same one layer lower.
+    if (entry.spendPhase !== undefined && entry.spendSource !== "RUN") {
+      throw new TypedDomainError(
+        "MODEL_SPEND_PHASE_NOT_A_RUN_CHARGE",
+        "Only a debate run's charge records the phase that spent it"
+      );
     }
     await this.pool.query(
       `INSERT INTO ledger.model_spend (
          spend_id, spend_source, run_id, provider_ref,
-         charged_on, charge_micros, input_tokens, output_tokens
-       ) VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8)`,
+         charged_on, charge_micros, input_tokens, output_tokens, spend_phase
+       ) VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9)`,
       [
         entry.spendId, entry.spendSource, entry.runId, entry.providerRef,
-        entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens
+        entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens,
+        entry.spendPhase ?? null
       ]
     );
   }
 
   async readRunSpentMicros(runId: string): Promise<number> {
     const result = await this.pool.query<{ total: string }>(
-      "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE run_id = $1",
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source <> 'STORY'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readRunStorySpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'STORY'`,
       [runId]
     );
     return this.#total(result.rows[0]?.total);

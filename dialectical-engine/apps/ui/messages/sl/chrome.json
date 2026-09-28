@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Več dejanj razprave",
   "chrome.help": "Pomoč",
   "chrome.signedInAsker": "Prijavljeni spraševalec",
-  "chrome.guestSession": "Gostujoča seja"
+  "chrome.guestSession": "Gostujoča seja",
+  "chrome.languageOffer.label": "Jezik strani",
+  "chrome.languageOffer.text": "Jezik te razprave: {language} ({nativeName}). Želite stran prikazati v jeziku: {language}?",
+  "chrome.languageOffer.textNative": "Jezik te razprave: {language}. Želite stran prikazati v jeziku: {language}?",
+  "chrome.languageOffer.switch": "Preklopi na jezik: {language}",
+  "chrome.languageOffer.dismiss": "Ne, hvala"
 }

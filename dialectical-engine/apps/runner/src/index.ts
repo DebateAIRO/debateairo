@@ -4,11 +4,13 @@ import type { Pool } from "pg";
 import {
   ProviderProbeRepository,
   RunRepository,
+  ServeDisclosureRepository,
   assertNoOpenWriteTransaction,
   withRunContentLease,
   withWriteTransaction,
   type CompletionActivationResolution,
-  type DiscoveredPanelMember
+  type DiscoveredPanelMember,
+  type ServeDisclosureRecord
 } from "@debateai/db";
 import {
   WorkItemRepository,
@@ -43,14 +45,19 @@ import {
   ENGINE_COMPOSITION_SEGMENT_CAP,
   ENGINE_FIXED_ORGANS_PER_COMPOSITION,
   ENGINE_MAX_RECOMPOSE,
+  readVerdictLabelControls,
   resolveScoringOperator,
   type AdaptiveStoppingControls
 } from "@debateai/register";
 import {
   BudgetRepository,
   BATTERY_BUDGET_CONTRACTS,
+  attemptCeilingForPhase,
   parseCostEnvelopeBasis,
-  type BudgetPressureDecision
+  projectedCallCeilingMicros,
+  type BudgetPressureDecision,
+  type CostEnvelopePhase,
+  type ProviderTargetPrice
 } from "@debateai/budget";
 import {
   countMeasuredEdges,
@@ -81,6 +88,8 @@ import {
   OpenAICompatibleProviderGateway,
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
+  lengthRetryTokenCeiling,
+  providerTargetPrice,
   type CallBound,
   type ContentClassification,
   type OpenAICompatibleGatewayOptions,
@@ -88,16 +97,24 @@ import {
   type ProviderCallRequest,
   type ProviderCallResult,
   type ProviderCostEnvelopeSeam,
+  type ProviderDiscoveryTarget,
   type ProviderGateway
 } from "@debateai/providers";
 import {
+  assertEvaluatorVerdict,
   buildFactBundle,
   compositionEvidenceRequired,
   createEnvelopeExhaustedResult,
   deriveBandCeiling,
   deriveVerdictLabel,
+  digestLeverageByNodeId,
+  digestPointsOmitted,
+  idShapedTokensIn,
+  keepsCompleteSynthesisRounds,
+  nodeIdsNamedInText,
   LABEL_BASIS_INCOMPLETE_MARK,
   PROTECTED_CORE_GUARD_RETIRED_MARK,
+  resolveDigestNodeRef,
   runServeGateChain,
   ServeRepository,
   toSynthesisPromptMaterial,
@@ -115,8 +132,10 @@ import {
   type PreservedConditionMarkRecord,
   type ServeGateResult,
   type ServeNode,
+  type SynthesisDigest,
   type SynthesizerRequest,
-  type VerdictLabelBasis
+  type VerdictLabelBasis,
+  type VerdictLabelDerivation
 } from "@debateai/serve";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import {
@@ -129,7 +148,9 @@ import {
   type WayOfKnowing
 } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
+import type { StoryCostFallback, StorySnapshotFailure, StoryWriteInput } from "@debateai/story";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
+import { buildStoryRunSnapshot } from "./story-snapshot.js";
 
 /**
  * T9 / J24 — the two sealed synthesis roles, named ONCE. Every check that has
@@ -151,10 +172,17 @@ const machineIdentifierSchema = z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9:
  *
  * Two independent bounds refuse the next provider call, and the serve leg's
  * catch has to tell them apart from a genuine failure, which must keep
- * travelling. Both end the run the same way — the components-only envelope
- * terminal, which serves the nodes already verified — but they are reached by
- * different questions and are lifted by different operator actions, so the
- * distinction is named rather than inferred from a count.
+ * travelling. Both end the run the same way, but they are reached by different
+ * questions and are lifted by different operator actions, so the distinction is
+ * named rather than inferred from a count.
+ *
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — "the same way" depends on WHERE
+ * the refusal lands. While the debate is argued, every kind below stops the
+ * ARGUING and the run goes on to write its answer with the tree it has
+ * (`RUN_BODY_STOP_KINDS`); the stop rides the answer as its envelope record
+ * (`runBodyStopDisclosure`). On an answer-writing call it still takes the
+ * components-only envelope terminal, which serves the nodes already verified
+ * (Task M3 puts a cheaper-model fallback in front of that).
  */
 export const ENVELOPE_STOP_CODES = Object.freeze({
   /** The attempt ceiling pinned on the run head (`assertModelAttemptAllowed`). */
@@ -206,8 +234,9 @@ export const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> =
  * on one lineage because a spend bound stopped the run before the other maker
  * positions could be afforded. One lift per stop, because "re-ask with more
  * money", "wait for the next day" and "fix the vendor" are different actions.
- * The ATTEMPT ceiling is listed for completeness of the record: it is never a
- * run-body stop (`RUN_BODY_STOP_KINDS`), so no such record is ever minted for it.
+ * The ATTEMPT ceiling was listed only for completeness of the record while it
+ * failed the run instead of stopping it; since Task M2 it is a run-body stop
+ * (`RUN_BODY_STOP_KINDS`) and its lift is used like the others.
  */
 const SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
   ATTEMPTS: "Re-ask under a larger attempt ceiling so the other maker positions can be authored",
@@ -239,16 +268,22 @@ export function envelopeStopKind(error: unknown): EnvelopeStopKind | null {
 /**
  * C1 (review round 2) — WHAT A RUN-BODY PHASE DOES WITH AN ENVELOPE REFUSAL.
  *
- * The envelope terminal cannot be built during authoring, expansion or review:
- * it needs the propagation, the served root and the fact bundle, and none of
- * them exists yet. So a spend refusal raised there cannot become a terminal on
- * the spot — it must STOP THE PHASE and let the run reach the envelope
- * evaluation that already stands in front of the serve chain, where the terminal
- * IS buildable and the components produced so far are what it serves.
+ * A spend refusal raised during authoring, expansion or review must STOP THE
+ * PHASE, never travel: travelling discards what the run already paid for. C1
+ * then carried the stop to the envelope evaluation in front of the serve chain,
+ * which turned it into the components-only terminal. Since Task M2 (spec
+ * §14.4.1) that evaluation no longer reads it: the run goes on to write its
+ * answer with what it has, and the stop rides the answer as its envelope
+ * record (`runBodyStopDisclosure`).
  *
- * `null` means "this is not a phase stop, let it travel". The ATTEMPT ceiling is
- * deliberately `null`: it has always propagated from these phases, changing that
- * is a behaviour nobody ruled, and V-28 is about money.
+ * `null` means "this is not a phase stop, let it travel".
+ *
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2: the ATTEMPT ceiling is a phase stop
+ * too. It used to be deliberately `null` — it propagated from these phases and
+ * FAILED the run — because V-28 was about money. The owner's rule is that a cost
+ * bound never costs the person their answer, and the attempt ceiling is a cost
+ * bound by count, so it now stops the arguing like money does (the controller's
+ * ruling R10, 2026-09-27).
  */
 /**
  * C3 (re-review) — WHICH QUESTION THE ENVELOPE IS ASKED, per stop.
@@ -271,9 +306,10 @@ export function envelopeStopPendingAttempts(stop: EnvelopeStopKind): Readonly<{
 /**
  * The kinds that stop a run-body phase, enumerated POSITIVELY: a fifth kind
  * added tomorrow does not become a phase stop by omission, it has to be listed
- * and reasoned about. `ATTEMPTS` is deliberately absent (see above).
+ * and reasoned about. Since Task M2 that is all four of today's: `ATTEMPTS` was
+ * deliberately absent until the engine money rule (see above).
  */
-const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["MONEY", "USAGE", "DAILY"]);
+const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["ATTEMPTS", "MONEY", "USAGE", "DAILY"]);
 
 export function expansionPhaseStop(error: unknown): EnvelopeStopKind | null {
   const stop = envelopeStopKind(error);
@@ -291,9 +327,12 @@ export type ReviewFailureOutcome =
  * `NODE_REVIEW_UNAVAILABLE`: a diagnostic naming the wrong cause, and one no
  * envelope path can recognise. The list is a DECISION now, so it can be tested
  * instead of read.
+ *
+ * Task M2: `RUN_COST_ENVELOPE_EXHAUSTED` left this list. The attempt ceiling is
+ * a phase stop now (`RUN_BODY_STOP_KINDS`), so a review it refuses is a
+ * `BUDGET_STOP` — the entry here could no longer be reached.
  */
 const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
-  "RUN_COST_ENVELOPE_EXHAUSTED",
   "CALL_BUDGET_EXHAUSTED",
   "PRODUCER_GRADING_FORBIDDEN"
 ]);
@@ -305,6 +344,114 @@ export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
     return Object.freeze({ kind: "RETHROW" as const });
   }
   return Object.freeze({ kind: "UNAVAILABLE" as const });
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — WHAT A NODE'S PANEL DOES WITH A
+ * STOP RAISED BY ONE OF ITS MEMBERS.
+ *
+ * A run-level spend stop is never noted as a member failure (C2(b)): the panel
+ * asks no further member. Since the M2 polish that includes the attempt ceiling,
+ * which used to be noted as a PROVIDER_ERROR member failure.
+ *
+ *  · "TRAVEL" — every node but the first root: the panel rethrows the stop, and
+ *    the phase catch that authored the node records it (the node is not
+ *    minted, and the run goes on to its answer with what it has).
+ *  · "AUTHOR_ONLY" — the first root's panel (`PANEL:root`). Nothing exists yet
+ *    to answer from but this node, so letting the stop travel would fail the
+ *    whole work item. The panel returns the voices it had already heard
+ *    (`onRunLevelSpendStop: "RETURN_HEARD"`), the node rests on them — on the
+ *    author's own judgement alone when none was heard — and the stop is handed
+ *    back for the caller to record.
+ *
+ * `null` means "let it travel".
+ */
+export type PanelSpendStopRule = "AUTHOR_ONLY" | "TRAVEL";
+
+export function panelSpendStop(error: unknown, rule: PanelSpendStopRule): EnvelopeStopKind | null {
+  return rule === "AUTHOR_ONLY" ? expansionPhaseStop(error) : null;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — THE ONE STOP THAT STILL ENDS A RUN
+ * WITHOUT AN ANSWER.
+ *
+ * If the author's own FIRST call — the first root's judgement — is refused by a
+ * ceiling, nothing exists to answer from: no node, no label, nothing a floor
+ * could print. That is not money deciding the outcome; the owner's rule counts
+ * it as technical. It fails TYPED, under its own code, so the operator is told
+ * which kind of limit to look at.
+ *
+ * The code names the usual cause, a ceiling below one call. The MESSAGE does
+ * not assume it (M2 review polish): a crash followed by a re-claim carries the
+ * earlier claim's attempts and spend over, so a ceiling that fits one call can
+ * still refuse the first call of the re-claim. So the message states both
+ * readings and keeps the refusal's own evidence verbatim — for money, "spent X
+ * of Y … the next call could cost Z" — which is what tells them apart. The
+ * refusal is also kept as the `cause`.
+ *
+ * Only the two CEILINGS map here. A vendor that reports no usage and a spent day
+ * are not a ceiling below one call: each already fails typed under its own code,
+ * and each is lifted differently (ruling R-C). `null` means "let it travel as it
+ * is".
+ */
+const FIRST_CALL_CEILING_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["ATTEMPTS", "MONEY"]);
+
+export function firstCallCeilingFailure(error: unknown): TypedDomainError | null {
+  const stop = envelopeStopKind(error);
+  if (stop === null || !FIRST_CALL_CEILING_KINDS.includes(stop)) return null;
+  const evidence = error instanceof Error ? error.message : String(error);
+  const failure = new TypedDomainError(
+    "RUN_CEILING_BELOW_FIRST_CALL",
+    `${ENVELOPE_STOP_REASONS[stop]} refused the first position's own call, so nothing exists to answer from.`
+      + " Either the run's ceiling for arguing is below one call, or an earlier claim of this run"
+      + ` spent it before a re-claim. The refusal said: ${evidence}`
+  );
+  failure.cause = error;
+  return failure;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — THE STOP WHILE ARGUING, KEPT ON THE
+ * ANSWER IT NO LONGER PREVENTS.
+ *
+ * Before M2 a stop while arguing forced the envelope terminal, whose answer-scope
+ * `ENVELOPE_EXHAUSTED` record named the stop — and that record is what told a
+ * reader (the honesty drawer's "Run envelope exhausted") the debate was cut
+ * short. The terminal is gone from that path; the record is not. It is the same
+ * record, minted AFTER the serve chain, the way the owed-check and type-fallback
+ * disclosures are, so:
+ *
+ *  · the answer-writer's own input is unchanged by it;
+ *  · the chain's post-answer envelope check, which treats the mark as "the
+ *    envelope terminal already fired", still runs.
+ *
+ * `null` — nothing to add:
+ *
+ *  · the run was never stopped;
+ *  · the answer already carries the mark, because a refused ANSWER-WRITING call
+ *    took the envelope terminal with its own record;
+ *  · the answer is DEFECT: serve's own rule keeps DEFECT and ENVELOPE_EXHAUSTED
+ *    independent terminals.
+ */
+export function runBodyStopDisclosure(input: Readonly<{
+  runBodyBudgetStop: EnvelopeStopKind | null;
+  resultConditionMarks: readonly string[];
+  runId: string;
+  servedRootNodeId: string;
+}>): ConditionMarkRecord | null {
+  if (input.runBodyBudgetStop === null) return null;
+  if (input.resultConditionMarks.includes("ENVELOPE_EXHAUSTED")) return null;
+  if (input.resultConditionMarks.includes("DEFECT")) return null;
+  return Object.freeze({
+    mark: "ENVELOPE_EXHAUSTED" as const,
+    scope: "answer" as const,
+    subjectRef: input.runId,
+    reason: ENVELOPE_STOP_REASONS[input.runBodyBudgetStop],
+    liftPath: null,
+    servedRootRule: null,
+    affectedNodeIds: Object.freeze([input.servedRootNodeId])
+  } satisfies ConditionMarkRecord);
 }
 
 const compositionSchema = z.object({
@@ -814,7 +961,8 @@ export type ReviewCatchUpRefusal =
   | "CATCH_UP_DISCLOSURE_MISMATCH"
   | "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE"
   | "CATCH_UP_WOULD_DOWNGRADE"
-  | "CATCH_UP_NUMBER_WOULD_MOVE";
+  | "CATCH_UP_NUMBER_WOULD_MOVE"
+  | "CATCH_UP_FLOOR_WOULD_MOVE";
 
 /** The previous answer's class-H/class-D row, as the catch-up lane reads it. */
 export interface StoredUnjudgedDisclosure {
@@ -983,11 +1131,30 @@ export interface ReviewCatchUpReviewer {
   }>;
 }
 
+/**
+ * ENGINE MONEY RULE, TASK M5 review (M1) — a floor answer's floor, as the
+ * catch-up compares it: the leading position and its label. `verdictState` is
+ * null when the leading position MOVED: its label is not re-derived, because
+ * the move alone refuses the version.
+ */
+export interface ReviewCatchUpFloor {
+  readonly leadingNodeId: string;
+  readonly verdictState: VerdictLabelDerivation["label"] | null;
+}
+
 export interface ReviewCatchUpVersionCandidate {
   readonly terminalBefore: "SERVED" | "DOWNGRADED" | "COMPONENTS_ONLY" | "BLOCKED";
   readonly terminalAfter: "SERVED" | "DOWNGRADED" | "COMPONENTS_ONLY" | "BLOCKED";
   readonly numberBefore: number | null;
   readonly numberAfter: number | null;
+  /**
+   * M5 review (M1): the floor of the answer being superseded (null when it has
+   * none), and the floor re-derived from the catch-up's own propagation (null
+   * when no servable position is left). A superseding version carries the
+   * floor forward on the owner's record, so it may not move it.
+   */
+  readonly floorBefore: ReviewCatchUpFloor | null;
+  readonly floorAfter: ReviewCatchUpFloor | null;
   readonly nowVisible: number;
   readonly stillSetAside: number;
   persist(): Promise<{ readonly answerVersion: number }>;
@@ -1018,6 +1185,7 @@ export interface ReviewCatchUpDependencies {
     readonly measurements: readonly { readonly edgeId: string; readonly bearing: number | null }[];
   }): Promise<string>;
   countRunModelAttempts(runId: string): Promise<number>;
+  /** The pinned attempt ceiling the catch-up's own (BODY) calls are held to (Task M1). */
   readPinnedMaximumAttempts(runId: string): Promise<number>;
   prepareVersion(input: {
     readonly runId: string;
@@ -1162,6 +1330,13 @@ export async function runReviewCatchUp(input: {
   if (!Object.is(candidate.numberAfter, candidate.numberBefore)) {
     return reportWithoutVersion("CATCH_UP_NUMBER_WOULD_MOVE", reviewed, work.length - reviewed);
   }
+  // Engine money rule, M5 review (M1): a floor answer has no served number, so
+  // the guard above can never see its label move. Its floor — the leading
+  // position and the label — is re-derived from the same propagation, and a
+  // version that would move either is refused the same way.
+  if (catchUpFloorWouldMove(candidate.floorBefore, candidate.floorAfter)) {
+    return reportWithoutVersion("CATCH_UP_FLOOR_WOULD_MOVE", reviewed, work.length - reviewed);
+  }
   const persisted = await candidate.persist();
   const afterAttempts = await input.dependencies.countRunModelAttempts(input.runId);
   return Object.freeze({
@@ -1172,6 +1347,46 @@ export async function runReviewCatchUp(input: {
     envelopeRemaining: Math.max(0, maximumAttempts - afterAttempts), refusal: null
   });
   });
+}
+
+/** A floor moved when it is gone, led by another position, or labelled otherwise. */
+export function catchUpFloorWouldMove(before: ReviewCatchUpFloor | null, after: ReviewCatchUpFloor | null): boolean {
+  if (before === null) return false;
+  return after === null || after.leadingNodeId !== before.leadingNodeId || after.verdictState !== before.verdictState;
+}
+
+/**
+ * ENGINE MONEY RULE, TASK M5 review (M1) — THE FLOOR, RE-DERIVED from a
+ * catch-up's own propagation, the way the runner derived it: the servable
+ * maker positions (the graph's parentless, non-folder nodes that propagated)
+ * are ranked by `selectServedRootByStrength`; when the same position leads, its
+ * label is re-derived by the sealed `deriveVerdictLabel` from the new winning
+ * strength and margin, the SAME disagreement the floor's label read (the
+ * leading position's recorded panel dispersion, which a review never changes)
+ * and the label controls of the register version the floor's receipt names.
+ */
+export function rederiveCatchUpFloor(input: Readonly<{
+  nodes: readonly Readonly<{ nodeId: string; parentNodeId?: string | null; isFolder?: boolean }>[];
+  strengths: readonly Readonly<{ nodeId: string; strength: number }>[];
+  leadingNodeId: string;
+  disagreement: VerdictLabelBasis["disagreement"];
+  controls: VerdictLabelBasis["controls"];
+}>): ReviewCatchUpFloor | null {
+  const propagated = new Set(input.strengths.map((row) => row.nodeId));
+  const servable = input.nodes.filter((node) =>
+    (node.parentNodeId ?? null) === null && node.isFolder !== true && propagated.has(node.nodeId));
+  if (servable.length === 0) return null;
+  const selection = selectServedRootByStrength(servable, input.strengths);
+  if (selection.root.nodeId !== input.leadingNodeId) {
+    return Object.freeze({ leadingNodeId: selection.root.nodeId, verdictState: null });
+  }
+  const label = deriveVerdictLabel(Object.freeze({
+    winner: selection.servedStrength,
+    margin: selection.margin,
+    disagreement: input.disagreement,
+    controls: input.controls
+  }));
+  return Object.freeze({ leadingNodeId: selection.root.nodeId, verdictState: label.label });
 }
 
 export function createPostgresReviewCatchUpDependencies(input: {
@@ -1194,6 +1409,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
   const ledger = new LedgerRepository(input.pool);
   const serve = new ServeRepository(input.pool);
   const budget = new BudgetRepository(input.pool);
+  const disclosures = new ServeDisclosureRepository(input.pool);
   const resolveSnapshot = async (runId: string): Promise<EvaluationSnapshot> => {
     const materialised = await graph.materialiseSnapshot(runId);
     const targets = [...new Set(materialised.arrows.flatMap((arrow) =>
@@ -1228,7 +1444,10 @@ export function createPostgresReviewCatchUpDependencies(input: {
     readLatestReviewerMaker: (runId, maker) => judgements.readLatestReviewerMaker(runId, maker),
     recordReviewWithMeasurements: (record) => recordReviewWithMeasurements(input.pool, record),
     countRunModelAttempts: (runId) => budget.countRunModelAttempts(runId),
-    readPinnedMaximumAttempts: async (runId) => (await budget.readPinnedBasis(runId)).maxModelAttempts,
+    // Task M1: the catch-up's JUDGE calls are BODY calls, refused at the pinned
+    // ceiling less the answer's reserve, so what is left is measured against
+    // that same ceiling (a receipt with no reserve gives the whole ceiling).
+    readPinnedMaximumAttempts: async (runId) => attemptCeilingForPhase(await budget.readPinnedBasis(runId), "BODY"),
     prepareVersion: async ({ runId, answerId, fromVersion }) => {
       const source = await serve.readReviewCatchUpSource(runId);
       if (source.answerId !== answerId || source.answerVersion !== fromVersion) {
@@ -1341,6 +1560,28 @@ export function createPostgresReviewCatchUpDependencies(input: {
       const currentNumber = source.servedNumber;
       const nextStrength = currentNumber === null ? null
         : propagation.strengths.find((row) => row.nodeId === currentNumber.nodeId)?.strength ?? null;
+      // M5 review (M1): the floor the answer carries on the owner's record, and
+      // the one this propagation would give it.
+      const floorReceipt = await disclosures.readLatestFloorReceipt(answerId);
+      const floorBefore: ReviewCatchUpFloor | null = floorReceipt === null ? null : Object.freeze({
+        leadingNodeId: floorReceipt.floor.leadingNodeId,
+        verdictState: floorReceipt.floor.verdictState
+      });
+      const floorAfter = floorReceipt === null ? null : await (async () => {
+        const controls = await readVerdictLabelControls(input.pool, floorReceipt.registerVersion);
+        return rederiveCatchUpFloor({
+          nodes: fullSnapshot.nodes,
+          strengths: propagation.strengths,
+          leadingNodeId: floorReceipt.floor.leadingNodeId,
+          disagreement: floorReceipt.disagreement,
+          controls: Object.freeze({
+            gamma: controls.gamma,
+            highCut: controls.highCut,
+            lowCut: controls.lowCut,
+            disagreementThreshold: controls.disagreementThreshold
+          })
+        });
+      })();
       const result = {
         terminal: source.answer.terminal,
         answerForm: source.answer.answer_form as ServeGateResult["answerForm"],
@@ -1380,6 +1621,8 @@ export function createPostgresReviewCatchUpDependencies(input: {
         terminalAfter: result.terminal,
         numberBefore: currentNumber?.value ?? null,
         numberAfter: nextStrength,
+        floorBefore,
+        floorAfter,
         nowVisible: standing.snapshot.nodes.length,
         stillSetAside: standing.hiddenNodeIds.length,
         persist: async () => serve.persist({
@@ -1485,6 +1728,38 @@ export interface WalkingSkeletonSettings {
    * reason (S06 codex r1 B1, board F33).
    */
   readonly synthesisRolePolicy: RunnerSynthesisRolePolicy;
+  /**
+   * VERDICT STORY (docs/superpowers/specs/2026-09-26-verdict-story-design.md).
+   * Written after the work item is settled, inside this run's content lease,
+   * and never able to change the answer, the label or the work item. OPTIONAL
+   * on purpose: an absent writer means no story (every fixture, and the
+   * acceptance root, which stays story-free on register v3).
+   */
+  readonly story?: {
+    writeAfterSettle(input: StoryWriteInput): Promise<void>;
+    reportSnapshotFailure(failure: StorySnapshotFailure): void;
+  };
+  /**
+   * ENGINE MONEY RULE (spec 2026-09-26 §14.4.2), TASK M3: each provider
+   * target's price (`buildProviderPriceMap`), so a MONEY refusal of an
+   * answer-writing call tries the cheaper claim-eligible makers first. Never
+   * sealed. OPTIONAL with an EMPTY default rather than a required family: local
+   * mode has no prices and no money ceiling (so it can never need the order),
+   * the acceptance root runs local, and a missing map only changes the ORDER of
+   * the tries — the per-call seam still decides what fits. The shipped runner
+   * passes it (pinned by `tests/unit/m3-serve-fallback.test.ts`).
+   */
+  readonly providerPrices?: ProviderPriceMap;
+  /**
+   * ENGINE MONEY RULE (spec §14.4.5), TASK M3: where the owner-side disclosure
+   * row goes (default: `ServeDisclosureRepository` on the runner's pool) and
+   * where a failure to write it is logged (default: one code-only JSON line).
+   * The row can never change the answer: its writer never throws.
+   */
+  readonly serveDisclosure?: Readonly<{
+    store?: Pick<ServeDisclosureRepository, "insert">;
+    log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
+  }>;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1573,12 +1848,126 @@ function buildSchemaRepairPacket(framed: FramedPrompt, rejected: {
 }
 
 /**
+ * ENGINE MONEY RULE, TASK M4 review fix I-1 — THE WRITER'S CITATIONS, CHECKED
+ * AS CONTENT. Two ways a draft can name the engine's internals, each refused by
+ * the writer's content classifier so the provider's own repair re-asks the
+ * SAME call (the model's words are never rewritten):
+ *
+ *  · `COMPOSED_TEXT_NAMES_A_NODE` — a segment's prose names a node the way the
+ *    digest does (`(n12)`) or by a UUID. The person reads the prose; the
+ *    engine's ids are not theirs to read (the owner's rule: no internals in
+ *    the answer). The checker reads only the prose and its objections return
+ *    word for word, so "cite the digest node" is exactly what invites this.
+ *  · `COMPOSED_REF_NOT_IN_DIGEST` — a `node_refs` entry the digest does not
+ *    carry: unknown, a real id where the digest showed short refs, or a point
+ *    the spine left out. It used to end the run FAILED; now it is re-asked.
+ *
+ * Each is reported the way the story's checks report theirs: `SCHEMA_FAILED`
+ * with a JSON array of issues whose `path` is the member's machine address and
+ * whose `message` is the code — never a byte the model wrote.
+ */
+export const COMPOSED_CITATION_REJECTIONS = Object.freeze([
+  "COMPOSED_TEXT_NAMES_A_NODE",
+  "COMPOSED_REF_NOT_IN_DIGEST"
+] as const);
+type ComposedCitationRejection = typeof COMPOSED_CITATION_REJECTIONS[number];
+
+interface ComposedCitationIssue {
+  readonly path: readonly (string | number)[];
+  readonly message: ComposedCitationRejection;
+}
+
+/** A node ref the writer may cite: `"primary"`, or a node the digest carries that is in the serve set. */
+function composedRefResolves(ref: string, citation: ComposedCitationContext): boolean {
+  if (ref === "primary") return true;
+  const nodeId = resolveDigestNodeRef(citation.digest, ref);
+  return nodeId !== null && citation.servedNodes.some((node) => node.nodeId === nodeId);
+}
+
+interface ComposedCitationContext {
+  readonly digest: SynthesisDigest;
+  readonly servedNodes: readonly Readonly<{ nodeId: string }>[];
+  /**
+   * Review round 2: the id-shaped tokens the person's question and the
+   * debate's FULL statements already contain (`idShapedTokensIn`). They are
+   * the person's and the debaters' own words, so the prose may repeat them.
+   */
+  readonly exemptTokens: ReadonlySet<string>;
+}
+
+/**
+ * The writer's content classifier: the composition schema first (unchanged),
+ * then every segment's prose and every cited ref (I-1). A token the person's
+ * question or a node's full statement already states is exempt from the prose
+ * check (review round 2). Deterministic, and it never throws on model content.
+ */
+export function classifyComposedContent(content: string, citation: ComposedCitationContext): ContentClassification {
+  const structured = classifyStructuredContent(content, compositionSchema);
+  if (structured.parseStatus !== "PARSED") return structured;
+  const composed = compositionSchema.parse(JSON.parse(content));
+  const issues: ComposedCitationIssue[] = [];
+  for (const [segmentIndex, segment] of composed.segments.entries()) {
+    if (nodeIdsNamedInText(citation.digest, segment.text, citation.exemptTokens).length > 0) {
+      issues.push({ path: ["segments", segmentIndex, "text"], message: "COMPOSED_TEXT_NAMES_A_NODE" });
+    }
+    for (const [refIndex, ref] of segment.node_refs.entries()) {
+      if (!composedRefResolves(ref, citation)) {
+        issues.push({ path: ["segments", segmentIndex, "node_refs", refIndex], message: "COMPOSED_REF_NOT_IN_DIGEST" });
+      }
+    }
+  }
+  return issues.length === 0
+    ? { parseStatus: "PARSED", parseError: null }
+    : { parseStatus: "SCHEMA_FAILED", parseError: JSON.stringify(issues) };
+}
+
+/** The citation rejection a classifier error names first, or null for any other rejection. */
+export function composedCitationRejectionOf(parseError: string): ComposedCitationRejection | null {
+  try {
+    const issues = JSON.parse(parseError) as unknown;
+    const first = Array.isArray(issues) ? issues[0] as { readonly message?: unknown } | undefined : undefined;
+    const code = first?.message;
+    return typeof code === "string" && (COMPOSED_CITATION_REJECTIONS as readonly string[]).includes(code)
+      ? code as ComposedCitationRejection
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The writer's repair turn: the machine path of the rejected member, and — for
+ * a citation rejection — its own code (the engine's constant, which says what
+ * to fix) in place of the generic `SCHEMA_FAILED`. Anything else is the shared
+ * schema repair, unchanged.
+ */
+function buildComposedRepairPacket(framed: FramedPrompt, rejected: {
+  readonly parseStatus: string;
+  readonly parseError: string;
+}): PromptPacket {
+  const locator = schemaFailureLocator(rejected);
+  const citation = rejected.parseStatus === "SCHEMA_FAILED" ? composedCitationRejectionOf(rejected.parseError) : null;
+  return buildFramedRepairPrompt(framed, citation === null ? locator : { code: citation, path: locator.path });
+}
+
+/**
  * T9 (goal 263-266): a SYNTHESIZER or EVALUATOR call whose transport dies is
  * one of the four enumerated COMPONENTS_ONLY crash classes — a death, not a
  * quality judgement. It is typed HERE, at the seam, so the serve chain can name
  * the class without catching every error it sees. Content refusals keep their
  * existing organ code: a provider that answered with unusable content is a
  * contract error, not a dead transport.
+ *
+ * Task M4 review fix I-1: ONE content refusal is typed differently. A writer
+ * whose every repair still named an internal id in its prose, or cited a node
+ * the digest does not carry, has produced no draft the engine may serve: that
+ * is `SYNTHESIS_NO_ARTIFACT`, the sealed chain's own class. A later round then
+ * keeps the complete round before it (M3), and a first round ends
+ * components-only (which the M5 floor answers) — never a FAILED run.
+ *
+ * Final review I-1: a CHEAPER maker's content refusal (its organ code here) is
+ * mapped to `SYNTHESIS_NO_ARTIFACT` one level up, by `fallbackContentRefusal`,
+ * because only there is it known that the maker was a fallback.
  */
 async function callSynthesisRole(
   provider: ProviderGateway,
@@ -1589,6 +1978,15 @@ async function callSynthesisRole(
     return await provider.call(request);
   } catch (error) {
     if (error instanceof ProviderContentUnacceptedError) {
+      const citation = request.role === "SYNTHESIZER" && error.lastParseStatus === "SCHEMA_FAILED"
+        ? composedCitationRejectionOf(error.lastParseError)
+        : null;
+      if (citation !== null) {
+        throw new TypedDomainError(
+          "SYNTHESIS_NO_ARTIFACT",
+          `The synthesizer's last repair at ${request.callSiteKey} was still refused: ${citation}`
+        );
+      }
       throw new TypedDomainError(organFailureCode, error.lastParseError);
     }
     if (error instanceof ProviderCallFailedError) {
@@ -1599,6 +1997,532 @@ async function callSynthesisRole(
     }
     throw error;
   }
+}
+
+/**
+ * ENGINE MONEY RULE (spec 2026-09-26 §14.4.2), TASK M3 — THE RUNNER'S PRICE MAP.
+ *
+ * providerRef → the target's price, in the shape `@debateai/budget` charges
+ * with. It exists so a cheaper maker can be tried FIRST when the planned
+ * answer-writing call is refused for money; it never decides whether a call
+ * fits (the per-call money seam does, before sending) and it is never sealed:
+ * prices live with the provider targets, and no register row may carry one.
+ *
+ * HOSTED only. Local mode is the relays and loopback model servers, which cost
+ * nothing and have no money ceiling, so its map is empty and a fallback — which
+ * a local run can never need — would follow the roster order. A target with no
+ * declared price is left out rather than priced at a guess; in hosted mode
+ * `assertPricedProviderTargets` has already refused one.
+ *
+ * The one price reader is `providerTargetPrice`. Each price is a frozen copy,
+ * and the map is handed over typed read-only: nothing in the runner writes it.
+ */
+export type ProviderPriceMap = ReadonlyMap<string, ProviderTargetPrice>;
+
+const EMPTY_PROVIDER_PRICES: ProviderPriceMap = Object.freeze(new Map<string, ProviderTargetPrice>());
+
+export function buildProviderPriceMap(
+  targets: readonly ProviderDiscoveryTarget[],
+  mode: "hosted" | "local"
+): ProviderPriceMap {
+  if (mode !== "hosted") return EMPTY_PROVIDER_PRICES;
+  const prices = new Map<string, ProviderTargetPrice>();
+  for (const target of targets) {
+    const price = providerTargetPrice(target);
+    if (price !== null) prices.set(target.providerRef, Object.freeze({ ...price }));
+  }
+  return Object.freeze(prices);
+}
+
+/** A claim-eligible maker, as the serve chain's two roles can call it. */
+export interface ServeRoleMaker {
+  readonly provider: ProviderGateway;
+  readonly providerRef: string;
+}
+
+/**
+ * What THIS request would cost on a target, by the seam's own projection
+ * (`projectedCallCeilingMicros`: bytes/2 × input price + max_tokens × output
+ * price). The body measured is the one the gateway sends, less the target's
+ * own `model` member — a few bytes, alike for every target — so the ORDER is
+ * the seam's; whether a call FITS is always the seam's exact decision.
+ *
+ * A price the projection cannot use (malformed, or a charge too large to
+ * represent) ranks the maker as unpriced rather than failing the search: the
+ * order can never be the reason an answer is not written, and the seam still
+ * refuses whatever does not fit.
+ */
+function projectedServeCallMicros(
+  request: Pick<ProviderCallRequest, "packet" | "bound">,
+  price: ProviderTargetPrice
+): number | null {
+  try {
+    const completionTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, 0);
+    return projectedCallCeilingMicros(price, {
+      requestBytes: Buffer.byteLength(JSON.stringify({
+        max_tokens: completionTokenCeiling,
+        messages: request.packet.messages
+      }), "utf8"),
+      completionTokenCeiling
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — WHO IS TRIED AFTER A MONEY
+ * REFUSAL, AND IN WHICH ORDER.
+ *
+ * Every OTHER claim-eligible maker, once each, cheapest first by the projected
+ * cost of this exact request; a maker the map has no price for comes after
+ * every priced one; ties, and the whole list when the map is empty (local
+ * mode), keep the roster order. For the checker, every maker other than the
+ * one that wrote the draft under check comes first (`preferNot`); the writer
+ * itself is offered last, so it checks its own draft only when nothing else
+ * fits — and the disclosure row says so.
+ */
+export function servePhaseFallbackOrder(input: Readonly<{
+  planned: string;
+  claimEligible: readonly ServeRoleMaker[];
+  prices: ProviderPriceMap;
+  request: Pick<ProviderCallRequest, "packet" | "bound">;
+  preferNot: string | null;
+}>): readonly ServeRoleMaker[] {
+  const seen = new Set<string>([input.planned]);
+  const candidates: { readonly maker: ServeRoleMaker; readonly index: number; readonly micros: number | null }[] = [];
+  for (const maker of input.claimEligible) {
+    if (seen.has(maker.providerRef)) continue;
+    seen.add(maker.providerRef);
+    const price = input.prices.get(maker.providerRef);
+    candidates.push({
+      maker,
+      index: candidates.length,
+      micros: price === undefined ? null : projectedServeCallMicros(input.request, price)
+    });
+  }
+  const rank = (entry: typeof candidates[number]): readonly number[] => [
+    input.preferNot !== null && entry.maker.providerRef === input.preferNot ? 1 : 0,
+    entry.micros === null ? 1 : 0,
+    entry.micros ?? 0,
+    entry.index
+  ];
+  return Object.freeze([...candidates].sort((left, right) => {
+    const a = rank(left);
+    const b = rank(right);
+    for (let position = 0; position < a.length; position += 1) {
+      if (a[position] !== b[position]) return a[position]! - b[position]!;
+    }
+    return 0;
+  }).map((entry) => entry.maker));
+}
+
+export interface ServeRoleCallOutcome<T> {
+  readonly result: T;
+  readonly servedBy: ServeRoleMaker;
+  readonly fallback: boolean;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — ONE ANSWER-WRITING CALL, WITH
+ * THE COST FALLBACK J24 NOW ALLOWS.
+ *
+ * The planned maker (the sealed role ref) is always asked first. Only a MONEY
+ * refusal (`RUN_COST_ENVELOPE_MONEY_REACHED`, raised by the per-call seam BEFORE
+ * an attempt is sent) moves the SAME request — the same call site, the same
+ * framed prompt object, the same bound and contract — to the next maker in
+ * `servePhaseFallbackOrder`. A refused try costs nothing only when the refusal
+ * comes on its FIRST attempt: the seam decides before each attempt, so a later
+ * repair or length retry refused for money also moves the request on, and the
+ * attempts that maker already made stay charged and ledgered. The provider
+ * is the only thing that changes; the prompt is never rebuilt. The seam decides
+ * what fits: a maker it refuses for money is skipped, and the first that goes
+ * through serves. Nothing fits → the planned call's own refusal travels, as it
+ * always has.
+ *
+ * J24 AMENDED, not repealed: every other refusal — the attempt ceiling, a
+ * vendor with no usage, a spent day, a dead transport, a vanished role
+ * provider, a contract error, anything untyped — travels UNTOUCHED from the
+ * planned call, and a fallback that fails for any reason but money ends the
+ * search with its own failure. A sealed identity is substituted for cost only.
+ *
+ * TASK M7 (spec §14.4.6): the VERDICT STORY's calls take this same fallback
+ * (`storyCostFallback`). Their money refusal is the story seam's own
+ * (STORY_COST_ENVELOPE_REACHED), not the run's, so the caller may name which
+ * refusal is money (`refusedForMoney`); the answer-writer's default is the
+ * run's money stop, as before.
+ *
+ * FINAL REVIEW, Important 1: a FALLBACK try's own failure passes through
+ * `onFallbackFailure` before it ends the search. The answer-writer and the
+ * checker hand it `fallbackContentRefusal`; the story hands nothing, so its
+ * failures travel as they are. The planned maker's failure is never mapped.
+ */
+export async function callServeRoleWithFallback<T>(input: Readonly<{
+  planned: ServeRoleMaker;
+  claimEligible: readonly ServeRoleMaker[];
+  prices: ProviderPriceMap;
+  preferNot: string | null;
+  request: ProviderCallRequest;
+  call: (maker: ServeRoleMaker, request: ProviderCallRequest) => Promise<T>;
+  refusedForMoney?: (error: unknown) => boolean;
+  onFallbackFailure?: (error: unknown, request: ProviderCallRequest) => unknown;
+}>): Promise<ServeRoleCallOutcome<T>> {
+  const refusedForMoney = input.refusedForMoney ?? ((error: unknown) => envelopeStopKind(error) === "MONEY");
+  try {
+    return Object.freeze({ result: await input.call(input.planned, input.request), servedBy: input.planned, fallback: false });
+  } catch (refusal) {
+    if (!refusedForMoney(refusal)) throw refusal;
+    for (const maker of servePhaseFallbackOrder({
+      planned: input.planned.providerRef,
+      claimEligible: input.claimEligible,
+      prices: input.prices,
+      request: input.request,
+      preferNot: input.preferNot
+    })) {
+      const fallbackRequest = { ...input.request, providerRef: maker.providerRef };
+      try {
+        const result = await input.call(maker, fallbackRequest);
+        return Object.freeze({ result, servedBy: maker, fallback: true });
+      } catch (error) {
+        if (!refusedForMoney(error)) {
+          throw input.onFallbackFailure === undefined ? error : input.onFallbackFailure(error, fallbackRequest);
+        }
+      }
+    }
+    throw refusal;
+  }
+}
+
+/**
+ * FINAL REVIEW, Important 1 (spec §14.4.2, §14.4.9) — A CHEAPER MAKER THAT
+ * LEAVES NOTHING TO SERVE.
+ *
+ * A cheaper maker is asked only because the planned one could not be paid.
+ * When its draft or verdict is then refused for its CONTENT after its own
+ * repairs — the writer's or the checker's contract, or a verdict whose
+ * criteria disagree with it — it has produced nothing the engine may serve:
+ * `SYNTHESIS_NO_ARTIFACT`, the sealed chain's own class, exactly as a writer
+ * whose repairs never stop naming an id (Task M4, I-1). A later round then
+ * keeps the complete round before it (M3), and round 1 ends components-only,
+ * which the floor answers (M5). Money is never the reason a run FAILS, and a
+ * complete round is never thrown away for it. The owner's row names the stop
+ * (`serve_stop` NO_ARTIFACT).
+ *
+ * The PLANNED maker's own contract failure keeps today's handling: the run
+ * fails (pinned in tests/integration/database.test.ts, "writes no floor, and
+ * no row, for a run that FAILED on a contract error"). Whether it should also
+ * count as NO_ARTIFACT is an owner question. Any other failure — a dead
+ * transport, a spend stop, anything untyped — travels as itself.
+ */
+export const FALLBACK_CONTENT_REFUSAL_CODES: readonly string[] = Object.freeze([
+  "COMPOSITION_CONTRACT_ERROR",
+  "EVALUATOR_CONTRACT_ERROR",
+  "EVALUATOR_VERDICT_INCOHERENT",
+  "EVALUATOR_OBJECTION_MISSING"
+]);
+
+export function fallbackContentRefusal(
+  error: unknown,
+  request: Pick<ProviderCallRequest, "role" | "callSiteKey">
+): unknown {
+  if (!(error instanceof TypedDomainError) || !FALLBACK_CONTENT_REFUSAL_CODES.includes(error.code)) return error;
+  const noArtifact = new TypedDomainError(
+    "SYNTHESIS_NO_ARTIFACT",
+    `The cost fallback's ${request.role} at ${request.callSiteKey} left nothing to serve: ${error.code}`
+  );
+  noArtifact.cause = error;
+  return noArtifact;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.6), TASK M7 — THE STORY'S COST FALLBACK, over
+ * one run's claim-eligible makers and the runner's price map. It IS the
+ * answer-writer's fallback (`callServeRoleWithFallback`, with its order and
+ * the seam's projection), handed to the story writer rather than copied into
+ * it; the story names its own money refusal. Built per run at the post-settle
+ * hook, beside the run's own role resolver, so a story never falls back onto a
+ * maker the claim did not find healthy.
+ */
+export function storyCostFallback(
+  claimEligible: readonly ServeRoleMaker[],
+  prices: ProviderPriceMap
+): StoryCostFallback {
+  return (input) => callServeRoleWithFallback({ ...input, claimEligible, prices });
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — A ROUND KEPT AFTER A SPEND STOP
+ * SAYS SO ON THE ANSWER.
+ *
+ * When an answer-writing call is stopped by a spend bound after a complete
+ * round (money only after every cheaper maker was refused), the loop now keeps
+ * that round (`keepsCompleteSynthesisRounds`) and the answer is SERVED instead
+ * of taking the envelope terminal. The stop is not dropped: the answer carries
+ * the same answer-scope `ENVELOPE_EXHAUSTED` record the envelope terminal (and,
+ * since M2, a stop while arguing) carries, naming the bound that stopped it.
+ * Minted after the chain, like `runBodyStopDisclosure`.
+ *
+ * `null` — nothing to add: no failure escaped a role call; no round was kept
+ * (a round-1 refusal still takes the terminal, which has its own record); the
+ * failure was a dead transport or an empty draft, which are not spend bounds;
+ * the answer already carries the mark (the stop while arguing took it); or the
+ * answer is DEFECT. The owner's row names the loop's stop in every one of these
+ * cases (`serve_stop`, `serveLoopStopOf`).
+ */
+export function servePhaseStopDisclosure(input: Readonly<{
+  servePhaseFailure: unknown;
+  keptRounds: number;
+  resultConditionMarks: readonly string[];
+  runId: string;
+  servedRootNodeId: string;
+}>): ConditionMarkRecord | null {
+  if (input.servePhaseFailure === null || input.keptRounds < 1) return null;
+  const stop = envelopeStopKind(input.servePhaseFailure);
+  if (stop === null) return null;
+  if (input.resultConditionMarks.includes("ENVELOPE_EXHAUSTED")) return null;
+  if (input.resultConditionMarks.includes("DEFECT")) return null;
+  return Object.freeze({
+    mark: "ENVELOPE_EXHAUSTED" as const,
+    scope: "answer" as const,
+    subjectRef: input.runId,
+    reason: ENVELOPE_STOP_REASONS[stop],
+    liftPath: null,
+    servedRootRule: null,
+    affectedNodeIds: Object.freeze([input.servedRootNodeId])
+  } satisfies ConditionMarkRecord);
+}
+
+/** The kinds of stop that can end the answer-writing loop early (`serve.serve_disclosure.serve_stop`). */
+export type ServeLoopStop = EnvelopeStopKind | "TRANSPORT_DEATH" | "NO_ARTIFACT";
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M3 review polish — WHAT ENDED THE
+ * ANSWER-WRITING LOOP EARLY, for the owner's record (`serve_stop`).
+ *
+ * The runner's view of the loop's `endedEarlyBy`: the sealed chain does not
+ * hand the loop's outcome back, so the runner keeps the failure that left a
+ * role call (`whileServing`) — money only after every cheaper maker was
+ * refused — or the empty draft it handed the chain. Every failure named here
+ * ends the loop: kept on a complete round, or, before one, a components-only
+ * terminal. It is recorded either way, and it is the only durable trace of a
+ * transport death after a kept round and of a serve-leg stop whose envelope
+ * record the stop while arguing already took. `null` for anything else.
+ *
+ * Every code the loop keeps a round for (the kernel's spend stops and serve's
+ * `ROUND_KEEPING_TECHNICAL_FAILURES`) names a stop here; a unit row pins that,
+ * so a new code cannot silently record NULL (M3 review carry, Task M4).
+ */
+export function serveLoopStopOf(failure: unknown): ServeLoopStop | null {
+  const stop = envelopeStopKind(failure);
+  if (stop !== null) return stop;
+  if (!(failure instanceof TypedDomainError)) return null;
+  if (failure.code === "SYNTHESIS_TRANSPORT_DEATH") return "TRANSPORT_DEATH";
+  if (failure.code === "SYNTHESIS_NO_ARTIFACT") return "NO_ARTIFACT";
+  return null;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.3), TASK M4 — THE ONE POINT WHERE A CITATION
+ * BECOMES A NODE ID.
+ *
+ * The answer-writer cites the nodes a segment rests on (`node_refs`) by the
+ * refs the digest showed it: node ids at rungs 0-5, short refs (`n1`, …) at the
+ * compact and spine rungs. Each is mapped back HERE, in the writer's adapter,
+ * before the segment reaches the sealed chain — whose own checks (the serve
+ * set, the load-bearing flag, SERVED_STATEMENT_CITES_NO_VERIFIED_NODE, the
+ * cited set the answer's form and band are read from) therefore only ever see
+ * real node ids.
+ *
+ *  · `"primary"` stays the served root's alias (fixtures and prompts written
+ *    against the one-node serve set);
+ *  · a ref the digest does not carry — an unknown ref, a real id where the
+ *    digest showed short refs, or a point the spine left out, which is not in
+ *    the digest and so cannot be cited — is refused before it gets here: the
+ *    writer's classifier (`classifyComposedContent`, review fix I-1) re-asks
+ *    the call, and a writer that never stops ends as SYNTHESIS_NO_ARTIFACT.
+ *    This refusal (COMPOSITION_CONTRACT_ERROR, "Unknown composition node
+ *    ref") stays as the backstop behind that check.
+ */
+export function composedNodeIdOf(input: Readonly<{
+  ref: string;
+  digest: SynthesisDigest;
+  servedRootNodeId: string;
+  servedNodes: readonly Readonly<{ nodeId: string }>[];
+}>): string {
+  if (input.ref === "primary") return input.servedRootNodeId;
+  const nodeId = resolveDigestNodeRef(input.digest, input.ref);
+  if (nodeId === null || !input.servedNodes.some((node) => node.nodeId === nodeId)) {
+    throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", `Unknown composition node ref ${input.ref}`);
+  }
+  return nodeId;
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M4 — the digest built for the
+ * answer-writer, SERVED OR NOT, for the owner's record: its ladder rung (0-7)
+ * and how many points it left out (0 below the spine rung). Set whenever the
+ * writer was handed a digest, including when its call was then refused and the
+ * answer ended components-only; null when no digest was handed over — the
+ * digest could not exist, or the run took a terminal before the chain.
+ */
+export function serveDisclosureDigestFacts(
+  digest: SynthesisDigest | null
+): Readonly<{ rung: number; pointsOmitted: number }> | null {
+  if (digest === null) return null;
+  return Object.freeze({ rung: digest.compressionLevel, pointsOmitted: digestPointsOmitted(digest) });
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M3 — WHAT THE ARGUING LEFT FOR THE
+ * OWNER'S RECORD, taken where the body ends (the serve decision), never later.
+ *
+ *  · `bodyStop` — the stop that ended the arguing early, if any. The answer
+ *    carries it as its envelope record, except on a DEFECT answer, where
+ *    nothing did (M2 review): the row keeps it for every answer.
+ *  · `pointsWithoutReview` — how many points the stop left without a
+ *    cross-review, each seeded from its own panel with UNKNOWN edges (R-A). Only
+ *    the spend-stopped footing has such points; a mono-maker run never
+ *    cross-reviews and a run never stopped reviewed what it could, so both are
+ *    null rather than a zero that would claim a count was taken.
+ */
+export function serveDisclosureBodyFacts(input: Readonly<{
+  runBodyBudgetStop: EnvelopeStopKind | null;
+  decision: Readonly<{ footing: MakerPositionServeFooting; seededWithoutReview: readonly string[] }>;
+}>): Readonly<{ bodyStop: EnvelopeStopKind | null; pointsWithoutReview: number | null }> {
+  return Object.freeze({
+    bodyStop: input.runBodyBudgetStop,
+    pointsWithoutReview: input.decision.footing === "SPEND_STOPPED" ? input.decision.seededWithoutReview.length : null
+  });
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.4), TASK M5 — THE FLOOR: an answer even when no
+ * answer could be written.
+ *
+ * The runner derives the arithmetic label BEFORE the answer-writing step (T11),
+ * from the propagated numbers alone. When the sealed result still ends
+ * COMPONENTS_ONLY — whatever the cause: money after every cheaper maker, a
+ * digest that cannot exist, a dead transport, a draft with nothing to serve, a
+ * round-1 checker that could not be paid, an attempt overspend — that label
+ * still exists, and the owner's row keeps it:
+ *
+ *  · `verdictState`: the label, exactly as derived;
+ *  · `leadingNodeId`: the position the label rests on, the same node the
+ *    label's `servedNodeId` names;
+ *  · `reason`: the sealed components-only cause (the result's crash class), a
+ *    code. Every sealed components-only constructor names one, so a result
+ *    without one is a typed stop (`SERVE_FLOOR_REASON_UNRESOLVED`), never an
+ *    unnamed floor (M5 review, M5).
+ *
+ * The sealed answer stays COMPONENTS_ONLY: nothing here reaches it, so no
+ * artifact and no checker verdict are invented (money map R1, route (a)). A
+ * SERVED or DOWNGRADED answer carries its own label and has no floor; a FAILED
+ * run persists no answer, so it has no row and no floor.
+ */
+export type ServeFloor = Readonly<{
+  verdictState: VerdictLabelDerivation["label"];
+  leadingNodeId: string;
+  reason: string;
+}>;
+
+export function serveFloorOf(input: Readonly<{
+  terminal: ServeGateResult["terminal"];
+  crashClass: ServeGateResult["crashClass"];
+  label: VerdictLabelDerivation["label"];
+  leadingNodeId: string;
+}>): ServeFloor | null {
+  if (input.terminal !== "COMPONENTS_ONLY") return null;
+  if (input.crashClass === null) {
+    throw new TypedDomainError(
+      "SERVE_FLOOR_REASON_UNRESOLVED",
+      "A components-only result names its sealed crash class; a floor is never written without its cause"
+    );
+  }
+  return Object.freeze({
+    verdictState: input.label,
+    leadingNodeId: input.leadingNodeId,
+    reason: input.crashClass
+  });
+}
+
+/**
+ * ENGINE MONEY RULE (spec §14.4.5), TASK M3 — THE OWNER-SIDE DISCLOSURE ROW.
+ *
+ * Content-free: provider refs, codes and counts. The served refs are the
+ * makers that wrote and checked the round the answer serves (null when the
+ * answer has no checked round). A served maker other than the planned one can
+ * only be the money fallback — every other substitution is refused — so the
+ * fallback flags and the reason are derived from the refs, and migration 0076
+ * refuses a row where they disagree. `checkerSameAsWriter` is R9's disclosure:
+ * DEGRADED-DIVERSITY reads the SEALED refs, so a fallback that put both roles
+ * on one maker is recorded here instead. The digest fields (Task M4) are the
+ * rung and the points left out of the digest the answer-writer was handed
+ * (`serveDisclosureDigestFacts`); the floor fields (Task M5) are the floor of a
+ * components-only answer (`serveFloorOf`), all three or none.
+ */
+export function buildServeDisclosureRecord(input: Readonly<{
+  answerId: string;
+  answerVersion: number;
+  runId: string;
+  planned: Readonly<{ writerRef: string; checkerRef: string }>;
+  served: Readonly<{ writerRef: string; checkerRef: string }> | null;
+  body: Readonly<{ bodyStop: EnvelopeStopKind | null; pointsWithoutReview: number | null }>;
+  /** What ended the answer-writing loop early (`serveLoopStopOf`), or null. */
+  serveStop: ServeLoopStop | null;
+  /** The digest built for the answer-writer, served or not (`serveDisclosureDigestFacts`), or null. */
+  digest: Readonly<{ rung: number; pointsOmitted: number }> | null;
+  /** The floor of a components-only answer (`serveFloorOf`), or null. */
+  floor: ServeFloor | null;
+}>): ServeDisclosureRecord {
+  const writerFallback = input.served !== null && input.served.writerRef !== input.planned.writerRef;
+  const checkerFallback = input.served !== null && input.served.checkerRef !== input.planned.checkerRef;
+  return Object.freeze({
+    answerId: input.answerId,
+    answerVersion: input.answerVersion,
+    runId: input.runId,
+    writerPlannedRef: input.planned.writerRef,
+    checkerPlannedRef: input.planned.checkerRef,
+    writerServedRef: input.served?.writerRef ?? null,
+    checkerServedRef: input.served?.checkerRef ?? null,
+    writerFallback,
+    checkerFallback,
+    fallbackReason: writerFallback || checkerFallback ? "MONEY" as const : null,
+    checkerSameAsWriter: input.served !== null && input.served.checkerRef === input.served.writerRef,
+    bodyStop: input.body.bodyStop,
+    pointsWithoutReview: input.body.pointsWithoutReview,
+    serveStop: input.serveStop,
+    digestRung: input.digest?.rung ?? null,
+    digestPointsOmitted: input.digest?.pointsOmitted ?? null,
+    floorVerdictState: input.floor?.verdictState ?? null,
+    floorLeadingNodeId: input.floor?.leadingNodeId ?? null,
+    floorReason: input.floor?.reason ?? null
+  });
+}
+
+/** The maker a served round's role call recorded, or the typed defect of a round no call recorded. */
+function servedRoleRef(providerRef: string | undefined, role: "writer" | "checker"): string {
+  if (providerRef === undefined) {
+    throw new TypedDomainError(
+      "SERVE_DRAFT_UNRESOLVED",
+      `The served round names a ${role} artifact this run's ${role} call did not record`
+    );
+  }
+  return providerRef;
+}
+
+function databaseStateOf(error: unknown): string | null {
+  const code = typeof error === "object" && error !== null ? (error as { readonly code?: unknown }).code : undefined;
+  return typeof code === "string" && /^[0-9A-Z]{5}$/u.test(code) ? code : null;
+}
+
+/**
+ * The ONE disclosure log line (M3 review polish: `main.ts` composes this same
+ * function rather than a copy). Codes and ids only: it never carries debate or
+ * model text. The detail goes FIRST, so no detail key can overwrite the line's
+ * kind or event.
+ */
+export function logServeDisclosure(event: string, detail: Readonly<Record<string, unknown>>): void {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_SERVE_DISCLOSURE", event }));
 }
 
 export function parseComposerOutput(content: string): z.infer<typeof compositionSchema> {
@@ -1979,7 +2903,8 @@ export interface MakerPositionDisclosureRoot {
  *    vocabulary and the record's REASON is a free string, so the mark carries
  *    the truth and the reason names what actually happened: the run-level
  *    spend-stop code (`RUN_COST_ENVELOPE_MONEY_REACHED`,
- *    `PROVIDER_USAGE_UNREPORTED`, `DAILY_COST_ENVELOPE_REACHED`) — never
+ *    `RUN_COST_ENVELOPE_EXHAUSTED` since Task M2, `PROVIDER_USAGE_UNREPORTED`,
+ *    `DAILY_COST_ENVELOPE_REACHED`) — never
  *    `MONO_MAKER_RUN`, which means one maker was CONFIGURED, a different fact
  *    with a different lift. The only way the run body reaches one authored root
  *    at M > 1 is a spend stop (a halted root 1 throws `MAKER_POSITION_UNAVAILABLE`
@@ -2043,6 +2968,12 @@ export interface MakerPositionServeDecision<T extends MakerPositionDisclosureRoo
   readonly footing: MakerPositionServeFooting;
   /** The node ids that seeded `projectJudgedStanding` — what "reviewed" meant on this footing. */
   readonly judgedStandingSeed: readonly string[];
+  /**
+   * Engine money rule, Task M3 (spec §14.4.5; M2 review Minor 1): the seeds the
+   * stop DENIED a cross-review — each stands on its own panel, with UNKNOWN
+   * edges. Empty on every footing but SPEND_STOPPED.
+   */
+  readonly seededWithoutReview: readonly string[];
   readonly standing: ReturnType<typeof projectJudgedStanding>;
   readonly propagation: PropagationOutcome;
   readonly servableMakerPositions: readonly T[];
@@ -2105,20 +3036,20 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
   const footing: MakerPositionServeFooting = input.effectiveMakerCount <= 1
     ? "MONO_MAKER"
     : input.runBodyBudgetStop === null ? "CROSS_REVIEWED" : "SPEND_STOPPED";
+  const seededWithoutReview: readonly string[] = (() => {
+    if (footing !== "SPEND_STOPPED") return Object.freeze([]);
+    const reviewed = new Set(input.reviewedNodeIds);
+    const unjudged = new Set(input.unjudgedReviewNodeIds);
+    return Object.freeze(input.materialisedNodeIds.filter((nodeId) => !reviewed.has(nodeId) && !unjudged.has(nodeId)));
+  })();
   const judgedStandingSeed: readonly string[] = (() => {
     switch (footing) {
       case "MONO_MAKER":
         return input.materialisedNodeIds;
       case "CROSS_REVIEWED":
         return input.reviewedNodeIds;
-      case "SPEND_STOPPED": {
-        const reviewed = new Set(input.reviewedNodeIds);
-        const unjudged = new Set(input.unjudgedReviewNodeIds);
-        return Object.freeze([
-          ...input.reviewedNodeIds,
-          ...input.materialisedNodeIds.filter((nodeId) => !reviewed.has(nodeId) && !unjudged.has(nodeId))
-        ]);
-      }
+      case "SPEND_STOPPED":
+        return Object.freeze([...input.reviewedNodeIds, ...seededWithoutReview]);
       default: return exhaustive(footing);
     }
   })();
@@ -2148,6 +3079,7 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
   return Object.freeze({
     footing,
     judgedStandingSeed: Object.freeze([...judgedStandingSeed]),
+    seededWithoutReview,
     standing,
     propagation,
     servableMakerPositions,
@@ -2476,6 +3408,7 @@ export class WalkingSkeletonRunner {
   readonly #valuation: ValuationRepository;
   readonly #memory: MemoryRepository;
   readonly #providerProbes: ProviderProbeRepository;
+  readonly #serveDisclosure: Pick<ServeDisclosureRepository, "insert">;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly provider: ProviderGateway;
@@ -2499,6 +3432,7 @@ export class WalkingSkeletonRunner {
     this.#valuation = new ValuationRepository(pool);
     this.#memory = new MemoryRepository(pool);
     this.#providerProbes = new ProviderProbeRepository(pool);
+    this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
     this.#configuredMakers = Object.freeze([
       Object.freeze({ judge: this.#judge, provider, providerRef: settings.providerRef, maker: settings.maker }),
       ...(settings.critique === undefined ? [] : [Object.freeze({
@@ -2518,6 +3452,40 @@ export class WalkingSkeletonRunner {
 
   async executeNext(): Promise<RunnerExecutionResult> {
     return this.execute();
+  }
+
+  /**
+   * ENGINE MONEY RULE (spec §14.4.5), TASK M3 — THE DISCLOSURE ROW'S WRITER.
+   * It never throws: building the row, storing it and logging a failure each
+   * sit behind the one catch, like the story hook, so the row can never change
+   * the answer, the label, the run's outcome or the work item. A failure is
+   * logged with its typed code (UNTYPED otherwise) and the ids, never text.
+   *
+   * Final review, Minor 2: it answers whether the answer version HAS its row
+   * now (written here, or already there), because a floor exists for the
+   * reader only through that row, and the floor's story waits for it.
+   */
+  async #recordServeDisclosure(
+    ids: Readonly<{ runId: string; answerId: string }>,
+    build: () => ServeDisclosureRecord
+  ): Promise<boolean> {
+    try {
+      await this.#serveDisclosure.insert(build());
+      return true;
+    } catch (error) {
+      try {
+        (this.settings.serveDisclosure?.log ?? logServeDisclosure)("SERVE_DISCLOSURE_WRITE_FAILED", {
+          code: error instanceof TypedDomainError ? error.code : "UNTYPED",
+          // A database refusal's SQLSTATE (five characters, never a message).
+          sqlState: databaseStateOf(error),
+          runId: ids.runId,
+          answerId: ids.answerId
+        });
+      } catch {
+        // A log line can never cost the answer either.
+      }
+      return false;
+    }
   }
 
   async executeWorkItem(workItemId: string): Promise<RunnerExecutionResult> {
@@ -2769,8 +3737,21 @@ export class WalkingSkeletonRunner {
     if (claimed === null) return { kind: "NO_WORK" };
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
+    /**
+     * VERDICT STORY (spec §3, amended): what the settled debate hands its story.
+     * The snapshot is built INSIDE the lease below, where the in-memory material
+     * lives, and the story runs AFTER the lease is released, so an erasure is
+     * never held up for the length of a story.
+     */
+    const afterSettle: {
+      story:
+        | { readonly kind: "SNAPSHOT"; readonly input: StoryWriteInput }
+        | ({ readonly kind: "SNAPSHOT_FAILED" } & StorySnapshotFailure)
+        | null;
+    } = { story: null };
+    let executed: RunnerExecutionResult;
     try {
-    return await this.#memory.withDisclosureContentLease([claimedRunId],async () => {
+    executed = await this.#memory.withDisclosureContentLease([claimedRunId],async () => {
     const runnerAttemptId = randomUUID();
     let run: Awaited<ReturnType<RunRepository["readFrozenHead"]>>;
     try {
@@ -3041,6 +4022,12 @@ export class WalkingSkeletonRunner {
       readonly statement: string;
       readonly callSiteKey: string;
       readonly questionLine: string;
+      /**
+       * Task M2 (spec §14.4.1): what a run-level spend stop raised by a panel
+       * member does — see `panelSpendStop`. "AUTHOR_ONLY" on the first root's
+       * panel only; "TRAVEL" on every other node's panel.
+       */
+      readonly onSpendStop: PanelSpendStopRule;
     }): Promise<{
       readonly selectedJudgementRef: string;
       readonly tau: number;
@@ -3056,6 +4043,12 @@ export class WalkingSkeletonRunner {
        */
       readonly marks: readonly PanelDegradationMark[];
       readonly panelFailureReason: string | null;
+      /**
+       * Task M2: the stop that cut this panel short, for the caller to record;
+       * `null` on every panel that ran to its end. Only an "AUTHOR_ONLY" panel
+       * can return one.
+       */
+      readonly spendStop: EnvelopeStopKind | null;
     }> => {
       const judgeContractHash = this.settings.judgeContractHash;
       const authorOnlySelection = (): {
@@ -3088,7 +4081,8 @@ export class WalkingSkeletonRunner {
           panelContractHashes: Object.freeze([judgeContractHash]),
           disagreement: createUnmeasuredDisagreement(),
           marks: Object.freeze([]),
-          panelFailureReason: null
+          panelFailureReason: null,
+          spendStop: null
         });
       }
       if (panelPolicy === undefined) {
@@ -3127,8 +4121,32 @@ export class WalkingSkeletonRunner {
             });
             return { judgementRef: assessed.judgementRef, assessment: assessed.assessment };
           }
-        }))
+        })),
+        // Task M2: only the first root's panel keeps the voices it heard when a
+        // spend stop cuts it short; every other panel lets the stop travel.
+        onRunLevelSpendStop: input.onSpendStop === "AUTHOR_ONLY" ? "RETURN_HEARD" : "RETHROW"
       });
+      /**
+       * Task M2 — THE FIRST ROOT'S PANEL, CUT SHORT BY A SPEND STOP.
+       *
+       * The panel ended where it stood and returned what it had gathered: the
+       * author, every member voice already heard (and paid for), and every
+       * note. They go through the SAME reduction as any panel whose remaining
+       * members could not speak, so the disclosure is the existing one:
+       *
+       *  · one or more member voices heard -> selection over the author and
+       *    those voices, PANEL-PARTIAL, exactly as a member failure degrades
+       *    the panel (no single-voice step-down);
+       *  · none heard -> the author alone; with one candidate the selection is
+       *    exactly `authorOnlySelection()` (same judgement, tau and earned
+       *    weight), with the single-voice disclosure and its step-down.
+       *
+       * Either way the stop is handed back for the caller to record.
+       */
+      const spendStop = Object.hasOwn(panel, "stoppedBy")
+        ? panelSpendStop(panel.stoppedBy, input.onSpendStop)
+        : null;
+      if (Object.hasOwn(panel, "stoppedBy") && spendStop === null) throw panel.stoppedBy;
 
       // Each member's assessment is reduced through the SAME ratified
       // composition as the author's, so the taus are commensurable.
@@ -3197,12 +4215,16 @@ export class WalkingSkeletonRunner {
       const memberFailures = panel.notes.filter((note) => note.kind === "MEMBER_FAILED");
       const marks: PanelDegradationMark[] = [];
       if (nonAuthorVoices === 0) marks.push(PANEL_DEGRADED_SINGLE_VOICE_MARK);
-      else if (memberFailures.length > 0) marks.push(PANEL_PARTIAL_MARK);
+      else if (memberFailures.length > 0 || spendStop !== null) marks.push(PANEL_PARTIAL_MARK);
       // The reason names WHICH members fell over and how — a disclosure that says only
-      // "partial" tells a reader nothing they can act on.
-      const panelFailureReason = memberFailures.length === 0
-        ? null
-        : memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`).join("; ");
+      // "partial" tells a reader nothing they can act on. Task M2: a panel cut short
+      // by a spend stop also names the stop, which is why the members after it never
+      // spoke.
+      const panelFailureReasons = [
+        ...memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`),
+        ...(spendStop === null ? [] : [ENVELOPE_STOP_REASONS[spendStop]])
+      ];
+      const panelFailureReason = panelFailureReasons.length === 0 ? null : panelFailureReasons.join("; ");
 
       const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
@@ -3252,9 +4274,12 @@ export class WalkingSkeletonRunner {
               kind: note.kind,
               failureKind: note.failureKind,
               reason: note.reason
-            })))
+            }))),
+            // Task M2: present only on a panel a spend stop cut short.
+            ...(spendStop === null ? {} : { spendStop: ENVELOPE_STOP_REASONS[spendStop] })
           })
-        })
+        }),
+        spendStop
       });
     };
 
@@ -3305,6 +4330,29 @@ export class WalkingSkeletonRunner {
       }
     }
 
+    /**
+     * C1 (review round 2) — WHICH SPEND BOUND, IF ANY, STOPPED THIS RUN BODY.
+     *
+     * Set by the first root's panel and by the authoring, expansion and review
+     * phases when the gateway refuses on money, on the attempt ceiling or on an
+     * unbillable vendor. It is NOT an error path: the phase stops where it is,
+     * and the run keeps everything it has produced. `null` all the way through
+     * is a run that was never stopped by a spend bound.
+     *
+     * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — IT STOPS THE ARGUING, NOT THE
+     * ANSWER. It used to be read at the serve gate to FORCE the components-only
+     * envelope terminal, so a stopped run never reached the answer-writer. Now
+     * nothing more is argued, the run goes on to serve with the tree as it
+     * stands, and the stop rides the answer as its envelope record
+     * (`runBodyStopDisclosure`), so a reader is still told the debate was cut
+     * short.
+     *
+     * RE-REVIEW: declared before the secondary and additional ROOT loops, so a
+     * refusal while authoring root 1 or 2 keeps the root 0 already minted and
+     * panelled. Task M2 declares it before root 0 itself, because a stop on
+     * root 0's own panel is recorded here too instead of failing the run.
+     */
+    let runBodyBudgetStop: EnvelopeStopKind | null = null;
     const judgementScheduledAt = new Date();
     await this.#ledger.append({
       runId: run.runId,
@@ -3337,6 +4385,12 @@ export class WalkingSkeletonRunner {
         contractHash: this.settings.judgeContractHash,
         bound: { ...this.settings.judgeBound, maxAttempts }
       })
+    }).catch((error: unknown) => {
+      // Task M2 (spec §14.4.1): the author's own first call is the one stop that
+      // leaves nothing to answer from. A ceiling that refuses it is below one
+      // call — a configuration fault, failed typed under its own code. Anything
+      // else, a vendor that reports no usage included, travels as it is.
+      throw firstCallCeilingFailure(error) ?? error;
     });
     if (primaryAttempt.kind === "HALTED") {
       throw new TypedDomainError(
@@ -3363,8 +4417,15 @@ export class WalkingSkeletonRunner {
       claimType: judged.normalizedClaim.claimType,
       statement: judged.statement,
       callSiteKey: "PANEL:root",
-      questionLine: run.questionLine
+      questionLine: run.questionLine,
+      onSpendStop: "AUTHOR_ONLY"
     });
+    // Task M2 (spec §14.4.1): a stop on the first root's panel no longer escapes
+    // the work item. Root 0 rests on the voices its panel heard before the stop
+    // (PANEL-PARTIAL), or on its author's own judgement when none was heard
+    // (single voice), and the stop ends the arguing here: the run goes straight
+    // on to its answer.
+    if (selection.spendStop !== null) runBodyBudgetStop = selection.spendStop;
     const nodeId = await this.#graph.withGraphWrite(run.runId, async (writer) => {
       const created = await writer.addNode({
         runId: run.runId,
@@ -3569,7 +4630,9 @@ export class WalkingSkeletonRunner {
           // The PANEL assesses a node against THE DEBATE'S QUESTION. It used to
           // receive the leg's concatenated instruction string, so a parent's
           // statement rode into the panel prompt as well (DL4-F4).
-          questionLine: run.questionLine
+          questionLine: run.questionLine,
+          // A stop here travels to the phase catch that authored this node.
+          onSpendStop: "TRAVEL"
         });
         const { created: childNodeId, minted: childSourcedEdges } = await this.#graph.withGraphWrite(run.runId, async (writer) => {
           const created = await writer.addNode({
@@ -3659,24 +4722,9 @@ export class WalkingSkeletonRunner {
         }) };
     };
 
-    /**
-     * C1 (review round 2) — WHICH SPEND BOUND, IF ANY, STOPPED THIS RUN BODY.
-     *
-     * Set by the authoring, expansion and review phases when the gateway refuses
-     * on money or on an unbillable vendor. It is NOT an error path: the phase
-     * stops where it is, the run keeps everything it has produced, and the
-     * envelope evaluation in front of the serve chain turns it into the ruled
-     * components-only terminal. `null` all the way through is a run that was
-     * never stopped by a spend bound, which is every run today.
-     *
-     * RE-REVIEW: declared HERE, before the secondary and additional ROOT loops.
-     * Round 2 declared it after them, so a refusal while authoring root 1 or 2
-     * threw MAKER_POSITION_UNAVAILABLE and discarded a root 0 that had already
-     * been minted and panelled. Root 0 existing is exactly what makes the
-     * terminal buildable, so that run had something to serve and served nothing.
-     */
-    let runBodyBudgetStop: EnvelopeStopKind | null = null;
-    if (effectiveMakerCount > 1) {
+    // Task M2: a stop on the first root's panel has already ended the arguing;
+    // authoring the secondary root would be one more call after it.
+    if (effectiveMakerCount > 1 && runBodyBudgetStop === null) {
       let secondary: Awaited<ReturnType<typeof authorPosition>> | null = null;
       try {
       secondary = await authorPosition({
@@ -3917,9 +4965,8 @@ export class WalkingSkeletonRunner {
     let stoppedByAdaptiveRule = false;
     for (const [legIndex, leg] of expansionPlan.entries()) {
       // C1: an earlier leg, or a review between rounds, reached a spend bound.
-      // Expansion stops here and the run carries what it has to the envelope
-      // evaluation in front of the serve chain, which turns it into the ruled
-      // components-only terminal.
+      // Expansion stops here and, since Task M2, the run carries what it has
+      // on to its answer; the stop rides that answer as its envelope record.
       if (runBodyBudgetStop !== null) break;
       if (activeExpansionRound !== null && leg.round !== activeExpansionRound) {
         await reviewPendingAuthoredNodes();
@@ -3960,9 +5007,12 @@ export class WalkingSkeletonRunner {
         edges: [{ targetNodeId: parent.nodeId, targetStatement: parent.statement, polarity: leg.polarity }]
       });
       } catch (error) {
-        // C1: a spend refusal is not an expansion failure. Nothing is recorded
-        // as halted — the leg was never attempted against a vendor — and the
-        // branch simply stops being expanded.
+        // C1: a spend refusal is not an expansion failure, and nothing is
+        // recorded as halted: no transport failed. The refusal may have come on
+        // the leg's own author call (money and the attempt ceiling refuse before
+        // sending) or on its panel, after the author call was made and billed
+        // (a usage stop always comes after its call). Either way no node is
+        // minted for the leg, and the branch simply stops being expanded.
         const stop = expansionPhaseStop(error);
         if (stop === null) throw error;
         runBodyBudgetStop = stop;
@@ -4107,6 +5157,11 @@ export class WalkingSkeletonRunner {
       monoMakerConditionMarks,
       monoMakerRecords
     });
+    // Task M3 (spec §14.4.5): what the arguing left for the owner's disclosure
+    // row, taken HERE, where the body ends and the serve decision reads the same
+    // stop. Nothing from the serve gate on reads the stop itself
+    // (`tests/architecture/v28-serve-decision-wiring.test.ts`, pins 5 and 7).
+    const serveDisclosureBody = serveDisclosureBodyFacts({ runBodyBudgetStop, decision: makerPositionServe });
     const standing = makerPositionServe.standing;
     snapshot = makerPositionServe.standing.snapshot;
     const classHNodeIds = new Set(standing.hiddenNodeIds);
@@ -4163,7 +5218,10 @@ export class WalkingSkeletonRunner {
     // J23: the citable set follows the DIGEST — same source, same membership,
     // so "every load-bearing claim traces to a digest node" is satisfiable by
     // construction rather than by the synthesizer guessing. Exactly one node is
-    // load-bearing (DR-159 B2-A clause 1); the rest are citable evidence.
+    // load-bearing (DR-159 B2-A clause 1); the rest are citable evidence. At
+    // the digest's spine rung (Task M4) a left-out point stays in this set but
+    // is not in the digest, and the writer's one mapping point
+    // (`composedNodeIdOf`) refuses a citation of it.
     const servedNodes = buildDigestFollowingServeNodes({
       authored: authoredNodeList,
       servedRootNodeId: servedRoot.nodeId
@@ -4337,6 +5395,33 @@ export class WalkingSkeletonRunner {
     let compositionRawArtifactRef: string | null = null;
     let compositionAttempt = 0;
     const conformanceRawArtifactRefs: string[] = [];
+    /**
+     * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — what each answer-writing call
+     * left, keyed by the artifact it recorded: the draft a KEPT round is
+     * persisted from (after a kept round, the last draft written is not the one
+     * served), the maker that actually wrote each draft and checked each one,
+     * and the last failure that escaped a role call and can end the loop on a
+     * complete round. Read after the chain; never by the prompt.
+     */
+    const servedDrafts = new Map<string, Readonly<{
+      segments: readonly ComposedSegment[];
+      round: number;
+      providerRef: string;
+    }>>();
+    const servedChecks = new Map<string, string>();
+    const draftWriterByRound = new Map<number, string>();
+    let servePhaseFailure: unknown = null;
+    /** Task M4: the digest the answer-writer was handed (every round's is the same), for the owner's row. */
+    let writerDigest: SynthesisDigest | null = null;
+    const servePrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+    const whileServing = async <T>(call: () => Promise<T>): Promise<T> => {
+      try {
+        return await call();
+      } catch (error) {
+        if (keepsCompleteSynthesisRounds(error)) servePhaseFailure = error;
+        throw error;
+      }
+    };
     let conditionMarkRecords: readonly ConditionMarkRecord[] = makerPositionServe.disclosure.records;
     conditionMarkRecords = Object.freeze([
       ...conditionMarkRecords,
@@ -4513,7 +5598,18 @@ export class WalkingSkeletonRunner {
      * everything the debate authored. A node with no propagated strength keeps
      * its place with a null number; dropping it would be exactly the silent
      * subset the goal forbids.
+     *
+     * Task M4 (spec §14.4.3): each node also carries its LEVERAGE, from the
+     * same sensitivity records the story reads, so the digest's spine rung
+     * ranks "most decisive" by the story's own number. It is never sent.
      */
+    const digestLeverage = digestLeverageByNodeId(propagation.sensitivityRecords);
+    /**
+     * Task M4 review round 2: what the answer's prose may repeat although it
+     * looks like an internal id — every such token in the person's question
+     * and in each node's full statement (not the digest's clipped summaries).
+     */
+    const personIdTokens = idShapedTokensIn([run.questionLine, ...authoredNodeList.map((node) => node.statement)]);
     const digestNodes: readonly DigestSourceNode[] = Object.freeze(authoredNodeList.map((node) => Object.freeze({
       nodeId: node.nodeId,
       statement: node.statement,
@@ -4531,7 +5627,8 @@ export class WalkingSkeletonRunner {
       // A SURVIVING objection: it attacks something and it still carries a
       // propagated number at the end of the debate.
       isSurvivingObjection: strengthByNodeId.has(node.nodeId)
-        && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack")
+        && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack"),
+      leverage: digestLeverage.get(node.nodeId) ?? null
     })));
     const serveStartedAt = new Date();
     /**
@@ -4708,21 +5805,28 @@ export class WalkingSkeletonRunner {
       }).certaintyBand ?? capped;
     };
     /**
-     * C1 (review round 2): the run body's own spend stop is asked HERE, the
-     * first point at which the ruled terminal can be built — the propagation
-     * has run, the served root is chosen and the fact bundle exists, so the
-     * components the run produced before it ran out are exactly what this
-     * terminal serves. A money or usage stop during authoring, expansion or
-     * review arrives as `runBodyBudgetStop` rather than as an exception,
-     * because there was no terminal to build where it was raised.
+     * ENGINE MONEY RULE (spec §14.4.1), TASK M2 — A STOP WHILE ARGUING NEVER
+     * SKIPS THE ANSWER.
+     *
+     * C1 (review round 2) asked the run body's own spend stop HERE and forced
+     * the envelope decision to a hard stop with it, so a run stopped while
+     * arguing took the components-only terminal and the answer-writer was never
+     * called. V-28 is amended: the stop ends the arguing only. This question is
+     * asked on the attempt count alone — J28's comparison, WITHIN at equality —
+     * exactly as for a run that was never stopped, and a stopped run goes on to
+     * the answer with the tree as it stands. The stop is not lost: it rides the
+     * answer as its envelope record, appended after the chain.
+     *
+     * The only terminal taken here is the attempt-overspend one, for a run that
+     * somehow spent MORE attempts than its receipt allows.
      */
-    const initialEnvelopeDecision = await evaluateEnvelope(0, runBodyBudgetStop !== null);
+    const initialEnvelopeDecision = await evaluateEnvelope();
     let result: Awaited<ReturnType<typeof runServeGateChain>>;
     // F4: no `restatementStatus === "PASS"` conjunct. The envelope terminal
     // fires on HARD_STOP whenever no served statement exists yet, independent
     // of restatement status — never serving over budget.
     if (initialEnvelopeDecision.kind === "HARD_STOP") {
-      result = await makeEnvelopeTerminal(initialEnvelopeDecision, runBodyBudgetStop ?? "ATTEMPTS");
+      result = await makeEnvelopeTerminal(initialEnvelopeDecision);
     } else {
       await recordEnvelope(initialEnvelopeDecision);
       const candidateConfidenceBand = await servedCandidateConfidenceBand();
@@ -4735,8 +5839,11 @@ export class WalkingSkeletonRunner {
       // downgrade a disputed cross-maker review fires.
       candidateConfidenceBand,
       // T9: EVERY materialized node, with its number, its polarity relations,
-      // its way of knowing and its marks. This list is the digest's membership
-      // and the byte budget may not shorten it — only the summaries inside it.
+      // its way of knowing and its marks. This list is the digest's membership.
+      // The byte budget shortens the summaries, then each entry's shape; T9's
+      // law as amended by Task M4 (spec §14.4.3) lets it drop membership at the
+      // LAST rung only, only when every earlier rung is over budget, and the
+      // drop is disclosed (the compressed mark, the owner's row).
       digestNodes,
       servedRootNodeId: servedRoot.nodeId,
       // T10/T11's numbers, derived BEFORE synthesis, handed to both roles so
@@ -4765,6 +5872,7 @@ export class WalkingSkeletonRunner {
        * VERBATIM — the loop converges by feedback, never by accident.
        */
       synthesize: async (request: SynthesizerRequest) => {
+        writerDigest ??= request.digest;
         const role = resolveSynthesisRoleMaker(request.roleRef, "SYNTHESIZER");
         const synthesizerCallSiteKey = synthesisCallSiteKey({
           role: "SYNTHESIZER", stage: request.stage, round: request.round
@@ -4775,7 +5883,63 @@ export class WalkingSkeletonRunner {
         // engine's own `instructions`, with nothing saying which was which.
         const framed = buildSynthesizerFramedPrompt(request,run.argumentLanguageName);
         const packet = framed.packet;
-        const response = await callSynthesisRole(role.provider, {
+        /**
+         * The draft as the engine reads it. Final review I-1: it is read INSIDE
+         * the call each maker makes, so a cheaper maker's draft that this
+         * reading refuses is that maker's content failure (`fallbackContentRefusal`).
+         * For the planned maker nothing changes: the same codes end the run.
+         */
+        const composedSegmentsOf = (content: string): readonly ComposedSegment[] => {
+          const parsed = parseComposerOutput(content);
+          const segments = parsed.segments.map((segment) => {
+            if (segment.segment_id === "memory:disclosure") {
+              throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "The memory disclosure segment id is reserved for the typed renderer");
+            }
+            return Object.freeze({
+            segmentId: segment.segment_id,
+            text: segment.text,
+            loadBearing: false,
+            // J23: a citation may name ANY node the digest carries, by the ref the
+            // digest showed it under — its real id at rungs 0-5, its short ref at
+            // the compact and spine rungs (Task M4) — and is mapped back to the
+            // real id HERE, the one mapping point, before the sealed checks.
+            // `"primary"` stays admissible as the served root's alias so sealed
+            // prompts and fixtures written against the one-node set keep working;
+            // an unknown ref is still a loud contract error.
+            assertedNodeRefs: Object.freeze(segment.node_refs.map((ref) => composedNodeIdOf({
+              ref,
+              digest: request.digest,
+              servedRootNodeId: servedRoot.nodeId,
+              servedNodes
+            }))),
+            servedNumberRefs: Object.freeze([...segment.served_number_refs])
+            });
+          });
+          // The sealed chain refuses repeated segment ids with this same code;
+          // read here first, so a fallback's draft that repeats one is its content
+          // failure too. The planned maker's run ends exactly as it did.
+          if (new Set(segments.map((segment) => segment.segmentId)).size !== segments.length) {
+            throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "Composed segment ids must be stable and unique");
+          }
+          return segments;
+        };
+        // Task M3 (spec §14.4.2): refused for MONEY, this SAME request — call
+        // site, framed prompt, bound — is offered to the cheaper claim-eligible
+        // makers; only the provider changes, and the seam decides what fits.
+        // M3 review polish: the planned CHECKER's maker is offered last, so the
+        // cheapest fallback writer is not the maker that will check its draft
+        // whenever another maker fits.
+        const served = await whileServing(() => callServeRoleWithFallback({
+          planned: role,
+          claimEligible: synthesisMakers,
+          prices: servePrices,
+          preferNot: synthesisRoles.evaluatorRoleRef,
+          call: async (maker, call) => {
+            const response = await callSynthesisRole(maker.provider, call, "COMPOSITION_CONTRACT_ERROR");
+            return Object.freeze({ response, composedSegments: composedSegmentsOf(response.content) });
+          },
+          onFallbackFailure: fallbackContentRefusal,
+          request: {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           // CALL SITE vs ROLE. The `role` is the T9 identity making the call;
@@ -4798,32 +5962,16 @@ export class WalkingSkeletonRunner {
           argumentLanguageName: run.argumentLanguageName,
           providerRef: role.providerRef,
           packet,
-          classifyContent: (content) => classifyStructuredContent(content, compositionSchema),
-          buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
-        }, "COMPOSITION_CONTRACT_ERROR");
-        const parsed = parseComposerOutput(response.content);
-        const composedSegments = parsed.segments.map((segment) => {
-          if (segment.segment_id === "memory:disclosure") {
-            throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", "The memory disclosure segment id is reserved for the typed renderer");
+          // Task M4 review fix I-1: the schema, then the prose and the cited refs.
+          classifyContent: (content) => classifyComposedContent(content, {
+            digest: request.digest,
+            servedNodes,
+            exemptTokens: personIdTokens
+          }),
+          buildRepairPacket: (rejected) => buildComposedRepairPacket(framed, rejected)
           }
-          return Object.freeze({
-          segmentId: segment.segment_id,
-          text: segment.text,
-          loadBearing: false,
-          // J23: a citation may name ANY node in the digest-following set by its
-          // real id. `"primary"` stays admissible as the served root's alias so
-          // sealed prompts and fixtures written against the one-node set keep
-          // working; an unknown ref is still a loud contract error.
-          assertedNodeRefs: Object.freeze(segment.node_refs.map((ref) => {
-            if (ref === "primary") return servedRoot.nodeId;
-            if (!servedNodes.some((node) => node.nodeId === ref)) {
-              throw new TypedDomainError("COMPOSITION_CONTRACT_ERROR", `Unknown composition node ref ${ref}`);
-            }
-            return ref;
-          })),
-          servedNumberRefs: Object.freeze([...segment.served_number_refs])
-          });
-        });
+        }));
+        const { response, composedSegments } = served.result;
         const renderedMemory = renderMemorySentence(factBundle.memoryDisclosure);
         validateMemorySentence(factBundle.memoryDisclosure, renderedMemory);
         const partitioned = partitionServedSegments(composedSegments, renderedMemory);
@@ -4832,6 +5980,22 @@ export class WalkingSkeletonRunner {
         // `serve_state` reads this: round 1 COMPOSED, a later round
         // RECOMPOSED_ONCE. The loop round IS the composition attempt now.
         compositionAttempt = request.round;
+        servedDrafts.set(response.rawArtifactRef, Object.freeze({
+          segments: partitioned.persistedSegments,
+          round: request.round,
+          providerRef: served.servedBy.providerRef
+        }));
+        draftWriterByRound.set(request.round, served.servedBy.providerRef);
+        // M3 review polish: an empty draft is what the sealed chain answers with
+        // SYNTHESIS_NO_ARTIFACT, its first check on every draft; it ends the loop
+        // (kept on a complete round), so the owner's record names it. The
+        // composition schema requires a segment, so today nothing reaches this.
+        if (partitioned.conformanceSegments.length === 0) {
+          servePhaseFailure = new TypedDomainError(
+            "SYNTHESIS_NO_ARTIFACT",
+            `The synthesizer returned no segment to serve at ${synthesizerCallSiteKey}`
+          );
+        }
         return {
           candidate: partitioned.conformanceSegments,
           // codex r1 B2: the RECORDED artifact for THIS round. `compositionRawArtifactRef`
@@ -4854,7 +6018,40 @@ export class WalkingSkeletonRunner {
         const evaluatorCallSiteKey = synthesisCallSiteKey({ role: "EVALUATOR", round: request.round });
         const framed = buildEvaluatorFramedPrompt(request,run.argumentLanguageName);
         const packet = framed.packet;
-        const response = await callSynthesisRole(role.provider, {
+        /**
+         * The verdict as the engine reads it, its coherence included (the loop
+         * checks it again, unchanged). Final review I-1: read INSIDE the call
+         * each maker makes, like the writer's draft, so a cheaper checker whose
+         * verdict this reading refuses has left nothing to serve.
+         */
+        const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
+          const parsed = parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+          return assertEvaluatorVerdict(Object.freeze({
+            satisfied: parsed.satisfied,
+            objection: parsed.objection,
+            criteria: Object.freeze({
+              fairnessToLosers: parsed.criteria.fairness_to_losers,
+              statementLabelAgreement: parsed.criteria.statement_label_agreement,
+              noOverstatement: parsed.criteria.no_overstatement,
+              restatement: parsed.criteria.restatement,
+              citationTracing: parsed.criteria.citation_tracing
+            })
+          }));
+        };
+        // Task M3 (spec §14.4.2): the checker's cost fallback prefers a maker
+        // other than the one that wrote the draft it checks, and takes that one
+        // only when nothing else fits (the disclosure row records it, R9).
+        const served = await whileServing(() => callServeRoleWithFallback({
+          planned: role,
+          claimEligible: synthesisMakers,
+          prices: servePrices,
+          preferNot: draftWriterByRound.get(request.round) ?? null,
+          call: async (maker, call) => {
+            const response = await callSynthesisRole(maker.provider, call, "EVALUATOR_CONTRACT_ERROR");
+            return Object.freeze({ response, verdict: evaluatorVerdictOf(response.content) });
+          },
+          onFallbackFailure: fallbackContentRefusal,
+          request: {
           runId: run.runId,
           subjectItemId: claimed.workItemId,
           // Same contract as the synthesizer's key above: `POST_COMPOSE_R9:%`
@@ -4872,21 +6069,13 @@ export class WalkingSkeletonRunner {
           packet,
           classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
           buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
-        }, "EVALUATOR_CONTRACT_ERROR");
+          }
+        }));
+        const { response, verdict } = served.result;
         conformanceRawArtifactRefs.push(response.rawArtifactRef);
-        const parsed = parseContent(response.content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+        servedChecks.set(response.rawArtifactRef, served.servedBy.providerRef);
         return Object.freeze({
-          verdict: Object.freeze({
-            satisfied: parsed.satisfied,
-            objection: parsed.objection,
-            criteria: Object.freeze({
-              fairnessToLosers: parsed.criteria.fairness_to_losers,
-              statementLabelAgreement: parsed.criteria.statement_label_agreement,
-              noOverstatement: parsed.criteria.no_overstatement,
-              restatement: parsed.criteria.restatement,
-              citationTracing: parsed.criteria.citation_tracing
-            })
-          }),
+          verdict,
           // J29: the evaluator's own recorded artifact, so the round's verdict
           // and objection resolve through `ledger.raw_artifact` rather than
           // being duplicated into a second plaintext table.
@@ -4930,6 +6119,35 @@ export class WalkingSkeletonRunner {
         if (exhausted.kind !== "HARD_STOP") throw error;
         result = await makeEnvelopeTerminal(exhausted, stop);
       }
+      // Task M3 (spec §14.4.2): the answer serves the chain's LAST round, and
+      // after a kept round that is not the last draft written. The persist takes
+      // that round's own draft, artifact and attempt, never a later draft its
+      // checker did not read — and, for a result that serves NO round (a crash
+      // class the chain returned after a draft was written, e.g. round 1's
+      // checker transport dying), no draft at all. With a stale draft attached
+      // the sealed persist wrote the composed text and then a conformance record
+      // with the crash result's coverage mode `NOT_RUN`, which the database's
+      // CHECK refuses (`serve.conformance_record.coverage_mode IN
+      // ('EXHAUSTIVE','SAMPLED')`, 23514): ANSWER_PERSIST_FAILED, and the whole
+      // run failed instead of ending components-only / DEFECT.
+      const servedRound = result.loopRounds.at(-1);
+      if (servedRound === undefined) {
+        finalSegments = [];
+        compositionRawArtifactRef = null;
+        compositionAttempt = 0;
+        conformanceRawArtifactRefs.length = 0;
+      } else {
+        const draft = servedDrafts.get(servedRound.candidateRef);
+        if (draft === undefined || draft.round !== servedRound.round) {
+          throw new TypedDomainError(
+            "SERVE_DRAFT_UNRESOLVED",
+            `The served round ${String(servedRound.round)} names a draft this run's writer did not record`
+          );
+        }
+        finalSegments = draft.segments;
+        compositionRawArtifactRef = servedRound.candidateRef;
+        compositionAttempt = draft.round;
+      }
       if (!result.conditionMarks.includes("DEFECT") && !result.conditionMarks.includes("ENVELOPE_EXHAUSTED")) {
         const finalEnvelopeDecision = await evaluateEnvelope();
         if (finalEnvelopeDecision.kind === "HARD_STOP") {
@@ -4938,6 +6156,33 @@ export class WalkingSkeletonRunner {
           await recordEnvelope(finalEnvelopeDecision);
         }
       }
+    }
+    // Task M2 (spec §14.4.1): a stop while arguing no longer decides the
+    // terminal, but it stays on the record of the answer, so the honesty drawer
+    // still says the debate was cut short and which bound cut it.
+    const runBodyStopRecord = runBodyStopDisclosure({
+      runBodyBudgetStop,
+      resultConditionMarks: result.conditionMarks,
+      runId: run.runId,
+      servedRootNodeId: servedRoot.nodeId
+    });
+    if (runBodyStopRecord !== null) {
+      conditionMarkRecords = Object.freeze([...conditionMarkRecords, runBodyStopRecord]);
+      result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, runBodyStopRecord.mark]) };
+    }
+    // Task M3 (spec §14.4.2): a round kept after a spend stop on an
+    // answer-writing call is served, and the stop rides it the same way. When
+    // the arguing was stopped too, the record above already names a bound.
+    const servePhaseStopRecord = servePhaseStopDisclosure({
+      servePhaseFailure,
+      keptRounds: result.loopRounds.length,
+      resultConditionMarks: result.conditionMarks,
+      runId: run.runId,
+      servedRootNodeId: servedRoot.nodeId
+    });
+    if (servePhaseStopRecord !== null) {
+      conditionMarkRecords = Object.freeze([...conditionMarkRecords, servePhaseStopRecord]);
+      result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, servePhaseStopRecord.mark]) };
     }
     // The served number is the POSITION node's final strength — selected by
     // node identity, never by array position (a multi-node graph reorders).
@@ -5044,6 +6289,16 @@ export class WalkingSkeletonRunner {
         result = { ...result, conditionMarks: Object.freeze([...result.conditionMarks, LABEL_BASIS_INCOMPLETE_MARK]) };
       }
     }
+    // Task M5 (spec §14.4.4): an answer that still ends COMPONENTS_ONLY keeps the
+    // label derived above as its FLOOR, on the owner's row, with the position
+    // the label rests on and the sealed cause. The sealed persist below is
+    // handed no basis for it: the answer stays components-only.
+    const floor = serveFloorOf({
+      terminal: result.terminal,
+      crashClass: result.crashClass,
+      label: verdictLabel.label,
+      leadingNodeId: servedRoot.nodeId
+    });
     const persisted = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#serve.persist({
       runId: run.runId,
       workItemId: claimed.workItemId,
@@ -5071,6 +6326,24 @@ export class WalkingSkeletonRunner {
       // they ever do.
       verdictLabelBasis: answerCarriesLabel ? verdictLabelBasis : null
     }));
+    // Task M3 (spec §14.4.5): the owner-side disclosure row, once, after the
+    // sealed persist, for every answer. It can never change the answer: the
+    // writer logs a failure by code and carries on.
+    const answeredRound = result.loopRounds.at(-1);
+    const disclosureRecorded = await this.#recordServeDisclosure({ runId: run.runId, answerId: persisted.answerId }, () => buildServeDisclosureRecord({
+      answerId: persisted.answerId,
+      answerVersion: persisted.answerVersion,
+      runId: run.runId,
+      planned: { writerRef: synthesisRoles.synthesizerRoleRef, checkerRef: synthesisRoles.evaluatorRoleRef },
+      served: answeredRound === undefined ? null : {
+        writerRef: servedRoleRef(servedDrafts.get(answeredRound.candidateRef)?.providerRef, "writer"),
+        checkerRef: servedRoleRef(servedChecks.get(answeredRound.verdictRef), "checker")
+      },
+      body: serveDisclosureBody,
+      serveStop: serveLoopStopOf(servePhaseFailure),
+      digest: serveDisclosureDigestFacts(writerDigest),
+      floor
+    }));
     await runnerStage(
       "ANSWER_MEMORY_OBSERVATION_FAILED",
       () => this.#memory.observeAnswerContradiction(persisted.answerId, "memory:served-verdict-observer")
@@ -5093,7 +6366,96 @@ export class WalkingSkeletonRunner {
       attemptId: runnerAttemptId,
       artifactRef: persisted.answerId
     });
-    if (wonSettlement) return { kind: "COMPLETED", answerId: persisted.answerId };
+    if (wonSettlement) {
+      /**
+       * VERDICT STORY (spec §3, amended): the work item is DONE and nothing can
+       * re-claim it. Only an answer that carries a label gets a story: its own
+       * served label, or — Task M5, spec §14.4.4 — its FLOOR, whose story takes
+       * the SAME label basis and has the leading position's own statement as
+       * its answer. The story's checks are unchanged: the label stays fixed.
+       * The snapshot is built HERE, inside the run's content lease, where the
+       * in-memory material is; the story itself runs after the lease (below
+       * `executeWorkItem`'s catch), each step under its own short disclosure
+       * lease on this runner's pool. Building the snapshot cannot fail the
+       * settled run: a failure is kept and logged by code after the lease.
+       *
+       * Final review, Minor 2: a floor answer's story waits for the floor's
+       * ROW. The owner's page and the public page learn the floor from that row
+       * alone, so a story told from the in-memory floor after the row's write
+       * failed would state an answer beside a page that says the verdict is
+       * unavailable. The failed write is already logged by its code
+       * (SERVE_DISCLOSURE_WRITE_FAILED); there is then no floor story.
+       */
+      const storyWriter = this.settings.story;
+      const floorRecorded = floor !== null && disclosureRecorded;
+      if (storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
+        try {
+          afterSettle.story = {
+            kind: "SNAPSHOT",
+            input: buildStoryRunSnapshot({
+              runId: run.runId,
+              workItemId: claimed.workItemId,
+              answerId: persisted.answerId,
+              answerVersion: persisted.answerVersion,
+              questionLine: run.questionLine,
+              // The same language the debate's own prompts were told to write in
+              // (argumentLanguageDirective), and the tag the story is stored with.
+              argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
+              compositionBudgetTier: run.compositionBudgetTier,
+              verdict: { label: verdictLabel.label, rung: verdictLabel.rung, trigger: verdictLabel.trigger },
+              servedRootNodeId: servedRoot.nodeId,
+              servedStrength: servedRootSelection.servedStrength,
+              runnerUp: servedRootSelection.runnerUp,
+              margin: servedRootSelection.margin,
+              // The SAME quantity the label's disagreement rung read: the winning
+              // root's recorded panel dispersion, or ABSENT with s04's reason.
+              disagreement: verdictLabelBasis.disagreement,
+              thresholds: {
+                gamma: verdictLabelControls.gamma,
+                highCut: verdictLabelControls.highCut,
+                lowCut: verdictLabelControls.lowCut,
+                disagreementThreshold: verdictLabelControls.disagreementThreshold
+              },
+              confidenceBand: result.confidenceBand,
+              answerMarks: result.conditionMarks,
+              // A floor answer has no prose: its answer is the leading position's
+              // own statement (the node the label's servedNodeId names).
+              servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
+              authored: authoredNodeList,
+              positionNodeIds: makerPositionNodeIds,
+              baseStrengths: materialised.nodes,
+              finalStrengths: propagation.strengths,
+              // The WHOLE graph's arrows, in the engine's fixed order, so every
+              // argued point keeps its arrow and the points number the same way.
+              arrows: materialised.arrows,
+              arrowOrder: materialised.arrowOrder,
+              sensitivity: propagation.sensitivityRecords,
+              conditionMarkRecords,
+              // The run's OWN claim-eligible providers: a role provider that the
+              // claim-time probe found absent is never called for the story.
+              resolveProvider: (roleRef) => {
+                const maker = synthesisMakers.find((candidate) => candidate.providerRef === roleRef);
+                return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
+              },
+              // Task M7 (spec §14.4.6): a story call refused for money is offered
+              // to the SAME claim-eligible makers, cheapest first by this runner's
+              // price map — the answer-writer's own fallback (Task M3).
+              costFallback: storyCostFallback(synthesisMakers, servePrices),
+              // Each story step re-takes the SAME disclosure lease the debate held
+              // (this run and its memory-linked prior run), briefly, on this
+              // runner's pool: every store and gateway inside it borrows it, and
+              // an erasure between steps ends the story at the next one.
+              stepLease: (use) => this.#memory.withDisclosureContentLease([run.runId], use)
+            })
+          };
+        } catch (error) {
+          afterSettle.story = {
+            kind: "SNAPSHOT_FAILED", answerId: persisted.answerId, answerVersion: persisted.answerVersion, error
+          };
+        }
+      }
+      return { kind: "COMPLETED", answerId: persisted.answerId };
+    }
     const winningArtifact = await this.#work.readSettledArtifact(claimed.workItemId);
     if (winningArtifact === null) {
       throw new TypedDomainError("SETTLEMENT_RACE_WITHOUT_WINNER", claimed.workItemId);
@@ -5107,6 +6469,26 @@ export class WalkingSkeletonRunner {
         "The runner failed inside its private-content disclosure lease"
       );
     }
+    /**
+     * VERDICT STORY (spec §3, amended): the run's lease is released, the work
+     * item is DONE and the answer is served. The story runs now, and nothing it
+     * does can change that: the writer never rejects, and this catch exists so
+     * that no defect in the writer can reach the failure path of a DONE item.
+     */
+    const storyWriter = this.settings.story;
+    const settled = afterSettle.story;
+    if (storyWriter !== undefined && settled !== null) {
+      try {
+        if (settled.kind === "SNAPSHOT") {
+          await storyWriter.writeAfterSettle(settled.input);
+        } else {
+          storyWriter.reportSnapshotFailure(settled);
+        }
+      } catch {
+        // See above: the story can never cost the verdict.
+      }
+    }
+    return executed;
   }
 }
 
@@ -5531,6 +6913,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RIVAL_CARVER_UNAVAILABLE",
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
+  "RUN_CEILING_BELOW_FIRST_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
@@ -5563,6 +6946,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SERVED_ROOT_STRENGTH_UNRESOLVED",
   "SERVED_ROOT_UNRESOLVED",
   "SERVED_STATEMENT_CITES_NO_VERIFIED_NODE",
+  "SERVE_DISCLOSURE_RECORD_INVALID",
+  "SERVE_DISCLOSURE_ROW_INVALID",
+  "SERVE_DRAFT_UNRESOLVED",
+  "SERVE_FLOOR_REASON_UNRESOLVED",
   "SERVE_GATE_CHAIN_FAILED",
   "SERVE_ITEMS_NOT_A_LIST",
   "SERVE_ITEM_INVALID",
@@ -5595,6 +6982,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "STOPPING_ROOT_STRENGTH_UNRESOLVED",
   "STOPPING_ROUND_COUNT_INVALID",
   "STORED_RESULT_MISSING",
+  "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
+  "STORY_ROW_INVALID",
   "STRENGTH_LINEAGE_UNRESOLVED",
   "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
   "STRUCTURAL_CEILING_COMPOSITIONSEGMENTCAP_INVALID",
@@ -6248,6 +7637,43 @@ export function declareHatchetWalkingSkeletonTask(input: {
   });
 }
 
+/**
+ * Verdict story: the call-site namespace the story allowance accepts and the
+ * run allowance refuses (spec 2026-09-26 §8). `packages/story` mints the keys
+ * (`storyCallSiteKey`). A story call site is EXACTLY `STORY:STORYTELLER:{round}`
+ * or `STORY:CHECKER:{round}`, the round 1 to 8 (the `storyLoopMaxRounds` schema
+ * cap, packages/register/src/story-policy.ts), and each carries its own role:
+ * the storyteller is a SYNTHESIZER call and the checker an EVALUATOR call.
+ * Anything else under the prefix is not a story call at all.
+ */
+const STORY_CALL_SITE_PREFIX = "STORY:";
+const STORY_CALL_SITE = /^STORY:(STORYTELLER|CHECKER):[1-8]$/u;
+
+/** The role a well-formed story call site must carry, or null for any other key. */
+function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | null {
+  const site = STORY_CALL_SITE.exec(callSiteKey);
+  if (site === null) return null;
+  return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
+}
+
+/**
+ * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1) — WHICH CEILING A CALL
+ * SEES. An answer-writing call is the synthesizer or the evaluator on the
+ * served lane, and only that pair: the judges use the served lane too, so the
+ * lane alone would put every judge call on the answer's money, and the role
+ * alone would put the story's storyteller and checker there. Every other call
+ * a run makes is BODY. The phase picks the ceiling (the money seam's and the
+ * attempt ceiling's) and is recorded on the charge; it never changes a
+ * refusal's code.
+ */
+export function providerCallCostEnvelopePhase(
+  request: Pick<ProviderCallRequest, "role" | "lane">
+): CostEnvelopePhase {
+  return (request.role === "SYNTHESIZER" || request.role === "EVALUATOR") && request.lane === "served"
+    ? "SERVE"
+    : "BODY";
+}
+
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction">
@@ -6258,15 +7684,27 @@ export function createPostgresProviderGateway(
        * target's — but the spend belongs to the run, and one gateway serves
        * every run that reaches it, so the seam cannot be a construction-time
        * value. Absent = no money bound, which is local mode byte-for-byte.
+       *
+       * Task M1: and from the call's PHASE (`providerCallCostEnvelopePhase`),
+       * because an answer-writing call and a call made while the debate is
+       * argued are held to different ceilings over the same run total.
        */
-      readonly buildCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
+      readonly buildCostEnvelopeSeam?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+      /**
+       * Verdict story (spec §8): the STORY's own money bound, built per call
+       * from the leased run exactly as the run's is. A story call on a metered
+       * gateway (one with `buildCostEnvelopeSeam`) that has no story seam is
+       * refused, so a story can never spend unbounded where the debate cannot.
+       */
+      readonly buildStoryCostEnvelopeSeam?: (runId: string) => ProviderCostEnvelopeSeam;
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
+  const { buildStoryCostEnvelopeSeam, ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
-    ...gatewayOptions,
+    ...httpOptions,
     assertNoOpenWriteTransaction,
     persistRawArtifact: (artifact) => ledger.appendRawArtifact(artifact),
     appendLedgerEntry: async (entry) => (await ledger.append(entry)).ledgerEntryId
@@ -6277,6 +7715,29 @@ export function createPostgresProviderGateway(
         throw new TypedDomainError(
           "PROVIDER_RUN_REQUIRED",
           "Every provider content operation must be bound to one leased run"
+        );
+      }
+      /**
+       * Verdict story — THE STORY SCOPE, decided before anything is read. The
+       * lane and the call-site namespace must agree: a story lane on a debate
+       * call site would hide a debate call in the story's allowance, and a
+       * STORY: call site on a debate lane would bill a story to the run. A
+       * story call must also name one of the story's own call sites, with the
+       * role that site carries (`storyCallSiteRole`), so the story lane cannot
+       * be used for a free-form or out-of-range call.
+       */
+      const storyScope = request.lane === "story";
+      if ((storyScope || request.callSiteKey.startsWith(STORY_CALL_SITE_PREFIX))
+        && (!storyScope || storyCallSiteRole(request.callSiteKey) !== request.role)) {
+        throw new TypedDomainError(
+          "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
+          "A story call and the STORY: call-site namespace must agree"
+        );
+      }
+      if (storyScope && buildStoryCostEnvelopeSeam === undefined && buildCostEnvelopeSeam !== undefined) {
+        throw new TypedDomainError(
+          "STORY_ENVELOPE_MISSING",
+          "A metered deployment makes no story call without the story's own money bound"
         );
       }
       // S06 gateway seam, restored with the task binding above (e8d99d33,
@@ -6309,9 +7770,19 @@ export function createPostgresProviderGateway(
           );
         }
       }
+      /**
+       * Task M1: decided once, from the request, and used for both run-wide
+       * ceilings below — the attempt ceiling and the money seam — so the two
+       * can never disagree about which part of the run a call belongs to.
+       */
+      const costEnvelopePhase = providerCallCostEnvelopePhase(request);
       return withRunContentLease(pool,[leasedRunId],async () => {
-      if (!authenticatedEvaluatorScope) {
-        await budget.assertModelAttemptAllowed(leasedRunId);
+      // Verdict story: the story's attempts are its own. Each STORY: call site
+      // is bounded by its sealed call bound (the per-site count below), and the
+      // rounds by `storyLoopMaxRounds`; the RUN's ceiling is never consulted,
+      // so a debate that used every attempt still gets its story.
+      if (!authenticatedEvaluatorScope && !storyScope) {
+        await budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase);
       }
       const consumed = await ledger.countModelAttempts({
         runId: request.runId,
@@ -6331,8 +7802,8 @@ export function createPostgresProviderGateway(
           // retry loop (B26c's hook, wired here), not only once per call; the refusal is the
           // run's own RUN_COST_ENVELOPE_EXHAUSTED and no ledger row is written for it. The
           // run id is the leased one the S06 seam bound above, not a re-read of the request.
-          ...(authenticatedEvaluatorScope ? {} : {
-            assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId)
+          ...(authenticatedEvaluatorScope || storyScope ? {} : {
+            assertAttemptAllowed: () => budget.assertModelAttemptAllowed(leasedRunId, costEnvelopePhase)
           }),
           /**
            * V-28: the money envelope binds EVERY call, the authenticated evaluator
@@ -6342,10 +7813,20 @@ export function createPostgresProviderGateway(
            * the same paid vendor with the same money, so exempting them from the
            * money ceiling would leave a hole the size of the evaluator leg. The run
            * id is the leased one, for the same reason as the attempt hook above.
+           *
+           * Verdict story: a story call is bound by the STORY's seam instead —
+           * its own ceiling, summed over STORY charges only.
+           *
+           * Task M1: the run's seam is built for the call's phase, so an
+           * answer-writing call is compared with the answer's ceiling.
            */
-          ...(buildCostEnvelopeSeam === undefined ? {} : {
-            costEnvelope: buildCostEnvelopeSeam(leasedRunId)
-          })
+          ...(storyScope
+            ? (buildStoryCostEnvelopeSeam === undefined ? {} : {
+              costEnvelope: buildStoryCostEnvelopeSeam(leasedRunId)
+            })
+            : (buildCostEnvelopeSeam === undefined ? {} : {
+              costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase)
+            }))
         });
       } catch (error) {
         capture?.emit(captureFailureEnvelope({

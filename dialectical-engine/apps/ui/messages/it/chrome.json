@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Altre azioni del dibattito",
   "chrome.help": "Aiuto",
   "chrome.signedInAsker": "Richiedente autenticato",
-  "chrome.guestSession": "Sessione ospite"
+  "chrome.guestSession": "Sessione ospite",
+  "chrome.languageOffer.label": "Lingua della pagina",
+  "chrome.languageOffer.text": "Questo dibattito è in {language} ({nativeName}). Mostrare la pagina in {language}?",
+  "chrome.languageOffer.textNative": "Questo dibattito è in {language}. Mostrare la pagina in {language}?",
+  "chrome.languageOffer.switch": "Visualizza in {language}",
+  "chrome.languageOffer.dismiss": "No, grazie"
 }

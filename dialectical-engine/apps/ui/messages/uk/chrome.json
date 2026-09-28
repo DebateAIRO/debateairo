@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Інші дії з дебатами",
   "chrome.help": "Довідка",
   "chrome.signedInAsker": "Автор запитання, який увійшов у систему",
-  "chrome.guestSession": "Гостьовий сеанс"
+  "chrome.guestSession": "Гостьовий сеанс",
+  "chrome.languageOffer.label": "Мова сторінки",
+  "chrome.languageOffer.text": "Мова цих дебатів — {language} ({nativeName}). Показати сторінку мовою: {language}?",
+  "chrome.languageOffer.textNative": "Мова цих дебатів — {language}. Показати сторінку мовою: {language}?",
+  "chrome.languageOffer.switch": "Перейти на мову: {language}",
+  "chrome.languageOffer.dismiss": "Ні, дякую"
 }

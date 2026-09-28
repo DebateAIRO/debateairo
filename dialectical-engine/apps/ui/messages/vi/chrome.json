@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Thêm thao tác tranh luận",
   "chrome.help": "Trợ giúp",
   "chrome.signedInAsker": "Người đặt câu hỏi đã đăng nhập",
-  "chrome.guestSession": "Phiên khách"
+  "chrome.guestSession": "Phiên khách",
+  "chrome.languageOffer.label": "Ngôn ngữ của trang",
+  "chrome.languageOffer.text": "Cuộc tranh luận này được viết bằng {language} ({nativeName}). Bạn có muốn hiển thị trang bằng {language} không?",
+  "chrome.languageOffer.textNative": "Cuộc tranh luận này được viết bằng {language}. Bạn có muốn hiển thị trang bằng {language} không?",
+  "chrome.languageOffer.switch": "Chuyển sang {language}",
+  "chrome.languageOffer.dismiss": "Không, cảm ơn"
 }

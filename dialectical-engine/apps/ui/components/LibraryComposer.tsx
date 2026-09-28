@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { COOKIE_SESSION_MARKER, createDebate, validateSession } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
 
 /* The claim field rests at one line and grows with what is typed. */
 function grow(field: HTMLTextAreaElement | null): void {
@@ -13,7 +14,14 @@ function grow(field: HTMLTextAreaElement | null): void {
   field.style.height = `${field.scrollHeight + border}px`;
 }
 
-export function LibraryComposer({ catalog }: { catalog: MessageCatalog }) {
+export function LibraryComposer({
+  catalog,
+  newDebateCatalog
+}: {
+  catalog: MessageCatalog;
+  /** The interface locale's `newDebate` catalogue: the refusal words /new uses. */
+  newDebateCatalog: MessageCatalog;
+}) {
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,8 +40,16 @@ export function LibraryComposer({ catalog }: { catalog: MessageCatalog }) {
       );
       router.push(`/debate/${debate.id}`);
       return;
-    } catch {
-      // fall through to the authenticated /new flow
+    } catch (exc) {
+      // Task M8 (spec 2026-09-26 §14.4.7): today's limit for new debates is an
+      // answer, not a detour. /new would only refuse the same ask again, so the
+      // person reads it here, where they typed, in the words /new uses.
+      if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "DAILY_LIMIT_REACHED") {
+        setError(requestFailureMessage("DEBATE_CREATE", exc, newDebateCatalog));
+        setBusy(false);
+        return;
+      }
+      // Anything else falls through to the authenticated /new flow.
     }
     router.push(`/new?topic=${encodeURIComponent(topic.trim())}`);
     setBusy(false);

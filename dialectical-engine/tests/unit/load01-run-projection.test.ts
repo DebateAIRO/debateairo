@@ -50,7 +50,9 @@ describe("LOAD-01 persisted run projection", () => {
       runRef: "run:failed",
       questionLine: "Messi or Ronaldo?",
       state: "FAILED",
-      terminalReason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED"
+      terminalReason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED",
+      // No argument-language columns on this database (information_schema answers not applied).
+      argumentLanguage: null
     });
     const ownershipQuery = calls.find((call) => call.text.includes("core.run_is_owned_by"));
     expect(ownershipQuery?.values).toEqual(["run:failed", null, "asker:owner"]);

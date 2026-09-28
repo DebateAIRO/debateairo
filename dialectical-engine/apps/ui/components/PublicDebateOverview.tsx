@@ -2,13 +2,18 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import type { PublicDebate } from "@debateai/contract";
+import type { PublicDebate, PublicStoryShort } from "@debateai/contract";
 import { modelMeta } from "@/lib/models";
 import {
   buildPublicDebatePresentation,
   type PublicArgumentPresentation
 } from "@/lib/publicDebatePresentation";
 import { v3ScorePercentage } from "@/lib/v3/adapter";
+import { countStoryPositions, storyLabelWords } from "@/lib/v3/storyWords";
+import { StoryShortBlocks, type StoryShortContent } from "@/components/StoryShortBlocks";
+import { FloorAnswer } from "@/components/FloorAnswer";
+import { floorAnswerView, publicFloorHost, resolveFloor } from "@/lib/v3/floorAnswer";
+import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import composeEnglish from "@/messages/en/compose.json";
 
@@ -97,21 +102,62 @@ function ArgumentCard({
   );
 }
 
+/**
+ * The snapshot's short story (spec 2026-09-26 §10, §14) in the shape the shared
+ * blocks take, with the storyteller's confidence sentence. The positions the
+ * short version left out are counted from the published tree; a snapshot
+ * without a tree counts none. A story that was not fully double-checked
+ * (`double_checked: false`, final review Important 2) shows the same gentle
+ * catalogue line as the owner's page, in the question's language; the
+ * snapshot never carries the checker's own text.
+ */
+function publicStoryContent(story: PublicStoryShort, answer: PublicDebate["answer"]): StoryShortContent {
+  return {
+    headline: story.headline,
+    confidence: story.confidence,
+    summary: story.summary,
+    paths: story.paths.map((path) => ({ fate: path.fate, line: path.line, positionRef: path.position_ref })),
+    morePaths: Math.max(0, countStoryPositions(answer.nodes ?? [], answer.edges ?? []) - story.paths.length),
+    change: story.change.text,
+    reviewerNote: story.reviewer_note === null ? null : story.reviewer_note.text,
+    reservation: story.double_checked === false
+  };
+}
+
 export function PublicDebateOverview({
   debate,
   catalog,
+  storyCatalog,
+  storyLocale,
   composeCatalog = composeEnglish,
   onDetails,
   onRead
 }: {
   debate: PublicDebate;
   catalog: MessageCatalog;
+  /**
+   * The `public` catalogue of the language the debate was argued in (spec
+   * 2026-09-26 §14.3): the short story's label, fates and lines read in it,
+   * whatever the interface's language.
+   */
+  storyCatalog: MessageCatalog;
+  storyLocale: LocaleCode;
   /** The interface locale's `compose` catalogue: V3 score copy and model family names. */
   composeCatalog?: MessageCatalog;
   onDetails: () => void;
   onRead: (nodeId: string) => void;
 }) {
   const presentation = buildPublicDebatePresentation(debate, catalog);
+  // With a story, the label is said in human words and the storyteller's own
+  // sentence replaces the generic confidence words (spec §14.2), both in the
+  // question's language. Without one, the snapshot reads as it always did.
+  const story = debate.story_short;
+  // A components-only snapshot whose label the engine kept (spec §14.4.4): the
+  // label in human words and, without a story, "Our best answer:" and the
+  // leading position's statement, all in the question's language.
+  const floor = resolveFloor(publicFloorHost(debate.answer), debate.floor);
+  const floorView = floor === null ? null : floorAnswerView(floor, storyCatalog, storyLocale, storyLocale);
+  const storyVerdict = floor !== null ? floor.label : story === undefined ? null : debate.answer.verdict;
   const returnPath = `/public/debate/${encodeURIComponent(debate.public_ref)}`;
   const signInHref = `/login?next=${encodeURIComponent(returnPath)}`;
 
@@ -123,14 +169,25 @@ export function PublicDebateOverview({
           <div className="publicVerdictCore">
             <span className="publicVerdictTab" aria-hidden />
             <div className="publicVerdictHead">
-              <span
-                id="public-verdict-label"
-                className="publicVerdictPill"
-                data-verdict={presentation.verdict?.toLowerCase() ?? "unavailable"}
-              >
-                {verdictLabel(presentation.verdict, catalog)}
-              </span>
-              {presentation.confidenceBand ? (
+              {storyVerdict === null ? (
+                <span
+                  id="public-verdict-label"
+                  className="publicVerdictPill"
+                  data-verdict={presentation.verdict?.toLowerCase() ?? "unavailable"}
+                >
+                  {verdictLabel(presentation.verdict, catalog)}
+                </span>
+              ) : (
+                <span
+                  id="public-verdict-label"
+                  className="publicVerdictPill"
+                  data-verdict={storyVerdict.toLowerCase()}
+                  lang={storyLocale}
+                >
+                  {storyLabelWords(storyVerdict, storyCatalog)}
+                </span>
+              )}
+              {story === undefined && presentation.confidenceBand ? (
                 <span className="publicThresholdLabel">{t(catalog, "public.overview.confidence", { confidence: presentation.confidenceBand.toLowerCase() })}</span>
               ) : null}
               <button type="button" className="publicDetailsAction" onClick={onDetails}>
@@ -138,9 +195,16 @@ export function PublicDebateOverview({
               </button>
             </div>
             <div className="publicVerdictText">
-              {presentation.summary.length > 0
-                ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
-                : <p>{t(catalog, "public.overview.composedVerdictUnavailable")}</p>}
+              {story !== undefined
+                ? <StoryShortBlocks story={publicStoryContent(story, debate.answer)} catalog={storyCatalog} locale={storyLocale} className="publicStory" />
+                : floorView !== null
+                  ? <FloorAnswer view={floorView} showLabel={false} />
+                  : presentation.summary.length > 0
+                    ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+                    : <p>{t(catalog, "public.overview.composedVerdictUnavailable")}</p>}
+              {story !== undefined && floorView !== null && floorView.thinBasis !== null ? (
+                <p className="floorAnswerNote" lang={floorView.locale} dir={floorView.direction}>{floorView.thinBasis}</p>
+              ) : null}
             </div>
             <p className="publicVerdictCaveat"><span aria-hidden>⚠</span> {t(catalog, "public.overview.caveat", { caveat: presentation.caveat })}</p>
             <div className="publicMetricRow">

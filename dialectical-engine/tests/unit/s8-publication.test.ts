@@ -219,6 +219,7 @@ function publicationHarness() {
   const repository = {
     preflightGrant: async () => true,
     readAuthorPseudonym: async () => "Stable Public Name",
+    readArgumentLanguageTag: async () => null,
     prepareKeyProvision: async () => true,
     publish: async (input: Readonly<{
       publicationRef: string;

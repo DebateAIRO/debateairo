@@ -16,9 +16,9 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
-import type { RiskTier } from "@debateai/kernel";
+import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   assertHostedCostEnvelopesSealed,
@@ -31,6 +31,7 @@ import {
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
+  readStoryPolicyFromRegister,
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
@@ -41,7 +42,7 @@ import {
 } from "@debateai/register";
 // V-28 (DL4-F2): the application-wide daily spending ceiling, over the persisted
 // model-spend ledger migration 0066 created.
-import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
+import { CostEnvelopeGuard, PostgresModelSpendStore, costEnvelopeGuardPolicy } from "@debateai/budget";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
@@ -55,6 +56,9 @@ import { createSupportCaseMaterial, createSupportCaseService, createSupportMessa
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
+import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
+import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
+import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
 import {
@@ -238,8 +242,28 @@ await boot.run("support-admission-scopes", async () => {
 const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
   ? new CostEnvelopeGuard({
       store: new PostgresModelSpendStore(pool),
-      policy: await boot.run("cost-envelope-policy",
-        () => readCostEnvelopePolicy(pool, environment.REGISTER_VERSION))
+      policy: await boot.run("cost-envelope-policy", async () => {
+        const runPolicy = await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION);
+        // Verdict story (spec §8): an admitted run may also write its story,
+        // whose spend counts toward the day, so the day reserves the story's own
+        // ceiling beside the run's. The rows are OPTIONAL: a register without
+        // them, or with a malformed family, reserves the run's ceiling alone.
+        // An unreadable family is logged by code, as the runner logs it.
+        const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
+          .catch((error: unknown) => {
+            console.warn(JSON.stringify({
+              kind: "DEBATEAI_STORY",
+              event: "STORY_POLICY_UNREADABLE",
+              code: error instanceof TypedDomainError ? error.code : "UNTYPED"
+            }));
+            return null;
+          });
+        // Engine money rule, Task M7 (spec §14.4.1, §14.4.6): the story's
+        // overrun travels with its ceiling, and the ONE check over both money
+        // rows refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT) when the
+        // day cannot hold one full run plus its story.
+        return costEnvelopeGuardPolicy(runPolicy, storyPolicy);
+      })
     })
   : undefined;
 await boot.run("product-role-policy", () => readProductRolePolicy(pool, environment.REGISTER_VERSION));
@@ -441,6 +465,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
 },undefined,contentProvisionPool,Object.freeze({
   server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
 }));
+// Verdict story (spec 2026-09-26 §10): the owner reads stories through the
+// API's runtime pool; decryption uses the content encryption configured above.
+const storyRepository = new StoryRepository(pool);
 const publicationCipher = environment.PUBLICATION_ENABLED === "true"
   ? boot.runSync("publication-key-store", () => new PublicationCipher(new FilePublicationKeyStore(
       environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
@@ -452,7 +479,8 @@ const publications = publicationCipher === undefined
       new PostgresPublicationRepository(pool, auditContextHasher),
       publicationCipher,
       undefined,
-      new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher)
+      new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher),
+      new RepositoryPublicationStoryReader(storyRepository)
     );
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
@@ -685,6 +713,10 @@ const supportAnswers = createSupportAnswerService({
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
 const api = buildApi({
   application,
+  stories: new RepositoryAnswerStoryApplication(storyRepository),
+  // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
+  // the content-free disclosure record, on the same runtime pool.
+  disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pool)),
   accountErasure:erasureApplication,
   registration,
   recovery,

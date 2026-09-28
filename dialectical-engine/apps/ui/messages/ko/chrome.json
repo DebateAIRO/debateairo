@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "기타 토론 작업",
   "chrome.help": "도움말",
   "chrome.signedInAsker": "로그인한 질문자",
-  "chrome.guestSession": "게스트 세션"
+  "chrome.guestSession": "게스트 세션",
+  "chrome.languageOffer.label": "페이지 언어",
+  "chrome.languageOffer.text": "이 토론은 {language}({nativeName})로 작성되었습니다. 페이지를 {language}로 표시할까요?",
+  "chrome.languageOffer.textNative": "이 토론은 {language}로 작성되었습니다. 페이지를 {language}로 표시할까요?",
+  "chrome.languageOffer.switch": "{language}로 전환",
+  "chrome.languageOffer.dismiss": "아니요, 괜찮습니다"
 }

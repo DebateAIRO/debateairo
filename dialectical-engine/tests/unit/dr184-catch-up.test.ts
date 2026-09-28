@@ -46,7 +46,7 @@ function dependencies(overrides: Partial<ReviewCatchUpDependencies> = {}): Revie
     readPinnedMaximumAttempts: vi.fn(async () => 10),
     prepareVersion: vi.fn(async () => ({
       terminalBefore: "SERVED" as const, terminalAfter: "SERVED" as const,
-      numberBefore: 0.7, numberAfter: 0.7,
+      numberBefore: 0.7, numberAfter: 0.7, floorBefore: null, floorAfter: null,
       nowVisible: 1, stillSetAside: 0,
       persist: vi.fn(async () => ({ answerVersion: 2 }))
     })),
@@ -178,7 +178,7 @@ describe("DR-184 catch-up", () => {
     const persist = vi.fn(async () => ({ answerVersion: 2 }));
     const deps = dependencies({ prepareVersion: vi.fn(async () => ({
       terminalBefore: "SERVED" as const, terminalAfter: "SERVED" as const, numberBefore: 0.7, numberAfter: 0.6,
-      nowVisible: 1, stillSetAside: 0, persist
+      floorBefore: null, floorAfter: null, nowVisible: 1, stillSetAside: 0, persist
     })) });
     const report = await runReviewCatchUp({
       runId: "run:1", answerId: "answer:1", fromVersion: 1, workItemId: "work:1",
@@ -211,11 +211,62 @@ describe("DR-184 catch-up", () => {
     expect(deps.prepareVersion).not.toHaveBeenCalled();
   });
 
+  /**
+   * Engine money rule, M5 review (M1): a floor answer has no served number, so
+   * the number guard cannot see its label move. Its floor is re-derived by
+   * prepareVersion, and a version that would move it is refused the same way.
+   */
+  it.each([
+    ["the label would move", { leadingNodeId: "node:root", verdictState: "UNSUPPORTED" as const }],
+    ["another position would lead", { leadingNodeId: "node:other", verdictState: null }],
+    ["no position would be left to lead", null]
+  ] as const)("refuses a version on which %s, and does not persist it", async (_name, floorAfter) => {
+    const persist = vi.fn(async () => ({ answerVersion: 2 }));
+    const deps = dependencies({ prepareVersion: vi.fn(async () => ({
+      terminalBefore: "COMPONENTS_ONLY" as const, terminalAfter: "COMPONENTS_ONLY" as const,
+      numberBefore: null, numberAfter: null,
+      floorBefore: { leadingNodeId: "node:root", verdictState: "CONTESTED" as const }, floorAfter,
+      nowVisible: 1, stillSetAside: 0, persist
+    })) });
+    const report = await runReviewCatchUp({
+      runId: "run:1", answerId: "answer:1", fromVersion: 1, workItemId: "work:1",
+      questionLine: "Question?", invocationId: "catch:1",
+      pinnedPanel: [{ maker: "maker:b", providerRef: "provider:b" }],
+      judgeBound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 1_000 },
+      judgeContractHash: "contract:judge", runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 0 },
+      hold: { countCooldownHolds: async () => 0, record: async () => undefined, wait: async () => undefined },
+      dependencies: deps
+    });
+    expect(report).toMatchObject({ refusal: "CATCH_UP_FLOOR_WOULD_MOVE", toVersion: null });
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("persists a floor answer's version when its floor stays where it was", async () => {
+    const persist = vi.fn(async () => ({ answerVersion: 2 }));
+    const floor = { leadingNodeId: "node:root", verdictState: "CONTESTED" as const };
+    const deps = dependencies({ prepareVersion: vi.fn(async () => ({
+      terminalBefore: "COMPONENTS_ONLY" as const, terminalAfter: "COMPONENTS_ONLY" as const,
+      numberBefore: null, numberAfter: null, floorBefore: floor, floorAfter: { ...floor },
+      nowVisible: 1, stillSetAside: 0, persist
+    })) });
+    const report = await runReviewCatchUp({
+      runId: "run:1", answerId: "answer:1", fromVersion: 1, workItemId: "work:1",
+      questionLine: "Question?", invocationId: "catch:1",
+      pinnedPanel: [{ maker: "maker:b", providerRef: "provider:b" }],
+      judgeBound: { maxAttempts: 3, tokenCeiling: 256, deadlineMs: 1_000 },
+      judgeContractHash: "contract:judge", runDeathPolicy: { cooldownMs: 1, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 0 },
+      hold: { countCooldownHolds: async () => 0, record: async () => undefined, wait: async () => undefined },
+      dependencies: deps
+    });
+    expect(report).toMatchObject({ refusal: null, toVersion: 2 });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it("refuses a worse terminal before persisting", async () => {
     const persist = vi.fn(async () => ({ answerVersion: 2 }));
     const deps = dependencies({ prepareVersion: vi.fn(async () => ({
       terminalBefore: "SERVED" as const, terminalAfter: "COMPONENTS_ONLY" as const,
-      numberBefore: 0.7, numberAfter: 0.7, nowVisible: 1, stillSetAside: 0, persist
+      numberBefore: 0.7, numberAfter: 0.7, floorBefore: null, floorAfter: null, nowVisible: 1, stillSetAside: 0, persist
     })) });
     const report = await runReviewCatchUp({
       runId: "run:1", answerId: "answer:1", fromVersion: 1, workItemId: "work:1",

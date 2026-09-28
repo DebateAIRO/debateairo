@@ -422,6 +422,9 @@ describe("V-9 the kit names every refusal the credential path can emit", () => {
     const support = await read("apps/api/src/support/model.ts");
     const envelope = await read("packages/register/src/cost-envelope-policy.ts");
     const runtime = await read("packages/register/src/runtime-environment.ts");
+    // Engine money rule, Task M7: both hosted boots build their money guard through
+    // the one check over the cost row AND the story row.
+    const guardPolicy = await read("packages/budget/src/model-spend.ts");
     // slices/S03/PLAN.md §1b, rows E1…E7 in order. Anchors are strings, never line numbers.
     const anchors: ReadonlyArray<readonly [string, string, string]> = [
       [providers, "const PROVIDER_CREDENTIAL_REFUSAL_CODES", "] as const);"],
@@ -431,7 +434,8 @@ describe("V-9 the kit names every refusal the credential path can emit", () => {
       [providers, "function providerTargetPriceAmount", "\n}"],
       [envelope, "export function costEnvelopePolicyFromValue", "\n}"],
       [envelope, "export async function readCostEnvelopePolicy", "\n}"],
-      [runtime, "export class SupportAdmissionScopesNotSealedError", "\n}"]
+      [runtime, "export class SupportAdmissionScopesNotSealedError", "\n}"],
+      [guardPolicy, "export function costEnvelopeGuardPolicy", "\n}"]
     ];
     const union = new Set<string>();
     for (const [source, from, until] of anchors) {
@@ -442,7 +446,9 @@ describe("V-9 the kit names every refusal the credential path can emit", () => {
       expect(codes.length, from).toBeGreaterThan(0);
       for (const code of codes) union.add(code);
     }
-    expect(union.size).toBe(12);
+    // Task M7: 12 -> 13, STORY_DAILY_CEILING_INSUFFICIENT (a day that cannot hold
+    // one run plus its story), raised by `costEnvelopeGuardPolicy` at both boots.
+    expect(union.size).toBe(13);
     const readme = await read("deploy/vps/README.md");
     const refusal = readme.slice(
       readme.indexOf("### What the hosted mode refuses, in code"),
@@ -481,6 +487,7 @@ describe("V-9 the kit names every refusal the credential path can emit", () => {
       "PROVIDER_TARGET_PRICE_ZERO",
       "COST_ENVELOPE_POLICY_UNRESOLVED",
       "COST_ENVELOPE_POLICY_INVALID",
+      "STORY_DAILY_CEILING_INSUFFICIENT",
       "SUPPORT_ADMISSION_SCOPES_NOT_SEALED"
     ].sort());
     // (3) ARCH-REV p1 N1, p2 B1 — C1-3's EXACT sentence, BELOW the table only, whitespace collapsed.

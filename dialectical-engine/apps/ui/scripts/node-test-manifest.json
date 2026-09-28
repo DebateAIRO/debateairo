@@ -29,6 +29,7 @@
   "lib/contentSecurityPolicy.test.mjs",
   "lib/edgeUpgrade.test.mjs",
   "lib/publicDebatePresentation.test.mjs",
+  "lib/report/fonts.test.mjs",
   "lib/recommendation.test.mjs",
   "lib/scoringResponse.test.mjs",
   "lib/serverApi.test.mjs",

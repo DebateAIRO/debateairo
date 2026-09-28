@@ -1,11 +1,16 @@
 import { randomUUID } from "node:crypto";
 import {
+  AnswerFloorSchema,
   PublicDebateSchema,
+  PublicStoryShortSchema,
+  StoryLanguageTagSchema,
   type Answer,
+  type AnswerFloor,
   type Edge,
   type Node,
   type PublicDebate,
-  type PublicNode
+  type PublicNode,
+  type PublicStoryShort
 } from "@debateai/contract";
 import {
   hashToken,
@@ -15,6 +20,7 @@ import {
   PostgresPublicationRepository,
   type AuthSourceContext
 } from "@debateai/db";
+import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
@@ -91,6 +97,161 @@ function redactEdgeForPublic(edge: Edge): Edge {
   };
 }
 
+/**
+ * Verdict story (spec 2026-09-26 §10): where publish reads the short story of
+ * the answer being published. Owner-scoped; null when there is no READY or
+ * READY_WITH_RESERVATION story for that exact answer version.
+ */
+export interface PublicationStoryReader {
+  readStoryShort(input: Readonly<{
+    answerId: string;
+    answerVersion: number;
+    ownerRef: string;
+  }>): Promise<PublicStoryShort | null>;
+}
+
+const NO_PUBLICATION_STORIES: PublicationStoryReader = Object.freeze({
+  readStoryShort: async () => null
+});
+
+/** A diagnostic the log may carry: an identifier-shaped code or class name, never free text. */
+const STORY_READ_DIAGNOSTIC_SHAPE = /^[A-Za-z][A-Za-z0-9_]{0,63}$/u;
+
+/**
+ * What a failed publish-time story read logs: the error's typed code, or its
+ * class name, and never its message, which may carry a query, an id or story
+ * text. Anything that is not identifier-shaped logs as UNEXPECTED_ERROR.
+ */
+function storyReadDiagnostic(error: unknown): string {
+  const candidate = error instanceof TypedDomainError
+    ? error.code
+    : error instanceof Error ? error.name : null;
+  return candidate !== null && STORY_READ_DIAGNOSTIC_SHAPE.test(candidate) ? candidate : "UNEXPECTED_ERROR";
+}
+
+/** The API's operational log line (one JSON object), as the story route writes it. */
+function logStoryNotPublished(requestId: string, diagnostic: string): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.publication.story_not_published",
+    requestId,
+    diagnostic
+  })));
+}
+
+/**
+ * A story that cannot be read never blocks publishing: the snapshot keeps
+ * today's summary. A reader that throws, or answers with anything the public
+ * schema refuses, publishes no story rather than failing the snapshot's parse,
+ * and the log records only a bounded diagnostic.
+ */
+async function readPublishableStory(
+  stories: PublicationStoryReader,
+  input: Readonly<{ answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+): Promise<PublicStoryShort | null> {
+  let story: PublicStoryShort | null;
+  try {
+    story = await stories.readStoryShort({
+      answerId: input.answer.answer_id,
+      answerVersion: input.answer.answer_version,
+      ownerRef: input.authenticated.ownerRef
+    });
+  } catch (error) {
+    logStoryNotPublished(input.source.requestId, storyReadDiagnostic(error));
+    return null;
+  }
+  if (story === null) return null;
+  const parsed = PublicStoryShortSchema.safeParse(story);
+  if (parsed.success) return parsed.data;
+  logStoryNotPublished(input.source.requestId, "STORY_PUBLIC_SHORT_REFUSED");
+  return null;
+}
+
+/**
+ * The question's language tag for the snapshot (spec 2026-09-26 §14.3), copied
+ * from the run so the public page can show the short story's fixed text in it.
+ * Like the story, it never blocks publishing: a failed read, or a stored tag the
+ * snapshot schema refuses, publishes no language, and the log records only a
+ * bounded diagnostic.
+ */
+async function readPublishableLanguage(
+  repository: PostgresPublicationRepository,
+  input: Readonly<{ runId: string; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+): Promise<string | null> {
+  let tag: string | null;
+  try {
+    tag = await repository.readArgumentLanguageTag(input.runId, input.authenticated.userId, input.authenticated.ownerRef);
+  } catch (error) {
+    logLanguageNotPublished(input.source.requestId, storyReadDiagnostic(error));
+    return null;
+  }
+  if (tag === null) return null;
+  const parsed = StoryLanguageTagSchema.safeParse(tag);
+  if (parsed.success) return parsed.data;
+  logLanguageNotPublished(input.source.requestId, "LANGUAGE_TAG_REFUSED");
+  return null;
+}
+
+function logLanguageNotPublished(requestId: string, diagnostic: string): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.publication.language_not_published",
+    requestId,
+    diagnostic
+  })));
+}
+
+/**
+ * Engine money rule, Task M5 (spec 2026-09-26 §14.4.4): the FLOOR of a
+ * components-only answer — its label and its leading position — copied from
+ * the owner's disclosure record, so the public page can say "Our best answer"
+ * with the position's own statement, and whether that label's basis was thin
+ * (M5 review, I2). Never its cause. A served answer carries its own label and
+ * is never read. Like the story and the language, it never blocks publishing:
+ * a failed read, a floor the snapshot schema refuses, or a leading position
+ * that is not among the published nodes publishes no floor, and the log
+ * records only a bounded diagnostic.
+ */
+async function readPublishableFloor(
+  repository: PostgresPublicationRepository,
+  input: Readonly<{ runId: string; answer: Answer; authenticated: AuthenticatedSession; source: AuthSourceContext }>
+): Promise<AnswerFloor | null> {
+  if (input.answer.terminal !== "COMPONENTS_ONLY") return null;
+  let floor: Readonly<{ verdictState: string; leadingNodeId: string; basisIncomplete: boolean | null }> | null;
+  try {
+    floor = await repository.readAnswerFloor({
+      runId: input.runId,
+      answerId: input.answer.answer_id,
+      userId: input.authenticated.userId,
+      ownerRef: input.authenticated.ownerRef
+    });
+  } catch (error) {
+    logFloorNotPublished(input.source.requestId, storyReadDiagnostic(error));
+    return null;
+  }
+  if (floor === null) return null;
+  // A floor whose label receipt is missing has no known basis (`null`): the
+  // schema refuses it, so no floor goes out without its thin-basis flag.
+  const parsed = AnswerFloorSchema.safeParse({
+    verdict_state: floor.verdictState, leading_node_id: floor.leadingNodeId, basis_incomplete: floor.basisIncomplete
+  });
+  if (!parsed.success) {
+    logFloorNotPublished(input.source.requestId, "FLOOR_REFUSED");
+    return null;
+  }
+  if (!input.answer.nodes.some((node) => node.node_id === parsed.data.leading_node_id)) {
+    logFloorNotPublished(input.source.requestId, "FLOOR_NODE_NOT_PUBLISHED");
+    return null;
+  }
+  return parsed.data;
+}
+
+function logFloorNotPublished(requestId: string, diagnostic: string): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.publication.floor_not_published",
+    requestId,
+    diagnostic
+  })));
+}
+
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
   reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
@@ -144,7 +305,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
     private readonly repository: PostgresPublicationRepository,
     private readonly cipher: PublicationCipher,
     private readonly clock: () => Date = () => new Date(),
-    private readonly cleanupRepository: PostgresPublicationRepository = repository
+    private readonly cleanupRepository: PostgresPublicationRepository = repository,
+    private readonly stories: PublicationStoryReader = NO_PUBLICATION_STORIES
   ) {}
 
   async preflightGrant(input: Readonly<{
@@ -218,6 +380,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
       input.authenticated.ownerRef
     );
     if (pseudonym === null) return null;
+    const storyShort = await readPublishableStory(this.stories, input);
+    const language = await readPublishableLanguage(this.repository, input);
+    const floor = await readPublishableFloor(this.repository, input);
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
     if (!await this.repository.prepareKeyProvision({
@@ -246,7 +411,10 @@ export class PostgresPublicationApplication implements PublicationApplication {
         nodes: input.answer.nodes.map(redactNodeForPublic),
         edges: input.answer.edges.map(redactEdgeForPublic),
         tree_included: true
-      }
+      },
+      ...(storyShort === null ? {} : { story_short: storyShort }),
+      ...(language === null ? {} : { language }),
+      ...(floor === null ? {} : { floor })
     });
     let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;
     try {
@@ -415,6 +583,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       models?: readonly string[];
       verdict: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | null;
       confidence_band: string | null;
+      floor_verdict?: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED";
     }>[];
     total: number;
   }>> {
@@ -432,7 +601,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
           node.maker_lineage === null ? [] : [node.maker_lineage.model_id]
         ))]),
         verdict: debate.answer.verdict,
-        confidence_band: debate.answer.confidence_band
+        confidence_band: debate.answer.confidence_band,
+        // Task M6: the floor's label only (spec §14.4.4), for the library row.
+        ...(debate.floor === undefined ? {} : { floor_verdict: debate.floor.verdict_state })
       }));
     }
     return Object.freeze({ items: Object.freeze(items), total: page.total });

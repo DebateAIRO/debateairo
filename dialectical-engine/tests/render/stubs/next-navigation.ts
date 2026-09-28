@@ -1,5 +1,7 @@
 let calls = 0;
 let pathname = "/";
+/** Each router.refresh(), recorded as the page's query string at that moment ("" in a node environment). */
+let refreshes: string[] = [];
 
 export function notFound(): never {
   calls += 1;
@@ -20,4 +22,27 @@ export function usePathname(): string {
 
 export function setPathname(value: string): void {
   pathname = value;
+}
+
+const router = Object.freeze({
+  refresh(): void {
+    refreshes.push(typeof window === "undefined" ? "" : window.location.search);
+  },
+  push(): void {},
+  replace(): void {},
+  prefetch(): void {},
+  back(): void {},
+  forward(): void {}
+});
+
+export function useRouter(): typeof router {
+  return router;
+}
+
+export function resetRefreshes(): void {
+  refreshes = [];
+}
+
+export function readRefreshes(): readonly string[] {
+  return [...refreshes];
 }

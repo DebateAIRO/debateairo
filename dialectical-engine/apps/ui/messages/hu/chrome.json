@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "További vitaműveletek",
   "chrome.help": "Súgó",
   "chrome.signedInAsker": "Bejelentkezett kérdező",
-  "chrome.guestSession": "Vendégmunkamenet"
+  "chrome.guestSession": "Vendégmunkamenet",
+  "chrome.languageOffer.label": "Az oldal nyelve",
+  "chrome.languageOffer.text": "Ez a vita {language} nyelvű ({nativeName}). Szeretné {language} nyelven megjeleníteni az oldalt?",
+  "chrome.languageOffer.textNative": "Ez a vita {language} nyelvű. Szeretné {language} nyelven megjeleníteni az oldalt?",
+  "chrome.languageOffer.switch": "Váltás {language} nyelvre",
+  "chrome.languageOffer.dismiss": "Köszönöm, nem"
 }

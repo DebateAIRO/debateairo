@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "Więcej działań debaty",
   "chrome.help": "Pomoc",
   "chrome.signedInAsker": "Zalogowany pytający",
-  "chrome.guestSession": "Sesja gościa"
+  "chrome.guestSession": "Sesja gościa",
+  "chrome.languageOffer.label": "Język strony",
+  "chrome.languageOffer.text": "Język tej debaty: {language} ({nativeName}). Czy wyświetlić stronę w języku: {language}?",
+  "chrome.languageOffer.textNative": "Język tej debaty: {language}. Czy wyświetlić stronę w języku: {language}?",
+  "chrome.languageOffer.switch": "Przełącz na język: {language}",
+  "chrome.languageOffer.dismiss": "Nie, dziękuję"
 }

@@ -42,5 +42,10 @@
   "chrome.moreDebateActions": "更多辩论操作",
   "chrome.help": "帮助",
   "chrome.signedInAsker": "已登录的提问者",
-  "chrome.guestSession": "访客会话"
+  "chrome.guestSession": "访客会话",
+  "chrome.languageOffer.label": "页面语言",
+  "chrome.languageOffer.text": "这场辩论使用的是{language}（{nativeName}）。要以{language}显示此页面吗？",
+  "chrome.languageOffer.textNative": "这场辩论使用的是{language}。要以{language}显示此页面吗？",
+  "chrome.languageOffer.switch": "切换到{language}",
+  "chrome.languageOffer.dismiss": "不用了，谢谢"
 }

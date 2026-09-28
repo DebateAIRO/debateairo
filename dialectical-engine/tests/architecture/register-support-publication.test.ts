@@ -11,6 +11,7 @@ import {
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
+  STORY_ROW_KEYS,
   buildBootstrapRegisterPublicationRows,
   canonicalRegisterJson,
   computeRegisterSnapshotSha256,
@@ -403,9 +404,18 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     // the same reason `admissionPolicy` is, so `historicalRows` stays 14 and the
     // legacy hash below is untouched. MEASURED: the port emits 51 with no
     // duplicate keys, and 50 with exactly `costEnvelopePolicy` removed.
-    expect(developmentRows).toHaveLength(51);
-    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(50);
-    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(50);
+    //
+    // VERDICT STORY (spec 2026-09-26 §9): 51 -> 57. The development deployment
+    // now also seals the six OPTIONAL story rows (packages/register/src/
+    // story-policy.ts); the seventh, the money row, is sealed only by a HOSTED
+    // publication. They are DEPLOYMENT rows, so `historicalRows` stays 14 and
+    // the legacy hash below is untouched: 57 with no duplicate keys, and 51
+    // with exactly the six story keys removed.
+    const storyKeys: readonly string[] = STORY_ROW_KEYS;
+    expect(developmentRows).toHaveLength(57);
+    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(51);
+    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(56);
+    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(56);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
 
