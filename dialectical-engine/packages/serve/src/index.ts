@@ -2740,8 +2740,9 @@ export class ServeRepository {
     );
     const row = answer.rows[0];
     if (row === undefined) return null;
-    // A21: which models did each job — undefined when the run pinned no assignment.
-    const modelAssignment = projectModelAssignment(row.role_assignment_row);
+    // A21: which models did each job — undefined when the run pinned no assignment,
+    // or pinned one that does not parse (omitted whole and reported, never a failed answer).
+    const modelAssignment = projectModelAssignment(row.role_assignment_row, row.run_id);
     return this.#memory.withDisclosureContentLease([row.run_id],async () => {
     const [runContent, factContent, composedContent, answerContent, conformanceContent] = await Promise.all([
       decryptContentForRun<{ questionLine: string }>(
