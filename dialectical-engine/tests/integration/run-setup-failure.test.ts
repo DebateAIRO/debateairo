@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { WorkItemRepository } from "@debateai/battery";
 import { migrate } from "@debateai/db";
+import type { Pool } from "pg";
 import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
 import { ServeRepository } from "@debateai/serve";
 import { PostgresAskApplication, type Dispatcher, type RunCreationSettings } from "@debateai/api";
@@ -67,14 +68,18 @@ const ask: AskRequest = {
   steering_annotations: []
 };
 
-function submitAs(askerId: string, dispatcher: Dispatcher): Promise<unknown> {
+function submitAs(
+  askerId: string,
+  dispatcher: Dispatcher,
+  admissionPools: Readonly<{ server: Pool; legacy: Pool }> = createTestAskAdmissionPoolFacades(database.pool)
+): Promise<unknown> {
   const application = new PostgresAskApplication(
     database.pool,
     dispatcher,
     settings,
     undefined,
     database.pool,
-    createTestAskAdmissionPoolFacades(database.pool)
+    admissionPools
   );
   const session = {
     asker_id: askerId,
@@ -115,6 +120,39 @@ async function isDispatchable(runId: string): Promise<boolean> {
 }
 
 /**
+ * Admission pools whose per-owner lease really unlocks and then reports that it
+ * did not, as a dropped connection does: the run was already committed by then.
+ */
+function admissionPoolsWhoseUnlockFails(): Readonly<{ server: Pool; legacy: Pool }> {
+  const facade = (): Pool => new Proxy(database.pool, {
+    get(target, property) {
+      if (property === "connect") {
+        return async () => {
+          const client = await target.connect();
+          return new Proxy(client, {
+            get(inner, key) {
+              if (key === "query") {
+                return async (...args: unknown[]) => {
+                  const result = await Reflect.apply(inner.query, inner, args);
+                  return typeof args[0] === "string" && args[0].includes("pg_advisory_unlock")
+                    ? { ...result, rows: [{ unlocked: false }] }
+                    : result;
+                };
+              }
+              const value = Reflect.get(inner, key, inner);
+              return typeof value === "function" ? value.bind(inner) : value;
+            }
+          });
+        };
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    }
+  });
+  return Object.freeze({ server: facade(), legacy: facade() });
+}
+
+/**
  * Makes the database refuse one insert for this asker's runs only, so the rest
  * of the file (and the step under test's neighbours) keep working. Dropped in
  * `finally` by the caller.
@@ -146,6 +184,25 @@ async function refuseInsert(input: {
 }
 
 describe("a run whose setup fails after it was created", () => {
+  it("is marked FAILED when the admission lease cannot be released after the run was committed", async () => {
+    const askerId = `asker:setup-lease:${randomUUID()}`;
+    const dispatched: string[] = [];
+    await expect(submitAs(
+      askerId,
+      { dispatch: async ({ runId }) => { dispatched.push(runId); } },
+      admissionPoolsWhoseUnlockFails()
+    )).rejects.toThrow("OWNER_ASK_ADMISSION_LEASE_UNLOCK_FAILED");
+
+    const runId = await onlyRunOf(askerId);
+    expect(await jobsOf(runId)).toEqual([
+      { state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:ADMISSION_RELEASE" }
+    ]);
+    expect(await openRunRow(askerId, runId)).toMatchObject({
+      state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:ADMISSION_RELEASE"
+    });
+    expect(dispatched).toEqual([]);
+  });
+
   it("is marked FAILED when the memory question cannot be recorded, before any job exists", async () => {
     const askerId = `asker:setup-memory:${randomUUID()}`;
     const dispatched: string[] = [];

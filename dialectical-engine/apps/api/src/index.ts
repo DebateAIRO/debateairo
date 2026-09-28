@@ -2653,7 +2653,16 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
 }
 
 /** The step of `submit` after the run row exists; its failure reason is `RUN_SETUP_FAILED:<step>`. */
-type RunSetupStep = "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH";
+type RunSetupStep = "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH";
+
+/**
+ * A run's first job, named once: `submit` queues it, and a failed setup records
+ * this same job FAILED. Two spellings could leave a READY job beside the
+ * FAILED one, and start-up recovery would run a debate its owner sees failed.
+ */
+function firstRunJob(runId: string): Readonly<{ batteryRowId: "Q1"; commandKey: string }> {
+  return Object.freeze({ batteryRowId: "Q1", commandKey: `S00:${runId}:Q1` });
+}
 
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
@@ -2709,6 +2718,9 @@ export class PostgresAskApplication implements AskApplication {
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     let runId:string;
+    // Set the moment startRun commits: the lease's release can still throw
+    // after that, and the run then exists with nothing to start it.
+    let createdRunId:string|undefined;
     try {
       const admissionPool=principal.kind === "server"
         ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
@@ -2716,7 +2728,7 @@ export class PostgresAskApplication implements AskApplication {
         await this.#liveness.recordQuery(
           ask.question_line,ownership,new Date(ask.as_of)
         );
-        return this.#runs.startRun({
+        createdRunId=await this.#runs.startRun({
           questionLine: ask.question_line,
           argumentLanguageTag: argumentLanguage.tag,
           argumentLanguageName: argumentLanguage.nameEn,
@@ -2744,8 +2756,10 @@ export class PostgresAskApplication implements AskApplication {
           },
           batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
         },lease.client);
+        return createdRunId;
       });
     } catch (error) {
+      if (createdRunId !== undefined) await this.#recordRunSetupFailure(createdRunId, "ADMISSION_RELEASE");
       if (error instanceof TypedDomainError
         && error.code === "OWNER_PRIVATE_HISTORY_SCAN_SATURATED") {
         throw new AskRefusal(error);
@@ -2770,9 +2784,8 @@ export class PostgresAskApplication implements AskApplication {
       setupStep = "WORK_QUEUE";
       const workItemId=await this.#work.enqueue({
         runId,
-        batteryRowId: "Q1",
-        nodeSet: [],
-        commandKey: `S00:${runId}:Q1`
+        ...firstRunJob(runId),
+        nodeSet: []
       });
       setupStep = "DISPATCH";
       await this.dispatcher.dispatch({ runId, workItemId });
@@ -2791,9 +2804,7 @@ export class PostgresAskApplication implements AskApplication {
   async #recordRunSetupFailure(runId: string, step: RunSetupStep): Promise<void> {
     const reason = `RUN_SETUP_FAILED:${step}`;
     try {
-      await this.#work.recordSetupFailure({
-        runId, batteryRowId: "Q1", commandKey: `S00:${runId}:Q1`, reason
-      });
+      await this.#work.recordSetupFailure({ runId, ...firstRunJob(runId), reason });
     } catch (recordError) {
       console.error(JSON.stringify(Object.freeze({
         event: "api.run.setup_failure_unrecorded",
