@@ -6,3 +6,5 @@
 f76e47f945c8944694c1acfd8791ea37d2ee8836:dialectical-engine/apps/ui/messages/hr/compose.json:generic-api-key:41
 # 2026-09-26 — Turn 12 localization: generic-api-key matched Slovenian UI text ("Ni zapisa o nestrinjanju", "no disagreement record"), not a key.
 f76e47f945c8944694c1acfd8791ea37d2ee8836:dialectical-engine/apps/ui/messages/sl/compose.json:generic-api-key:41
+# 2026-09-28 — PES-S02 host tools: generic-api-key matched the refusal CODE "PES_S02_LSOF_UNAVAILABLE" written after LSOF_BINARY_ENV_KEY (the NAME of the operator's lsof override variable) in resolveHostTool's call, not a key.
+872c88a03b5ed7763f0fc212f7c1e3ff546b1a23:dialectical-engine/acceptance/pes-s02-fake-vendor.ts:generic-api-key:75
