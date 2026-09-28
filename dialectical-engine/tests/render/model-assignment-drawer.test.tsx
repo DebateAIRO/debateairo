@@ -18,8 +18,9 @@ import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
  *    JSON export.
  *  - O3: a lowered strength is never mentioned.
  * Carries: 2 (the backup mark's COMMITTED label), 4 (a FALLBACK answer seat names no model),
- * 5 (the cross-exchange is one fixed line), 6 (the title claims no use), 13 (the absent-field
- * sentence is true for "no scorecard" and for an unreadable pin alike).
+ * 5 (the cross-exchange is one fixed line), 6 (the title claims no use). Final review I4 replaced
+ * carry 13's absent-field sentence: an answer with no assignment (every answer without a scorecard,
+ * and an unreadable pin) shows NO section, so the legacy drawer is exactly what it was.
  */
 
 const noop = () => {};
@@ -58,8 +59,8 @@ function escaped(text: string): string {
 
 const TITLE = "Models chosen for this debate";
 const STAND_IN = "Where a chosen model was unavailable, another AI model may have stepped in.";
-// Fix round 1 (review Minor 1): exact both when no scorecard was in force and when the run's record is unreadable.
-const NOT_RECORDED = "No record of the models for this debate is available.";
+// Final review I4: the sentence carry 13 once showed for an absent assignment. It must never render again.
+const RETIRED_NOT_RECORDED = "No record of the models for this debate is available.";
 const SITE_SETTING = "This site's usual setting chooses the model for this job.";
 const CROSS_EXCHANGE = "The model that wrote each opening position also writes its replies to the other positions.";
 
@@ -184,11 +185,15 @@ describe("A21.3 · the honesty drawer names the models chosen for each debate jo
     expect(html).not.toContain(">Models used<");
   });
 
-  it("carry 13 · an absent assignment says only that the models were not recorded", () => {
-    const section = modelsSection(drawerHtml({}));
-    expect(section).toContain(`<div class="drawerHintMuted">${escaped(NOT_RECORDED)}</div>`);
-    expect(section).not.toContain(escaped(STAND_IN));
-    expect(section).not.toMatch(/scorecard|plan list|because|metaLine/iu);
+  it("final review I4 · an absent assignment adds no section: the legacy drawer is exactly as before", () => {
+    // Absent is every answer without a scorecard in force, and an answer whose pin could not be read.
+    const html = drawerHtml({});
+    expect(html).not.toContain(TITLE);
+    expect(html).not.toContain(escaped(RETIRED_NOT_RECORDED));
+    expect(html).not.toContain(escaped(STAND_IN));
+    expect(html).not.toContain('class="metaLine"');
+    // An assigned answer still gets its section, so the omission is the absent case alone.
+    expect(drawerHtml({ model_assignment: ASSIGNMENT })).toContain(`aria-label="${TITLE}"`);
   });
 
   it("carry 2 / final review m1 · the backup mark reads in its committed plain words, true in every case", () => {

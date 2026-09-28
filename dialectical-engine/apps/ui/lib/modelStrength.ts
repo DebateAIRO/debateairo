@@ -112,9 +112,9 @@ export function modelStrengthControl(input: Readonly<{
  */
 export const MODEL_ASSIGNMENT_COPY = Object.freeze({
   // Carry 6: the drawer shows the PINNED choice, not a record of use (a backup may answer some calls).
+  // Final review I4: an answer with no assignment (no scorecard was in force, or its pin is
+  // unreadable) shows NO section at all, so there is no absent-field sentence to hold here.
   title: "Models chosen for this debate",
-  // Carry 13 / fix round 1: exact both when no scored model list was in force and when the run's record is unreadable.
-  notRecorded: "No record of the models for this debate is available.",
   // O1: the one sentence about stand-ins, in the words of the committed backup-mark label.
   standIn: "Where a chosen model was unavailable, another AI model may have stepped in.",
   // Carry 4: a FALLBACK answer-writer or answer-checker seat is never sat; the site's configured model answers.

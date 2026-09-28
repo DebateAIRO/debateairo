@@ -208,35 +208,34 @@ export function AnswerHonestyDrawer({
 
           {/* A21.3 · owner decisions O1-O3: a plain list of the models chosen per debate job,
               named as the node badges name them. No seat, thinking level, share, strength,
-              step-down or scorecard version; that detail stays in the JSON export. */}
-          <section className="wsSection" aria-label={MODEL_ASSIGNMENT_COPY.title}>
-            <div className="drawerSectionTitle">{MODEL_ASSIGNMENT_COPY.title}</div>
-            {answer.model_assignment === undefined ? (
-              <div className="drawerHintMuted">{MODEL_ASSIGNMENT_COPY.notRecorded}</div>
-            ) : (
-              <>
-                <ul className="drawerFindingList">
-                  {modelAssignmentJobs(answer.model_assignment).map((job) => (
-                    <li key={job.role} className="drawerFindingItem">
-                      <div className="drawerFindingMeta">
-                        <span>{job.label}</span>
+              step-down or scorecard version; that detail stays in the JSON export.
+              Final review I4: an answer with no assignment — every answer without a scorecard
+              in force, and one whose pin could not be read — adds no section at all, so the
+              legacy drawer is exactly what it was. */}
+          {answer.model_assignment === undefined ? null : (
+            <section className="wsSection" aria-label={MODEL_ASSIGNMENT_COPY.title}>
+              <div className="drawerSectionTitle">{MODEL_ASSIGNMENT_COPY.title}</div>
+              <ul className="drawerFindingList">
+                {modelAssignmentJobs(answer.model_assignment).map((job) => (
+                  <li key={job.role} className="drawerFindingItem">
+                    <div className="drawerFindingMeta">
+                      <span>{job.label}</span>
+                    </div>
+                    {job.note !== null ? (
+                      <div className="drawerFindingText">{job.note}</div>
+                    ) : (
+                      <div className="roleChips">
+                        {job.models.map((model) => (
+                          <ModelMetaLine key={JSON.stringify([model.maker, model.modelId])} modelId={model.modelId} maker={model.maker} />
+                        ))}
                       </div>
-                      {job.note !== null ? (
-                        <div className="drawerFindingText">{job.note}</div>
-                      ) : (
-                        <div className="roleChips">
-                          {job.models.map((model) => (
-                            <ModelMetaLine key={JSON.stringify([model.maker, model.modelId])} modelId={model.modelId} maker={model.maker} />
-                          ))}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <div className="drawerHintMuted">{MODEL_ASSIGNMENT_COPY.standIn}</div>
-              </>
-            )}
-          </section>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="drawerHintMuted">{MODEL_ASSIGNMENT_COPY.standIn}</div>
+            </section>
+          )}
 
           <section className="wsSection" aria-label="Graph edges">
             <div className="drawerSectionTitle">Graph edges</div>

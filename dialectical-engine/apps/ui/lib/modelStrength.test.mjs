@@ -197,13 +197,14 @@ test("A21 O3: the list is the same whatever the strength, the step-down or the s
 test("A21 O2: the drawer's strings live in one place and name no figure or internal term", () => {
   const strings = [
     MODEL_ASSIGNMENT_COPY.title,
-    MODEL_ASSIGNMENT_COPY.notRecorded,
     MODEL_ASSIGNMENT_COPY.standIn,
     MODEL_ASSIGNMENT_COPY.siteSetting,
     MODEL_ASSIGNMENT_COPY.crossExchange,
     ...Object.values(MODEL_ASSIGNMENT_COPY.jobs)
   ];
-  assert.equal(strings.length, 12);
+  // Final review I4: the absent-field sentence is gone — an answer with no assignment shows no section.
+  assert.deepEqual(Object.keys(MODEL_ASSIGNMENT_COPY), ["title", "standIn", "siteSetting", "crossExchange", "jobs"]);
+  assert.equal(strings.length, 11);
   for (const text of strings) {
     assert.doesNotMatch(text, /[$€%\d]|USD/u);
     assert.doesNotMatch(
@@ -212,7 +213,6 @@ test("A21 O2: the drawer's strings live in one place and name no figure or inter
     );
   }
   assert.deepEqual(DEBATE_ROLES.map((role) => debateRoleLabel(role)), DEBATE_ROLES.map((role) => MODEL_ASSIGNMENT_COPY.jobs[role]));
-  // Carry 6: the title claims a choice, never use; carry 13: true for "no scorecard" AND "unreadable pin".
+  // Carry 6: the title claims a choice, never use.
   assert.doesNotMatch(MODEL_ASSIGNMENT_COPY.title, /used/iu);
-  assert.doesNotMatch(MODEL_ASSIGNMENT_COPY.notRecorded, /because|no scorecard|plan/iu);
 });
