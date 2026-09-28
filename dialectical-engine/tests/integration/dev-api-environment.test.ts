@@ -173,11 +173,11 @@ describe("DEV-09 private local API environment", () => {
       .toContain("debateai_dev_evaluator_api");
     expect(environment.get("EVALUATOR_DEV_MENU_DATABASE_URL"))
       .not.toBe(environment.get("DATABASE_URL"));
-    expect(environment.get("EVALUATOR_DATABASE_URL"))
-      .toContain("debateai_dev_evaluator_worker");
-    expect(environment.get("EVALUATOR_DATABASE_URL"))
-      .not.toBe(environment.get("DATABASE_URL"));
-    expect(environment.get("EVALUATOR_DEV_MENU_ENABLED")).toBe("true");
+    // The menu stays off and no evaluator-worker URL is written: the source has
+    // said so since 2026-08-28. b7ca2c41 (2026-09-14) expected both without the
+    // source that would produce them (see tests/architecture/dev-database-principals).
+    expect(environment.has("EVALUATOR_DATABASE_URL")).toBe(false);
+    expect(environment.get("EVALUATOR_DEV_MENU_ENABLED")).toBe("false");
     expect(JSON.parse(environment.get("PROVIDER_DISCOVERY_TARGETS_JSON")!)).toEqual(
       TEST_DEVELOPMENT_PROVIDER_DOCUMENT.providers.map((provider) => ({
         provider_ref: provider.provider_ref,
