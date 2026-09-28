@@ -1,8 +1,18 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runDualMakerProof } from "../../acceptance/dual-maker-proof.js";
 import { main as startAcceptanceBoot } from "../../acceptance/main.js";
+import {
+  invokeCli,
+  startCliRelayServer,
+  type CliRelayAdapter,
+  type CommandSpec
+} from "../../acceptance/relay-core.js";
 import { assertRelayRuntime, relayRuntimeRefusalCode } from "../../acceptance/relay-deployment-guard.js";
 import { runAcceptanceCeremony, type AcceptanceArguments } from "../../acceptance/run-acceptance.js";
 import {
@@ -14,15 +24,16 @@ import {
 
 /**
  * V-9(c): the command-line relays ARE the local mode, and the hosted site never
- * runs them. `relays:serve` refuses the hosted deployment first thing
- * (acceptance/relay-host.test.ts); these are the OTHER entry points that start a
- * relay, each held to the same refusal, with the same codes, before it reads a
- * file or starts a CLI.
+ * runs them. Every entry point that starts a relay is held to one refusal, with
+ * one set of codes, before it reads a file or starts a CLI; the relay core holds
+ * its two doors to the same refusal as a backstop. A new entry point that starts
+ * a relay gets its own case here.
  *
  * No case here can start a real CLI or the real development stack, with or
- * without the guard: the panel gets recording stand-ins, the acceptance entries
- * are handed settings that stop them at their own first check, and `dev:auth:up`
- * runs with a stack profile its settings check refuses before anything is read.
+ * without the guard: the panel gets recording stand-ins, the relay core gets a
+ * stand-in program, the acceptance entries are handed settings that stop them at
+ * their own first check, and `dev:auth:up` runs with a stack profile its settings
+ * check refuses before anything is read.
  */
 
 type Environment = Readonly<Record<string, string | undefined>>;
@@ -62,6 +73,68 @@ describe("V-9(c) the one relay deployment guard", () => {
     expect(relayRuntimeRefusalCode(new TypeError("DEPLOYMENT_MODE_UNRESOLVED"))).toBeNull();
     expect(relayRuntimeRefusalCode("RELAY_HOST_REFUSED_IN_HOSTED")).toBeNull();
     expect(relayRuntimeRefusalCode(undefined)).toBeNull();
+  });
+});
+
+describe("V-9(c) the relay core refuses too, whichever entry point reached it", () => {
+  // A stand-in CLI: this repository's own Node, writing a marker file. It is the
+  // only program either door can reach here, so no vendor CLI ever runs.
+  const standIn = async () => {
+    const directory = await mkdtemp(join(tmpdir(), "v9c-relay-core-"));
+    const marker = join(directory, "ran");
+    const command: CommandSpec = Object.freeze({
+      binary: process.execPath,
+      prefixArguments: ["-e", `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran")`]
+    });
+    return { directory, marker, command };
+  };
+  const adapter: CliRelayAdapter = Object.freeze({
+    maker: "StandIn",
+    authEnvironmentKeys: [],
+    testEnvironmentKeys: [],
+    failureCode: "STAND_IN_CLI_FAILED",
+    timeoutCode: "STAND_IN_CLI_TIMEOUT",
+    buildArguments: () => [],
+    parseCompletion: () => ({ content: "ok", model: "stand-in-model", usage: null })
+  });
+  const listeningServers = () =>
+    process.getActiveResourcesInfo().filter((resource) => resource === "TCPServerWrap").length;
+  const stubProcessEnvironment = (environment: Environment) => {
+    vi.stubEnv("DEBATEAI_DEPLOYMENT_MODE", environment.DEBATEAI_DEPLOYMENT_MODE);
+    vi.stubEnv("NODE_ENV", environment.NODE_ENV);
+  };
+
+  it("never starts a CLI and never serves a relay in a hosted process; a local process does both", async () => {
+    for (const [label, environment, code] of REFUSED) {
+      const { directory, marker, command } = await standIn();
+      const serversBefore = listeningServers();
+      stubProcessEnvironment(environment);
+      try {
+        await expect(invokeCli(command, adapter, "prompt", 10_000), label)
+          .rejects.toMatchObject({ code, message: code });
+        await expect(startCliRelayServer({ port: 0, timeoutMs: 10_000, command, adapter }), label)
+          .rejects.toMatchObject({ code, message: code });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+      expect(existsSync(marker), label).toBe(false);
+      expect(listeningServers(), label).toBe(serversBefore);
+      await rm(directory, { recursive: true, force: true });
+    }
+    for (const [label, environment] of LOCAL) {
+      const { directory, marker, command } = await standIn();
+      stubProcessEnvironment(environment);
+      try {
+        await expect(invokeCli(command, adapter, "prompt", 10_000), label)
+          .resolves.toMatchObject({ model: "stand-in-model" });
+        const relay = await startCliRelayServer({ port: 0, timeoutMs: 10_000, command, adapter });
+        await relay.close();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+      expect(existsSync(marker), label).toBe(true);
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
 

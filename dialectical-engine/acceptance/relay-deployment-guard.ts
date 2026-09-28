@@ -15,6 +15,13 @@ import {
  * - the acceptance boot, ceremony and dual-maker proof — acceptance/main.ts,
  *   acceptance/run-acceptance.ts and acceptance/dual-maker-proof.ts
  *
+ * The relay core (relay-core.ts) calls it again as a backstop, on the process's
+ * own environment, at the only two doors every relay passes through: `invokeCli`,
+ * where a CLI is started, and `startCliRelayServer`, where a relay listens. A
+ * forgotten entry point therefore still starts no CLI and serves no relay; what
+ * the backstop cannot stop is a relay's own work before those doors (the Hermes
+ * relay reads its credential file first), which is why the entry points check.
+ *
  * `hosted` refuses with RELAY_HOST_REFUSED_IN_HOSTED. `resolveDeploymentMode`
  * itself refuses a production process that names no deployment
  * (DEPLOYMENT_MODE_UNRESOLVED) and a mode it does not know
