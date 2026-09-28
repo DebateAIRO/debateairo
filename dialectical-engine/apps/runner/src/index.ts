@@ -140,6 +140,9 @@ import {
   plannedSeatSlot,
   roleAssignmentSeatProblem,
   roleFallbackEventValue,
+  rotateSeats,
+  rotatedSeatSelection,
+  seatRotationOffset,
   seatSiteOrdinal,
   withEffectiveDegradedDiversity,
   type AssignedRunSeatBook,
@@ -3750,9 +3753,8 @@ export class WalkingSkeletonRunner {
       // author's maker is answered by its runner-up instead of being lost.
       const notTheAuthor = (member: SeatIdentity): boolean => member.maker !== input.authorMaker;
       const panelCallCap = Math.max(effectiveMakerCount, envelopeBasis.panelSize) - 1;
-      let panelCallsPlanned = 0;
       const panelKeyFor = (member: SeatMember): string => `${input.callSiteKey}:${member.providerRef}`;
-      const panelMembers = seatBook.judge.flatMap((seat) => {
+      const plannedSeats = seatBook.judge.map((seat) => {
         // A16a (controller ruling on carry 1; fix round 1): a panel site a slot
         // answered on an earlier pass is PREFERRED for that slot again, and the
         // other member stays its backup (`ledgerSeatRule`).
@@ -3769,7 +3771,20 @@ export class WalkingSkeletonRunner {
           ...(fromLedger.prefer === undefined ? {} : { prefer: fromLedger.prefer }),
           ...(ledgerMove === undefined ? {} : { ledgerMove })
         };
-        const planned = seatCaller.plan(seat, input.callSiteKey, panelOptions);
+        return { seat, panelOptions, planned: seatCaller.plan(seat, input.callSiteKey, panelOptions) };
+      });
+      // Final review I2: the `panelCallCap` seats this node calls, going round the
+      // judge seats from a SITE-PURE offset (`seatRotationOffset`: run, role, base
+      // key), never always the first ones — so across nodes every seat the drawer
+      // lists judges, and a resumed pass calls the same seats at every node. The
+      // per-node count is unchanged (DR-184-v5), and on the legacy book the cap
+      // never binds, so every eligible seat is called there exactly as before.
+      const calledSeats = rotatedSeatSelection(
+        plannedSeats.map((entry) => entry.planned !== null),
+        panelCallCap,
+        seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: input.callSiteKey })
+      );
+      const panelMembers = plannedSeats.flatMap(({ seat, panelOptions, planned }, seatPosition) => {
         if (planned === null) {
           return [{
             memberRole: seat.main.maker,
@@ -3783,8 +3798,7 @@ export class WalkingSkeletonRunner {
             }
           }];
         }
-        if (panelCallsPlanned >= panelCallCap) return [];
-        panelCallsPlanned += 1;
+        if (calledSeats[seatPosition] !== true) return [];
         return [{
           memberRole: planned.maker,
           actorRef: planned.providerRef,
@@ -4648,7 +4662,14 @@ export class WalkingSkeletonRunner {
         // only through a member of a different maker than the author — checked
         // per member, so whichever member answers is held to the same rule.
         const differentMaker = (member: SeatIdentity): boolean => member.maker !== authoredNode.maker;
-        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, seatBook.reviewer.flatMap((seat) => {
+        // Final review I2 (REVIEWER): on an assigned run the maker rotation below
+        // starts at a SITE-PURE offset (`seatRotationOffset`), so no listed reviewer
+        // seat can sit idle for a whole run — two seats of one maker, or a third
+        // behind two that alternate. The legacy (unassigned) book keeps today's order.
+        const reviewerSeats = seatBook.assigned
+          ? rotateSeats(seatBook.reviewer, seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: reviewCallSiteKey }))
+          : seatBook.reviewer;
+        const reviewer = selectDifferentMakerReviewer(authoredNode.maker, reviewerSeats.flatMap((seat) => {
           const planned = seatCallPlan(seat, reviewCallSiteKey, differentMaker);
           const first = seatCaller.plan(seat, reviewCallSiteKey, planned.options);
           return first === null ? [] : [{ seat, maker: first.maker, plan: planned }];

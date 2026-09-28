@@ -10,6 +10,9 @@ import {
   createSeatCaller,
   legacySynthesisSeat,
   roleAssignmentSeatProblem,
+  rotateSeats,
+  rotatedSeatSelection,
+  seatRotationOffset,
   seatSiteOrdinal,
   stampCandidateGateway,
   type ConfiguredSeatMaker,
@@ -410,5 +413,73 @@ describe("A15b fix round 1", () => {
     expect(called).toBe(false);
     // A seat without a runner-up still records its bare key, as the legacy case above shows.
     expect(bare.plan(claimBook().position[1]!, "PANEL:root")?.providerRef).toBe("provider:b");
+  });
+});
+
+/**
+ * Final review I2 — every judge seat the drawer lists can judge. The runner calls at most
+ * `M - 1` judges per node; it used to call the FIRST eligible seats every time, so with M
+ * non-debating judges (all eligible at every node) the last seat never judged. It now starts
+ * at a site-pure offset — a hash of the run, the role and the node's base call-site key, built
+ * the way `seatSiteOrdinal` is — so across nodes every seat serves, and a resumed pass (a fresh
+ * book, any visit order) starts every node where the first pass did.
+ */
+describe("final review I2 · the seats a capped node calls rotate by a site-pure offset", () => {
+  const site = { runId: "run:i2", role: "JUDGE" as const, callSiteKey: "PANEL:JUDGE:root:secondary" };
+
+  it("is a pure function of the run, the role and the base key (a seat marker is stripped)", () => {
+    const offset = seatRotationOffset(site);
+    expect(Number.isSafeInteger(offset) && offset >= 0).toBe(true);
+    expect(seatRotationOffset({ ...site })).toBe(offset);
+    expect(seatRotationOffset({ ...site, callSiteKey: `${site.callSiteKey}:seat:main` })).toBe(offset);
+    expect(seatRotationOffset({ ...site, runId: "run:other" })).not.toBe(offset);
+    expect(seatRotationOffset({ ...site, callSiteKey: "PANEL:root" })).not.toBe(offset);
+    expect(seatRotationOffset({ ...site, role: "REVIEWER" })).not.toBe(offset);
+    // Never the 80-20 ordinal of any seat at the same site: the two choices are independent.
+    for (const pinnedSeatIndex of [0, 1, 2]) {
+      expect(seatSiteOrdinal({ ...site, pinnedSeatIndex })).not.toBe(offset);
+    }
+  });
+
+  it("with every seat eligible and a cap of M - 1, skips exactly one seat — and every seat serves across offsets", () => {
+    const eligible = [true, true, true];
+    const skipped = [0, 1, 2, 3, 4, 5].map((offset) => {
+      const selected = rotatedSeatSelection(eligible, 2, offset);
+      expect(selected.filter(Boolean)).toHaveLength(2);
+      return selected.indexOf(false);
+    });
+    // Offset k starts at seat k mod 3, so the seat just before it is the one left out.
+    expect(skipped).toEqual([2, 0, 1, 2, 0, 1]);
+    // The old rule was offset 0 at every node: the last seat never judged.
+    expect(rotatedSeatSelection(eligible, 2, 0)).toEqual([true, true, false]);
+  });
+
+  it("never calls an ineligible seat, and calls every eligible one when the cap does not bind (the legacy book)", () => {
+    expect(rotatedSeatSelection([false, true, true], 1, 0)).toEqual([false, true, false]);
+    expect(rotatedSeatSelection([false, true, true], 1, 2)).toEqual([false, false, true]);
+    expect(rotatedSeatSelection([true, false, true], 5, 7)).toEqual([true, false, true]);
+    expect(rotatedSeatSelection([false, false], 1, 3)).toEqual([false, false]);
+    expect(rotatedSeatSelection([], 1, 3)).toEqual([]);
+    for (let offset = 0; offset < 4; offset += 1) {
+      expect(rotatedSeatSelection([true, false, true, true], 3, offset)).toEqual([true, false, true, true]);
+    }
+  });
+
+  it("picks the same seats on a restart: a fresh book and any visit order give the same choice per node", () => {
+    const nodes = ["PANEL:root", "PANEL:JUDGE:root:secondary", "PANEL:JUDGE:cross-root:0->1", "PANEL:JUDGE:cross-root:1->0"];
+    const choose = (order: readonly string[]) => new Map(order.map((key) => [key, rotatedSeatSelection(
+      [true, true, true], 2, seatRotationOffset({ runId: "run:restart", role: "JUDGE", callSiteKey: key })
+    )]));
+    const firstPass = choose(nodes);
+    const resumedPass = choose([...nodes].reverse());
+    for (const key of nodes) expect(resumedPass.get(key)).toEqual(firstPass.get(key));
+  });
+
+  it("rotates a reviewer list to start at the offset, keeping every seat and its order around the ring", () => {
+    const seats = ["a", "b", "c"] as const;
+    expect(rotateSeats(seats, 0)).toEqual(["a", "b", "c"]);
+    expect(rotateSeats(seats, 1)).toEqual(["b", "c", "a"]);
+    expect(rotateSeats(seats, 5)).toEqual(["c", "a", "b"]);
+    expect(rotateSeats([], 5)).toEqual([]);
   });
 });

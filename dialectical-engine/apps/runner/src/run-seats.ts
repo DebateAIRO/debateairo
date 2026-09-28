@@ -559,6 +559,66 @@ export function seatSiteOrdinal(site: {
 }
 
 /**
+ * Final review I2 — WHERE A MULTI-SEAT ROLE STARTS AT ONE NODE. The runner calls
+ * at most `panel_size - 1` judges per node (DR-184-v5's per-node count), and it
+ * used to take the FIRST eligible seats every time: with every judge seat
+ * eligible at every node (non-debating judges, which R5 prefers), the last seat
+ * the drawer lists never judged, and the cost estimate spread its share over a
+ * seat that never worked. Each node now starts at this offset instead.
+ *
+ * Built the way `seatSiteOrdinal` is — the first 48 bits of sha256 over
+ * canonical JSON of the run, the role and the node's BASE call-site key (a seat
+ * marker, if one slipped in, is stripped) — plus a fixed tag, so it is never the
+ * 80-20 ordinal of any seat at the same site. It is a PURE FUNCTION OF THE SITE:
+ * a resumed pass, on a fresh book and in any visit order, starts every node
+ * exactly where the first pass did, and the choice never depends on what an
+ * earlier node did. Across nodes the start moves, so every seat serves.
+ */
+export function seatRotationOffset(site: {
+  readonly runId: string | null;
+  readonly role: DebateRole;
+  readonly callSiteKey: string;
+}): number {
+  const canonical = JSON.stringify([site.runId ?? "", site.role, "SEAT_ROTATION", seatBaseCallSiteKey(site.callSiteKey)]);
+  return createHash("sha256").update(canonical, "utf8").digest().readUIntBE(0, 6);
+}
+
+/**
+ * Final review I2 — WHICH SEATS ONE NODE CALLS: going round the role's seats in
+ * book order from `offset` (modulo their count), the first `cap` eligible ones.
+ * The result is per seat, in book order, so a caller keeps the seats it calls in
+ * the order it always used. When the cap does not bind — every eligible seat
+ * fits, as on the legacy book — every eligible seat is chosen, whatever the offset.
+ */
+export function rotatedSeatSelection(eligible: readonly boolean[], cap: number, offset: number): readonly boolean[] {
+  const count = eligible.length;
+  const selected = eligible.map(() => false);
+  let taken = 0;
+  for (let step = 0; step < count && taken < cap; step += 1) {
+    const index = (offset + step) % count;
+    if (eligible[index] === true) {
+      selected[index] = true;
+      taken += 1;
+    }
+  }
+  return Object.freeze(selected);
+}
+
+/**
+ * Final review I2 (REVIEWER) — the role's seats in the order one node tries
+ * them: starting at `offset` (modulo their count) and wrapping round. The
+ * review rotation (`selectDifferentMakerReviewer`) takes the first seat whose
+ * maker differs from the latest reviewer's, so an unrotated list could leave a
+ * listed seat idle for a whole run (two reviewer seats of one maker, or a third
+ * seat behind two that alternate); a site-pure start lets every seat serve.
+ */
+export function rotateSeats<T>(seats: readonly T[], offset: number): readonly T[] {
+  if (seats.length === 0) return Object.freeze([]);
+  const start = offset % seats.length;
+  return Object.freeze([...seats.slice(start), ...seats.slice(0, start)]);
+}
+
+/**
  * A16c — the member R3's 80-20 split PLANS for one call site: the pinned
  * seat's choice at the site's ordinal (`seatSiteOrdinal`, or the explicit one a
  * synthesis call passes), read off the CLAIMED seat's share — exactly the member

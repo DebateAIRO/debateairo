@@ -43,6 +43,9 @@ import {
   EVALUATOR_PROMPT_CONTRACT,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
+  rotateSeats,
+  rotatedSeatSelection,
+  seatRotationOffset,
   seatSiteOrdinal,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
@@ -6540,6 +6543,51 @@ const SEAT_TWIN = Object.freeze({
   providerRef: "provider:test-layer:twin", maker: SEAT_ROUTES.primary.maker, model: SEAT_ROUTES.primary.model
 });
 
+/**
+ * Final review I2: routes that only judge and review — they neither debate nor write a leg, so
+ * every node's author differs from them and the panel cap is what decides who judges. Served by
+ * the third double, which answers panel calls from the contract and reviews from its queue.
+ * `fourthTwin` is a second route of the fourth route's maker: two reviewer seats of one maker.
+ */
+const SEAT_JUDGE_ONLY = Object.freeze({
+  fourth: Object.freeze({ providerRef: "provider:test-layer:fourth", maker: "Fourth test maker", model: "test-layer/fourth-model" }),
+  fifth: Object.freeze({ providerRef: "provider:test-layer:fifth", maker: "Fifth test maker", model: "test-layer/fifth-model" }),
+  fourthTwin: Object.freeze({
+    providerRef: "provider:test-layer:fourth-twin", maker: "Fourth test maker", model: "test-layer/fourth-model"
+  })
+});
+type JudgeOnlyRoute = keyof typeof SEAT_JUDGE_ONLY;
+
+function judgeOnlySeat(seatIndex: number, route: JudgeOnlyRoute): RoleSeat {
+  const target = SEAT_JUDGE_ONLY[route];
+  return {
+    seatIndex,
+    main: {
+      candidateId: `candidate:${route}`, providerRef: target.providerRef, maker: target.maker,
+      modelId: target.model, thinkingLevel: "DEFAULT_ONLY"
+    },
+    runnerUp: null,
+    diversityShare: 0,
+    source: "SCORECARD"
+  };
+}
+
+/**
+ * Final review I2: the seats one node's panel calls — `rotatedSeatSelection` from the node's
+ * site-pure `seatRotationOffset` — as indexes into the role's seats, in pinned order.
+ */
+function predictedSeats(runId: string, role: "JUDGE" | "REVIEWER", baseKey: string, eligible: readonly boolean[], cap: number): readonly number[] {
+  return rotatedSeatSelection(eligible, cap, seatRotationOffset({ runId, role, callSiteKey: baseKey }))
+    .flatMap((chosen, index) => (chosen ? [index] : []));
+}
+
+/** A panel row's node key: its call-site key without the member's route and seat marker. */
+function panelBaseKey(call: { readonly call_site_key: string; readonly actor_ref: string }): string {
+  const at = call.call_site_key.indexOf(`:${call.actor_ref}:seat:`);
+  if (at < 0) throw new Error(`not a seat-marked panel key: ${call.call_site_key}`);
+  return call.call_site_key.slice(0, at);
+}
+
 function seatCandidateOf(route: SeatRoute) {
   return {
     candidateId: `candidate:${route}`,
@@ -6595,6 +6643,8 @@ async function executeSeatScenario(input: {
   readonly judgeMaxAttempts?: number;
   /** A15d carry 9: configure SEAT_TWIN beside the three routes. */
   readonly twin?: boolean;
+  /** Final review I2: configure the judge-only routes (SEAT_JUDGE_ONLY) beside the three routes. */
+  readonly judgeOnlyRoutes?: boolean;
   /** A15d carries: the ledger an earlier pass of this work item left behind. */
   readonly beforeExecute?: (context: { readonly runId: string; readonly workItemId: string }) => Promise<void>;
   readonly settings?: Partial<WalkingSkeletonSettings>;
@@ -6653,7 +6703,13 @@ async function executeSeatScenario(input: {
         }),
         providerRef: SEAT_TWIN.providerRef,
         maker: SEAT_TWIN.maker
-      }] : [])],
+      }] : []), ...(input.judgeOnlyRoutes === true ? Object.values(SEAT_JUDGE_ONLY).map((route) => ({
+        provider: createPostgresProviderGateway(database.pool, {
+          endpoint: doubles.third.endpoint, model: route.model, maker: route.maker
+        }),
+        providerRef: route.providerRef,
+        maker: route.maker
+      })) : [])],
       scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
       ...input.settings
     });
@@ -6752,12 +6808,22 @@ describe("A15 · a pinned role assignment seats the run", () => {
     // (4) A cross-exchange is written by the member that wrote its root (R5).
     expect(actorOf("JUDGE:cross-root:0->1:seat:main")).toEqual([SEAT_ROUTES.primary.providerRef]);
     expect(actorOf("JUDGE:cross-root:1->0:seat:main")).toEqual([SEAT_ROUTES.secondary.providerRef]);
-    // (5) One judge per node — the ceiling's panel basis — and never the author.
+    // (5) One judge per node — the ceiling's panel basis — and never the author. Final review
+    //     I2: where both judge seats may judge a node (the secondary's root and exchange), the
+    //     one called is the seat that node's site-pure rotation starts at, not always the first.
     const panel = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
     expect(panel).toHaveLength(8);
-    expect(panel.filter((call) => call.actor_ref === SEAT_ROUTES.third.providerRef)).toHaveLength(4);
-    expect(panel.filter((call) => call.actor_ref === SEAT_ROUTES.primary.providerRef)).toHaveLength(4);
     expect(panel.every((call) => call.call_site_key.endsWith(`:${call.actor_ref}:seat:main`))).toBe(true);
+    expect(new Set(panel.map(panelBaseKey)).size).toBe(8);
+    const judgeSeats = [SEAT_ROUTES.third.providerRef, SEAT_ROUTES.primary.providerRef];
+    const expectedJudge = (baseKey: string): string => {
+      // The primary's nodes: only the third may judge them. The third's legs: only the primary.
+      if (baseKey === "PANEL:root" || baseKey === "PANEL:JUDGE:cross-root:0->1") return SEAT_ROUTES.third.providerRef;
+      if (/^PANEL:JUDGE:(?:defender|critic):/u.test(baseKey)) return SEAT_ROUTES.primary.providerRef;
+      return judgeSeats[predictedSeats(scenario.runId, "JUDGE", baseKey, [true, true], 1)[0]!]!;
+    };
+    expect(panel.map((call) => [panelBaseKey(call), call.actor_ref]))
+      .toEqual(panel.map((call) => [panelBaseKey(call), expectedJudge(panelBaseKey(call))]));
     // (6) One review per node, never by the author's maker (the database refuses
     //     that too); the secondary holds no REVIEWER seat and reviews nothing.
     const reviews = scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:review:"));
@@ -6803,6 +6869,130 @@ describe("A15 · a pinned role assignment seats the run", () => {
       "SELECT state, terminal_reason FROM core.work_item WHERE run_id=$1", [scenario.runId]
     );
     expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "RUN_ROLE_ASSIGNMENT_INVALID" }]);
+  });
+});
+
+/**
+ * Final review I2 — every judge seat the drawer lists can judge. Two NON-DEBATING judge seats
+ * (fourth, fifth): neither debates nor writes a leg, so both may judge every one of the eight
+ * nodes and the panel's cap of M - 1 = 1 binds at each. The old rule called the first seat at
+ * every node, so the second — listed in the drawer under "Judging the arguments" — never judged.
+ * The two reviewer seats share a maker (fourth, fourthTwin): the maker rotation alone would leave
+ * the second idle all run, so its start is site-pure as well.
+ *
+ * The rotation hashes the run's own id, so a run is drawn until its four root and exchange nodes
+ * already use both judge seats (seven runs in eight do); a redrawn run is failed before any call.
+ */
+class RotationRedraw extends Error {}
+
+describe("final review I2 · every judge seat the drawer lists can judge", () => {
+  const knownNodes = ["PANEL:root", "PANEL:JUDGE:root:secondary", "PANEL:JUDGE:cross-root:0->1", "PANEL:JUDGE:cross-root:1->0"];
+  const judgeRoutes = [SEAT_JUDGE_ONLY.fourth.providerRef, SEAT_JUDGE_ONLY.fifth.providerRef];
+  const assignment = () => {
+    const position = [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")];
+    return pinnedAssignment({
+      POSITION: position,
+      SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+      CROSS_EXCHANGE: position,
+      JUDGE: [judgeOnlySeat(0, "fourth"), judgeOnlySeat(1, "fifth")],
+      REVIEWER: [judgeOnlySeat(0, "fourth"), judgeOnlySeat(1, "fourthTwin")],
+      ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+      ANSWER_CHECKER: [pinnedSeat(0, "third")]
+    });
+  };
+  const doubles = (label: string) => ({
+    primary: Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+    secondary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Judge-only ${label} review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  });
+  const drawRunUsingBothJudges = async (
+    execute: (beforeExecute: (context: { readonly runId: string; readonly workItemId: string }) => Promise<void>) =>
+      ReturnType<typeof executeSeatScenario>,
+    seed: (context: { readonly runId: string; readonly workItemId: string }) => Promise<void> = async () => undefined
+  ): ReturnType<typeof executeSeatScenario> => {
+    for (let draw = 0; draw < 12; draw += 1) {
+      try {
+        return await execute(async (context) => {
+          const seats = new Set(knownNodes.map((key) => predictedSeats(context.runId, "JUDGE", key, [true, true], 1)[0]));
+          if (seats.size < 2) {
+            await new WorkItemRepository(database.pool).recordTerminalFailure({
+              runId: context.runId, workItemId: context.workItemId, reason: "TEST_ROTATION_REDRAW"
+            });
+            throw new RotationRedraw();
+          }
+          await seed(context);
+        });
+      } catch (error) {
+        if (!(error instanceof RotationRedraw)) throw error;
+      }
+    }
+    throw new Error("twelve runs in a row put all four root and exchange nodes on one judge seat");
+  };
+
+  it("calls each node's site-pure pick among the judge seats, so both seats judge across the run", async () => {
+    const scenario = await drawRunUsingBothJudges((beforeExecute) => executeSeatScenario({
+      label: "i2-every-judge-seat", judgeOnlyRoutes: true, assignment: assignment(), beforeExecute, ...doubles("I2 rotation")
+    }));
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const panel = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
+    // One judge per node (DR-184-v5's per-node count is unchanged) ...
+    expect(panel).toHaveLength(8);
+    expect(new Set(panel.map(panelBaseKey)).size).toBe(8);
+    // ... and it is the seat the node's rotation starts at, never simply the first seat.
+    expect(panel.map((call) => [panelBaseKey(call), call.actor_ref])).toEqual(panel.map((call) => [
+      panelBaseKey(call), judgeRoutes[predictedSeats(scenario.runId, "JUDGE", panelBaseKey(call), [true, true], 1)[0]!]
+    ]));
+    // Across the run, every judge seat the drawer lists judged.
+    expect(new Set(panel.map((call) => call.actor_ref))).toEqual(new Set(judgeRoutes));
+  });
+
+  it("reviews each node with the reviewer seat its site-pure rotation puts first, even where two seats share a maker", async () => {
+    const scenario = await drawRunUsingBothJudges((beforeExecute) => executeSeatScenario({
+      label: "i2-reviewer-rotation", judgeOnlyRoutes: true, assignment: assignment(), beforeExecute, ...doubles("I2 review")
+    }));
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const reviewerRoutes = [SEAT_JUDGE_ONLY.fourth.providerRef, SEAT_JUDGE_ONLY.fourthTwin.providerRef];
+    const reviews = scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:review:"));
+    expect(reviews).toHaveLength(8);
+    // Both seats are of one maker, so the maker rotation never moves off the first seat it is
+    // handed: the reviewer is exactly the seat the review site's own offset puts first.
+    expect(reviews.map((call) => call.actor_ref)).toEqual(reviews.map((call) => reviewerRoutes[
+      rotateSeats([0, 1], seatRotationOffset({
+        runId: scenario.runId, role: "REVIEWER", callSiteKey: call.call_site_key.replace(/:seat:main$/u, "")
+      }))[0]!
+    ]));
+  });
+
+  it("calls the same judge seat at every node on a resumed pass as the earlier pass did (restart determinism)", async () => {
+    const predicted = (runId: string, key: string): string =>
+      judgeRoutes[predictedSeats(runId, "JUDGE", key, [true, true], 1)[0]!]!;
+    const scenario = await drawRunUsingBothJudges((beforeExecute) => executeSeatScenario({
+      label: "i2-restart", judgeOnlyRoutes: true, judgeMaxAttempts: 2, assignment: assignment(), beforeExecute,
+      ...doubles("I2 restart")
+    }), async (context) => {
+      // The earlier pass judged the four root and exchange nodes, each with its own pick.
+      for (const key of knownNodes) {
+        const route = predicted(context.runId, key);
+        await appendEarlierPassCall(context, `${key}:${route}:seat:main`, "OK", route);
+      }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    for (const key of knownNodes) {
+      const rows = scenario.calls.filter((call) => call.call_site_key.startsWith(`${key}:`));
+      // The earlier pass's row and this pass's call: ONE seat at the node across both passes,
+      // so the node never spends above the per-node count on a seat the earlier pass left idle.
+      expect(rows.map((call) => call.actor_ref), key).toEqual([predicted(scenario.runId, key), predicted(scenario.runId, key)]);
+    }
   });
 });
 
