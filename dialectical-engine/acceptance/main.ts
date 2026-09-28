@@ -49,6 +49,7 @@ import {
 } from "./discovery.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import type { CommandSpec } from "./relay-core.js";
+import { assertRelayRuntime } from "./relay-deployment-guard.js";
 import { ACCEPTANCE_REGISTER_SOURCE_REF, ACCEPTANCE_REGISTER_VERSION } from "./seed-register.js";
 import {
   computeAcceptanceStructuralCeiling,
@@ -748,14 +749,20 @@ export async function startBootRelays(
   });
 }
 
-async function main(): Promise<void> {
-  const environment = loadAcceptanceEnvironment();
+/**
+ * The standalone boot. V-9(c): it starts the local mode's relays, so it refuses
+ * the hosted deployment (relay-deployment-guard.ts) before it reads its settings,
+ * opens the database or starts a CLI.
+ */
+export async function main(processEnvironment: NodeJS.ProcessEnv = process.env): Promise<void> {
+  assertRelayRuntime(processEnvironment);
+  const environment = loadAcceptanceEnvironment(processEnvironment);
   const pool = createPool(environment.DATABASE_URL);
   // FAIR-01: the standalone boot starts the REAL Anthropic relay itself — the
   // startup handshake proves the claude CLI is alive and captures its honest
   // model id before the API accepts any ask (DR-143(3)).
   const policy = await readAcceptanceRuntimePolicy(pool);
-  const grokRelayPort = z.coerce.number().int().positive().max(65_535).parse(process.env.GROK_RELAY_PORT);
+  const grokRelayPort = z.coerce.number().int().positive().max(65_535).parse(processEnvironment.GROK_RELAY_PORT);
   const { claudeRelay, grokRelay } = await startBootRelays(policy.providers, {
     grokRelayPort,
     timeoutMs: policy.bounds.JUDGE.deadlineMs
@@ -764,7 +771,7 @@ async function main(): Promise<void> {
     pool,
     environment,
     serviceCredential:z.string().regex(SERVICE_CREDENTIAL_PATTERN)
-      .parse(process.env.ACCEPTANCE_SERVICE_CREDENTIAL),
+      .parse(processEnvironment.ACCEPTANCE_SERVICE_CREDENTIAL),
     makerRelays: [
       ...(claudeRelay === null ? [] : [{
         providerRef: "acceptance:claude-cli",baseUrl: claudeRelay.baseUrl,model: claudeRelay.model,

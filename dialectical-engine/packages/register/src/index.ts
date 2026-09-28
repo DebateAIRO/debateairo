@@ -812,6 +812,7 @@ export {
   type DeploymentMode,
   type SealedCostEnvelopeStatus,
   loadApiEnvironment,
+  loadDeploymentModeSource,
   loadDevelopmentCommandEnvironment,
   loadKeyRotationEnvironment,
   loadLivenessEnvironment,

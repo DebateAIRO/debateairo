@@ -1,4 +1,8 @@
-import { loadDevelopmentCommandEnvironment } from "@debateai/register";
+import { loadDeploymentModeSource, loadDevelopmentCommandEnvironment } from "@debateai/register";
+import {
+  assertRelayRuntime,
+  relayRuntimeRefusalCode
+} from "../../../acceptance/relay-deployment-guard.js";
 import {
   createDevelopmentAuthStackOperations,
   developmentAuthStackErrorCode,
@@ -50,6 +54,9 @@ function runtimeFaultSignal(): Readonly<{ promise: Promise<never>; dispose(): vo
 
 const runtimeFault = runtimeFaultSignal();
 try {
+  // V-9(c): the stack starts the local mode's relays, so it refuses the hosted
+  // deployment before it reads a file or starts a CLI.
+  assertRelayRuntime(loadDeploymentModeSource());
   const commandEnvironment = loadDevelopmentCommandEnvironment();
   const profile = loadDevelopmentAuthStackProfile(commandEnvironment);
   const stack = await startDevelopmentAuthStack(
@@ -67,7 +74,7 @@ try {
 } catch (error) {
   const code = error instanceof DevelopmentAuthStackError
     ? developmentAuthStackErrorCode(error)
-    : "DEV_AUTH_STACK_FAILED";
+    : relayRuntimeRefusalCode(error) ?? "DEV_AUTH_STACK_FAILED";
   console.error(code);
   process.exitCode = 1;
 } finally {

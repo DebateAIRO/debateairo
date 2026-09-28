@@ -100,6 +100,19 @@ export function resolveDeploymentMode(
   return mode;
 }
 
+/**
+ * V-9(c): the two values the deployment mode is resolved from, for a local-mode
+ * command that must refuse the hosted deployment before it does anything else
+ * (the relay guard, acceptance/relay-deployment-guard.ts). Read as they are, not
+ * validated here: `resolveDeploymentMode` decides on them, and refuses.
+ */
+export function loadDeploymentModeSource(): Readonly<Record<"DEBATEAI_DEPLOYMENT_MODE" | "NODE_ENV", string | undefined>> {
+  return Object.freeze({
+    DEBATEAI_DEPLOYMENT_MODE: process.env.DEBATEAI_DEPLOYMENT_MODE,
+    NODE_ENV: process.env.NODE_ENV
+  });
+}
+
 export type SealedCostEnvelopeStatus = "SEALED" | "NOT_SEALED";
 
 /**
