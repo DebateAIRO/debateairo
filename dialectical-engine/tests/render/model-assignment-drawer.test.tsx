@@ -58,7 +58,7 @@ function escaped(text: string): string {
 }
 
 const TITLE = "Models chosen for this debate";
-const STAND_IN = "Where a chosen model was unavailable, another AI model may have stepped in.";
+const STAND_IN = "Where a chosen model could not be used, another AI model may have stepped in.";
 // Final review I4: the sentence carry 13 once showed for an absent assignment. It must never render again.
 const RETIRED_NOT_RECORDED = "No record of the models for this debate is available.";
 const SITE_SETTING = "This site's usual setting chooses the model for this job.";

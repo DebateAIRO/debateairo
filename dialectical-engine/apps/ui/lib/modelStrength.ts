@@ -115,8 +115,9 @@ export const MODEL_ASSIGNMENT_COPY = Object.freeze({
   // Final review I4: an answer with no assignment (no scorecard was in force, or its pin is
   // unreadable) shows NO section at all, so there is no absent-field sentence to hold here.
   title: "Models chosen for this debate",
-  // O1: the one sentence about stand-ins, in the words of the committed backup-mark label.
-  standIn: "Where a chosen model was unavailable, another AI model may have stepped in.",
+  // O1: the one sentence about stand-ins, worded like the committed backup-mark label (final review m1:
+  // "could not be used" is true even when a model is handed over after only OK answers).
+  standIn: "Where a chosen model could not be used, another AI model may have stepped in.",
   // Carry 4: a FALLBACK answer-writer or answer-checker seat is never sat; the site's configured model answers.
   siteSetting: "This site's usual setting chooses the model for this job.",
   // Carry 5: a cross-exchange defends a root, so the root's writer writes it; it has no backup of its own.
