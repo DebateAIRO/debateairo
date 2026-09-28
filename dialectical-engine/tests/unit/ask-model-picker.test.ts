@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   ASK_MODEL_ASSIGNMENT_INVALID,
   ASK_MODEL_REFUSALS,
+  answerTokenCeilingsByRole,
   askModelPickerSettings,
   askTargetFacts,
   debaterSeatCount,
@@ -28,6 +29,7 @@ import {
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
   computeStructuralCeilingBasis,
   readBundledModelScorecard,
+  readCallTokenCeilings,
   readEngineVersion
 } from "@debateai/register";
 import type { Scorecard } from "@debateai/scorecard";
@@ -75,6 +77,10 @@ const TARGETS: readonly ProviderDiscoveryTarget[] = Object.freeze([
     providerRef: "development:grok-cli", maker: "xAI", baseUrl: "http://127.0.0.1:8793/v1", model: "grok-4.7-build"
   })
 ]);
+
+
+/** Final review I3: the sealed per-call answer bounds — debate calls, the writer's and the checker's. */
+const CEILINGS = Object.freeze({ judge: 2048, synthesizer: 4096, evaluator: 1024 });
 
 describe("A20 · expected calls per role come from the admitted structure", () => {
   it.each([
@@ -193,10 +199,10 @@ describe("A20 · deployment facts", () => {
   it("builds HOSTED settings with the per-run ceiling, and LOCAL settings without one", () => {
     const absent = Object.freeze({ state: "ABSENT" as const });
     expect(askModelPickerSettings({
-      scorecard: absent, deploymentMode: "hosted", targets: TARGETS, perRunCeilingMicros: 250_000
+      scorecard: absent, deploymentMode: "hosted", targets: TARGETS, callTokenCeilings: CEILINGS, perRunCeilingMicros: 250_000
     })).toMatchObject({ mode: "HOSTED", perRunCeilingMicros: 250_000 });
     expect(askModelPickerSettings({
-      scorecard: absent, deploymentMode: "local", targets: TARGETS, perRunCeilingMicros: 250_000
+      scorecard: absent, deploymentMode: "local", targets: TARGETS, callTokenCeilings: CEILINGS, perRunCeilingMicros: 250_000
     })).toMatchObject({ mode: "LOCAL", perRunCeilingMicros: null });
   });
 
@@ -205,7 +211,7 @@ describe("A20 · deployment facts", () => {
     "refuses HOSTED settings at boot whose per-run ceiling is %s",
     (perRunCeilingMicros) => {
       expect(() => askModelPickerSettings({
-        scorecard: Object.freeze({ state: "ABSENT" as const }), deploymentMode: "hosted", targets: TARGETS, perRunCeilingMicros
+        scorecard: Object.freeze({ state: "ABSENT" as const }), deploymentMode: "hosted", targets: TARGETS, callTokenCeilings: CEILINGS, perRunCeilingMicros
       })).toThrowError(new TypeError("ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED"));
     }
   );
@@ -228,7 +234,7 @@ describe("A20 · deployment facts", () => {
 
   it("keeps LOCAL settings without a ceiling: local mode has no money bound", () => {
     expect(askModelPickerSettings({
-      scorecard: Object.freeze({ state: "ABSENT" as const }), deploymentMode: "local", targets: TARGETS, perRunCeilingMicros: null
+      scorecard: Object.freeze({ state: "ABSENT" as const }), deploymentMode: "local", targets: TARGETS, callTokenCeilings: CEILINGS, perRunCeilingMicros: null
     })).toMatchObject({ mode: "LOCAL", perRunCeilingMicros: null });
   });
 
@@ -237,13 +243,13 @@ describe("A20 · deployment facts", () => {
     const log = (_line: string): void => undefined;
     const scorecard = Object.freeze({ state: "ABSENT" as const });
     const withLog = askModelPickerSettings({
-      scorecard, deploymentMode: "hosted", targets: TARGETS, perRunCeilingMicros: 250_000, log
+      scorecard, deploymentMode: "hosted", targets: TARGETS, callTokenCeilings: CEILINGS, perRunCeilingMicros: 250_000, log
     });
     expect(withLog.scorecard).toBe(scorecard);
     expect([...withLog.targetFacts]).toEqual([...askTargetFacts(TARGETS)]);
     expect(withLog.log).toBe(log);
     const withoutLog = askModelPickerSettings({
-      scorecard, deploymentMode: "local", targets: TARGETS, perRunCeilingMicros: null
+      scorecard, deploymentMode: "local", targets: TARGETS, callTokenCeilings: CEILINGS, perRunCeilingMicros: null
     });
     expect("log" in withoutLog).toBe(false);
     expect(Object.isFrozen(withLog)).toBe(true);
@@ -315,6 +321,72 @@ describe("A20 · deployment facts", () => {
       expect(describeModelScorecard(read, "hosted")).toMatch(/source=bundled-file \(wrong source: /u);
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+/*
+ * Final review I3 — the picker's window check is never looser than the gateway's wall, whose
+ * answer side is each call's sealed `tokenCeiling`. Admission reads those bounds ONCE at boot
+ * (never per ask) and hands the picker each role's own: every debate call — positions,
+ * arguments, exchanges, the panel and reviews — goes through the JUDGE bound; the answer writer
+ * through the SYNTHESIZER bound, the checker through the EVALUATOR bound.
+ */
+describe("final review I3 · the sealed answer bounds reach the picker", () => {
+  it("maps the three sealed bounds onto the seven debate jobs", () => {
+    expect(answerTokenCeilingsByRole(CEILINGS)).toEqual({
+      POSITION: 2048, SUPPORT_ATTACK: 2048, CROSS_EXCHANGE: 2048, JUDGE: 2048, REVIEWER: 2048,
+      ANSWER_WRITER: 4096, ANSWER_CHECKER: 1024
+    });
+  });
+
+  it("carries them in the settings, in both modes, and refuses a bound that bounds nothing", () => {
+    for (const deploymentMode of ["hosted", "local"] as const) {
+      expect(askModelPickerSettings({
+        scorecard: Object.freeze({ state: "ABSENT" as const }), deploymentMode, targets: TARGETS,
+        callTokenCeilings: CEILINGS, perRunCeilingMicros: 250_000
+      }).answerTokenCeilings).toEqual(answerTokenCeilingsByRole(CEILINGS));
+    }
+    for (const bad of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      for (const role of ["judge", "synthesizer", "evaluator"] as const) {
+        expect(() => askModelPickerSettings({
+          scorecard: Object.freeze({ state: "ABSENT" as const }), deploymentMode: "local", targets: TARGETS,
+          callTokenCeilings: { ...CEILINGS, [role]: bad }, perRunCeilingMicros: null
+        })).toThrowError(new TypeError("ASK_MODEL_PICKER_CALL_TOKEN_CEILINGS_INVALID"));
+      }
+    }
+  });
+
+  it("reads the three bounds once from the register rows in force, and refuses rows that do not carry them", async () => {
+    const rows = (overrides: Readonly<Record<string, unknown>> = {}) => ({
+      acceptanceOrganCostBounds: {
+        kind: "ACCEPTANCE_ORGAN_COST_BOUNDS",
+        organs: {
+          JUDGE: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 180_000 },
+          COMPOSER: { maxAttempts: 3, tokenCeiling: 512, deadlineMs: 60_000 },
+          CONFORMANCE: { maxAttempts: 3, tokenCeiling: 512, deadlineMs: 60_000 }
+        }
+      },
+      synthesizerCallBound: { kind: "SYNTHESIZER_CALL_BOUND", maxAttempts: 3, tokenCeiling: 4096, deadlineMs: 240_000 },
+      evaluatorCallBound: { kind: "EVALUATOR_CALL_BOUND", maxAttempts: 3, tokenCeiling: 1024, deadlineMs: 240_000 },
+      ...overrides
+    });
+    const queries: unknown[][] = [];
+    const poolWith = (values: Readonly<Record<string, unknown>>) => ({
+      query: async (_sql: string, parameters: unknown[]) => {
+        queries.push(parameters);
+        return { rows: Object.entries(values).map(([row_key, value_json]) => ({ row_key, value_json })) };
+      }
+    }) as unknown as Parameters<typeof readCallTokenCeilings>[0];
+    expect(await readCallTokenCeilings(poolWith(rows()), 7)).toEqual(CEILINGS);
+    expect(queries).toEqual([[7, ["acceptanceOrganCostBounds", "synthesizerCallBound", "evaluatorCallBound"]]]);
+    const { evaluatorCallBound: _missing, ...withoutEvaluator } = rows();
+    for (const broken of [
+      withoutEvaluator,
+      rows({ synthesizerCallBound: { kind: "SYNTHESIZER_CALL_BOUND", maxAttempts: 3, deadlineMs: 1 } }),
+      rows({ acceptanceOrganCostBounds: { kind: "ACCEPTANCE_ORGAN_COST_BOUNDS", organs: { JUDGE: { maxAttempts: 3 } } } })
+    ]) {
+      await expect(readCallTokenCeilings(poolWith(broken), 7)).rejects.toThrowError(new TypeError("CALL_TOKEN_CEILINGS_UNRESOLVED"));
     }
   });
 });

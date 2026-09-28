@@ -18,6 +18,14 @@ import { DEBATE_ROLES, MODEL_STRENGTHS } from "@debateai/kernel";
  * compares this schema's parsed OUTPUT keys with the input document's to refuse a field the
  * format does not define before it is sealed; a transform, a rename or `.passthrough()` here
  * changes what that guard sees, so update the hosted check and its tests together with it.
+ *
+ * TOKEN UNITS (final review I3). A role entry's `typicalCall` counts VENDOR-STYLE tokens, as a
+ * vendor's usage block reports them: about 4 characters of text each. The engine's context-window
+ * wall counts differently — UTF-8 bytes / 2 (`estimateWindowTokens` in @debateai/providers), plus
+ * the attempt's answer bound. The picker converts with ONE constant,
+ * `WINDOW_TOKENS_PER_VENDOR_TOKEN` = 4: the worst case of the wall's rule for about 4 characters
+ * per token at no more than 2 UTF-8 bytes per character (Romanian diacritics included), so the
+ * picker never seats a candidate the gateway would then refuse on every call.
  */
 export const TIERS = ["TOP", "GOOD_VALUE", "AVOID", "UNTESTED"] as const;
 export type Tier = typeof TIERS[number];
@@ -84,6 +92,13 @@ export const ScorecardCandidateSchema = z.object({
   contextWindowTokens: z.number().int().min(1).nullable().default(null)
 });
 
+/**
+ * Final review I3: how many of the window wall's tokens (UTF-8 bytes / 2) one vendor-style
+ * `typicalCall` token can take — 4 characters of at most 2 bytes each. See TOKEN UNITS above.
+ */
+export const WINDOW_TOKENS_PER_VENDOR_TOKEN = 4;
+
+/** One typical call of a role, in VENDOR-STYLE tokens (see TOKEN UNITS above) and seconds. */
 const TypicalCallSchema = z.object({
   inputTokens: countInteger,
   outputTokens: countInteger,

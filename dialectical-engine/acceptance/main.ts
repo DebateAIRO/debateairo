@@ -614,7 +614,13 @@ export async function createAcceptanceRuntime(input: {
       scorecard: modelScorecard,
       deploymentMode: "local",
       targets: [],
-      perRunCeilingMicros: null
+      perRunCeilingMicros: null,
+      // Final review I3: the acceptance register's own sealed answer bounds.
+      callTokenCeilings: {
+        judge: policy.bounds.JUDGE.tokenCeiling,
+        synthesizer: policy.synthesisRolePolicy.synthesizerBound.tokenCeiling,
+        evaluator: policy.synthesisRolePolicy.evaluatorBound.tokenCeiling
+      }
     }),
     resolveDiscoveredPanel: async () => {
       const latest = await probes.readLatest(policy.providers.map((provider) => provider.providerRef));

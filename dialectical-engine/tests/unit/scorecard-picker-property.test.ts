@@ -102,6 +102,8 @@ function generatedInput(seed: number): PickerInput {
   const planTier = oneOf(random, PLAN_TIERS_OR_NONE);
   const expectedCallsByRole = roleNumbers(Object.fromEntries(DEBATE_ROLES.map((role) => [role, between(random, 0, 40)])));
   const perRunCeilingMicros = chance(random, 0.5) ? null : between(random, 0, 200) * 1000;
+  // Final review I3: each role's sealed answer bound. Drawn LAST, so every earlier draw keeps its meaning.
+  const answerTokenCeilingByRole = roleNumbers(Object.fromEntries(DEBATE_ROLES.map((role) => [role, between(random, 1, 8) * 512])));
   return {
     scorecard,
     mode,
@@ -114,7 +116,8 @@ function generatedInput(seed: number): PickerInput {
     }),
     expectedCallsByRole,
     perRunCeilingMicros,
-    prices
+    prices,
+    answerTokenCeilingByRole
   };
 }
 
@@ -178,7 +181,8 @@ function violationsOf(input: PickerInput, outcome: Extract<PickerOutcome, { stat
           const crossCandidate = input.scorecard.candidates.find((listed) => listed.candidateId === member.candidateId);
           const crossWindows = [crossCandidate?.contextWindowTokens ?? null, target?.contextWindowTokens ?? null]
             .filter((size): size is number => size !== null);
-          const crossTokens = crossEntry.typicalCall.inputTokens + crossEntry.typicalCall.outputTokens + (crossEntry.typicalCall.thinkingTokens ?? 0);
+          // Final review I3: the gateway's own wall — input at 4 window tokens per vendor token, plus the role's answer bound.
+          const crossTokens = crossEntry.typicalCall.inputTokens * 4 + input.answerTokenCeilingByRole.CROSS_EXCHANGE;
           if (crossWindows.length > 0 && crossTokens > Math.min(...crossWindows)) {
             found.push(`CROSS_EXCHANGE seats ${String(member.candidateId)} past its own cross-exchange context window`);
           }
@@ -195,7 +199,8 @@ function violationsOf(input: PickerInput, outcome: Extract<PickerOutcome, { stat
           found.push(`HOSTED seats subscription-only ${candidate.candidateId}`);
         }
         const windows = [candidate.contextWindowTokens, target?.contextWindowTokens ?? null].filter((size): size is number => size !== null);
-        const typicalCallTokens = entry.typicalCall.inputTokens + entry.typicalCall.outputTokens + (entry.typicalCall.thinkingTokens ?? 0);
+        // Final review I3: the gateway's own wall — input at 4 window tokens per vendor token, plus the role's answer bound.
+        const typicalCallTokens = entry.typicalCall.inputTokens * 4 + input.answerTokenCeilingByRole[role];
         if (windows.length > 0 && typicalCallTokens > Math.min(...windows)) {
           found.push(`${role} seats ${candidate.candidateId} past its context window`);
         }

@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { DEBATE_ROLES, MODEL_STRENGTHS, THINKING_LEVEL_DEFAULT_ONLY, type DebateRole, type ModelStrength } from "@debateai/kernel";
+import { estimatePromptTokens, estimateWindowTokens } from "@debateai/providers";
 import {
   RoleAssignmentSchema,
+  WINDOW_TOKENS_PER_VENDOR_TOKEN,
   backupFor,
   diversityOrdinalForRun,
   pickRoleAssignment,
   selectSeatCandidate,
+  typicalCallWindowTokens,
   type PickerSettings,
   type ReachableTarget,
   type RoleAssignment,
@@ -273,7 +276,8 @@ describe("pickRoleAssignment — R5 fairness", () => {
 
 describe("pickRoleAssignment — CROSS_EXCHANGE eligibility (fix round 1, R5)", () => {
   it("excludes a POSITION candidate the scorecard marks AVOID for its own cross-exchange call, and says why (probe)", () => {
-    const z1 = testCandidate("z1", "OpenAI", { contextWindowTokens: 4000 });
+    // Final review I3: a window the POSITION call fits under the gateway's own rule (2000 × 4 + 2048).
+    const z1 = testCandidate("z1", "OpenAI", { contextWindowTokens: 16_000 });
     const a1 = testCandidate("a1", "Anthropic");
     const outcome = assignedOutcome(pickRoleAssignment(testPickerInput({
       scorecard: testScorecard([z1, a1], {
@@ -285,7 +289,7 @@ describe("pickRoleAssignment — CROSS_EXCHANGE eligibility (fix round 1, R5)", 
       strength: "BEST"
     })));
     // z1 is the higher-quality POSITION candidate and its own POSITION entry (2000 input) fits
-    // its 4000-token window, so without the fix it would be seated despite being AVOID for
+    // its 16 000-token window, so without the fix it would be seated despite being AVOID for
     // cross-exchange (its CX entry asks for 9000 input, which would also overflow the window).
     expect(mainIds(outcome.assignment.roles.POSITION)).toEqual(["a1"]);
     expect(outcome.assignment.roles.CROSS_EXCHANGE).toEqual(outcome.assignment.roles.POSITION);
@@ -293,12 +297,13 @@ describe("pickRoleAssignment — CROSS_EXCHANGE eligibility (fix round 1, R5)", 
   });
 
   it("excludes a POSITION candidate whose own cross-exchange typical call overflows its window", () => {
-    const z1 = testCandidate("z1", "OpenAI", { contextWindowTokens: 5000 });
+    // Final review I3: POSITION fits (2000 × 4 + 2048 ≤ 16 000); the cross-exchange call does not.
+    const z1 = testCandidate("z1", "OpenAI", { contextWindowTokens: 16_000 });
     const a1 = testCandidate("a1", "Anthropic");
     const outcome = assignedOutcome(pickRoleAssignment(testPickerInput({
       scorecard: testScorecard([z1, a1], {
         POSITION: [testEntry("z1", 95, 10, { inputTokens: 2000 }), testEntry("a1", 90, 10)],
-        // TOP tier, but 6000 input overflows the 5000-token window on its own cross-exchange call.
+        // TOP tier, but 6000 input (24 000 window tokens) overflows the window on its own cross-exchange call.
         CROSS_EXCHANGE: [testEntry("z1", 95, 10, { inputTokens: 6000 })]
       }),
       reachable: [targetFor(z1), targetFor(a1)],
@@ -463,27 +468,79 @@ describe("pickRoleAssignment — reachability", () => {
     ]));
   });
 
-  it("counts the typical call's output and thinking tokens against the window, as the gateway's wall does (F29)", () => {
+  /*
+   * Final review I3 — the picker's window check is never looser than the gateway's wall. The
+   * gateway refuses an attempt when the prompt's UTF-8 bytes / 2 PLUS the attempt's answer bound
+   * (`tokenCeiling`) exceed the window; a scorecard's `typicalCall.inputTokens` are vendor-style
+   * tokens (about 4 characters each, and a character is at most 2 bytes in the prompts this engine
+   * sends), so the picker counts them at WINDOW_TOKENS_PER_VENDOR_TOKEN = 4 and adds the role's
+   * sealed answer bound. The typical output and thinking tokens are not what the wall adds.
+   */
+  it("seats a candidate only if its typical input at 4 window tokens per vendor token, plus the role's answer bound, fits (I3)", () => {
     const z1 = testCandidate("z1", "Z.AI", { contextWindowTokens: 16_000 });
     const a1 = testCandidate("a1", "Anthropic");
-    const writerEntry = (thinkingTokens: number): ScorecardRoleEntry => ({
+    const writerEntry = (inputTokens: number): ScorecardRoleEntry => ({
       ...testEntry("z1", 99, 10),
-      typicalCall: { inputTokens: 12_000, outputTokens: 3000, thinkingTokens, seconds: 10 }
+      // The output and thinking tokens are far past the window: the wall does not count them.
+      typicalCall: { inputTokens, outputTokens: 50_000, thinkingTokens: 50_000, seconds: 10 }
     });
-    const pick = (entry: ScorecardRoleEntry) => assignedOutcome(pickRoleAssignment(testPickerInput({
+    const pick = (entry: ScorecardRoleEntry, writerCeiling = 2048) => assignedOutcome(pickRoleAssignment(testPickerInput({
       scorecard: testScorecard([z1, a1], { ANSWER_WRITER: [entry, testEntry("a1", 70, 10)] }),
       reachable: [targetFor(z1), targetFor(a1)],
       seatDemand: roleNumbers({ ANSWER_WRITER: 1 }),
+      answerTokenCeilingByRole: roleNumbers({ ANSWER_WRITER: writerCeiling }, 2048),
       strength: "BEST"
     })));
-    // 12 000 in + 3000 out + 1001 thinking = 16 001 > 16 000: skipped, although the input alone fits.
-    const skipped = pick(writerEntry(1001));
-    expect(mainIds(skipped.assignment.roles.ANSWER_WRITER)).toEqual(["a1"]);
-    expect(skipped.notes).toContain("CONTEXT_WINDOW_SKIP:ANSWER_WRITER:z1");
-    // Exactly the window fits.
-    const fitting = pick(writerEntry(1000));
+    // 3488 × 4 + 2048 = 16 000: exactly the window fits.
+    const fitting = pick(writerEntry(3488));
     expect(mainIds(fitting.assignment.roles.ANSWER_WRITER)).toEqual(["z1"]);
     expect(fitting.notes).not.toContain("CONTEXT_WINDOW_SKIP:ANSWER_WRITER:z1");
+    // 3489 × 4 + 2048 = 16 004 > 16 000: skipped, although 3489 vendor tokens alone are far inside it.
+    const skipped = pick(writerEntry(3489));
+    expect(mainIds(skipped.assignment.roles.ANSWER_WRITER)).toEqual(["a1"]);
+    expect(skipped.notes).toContain("CONTEXT_WINDOW_SKIP:ANSWER_WRITER:z1");
+    // The ROLE's own bound is the one added: a writer bound of 4001 pushes 3000 × 4 past the window.
+    expect(mainIds(pick(writerEntry(3000), 4000).assignment.roles.ANSWER_WRITER)).toEqual(["z1"]);
+    expect(pick(writerEntry(3000), 4001).notes).toContain("CONTEXT_WINDOW_SKIP:ANSWER_WRITER:z1");
+  });
+
+  it("applies the same rule to a POSITION candidate's own cross-exchange call (I3)", () => {
+    const z1 = testCandidate("z1", "OpenAI", { contextWindowTokens: 16_000 });
+    const a1 = testCandidate("a1", "Anthropic");
+    const outcome = (crossInput: number) => assignedOutcome(pickRoleAssignment(testPickerInput({
+      scorecard: testScorecard([z1, a1], {
+        POSITION: [testEntry("z1", 95, 10, { inputTokens: 1000 }), testEntry("a1", 90, 10)],
+        CROSS_EXCHANGE: [testEntry("z1", 95, 10, { inputTokens: crossInput })]
+      }),
+      reachable: [targetFor(z1), targetFor(a1)],
+      seatDemand: roleNumbers({ POSITION: 1, CROSS_EXCHANGE: 1 }),
+      answerTokenCeilingByRole: roleNumbers({ CROSS_EXCHANGE: 2000 }, 2048),
+      strength: "BEST"
+    })));
+    // 3500 × 4 + 2000 = 16 000 fits; 3501 × 4 + 2000 = 16 004 does not.
+    expect(mainIds(outcome(3500).assignment.roles.POSITION)).toEqual(["z1"]);
+    expect(mainIds(outcome(3501).assignment.roles.POSITION)).toEqual(["a1"]);
+    expect(outcome(3501).notes).toContain("CROSS_EXCHANGE_INELIGIBLE:z1");
+  });
+
+  it.each([
+    ["an ASCII prompt", "The committee weighed the evidence and found the argument sound. "],
+    ["a Romanian prompt with diacritics", "Ștefan își țese argumentul în fața juriului, cântărind fiecare dovadă. "]
+  ])("agrees with the gateway's wall on %s: the picker's count is never below estimateWindowTokens (I3)", (_name, sentence) => {
+    const messages = [
+      { role: "system" as const, content: "Answer as JSON." },
+      { role: "user" as const, content: sentence.repeat(150) }
+    ];
+    // The typical call as a scorecard records it: vendor-style tokens, about 4 characters each.
+    const inputTokens = estimatePromptTokens(messages);
+    const typicalCall = { inputTokens, outputTokens: 0, thinkingTokens: null, seconds: 1 };
+    expect(WINDOW_TOKENS_PER_VENDOR_TOKEN).toBe(4);
+    for (const answerBound of [0, 2048]) {
+      expect(typicalCallWindowTokens(typicalCall, answerBound))
+        .toBeGreaterThanOrEqual(estimateWindowTokens(messages) + answerBound);
+    }
+    // And the old count (input + output + thinking) was below the wall on this very prompt.
+    expect(inputTokens).toBeLessThan(estimateWindowTokens(messages));
   });
 
   it("refuses NO_REACHABLE_CANDIDATE when nothing can take a demanded seat", () => {

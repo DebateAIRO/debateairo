@@ -32,6 +32,7 @@ import {
   readAdmissionPolicy,
   readCostEnvelopePolicy,
   readAuthPolicy,
+  readCallTokenCeilings,
   readMfaPolicy,
   readProductRolePolicy,
   readRecoveryPolicy,
@@ -327,8 +328,11 @@ const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
  * (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED). Local: the bundled public file
  * (scorecards/current.json). ABSENT or REFUSED never stops the boot — asks keep
  * the plan rosters — and one line on stderr says which. The targets are the
- * DECLARED ones: levels, windows and prices, no credential.
+ * DECLARED ones: levels, windows and prices, no credential. Final review I3:
+ * the sealed per-call answer bounds are read first, in their own stage, so the
+ * picker never seats a model whose window the gateway would refuse.
  */
+const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));
 const modelPicker = await composeAskModelPicker({
   boot,
   pool,
@@ -336,6 +340,7 @@ const modelPicker = await composeAskModelPicker({
   registerVersion: environment.REGISTER_VERSION,
   targets: declaredProviderTargets,
   perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,
+  callTokenCeilings,
   log: (line) => console.error(line)
 });
 const resolveProviderPanel = createProviderDiscoveryResolver({

@@ -20,6 +20,12 @@ describe("A20 · the picker is composed where runs are created", () => {
       + "  targets: declaredProviderTargets,\n  perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,\n"
     );
     expect(source).toContain("  log: (line) => console.error(line)\n});");
+    // Final review I3: the sealed answer bounds are read once, in their own boot stage, and handed over.
+    expect(source).toContain(
+      'const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));'
+    );
+    expect(source).toContain("  perRunCeilingMicros: costEnvelopePolicy?.perRunCeilingMicros ?? null,\n  callTokenCeilings,\n");
+    expect(source.indexOf('boot.run("call-token-ceilings"')).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source).toMatch(/\n {2}resolveDiscoveredPanel: resolveProviderPanel,\n(?: {2}\/\/[^\n]*\n)* {2}modelPicker,\n/u);
     expect(source.indexOf("const declaredProviderTargets = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source.indexOf("await composeAskModelPicker({")).toBeLessThan(source.indexOf("new PostgresAskApplication("));
@@ -48,6 +54,7 @@ describe("A20 · the picker is composed where runs are created", () => {
       "    scorecard: modelScorecard,\n    deploymentMode: input.deploymentMode,\n    targets: input.targets,"
     );
     expect(body).toContain("    perRunCeilingMicros: input.perRunCeilingMicros,");
+    expect(body).toContain("    callTokenCeilings: input.callTokenCeilings,");
     expect(body.indexOf('input.boot.run("model-scorecard"')).toBeLessThan(body.indexOf('input.boot.runSync("model-picker"'));
   });
 
@@ -57,6 +64,12 @@ describe("A20 · the picker is composed where runs are created", () => {
     expect(source).toContain("input.modelScorecard ?? await readBundledModelScorecard(await readEngineVersion())");
     expect(source).toContain("modelPicker: askModelPickerSettings({");
     expect(source).toContain('deploymentMode: "local",');
+    // Final review I3: the acceptance picker counts the acceptance register's own sealed answer bounds.
+    expect(source).toContain(
+      "callTokenCeilings: {\n        judge: policy.bounds.JUDGE.tokenCeiling,\n"
+      + "        synthesizer: policy.synthesisRolePolicy.synthesizerBound.tokenCeiling,\n"
+      + "        evaluator: policy.synthesisRolePolicy.evaluatorBound.tokenCeiling\n      }\n    }),"
+    );
     // Pre-flight ruling F17: admission's backup provision reaches the acceptance ceiling too.
     expect(source).toContain(
       "computeAcceptanceStructuralCeiling(policy, basis.panelSize, Number(basis.depthParams.depth), basis.backupSequencesProvisioned)"

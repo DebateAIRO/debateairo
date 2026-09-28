@@ -151,7 +151,11 @@ const VALID: AskModelPickerSettings = Object.freeze({
   }),
   mode: "LOCAL" as const,
   targetFacts: new Map(),
-  perRunCeilingMicros: null
+  perRunCeilingMicros: null,
+  answerTokenCeilings: Object.freeze({
+    POSITION: 2048, SUPPORT_ATTACK: 2048, CROSS_EXCHANGE: 2048, JUDGE: 2048, REVIEWER: 2048,
+    ANSWER_WRITER: 2048, ANSWER_CHECKER: 2048
+  })
 });
 
 function recordRunStart(order: string[]) {

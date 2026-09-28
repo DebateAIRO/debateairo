@@ -74,6 +74,37 @@ export interface AskTargetFacts {
   readonly price: TargetPrice | null;
 }
 
+/**
+ * Final review I3 — the sealed per-call answer bounds (`CallBound.tokenCeiling`)
+ * the debate jobs' calls use, read once at boot (`readCallTokenCeilings` in
+ * @debateai/register). The gateway's window wall adds the call's bound to its
+ * prompt, so the picker adds each role's own.
+ */
+export interface CallTokenCeilings {
+  /** Every debate call — positions, arguments, exchanges, the panel and reviews — runs under the JUDGE bound. */
+  readonly judge: number;
+  /** The answer writer's call: the SYNTHESIZER bound. */
+  readonly synthesizer: number;
+  /** The answer checker's call: the EVALUATOR bound. */
+  readonly evaluator: number;
+}
+
+/** I3: each debate job's own answer bound, or a boot refusal when a bound would bound nothing. */
+export function answerTokenCeilingsByRole(ceilings: CallTokenCeilings): Readonly<Record<DebateRole, number>> {
+  for (const bound of [ceilings.judge, ceilings.synthesizer, ceilings.evaluator]) {
+    if (!Number.isSafeInteger(bound) || bound < 1) throw new TypeError("ASK_MODEL_PICKER_CALL_TOKEN_CEILINGS_INVALID");
+  }
+  return Object.freeze({
+    POSITION: ceilings.judge,
+    SUPPORT_ATTACK: ceilings.judge,
+    CROSS_EXCHANGE: ceilings.judge,
+    JUDGE: ceilings.judge,
+    REVIEWER: ceilings.judge,
+    ANSWER_WRITER: ceilings.synthesizer,
+    ANSWER_CHECKER: ceilings.evaluator
+  });
+}
+
 export interface AskModelPickerSettings {
   /** Read once at boot: the sealed row (hosted) or the bundled file (local). */
   readonly scorecard: ModelScorecardReadResult;
@@ -82,6 +113,8 @@ export interface AskModelPickerSettings {
   readonly targetFacts: ReadonlyMap<string, AskTargetFacts>;
   /** Hosted only; local mode has no money ceiling. */
   readonly perRunCeilingMicros: number | null;
+  /** Final review I3: each debate job's sealed answer bound, which the picker adds to a typical call's input. */
+  readonly answerTokenCeilings: Readonly<Record<DebateRole, number>>;
   /** Operator lines (stderr in production): picker notes, estimates, refusal details. */
   readonly log?: (line: string) => void;
 }
@@ -127,6 +160,8 @@ export function askModelPickerSettings(input: Readonly<{
   deploymentMode: "hosted" | "local";
   targets: readonly ProviderDiscoveryTarget[];
   perRunCeilingMicros: number | null;
+  /** Final review I3: read once at boot, in both modes — the picker runs in both. */
+  callTokenCeilings: CallTokenCeilings;
   log?: (line: string) => void;
 }>): AskModelPickerSettings {
   const hosted = input.deploymentMode === "hosted";
@@ -136,11 +171,13 @@ export function askModelPickerSettings(input: Readonly<{
   if (hosted && !isUsablePerRunCeiling(input.perRunCeilingMicros)) {
     throw new TypeError("ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED");
   }
+  const answerTokenCeilings = answerTokenCeilingsByRole(input.callTokenCeilings);
   return Object.freeze({
     scorecard: input.scorecard,
     mode: hosted ? "HOSTED" : "LOCAL",
     targetFacts: askTargetFacts(input.targets),
     perRunCeilingMicros: hosted ? input.perRunCeilingMicros : null,
+    answerTokenCeilings,
     ...(input.log === undefined ? {} : { log: input.log })
   });
 }
@@ -160,7 +197,8 @@ export function askModelPickerSettings(input: Readonly<{
  *    envelope's, and a boot without a positive one is refused
  *    (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED). That is a synchronous decision,
  *    so it runs under the ledger's `runSync` (DL7-F7). The targets are the
- *    DECLARED ones: levels, windows and prices, no credential.
+ *    DECLARED ones: levels, windows and prices, no credential. The sealed
+ *    answer bounds (final review I3) were read by their own earlier stage.
  *
  * `boot` is the API boot's own ledger (`installBootCustody`), so a failure in
  * either stage closes everything the boot holds and names the stage, exactly as
@@ -175,6 +213,7 @@ export async function composeAskModelPicker(input: Readonly<{
   registerVersion: number;
   targets: readonly ProviderDiscoveryTarget[];
   perRunCeilingMicros: number | null;
+  callTokenCeilings: CallTokenCeilings;
   log: (line: string) => void;
   engineManifest?: URL;
   bundledScorecard?: URL;
@@ -191,6 +230,7 @@ export async function composeAskModelPicker(input: Readonly<{
     deploymentMode: input.deploymentMode,
     targets: input.targets,
     perRunCeilingMicros: input.perRunCeilingMicros,
+    callTokenCeilings: input.callTokenCeilings,
     log: input.log
   }));
 }

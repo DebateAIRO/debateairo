@@ -134,6 +134,12 @@ export function targetFor(candidate: ScorecardCandidate, overrides: Partial<Reac
   };
 }
 
+/**
+ * The sealed per-call answer bound every test role gets unless a test names its own: 2048, the
+ * development and acceptance registers' JUDGE and synthesis `tokenCeiling` (final review I3).
+ */
+export const TEST_ANSWER_TOKEN_CEILING = 2048;
+
 /** LOCAL, no strength, no plan, no demand, no calls, no ceiling, no prices — then the overrides. */
 export function testPickerInput(overrides: Partial<PickerInput> & Pick<PickerInput, "scorecard" | "reachable">): PickerInput {
   return {
@@ -144,6 +150,7 @@ export function testPickerInput(overrides: Partial<PickerInput> & Pick<PickerInp
     expectedCallsByRole: roleNumbers({}),
     perRunCeilingMicros: null,
     prices: new Map(),
+    answerTokenCeilingByRole: roleNumbers({}, TEST_ANSWER_TOKEN_CEILING),
     ...overrides
   };
 }

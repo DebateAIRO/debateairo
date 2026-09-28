@@ -144,6 +144,11 @@ function valid(overrides: Partial<AskModelPickerSettings> = {}): AskModelPickerS
       })]
     ]),
     perRunCeilingMicros: null,
+    // Final review I3: each debate job's sealed answer bound, handed to the picker as is.
+    answerTokenCeilings: Object.freeze({
+      POSITION: 2048, SUPPORT_ATTACK: 2048, CROSS_EXCHANGE: 2048, JUDGE: 2048, REVIEWER: 2048,
+      ANSWER_WRITER: 4096, ANSWER_CHECKER: 1024
+    }),
     ...overrides
   };
 }
@@ -272,6 +277,8 @@ describe("A20 · with a VALID scorecard the picker replaces the roster filter", 
       scorecard: SCORECARD, mode: "HOSTED", strength: "BEST", planTier: "premium", perRunCeilingMicros: 250_000
     });
     expect([...hosted.prices]).toEqual([["development:claude-premium-cli", price]]);
+    // Final review I3: the picker counts each role's own sealed answer bound against the window.
+    expect(hosted.answerTokenCeilingByRole).toEqual(valid().answerTokenCeilings);
     await evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("premium"));
     expect(lastInput()).toMatchObject({ mode: "LOCAL", strength: null, planTier: null, perRunCeilingMicros: null });
     expect(lastInput().prices.size).toBe(0);

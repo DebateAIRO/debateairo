@@ -539,6 +539,48 @@ export async function readStructuralCeilingPolicyInputs(pool: Pool, registerVers
   });
 }
 
+/**
+ * Final review I3 — THE SEALED PER-CALL ANSWER BOUNDS the debate jobs' calls use,
+ * read once at boot for the model picker. The gateway's window wall is the
+ * prompt (UTF-8 bytes / 2) PLUS the attempt's `tokenCeiling`, so the picker needs
+ * each role's own bound to seat only candidates the gateway will not refuse:
+ *  - `judge`: `acceptanceOrganCostBounds.organs.JUDGE` — every debate call
+ *    (positions, arguments, exchanges, the panel, reviews) runs under it;
+ *  - `synthesizer` / `evaluator`: the synthesis-role rows `synthesizerCallBound`
+ *    and `evaluatorCallBound` (W10/3) — the answer writer's and checker's calls.
+ * Rows absent at this register version, or without a positive whole bound,
+ * refuse by one fixed code. Nothing here restates a sealed value.
+ */
+const callTokenCeilingSchema = z.object({ tokenCeiling: z.number().int().positive() }).passthrough();
+const organTokenCeilingsSchema = z.object({
+  kind: z.literal("ACCEPTANCE_ORGAN_COST_BOUNDS"),
+  organs: z.object({ JUDGE: callTokenCeilingSchema }).passthrough()
+}).passthrough();
+
+export async function readCallTokenCeilings(pool: Pool, registerVersion: number): Promise<{
+  readonly judge: number;
+  readonly synthesizer: number;
+  readonly evaluator: number;
+}> {
+  const result = await pool.query<{ row_key: string; value_json: unknown }>(
+    `SELECT row_key, value_json FROM register.register_row
+     WHERE register_version=$1 AND row_key=ANY($2::text[])`,
+    [registerVersion, ["acceptanceOrganCostBounds", "synthesizerCallBound", "evaluatorCallBound"]]
+  );
+  const byKey = new Map(result.rows.map((row) => [row.row_key, row.value_json]));
+  const organs = organTokenCeilingsSchema.safeParse(byKey.get("acceptanceOrganCostBounds"));
+  const synthesizer = callTokenCeilingSchema.safeParse(byKey.get("synthesizerCallBound"));
+  const evaluator = callTokenCeilingSchema.safeParse(byKey.get("evaluatorCallBound"));
+  if (!organs.success || !synthesizer.success || !evaluator.success) {
+    throw new TypeError("CALL_TOKEN_CEILINGS_UNRESOLVED");
+  }
+  return Object.freeze({
+    judge: organs.data.organs.JUDGE.tokenCeiling,
+    synthesizer: synthesizer.data.tokenCeiling,
+    evaluator: evaluator.data.tokenCeiling
+  });
+}
+
 export async function readPanelDiscoveryPolicy(pool: Pool, registerVersion: number): Promise<{
   readonly probeFreshnessMs: number;
   readonly probeMaxAttempts: 1;

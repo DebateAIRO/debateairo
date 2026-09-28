@@ -61,6 +61,7 @@ import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/criti
 export {
   ASK_MODEL_ASSIGNMENT_INVALID,
   ASK_MODEL_REFUSALS,
+  answerTokenCeilingsByRole,
   askModelPickerSettings,
   askTargetFacts,
   debaterSeatCount,
@@ -72,7 +73,8 @@ export {
   targetPricesOf,
   type AdmittedModelAssignment,
   type AskModelPickerSettings,
-  type AskTargetFacts
+  type AskTargetFacts,
+  type CallTokenCeilings
 } from "./ask-model-picker.js";
 import { RoleAssignmentSchema, pickRoleAssignment, type RoleAssignment, type Scorecard } from "@debateai/scorecard";
 import {
@@ -2582,7 +2584,9 @@ async function admitWithScorecard(input: Readonly<{
     seatDemand: seatDemandForDebaters(plannedDebaters),
     expectedCallsByRole: expectedCallsByRoleFromBasis(plannedBasis),
     perRunCeilingMicros: picker.perRunCeilingMicros,
-    prices: targetPricesOf(picker.targetFacts)
+    prices: targetPricesOf(picker.targetFacts),
+    // Final review I3: the gateway's window wall adds each call's sealed answer bound.
+    answerTokenCeilingByRole: picker.answerTokenCeilings
   });
   if (outcome.state === "REFUSED") {
     picker.log?.(`MODEL_PICKER refused reason=${outcome.reason} detail=${outcome.detail}`);

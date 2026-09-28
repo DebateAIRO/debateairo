@@ -7,7 +7,13 @@ import {
   type DebateRole,
   type ModelStrength
 } from "@debateai/kernel";
-import type { PickerSettings, Scorecard, ScorecardCandidate, ScorecardRoleEntry } from "./schema.js";
+import {
+  WINDOW_TOKENS_PER_VENDOR_TOKEN,
+  type PickerSettings,
+  type Scorecard,
+  type ScorecardCandidate,
+  type ScorecardRoleEntry
+} from "./schema.js";
 import { estimateRunCost, typicalCallMicros } from "./estimate.js";
 
 /**
@@ -24,7 +30,7 @@ import { estimateRunCost, typicalCallMicros } from "./estimate.js";
  *   STEPPED_DOWN:<from>-><to>                 the money estimate was over the per-run ceiling
  *   ROLE_FALLBACK:<role>:NO_ELIGIBLE_CANDIDATE | MAKER_COVERAGE
  *   SEATS_SHORT:<role>:<filled>/<asked>       fewer eligible makers or routes than seats
- *   CONTEXT_WINDOW_SKIP:<role>:<candidateId>  the role's typical call (input + output + thinking) does not fit the window
+ *   CONTEXT_WINDOW_SKIP:<role>:<candidateId>  the role's typical input (× 4) plus its answer bound does not fit the window
  *   ECONOMY_CAP_UNMET:<role>                  nothing was under the cap; the cheapest sits
  *   PRICE_UNUSABLE:<providerRef>              a hosted route without a usable price
  *   ESTIMATE_UNAVAILABLE                      a called seat has no typical call or no price
@@ -83,6 +89,12 @@ export type PickerInput = Readonly<{
   expectedCallsByRole: Readonly<Record<DebateRole, number>>;
   perRunCeilingMicros: number | null;
   prices: ReadonlyMap<string, TargetPrice>;
+  /**
+   * Final review I3: the sealed per-call answer bound (`CallBound.tokenCeiling`) of the calls each
+   * role makes — what the gateway's window wall adds to a prompt. A role without a positive whole
+   * number here fits no declared window (fail closed).
+   */
+  answerTokenCeilingByRole: Readonly<Record<DebateRole, number>>;
 }>;
 
 export type PickerOutcome =
@@ -229,13 +241,23 @@ function matchTarget(reachable: readonly ReachableTarget[], candidate: Scorecard
 }
 
 /**
- * R1 applied to a typical call (pre-flight ruling F29): the gateway refuses a prompt when the prompt
- * PLUS the answer bound exceeds the window, so the picker counts the typical call's input, output
- * and thinking tokens together. Comparing the input alone would seat a candidate the gateway then
- * refuses on every call (PROVIDER_CONTEXT_WINDOW_EXCEEDED is not a backup trigger).
+ * R1 applied to a typical call — THE GATEWAY'S OWN WALL (final review I3, replacing pre-flight
+ * ruling F29's count). The gateway refuses an attempt when the prompt's UTF-8 bytes / 2
+ * (`estimateWindowTokens`) PLUS the attempt's answer bound (`tokenCeiling`) exceed the window,
+ * and PROVIDER_CONTEXT_WINDOW_EXCEEDED is not a backup trigger, so a candidate seated past it is
+ * refused on every call. The scorecard's input is in vendor-style tokens, so it is converted at
+ * `WINDOW_TOKENS_PER_VENDOR_TOKEN` (the rule's worst case), and the role's sealed answer bound is
+ * added: never looser than the wall. The typical output and thinking tokens are not what the
+ * wall adds, so they do not count here.
  */
-function typicalCallWindowTokens(typicalCall: ScorecardRoleEntry["typicalCall"]): number {
-  return typicalCall.inputTokens + typicalCall.outputTokens + (typicalCall.thinkingTokens ?? 0);
+export function typicalCallWindowTokens(typicalCall: ScorecardRoleEntry["typicalCall"], answerTokenCeiling: number): number {
+  return typicalCall.inputTokens * WINDOW_TOKENS_PER_VENDOR_TOKEN + answerTokenCeiling;
+}
+
+/** The role's sealed answer bound, or +Infinity — fits no declared window — when the input carries none usable. */
+function answerTokenCeilingOf(input: PickerInput, role: DebateRole): number {
+  const ceiling = input.answerTokenCeilingByRole?.[role];
+  return typeof ceiling === "number" && Number.isSafeInteger(ceiling) && ceiling >= 1 ? ceiling : Number.POSITIVE_INFINITY;
 }
 
 function smallestWindow(left: number | null, right: number | null): number | null {
@@ -275,23 +297,30 @@ function seatDemandOf(input: PickerInput, role: DebateRole): number {
  * as a main or as a runner-up — must ALSO be able to take its own cross-exchange call. A
  * candidate with no CROSS_EXCHANGE entry of its own stands in on its POSITION entry (the same
  * rule the estimate applies, F28) and is eligible. A candidate WITH a CROSS_EXCHANGE entry is
- * eligible only when that entry is not AVOID/UNTESTED and its typical call (input + output +
- * thinking tokens) fits the smaller of its own and its route's window — the identical test
- * `eligiblePool` applies to the role's own entry.
+ * eligible only when that entry is not AVOID/UNTESTED and its typical call fits the smaller of its
+ * own and its route's window under the gateway's own wall (`typicalCallWindowTokens`, with the
+ * CROSS_EXCHANGE answer bound) — the identical test `eligiblePool` applies to the role's own entry.
  */
-function crossExchangeEligible(scorecard: Scorecard, candidate: ScorecardCandidate, target: ReachableTarget): boolean {
+function crossExchangeEligible(
+  input: PickerInput,
+  scorecard: Scorecard,
+  candidate: ScorecardCandidate,
+  target: ReachableTarget
+): boolean {
   const entry = scorecard.roles.CROSS_EXCHANGE.find((listed) => listed.candidateId === candidate.candidateId);
   if (entry === undefined) return true;
   if (entry.tier === "AVOID" || entry.tier === "UNTESTED") return false;
   const contextWindow = smallestWindow(candidate.contextWindowTokens, target.contextWindowTokens);
-  return contextWindow === null || typicalCallWindowTokens(entry.typicalCall) <= contextWindow;
+  return contextWindow === null
+    || typicalCallWindowTokens(entry.typicalCall, answerTokenCeilingOf(input, "CROSS_EXCHANGE")) <= contextWindow;
 }
 
 /**
  * Every scorecard candidate that may sit in `role`: listed for it, not AVOID or UNTESTED,
  * reachable at its own thinking level, on an API route in HOSTED mode (relays never run
- * hosted), and whose typical call (input + output + thinking tokens) fits the smaller of its own
- * and its route's window. For POSITION, when the run also demands CROSS_EXCHANGE seats
+ * hosted), and whose typical call fits the smaller of its own and its route's window under the
+ * gateway's own wall (`typicalCallWindowTokens`: input × 4 plus the role's answer bound, final
+ * review I3). For POSITION, when the run also demands CROSS_EXCHANGE seats
  * (`requireCrossExchangeEligible`), a candidate that cannot also take its own cross-exchange
  * call is excluded too (`crossExchangeEligible`), noted `CROSS_EXCHANGE_INELIGIBLE`.
  * Entries are walked in candidateId order so the notes do not depend on the file's order.
@@ -314,11 +343,11 @@ function eligiblePool(
     const target = matchTarget(input.reachable, candidate);
     if (target === null) continue;
     const contextWindow = smallestWindow(candidate.contextWindowTokens, target.contextWindowTokens);
-    if (contextWindow !== null && typicalCallWindowTokens(entry.typicalCall) > contextWindow) {
+    if (contextWindow !== null && typicalCallWindowTokens(entry.typicalCall, answerTokenCeilingOf(input, role)) > contextWindow) {
       notes.push(`CONTEXT_WINDOW_SKIP:${role}:${candidate.candidateId}`);
       continue;
     }
-    if (requireCrossExchangeEligible && !crossExchangeEligible(scorecard, candidate, target)) {
+    if (requireCrossExchangeEligible && !crossExchangeEligible(input, scorecard, candidate, target)) {
       notes.push(`CROSS_EXCHANGE_INELIGIBLE:${candidate.candidateId}`);
       continue;
     }

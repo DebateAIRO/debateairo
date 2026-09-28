@@ -36,6 +36,8 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 });
 
 const REGISTER_VERSION = 42;
+/** Final review I3: the sealed answer bounds the boot read in its own stage, handed through. */
+const CALL_TOKEN_CEILINGS = Object.freeze({ judge: 2048, synthesizer: 4096, evaluator: 1024 });
 const HOSTED_SOURCE_REF = "hosted-register.json | modelScorecard v5 sha256:test";
 
 function heldKek() {
@@ -100,6 +102,7 @@ describe("final review I5 · composeAskModelPicker, the API's model-scorecard an
       deploymentMode: input.deploymentMode,
       registerVersion: REGISTER_VERSION,
       targets: [],
+      callTokenCeilings: CALL_TOKEN_CEILINGS,
       perRunCeilingMicros: input.perRunCeilingMicros,
       log: (line) => lines.push(line),
       engineManifest: input.engineManifest ?? engineManifest,
@@ -116,6 +119,7 @@ describe("final review I5 · composeAskModelPicker, the API's model-scorecard an
     expect(pool.query.mock.calls[0]?.[1]).toEqual([REGISTER_VERSION, "modelScorecard"]);
     expect(opened.filter((path) => path === String(bundledScorecard))).toEqual([]);
     expect(picker).toMatchObject({ mode: "HOSTED", perRunCeilingMicros: 1_000_000 });
+    expect(picker.answerTokenCeilings).toMatchObject({ JUDGE: 2048, ANSWER_WRITER: 4096, ANSWER_CHECKER: 1024 });
     expect(picker.scorecard).toMatchObject({ state: "VALID", sourceRef: HOSTED_SOURCE_REF });
     if (picker.scorecard.state !== "VALID") throw new Error("expected the sealed row's scorecard");
     expect(picker.scorecard.scorecard.scorecardVersion).toBe(5);
