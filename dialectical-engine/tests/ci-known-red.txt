@@ -96,6 +96,24 @@
 # failure, not "known"), then restored; the entries below carry the new exact names.
 # Every entry now says what it blinds.
 #
+# SHRUNK 2026-09-28 (branch fix/2026-09-28-dev-baseline-reds, off origin/dev@534c526a):
+#   - register-support-publication "the sealed development-v4 fixture hashes to the pinned v4
+#     snapshot constant" (was "dev's 6a05a0d0 expectation: …the moved snapshot constant") is
+#     green and its entry deleted. The ruling the entry waited for was settled by the record:
+#     the frozen fixture is register version 4 as published (three slots, 32 rows) and the
+#     P3-02 runbook names its snapshot, 120bdfea…; 42b90bca… is the five-slot panel, version 9
+#     on the dev deployment. 6a05a0d0 had moved the PIN, never the sealed bytes, so the pin
+#     was restored (tests/support/registerFixtures.ts).
+#   - dev-database-principals "dev's b7ca2c41 expectation: a twelfth fixed wrapper,
+#     debateai_dev_evaluator_worker" is replaced by "declares exactly the eleven fixed
+#     wrappers the development stack provisions", green, and its entry deleted. b7ca2c41
+#     ("snapshot current CP1 baseline") moved tests to an evaluator-worker login, an
+#     EVALUATOR_DATABASE_URL and an on evaluator menu with no source for any of them; the
+#     source has declared eleven logins and kept the menu off since 2026-08-28, and
+#     78988fc2 had already made the integration twin follow the declared list. The seven
+#     integration rows of the same snapshot (dev-api-environment x1, dev-api-process x5,
+#     dev-ui-process x1 — outside this gate) were brought back to the source with it.
+#
 # Deliberately NOT listed:
 #   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
 #     tripwire"): they pass solo; listing them would hide a real regression. Integration
@@ -138,25 +156,6 @@ tests/unit/v2ui-pages.test.ts > XREV-01 — node review uses the existing V2 car
 #   source: dev's closing four-count at a61206dc, row 12. UI source pin owned by the apps/ui lane.
 #   blinds: the three other card-review pins of the same deferred feature (D79 (c)(1)); the
 #   drawer's review pins run in their own row. Nothing of this line's.
-tests/architecture/dev-database-principals.test.ts > DEV-03 development database principal provisioning source contract > dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker
-#   source: dev, b7ca2c41 (SYNC3, 2026-09-23; split out at fix round 1 from "keeps all twelve
-#   fixed wrappers least-privileged and file-backed"). Red on origin/dev@25a0069f with the
-#   same message: dev's test demands twelve principals including
-#   debateai_dev_evaluator_worker; dev's apps/runner/src/dev-database-principals.ts declares
-#   eleven. Adding a database role is dev's product change, not a sync's.
-#   blinds: nothing of ours — the row holds only dev's count and dev's evaluator-worker pin;
-#   the least-privilege, file-custody and L7-F10 assertions run in "keeps every fixed
-#   wrapper least-privileged and file-backed".
-tests/architecture/register-support-publication.test.ts > REGISTER-SUPPORT-PUBLICATION schema source contract > dev's 6a05a0d0 expectation: the sealed development-v4 fixture hashes to the moved snapshot constant
-#   source: dev, 6a05a0d0 (SYNC3, 2026-09-23; split out at fix round 1 from "preserves the
-#   exact legacy hashes while the actual port input owns all 248 policy decimals"). Red on
-#   origin/dev@25a0069f with the same message: dev moved
-#   DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 (120bdfea… -> 42b90bca…) but not the sealed
-#   fixture tests/support/fixtures/register-development-v4.json, which still hashes to
-#   120bdfea…. Which side is right is a ruling on a sealed value.
-#   blinds: nothing of ours — the row is that one hash assertion; the row counts, the legacy
-#   v1 hash, both 248-decimal censuses and the canonical refusal run in "preserves the exact
-#   legacy v1 hash while the actual port input owns all 248 policy decimals".
 tests/unit/v2ui-pages.test.ts > UI-02a: the node card shows V3's recorded numbers, in V2's own vocabulary > dev's b7ca2c41 pin: the drawer projects the fuller record through v3NodeScoreDetails(v3)
 #   source: dev, b7ca2c41 (SYNC3, 2026-09-23; split out at fix round 1 from "keeps the fuller
 #   record on the executable drawer projection and forbids raw-value JSX"). Red on

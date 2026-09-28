@@ -5959,7 +5959,6 @@ export class WalkingSkeletonRunner {
           // judge, answering about ONE node, had 180.
           bound: this.settings.synthesisRolePolicy.synthesizerBound,
           contractHash: this.settings.composerContractHash,
-          argumentLanguageName: run.argumentLanguageName,
           providerRef: role.providerRef,
           packet,
           // Task M4 review fix I-1: the schema, then the prose and the cited refs.
@@ -6064,7 +6063,6 @@ export class WalkingSkeletonRunner {
           // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
           bound: this.settings.synthesisRolePolicy.evaluatorBound,
           contractHash: this.settings.conformanceContractHash,
-          argumentLanguageName: run.argumentLanguageName,
           providerRef: role.providerRef,
           packet,
           classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),

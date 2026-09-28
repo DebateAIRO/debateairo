@@ -113,7 +113,6 @@ function synthesizerCall(statement: string, providerRef = "provider:planned"): P
     lane: "served" as const,
     bound: Object.freeze({ maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 }),
     contractHash: "c".repeat(64),
-    argumentLanguageName: "English",
     providerRef,
     packet: buildSynthesizerPromptPacket(request, "English")
   });

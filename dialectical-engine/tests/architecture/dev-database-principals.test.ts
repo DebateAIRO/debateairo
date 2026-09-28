@@ -20,12 +20,11 @@ describe("DEV-03 development database principal provisioning source contract", (
 
   /**
    * SYNC3 fix round 1. This row and the one below were ONE row whose first
-   * assertion — dev's count of twelve — fails on dev itself (dev's source
+   * assertion — dev's count of twelve — failed on dev itself (dev's source
    * declares eleven), so the gate matched the row by name as "known red" and
    * nothing after it ever ran: the least-privilege, file-custody and L7-F10
    * assertions here were blind, and a regression in any of them would have
-   * read as the known failure. Every assertion of this line lives in THIS row,
-   * which runs; dev's own expectation is alone in the next row.
+   * read as the known failure. They stay in THIS row; the count has its own.
    */
   it("keeps every fixed wrapper least-privileged and file-backed", async () => {
     const source = await readFile("apps/runner/src/dev-database-principals.ts", "utf8");
@@ -55,16 +54,19 @@ describe("DEV-03 development database principal provisioning source contract", (
   });
 
   /**
-   * dev's own expectation, alone in its row (b7ca2c41): a twelfth wrapper for
-   * the evaluator worker. dev's source declares eleven, so this row is red on
-   * dev itself and is listed in tests/ci-known-red.txt; listing it blinds
-   * nothing of this line's.
+   * The count of development LOGIN wrappers, pinned: a new database login is a
+   * deliberate change and must move this number in the same commit.
+   *
+   * b7ca2c41 ("snapshot current CP1 baseline", 2026-09-14) moved this pin to
+   * twelve, adding an evaluator-worker login, together with an on evaluator
+   * menu and an EVALUATOR_DATABASE_URL in the dev API and UI tests — and no
+   * source for any of them. The source has declared eleven and kept the menu
+   * off since 2026-08-28; 78988fc2 (2026-09-20) made the integration twin of
+   * this count follow the declared list. The row was red on dev and listed
+   * known-red until 2026-09-28, when the tests were brought back to the source.
    */
-  it("dev's b7ca2c41 expectation: a twelfth fixed wrapper, debateai_dev_evaluator_worker", async () => {
+  it("declares exactly the eleven fixed wrappers the development stack provisions", async () => {
     const source = await readFile("apps/runner/src/dev-database-principals.ts", "utf8");
-    expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toHaveLength(12);
-    expect(source).toContain(`roleName: "debateai_dev_evaluator_worker",
-    capabilityRole: "debateai_evaluator_worker",
-    environmentKey: "EVALUATOR_DATABASE_URL"`);
+    expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toHaveLength(11);
   });
 });

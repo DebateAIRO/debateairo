@@ -12,7 +12,17 @@ afterEach(async () => {
 });
 
 describe("FX-HR-H1 — one provider interface", () => {
-  it("records the argument language beside the sealed contract hash on every artifact receipt", async () => {
+  /**
+   * An encrypted run's `raw_artifact.metadata_json` stays readable, and migration
+   * 0069 (V-6) admits only these code / number keys in it: any other key refuses
+   * the artifact and, with it, the model reply. f76e47f9 added the debate's
+   * language name here, and every reply of an encrypted debate was refused. The
+   * language is the RUN's (`core.run.argument_language_name`), reached through the
+   * artifact's run_id. The database half of this pin is "persists the provider
+   * gateway's own artifact metadata for an encrypted run" in
+   * `tests/integration/v6-remaining-content-carriers.test.ts`.
+   */
+  it("records only the metadata keys an encrypted run's artifact admits", async () => {
     const artifacts: Record<string, unknown>[] = [];
     const gateway = new OpenAICompatibleProviderGateway({
       endpoint: "http://fixture/v1", model: "fixture", maker: "fixture",
@@ -26,10 +36,11 @@ describe("FX-HR-H1 — one provider interface", () => {
     await gateway.call({
       runId: null, subjectItemId: "node:test", callSiteKey: "fixture", role: "EVALUATOR",
       lane: "served", bound: { maxAttempts: 1, tokenCeiling: 8, deadlineMs: 1000 },
-      contractHash: "sealed-evaluator-contract", argumentLanguageName: "Romanian",
-      providerRef: "provider", packet: framedFixturePacket("x")
+      contractHash: "sealed-evaluator-contract", providerRef: "provider", packet: framedFixturePacket("x")
     });
-    expect(artifacts).toEqual([expect.objectContaining({ argument_language_name: "Romanian" })]);
+    expect(artifacts).toHaveLength(1);
+    const admitted = ["status", "attempt", "prompt_tripwires", "usage", "finish_reason", "token_ceiling"];
+    expect(Object.keys(artifacts[0]!).filter((key) => !admitted.includes(key))).toEqual([]);
   });
 
   it("preserves observed usage in raw artifact metadata and uses null when absent", async () => {
