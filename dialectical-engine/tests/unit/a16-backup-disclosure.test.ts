@@ -117,6 +117,21 @@ describe("A16c · the answer discloses a stand-in in plain words (carries 8, 12,
       }
     }
   });
+
+  /*
+   * Final review m1. A resumed pass re-asks the slot that answered, so after enough resumes a
+   * main's key can reach its bound with only OK answers; its site is then handed to the
+   * runner-up. That model was never unavailable — it could not be USED. The record must be
+   * true in that case too, so no sentence claims (or presumes) that a model was unavailable.
+   */
+  it("m1: says a planned model could not be used, never that it was (or will be) unavailable", () => {
+    for (const wording of Object.values(BACKUP_MODEL_USED_WORDING)) {
+      expect(wording.reason).toMatch(/could not be used/u);
+      for (const text of [wording.subject, wording.reason, wording.liftPath]) {
+        expect(text).not.toMatch(/\b(?:un)?available\b|\bavailability\b/iu);
+      }
+    }
+  });
 });
 
 describe("A16c · the progress-stream values carry the internals (owner/admin side)", () => {

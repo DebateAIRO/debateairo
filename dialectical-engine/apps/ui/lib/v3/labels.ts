@@ -28,8 +28,10 @@ export function conditionMarkLabel(mark: ConditionMark): string {
     // Model scorecard A16 (R6). Plain words for the asker (owners' no-internals
     // rule): no role, seat or "runner-up", and true in BOTH switch directions
     // (carry 12: the 80-20 split can plan the runner-up, which then falls back
-    // to the main model) and for both causes (usage limit or outage).
-    case "BACKUP-MODEL-USED": return "Where a planned AI model was unavailable, another one stepped in";
+    // to the main model) and for every cause (usage limit, outage, or — final
+    // review m1 — a key that reached its bound after answering on resumed
+    // passes, which is why it says "could not be used", never "unavailable").
+    case "BACKUP-MODEL-USED": return "Where a planned AI model could not be used, another one stepped in";
     case "SINGLE-LINEAGE": return "Single model lineage";
     case "CRITIQUE-UNAVAILABLE": return "Independent critique unavailable";
     case "PANEL-PARTIAL": return "Some judges could not assess this point";

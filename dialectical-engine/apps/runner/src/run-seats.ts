@@ -815,17 +815,19 @@ export const BACKUP_MODEL_USED_WORDING = Object.freeze({
   /**
    * A planned model was replaced: a main answered by its runner-up (during a
    * call, at claim or on a resumed pass), or a role whose planned models were
-   * all unavailable, answered by the debaters.
+   * all unavailable, answered by the debaters. Final review m1: "could not be
+   * used", never "unavailable" — a main whose key reached its bound with only
+   * OK answers on resumed passes is handed over too, and it was never down.
    */
   STAND_IN: Object.freeze({
     subject: "Planned AI models",
-    reason: "One or more AI models planned for this debate were unavailable, so other AI models answered in their place.",
-    liftPath: "Ask again later, when the planned AI models are available."
+    reason: "One or more AI models planned for this debate could not be used, so other AI models answered in their place.",
+    liftPath: "Ask again later to give the planned AI models another chance."
   }),
-  /** Carry 12: a runner-up the 80-20 split chose for a call was unavailable, so the main answered it. */
+  /** Carry 12: a runner-up the 80-20 split chose for a call could not be used, so the main answered it. */
   USUAL: Object.freeze({
     subject: "Extra AI model",
-    reason: "An AI model chosen to add variety to this debate was unavailable, so the usual AI model answered in its place.",
+    reason: "An AI model chosen to add variety to this debate could not be used, so the usual AI model answered in its place.",
     liftPath: "Ask again later if you want that extra variety."
   })
 });

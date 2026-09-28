@@ -191,9 +191,11 @@ describe("A21.3 · the honesty drawer names the models chosen for each debate jo
     expect(section).not.toMatch(/scorecard|plan list|because|metaLine/iu);
   });
 
-  it("carry 2 · the backup mark reads in its committed plain words", () => {
+  it("carry 2 / final review m1 · the backup mark reads in its committed plain words, true in every case", () => {
     const html = drawerHtml({ condition_marks: ["BACKUP-MODEL-USED"] });
-    expect(conditionMarkLabel("BACKUP-MODEL-USED")).toBe("Where a planned AI model was unavailable, another one stepped in");
+    // m1: a main whose key reached its bound with only OK answers is handed over too, so the
+    // label says the planned model could not be used, never that it was unavailable.
+    expect(conditionMarkLabel("BACKUP-MODEL-USED")).toBe("Where a planned AI model could not be used, another one stepped in");
     expect(html).toContain(`>${conditionMarkLabel("BACKUP-MODEL-USED")}<`);
     expect(html).not.toContain(">BACKUP-MODEL-USED<");
   });
