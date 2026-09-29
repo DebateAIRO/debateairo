@@ -23,6 +23,7 @@ const SESSION = {
 };
 
 let root: Root | null = null;
+const checkAge = vi.fn();
 
 async function settle(): Promise<void> {
   await act(async () => {
@@ -36,6 +37,22 @@ function field(name: string): HTMLInputElement {
   const input = document.querySelector<HTMLInputElement>(`input[name="${name}"]`);
   expect(input, `missing rendered input ${name}`).not.toBeNull();
   return input!;
+}
+
+/* Age gate replaced the 18+ box (Turn 8). The date of birth is React state, not FormData, so it
+   is typed the way React sees it: the prototype value setter plus an `input` event, in act.
+   Call it BEFORE the direct assignments: its re-renders reset the controlled text fields. */
+async function type(name: string, value: string): Promise<void> {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field(name), value);
+    field(name).dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+async function fillAdultDateOfBirth(): Promise<void> {
+  await type("dob-d", "01");
+  await type("dob-m", "01");
+  await type("dob-y", "1990");
 }
 
 async function submit(): Promise<void> {
@@ -58,6 +75,7 @@ async function click(label: string): Promise<void> {
 describe("rendered auth flow integration", () => {
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    checkAge.mockReset().mockResolvedValue({ outcome: "allowed" });
     window.history.replaceState({}, "", "/");
     setPathname("/");
     const container = document.createElement("div");
@@ -77,7 +95,7 @@ describe("rendered auth flow integration", () => {
       <LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />
     );
     const signUpHtml = renderToStaticMarkup(
-      <SignUpFlow client={{ register: vi.fn() }} />
+      <SignUpFlow client={{ register: vi.fn(), checkAge }} />
     );
     const cases = [
       { route: "/login", html: loginHtml },
@@ -205,7 +223,7 @@ describe("rendered auth flow integration", () => {
     await act(async () => root!.render(
       <>
         <TopBar />
-        <SignUpFlow client={{ register: vi.fn() }} />
+        <SignUpFlow client={{ register: vi.fn(), checkAge }} />
       </>
     ));
     expect(document.querySelector('.authTopBar a[href="/"]')).not.toBeNull();
@@ -295,7 +313,7 @@ describe("rendered auth flow integration", () => {
   it("forwards sign-up next to login only when the parameter is present", async () => {
     window.history.replaceState({}, "", "/sign-up?next=%2Fnew");
     await act(async () => root!.render(
-      <SignUpFlow client={{ register: vi.fn() }} />
+      <SignUpFlow client={{ register: vi.fn(), checkAge }} />
     ));
     await settle();
 
@@ -306,7 +324,7 @@ describe("rendered auth flow integration", () => {
   it("keeps the sign-up login link query-free when next is absent", async () => {
     window.history.replaceState({}, "", "/sign-up");
     await act(async () => root!.render(
-      <SignUpFlow client={{ register: vi.fn() }} />
+      <SignUpFlow client={{ register: vi.fn(), checkAge }} />
     ));
     await settle();
 
@@ -315,23 +333,24 @@ describe("rendered auth flow integration", () => {
 
   it("renders the non-enumerating registration state", async () => {
     const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
-    await act(async () => root!.render(<SignUpFlow client={{ register }} />));
+    await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} />));
 
+    await fillAdultDateOfBirth();
     field("email").value = " person@example.test ";
     field("confirm-email").value = " person@example.test ";
     field("recovery-email").value = " recovery@example.test ";
     field("password").value = "correct horse battery staple";
     field("confirm-password").value = "correct horse battery staple";
-    field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;
     await submit();
 
+    // The 4th argument is the ISO date of birth, not `true`: the age gate replaced the 18+ box (Turn 8).
     expect(register).toHaveBeenCalledWith(
       "person@example.test",
       "correct horse battery staple",
       "recovery@example.test",
-      true
+      "1990-01-01"
     );
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
     expect(document.body.textContent).toContain("No account status is revealed here.");
@@ -437,20 +456,21 @@ describe("rendered auth flow integration", () => {
     const register = vi.fn().mockRejectedValue(
       new Error("ContractHttpError: duplicate account person@example.test")
     );
-    await act(async () => root!.render(<SignUpFlow client={{ register }} />));
+    await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} />));
 
     expect(field("email").autocomplete).toBe("section-primary-email email");
     expect(field("recovery-email").autocomplete).toBe("section-recovery-email email");
+    await fillAdultDateOfBirth();
     field("email").value = "person@example.test";
     field("confirm-email").value = "person@example.test";
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "password";
     field("confirm-password").value = "password";
-    field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;
     await submit();
 
+    expect(register, "the failure under test is register's, not an unfilled form's").toHaveBeenCalledTimes(1);
     expect(document.querySelector('[role="alert"]')?.textContent)
       .toBe("Account creation could not be completed.");
     expect(document.body.textContent).not.toMatch(/ContractHttpError|duplicate account/);
@@ -462,46 +482,71 @@ describe("rendered auth flow integration", () => {
   // validation, so `required` gates nothing against a scripted submit. The handler
   // refuses from the two FormData reads — never from R17's React mirror, which an
   // assignment never updates.
-  it("refuses to register when any consent box is left unticked", async () => {
-    const registerWithoutPrivacy = vi.fn();
-    await act(async () =>
-      root!.render(
-        <SignUpFlow client={{ register: registerWithoutPrivacy }} />
-      )
-    );
-
-    field("email").value = "person@example.test";
-    field("confirm-email").value = "person@example.test";
-    field("recovery-email").value = "recovery@example.test";
-    field("password").value = "correct horse battery staple";
-    field("confirm-password").value = "correct horse battery staple";
-    field("adult-affirmed").checked = true;
-    await submit();
-
-    expect(registerWithoutPrivacy).not.toHaveBeenCalled();
-
+  // Rewritten: the age gate replaced the 18+ box (Turn 8). Each consent box is now left empty
+  // in turn with an adult date of birth filled, and the old "without the 18+ box" arm became
+  // "without a date of birth": it is refused before any network call, checkAge included.
+  async function remount(): Promise<void> {
     await act(async () => root!.unmount());
     document.body.replaceChildren();
     const container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
+  }
 
-    const registerWithoutAdult = vi.fn();
-    await act(async () =>
-      root!.render(
-        <SignUpFlow client={{ register: registerWithoutAdult }} />
-      )
-    );
-
+  function fillCredentials(): void {
     field("email").value = "person@example.test";
     field("confirm-email").value = "person@example.test";
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "correct horse battery staple";
     field("confirm-password").value = "correct horse battery staple";
+  }
+
+  it("refuses to register when any consent box is left unticked", async () => {
+    const registerWithoutPrivacy = vi.fn();
+    await act(async () =>
+      root!.render(
+        <SignUpFlow client={{ register: registerWithoutPrivacy, checkAge }} />
+      )
+    );
+
+    await fillAdultDateOfBirth();
+    fillCredentials();
+    field("terms-accepted").checked = true;
+    await submit();
+
+    expect(registerWithoutPrivacy).not.toHaveBeenCalled();
+
+    await remount();
+    const registerWithoutTerms = vi.fn();
+    await act(async () =>
+      root!.render(
+        <SignUpFlow client={{ register: registerWithoutTerms, checkAge }} />
+      )
+    );
+
+    await fillAdultDateOfBirth();
+    fillCredentials();
+    field("privacy-accepted").checked = true;
+    await submit();
+
+    expect(registerWithoutTerms).not.toHaveBeenCalled();
+
+    await remount();
+    const registerWithoutDateOfBirth = vi.fn();
+    await act(async () =>
+      root!.render(
+        <SignUpFlow client={{ register: registerWithoutDateOfBirth, checkAge }} />
+      )
+    );
+
+    fillCredentials();
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;
     await submit();
 
-    expect(registerWithoutAdult).not.toHaveBeenCalled();
+    expect(registerWithoutDateOfBirth).not.toHaveBeenCalled();
+    expect(document.getElementById("dob-msg")?.textContent, "the date of birth answers the submit")
+      .toMatch(/^✗ /);
+    expect(checkAge, "no refused arm reaches the age check").not.toHaveBeenCalled();
   });
 });

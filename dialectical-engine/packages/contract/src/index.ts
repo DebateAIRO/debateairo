@@ -218,6 +218,20 @@ export const SessionListSchema = z.object({
 export type SessionList = z.infer<typeof SessionListSchema>;
 
 export const RevokeAllSessionsSchema = z.object({ revoked: z.number().int().nonnegative() }).strict();
+
+/**
+ * Age gate (design document Turn 8 · 8d/8j/8k). The date of birth crosses the wire
+ * only to be checked; it is never stored. `refused` sets the 30-day lockout cookie.
+ */
+export const AGE_REFUSAL_COOKIE_NAME = "__Host-debateai-age-refusal" as const;
+export const AGE_REFUSAL_COOKIE_VALUE = "refused" as const;
+export const AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+export const DateOfBirthSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const AgeCheckRequestSchema = z.object({ date_of_birth: DateOfBirthSchema }).strict();
+export const AgeCheckResultSchema = z.object({ outcome: z.enum(["allowed", "refused"]) }).strict();
+export type AgeCheckResult = z.infer<typeof AgeCheckResultSchema>;
+export const AgeConfirmationStatusSchema = z.object({ status: z.enum(["required", "confirmed"]) }).strict();
+export type AgeConfirmationStatus = z.infer<typeof AgeConfirmationStatusSchema>;
 export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
   "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
@@ -733,6 +747,7 @@ export type RunEvent = z.infer<typeof RunEventSchema>;
 
 export const contractInventory = Object.freeze({
   routes: Object.freeze([
+    "POST /v1/auth/age-check",
     "POST /v1/auth/register",
     "POST /v1/auth/verify-email",
     "POST /v1/auth/resend-verification",
@@ -747,6 +762,8 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/auth/sessions/{id}",
     "DELETE /v1/auth/sessions",
     "POST /v1/auth/step-up",
+    "GET /v1/auth/age-confirmation",
+    "POST /v1/auth/age-confirmation",
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
@@ -788,6 +805,7 @@ export const contractInventory = Object.freeze({
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
+    AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,

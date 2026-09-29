@@ -73,6 +73,17 @@ export interface SessionApplication {
   listSessions(session: AuthenticatedSession): Promise<readonly SessionSummary[]>;
   revokeSession(session: AuthenticatedSession, sessionId: string, source: AuthSourceContext): Promise<boolean>;
   revokeAllSessions(session: AuthenticatedSession, source: AuthSourceContext): Promise<number>;
+  /** Age gate (8k): "required" until an existing account answers its one-time check. */
+  readAgeConfirmation?(session: AuthenticatedSession): Promise<"required" | "confirmed">;
+  /**
+   * Age gate (8k): records the one-time check. `refused` has already revoked every session
+   * of the account and frozen it; `SESSION_NOT_FOUND` means this session was not live.
+   */
+  confirmAccountAge?(
+    session: AuthenticatedSession,
+    input: Readonly<{ passed: boolean; minAgeApplied: number; countryCode: string | null; ruleVersion: string }>,
+    source: AuthSourceContext
+  ): Promise<"passed" | "refused" | "SESSION_NOT_FOUND">;
   stepUp(input: Readonly<{
     session: AuthenticatedSession;
     password: string;
@@ -94,6 +105,8 @@ export interface SessionApplication {
 type SessionRepository = Pick<PostgresSessionRepository,
   | "authenticateSession"
   | "authenticateAccountErasureStatusSession"
+  | "confirmAccountAge"
+  | "readAgeCheckOutcome"
   | "completeRecoveryLogin"
   | "completeTotpLogin"
   | "createLoginChallenge"
@@ -528,6 +541,25 @@ export class SessionService implements SessionApplication {
     return this.dependencies.repository.revokeAllSessions({
       userId: session.userId,
       initiatingSessionId: session.session.session_id,
+      occurredAt: this.now(),
+      source
+    });
+  }
+
+  async readAgeConfirmation(session: AuthenticatedSession): Promise<"required" | "confirmed"> {
+    const outcome = await this.dependencies.repository.readAgeCheckOutcome(session.userId);
+    return outcome === "required" ? "required" : "confirmed";
+  }
+
+  confirmAccountAge(
+    session: AuthenticatedSession,
+    input: Readonly<{ passed: boolean; minAgeApplied: number; countryCode: string | null; ruleVersion: string }>,
+    source: AuthSourceContext
+  ): Promise<"passed" | "refused" | "SESSION_NOT_FOUND"> {
+    return this.dependencies.repository.confirmAccountAge({
+      userId: session.userId,
+      sessionId: session.session.session_id,
+      ...input,
       occurredAt: this.now(),
       source
     });

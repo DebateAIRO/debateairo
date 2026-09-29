@@ -7,9 +7,11 @@ import authEnglish from "../../apps/ui/messages/en/auth.json";
 
 let host: HTMLDivElement;
 let root: Root;
+const checkAge = vi.fn();
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  checkAge.mockReset().mockResolvedValue({ outcome: "allowed" });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -28,18 +30,34 @@ async function mount(message = "Check your inbox for verification instructions."
   const register = vi.fn().mockResolvedValue({
     message
   });
-  await act(async () => root.render(<SignUpFlow client={{ register }} />));
+  await act(async () => root.render(<SignUpFlow client={{ register, checkAge }} />));
   return register;
 }
 
+/* Age gate replaced the 18+ box (Turn 8). The date of birth is React state, not FormData, so it
+   is typed the way React sees it: the prototype value setter plus an `input` event. */
+async function type(name: string, value: string): Promise<void> {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field(name), value);
+    field(name).dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+async function fillAdultDateOfBirth(): Promise<void> {
+  await type("dob-d", "01");
+  await type("dob-m", "01");
+  await type("dob-y", "1990");
+}
+
 async function submitValidForm() {
+  // First: its re-renders would reset the controlled fields assigned directly below.
+  await fillAdultDateOfBirth();
   // Email inputs strip ASCII padding before FormData; NBSP survives and exercises trim().
   field("email").value = "\u00a0Person@Example.test\u00a0";
   field("confirm-email").value = "\u00a0Person@Example.test\u00a0";
   field("recovery-email").value = "\u00a0Recovery@Example.test\u00a0";
   field("password").value = " Correct horse 7! ";
   field("confirm-password").value = " Correct horse 7! ";
-  field("adult-affirmed").checked = true;
   field("privacy-accepted").checked = true;
   field("terms-accepted").checked = true;
   await act(async () => {
@@ -69,6 +87,7 @@ describe("register form F1", () => {
     }
   });
 
+  // The 4th argument is the ISO date of birth, not `true`: the age gate replaced the 18+ box (Turn 8).
   it("submits the four registration arguments unchanged", async () => {
     const register = await mount();
     await submitValidForm();
@@ -76,7 +95,7 @@ describe("register form F1", () => {
       "Person@Example.test",
       " Correct horse 7! ",
       "Recovery@Example.test",
-      true
+      "1990-01-01"
     );
   });
 

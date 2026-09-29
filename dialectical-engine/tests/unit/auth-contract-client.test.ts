@@ -41,7 +41,7 @@ describe("auth registration contract client", () => {
       "person@example.test",
       "correct horse battery staple",
       "recovery@example.test",
-      true
+      "1990-01-01"
     )).resolves.toEqual({ message: REGISTRATION_MESSAGE });
     await expect(client.resendVerification("person@example.test"))
       .resolves.toEqual({ message: RESEND_MESSAGE });
@@ -56,7 +56,7 @@ describe("auth registration contract client", () => {
         email: "person@example.test",
         password: "correct horse battery staple",
         recovery_email: "recovery@example.test",
-        adult_affirmed: true
+        date_of_birth: "1990-01-01"
       },
       credentials: "same-origin"
     });
@@ -84,7 +84,7 @@ describe("auth registration contract client", () => {
       (async () => Response.json({ message: "That account already exists." }, { status: 202 })) as typeof fetch
     );
 
-    await expect(client.register("person@example.test", "password", "recovery@example.test", true))
+    await expect(client.register("person@example.test", "password", "recovery@example.test", "1990-01-01"))
       .rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 202 });
   });
 
