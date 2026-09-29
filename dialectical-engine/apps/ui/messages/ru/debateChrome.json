@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "Не удалось составить сводку в пределах бюджета на формирование ответа",
   "debateChrome.condition.protectedCoreGuardRetired": "Запуск остановлен из-за бюджета; проверка переформулировки больше не была обязательным условием",
   "debateChrome.condition.hiddenUnjudgeable": "Скрыто: невозможно оценить — включите показ скрытого, чтобы прочитать",
-  "debateChrome.condition.derivedStandingUnreviewed": "Сохраняет силу благодаря оценённым аргументам — собственная перекрёстная рецензия отсутствует",
+  "debateChrome.condition.derivedStandingUnreviewed": "Сохраняет силу благодаря оценённым аргументам — собственная перекрёстная проверка моделью другого разработчика отсутствует",
   "debateChrome.condition.hiddenLowScore": "Скрыто: оценка ниже показанного порога",
   "debateChrome.condition.unauthoredBranchHalted": "Расширение остановлено здесь — скрывать или показывать нечего, поскольку текст не был создан",
   "debateChrome.condition.labelBasisIncomplete": "Основание вердикта неполно — нет позиции соперника или второго судьи для сравнения",

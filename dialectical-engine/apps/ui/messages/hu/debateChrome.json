@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "A megfogalmazási kereten belül nem lehetett kivonatot készíteni",
   "debateChrome.condition.protectedCoreGuardRetired": "A futtatás a keret miatt leállt; az újrafogalmazási ellenőrzés már nem korlátozta",
   "debateChrome.condition.hiddenUnjudgeable": "Rejtett: nem volt elbírálható – az elolvasásához jelenítse meg a rejtett elemeket",
-  "debateChrome.condition.derivedStandingUnreviewed": "Elbírált érvei alapján fennáll – hiányzik a saját, modellházak közötti felülvizsgálata",
+  "debateChrome.condition.derivedStandingUnreviewed": "Elbírált érvei alapján fennáll – hiányzik a saját, más készítő modellje által végzett felülvizsgálata",
   "debateChrome.condition.hiddenLowScore": "Rejtett: a megjelenített küszöb alatti pontszámot kapott",
   "debateChrome.condition.unauthoredBranchHalted": "A kibontás itt leállt – nem készült elrejthető vagy megjeleníthető szöveg",
   "debateChrome.condition.labelBasisIncomplete": "Az ítélet alapja hiányos – nincs összehasonlítható rivális álláspont vagy második bíró",

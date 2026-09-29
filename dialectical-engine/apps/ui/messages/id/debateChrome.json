@@ -202,7 +202,7 @@
   "debateChrome.condition.digestCannotExist": "Ringkasan tidak dapat dibuat dalam anggaran penyusunan",
   "debateChrome.condition.protectedCoreGuardRetired": "Proses dihentikan karena anggaran; pemeriksaan pernyataan ulang tidak lagi menjadi syarat",
   "debateChrome.condition.hiddenUnjudgeable": "Disembunyikan: tidak dapat dinilai — tampilkan bagian tersembunyi untuk membacanya",
-  "debateChrome.condition.derivedStandingUnreviewed": "Bertumpu pada argumen yang telah dinilai — tinjauan lintas kubunya sendiri belum tersedia",
+  "debateChrome.condition.derivedStandingUnreviewed": "Bertumpu pada argumen yang telah dinilai — tinjauannya sendiri oleh model dari pembuat lain tidak ada",
   "debateChrome.condition.hiddenLowScore": "Disembunyikan: skornya di bawah ambang yang ditampilkan",
   "debateChrome.condition.unauthoredBranchHalted": "Pengembangan berhenti di sini — tidak ada tulisan untuk disembunyikan atau ditampilkan",
   "debateChrome.condition.labelBasisIncomplete": "Dasar putusan tidak lengkap — tidak ada posisi tandingan atau penilai kedua untuk dibandingkan",

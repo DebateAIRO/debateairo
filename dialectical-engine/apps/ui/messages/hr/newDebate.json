@@ -24,7 +24,7 @@
   "newDebate.medium": "Srednja",
   "newDebate.high": "Visoka",
   "newDebate.treeDepth": "Dubina stabla",
-  "newDebate.treeDepthHint": "Koliko se rasprava širi kada je dostupan unakrsni pregled modela drugih proizvođača",
+  "newDebate.treeDepthHint": "Koliko se rasprava širi kada je dostupan unakrsni pregled koji obavljaju modeli drugih proizvođača",
   "newDebate.steeringSelections": "Odabiri iz izbornika za usmjeravanje",
   "newDebate.onePerLine": "Jedan po retku",
   "newDebate.steeringPlaceholder": "Dajte prednost primarnim izvorima\nRano iznesite najjači protuargument",

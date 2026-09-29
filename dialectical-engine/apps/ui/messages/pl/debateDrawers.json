@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Luki",
   "debateDrawers.node.honestyAriaLabel": "Rzetelność węzła V3",
   "debateDrawers.node.noArgumentText": "Brak tekstu argumentu.",
-  "debateDrawers.node.noCompletedReview": "Dla tego węzła nie zapisano ukończonej recenzji drugiego autora.",
+  "debateDrawers.node.noCompletedReview": "Dla tego węzła nie zapisano ukończonej recenzji wykonanej przez model innego twórcy.",
   "debateDrawers.node.noPreviousGenerations": "Brak wcześniejszych wersji.",
   "debateDrawers.node.noScoringRecommendation": "Dla tego argumentu nie ma rekomendacji wynikającej z oceny.",
   "debateDrawers.node.notUseful": "nieprzydatne",

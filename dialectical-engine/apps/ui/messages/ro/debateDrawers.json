@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Lacune",
   "debateDrawers.node.honestyAriaLabel": "Transparența nodului V3",
   "debateDrawers.node.noArgumentText": "Nu există încă textul argumentului.",
-  "debateDrawers.node.noCompletedReview": "Pentru acest nod nu este înregistrată nicio evaluare finalizată de un al doilea autor.",
+  "debateDrawers.node.noCompletedReview": "Pentru acest nod nu este înregistrată nicio evaluare finalizată făcută de un model al altui dezvoltator.",
   "debateDrawers.node.noPreviousGenerations": "Nu există generări anterioare.",
   "debateDrawers.node.noScoringRecommendation": "Nu este disponibilă nicio recomandare de punctare pentru acest argument.",
   "debateDrawers.node.notUseful": "neutil",

@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "रचना-बजट में कोई सार-संकलन नहीं बन सका",
   "debateChrome.condition.protectedCoreGuardRetired": "बजट पर संचालन रुका; पुनर्कथन जाँच अब इसे नियंत्रित नहीं करती",
   "debateChrome.condition.hiddenUnjudgeable": "छिपा हुआ: निर्णय नहीं किया जा सका — पढ़ने के लिए छिपी सामग्री दिखाएँ",
-  "debateChrome.condition.derivedStandingUnreviewed": "अपने निर्णीत तर्कों पर कायम — इसकी अपनी अंतर-समूह समीक्षा उपलब्ध नहीं है",
+  "debateChrome.condition.derivedStandingUnreviewed": "अपने निर्णीत तर्कों पर कायम — दूसरे निर्माता के मॉडल द्वारा इसकी अपनी समीक्षा नहीं हुई है",
   "debateChrome.condition.hiddenLowScore": "छिपा हुआ: दिखायी गई सीमा से कम अंक",
   "debateChrome.condition.unauthoredBranchHalted": "विस्तार यहाँ रुका — छिपाने या दिखाने के लिए कुछ लिखा नहीं गया",
   "debateChrome.condition.labelBasisIncomplete": "निर्णय का आधार अधूरा — तुलना के लिए कोई प्रतिद्वंद्वी पक्ष या दूसरा निर्णायक नहीं",
