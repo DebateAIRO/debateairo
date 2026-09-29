@@ -11,6 +11,8 @@ import type {
 } from "@debateai/crypto";
 import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
 
+export * from "./publication-check.js";
+
 export {
   PostgresSessionRepository,
   type LoginChallengeRecord,
