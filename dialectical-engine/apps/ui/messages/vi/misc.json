@@ -79,7 +79,7 @@
   "misc.answerHonesty.weights": "trọng số {source}",
   "misc.answerHonesty.weightsBy": "trọng số {source} do {owner} đặt",
   "misc.answerHonesty.whatWouldReverseThis": "Điều gì sẽ đảo ngược kết quả này",
-  "misc.model.houseUnavailable": "Không có nhóm mô hình",
-  "misc.model.noRecordedHouse": "Không có nhóm mô hình nào được ghi cho lập luận này.",
+  "misc.model.houseUnavailable": "Chưa ghi nhận nhà phát triển mô hình",
+  "misc.model.noRecordedHouse": "Chưa ghi nhận nhà phát triển mô hình cho lập luận này.",
   "misc.scoring.unavailable": "Giao diện chấm điểm không khả dụng."
 }

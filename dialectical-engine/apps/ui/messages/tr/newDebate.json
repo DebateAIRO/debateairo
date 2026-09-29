@@ -24,7 +24,7 @@
   "newDebate.medium": "Orta",
   "newDebate.high": "Yüksek",
   "newDebate.treeDepth": "Ağaç derinliği",
-  "newDebate.treeDepthHint": "Modeller arası çapraz inceleme olduğunda tartışmanın ne kadar genişleyeceği",
+  "newDebate.treeDepthHint": "Farklı üreticilerin modelleri arasında çapraz inceleme olduğunda tartışmanın ne kadar genişleyeceği",
   "newDebate.steeringSelections": "Yönlendirme menüsü seçimleri",
   "newDebate.onePerLine": "Her satıra bir tane",
   "newDebate.steeringPlaceholder": "Birincil kaynakları tercih et\nEn güçlü karşı savı erken sun",

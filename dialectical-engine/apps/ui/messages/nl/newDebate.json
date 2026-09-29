@@ -24,7 +24,7 @@
   "newDebate.medium": "Gemiddeld",
   "newDebate.high": "Hoog",
   "newDebate.treeDepth": "Boomdiepte",
-  "newDebate.treeDepthHint": "Hoe ver het debat wordt uitgebreid wanneer modellen elkaar kunnen beoordelen",
+  "newDebate.treeDepthHint": "Hoe ver het debat wordt uitgebreid wanneer modellen van verschillende makers elkaar kunnen beoordelen",
   "newDebate.steeringSelections": "Stuurmenuselecties",
   "newDebate.onePerLine": "Eén per regel",
   "newDebate.steeringPlaceholder": "Geef de voorkeur aan primaire bronnen\nBreng het sterkste tegenargument vroeg naar voren",

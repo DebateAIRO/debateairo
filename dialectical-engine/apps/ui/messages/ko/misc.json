@@ -79,7 +79,7 @@
   "misc.answerHonesty.weights": "가중치 {source}",
   "misc.answerHonesty.weightsBy": "{owner}의 가중치 {source}",
   "misc.answerHonesty.whatWouldReverseThis": "판정을 뒤집을 수 있는 요인",
-  "misc.model.houseUnavailable": "진영 이용 불가",
-  "misc.model.noRecordedHouse": "이 논거에 기록된 진영 정보가 없습니다.",
+  "misc.model.houseUnavailable": "모델 개발사 기록 없음",
+  "misc.model.noRecordedHouse": "이 논거에는 모델 개발사 기록이 없습니다.",
   "misc.scoring.unavailable": "채점 UI를 사용할 수 없습니다."
 }

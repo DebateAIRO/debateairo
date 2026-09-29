@@ -24,7 +24,7 @@
   "newDebate.medium": "Mediu",
   "newDebate.high": "Ridicat",
   "newDebate.treeDepth": "Adâncimea arborelui",
-  "newDebate.treeDepthHint": "Cât de mult se extinde dezbaterea când este disponibilă evaluarea încrucișată a autorilor",
+  "newDebate.treeDepthHint": "Cât de mult se extinde dezbaterea când este disponibilă evaluarea încrucișată între modele ale unor dezvoltatori diferiți",
   "newDebate.steeringSelections": "Opțiuni din meniul de ghidare",
   "newDebate.onePerLine": "Una pe rând",
   "newDebate.steeringPlaceholder": "Preferați sursele primare\nPrezentați devreme cel mai puternic contraargument",

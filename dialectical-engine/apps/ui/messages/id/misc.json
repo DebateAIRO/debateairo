@@ -79,7 +79,7 @@
   "misc.answerHonesty.weights": "bobot {source}",
   "misc.answerHonesty.weightsBy": "bobot {source} oleh {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "Hal yang dapat membalikkan hasil ini",
-  "misc.model.houseUnavailable": "Kubu tidak tersedia",
-  "misc.model.noRecordedHouse": "Tidak ada kubu tercatat untuk argumen ini.",
+  "misc.model.houseUnavailable": "Pembuat model tidak tercatat",
+  "misc.model.noRecordedHouse": "Tidak ada pembuat model yang tercatat untuk argumen ini.",
   "misc.scoring.unavailable": "Antarmuka penilaian tidak tersedia."
 }

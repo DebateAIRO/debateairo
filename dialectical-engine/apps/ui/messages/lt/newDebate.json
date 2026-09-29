@@ -24,7 +24,7 @@
   "newDebate.medium": "Vidutinis",
   "newDebate.high": "Didelis",
   "newDebate.treeDepth": "Medžio gylis",
-  "newDebate.treeDepthHint": "Kiek išsiplečia debatai, kai galima kryžminė kitų kūrėjų modelių peržiūra",
+  "newDebate.treeDepthHint": "Kiek išsiplečia debatai, kai galima kryžminė peržiūra, kurią atlieka kitų kūrėjų modeliai",
   "newDebate.steeringSelections": "Valdymo meniu pasirinkimai",
   "newDebate.onePerLine": "Po vieną eilutėje",
   "newDebate.steeringPlaceholder": "Teikite pirmenybę pirminiams šaltiniams\nAnksti pateikite stipriausią kontrargumentą",

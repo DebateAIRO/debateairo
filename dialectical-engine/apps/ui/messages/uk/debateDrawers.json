@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Прогалини",
   "debateDrawers.node.honestyAriaLabel": "Доброчесність вузла V3",
   "debateDrawers.node.noArgumentText": "Тексту аргументу ще немає.",
-  "debateDrawers.node.noCompletedReview": "Для цього вузла не записано завершеної перевірки іншим автором.",
+  "debateDrawers.node.noCompletedReview": "Для цього вузла не записано завершеної перевірки моделлю іншого розробника.",
   "debateDrawers.node.noPreviousGenerations": "Попередніх створених версій немає.",
   "debateDrawers.node.noScoringRecommendation": "Для цього аргументу немає рекомендації за результатами оцінювання.",
   "debateDrawers.node.notUseful": "не корисно",

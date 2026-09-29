@@ -24,7 +24,7 @@
   "newDebate.medium": "Sedang",
   "newDebate.high": "Tinggi",
   "newDebate.treeDepth": "Kedalaman pohon",
-  "newDebate.treeDepthHint": "Seberapa jauh debat berkembang saat peninjauan silang oleh model lain tersedia",
+  "newDebate.treeDepthHint": "Seberapa jauh debat berkembang saat peninjauan silang oleh model dari pembuat lain tersedia",
   "newDebate.steeringSelections": "Pilihan menu pengarahan",
   "newDebate.onePerLine": "Satu per baris",
   "newDebate.steeringPlaceholder": "Utamakan sumber primer\nTampilkan argumen tandingan terkuat sejak awal",

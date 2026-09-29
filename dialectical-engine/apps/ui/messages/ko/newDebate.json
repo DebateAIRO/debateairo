@@ -24,7 +24,7 @@
   "newDebate.medium": "중간",
   "newDebate.high": "높음",
   "newDebate.treeDepth": "트리 깊이",
-  "newDebate.treeDepthHint": "다른 생성 모델의 검토를 이용할 수 있을 때 토론이 확장되는 깊이",
+  "newDebate.treeDepthHint": "서로 다른 개발사 모델 간 교차 검토를 이용할 수 있을 때 토론이 확장되는 깊이",
   "newDebate.steeringSelections": "방향 설정 메뉴 선택",
   "newDebate.onePerLine": "한 줄에 하나",
   "newDebate.steeringPlaceholder": "1차 출처 우선\n가장 강력한 반론을 일찍 제시",

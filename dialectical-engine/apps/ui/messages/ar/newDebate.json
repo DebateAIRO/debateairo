@@ -24,7 +24,7 @@
   "newDebate.medium": "متوسطة",
   "newDebate.high": "مرتفعة",
   "newDebate.treeDepth": "عمق الشجرة",
-  "newDebate.treeDepthHint": "مدى توسع المناظرة عند توفر مراجعة متبادلة بين النماذج المنشئة",
+  "newDebate.treeDepthHint": "مدى توسع المناظرة عند توفر مراجعة متبادلة بين نماذج من مُنشئين مختلفين",
   "newDebate.steeringSelections": "اختيارات قائمة التوجيه",
   "newDebate.onePerLine": "واحد في كل سطر",
   "newDebate.steeringPlaceholder": "تفضيل المصادر الأولية\nإظهار أقوى حجة مضادة مبكرًا",

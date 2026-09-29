@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Vrzeli",
   "debateDrawers.node.honestyAriaLabel": "Iskrenost vozlišča V3",
   "debateDrawers.node.noArgumentText": "Besedila argumenta še ni.",
-  "debateDrawers.node.noCompletedReview": "Za to vozlišče ni zabeleženega dokončanega pregleda drugega avtorja.",
+  "debateDrawers.node.noCompletedReview": "Za to vozlišče ni zabeleženega dokončanega pregleda, ki bi ga opravil model drugega razvijalca.",
   "debateDrawers.node.noPreviousGenerations": "Prejšnjih ustvarjenih različic ni.",
   "debateDrawers.node.noScoringRecommendation": "Za ta argument priporočilo ocenjevanja ni na voljo.",
   "debateDrawers.node.notUseful": "ni koristno",

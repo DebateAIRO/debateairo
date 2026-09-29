@@ -82,7 +82,7 @@
   "misc.answerHonesty.weights": "súlyozás: {source}",
   "misc.answerHonesty.weightsBy": "{owner} súlyozása: {source}",
   "misc.answerHonesty.whatWouldReverseThis": "Mi fordítaná meg ezt az eredményt?",
-  "misc.model.houseUnavailable": "A modellház nem érhető el",
-  "misc.model.noRecordedHouse": "Ehhez az érvhez nem érhető el rögzített modellház.",
+  "misc.model.houseUnavailable": "A modell készítője nincs rögzítve",
+  "misc.model.noRecordedHouse": "Ehhez az érvhez nincs rögzítve a modell készítője.",
   "misc.scoring.unavailable": "A pontozási felület nem érhető el."
 }
