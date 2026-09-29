@@ -40,6 +40,11 @@ let root: Root;
 let host: HTMLDivElement;
 let requests: { path: string; body: unknown }[];
 let respond: () => Promise<Response>;
+let respondStepUp: () => Promise<Response>;
+const grantedStepUp = async () => Response.json({
+  status: "step_up_complete", csrf_token: "c".repeat(43),
+  step_up_grant: { token: "g".repeat(43), action: "PUBLISH", target_run_id: runId, expires_at: "2026-09-29T20:00:00Z" }
+});
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -48,6 +53,7 @@ beforeEach(() => {
   root = createRoot(host);
   requests = [];
   respond = async () => Response.json(refusal, { status: 409 });
+  respondStepUp = grantedStepUp;
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -59,10 +65,7 @@ async function mount(catalog: Record<string, string> = english) {
     const body = init.body === undefined ? undefined : JSON.parse(String(init.body));
     requests.push({ path, body });
     if (path.endsWith("/visibility")) return Response.json({ state: "PRIVATE", public_ref: null });
-    if (path === "/v1/auth/step-up") return Response.json({
-      status: "step_up_complete", csrf_token: "c".repeat(43),
-      step_up_grant: { token: "g".repeat(43), action: "PUBLISH", target_run_id: runId, expires_at: "2026-09-29T20:00:00Z" }
-    });
+    if (path === "/v1/auth/step-up") return respondStepUp();
     if (path.endsWith("/publish")) return respond();
     return Response.json({ error: "NOT_FOUND" }, { status: 404 });
   }) as typeof fetch);
@@ -127,6 +130,69 @@ describe("publication statement", () => {
     await mount(); await openAndSubmit();
     expect([...host.querySelectorAll('[role="status"]')].map((node) => node.textContent)).toEqual([message]);
   });
+  // Property (sd-N4): a failure the server did not attribute to the owner's credentials (5xx, no answer, an unreadable
+  // answer, a step-up with no grant) never shows the wrong-password sentence; it shows the card's own status-unknown line.
+  // Break caught: the catch-all mapping every non-statement, non-503-check failure to changeUnauthorized.
+  const statusUnknown = "Publication status is unavailable.";
+  it.each([
+    ["publish 500 INTERNAL_ERROR (record write failed)", "publish", async () => Response.json({ error: "INTERNAL_ERROR", message: "INTERNAL_ERROR" }, { status: 500 })],
+    ["publish 502 from the proxy", "publish", async () => new Response("Bad Gateway", { status: 502 })],
+    ["publish 503 without the check code", "publish", async () => Response.json({ error: "SERVICE_UNAVAILABLE" }, { status: 503 })],
+    ["publish 504 at the proxy ceiling", "publish", async () => new Response("Gateway Timeout", { status: 504 })],
+    ["publish never answers (network)", "publish", async () => { throw new TypeError("fetch failed"); }],
+    ["publish 201 with an unreadable body", "publish", async () => Response.json({ unexpected: true }, { status: 201 })],
+    ["step-up 500", "step-up", async () => Response.json({ error: "INTERNAL_ERROR" }, { status: 500 })],
+    ["step-up without a grant", "step-up", async () => Response.json({ status: "step_up_complete", csrf_token: "c".repeat(43) })]
+  ] as const)("shows the status-unknown line, not the password sentence, for %s", async (_name, where, answer) => {
+    if (where === "publish") respond = answer; else respondStepUp = answer;
+    await mount(); await openAndSubmit();
+    expect([...host.querySelectorAll('[role="status"]')].map((node) => node.textContent)).toEqual([statusUnknown]);
+  });
+  // Neighbour of sd-N4: a failure the server DID attribute to the request keeps today's sentence (R11 "any other failure").
+  it.each([
+    ["step-up 401 STEP_UP_REFUSED", "step-up", 401, "STEP_UP_REFUSED"],
+    ["publish 403 FORBIDDEN", "publish", 403, "FORBIDDEN"],
+    ["publish 429 RATE_LIMITED", "publish", 429, "RATE_LIMITED"]
+  ] as const)("keeps the password sentence for %s", async (_name, where, status, error) => {
+    const answer = async () => Response.json({ error }, { status });
+    if (where === "publish") respond = answer; else respondStepUp = answer;
+    await mount(); await openAndSubmit();
+    expect([...host.querySelectorAll('[role="status"]')].map((node) => node.textContent)).toEqual([
+      "Publication change was not authorized. Recheck your password and authenticator code."
+    ]);
+  });
+  // Property (pt-B2): whatever the card has to say after an action (statement or one-line message) is its first content
+  // after the visibility status line — before every control — so a height-capped card shows it without scrolling.
+  // Break caught: the status slot rendered after the form and the delete section (the pre-fix order).
+  function statusPrecedesEveryControl() {
+    const card = host.querySelector("section.publicationControl")!;
+    const status = card.querySelector('[role="status"]')!;
+    const children = [...card.children];
+    return {
+      slot: children.indexOf(status),
+      controlsBefore: [...card.querySelectorAll("button, form, input, h3")].filter((node) =>
+        !status.contains(node) && (node.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).length
+    };
+  }
+  it.each([
+    ["BLOCK statement", async () => Response.json(refusal, { status: 409 })],
+    ["check unavailable", async () => Response.json({ error: "PUBLICATION_CHECK_UNAVAILABLE" }, { status: 503 })],
+    ["other failure", async () => Response.json({ error: "RUN_NOT_FOUND" }, { status: 404 })],
+    ["server failure", async () => Response.json({ error: "INTERNAL_ERROR" }, { status: 500 })]
+  ] as const)("puts the %s before every control", async (_name, answer) => {
+    respond = answer;
+    await mount(); await openAndSubmit();
+    expect(statusPrecedesEveryControl()).toEqual({ slot: 2, controlsBefore: 0 });
+  });
+  it("puts a failed deletion's message before every control", async () => {
+    await mount();
+    await click("Delete private debate…");
+    await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    respondStepUp = async () => Response.json({ error: "STEP_UP_REFUSED" }, { status: 401 });
+    await submit();
+    expect(host.querySelector('[role="status"]')?.textContent).toBe("Private debate deletion was not authorized. Recheck your credentials.");
+    expect(statusPrecedesEveryControl()).toEqual({ slot: 2, controlsBefore: 0 });
+  });
   // Property: successful publication still reports success and exposes the actual returned public link.
   it("renders success and the public link", async () => {
     respond = async () => Response.json({ state: "PUBLISHED", public_ref: publicRef }, { status: 201 });
@@ -173,6 +239,15 @@ describe("locales", () => {
     const catalog = JSON.parse(readFileSync(resolve(process.cwd(), `apps/ui/messages/${locale}/public.json`), "utf8")) as Record<string, string>;
     expect(Object.keys(copy).filter((key) => typeof catalog[prefix + key] !== "string" || catalog[prefix + key]!.trim() === "")).toEqual([]);
     expect(catalog[prefix + "appeal"]).toContain("[appeals@dezbatere.ro]");
+  });
+  // Property (pt-N1): the ground line names the Terms with the exact name the app's own Terms link uses in that locale
+  // (`chrome.legal.terms`), compared case-insensitively in the locale (a capital letter mid-sentence is spelling, not a name).
+  // Break caught: a locale calling the document "Terms of Use" while its footer link says "Terms of Service".
+  it.each(locales)("names the Terms in the ground line as the footer link does in %s", (locale) => {
+    const read = (namespace: string) => JSON.parse(readFileSync(resolve(process.cwd(), `apps/ui/messages/${locale}/${namespace}.json`), "utf8")) as Record<string, string>;
+    const terms = read("chrome")["chrome.legal.terms"];
+    expect(terms?.trim()).toBeTruthy();
+    expect(read("public")[prefix + "groundTerms"]!.toLocaleLowerCase(locale)).toContain(terms!.toLocaleLowerCase(locale));
   });
   // Property: the authoritative English copy matches the SPEC, and Romanian has no untranslated message.
   it("uses the English oracle and translated Romanian values", () => {

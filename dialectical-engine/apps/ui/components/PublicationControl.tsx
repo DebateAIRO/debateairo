@@ -76,8 +76,12 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
         setStatement(failure.statement);
       } else if (failure instanceof ContractHttpError && failure.serverCode === "PUBLICATION_CHECK_UNAVAILABLE") {
         setMessage(t(catalog, "public.publication.contentCheck.unavailable"));
-      } else {
+      } else if (failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500) {
         setMessage(t(catalog, "public.publication.changeUnauthorized"));
+      } else {
+        // A 5xx, no answer, an unreadable answer or a step-up without a grant: the server did not refuse the
+        // credentials, and whether the change happened is unknown — never the wrong-password sentence (sd-N4).
+        setMessage(t(catalog, "public.publication.statusUnavailable"));
       }
     } finally {
       setBusy(false);
@@ -158,6 +162,24 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       {visibility?.state === "PUBLISHED" && visibility.public_ref !== null ? (
         <p><Link href={`/public/debate/${visibility.public_ref}`}>{t(catalog, "public.publication.openPublicVersion")}</Link></p>
       ) : null}
+      {/* The card's answer to the last action sits above its controls: the card is height-capped and scrolls
+          (globals.css, D-S02-24), so anything below the form and the delete section starts out of view (pt-B2). */}
+      {statement !== null ? (
+        <div role="status">
+          <h3>{t(catalog, "public.publication.contentCheck.refusedHeading")}</h3>
+          <p>{statement.outcome === "BLOCK"
+            ? t(catalog, "public.publication.contentCheck.refusedWhatBlock")
+            : t(catalog, "public.publication.contentCheck.refusedWhatUnsure")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.partsIntro")}</p>
+          <ul>{statement.parts.map((part) => <li key={part}>{partLabels[part]}</li>)}</ul>
+          <p>{t(catalog, "public.publication.contentCheck.groundTerms")}</p>
+          {statement.ground === "TERMS_AND_POSSIBLY_ILLEGAL"
+            ? <p>{t(catalog, "public.publication.contentCheck.groundIllegal")}</p> : null}
+          <p>{t(catalog, "public.publication.contentCheck.automated")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.stillPrivate")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.appeal")}</p>
+        </div>
+      ) : message ? <p role="status">{message}</p> : null}
       {action === null ? (
         <button
           type="button"
@@ -283,22 +305,6 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           )}
         </div>
       ) : null}
-      {statement !== null ? (
-        <div role="status">
-          <h3>{t(catalog, "public.publication.contentCheck.refusedHeading")}</h3>
-          <p>{statement.outcome === "BLOCK"
-            ? t(catalog, "public.publication.contentCheck.refusedWhatBlock")
-            : t(catalog, "public.publication.contentCheck.refusedWhatUnsure")}</p>
-          <p>{t(catalog, "public.publication.contentCheck.partsIntro")}</p>
-          <ul>{statement.parts.map((part) => <li key={part}>{partLabels[part]}</li>)}</ul>
-          <p>{t(catalog, "public.publication.contentCheck.groundTerms")}</p>
-          {statement.ground === "TERMS_AND_POSSIBLY_ILLEGAL"
-            ? <p>{t(catalog, "public.publication.contentCheck.groundIllegal")}</p> : null}
-          <p>{t(catalog, "public.publication.contentCheck.automated")}</p>
-          <p>{t(catalog, "public.publication.contentCheck.stillPrivate")}</p>
-          <p>{t(catalog, "public.publication.contentCheck.appeal")}</p>
-        </div>
-      ) : message ? <p role="status">{message}</p> : null}
     </section>
   );
 }
