@@ -77,9 +77,11 @@ const COLUMNS: Readonly<Record<DobPart, number>> = { d: 7, m: 3, y: 5 };
  *
  * Controlled: the parent owns the three parts and the submit-time error, and
  * clears the error on every edit (`onChange`). The ✓ line shows live once the
- * three parts make a valid date; errors show only after the parent sets one.
- * With `minimumAgeMessage`, a complete real date under MIN_AGE is refused live
- * instead: all three fields are marked and the message replaces the ✓ line.
+ * three parts make a valid date. A complete date that fails (before 1900, in the
+ * future, or impossible) shows its error live too (V 2026-09-29); only the
+ * "incomplete" error waits for the parent to set it on submit. With
+ * `minimumAgeMessage`, a complete real date under MIN_AGE is refused live as
+ * well: all three fields are marked and the message replaces the ✓ line.
  */
 export function DateOfBirthField({
   catalog,
@@ -118,16 +120,18 @@ export function DateOfBirthField({
   };
   const currentYear = new Date().getUTCFullYear();
   const live = checkDob(value);
-  const underAge = minimumAgeMessage !== undefined && error === null && live.code === "ok"
+  const shownError: DobErrorCode | null = error
+    ?? (live.code !== "ok" && live.code !== "incomplete" ? live.code : null);
+  const underAge = minimumAgeMessage !== undefined && shownError === null && live.code === "ok"
     && !meetsMinimumAge(value);
-  const flagged = error !== null
-    ? flaggedParts(error, value)
+  const flagged = shownError !== null
+    ? flaggedParts(shownError, value)
     : underAge ? new Set<DobPart>(["d", "m", "y"]) : new Set<DobPart>();
-  const message = error !== null
-    ? `✗ ${dobErrorMessage(catalog, error, order)}`
+  const message = shownError !== null
+    ? `✗ ${dobErrorMessage(catalog, shownError, order)}`
     : underAge ? `✗ ${minimumAgeMessage}`
     : live.code === "ok" ? t(catalog, "auth.dob.valid") : "";
-  const messageState = error !== null || underAge ? "bad" : live.code === "ok" ? "ok" : "idle";
+  const messageState = shownError !== null || underAge ? "bad" : live.code === "ok" ? "ok" : "idle";
 
   const focusPart = (part: DobPart | undefined) => {
     if (part !== undefined) inputRefs.current[part]?.focus();

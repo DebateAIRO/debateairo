@@ -143,6 +143,30 @@ describe("sign-up with the date of birth (8a)", () => {
     vi.useRealTimers();
   });
 
+  it.each([
+    ["born in 1500", ["14", "03", "1500"], "✗ Enter a year from 1900 onwards."],
+    ["born in the future", ["14", "03", "2030"], "✗ That date is in the future."],
+    ["an impossible date", ["31", "02", "2001"], "✗ That date doesn't exist. Check the day and month."]
+  ] as const)("refuses %s on the form as soon as the date is complete, and sends nothing", async (_label, date, text) => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.UTC(2026, 8, 29, 12)) });
+    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await fillForm(date);
+    expect(host.querySelector("#dob-msg")!.textContent).toBe(text);
+    expect(host.querySelector("#dob-msg")!.getAttribute("data-state")).toBe("bad");
+    expect(host.querySelector<HTMLButtonElement>("button.authPrimary")!.disabled).toBe(true);
+    await submit();
+    expect(requests).toEqual([]);
+    vi.useRealTimers();
+  });
+
+  it("stays quiet while the date is still being typed", async () => {
+    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await setValue("dob-d", "14");
+    await setValue("dob-m", "03");
+    await setValue("dob-y", "150");
+    expect(host.querySelector("#dob-msg")!.textContent).toBe("");
+  });
+
   it("names the minimum age in the reader's language (de)", async () => {
     await act(async () => root.render(<SignUpFlow catalog={german} dobLocale={resolveDobLocale("de")} client={networkClient("allowed")} />));
     await setValue("dob-d", "01");

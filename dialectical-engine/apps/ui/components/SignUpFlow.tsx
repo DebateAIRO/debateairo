@@ -160,8 +160,10 @@ export function SignUpFlow({
   /* Date of birth (8d): the widget is controlled; its error is set on submit and cleared by
      every edit. The date never leaves this form except to be checked. */
   const [dateOfBirth, setDateOfBirth] = useState<DobParts>(EMPTY_DOB);
-  /* A complete, real date under MIN_AGE (V 2026-09-29): Create account stays disabled. */
-  const underAge = checkDob(dateOfBirth).code === "ok" && !meetsMinimumAge(dateOfBirth);
+  /* A complete date that is not a real date of birth of someone at least MIN_AGE: under 18,
+     before 1900, in the future or impossible (V 2026-09-29). The field says which; Create
+     account stays disabled. A date still being typed does not disable it. */
+  const dateRefused = checkDob(dateOfBirth).code !== "incomplete" && !meetsMinimumAge(dateOfBirth);
   const [dateOfBirthError, setDateOfBirthError] = useState<DobErrorCode | null>(null);
   const [refused, setRefused] = useState(refusedOnArrival);
   /* The two consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
@@ -479,7 +481,7 @@ export function SignUpFlow({
         <button
           className="authPrimary"
           type="submit"
-          disabled={busy || sent || !privacyAccepted || !termsAccepted || underAge}
+          disabled={busy || sent || !privacyAccepted || !termsAccepted || dateRefused}
         >
           {busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}
         </button>

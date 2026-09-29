@@ -59,8 +59,9 @@ test("sign-up exposes only fields backed by the registration contract", () => {
   // V 2026-09-29: a date under 18 is refused on the form — named under the field, and the
   // Create account button stays disabled.
   assert.match(signUp, /minimumAgeMessage=\{t\(catalog, "auth\.dob\.underAge"\)\}/);
-  assert.match(signUp, /const underAge = checkDob\(dateOfBirth\)\.code === "ok" && !meetsMinimumAge\(dateOfBirth\);/);
-  assert.match(signUp, /disabled=\{busy \|\| sent \|\| !privacyAccepted \|\| !termsAccepted \|\| underAge\}/);
+  // ...and so is any other complete date that is not a real one (before 1900, future, impossible).
+  assert.match(signUp, /const dateRefused = checkDob\(dateOfBirth\)\.code !== "incomplete" && !meetsMinimumAge\(dateOfBirth\);/);
+  assert.match(signUp, /disabled=\{busy \|\| sent \|\| !privacyAccepted \|\| !termsAccepted \|\| dateRefused\}/);
   assert.ok(signUp.indexOf("await client.checkAge") > 0);
   assert.ok(signUp.indexOf("await client.checkAge") < signUp.indexOf("await client.register"));
   assert.match(signUp, /await client\.register/);
