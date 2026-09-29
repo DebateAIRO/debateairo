@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Dili {language} olarak değiştir",
   "chrome.languageOffer.dismiss": "Hayır, teşekkürler",
   "chrome.legalPages": "Yasal",
+  "chrome.legal.notice": "Yasal Bilgiler",
   "chrome.legal.terms": "Hizmet Koşulları",
   "chrome.legal.versions": "Koşulların sürümleri",
   "chrome.legal.privacy": "Gizlilik Politikası",

@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Lülituge ümber {language} keelele",
   "chrome.languageOffer.dismiss": "Ei, aitäh",
   "chrome.legalPages": "Õigusteave",
+  "chrome.legal.notice": "Teenusepakkuja andmed",
   "chrome.legal.terms": "Teenusetingimused",
   "chrome.legal.versions": "Tingimuste versioonid",
   "chrome.legal.privacy": "Privaatsuspoliitika",

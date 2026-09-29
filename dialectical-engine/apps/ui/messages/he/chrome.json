@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "מעבר ל{language}",
   "chrome.languageOffer.dismiss": "לא, תודה",
   "chrome.legalPages": "מידע משפטי",
+  "chrome.legal.notice": "הודעה משפטית",
   "chrome.legal.terms": "תנאי השירות",
   "chrome.legal.versions": "גרסאות התנאים",
   "chrome.legal.privacy": "מדיניות הפרטיות",

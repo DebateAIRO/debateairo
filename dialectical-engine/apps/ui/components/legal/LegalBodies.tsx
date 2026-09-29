@@ -1,45 +1,220 @@
+import type { ReactNode } from "react";
 import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
+import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { LegalBlock, LegalDocument } from "@/lib/legalDocument";
 import {
+  ANPC_ADR_URL,
+  COMPANY,
+  isUnverified,
   LEGAL_BROWSER_STORAGE,
   LEGAL_COOKIES,
+  LEGAL_PAGES,
   MODEL_PROVIDERS,
-  TERMS_VERSIONS
+  TERMS_VERSIONS,
+  type LegalPageKey
 } from "@/lib/legal/pages";
 
 /**
- * The bodies of the six legal pages (design 15a). Server components with no state: each one
+ * The bodies of the seven legal pages (design 15a). Server components with no state: each one
  * turns data — a generated legal document, or the facts in `lib/legal/pages.ts` — into the
  * numbered column or the table the design draws.
  */
 
 type NumberedSection = Readonly<{ no: string; title: string; blocks: readonly LegalBlock[] }>;
 
+function LegalSection({ no, title, children }: { no: string; title: string; children: ReactNode }) {
+  return (
+    <section className="legalSection" id={`legal-section-${no}`} aria-labelledby={`legal-section-${no}-title`}>
+      <span className="legalSectionNo" aria-hidden>
+        {no}
+      </span>
+      <div>
+        <h2 id={`legal-section-${no}-title`}>{title}</h2>
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function NumberedSections({ sections }: { sections: readonly NumberedSection[] }) {
   return (
     <div className="legalSections">
       {sections.map(({ no, title, blocks }) => (
-        <section className="legalSection" id={`legal-section-${no}`} key={no} aria-labelledby={`legal-section-${no}-title`}>
-          <span className="legalSectionNo" aria-hidden>
-            {no}
-          </span>
-          <div>
-            <h2 id={`legal-section-${no}-title`}>{title}</h2>
-            {blocks.map((block, index) =>
-              block.kind === "p" ? (
-                <p key={index}>{block.text}</p>
-              ) : (
-                <ul key={index}>
-                  {block.items.map((item, itemIndex) => (
-                    <li key={itemIndex}>{item}</li>
-                  ))}
-                </ul>
-              )
-            )}
-          </div>
-        </section>
+        <LegalSection no={no} title={title} key={no}>
+          {blocks.map((block, index) =>
+            block.kind === "p" ? (
+              <p key={index}>{block.text}</p>
+            ) : (
+              <ul key={index}>
+                {block.items.map((item, itemIndex) => (
+                  <li key={itemIndex}>{item}</li>
+                ))}
+              </ul>
+            )
+          )}
+        </LegalSection>
       ))}
+    </div>
+  );
+}
+
+/**
+ * An email address: a link once it is verified, plain bracketed text until then (R4). Facts are
+ * isolated in `<bdi>` (the language switcher's precedent) so a left-to-right value keeps its order
+ * on a right-to-left page instead of becoming `[…/…/J40]`.
+ */
+function Email({ address }: { address: string }) {
+  return <bdi>{isUnverified(address) ? address : <a href={`mailto:${address}`}>{address}</a>}</bdi>;
+}
+
+/** A catalogue sentence whose placeholders are facts, each fact isolated in `<bdi>`. */
+function withFacts(template: string, facts: Readonly<Record<string, string>>): ReactNode[] {
+  return template.split(/(\{[A-Za-z][A-Za-z0-9_]*\})/).map((part, index) => {
+    const name = /^\{(.+)\}$/.exec(part)?.[1];
+    return name !== undefined && Object.hasOwn(facts, name) ? <bdi key={index}>{facts[name]}</bdi> : part;
+  });
+}
+
+/** "Romanian and English", in the reader's language, from the locale codes in `COMPANY`. */
+function languageList(locale: LocaleCode): string {
+  const names = new Intl.DisplayNames([locale], { type: "language" });
+  const list = new Intl.ListFormat([locale], { type: "conjunction" }).format(
+    COMPANY.languages.map((code) => names.of(code) ?? code)
+  );
+  return list.charAt(0).toLocaleUpperCase(locale) + list.slice(1);
+}
+
+const READ_MORE: readonly LegalPageKey[] = ["terms", "privacy", "cookies", "providers"];
+
+/**
+ * The legal notice (`/legal`): the company and seller details every user is shown. Every fact —
+ * names, numbers, addresses, languages — comes from `COMPANY`; the catalogues carry only the
+ * labels and the sentences around them.
+ */
+export function LegalNoticeBody({
+  legalCatalog,
+  chromeCatalog,
+  locale
+}: {
+  legalCatalog: MessageCatalog;
+  chromeCatalog: MessageCatalog;
+  locale: LocaleCode;
+}) {
+  const [product = COMPANY.legalName, ...otherNames] = COMPANY.tradingNames;
+  const vat =
+    COMPANY.vat.kind === "registered"
+      ? COMPANY.vat.number
+      : t(legalCatalog, COMPANY.vat.kind === "not-registered" ? "legal.notice.company.vatNone" : "legal.notice.company.vatUnconfirmed");
+  const companyRows: ReadonlyArray<readonly [string, string]> = [
+    ["legal.notice.company.name", COMPANY.legalName],
+    ["legal.notice.company.tradingNames", COMPANY.tradingNames.join(" · ")],
+    ["legal.notice.company.office", COMPANY.registeredOffice],
+    ["legal.notice.company.register", COMPANY.tradeRegisterNo],
+    ["legal.notice.company.cui", COMPANY.cui],
+    ["legal.notice.company.vat", vat],
+    ["legal.notice.company.capital", COMPANY.shareCapital],
+    ["legal.notice.company.representative", COMPANY.representative]
+  ];
+  const contactRows: ReadonlyArray<readonly [string, string, string]> = [
+    ["legal.notice.contact.authorities", "legal.notice.contact.authoritiesFor", COMPANY.emails.authorities],
+    ["legal.notice.contact.users", "legal.notice.contact.usersFor", COMPANY.emails.general],
+    ["legal.notice.contact.legal", "legal.notice.contact.legalFor", COMPANY.emails.legal],
+    ["legal.notice.contact.privacy", "legal.notice.contact.privacyFor", COMPANY.emails.privacy],
+    ["legal.notice.contact.reports", "legal.notice.contact.reportsFor", COMPANY.emails.reports]
+  ];
+
+  return (
+    <div className="legalSections">
+      <LegalSection no="01" title={t(legalCatalog, "legal.notice.s01.title")}>
+        <p>
+          {withFacts(t(legalCatalog, "legal.notice.s01.body"), {
+            product,
+            alsoCalled: otherNames.join(", "),
+            company: COMPANY.legalName
+          })}
+        </p>
+        <table className="legalTable legalFactTable">
+          <tbody>
+            {companyRows.map(([labelKey, value]) => (
+              <tr key={labelKey}>
+                <th scope="row">{t(legalCatalog, labelKey)}</th>
+                <td>
+                  <bdi>{value}</bdi>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </LegalSection>
+
+      <LegalSection no="02" title={t(legalCatalog, "legal.notice.s02.title")}>
+        <p>{t(legalCatalog, "legal.notice.s02.body")}</p>
+        <table className="legalTable legalFactTable">
+          <tbody>
+            {contactRows.map(([labelKey, forKey, address]) => (
+              <tr key={labelKey}>
+                <th scope="row">{t(legalCatalog, labelKey)}</th>
+                <td>
+                  <Email address={address} />
+                  <span className="legalFactNote">{t(legalCatalog, forKey)}</span>
+                </td>
+              </tr>
+            ))}
+            <tr>
+              <th scope="row">{t(legalCatalog, "legal.notice.contact.phone")}</th>
+              <td>
+                <bdi>{isUnverified(COMPANY.phone) ? COMPANY.phone : <a href={`tel:${COMPANY.phone.replace(/\s/g, "")}`}>{COMPANY.phone}</a>}</bdi>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">{t(legalCatalog, "legal.notice.contact.languages")}</th>
+              <td>{languageList(locale)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </LegalSection>
+
+      <LegalSection no="03" title={t(legalCatalog, "legal.notice.s03.title")}>
+        <p>{withFacts(t(legalCatalog, "legal.notice.s03.body"), { product })}</p>
+        <p>
+          <a href="/ai-transparency">{t(chromeCatalog, "chrome.aiTransparency")}</a>
+        </p>
+      </LegalSection>
+
+      <LegalSection no="04" title={t(legalCatalog, "legal.notice.s04.title")}>
+        <p>{withFacts(t(legalCatalog, "legal.notice.s04.body"), { product })}</p>
+      </LegalSection>
+
+      <LegalSection no="05" title={t(legalCatalog, "legal.notice.s05.title")}>
+        <p>{t(legalCatalog, "legal.notice.s05.body")}</p>
+        <p>
+          <a href="/terms#legal-section-13">{t(legalCatalog, "legal.notice.s05.link")}</a>
+        </p>
+      </LegalSection>
+
+      <LegalSection no="06" title={t(legalCatalog, "legal.notice.s06.title")}>
+        <p>{withFacts(t(legalCatalog, "legal.notice.s06.body"), { reports: COMPANY.emails.reports, legal: COMPANY.emails.legal })}</p>
+        <p>
+          {t(legalCatalog, "legal.notice.s06.anpc")}{" "}
+          <bdi>
+            <a href={ANPC_ADR_URL}>{new URL(ANPC_ADR_URL).host}</a>
+          </bdi>
+        </p>
+        <p>
+          {t(legalCatalog, "legal.notice.s06.courts")} <a href="/terms#legal-section-18">{t(legalCatalog, "legal.notice.s06.courtsLink")}</a>
+        </p>
+      </LegalSection>
+
+      <LegalSection no="07" title={t(legalCatalog, "legal.notice.s07.title")}>
+        <ul>
+          {LEGAL_PAGES.filter(({ key }) => READ_MORE.includes(key)).map(({ key, href, labelKey }) => (
+            <li key={key}>
+              <a href={href}>{t(chromeCatalog, labelKey)}</a>
+            </li>
+          ))}
+        </ul>
+      </LegalSection>
     </div>
   );
 }

@@ -4,11 +4,9 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/translate";
-import { LEGAL_PAGES } from "@/lib/legal/pages";
+import { COMPANY, LEGAL_PAGES } from "@/lib/legal/pages";
 
 const PRODUCT_NAME = "Dialectical Engine";
-const COMPANY = "DebateAIRO SRL";
-const PRIVACY_CONTACT = "privacy@dezbatere.ro";
 
 const PRODUCT_LINKS = [
   { href: "/", labelKey: "chrome.footer.home" },
@@ -21,7 +19,7 @@ const PRODUCT_LINKS = [
  *
  * - `full` — marketing and legal pages: company block, PRODUCT and LEGAL columns, then the
  *   copyright line with the language switcher. On a phone the columns stack (15c) in CSS.
- * - `line` — every other screen: copyright, the six legal links and cookie preferences on one
+ * - `line` — every other screen: copyright, the seven legal links and cookie preferences on one
  *   line, so the canvas keeps its room (15b).
  *
  * The root layout renders the `line` footer after every page; a page that renders the `full`
@@ -30,7 +28,7 @@ const PRODUCT_LINKS = [
  */
 export function SiteFooter({ variant }: { variant: "full" | "line" }) {
   const { catalog } = useChromeI18n();
-  const copyright = `© ${new Date().getFullYear()} ${COMPANY}`;
+  const copyright = `© ${new Date().getFullYear()} ${COMPANY.legalName}`;
   const cookiePreferences = t(catalog, "chrome.footer.cookiePreferences");
   const legalLinks = LEGAL_PAGES.map(({ href, labelKey }) => (
     <li key={href}>
@@ -67,10 +65,10 @@ export function SiteFooter({ variant }: { variant: "full" | "line" }) {
             <span className="siteFooterBrandName">{PRODUCT_NAME}</span>
           </span>
           <span>
-            {COMPANY} · {t(catalog, "chrome.footer.location")}
+            {COMPANY.legalName} · {t(catalog, "chrome.footer.location")}
           </span>
-          <a className="siteFooterLink" href={`mailto:${PRIVACY_CONTACT}`}>
-            {PRIVACY_CONTACT}
+          <a className="siteFooterLink" href={`mailto:${COMPANY.emails.privacy}`}>
+            {COMPANY.emails.privacy}
           </a>
         </div>
         <nav className="siteFooterColumn" aria-label={t(catalog, "chrome.footer.product")}>

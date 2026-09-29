@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "{language}로 전환",
   "chrome.languageOffer.dismiss": "아니요, 괜찮습니다",
   "chrome.legalPages": "법적 고지",
+  "chrome.legal.notice": "사업자 정보",
   "chrome.legal.terms": "서비스 이용약관",
   "chrome.legal.versions": "이용약관 버전 기록",
   "chrome.legal.privacy": "개인정보 처리방침",

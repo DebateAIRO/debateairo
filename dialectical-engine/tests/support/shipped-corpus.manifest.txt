@@ -229,6 +229,7 @@ apps/ui/app/enroll-mfa/layout.tsx
 apps/ui/app/enroll-mfa/page.tsx
 apps/ui/app/help/page.tsx
 apps/ui/app/layout.tsx
+apps/ui/app/legal/page.tsx
 apps/ui/app/login/page.tsx
 apps/ui/app/new/NewDebatePageClient.tsx
 apps/ui/app/new/defaults.tsx

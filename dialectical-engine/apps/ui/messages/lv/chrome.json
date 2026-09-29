@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Pārslēgt uz {language} valodu",
   "chrome.languageOffer.dismiss": "Nē, paldies",
   "chrome.legalPages": "Juridiskā informācija",
+  "chrome.legal.notice": "Rekvizīti",
   "chrome.legal.terms": "Pakalpojuma noteikumi",
   "chrome.legal.versions": "Noteikumu versijas",
   "chrome.legal.privacy": "Privātuma politika",

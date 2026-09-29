@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Váltás {language} nyelvre",
   "chrome.languageOffer.dismiss": "Köszönöm, nem",
   "chrome.legalPages": "Jogi információk",
+  "chrome.legal.notice": "Impresszum",
   "chrome.legal.terms": "Szolgáltatási feltételek",
   "chrome.legal.versions": "A feltételek változatai",
   "chrome.legal.privacy": "Adatvédelmi szabályzat",

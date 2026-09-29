@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Overschakelen naar het {language}",
   "chrome.languageOffer.dismiss": "Nee, bedankt",
   "chrome.legalPages": "Juridisch",
+  "chrome.legal.notice": "Wettelijke informatie",
   "chrome.legal.terms": "Servicevoorwaarden",
   "chrome.legal.versions": "Versies van de voorwaarden",
   "chrome.legal.privacy": "Privacybeleid",

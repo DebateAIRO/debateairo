@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "{language}に切り替え",
   "chrome.languageOffer.dismiss": "いいえ、結構です",
   "chrome.legalPages": "法的情報",
+  "chrome.legal.notice": "特定商取引法に基づく表記",
   "chrome.legal.terms": "利用規約",
   "chrome.legal.versions": "利用規約の版履歴",
   "chrome.legal.privacy": "プライバシーポリシー",

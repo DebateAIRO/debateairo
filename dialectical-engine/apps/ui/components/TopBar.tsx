@@ -14,6 +14,7 @@ const SCREEN_TITLES: Record<string, string> = {
   "/settings": "chrome.settings",
   "/ai-transparency": "chrome.aiTransparency",
   "/admin/workers": "chrome.workers",
+  "/legal": "chrome.legalPages",
   "/terms": "chrome.legalPages",
   "/terms/versions": "chrome.legalPages",
   "/privacy": "chrome.legalPages",

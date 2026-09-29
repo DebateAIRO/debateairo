@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Auf {language} umstellen",
   "chrome.languageOffer.dismiss": "Nein, danke",
   "chrome.legalPages": "Rechtliches",
+  "chrome.legal.notice": "Impressum",
   "chrome.legal.terms": "Nutzungsbedingungen",
   "chrome.legal.versions": "Fassungen der Nutzungsbedingungen",
   "chrome.legal.privacy": "Datenschutzerklärung",

@@ -38,6 +38,7 @@ describe("Support catalog route coverage", () => {
       "/debate/[id]",
       "/enroll-mfa",
       "/help",
+      "/legal",
       "/login",
       "/new",
       "/privacy",
@@ -66,7 +67,7 @@ describe("Support catalog route coverage", () => {
 
   it("keeps the Turn 15 legal pages public, actionless, and backed by the privacy article", () => {
     // Property: a legal page is reference reading — the assistant may name it, never act through it.
-    for (const route of ["/terms", "/terms/versions", "/privacy", "/privacy/us-health-data", "/cookies", "/providers"]) {
+    for (const route of ["/legal", "/terms", "/terms/versions", "/privacy", "/privacy/us-health-data", "/cookies", "/providers"]) {
       expect(SUPPORT_CAPABILITIES.find((capability) => capability.route === route), route).toMatchObject({
         audience: "any", availability: "public", actionIds: [], articleIds: ["privacy-consent"]
       });

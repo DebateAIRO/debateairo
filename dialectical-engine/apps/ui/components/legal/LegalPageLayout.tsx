@@ -4,7 +4,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { LEGAL_PAGES, type LegalPageKey } from "@/lib/legal/pages";
 
 /**
- * The one layout the six legal pages share (design 15a): side navigation, a numbered text
+ * The one layout the seven legal pages share (design 15a): side navigation, a numbered text
  * column, and the full footer. It holds no legal prose — every page hands it the heading block
  * and the body — and it is a server component, so the text is in the first HTML response.
  */

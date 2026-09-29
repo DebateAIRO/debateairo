@@ -97,3 +97,89 @@ Local only; nothing pushed.
   opening upward, no horizontal overflow from the new code, no hydration errors. Not seen: the
   debate canvas (needs the API, which cannot boot here until the catalogue is signed); its footer
   fit is CSS-only (`app/legal.css`).
+
+## Legal notice — `/legal` (2026-09-29, V's goal `docs/legal-research/prompts/legal-notice-page.md`)
+
+A seventh page, first in the side navigation and both footers: the company and seller details
+required by Romanian Law 365/2002 Art. 5, DSA Arts. 11–12, CRD Art. 6 and Japan's Specified
+Commercial Transactions Act Art. 11. Content work on the existing layout; nothing redesigned.
+
+### Rulings taken (V may overturn any of them)
+
+- **R9 — one constant.** Every fact is in `COMPANY` (`lib/legal/pages.ts`); the catalogues carry
+  only labels and sentences with placeholders, and a test fails if a `legal.notice.*` string in
+  any locale contains a company fact. The footer now reads `COMPANY` too, so its copyright shows
+  the legal name "DebateAIRO S.R.L." (it said "DebateAIRO SRL").
+- **R10 — brackets render as written; a bracketed address is text, never a link.** Only
+  privacy@dezbatere.ro is a mailto link today.
+- **R11 — the office is written in the Trade Register form** "[…], București, România" in every
+  locale (a postal address, not prose). The city comes from the drafts, not from a register extract.
+- **R12 — the two DSA contact points:** authorities (Art. 11) = [dsa@]; users (Art. 12) = the
+  Terms' "General contact" [hello@]. Legal, privacy and reports rows follow the Terms' §1 table.
+- **R13 — the CUI row uses each edition's own Terms label** ("Sole registration code (CUI)" in
+  English), so the page and the Terms name the code the same way in all 35 locales.
+- **R14 — complaints:** reports + legal addresses first, then ANPC's SAL service
+  (reclamatiisal.anpc.ro) for consumers in Romania, then a link to Terms §18. The EU ODR platform
+  (closed 20 July 2025) is not linked; a test pins its absence.
+- **R15 — right-to-left safety:** every fact is isolated in `<bdi>` (the language switcher's
+  precedent). Without it Arabic showed ".DebateAIRO S.R.L" and "[…/…/J40]".
+- **R16 — withdrawal and disputes link to `/terms#legal-section-13` and `#legal-section-18`**;
+  a test pins that those numbers are still those sections.
+
+### For V
+
+9. **Bracketed facts to fill in `COMPANY`** (once, for all 35 locales): street address; Trade
+   Register number; CUI; VAT status (set `vat` to `registered` + number, or `not-registered`);
+   share capital; the person responsible; phone; and confirm hello@, legal@, abuse@, dsa@ exist
+   (privacy@ is the only confirmed address). The Japanese statute also expects the representative's
+   name and a phone number to be shown; both are brackets today.
+10. **Support catalogue digest moved again** (seventh capability `legal-notice`): the packet
+    `OWNER-SIGNOFF-legal-pages-catalog.md` now asks for `ffd72986…` (the six-page `b0180850…` is
+    superseded and must not be signed). Label count 74 → 76.
+11. **`/providers` lists Google (Gemini), which is not wired.** Gemini exists only as a display
+    name/colour in `lib/models.ts`, `ModelPresentation.tsx`, `globals.css` and the landing sample
+    cards; no backend adapter, register row or deploy config names it (the gateways are generic
+    OpenAI-compatible, with makers set per deployment). The row is false under R3. Not removed here:
+    R3's provider list is pinned one-to-one to the `lib/models.ts` families, so removing it means
+    deciding whether the UI registry keeps Gemini at all — V's call.
+12. **Salad gate:** 33 of 34 locales pass on `legal` and `chrome`. `fr/legal` scores 0.13 against a
+    0.10 floor (it was 0.09 before this page): the surviving words are correct French that equals
+    English — "point de contact" (the DSA's own French term), "service", "section" (the French Terms
+    say "section 13"), "questions", "verdict", "protection" and "ANPC". Same family V accepted for
+    fr/auth; the French was not bent to pass the gate.
+13. **The US health data page still writes privacy@dezbatere.ro inside 35 catalogues**
+    (`legal.health.s06.body`), outside `COMPANY`. Not changed here (other page); a `{privacy}`
+    placeholder would bring it under R9.
+14. **Translations and the fluency review.** 34 locales, one Opus writer per 4–5 locales, each
+    told to reuse its own Terms' words; then ONE round of independent Opus fluency review per
+    locale, where the reviewer fixed findings in place (ar, ga, ja passed as written; the rest had
+    1–6 fixes: calques, wrong prepositions, "users"/"you" switches, Terms-term drift). This is one
+    round, not the multi-round loop of the i18n mission. Title choices to know: bg, cs, et, it, lt,
+    lv, mt, ru, sk, uk use "company/operator details" style titles (e.g. it "Dati societari", lv
+    "Rekvizīti") because their literal "Legal information" equals the footer column heading
+    `chrome.legalPages`. **ro keeps V's "Informații legale", which is identical to the ro footer
+    heading**, so the ro footer shows that phrase twice — V may prefer "Date de identificare"
+    (the reviewer's pick) or renaming the heading. Japanese is 特定商取引法に基づく表記 in the title,
+    the tab title, the side navigation and both footers. Reviewer notes left open: de/fr "Person
+    responsible" could become the local term ("Vertretungsberechtigte Person", "Directeur de la
+    publication") — that changes what the row claims; ru's Terms say "Контактное лицо" (contact
+    person) for "point of contact".
+
+### Record (legal notice)
+
+- **Code:** `app/legal/page.tsx`; `LegalNoticeBody` + a shared `LegalSection` in
+  `components/legal/LegalBodies.tsx`; `COMPANY`, `isUnverified`, `ANPC_ADR_URL`, the `notice`
+  entry in `lib/legal/pages.ts`; footer reads `COMPANY`; TopBar title; four CSS rules in
+  `app/legal.css`; `legal-notice` support capability; 42 `legal.notice.*` keys + `chrome.legal.notice`
+  × 35 locales.
+- **Tests (2026-09-29):** `tests/render/legal-pages.test.tsx` 26/26 (9 new); `legal.test.mjs` and
+  the catalog tests green; UI node suite 234/234; both typechecks clean; render suite red only in
+  the 3 files already red (t1-canvas, t3-library, ui02e — the same on a clean copy of 6db316c50);
+  architecture red only in the 3 pre-existing tests (scaffold F31, role-token-map ×2 — the same on
+  the clean copy); support-catalog-coverage and support-response-policy green; the other support
+  unit reds are the catalogue signature, as before.
+- **Seen in the browser** (lane dev server :4700): en/ro/ja/ar at 1280px and 375px; seven sections;
+  bracketed facts as text, privacy@ the only mailto link; Arabic facts in order after `<bdi>`;
+  side nav, full footer (4×2 phone grid), one-line footer on `/ai-transparency` all list the page;
+  no console errors. The 375px page is 427px wide only because of the pre-existing top bar
+  (item 7); the page's own column is 343px.

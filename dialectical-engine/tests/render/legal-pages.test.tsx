@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -10,6 +10,9 @@ import legalEnglish from "../../apps/ui/messages/en/legal.json" with { type: "js
 import { CONSENT_KEY, subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
 import { LOCALE_COOKIE } from "../../apps/ui/lib/i18n/locales.js";
 import {
+  ANPC_ADR_URL,
+  COMPANY,
+  isUnverified,
   LEGAL_BROWSER_STORAGE,
   LEGAL_COOKIES,
   LEGAL_PAGES,
@@ -23,6 +26,7 @@ import {
   LegalCookiesBody,
   LegalDocumentBody,
   LegalHealthBody,
+  LegalNoticeBody,
   LegalProvidersBody,
   LegalVersionsBody
 } from "../../apps/ui/components/legal/LegalBodies.js";
@@ -63,9 +67,13 @@ function render(element: ReactElement): HTMLDivElement {
 
 const texts = (nodes: Iterable<Element>): string[] => [...nodes].map((node) => node.textContent?.trim() ?? "");
 
-describe("the six legal pages share one navigation", () => {
-  it("lists the six pages in the design's order with their public paths", () => {
+const catalog = (locale: string, namespace: "chrome" | "legal"): Record<string, string> =>
+  JSON.parse(source(`apps/ui/messages/${locale}/${namespace}.json`));
+
+describe("the seven legal pages share one navigation", () => {
+  it("lists the seven pages, the legal notice first, with their public paths", () => {
     expect(LEGAL_PAGES.map(({ key, href }) => [key, href])).toEqual([
+      ["notice", "/legal"],
       ["terms", "/terms"],
       ["versions", "/terms/versions"],
       ["privacy", "/privacy"],
@@ -99,6 +107,7 @@ describe("the six legal pages share one navigation", () => {
     const links = [...(nav?.querySelectorAll("a") ?? [])];
     expect(links.map((link) => link.getAttribute("href"))).toEqual(LEGAL_PAGES.map(({ href }) => href));
     expect(texts(links)).toEqual([
+      "Legal notice",
       "Terms of service",
       "Terms versions",
       "Privacy policy",
@@ -112,6 +121,132 @@ describe("the six legal pages share one navigation", () => {
     expect(view.querySelector(".legalEyebrow")?.textContent).toBe("COOKIE POLICY");
     expect(view.querySelector(".legalMeta")?.textContent).toBe("All first-party");
     expect(view.querySelector("footer.siteFooterFull")).not.toBeNull();
+  });
+});
+
+describe("the legal notice states the company and seller details from one constant", () => {
+  const renderNotice = (locale: string) =>
+    render(
+      <LegalNoticeBody legalCatalog={catalog(locale, "legal")} chromeCatalog={catalog(locale, "chrome")} locale={locale as never} />
+    );
+  const factCell = (view: HTMLElement, labelKey: string, locale = "en") =>
+    [...view.querySelectorAll(".legalFactTable tr")]
+      .find((row) => row.querySelector("th")?.textContent === catalog(locale, "legal")[labelKey])
+      ?.querySelector("td");
+
+  it("has a /legal route built like the other legal pages", () => {
+    const page = source("apps/ui/app/legal/page.tsx");
+    expect(page).toMatch(/legalPageMetadata\("notice"\)/);
+    expect(page).toMatch(/<LegalPageLayout\s+current="notice"/);
+    expect(page).toMatch(/<LegalNoticeBody /);
+    expect(source("apps/ui/components/TopBar.tsx")).toMatch(/"\/legal": "chrome\.legalPages"/);
+  });
+
+  it("renders /legal in the shared layout with the notice marked current", () => {
+    const view = render(
+      <LegalPageLayout current="notice" chromeCatalog={chromeEnglish} legalCatalog={legalEnglish} eyebrow="E" title="Legal notice" meta="M">
+        <LegalNoticeBody legalCatalog={legalEnglish} chromeCatalog={chromeEnglish} locale="en" />
+      </LegalPageLayout>
+    );
+    expect(view.querySelector("nav.legalNav a[aria-current='page']")?.getAttribute("href")).toBe("/legal");
+    expect(texts(view.querySelectorAll(".legalSectionNo"))).toEqual(["01", "02", "03", "04", "05", "06", "07"]);
+    expect(view.querySelector("footer.siteFooterFull a[href='/legal']")).not.toBeNull();
+  });
+
+  it("takes every company fact from COMPANY, never from a catalogue", () => {
+    const view = renderNotice("en");
+    expect(factCell(view, "legal.notice.company.name")?.textContent).toBe(COMPANY.legalName);
+    expect(factCell(view, "legal.notice.company.tradingNames")?.textContent).toBe(COMPANY.tradingNames.join(" · "));
+    expect(factCell(view, "legal.notice.company.office")?.textContent).toBe(COMPANY.registeredOffice);
+    expect(factCell(view, "legal.notice.company.register")?.textContent).toBe(COMPANY.tradeRegisterNo);
+    expect(factCell(view, "legal.notice.company.cui")?.textContent).toBe(COMPANY.cui);
+    expect(factCell(view, "legal.notice.company.capital")?.textContent).toBe(COMPANY.shareCapital);
+    expect(factCell(view, "legal.notice.company.representative")?.textContent).toBe(COMPANY.representative);
+    expect(factCell(view, "legal.notice.contact.phone")?.textContent).toBe(COMPANY.phone);
+    expect(view.querySelector(".legalSection p")?.textContent).toBe(
+      `${COMPANY.tradingNames[0]} (also called ${COMPANY.tradingNames[1]}) is run by ${COMPANY.legalName}, a company registered in Romania.`
+    );
+    for (const address of Object.values(COMPANY.emails)) expect(view.textContent).toContain(address);
+    // No catalogue in any locale may carry a company fact: filling COMPANY once must update all 35.
+    const facts = [COMPANY.legalName, COMPANY.tradeRegisterNo, COMPANY.phone, ...Object.values(COMPANY.emails)];
+    for (const locale of readdirSync(resolve(process.cwd(), "apps/ui/messages"))) {
+      const values = Object.entries(catalog(locale, "legal"))
+        .filter(([key]) => key.startsWith("legal.notice."))
+        .map(([, value]) => value)
+        .join("\n");
+      for (const fact of facts) expect(values, `${locale}/legal carries ${fact}`).not.toContain(fact);
+    }
+  });
+
+  it("renders unverified facts bracketed, and never links a bracketed address", () => {
+    const view = renderNotice("en");
+    expect(COMPANY.tradeRegisterNo).toBe("[J40/…/…]");
+    expect(factCell(view, "legal.notice.company.register")?.textContent).toBe("[J40/…/…]");
+    expect(factCell(view, "legal.notice.company.vat")?.textContent).toBe(legalEnglish["legal.notice.company.vatUnconfirmed"]);
+    expect(factCell(view, "legal.notice.company.vat")?.textContent).toMatch(/^\[.+\]$/);
+    const mailto = [...view.querySelectorAll("a[href^='mailto:']")].map((link) => link.getAttribute("href"));
+    expect(mailto).toEqual(
+      Object.values(COMPANY.emails).filter((address) => !isUnverified(address)).map((address) => `mailto:${address}`)
+    );
+    expect(mailto).toContain("mailto:privacy@dezbatere.ro");
+    expect(view.querySelector("a[href^='mailto:[']")).toBeNull();
+  });
+
+  it("names both Digital Services Act contact points and the languages we answer in", () => {
+    const view = renderNotice("en");
+    const labels = texts(view.querySelectorAll(".legalFactTable th"));
+    expect(labels).toContain("Contact point for authorities (EU Digital Services Act, Art. 11)");
+    expect(labels).toContain("Contact point for users (Art. 12)");
+    expect(factCell(view, "legal.notice.contact.authorities")?.textContent).toContain(COMPANY.emails.authorities);
+    expect(factCell(view, "legal.notice.contact.users")?.textContent).toContain(COMPANY.emails.general);
+    expect(factCell(view, "legal.notice.contact.languages")?.textContent).toBe("Romanian and English");
+    expect(view.textContent).toContain("A person reads these mailboxes.");
+    const ro = renderNotice("ro");
+    expect(factCell(ro, "legal.notice.contact.languages", "ro")?.textContent).toBe("Română și engleză");
+  });
+
+  it("links ANPC's dispute resolution, the terms, AI transparency and the reading list — and not the closed EU ODR platform", () => {
+    const view = renderNotice("en");
+    const hrefs = [...view.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "");
+    expect(hrefs).toContain(ANPC_ADR_URL);
+    expect(ANPC_ADR_URL).toBe("https://reclamatiisal.anpc.ro");
+    expect(hrefs).toEqual(
+      expect.arrayContaining(["/ai-transparency", "/terms#legal-section-13", "/terms#legal-section-18", "/terms", "/privacy", "/cookies", "/providers"])
+    );
+    expect(hrefs.filter((href) => /ec\.europa\.eu\/consumers\/odr|\/odr\b/i.test(href))).toEqual([]);
+    expect(view.textContent).not.toMatch(/\bODR\b|online dispute resolution/i);
+    // The withdrawal and disputes links point at the sections they name, in every edition.
+    expect(TERMS_OF_SERVICE.sections.find(({ no }) => no === "13")?.title).toBe("Your right of withdrawal");
+    expect(TERMS_OF_SERVICE.sections.find(({ no }) => no === "18")?.title).toBe("Governing law and where disputes are heard");
+  });
+
+  it("states no price: paid plans do not exist yet", () => {
+    const view = renderNotice("en");
+    expect(view.textContent).not.toMatch(/[€$£]|\bEUR\b|\bUSD\b|\blei\b/);
+    expect(view.textContent).toContain("Paid plans are not available yet.");
+  });
+
+  it("gives the Japanese page its statutory title, and every locale its own title", () => {
+    expect(catalog("ja", "legal")["legal.notice.title"]).toBe("特定商取引法に基づく表記");
+    expect(catalog("ja", "chrome")["chrome.legal.notice"]).toBe("特定商取引法に基づく表記");
+    for (const locale of readdirSync(resolve(process.cwd(), "apps/ui/messages")).filter((code) => code !== "en")) {
+      expect(catalog(locale, "legal")["legal.notice.title"], locale).not.toBe(legalEnglish["legal.notice.title"]);
+    }
+  });
+
+  it("renders the Arabic notice in Arabic, with the facts left as written", () => {
+    // The root layout sets <html dir> from the locale; Arabic is declared right-to-left.
+    expect(source("apps/ui/lib/i18n/locales.ts")).toMatch(/locale\("ar", "[^"]+", "[^"]+", "rtl"\)/);
+    expect(source("apps/ui/app/layout.tsx")).toMatch(/dir=\{localeDefinition\.dir\}/);
+    const view = renderNotice("ar");
+    const arabic = catalog("ar", "legal");
+    expect(view.querySelector("h2")?.textContent).toBe(arabic["legal.notice.s01.title"]);
+    expect(factCell(view, "legal.notice.company.register", "ar")?.textContent).toBe(COMPANY.tradeRegisterNo);
+    // Left-to-right facts are isolated, so right-to-left text cannot reorder them into "[…/…/J40]".
+    expect(factCell(view, "legal.notice.company.register", "ar")?.querySelector("bdi")?.textContent).toBe(COMPANY.tradeRegisterNo);
+    const isolated = texts(view.querySelectorAll("bdi"));
+    for (const fact of [COMPANY.legalName, COMPANY.phone, ...Object.values(COMPANY.emails)]) expect(isolated).toContain(fact);
+    expect(factCell(view, "legal.notice.contact.languages", "ar")?.textContent).toMatch(/[\u0600-\u06FF]/);
   });
 });
 
@@ -213,7 +348,7 @@ describe("the US consumer health data page", () => {
 });
 
 describe("the footers (15a full, 15b one line)", () => {
-  it("the one-line footer carries the six legal links and cookie preferences", () => {
+  it("the one-line footer carries the seven legal links and cookie preferences", () => {
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
@@ -226,7 +361,8 @@ describe("the footers (15a full, 15b one line)", () => {
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());
       expect(requests).toEqual([button]);
-      expect(footer?.textContent).toContain(`© ${new Date().getFullYear()} DebateAIRO SRL`);
+      expect(footer?.textContent).toContain(`© ${new Date().getFullYear()} ${COMPANY.legalName}`);
+      expect(footer?.querySelector("a[href='/legal']")?.textContent).toBe("Legal notice");
     } finally {
       unsubscribe();
     }
@@ -238,7 +374,7 @@ describe("the footers (15a full, 15b one line)", () => {
     expect(footer?.textContent).toContain("privacy@dezbatere.ro");
     expect(footer?.querySelector("a[href='mailto:privacy@dezbatere.ro']")).not.toBeNull();
     const hrefs = [...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href"));
-    expect(hrefs).toEqual(expect.arrayContaining(["/", "/help", "/settings", ...LEGAL_PAGES.map(({ href }) => href)]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/", "/help", "/settings", "/legal", ...LEGAL_PAGES.map(({ href }) => href)]));
     expect(footer?.querySelector(".languageSwitcher")).not.toBeNull();
   });
 

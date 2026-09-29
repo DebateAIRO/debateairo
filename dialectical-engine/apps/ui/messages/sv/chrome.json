@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Byt till {language}",
   "chrome.languageOffer.dismiss": "Nej tack",
   "chrome.legalPages": "Juridiskt",
+  "chrome.legal.notice": "Juridisk information",
   "chrome.legal.terms": "Användarvillkor",
   "chrome.legal.versions": "Versioner av villkoren",
   "chrome.legal.privacy": "Integritetspolicy",

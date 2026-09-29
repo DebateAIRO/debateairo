@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Perjungti į {language} kalbą",
   "chrome.languageOffer.dismiss": "Ne, ačiū",
   "chrome.legalPages": "Teisinė informacija",
+  "chrome.legal.notice": "Rekvizitai",
   "chrome.legal.terms": "Paslaugų teikimo sąlygos",
   "chrome.legal.versions": "Sąlygų versijos",
   "chrome.legal.privacy": "Privatumo politika",

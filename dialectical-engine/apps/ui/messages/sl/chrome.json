@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Preklopi na jezik: {language}",
   "chrome.languageOffer.dismiss": "Ne, hvala",
   "chrome.legalPages": "Pravno",
+  "chrome.legal.notice": "Impresum",
   "chrome.legal.terms": "Pogoji uporabe",
   "chrome.legal.versions": "Različice pogojev",
   "chrome.legal.privacy": "Pravilnik o zasebnosti",

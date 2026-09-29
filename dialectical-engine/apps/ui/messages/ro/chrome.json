@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Treceți la limba {language}",
   "chrome.languageOffer.dismiss": "Nu, mulțumesc",
   "chrome.legalPages": "Informații legale",
+  "chrome.legal.notice": "Informații legale",
   "chrome.legal.terms": "Termenii serviciului",
   "chrome.legal.versions": "Versiunile termenilor",
   "chrome.legal.privacy": "Politica de confidențialitate",

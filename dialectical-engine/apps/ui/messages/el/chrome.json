@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Μετάβαση στα {language}",
   "chrome.languageOffer.dismiss": "Όχι, ευχαριστώ",
   "chrome.legalPages": "Νομικά",
+  "chrome.legal.notice": "Νομικές πληροφορίες",
   "chrome.legal.terms": "Όροι παροχής υπηρεσιών",
   "chrome.legal.versions": "Εκδόσεις των όρων",
   "chrome.legal.privacy": "Πολιτική απορρήτου",

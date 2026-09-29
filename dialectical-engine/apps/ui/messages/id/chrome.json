@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Beralih ke bahasa {language}",
   "chrome.languageOffer.dismiss": "Tidak, terima kasih",
   "chrome.legalPages": "Hukum",
+  "chrome.legal.notice": "Informasi hukum",
   "chrome.legal.terms": "Ketentuan layanan",
   "chrome.legal.versions": "Versi ketentuan",
   "chrome.legal.privacy": "Kebijakan privasi",

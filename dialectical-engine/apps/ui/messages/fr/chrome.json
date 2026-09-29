@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Passer en {language}",
   "chrome.languageOffer.dismiss": "Non merci",
   "chrome.legalPages": "Informations légales",
+  "chrome.legal.notice": "Mentions légales",
   "chrome.legal.terms": "Conditions d’utilisation",
   "chrome.legal.versions": "Versions des conditions",
   "chrome.legal.privacy": "Politique de confidentialité",

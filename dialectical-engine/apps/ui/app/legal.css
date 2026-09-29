@@ -259,6 +259,19 @@
 .legalProviderTable td:last-child { width: 170px; }
 .legalAction { margin-top: 20px; }
 
+/* Legal notice: label/value fact tables and inline links */
+.legalSection .legalTable { margin-top: 14px; }
+.legalFactTable th:first-child { width: 42%; font-weight: 600; }
+.legalFactNote { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+.legalSection a,
+.legalFactTable a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.legalSection a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
 /* ---------- 15a full footer ---------- */
 
 .siteFooterFull {

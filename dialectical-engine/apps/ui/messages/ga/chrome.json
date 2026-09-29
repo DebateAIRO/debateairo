@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Taispeáin as {language}",
   "chrome.languageOffer.dismiss": "Níor mhaith, go raibh maith agat",
   "chrome.legalPages": "Dlíthiúil",
+  "chrome.legal.notice": "Fógra dlíthiúil",
   "chrome.legal.terms": "Téarmaí seirbhíse",
   "chrome.legal.versions": "Leaganacha na dtéarmaí",
   "chrome.legal.privacy": "Beartas príobháideachais",

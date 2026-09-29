@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Chuyển sang {language}",
   "chrome.languageOffer.dismiss": "Không, cảm ơn",
   "chrome.legalPages": "Pháp lý",
+  "chrome.legal.notice": "Thông tin pháp lý",
   "chrome.legal.terms": "Điều khoản dịch vụ",
   "chrome.legal.versions": "Các phiên bản điều khoản",
   "chrome.legal.privacy": "Chính sách quyền riêng tư",

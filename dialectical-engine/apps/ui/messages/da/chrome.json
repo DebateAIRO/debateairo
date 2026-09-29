@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Skift til {language}",
   "chrome.languageOffer.dismiss": "Nej tak",
   "chrome.legalPages": "Juridisk",
+  "chrome.legal.notice": "Juridiske oplysninger",
   "chrome.legal.terms": "Tjenestevilkår",
   "chrome.legal.versions": "Versioner af vilkårene",
   "chrome.legal.privacy": "Privatlivspolitik",

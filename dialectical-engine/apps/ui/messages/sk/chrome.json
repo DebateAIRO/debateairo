@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Prepnúť na jazyk: {language}",
   "chrome.languageOffer.dismiss": "Nie, ďakujem",
   "chrome.legalPages": "Právne informácie",
+  "chrome.legal.notice": "Informácie o prevádzkovateľovi",
   "chrome.legal.terms": "Podmienky poskytovania služby",
   "chrome.legal.versions": "Verzie podmienok",
   "chrome.legal.privacy": "Zásady ochrany osobných údajov",

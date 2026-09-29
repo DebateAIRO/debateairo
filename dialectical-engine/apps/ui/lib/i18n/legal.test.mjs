@@ -24,7 +24,8 @@ const ownedFiles = [
   "app/privacy/page.tsx",
   "app/privacy/us-health-data/page.tsx",
   "app/cookies/page.tsx",
-  "app/providers/page.tsx"
+  "app/providers/page.tsx",
+  "app/legal/page.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const english = JSON.parse(source(`messages/en/${namespace}.json`));
@@ -63,7 +64,7 @@ test("every chrome key the footer and navigation read exists in English", () => 
   for (const path of ownedFiles) {
     for (const match of source(path).matchAll(/"(chrome\.[A-Za-z0-9.]+)"/g)) read.add(match[1]);
   }
-  assert.ok(read.size >= 12);
+  assert.ok(read.size >= 13);
   for (const key of read) assert.ok(Object.hasOwn(chromeEnglish, key), key);
 });
 
@@ -80,7 +81,7 @@ test("all 35 locales carry the exact legal contract and a translated sample", ()
 
 test("every locale translates the footer and navigation labels", () => {
   const added = Object.keys(chromeEnglish).filter((key) => key.startsWith("chrome.legal") || key.startsWith("chrome.footer."));
-  assert.equal(added.length, 12);
+  assert.equal(added.length, 13);
   for (const locale of locales.filter((code) => code !== "en")) {
     const chrome = JSON.parse(source(`messages/${locale}/chrome.json`));
     for (const key of added) {

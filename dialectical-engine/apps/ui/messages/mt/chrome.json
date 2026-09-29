@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Ibdel għall-lingwa {language}",
   "chrome.languageOffer.dismiss": "Le, grazzi",
   "chrome.legalPages": "Legali",
+  "chrome.legal.notice": "Informazzjoni dwar il-kumpanija",
   "chrome.legal.terms": "Termini tas-servizz",
   "chrome.legal.versions": "Verżjonijiet tat-termini",
   "chrome.legal.privacy": "Politika dwar il-privatezza",

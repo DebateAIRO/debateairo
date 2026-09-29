@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "切换到{language}",
   "chrome.languageOffer.dismiss": "不用了，谢谢",
   "chrome.legalPages": "法律信息",
+  "chrome.legal.notice": "法律声明",
   "chrome.legal.terms": "服务条款",
   "chrome.legal.versions": "服务条款历史版本",
   "chrome.legal.privacy": "隐私政策",

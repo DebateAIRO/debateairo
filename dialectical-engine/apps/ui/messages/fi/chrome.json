@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "Vaihda kieleksi {language}",
   "chrome.languageOffer.dismiss": "Ei kiitos",
   "chrome.legalPages": "Oikeudelliset tiedot",
+  "chrome.legal.notice": "Palveluntarjoajan tiedot",
   "chrome.legal.terms": "Käyttöehdot",
   "chrome.legal.versions": "Käyttöehtojen versiot",
   "chrome.legal.privacy": "Tietosuojakäytäntö",

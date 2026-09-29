@@ -275,6 +275,20 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
     ),
   }),
   capability({
+    id: "legal-notice",
+    route: "/legal",
+    labels: labels("Legal notice and company details", "Informații legale și datele companiei"),
+    audience: "any",
+    availability: "public",
+    disposition: "action",
+    actionIds: [],
+    articleIds: ["privacy-consent"],
+    searchTerms: terms(
+      ["legal notice", "company details", "imprint", "contact", "trade register", "complaints"],
+      ["informații legale", "datele companiei", "contact", "registrul comerțului", "reclamații"]
+    ),
+  }),
+  capability({
     id: "legal-terms",
     route: "/terms",
     labels: labels("Terms of service", "Termeni și condiții"),

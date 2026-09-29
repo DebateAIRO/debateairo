@@ -49,6 +49,7 @@
   "chrome.languageOffer.switch": "التبديل إلى {language}",
   "chrome.languageOffer.dismiss": "لا، شكرًا",
   "chrome.legalPages": "قانوني",
+  "chrome.legal.notice": "المعلومات القانونية",
   "chrome.legal.terms": "شروط الخدمة",
   "chrome.legal.versions": "نسخ الشروط",
   "chrome.legal.privacy": "سياسة الخصوصية",

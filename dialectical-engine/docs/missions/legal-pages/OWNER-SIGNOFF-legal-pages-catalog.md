@@ -1,4 +1,4 @@
-# Owner sign-off — the support catalogue with the six legal pages (DRAFT, NOT SIGNED)
+# Owner sign-off — the support catalogue with the seven legal pages (DRAFT, NOT SIGNED)
 
 **Status: awaiting the owner.** Nothing in `packages/support-kb/reviews/manifest.json` points at
 this file yet. It becomes the record only after V reads the entries below in chat and answers
@@ -6,19 +6,21 @@ this file yet. It becomes the record only after V reads the entries below in cha
 record (`sha256`, `reviewedBy: "OWNER"`, `reviewerSession`, `reviewedOn`, `evidence` = this
 file, `ratifiedBy: "V"`, `ratifiedOn`).
 
-**Why a signature is needed:** Turn 15 adds six page routes. The route-coverage test
+**Why a signature is needed:** Turn 15 adds seven page routes (the six legal documents, then the
+legal notice at `/legal`, added 2026-09-29). The route-coverage test
 (`tests/architecture/support-catalog-coverage.test.ts`) requires every page to be a catalogue
 capability, so the catalogue's bytes change. The API loads the help corpus at boot with
 `requireReviewedRecovery: true` (`apps/api/src/main.ts`), and with the old signature no longer
 matching, the corpus admits no article and the load refuses (`SUPPORT_KB_RECOVERY_COMPONENT_INVALID`).
 **Until this is signed, the API on this branch does not start.** No agent may sign in V's place.
 
-**What changes in the catalogue (nothing else does):** six capabilities, each `audience: "any"`,
+**What changes in the catalogue (nothing else does):** seven capabilities, each `audience: "any"`,
 `availability: "public"`, `disposition: "action"`, **no actions** (the assistant can name the page,
 never act through it), backed by the existing `privacy-consent` article pair (no new article text).
 
 | id | route | English label | Romanian label |
 |---|---|---|---|
+| legal-notice | /legal | Legal notice and company details | Informații legale și datele companiei |
 | legal-terms | /terms | Terms of service | Termeni și condiții |
 | legal-terms-versions | /terms/versions | Earlier versions of the terms | Versiunile anterioare ale termenilor |
 | legal-privacy | /privacy | Privacy policy | Politica de confidențialitate |
@@ -31,7 +33,8 @@ Search terms (en / ro) are in `packages/support-kb/src/catalog.ts` next to each 
 | Record | sha256 |
 |---|---|
 | The support catalogue before (signed 2026-09-24) | `ebf458f1cceb6aa5681534a391f239466f92d68680e21af448bd4b7225436032` |
-| The support catalogue after (to be signed) | `b018085009479b7f172818b7e30d24d3aa529a97a41a9de55403e8adc218c8c5` |
+| The support catalogue after (to be signed) | `ffd729867aa1ed250d142f1a82aee386f493a56a224193adf387c231da111854` |
+| Superseded, never signed (six pages, before the legal notice) | `b018085009479b7f172818b7e30d24d3aa529a97a41a9de55403e8adc218c8c5` |
 
 **Who / when:** _(filled in after V answers)_
 
@@ -49,4 +52,6 @@ Search terms (en / ro) are in `packages/support-kb/src/catalog.ts` next to each 
 **Measured on 2026-09-29 (temporary local swap of the digest, reverted byte-for-byte):** with the
 new digest in the manifest, 139 of the 142 support failures clear; the remaining three are exactly
 the pins in step 2 plus the label count, which this branch already moved from 62 to 74 (six
-capabilities × en/ro, all passing the neutral-framing check).
+capabilities × en/ro, all passing the neutral-framing check). The legal notice moved it to 76.
+The "after" digest is `sha256(SUPPORT_CATALOG_CANONICAL)` from `packages/support-kb/src/catalog.ts`,
+recomputed after the seventh entry; the six-page digest above it is superseded and must not be signed.
