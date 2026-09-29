@@ -153,7 +153,10 @@ describe("cross-slice integration — both consent surfaces in one document", ()
     await mountBoth();
     activate(labelled(WHAT_WE_STORE));
     activate(labelled("Privacy notice"));
-    const readButtons = [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
+    // Scoped to the policy dialog: the cookie card underneath renders a `Close` of its own
+    // (CT-N1, REV-S01-p1), so a document-wide collection would pass with the policy's missing.
+    expect(policy(), "the read-mode policy is open").not.toBeNull();
+    const readButtons = [...policy()!.querySelectorAll("button")].map((b) => b.textContent?.trim());
     expect(readButtons, "read mode: a Close, and NO `I have read it`").toContain("Close");
     expect(readButtons).not.toContain("I have read it");
     press("Escape");
@@ -162,7 +165,8 @@ describe("cross-slice integration — both consent surfaces in one document", ()
     await act(async () => {
       privacyBox().click();
     });
-    const consentButtons = [...document.querySelectorAll("button")].map((b) =>
+    expect(policy(), "the consent-mode policy is open").not.toBeNull();
+    const consentButtons = [...policy()!.querySelectorAll("button")].map((b) =>
       b.textContent?.trim()
     );
     expect(consentButtons, "consent mode: `I have read it` present").toContain("I have read it");

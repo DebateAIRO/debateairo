@@ -227,9 +227,11 @@ describe("S01 the cookie notice bar (10a)", () => {
     ]);
   });
 
-  it("renders exactly the acknowledgement, the what-we-store button and one link to /cookies, in DOM order, and none of the three old labels", () => {
-    // PROPERTY (R01): exactly three operable elements — one link whose href is /cookies, one
-    // button that opens the card, one acknowledgement button — and none of the old labels.
+  it("renders exactly one link to /cookies, the what-we-store button and the acknowledgement, in that DOM order, and none of the three old labels", () => {
+    // PROPERTY (R01, DONE.md answer 2): exactly three operable elements, in the DOM (and tab)
+    // order Cookie policy → What we store → OK — one link whose href is /cookies, one button
+    // that opens the card, one acknowledgement button — and none of the old labels. The title
+    // states that order because the assertion below checks it (CT-N2, REV-S01-p1).
     const acknowledged: number[] = [];
     const openers: (HTMLElement | null)[] = [];
     const cardButtonRef = createRef<HTMLButtonElement>();
