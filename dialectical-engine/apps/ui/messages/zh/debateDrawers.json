@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "缺口",
   "debateDrawers.node.honestyAriaLabel": "V3 节点诚信度",
   "debateDrawers.node.noArgumentText": "尚无论点文本。",
-  "debateDrawers.node.noCompletedReview": "此节点没有已完成的第二生成者评审记录。",
+  "debateDrawers.node.noCompletedReview": "此节点没有由其他开发方模型完成的评审记录。",
   "debateDrawers.node.noPreviousGenerations": "没有以往的生成结果。",
   "debateDrawers.node.noScoringRecommendation": "没有此论点的评分建议。",
   "debateDrawers.node.notUseful": "没有用",

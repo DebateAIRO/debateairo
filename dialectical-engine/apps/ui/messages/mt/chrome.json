@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "Dan id-dibattitu huwa bil-lingwa {language} ({nativeName}). Trid tara l-paġna bil-lingwa {language}?",
   "chrome.languageOffer.textNative": "Dan id-dibattitu huwa bil-lingwa {language}. Trid tara l-paġna bil-lingwa {language}?",
   "chrome.languageOffer.switch": "Ibdel għall-lingwa {language}",
-  "chrome.languageOffer.dismiss": "Le, grazzi"
+  "chrome.languageOffer.dismiss": "Le, grazzi",
+  "chrome.legalPages": "Legali",
+  "chrome.legal.notice": "Informazzjoni dwar il-kumpanija",
+  "chrome.legal.terms": "Termini tas-servizz",
+  "chrome.legal.versions": "Verżjonijiet tat-termini",
+  "chrome.legal.privacy": "Politika dwar il-privatezza",
+  "chrome.legal.cookies": "Politika dwar il-cookies",
+  "chrome.legal.providers": "Fornituri tal-mudelli",
+  "chrome.legal.health": "Privatezza tad-data tas-saħħa fl-Istati Uniti",
+  "chrome.footer.label": "Qiegħ is-sit",
+  "chrome.footer.location": "Bukarest, ir-Rumanija",
+  "chrome.footer.product": "Prodott",
+  "chrome.footer.home": "Paġna ewlenija",
+  "chrome.footer.cookiePreferences": "Preferenzi tal-cookies"
 }

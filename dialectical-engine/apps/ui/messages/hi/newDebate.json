@@ -24,7 +24,7 @@
   "newDebate.medium": "मध्यम",
   "newDebate.high": "उच्च",
   "newDebate.treeDepth": "वृक्ष की गहराई",
-  "newDebate.treeDepthHint": "परस्पर मॉडल समीक्षा उपलब्ध होने पर वाद-विवाद कहाँ तक बढ़ता है",
+  "newDebate.treeDepthHint": "अलग-अलग निर्माताओं के मॉडलों की परस्पर समीक्षा उपलब्ध होने पर वाद-विवाद कहाँ तक बढ़ता है",
   "newDebate.steeringSelections": "दिशा-निर्देश मेन्यू चयन",
   "newDebate.onePerLine": "हर पंक्ति में एक",
   "newDebate.steeringPlaceholder": "प्राथमिक स्रोतों को प्राथमिकता दें\nसबसे मजबूत प्रतितर्क जल्दी सामने लाएँ",

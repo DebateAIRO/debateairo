@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Lüngad",
   "debateDrawers.node.honestyAriaLabel": "V3 sõlme ausus",
   "debateDrawers.node.noArgumentText": "Argumendi tekst veel puudub.",
-  "debateDrawers.node.noCompletedReview": "Selle sõlme kohta pole salvestatud teise koostaja lõpetatud hinnangut.",
+  "debateDrawers.node.noCompletedReview": "Selle sõlme kohta pole salvestatud teise arendaja mudeli lõpetatud hinnangut.",
   "debateDrawers.node.noPreviousGenerations": "Varasemaid genereerimisi pole.",
   "debateDrawers.node.noScoringRecommendation": "Selle argumendi kohta pole hindamissoovitust.",
   "debateDrawers.node.notUseful": "ei olnud kasulik",

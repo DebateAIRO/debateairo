@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "Cuộc tranh luận này được viết bằng {language} ({nativeName}). Bạn có muốn hiển thị trang bằng {language} không?",
   "chrome.languageOffer.textNative": "Cuộc tranh luận này được viết bằng {language}. Bạn có muốn hiển thị trang bằng {language} không?",
   "chrome.languageOffer.switch": "Chuyển sang {language}",
-  "chrome.languageOffer.dismiss": "Không, cảm ơn"
+  "chrome.languageOffer.dismiss": "Không, cảm ơn",
+  "chrome.legalPages": "Pháp lý",
+  "chrome.legal.notice": "Thông tin pháp lý",
+  "chrome.legal.terms": "Điều khoản dịch vụ",
+  "chrome.legal.versions": "Các phiên bản điều khoản",
+  "chrome.legal.privacy": "Chính sách quyền riêng tư",
+  "chrome.legal.cookies": "Chính sách cookie",
+  "chrome.legal.providers": "Nhà cung cấp mô hình",
+  "chrome.legal.health": "Quyền riêng tư dữ liệu sức khỏe (Hoa Kỳ)",
+  "chrome.footer.label": "Chân trang",
+  "chrome.footer.location": "Bucharest, Romania",
+  "chrome.footer.product": "Sản phẩm",
+  "chrome.footer.home": "Trang chủ",
+  "chrome.footer.cookiePreferences": "Tùy chọn cookie"
 }

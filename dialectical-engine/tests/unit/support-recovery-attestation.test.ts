@@ -69,6 +69,17 @@ const OWNER_REVIEW = Object.freeze({
   ratifiedOn: "2026-09-24",
 });
 
+// 2026-09-29: the owner read the seven Turn 15 legal-page entries (EN + RO labels) in chat
+// and signed the catalogue that adds them; the article pairs keep their earlier signatures.
+const CATALOG_REVIEW = Object.freeze({
+  reviewedBy: "OWNER",
+  reviewerSession: "d65424e5-27a7-40b7-8a4c-773e60cb404f (legal-notice session; the owner read the seven legal-page entries in chat and answered 'Signed')",
+  reviewedOn: "2026-09-29",
+  evidence: "docs/missions/legal-pages/OWNER-SIGNOFF-legal-pages-catalog.md",
+  ratifiedBy: "V",
+  ratifiedOn: "2026-09-29",
+});
+
 const QUALITY_REVIEW = Object.freeze({
   reviewedBy: "SOL",
   reviewerSession: "01a09ef7-e096-7c31-9b35-806840028cf0",
@@ -184,8 +195,8 @@ describe("production Support recovery attestation", () => {
       schemaVersion: 2,
       catalog: {
         sha256:
-          "ebf458f1cceb6aa5681534a391f239466f92d68680e21af448bd4b7225436032",
-        ...OWNER_REVIEW,
+          "ffd729867aa1ed250d142f1a82aee386f493a56a224193adf387c231da111854",
+        ...CATALOG_REVIEW,
       },
       recovery: {
         componentFileSha256:

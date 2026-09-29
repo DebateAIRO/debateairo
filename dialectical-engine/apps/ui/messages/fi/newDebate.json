@@ -24,7 +24,7 @@
   "newDebate.medium": "Keskitasoinen",
   "newDebate.high": "Korkea",
   "newDebate.treeDepth": "Puun syvyys",
-  "newDebate.treeDepthHint": "Kuinka pitkälle väittely laajenee, kun muiden laatijoiden ristiinarviointi on käytettävissä",
+  "newDebate.treeDepthHint": "Kuinka pitkälle väittely laajenee, kun eri kehittäjien mallit voivat ristiinarvioida toistensa väitteet",
   "newDebate.steeringSelections": "Ohjausvalikon valinnat",
   "newDebate.onePerLine": "Yksi riviä kohden",
   "newDebate.steeringPlaceholder": "Suosi ensisijaisia lähteitä\nTuo vahvin vastanäkemys esiin varhain",

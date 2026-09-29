@@ -24,7 +24,7 @@
   "newDebate.medium": "Közepes",
   "newDebate.high": "Magas",
   "newDebate.treeDepth": "Famélység",
-  "newDebate.treeDepthHint": "Milyen mélyre terjed ki a vita, ha elérhető az alkotók közötti keresztbírálat",
+  "newDebate.treeDepthHint": "Milyen mélyre terjed ki a vita, ha elérhető a különböző készítők modelljei közötti keresztbírálat",
   "newDebate.steeringSelections": "Irányítási menü választásai",
   "newDebate.onePerLine": "Soronként egy",
   "newDebate.steeringPlaceholder": "Elsődleges források előnyben részesítése\nA legerősebb ellenérv korai bemutatása",

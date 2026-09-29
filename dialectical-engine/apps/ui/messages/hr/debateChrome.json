@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "Sažetak nije bilo moguće izraditi unutar proračuna sastavljanja",
   "debateChrome.condition.protectedCoreGuardRetired": "Izvođenje je zaustavljeno zbog proračuna; provjera preoblikovanja više ga nije uvjetovala",
   "debateChrome.condition.hiddenUnjudgeable": "Skriveno: nije se moglo ocijeniti — prikažite skriveno da biste ga pročitali",
-  "debateChrome.condition.derivedStandingUnreviewed": "Počiva na ocijenjenim argumentima — nedostaje vlastiti unakrsni pregled modela drugog proizvođača",
+  "debateChrome.condition.derivedStandingUnreviewed": "Počiva na ocijenjenim argumentima — nedostaje vlastiti unakrsni pregled koji bi obavio model drugog proizvođača",
   "debateChrome.condition.hiddenLowScore": "Skriveno: rezultat ispod prikazanog praga",
   "debateChrome.condition.unauthoredBranchHalted": "Proširenje je ovdje zaustavljeno — nema napisanog sadržaja koji bi se mogao sakriti ili prikazati",
   "debateChrome.condition.labelBasisIncomplete": "Osnova presude nije potpuna — nema suparničkog stajališta ili drugog suca za usporedbu",

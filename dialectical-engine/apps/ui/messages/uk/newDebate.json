@@ -24,7 +24,7 @@
   "newDebate.medium": "Середній",
   "newDebate.high": "Високий",
   "newDebate.treeDepth": "Глибина дерева",
-  "newDebate.treeDepthHint": "Наскільки розгортаються дебати, коли доступна перехресна рецензія іншою моделлю",
+  "newDebate.treeDepthHint": "Наскільки розгортаються дебати, коли доступна перехресна перевірка моделлю іншого розробника",
   "newDebate.steeringSelections": "Пункти меню спрямування",
   "newDebate.onePerLine": "По одному в рядку",
   "newDebate.steeringPlaceholder": "Надавати перевагу першоджерелам\nРано представити найсильніший контраргумент",

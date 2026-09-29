@@ -9,6 +9,8 @@ export interface AuthSourceContext {
   readonly ip: string;
   readonly userAgent: string;
   readonly requestId: string;
+  /** ISO 3166-1 alpha-2 the edge reported for this source, when it reported one. */
+  readonly countryCode?: string;
 }
 
 export interface PendingAccountInput {
@@ -19,10 +21,18 @@ export interface PendingAccountInput {
   readonly passwordHash: string;
   readonly pseudonym: string;
   readonly adultAffirmedAt: Date;
+  /** The passed age check this account is created under (the date itself is never stored). */
+  readonly ageCheck: RegistrationAgeCheck;
   readonly verificationTokenHash: string;
   readonly verificationExpiresAt: Date;
   readonly occurredAt: Date;
   readonly source: AuthSourceContext;
+}
+
+export interface RegistrationAgeCheck {
+  readonly minAgeApplied: number;
+  readonly countryCode: string | null;
+  readonly ruleVersion: string;
 }
 
 export type PendingAccountResult =
@@ -209,6 +219,13 @@ export class PostgresIdentityRepository {
       if (row.user_id === null || row.channel_binding_id === null) {
         throw new Error("ACCOUNT_CREATE_RECEIPT_INVALID");
       }
+      await client.query("SELECT identity.record_registration_age_check($1,$2::smallint,$3,$4,$5)", [
+        row.user_id,
+        input.ageCheck.minAgeApplied,
+        input.ageCheck.countryCode,
+        input.ageCheck.ruleVersion,
+        input.occurredAt
+      ]);
       await beforeCommit();
       return Object.freeze({
         status: "created" as const,

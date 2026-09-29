@@ -24,7 +24,7 @@
   "newDebate.medium": "Srednja",
   "newDebate.high": "Visoka",
   "newDebate.treeDepth": "Globina drevesa",
-  "newDebate.treeDepthHint": "Kako daleč se razprava razširi, kadar je na voljo navzkrižni pregled avtorjev",
+  "newDebate.treeDepthHint": "Kako daleč se razprava razširi, kadar je na voljo navzkrižni pregled med modeli različnih razvijalcev",
   "newDebate.steeringSelections": "Izbire v meniju usmerjanja",
   "newDebate.onePerLine": "Ena na vrstico",
   "newDebate.steeringPlaceholder": "Dajte prednost primarnim virom\nNajmočnejši protiargument predstavite zgodaj",

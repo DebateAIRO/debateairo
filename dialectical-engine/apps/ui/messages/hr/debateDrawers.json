@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Nedostaci",
   "debateDrawers.node.honestyAriaLabel": "Poštenje V3 čvora",
   "debateDrawers.node.noArgumentText": "Još nema teksta argumenta.",
-  "debateDrawers.node.noCompletedReview": "Za ovaj čvor nije zabilježen dovršeni pregled modela drugog proizvođača.",
+  "debateDrawers.node.noCompletedReview": "Za ovaj čvor nije zabilježen dovršeni pregled koji je obavio model drugog proizvođača.",
   "debateDrawers.node.noPreviousGenerations": "Nema prethodno stvorenih inačica.",
   "debateDrawers.node.noScoringRecommendation": "Za ovaj argument nije dostupna preporuka bodovanja.",
   "debateDrawers.node.notUseful": "nije korisno",

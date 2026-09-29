@@ -24,7 +24,7 @@
   "newDebate.medium": "Middel",
   "newDebate.high": "Højt",
   "newDebate.treeDepth": "Træets dybde",
-  "newDebate.treeDepthHint": "Hvor langt debatten udvides, når krydsgennemgang mellem modeller er tilgængelig",
+  "newDebate.treeDepthHint": "Hvor langt debatten udvides, når krydsgennemgang mellem modeludviklere er tilgængelig",
   "newDebate.steeringSelections": "Valg af styremenu",
   "newDebate.onePerLine": "En per linje",
   "newDebate.steeringPlaceholder": "Foretrækker primære kilder\nFremhæv den stærkeste modsag tidligt",
