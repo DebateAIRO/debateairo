@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "Denne debat er på {language} ({nativeName}). Vil du vise siden på {language}?",
   "chrome.languageOffer.textNative": "Denne debat er på {language}. Vil du vise siden på {language}?",
   "chrome.languageOffer.switch": "Skift til {language}",
-  "chrome.languageOffer.dismiss": "Nej tak"
+  "chrome.languageOffer.dismiss": "Nej tak",
+  "chrome.legalPages": "Juridisk",
+  "chrome.legal.terms": "Tjenestevilkår",
+  "chrome.legal.versions": "Versioner af vilkårene",
+  "chrome.legal.privacy": "Privatlivspolitik",
+  "chrome.legal.cookies": "Cookiepolitik",
+  "chrome.legal.providers": "Modeludbydere",
+  "chrome.legal.health": "Helbredsoplysninger i USA",
+  "chrome.footer.label": "Sidefod",
+  "chrome.footer.location": "Bukarest, Rumænien",
+  "chrome.footer.product": "Produkt",
+  "chrome.footer.home": "Forside",
+  "chrome.footer.cookiePreferences": "Cookieindstillinger"
 }

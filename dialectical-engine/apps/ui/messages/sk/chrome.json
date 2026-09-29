@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "Jazyk tejto debaty: {language} ({nativeName}). Zobraziť stránku v jazyku: {language}?",
   "chrome.languageOffer.textNative": "Jazyk tejto debaty: {language}. Zobraziť stránku v jazyku: {language}?",
   "chrome.languageOffer.switch": "Prepnúť na jazyk: {language}",
-  "chrome.languageOffer.dismiss": "Nie, ďakujem"
+  "chrome.languageOffer.dismiss": "Nie, ďakujem",
+  "chrome.legalPages": "Právne informácie",
+  "chrome.legal.terms": "Podmienky poskytovania služby",
+  "chrome.legal.versions": "Verzie podmienok",
+  "chrome.legal.privacy": "Zásady ochrany osobných údajov",
+  "chrome.legal.cookies": "Zásady používania súborov cookie",
+  "chrome.legal.providers": "Poskytovatelia modelov",
+  "chrome.legal.health": "Ochrana údajov o zdraví v USA",
+  "chrome.footer.label": "Päta webu",
+  "chrome.footer.location": "Bukurešť, Rumunsko",
+  "chrome.footer.product": "Produkt",
+  "chrome.footer.home": "Domov",
+  "chrome.footer.cookiePreferences": "Nastavenia súborov cookie"
 }

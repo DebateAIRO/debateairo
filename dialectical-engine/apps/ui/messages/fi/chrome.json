@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "Tämän väittelyn kieli on {language} ({nativeName}). Näytetäänkö sivu kielellä {language}?",
   "chrome.languageOffer.textNative": "Tämän väittelyn kieli on {language}. Näytetäänkö sivu kielellä {language}?",
   "chrome.languageOffer.switch": "Vaihda kieleksi {language}",
-  "chrome.languageOffer.dismiss": "Ei kiitos"
+  "chrome.languageOffer.dismiss": "Ei kiitos",
+  "chrome.legalPages": "Oikeudelliset tiedot",
+  "chrome.legal.terms": "Käyttöehdot",
+  "chrome.legal.versions": "Käyttöehtojen versiot",
+  "chrome.legal.privacy": "Tietosuojakäytäntö",
+  "chrome.legal.cookies": "Evästekäytäntö",
+  "chrome.legal.providers": "Mallien tarjoajat",
+  "chrome.legal.health": "Terveystietojen suoja (Yhdysvallat)",
+  "chrome.footer.label": "Sivuston alatunniste",
+  "chrome.footer.location": "Bukarest, Romania",
+  "chrome.footer.product": "Tuote",
+  "chrome.footer.home": "Etusivu",
+  "chrome.footer.cookiePreferences": "Evästeasetukset"
 }

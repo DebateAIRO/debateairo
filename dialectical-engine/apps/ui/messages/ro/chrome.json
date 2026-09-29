@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "Această dezbatere este în limba {language} ({nativeName}). Afișați pagina în limba {language}?",
   "chrome.languageOffer.textNative": "Această dezbatere este în limba {language}. Afișați pagina în limba {language}?",
   "chrome.languageOffer.switch": "Treceți la limba {language}",
-  "chrome.languageOffer.dismiss": "Nu, mulțumesc"
+  "chrome.languageOffer.dismiss": "Nu, mulțumesc",
+  "chrome.legalPages": "Informații legale",
+  "chrome.legal.terms": "Termenii serviciului",
+  "chrome.legal.versions": "Versiunile termenilor",
+  "chrome.legal.privacy": "Politica de confidențialitate",
+  "chrome.legal.cookies": "Politica privind modulele cookie",
+  "chrome.legal.providers": "Furnizori de modele",
+  "chrome.legal.health": "Datele de sănătate (SUA)",
+  "chrome.footer.label": "Subsolul site-ului",
+  "chrome.footer.location": "București, România",
+  "chrome.footer.product": "Produs",
+  "chrome.footer.home": "Acasă",
+  "chrome.footer.cookiePreferences": "Preferințe pentru cookie-uri"
 }

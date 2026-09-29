@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "See väitlus on {language} keeles ({nativeName}). Kas soovite lehte näha {language} keeles?",
   "chrome.languageOffer.textNative": "See väitlus on {language} keeles. Kas soovite lehte näha {language} keeles?",
   "chrome.languageOffer.switch": "Lülituge ümber {language} keelele",
-  "chrome.languageOffer.dismiss": "Ei, aitäh"
+  "chrome.languageOffer.dismiss": "Ei, aitäh",
+  "chrome.legalPages": "Õigusteave",
+  "chrome.legal.terms": "Teenusetingimused",
+  "chrome.legal.versions": "Tingimuste versioonid",
+  "chrome.legal.privacy": "Privaatsuspoliitika",
+  "chrome.legal.cookies": "Küpsisepoliitika",
+  "chrome.legal.providers": "Mudelipakkujad",
+  "chrome.legal.health": "USA terviseandmete privaatsus",
+  "chrome.footer.label": "Saidi jalus",
+  "chrome.footer.location": "Bukarest, Rumeenia",
+  "chrome.footer.product": "Toode",
+  "chrome.footer.home": "Avaleht",
+  "chrome.footer.cookiePreferences": "Küpsiste eelistused"
 }

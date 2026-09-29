@@ -34,14 +34,20 @@ describe("Support catalog route coverage", () => {
       "/",
       "/admin/workers",
       "/ai-transparency",
+      "/cookies",
       "/debate/[id]",
       "/enroll-mfa",
       "/help",
       "/login",
       "/new",
+      "/privacy",
+      "/privacy/us-health-data",
+      "/providers",
       "/public/debate/[id]",
       "/settings",
       "/sign-up",
+      "/terms",
+      "/terms/versions",
       "/verify-email",
     ]);
   });
@@ -56,6 +62,15 @@ describe("Support catalog route coverage", () => {
     expect(disposition.get("/debate/[id]")).toBe("trusted-context-only");
     expect(disposition.get("/public/debate/[id]")).toBe("trusted-context-only");
     expect(SUPPORT_PROXY_ROUTES).toEqual(["/api/[...path]"]);
+  });
+
+  it("keeps the Turn 15 legal pages public, actionless, and backed by the privacy article", () => {
+    // Property: a legal page is reference reading — the assistant may name it, never act through it.
+    for (const route of ["/terms", "/terms/versions", "/privacy", "/privacy/us-health-data", "/cookies", "/providers"]) {
+      expect(SUPPORT_CAPABILITIES.find((capability) => capability.route === route), route).toMatchObject({
+        audience: "any", availability: "public", actionIds: [], articleIds: ["privacy-consent"]
+      });
+    }
   });
 
   it("maps every capability article id to a complete bilingual pair", () => {

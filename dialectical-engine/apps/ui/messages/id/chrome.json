@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "Debat ini menggunakan bahasa {language} ({nativeName}). Tampilkan halaman dalam bahasa {language}?",
   "chrome.languageOffer.textNative": "Debat ini menggunakan bahasa {language}. Tampilkan halaman dalam bahasa {language}?",
   "chrome.languageOffer.switch": "Beralih ke bahasa {language}",
-  "chrome.languageOffer.dismiss": "Tidak, terima kasih"
+  "chrome.languageOffer.dismiss": "Tidak, terima kasih",
+  "chrome.legalPages": "Hukum",
+  "chrome.legal.terms": "Ketentuan layanan",
+  "chrome.legal.versions": "Versi ketentuan",
+  "chrome.legal.privacy": "Kebijakan privasi",
+  "chrome.legal.cookies": "Kebijakan kuki",
+  "chrome.legal.providers": "Penyedia model",
+  "chrome.legal.health": "Privasi data kesehatan AS",
+  "chrome.footer.label": "Kaki halaman situs",
+  "chrome.footer.location": "Bukares, Rumania",
+  "chrome.footer.product": "Produk",
+  "chrome.footer.home": "Beranda",
+  "chrome.footer.cookiePreferences": "Preferensi kuki"
 }

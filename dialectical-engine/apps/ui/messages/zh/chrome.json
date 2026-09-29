@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "这场辩论使用的是{language}（{nativeName}）。要以{language}显示此页面吗？",
   "chrome.languageOffer.textNative": "这场辩论使用的是{language}。要以{language}显示此页面吗？",
   "chrome.languageOffer.switch": "切换到{language}",
-  "chrome.languageOffer.dismiss": "不用了，谢谢"
+  "chrome.languageOffer.dismiss": "不用了，谢谢",
+  "chrome.legalPages": "法律信息",
+  "chrome.legal.terms": "服务条款",
+  "chrome.legal.versions": "服务条款历史版本",
+  "chrome.legal.privacy": "隐私政策",
+  "chrome.legal.cookies": "Cookie 政策",
+  "chrome.legal.providers": "模型提供商",
+  "chrome.legal.health": "美国健康数据隐私",
+  "chrome.footer.label": "网站页脚",
+  "chrome.footer.location": "罗马尼亚布加勒斯特",
+  "chrome.footer.product": "产品",
+  "chrome.footer.home": "首页",
+  "chrome.footer.cookiePreferences": "Cookie 偏好设置"
 }

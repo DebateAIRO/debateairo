@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "Šie debatai vyksta {language} kalba ({nativeName}). Ar rodyti puslapį {language} kalba?",
   "chrome.languageOffer.textNative": "Šie debatai vyksta {language} kalba. Ar rodyti puslapį {language} kalba?",
   "chrome.languageOffer.switch": "Perjungti į {language} kalbą",
-  "chrome.languageOffer.dismiss": "Ne, ačiū"
+  "chrome.languageOffer.dismiss": "Ne, ačiū",
+  "chrome.legalPages": "Teisinė informacija",
+  "chrome.legal.terms": "Paslaugų teikimo sąlygos",
+  "chrome.legal.versions": "Sąlygų versijos",
+  "chrome.legal.privacy": "Privatumo politika",
+  "chrome.legal.cookies": "Slapukų politika",
+  "chrome.legal.providers": "Modelių teikėjai",
+  "chrome.legal.health": "JAV sveikatos duomenų privatumas",
+  "chrome.footer.label": "Svetainės poraštė",
+  "chrome.footer.location": "Bukareštas, Rumunija",
+  "chrome.footer.product": "Produktas",
+  "chrome.footer.home": "Pradžia",
+  "chrome.footer.cookiePreferences": "Slapukų nuostatos"
 }

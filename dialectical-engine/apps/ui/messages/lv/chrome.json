@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "Šīs debates notiek {language} valodā ({nativeName}). Vai rādīt lapu {language} valodā?",
   "chrome.languageOffer.textNative": "Šīs debates notiek {language} valodā. Vai rādīt lapu {language} valodā?",
   "chrome.languageOffer.switch": "Pārslēgt uz {language} valodu",
-  "chrome.languageOffer.dismiss": "Nē, paldies"
+  "chrome.languageOffer.dismiss": "Nē, paldies",
+  "chrome.legalPages": "Juridiskā informācija",
+  "chrome.legal.terms": "Pakalpojuma noteikumi",
+  "chrome.legal.versions": "Noteikumu versijas",
+  "chrome.legal.privacy": "Privātuma politika",
+  "chrome.legal.cookies": "Sīkdatņu politika",
+  "chrome.legal.providers": "Modeļu pakalpojumu sniedzēji",
+  "chrome.legal.health": "ASV veselības datu privātums",
+  "chrome.footer.label": "Vietnes kājene",
+  "chrome.footer.location": "Bukareste, Rumānija",
+  "chrome.footer.product": "Produkts",
+  "chrome.footer.home": "Sākums",
+  "chrome.footer.cookiePreferences": "Sīkdatņu preferences"
 }

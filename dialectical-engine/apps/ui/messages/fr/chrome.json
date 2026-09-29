@@ -47,5 +47,17 @@
   "chrome.languageOffer.text": "Ce débat se déroule en {language} ({nativeName}). Voulez-vous afficher la page en {language} ?",
   "chrome.languageOffer.textNative": "Ce débat se déroule en {language}. Voulez-vous afficher la page en {language} ?",
   "chrome.languageOffer.switch": "Passer en {language}",
-  "chrome.languageOffer.dismiss": "Non merci"
+  "chrome.languageOffer.dismiss": "Non merci",
+  "chrome.legalPages": "Informations légales",
+  "chrome.legal.terms": "Conditions d’utilisation",
+  "chrome.legal.versions": "Versions des conditions",
+  "chrome.legal.privacy": "Politique de confidentialité",
+  "chrome.legal.cookies": "Politique relative aux cookies",
+  "chrome.legal.providers": "Fournisseurs de modèles",
+  "chrome.legal.health": "Données de santé (États-Unis)",
+  "chrome.footer.label": "Pied de page du site",
+  "chrome.footer.location": "Bucarest, Roumanie",
+  "chrome.footer.product": "Produit",
+  "chrome.footer.home": "Accueil",
+  "chrome.footer.cookiePreferences": "Préférences relatives aux cookies"
 }
