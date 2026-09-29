@@ -43,7 +43,6 @@ const DOCUMENTS = {
     draft: "privacy-policy.md",
     module: "privacyPolicy.ts",
     englishOutput: "apps/ui/lib/privacyPolicy.ts",
-    legacySourceLabel: "apps/ui/legal/privacy-policy.md",
     versionAnchor: "Version 3.0",
     numberedSections: 14,
     annexLetter: "B",
@@ -58,7 +57,6 @@ const DOCUMENTS = {
     draft: "terms-of-service.md",
     module: "termsOfService.ts",
     englishOutput: "apps/ui/lib/termsOfService.ts",
-    legacySourceLabel: "apps/ui/legal/terms-of-service.md",
     versionAnchor: "Version 2.0",
     numberedSections: 19,
     annexLetter: "A",
@@ -436,7 +434,7 @@ export function renderLegalModule(markdown, key, locale = "en") {
   if (config === undefined) throw new Error(`Unknown legal document key: ${key}`);
   const document = buildLegalDocument(markdown, key);
   const { jumps, sections, document: documentName } = config.exports;
-  const sourceLabel = locale === "en" ? config.legacySourceLabel : sourceFor(locale, config);
+  const sourceLabel = sourceFor(locale, config);
   const legalDocumentImport = locale === "en" ? "./legalDocument.js" : "../../legalDocument.js";
   const jumpLines = document.jumps
     .map((jump) => `  { label: ${str(jump.label)}, target: ${str(jump.target)} }`)

@@ -163,7 +163,24 @@ DebateAI skirta suaugusiesiems. Registruodamiesi patvirtinate, kad jums yra 18 m
 
 ## 13. Slapukai
 
-Nustatome du slapukus ir abu jie yra griežtai būtini: vienas padeda išlaikyti jus prisijungusius, o kitas apsaugo formas nuo klastojimo. Nenustatome analitikos, reklamos ar sekimo slapukų. **Slapukų politikoje** adresu \[dezbatere.ro/cookies\] jie išvardyti kartu su galiojimo trukme, paaiškinta, kaip saugomas jūsų pasirinkimas, ir ši politika bus pakeista prieš pridedant bet kokį kitą slapuką. Jei jūsų regiono teisėje tam tikri slapukai vertinami kitaip — pavyzdžiui, Jungtinėje Karalystėje taikoma teisė atsisakyti analitikos slapukų — tai nurodyta Slapukų politikoje.
+DebateAI naudoja aštuonis elementus – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik DebateAI: keturis slapukus ir keturis įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. **Slapukų politikoje** adresu \[dezbatere.ro/cookies\] jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita.
+
+| Pavadinimas | Tipas | Paskirtis | Trukmė |
+|---|---|---|---|
+| `__Host-debateai-session` | Slapukas (HttpOnly) | Išlaiko jus prisijungusius. Atnaujinamas, kol naudojatės paslauga. | 14 dienų |
+| `__Host-debateai-csrf` | Slapukas | Neleidžia kitoms svetainėms jūsų vardu pateikti formų. | 14 dienų |
+| `__Host-debateai-age-refusal` | Slapukas (HttpOnly) | Atmetus amžiaus patikrą, 30 dienų neleidžia šiai naršyklei bandyti dar kartą. Jame yra tik žodis „atmesta“, jokių asmens duomenų. | 30 dienų |
+| `debateai.locale` | Slapukas | Įsimena jūsų pasirinktą sąsajos kalbą. | 1 metai |
+| `debateai.consent` | Vietinė saugykla | Įsimena, kad jau matėte pranešimą apie slapukus, todėl jis rodomas tik kartą. | Kol jo neišvalysite |
+| `debateai.mode` | Vietinė saugykla | Ar naudojate šviesųjį, ar tamsųjį režimą. | Kol jo neišvalysite |
+| `debateai.languageOffer.dismissed` | Seanso saugykla | Įsimena šiam skirtukui, kad atsisakėte pasiūlymo parodyti debatus kita kalba. | Kol uždarysite skirtuką |
+| `debateai.support.conversation.v2` | Seanso saugykla | Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai pasikeičia prisijungęs asmuo. | Kol uždarysite skirtuką |
+
+Jokia kita šalis per DebateAI nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse.
+
+Naršyklės gali siųsti signalą „Do Not Track“ arba panašų signalą. DebateAI jūsų neseka, todėl tokiam signalui nėra ko išjungti: paslauga veikia vienodai su juo arba be jo.
+
+Norėdami atsisakyti šių elementų, naršyklės nustatymuose užblokuokite arba ištrinkite šios svetainės slapukus ir svetainės duomenis. Kas tada nustoja veikti: prisijungimas ir jūsų kalbos bei rodymo pasirinkimų įsiminimas; slapukų pranešimas taip pat bus rodomas vėl.
 
 ## 14. Šios politikos pakeitimai
 

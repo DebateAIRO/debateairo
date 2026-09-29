@@ -163,7 +163,24 @@ DebateAI ist für Erwachsene bestimmt. Bei der Registrierung bestätigen Sie, mi
 
 ## 13. Cookies
 
-Wir setzen zwei Cookies, die beide unbedingt erforderlich sind: eines hält Ihre Anmeldung aufrecht, das andere schützt Formulare vor Fälschung. Wir setzen keine Analyse-, Werbe- oder Tracking-Cookies. Die **Cookie-Richtlinie** unter \[dezbatere.ro/cookies\] führt sie samt Laufzeiten auf, erläutert die Speicherung Ihrer Auswahl und wird geändert, bevor ein weiteres Cookie hinzukommt. Soweit das Recht Ihrer Region bestimmte Cookies anders behandelt – beispielsweise die Opt-out-Regel des Vereinigten Königreichs für Analysen –, wird dies in der Cookie-Richtlinie erläutert.
+DebateAI verwendet acht Elemente, die alle für den von Ihnen angeforderten Dienst unbedingt erforderlich sind und alle ausschließlich von DebateAI gesetzt werden: vier Cookies und vier Einträge im Speicher Ihres Browsers. Wir setzen keine Analyse-, Werbe- oder Tracking-Cookies. Die **Cookie-Richtlinie** unter \[dezbatere.ro/cookies\] führt sie auf, mit dem Zweck jedes Elements und seinem Empfänger, und wird geändert, bevor irgendetwas anderes hinzukommt.
+
+| Name | Art | Zweck | Laufzeit |
+|---|---|---|---|
+| `__Host-debateai-session` | Cookie-Datei (HttpOnly) | Hält Sie angemeldet. Das Cookie wird verlängert, solange Sie den Dienst nutzen. | 14 Tage |
+| `__Host-debateai-csrf` | Cookie-Datei | Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. | 14 Tage |
+| `__Host-debateai-age-refusal` | Cookie-Datei (HttpOnly) | Nach einer abgelehnten Altersprüfung hindert er diesen Browser 30 Tage lang an einem neuen Versuch. Er enthält nur das Wort „abgelehnt“, keine personenbezogenen Daten. | 30 Tage |
+| `debateai.locale` | Cookie-Datei | Speichert die von Ihnen gewählte Sprache der Benutzeroberfläche. | 1 Jahr |
+| `debateai.consent` | Lokaler Speicher | Merkt sich, dass Sie den Cookie-Hinweis gesehen haben, damit er nur einmal erscheint. | Bis zur Löschung |
+| `debateai.mode` | Lokaler Speicher | Ob Sie die helle oder die dunkle Darstellung verwenden. | Bis zur Löschung |
+| `debateai.languageOffer.dismissed` | Sitzungsspeicher | Merkt sich für diesen Tab, dass Sie das Angebot abgelehnt haben, eine Debatte in einer anderen Sprache zu zeigen. | Bis Sie den Tab schließen |
+| `debateai.support.conversation.v2` | Sitzungsspeicher | Hält Ihr Gespräch mit dem Hilfe-Chat auf dem Bildschirm, solange der Tab offen ist. Es wird gelöscht, wenn die angemeldete Person wechselt. | Bis Sie den Tab schließen |
+
+Keine andere Partei erhebt über DebateAI Informationen über Ihre Online-Aktivitäten im Zeitverlauf und über verschiedene Websites hinweg.
+
+Browser können ein „Do Not Track“-Signal oder ein ähnliches Signal senden. DebateAI verfolgt Sie nicht, daher gibt es nichts, was ein solches Signal abschalten könnte: Der Dienst funktioniert mit und ohne dieses Signal gleich.
+
+Um diese Elemente abzulehnen, blockieren oder löschen Sie Cookies und Websitedaten für diese Website in Ihren Browsereinstellungen. Was dann nicht mehr funktioniert: die Anmeldung und das Merken Ihrer Sprach- und Darstellungswahl; auch der Cookie-Hinweis erscheint erneut.
 
 ## 14. Änderungen dieser Datenschutzerklärung
 

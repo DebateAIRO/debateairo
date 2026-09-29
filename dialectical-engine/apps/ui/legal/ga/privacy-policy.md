@@ -163,7 +163,24 @@ Is do dhaoine fásta é DebateAI. Deimhníonn tú go bhfuil tú 18 mbliana d'aoi
 
 ## 13. Fianáin
 
-Socraímid dhá fhianán, agus tá géarghá leis an dá cheann: coinníonn ceann amháin sínithe isteach thú, agus cosnaíonn an ceann eile foirmeacha ar bhrionnú. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad agus a dtréimhsí sa **Bheartas Fianán** ag \[dezbatere.ro/cookies\], mínítear ann conas a stóráiltear do rogha, agus athrófar é sula gcuirfear aon fhianán eile leis. Sa chás ina ndéileálann dlí do réigiúin ar bhealach eile le roinnt fianán — mar shampla, riail na Ríochta Aontaithe maidir le rogha an diúltaithe i gcás anailísíochta — deir an Beartas Fianán amhlaidh.
+Úsáideann DebateAI ocht mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach DebateAI iad: ceithre fhianán agus ceithre iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa **Bheartas Fianán** ag \[dezbatere.ro/cookies\], mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis.
+
+| Ainm | Cineál | Cuspóir | Tréimhse |
+|---|---|---|---|
+| `__Host-debateai-session` | Fianán (HttpOnly) | Coinníonn sé sínithe isteach thú. Athnuaitear é fad is a bhíonn tú ag úsáid na seirbhíse. | 14 lá |
+| `__Host-debateai-csrf` | Fianán | Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. | 14 lá |
+| `__Host-debateai-age-refusal` | Fianán (HttpOnly) | Tar éis seiceáil aoise a dhiúltú, cuireann sé cosc ar an mbrabhsálaí seo triail eile a bhaint as ar feadh 30 lá. Níl ann ach an focal “diúltaithe”, gan aon sonraí pearsanta. | 30 lá |
+| `debateai.locale` | Fianán | Meabhraíonn sé teanga an chomhéadain a roghnaigh tú. | 1 bhliain |
+| `debateai.consent` | Stóras áitiúil | Cuimhníonn sé go bhfaca tú an fógra fianán, ionas nach dtaispeántar é ach uair amháin. | Go dtí go nglanann tú é |
+| `debateai.mode` | Stóras áitiúil | Cé acu an mód geal nó an mód dorcha a úsáideann tú. | Go dtí go nglanann tú é |
+| `debateai.languageOffer.dismissed` | Stóras seisiúin | Cuimhníonn sé, don chluaisín seo, gur dhiúltaigh tú don tairiscint díospóireacht a thaispeáint i dteanga eile. | Go dtí go ndúnann tú an cluaisín |
+| `debateai.support.conversation.v2` | Stóras seisiúin | Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a athraíonn an duine atá sínithe isteach. | Go dtí go ndúnann tú an cluaisín |
+
+Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí DebateAI.
+
+Is féidir le brabhsálaithe comhartha “Do Not Track” nó comhartha cosúil leis a sheoladh. Ní rianaíonn DebateAI thú, mar sin níl aon rud ann le múchadh ag comhartha den sórt sin: oibríonn an tseirbhís ar an mbealach céanna leis nó gan é.
+
+Chun na míreanna seo a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh an tsuímh seo, nó scrios iad, i socruithe do bhrabhsálaí. Cad a stopann ag obair ansin: síniú isteach, agus cuimhneamh ar do roghanna teanga agus taispeána; taispeánfar an fógra fianán arís freisin.
 
 ## 14. Athruithe ar an mbeartas seo
 

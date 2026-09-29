@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Instalamos dos cookies, ambas estrictamente necesarias: una mantiene iniciada su sesión y la otra protege los formularios contra falsificaciones. No instalamos cookies analíticas, publicitarias ni de seguimiento. La Política de cookies, disponible en [dezbatere.ro/cookies], las enumera junto con su duración, explica cómo se almacena su elección y se modificará antes de añadir cualquier otra cookie. Cuando la legislación de su región trate algunas cookies de manera diferente —por ejemplo, la regla del Reino Unido de exclusión voluntaria de la analítica—, la Política de cookies lo indicará." }
+      { kind: "p", text: "DebateAI utiliza ocho elementos, todos estrictamente necesarios para el servicio que ha solicitado y todos establecidos únicamente por DebateAI: cuatro cookies y cuatro entradas en el almacenamiento de su navegador. No instalamos cookies analíticas, publicitarias ni de seguimiento. La Política de cookies, disponible en [dezbatere.ro/cookies], los enumera indicando qué hace cada uno y quién lo recibe, y se modificará antes de añadir cualquier otra cosa." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Archivo de cookie (HttpOnly) — Mantiene iniciada su sesión. Se renueva mientras utiliza el servicio. — 14 días",
+        "__Host-debateai-csrf — Archivo de cookie — Impide que otros sitios web envíen formularios en su nombre. — 14 días",
+        "__Host-debateai-age-refusal — Archivo de cookie (HttpOnly) — Tras rechazarse una verificación de edad, impide que este navegador vuelva a intentarlo durante 30 días. Solo contiene la palabra «rechazado», ningún dato personal. — 30 días",
+        "debateai.locale — Archivo de cookie — Recuerda el idioma de la interfaz que ha elegido. — 1 año",
+        "debateai.consent — Almacenamiento local — Recuerda que ya ha visto el aviso de cookies, para que solo se muestre una vez. — Hasta que lo borre",
+        "debateai.mode — Almacenamiento local — Si utiliza el modo de visualización claro u oscuro. — Hasta que lo borre",
+        "debateai.languageOffer.dismissed — Almacenamiento de sesión — Recuerda, para esta pestaña, que rechazó la oferta de mostrar un debate en otro idioma. — Hasta que cierre la pestaña",
+        "debateai.support.conversation.v2 — Almacenamiento de sesión — Mantiene en pantalla su conversación con el chat de ayuda mientras la pestaña siga abierta. Se borra cuando cambia la persona que ha iniciado sesión. — Hasta que cierre la pestaña"
+        ]
+      },
+      { kind: "p", text: "Ningún tercero recopila, a través de DebateAI, información sobre sus actividades en línea a lo largo del tiempo y en distintos sitios web." },
+      { kind: "p", text: "Los navegadores pueden enviar una señal «Do Not Track» u otra señal similar. DebateAI no le rastrea, por lo que no hay nada que dicha señal pueda desactivar: el servicio funciona igual con ella o sin ella." },
+      { kind: "p", text: "Para rechazar estos elementos, bloquee o elimine las cookies y los datos de este sitio en la configuración de su navegador. Qué deja de funcionar entonces: el inicio de sesión y el recuerdo de sus opciones de idioma y de visualización; el aviso de cookies también volverá a mostrarse." }
     ]
   },
   {

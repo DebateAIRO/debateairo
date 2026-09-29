@@ -252,8 +252,11 @@
 .legalCookieTable th:first-child { width: 190px; }
 .legalCookieTable td:nth-child(2) { width: 86px; }
 .legalCookieTable td:last-child { width: 90px; }
-.legalTagEssential { font-size: 11px; font-weight: 700; color: var(--ok-text) !important; }
-.legalTagPreference { font-size: 11px; font-weight: 700; color: var(--gold-text) !important; }
+.legalCookieTable td:nth-child(4) { width: 104px; }
+/* cookie-compliance S01 (/cookies artboards S01-14): the kind cell, and the two refusal sentences under the tables. */
+.legalKindCell { font-size: 11px; font-weight: 700; color: var(--ink) !important; }
+.legalRefuse { margin: 18px 0 0; }
+.legalRefuse + .legalRefuse { margin-top: 7px; }
 .legalProviderTable th:first-child { width: 110px; }
 .legalProviderTable td:nth-child(3) { width: 140px; }
 .legalProviderTable td:last-child { width: 170px; }

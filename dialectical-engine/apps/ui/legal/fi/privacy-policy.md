@@ -163,7 +163,24 @@ DebateAI on tarkoitettu aikuisille. Vahvistat rekisteröityessäsi olevasi vähi
 
 ## 13. Evästeet
 
-Asetamme kaksi evästettä, jotka molemmat ovat ehdottoman välttämättömiä: toinen pitää sinut kirjautuneena sisään ja toinen suojaa lomakkeita väärentämiseltä. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa \[dezbatere.ro/cookies\] oleva **Evästekäytäntö** luettelee evästeet ja niiden kestot, selittää, miten valintasi tallennetaan, ja sitä muutetaan ennen uuden evästeen lisäämistä. Jos alueesi lainsäädännössä joitakin evästeitä kohdellaan eri tavalla — esimerkiksi Yhdistyneen kuningaskunnan analytiikkaa koskevan kieltäytymisoikeuden vuoksi — tästä kerrotaan Evästekäytännössä.
+DebateAI käyttää kahdeksaa kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain DebateAI: neljä evästettä ja neljä merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa \[dezbatere.ro/cookies\] oleva **Evästekäytäntö** luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään.
+
+| Nimi | Tyyppi | Käyttötarkoitus | Voimassaolo |
+|---|---|---|---|
+| `__Host-debateai-session` | Eväste (HttpOnly) | Pitää sinut kirjautuneena. Se uusitaan, kun käytät palvelua. | 14 päivää |
+| `__Host-debateai-csrf` | Eväste | Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. | 14 päivää |
+| `__Host-debateai-age-refusal` | Eväste (HttpOnly) | Kun ikätarkistus on hylätty, estää tätä selainta yrittämästä uudelleen 30 päivän ajan. Se sisältää vain sanan ”hylätty”, ei henkilötietoja. | 30 päivää |
+| `debateai.locale` | Eväste | Muistaa valitsemasi käyttöliittymän kielen. | 1 vuosi |
+| `debateai.consent` | Paikallinen tallennustila | Muistaa, että olet nähnyt evästeilmoituksen, joten se näytetään vain kerran. | Kunnes tyhjennät sen |
+| `debateai.mode` | Paikallinen tallennustila | Käytätkö vaaleaa vai tummaa tilaa. | Kunnes tyhjennät sen |
+| `debateai.languageOffer.dismissed` | Istunnon tallennustila | Muistaa tämän välilehden osalta, että kieltäydyit tarjouksesta näyttää väittely toisella kielellä. | Kunnes suljet välilehden |
+| `debateai.support.conversation.v2` | Istunnon tallennustila | Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun sisäänkirjautunut henkilö vaihtuu. | Kunnes suljet välilehden |
+
+Mikään muu osapuoli ei kerää DebateAI:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla.
+
+Selaimet voivat lähettää ”Do Not Track” -signaalin tai muun vastaavan signaalin. DebateAI ei seuraa sinua, joten tällaisella signaalilla ei ole mitään kytkettävää pois päältä: palvelu toimii samalla tavalla signaalin kanssa tai ilman sitä.
+
+Voit kieltäytyä näistä kohteista estämällä tai poistamalla tämän sivuston evästeet ja sivustotiedot selaimesi asetuksista. Mikä silloin lakkaa toimimasta: sisäänkirjautuminen sekä kieli- ja näyttövalintojesi muistaminen; myös evästeilmoitus näytetään uudelleen.
 
 ## 14. Tämän käytännön muutokset
 

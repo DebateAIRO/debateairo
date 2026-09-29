@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Piškotki",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Nastavimo dva piškotka, oba nujno potrebna: eden ohranja vašo prijavo, drugi pa varuje obrazce pred ponarejanjem. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. Pravilnik o piškotkih na [dezbatere.ro/cookies] jih navaja skupaj z obdobjem veljavnosti, pojasnjuje, kako se shrani vaša izbira, in bo spremenjen, preden bo dodan kateri koli drug piškotek. Če pravo vaše regije nekatere piškotke obravnava drugače — na primer pravilo Združenega kraljestva o zavrnitvi analitike — je to navedeno v Pravilniku o piškotkih." }
+      { kind: "p", text: "DebateAI uporablja osem elementov, ki so vsi nujno potrebni za storitev, ki ste jo zahtevali, in jih vse nastavlja izključno DebateAI: štiri piškotke in štiri vnose v shrambi vašega brskalnika. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. Pravilnik o piškotkih na [dezbatere.ro/cookies] jih navaja skupaj s tem, kaj vsak od njih počne in kdo ga prejme, in bo spremenjen, preden bo dodano karkoli drugega." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Piškotek (HttpOnly) — Ohranja vašo prijavo. Obnavlja se, dokler uporabljate storitev. — 14 dni",
+        "__Host-debateai-csrf — Piškotek — Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. — 14 dni",
+        "__Host-debateai-age-refusal — Piškotek (HttpOnly) — Po zavrnjenem preverjanju starosti temu brskalniku 30 dni preprečuje nov poskus. Vsebuje le besedo »zavrnjeno«, nobenih osebnih podatkov. — 30 dni",
+        "debateai.locale — Piškotek — Zapomni si jezik vmesnika, ki ste ga izbrali. — 1 leto",
+        "debateai.consent — Lokalna shramba — Zapomni si, da ste obvestilo o piškotkih že videli, zato se prikaže le enkrat. — Dokler ga ne izbrišete",
+        "debateai.mode — Lokalna shramba — Ali uporabljate svetli ali temni način prikaza. — Dokler ga ne izbrišete",
+        "debateai.languageOffer.dismissed — Shramba seje — Za ta zavihek si zapomni, da ste zavrnili ponudbo, da se razprava prikaže v drugem jeziku. — Dokler ne zaprete zavihka",
+        "debateai.support.conversation.v2 — Shramba seje — Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se prijavljena oseba zamenja. — Dokler ne zaprete zavihka"
+        ]
+      },
+      { kind: "p", text: "Nobena druga stran prek DebateAI ne zbira informacij o vaših spletnih dejavnostih skozi čas in na različnih spletnih mestih." },
+      { kind: "p", text: "Brskalniki lahko pošiljajo signal »Do Not Track« ali podoben signal. DebateAI vam ne sledi, zato takšen signal nima česa izklopiti: storitev deluje enako z njim ali brez njega." },
+      { kind: "p", text: "Če želite te elemente zavrniti, v nastavitvah brskalnika blokirajte ali izbrišite piškotke in podatke spletnega mesta za to spletno mesto. Kaj takrat preneha delovati: prijava ter pomnjenje vaše izbire jezika in načina prikaza; obvestilo o piškotkih se bo prav tako znova prikazalo." }
     ]
   },
   {

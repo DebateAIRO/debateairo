@@ -163,7 +163,24 @@ DebateAI ditujukan untuk orang dewasa. Anda mengonfirmasi bahwa Anda berusia 18 
 
 ## 13. Kuki
 
-Kami memasang dua kuki, keduanya mutlak diperlukan: satu mempertahankan status masuk Anda, dan satu melindungi formulir dari pemalsuan. Kami tidak memasang kuki analitik, iklan, atau pelacakan. **Kebijakan Kuki** di \[dezbatere.ro/cookies\] mencantumkannya beserta durasinya, menjelaskan cara pilihan Anda disimpan, dan akan berubah sebelum kuki lain ditambahkan. Jika hukum di wilayah Anda memperlakukan beberapa kuki secara berbeda — misalnya aturan opt-out Britania Raya untuk analitik — Kebijakan Kuki menjelaskannya.
+DebateAI menggunakan delapan item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh DebateAI: empat kuki dan empat entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. **Kebijakan Kuki** di \[dezbatere.ro/cookies\] mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan.
+
+| Nama | Jenis | Tujuan | Masa berlaku |
+|---|---|---|---|
+| `__Host-debateai-session` | Kuki (HttpOnly) | Menjaga Anda tetap masuk. Kuki ini diperbarui selama Anda menggunakan layanan. | 14 hari |
+| `__Host-debateai-csrf` | Kuki | Mencegah situs web lain mengirimkan formulir atas nama Anda. | 14 hari |
+| `__Host-debateai-age-refusal` | Kuki (HttpOnly) | Setelah pemeriksaan usia ditolak, mencegah peramban ini mencoba lagi selama 30 hari. Isinya hanya kata “ditolak”, tanpa data pribadi. | 30 hari |
+| `debateai.locale` | Kuki | Mengingat bahasa antarmuka yang Anda pilih. | 1 tahun |
+| `debateai.consent` | Penyimpanan lokal | Mengingat bahwa Anda sudah melihat pemberitahuan kuki, sehingga pemberitahuan itu hanya muncul sekali. | Sampai Anda menghapusnya |
+| `debateai.mode` | Penyimpanan lokal | Apakah Anda menggunakan mode terang atau mode gelap. | Sampai Anda menghapusnya |
+| `debateai.languageOffer.dismissed` | Penyimpanan sesi | Mengingat, untuk tab ini, bahwa Anda menolak tawaran untuk menampilkan debat dalam bahasa lain. | Sampai Anda menutup tab |
+| `debateai.support.conversation.v2` | Penyimpanan sesi | Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat orang yang masuk berganti. | Sampai Anda menutup tab |
+
+Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui DebateAI.
+
+Browser dapat mengirim sinyal “Do Not Track” atau sinyal serupa. DebateAI tidak melacak Anda, sehingga tidak ada yang perlu dimatikan oleh sinyal tersebut: layanan berfungsi sama dengan atau tanpa sinyal itu.
+
+Untuk menolak item ini, blokir atau hapus kuki dan data situs untuk situs ini di pengaturan browser Anda. Yang kemudian berhenti berfungsi: masuk ke akun, dan pengingatan pilihan bahasa serta tampilan Anda; pemberitahuan kuki juga akan muncul lagi.
 
 ## 14. Perubahan atas kebijakan ini
 
