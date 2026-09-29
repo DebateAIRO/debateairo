@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
@@ -156,7 +157,7 @@ describe("hs:accept-s01", () => {
   it("census-compare PASS", async () => {
     const paths: string[] = [];
     expect(await runHsS01(["--census-compare", "/tmp/before"], ports({ readText: async p => { paths.push(p); return before; } })))
-      .toEqual({ lines: ["HS-S01 CENSUS-COMPARE version=4 before=12 after=12 SAME", "HS-S01 CENSUS-COMPARE version=5 before=12 after=12 SAME", "HS-S01 CENSUS-COMPARE new=6 receipt=6", "HS-S01-CENSUS: PASS"], exitCode: 0 });
+      .toEqual({ lines: ["HS-S01 CENSUS-COMPARE version=4 before=12 after=12 row_count_before=12 row_count_after=12 SAME", "HS-S01 CENSUS-COMPARE version=5 before=12 after=12 row_count_before=12 row_count_after=12 SAME", "HS-S01 CENSUS-COMPARE new=6 receipt=6", "HS-S01-CENSUS: PASS"], exitCode: 0 });
     expect(paths).toEqual(["/tmp/before"]);
     // A new lower version cannot masquerade as a reseed above all history.
     expect((await runHsS01(["--census-compare", "/tmp/before"], ports({ readCensus: async () => [census("3"), census("4"), census("5")], readReceiptVersion: async () => "3" }))).lines.at(-1))
@@ -169,17 +170,18 @@ describe("hs:accept-s01", () => {
         .toEqual({ lines: ["HS-S01-ACCEPT: FAIL HS_S01_CENSUS_BEFORE_INVALID"], exitCode: 1 });
     }
   });
-  // Property: either actual_rows OR declared row_count changing fails.
+  // Property: either actual_rows OR declared row_count changing fails, and the CHANGED line prints BOTH
+  // pairs, so the number that moved is on the line (REV-S01-p1 pt N3: row_count 12→13 once printed 12/12).
   it("census-compare FAIL CENSUS_ROW_COUNT_CHANGED_5", async () => {
     for (const changed of [census("5", 13, 12), census("5", 12, 13)]) {
       expect(await runHsS01(["--census-compare", "/tmp/before"], ports({ readCensus: async () => [census("4"), changed, census("6")] })))
-        .toEqual({ lines: ["HS-S01 CENSUS-COMPARE version=4 before=12 after=12 SAME", `HS-S01 CENSUS-COMPARE version=5 before=12 after=${changed.actualRows} CHANGED`, "HS-S01 CENSUS-COMPARE new=6 receipt=6", "HS-S01-CENSUS: FAIL CENSUS_ROW_COUNT_CHANGED_5"], exitCode: 1 });
+        .toEqual({ lines: ["HS-S01 CENSUS-COMPARE version=4 before=12 after=12 row_count_before=12 row_count_after=12 SAME", `HS-S01 CENSUS-COMPARE version=5 before=12 after=${changed.actualRows} row_count_before=12 row_count_after=${changed.rowCount} CHANGED`, "HS-S01 CENSUS-COMPARE new=6 receipt=6", "HS-S01-CENSUS: FAIL CENSUS_ROW_COUNT_CHANGED_5"], exitCode: 1 });
     }
   });
   // Property: missing history outranks changed rows and missing new publication.
   it("census-compare FAIL CENSUS_VERSION_MISSING_4", async () => {
     expect(await runHsS01(["--census-compare", "/tmp/before"], ports({ readCensus: async () => [census("5", 13)] })))
-      .toEqual({ lines: ["HS-S01 CENSUS-COMPARE version=4 before=12 after=MISSING CHANGED", "HS-S01 CENSUS-COMPARE version=5 before=12 after=13 CHANGED", "HS-S01 CENSUS-COMPARE new=none receipt=6", "HS-S01-CENSUS: FAIL CENSUS_VERSION_MISSING_4"], exitCode: 1 });
+      .toEqual({ lines: ["HS-S01 CENSUS-COMPARE version=4 before=12 after=MISSING row_count_before=12 row_count_after=MISSING CHANGED", "HS-S01 CENSUS-COMPARE version=5 before=12 after=13 row_count_before=12 row_count_after=13 CHANGED", "HS-S01 CENSUS-COMPARE new=none receipt=6", "HS-S01-CENSUS: FAIL CENSUS_VERSION_MISSING_4"], exitCode: 1 });
   });
   // Property: unchanged history alone cannot certify a reseed.
   it("census-compare FAIL CENSUS_NO_NEW_VERSION", async () => {
@@ -191,14 +193,51 @@ describe("hs:accept-s01", () => {
     for (const receipt of ["4", null]) expect((await runHsS01(["--census-compare", "/tmp/before"], ports({ readReceiptVersion: async () => receipt }))).lines.at(-1))
       .toBe("HS-S01-CENSUS: FAIL CENSUS_RECEIPT_NOT_NEW");
   });
-  // Property: missing credentials map to a fixed public code; other errors prefer code and are bounded.
+  // Property: missing credentials map to a fixed public code; a token-shaped error code prints, bounded to 120.
   it("credentials missing → FAIL CREDENTIALS_MISSING and no credential in any line", async () => {
     expect(await runHsS01([], ports({ login: async () => { throw new TypeError("HS_S01_CREDENTIALS_MISSING"); } })))
       .toEqual({ lines: ["HS-S01-ACCEPT: FAIL CREDENTIALS_MISSING"], exitCode: 1 });
     expect(await runHsS01([], ports({ login: async () => { throw Object.assign(new Error("secret-password"), { code: "AUTH_FAILED" }); } })))
       .toEqual({ lines: ["HS-S01-ACCEPT: FAIL AUTH_FAILED"], exitCode: 1 });
-    expect(await runHsS01([], ports({ login: async () => { throw new Error("X".repeat(121)); } })))
+    expect(await runHsS01([], ports({ login: async () => { throw Object.assign(new Error("x"), { code: "X".repeat(121) }); } })))
       .toEqual({ lines: [`HS-S01-ACCEPT: FAIL ${"X".repeat(120)}`], exitCode: 1 });
+  });
+  // Property (REV-S01-p1 sd N2, class "free error text reaches the FAIL line"): the FAIL value is a token-shaped
+  // `code`, or one of this module's own HS_S01_ codes, or HS_S01_UNKNOWN_ERROR — never a message, a non-token
+  // code, or a parser's dump. Mutant: restore `detail.code ?? detail.message`.
+  it("an error's free text never reaches the FAIL line", async () => {
+    const canary = "rev-s01-password-canary-7f3a";
+    const unknown = { lines: ["HS-S01-ACCEPT: FAIL HS_S01_UNKNOWN_ERROR"], exitCode: 1 };
+    const cases: [string, Partial<HsS01Ports>, string[], unknown][] = [
+      ["uncoded Error", { login: async () => { throw new Error(canary); } }, [], unknown],
+      ["code that is free text", { login: async () => { throw Object.assign(new Error("x"), { code: canary }); } }, [], unknown],
+      ["numeric code", { login: async () => { throw Object.assign(new Error(canary), { code: 28 }); } }, [], unknown],
+      ["own-prefix message not in the list", { login: async () => { throw new TypeError("HS_S01_NOT_A_CODE"); } }, [], unknown],
+      ["thrown string", { login: async () => { throw canary; } }, [], unknown],
+      ["thrown null", { login: async () => { throw null; } }, [], unknown],
+      ["BigInt SyntaxError on a census version", { readCensus: async () => [census(canary), census("2")] }, ["--census"], unknown],
+      ["served answer the contract refuses", { readAnswer: async () => ({ ...answer(), terminal: canary }) }, [],
+        { lines: ["HS-S01-ACCEPT: FAIL HS_S01_ANSWER_INVALID"], exitCode: 1 }],
+      ["token code from a library", { login: async () => { throw Object.assign(new Error(canary), { code: "ECONNRESET" }); } }, [],
+        { lines: ["HS-S01-ACCEPT: FAIL ECONNRESET"], exitCode: 1 }]
+    ];
+    for (const [name, overrides, argv, want] of cases) {
+      const result = await runHsS01(argv, ports(overrides));
+      expect({ name, result }).toEqual({ name, result: want });
+      expect(result.lines.join("\n")).not.toContain(canary);
+    }
+  });
+  // Property: the allow-list is complete — every HS_S01_ code the two acceptance files throw prints itself
+  // (CREDENTIALS_MISSING keeps its public name). Mutant: drop one code from the list.
+  it("every HS_S01_ code the acceptance files throw reaches the FAIL line", async () => {
+    const thrown = ["acceptance/hs-s01-accept.ts", "acceptance/hs-s01-accept-cli.ts"].flatMap(file =>
+      [...readFileSync(file, "utf8").matchAll(/new TypeError\((?:"|`)(HS_S01_[A-Z0-9_]*)(\$\{[^}]*\})?(?:"|`)\)/g)]
+        .map(match => match[2] ? `${match[1]}503` : match[1]!));
+    expect(thrown.length).toBe(12);
+    for (const code of thrown) {
+      expect((await runHsS01([], ports({ login: async () => { throw new TypeError(code); } }))).lines)
+        .toEqual([`HS-S01-ACCEPT: FAIL ${code === "HS_S01_CREDENTIALS_MISSING" ? "CREDENTIALS_MISSING" : code}`]);
+    }
   });
   // Property: the new command cannot introduce a shell subprocess path; required packet source pin.
   it("the two new acceptance files contain none of relay-core.test.ts's forbidden shell patterns", () => {
@@ -216,6 +255,16 @@ describe("hs:accept-s01", () => {
     expect(JSON.parse(readFileSync("package.json", "utf8")).scripts["hs:accept-s01"])
       .toBe("NODE_OPTIONS=--use-system-ca tsx acceptance/hs-s01-accept-cli.ts");
   });
+  // Property (REV-S01-p1 pt N2): on the two no-I/O paths the CLI's OWN stdout is exactly one line, the
+  // HS-S01-ACCEPT line, and it exits 1 — anything after it on a pnpm transcript is pnpm's. HS_ACCEPT_* are
+  // removed from the child env so the credentials path cannot reach the network. Mutant: a console.log after the loop.
+  it("the CLI's own stdout ends with the HS-S01-ACCEPT line on the no-I/O paths", () => {
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("HS_ACCEPT_")));
+    for (const [argv, line] of [[["--bogus"], "HS-S01-ACCEPT: FAIL HS_S01_ARGUMENTS_INVALID"], [[], "HS-S01-ACCEPT: FAIL CREDENTIALS_MISSING"]] as const) {
+      const child = spawnSync("node_modules/.bin/tsx", ["acceptance/hs-s01-accept-cli.ts", ...argv], { env, encoding: "utf8", timeout: 30_000 });
+      expect({ status: child.status, stdout: child.stdout }).toEqual({ status: 1, stdout: `${line}\n` });
+    }
+  }, 60_000);
   // Property: invalid arguments fail before any I/O, including custody access.
   it('runHsS01(["--bogus"]) prints HS-S01-ACCEPT: FAIL HS_S01_ARGUMENTS_INVALID and exits 1, calling no port', async () => {
     let touched = false;

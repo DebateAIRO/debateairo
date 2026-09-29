@@ -87,6 +87,24 @@ function versionOrder(a: CensusRow, b: CensusRow): number {
     : BigInt(a.registerVersion) > BigInt(b.registerVersion) ? 1 : 0;
 }
 
+// Every fixed code the two acceptance files throw as a TypeError message (HS_S01_HTTP_<status> is the one
+// open member). Only these messages may reach the FAIL line; any other message is free text.
+const OWN_CODES = new Set(["HS_S01_ARGUMENTS_INVALID", "HS_S01_CENSUS_BEFORE_INVALID", "HS_S01_ANSWER_INVALID",
+  "HS_S01_CREDENTIALS_MISSING", "HS_S01_DATABASE_READ_FAILED", "HS_S01_HTTP_REQUEST_FAILED", "HS_S01_RESPONSE_INVALID",
+  "HS_S01_LOGIN_CHALLENGE_INVALID", "HS_S01_LOGIN_COOKIES_MISSING", "HS_S01_TIMEOUT_INVALID", "HS_S01_RECEIPT_READ_FAILED"]);
+
+// A thrown value becomes a FAIL code only as a token-shaped `code` or one of OWN_CODES; a message can carry a
+// credential, a SQL detail or a parser dump, so it never prints (REV-S01-p1 sd N2).
+function failCode(error: unknown): string {
+  const detail = error as { code?: unknown; message?: unknown } | null;
+  if (typeof detail?.code === "string" && /^[A-Z][A-Z0-9_]*$/.test(detail.code)) return detail.code.slice(0, 120);
+  const message = detail?.message;
+  if (typeof message === "string" && (OWN_CODES.has(message) || /^HS_S01_HTTP_[1-5][0-9]{2}$/.test(message))) {
+    return message === "HS_S01_CREDENTIALS_MISSING" ? "CREDENTIALS_MISSING" : message;
+  }
+  return "HS_S01_UNKNOWN_ERROR";
+}
+
 function finish(lines: string[], code?: string, prefix = "HS-S01-ACCEPT"): Result {
   return { lines: [...lines, `${prefix}: ${code ? `FAIL ${code}` : "PASS"}`], exitCode: code ? 1 : 0 };
 }
@@ -114,7 +132,12 @@ async function runCensus(args: Exclude<Arguments, { kind: "run" }>, ports: HsS01
     const after = now.get(row.registerVersion);
     return after === undefined || row.rowCount !== after.rowCount || row.actualRows !== after.actualRows;
   };
-  const lines = earlier.map(row => `HS-S01 CENSUS-COMPARE version=${row.registerVersion} before=${row.actualRows} after=${now.get(row.registerVersion)?.actualRows ?? "MISSING"} ${changed(row) ? "CHANGED" : "SAME"}`);
+  // Both compared counts print, so a CHANGED line always shows the number that moved (REV-S01-p1 pt N3).
+  const lines = earlier.map(row => {
+    const after = now.get(row.registerVersion);
+    return `HS-S01 CENSUS-COMPARE version=${row.registerVersion} before=${row.actualRows} after=${after?.actualRows ?? "MISSING"}`
+      + ` row_count_before=${row.rowCount} row_count_after=${after?.rowCount ?? "MISSING"} ${changed(row) ? "CHANGED" : "SAME"}`;
+  });
   const oldVersions = new Set(earlier.map(row => row.registerVersion));
   const added = current.filter(row => !oldVersions.has(row.registerVersion));
   lines.push(`HS-S01 CENSUS-COMPARE new=${added.map(row => row.registerVersion).join(",") || "none"} receipt=${receipt ?? "NONE"}`);
@@ -136,7 +159,9 @@ export async function runHsS01(argv: readonly string[], ports: HsS01Ports): Prom
     const runRef = await ports.ask(HS_S01_QUESTIONS[args.questionId]);
     const { state, run } = await ports.waitForTerminal(runRef);
     const rawAnswer = await ports.readAnswer(runRef);
-    const answer = state === "SETTLED" ? AnswerSchema.parse(rawAnswer) : null;
+    const parsed = state === "SETTLED" ? AnswerSchema.safeParse(rawAnswer) : null;
+    if (parsed && !parsed.success) throw new TypeError("HS_S01_ANSWER_INVALID");
+    const answer = parsed ? parsed.data : null;
     const terminal = state === "TIMEOUT" ? "NONE" : state === "FAILED" ? "FAILED" : answer!.terminal;
     const terminalCode = state === "TIMEOUT" ? "NO_TERMINAL"
       : !(HS_S01_SERVED_TERMINALS as readonly string[]).includes(terminal) ? `TERMINAL_${terminal}` : undefined;
@@ -160,9 +185,6 @@ export async function runHsS01(argv: readonly string[], ports: HsS01Ports): Prom
     }
     return finish(lines, terminalCode ?? (legs.length === 0 ? "NO_LEGS" : valid < legs.length ? "LEG_SCHEMA_INVALID" : undefined));
   } catch (error) {
-    const detail = error as { code?: unknown; message?: unknown } | null;
-    const value = String(detail?.code ?? detail?.message ?? "HS_S01_UNKNOWN_ERROR");
-    const code = value === "HS_S01_CREDENTIALS_MISSING" ? "CREDENTIALS_MISSING" : value.slice(0, 120);
-    return finish([], code);
+    return finish([], failCode(error));
   }
 }
