@@ -82,7 +82,7 @@
   "misc.answerHonesty.weights": "painot {source}",
   "misc.answerHonesty.weightsBy": "painot {source}, omistaja {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "Mikä kääntäisi tämän",
-  "misc.model.houseUnavailable": "Talomalli ei ole saatavilla",
-  "misc.model.noRecordedHouse": "Tälle argumentille ei ole saatavilla kirjattua talomallia.",
+  "misc.model.houseUnavailable": "Mallin kehittäjää ei ole kirjattu",
+  "misc.model.noRecordedHouse": "Tälle argumentille ei ole kirjattu mallin kehittäjää.",
   "misc.scoring.unavailable": "Pisteytyskäyttöliittymä ei ole saatavilla."
 }

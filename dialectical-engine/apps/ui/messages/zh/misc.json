@@ -79,7 +79,7 @@
   "misc.answerHonesty.weights": "权重来源 {source}",
   "misc.answerHonesty.weightsBy": "权重来源 {source}，所有者 {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "哪些情况会推翻此结论",
-  "misc.model.houseUnavailable": "模型阵营不可用",
-  "misc.model.noRecordedHouse": "此论点没有可用的模型阵营记录。",
+  "misc.model.houseUnavailable": "未记录模型开发方",
+  "misc.model.noRecordedHouse": "此论点未记录模型开发方。",
   "misc.scoring.unavailable": "评分界面不可用。"
 }
