@@ -10,7 +10,8 @@ import {
   type Node,
   type PublicDebate,
   type PublicNode,
-  type PublicStoryShort
+  type PublicStoryShort,
+  type PublicationRefusalStatement
 } from "@debateai/contract";
 import {
   hashToken,
@@ -22,6 +23,7 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
+import type { PublicationContentCheck } from "./publication-check/check.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
   n: LabeledNumber,
@@ -252,6 +254,16 @@ function logFloorNotPublished(requestId: string, diagnostic: string): void {
   })));
 }
 
+/**
+ * What one publish attempt ends in (hate-speech S02, SPEC-v2 R6). A refusal
+ * carries only the closed-code statement of reasons (R9); an unavailable check
+ * carries nothing. `null` stays today's "not found / not allowed".
+ */
+export type PublicationPublishResult =
+  | Readonly<{ state: "PUBLISHED"; public_ref: string }>
+  | Readonly<{ state: "REFUSED"; statement: PublicationRefusalStatement }>
+  | Readonly<{ state: "CHECK_UNAVAILABLE" }>;
+
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
   reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
@@ -278,7 +290,9 @@ export interface PublicationApplication {
     authenticated: AuthenticatedSession;
     grantToken: string;
     source: AuthSourceContext;
-  }>): Promise<Readonly<{ state: "PUBLISHED"; public_ref: string }> | null>;
+    /** hate-speech S02 (SPEC-v2 R1, D-S02-22): required, so every caller names the check it runs. */
+    contentCheck: PublicationContentCheck;
+  }>): Promise<PublicationPublishResult | null>;
   unpublish(input: Readonly<{
     runId: string;
     authenticated: AuthenticatedSession;
@@ -359,7 +373,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
     authenticated: AuthenticatedSession;
     grantToken: string;
     source: AuthSourceContext;
-  }>): Promise<Readonly<{ state: "PUBLISHED"; public_ref: string }> | null> {
+    contentCheck: PublicationContentCheck;
+  }>): Promise<PublicationPublishResult | null> {
     if (input.answer.run_ref !== input.runId || input.answer.terminal === "BLOCKED") return null;
     const grantTokenHash = hashToken("step-up-grant", input.grantToken);
     if (!await this.preflightGrant({
@@ -385,14 +400,6 @@ export class PostgresPublicationApplication implements PublicationApplication {
     const floor = await readPublishableFloor(this.repository, input);
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
-    if (!await this.repository.prepareKeyProvision({
-      publicationRef,
-      runId: input.runId,
-      userId: input.authenticated.userId,
-      ownerRef: input.authenticated.ownerRef,
-      sessionId: input.authenticated.session.session_id,
-      grantTokenHash
-    })) return null;
     const publicDebate = PublicDebateSchema.parse({
       public_ref: publicationRef,
       author_pseudonym: pseudonym,
@@ -416,6 +423,22 @@ export class PostgresPublicationApplication implements PublicationApplication {
       ...(language === null ? {} : { language }),
       ...(floor === null ? {} : { floor })
     });
+    // hate-speech S02 (D-S02-14): the content check reads the exact snapshot that
+    // would be encrypted, and a refusal returns before any key provision, cipher,
+    // encryption or visibility transition exists for the attempt (SPEC-v2 R8).
+    const checked = await input.contentCheck.check({ runId: input.runId, snapshot: publicDebate });
+    if (checked.outcome === "BLOCK" || checked.outcome === "UNSURE") {
+      return Object.freeze({ state: "REFUSED" as const, statement: checked.statement });
+    }
+    if (checked.outcome !== "ALLOW") return Object.freeze({ state: "CHECK_UNAVAILABLE" as const });
+    if (!await this.repository.prepareKeyProvision({
+      publicationRef,
+      runId: input.runId,
+      userId: input.authenticated.userId,
+      ownerRef: input.authenticated.ownerRef,
+      sessionId: input.authenticated.session.session_id,
+      grantTokenHash
+    })) return null;
     let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;
     try {
       prepared = await this.cipher.create(publicationRef, input.runId);

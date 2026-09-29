@@ -53,7 +53,7 @@ export function combineJudgeCalls(results: readonly JudgeCallResult[]): Combined
     const answers = results.flatMap(result => result.ok && result.answer.verdict === outcome ? [result.answer] : []);
     if (answers.length || outcome === "ALLOW") return {
       outcome,
-      rules: ([1, 2] as const).filter(rule => answers.some(answer => answer.rules.includes(rule))),
+      rules: [...new Set(answers.flatMap(answer => answer.rules))].sort((a, b) => a - b),
       parts: [...new Set(answers.flatMap(answer => answer.parts))],
       possibly_illegal: outcome === "BLOCK" && answers.some(answer => answer.possibly_illegal)
     };

@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -47,6 +47,7 @@ import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support
 import {
   buildApi,
   HatchetDispatcher,
+  installPublicationJudgeSwitchSignal,
   PostgresAskApplication,
   preserveSubmittedTierSource
 } from "./index.js";
@@ -56,6 +57,8 @@ import { createSupportCaseMaterial, createSupportCaseService, createSupportMessa
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
+import { createPublicationContentCheck } from "./publication-check/check.js";
+import { createPublicationJudgeSwitch, createPublicationJudgeTransport } from "./publication-check/judge-transport.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
@@ -624,6 +627,23 @@ const supportModels = new Map<string,SupportModelPort>(supportModelTarget === un
     reportDiagnostic: reportSupportDiagnostic
   })
 ] as const]);
+// hate-speech S02 (D-S02-12, D-S02-21): the publish check's judge is the support
+// chat's configured target, called through its own per-call adapter; absent,
+// every publish answers UNAVAILABLE `JUDGE_NOT_CONFIGURED`. SIGUSR2 toggles the
+// judge off and back on (SPEC-v2 §6 step 9) — it can only make publishing
+// refuse, never skip the check.
+const publicationJudgeSwitch = createPublicationJudgeSwitch(supportModelTarget === undefined
+  ? null
+  : createPublicationJudgeTransport(supportModelTarget, {
+    readAuthorizationHeader: readCustodyAuthorizationHeader,
+    reportDiagnostic: reportSupportDiagnostic
+  }));
+const publicationContentCheck = createPublicationContentCheck({
+  judge: publicationJudgeSwitch.current,
+  recorder: new PostgresPublicationCheckRecordRepository(pool),
+  clock: () => new Date()
+});
+installPublicationJudgeSwitchSignal(process, publicationJudgeSwitch);
 const supportModelReservations = new SupportModelReservationLedger({
   processId: `support-api-${process.pid}`,
   processPid: process.pid,
@@ -757,6 +777,7 @@ const api = buildApi({
     }
   },
   ...(publications === undefined ? {} : { publications }),
+  publicationContentCheck,
   allowedOrigin: environment.PUBLIC_APP_URL,
   ...(evaluatorDevMenu === undefined ? {} : {
     evaluatorDevMenu,

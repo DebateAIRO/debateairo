@@ -24,6 +24,7 @@ import {
   PrivateDebateErasureRequestSchema,
   PrivateDebateErasureStatusSchema,
   PLAN_TIER_ROSTERS,
+  PublicationContentRefusalSchema,
   PublicationTransitionSchema,
   PublicDebateListSchema,
   PublicDebateSchema,
@@ -51,7 +52,8 @@ import {
   AGE_REFUSAL_COOKIE_NAME,
   AGE_REFUSAL_COOKIE_VALUE,
   AgeCheckRequestSchema,
-  DateOfBirthSchema
+  DateOfBirthSchema,
+  PUBLICATION_CONTENT_REFUSED_MESSAGE
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
@@ -96,6 +98,7 @@ import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admi
 import type { MfaApplication } from "./mfa.js";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
+import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
@@ -1313,6 +1316,13 @@ export interface ApiOptions {
   readonly sessions?: SessionApplication;
   readonly publications?: PublicationApplication;
   /**
+   * hate-speech S02 (SPEC-v2 R1, D-S02-22): the pre-publish content check,
+   * composed in main.ts. Absent, every publish answers 503
+   * PUBLICATION_CHECK_UNAVAILABLE — a composition that forgets the check
+   * publishes nothing (fail closed), never everything.
+   */
+  readonly publicationContentCheck?: PublicationContentCheck;
+  /**
    * Verdict story (spec 2026-09-26 §10). Optional like `publications`: the
    * many test compositions of AskApplication do not supply it, and the route
    * answers its closed 404 when it is absent.
@@ -1336,6 +1346,34 @@ export interface ApiOptions {
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
   readonly support?: SupportApplication;
+}
+
+/**
+ * The check a route composed without `publicationContentCheck` runs: no judge,
+ * no record, always UNAVAILABLE `JUDGE_NOT_CONFIGURED` (SPEC-v2 R7 last cause).
+ * PLAN S02-11 placed it in publication-check/check.ts, which is outside this
+ * cluster's file contract; it lives beside the one route that uses it.
+ */
+const UNCONFIGURED_PUBLICATION_CONTENT_CHECK: PublicationContentCheck = Object.freeze({
+  check: async () => Object.freeze({ outcome: "UNAVAILABLE" as const, cause: "JUDGE_NOT_CONFIGURED" as const })
+});
+
+/**
+ * hate-speech S02 (D-S02-21, SPEC-v2 §6 step 9): SIGUSR2 flips the publish
+ * check's judge between configured and absent, and writes one content-free
+ * line per flip. Absent means every publish answers 503 — the switch can make
+ * publishing refuse, never skip the check. It is installed from main.ts with the
+ * real process; the boot script itself registers no process signal
+ * (tests/architecture/t1-argon2-worker-contract.test.ts:495, :706-707).
+ */
+export function installPublicationJudgeSwitchSignal(
+  target: Readonly<{ on(event: "SIGUSR2", listener: () => void): unknown }>,
+  judgeSwitch: Readonly<{ toggle(): boolean }>,
+  log: (line: string) => void = (line) => { console.error(line); }
+): void {
+  target.on("SIGUSR2", () => {
+    log(JSON.stringify({ event: "api.publication_check.switch", configured: judgeSwitch.toggle() }));
+  });
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -2539,12 +2577,27 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           answer,
           authenticated,
           grantToken: input.step_up_grant,
-          source: sourceFor(request)
+          source: sourceFor(request),
+          contentCheck: options.publicationContentCheck ?? UNCONFIGURED_PUBLICATION_CONTENT_CHECK
         });
       });
-      return published === null
-        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
-        : reply.status(201).send(PublicationTransitionSchema.parse(published));
+      if (published === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      // hate-speech S02 (SPEC-v2 R6, R9): a refusal is 409 with the closed-code
+      // statement and nothing else; an unavailable check is the house 503 shape.
+      if (published.state === "REFUSED") {
+        return reply.status(409).send(PublicationContentRefusalSchema.parse({
+          error: "PUBLICATION_CONTENT_REFUSED",
+          message: PUBLICATION_CONTENT_REFUSED_MESSAGE,
+          statement: published.statement
+        }));
+      }
+      if (published.state === "CHECK_UNAVAILABLE") {
+        return reply.status(503).send({
+          error: "PUBLICATION_CHECK_UNAVAILABLE",
+          message: "PUBLICATION_CHECK_UNAVAILABLE"
+        });
+      }
+      return reply.status(201).send(PublicationTransitionSchema.parse(published));
     }
   );
   api.post<{ Params: { id: string } }>(

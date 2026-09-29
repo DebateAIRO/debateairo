@@ -62,8 +62,9 @@ describe("policy", () => {
   // Property: integration cannot leave a second product copy of the content rule.
   it("has one product source for the rule", async () => {
     await import("../../apps/api/src/publication-check/policy.js");
-    const files = execFileSync("rg", ["--files", "apps", "packages", "-g", "*.ts", "-g", "*.tsx", "-g", "*.mjs", "-g", "*.js",
-      "-g", "!**/node_modules/**", "-g", "!**/generated/**", "-g", "!**/.next/**", "-g", "!*.test.*"], { encoding: "utf8" }).trim().split("\n");
+    // git (tracked + untracked, not ignored), not a host `rg`: the scan must run on any shell or CI runner.
+    const files = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "apps", "packages"], { encoding: "utf8" })
+      .split("\0").filter(f => /\.(ts|tsx|mjs|js)$/u.test(f) && !/(^|\/)(node_modules|generated|\.next)\//u.test(f) && !/\.test\./u.test(f));
     expect(files.filter(f => readFileSync(f, "utf8").includes("Never produce content that attacks, dehumanises, or incites hatred"))).toHaveLength(1);
   });
 });

@@ -269,13 +269,14 @@ function publicationHarness() {
     },
     async publish(answer: Answer) {
       const transition = await application.publish({
+        contentCheck: { check: async () => ({ outcome: "ALLOW" }) },
         runId: answer.run_ref,
         answer,
         authenticated,
         grantToken: "g".repeat(43),
         source: { ip: "192.0.2.1", userAgent: "S01 test", requestId: "request:S01" }
       });
-      if (transition === null) throw new TypeError("S01_TEST_PUBLICATION_FAILED");
+      if (transition?.state !== "PUBLISHED") throw new TypeError("S01_TEST_PUBLICATION_FAILED");
       const snapshot = storedSnapshot;
       if (snapshot === null) throw new TypeError("S01_TEST_SNAPSHOT_MISSING");
       const prepared = await cipher.open(snapshot.publicationRef, snapshot.runId);
@@ -785,6 +786,7 @@ describe("S8 publication crypto and projection", () => {
     } as unknown as PostgresPublicationRepository, new PublicationCipher(store));
     const runId = randomUUID();
     await expect(application.publish({
+      contentCheck: { check: async () => ({ outcome: "ALLOW" }) },
       runId,
       answer: { run_ref: runId, terminal: "SERVED" } as Answer,
       authenticated: {
