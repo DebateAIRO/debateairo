@@ -18,11 +18,19 @@ import type { CanonicalJsonAst, RegisterVersionText } from "../../packages/regis
 export const LEGACY_REGISTER_V1_SNAPSHOT_SHA256 =
   "8fde270cae50e99ea7ff723f50c26a64833a72347838ed4aee0eb9cbfea3104b" as const;
 
-// Moved 2026-09-12 when the development provider set grew from one slot per maker to one
-// per plan-tier roster member (V: "Both free and premium need to be accessible at the same
-// time"). The previous three-slot snapshot was 120bdfea9776cff5...
+// SEALED HISTORY: the snapshot of development register version 4 exactly as it was
+// published (three provider slots, 32 rows) — the bytes `readLegacyDevelopmentV4Rows`
+// replays from `fixtures/register-development-v4.json`, and the value the P3-02 runbook
+// tells an operator to confirm on a deployed database. It never moves.
+//
+// 6a05a0d0 (2026-09-13) moved this pin to 42b90bca…, the five-slot panel's snapshot, on a
+// line where "v4 rows" were still rebuilt by the CURRENT development builder; the five-slot
+// set was published as a NEW version above 4 (version 9 in the debate-tiers ledger,
+// .hermes/reports/debate-tiers/LEDGER.md), never as version 4. The merge e2689c26
+// (2026-09-23) then paired that moved pin with the frozen three-slot bytes, so every
+// assertion of this constant against the fixture failed. Restored 2026-09-28.
 export const DETERMINISTIC_DEVELOPMENT_V4_SNAPSHOT_SHA256 =
-  "42b90bca671d96d6e1c53de5c3115ca2ab7a5e11b33ad0d9eb0437f44a32c6eb" as const;
+  "120bdfea9776cff519113d915694f02b1e4302a14a4282c8e6272a0bf09a5e96" as const;
 
 function fixtureValueAst(value: unknown): CanonicalJsonAst {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;

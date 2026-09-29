@@ -183,8 +183,14 @@ describe("ACC-01 one-shot ceremony arguments", () => {
       decision_scope: "prototype-acceptance",
       as_of: "2026-08-09T00:00:00.000Z",
       steering_presets: [],
+      plan_tier: "free",
       steering_annotations: []
     });
+  });
+
+  it("takes the plan tier as an asker input and refuses one the contract does not know", () => {
+    expect(parseAcceptanceArguments(["--plan-tier", "premium"], asOf, environment).ask.plan_tier).toBe("premium");
+    expect(() => parseAcceptanceArguments(["--plan-tier", "gold"], asOf, environment)).toThrow("plan_tier");
   });
 
   it("rejects unknown arguments rather than silently ignoring them", () => {

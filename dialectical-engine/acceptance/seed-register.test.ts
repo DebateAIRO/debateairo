@@ -1,4 +1,3 @@
-import { EVALUATOR_CONTRACT_TEXT } from "@debateai/runner";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
@@ -17,39 +16,44 @@ import {
 
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 
+/**
+ * The three PROMPT fingerprints are sealed VALUES, pinned here as literals.
+ *
+ * This function used to find the judge and composer prompts by searching the
+ * shipped source with two regular expressions. RUN1 (3a3e6fcc, 2026-09-22)
+ * moved every prompt onto the frame — a code-owned safety frame plus the
+ * owners' instruction text — and both seeders now digest the prompt CONTRACTS
+ * through `promptContractFingerprintText`. The two searches then matched
+ * nothing, so this test stopped at TEST_CONTRACT_TEXT_EXTRACTION_FAILED and
+ * checked no hash at all. Searching again would repeat the fault the
+ * F-SEALEDROWS-A record describes (every lexical locator has an input that
+ * defeats it), and recomputing through the seeder's own objects would check
+ * the seeder against itself. So the values are pinned: they are register
+ * version 6's sealed fingerprints, the same literals
+ * `tests/unit/f-sealedrows-a-conformance-extractor.test.ts` pins. A prompt edit
+ * moves them, and that is a NEW sealed version, never an edit of these.
+ *
+ * `propagation` and `serve` are still whole-module digests of the shipped
+ * source, exactly as the seeder takes them.
+ */
 async function expectedContractHashes(): Promise<Record<string, string>> {
-  const [judge, runner, propagation, serve] = await Promise.all([
-    readFile(new URL("../packages/judgement/src/index.ts", import.meta.url), "utf8"),
-    readFile(new URL("../apps/runner/src/index.ts", import.meta.url), "utf8"),
+  const [propagation, serve] = await Promise.all([
     readFile(new URL("../packages/propagation/src/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
-  const judgeText = judge.match(/content: `([\s\S]*?)`/)?.[1];
-  const composerText = runner.match(/content: "(Return only JSON with a segments array[^"]+)"/)?.[1];
-  // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints the
-  // EVALUATOR prompt alone.
-  //
-  // This line used to locate that prompt independently of the seeder, so that
-  // two different locators had to agree. THERE IS NOTHING LEFT TO CROSS-CHECK:
-  // codex r2 showed every lexical locator has an input that defeats it, so the
-  // prompt is now an exported constant that the runner SENDS and the seeders
-  // digest. Cross-checking one constant against itself would be theatre. The
-  // real guard moved to `tests/unit/f-sealedrows-a-conformance-extractor.test.ts`,
-  // which pins the digest VALUE and fails if the prompt is edited at all.
-  if (judgeText === undefined || composerText === undefined) {
-    throw new Error("TEST_CONTRACT_TEXT_EXTRACTION_FAILED");
-  }
   return {
-    judgeContractHash: sha256(judgeText),
-    composerContractHash: sha256(composerText),
-    conformanceContractHash: sha256(EVALUATOR_CONTRACT_TEXT),
+    judgeContractHash: "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69",
+    composerContractHash: "9482cbb7bc9251d121f26cccf7141022caab4521b08b2a67f09ac07381443888",
+    // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints
+    // the EVALUATOR prompt alone; its own words are still the 2026-09-04 text.
+    conformanceContractHash: "80753d1a25f5c771a2fecb7f80c4f6f687dfa78f2ca410f572fb1acf39d8b447",
     propagationContractHash: sha256(propagation),
     serveContractHash: sha256(serve)
   };
 }
 
 describe("ACC-01 acceptance register", () => {
-  it("materializes the V-approved DR-133 values byte-faithfully and computes contract hashes from shipped text", async () => {
+  it("materializes the V-approved DR-133 values byte-faithfully and seals the pinned contract hashes", async () => {
     const rows = await buildAcceptanceRegisterRows();
     const byKey = Object.fromEntries(rows.map((row) => [row.rowKey, row]));
 

@@ -419,6 +419,37 @@ export class WorkItemRepository {
     });
   }
 
+  /**
+   * The asker's submit threw after the run row was written, so no runner will
+   * ever claim the run: its first job is recorded FAILED with `reason`, created
+   * FAILED when the failure came before it was queued. A job a runner already
+   * claimed or settled is left alone — that debate is under way. True when the
+   * run now reads FAILED because of this call.
+   */
+  async recordSetupFailure(input: {
+    readonly runId: string;
+    readonly batteryRowId: BatteryRowId;
+    readonly commandKey: string;
+    readonly reason: string;
+  }): Promise<boolean> {
+    if (input.reason.trim().length === 0) {
+      throw new TypeError("Setup failure reason must be a typed non-empty value");
+    }
+    return withWriteTransaction(this.pool, async (client) => {
+      const sequence = await allocateSequence(client);
+      const result = await client.query(
+        `INSERT INTO core.work_item (
+          run_id, battery_row_id, node_set, command_key, state, terminal_reason, created_at_seq
+        ) VALUES ($1,$2,'[]'::jsonb,$3,'FAILED',$4,$5)
+        ON CONFLICT (command_key) DO UPDATE
+          SET state = 'FAILED', terminal_reason = EXCLUDED.terminal_reason
+          WHERE core.work_item.run_id = EXCLUDED.run_id AND core.work_item.state = 'READY'`,
+        [input.runId, input.batteryRowId, input.commandKey, input.reason, sequence]
+      );
+      return result.rowCount === 1;
+    });
+  }
+
   async recordTerminalFailure(input: {
     readonly runId: string;
     readonly workItemId: string;
