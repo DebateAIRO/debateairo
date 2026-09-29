@@ -133,9 +133,9 @@ Commercial Transactions Act Art. 11. Content work on the existing layout; nothin
    share capital; the person responsible; phone; and confirm hello@, legal@, abuse@, dsa@ exist
    (privacy@ is the only confirmed address). The Japanese statute also expects the representative's
    name and a phone number to be shown; both are brackets today.
-10. **Support catalogue digest moved again** (seventh capability `legal-notice`): the packet
-    `OWNER-SIGNOFF-legal-pages-catalog.md` now asks for `ffd72986…` (the six-page `b0180850…` is
-    superseded and must not be signed). Label count 74 → 76.
+10. **Support catalogue digest moved again** (seventh capability `legal-notice`) to `ffd72986…`
+    (the six-page `b0180850…` was superseded). Label count 74 → 76. **SIGNED by V 2026-09-29**
+    before the push; this also closes gate item 1 above (see the sign-off packet).
 11. **`/providers` lists Google (Gemini), which is not wired.** Gemini exists only as a display
     name/colour in `lib/models.ts`, `ModelPresentation.tsx`, `globals.css` and the landing sample
     cards; no backend adapter, register row or deploy config names it (the gateways are generic

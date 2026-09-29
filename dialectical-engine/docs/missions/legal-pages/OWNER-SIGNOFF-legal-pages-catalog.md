@@ -1,10 +1,8 @@
-# Owner sign-off — the support catalogue with the seven legal pages (DRAFT, NOT SIGNED)
+# Owner sign-off — the support catalogue with the seven legal pages (SIGNED 2026-09-29)
 
-**Status: awaiting the owner.** Nothing in `packages/support-kb/reviews/manifest.json` points at
-this file yet. It becomes the record only after V reads the entries below in chat and answers
-"signed"; the coordinator then fills in the session line and updates the manifest's `catalog`
-record (`sha256`, `reviewedBy: "OWNER"`, `reviewerSession`, `reviewedOn`, `evidence` = this
-file, `ratifiedBy: "V"`, `ratifiedOn`).
+**Status: SIGNED by the owner on 2026-09-29.** V read the seven entries below (route, English and
+Romanian label) in chat and answered "Signed" to fingerprint `ffd72986…`. The manifest's `catalog`
+record now points at this file; the two test pins are updated (checklist below).
 
 **Why a signature is needed:** Turn 15 adds seven page routes (the six legal documents, then the
 legal notice at `/legal`, added 2026-09-29). The route-coverage test
@@ -36,7 +34,14 @@ Search terms (en / ro) are in `packages/support-kb/src/catalog.ts` next to each 
 | The support catalogue after (to be signed) | `ffd729867aa1ed250d142f1a82aee386f493a56a224193adf387c231da111854` |
 | Superseded, never signed (six pages, before the legal notice) | `b018085009479b7f172818b7e30d24d3aa529a97a41a9de55403e8adc218c8c5` |
 
-**Who / when:** _(filled in after V answers)_
+**Who / when:** V (OWNER), 2026-09-29, in session `d65424e5-27a7-40b7-8a4c-773e60cb404f`
+(the legal-notice session), answering "Signed" to the question listing the seven entries and the
+fingerprint, before the push of `feat/legal-pages` to `origin/dev`. Applied by the coordinator:
+manifest `catalog` record, `CATALOG_REVIEW` in `tests/unit/support-recovery-attestation.test.ts`,
+`corpus.kbVersion` = `3ba3bdb5bf4359a412b50054dfd50ae0ed816f492e29656e9bd39ef7726ef881` in
+`tests/unit/support-context.test.ts`. After it: `tests/unit/support-*.test.ts` + the coverage test
+1721/1721, and the API's boot-time `loadHelpCorpus(..., { requireReviewedRecovery: true })` loads
+(46 entries).
 
 ## Applying the signature (coordinator checklist, after V answers)
 
