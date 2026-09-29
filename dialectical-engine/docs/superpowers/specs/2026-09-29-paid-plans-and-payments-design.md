@@ -1402,3 +1402,28 @@ Each item: finding → resolution → affected tasks.
 - **A25** (cancel links). RESOLUTION: M3/M4/M7 link to the `/cancel` page (which asks for the email and sends a fresh one-time link), never to a token; token links open a page that needs a button click (POST) — mail scanners only GET; `billingCancelLink` is limited per IP (5/h) AND per account (3 per 24 h, keyed by the blind index, silent when exceeded). Affects P13, P17, P21.
 
 - **A26** (build + mail). (a) `tools/orphan-audit/src/index.ts` package graph (~9-54) gains rows for the 7 new packages (each package's own task adds its row); (b) M2 carries a LINK to Quaderno's hosted PDF (non-RO) and ATTACHES the SmartBill PDF (RO, fetched via the SmartBill API); M1 attaches the accepted Terms as text; `TemplatedMailSender` sends multipart/mixed with text + html + attachments. Affects every new-package task, P10, P17.
+
+### 2.16 The colleague's new work on `dev` (29 September 2026, evening)
+
+While the plan was being written, the colleague merged three pieces of work into `dev`, and a fourth is open. This design now builds on them.
+
+- **The age gate (PR #41).**
+  - Sign-up asks for a date of birth, and the minimum age is 18.
+  - The migration is `0077_age_gate.sql`. It adds a new account state `age_frozen` and an age record written inside registration.
+  - Our acceptance records (§2.3.2) are added to that same registration transaction, not a separate one.
+  - The age gate reads the visitor's country from Cloudflare's `cf-ipcountry` header. The V3 server kit has no Cloudflare in front, so the country gate (§2.3.3) supplies the country instead. It is recorded but never decisive, as the age gate intends.
+- **The legal pages and footer (PR #42).**
+  - `/legal`, `/terms`, `/terms/versions`, `/privacy`, `/cookies`, `/providers` and the site footer already exist.
+  - The company facts live in one `COMPANY` constant.
+  - §2.10's pages `/legal`, `/terms`, `/privacy` and `/contact`, and the footer, are therefore **extended**, not created. The additions are the card marks, the DB-IP credit, the links to pricing, cancel and withdraw, and the paid-plan lines on `/legal` when billing is on.
+  - `/cancel` and `/withdraw` are still new.
+- **The sensitive-data consent (open branch `feat/sensitive-data-consent`).**
+  - It asks for explicit consent (GDPR Art. 9) before a person's first debate, and it takes migration number `0078`.
+  - When it merges, its refusal comes before the waiting line and the plan decision. A person who has not consented neither waits nor is charged.
+- **Migration numbers.** Ours start at `0079`:
+  - `0079` legal acceptance
+  - `0080` holds and waiting line
+  - `0081`–`0084` billing
+  - `0085` withdrawal step-up
+  - `0086` erasure hook
+  - `0087` scorecard
