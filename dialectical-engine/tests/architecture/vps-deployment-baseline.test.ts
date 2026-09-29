@@ -365,21 +365,35 @@ describe("VPS baseline: encrypted DB + custody backups with separate escrow, res
   it("backup.sh escrows the support KEK as the fifth secret, and the drill proves it came back (DL2-F5)", () => {
     const script = read("deploy/vps/backup.sh");
     expect(script).toContain(': "${SUPPORT_KEK_PATH:?}"');
+    // Paid plans L1 (ruling Q-12): the records key is the sixth escrowed secret.
+    expect(script).toContain(': "${RECORDS_KEY_PATH:?}"');
     const escrow = script.slice(script.indexOf('tar -cf "$WORK/keys.tar"'), script.indexOf("KEY_DIGEST="));
-    for (const key of ["KEK_PATH", "CORPUS_KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_SOURCE_IP_SALT_PATH", "SUPPORT_KEK_PATH"]) {
+    for (const key of ["KEK_PATH", "CORPUS_KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_SOURCE_IP_SALT_PATH", "SUPPORT_KEK_PATH", "RECORDS_KEY_PATH"]) {
       expect(escrow, key).toContain(`"$(basename "$${key}")"`);
     }
     // The support KEK never rides in the data envelope with the dump it unlocks.
     const dataEnvelope = script.slice(script.indexOf("# --- 3. the custody tree"), script.indexOf("# --- 5."));
     expect(dataEnvelope).not.toContain("SUPPORT_KEK_PATH");
+    // The records key never rides with the dump it unlocks either.
+    expect(dataEnvelope).not.toContain("RECORDS_KEY_PATH");
     const conf = envKeys(read("deploy/vps/backup.conf.example"));
     expect(conf.get("SUPPORT_KEK_PATH")).toBe("/etc/debateai/api/support-kek.bin");
     expect(envKeys(read("deploy/vps/env/api.env.example")).get("SUPPORT_KEK_PATH")).toBe(conf.get("SUPPORT_KEK_PATH"));
+    expect(conf.get("RECORDS_KEY_PATH")).toBe("/etc/debateai/api/records-key.bin");
+    expect(envKeys(read("deploy/vps/env/api.env.example")).get("RECORDS_KEY_PATH")).toBe(conf.get("RECORDS_KEY_PATH"));
     const drill = read("deploy/vps/restore-drill.sh");
     expect(drill).toContain(': "${SUPPORT_KEK_PATH:?}"');
     expect(drill).toContain("RESTORE_DRILL_REFUSED no restored support KEK");
     expect(drill.indexOf("RESTORE_DRILL_REFUSED no restored support KEK"))
       .toBeLessThan(drill.indexOf("RESTORE_DRILL_OK"));
+    expect(drill).toContain("RESTORE_DRILL_REFUSED no restored records key");
+    expect(drill.indexOf("RESTORE_DRILL_REFUSED no restored records key"))
+      .toBeLessThan(drill.indexOf("RESTORE_DRILL_OK"));
+    for (const needle of [
+      "the six raw 32-byte secrets",
+      "RESTORE_DRILL_RECORDS_KEY bytes=32",
+      "Owner confirmation — the records key in escrow (paid plans ruling Q-12)"
+    ]) expect(read("deploy/vps/README.md"), needle).toContain(needle);
   });
 
   it("restore-drill.sh: scratch DB + scratch custody, core.run count, chain SQL, sample decrypt, RESTORE_DRILL_OK, cleanup", () => {
@@ -491,7 +505,9 @@ describe("VPS baseline: runbook and environment templates", () => {
       // own shape, and both were absent — an api.env built from this example
       // refused at boot with KEK_UNRESOLVED, and the runbook's rotation command
       // (which loads this same file) refused before touching a record.
-      "SUPPORT_KEK_PATH", "SUPPORT_DATABASE_URL"
+      "SUPPORT_KEK_PATH", "SUPPORT_DATABASE_URL",
+      // Paid plans L1: required in every mode (apiEnvironmentShape).
+      "RECORDS_KEY_PATH"
     ]) expect(env.has(key), key).toBe(true);
     expect(env.get("NODE_ENV")).toBe("production");
     // V-9(c): both services answer the same question with the same word, or the

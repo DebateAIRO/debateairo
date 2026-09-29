@@ -152,6 +152,12 @@ const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 // finding.
 boot.hold({ end: async () => { blindIndexKey.fill(0); } });
 boot.hold({ end: async () => { sourceIpSalt.fill(0); } });
+// Paid plans L1 (spec §2.3.1): the records key. Loaded under the ledger AFTER the two plain
+// secrets are held, so a missing or mis-permissioned file zeroes the KEKs, the blind-index key
+// and the audit salt already held; it lives for the whole process (the acceptance writer and,
+// later, the billing profile use it) and is zeroed by the startup owner.
+const recordsKey = boot.runSync("records-key", () => loadSecretKey(environment.RECORDS_KEY_PATH));
+boot.hold({ end: async () => { recordsKey.fill(0); } });
 // L2-F8: this guarded the whole check on publication being enabled, so a
 // private-only deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one
 // file and boot. The private domains are always checked; the corpus KEK and
@@ -175,7 +181,8 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   ],
   additionalSecrets: [
     { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
-    { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
+    { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt },
+    { path: environment.RECORDS_KEY_PATH, material: recordsKey }
   ],
   additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
 }));
@@ -573,7 +580,8 @@ const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
     environment.KEK_PATH,
     environment.CORPUS_KEK_PATH,
     environment.BLIND_INDEX_KEY_PATH,
-    environment.AUDIT_SOURCE_IP_SALT_PATH
+    environment.AUDIT_SOURCE_IP_SALT_PATH,
+    environment.RECORDS_KEY_PATH
   ].filter((path): path is string => path !== undefined)
 }));
 // DL7-F7: the support KEK is the third key the boot holds, and every stage
@@ -793,7 +801,9 @@ const startup = installStartupResourceOwner({
     supportPool,
     supportRelayLeasePool,
     { end: () => supportKeys.close() },
-    { end: () => supportConfiguration.close() }
+    { end: () => supportConfiguration.close() },
+    // L1: the records key outlives the boot ledger; it is zeroed after every pool has closed.
+    { end: async () => { recordsKey.fill(0); } }
   ],
   // L2-F7: zeroed after every pool that borrows from them has closed. A
   // changeover's PREVIOUS keys are in this list for the same reason the current

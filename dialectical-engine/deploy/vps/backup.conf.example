@@ -32,6 +32,7 @@ CORPUS_KEK_PATH=/etc/debateai/api/corpus-kek.bin
 BLIND_INDEX_KEY_PATH=/etc/debateai/api/blind-index-key.bin
 AUDIT_SOURCE_IP_SALT_PATH=/etc/debateai/api/audit-source-ip-salt.bin
 SUPPORT_KEK_PATH=/etc/debateai/api/support-kek.bin
+RECORDS_KEY_PATH=/etc/debateai/api/records-key.bin
 
 # Set only for the duration of a drill, from removable media; never written into this file.
 #BACKUP_AGE_IDENTITY=/media/operator/data.age.key

@@ -144,7 +144,7 @@ process start: restart both units after either change.
 | `/etc/debateai/observation-agent.env` | `0600` | `debateai-observer` | observation agent `EnvironmentFile` (§12; the unit is not enabled) |
 | `/etc/debateai/hatchet.env` | `0600` | `root:root` | container `env_file`: `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*` |
 | `/etc/debateai/hatchet.pgpass` | `0600` | `root:root` | the `debateai_prod_hatchet` role's password, read once by `bootstrap.sql` (§4) |
-| `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin`, `support-kek.bin` (the support chat's master key — the file name is checked and must be exactly this) |
+| `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin`, `support-kek.bin` (the support chat's master key — the file name is checked and must be exactly this), `records-key.bin` (the records key, §9) |
 | `/etc/debateai/api/providers/` | `0700` | `debateai-api` | the API's own copy of each vendor credential (V-9, §11) |
 | `/etc/debateai/runner/` | `0700` | `debateai-runner` | `kek.bin` (the runner's own copy of the same bytes — a master-key rotation must replace this file too, §3 "Changing a master key") |
 | `/etc/debateai/runner/providers/` | `0700` | `debateai-runner` | the runner's own copy of each vendor credential (V-9, §11) |
@@ -200,17 +200,19 @@ test ! -e /etc/debateai/api/kek.bin && (umask 0177 && head -c 32 /dev/urandom > 
   `0600` key file is unreadable by the service — `EnvironmentFile` semantics (read by root, handed
   over) do **not** carry over to key files.
 - Directories are `0700`, owned by the same service user.
-- The five secrets must be pairwise distinct: the API refuses at boot with
+- The six secrets must be pairwise distinct: the API refuses at boot with
   `SECRET_DOMAIN_MUST_BE_SEPARATE` if two paths resolve to the same bytes or the same inode, and
-  with `SUPPORT_KEK_PATH_MUST_BE_SEPARATE` if the support KEK is one of the other four.
+  with `SUPPORT_KEK_PATH_MUST_BE_SEPARATE` if the support KEK is one of the other four, and with
+  `RECORDS_KEY_PATH_MUST_BE_SEPARATE` if the records key path names any other key file.
 
-The other four are made the same way. Each is its own 32 random bytes:
+The other five are made the same way. Each is its own 32 random bytes:
 
 ```sh
 test ! -e /etc/debateai/api/corpus-kek.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/corpus-kek.bin) && chown debateai-api:debateai-api /etc/debateai/api/corpus-kek.bin
 test ! -e /etc/debateai/api/blind-index-key.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/blind-index-key.bin) && chown debateai-api:debateai-api /etc/debateai/api/blind-index-key.bin
 test ! -e /etc/debateai/api/audit-source-ip-salt.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/audit-source-ip-salt.bin) && chown debateai-api:debateai-api /etc/debateai/api/audit-source-ip-salt.bin
 test ! -e /etc/debateai/api/support-kek.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/support-kek.bin) && chown debateai-api:debateai-api /etc/debateai/api/support-kek.bin
+test ! -e /etc/debateai/api/records-key.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/records-key.bin) && chown debateai-api:debateai-api /etc/debateai/api/records-key.bin
 ```
 
 The runner's own copy of the user-DEK KEK is the SAME 32 bytes as `/etc/debateai/api/kek.bin`,
@@ -860,13 +862,17 @@ manifest forbids minting one a long-lived superuser credential (audit L5-F8).
    a key referenced by a dumped row is present in the later snapshot; the reverse order can leave
    a row whose key no longer exists. A dump **alone restores nothing** — every private run is
    ciphertext under keys that live outside PostgreSQL (audit L2-F3).
-2. **Escrow recipient** — the five raw 32-byte secrets (`kek`, `corpus-kek`, `blind-index-key`,
-   `audit-source-ip-salt`, `support-kek`), written only when their sha256 changed. Held by V,
+2. **Escrow recipient** — the six raw 32-byte secrets (`kek`, `corpus-kek`, `blind-index-key`,
+   `audit-source-ip-salt`, `support-kek`, `records-key`), written only when their sha256 changed. Held by V,
    offline, on different media from the data key: whoever holds one envelope alone restores
    nothing. The audit source-IP salt is a key, not metadata: bundling it with the dump would let
    one envelope re-identify every hashed source IP in it. The support KEK (`DL2-F5`) wraps the
    support session and case keys, which live IN the dump — without it in escrow a restore opens no
-   support conversation, and beside the dump it would open every one.
+   support conversation, and beside the dump it would open every one. The records key is the
+   sixth escrowed secret, in this same envelope (paid plans ruling Q-12). It seals the acceptance
+   and billing evidence kept for years after an account is erased; without it those rows cannot be
+   read, and beside the dump it would open every one, so it rides here and never in the data
+   envelope.
 
 **What erasure means for a backup.** Deleting a support conversation (or a private debate)
 destroys its key in place, and from then on the live system cannot open it. The key bytes as they
@@ -905,6 +911,9 @@ scratch custody directory, then:
 4. the support KEK — refuses unless a 32-byte `support-kek.bin` came out of the escrow envelope
    (`RESTORE_DRILL_SUPPORT_KEK bytes=32`). This proves the key is in escrow; it does not decrypt a
    support conversation.
+5. the records key — refuses unless a 32-byte `records-key.bin` came out of the escrow envelope
+   (`RESTORE_DRILL_RECORDS_KEY bytes=32`). This proves the key is in escrow; it does not open an
+   acceptance row.
 
 Only then does it print `RESTORE_DRILL_OK` and drop the scratch database and directory. Prefer
 running the whole drill on a **separate machine**: that exercises "the VPS is gone" rather than
@@ -912,6 +921,14 @@ running the whole drill on a **separate machine**: that exercises "the VPS is go
 `DRILL_APPLY_GLOBALS=true`.
 
 Record each drill: date, artefact, `core.run` count, chain totals, and the decrypt line.
+
+**Owner confirmation — the records key in escrow (paid plans ruling Q-12). OWNER-RUN, once, after the first
+nightly backup that follows the paid-plans L1 deploy.** Run the restore drill above. It must print
+`RESTORE_DRILL_RECORDS_KEY bytes=32` before `RESTORE_DRILL_OK`. Write that line, the date and the artefact name in
+the drill record. That record is the owner's confirmation that the records key is the sixth secret in the same
+escrow envelope as the other five. If the drill prints `RESTORE_DRILL_REFUSED no restored records key`, check that
+`/etc/debateai/backup.conf` names `RECORDS_KEY_PATH` and that the backup ran after it was added, then run the
+drill again.
 
 #### The restore rehearsal — before go-live
 

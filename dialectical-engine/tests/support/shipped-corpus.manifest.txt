@@ -533,6 +533,7 @@ packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
 packages/crypto/src/argon2-worker.ts
 packages/crypto/src/index.ts
+packages/crypto/src/records.ts
 packages/db/src/account-erasure.ts
 packages/db/src/auth-risk.ts
 packages/db/src/identity.ts

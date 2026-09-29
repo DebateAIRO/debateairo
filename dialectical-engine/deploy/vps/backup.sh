@@ -43,6 +43,7 @@ CONFIG="${DEBATEAI_BACKUP_CONFIG:-/etc/debateai/backup.conf}"
 : "${BLIND_INDEX_KEY_PATH:?}"
 : "${AUDIT_SOURCE_IP_SALT_PATH:?}"
 : "${SUPPORT_KEK_PATH:?}"
+: "${RECORDS_KEY_PATH:?}"
 
 KEEP_DAILY=14
 KEEP_WEEKLY=8
@@ -95,14 +96,14 @@ DIGEST="$(sha256sum "$ARTEFACT" | cut -d' ' -f1)"
 BYTES="$(wc -c < "$ARTEFACT" | tr -d ' ')"
 UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# --- 5. the five raw secrets, escrowed separately -----------------------------------------
+# --- 5. the six raw secrets, escrowed separately ------------------------------------------
 # Written only when their contents changed: an escrow copy per night would multiply the number
 # of envelopes an attacker could try against the offline key for no added recoverability. A
 # master-key rotation (README §3) changes the digest, so the next night escrows the new keys.
 # Each secret is archived under its own basename; refuse rather than let one shadow another.
 secret_names="$(printf '%s\n' "$KEK_PATH" "$CORPUS_KEK_PATH" "$BLIND_INDEX_KEY_PATH" \
-  "$AUDIT_SOURCE_IP_SALT_PATH" "$SUPPORT_KEK_PATH" | xargs -n 1 basename | sort)"
-if [ "$(printf '%s\n' "$secret_names" | uniq | wc -l | tr -d ' ')" != "5" ]; then
+  "$AUDIT_SOURCE_IP_SALT_PATH" "$SUPPORT_KEK_PATH" "$RECORDS_KEY_PATH" | xargs -n 1 basename | sort)"
+if [ "$(printf '%s\n' "$secret_names" | uniq | wc -l | tr -d ' ')" != "6" ]; then
   echo "BACKUP_REFUSED escrowed secret basenames must be distinct" >&2
   exit 1
 fi
@@ -111,7 +112,8 @@ tar -cf "$WORK/keys.tar" \
   -C "$(dirname "$CORPUS_KEK_PATH")" "$(basename "$CORPUS_KEK_PATH")" \
   -C "$(dirname "$BLIND_INDEX_KEY_PATH")" "$(basename "$BLIND_INDEX_KEY_PATH")" \
   -C "$(dirname "$AUDIT_SOURCE_IP_SALT_PATH")" "$(basename "$AUDIT_SOURCE_IP_SALT_PATH")" \
-  -C "$(dirname "$SUPPORT_KEK_PATH")" "$(basename "$SUPPORT_KEK_PATH")"
+  -C "$(dirname "$SUPPORT_KEK_PATH")" "$(basename "$SUPPORT_KEK_PATH")" \
+  -C "$(dirname "$RECORDS_KEY_PATH")" "$(basename "$RECORDS_KEY_PATH")"
 KEY_DIGEST="$(sha256sum "$WORK/keys.tar" | cut -d' ' -f1)"
 STATE="$ESCROW_DIR/.last-sha256"
 PREVIOUS=""

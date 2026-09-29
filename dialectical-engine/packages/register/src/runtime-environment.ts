@@ -339,6 +339,13 @@ const apiEnvironmentShape = {
     // forget to ask; the resolved value rides on `DEPLOYMENT_MODE`.
     DEBATEAI_DEPLOYMENT_MODE: z.string().min(1).optional(),
     BLIND_INDEX_KEY_PATH: z.string().min(1),
+    /**
+     * Paid plans L1 (spec 2026-09-29 §2.3.1, amendment A14): the RECORDS KEY — 32 raw bytes under
+     * the same custody contract as every key file. Required in EVERY mode, because the acceptance
+     * record of the Terms and the Privacy Policy is written at every sign-up. The API alone holds
+     * it; the runner has no shape for it.
+     */
+    RECORDS_KEY_PATH: z.string().min(1),
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
     USER_DEK_STORE_PATH: z.string().min(1),
@@ -509,6 +516,16 @@ function validateApiEnvironment(
     && (environment.CORPUS_KEK_PATH === environment.KEK_PATH
       || environment.PUBLICATION_KEY_STORE_PATH === environment.USER_DEK_STORE_PATH)) {
     throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");
+  }
+  // L1: the records key is its own file. The byte-level pairwise check runs at boot
+  // (assertPublicationSecretDomains); this refuses the obvious mistake before any file is opened.
+  if ([
+    environment.KEK_PATH, environment.SUPPORT_KEK_PATH, environment.CORPUS_KEK_PATH,
+    environment.BLIND_INDEX_KEY_PATH, environment.AUDIT_SOURCE_IP_SALT_PATH,
+    environment.KEK_PREVIOUS_PATH, environment.CORPUS_KEK_PREVIOUS_PATH,
+    environment.SUPPORT_KEK_PREVIOUS_PATH
+  ].includes(environment.RECORDS_KEY_PATH)) {
+    throw new TypeError("RECORDS_KEY_PATH_MUST_BE_SEPARATE");
   }
   assertProductionFloors(environment);
   return {
