@@ -174,7 +174,7 @@ DebateAI, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamam
 | `debateai.consent` | Yerel depolama | Çerez bildirimini gördüğünüzü hatırlar, böylece bildirim yalnızca bir kez gösterilir. | Siz temizleyene kadar |
 | `debateai.mode` | Yerel depolama | Açık ve koyu görünümden hangisini kullandığınız. | Siz temizleyene kadar |
 | `debateai.languageOffer.dismissed` | Oturum depolaması | Bu sekme için bir tartışmayı başka bir dilde gösterme önerisini reddettiğinizi hatırlar. | Sekmeyi kapatana kadar |
-| `debateai.support.conversation.v2` | Oturum depolaması | Sekme açık kaldığı sürece yardım sohbetindeki konuşmanızı ekranda tutar. Oturum açmış kişi değiştiğinde silinir. | Sekmeyi kapatana kadar |
+| `debateai.support.conversation.v2` | Oturum depolaması | Sekme açık kaldığı sürece yardım sohbetindeki konuşmanızı ekranda tutar. Bu sekmede biri oturum açtığında veya kapattığında silinir. | Sekmeyi kapatana kadar |
 
 Başka hiçbir taraf, DebateAI aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz.
 

@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Lokal lagring — Husker, at du har set cookiemeddelelsen, så den kun vises én gang. — Indtil du sletter det",
         "debateai.mode — Lokal lagring — Om du bruger lys eller mørk tilstand. — Indtil du sletter det",
         "debateai.languageOffer.dismissed — Sessionslagring — Husker for denne fane, at du har takket nej til at se en debat på et andet sprog. — Indtil du lukker fanen",
-        "debateai.support.conversation.v2 — Sessionslagring — Holder din samtale med hjælpechatten på skærmen, så længe fanen er åben. Den slettes, når den loggede ind person skifter. — Indtil du lukker fanen"
+        "debateai.support.conversation.v2 — Sessionslagring — Holder din samtale med hjælpechatten på skærmen, så længe fanen er åben. Den slettes, når nogen logger ind eller ud i denne fane. — Indtil du lukker fanen"
         ]
       },
       { kind: "p", text: "Ingen anden part indsamler via DebateAI oplysninger om dine onlineaktiviteter over tid og på tværs af websteder." },

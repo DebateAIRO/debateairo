@@ -174,7 +174,7 @@ DebateAI folosește opt elemente, toate strict necesare pentru serviciul pe care
 | `debateai.consent` | Stocare locală | Reține că ați văzut deja notificarea despre cookie-uri, ca să fie afișată o singură dată. | Până când îl ștergeți |
 | `debateai.mode` | Stocare locală | Dacă folosiți modul luminos sau modul întunecat. | Până când îl ștergeți |
 | `debateai.languageOffer.dismissed` | Stocare de sesiune | Reține, pentru această filă, că ați refuzat propunerea de a afișa o dezbatere în altă limbă. | Până când închideți fila |
-| `debateai.support.conversation.v2` | Stocare de sesiune | Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când se schimbă persoana autentificată. | Până când închideți fila |
+| `debateai.support.conversation.v2` | Stocare de sesiune | Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă. | Până când închideți fila |
 
 Nicio altă parte nu colectează, prin intermediul DebateAI, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web.
 

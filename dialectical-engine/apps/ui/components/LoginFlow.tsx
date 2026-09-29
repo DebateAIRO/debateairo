@@ -7,6 +7,7 @@ import { AuthShell } from "@/components/AuthShell";
 import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmation";
 import { contractClient } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
+import { clearStoredSupportConversation } from "@/components/support/conversation";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { safeReturnPath } from "@/lib/returnPath";
 import authEnglish from "@/messages/en/auth.json";
@@ -93,6 +94,9 @@ export function LoginFlow({
     setError(null);
     try {
       const result = await client.completeLogin(challengeToken, code);
+      // A new sign-in in this tab: the previous person's help-chat transcript goes now. Its stored value carries no
+      // person id, so this is the moment the tab can tell a person changed (REV-S01 p1 SD-B1; /cookies row 8).
+      clearStoredSupportConversation();
       setChallengeToken(null);
       if (result.replacement_recovery_code !== undefined) {
         setRecoveryAcknowledgementPending(true);

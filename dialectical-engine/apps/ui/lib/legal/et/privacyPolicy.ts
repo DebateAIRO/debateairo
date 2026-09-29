@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Kohalik salvestusruum — Jätab meelde, et olete küpsiseteate näinud, nii et seda näidatakse vaid korra. — Kuni te selle kustutate",
         "debateai.mode — Kohalik salvestusruum — Kas kasutate heledat või tumedat kuvarežiimi. — Kuni te selle kustutate",
         "debateai.languageOffer.dismissed — Seansi salvestusruum — Jätab selle vahekaardi jaoks meelde, et loobusite pakkumisest näidata väitlust teises keeles. — Kuni te vahekaardi sulgete",
-        "debateai.support.conversation.v2 — Seansi salvestusruum — Hoiab teie abivestluse ekraanil, kuni vahekaart on avatud. See kustutatakse, kui sisse logitud isik vahetub. — Kuni te vahekaardi sulgete"
+        "debateai.support.conversation.v2 — Seansi salvestusruum — Hoiab teie abivestluse ekraanil, kuni vahekaart on avatud. See kustutatakse, kui keegi selles vahekaardis sisse või välja logib. — Kuni te vahekaardi sulgete"
         ]
       },
       { kind: "p", text: "Ükski teine osapool ei kogu DebateAI kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel." },

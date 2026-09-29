@@ -174,7 +174,7 @@ DebateAI uporablja osem elementov, ki so vsi nujno potrebni za storitev, ki ste 
 | `debateai.consent` | Lokalna shramba | Zapomni si, da ste obvestilo o piškotkih že videli, zato se prikaže le enkrat. | Dokler ga ne izbrišete |
 | `debateai.mode` | Lokalna shramba | Ali uporabljate svetli ali temni način prikaza. | Dokler ga ne izbrišete |
 | `debateai.languageOffer.dismissed` | Shramba seje | Za ta zavihek si zapomni, da ste zavrnili ponudbo, da se razprava prikaže v drugem jeziku. | Dokler ne zaprete zavihka |
-| `debateai.support.conversation.v2` | Shramba seje | Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se prijavljena oseba zamenja. | Dokler ne zaprete zavihka |
+| `debateai.support.conversation.v2` | Shramba seje | Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se v tem zavihku kdor koli prijavi ali odjavi. | Dokler ne zaprete zavihka |
 
 Nobena druga stran prek DebateAI ne zbira informacij o vaših spletnih dejavnostih skozi čas in na različnih spletnih mestih.
 

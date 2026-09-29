@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Ħażna lokali — Jiftakar li rajt l-avviż dwar il-cookies, biex jintwera darba biss. — Sakemm tħassarha",
         "debateai.mode — Ħażna lokali — Jekk tużax il-modalità ċara jew dik skura. — Sakemm tħassarha",
         "debateai.languageOffer.dismissed — Ħażna tas-sessjoni — Jiftakar, għal din it-tab, li rrifjutajt l-offerta li jintwera dibattitu b’lingwa oħra. — Sakemm tagħlaq it-tab",
-        "debateai.support.conversation.v2 — Ħażna tas-sessjoni — Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta tinbidel il-persuna li tkun dħalt. — Sakemm tagħlaq it-tab"
+        "debateai.support.conversation.v2 — Ħażna tas-sessjoni — Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta xi ħadd jidħol jew joħroġ mill-kont f’din it-tab. — Sakemm tagħlaq it-tab"
         ]
       },
       { kind: "p", text: "L-ebda parti oħra ma tiġbor, permezz ta’ DebateAI, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web." },

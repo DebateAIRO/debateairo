@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Paikallinen tallennustila — Muistaa, että olet nähnyt evästeilmoituksen, joten se näytetään vain kerran. — Kunnes tyhjennät sen",
         "debateai.mode — Paikallinen tallennustila — Käytätkö vaaleaa vai tummaa tilaa. — Kunnes tyhjennät sen",
         "debateai.languageOffer.dismissed — Istunnon tallennustila — Muistaa tämän välilehden osalta, että kieltäydyit tarjouksesta näyttää väittely toisella kielellä. — Kunnes suljet välilehden",
-        "debateai.support.conversation.v2 — Istunnon tallennustila — Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun sisäänkirjautunut henkilö vaihtuu. — Kunnes suljet välilehden"
+        "debateai.support.conversation.v2 — Istunnon tallennustila — Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun joku kirjautuu sisään tai ulos tässä välilehdessä. — Kunnes suljet välilehden"
         ]
       },
       { kind: "p", text: "Mikään muu osapuoli ei kerää DebateAI:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla." },

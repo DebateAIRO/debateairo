@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Archiviazione locale — Ricorda che hai già visto l’avviso sui cookie, così viene mostrato una sola volta. — Finché non lo cancelli",
         "debateai.mode — Archiviazione locale — Se usi la visualizzazione chiara o quella scura. — Finché non lo cancelli",
         "debateai.languageOffer.dismissed — Archiviazione di sessione — Ricorda, per questa scheda, che hai rifiutato la proposta di mostrare un dibattito in un’altra lingua. — Finché non chiudi la scheda",
-        "debateai.support.conversation.v2 — Archiviazione di sessione — Mantiene sullo schermo la tua conversazione con la chat di assistenza finché la scheda resta aperta. Viene cancellata quando cambia la persona che ha effettuato l’accesso. — Finché non chiudi la scheda"
+        "debateai.support.conversation.v2 — Archiviazione di sessione — Mantiene sullo schermo la tua conversazione con la chat di assistenza finché la scheda resta aperta. Viene cancellata quando qualcuno accede o esce in questa scheda. — Finché non chiudi la scheda"
         ]
       },
       { kind: "p", text: "Nessun'altra parte raccoglie, tramite DebateAI, informazioni sulle tue attività online nel tempo e su siti web diversi." },

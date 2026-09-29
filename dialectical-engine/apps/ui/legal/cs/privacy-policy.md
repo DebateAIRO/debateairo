@@ -174,7 +174,7 @@ DebateAI používá osm položek, všechny nezbytně nutné pro službu, o ktero
 | `debateai.consent` | Místní úložiště | Pamatuje si, že jste oznámení o souborech cookie už viděli, takže se zobrazí jen jednou. | Do vymazání |
 | `debateai.mode` | Místní úložiště | Zda používáte světlý, nebo tmavý režim zobrazení. | Do vymazání |
 | `debateai.languageOffer.dismissed` | Úložiště relace | Pamatuje si pro tuto kartu, že jste odmítli nabídku zobrazit debatu v jiném jazyce. | Do zavření karty |
-| `debateai.support.conversation.v2` | Úložiště relace | Drží vaši konverzaci s nápovědou na obrazovce, dokud je karta otevřená. Smaže se, když se změní přihlášená osoba. | Do zavření karty |
+| `debateai.support.conversation.v2` | Úložiště relace | Drží vaši konverzaci s nápovědou na obrazovce, dokud je karta otevřená. Smaže se, když se na této kartě kdokoli přihlásí nebo odhlásí. | Do zavření karty |
 
 Žádná jiná strana prostřednictvím DebateAI neshromažďuje informace o vašich online aktivitách v průběhu času a napříč webovými stránkami.
 

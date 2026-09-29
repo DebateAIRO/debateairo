@@ -174,7 +174,7 @@ DebateAI menggunakan delapan item, semuanya mutlak diperlukan untuk layanan yang
 | `debateai.consent` | Penyimpanan lokal | Mengingat bahwa Anda sudah melihat pemberitahuan kuki, sehingga pemberitahuan itu hanya muncul sekali. | Sampai Anda menghapusnya |
 | `debateai.mode` | Penyimpanan lokal | Apakah Anda menggunakan mode terang atau mode gelap. | Sampai Anda menghapusnya |
 | `debateai.languageOffer.dismissed` | Penyimpanan sesi | Mengingat, untuk tab ini, bahwa Anda menolak tawaran untuk menampilkan debat dalam bahasa lain. | Sampai Anda menutup tab |
-| `debateai.support.conversation.v2` | Penyimpanan sesi | Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat orang yang masuk berganti. | Sampai Anda menutup tab |
+| `debateai.support.conversation.v2` | Penyimpanan sesi | Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat seseorang masuk atau keluar di tab ini. | Sampai Anda menutup tab |
 
 Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui DebateAI.
 

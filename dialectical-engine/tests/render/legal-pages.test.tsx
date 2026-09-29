@@ -310,6 +310,12 @@ describe("the cookie policy describes the cookies the product really sets", () =
     expect(source("packages/contract/src/index.ts")).toMatch(/AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS = 30 \* 24 \* 60 \* 60;/);
     expect(INV_IDS.map((id) => english[`legal.cookies.${id}.life`])).toEqual(EN_LIFE);
     expect(LEGAL_INVENTORY.map(({ lifeKey }) => lifeKey)).toEqual(INV_IDS.map((id) => `legal.cookies.${id}.life`));
+    // REV-S01 p1 SD-B1: the help-chat row says when its transcript ends besides the tab closing; each event it names is
+    // one the code runs. The stored value carries no person id (conversation.ts), so the row names the two events in
+    // this tab that clear it: a sign-in (LoginFlow, once completeLogin succeeds) and a sign-out (SessionControls).
+    expect(english["legal.cookies.supportConversation.purpose"]).toMatch(/erased when someone signs in or signs out in this tab/);
+    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/await client\.completeLogin\(challengeToken, code\);(?:\s*\/\/[^\n]*)*\s*clearStoredSupportConversation\(\);/);
+    expect(source("apps/ui/components/SessionControls.tsx")).toMatch(/clearStoredSupportConversation\(\);/);
   });
 
   it("renders every row's name, kind, purpose, sent-to and lifetime from SPEC-v2 §2", () => {
@@ -325,6 +331,18 @@ describe("the cookie policy describes the cookies the product really sets", () =
     expect(rows.map((row) => tables.indexOf(row.closest("table") as Element))).toEqual([0, 0, 0, 0, 1, 1, 1, 1]);
     const cells = rows.map((row) => texts(row.querySelectorAll("th, td")));
     expect(rows.map((row) => row.querySelector("th code")?.textContent)).toEqual([...INV_COOKIES, ...INV_STORAGE]);
+    // DONE.md default 8 (REV-S01 p1 PT-B1): a long name breaks only after a dot. Each dot-separated part is one unbreakable
+    // run, a <wbr> follows every dot and sits nowhere else, and legal.css keeps the runs from wrapping.
+    for (const code of rows.map((row) => row.querySelector("th code")!)) {
+      const name = code.textContent ?? "";
+      const parts = [...code.children].filter((child) => child.tagName !== "WBR");
+      expect(parts.map((part) => part.className), name).toEqual(Array(parts.length).fill("legalNamePart"));
+      expect(parts.map((part) => part.textContent), name).toEqual(name.split(/(?<=\.)/));
+      expect([...code.children].map((child) => child.tagName), name).toEqual(
+        parts.flatMap((_, index) => (index === parts.length - 1 ? ["SPAN"] : ["SPAN", "WBR"]))
+      );
+    }
+    expect(source("apps/ui/app/legal.css")).toMatch(/\.legalNamePart \{ white-space: nowrap; \}/);
     expect(cells.map((row) => row.length)).toEqual(Array(8).fill(5));
     expect(cells.map((row) => row[1])).toEqual(EN_KIND);
     expect(cells.map((row) => row[3])).toEqual(EN_RECIPIENT);
@@ -342,6 +360,9 @@ describe("the cookie policy describes the cookies the product really sets", () =
     expect(typeof refuse).toBe("string");
     expect(typeof effect).toBe("string");
     expect(view.textContent).not.toMatch(/two choices/i);
+    // REV-S01 p1 SD-N1: help-chat text is posted to DebateAI's help (Assistant.tsx sendMessage), so the storage intro
+    // makes no claim that nothing in the browser's storage was ever sent.
+    expect(english["legal.cookies.storageIntro"]).not.toMatch(/none of them is sent/i);
     expect(view.textContent).toContain(refuse);
     expect(view.textContent).toContain(effect);
     for (const phrase of ["block or delete", "browser settings"]) expect(refuse?.toLowerCase(), phrase).toContain(phrase);

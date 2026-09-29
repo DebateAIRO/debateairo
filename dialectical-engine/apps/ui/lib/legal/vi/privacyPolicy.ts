@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Bộ nhớ cục bộ — Ghi nhớ rằng bạn đã xem thông báo về cookie, để thông báo chỉ hiện một lần. — Cho đến khi bạn xóa",
         "debateai.mode — Bộ nhớ cục bộ — Ghi nhớ bạn dùng chế độ hiển thị sáng hay tối. — Cho đến khi bạn xóa",
         "debateai.languageOffer.dismissed — Bộ nhớ phiên — Ghi nhớ, cho thẻ này, rằng bạn đã từ chối đề nghị hiển thị một cuộc tranh luận bằng ngôn ngữ khác. — Cho đến khi bạn đóng thẻ",
-        "debateai.support.conversation.v2 — Bộ nhớ phiên — Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi người đăng nhập thay đổi. — Cho đến khi bạn đóng thẻ"
+        "debateai.support.conversation.v2 — Bộ nhớ phiên — Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi có người đăng nhập hoặc đăng xuất trong thẻ này. — Cho đến khi bạn đóng thẻ"
         ]
       },
       { kind: "p", text: "Không có bên nào khác thu thập, thông qua DebateAI, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau." },

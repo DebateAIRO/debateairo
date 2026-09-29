@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Vietinė saugykla — Įsimena, kad jau matėte pranešimą apie slapukus, todėl jis rodomas tik kartą. — Kol jo neišvalysite",
         "debateai.mode — Vietinė saugykla — Ar naudojate šviesųjį, ar tamsųjį režimą. — Kol jo neišvalysite",
         "debateai.languageOffer.dismissed — Seanso saugykla — Įsimena šiam skirtukui, kad atsisakėte pasiūlymo parodyti debatus kita kalba. — Kol uždarysite skirtuką",
-        "debateai.support.conversation.v2 — Seanso saugykla — Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai pasikeičia prisijungęs asmuo. — Kol uždarysite skirtuką"
+        "debateai.support.conversation.v2 — Seanso saugykla — Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai šiame skirtuke kas nors prisijungia arba atsijungia. — Kol uždarysite skirtuką"
         ]
       },
       { kind: "p", text: "Jokia kita šalis per DebateAI nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse." },

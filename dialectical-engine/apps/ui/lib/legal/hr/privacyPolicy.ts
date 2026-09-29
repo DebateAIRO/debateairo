@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Lokalna pohrana — Pamti da ste vidjeli obavijest o kolačićima, pa se prikazuje samo jednom. — Dok ga ne izbrišete",
         "debateai.mode — Lokalna pohrana — Upotrebljavate li svijetli ili tamni način prikaza. — Dok ga ne izbrišete",
         "debateai.languageOffer.dismissed — Pohrana sesije — Pamti, za ovu karticu, da ste odbili ponudu da se rasprava prikaže na drugom jeziku. — Dok ne zatvorite karticu",
-        "debateai.support.conversation.v2 — Pohrana sesije — Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se promijeni prijavljena osoba. — Dok ne zatvorite karticu"
+        "debateai.support.conversation.v2 — Pohrana sesije — Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. — Dok ne zatvorite karticu"
         ]
       },
       { kind: "p", text: "Nijedna druga strana putem DebateAI-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima." },

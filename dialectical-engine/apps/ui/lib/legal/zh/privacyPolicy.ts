@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — 本地存储 — 记录您已看过 Cookie 通知，因此该通知只显示一次。 — 直至您将其清除",
         "debateai.mode — 本地存储 — 记录您使用浅色模式还是深色模式。 — 直至您将其清除",
         "debateai.languageOffer.dismissed — 会话存储 — 在此标签页中记录您已拒绝以其他语言显示辩论的提议。 — 直至您关闭标签页",
-        "debateai.support.conversation.v2 — 会话存储 — 在标签页保持打开期间，让您与帮助聊天的对话留在屏幕上。当登录的人发生变化时，对话会被清除。 — 直至您关闭标签页"
+        "debateai.support.conversation.v2 — 会话存储 — 在标签页保持打开期间，让您与帮助聊天的对话留在屏幕上。只要有人在此标签页中登录或退出登录，对话就会被清除。 — 直至您关闭标签页"
         ]
       },
       { kind: "p", text: "没有任何其他方通过 DebateAI 收集有关您长期以及跨网站的在线活动的信息。" },

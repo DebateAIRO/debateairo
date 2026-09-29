@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Lokal lagring — Kommer ihåg att du har sett meddelandet om kakor, så att det bara visas en gång. — Tills du rensar det",
         "debateai.mode — Lokal lagring — Om du använder ljust eller mörkt läge. — Tills du rensar det",
         "debateai.languageOffer.dismissed — Sessionslagring — Kommer ihåg, för den här fliken, att du tackade nej till att visa en debatt på ett annat språk. — Tills du stänger fliken",
-        "debateai.support.conversation.v2 — Sessionslagring — Håller ditt samtal med hjälpchatten på skärmen så länge fliken är öppen. Det raderas när den inloggade personen byts. — Tills du stänger fliken"
+        "debateai.support.conversation.v2 — Sessionslagring — Håller ditt samtal med hjälpchatten på skärmen så länge fliken är öppen. Det raderas när någon loggar in eller ut i den här fliken. — Tills du stänger fliken"
         ]
       },
       { kind: "p", text: "Ingen annan part samlar via DebateAI in information om dina aktiviteter på nätet över tid och på olika webbplatser." },

@@ -174,7 +174,7 @@ DebateAI utiliza ocho elementos, todos estrictamente necesarios para el servicio
 | `debateai.consent` | Almacenamiento local | Recuerda que ya ha visto el aviso de cookies, para que solo se muestre una vez. | Hasta que lo borre |
 | `debateai.mode` | Almacenamiento local | Si utiliza el modo de visualización claro u oscuro. | Hasta que lo borre |
 | `debateai.languageOffer.dismissed` | Almacenamiento de sesión | Recuerda, para esta pestaña, que rechazó la oferta de mostrar un debate en otro idioma. | Hasta que cierre la pestaña |
-| `debateai.support.conversation.v2` | Almacenamiento de sesión | Mantiene en pantalla su conversación con el chat de ayuda mientras la pestaña siga abierta. Se borra cuando cambia la persona que ha iniciado sesión. | Hasta que cierre la pestaña |
+| `debateai.support.conversation.v2` | Almacenamiento de sesión | Mantiene en pantalla su conversación con el chat de ayuda mientras la pestaña siga abierta. Se borra cuando alguien inicia o cierra sesión en esta pestaña. | Hasta que cierre la pestaña |
 
 Ningún tercero recopila, a través de DebateAI, información sobre sus actividades en línea a lo largo del tiempo y en distintos sitios web.
 

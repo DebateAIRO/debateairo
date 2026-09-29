@@ -174,7 +174,7 @@ DebateAI utilise huit éléments, tous strictement nécessaires au service que v
 | `debateai.consent` | Stockage local | Retient que vous avez vu l’avis sur les cookies, afin qu’il ne s’affiche qu’une fois. | Jusqu’à ce que vous l’effaciez |
 | `debateai.mode` | Stockage local | Votre choix entre le mode clair et le mode sombre. | Jusqu’à ce que vous l’effaciez |
 | `debateai.languageOffer.dismissed` | Stockage de session | Retient, pour cet onglet, que vous avez décliné la proposition d’afficher un débat dans une autre langue. | Jusqu’à la fermeture de l’onglet |
-| `debateai.support.conversation.v2` | Stockage de session | Garde votre conversation avec l’aide à l’écran tant que l’onglet reste ouvert. Elle est effacée quand la personne connectée change. | Jusqu’à la fermeture de l’onglet |
+| `debateai.support.conversation.v2` | Stockage de session | Garde votre conversation avec l’aide à l’écran tant que l’onglet reste ouvert. Elle est effacée quand quelqu’un se connecte ou se déconnecte dans cet onglet. | Jusqu’à la fermeture de l’onglet |
 
 Aucun autre tiers ne collecte, par l'intermédiaire de DebateAI, d'informations sur vos activités en ligne au fil du temps et sur différents sites web.
 

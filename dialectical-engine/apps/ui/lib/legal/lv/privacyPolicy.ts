@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Lokālā krātuve — Atceras, ka esat redzējis paziņojumu par sīkdatnēm, tāpēc tas tiek parādīts tikai vienreiz. — Līdz jūs to notīrāt",
         "debateai.mode — Lokālā krātuve — Vai izmantojat gaišo vai tumšo režīmu. — Līdz jūs to notīrāt",
         "debateai.languageOffer.dismissed — Sesijas krātuve — Atceras šai cilnei, ka atteicāties no piedāvājuma rādīt debates citā valodā. — Līdz jūs aizverat cilni",
-        "debateai.support.conversation.v2 — Sesijas krātuve — Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad mainās pieteikusies persona. — Līdz jūs aizverat cilni"
+        "debateai.support.conversation.v2 — Sesijas krātuve — Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad šajā cilnē kāds pierakstās vai izrakstās. — Līdz jūs aizverat cilni"
         ]
       },
       { kind: "p", text: "Neviena cita puse ar DebateAI starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs." },

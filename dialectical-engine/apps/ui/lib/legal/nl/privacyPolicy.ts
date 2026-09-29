@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Lokale opslag — Onthoudt dat u de cookiemelding hebt gezien, zodat die maar één keer wordt getoond. — Totdat u dit wist",
         "debateai.mode — Lokale opslag — Of u de lichte of de donkere weergave gebruikt. — Totdat u dit wist",
         "debateai.languageOffer.dismissed — Sessieopslag — Onthoudt voor dit tabblad dat u het aanbod hebt afgeslagen om een debat in een andere taal te tonen. — Totdat u het tabblad sluit",
-        "debateai.support.conversation.v2 — Sessieopslag — Houdt uw gesprek met de hulpchat op het scherm zolang het tabblad open blijft. Het wordt gewist wanneer de ingelogde persoon wisselt. — Totdat u het tabblad sluit"
+        "debateai.support.conversation.v2 — Sessieopslag — Houdt uw gesprek met de hulpchat op het scherm zolang het tabblad open blijft. Het wordt gewist wanneer iemand zich in dit tabblad aanmeldt of afmeldt. — Totdat u het tabblad sluit"
         ]
       },
       { kind: "p", text: "Geen enkele andere partij verzamelt via DebateAI informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen." },

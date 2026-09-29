@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Stóras áitiúil — Cuimhníonn sé go bhfaca tú an fógra fianán, ionas nach dtaispeántar é ach uair amháin. — Go dtí go nglanann tú é",
         "debateai.mode — Stóras áitiúil — Cé acu an mód geal nó an mód dorcha a úsáideann tú. — Go dtí go nglanann tú é",
         "debateai.languageOffer.dismissed — Stóras seisiúin — Cuimhníonn sé, don chluaisín seo, gur dhiúltaigh tú don tairiscint díospóireacht a thaispeáint i dteanga eile. — Go dtí go ndúnann tú an cluaisín",
-        "debateai.support.conversation.v2 — Stóras seisiúin — Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a athraíonn an duine atá sínithe isteach. — Go dtí go ndúnann tú an cluaisín"
+        "debateai.support.conversation.v2 — Stóras seisiúin — Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a shíníonn duine ar bith isteach nó amach sa chluaisín seo. — Go dtí go ndúnann tú an cluaisín"
         ]
       },
       { kind: "p", text: "Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí DebateAI." },

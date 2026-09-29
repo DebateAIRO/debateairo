@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Lokálne úložisko — Pamätá si, že ste oznámenie o súboroch cookie už videli, takže sa zobrazí iba raz. — Do vymazania",
         "debateai.mode — Lokálne úložisko — Či používate svetlý, alebo tmavý režim zobrazenia. — Do vymazania",
         "debateai.languageOffer.dismissed — Úložisko relácie — Pamätá si pre túto kartu, že ste odmietli ponuku zobraziť debatu v inom jazyku. — Do zatvorenia karty",
-        "debateai.support.conversation.v2 — Úložisko relácie — Drží vašu konverzáciu s chatom pomoci na obrazovke, kým je karta otvorená. Vymaže sa, keď sa zmení prihlásená osoba. — Do zatvorenia karty"
+        "debateai.support.conversation.v2 — Úložisko relácie — Drží vašu konverzáciu s chatom pomoci na obrazovke, kým je karta otvorená. Vymaže sa, keď sa na tejto karte ktokoľvek prihlási alebo odhlási. — Do zatvorenia karty"
         ]
       },
       { kind: "p", text: "Žiadna iná strana prostredníctvom DebateAI nezhromažďuje informácie o vašich online aktivitách v priebehu času a naprieč webovými stránkami." },

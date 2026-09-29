@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Local storage — Remembers that you have seen the cookie notice, so it is shown once. — Until you clear it",
         "debateai.mode — Local storage — Whether you use the light or the dark display. — Until you clear it",
         "debateai.languageOffer.dismissed — Session storage — Remembers, for this tab, that you declined the offer to show a debate in another language. — Until you close the tab",
-        "debateai.support.conversation.v2 — Session storage — Keeps your help-chat conversation on screen while the tab stays open. It is erased when the signed-in person changes. — Until you close the tab"
+        "debateai.support.conversation.v2 — Session storage — Keeps your help-chat conversation on screen while the tab stays open. It is erased when someone signs in or signs out in this tab. — Until you close the tab"
         ]
       },
       { kind: "p", text: "No other party collects information about your online activities over time and across websites through DebateAI." },

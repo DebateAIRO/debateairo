@@ -174,7 +174,7 @@ DebateAI verwendet acht Elemente, die alle für den von Ihnen angeforderten Dien
 | `debateai.consent` | Lokaler Speicher | Merkt sich, dass Sie den Cookie-Hinweis gesehen haben, damit er nur einmal erscheint. | Bis zur Löschung |
 | `debateai.mode` | Lokaler Speicher | Ob Sie die helle oder die dunkle Darstellung verwenden. | Bis zur Löschung |
 | `debateai.languageOffer.dismissed` | Sitzungsspeicher | Merkt sich für diesen Tab, dass Sie das Angebot abgelehnt haben, eine Debatte in einer anderen Sprache zu zeigen. | Bis Sie den Tab schließen |
-| `debateai.support.conversation.v2` | Sitzungsspeicher | Hält Ihr Gespräch mit dem Hilfe-Chat auf dem Bildschirm, solange der Tab offen ist. Es wird gelöscht, wenn die angemeldete Person wechselt. | Bis Sie den Tab schließen |
+| `debateai.support.conversation.v2` | Sitzungsspeicher | Hält Ihr Gespräch mit dem Hilfe-Chat auf dem Bildschirm, solange der Tab offen ist. Es wird gelöscht, sobald sich in diesem Tab jemand anmeldet oder abmeldet. | Bis Sie den Tab schließen |
 
 Keine andere Partei erhebt über DebateAI Informationen über Ihre Online-Aktivitäten im Zeitverlauf und über verschiedene Websites hinweg.
 

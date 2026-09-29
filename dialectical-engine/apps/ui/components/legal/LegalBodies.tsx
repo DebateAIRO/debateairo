@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -254,12 +254,30 @@ export function LegalVersionsBody({ legalCatalog }: { legalCatalog: MessageCatal
   );
 }
 
+/**
+ * A stored item's name, breakable only after a dot (DONE.md default 8): each dot-ended part is one run that
+ * `legal.css` keeps from wrapping, with a <wbr> after it. The text is the name exactly, so a copy is the real key.
+ */
+function InventoryName({ name }: { name: string }) {
+  const parts = name.split(/(?<=\.)/);
+  return (
+    <code>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          <span className="legalNamePart">{part}</span>
+          {index < parts.length - 1 ? <wbr /> : null}
+        </Fragment>
+      ))}
+    </code>
+  );
+}
+
 /** One /cookies row: the name as the code writes it, then kind, purpose, who receives it, and lifetime. */
 function InventoryRow({ item, legalCatalog }: { item: LegalInventoryItem; legalCatalog: MessageCatalog }) {
   return (
     <tr>
       <th scope="row">
-        <code>{item.name}</code>
+        <InventoryName name={item.name} />
       </th>
       <td className="legalKindCell">{t(legalCatalog, item.kindKey)}</td>
       <td>{t(legalCatalog, item.purposeKey)}</td>

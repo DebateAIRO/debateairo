@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Armazenamento local — Lembra-se de que já viu o aviso de cookies, para que seja mostrado apenas uma vez. — Até o apagar",
         "debateai.mode — Armazenamento local — Se utiliza o modo de apresentação claro ou escuro. — Até o apagar",
         "debateai.languageOffer.dismissed — Armazenamento de sessão — Lembra-se, para este separador, de que recusou a proposta de mostrar um debate noutra língua. — Até fechar o separador",
-        "debateai.support.conversation.v2 — Armazenamento de sessão — Mantém a sua conversa com o chat de ajuda no ecrã enquanto o separador estiver aberto. É apagada quando muda a pessoa com sessão iniciada. — Até fechar o separador"
+        "debateai.support.conversation.v2 — Armazenamento de sessão — Mantém a sua conversa com o chat de ajuda no ecrã enquanto o separador estiver aberto. É apagada quando alguém inicia ou termina sessão neste separador. — Até fechar o separador"
         ]
       },
       { kind: "p", text: "Nenhuma outra parte recolhe, através do DebateAI, informações sobre as suas atividades online ao longo do tempo e em diferentes sítios web." },

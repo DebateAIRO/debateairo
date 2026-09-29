@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Helyi tárhely — Megjegyzi, hogy Ön már látta a sütikről szóló értesítést, így az csak egyszer jelenik meg. — Amíg Ön nem törli",
         "debateai.mode — Helyi tárhely — Megjegyzi, hogy a világos vagy a sötét módot használja. — Amíg Ön nem törli",
         "debateai.languageOffer.dismissed — Munkamenet-tárhely — Megjegyzi ennél a lapnál, hogy Ön elutasította az ajánlatot, hogy egy vitát más nyelven mutassunk meg. — Amíg be nem zárja a lapot",
-        "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, ha a bejelentkezett személy megváltozik. — Amíg be nem zárja a lapot"
+        "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. — Amíg be nem zárja a lapot"
         ]
       },
       { kind: "p", text: "Semmilyen más fél nem gyűjt a DebateAI-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },

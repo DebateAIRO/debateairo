@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.consent — Pamięć lokalna — Zapamiętuje, że komunikat o plikach cookie był już wyświetlony, więc pokazuje się tylko raz. — Do wyczyszczenia",
         "debateai.mode — Pamięć lokalna — Czy korzystasz z trybu jasnego, czy ciemnego. — Do wyczyszczenia",
         "debateai.languageOffer.dismissed — Pamięć sesji — Zapamiętuje dla tej karty, że odrzucono propozycję pokazania debaty w innym języku. — Do zamknięcia karty",
-        "debateai.support.conversation.v2 — Pamięć sesji — Utrzymuje Twoją rozmowę z czatem pomocy na ekranie, dopóki karta jest otwarta. Zostaje usunięta, gdy zmieni się zalogowana osoba. — Do zamknięcia karty"
+        "debateai.support.conversation.v2 — Pamięć sesji — Utrzymuje Twoją rozmowę z czatem pomocy na ekranie, dopóki karta jest otwarta. Zostaje usunięta, gdy ktokolwiek zaloguje się lub wyloguje w tej karcie. — Do zamknięcia karty"
         ]
       },
       { kind: "p", text: "Żaden inny podmiot nie zbiera za pośrednictwem DebateAI informacji o Twojej aktywności w internecie na przestrzeni czasu i w różnych witrynach." },
