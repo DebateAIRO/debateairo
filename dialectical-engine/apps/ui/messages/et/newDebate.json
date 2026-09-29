@@ -24,7 +24,7 @@
   "newDebate.medium": "Keskmine",
   "newDebate.high": "Kõrge",
   "newDebate.treeDepth": "Puu sügavus",
-  "newDebate.treeDepthHint": "Kui kaugele väitlus laieneb, kui saadaval on teise koostaja hinnang",
+  "newDebate.treeDepthHint": "Kui kaugele väitlus laieneb, kui saadaval on teise arendaja mudeli hinnang",
   "newDebate.steeringSelections": "Suunamismenüü valikud",
   "newDebate.onePerLine": "Üks rea kohta",
   "newDebate.steeringPlaceholder": "Eelistage esmaseid allikaid\nTooge tugevaim vastuargument varakult esile",

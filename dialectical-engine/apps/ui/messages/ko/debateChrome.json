@@ -189,7 +189,7 @@
   "debateChrome.condition.unpriced": "기권 셀 가격 미정",
   "debateChrome.condition.unadjudicated": "불리한 근거를 찾지 못함",
   "debateChrome.condition.uncoveredScope": "범위가 완전히 다뤄지지 않음",
-  "debateChrome.condition.unservedMakerPosition": "다른 작성자의 입장이 제공되지 않음",
+  "debateChrome.condition.unservedMakerPosition": "다른 개발사 모델의 입장이 제공되지 않음",
   "debateChrome.condition.nonComparable": "결과의 연산 조건이 일치하지 않음",
   "debateChrome.condition.notSampled": "표본 미추출",
   "debateChrome.condition.offSubjectDowngrade": "주제에서 벗어난 근거의 등급 하향",

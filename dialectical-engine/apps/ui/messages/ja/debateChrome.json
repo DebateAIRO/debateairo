@@ -189,7 +189,7 @@
   "debateChrome.condition.unpriced": "回答保留セルのコスト未算定",
   "debateChrome.condition.unadjudicated": "不利な証拠は見つからず",
   "debateChrome.condition.uncoveredScope": "対象範囲を完全には網羅せず",
-  "debateChrome.condition.unservedMakerPosition": "別の生成者の立場は未提供",
+  "debateChrome.condition.unservedMakerPosition": "別の開発元のモデルの立場は未提供",
   "debateChrome.condition.nonComparable": "結果の計算条件が一致せず",
   "debateChrome.condition.notSampled": "未抽出",
   "debateChrome.condition.offSubjectDowngrade": "主題外の証拠として評価を引き下げ",

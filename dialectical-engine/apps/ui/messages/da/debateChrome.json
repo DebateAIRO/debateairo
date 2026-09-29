@@ -190,7 +190,7 @@
   "debateChrome.condition.unpriced": "Afståelsescelle ikke prissat",
   "debateChrome.condition.unadjudicated": "Ingen modstridende evidens fundet",
   "debateChrome.condition.uncoveredScope": "Omfanget er ikke fuldt dækket",
-  "debateChrome.condition.unservedMakerPosition": "En anden ophavspersons position blev ikke forelagt",
+  "debateChrome.condition.unservedMakerPosition": "En anden modeludviklers position blev ikke forelagt",
   "debateChrome.condition.nonComparable": "Resultaternes beregningsgrundlag er ikke sammenligneligt",
   "debateChrome.condition.notSampled": "Ikke udtaget",
   "debateChrome.condition.offSubjectDowngrade": "Evidens uden for emnet nedgraderet",

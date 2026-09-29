@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Пробелы",
   "debateDrawers.node.honestyAriaLabel": "Добросовестность узла V3",
   "debateDrawers.node.noArgumentText": "Текст аргумента пока отсутствует.",
-  "debateDrawers.node.noCompletedReview": "Для этого узла нет записанной завершённой рецензии модели другого разработчика.",
+  "debateDrawers.node.noCompletedReview": "Для этого узла нет записанной завершённой проверки моделью другого разработчика.",
   "debateDrawers.node.noPreviousGenerations": "Предыдущих вариантов нет.",
   "debateDrawers.node.noScoringRecommendation": "Для этого аргумента нет рекомендации по результатам оценки.",
   "debateDrawers.node.notUseful": "не полезно",

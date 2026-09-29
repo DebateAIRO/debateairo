@@ -24,7 +24,7 @@
   "newDebate.medium": "Medio",
   "newDebate.high": "Alto",
   "newDebate.treeDepth": "Profundidad del árbol",
-  "newDebate.treeDepthHint": "Hasta dónde se amplía el debate cuando está disponible la revisión cruzada de autores",
+  "newDebate.treeDepthHint": "Hasta dónde se amplía el debate cuando está disponible la revisión cruzada entre modelos de distintos desarrolladores",
   "newDebate.steeringSelections": "Selecciones del menú de orientación",
   "newDebate.onePerLine": "Una por línea",
   "newDebate.steeringPlaceholder": "Dar preferencia a las fuentes primarias\nPresentar pronto el contraargumento más sólido",

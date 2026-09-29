@@ -190,7 +190,7 @@
   "debateChrome.condition.unpriced": "Клітинку утримання від оцінки не оцінено",
   "debateChrome.condition.unadjudicated": "Несприятливих доказів не знайдено",
   "debateChrome.condition.uncoveredScope": "Охоплення неповне",
-  "debateChrome.condition.unservedMakerPosition": "Позицію іншого автора не надано",
+  "debateChrome.condition.unservedMakerPosition": "Позицію моделі іншого розробника не надано",
   "debateChrome.condition.nonComparable": "Результати отримано за різних обчислювальних умов",
   "debateChrome.condition.notSampled": "Не перевірялося",
   "debateChrome.condition.offSubjectDowngrade": "Статус доказів не за темою знижено",

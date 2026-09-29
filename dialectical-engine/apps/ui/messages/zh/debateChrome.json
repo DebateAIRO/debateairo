@@ -189,7 +189,7 @@
   "debateChrome.condition.unpriced": "弃权单元未定价",
   "debateChrome.condition.unadjudicated": "未发现不利证据",
   "debateChrome.condition.uncoveredScope": "范围未完全覆盖",
-  "debateChrome.condition.unservedMakerPosition": "另一生成者的立场未提供",
+  "debateChrome.condition.unservedMakerPosition": "另一开发方模型的立场未提供",
   "debateChrome.condition.nonComparable": "结果的计算条件不匹配",
   "debateChrome.condition.notSampled": "未抽样",
   "debateChrome.condition.offSubjectDowngrade": "偏离主题的证据已降级",

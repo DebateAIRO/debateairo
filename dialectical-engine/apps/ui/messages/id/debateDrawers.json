@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Celah",
   "debateDrawers.node.honestyAriaLabel": "Kejujuran simpul V3",
   "debateDrawers.node.noArgumentText": "Belum ada teks argumen.",
-  "debateDrawers.node.noCompletedReview": "Belum ada tinjauan pembuat kedua yang selesai dicatat untuk simpul ini.",
+  "debateDrawers.node.noCompletedReview": "Belum ada tinjauan selesai dari pembuat kedua yang tercatat untuk simpul ini.",
   "debateDrawers.node.noPreviousGenerations": "Tidak ada hasil pembuatan sebelumnya.",
   "debateDrawers.node.noScoringRecommendation": "Tidak ada rekomendasi penilaian untuk argumen ini.",
   "debateDrawers.node.notUseful": "tidak berguna",

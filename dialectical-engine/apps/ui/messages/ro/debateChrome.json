@@ -191,7 +191,7 @@
   "debateChrome.condition.unpriced": "Celula de abținere nu are cost stabilit",
   "debateChrome.condition.unadjudicated": "Nu au fost găsite dovezi contrare",
   "debateChrome.condition.uncoveredScope": "Domeniul nu este acoperit integral",
-  "debateChrome.condition.unservedMakerPosition": "Poziția altui autor nu a fost furnizată",
+  "debateChrome.condition.unservedMakerPosition": "Poziția unui model al altui dezvoltator nu a fost furnizată",
   "debateChrome.condition.nonComparable": "Rezultatele nu au resurse de calcul echivalente",
   "debateChrome.condition.notSampled": "Neeșantionat",
   "debateChrome.condition.offSubjectDowngrade": "Dovezile fără legătură cu subiectul au fost retrogradate",

@@ -24,7 +24,7 @@
   "newDebate.medium": "中",
   "newDebate.high": "高",
   "newDebate.treeDepth": "树深度",
-  "newDebate.treeDepthHint": "可进行跨模型评审时，辩论向下展开的程度",
+  "newDebate.treeDepthHint": "不同开发方的模型可相互评审时，辩论向下展开的程度",
   "newDebate.steeringSelections": "引导菜单选项",
   "newDebate.onePerLine": "每行一项",
   "newDebate.steeringPlaceholder": "优先采用一手资料\n尽早呈现最有力的反方论证",

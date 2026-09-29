@@ -189,7 +189,7 @@
   "debateChrome.condition.unpriced": "Chưa định giá ô từ chối trả lời",
   "debateChrome.condition.unadjudicated": "Không tìm thấy bằng chứng bất lợi",
   "debateChrome.condition.uncoveredScope": "Phạm vi chưa được bao quát đầy đủ",
-  "debateChrome.condition.unservedMakerPosition": "Quan điểm của một bên tạo khác chưa được cung cấp",
+  "debateChrome.condition.unservedMakerPosition": "Quan điểm của mô hình từ một nhà phát triển khác chưa được cung cấp",
   "debateChrome.condition.nonComparable": "Kết quả không khớp về mức tính toán",
   "debateChrome.condition.notSampled": "Không lấy mẫu",
   "debateChrome.condition.offSubjectDowngrade": "Bằng chứng lạc đề đã bị hạ cấp",

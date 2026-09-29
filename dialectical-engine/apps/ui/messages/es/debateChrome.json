@@ -191,7 +191,7 @@
   "debateChrome.condition.unpriced": "Celda de abstención sin valorar",
   "debateChrome.condition.unadjudicated": "No se encontraron pruebas en contra",
   "debateChrome.condition.uncoveredScope": "Alcance no cubierto por completo",
-  "debateChrome.condition.unservedMakerPosition": "No se presentó la postura de otro autor",
+  "debateChrome.condition.unservedMakerPosition": "No se presentó la postura de un modelo de otro desarrollador",
   "debateChrome.condition.nonComparable": "Los resultados no se obtuvieron con recursos informáticos equivalentes",
   "debateChrome.condition.notSampled": "Sin muestra",
   "debateChrome.condition.offSubjectDowngrade": "Se redujo la valoración de las pruebas ajenas al tema",

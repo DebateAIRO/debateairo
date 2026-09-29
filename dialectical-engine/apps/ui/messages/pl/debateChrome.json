@@ -190,7 +190,7 @@
   "debateChrome.condition.unpriced": "Nie wyceniono komórki wstrzymania się od odpowiedzi",
   "debateChrome.condition.unadjudicated": "Nie znaleziono dowodów przeciwnych",
   "debateChrome.condition.uncoveredScope": "Zakres nie został w pełni pokryty",
-  "debateChrome.condition.unservedMakerPosition": "Nie udostępniono stanowiska innego autora",
+  "debateChrome.condition.unservedMakerPosition": "Nie udostępniono stanowiska modelu innego twórcy",
   "debateChrome.condition.nonComparable": "Wyniki nie mają porównywalnego nakładu obliczeniowego",
   "debateChrome.condition.notSampled": "Nie pobrano próby",
   "debateChrome.condition.offSubjectDowngrade": "Obniżono wagę dowodów niezwiązanych z tematem",

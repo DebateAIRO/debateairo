@@ -190,7 +190,7 @@
   "debateChrome.condition.unpriced": "Pidättymissolua ei pisteytetty",
   "debateChrome.condition.unadjudicated": "Vastakkaista näyttöä ei löytynyt",
   "debateChrome.condition.uncoveredScope": "Käyttöaluetta ei katettu kokonaan",
-  "debateChrome.condition.unservedMakerPosition": "Toisen laatijan kantaa ei käsitelty",
+  "debateChrome.condition.unservedMakerPosition": "Toisen kehittäjän mallin kantaa ei esitetty",
   "debateChrome.condition.nonComparable": "Tuloksia ei ole laskettu vertailukelpoisesti",
   "debateChrome.condition.notSampled": "Ei otettu näytteeseen",
   "debateChrome.condition.offSubjectDowngrade": "Aiheeseen kuulumattoman näytön arvoa alennettiin",

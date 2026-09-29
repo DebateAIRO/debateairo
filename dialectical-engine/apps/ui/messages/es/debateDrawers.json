@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Lagunas",
   "debateDrawers.node.honestyAriaLabel": "Honestidad del nodo V3",
   "debateDrawers.node.noArgumentText": "Aún no hay texto para el argumento.",
-  "debateDrawers.node.noCompletedReview": "No hay registrada ninguna revisión finalizada por un segundo autor para este nodo.",
+  "debateDrawers.node.noCompletedReview": "No hay registrada ninguna revisión finalizada por un modelo de otro desarrollador para este nodo.",
   "debateDrawers.node.noPreviousGenerations": "No hay generaciones anteriores.",
   "debateDrawers.node.noScoringRecommendation": "No hay ninguna recomendación de puntuación disponible para este argumento.",
   "debateDrawers.node.notUseful": "no útil",

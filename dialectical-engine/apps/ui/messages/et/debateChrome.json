@@ -190,7 +190,7 @@
   "debateChrome.condition.unpriced": "Vastusest hoidumise lahter on hindamata",
   "debateChrome.condition.unadjudicated": "Vastupidiseid tõendeid ei leitud",
   "debateChrome.condition.uncoveredScope": "Ulatus pole täielikult kaetud",
-  "debateChrome.condition.unservedMakerPosition": "Teise koostaja seisukohta ei esitatud",
+  "debateChrome.condition.unservedMakerPosition": "Teise arendaja mudeli seisukohta ei esitatud",
   "debateChrome.condition.nonComparable": "Tulemused pole arvutusmahu poolest võrreldavad",
   "debateChrome.condition.notSampled": "Valimisse kaasamata",
   "debateChrome.condition.offSubjectDowngrade": "Teemaväliste tõendite kaalu vähendati",

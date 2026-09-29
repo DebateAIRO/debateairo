@@ -24,7 +24,7 @@
   "newDebate.medium": "Střední",
   "newDebate.high": "Vysoký",
   "newDebate.treeDepth": "Hloubka stromu",
-  "newDebate.treeDepthHint": "Jak daleko se debata rozvine, když je k dispozici křížová kontrola mezi modely",
+  "newDebate.treeDepthHint": "Jak daleko se debata rozvine, když je k dispozici křížová kontrola mezi modely různých tvůrců",
   "newDebate.steeringSelections": "Volby nabídky řízení",
   "newDebate.onePerLine": "Jeden na řádek",
   "newDebate.steeringPlaceholder": "Preferujte primární zdroje\nNejsilnější protipouzdro vyrovnejte brzy",
