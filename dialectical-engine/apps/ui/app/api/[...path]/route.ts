@@ -1,3 +1,8 @@
+import {
+  AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
+  AGE_REFUSAL_COOKIE_NAME,
+  AGE_REFUSAL_COOKIE_VALUE
+} from "@debateai/contract";
 import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../../../trusted-client-ip.mjs";
 
 type ProxyContext = Readonly<{
@@ -112,12 +117,17 @@ function filteredSessionCookies(raw: string | null): string | null {
     const index = member.indexOf("=");
     if (index < 1) continue;
     const name = member.slice(0, index).trim();
-    if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) continue;
     const value = member.slice(index + 1).trim();
+    // Age gate (8j): the lockout travels only in its one constant value.
+    if (name === AGE_REFUSAL_COOKIE_NAME) {
+      if (value === AGE_REFUSAL_COOKIE_VALUE) selected.set(name, value);
+      continue;
+    }
+    if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) continue;
     if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
     selected.set(name, value);
   }
-  const pairs = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME].flatMap((name) => {
+  const pairs = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, AGE_REFUSAL_COOKIE_NAME].flatMap((name) => {
     const value = selected.get(name);
     return value === undefined ? [] : [`${name}=${value}`];
   });
@@ -131,6 +141,11 @@ function lawfulSetCookie(value: string): boolean {
   const pairSeparator = pair.indexOf("=");
   if (pairSeparator < 1) return false;
   const name = pair.slice(0, pairSeparator);
+  if (name === AGE_REFUSAL_COOKIE_NAME) {
+    // Age gate (8j): exactly the API's lockout, nothing else under this name.
+    return value === `${AGE_REFUSAL_COOKIE_NAME}=${AGE_REFUSAL_COOKIE_VALUE}; Path=/; `
+      + `Max-Age=${AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax`;
+  }
   if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) return false;
   const cookieValue = pair.slice(pairSeparator + 1);
   const attributes = members.slice(1).map((member) => member.toLowerCase());

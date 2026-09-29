@@ -1789,6 +1789,7 @@ export {
   PostgresIdentityRepository,
   type AuthSourceContext,
   type PendingAccountInput,
+  type RegistrationAgeCheck,
   type PendingAccountResult,
   type RecoveryCodeRecord,
   type ResendPreparation,

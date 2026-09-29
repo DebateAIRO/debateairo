@@ -5302,6 +5302,7 @@ setTimeout(() => undefined, 500);
         passwordHash: "s3b-f3-password-hash",
         pseudonym: `s3b-f3-${userId}`,
         adultAffirmedAt: new Date("2026-08-20T00:00:00.000Z"),
+        ageCheck: { minAgeApplied: 18, countryCode: null, ruleVersion: "age-gate/v2-single-min-age-18" },
         verificationTokenHash: createHash("sha256").update(generateVerificationToken()).digest("hex"),
         verificationExpiresAt: new Date("2026-08-21T00:00:00.000Z"),
         occurredAt: new Date("2026-08-20T00:00:00.000Z"),
@@ -5697,7 +5698,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           email,
           password: "correct horse battery staple",
           recovery_email: recoveryEmail,
-          adult_affirmed: true
+          date_of_birth: "1990-01-01"
         },
         remoteAddress: ip,
         headers: { "user-agent": "vitest-t9" }

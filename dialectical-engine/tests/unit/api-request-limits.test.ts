@@ -78,8 +78,8 @@ function fixtureApplication(): AskApplication {
 }
 
 /** A JSON document of exactly `totalBytes` bytes. */
-function jsonBodyOfBytes(totalBytes: number): string {
-  const body = `{"filler":"${"a".repeat(totalBytes - 13)}"}`;
+function jsonBodyOfBytes(totalBytes: number, prefix = ""): string {
+  const body = `{${prefix}"filler":"${"a".repeat(totalBytes - 13 - prefix.length)}"}`;
   if (Buffer.byteLength(body, "utf8") !== totalBytes) throw new Error("FIXTURE_SIZE_MISMATCH");
   return body;
 }
@@ -176,7 +176,8 @@ describe("API request limits (F-07, L1-F4)", () => {
     try {
       const response = await api.inject({
         method: "POST", url: "/v1/auth/register", headers: JSON_HEADERS,
-        payload: jsonBodyOfBytes(AUTH_BODY_LIMIT_BYTES)
+        // Register reaches the service only past the age gate, so the body carries an adult date.
+        payload: jsonBodyOfBytes(AUTH_BODY_LIMIT_BYTES, '"date_of_birth":"1990-01-01",')
       });
       expect(response.statusCode).toBe(202);
       expect(registration.register).toHaveBeenCalledTimes(1);
@@ -251,7 +252,7 @@ describe("API request limits (F-07, L1-F4)", () => {
       const overByLength = "p".repeat(AUTH_PASSWORD_MAX_BYTES + 1);
       const atLimit = "p".repeat(AUTH_PASSWORD_MAX_BYTES);
       const registerBody = (password: string) => ({
-        email: "alice@example.test", password, recovery_email: "", adult_affirmed: true
+        email: "alice@example.test", password, recovery_email: "", date_of_birth: "1990-01-01"
       });
 
       for (const password of [overByBytes, overByLength]) {

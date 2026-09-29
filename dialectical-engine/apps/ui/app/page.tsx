@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { AiNotice } from "@/components/AiNotice";
 import { cookies, headers } from "next/headers";
+import { AgeConfirmationFlow } from "@/components/AgeConfirmationFlow";
+import { resolveDobLocale } from "@/lib/dob/dobLocale";
 import { createServerContractClient, listDebatesPageServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
@@ -66,6 +68,22 @@ export default async function HomePage({
     } catch {
       error = t(catalog, "home.sessionUnconfirmed");
     }
+  }
+  // Age gate (8k): a signed-in account created before the date-of-birth field answers its
+  // one-time check here, before anything else. A failed read falls through to the home page.
+  let ageCheckOwed = false;
+  if (sessionConfirmed) {
+    try {
+      ageCheckOwed = (await createServerContractClient(fetch, token, userAgent, clientIp)
+        .readAgeConfirmation()).status === "required";
+    } catch {
+      ageCheckOwed = false;
+    }
+  }
+  if (ageCheckOwed) {
+    const authCatalog = await loadNamespace(locale, "auth");
+    const dobLocale = resolveDobLocale(locale, (await headers()).get("accept-language"));
+    return <AgeConfirmationFlow catalog={authCatalog} dobLocale={dobLocale} />;
   }
 
   // V's ruling of 2026-09-20: the chip counts what is on screen. It used to

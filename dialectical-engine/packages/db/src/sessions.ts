@@ -471,6 +471,49 @@ export class PostgresSessionRepository {
     });
   }
 
+  /** The account's age record: "required" until the one-time check has been answered. */
+  async readAgeCheckOutcome(userId: string): Promise<"required" | "passed" | "refused"> {
+    const result = await this.pool.query<{ outcome: "required" | "passed" | "refused" }>(
+      "SELECT identity.read_age_check_outcome($1) AS outcome",
+      [userId]
+    );
+    const outcome = result.rows[0]?.outcome;
+    if (outcome !== "required" && outcome !== "passed" && outcome !== "refused") {
+      throw new Error("AGE_CHECK_OUTCOME_INVALID");
+    }
+    return outcome;
+  }
+
+  /**
+   * Records the one-time age check of an existing account from a session it owns. A refusal
+   * revokes every session of the account and freezes it, in the same transaction.
+   */
+  async confirmAccountAge(input: Readonly<{
+    userId: string;
+    sessionId: string;
+    passed: boolean;
+    minAgeApplied: number;
+    countryCode: string | null;
+    ruleVersion: string;
+    occurredAt: Date;
+    source: AuthSourceContext;
+  }>): Promise<"passed" | "refused" | "SESSION_NOT_FOUND"> {
+    const prepared = await this.prepareAuditContext(input.source);
+    return this.transaction(async (client) => {
+      const result = await client.query<{ outcome: "passed" | "refused" | "SESSION_NOT_FOUND" }>(`
+        SELECT identity.confirm_account_age_with_audit($1,$2,$3,$4::smallint,$5,$6,$7,$8::jsonb) AS outcome
+      `, [input.userId, input.sessionId, input.passed, input.minAgeApplied, input.countryCode,
+        input.ruleVersion, input.occurredAt, JSON.stringify({
+          ipArgon2id: prepared.ipArgon2id, userAgentArgon2id: prepared.userAgentArgon2id
+        })]);
+      const outcome = result.rows[0]?.outcome;
+      if (outcome !== "passed" && outcome !== "refused" && outcome !== "SESSION_NOT_FOUND") {
+        throw new Error("AGE_CHECK_OUTCOME_INVALID");
+      }
+      return outcome;
+    });
+  }
+
   async readStepUpIdentity(userId: string): Promise<LoginIdentityRecord | null> {
     const result = await this.pool.query<{
       user_id: string; owner_ref: string; audit_token: string; password_hash: string;

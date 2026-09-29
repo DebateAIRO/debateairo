@@ -1,5 +1,9 @@
 import {
   AccountErasureCancelRequestSchema,
+  AgeCheckResultSchema,
+  AgeConfirmationStatusSchema,
+  type AgeCheckResult,
+  type AgeConfirmationStatus,
   AccountErasureCancelledSchema,
   AccountErasureStatusSchema,
   AnswerSchema,
@@ -221,11 +225,13 @@ const ResendVerificationPublicResponseSchema = exactPublicMessageSchema(RESEND_V
 const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
 
 export interface ContractClient {
+  /** Age gate: answers `refused` (and sets the lockout cookie) for anyone under the minimum age. */
+  checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
   register(
     email: string,
     password: string,
     recoveryEmail: string,
-    adultAffirmed: boolean
+    dateOfBirth: string
   ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
   resendVerification(email: string): Promise<Readonly<{
     message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
@@ -244,6 +250,10 @@ export interface ContractClient {
   listSessions(): Promise<SessionList>;
   revokeSession(sessionId: string): Promise<void>;
   revokeAllSessions(): Promise<{ revoked: number }>;
+  /** Existing accounts without an age record answer `required` (the one-time 8k interstitial). */
+  readAgeConfirmation(): Promise<AgeConfirmationStatus>;
+  /** `refused` freezes the account, ends its sessions and sets the lockout cookie. */
+  confirmAge(dateOfBirth: string): Promise<AgeCheckResult>;
   stepUp(password: string, code: string, authorization?:
     | Readonly<{
       action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
@@ -363,11 +373,16 @@ export function createContractClient(
     }
   };
   return Object.freeze({
+    checkAge: (dateOfBirth: string) => request(
+      "/v1/auth/age-check",
+      AgeCheckResultSchema,
+      { method: "POST", body: JSON.stringify({ date_of_birth: dateOfBirth }) }
+    ),
     register: (
       email: string,
       password: string,
       recoveryEmail: string,
-      adultAffirmed: boolean
+      dateOfBirth: string
     ) => request(
       "/v1/auth/register",
       RegistrationPublicResponseSchema,
@@ -375,9 +390,15 @@ export function createContractClient(
           email,
           password,
           recovery_email: recoveryEmail,
-          adult_affirmed: adultAffirmed
+          date_of_birth: dateOfBirth
         }) },
       202
+    ),
+    readAgeConfirmation: () => request("/v1/auth/age-confirmation", AgeConfirmationStatusSchema),
+    confirmAge: (dateOfBirth: string) => request(
+      "/v1/auth/age-confirmation",
+      AgeCheckResultSchema,
+      { method: "POST", body: JSON.stringify({ date_of_birth: dateOfBirth }) }
     ),
     resendVerification: (email: string) => request(
       "/v1/auth/resend-verification",

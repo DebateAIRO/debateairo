@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmation";
 import { COOKIE_SESSION_MARKER, validateSession } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
@@ -19,9 +20,25 @@ export function AuthGate({
   useEffect(() => {
     let active = true;
     void validateSession().then(
-      () => { if (active) setAuthenticated(true); },
-      () => { if (active) setAuthenticated(false); }
-    ).finally(() => { if (active) setChecking(false); });
+      async () => {
+        // Age gate (8k): a session opened before the date-of-birth field still owes the
+        // one-time check, so the page waits behind "checking" while the interstitial loads.
+        if (await ageConfirmationRequired()) {
+          window.location.replace(ageConfirmationHref(`${window.location.pathname}${window.location.search}`));
+          return;
+        }
+        if (active) {
+          setAuthenticated(true);
+          setChecking(false);
+        }
+      },
+      () => {
+        if (active) {
+          setAuthenticated(false);
+          setChecking(false);
+        }
+      }
+    );
     return () => { active = false; };
   }, []);
 

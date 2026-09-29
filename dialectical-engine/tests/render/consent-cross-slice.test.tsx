@@ -102,7 +102,8 @@ const activate = (b: HTMLButtonElement): void => {
 
 /** BOTH slices mounted in ONE document, the way `layout.tsx:45-49` composes them. */
 async function mountBoth(): Promise<void> {
-  const client = { register: vi.fn() };
+  /* A fresh fake per mount, so `checkAge` is reset exactly like `register`. */
+  const client = { register: vi.fn(), checkAge: vi.fn().mockResolvedValue({ outcome: "allowed" }) };
   await act(async () => {
     root!.render(
       <div className="appShell">
@@ -120,7 +121,8 @@ async function mountBoth(): Promise<void> {
 describe("cross-slice integration — both consent surfaces in one document", () => {
   it("P1 · both slices' surfaces coexist in one document", async () => {
     await mountBoth();
-    expect(document.querySelectorAll(".consentGroup .consentRow").length, "S02 rows").toBe(3);
+    // Two rows (privacy, terms): the age gate replaced the 18+ row (Turn 8).
+    expect(document.querySelectorAll(".consentGroup .consentRow").length, "S02 rows").toBe(2);
     expect(bar(), "S01 cookie bar").not.toBeNull();
     expect(dialogs().length, "no dialog open at rest").toBe(0);
   });

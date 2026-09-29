@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
+import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmation";
 import { contractClient } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -33,9 +34,11 @@ function emailValidity(value: string, catalog: MessageCatalog): { state: "idle" 
     : { state: "bad", text: t(catalog, "auth.invalidEmail") };
 }
 
-function navigateHome(): void {
+/* After sign-in, before anything else: an account created before the date-of-birth field
+   answers its one-time age check first (8k). */
+async function navigateHome(): Promise<void> {
   const next = new URLSearchParams(window.location.search).get("next");
-  window.location.assign(safeReturnPath(next));
+  window.location.assign(await ageConfirmationRequired() ? ageConfirmationHref(next) : safeReturnPath(next));
 }
 
 export function LoginFlow({
@@ -45,7 +48,7 @@ export function LoginFlow({
 }: Readonly<{
   catalog?: MessageCatalog;
   client?: LoginClient;
-  onAuthenticated?: () => void;
+  onAuthenticated?: () => void | Promise<void>;
 }>) {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [replacementRecoveryCode, setReplacementRecoveryCode] = useState<string | null>(null);
@@ -96,7 +99,7 @@ export function LoginFlow({
         setReplacementRecoveryCode(result.replacement_recovery_code);
         return;
       }
-      onAuthenticated();
+      void onAuthenticated();
     } catch (failure) {
       if (failure instanceof ContractHttpError && failure.status === 429) {
         setError(t(catalog, "auth.login.tooManyAttempts"));
@@ -164,7 +167,7 @@ export function LoginFlow({
             onClick={() => {
               setRecoveryAcknowledgementPending(false);
               setReplacementRecoveryCode(null);
-              onAuthenticated();
+              void onAuthenticated();
             }}
           >
             {t(catalog, "auth.login.savedContinue")}

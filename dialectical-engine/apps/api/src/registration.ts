@@ -16,6 +16,7 @@ import {
   type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
+import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
 
 export const REGISTRATION_PUBLIC_RESPONSE = Object.freeze({
@@ -30,6 +31,10 @@ export interface RegisterInput {
   readonly email: string;
   readonly password: string;
   readonly recoveryEmail: string;
+  /**
+   * True only when the API's age gate found a date of birth of at least MIN_AGE; the
+   * date itself never reaches this service. Registration records that result.
+   */
   readonly adultAffirmed: boolean;
 }
 
@@ -422,6 +427,7 @@ interface PendingRegistration {
   readonly emailBlindIndex: Buffer;
   readonly passwordHash: string;
   readonly requestedAt: Date;
+  readonly countryCode: string | null;
   readonly source: AuthSourceContext;
 }
 
@@ -1276,6 +1282,11 @@ export class RegistrationService implements RegistrationApplication {
           passwordHash: input.passwordHash,
           pseudonym,
           adultAffirmedAt: input.requestedAt,
+          ageCheck: {
+            minAgeApplied: MIN_AGE,
+            countryCode: input.countryCode,
+            ruleVersion: AGE_RULE_VERSION
+          },
           verificationTokenHash: tokenHash,
           verificationExpiresAt: expiresAt,
           occurredAt: input.requestedAt,
@@ -1377,6 +1388,9 @@ export class RegistrationService implements RegistrationApplication {
           || input.adultAffirmed !== true) {
           throw new AuthFlowError("AUTH_INPUT_INVALID");
         }
+        // Age gate: the edge's country is recorded with the result, never decisive.
+        const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
+          ? rawSource.countryCode : null;
         const source = sourceContext(rawSource);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
@@ -1441,7 +1455,7 @@ export class RegistrationService implements RegistrationApplication {
         mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, source
+            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, countryCode, source
           }));
           const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
           if (preTransportWorkMs
