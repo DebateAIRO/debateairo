@@ -586,6 +586,7 @@ packages/obs-capture/src/zone/counter.ts
 packages/obs-capture/src/zone/index.ts
 packages/obs-capture/src/zone/manifest.ts
 packages/propagation/src/index.ts
+packages/providers/src/content-rule.ts
 packages/providers/src/index.ts
 packages/providers/src/prompt-frame.ts
 packages/providers/src/prompt-tripwire.ts

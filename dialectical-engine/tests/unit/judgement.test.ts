@@ -269,12 +269,12 @@ describe("Organ 2 / P4 — one-node judge contract", () => {
     expect(captured.map(({ user }) => fencedEnvelope(user))).toEqual([
       {
         format: "debateai.framed-material.v1",
-        frame: "debateai.prompt-frame.v1",
+        frame: "debateai.prompt-frame.v2",
         fields: [{ name: "question_line", content: questionLine }]
       },
       {
         format: "debateai.framed-material.v1",
-        frame: "debateai.prompt-frame.v1",
+        frame: "debateai.prompt-frame.v2",
         fields: [
           { name: "question_line", content: questionLine },
           // W7 / V-BLIND-CONTEXT (2026-09-03): `author_maker` is gone from the
