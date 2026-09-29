@@ -204,7 +204,7 @@
   "debateChrome.condition.digestCannotExist": "No se pudo crear ningún resumen dentro del presupuesto de composición",
   "debateChrome.condition.protectedCoreGuardRetired": "La ejecución se detuvo por el presupuesto; la comprobación de reformulación dejó de condicionarla",
   "debateChrome.condition.hiddenUnjudgeable": "Oculta: no se pudo evaluar — muestre los elementos ocultos para leerla",
-  "debateChrome.condition.derivedStandingUnreviewed": "Se sostiene por sus argumentos evaluados — falta su propia revisión cruzada",
+  "debateChrome.condition.derivedStandingUnreviewed": "Se sostiene por sus argumentos evaluados — falta su propia revisión por un modelo de otro desarrollador",
   "debateChrome.condition.hiddenLowScore": "Oculta: obtuvo una puntuación inferior al umbral mostrado",
   "debateChrome.condition.unauthoredBranchHalted": "La ampliación se detuvo aquí — no se escribió nada que ocultar o mostrar",
   "debateChrome.condition.labelBasisIncomplete": "Fundamento del veredicto incompleto — falta una postura rival o un segundo juez para comparar",

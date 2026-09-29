@@ -202,7 +202,7 @@
   "debateChrome.condition.digestCannotExist": "Không thể tạo bản tóm lược trong ngân sách tổng hợp",
   "debateChrome.condition.protectedCoreGuardRetired": "Lần chạy dừng do ngân sách; kiểm tra diễn đạt lại không còn là điều kiện chặn",
   "debateChrome.condition.hiddenUnjudgeable": "Đã ẩn: không thể đánh giá — hiển thị nội dung ẩn để đọc",
-  "debateChrome.condition.derivedStandingUnreviewed": "Được duy trì dựa trên các lập luận đã đánh giá — còn thiếu đánh giá chéo riêng",
+  "debateChrome.condition.derivedStandingUnreviewed": "Được duy trì dựa trên các lập luận đã đánh giá — còn thiếu đánh giá riêng do mô hình của nhà phát triển khác thực hiện",
   "debateChrome.condition.hiddenLowScore": "Đã ẩn: điểm thấp hơn ngưỡng hiển thị",
   "debateChrome.condition.unauthoredBranchHalted": "Việc mở rộng dừng tại đây — không có nội dung nào được viết để ẩn hoặc hiển thị",
   "debateChrome.condition.labelBasisIncomplete": "Cơ sở phán quyết chưa đầy đủ — không có quan điểm đối lập hoặc không có giám khảo thứ hai để so sánh",

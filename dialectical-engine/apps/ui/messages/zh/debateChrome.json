@@ -202,7 +202,7 @@
   "debateChrome.condition.digestCannotExist": "无法在合成预算内生成摘要",
   "debateChrome.condition.protectedCoreGuardRetired": "运行因预算而停止；复述检查不再构成门槛",
   "debateChrome.condition.hiddenUnjudgeable": "已隐藏：无法评审 — 显示隐藏内容后即可阅读",
-  "debateChrome.condition.derivedStandingUnreviewed": "凭借已评审的论点成立 — 缺少其自身的跨阵营评审",
+  "debateChrome.condition.derivedStandingUnreviewed": "凭借已评审的论点成立 — 缺少其他开发方模型对此要点本身的评审",
   "debateChrome.condition.hiddenLowScore": "已隐藏：分数低于显示阈值",
   "debateChrome.condition.unauthoredBranchHalted": "扩展在此停止 — 没有生成可隐藏或显示的内容",
   "debateChrome.condition.labelBasisIncomplete": "裁决依据不完整 — 没有对立立场，或没有第二位评审可供比较",

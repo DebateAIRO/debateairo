@@ -202,7 +202,7 @@
   "debateChrome.condition.digestCannotExist": "작성 예산 안에서 요약을 만들 수 없음",
   "debateChrome.condition.protectedCoreGuardRetired": "예산으로 실행이 중단되어 재진술 검사가 더 이상 진행을 제한하지 않음",
   "debateChrome.condition.hiddenUnjudgeable": "숨김: 심사할 수 없음 — 내용을 보려면 숨긴 항목 표시",
-  "debateChrome.condition.derivedStandingUnreviewed": "심사를 마친 논거로 뒷받침됨 — 자체 교차 진영 검토는 누락됨",
+  "debateChrome.condition.derivedStandingUnreviewed": "심사를 마친 논거로 뒷받침됨 — 이 쟁점 자체에 대한 다른 개발사 모델의 검토는 누락됨",
   "debateChrome.condition.hiddenLowScore": "숨김: 표시된 기준보다 낮은 점수",
   "debateChrome.condition.unauthoredBranchHalted": "여기서 확장 중단 — 숨기거나 표시할 내용이 작성되지 않음",
   "debateChrome.condition.labelBasisIncomplete": "판정 근거 불완전 — 비교할 경쟁 입장 또는 두 번째 심사자가 없음",

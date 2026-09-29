@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "Koostetta ei voitu muodostaa koontibudjetin rajoissa",
   "debateChrome.condition.protectedCoreGuardRetired": "Suoritus pysähtyi budjettiin; uudelleenmuotoilun tarkistus ei enää estänyt sitä",
   "debateChrome.condition.hiddenUnjudgeable": "Piilotettu: ei voitu arvioida — lue näyttämällä piilotetut",
-  "debateChrome.condition.derivedStandingUnreviewed": "Perustuu arvioituihin argumentteihinsa — sen oma osapuolten välinen arvio puuttuu",
+  "debateChrome.condition.derivedStandingUnreviewed": "Perustuu arvioituihin argumentteihinsa — toisen kehittäjän mallin arvio siitä itsestään puuttuu",
   "debateChrome.condition.hiddenLowScore": "Piilotettu: pisteet alittivat näytettävän kynnyksen",
   "debateChrome.condition.unauthoredBranchHalted": "Laajennus päättyi tähän — mitään piilotettavaa tai näytettävää ei kirjoitettu",
   "debateChrome.condition.labelBasisIncomplete": "Tuomion peruste on puutteellinen — vertailuun ei ole kilpailevaa kantaa tai toista tuomaria",

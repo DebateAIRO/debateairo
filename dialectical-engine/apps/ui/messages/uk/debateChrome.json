@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "У межах бюджету компонування не вдалося створити зведення",
   "debateChrome.condition.protectedCoreGuardRetired": "Запуск зупинено через бюджет; перевірка переформулювання більше не блокувала його",
   "debateChrome.condition.hiddenUnjudgeable": "Приховано: оцінити не вдалося — увімкніть показ прихованого, щоб прочитати",
-  "debateChrome.condition.derivedStandingUnreviewed": "Зберігається завдяки оціненим аргументам — власної перехресної перевірки іншою групою немає",
+  "debateChrome.condition.derivedStandingUnreviewed": "Зберігається завдяки оціненим аргументам — власної перехресної перевірки моделлю іншого розробника немає",
   "debateChrome.condition.hiddenLowScore": "Приховано: оцінка нижча за показаний поріг",
   "debateChrome.condition.unauthoredBranchHalted": "Розгортання зупинено тут — немає написаного вмісту, який можна показати чи приховати",
   "debateChrome.condition.labelBasisIncomplete": "Підстава вердикту неповна — немає позиції суперника або другого судді для порівняння",

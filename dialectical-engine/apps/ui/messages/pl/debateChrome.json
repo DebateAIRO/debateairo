@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "Nie udało się utworzyć skrótu w ramach budżetu redagowania",
   "debateChrome.condition.protectedCoreGuardRetired": "Przebieg zatrzymano z powodu budżetu; test przeformułowania przestał go warunkować",
   "debateChrome.condition.hiddenUnjudgeable": "Ukryte: nie można było ocenić — włącz ukryte elementy, aby przeczytać",
-  "debateChrome.condition.derivedStandingUnreviewed": "Utrzymuje się na podstawie ocenionych argumentów — brak własnej recenzji między grupami modeli",
+  "debateChrome.condition.derivedStandingUnreviewed": "Utrzymuje się na podstawie ocenionych argumentów — brak własnej recenzji wykonanej przez model innego twórcy",
   "debateChrome.condition.hiddenLowScore": "Ukryte: ocena poniżej wyświetlanego progu",
   "debateChrome.condition.unauthoredBranchHalted": "Rozwijanie zatrzymano tutaj — nie napisano niczego do ukrycia ani wyświetlenia",
   "debateChrome.condition.labelBasisIncomplete": "Podstawa werdyktu jest niepełna — brak stanowiska przeciwnego lub drugiego sędziego do porównania",

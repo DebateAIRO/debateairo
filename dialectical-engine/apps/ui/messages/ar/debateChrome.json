@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "تعذّر إنشاء ملخص ضمن ميزانية التركيب",
   "debateChrome.condition.protectedCoreGuardRetired": "توقف التشغيل بسبب الميزانية؛ ولم يعد فحص إعادة الصياغة شرطًا لاستمراره",
   "debateChrome.condition.hiddenUnjudgeable": "مخفي: تعذّر تحكيمه — اعرض العناصر المخفية لقراءته",
-  "debateChrome.condition.derivedStandingUnreviewed": "قائم استنادًا إلى حججه المحكَّمة — تنقصه مراجعته الخاصة عبر مجموعات النماذج",
+  "debateChrome.condition.derivedStandingUnreviewed": "قائم استنادًا إلى حججه المحكَّمة — تنقصه مراجعته الخاصة من قِبل نموذج لمُنشئ آخر",
   "debateChrome.condition.hiddenLowScore": "مخفي: درجته أدنى من العتبة المعروضة",
   "debateChrome.condition.unauthoredBranchHalted": "توقف التوسّع هنا — لم يُكتب شيء لإخفائه أو عرضه",
   "debateChrome.condition.labelBasisIncomplete": "أساس الحكم غير مكتمل — لا يوجد موقف منافس أو حَكَم ثانٍ للمقارنة",
