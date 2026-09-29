@@ -7868,6 +7868,63 @@ systemctl enable --now debateai-hatchet debateai-api debateai-ui debateai-runner
 4. New subsection at the end of §5:
 
 ```text
+### Country data — the GeoIP and Tor refresh (paid plans G4)
+```
+
+   with this prose (no fenced block other than the two below):
+
+   "The country gate reads two public data files: DB-IP's Lite country database and the Tor exit list. Their
+   PATHS are required in every hosted `api.env` (`GEOIP_COUNTRY_DB_PATH`, `TOR_EXIT_LIST_PATH`; without them the
+   API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist from the moment the register version in force
+   publishes a `countryPolicy` row: the API then opens them at boot, and a missing file refuses the boot with
+   `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a malformed one with `GEOIP_COUNTRY_DB_INVALID`
+   or `TOR_EXIT_LIST_INVALID`; the refresh below checks each file the same way before it renames it into place).
+   `debateai-geoip-refresh.service` writes both into `/var/lib/debateai-geoip`, as its own user `debateai-geoip`,
+   which owns nothing else. §5 starts it once, and waits for it, before enabling the API, so the files are there
+   before any register version turns the gate on. The daily timer then refreshes the Tor list every day and the
+   country file when it is older than 27 days; the API notices a replaced file within a minute, and a refused
+   download keeps the previous file. Addresses are looked up on this host: no visitor's address is ever sent
+   anywhere.
+
+   The country gate only runs once the register version in force publishes a `countryPolicy` row. A hosted
+   register file publishes that row only when it carries the `countryPolicy` member
+   (`deploy/vps/register/hosted-register.example.json` carries the §1.5 switches; a file without the member
+   publishes no row, and so no gate): add the member and publish the register, §11. Signing in and reading one's
+   debates are never gated.
+
+   Attribution: DB-IP's Lite data is licensed CC BY 4.0. Every page footer must carry the credit
+   `IP Geolocation by DB-IP` linking to `https://db-ip.com` (the site footer, `apps/ui/components/SiteFooter.tsx`, is
+   PR #42's; task P21 adds the credit to it in both of its shapes — keep it there).
+
+   To check the last refresh:"
+
+```sh
+journalctl -u debateai-geoip-refresh.service --since yesterday --no-pager
+```
+
+   "Each run prints one line per file: `GEOIP_REFRESH_OK`, `GEOIP_REFRESH_SKIPPED` (the country file is
+   fresh) or `GEOIP_REFRESH_REFUSED` with the reason. To refresh now:"
+
+```sh
+systemctl start debateai-geoip-refresh.service
+```
+
+- [ ] **Step 5: Run them and see them pass**
+
+Run: `pnpm exec vitest run tests/unit/geoip-refresh-script.test.ts tests/architecture/vps-deployment-baseline.test.ts tests/architecture/vps-env-examples-match-shapes.test.ts`
+Expected: PASS — including the README rules already in that file (every fenced block is `sh` or `text`, no
+angle-bracket placeholder, the enable line still names `debateai-api` and not the observation agent).
+
+Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts && git diff --exit-code tests/support/shipped-corpus.manifest.txt`
+Expected: PASS and exit 0 — G4 writes only shell, systemd and Markdown files outside the corpus roots, so the
+shipped-corpus manifest is unchanged (ruling Q-15; run WITHOUT `SHIPPED_CORPUS_MANIFEST_UPDATE`).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add deploy/vps/geoip-refresh.sh deploy/vps/systemd/debateai-geoip-refresh.service deploy/vps/systemd/debateai-geoip-refresh.timer deploy/vps/README.md tests/unit/geoip-refresh-script.test.ts tests/architecture/vps-deployment-baseline.test.ts
+git commit -m "feat(deploy): daily refresh of the country database and the Tor exit list" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
 
 ### Task G5: the Part 1a pull request — merge `dev`, run every Part 1a suite by hand, open it, fix it, merge it
 
@@ -84844,63 +84901,6 @@ sv tr uk vi zh`.
 
 ---
 
-#### Country data — the GeoIP and Tor refresh (paid plans G4)
-```
-
-   with this prose (no fenced block other than the two below):
-
-   "The country gate reads two public data files: DB-IP's Lite country database and the Tor exit list. Their
-   PATHS are required in every hosted `api.env` (`GEOIP_COUNTRY_DB_PATH`, `TOR_EXIT_LIST_PATH`; without them the
-   API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist from the moment the register version in force
-   publishes a `countryPolicy` row: the API then opens them at boot, and a missing file refuses the boot with
-   `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a malformed one with `GEOIP_COUNTRY_DB_INVALID`
-   or `TOR_EXIT_LIST_INVALID`; the refresh below checks each file the same way before it renames it into place).
-   `debateai-geoip-refresh.service` writes both into `/var/lib/debateai-geoip`, as its own user `debateai-geoip`,
-   which owns nothing else. §5 starts it once, and waits for it, before enabling the API, so the files are there
-   before any register version turns the gate on. The daily timer then refreshes the Tor list every day and the
-   country file when it is older than 27 days; the API notices a replaced file within a minute, and a refused
-   download keeps the previous file. Addresses are looked up on this host: no visitor's address is ever sent
-   anywhere.
-
-   The country gate only runs once the register version in force publishes a `countryPolicy` row. A hosted
-   register file publishes that row only when it carries the `countryPolicy` member
-   (`deploy/vps/register/hosted-register.example.json` carries the §1.5 switches; a file without the member
-   publishes no row, and so no gate): add the member and publish the register, §11. Signing in and reading one's
-   debates are never gated.
-
-   Attribution: DB-IP's Lite data is licensed CC BY 4.0. Every page footer must carry the credit
-   `IP Geolocation by DB-IP` linking to `https://db-ip.com` (the site footer, `apps/ui/components/SiteFooter.tsx`, is
-   PR #42's; task P21 adds the credit to it in both of its shapes — keep it there).
-
-   To check the last refresh:"
-
-```sh
-journalctl -u debateai-geoip-refresh.service --since yesterday --no-pager
-```
-
-   "Each run prints one line per file: `GEOIP_REFRESH_OK`, `GEOIP_REFRESH_SKIPPED` (the country file is
-   fresh) or `GEOIP_REFRESH_REFUSED` with the reason. To refresh now:"
-
-```sh
-systemctl start debateai-geoip-refresh.service
-```
-
-- [ ] **Step 5: Run them and see them pass**
-
-Run: `pnpm exec vitest run tests/unit/geoip-refresh-script.test.ts tests/architecture/vps-deployment-baseline.test.ts tests/architecture/vps-env-examples-match-shapes.test.ts`
-Expected: PASS — including the README rules already in that file (every fenced block is `sh` or `text`, no
-angle-bracket placeholder, the enable line still names `debateai-api` and not the observation agent).
-
-Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts && git diff --exit-code tests/support/shipped-corpus.manifest.txt`
-Expected: PASS and exit 0 — G4 writes only shell, systemd and Markdown files outside the corpus roots, so the
-shipped-corpus manifest is unchanged (ruling Q-15; run WITHOUT `SHIPPED_CORPUS_MANIFEST_UPDATE`).
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add deploy/vps/geoip-refresh.sh deploy/vps/systemd/debateai-geoip-refresh.service deploy/vps/systemd/debateai-geoip-refresh.timer deploy/vps/README.md tests/unit/geoip-refresh-script.test.ts tests/architecture/vps-deployment-baseline.test.ts
-git commit -m "feat(deploy): daily refresh of the country database and the Tor exit list" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-```
 
 #### New names (for the assembler)
 
