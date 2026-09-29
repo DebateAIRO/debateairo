@@ -215,3 +215,29 @@ describe("B-I2 — a changed consumer prompt is a new version, not a silent edit
     });
   });
 });
+
+describe("S01 R4 — the content rule is part of the door", () => {
+  // Property: evaluator refuses the rule defect before dispatch, after authorization passes.
+  it.each(["deleted", "one character changed"])("refuses a rule %s without posting", async (mutation) => {
+    const { CONTENT_RULE_TEXT } = await import("@debateai/providers");
+    const sent: PromptPacket["messages"][] = [];
+    const provider = createOpenAiPublicAggregateProvider({
+      endpoint: "https://fixture.invalid/v1", providerRef: "provider:consumer", model: "consumer/model", maker: "consumer",
+      fetchImplementation: async (_url, init) => {
+        sent.push(JSON.parse(String(init?.body)).messages);
+        return new Response(JSON.stringify({ model: "consumer/model", choices: [{ message: { content: JSON.stringify({
+          bias_pattern_name: "none observed", capability_summary: "The aggregate supports no bias claim.", adjacent_domain_flags: []
+        }) } }] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    const built = framed().packet;
+    const packet = { messages: built.messages.map((message, i) => i === 0 ? {
+      ...message, content: mutation === "deleted" ? message.content.replace(CONTENT_RULE_TEXT, "")
+        : message.content.replace("dehumanises", "dehumanizes")
+    } : message) };
+    await expect(provider.classify({ consumerModelId: "consumer/model", packet,
+      bound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 5_000 }, allowedAdjacentDomainRefs: []
+    })).rejects.toMatchObject({ code: "PROMPT_FRAME_ABSENT", message: "The safety frame carries no content rule" });
+    expect(sent).toHaveLength(0);
+  });
+});
