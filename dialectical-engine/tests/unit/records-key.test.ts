@@ -119,16 +119,38 @@ describe("readCustodyTextSecretBytes (amendment A23)", () => {
     const loose = await custodyFile("abc\n", 0o644);
     expect(codeOf(() => readCustodyTextSecretBytes(loose))).toBe("SECRET_CUSTODY_INVALID");
   });
+
+  it("refuses an empty file and one over 4 KiB by content, and accepts exactly 4096 bytes", async () => {
+    // Both refusals come from readCustodyFile's own size checks; they must keep the text-secret
+    // name rather than turn into a custody refusal.
+    const empty = await custodyFile("");
+    expect(codeOf(() => readCustodyTextSecretBytes(empty))).toBe("SECRET_TEXT_INVALID");
+    const oversize = await custodyFile("a".repeat(4097));
+    expect(codeOf(() => readCustodyTextSecretBytes(oversize))).toBe("SECRET_TEXT_INVALID");
+    const ceiling = readCustodyTextSecretBytes(await custodyFile("a".repeat(4096)));
+    expect(Buffer.isBuffer(ceiling)).toBe(true);
+    expect(ceiling.length).toBe(4096);
+  });
 });
 
 describe("RECORDS_KEY_PATH in the API environment and boot", () => {
   it("is required always and must name its own file", () => {
     const fixture = validApiEnvironmentFixture();
     expect(parseApiEnvironment(fixture).RECORDS_KEY_PATH).toBe("/run/secrets/records-key");
-    expect(() => parseApiEnvironment({ ...fixture, RECORDS_KEY_PATH: undefined })).toThrow();
+    expect(() => parseApiEnvironment({ ...fixture, RECORDS_KEY_PATH: undefined })).toThrow(/RECORDS_KEY_PATH/u);
     for (const other of ["KEK_PATH", "SUPPORT_KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_SOURCE_IP_SALT_PATH"] as const) {
       expect(() => parseApiEnvironment({ ...fixture, RECORDS_KEY_PATH: fixture[other]! }))
         .toThrow("RECORDS_KEY_PATH_MUST_BE_SEPARATE");
+    }
+    // The four guarded keys the fixture does not carry: each is refused when it names the records
+    // key's file, and each parses on its own (the control), so the refusal is the shared path.
+    for (const other of ["CORPUS_KEK_PATH", "KEK_PREVIOUS_PATH", "CORPUS_KEK_PREVIOUS_PATH", "SUPPORT_KEK_PREVIOUS_PATH"] as const) {
+      expect(() => parseApiEnvironment({
+        ...fixture,
+        [other]: "/run/secrets/shared-key",
+        RECORDS_KEY_PATH: "/run/secrets/shared-key"
+      }), other).toThrow("RECORDS_KEY_PATH_MUST_BE_SEPARATE");
+      expect(() => parseApiEnvironment({ ...fixture, [other]: "/run/secrets/shared-key" }), other).not.toThrow();
     }
   });
 

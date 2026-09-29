@@ -14,12 +14,14 @@
 # in the later key snapshot; a key erased between the two corresponds to a row that was already
 # erased. The reverse order can produce a row whose key no longer exists.
 #
-# The five raw 32-byte secrets are NOT in that envelope. They go to a SECOND age recipient whose
+# The six raw 32-byte secrets are NOT in that envelope. They go to a SECOND age recipient whose
 # private key never touches this host (offline escrow held by V). The audit source-IP salt is a
 # key, not metadata: bundling it with the dump would let whoever holds one backup re-identify
 # every hashed source IP in it. The fifth, the support KEK (DL2-F5), wraps the support session
 # and case keys that live IN the dump: without it in escrow a restore opens no support
-# conversation at all, and beside the dump it would open every one.
+# conversation at all, and beside the dump it would open every one. The records key is the sixth
+# (paid plans ruling Q-12); it seals the acceptance and billing evidence kept after an account is
+# erased, so it never rides with the dump.
 #
 # Runs as root from debateai-backup.timer. Reaches PostgreSQL as the postgres OS user over the
 # unix socket (peer auth, pg_hba line 1) — no DebateAI principal has read-all rights, and the

@@ -943,8 +943,8 @@ const MAX_TEXT_SECRET_BYTES = 4_096;
  * A23 (paid plans) — a TEXT secret read as BYTES. The xMoney private key is both the HMAC key and
  * the source of the AES key, so it must be a zeroable Buffer, never a JavaScript string. Same
  * custody contract as every key file (O_NOFOLLOW, facts from the descriptor, custodyAccepts,
- * exactly-sized allocUnsafeSlow buffers). One printable line: an optional trailing LF or CRLF is
- * dropped, surrounding spaces and tabs are trimmed, and anything else outside 0x20-0x7e refuses.
+ * exactly-sized allocUnsafeSlow buffers). One printable line: an optional trailing LF, CRLF or lone
+ * CR is dropped, surrounding spaces and tabs are trimmed, and anything else outside 0x20-0x7e refuses.
  * The caller owns the returned buffer and zeroes it (boot.hold).
  */
 export function readCustodyTextSecretBytes(path: string): Buffer {

@@ -6,7 +6,7 @@
 # needed for a restore, so it is held by the operator offline, NOT on the VPS.
 BACKUP_DATA_RECIPIENT=age1exampledatarecipientreplacewiththerealpublickey000000000000
 
-# Public key of the escrow recipient. Opens the envelope holding the five raw 32-byte secrets.
+# Public key of the escrow recipient. Opens the envelope holding the six raw 32-byte secrets.
 # Its private key is held by V, offline, on different media from the data key: whoever holds one
 # envelope alone can restore nothing.
 BACKUP_ESCROW_RECIPIENT=age1exampleescrowrecipientreplacewiththerealpublickey00000000000
@@ -21,9 +21,11 @@ BACKUP_RCLONE_REMOTE=debateai-offsite:debateai
 #BACKUP_SCP_TARGET=backup@offsite.example:/srv/debateai
 
 # Custody paths — must match /etc/debateai/api.env exactly. The three stores go into the data
-# envelope; the five raw keys go to the escrow recipient instead. The support KEK is the fifth
+# envelope; the six raw keys go to the escrow recipient instead. The support KEK is the fifth
 # (DL2-F5): the support session and case keys it wraps live in the database dump, so without it
-# in escrow a restore opens no support conversation.
+# in escrow a restore opens no support conversation. The records key is the sixth (paid plans
+# ruling Q-12); it seals the acceptance and billing evidence kept after an account is erased, so
+# it never rides with the dump.
 USER_DEK_STORE_PATH=/var/lib/debateai/api/user-deks
 PUBLICATION_KEY_STORE_PATH=/var/lib/debateai/api/publication-keys
 AUDIT_KEY_STORE_PATH=/var/lib/debateai/api/audit-keys
