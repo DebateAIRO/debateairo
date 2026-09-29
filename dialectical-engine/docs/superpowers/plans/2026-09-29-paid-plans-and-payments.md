@@ -106,11 +106,11 @@ Two more, pinned in their owning tasks:
 ## Build order
 
 - **Part 1a — Legal groundwork and the country gate** — from Task L1
-- **Part 1b — The money engine: site day, person windows, waiting line, cheaper models** — from Task B1
+- **Part 1b — The money engine: site day, person windows, waiting line, cheaper models** — from Task B1 (Part 1a closes with Task G5, its own pull request)
 - **Part 2 — Billing: data, connectors, checkout, renewals, subscription actions, emails, pages** — from Task X0
 - **Part 3 — Models chosen to fit each person's room** — from Task S1a
 
-L1 → L2 → L3a → L3b → L4 → G1 → G2 → G3a → G3b → G4 → B1 → B2 → B3 → B4a → B4b → B5 → B6a → B6b → B7a → B7b → B8 → B9a → B9b → B9c → B9d → B10a → B10b → B10c → B11a → B11b → B11c → B11d → X0 → X1 → P2 → P1a → P1b → P3a → P3b → P4 → P5 → P6a → P6b → P7 → P8a → P8b → P8c → P9a → P9b → P9c → P10a → P10b → P11a → P11b → P12a → P12b → P12c → P12d → P12e → P13 → P14a → P14b → P14c → P15 → P16a → P16b → P16c → P17 → P18 → P19 → P20 → P21 → P22 → P23 → P24 → S1a → S1b → S2 → S3
+L1 → L2 → L3a → L3b → L4 → G1 → G2 → G3a → G3b → G4 → G5 → B1 → B2 → B3 → B4a → B4b → B5 → B6a → B6b → B7a → B7b → B8 → B9a → B9b → B9c → B9d → B10a → B10b → B10c → B11a → B11b → B11c → B11d → X0 → X1 → P2 → P1a → P1b → P3a → P3b → P4 → P5 → P6a → P6b → P7 → P8a → P8b → P8c → P9a → P9b → P9c → P10a → P10b → P11a → P11b → P12a → P12b → P12c → P12d → P12e → P13 → P14a → P14b → P14c → P15 → P16a → P16b → P16c → P17 → P18 → P19 → P20 → P21 → P22 → P23 → P24 → S1a → S1b → S2 → S3
 
 Each part ends as its own pull request to `dev`: merge the latest `origin/dev`, pass CI plus the integration suites run locally, then merge (the owner's standing rule). Billing stays off, so each merge changes nothing on the live site.
 
@@ -7868,6 +7868,165 @@ systemctl enable --now debateai-hatchet debateai-api debateai-ui debateai-runner
 4. New subsection at the end of §5:
 
 ```text
+
+### Task G5: the Part 1a pull request — merge `dev`, run every Part 1a suite by hand, open it, fix it, merge it
+
+**Owner ruling (30 September 2026):** Part 1 ships as two pull requests, and this is the first one. It carries the spec, the budget spec and this plan (the three `docs/superpowers` files on this branch), plus Part 1a (L1–G4): acceptance records on the server, the records key, the legal manifest and Terms archive, the re-acceptance gate, and the country gate with its refresh timer. The Terms already say acceptance records exist, so this part is worth shipping on its own. Billing stays off, no `countryPolicy` row is published on the hosted site (A14: no row means no gate), and nothing changes for visitors until the owner publishes one. Part 1b (B1 onward) starts only after this pull request has merged, on a branch cut from the merged `dev`.
+
+**Files:**
+- No file is created. A file changes only when the merge or a finding needs it, in its own commit that names the owning task (for example `fix(geo): … (G3a)`), with the Co-Authored-By line. A test is never bent to pass.
+- Test (run, not written): the CI gate, the render tests, the UI node tests, and the Part 1a integration suites of Step 3.
+
+**Interfaces:**
+- Consumes: everything L1 … G4 produce, as built. In particular, the integration suites L3a creates (`legal-acceptance`) and G3a creates (`country-gate-audit`), and the existing suites Part 1a re-runs after changing what they cover:
+  - `dev-secret-files`, `dev-api-environment`, `dev-api-process`, `register-version-boundaries`, `support-config-principals` (L1);
+  - `registration-database`, `age-gate-database`, `s10-t9-account-erasure-races`, `identity-database`, `production-database-principals`, `t7-audit-chain-capacity-database` (L3a, L3b, G3a);
+  - `dev-deployment-register`, `hosted-register-publish` (G2).
+- Produces: the merged Part 1a pull request, whose description carries the checklist of Step 4. No code name.
+
+- [ ] **Step 1: Cut the branch and merge the latest `origin/dev`**
+
+Run: `git status --porcelain`
+Expected: no output. A change nobody here made may be the owner's parallel session in this worktree. Stop and ask the owner; never stash, revert or commit it.
+
+Run: `git fetch origin`
+
+Run: `git merge origin/dev -m "merge: origin/dev into the Part 1a branch" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"`
+Expected: a merge commit, or `Already up to date.` Resolve any conflict in the file, keeping both sides' intent. Two cases have their own rule:
+- **A migration number `dev` now also uses.** L3a's `0079` is the only Part 1a migration. `0078` is the colleague's reserved number, so its arrival is expected. A `dev` migration numbered `0079` or above triggers R3-1: shift ALL of ours up by the smallest amount that clears dev's highest number, in ONE commit (`fix(db): move our migrations after dev's <number> (R3-1)`). Rename L3a's file and every reference to it, and fix the pinned list in `tests/architecture/security-migration-0065.test.ts`. Record the shift in checklist item 2 and in the plan's R1 line, because every later migration of ours moves by the same amount.
+- **A pinned count** (`tests/architecture/scaffold.test.ts`, `tests/architecture/register-support-publication.test.ts`, the migration list, `tests/support/shipped-corpus.manifest.txt`). Resolve it only by measuring: run the test on the merged tree, read the count, write it, and keep both sides' comment lines.
+
+Run: `pnpm install --frozen-lockfile`
+Expected: exit 0.
+
+- [ ] **Step 2: Run what CI runs, and the local checks it does not**
+
+Run: `pnpm run generate:contract`
+Expected: exit 0.
+
+Run: `pnpm run typecheck`
+Expected: exit 0.
+
+Run: `pnpm run test:ci-gate`
+Expected: exit 0. No new failure, and no test listed in `tests/ci-known-red.txt` has started to pass (if one has, delete its line in its own commit).
+
+Run: `pnpm audit --audit-level=moderate`
+Expected: exit 0.
+
+Run: `pnpm run audit:architecture`
+
+Run: `pnpm run audit:source`
+
+Expected: each exactly as on `origin/dev` before this branch: the same baseline lines and no new line.
+
+Run: `pnpm exec vitest run tests/render`
+Expected: PASS. A failure `origin/dev` has on its own is not Part 1a's: name the test and the `dev` commit in checklist item 2 and ask the owner. Any other failure is fixed in the owning task's code.
+
+Run: `pnpm --filter dialectical-engine-v2ui test`
+Expected: PASS.
+
+Run: `pnpm --filter dialectical-engine-v2ui typecheck`
+Expected: exit 0.
+
+Run: `pnpm run build`
+Expected: exit 0.
+
+Run: `pnpm run generate:legal:check`
+Expected: exit 0: L2's legal manifest and archive are current.
+
+Run: `pnpm exec vitest run tests/unit/s1-1-depth-contract.test.ts && git diff --exit-code tests/support/shipped-corpus.manifest.txt`
+Expected: PASS and exit 0.
+
+- [ ] **Step 3: Run every Part 1a integration suite by hand**
+
+CI skips `tests/integration`, and Part 1a adds migration 0079. Run each suite on the merged head and see each PASS:
+
+Run: `pnpm exec vitest run tests/integration/dev-secret-files.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/dev-api-environment.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/dev-api-process.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/register-version-boundaries.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/support-config-principals.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/legal-acceptance.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/registration-database.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/age-gate-database.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/s10-t9-account-erasure-races.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/identity-database.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/production-database-principals.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/t7-audit-chain-capacity-database.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/country-gate-audit.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/dev-deployment-register.test.ts`
+
+Run: `pnpm exec vitest run tests/integration/hosted-register-publish.test.ts`
+
+Then run the whole directory once:
+
+Run: `pnpm exec vitest run tests/integration`
+Expected: PASS. A failure is a defect in the task that owns the failing line, fixed there in its own commit, after which Steps 2 and 3 are run again.
+
+- [ ] **Step 4: Write the Part 1a pull request checklist**
+
+The description carries three items, filled in with what Steps 2 and 3 printed on the head commit:
+
+1. **Integration suites run by hand:** the 15 suites of Step 3 and the directory run, each with its `Test Files … passed` line.
+2. **The checks of Step 2:** each command with its exit code. Name any render failure `origin/dev` already has, with the `dev` commit. Say whether the colleague's `feat/sensitive-data-consent` had merged (`ls migrations/0078_sensitive_data_consent.sql`). If Step 1 had to shift our migrations, give the old and new numbers.
+3. **What stays off, and the owner's steps after the merge:**
+   - The country gate is dormant on the hosted site until the owner publishes a register version with a `countryPolicy` row, and installs the GeoIP and Tor files and timer (G4, runbook).
+   - Acceptance records start at once for new sign-ups (A14).
+   - The records key must be created on the server before the API next boots, and escrowed as the sixth backup secret (L1, Q-12).
+
+- [ ] **Step 5: Push and open the pull request**
+
+Run: `git push -u origin HEAD`
+
+Run the command below with the three checklist items written in place of the bracketed lines:
+
+```bash
+gh pr create --base dev --title "Part 1a: acceptance records on the server and the country gate (billing off)" --body-file - <<'EOF'
+Part 1a of the paid-plans plan (spec 2026-09-29): tasks L1-G4 (the records key, the legal manifest and Terms archive, acceptance records at sign-up, re-acceptance, the country gate and its refresh timer), plus the spec, the budget spec and the plan. Billing stays off.
+
+## 1. Integration suites run by hand
+[the 15 suites of Step 3 and the directory run, each with its "Test Files ... passed" line]
+
+## 2. The checks CI runs, and the ones it skips
+[each Step 2 command and its exit code; any render failure dev already has, with the dev commit; the consent branch; any migration shift]
+
+## 3. Still off, and the owner's steps after the merge
+[Step 4, item 3]
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+```
+
+Expected: `gh` prints the pull request's URL, and no bracketed line is left in the description.
+
+- [ ] **Step 6: Fix CI and review findings until everything is green**
+
+Bind the pull request with the desktop app's pull-request tools (`get_status`, then `bind_pr` if it is not bound) and let the app watch CI. Wait for its CI notices. Never poll: no `gh pr checks --watch`, no loop, no timer, no scheduled wake-up.
+Expected: every check passes, including the `security` job and the gitleaks scan. Fix a red check or a review finding in the code of the task that owns the line, in its own commit, then push. Re-run Step 2's checks and every Step 3 suite the fix could reach. Update the checklist with `gh pr edit --body-file -`. A gitleaks finding is never dismissed or fingerprinted by the implementer; it goes to the owner.
+
+- [ ] **Step 7: Merge when green**
+
+Run: `git fetch origin && git log --oneline HEAD..origin/dev`
+Expected: no output. If `dev` moved since Step 1, repeat Steps 1 to 3 for the new commits, push, and come back here.
+
+Run: `gh pr merge --merge`
+Expected: the pull request is merged into `dev`, by a direct merge once every check is green (the repository does not allow auto-merge).
+
+Run: `git fetch origin && git log --oneline -1 origin/dev`
+Expected: the merge commit of this pull request. Part 1b (B1 onward) branches from it.
 
 ## Part 1b — The money engine: site day, person windows, waiting line, cheaper models
 
@@ -27849,9 +28008,9 @@ git add tests/integration/budget-waiting-line-end-to-end.test.ts
 git commit -m "test(budget): a hosted debate waits for the reset, wakes and answers" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-### Task B11d: the Part 1 pull request — merge `dev`, run every Part 1 suite by hand, open it, fix it, merge it
+### Task B11d: the Part 1b pull request — merge `dev`, run every Part 1b suite by hand, open it, fix it, merge it
 
-The part-closing task (spec §2.13 "Shipping"; spec §2.8, "CI skips these, so run them before merging each migration"). Part 1 is Part 1a (L1–G4) and Part 1b (B1–B11c), built on one branch. It ships as ONE pull request to `dev` under the owner's standing order: merge the latest `origin/dev`, run what CI runs and what CI skips, push, open the pull request, fix CI and review findings, and merge when everything is green. Billing stays off: no task in Part 1 publishes `billingPolicy.enabled: true`. Part 2 (X0 onward) starts only after this pull request has merged, from the merged `dev`.
+The part-closing task (spec §2.13 "Shipping"; spec §2.8, "CI skips these, so run them before merging each migration"). **Owner ruling (30 September 2026): Part 1 ships as TWO pull requests.** Part 1a (L1–G4) merged first through Task G5. Part 1b (B1–B11c) is built on a branch cut from the `dev` that contains G5's merge, and ships here as the second pull request. Part 1a's suites are still re-run in Step 3, because Part 1b edits files they cover. It ships under the owner's standing order: merge the latest `origin/dev`, run what CI runs and what CI skips, push, open the pull request, fix CI and review findings, and merge when everything is green. Billing stays off: no task in Part 1 publishes `billingPolicy.enabled: true`. Part 2 (X0 onward) starts only after this pull request has merged, from the merged `dev`.
 
 **Files:**
 - No file is created. A file changes only when the merge or a finding needs it, and then in its own commit that names the task owning the line (for example `fix(api): … (B6b)`), with the Co-Authored-By line. A test is never bent to pass.
@@ -28037,8 +28196,8 @@ Run: `git push -u origin HEAD`
 Run the command below with the four checklist items of Step 4 written in, each under its heading, in place of the bracketed instruction lines:
 
 ```bash
-gh pr create --base dev --title "Part 1: legal records, country gate, waiting line and each person's windows (billing off)" --body-file - <<'EOF'
-Part 1 of the paid-plans plan (spec 2026-09-29, budget spec 2026-09-28): tasks L1-G4 (legal records, country gate) and B1-B11c (the waiting line, holds, the shared wall, each person's windows, the server-decided plan). Billing stays off.
+gh pr create --base dev --title "Part 1b: the waiting line, holds, the shared wall and each person's windows (billing off)" --body-file - <<'EOF'
+Part 1b of the paid-plans plan (spec 2026-09-29, budget spec 2026-09-28): tasks B1-B11c (the waiting line, holds, the shared wall, each person's windows, the server-decided plan), on top of Part 1a (merged earlier). Billing stays off.
 
 ## 1. Integration suites run by hand
 [the 29 suites of Step 3 and the directory run, each with its "Test Files ... passed" line]
@@ -28060,7 +28219,7 @@ Expected: `gh` prints the pull request's URL. No bracketed line is left in the d
 
 - [ ] **Step 6: Fix CI and review findings until everything is green**
 
-Run: `gh pr checks --watch`
+Bind the pull request with the desktop app's pull-request tools (`get_status`, then `bind_pr` if it is not bound) and let the app watch CI. Wait for its CI notices. Never poll: no `gh pr checks --watch`, no loop, no timer, no scheduled wake-up.
 Expected: every check passes (the `security` job and the gitleaks scan). A red check or a review finding is fixed in the code of the task that owns the line, in its own commit:
 
 ```bash
@@ -77740,7 +77899,7 @@ Expected: the push succeeds and `gh` prints the pull request's URL. The descript
 
 - [ ] **Step 5: Fix what CI and review find, then merge when green**
 
-Run: `gh pr checks --watch`
+Bind the pull request with the desktop app's pull-request tools (`get_status`, then `bind_pr` if it is not bound) and let the app watch CI. Wait for its CI notices. Never poll: no `gh pr checks --watch`, no loop, no timer, no scheduled wake-up.
 Expected: every check green. For each red check or review finding: fix it at its cause in a new commit (message ending
 with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`), rerun Step 2, and rerun Step 3 whenever the fix
 touches a migration, `packages/db`, `apps/api/src/billing` or `tests/support/billingStack.ts`; then `git push`. A fix
@@ -83956,13 +84115,15 @@ the 23 result lines of Step 3.
 
 - [ ] **Step 5: CI and review, fixed at the cause**
 
+Bind the pull request with the desktop app's pull-request tools (`get_status`, then `bind_pr` if it is not bound)
+and let the app watch CI. Wait for its CI notices. Never poll: no loop over `gh pr checks`, no timer, no scheduled
+wake-up. Read the review comments once a notice arrives:
+
 ```bash
-gh pr checks
 gh pr view --comments
 ```
 
-Expected: every check passes and no review finding is open. A pending check is read again with `gh pr checks`
-until none is pending. A failed check or a finding is fixed at its cause on the branch (Step 2's commit form, one
+Expected: every check passes and no review finding is open. A failed check or a finding is fixed at its cause on the branch (Step 2's commit form, one
 fix per commit), Steps 2 and 3 are run again for what the fix touches (a migration or register change: the whole of
 Step 3), then `git push`, and the PR description's results block is updated with `gh pr edit --body-file
 .local/s3/pr-body.md` after regenerating it as in Step 4. A finding that needs an owner ruling (a register value,
@@ -83971,13 +84132,12 @@ a wording pick, a migration number) is asked, never guessed.
 - [ ] **Step 6: Merge when green**
 
 ```bash
-gh pr checks
 gh pr merge --merge
 git fetch origin
 git log --oneline -1 origin/dev
 ```
 
-Expected: `gh pr checks` shows every check passed; the merge is a merge commit (`--merge`, not `--squash`: S1a's
+Expected: the app's last CI notice showed every check passed; the merge is a merge commit (`--merge`, not `--squash`: S1a's
 merge commit keeps the scorecard branch's 94 commits and their ledger history reachable from dev), done by hand
 (the repository does not allow auto-merge); `origin/dev` now points at the pull request's merge commit.
 
