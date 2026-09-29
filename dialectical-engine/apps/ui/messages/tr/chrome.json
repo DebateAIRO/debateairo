@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "Bu tartışmanın dili: {language} ({nativeName}). Sayfa {language} olarak gösterilsin mi?",
   "chrome.languageOffer.textNative": "Bu tartışmanın dili: {language}. Sayfa {language} olarak gösterilsin mi?",
   "chrome.languageOffer.switch": "Dili {language} olarak değiştir",
-  "chrome.languageOffer.dismiss": "Hayır, teşekkürler"
+  "chrome.languageOffer.dismiss": "Hayır, teşekkürler",
+  "chrome.legalPages": "Yasal",
+  "chrome.legal.notice": "Yasal Bilgiler",
+  "chrome.legal.terms": "Hizmet Koşulları",
+  "chrome.legal.versions": "Koşulların sürümleri",
+  "chrome.legal.privacy": "Gizlilik Politikası",
+  "chrome.legal.cookies": "Çerez Politikası",
+  "chrome.legal.providers": "Model sağlayıcıları",
+  "chrome.legal.health": "ABD sağlık verileri gizliliği",
+  "chrome.footer.label": "Site alt bilgisi",
+  "chrome.footer.location": "Bükreş, Romanya",
+  "chrome.footer.product": "Ürün",
+  "chrome.footer.home": "Ana sayfa",
+  "chrome.footer.cookiePreferences": "Çerez tercihleri"
 }

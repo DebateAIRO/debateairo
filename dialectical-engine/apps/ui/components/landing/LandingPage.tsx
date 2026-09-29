@@ -4,6 +4,7 @@ import { LandingHero } from "./LandingHero";
 import { LandingMethod } from "./LandingMethod";
 import { LandingPricing } from "./LandingPricing";
 import { LandingSample } from "./LandingSample";
+import { SiteFooter } from "@/components/SiteFooter";
 import type { MessageCatalog } from "@/lib/i18n/translate";
 
 export function LandingPage({ catalog }: { catalog: MessageCatalog }): JSX.Element {
@@ -14,6 +15,7 @@ export function LandingPage({ catalog }: { catalog: MessageCatalog }): JSX.Eleme
       <LandingSample catalog={catalog} />
       <LandingMethod catalog={catalog} />
       <LandingPricing catalog={catalog} />
+      <SiteFooter variant="full" />
     </main>
   );
 }

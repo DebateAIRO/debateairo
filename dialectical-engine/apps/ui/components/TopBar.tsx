@@ -13,7 +13,14 @@ const SCREEN_TITLES: Record<string, string> = {
   "/new": "chrome.newDebate",
   "/settings": "chrome.settings",
   "/ai-transparency": "chrome.aiTransparency",
-  "/admin/workers": "chrome.workers"
+  "/admin/workers": "chrome.workers",
+  "/legal": "chrome.legalPages",
+  "/terms": "chrome.legalPages",
+  "/terms/versions": "chrome.legalPages",
+  "/privacy": "chrome.legalPages",
+  "/privacy/us-health-data": "chrome.legalPages",
+  "/cookies": "chrome.legalPages",
+  "/providers": "chrome.legalPages"
 };
 
 const AUTH_PATHS = new Set(["/login", "/sign-up", "/verify-email", "/enroll-mfa"]);
