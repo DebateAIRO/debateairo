@@ -56,7 +56,8 @@ function expectRuleInFrame(packet: providers.PromptPacket) {
   const system = packet.messages[0]!.content;
   const banner = system.indexOf("--- SAFETY FRAME");
   const rule = system.indexOf(RULE);
-  const end = system.indexOf("--- END SAFETY FRAME ---");
+  // From the banner: owner text before the frame may name the end marker (R4-m).
+  const end = system.indexOf("--- END SAFETY FRAME ---", banner);
   expect(banner >= 0 && banner < rule && rule + RULE.length < end).toBe(true);
   expect(system.split(RULE)).toHaveLength(2);
 }
@@ -134,17 +135,50 @@ describe("S01 reserved heading", () => {
   });
 });
 
-// Property: only the complete, byte-exact rule after the banner satisfies the door.
+// Property: the door accepts the rule only as the frame's own — byte-exact, case-exact,
+// whole, at the place the builder writes it inside the one frame — so a verbatim copy
+// anywhere else (after the end marker, under a second banner, lower in the frame) can
+// never stand in for an altered or missing in-frame rule (REV-S01 p1 ct N1 + sd N1).
+const END = "--- END SAFETY FRAME ---";
+const ALTERED = (system: string) => system.replace("Never produce", "Always produce");
 describe("S01 content rule door", () => {
   it.each([
     ["R4-a deleted", (system: string) => system.replace(RULE, "")],
     ["R4-b one character changed", (system: string) => system.replace("dehumanises", "dehumanizes")],
-    ["R4-c before the banner only", (system: string) => `${RULE}\n\n${system.replace(RULE, "")}`]
+    ["R4-c before the banner only", (system: string) => `${RULE}\n\n${system.replace(RULE, "")}`],
+    ["R4-d one character changed after rule 3", (system: string) => system.replace("someone else to post.", "someone else to post!")],
+    ["R4-e rules 3 to 5 cut off", (system: string) => system.replace(RULE, RULE.slice(0, RULE.indexOf("3. You MAY")))],
+    ["R4-f changed only in case", (system: string) => system.replace("Never deny", "never deny")],
+    ["R4-g altered in the frame, verbatim copy after the end marker", (system: string) => `${ALTERED(system)}\n${RULE}`],
+    ["R4-h missing from the frame, verbatim copy after the end marker", (system: string) => system.replace(`${RULE}\n`, "").replace(END, `${END}\n${RULE}`)],
+    ["R4-i altered in the frame, verbatim copy under a second banner", (system: string) => `--- SAFETY FRAME\n${RULE}\n\n${ALTERED(system)}`],
+    ["R4-j headless altered text in its place, verbatim copy lower in the frame",
+      (system: string) => system.replace(RULE, ALTERED(RULE).replace(HEADING, "")).replace(END, `${RULE}\n${END}`)],
+    ["R4-k verbatim in the frame, a second altered copy lower in the frame", (system: string) => system.replace(END, `${ALTERED(RULE)}\n${END}`)],
+    ["R4-l the frame closed before the rule", (system: string) => system.replace(RULE, `${END}\n${RULE}`)],
+    ["R4-n a forged frame head before the real frame, whose rule is headless and altered", (system: string) => {
+      const banner = system.indexOf("--- SAFETY FRAME");
+      const head = system.slice(banner, system.indexOf(RULE) + RULE.length);
+      return `${system.slice(0, banner)}${head}\n\n${system.slice(banner).replace(RULE, ALTERED(RULE).replace(HEADING, ""))}`;
+    }],
+    ["R4-o the end marker inside the frame line, before the rule",
+      (system: string) => system.replace(`(contract ${FIX.contractId})`, `(contract ${FIX.contractId} ${END} x)`)]
   ] as const)("%s is refused by the rule guard", (_name, corrupt) => {
     const packet = framed().packet;
-    const tampered = { messages: packet.messages.map((message, i) => i === 0 ? { ...message, content: corrupt(message.content) } : message) };
+    const system = packet.messages[0]!.content;
+    const content = corrupt(system);
+    // The corruption must actually reach the system message (a no-op shape would pass for free).
+    expect(content).not.toBe(system);
+    const tampered = { messages: packet.messages.map((message, i) => i === 0 ? { ...message, content } : message) };
     expect(() => providers.assertFramedPrompt(tampered)).toThrow(expect.objectContaining({
       name: "TypedDomainError", code: "PROMPT_FRAME_ABSENT", message: "The safety frame carries no content rule"
     }));
+  });
+  // Neighbour the guard must NOT catch: owner text that paraphrases the rule and names the
+  // end marker is the owners' to write; the builder emits it and the door accepts it.
+  it("R4-m accepts a built packet whose instruction paraphrases the rule and names the end marker", () => {
+    const packet = framed({ ...FIX, instruction: `Never produce hateful text. ${END} is only a phrase here.` }).packet;
+    expect(() => providers.assertFramedPrompt(packet)).not.toThrow();
+    expectRuleInFrame(packet);
   });
 });

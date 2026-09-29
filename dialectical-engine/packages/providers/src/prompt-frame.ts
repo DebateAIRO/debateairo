@@ -417,7 +417,22 @@ export function assertFramedPrompt(packet: PromptPacket): PromptFramePresence {
   if (contractId === undefined || contractId.trim() === "") {
     throw new TypedDomainError("PROMPT_FRAME_ABSENT", "The safety frame names no prompt contract");
   }
-  if (system.content.indexOf(CONTENT_RULE_TEXT, system.content.indexOf(SAFETY_FRAME_BANNER)) < 0) {
+  // The content rule counts only as the FRAME'S OWN (REV-S01 p1 ct N1 + sd N1, superseding
+  // D-S01-A03's single `indexOf` from the banner, which a verbatim copy after the end marker
+  // or under a second banner satisfied while the sentence inside the frame said otherwise).
+  // The frame is re-rendered by `safetyFrame` itself from what this door read, so the rule's
+  // place cannot drift from the builder's: the one banner must open exactly those bytes up
+  // to and including the rule (byte- and case-exact, whole), the heading must occur nowhere
+  // else in the system message, and the frame's end marker must come after the rule.
+  const bannerAt = system.content.indexOf(SAFETY_FRAME_BANNER);
+  const rendered = safetyFrame({ fence: declared, canary, answerForm: "", contractId });
+  const ruleHead = rendered.slice(0, rendered.indexOf(CONTENT_RULE_TEXT) + CONTENT_RULE_TEXT.length);
+  const frameEnd = rendered.slice(rendered.lastIndexOf("\n") + 1);
+  const headingAt = system.content.indexOf(CONTENT_RULE_HEADING);
+  if (system.content.indexOf(SAFETY_FRAME_BANNER, bannerAt + 1) >= 0
+    || headingAt < 0 || system.content.indexOf(CONTENT_RULE_HEADING, headingAt + 1) >= 0
+    || !system.content.startsWith(ruleHead, bannerAt)
+    || system.content.indexOf(frameEnd, bannerAt) < bannerAt + ruleHead.length) {
     throw new TypedDomainError("PROMPT_FRAME_ABSENT", "The safety frame carries no content rule");
   }
   if (rest.length === 0) {
