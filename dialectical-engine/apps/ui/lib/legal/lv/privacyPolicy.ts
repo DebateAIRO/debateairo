@@ -303,6 +303,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
+  version: "3.0",
+  sha256: "01697a8da2d2d8075a5dac834cb0f9bd573d59c83212018a9c5354fde5b0f324",
   eyebrow: "PRIVĀTUMA POLITIKA · v3.0 · SPĒKĀ NO [DATE]",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",

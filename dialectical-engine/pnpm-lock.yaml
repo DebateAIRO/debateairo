@@ -68,6 +68,9 @@ importers:
       '@debateai/ledger':
         specifier: workspace:*
         version: link:packages/ledger
+      '@debateai/legal-manifest':
+        specifier: workspace:*
+        version: link:packages/legal-manifest
       '@debateai/liveness':
         specifier: workspace:*
         version: link:packages/liveness
@@ -161,6 +164,9 @@ importers:
       '@debateai/ledger':
         specifier: workspace:*
         version: link:../../packages/ledger
+      '@debateai/legal-manifest':
+        specifier: workspace:*
+        version: link:../../packages/legal-manifest
       '@debateai/liveness':
         specifier: workspace:*
         version: link:../../packages/liveness
@@ -339,6 +345,9 @@ importers:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
+      '@debateai/legal-manifest':
+        specifier: workspace:*
+        version: link:../../packages/legal-manifest
       '@debateai/support-kb':
         specifier: workspace:*
         version: link:../../packages/support-kb
@@ -576,6 +585,8 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+
+  packages/legal-manifest: {}
 
   packages/liveness:
     dependencies:

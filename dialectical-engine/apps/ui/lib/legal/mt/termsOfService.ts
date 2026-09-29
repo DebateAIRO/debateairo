@@ -363,6 +363,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "e7a4c667880b7b0bc0b2a7ee5f8c02dfd925bf54dba909d488cabfdf6ef1063b",
   eyebrow: "TERMINI TAS-SERVIZZ · v2.0 · EFFETTIVI [DATE]",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DebateAIRO S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",

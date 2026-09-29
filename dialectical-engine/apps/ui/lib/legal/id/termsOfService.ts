@@ -363,6 +363,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "2a9da5c6b254a607039c37f3dbccb002ddb28110daac69126f9ea4638c963051",
   eyebrow: "KETENTUAN LAYANAN · v2.0 · BERLAKU [DATE]",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DebateAIRO S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",

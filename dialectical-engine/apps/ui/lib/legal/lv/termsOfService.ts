@@ -363,6 +363,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "3e05c4c326bdfec9967daaa6b03332d4990a715972ed3a15956b88512e0b3356",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.0 · SPĒKĀ NO [DATE]",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DebateAIRO S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",

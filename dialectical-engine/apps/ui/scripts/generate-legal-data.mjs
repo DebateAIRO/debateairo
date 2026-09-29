@@ -23,10 +23,12 @@
  * output, so edit the draft and regenerate — never the module.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { LOCALES } from "../lib/i18n/locales.ts";
+import { buildConsentManifestEntries } from "./legal-consent-manifest.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -40,6 +42,8 @@ const ACCENT_CYCLE = ["--ok-dot", "--gold", "--reasoning", "--con", "--ink", "--
 const DOCUMENTS = {
   privacy: {
     key: "privacy",
+    manifestKind: "PRIVACY",
+    reacceptanceFrom: null,
     draft: "privacy-policy.md",
     module: "privacyPolicy.ts",
     englishOutput: "apps/ui/lib/privacyPolicy.ts",
@@ -55,6 +59,8 @@ const DOCUMENTS = {
   },
   terms: {
     key: "terms",
+    manifestKind: "TERMS",
+    reacceptanceFrom: null,
     draft: "terms-of-service.md",
     module: "termsOfService.ts",
     englishOutput: "apps/ui/lib/termsOfService.ts",
@@ -81,6 +87,73 @@ export const LEGAL_DOCUMENT_SOURCES = Object.freeze(
     })
   )
 );
+
+/** The manifest the API and the UI both read (packages/legal-manifest). */
+export const LEGAL_MANIFEST_OUTPUT = "packages/legal-manifest/src/manifest.json";
+const LEGAL_MANIFEST_FORMAT = "debateai.legal-manifest.v1";
+
+/**
+ * The sha256 of the draft's EXACT bytes. `markdown` is the draft decoded as UTF-8; re-encoding a
+ * valid UTF-8 string reproduces its bytes exactly (a BOM included), and `main` refuses a draft that
+ * is not valid UTF-8, so this is the hash of the file on disk.
+ */
+export function legalDraftSha256(markdown) {
+  return createHash("sha256").update(markdown, "utf8").digest("hex");
+}
+
+/**
+ * Ruling Q-3: every Terms and Privacy text that was ever current is kept here, byte for byte, named by
+ * the sha256 of its bytes. The Terms promise "Previous versions at dezbatere.ro/terms/versions", and
+ * M1 attaches the version a person ACCEPTED, which may no longer be the current draft. A file is
+ * written once (`wx`) and never overwritten or deleted by this script.
+ */
+export const LEGAL_ARCHIVE_ROOT = "apps/ui/legal/archive";
+
+export function legalArchivePath(locale, sha256) {
+  return `${LEGAL_ARCHIVE_ROOT}/${locale}/${sha256}.md`;
+}
+
+/**
+ * The archive against its index: every listed file present and hashing to its own name, and no file
+ * the index does not list (dotfiles such as a Finder `.DS_Store` are not texts and are skipped).
+ * Returns the problems, sorted; an empty list means the two agree.
+ */
+export function legalArchiveProblems(repoRoot, archive) {
+  const problems = [];
+  const listed = new Set();
+  for (const byLocale of Object.values(archive)) {
+    for (const entries of Object.values(byLocale)) {
+      for (const [sha256, entry] of Object.entries(entries)) {
+        listed.add(entry.path);
+        let bytes;
+        try {
+          bytes = readFileSync(resolve(repoRoot, entry.path));
+        } catch {
+          problems.push(`${entry.path}: MISSING`);
+          continue;
+        }
+        if (createHash("sha256").update(bytes).digest("hex") !== sha256) {
+          problems.push(`${entry.path}: HASH MISMATCH`);
+        }
+      }
+    }
+  }
+  const root = resolve(repoRoot, LEGAL_ARCHIVE_ROOT);
+  const locales = existsSync(root) ? readdirSync(root, { withFileTypes: true }) : [];
+  for (const locale of locales) {
+    if (locale.name.startsWith(".")) continue;
+    if (!locale.isDirectory()) {
+      problems.push(`${LEGAL_ARCHIVE_ROOT}/${locale.name}: NOT IN THE MANIFEST`);
+      continue;
+    }
+    for (const file of readdirSync(join(root, locale.name))) {
+      if (file.startsWith(".")) continue;
+      const path = `${LEGAL_ARCHIVE_ROOT}/${locale.name}/${file}`;
+      if (!listed.has(path)) problems.push(`${path}: NOT IN THE MANIFEST`);
+    }
+  }
+  return problems.sort();
+}
 
 /* ------------------------------------------------------------------------------------------ */
 /* Inline markdown → plain text                                                                 */
@@ -353,7 +426,7 @@ export function buildLegalDocument(markdown, key) {
   const parsedChrome = parseLegalChrome(markdown);
   validateFrozenAnchors(parsedChrome.markdown, config);
   const { preamble, sections: rawSections } = parseSections(parsedChrome.markdown);
-  const { summary } = parsePreamble(preamble);
+  const { summary, version } = parsePreamble(preamble);
   const chrome = parsedChrome.chrome;
 
   const withSummary = [
@@ -380,6 +453,8 @@ export function buildLegalDocument(markdown, key) {
 
   return {
     key: config.key,
+    version,
+    sha256: legalDraftSha256(markdown),
     eyebrow: chrome.eyebrow,
     title: chrome.title,
     lede: chrome.lede,
@@ -464,6 +539,8 @@ export function renderLegalModule(markdown, key, locale = "en") {
     "",
     `export const ${documentName}: LegalDocument = {`,
     `  key: ${str(document.key)},`,
+    `  version: ${str(document.version)},`,
+    `  sha256: ${str(document.sha256)},`,
     `  eyebrow: ${str(document.eyebrow)},`,
     `  title: ${str(document.title)},`,
     `  lede: ${str(document.lede)},`,
@@ -478,6 +555,107 @@ export function renderLegalModule(markdown, key, locale = "en") {
     "};",
     ""
   ].join("\n");
+}
+
+/** The two consent kinds the checkout records (R-27); their pairs come from legal-consent-manifest.mjs. */
+const CONSENT_MANIFEST_KINDS = Object.freeze(["CONSENT_IMMEDIATE_START", "CONSENT_RENEWAL"]);
+
+const ARCHIVE_VERSION = /^[0-9]{1,4}\.[0-9]{1,4}$/;
+const ARCHIVE_SHA256 = /^[0-9a-f]{64}$/;
+
+/**
+ * Ruling Q-3: the committed archive index (`archiveHistory`, the `archive` member of the manifest
+ * already on disk; `{}` on the very first run) plus every current draft. An entry is never dropped.
+ * A history entry of an unknown kind or locale, a malformed hash or version, a path that is not its
+ * own, or a hash that the current draft carries with another version refuses the whole run
+ * (LEGAL_MANIFEST_ARCHIVE_INVALID), so a damaged index is never silently rewritten.
+ */
+function mergeArchive(archiveHistory, currentByKind) {
+  if (archiveHistory === null || typeof archiveHistory !== "object" || Array.isArray(archiveHistory)) {
+    throw new Error("LEGAL_MANIFEST_ARCHIVE_INVALID");
+  }
+  const localeCodes = new Set(LOCALES.map(({ code }) => code));
+  const archive = { PRIVACY: {}, TERMS: {} };
+  for (const [kind, byLocale] of Object.entries(archiveHistory)) {
+    if (!Object.hasOwn(archive, kind) || byLocale === null || typeof byLocale !== "object") {
+      throw new Error("LEGAL_MANIFEST_ARCHIVE_INVALID");
+    }
+    for (const [locale, entries] of Object.entries(byLocale)) {
+      if (!localeCodes.has(locale) || entries === null || typeof entries !== "object") {
+        throw new Error("LEGAL_MANIFEST_ARCHIVE_INVALID");
+      }
+      for (const [sha256, entry] of Object.entries(entries)) {
+        if (!ARCHIVE_SHA256.test(sha256) || typeof entry?.version !== "string" || !ARCHIVE_VERSION.test(entry.version)
+          || entry.path !== legalArchivePath(locale, sha256)) {
+          throw new Error("LEGAL_MANIFEST_ARCHIVE_INVALID");
+        }
+        archive[kind][locale] = { ...(archive[kind][locale] ?? {}), [sha256]: { version: entry.version, path: entry.path } };
+      }
+    }
+  }
+  for (const [kind, byLocale] of Object.entries(currentByKind)) {
+    for (const [locale, pair] of Object.entries(byLocale)) {
+      const known = archive[kind][locale]?.[pair.sha256];
+      if (known !== undefined && known.version !== pair.version) throw new Error("LEGAL_MANIFEST_ARCHIVE_INVALID");
+      archive[kind][locale] = {
+        ...(archive[kind][locale] ?? {}),
+        [pair.sha256]: { version: pair.version, path: legalArchivePath(locale, pair.sha256) }
+      };
+    }
+  }
+  return archive;
+}
+
+/**
+ * Every locale x both documents -> { version, sha256 }, plus each document's re-acceptance floor,
+ * plus the checkout consent pairs of the locales that have them (`consentEntries`, the shape
+ * `buildConsentManifestEntries` returns: locale -> { CONSENT_RENEWAL, CONSENT_IMMEDIATE_START }),
+ * plus the archive index (`archiveHistory` carried forward, every current draft added — Q-3).
+ * `readDraft(locale, kind)` returns the draft's text; a missing or invalid draft throws, so the
+ * manifest is either whole or not written. A kind with no entry at all is left out of `documents`
+ * (the package reads it as empty). Keys are sorted, so the output is deterministic.
+ */
+export function buildLegalManifest(readDraft, consentEntries = {}, archiveHistory = {}) {
+  const documents = {};
+  const reacceptance = {};
+  for (const key of ["privacy", "terms"]) {
+    const config = DOCUMENTS[key];
+    reacceptance[config.manifestKind] = config.reacceptanceFrom;
+    const byLocale = {};
+    for (const code of LOCALES.map(({ code: locale }) => locale).sort()) {
+      const markdown = readDraft(code, config.manifestKind);
+      const document = buildLegalDocument(markdown, key);
+      byLocale[code] = { version: document.version, sha256: document.sha256 };
+    }
+    documents[config.manifestKind] = byLocale;
+  }
+  const archive = mergeArchive(archiveHistory, { PRIVACY: documents.PRIVACY, TERMS: documents.TERMS });
+  const localeCodes = new Set(LOCALES.map(({ code }) => code));
+  for (const [locale, entries] of Object.entries(consentEntries)) {
+    if (!localeCodes.has(locale) || entries === null || typeof entries !== "object") {
+      throw new Error("LEGAL_MANIFEST_CONSENT_ENTRY_INVALID");
+    }
+    for (const [kind, pair] of Object.entries(entries)) {
+      if (!CONSENT_MANIFEST_KINDS.includes(kind) || typeof pair?.version !== "string" || typeof pair?.sha256 !== "string") {
+        throw new Error("LEGAL_MANIFEST_CONSENT_ENTRY_INVALID");
+      }
+      documents[kind] = { ...(documents[kind] ?? {}), [locale]: { version: pair.version, sha256: pair.sha256 } };
+    }
+  }
+  const sortedKeys = (value) => Object.fromEntries(Object.keys(value).sort().map((name) => [name, value[name]]));
+  return {
+    format: LEGAL_MANIFEST_FORMAT,
+    reacceptance: sortedKeys(reacceptance),
+    documents: Object.fromEntries(Object.keys(documents).sort().map((kind) => [kind, sortedKeys(documents[kind])])),
+    archive: Object.fromEntries(Object.keys(archive).sort().map((kind) => [
+      kind,
+      Object.fromEntries(Object.keys(archive[kind]).sort().map((locale) => [locale, sortedKeys(archive[kind][locale])]))
+    ]))
+  };
+}
+
+export function renderLegalManifest(manifest) {
+  return `${JSON.stringify(manifest, null, 2)}\n`;
 }
 
 /* ------------------------------------------------------------------------------------------ */
@@ -541,10 +719,11 @@ function main(argv) {
       const output = outputFor(locale, config);
       let markdown;
       try {
-        markdown = readFileSync(resolve(REPO_ROOT, source), "utf8");
+        const bytes = readFileSync(resolve(REPO_ROOT, source));
+        markdown = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
       } catch {
         stale += 1;
-        process.stderr.write(`${source}: MISSING\n`);
+        process.stderr.write(`${source}: MISSING OR NOT UTF-8\n`);
         continue;
       }
       let rendered;
@@ -578,6 +757,69 @@ function main(argv) {
       mkdirSync(dirname(outputPath), { recursive: true });
       writeFileSync(outputPath, rendered);
       process.stdout.write(`${output}: written\n`);
+    }
+  }
+  const manifestPath = resolve(REPO_ROOT, LEGAL_MANIFEST_OUTPUT);
+  let currentManifest = null;
+  try {
+    currentManifest = readFileSync(manifestPath, "utf8");
+  } catch {
+    currentManifest = null;
+  }
+  let manifest = null;
+  try {
+    // Q-3: the history of every text that was ever current. A manifest that exists but does not parse
+    // stops the run (JSON.parse throws), so a damaged file never erases what people accepted.
+    const archiveHistory = currentManifest === null ? {} : JSON.parse(currentManifest).archive;
+    // R-27: absent billing.json, or billing.json without the two sentences, contributes nothing.
+    const consentEntries = buildConsentManifestEntries({
+      messagesRoot: resolve(REPO_ROOT, "apps/ui/messages"),
+      locales: LOCALES.map(({ code }) => code)
+    });
+    manifest = buildLegalManifest((locale, kind) => {
+      const draft = kind === "TERMS" ? DOCUMENTS.terms.draft : DOCUMENTS.privacy.draft;
+      const bytes = readFileSync(resolve(REPO_ROOT, "apps/ui/legal", locale, draft));
+      return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    }, consentEntries, archiveHistory);
+  } catch (error) {
+    stale += 1;
+    process.stderr.write(`${LEGAL_MANIFEST_OUTPUT}: INVALID (${error instanceof Error ? error.message : String(error)})\n`);
+  }
+  let manifestText = null;
+  if (manifest !== null) {
+    if (!options.check) {
+      // Q-3: copy each current draft into the archive under the hash of its bytes. `wx` never
+      // overwrites: a file already there is left as it is, and the check below proves its bytes.
+      for (const code of LOCALES.map(({ code: locale }) => locale)) {
+        for (const key of ["privacy", "terms"]) {
+          const bytes = readFileSync(resolve(REPO_ROOT, sourceFor(code, DOCUMENTS[key])));
+          const target = legalArchivePath(code, createHash("sha256").update(bytes).digest("hex"));
+          if (existsSync(resolve(REPO_ROOT, target))) continue;
+          mkdirSync(dirname(resolve(REPO_ROOT, target)), { recursive: true });
+          writeFileSync(resolve(REPO_ROOT, target), bytes, { flag: "wx" });
+          process.stdout.write(`${target}: archived\n`);
+        }
+      }
+    }
+    const problems = legalArchiveProblems(REPO_ROOT, manifest.archive);
+    for (const problem of problems) process.stdout.write(`${problem}\n`);
+    stale += problems.length;
+    if (problems.length === 0) {
+      process.stdout.write(`${LEGAL_ARCHIVE_ROOT}: up to date\n`);
+      // The index is written only over an archive that matches it.
+      manifestText = renderLegalManifest(manifest);
+    }
+  }
+  if (manifestText !== null) {
+    if (currentManifest === manifestText) {
+      process.stdout.write(`${LEGAL_MANIFEST_OUTPUT}: up to date\n`);
+    } else if (options.check) {
+      stale += 1;
+      process.stdout.write(`${LEGAL_MANIFEST_OUTPUT}: STALE (regenerate with pnpm generate:legal)\n`);
+    } else {
+      mkdirSync(dirname(manifestPath), { recursive: true });
+      writeFileSync(manifestPath, manifestText);
+      process.stdout.write(`${LEGAL_MANIFEST_OUTPUT}: written\n`);
     }
   }
   process.exitCode = stale > 0 ? 1 : 0;

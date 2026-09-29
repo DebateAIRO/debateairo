@@ -505,6 +505,8 @@ apps/ui/next.config.mjs
 apps/ui/scripts/assert-production-auth-routes.mjs
 apps/ui/scripts/generate-legal-data.d.mts
 apps/ui/scripts/generate-legal-data.mjs
+apps/ui/scripts/legal-consent-manifest.d.mts
+apps/ui/scripts/legal-consent-manifest.mjs
 apps/ui/scripts/legal-locale-check.d.mts
 apps/ui/scripts/legal-locale-check.mjs
 apps/ui/scripts/next-config-csp.test.mjs
@@ -566,6 +568,7 @@ packages/kernel/src/index.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts
 packages/ledger/src/index.ts
+packages/legal-manifest/src/index.ts
 packages/liveness/src/index.ts
 packages/memory/src/index.ts
 packages/obs-capture/install/api.ts

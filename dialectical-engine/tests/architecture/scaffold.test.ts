@@ -38,9 +38,10 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
   ]);
 
   // 27 -> 28: the verdict story's `story` package row.
-  it("matches all 28 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
+  // 28 -> 29: the legal-manifest package row (A26(a)).
+  it("matches all 29 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
     const report = await auditArchitecture();
-    expect(report.edgeRowsChecked).toBe(28);
+    expect(report.edgeRowsChecked).toBe(29);
     expect(report.violations.filter((violation) => !DEV_F31_OBS_CAPTURE_EDGES.includes(violation)))
       .toEqual([]);
   });

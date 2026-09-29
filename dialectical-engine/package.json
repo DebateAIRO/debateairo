@@ -79,6 +79,7 @@
     "@debateai/judgement": "workspace:*",
     "@debateai/kernel": "workspace:*",
     "@debateai/ledger": "workspace:*",
+    "@debateai/legal-manifest": "workspace:*",
     "@debateai/liveness": "workspace:*",
     "@debateai/memory": "workspace:*",
     "@debateai/obs-capture": "workspace:*",

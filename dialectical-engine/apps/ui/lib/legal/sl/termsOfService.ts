@@ -363,6 +363,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "b8f64e08e29842575a487e74a2090db1a206349aed9fdccf1d896fbf8577041d",
   eyebrow: "POGOJI UPORABE · v2.0 · VELJAVNI OD [DATE]",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DebateAIRO S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
