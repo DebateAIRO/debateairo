@@ -12,6 +12,7 @@ import {
   LEGAL_PAGES,
   MODEL_PROVIDERS,
   TERMS_VERSIONS,
+  type LegalInventoryItem,
   type LegalPageKey
 } from "@/lib/legal/pages";
 
@@ -253,6 +254,25 @@ export function LegalVersionsBody({ legalCatalog }: { legalCatalog: MessageCatal
   );
 }
 
+/** One /cookies row: the name as the code writes it, then kind, purpose, who receives it, and lifetime. */
+function InventoryRow({ item, legalCatalog }: { item: LegalInventoryItem; legalCatalog: MessageCatalog }) {
+  return (
+    <tr>
+      <th scope="row">
+        <code>{item.name}</code>
+      </th>
+      <td className="legalKindCell">{t(legalCatalog, item.kindKey)}</td>
+      <td>{t(legalCatalog, item.purposeKey)}</td>
+      <td>{t(legalCatalog, item.recipientKey)}</td>
+      <td>{t(legalCatalog, item.lifeKey)}</td>
+    </tr>
+  );
+}
+
+/**
+ * The cookie policy (`/cookies`): the eight stored items of record, the four cookies in one table and
+ * the four browser-storage keys in another, then how to refuse them and what then stops working.
+ */
 export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalog }) {
   const head = (
     <thead>
@@ -260,6 +280,7 @@ export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalo
         <th scope="col">{t(legalCatalog, "legal.cookies.colName")}</th>
         <th scope="col">{t(legalCatalog, "legal.cookies.colType")}</th>
         <th scope="col">{t(legalCatalog, "legal.cookies.colPurpose")}</th>
+        <th scope="col">{t(legalCatalog, "legal.cookies.colRecipient")}</th>
         <th scope="col">{t(legalCatalog, "legal.cookies.colLasts")}</th>
       </tr>
     </thead>
@@ -270,15 +291,8 @@ export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalo
       <table className="legalTable legalCookieTable">
         {head}
         <tbody>
-          {LEGAL_COOKIES.map(({ name, purposeKey, lifeKey }) => (
-            <tr key={name}>
-              <th scope="row">
-                <code>{name}</code>
-              </th>
-              <td className="legalTagEssential">{t(legalCatalog, "legal.cookies.essential")}</td>
-              <td>{t(legalCatalog, purposeKey)}</td>
-              <td>{t(legalCatalog, lifeKey)}</td>
-            </tr>
+          {LEGAL_COOKIES.map((item) => (
+            <InventoryRow item={item} legalCatalog={legalCatalog} key={item.name} />
           ))}
         </tbody>
       </table>
@@ -287,18 +301,13 @@ export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalo
       <table className="legalTable legalCookieTable">
         {head}
         <tbody>
-          {LEGAL_BROWSER_STORAGE.map(({ name, purposeKey }) => (
-            <tr key={name}>
-              <th scope="row">
-                <code>{name}</code>
-              </th>
-              <td className="legalTagPreference">{t(legalCatalog, "legal.cookies.preference")}</td>
-              <td>{t(legalCatalog, purposeKey)}</td>
-              <td>{t(legalCatalog, "legal.cookies.untilCleared")}</td>
-            </tr>
+          {LEGAL_BROWSER_STORAGE.map((item) => (
+            <InventoryRow item={item} legalCatalog={legalCatalog} key={item.name} />
           ))}
         </tbody>
       </table>
+      <p className="legalRefuse">{t(legalCatalog, "legal.cookies.refuse")}</p>
+      <p className="legalRefuse">{t(legalCatalog, "legal.cookies.refuseEffect")}</p>
       <CookiePreferencesButton className="btn btnDark legalAction" label={t(legalCatalog, "legal.cookies.change")} />
     </>
   );

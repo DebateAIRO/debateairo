@@ -15,6 +15,7 @@ import {
   isUnverified,
   LEGAL_BROWSER_STORAGE,
   LEGAL_COOKIES,
+  LEGAL_INVENTORY,
   LEGAL_PAGES,
   MODEL_PROVIDERS,
   TERMS_VERSIONS
@@ -285,26 +286,69 @@ describe("the terms versions page lists only versions that exist", () => {
 });
 
 describe("the cookie policy describes the cookies the product really sets", () => {
-  it("lists exactly the API's two session cookies and the interface-language cookie", () => {
-    const api = source("apps/api/src/index.ts");
-    const session = api.match(/SESSION_COOKIE_NAME = "([^"]+)"/)?.[1];
-    const csrf = api.match(/CSRF_COOKIE_NAME = "([^"]+)"/)?.[1];
-    expect(LEGAL_COOKIES.map(({ name }) => name)).toEqual([session, csrf, LOCALE_COOKIE]);
+  // SPEC-v2 §2, in order: INV 1-4 are cookies, INV 5-8 live in the browser's storage.
+  const INV_COOKIES = ["__Host-debateai-session", "__Host-debateai-csrf", "__Host-debateai-age-refusal", "debateai.locale"];
+  const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2"];
+  // PLAN §2 Key map (SPEC-v2 R09, R10): the en kind, lifetime and recipient of each row, EXACT.
+  const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Local storage", "Local storage", "Session storage", "Session storage"];
+  const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab"];
+  const EN_RECIPIENT = [...Array(4).fill("DebateAI's server only"), ...Array(4).fill("stays in your browser")];
+  const english = legalEnglish as Record<string, string>;
+  const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "consent", "mode", "languageOffer", "supportConversation"];
+
+  it("lists INV 1-4 as cookies and INV 5-8 as browser storage, in SPEC-v2 §2 order", () => {
+    expect(LEGAL_COOKIES.map(({ name }) => name)).toEqual(INV_COOKIES);
+    expect(LEGAL_BROWSER_STORAGE.map(({ name }) => name)).toEqual(INV_STORAGE);
+    expect(LEGAL_INVENTORY).toEqual([...LEGAL_COOKIES, ...LEGAL_BROWSER_STORAGE]);
+    expect(LEGAL_COOKIES.map(({ name }) => name)).toContain(LOCALE_COOKIE);
+    expect(LEGAL_BROWSER_STORAGE.map(({ name }) => name)).toContain(CONSENT_KEY);
   });
 
   it("states lifetimes that match the Max-Age the code sets", () => {
     expect(source("apps/api/src/index.ts")).toMatch(/const SESSION_IDLE_MAX_AGE_SECONDS = 14 \* 24 \* 60 \* 60;/);
     expect(source("apps/ui/lib/i18n/localeChoice.ts")).toMatch(/Max-Age=31536000/);
-    expect(LEGAL_COOKIES.map(({ lifeKey }) => legalEnglish[lifeKey as keyof typeof legalEnglish]))
-      .toEqual(["14 days", "14 days", "1 year"]);
+    expect(source("packages/contract/src/index.ts")).toMatch(/AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS = 30 \* 24 \* 60 \* 60;/);
+    expect(INV_IDS.map((id) => english[`legal.cookies.${id}.life`])).toEqual(EN_LIFE);
+    expect(LEGAL_INVENTORY.map(({ lifeKey }) => lifeKey)).toEqual(INV_IDS.map((id) => `legal.cookies.${id}.life`));
   });
 
-  it("lists the two browser-storage keys the UI writes", () => {
-    expect(source("apps/ui/components/ModeToggle.tsx")).toMatch(/localStorage\.setItem\("debateai\.mode"/);
-    expect(LEGAL_BROWSER_STORAGE.map(({ name }) => name)).toEqual([CONSENT_KEY, "debateai.mode"]);
+  it("renders every row's name, kind, purpose, sent-to and lifetime from SPEC-v2 §2", () => {
+    const view = render(<LegalCookiesBody legalCatalog={legalEnglish} />);
+    const tables = [...view.querySelectorAll("table.legalTable")];
+    expect(tables).toHaveLength(2);
+    for (const table of tables) {
+      expect(texts(table.querySelectorAll("thead th"))).toEqual(
+        ["colName", "colType", "colPurpose", "colRecipient", "colLasts"].map((key) => english[`legal.cookies.${key}`])
+      );
+    }
+    const rows = tables.flatMap((table) => [...table.querySelectorAll("tbody tr")]);
+    expect(rows.map((row) => tables.indexOf(row.closest("table") as Element))).toEqual([0, 0, 0, 0, 1, 1, 1, 1]);
+    const cells = rows.map((row) => texts(row.querySelectorAll("th, td")));
+    expect(rows.map((row) => row.querySelector("th code")?.textContent)).toEqual([...INV_COOKIES, ...INV_STORAGE]);
+    expect(cells.map((row) => row.length)).toEqual(Array(8).fill(5));
+    expect(cells.map((row) => row[1])).toEqual(EN_KIND);
+    expect(cells.map((row) => row[3])).toEqual(EN_RECIPIENT);
+    expect(cells.map((row) => row[4])).toEqual(EN_LIFE);
+    for (const [index, row] of cells.entries()) {
+      expect(row[2], `purpose of ${row[0]}`).toBe(english[LEGAL_INVENTORY[index]!.purposeKey]);
+      expect(row[2]?.trim(), `purpose of ${row[0]}`).not.toBe("");
+    }
   });
 
-  it("renders both tables and a control that reopens the cookie preferences card", () => {
+  it("says no longer \"Two choices\", and states how to refuse and what stops working", () => {
+    const view = render(<LegalCookiesBody legalCatalog={legalEnglish} />);
+    const refuse = english["legal.cookies.refuse"];
+    const effect = english["legal.cookies.refuseEffect"];
+    expect(typeof refuse).toBe("string");
+    expect(typeof effect).toBe("string");
+    expect(view.textContent).not.toMatch(/two choices/i);
+    expect(view.textContent).toContain(refuse);
+    expect(view.textContent).toContain(effect);
+    for (const phrase of ["block or delete", "browser settings"]) expect(refuse?.toLowerCase(), phrase).toContain(phrase);
+    for (const phrase of ["stops working", "signing in", "language", "display"]) expect(effect?.toLowerCase(), phrase).toContain(phrase);
+  });
+
+  it("renders both tables with no switch or checkbox, and a control that reopens the card", () => {
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
@@ -313,6 +357,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
         ...LEGAL_COOKIES.map(({ name }) => name),
         ...LEGAL_BROWSER_STORAGE.map(({ name }) => name)
       ]);
+      expect(view.querySelectorAll("[role=switch],[role=checkbox],input[type=checkbox]")).toHaveLength(0);
       const button = [...view.querySelectorAll("button")].find(
         (candidate) => candidate.textContent === legalEnglish["legal.cookies.change"]
       );
