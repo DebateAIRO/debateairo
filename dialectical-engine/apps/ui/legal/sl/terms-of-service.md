@@ -96,7 +96,7 @@ Ta pravila veljajo za vsebino, ki jo pošljete in objavite, ter za način uporab
 
 **Ne pošiljajte osebnih podatkov drugih ljudi.** Sprašujte o temah, argumentih in javnih vprašanjih, ne pa o določljivih zasebnikih. Ne vključujte imen, kontaktnih podatkov, identifikacijskih številk, slik, zdravstvenih, finančnih ali drugih podatkov, ki določajo osebo, in ne uporabljajte DebateAI za izdelavo primera, profila ali dosjeja o osebi. Vprašanja o javnih osebah, ki delujejo v svoji javni vlogi, so dopustna; vprašanja, usmerjena proti zasebniku, niso. Če take podatke vendarle pošljete, ste zanje odgovorni in vsebino lahko odstranimo.
 
-**Vaši občutljivi podatki.** Vprašanja, ki jih zastavite, se lahko nanašajo na vaše zdravje, prepričanja, politična stališča ali druge občutljive zadeve. V to ste privolili ob registraciji. Če živite nekje, kjer veljajo posebna pravila za zdravstvene podatke, vas lahko Priloga A napoti na ločeno obvestilo.
+**Vaši občutljivi podatki.** Vprašanja, ki jih zastavite, se lahko nanašajo na vaše zdravje, prepričanja, politična stališča ali druge občutljive zadeve. V to privolite na ločenem zaslonu pred svojo prvo razpravo. Če živite nekje, kjer veljajo posebna pravila za zdravstvene podatke, vas lahko Priloga A napoti na ločeno obvestilo.
 
 **Ne pošiljajte ali objavljajte nezakonite vsebine**, vključno z vsebino, ki je obrekljiva, spodbuja nasilje ali sovraštvo, nadleguje ali grozi, predstavlja intimne posnetke, objavljene brez privolitve, krši pravice intelektualne lastnine ali zaupnost, razkriva poslovne skrivnosti, pomeni gradivo s spolno zlorabo otrok ali krši sankcije oziroma nadzor izvoza.
 
@@ -295,7 +295,7 @@ Naša oseba, odgovorna za zasebnost, je \[name, email\]. **Quebec:** ti Pogoji s
 
 ### A.6 Latinska Amerika *(priloga v španščini; samo če je navedena)*
 
-&#91;Published in Spanish.\] Privolitev je podlaga za obdelavo, kadar pogodba obdelave ne zahteva; ob registraciji izrecno privolite v obdelavo vseh občutljivih podatkov, ki se jih odločite vključiti. Svoje pravice ARCO lahko uveljavljate na \[address\], odgovore pa prejmete v \[Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719\]. *Mehika:* celotno *aviso de privacidad* je na \[URL\]; odstop je mogoč v \[5\] dneh. *Argentina:* \[AAIP legend\]; uporabite *botón de arrepentimiento* na \[URL\] v 10 dneh. *Kolumbija:* *política de tratamiento* je na \[URL\]; odstop je mogoč v 5 dneh. *Čile* (od 1. decembra 2026): kontakt agencije je \[…\]; prekličete lahko na enak način, kot ste se naročili; pravica do odstopa za digitalne storitve ne velja.
+&#91;Published in Spanish.\] Privolitev je podlaga za obdelavo, kadar pogodba obdelave ne zahteva; pred svojo prvo razpravo izrecno privolite v obdelavo vseh občutljivih podatkov, ki se jih odločite vključiti. Svoje pravice ARCO lahko uveljavljate na \[address\], odgovore pa prejmete v \[Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719\]. *Mehika:* celotno *aviso de privacidad* je na \[URL\]; odstop je mogoč v \[5\] dneh. *Argentina:* \[AAIP legend\]; uporabite *botón de arrepentimiento* na \[URL\] v 10 dneh. *Kolumbija:* *política de tratamiento* je na \[URL\]; odstop je mogoč v 5 dneh. *Čile* (od 1. decembra 2026): kontakt agencije je \[…\]; prekličete lahko na enak način, kot ste se naročili; pravica do odstopa za digitalne storitve ne velja.
 
 ### A.7 Zaliv — Združeni arabski emirati in Saudova Arabija *(samo če sta navedena)*
 

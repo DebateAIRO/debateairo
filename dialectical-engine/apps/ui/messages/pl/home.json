@@ -83,5 +83,18 @@
   "home.aiDisclosure": "Informacja o AI",
   "home.aiSupportLead": "Ta rozmowa jest prowadzona z asystentem pomocy technicznej AI.",
   "home.aiLinkLabel": "Jak oznaczamy treści AI (otwiera się w nowej karcie)",
-  "home.aiLink": "Jak oznaczamy treści AI"
+  "home.aiLink": "Jak oznaczamy treści AI",
+  "home.sensitiveConsent.eyebrow": "Przed pierwszą debatą",
+  "home.sensitiveConsent.title": "Twoje pytania mogą ujawniać informacje wrażliwe",
+  "home.sensitiveConsent.lede": "Pytanie o politykę, religię, zdrowie, seksualność lub przekonania może coś o Tobie powiedzieć. Prawo traktuje takie informacje jako wrażliwe, dlatego przed ich przetworzeniem potrzebujemy Twojej wyraźnej zgody.",
+  "home.sensitiveConsent.pointPurpose": "To, co piszesz, wykorzystujemy wyłącznie do prowadzenia Twoich debat.",
+  "home.sensitiveConsent.pointModels": "Aby przeprowadzić debatę, przesyłamy Twoje pytanie modelom AI, które w niej uczestniczą.",
+  "home.sensitiveConsent.pointOthers": "Nie zamieszczaj informacji wrażliwych dotyczących innych osób.",
+  "home.sensitiveConsent.pointDelete": "Debatę możesz usunąć w każdej chwili.",
+  "home.sensitiveConsent.statement": "Wyrażam zgodę na przetwarzanie przez DebateAI informacji wrażliwych, które zamieszczam we własnych pytaniach, w celu prowadzenia moich debat.",
+  "home.sensitiveConsent.privacyLink": "Przeczytaj w Polityce prywatności, jak postępujemy z tymi informacjami",
+  "home.sensitiveConsent.agree": "Wyrażam zgodę",
+  "home.sensitiveConsent.decline": "Nie wyrażam zgody",
+  "home.sensitiveConsent.declined": "Bez tej zgody nie możesz rozpocząć debaty. Zapytamy ponownie, gdy następnym razem będziesz rozpoczynać debatę.",
+  "home.sensitiveConsent.failed": "Nie udało się zapisać Twojej odpowiedzi. Spróbuj ponownie."
 }

@@ -81,5 +81,18 @@
   "home.aiDisclosure": "AI-meddelelse",
   "home.aiSupportLead": "Denne samtale er med en AI-supportagent.",
   "home.aiLinkLabel": "Sådan mærker vi AI-indhold (åbner i en ny fane)",
-  "home.aiLink": "Sådan mærker vi AI-indhold"
+  "home.aiLink": "Sådan mærker vi AI-indhold",
+  "home.sensitiveConsent.eyebrow": "Før din første debat",
+  "home.sensitiveConsent.title": "Dine spørgsmål kan afsløre følsomme oplysninger",
+  "home.sensitiveConsent.lede": "Et spørgsmål om politik, religion, sundhed, seksualitet eller overbevisning kan sige noget om dig. Loven betragter det som følsomme oplysninger, og derfor skal vi have dit udtrykkelige samtykke, før vi behandler dem.",
+  "home.sensitiveConsent.pointPurpose": "Vi bruger det, du skriver, udelukkende til at gennemføre dine debatter.",
+  "home.sensitiveConsent.pointModels": "For at gennemføre en debat sender vi dit spørgsmål til de AI-modeller, der deltager i den.",
+  "home.sensitiveConsent.pointOthers": "Medtag ikke følsomme oplysninger om andre personer.",
+  "home.sensitiveConsent.pointDelete": "Du kan til enhver tid slette en debat.",
+  "home.sensitiveConsent.statement": "Jeg giver samtykke til, at DebateAI må behandle de følsomme oplysninger, som jeg medtager i mine egne spørgsmål, med det formål at gennemføre mine debatter.",
+  "home.sensitiveConsent.privacyLink": "Læs i privatlivspolitikken, hvordan vi håndterer dem",
+  "home.sensitiveConsent.agree": "Jeg giver samtykke",
+  "home.sensitiveConsent.decline": "Jeg giver ikke samtykke",
+  "home.sensitiveConsent.declined": "Du kan ikke starte en debat uden dette samtykke. Vi spørger igen, næste gang du starter en.",
+  "home.sensitiveConsent.failed": "Dit svar kunne ikke gemmes. Prøv igen."
 }

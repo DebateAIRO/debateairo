@@ -65,7 +65,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Sistem za razprave spodbuja vprašanja o politiki, veri, zdravju, spolnosti in prepričanjih. Po členu 9 GDPR so to posebne vrste podatkov, ki se lahko pojavijo v vaših vprašanjih ne glede na to, ali jih nameravamo zbirati." },
-      { kind: "p", text: "O vas. Ob registraciji v ločenem stavku podate izrecno privolitev, da obdelujemo občutljive podatke, ki jih po lastni izbiri vključite v svoja vprašanja, zaradi izvajanja vaših razprav. Privolitev lahko kadar koli prekličete tako, da takih podatkov ne vključite, ali tako, da izbrišete razpravo. Kar objavite o sebi, so podatki, za katere ste se odločili, da jih boste javno objavili." },
+      { kind: "p", text: "O vas. Pred svojo prvo razpravo na ločenem zaslonu podate izrecno privolitev, da obdelujemo občutljive podatke, ki jih po lastni izbiri vključite v svoja vprašanja, zaradi izvajanja vaših razprav. Zabeležimo različico besedila, v katero ste privolili, vaš jezik in čas. Brez te privolitve ne morete začeti razprave. Privolitev lahko kadar koli prekličete tako, da takih podatkov ne vključite, ali tako, da izbrišete razpravo. Kar objavite o sebi, so podatki, za katere ste se odločili, da jih boste javno objavili." },
       { kind: "p", text: "O drugih osebah. Noben pravni pogoj nam ne dovoljuje obdelave občutljivih podatkov o tretji osebi, ki jo navedete v vprašanju, prav tako ga nima noben od naših ponudnikov umetne inteligence. Zato Pogoji to prepovedujejo, zato zmanjšujemo količino poslanih podatkov in zato tako vsebino na zahtevo hitro odstranimo — glejte razdelek 11." },
       { kind: "p", text: "Zdravstveni podatki. Nekatere države podatke, povezane z zdravjem, vključno z izpeljanimi sklepi, urejajo s posebnimi zakoni. Če živite v [the State of Washington], se uporablja ločeno [Consumer Health Data Privacy Notice]." }
     ]
@@ -84,7 +84,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Zagotavljanje varnosti storitve, odkrivanje zlorab, omogočanje prepoznave prijave, ki je niste izvedli, in vodenje revizijske sledi — Seje, varnostna revizijska sled, zgoščene vrednosti v podpori, povezane z zlorabo — Zakoniti interesi — Art. 6(1)(f): naši in vaši interesi za varno storitev. Ugovarjate lahko; glejte razdelek 10",
         "Dokazovanje, da ste sprejeli Pogoje ter dali ali preklicali privolitev — Evidence sprejetja in privolitev — Pravna obveznost — Art. 6(1)(c), naša dolžnost dokazati privolitev po Art. 7(1) — in zakoniti interesi za dokazovanje pogodbe",
         "Obravnavanje zahtev za podporo — Podpora — Pogodba — Art. 6(1)(b)",
-        "Obdelava občutljivih podatkov, ki jih vključite o sebi — Vsebina razprave — Izrecna privolitev — Art. 9(2)(a), podana ločeno ob registraciji",
+        "Obdelava občutljivih podatkov, ki jih vključite o sebi — Vsebina razprave — Izrecna privolitev — Art. 9(2)(a), podana na ločenem zaslonu pred vašo prvo razpravo",
         "Objava razprave, ki se jo odločite objaviti — Vsebina razprave, psevdonim — Pogodba — Art. 6(1)(b), po vašem navodilu; za občutljive podatke o vas Art. 9(2)(e) — podatki, ki ste jih očitno objavili sami",
         "Pošiljanje novic o izdelku — E-poštni naslov — Privolitev — Art. 6(1)(a), neoznačeno polje; kadar koli jo lahko prekličete v katerem koli e-poštnem sporočilu ali Nastavitvah",
         "Izpolnjevanje davčnih, računovodskih in pravnih obveznosti [pending paid plans] — Plačila, evidence sprejetja — Pravna obveznost — Art. 6(1)(c)",

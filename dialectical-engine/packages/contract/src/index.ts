@@ -232,6 +232,21 @@ export const AgeCheckResultSchema = z.object({ outcome: z.enum(["allowed", "refu
 export type AgeCheckResult = z.infer<typeof AgeCheckResultSchema>;
 export const AgeConfirmationStatusSchema = z.object({ status: z.enum(["required", "confirmed"]) }).strict();
 export type AgeConfirmationStatus = z.infer<typeof AgeConfirmationStatusSchema>;
+
+/**
+ * Sensitive-data consent (V's ruling of 2026-09-29). Before the first debate an account
+ * agrees, once, to the processing of sensitive information (politics, religion, health,
+ * sexuality) in its own questions. Without it `POST /v1/asks` answers 403 with
+ * `SENSITIVE_DATA_CONSENT_REQUIRED`. The version names the wording agreed to.
+ */
+export const SENSITIVE_DATA_NOTICE_VERSION = "2026-09-29" as const;
+export const SENSITIVE_DATA_CONSENT_REQUIRED = "SENSITIVE_DATA_CONSENT_REQUIRED" as const;
+export const SensitiveDataConsentRequestSchema = z.object({
+  notice_version: z.literal(SENSITIVE_DATA_NOTICE_VERSION),
+  locale: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/)
+}).strict();
+export const SensitiveDataConsentStatusSchema = z.object({ status: z.enum(["required", "given"]) }).strict();
+export type SensitiveDataConsentStatus = z.infer<typeof SensitiveDataConsentStatusSchema>;
 export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
   "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
@@ -764,6 +779,8 @@ export const contractInventory = Object.freeze({
     "POST /v1/auth/step-up",
     "GET /v1/auth/age-confirmation",
     "POST /v1/auth/age-confirmation",
+    "GET /v1/account/sensitive-data-consent",
+    "POST /v1/account/sensitive-data-consent",
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
@@ -806,6 +823,7 @@ export const contractInventory = Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema,
+    SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,

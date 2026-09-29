@@ -285,6 +285,7 @@ apps/ui/components/QuestionLanguageOffer.tsx
 apps/ui/components/RecommendedInvestigations.tsx
 apps/ui/components/ReferenceNodeMeta.tsx
 apps/ui/components/ScoringErrorBoundary.tsx
+apps/ui/components/SensitiveDataConsent.tsx
 apps/ui/components/SessionControls.tsx
 apps/ui/components/SettingsPageClient.tsx
 apps/ui/components/SignUpFlow.tsx

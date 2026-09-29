@@ -52,7 +52,7 @@ Me **ei** kogu analüüsi- ega telemeetriaandmeid selle kohta, kuidas te toodet 
 
 Väitlusmootor ajendab esitama küsimusi poliitika, religiooni, tervise, seksuaalsuse ja veendumuste kohta. Need on GDPR-i artikli 9 kohaselt eriliiki andmed ning võivad sisalduda teie küsimustes olenemata sellest, kas kavatseme neid koguda.
 
-**Teie kohta.** Registreerumisel annate eraldi lausega selgesõnalise nõusoleku, et töötleme tundlikku teavet, mille otsustate lisada oma küsimustesse, teie väitluste läbiviimise eesmärgil. Võite nõusoleku igal ajal tagasi võtta, jättes sellise teabe lisamata või kustutades väitluse. Enda kohta avaldatud andmed olete ise otsustanud avalikustada.
+**Teie kohta.** Enne oma esimest väitlust annate eraldi ekraanikuval selgesõnalise nõusoleku, et töötleme tundlikku teavet, mille otsustate lisada oma küsimustesse, teie väitluste läbiviimise eesmärgil. Salvestame selle sõnastuse versiooni, millega nõustusite, teie keele ja ajahetke. Ilma selle nõusolekuta ei saa te väitlust alustada. Võite nõusoleku igal ajal tagasi võtta, jättes sellise teabe lisamata või kustutades väitluse. Enda kohta avaldatud andmed olete ise otsustanud avalikustada.
 
 **Teiste inimeste kohta.** Ükski õiguslik tingimus ei luba meil töödelda küsimuses nimetatud kolmanda isiku tundlikke andmeid ning ka ühelgi meie tehisintellekti pakkujal ei ole selleks alust. Seepärast on see Tingimustes keelatud, seepärast minimeerime saadetavaid andmeid ja seepärast eemaldame sellise sisu taotluse korral kiiresti — jaotis 11.
 
@@ -69,7 +69,7 @@ Igal eesmärgil on üks õiguslik alus GDPR-i artikli 6(1) kohaselt ning me ei k
 | Teenuse turvalisuse tagamine, kuritarvitamise tuvastamine, võimaldamine märgata sisselogimist, mida te ei teinud, ja auditilogi pidamine | Seansid, turbeauditilogi, kasutajatoe kuritarvitamise räsid | **Õigustatud huvid** — Art. 6(1)(f): meie ja teie huvi turvalise teenuse vastu. Võite esitada vastuväite; jaotis 10 |
 | Tõendamine, et nõustusite Tingimustega ning andsite või võtsite tagasi nõusoleku | Nõustumise ja nõusoleku kirjed | **Juriidiline kohustus** — Art. 6(1)(c), meie kohustus tõendada nõusolekut Art. 7(1) alusel — ja õigustatud huvi lepingu tõendamise vastu |
 | Kasutajatoe päringutele vastamine | Kasutajatugi | **Leping** — Art. 6(1)(b) |
-| Enda kohta lisatud tundliku teabe töötlemine | Väitluse sisu | **Selgesõnaline nõusolek** — Art. 9(2)(a), antakse registreerumisel eraldi |
+| Enda kohta lisatud tundliku teabe töötlemine | Väitluse sisu | **Selgesõnaline nõusolek** — Art. 9(2)(a), antakse eraldi ekraanikuval enne teie esimest väitlust |
 | Teie valitud väitluse avaldamine | Väitluse sisu, pseudonüüm | **Leping** — Art. 6(1)(b), teie juhise alusel; teid puudutavate tundlike andmete puhul Art. 9(2)(e) — andmed, mille olete ilmselgelt avalikustanud |
 | Teile tooteuudiste saatmine | E-posti aadress | **Nõusolek** — Art. 6(1)(a), märkimata märkeruut; võite igal ajal loobuda mis tahes e-kirja kaudu või seadetes |
 | Maksu-, raamatupidamis- ja juriidiliste kohustuste täitmine [pending paid plans] | Maksed, nõustumise kirjed | **Juriidiline kohustus** — Art. 6(1)(c) |

@@ -47,6 +47,9 @@ import {
   type Node,
   type RunProjection,
   type Session,
+  SENSITIVE_DATA_CONSENT_REQUIRED,
+  SENSITIVE_DATA_NOTICE_VERSION,
+  SensitiveDataConsentRequestSchema,
   AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
   AGE_REFUSAL_COOKIE_NAME,
   AGE_REFUSAL_COOKIE_VALUE,
@@ -1100,6 +1103,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
   { route: "GET /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "read-age-confirmation" },
   { route: "POST /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "confirm-age" },
+  // Sensitive-data consent (V, 2026-09-29): the one-time agreement before the first debate.
+  { route: "GET /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "read-sensitive-data-consent" },
+  { route: "POST /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "give-sensitive-data-consent" },
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
@@ -1518,6 +1524,13 @@ function ageRefused(reply: FastifyReply): FastifyReply {
     .send({ error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" });
 }
 
+/** Fails closed: without the consent store, no debate can be admitted and none is recorded. */
+function sensitiveDataConsentUnavailable(reply: FastifyReply): FastifyReply {
+  return reply.status(503).send({
+    error: "SENSITIVE_DATA_CONSENT_UNAVAILABLE", message: "SENSITIVE_DATA_CONSENT_UNAVAILABLE"
+  });
+}
+
 function refreshedCookies(input: Readonly<{
   sessionToken: string;
   csrfToken: string | null;
@@ -1907,6 +1920,26 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       reply.header("set-cookie", [...expiredCookies(), ageRefusalCookie()]);
       return reply.send({ outcome: "refused" });
     });
+    // Sensitive-data consent (V, 2026-09-29): read and give the one-time agreement.
+    api.get("/v1/account/sensitive-data-consent", routePolicy("GET /v1/account/sensitive-data-consent"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      return reply.send({ status: await options.sessions!.readSensitiveDataConsent(authenticated) });
+    });
+    api.post("/v1/account/sensitive-data-consent", credentialRoutePolicy("POST /v1/account/sensitive-data-consent"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.recordSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      const body = SensitiveDataConsentRequestSchema.safeParse(request.body);
+      if (!body.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      const outcome = await options.sessions!.recordSensitiveDataConsent(authenticated, {
+        noticeVersion: SENSITIVE_DATA_NOTICE_VERSION,
+        locale: body.data.locale
+      });
+      if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      return reply.send({ status: "given" });
+    });
     api.post("/v1/auth/step-up", credentialRoutePolicy("POST /v1/auth/step-up"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
@@ -2253,6 +2286,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
+    // Sensitive-data consent (V, 2026-09-29): an account that has not agreed starts no
+    // debate. Checked before admission, so a refusal here spends none of the account's quota.
+    const asker = request.authenticatedSession;
+    if (asker !== undefined) {
+      if (options.sessions?.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      if (await options.sessions.readSensitiveDataConsent(asker) !== "given") {
+        return reply.status(403).send({
+          error: SENSITIVE_DATA_CONSENT_REQUIRED, message: SENSITIVE_DATA_CONSENT_REQUIRED
+        });
+      }
+    }
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
     const ask = parseRequest(AskRequestSchema, request.body);

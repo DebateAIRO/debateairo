@@ -96,7 +96,7 @@ These rules apply to what you submit, how you use the service, and what you publ
 
 **Do not submit personal data about other people.** Ask about issues, arguments and public questions rather than about identifiable private individuals. Do not include names, contact details, identification numbers, images, health, financial or other details that identify someone, and do not use DebateAI to build a case, profile or dossier about a person. Questions about public figures acting in their public role are acceptable; questions targeting a private individual are not. If you do submit such data, you are responsible for it, and we may remove the content.
 
-**Your own sensitive information.** Questions you ask may touch on your own health, beliefs, politics or other sensitive matters. You consented to that when you registered. If you live somewhere with specific rules on health data, Annex A may point you to a separate notice.
+**Your own sensitive information.** Questions you ask may touch on your own health, beliefs, politics or other sensitive matters. You consent to that on a separate screen before your first debate. If you live somewhere with specific rules on health data, Annex A may point you to a separate notice.
 
 **Do not submit or publish unlawful content**, including content that is defamatory, incites violence or hatred, harasses or threatens, is intimate imagery shared without consent, infringes intellectual property or confidentiality, discloses trade secrets, constitutes child sexual abuse material, or breaches sanctions or export controls.
 
@@ -295,7 +295,7 @@ Our privacy officer is \[name, email\]. **Quebec:** these Terms are available in
 
 ### A.6 Latin America *(Spanish-language annex; only if listed)*
 
-&#91;Published in Spanish.\] Consent is the basis for processing where no contract necessity exists; you consent expressly at sign-up to any sensitive data you choose to include. Your ARCO rights may be exercised at \[address\], with responses within \[Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719\]. *Mexico:* the full *aviso de privacidad* is at \[URL\]; withdrawal within \[5\] days. *Argentina:* \[AAIP legend\]; use the *botón de arrepentimiento* at \[URL\] within 10 days. *Colombia:* the *política de tratamiento* is at \[URL\]; withdrawal within 5 days. *Chile* (from 1 December 2026): the Agency's contact is \[…\]; you may cancel by the same means you subscribed; no withdrawal right applies to digital services.
+&#91;Published in Spanish.\] Consent is the basis for processing where no contract necessity exists; you consent expressly, before your first debate, to any sensitive data you choose to include. Your ARCO rights may be exercised at \[address\], with responses within \[Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719\]. *Mexico:* the full *aviso de privacidad* is at \[URL\]; withdrawal within \[5\] days. *Argentina:* \[AAIP legend\]; use the *botón de arrepentimiento* at \[URL\] within 10 days. *Colombia:* the *política de tratamiento* is at \[URL\]; withdrawal within 5 days. *Chile* (from 1 December 2026): the Agency's contact is \[…\]; you may cancel by the same means you subscribed; no withdrawal right applies to digital services.
 
 ### A.7 Gulf — United Arab Emirates and Saudi Arabia *(only if listed)*
 

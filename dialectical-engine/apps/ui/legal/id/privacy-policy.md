@@ -52,7 +52,7 @@ Kami **tidak** mengumpulkan analitik atau telemetri tentang cara Anda menggunaka
 
 Mesin debat mendorong pertanyaan tentang politik, agama, kesehatan, seksualitas, dan keyakinan. Hal-hal tersebut merupakan kategori data khusus berdasarkan Pasal 9 GDPR, dan dapat muncul dalam pertanyaan Anda baik kami bermaksud mengumpulkannya maupun tidak.
 
-**Tentang Anda.** Saat mendaftar, dalam kalimat terpisah Anda memberikan persetujuan tegas agar kami memproses informasi sensitif yang Anda pilih untuk disertakan dalam pertanyaan Anda sendiri, untuk tujuan menjalankan debat Anda. Anda dapat menariknya kapan saja dengan tidak menyertakan informasi tersebut, atau dengan menghapus debat. Apa yang Anda publikasikan tentang diri sendiri adalah data yang telah Anda pilih untuk dijadikan publik.
+**Tentang Anda.** Sebelum debat pertama Anda, pada layar terpisah Anda memberikan persetujuan tegas agar kami memproses informasi sensitif yang Anda pilih untuk disertakan dalam pertanyaan Anda sendiri, untuk tujuan menjalankan debat Anda. Kami mencatat versi redaksi yang Anda setujui, bahasa Anda, dan waktunya. Tanpa persetujuan ini, Anda tidak dapat memulai debat. Anda dapat menariknya kapan saja dengan tidak menyertakan informasi tersebut, atau dengan menghapus debat. Apa yang Anda publikasikan tentang diri sendiri adalah data yang telah Anda pilih untuk dijadikan publik.
 
 **Tentang orang lain.** Tidak ada ketentuan hukum yang mengizinkan kami memproses data sensitif tentang pihak ketiga yang Anda sebut dalam pertanyaan, dan tidak satu pun penyedia AI kami memiliki dasar tersebut. Itulah sebabnya Ketentuan melarangnya, kami meminimalkan apa yang dikirim, dan kami segera menghapus konten tersebut atas permintaan — bagian 11.
 
@@ -69,7 +69,7 @@ Setiap tujuan memiliki satu dasar hukum berdasarkan Pasal 6(1) GDPR, dan kami ti
 | Menjaga keamanan layanan, mendeteksi penyalahgunaan, memungkinkan Anda mengenali upaya masuk yang bukan dilakukan oleh Anda, menyimpan jejak audit | Sesi, jejak audit keamanan, hash penyalahgunaan dukungan | **Kepentingan yang sah** — Art. 6(1)(f): kepentingan kami dan Anda atas layanan yang aman. Anda dapat mengajukan keberatan; bagian 10 |
 | Membuktikan bahwa Anda menerima Ketentuan serta memberikan atau menarik persetujuan | Catatan penerimaan dan persetujuan | **Kewajiban hukum** — Art. 6(1)(c), kewajiban kami untuk menunjukkan persetujuan berdasarkan Art. 7(1) — dan kepentingan yang sah untuk membuktikan kontrak |
 | Menjawab permintaan dukungan | Dukungan | **Kontrak** — Art. 6(1)(b) |
-| Memproses informasi sensitif tentang diri Anda yang Anda sertakan | Konten debat | **Persetujuan tegas** — Art. 9(2)(a), diberikan secara terpisah saat pendaftaran |
+| Memproses informasi sensitif tentang diri Anda yang Anda sertakan | Konten debat | **Persetujuan tegas** — Art. 9(2)(a), diberikan pada layar terpisah sebelum debat pertama Anda |
 | Memublikasikan debat yang Anda pilih untuk dipublikasikan | Konten debat, nama samaran | **Kontrak** — Art. 6(1)(b), atas instruksi Anda; untuk data sensitif tentang Anda, Art. 9(2)(e) — data yang secara nyata telah Anda jadikan publik |
 | Mengirim berita produk kepada Anda | Alamat email | **Persetujuan** — Art. 6(1)(a), kotak yang tidak dicentang sebelumnya; tarik kapan saja melalui email mana pun atau Pengaturan |
 | Memenuhi kewajiban pajak, akuntansi, dan hukum \[pending paid plans\] | Pembayaran, catatan penerimaan | **Kewajiban hukum** — Art. 6(1)(c) |

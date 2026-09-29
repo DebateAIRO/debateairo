@@ -84,5 +84,18 @@
   "home.aiDisclosure": "Informazzjoni dwar l-IA",
   "home.aiSupportLead": "Din il-konverżazzjoni hija ma’ assistent tal-appoġġ tal-IA.",
   "home.aiLinkLabel": "Kif nimmarkaw il-kontenut tal-IA (jinfetaħ fi skeda ġdida)",
-  "home.aiLink": "Kif nimmarkaw il-kontenut tal-IA"
+  "home.aiLink": "Kif nimmarkaw il-kontenut tal-IA",
+  "home.sensitiveConsent.eyebrow": "Qabel l-ewwel dibattitu tiegħek",
+  "home.sensitiveConsent.title": "Il-mistoqsijiet tiegħek jistgħu jiżvelaw informazzjoni sensittiva",
+  "home.sensitiveConsent.lede": "Mistoqsija dwar il-politika, ir-reliġjon, is-saħħa, is-sesswalità jew it-twemmin tista’ tgħid xi ħaġa dwarek. Il-liġi tqis din bħala informazzjoni sensittiva, għalhekk għandna bżonn il-kunsens espliċitu tiegħek qabel ma nipproċessawha.",
+  "home.sensitiveConsent.pointPurpose": "Dak li tikteb nużawh biss għat-tmexxija tad-dibattiti tiegħek.",
+  "home.sensitiveConsent.pointModels": "Biex inmexxu dibattitu, nibagħtu l-mistoqsija tiegħek lill-mudelli tal-IA li jieħdu sehem fih.",
+  "home.sensitiveConsent.pointOthers": "Tinkludix informazzjoni sensittiva dwar persuni oħra.",
+  "home.sensitiveConsent.pointDelete": "Tista’ tħassar dibattitu fi kwalunkwe ħin.",
+  "home.sensitiveConsent.statement": "Naqbel li DebateAI tista’ tipproċessa l-informazzjoni sensittiva li ninkludi fil-mistoqsijiet tiegħi stess, għall-finijiet tat-tmexxija tad-dibattiti tiegħi.",
+  "home.sensitiveConsent.privacyLink": "Aqra kif nittrattawha fil-Politika dwar il-Privatezza",
+  "home.sensitiveConsent.agree": "Naqbel",
+  "home.sensitiveConsent.decline": "Ma naqbilx",
+  "home.sensitiveConsent.declined": "Ma tistax tibda dibattitu mingħajr dan il-kunsens. Nerġgħu nistaqsuk id-darba li jmiss li tibda wieħed.",
+  "home.sensitiveConsent.failed": "Ma setgħetx tinħażen it-tweġiba tiegħek. Erġa’ pprova."
 }

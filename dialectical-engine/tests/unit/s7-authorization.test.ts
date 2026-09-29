@@ -35,6 +35,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
   { route: "GET /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "read-age-confirmation" },
   { route: "POST /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "confirm-age" },
+  { route: "GET /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "read-sensitive-data-consent" },
+  { route: "POST /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "give-sensitive-data-consent" },
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },

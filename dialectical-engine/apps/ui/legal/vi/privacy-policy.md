@@ -52,7 +52,7 @@ Chúng tôi **không** thu thập dữ liệu phân tích hoặc dữ liệu đo
 
 Một công cụ tranh luận khuyến khích các câu hỏi về chính trị, tôn giáo, sức khỏe, tình dục và niềm tin. Đây là các loại dữ liệu đặc biệt theo Điều 9 GDPR và chúng có thể xuất hiện trong câu hỏi của bạn dù chúng tôi có chủ định thu thập hay không.
 
-**Về bạn.** Khi đăng ký, bằng một câu riêng biệt, bạn đồng ý rõ ràng cho phép chúng tôi xử lý thông tin nhạy cảm mà bạn lựa chọn đưa vào câu hỏi của mình nhằm vận hành các cuộc tranh luận. Bạn có thể rút lại sự đồng ý bất cứ lúc nào bằng cách không đưa thông tin đó vào hoặc bằng cách xóa cuộc tranh luận. Nội dung bạn công khai về bản thân là dữ liệu mà bạn đã lựa chọn công khai.
+**Về bạn.** Trước cuộc tranh luận đầu tiên, trên một màn hình riêng biệt, bạn đồng ý rõ ràng cho phép chúng tôi xử lý thông tin nhạy cảm mà bạn lựa chọn đưa vào câu hỏi của mình nhằm vận hành các cuộc tranh luận. Chúng tôi ghi lại phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm đồng ý. Nếu không có sự đồng ý này, bạn không thể bắt đầu một cuộc tranh luận. Bạn có thể rút lại sự đồng ý bất cứ lúc nào bằng cách không đưa thông tin đó vào hoặc bằng cách xóa cuộc tranh luận. Nội dung bạn công khai về bản thân là dữ liệu mà bạn đã lựa chọn công khai.
 
 **Về người khác.** Không có điều kiện pháp lý nào cho phép chúng tôi xử lý dữ liệu nhạy cảm về một bên thứ ba mà bạn nêu tên trong câu hỏi, và các nhà cung cấp AI của chúng tôi cũng không có điều kiện đó. Đây là lý do Điều khoản nghiêm cấm việc này, chúng tôi giảm thiểu dữ liệu gửi đi và nhanh chóng gỡ nội dung đó khi có yêu cầu — mục 11.
 
@@ -69,7 +69,7 @@ Mỗi mục đích có một cơ sở pháp lý theo Điều 6(1) GDPR và chún
 | Giữ an toàn cho dịch vụ, phát hiện hành vi lạm dụng, giúp bạn nhận biết một lần đăng nhập không phải do mình thực hiện, duy trì dấu vết kiểm toán | Phiên, dấu vết kiểm toán bảo mật, hàm băm chống lạm dụng của hoạt động hỗ trợ | **Lợi ích hợp pháp** — Art. 6(1)(f): lợi ích của chúng tôi và của bạn đối với một dịch vụ an toàn. Bạn có thể phản đối; mục 10 |
 | Chứng minh rằng bạn đã chấp nhận Điều khoản và đã đưa ra hoặc rút lại sự đồng ý | Hồ sơ chấp nhận và đồng ý | **Nghĩa vụ pháp lý** — Art. 6(1)(c), nghĩa vụ của chúng tôi trong việc chứng minh sự đồng ý theo Art. 7(1) — và lợi ích hợp pháp trong việc chứng minh hợp đồng |
 | Trả lời yêu cầu hỗ trợ | Hỗ trợ | **Hợp đồng** — Art. 6(1)(b) |
-| Xử lý thông tin nhạy cảm mà bạn đưa vào về bản thân | Nội dung tranh luận | **Sự đồng ý rõ ràng** — Art. 9(2)(a), được đưa ra riêng khi đăng ký |
+| Xử lý thông tin nhạy cảm mà bạn đưa vào về bản thân | Nội dung tranh luận | **Sự đồng ý rõ ràng** — Art. 9(2)(a), được đưa ra trên một màn hình riêng biệt trước cuộc tranh luận đầu tiên của bạn |
 | Công khai một cuộc tranh luận mà bạn lựa chọn công khai | Nội dung tranh luận, bí danh | **Hợp đồng** — Art. 6(1)(b), theo chỉ thị của bạn; đối với dữ liệu nhạy cảm về bạn, Art. 9(2)(e) — dữ liệu mà bạn đã công khai một cách rõ ràng |
 | Gửi tin tức sản phẩm cho bạn | Địa chỉ email | **Sự đồng ý** — Art. 6(1)(a), một ô không được đánh dấu sẵn; có thể rút lại bất cứ lúc nào từ bất kỳ email nào hoặc trong phần Cài đặt |
 | Tuân thủ nghĩa vụ thuế, kế toán và pháp lý \[pending paid plans\] | Thanh toán, hồ sơ chấp nhận | **Nghĩa vụ pháp lý** — Art. 6(1)(c) |

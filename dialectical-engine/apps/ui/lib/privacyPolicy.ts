@@ -65,7 +65,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "A debate engine invites questions about politics, religion, health, sexuality and belief. Those are special categories of data under Article 9 GDPR, and they can arrive in your questions whether or not we intend to collect them." },
-      { kind: "p", text: "About you. When you register you give explicit consent, as a separate sentence, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. You can withdraw it at any time by not including such information, or by deleting a debate. What you publish about yourself is data you have chosen to make public." },
+      { kind: "p", text: "About you. Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by not including such information, or by deleting a debate. What you publish about yourself is data you have chosen to make public." },
       { kind: "p", text: "About other people. No legal condition allows us to process sensitive data about a third party you name in a question, and none of our AI providers has one either. That is why the Terms prohibit it, why we minimise what we send, and why we remove such content quickly on request — section 11." },
       { kind: "p", text: "Health information. Some countries treat health-related data, including inferences, under specific laws. If you live in [the State of Washington], a separate [Consumer Health Data Privacy Notice] applies." }
     ]
@@ -84,7 +84,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Keeping the service secure, detecting abuse, letting you spot a login you did not make, keeping an audit trail — Sessions, security audit trail, support abuse hashes — Legitimate interests — Art. 6(1)(f): ours and yours in a secure service. You may object; section 10",
         "Proving that you accepted the Terms and gave or withdrew a consent — Acceptance and consent records — Legal obligation — Art. 6(1)(c), our duty to demonstrate consent under Art. 7(1) — and legitimate interests in evidencing the contract",
         "Answering support requests — Support — Contract — Art. 6(1)(b)",
-        "Processing sensitive information you include about yourself — Debate content — Explicit consent — Art. 9(2)(a), given separately at sign-up",
+        "Processing sensitive information you include about yourself — Debate content — Explicit consent — Art. 9(2)(a), given on a separate screen before your first debate",
         "Publishing a debate you choose to publish — Debate content, pseudonym — Contract — Art. 6(1)(b), on your instruction; for sensitive data about you, Art. 9(2)(e) — data you have manifestly made public",
         "Sending you product news — Email address — Consent — Art. 6(1)(a), an unticked box; withdraw any time from any email or from Settings",
         "Meeting tax, accounting and legal obligations [pending paid plans] — Payments, acceptance records — Legal obligation — Art. 6(1)(c)",

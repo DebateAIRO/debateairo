@@ -52,7 +52,7 @@ Wij verzamelen **geen** analyse- of telemetriegegevens over hoe u het product ge
 
 Een debatengine nodigt uit tot vragen over politiek, religie, gezondheid, seksualiteit en levensovertuiging. Dit zijn bijzondere categorieën van gegevens krachtens artikel 9 GDPR, en zij kunnen in uw vragen voorkomen, ongeacht of wij van plan zijn ze te verzamelen.
 
-**Over u.** Wanneer u zich registreert, geeft u in een afzonderlijke zin uitdrukkelijk toestemming voor onze verwerking van gevoelige informatie die u in uw eigen vragen wenst op te nemen, met als doel uw debatten uit te voeren. U kunt die toestemming te allen tijde intrekken door dergelijke informatie niet op te nemen of door een debat te verwijderen. Wat u over uzelf publiceert, zijn gegevens die u zelf bewust openbaar hebt gemaakt.
+**Over u.** Vóór uw eerste debat geeft u op een afzonderlijk scherm uitdrukkelijk toestemming voor onze verwerking van gevoelige informatie die u in uw eigen vragen wenst op te nemen, met als doel uw debatten uit te voeren. Wij leggen de versie van de tekst waarmee u hebt ingestemd, uw taal en het tijdstip vast. Zonder deze toestemming kunt u geen debat starten. U kunt die toestemming te allen tijde intrekken door dergelijke informatie niet op te nemen of door een debat te verwijderen. Wat u over uzelf publiceert, zijn gegevens die u zelf bewust openbaar hebt gemaakt.
 
 **Over andere personen.** Geen enkele rechtsgrond staat ons toe gevoelige gegevens te verwerken over een derde die u in een vraag noemt, en geen van onze AI-aanbieders beschikt over een dergelijke rechtsgrond. Daarom verbieden de Voorwaarden dit, beperken wij tot een minimum wat wij versturen en verwijderen wij dergelijke inhoud op verzoek snel — hoofdstuk 11.
 
@@ -69,7 +69,7 @@ Elk doel heeft één rechtsgrond krachtens artikel 6(1) GDPR, en wij hergebruike
 | De dienst beveiligen, misbruik opsporen, u een niet door u verrichte aanmelding laten herkennen en een auditlogboek bijhouden | Sessies, beveiligingsauditlogboek, hashes voor misbruik bij ondersteuning | **Gerechtvaardigde belangen** — Art. 6(1)(f): die van ons en van u bij een beveiligde dienst. U kunt bezwaar maken; hoofdstuk 10 |
 | Bewijzen dat u de Voorwaarden hebt aanvaard en toestemming hebt gegeven of ingetrokken | Vastleggingen van aanvaarding en toestemming | **Wettelijke verplichting** — Art. 6(1)(c), onze plicht om toestemming aan te tonen krachtens Art. 7(1) — en gerechtvaardigde belangen bij het bewijzen van de overeenkomst |
 | Ondersteuningsverzoeken beantwoorden | Ondersteuning | **Overeenkomst** — Art. 6(1)(b) |
-| Gevoelige informatie verwerken die u over uzelf opneemt | Debatinhoud | **Uitdrukkelijke toestemming** — Art. 9(2)(a), afzonderlijk gegeven bij registratie |
+| Gevoelige informatie verwerken die u over uzelf opneemt | Debatinhoud | **Uitdrukkelijke toestemming** — Art. 9(2)(a), gegeven op een afzonderlijk scherm vóór uw eerste debat |
 | Een debat publiceren dat u wenst te publiceren | Debatinhoud, pseudoniem | **Overeenkomst** — Art. 6(1)(b), op uw instructie; voor gevoelige gegevens over u, Art. 9(2)(e) — gegevens die u kennelijk openbaar hebt gemaakt |
 | U productnieuws sturen | E-mailadres | **Toestemming** — Art. 6(1)(a), een niet vooraf aangevinkt vakje; te allen tijde intrekbaar vanuit elke e-mail of via Instellingen |
 | Voldoen aan fiscale, boekhoudkundige en wettelijke verplichtingen [pending paid plans] | Betalingen, vastleggingen van aanvaarding | **Wettelijke verplichting** — Art. 6(1)(c) |
