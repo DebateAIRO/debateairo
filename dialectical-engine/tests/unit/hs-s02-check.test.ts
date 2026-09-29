@@ -230,6 +230,16 @@ describe("check", () => {
     expect(hung.result).toEqual({ outcome: "UNAVAILABLE", cause: "JUDGE_DEADLINE" });
     expect(hungCalls).toBe(2); expect(hung.judgeCallCount).toBe(2);
   });
+  // Property: empty UNSURE parts describe only kinds actually sent before the shared deadline.
+  it("does not attribute queued, unsent kinds to an empty UNSURE verdict", async () => {
+    const { judgeParts } = await import("../../apps/api/src/publication-check/check.js");
+    const { createJudgeStub } = await import("../support/hs-s02-judge-stub.js");
+    const judge = createJudgeStub([JSON.stringify({ ...unsure, parts: [] }), () => new Promise(() => {})]);
+    const result = await judgeParts({ judge, deadlineMs: 20, maxConcurrentCalls: 1, maxMaterialCodePoints: 1 },
+      [{ kind: "QUESTION", text: "q" }, { kind: "ARGUMENTS", text: "a" }, { kind: "STORY", text: "s" }]);
+    expect(result.result).toEqual({ outcome: "UNSURE", statement: { outcome: "UNSURE", parts: ["QUESTION", "ARGUMENTS"], ground: "TERMS", automated: true, visibility: "PRIVATE" } });
+    expect(result.judgeCallCount).toBe(2);
+  });
   // Property: a refused record write cannot resolve as ALLOW.
   it("propagates recorder failure", async () => {
     const c = await import("../../apps/api/src/publication-check/check.js");

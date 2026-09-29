@@ -66,6 +66,7 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
   const concurrency = options.maxConcurrentCalls ?? 4;
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("Invalid judge concurrency");
   const results: JudgeCallResult[] = new Array(calls.length);
+  const sentFieldNames = new Set<string>();
   let next = 0, judgeCallCount = 0;
   async function worker() {
     while (next < calls.length) {
@@ -74,6 +75,7 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
       try {
         const { packet } = buildFramedPrompt({ contract: publicationCheckContract(), material: call.fields });
         judgeCallCount++;
+        for (const field of call.fields) sentFieldNames.add(field.name);
         const response = await withinDeadline(judge!, packet, signal);
         results[index] = parseJudgeAnswer(response.text, call.fields.map(field => field.name));
       } catch (error) {
@@ -89,7 +91,7 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
   if (combined.outcome === "ALLOW") return { result: { outcome: "ALLOW" }, rules: [], partKinds: [], ground: null, judgeCallCount };
   if (combined.outcome === "UNAVAILABLE") return { result: { outcome: "UNAVAILABLE", cause: combined.cause! }, rules: [], partKinds: [], ground: null, judgeCallCount };
   const names = combined.outcome === "UNSURE" && combined.parts.length === 0
-    ? calls.flatMap(call => call.fields.map(field => field.name)) : combined.parts;
+    ? [...sentFieldNames] : combined.parts;
   const partKinds = PUBLICATION_PART_KINDS.filter(kind => names.includes(kind.toLowerCase()));
   const ground = combined.outcome === "BLOCK" && combined.possibly_illegal ? "TERMS_AND_POSSIBLY_ILLEGAL" : "TERMS";
   return {
