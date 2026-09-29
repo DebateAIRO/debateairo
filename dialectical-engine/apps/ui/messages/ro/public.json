@@ -190,5 +190,20 @@
   "public.report.error.tryAgain": "Raportul nu a putut fi pregătit acum. Vă rugăm să încercați din nou peste câteva clipe.",
   "public.story.morePaths.one": "și încă {count} poziție",
   "public.story.morePaths.few": "și încă {count} poziții",
-  "public.story.morePaths.other": "și încă {count} de poziții"
+  "public.story.morePaths.other": "și încă {count} de poziții",
+  "public.publication.contentCheck.refusedHeading": "Nu am publicat această dezbatere",
+  "public.publication.contentCheck.refusedWhatBlock": "O verificare automată a găsit în această dezbatere text care încalcă regulile noastre, așa că dezbaterea nu a fost publicată.",
+  "public.publication.contentCheck.refusedWhatUnsure": "O verificare automată nu a putut confirma că această dezbatere respectă regulile noastre, așa că dezbaterea nu a fost publicată.",
+  "public.publication.contentCheck.partsIntro": "Unde a fost găsit textul la verificare:",
+  "public.publication.contentCheck.part.question": "Întrebarea",
+  "public.publication.contentCheck.part.summary": "Rezumatul, notele privind verdictul și obiecțiile rămase",
+  "public.publication.contentCheck.part.arguments": "Argumentele",
+  "public.publication.contentCheck.part.reviews": "Comentariile evaluatorilor",
+  "public.publication.contentCheck.part.story": "Povestea verdictului",
+  "public.publication.contentCheck.groundTerms": "Temei: Termenii noștri de utilizare, secțiunea 7 (nu este permis conținutul care incită la violență sau ură).",
+  "public.publication.contentCheck.groundIllegal": "Textul ar putea fi și ilegal.",
+  "public.publication.contentCheck.automated": "Această decizie a fost luată de un instrument automat. Nicio persoană nu a examinat-o încă.",
+  "public.publication.contentCheck.stillPrivate": "Dezbaterea dumneavoastră rămâne privată și neschimbată. Doar dumneavoastră o puteți vedea.",
+  "public.publication.contentCheck.appeal": "Pentru a solicita unei persoane să examineze această decizie, scrieți la [appeals@dezbatere.ro] în termen de șase luni.",
+  "public.publication.contentCheck.unavailable": "Verificarea conținutului nu este disponibilă momentan, așa că nu s-a publicat nimic. Dezbaterea dumneavoastră rămâne privată. Încercați din nou peste câteva minute."
 }

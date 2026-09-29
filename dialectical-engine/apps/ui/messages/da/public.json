@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Denne rapport er ikke tilgængelig.",
   "public.report.error.tryAgain": "Rapporten kunne ikke laves lige nu. Prøv igen om et øjeblik.",
   "public.story.morePaths.one": "og {count} position mere",
-  "public.story.morePaths.other": "og {count} positioner mere"
+  "public.story.morePaths.other": "og {count} positioner mere",
+  "public.publication.contentCheck.refusedHeading": "Vi offentliggjorde ikke denne debat",
+  "public.publication.contentCheck.refusedWhatBlock": "En automatisk kontrol fandt tekst i denne debat, som bryder vores regler, så debatten blev ikke offentliggjort.",
+  "public.publication.contentCheck.refusedWhatUnsure": "En automatisk kontrol kunne ikke bekræfte, at denne debat følger vores regler, så debatten blev ikke offentliggjort.",
+  "public.publication.contentCheck.partsIntro": "Her fandt kontrollen teksten:",
+  "public.publication.contentCheck.part.question": "Spørgsmålet",
+  "public.publication.contentCheck.part.summary": "Resuméet, bemærkningerne til konklusionen og de resterende indvendinger",
+  "public.publication.contentCheck.part.arguments": "Argumenterne",
+  "public.publication.contentCheck.part.reviews": "Bedømmernes kommentarer",
+  "public.publication.contentCheck.part.story": "Fortællingen om konklusionen",
+  "public.publication.contentCheck.groundTerms": "Grundlag: vores Brugsvilkår, afsnit 7 (intet indhold, der opfordrer til vold eller had).",
+  "public.publication.contentCheck.groundIllegal": "Teksten kan også være ulovlig.",
+  "public.publication.contentCheck.automated": "Denne beslutning blev truffet af et automatisk værktøj. Ingen person har gennemgået den endnu.",
+  "public.publication.contentCheck.stillPrivate": "Din debat forbliver privat og uændret. Kun du kan se den.",
+  "public.publication.contentCheck.appeal": "For at bede en person om at gennemgå denne beslutning skal du skrive til [appeals@dezbatere.ro] inden for seks måneder.",
+  "public.publication.contentCheck.unavailable": "Indholdskontrollen er ikke tilgængelig lige nu, så intet blev offentliggjort. Din debat forbliver privat. Prøv igen om et par minutter."
 }

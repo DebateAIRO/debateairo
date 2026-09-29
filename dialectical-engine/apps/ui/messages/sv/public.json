@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Den här rapporten är inte tillgänglig.",
   "public.report.error.tryAgain": "Rapporten kunde inte tas fram just nu. Försök igen om en liten stund.",
   "public.story.morePaths.one": "och {count} ståndpunkt till",
-  "public.story.morePaths.other": "och {count} ståndpunkter till"
+  "public.story.morePaths.other": "och {count} ståndpunkter till",
+  "public.publication.contentCheck.refusedHeading": "Vi publicerade inte den här debatten",
+  "public.publication.contentCheck.refusedWhatBlock": "En automatisk kontroll hittade text i den här debatten som bryter mot våra regler, så debatten publicerades inte.",
+  "public.publication.contentCheck.refusedWhatUnsure": "En automatisk kontroll kunde inte bekräfta att den här debatten följer våra regler, så debatten publicerades inte.",
+  "public.publication.contentCheck.partsIntro": "Här hittade kontrollen texten:",
+  "public.publication.contentCheck.part.question": "Frågan",
+  "public.publication.contentCheck.part.summary": "Sammanfattningen, kommentarerna till slutsatsen och de återstående invändningarna",
+  "public.publication.contentCheck.part.arguments": "Argumenten",
+  "public.publication.contentCheck.part.reviews": "Granskarnas kommentarer",
+  "public.publication.contentCheck.part.story": "Berättelsen om slutsatsen",
+  "public.publication.contentCheck.groundTerms": "Grund: våra Användarvillkor, avsnitt 7 (inget innehåll som uppmanar till våld eller hat).",
+  "public.publication.contentCheck.groundIllegal": "Texten kan också vara olaglig.",
+  "public.publication.contentCheck.automated": "Det här beslutet fattades av ett automatiskt verktyg. Ingen person har granskat det ännu.",
+  "public.publication.contentCheck.stillPrivate": "Din debatt förblir privat och oförändrad. Bara du kan se den.",
+  "public.publication.contentCheck.appeal": "För att be en person granska det här beslutet, skriv till [appeals@dezbatere.ro] inom sex månader.",
+  "public.publication.contentCheck.unavailable": "Innehållskontrollen är inte tillgänglig just nu, så inget publicerades. Din debatt förblir privat. Försök igen om några minuter."
 }

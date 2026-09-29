@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "See aruanne pole saadaval.",
   "public.report.error.tryAgain": "Aruannet ei õnnestunud praegu koostada. Palun proovige mõne hetke pärast uuesti.",
   "public.story.morePaths.one": "ja veel {count} seisukoht",
-  "public.story.morePaths.other": "ja veel {count} seisukohta"
+  "public.story.morePaths.other": "ja veel {count} seisukohta",
+  "public.publication.contentCheck.refusedHeading": "Me ei avaldanud seda arutelu",
+  "public.publication.contentCheck.refusedWhatBlock": "Automaatne kontroll leidis sellest arutelust teksti, mis rikub meie reegleid, seega arutelu ei avaldatud.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Automaatne kontroll ei suutnud kinnitada, et see arutelu järgib meie reegleid, seega arutelu ei avaldatud.",
+  "public.publication.contentCheck.partsIntro": "Kust kontroll teksti leidis:",
+  "public.publication.contentCheck.part.question": "Küsimus",
+  "public.publication.contentCheck.part.summary": "Kokkuvõte, otsuse märkused ja allesjäänud vastuväited",
+  "public.publication.contentCheck.part.arguments": "Argumendid",
+  "public.publication.contentCheck.part.reviews": "Hindajate kommentaarid",
+  "public.publication.contentCheck.part.story": "Otsuse lugu",
+  "public.publication.contentCheck.groundTerms": "Alus: meie kasutustingimuste jaotis 7 (keelatud on vägivalda või vaenu õhutav sisu).",
+  "public.publication.contentCheck.groundIllegal": "Tekst võib olla ka ebaseaduslik.",
+  "public.publication.contentCheck.automated": "Selle otsuse tegi automaatne tööriist. Ükski inimene ei ole seda veel läbi vaadanud.",
+  "public.publication.contentCheck.stillPrivate": "Teie arutelu jääb privaatseks ja muutmata. Ainult teie saate seda näha.",
+  "public.publication.contentCheck.appeal": "Kui soovite, et inimene selle otsuse läbi vaataks, kirjutage kuue kuu jooksul aadressile [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.unavailable": "Sisu kontrollimine ei ole praegu saadaval, seega midagi ei avaldatud. Teie arutelu jääb privaatseks. Proovige mõne minuti pärast uuesti."
 }

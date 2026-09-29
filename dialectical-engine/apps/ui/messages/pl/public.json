@@ -191,5 +191,20 @@
   "public.story.morePaths.one": "i jeszcze {count} stanowisko",
   "public.story.morePaths.few": "i jeszcze {count} stanowiska",
   "public.story.morePaths.many": "i jeszcze {count} stanowisk",
-  "public.story.morePaths.other": "i jeszcze {count} stanowiska"
+  "public.story.morePaths.other": "i jeszcze {count} stanowiska",
+  "public.publication.contentCheck.refusedHeading": "Nie opublikowaliśmy tej debaty",
+  "public.publication.contentCheck.refusedWhatBlock": "Automatyczna kontrola wykryła w tej debacie tekst naruszający nasze zasady, dlatego debata nie została opublikowana.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Automatyczna kontrola nie zdołała potwierdzić, że ta debata jest zgodna z naszymi zasadami, dlatego debata nie została opublikowana.",
+  "public.publication.contentCheck.partsIntro": "Gdzie kontrola wykryła tekst:",
+  "public.publication.contentCheck.part.question": "Pytanie",
+  "public.publication.contentCheck.part.summary": "Podsumowanie, uwagi do werdyktu i pozostałe zastrzeżenia",
+  "public.publication.contentCheck.part.arguments": "Argumenty",
+  "public.publication.contentCheck.part.reviews": "Komentarze recenzentów",
+  "public.publication.contentCheck.part.story": "Historia werdyktu",
+  "public.publication.contentCheck.groundTerms": "Podstawa: nasz Regulamin, punkt 7 (zakaz treści nawołujących do przemocy lub nienawiści).",
+  "public.publication.contentCheck.groundIllegal": "Tekst może być również niezgodny z prawem.",
+  "public.publication.contentCheck.automated": "Decyzję podjęło narzędzie automatyczne. Nie została jeszcze sprawdzona przez człowieka.",
+  "public.publication.contentCheck.stillPrivate": "Twoja debata pozostaje prywatna i niezmieniona. Tylko Ty możesz ją zobaczyć.",
+  "public.publication.contentCheck.appeal": "Aby poprosić człowieka o ponowne rozpatrzenie tej decyzji, napisz na [appeals@dezbatere.ro] w ciągu sześciu miesięcy.",
+  "public.publication.contentCheck.unavailable": "Kontrola treści jest teraz niedostępna, więc niczego nie opublikowano. Twoja debata pozostaje prywatna. Spróbuj ponownie za kilka minut."
 }

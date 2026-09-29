@@ -191,5 +191,20 @@
   "public.story.morePaths.one": "ir dar {count} pozicija",
   "public.story.morePaths.few": "ir dar {count} pozicijos",
   "public.story.morePaths.many": "ir dar {count} pozicijos",
-  "public.story.morePaths.other": "ir dar {count} pozicijų"
+  "public.story.morePaths.other": "ir dar {count} pozicijų",
+  "public.publication.contentCheck.refusedHeading": "Šios diskusijos nepaskelbėme",
+  "public.publication.contentCheck.refusedWhatBlock": "Automatinė patikra šioje diskusijoje aptiko mūsų taisykles pažeidžiantį tekstą, todėl diskusija nebuvo paskelbta.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Automatinė patikra negalėjo patvirtinti, kad ši diskusija atitinka mūsų taisykles, todėl diskusija nebuvo paskelbta.",
+  "public.publication.contentCheck.partsIntro": "Kur patikra aptiko tekstą:",
+  "public.publication.contentCheck.part.question": "Klausimas",
+  "public.publication.contentCheck.part.summary": "Santrauka, pastabos apie verdiktą ir likę prieštaravimai",
+  "public.publication.contentCheck.part.arguments": "Argumentai",
+  "public.publication.contentCheck.part.reviews": "Vertintojų komentarai",
+  "public.publication.contentCheck.part.story": "Verdikto istorija",
+  "public.publication.contentCheck.groundTerms": "Pagrindas: mūsų Naudojimo sąlygų 7 skyrius (draudžiamas turinys, kurstantis smurtą ar neapykantą).",
+  "public.publication.contentCheck.groundIllegal": "Tekstas taip pat gali būti neteisėtas.",
+  "public.publication.contentCheck.automated": "Šį sprendimą priėmė automatinė priemonė. Joks žmogus jo dar neperžiūrėjo.",
+  "public.publication.contentCheck.stillPrivate": "Jūsų diskusija lieka privati ir nepakeista. Ją matote tik jūs.",
+  "public.publication.contentCheck.appeal": "Norėdami paprašyti žmogaus peržiūrėti šį sprendimą, per šešis mėnesius parašykite adresu [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.unavailable": "Turinio patikra šiuo metu neprieinama, todėl nieko nepaskelbta. Jūsų diskusija lieka privati. Bandykite dar kartą po kelių minučių."
 }

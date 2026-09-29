@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "This report isn't available.",
   "public.report.error.tryAgain": "The report couldn't be made right now. Please try again in a moment.",
   "public.story.morePaths.one": "and {count} more",
-  "public.story.morePaths.other": "and {count} more"
+  "public.story.morePaths.other": "and {count} more",
+  "public.publication.contentCheck.refusedHeading": "We did not publish this debate",
+  "public.publication.contentCheck.refusedWhatBlock": "An automated check found text in this debate that breaks our rules, so the debate was not published.",
+  "public.publication.contentCheck.refusedWhatUnsure": "An automated check could not confirm that this debate follows our rules, so the debate was not published.",
+  "public.publication.contentCheck.partsIntro": "Where the check found it:",
+  "public.publication.contentCheck.part.question": "The question",
+  "public.publication.contentCheck.part.summary": "The summary, verdict notes and remaining objections",
+  "public.publication.contentCheck.part.arguments": "The arguments",
+  "public.publication.contentCheck.part.reviews": "The reviewers' comments",
+  "public.publication.contentCheck.part.story": "The verdict story",
+  "public.publication.contentCheck.groundTerms": "Ground: our Terms of Service, section 7 (no content that incites violence or hatred).",
+  "public.publication.contentCheck.groundIllegal": "The text may also be illegal.",
+  "public.publication.contentCheck.automated": "This decision was made by an automated tool. No person has reviewed it yet.",
+  "public.publication.contentCheck.stillPrivate": "Your debate stays private and unchanged. Only you can see it.",
+  "public.publication.contentCheck.appeal": "To ask a person to review this decision, write to [appeals@dezbatere.ro] within six months.",
+  "public.publication.contentCheck.unavailable": "The content check is not available right now, so nothing was published. Your debate stays private. Try again in a few minutes."
 }

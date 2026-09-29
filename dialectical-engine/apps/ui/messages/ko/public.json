@@ -188,5 +188,20 @@
   "public.report.error.signIn": "이 보고서를 다운로드하려면 로그인하세요.",
   "public.report.error.notAvailable": "이 보고서는 이용할 수 없습니다.",
   "public.report.error.tryAgain": "지금은 보고서를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
-  "public.story.morePaths.other": "외 {count}개 입장"
+  "public.story.morePaths.other": "외 {count}개 입장",
+  "public.publication.contentCheck.refusedHeading": "이 토론을 게시하지 않았습니다",
+  "public.publication.contentCheck.refusedWhatBlock": "자동 검사에서 이 토론에 규칙을 위반하는 텍스트가 발견되어 토론을 게시하지 않았습니다.",
+  "public.publication.contentCheck.refusedWhatUnsure": "자동 검사에서 이 토론이 규칙을 준수하는지 확인할 수 없어 토론을 게시하지 않았습니다.",
+  "public.publication.contentCheck.partsIntro": "검사에서 텍스트가 발견된 부분:",
+  "public.publication.contentCheck.part.question": "질문",
+  "public.publication.contentCheck.part.summary": "요약, 판정 참고 사항 및 남은 이의",
+  "public.publication.contentCheck.part.arguments": "논거",
+  "public.publication.contentCheck.part.reviews": "검토자의 의견",
+  "public.publication.contentCheck.part.story": "판정 이야기",
+  "public.publication.contentCheck.groundTerms": "근거: 이용약관 제7조(폭력이나 혐오를 선동하는 콘텐츠 금지).",
+  "public.publication.contentCheck.groundIllegal": "해당 텍스트는 불법일 수도 있습니다.",
+  "public.publication.contentCheck.automated": "이 결정은 자동화된 도구가 내렸습니다. 아직 사람이 검토하지 않았습니다.",
+  "public.publication.contentCheck.stillPrivate": "토론은 변경 없이 비공개로 유지됩니다. 본인만 볼 수 있습니다.",
+  "public.publication.contentCheck.appeal": "사람에게 이 결정의 재검토를 요청하려면 6개월 이내에 [appeals@dezbatere.ro]로 연락하세요.",
+  "public.publication.contentCheck.unavailable": "현재 콘텐츠 검사를 사용할 수 없어 아무것도 게시되지 않았습니다. 토론은 비공개로 유지됩니다. 몇 분 후 다시 시도하세요."
 }

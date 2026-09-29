@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Ez a jelentés nem érhető el.",
   "public.report.error.tryAgain": "A jelentést most nem sikerült elkészíteni. Kérjük, próbálja újra egy kis idő múlva.",
   "public.story.morePaths.one": "és még {count} álláspont",
-  "public.story.morePaths.other": "és még {count} álláspont"
+  "public.story.morePaths.other": "és még {count} álláspont",
+  "public.publication.contentCheck.refusedHeading": "Ezt a vitát nem tettük közzé",
+  "public.publication.contentCheck.refusedWhatBlock": "Az automatikus ellenőrzés a szabályainkat sértő szöveget talált ebben a vitában, ezért a vitát nem tettük közzé.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Az automatikus ellenőrzés nem tudta megerősíteni, hogy ez a vita megfelel a szabályainknak, ezért a vitát nem tettük közzé.",
+  "public.publication.contentCheck.partsIntro": "Ahol az ellenőrzés megtalálta a szöveget:",
+  "public.publication.contentCheck.part.question": "A kérdés",
+  "public.publication.contentCheck.part.summary": "Az összefoglaló, az ítélethez fűzött megjegyzések és a fennmaradó kifogások",
+  "public.publication.contentCheck.part.arguments": "Az érvek",
+  "public.publication.contentCheck.part.reviews": "Az értékelők megjegyzései",
+  "public.publication.contentCheck.part.story": "Az ítélet története",
+  "public.publication.contentCheck.groundTerms": "Alap: Felhasználási feltételeink 7. szakasza (tilos az erőszakra vagy gyűlöletre uszító tartalom).",
+  "public.publication.contentCheck.groundIllegal": "A szöveg jogellenes is lehet.",
+  "public.publication.contentCheck.automated": "Ezt a döntést egy automatizált eszköz hozta. Ember még nem vizsgálta felül.",
+  "public.publication.contentCheck.stillPrivate": "A vitája privát és változatlan marad. Csak Ön láthatja.",
+  "public.publication.contentCheck.appeal": "Ha szeretné, hogy egy ember felülvizsgálja ezt a döntést, hat hónapon belül írjon az [appeals@dezbatere.ro] címre.",
+  "public.publication.contentCheck.unavailable": "A tartalomellenőrzés jelenleg nem érhető el, ezért semmit sem tettünk közzé. A vitája privát marad. Próbálja újra néhány perc múlva."
 }

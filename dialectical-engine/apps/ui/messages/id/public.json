@@ -188,5 +188,20 @@
   "public.report.error.signIn": "Masuk untuk mengunduh laporan ini.",
   "public.report.error.notAvailable": "Laporan ini tidak tersedia.",
   "public.report.error.tryAgain": "Laporan tidak dapat dibuat saat ini. Silakan coba lagi sebentar lagi.",
-  "public.story.morePaths.other": "dan {count} posisi lainnya"
+  "public.story.morePaths.other": "dan {count} posisi lainnya",
+  "public.publication.contentCheck.refusedHeading": "Kami tidak menerbitkan debat ini",
+  "public.publication.contentCheck.refusedWhatBlock": "Pemeriksaan otomatis menemukan teks dalam debat ini yang melanggar aturan kami, sehingga debat tidak diterbitkan.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Pemeriksaan otomatis tidak dapat memastikan bahwa debat ini mematuhi aturan kami, sehingga debat tidak diterbitkan.",
+  "public.publication.contentCheck.partsIntro": "Bagian tempat pemeriksaan menemukan teks:",
+  "public.publication.contentCheck.part.question": "Pertanyaan",
+  "public.publication.contentCheck.part.summary": "Ringkasan, catatan putusan, dan keberatan yang tersisa",
+  "public.publication.contentCheck.part.arguments": "Argumen",
+  "public.publication.contentCheck.part.reviews": "Komentar peninjau",
+  "public.publication.contentCheck.part.story": "Kisah putusan",
+  "public.publication.contentCheck.groundTerms": "Dasar: Ketentuan Layanan kami, bagian 7 (konten yang menghasut kekerasan atau kebencian tidak diperbolehkan).",
+  "public.publication.contentCheck.groundIllegal": "Teks tersebut mungkin juga melanggar hukum.",
+  "public.publication.contentCheck.automated": "Keputusan ini dibuat oleh alat otomatis. Belum ada manusia yang meninjaunya.",
+  "public.publication.contentCheck.stillPrivate": "Debat Anda tetap privat dan tidak berubah. Hanya Anda yang dapat melihatnya.",
+  "public.publication.contentCheck.appeal": "Untuk meminta seseorang meninjau keputusan ini, kirim pesan ke [appeals@dezbatere.ro] dalam waktu enam bulan.",
+  "public.publication.contentCheck.unavailable": "Pemeriksaan konten sedang tidak tersedia, sehingga tidak ada yang diterbitkan. Debat Anda tetap privat. Coba lagi dalam beberapa menit."
 }
