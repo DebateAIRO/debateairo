@@ -41,7 +41,7 @@ import { CONTENT_RULE_HEADING, CONTENT_RULE_TEXT } from "./content-rule.js";
  */
 
 /** Bumping this is a NEW sealed prompt version for EVERY contract (constraint 5). */
-export const PROMPT_FRAME_VERSION = "debateai.prompt-frame.v1" as const;
+export const PROMPT_FRAME_VERSION = "debateai.prompt-frame.v2" as const;
 export const FRAMED_MATERIAL_FORMAT = "debateai.framed-material.v1" as const;
 
 const FENCE_PREFIX = "#|DEBATEAI-FENCE-" as const;
@@ -159,6 +159,7 @@ function renderMaterialBlock(fence: string, fields: readonly FramedMaterialField
 export function promptContractFingerprintText(contract: PromptContract): string {
   return [
     PROMPT_FRAME_VERSION,
+    CONTENT_RULE_TEXT,
     contract.contractId,
     contract.instruction,
     contract.answerForm
