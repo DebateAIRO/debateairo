@@ -8958,6 +8958,24 @@ a:focus-visible {
 }
 /* === end verdict-story === */
 
+/* hate-speech S02: the owner's Visibility card on the debate page (D-S02-24) */
+.debateView > section.card.publicationControl {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: auto !important;
+  clip: auto !important;
+  clip-path: none !important;
+  white-space: normal !important;
+  flex: 0 0 auto;
+  max-height: 45dvh;
+  box-sizing: border-box;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 /* === consent-ui S01 === */
 /* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
    The ONE delimited block this slice may append, at the very end of the file

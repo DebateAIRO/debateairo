@@ -22,6 +22,11 @@ apps/api/src/mail-channel.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
 apps/api/src/provider-discovery.ts
+apps/api/src/publication-check/check.ts
+apps/api/src/publication-check/judge-transport.ts
+apps/api/src/publication-check/material.ts
+apps/api/src/publication-check/policy.ts
+apps/api/src/publication-check/verdict.ts
 apps/api/src/publications.ts
 apps/api/src/recovery.ts
 apps/api/src/registration.ts
@@ -539,6 +544,7 @@ packages/db/src/identity.ts
 packages/db/src/index.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/obs-schema.ts
+packages/db/src/publication-check.ts
 packages/db/src/publication-lease.ts
 packages/db/src/publication.ts
 packages/db/src/recovery.ts

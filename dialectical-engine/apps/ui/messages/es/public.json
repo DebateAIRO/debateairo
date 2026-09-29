@@ -190,5 +190,20 @@
   "public.report.error.tryAgain": "No se ha podido preparar el informe ahora mismo. Vuelva a intentarlo en unos instantes.",
   "public.story.morePaths.one": "y {count} posición más",
   "public.story.morePaths.many": "y {count} posiciones más",
-  "public.story.morePaths.other": "y {count} posiciones más"
+  "public.story.morePaths.other": "y {count} posiciones más",
+  "public.publication.contentCheck.refusedHeading": "No hemos publicado este debate",
+  "public.publication.contentCheck.refusedWhatBlock": "Una comprobación automática encontró en este debate texto que incumple nuestras normas, por lo que el debate no se publicó.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Una comprobación automática no pudo confirmar que este debate cumple nuestras normas, por lo que el debate no se publicó.",
+  "public.publication.contentCheck.partsIntro": "Dónde encontró el texto la comprobación:",
+  "public.publication.contentCheck.part.question": "La pregunta",
+  "public.publication.contentCheck.part.summary": "El resumen, las notas sobre el veredicto y las objeciones restantes",
+  "public.publication.contentCheck.part.arguments": "Los argumentos",
+  "public.publication.contentCheck.part.reviews": "Los comentarios de los revisores",
+  "public.publication.contentCheck.part.story": "El relato del veredicto",
+  "public.publication.contentCheck.groundTerms": "Fundamento: nuestras Condiciones de uso, sección 7 (no se permite contenido que incite a la violencia o al odio).",
+  "public.publication.contentCheck.groundIllegal": "El texto también podría ser ilegal.",
+  "public.publication.contentCheck.automated": "Esta decisión la tomó una herramienta automática. Ninguna persona la ha revisado todavía.",
+  "public.publication.contentCheck.stillPrivate": "Su debate sigue siendo privado y no ha cambiado. Solo usted puede verlo.",
+  "public.publication.contentCheck.appeal": "Para solicitar que una persona revise esta decisión, escriba a [appeals@dezbatere.ro] en un plazo de seis meses.",
+  "public.publication.contentCheck.unavailable": "La comprobación del contenido no está disponible ahora, por lo que no se ha publicado nada. Su debate sigue siendo privado. Inténtelo de nuevo en unos minutos."
 }

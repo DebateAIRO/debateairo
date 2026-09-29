@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { contractClient } from "@/lib/api";
 import { ContractHttpError } from "@debateai/contract";
-import type { ContractClient } from "@debateai/contract";
+import type { ContractClient, PublicationPartKind, PublicationRefusalStatement } from "@debateai/contract";
 import publicEnglish from "@/messages/en/public.json";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
@@ -31,6 +31,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [statement, setStatement] = useState<PublicationRefusalStatement | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteCode, setDeleteCode] = useState("");
@@ -51,6 +52,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
     if (action === null || !acknowledged || busy) return;
     setBusy(true);
     setMessage(null);
+    setStatement(null);
     try {
       const steppedUp = await client.stepUp(password, code, {
         action,
@@ -69,8 +71,14 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       setMessage(action === "PUBLISH"
         ? t(catalog, "public.publication.publishedSuccess")
         : t(catalog, "public.publication.unpublishedSuccess"));
-    } catch {
-      setMessage(t(catalog, "public.publication.changeUnauthorized"));
+    } catch (failure) {
+      if (failure instanceof ContractHttpError && failure.statement !== null) {
+        setStatement(failure.statement);
+      } else if (failure instanceof ContractHttpError && failure.serverCode === "PUBLICATION_CHECK_UNAVAILABLE") {
+        setMessage(t(catalog, "public.publication.contentCheck.unavailable"));
+      } else {
+        setMessage(t(catalog, "public.publication.changeUnauthorized"));
+      }
     } finally {
       setBusy(false);
     }
@@ -81,6 +89,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
     if (!deleteAcknowledged || busy || visibility?.state !== "PRIVATE") return;
     setBusy(true);
     setMessage(null);
+    setStatement(null);
     try {
       const steppedUp = await client.stepUp(deletePassword, deleteCode, {
         action: "DELETE_PRIVATE_DEBATE",
@@ -119,6 +128,14 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
     ? t(catalog, "public.publication.publishWarning")
     : t(catalog, "public.publication.unpublishWarning");
 
+  const partLabels: Record<PublicationPartKind, string> = {
+    QUESTION: t(catalog, "public.publication.contentCheck.part.question"),
+    SUMMARY: t(catalog, "public.publication.contentCheck.part.summary"),
+    ARGUMENTS: t(catalog, "public.publication.contentCheck.part.arguments"),
+    REVIEWS: t(catalog, "public.publication.contentCheck.part.reviews"),
+    STORY: t(catalog, "public.publication.contentCheck.part.story")
+  };
+
   if (deleted) {
     return (
       <section className="card" aria-label={t(catalog, "public.publication.deletedAria")}>
@@ -129,7 +146,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   }
 
   return (
-    <section className="card" data-support-primary-control aria-label={t(catalog, "public.publication.controlsAria")}>
+    <section className="card publicationControl" data-support-primary-control aria-label={t(catalog, "public.publication.controlsAria")}>
       <h2>{t(catalog, "public.publication.visibility")}</h2>
       <p>
         {visibility === null
@@ -147,6 +164,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           className="button"
           disabled={visibility === null}
           onClick={() => {
+            setStatement(null);
             setDeleteOpen(false);
             setAction(visibility?.state === "PUBLISHED" ? "UNPUBLISH" : "PUBLISH");
           }}
@@ -198,7 +216,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
                   ? t(catalog, "public.publication.publishPublicly")
                   : t(catalog, "public.publication.unpublish")}
             </button>
-            <button type="button" className="button" disabled={busy} onClick={() => setAction(null)}>{t(catalog, "public.publication.cancel")}</button>
+            <button type="button" className="button" disabled={busy} onClick={() => { setStatement(null); setAction(null); }}>{t(catalog, "public.publication.cancel")}</button>
           </div>
         </form>
       )}
@@ -213,7 +231,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
               type="button"
               className="button"
               disabled={busy || deletePending}
-              onClick={() => { setAction(null); setDeleteOpen(true); }}
+              onClick={() => { setStatement(null); setAction(null); setDeleteOpen(true); }}
             >
               {deletePending
                 ? t(catalog, "public.publication.deletionPendingShort")
@@ -265,7 +283,22 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           )}
         </div>
       ) : null}
-      {message ? <p role="status">{message}</p> : null}
+      {statement !== null ? (
+        <div role="status">
+          <h3>{t(catalog, "public.publication.contentCheck.refusedHeading")}</h3>
+          <p>{statement.outcome === "BLOCK"
+            ? t(catalog, "public.publication.contentCheck.refusedWhatBlock")
+            : t(catalog, "public.publication.contentCheck.refusedWhatUnsure")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.partsIntro")}</p>
+          <ul>{statement.parts.map((part) => <li key={part}>{partLabels[part]}</li>)}</ul>
+          <p>{t(catalog, "public.publication.contentCheck.groundTerms")}</p>
+          {statement.ground === "TERMS_AND_POSSIBLY_ILLEGAL"
+            ? <p>{t(catalog, "public.publication.contentCheck.groundIllegal")}</p> : null}
+          <p>{t(catalog, "public.publication.contentCheck.automated")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.stillPrivate")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.appeal")}</p>
+        </div>
+      ) : message ? <p role="status">{message}</p> : null}
     </section>
   );
 }

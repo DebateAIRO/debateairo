@@ -421,7 +421,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0076_serve_disclosure.sql",
         // Age gate (Turn 8 implementation prompt): identity.age_check, the result-only
         // age record, and the 'age_frozen' account state. The next free prefix, no pair.
-        "0077_age_gate.sql"
+        "0077_age_gate.sql",
+        // Hate-speech S02 R10: append-only, content-free publication check record.
+        "0078_publication_check_record.sql"
       ]);
   });
 });

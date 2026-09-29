@@ -59,6 +59,7 @@
     "replay:ceremony": "tsx apps/replay/src/cli.ts",
     "eval:roles": "tsx acceptance/eval-harness-cli.ts",
     "hs:accept-s01": "NODE_OPTIONS=--use-system-ca tsx acceptance/hs-s01-accept-cli.ts",
+    "hs:eval-s02": "tsx acceptance/hs-eval-s02.ts",
     "pes:accept-hosted": "tsx --no-cache acceptance/pes-s02-hosted-cli.ts"
   },
   "dependencies": {
