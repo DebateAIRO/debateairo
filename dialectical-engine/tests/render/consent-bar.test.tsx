@@ -2,7 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { act } from "react";
+import { act, createRef, type RefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
@@ -10,6 +10,7 @@ import { CookieBar } from "../../apps/ui/components/consent/CookieBar.js";
 import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
 import consentRomanian from "../../apps/ui/messages/ro/consent.json" with { type: "json" };
 import type { MessageCatalog } from "../../apps/ui/lib/i18n/translate.js";
+import { LEGAL_INVENTORY } from "../../apps/ui/lib/legal/pages.js";
 import {
   S01_CLOSE_MARKER,
   S01_OPEN_MARKER,
@@ -105,14 +106,22 @@ function expectDeclarations(css: string, selector: string, declarations: string[
   }
 }
 
-// SPEC §Copy, extracted from `slices/S01/SPEC.md` with a codepoint dump rather
-// than retyped (TOOLING-TRAPS, CODE-S01-C1C2): the title carries U+2014 EM DASH
-// at index 43 and is 70 characters; every other bar string is pure ASCII.
+// PLAN §3 copy drafts, which DONE.md (V, 2026-09-29) adopted as the copy of record — the
+// canvas carries them verbatim. The body's apostrophe is ASCII U+0027.
 const EYEBROW = "YOUR DATA, ON THE RECORD";
-const TITLE = "We store only what keeps the bench running — unless you say otherwise.";
+const TITLE = "We store only what keeps the bench running.";
 const BODY =
-  "Essential cookies hold your session, MFA state and device record. Analytics and model-quality telemetry are optional and never sold. You can change this any time in Settings.";
-const BUTTONS = ["Essential only", "Choose what to store", "Accept all"];
+  "Four cookies and four items in your browser's storage, each needed for DebateAI to work. Nothing optional, nothing shared with anyone else.";
+const LABEL = "Cookie notice";
+/**
+ * The three controls in DOM order. DONE.md default (2) and its step 3 fix the order
+ * `Cookie policy` → `What we store` → `OK` (the tab order V tests); PLAN S16 listed the same
+ * three controls in the reverse order, and DONE.md is V's.
+ */
+const CONTROLS = ["Cookie policy", "What we store", "OK"];
+const OLD_LABELS = ["Essential only", "Choose what to store", "Accept all"];
+const DURATION = /\b\d+\s*(days?|years?|months?|hours?|minutes?)\b/gi;
+const INV_NAMES = LEGAL_INVENTORY.map((item) => item.name);
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -129,6 +138,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (root !== null) act(() => root!.unmount());
   root = null;
   container = null;
@@ -138,9 +148,9 @@ afterEach(() => {
 });
 
 type BarHandlers = {
-  onEssentialOnly?: () => void;
-  onChoose?: (opener: HTMLElement | null) => void;
-  onAcceptAll?: () => void;
+  onAcknowledge?: () => void;
+  onOpenCard?: (opener: HTMLElement | null) => void;
+  cardButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
 function mountBar(handlers: BarHandlers = {}, catalog: MessageCatalog = consentEnglish): HTMLElement {
@@ -148,16 +158,14 @@ function mountBar(handlers: BarHandlers = {}, catalog: MessageCatalog = consentE
     root!.render(
       <CookieBar
         catalog={catalog}
-        onEssentialOnly={handlers.onEssentialOnly ?? ((): void => {})}
-        onChoose={handlers.onChoose ?? ((): void => {})}
-        onAcceptAll={handlers.onAcceptAll ?? ((): void => {})}
+        onAcknowledge={handlers.onAcknowledge ?? ((): void => {})}
+        onOpenCard={handlers.onOpenCard ?? ((): void => {})}
+        cardButtonRef={handlers.cardButtonRef}
       />
     );
   });
-  const bar = document.querySelector<HTMLElement>(
-    `[role="region"][aria-label="${catalog["consent.bar.label"]}"]`
-  );
-  expect(bar, "the bar renders as a labelled region").not.toBeNull();
+  const bar = document.querySelector<HTMLElement>(".consentBar");
+  expect(bar, "the bar renders").not.toBeNull();
   return bar!;
 }
 
@@ -167,37 +175,39 @@ function text(selector: string): string {
   return element!.textContent ?? "";
 }
 
-describe("S01-C3 the cookie bar (10a)", () => {
-  it("renders the five bar strings of SPEC §Copy byte-exact, and reaches no storage", () => {
-    // PROPERTY (S01-R11): the eyebrow, the Fraunces title, the body paragraph
-    // and the three button labels equal SPEC §Copy's strings by `textContent`,
-    // so any paraphrase — a swapped dash, a dropped sentence, a reworded
-    // button — fails. The bar is presentational: it is handed three callbacks
-    // and never touches `localStorage` itself, so the ONE state machine
-    // (`CookieConsent`, cluster C5) stays the only writer.
+/** The bar's operable controls — every `button` and `a[href]` — in DOM order. */
+const controls = (scope: ParentNode = document): HTMLElement[] => [
+  ...scope.querySelectorAll<HTMLElement>("button, a[href]")
+];
+const controlTexts = (scope: ParentNode = document): (string | undefined)[] =>
+  controls(scope).map((control) => control.textContent?.trim());
+
+describe("S01 the cookie notice bar (10a)", () => {
+  it("renders the bar strings byte-exact, and reaches no storage", () => {
+    // PROPERTY (R01, R03, DONE.md 10a): the eyebrow, the title, the body and the three control
+    // texts equal the copy of record by `textContent`; the bar is presentational and touches no
+    // storage, so `CookieConsent` stays the only reader and writer.
+    const getItem = vi.spyOn(Storage.prototype, "getItem");
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
     mountBar();
 
     expect(text(".consentEyebrow"), "eyebrow").toBe(EYEBROW);
-    expect(text(".consentTitle"), "Fraunces title").toBe(TITLE);
+    expect(text(".consentTitle"), "title").toBe(TITLE);
     expect(text(".consentBody"), "body paragraph").toBe(BODY);
-    expect(
-      [...document.querySelectorAll("button")].map((button) => button.textContent?.trim()),
-      "the three button labels"
-    ).toEqual(BUTTONS);
+    expect(controlTexts(), "the three control texts, in DOM order").toEqual(CONTROLS);
+    expect(getItem, "the bar reads no storage").not.toHaveBeenCalled();
+    expect(setItem, "the bar writes no storage").not.toHaveBeenCalled();
   });
 
-  it("keeps dev's SPEC §Copy bytes as the English catalogue values", () => {
-    // Localization moved the literals into `messages/en/consent.json`; the English bytes
-    // are still the codepoint-dumped SPEC §Copy strings above, key for key.
+  it("keeps the bar's English catalogue values byte-exact", () => {
+    // PROPERTY (PLAN §3 as adopted by DONE.md): the English catalogue holds the copy of record.
+    expect(consentEnglish["consent.bar.label"]).toBe(LABEL);
     expect(consentEnglish["consent.bar.eyebrow"]).toBe(EYEBROW);
     expect(consentEnglish["consent.bar.title"]).toBe(TITLE);
     expect(consentEnglish["consent.bar.body"]).toBe(BODY);
-    expect([
-      consentEnglish["consent.action.essentialOnly"],
-      consentEnglish["consent.bar.choose"],
-      consentEnglish["consent.bar.acceptAll"]
-    ]).toEqual(BUTTONS);
-    expect(consentEnglish["consent.bar.label"]).toBe("Cookie consent");
+    expect(consentEnglish["consent.bar.acknowledge"]).toBe("OK");
+    expect(consentEnglish["consent.bar.whatWeStore"]).toBe("What we store");
+    expect(consentEnglish["consent.link.cookiePolicy"]).toBe("Cookie policy");
   });
 
   it("renders Romanian consent copy from the catalogue into the DOM", () => {
@@ -210,51 +220,97 @@ describe("S01-C3 the cookie bar (10a)", () => {
       consentRomanian["consent.bar.title"]
     );
     expect(text(".consentBody"), "Romanian body").toBe(consentRomanian["consent.bar.body"]);
-    expect(
-      [...document.querySelectorAll("button")].map((button) => button.textContent?.trim()),
-      "Romanian controls in DOM order"
-    ).toEqual([
-      consentRomanian["consent.action.essentialOnly"],
-      consentRomanian["consent.bar.choose"],
-      consentRomanian["consent.bar.acceptAll"]
+    expect(controlTexts(), "Romanian controls in DOM order").toEqual([
+      (consentRomanian as MessageCatalog)["consent.link.cookiePolicy"],
+      (consentRomanian as MessageCatalog)["consent.bar.whatWeStore"],
+      (consentRomanian as MessageCatalog)["consent.bar.acknowledge"]
     ]);
   });
 
-  it("is a labelled region whose focusable descendants are the three buttons in DOM order", () => {
-    // PROPERTY (S01-R12): the bar exposes `role="region"` with
-    // `aria-label="Cookie consent"`, and its focusable descendants are exactly
-    // the three controls in the design's DOM order — the order in which a
-    // reader meets the least-committing option first. Focus is never pulled
-    // into the bar and never trapped there, so the visitor can read the page
-    // before deciding: the component owns no `.focus()` call and registers no
-    // listener of its own.
-    const bar = mountBar();
+  it("renders exactly the acknowledgement, the what-we-store button and one link to /cookies, in DOM order, and none of the three old labels", () => {
+    // PROPERTY (R01): exactly three operable elements — one link whose href is /cookies, one
+    // button that opens the card, one acknowledgement button — and none of the old labels.
+    const acknowledged: number[] = [];
+    const openers: (HTMLElement | null)[] = [];
+    const cardButtonRef = createRef<HTMLButtonElement>();
+    const bar = mountBar({
+      onAcknowledge: () => acknowledged.push(1),
+      onOpenCard: (opener) => openers.push(opener),
+      cardButtonRef
+    });
 
-    expect(bar.getAttribute("role"), "the bar's role").toBe("region");
-    expect(bar.getAttribute("aria-label"), "the bar's accessible name").toBe("Cookie consent");
+    const found = controls(bar);
+    expect(found.length, "button + a[href] count").toBe(3);
+    expect(controlTexts(bar), "the controls, in DOM order").toEqual(CONTROLS);
+    const [link, whatWeStore, ok] = found as [HTMLElement, HTMLElement, HTMLElement];
+    expect(link.tagName, "the first control is a link").toBe("A");
+    expect(link.getAttribute("href"), "to /cookies").toBe("/cookies");
+    expect(bar.querySelectorAll('a[href="/cookies"]').length, "one link to /cookies").toBe(1);
+    expect(whatWeStore.tagName, "what we store is a button").toBe("BUTTON");
+    expect(ok.tagName, "the acknowledgement is a button").toBe("BUTTON");
+    expect(cardButtonRef.current, "the card button is lent to the caller's ref").toBe(whatWeStore);
 
-    const focusable = [
-      ...bar.querySelectorAll<HTMLElement>(
-        'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])'
-      )
-    ].filter((element) => !element.hasAttribute("disabled"));
-    expect(
-      focusable.map((element) => element.textContent?.trim()),
-      "every focusable descendant, in DOM order"
-    ).toEqual(BUTTONS);
+    act(() => whatWeStore.click());
+    expect(openers, "what we store opens the card, carrying itself as the opener").toEqual([whatWeStore]);
+    act(() => ok.click());
+    expect(acknowledged, "OK acknowledges, once").toEqual([1]);
 
-    expect(document.activeElement, "the bar never pulls focus on mount").toBe(document.body);
+    for (const label of OLD_LABELS) {
+      expect(bar.textContent?.includes(label), `the old label ${label}`).toBe(false);
+    }
 
     const source = barSource();
     expect(source.includes(".focus()"), "CookieBar.tsx calls .focus()").toBe(false);
     expect(source.includes("addEventListener"), "CookieBar.tsx registers a listener").toBe(false);
   });
 
+  it("names the acknowledgement and the region with none of accept, agree, consent, allow", () => {
+    // PROPERTY (R05): the acknowledgement is not a consent — neither its visible label nor the
+    // region's accessible name asks for one (en).
+    const bar = mountBar();
+    const ok = bar.querySelector<HTMLButtonElement>("button.consentPrimary");
+    expect(ok, "the acknowledgement renders").not.toBeNull();
+    const banned = /accept|agree|consent|allow/i;
+    expect(ok!.textContent ?? "", "the acknowledgement label").not.toMatch(banned);
+    expect(bar.getAttribute("aria-label") ?? "", "the region's accessible name").not.toMatch(banned);
+    expect(bar.getAttribute("aria-label"), "the region's accessible name").toBe(LABEL);
+  });
+
+  it("shows no cookie name or duration outside the eight items", () => {
+    // PROPERTY (R11, bar side): every `code` text is an INV name and every duration string is
+    // one of the INV lifetimes that carry a number.
+    const bar = mountBar();
+    for (const code of bar.querySelectorAll("code")) {
+      expect(INV_NAMES, `code text ${code.textContent}`).toContain(code.textContent);
+    }
+    for (const match of (bar.textContent ?? "").matchAll(DURATION)) {
+      expect(["14 days", "30 days", "1 year"], `duration ${match[0]}`).toContain(match[0]);
+    }
+  });
+
+  it("is a non-modal region that takes no focus when it appears", () => {
+    // PROPERTY (R20, bar side): role region with a non-empty accessible name, no aria-modal,
+    // and the element that held focus before the bar appeared still holds it after.
+    const elsewhere = document.createElement("button");
+    elsewhere.textContent = "page control";
+    document.body.prepend(elsewhere);
+    elsewhere.focus();
+    const before = document.activeElement;
+    expect(before, "the page control holds focus first").toBe(elsewhere);
+
+    const bar = mountBar();
+    expect(bar.getAttribute("role"), "role").toBe("region");
+    expect((bar.getAttribute("aria-label") ?? "").trim(), "a non-empty accessible name").not.toBe("");
+    expect(bar.hasAttribute("aria-modal"), "no aria-modal").toBe(false);
+    expect(bar.querySelector("[aria-modal]"), "no aria-modal inside").toBeNull();
+    expect(document.activeElement, "focus did not move when the bar appeared").toBe(before);
+  });
+
   it("offers no dismissal that is not a decision: Escape leaves it standing and writes nothing", () => {
     // PROPERTY (S01-R13): the bar leaves only by a decision. There is no close
     // control and no fourth affordance of any kind, Escape does nothing to it,
     // and nothing reaches storage on a keystroke — the design gives 10a three
-    // buttons and no close glyph, and row V-7 says the bar shows until they
+    // controls and no close glyph, and row V-7 says the bar shows until they
     // choose.
     const bar = mountBar();
 
@@ -271,7 +327,7 @@ describe("S01-C3 the cookie bar (10a)", () => {
     expect(
       controls.map((control) => control.textContent?.trim()),
       "there is no fourth control and no ×"
-    ).toEqual(BUTTONS);
+    ).toEqual(CONTROLS);
     expect(bar.textContent?.includes("×"), "the bar renders no close glyph").toBe(false);
   });
 
@@ -364,6 +420,9 @@ describe("S01-C3 the cookie bar (10a)", () => {
     expectDeclarations(base, ".consentActions", ["display: flex", "gap: 9px"]);
     expectDeclarations(base, ".consentGhost", ["white-space: nowrap"]);
     expectDeclarations(base, ".consentPrimary", ["white-space: nowrap"]);
+    // The bar's `Cookie policy` link keeps its label on one line (DONE.md 10a declarations,
+    // `design/S01/declarations/S01-01-bar-firstvisit-terracotta.md`).
+    expectDeclarations(base, ".consentActions .consentLink", ["white-space: nowrap"]);
 
     const literals = s01Block()
       .split("\n")
@@ -436,6 +495,9 @@ describe("S01-C3 the cookie bar (10a)", () => {
       "gap: 14px"
     ]);
     expectDeclarations(stacked, ".consentActions", ["flex-wrap: wrap"]);
+    // Stacked, the link keeps its own width beside the two buttons (DONE.md 10a at 375,
+    // `S01-02-bar-375-terracotta.md`: `.w375 .consentActions .consentLink { flex: 0 0 auto; }`).
+    expectDeclarations(stacked, ".consentActions .consentLink", ["flex: 0 0 auto"]);
     for (const selector of [".consentGhost", ".consentPrimary"]) {
       expectDeclarations(stacked, selector, [
         "flex: 1 1 auto",
