@@ -109,9 +109,52 @@ describe("sign-up with the date of birth (8a)", () => {
     expect(host.querySelector('[role="status"]')!.textContent).toContain(english["auth.signUp.registrationSent"]);
   });
 
-  it("on refusal shows only the refusal screen and never calls register", async () => {
+  it("refuses a date under 18 on the form: the reason under the field, Create account disabled, no request", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.UTC(2026, 8, 29, 12)) });
+    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await fillForm(["14", "03", "2012"]);
+    const message = host.querySelector("#dob-msg")!;
+    expect(message.textContent).toBe("✗ You must be 18 or over in order for you to create an account.");
+    expect(message.getAttribute("data-state")).toBe("bad");
+    for (const name of ["dob-d", "dob-m", "dob-y"]) {
+      expect(field(name).getAttribute("aria-invalid")).toBe("true");
+      expect(field(name).getAttribute("aria-describedby")).toBe("dob-msg");
+    }
+    expect(host.querySelector<HTMLButtonElement>("button.authPrimary")!.disabled).toBe(true);
+    // A scripted submit gets no further than the disabled button would.
+    await submit();
+    expect(requests).toEqual([]);
+    expect(host.querySelector("form")).not.toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("holds the boundary: 18 tomorrow is refused on the form, exactly 18 today goes through", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.UTC(2026, 8, 29, 12)) });
+    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await fillForm(["30", "09", "2008"]);
+    expect(host.querySelector("#dob-msg")!.textContent).toBe("✗ You must be 18 or over in order for you to create an account.");
+    await submit();
+    expect(requests).toEqual([]);
+    await setValue("dob-d", "29");
+    expect(host.querySelector("#dob-msg")!.textContent).toBe("✓ Valid date");
+    await submit();
+    expect(requests.map((request) => request.path)).toEqual(["/v1/auth/age-check", "/v1/auth/register"]);
+    expect(requests[0]!.body).toEqual({ date_of_birth: "2008-09-29" });
+    vi.useRealTimers();
+  });
+
+  it("names the minimum age in the reader's language (de)", async () => {
+    await act(async () => root.render(<SignUpFlow catalog={german} dobLocale={resolveDobLocale("de")} client={networkClient("allowed")} />));
+    await setValue("dob-d", "01");
+    await setValue("dob-m", "01");
+    await setValue("dob-y", "2015");
+    expect(host.querySelector("#dob-msg")!.textContent)
+      .toBe("✗ Sie müssen mindestens 18 Jahre alt sein, um ein Konto zu erstellen.");
+  });
+
+  it("on a server refusal (the lockout) shows only the refusal screen and never calls register", async () => {
     await act(async () => root.render(<SignUpFlow client={networkClient("refused")} />));
-    await fillForm(["29", "09", "2010"]);
+    await fillForm(["14", "03", "1998"]);
     await submit();
     expect(requests.map((request) => request.path)).toEqual(["/v1/auth/age-check"]);
     expect(requests.some((request) => request.path === "/v1/auth/register")).toBe(false);

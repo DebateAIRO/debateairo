@@ -10,7 +10,7 @@ import {
   useState
 } from "react";
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
-import { checkDob, dobToIso, type DobErrorCode, type DobParts } from "@debateai/kernel";
+import { checkDob, dobToIso, meetsMinimumAge, type DobErrorCode, type DobParts } from "@debateai/kernel";
 import { AgeRefusal } from "@/components/AgeRefusal";
 import { AuthShell } from "@/components/AuthShell";
 import { DateOfBirthField, EMPTY_DOB } from "@/components/DateOfBirthField";
@@ -160,6 +160,8 @@ export function SignUpFlow({
   /* Date of birth (8d): the widget is controlled; its error is set on submit and cleared by
      every edit. The date never leaves this form except to be checked. */
   const [dateOfBirth, setDateOfBirth] = useState<DobParts>(EMPTY_DOB);
+  /* A complete, real date under MIN_AGE (V 2026-09-29): Create account stays disabled. */
+  const underAge = checkDob(dateOfBirth).code === "ok" && !meetsMinimumAge(dateOfBirth);
   const [dateOfBirthError, setDateOfBirthError] = useState<DobErrorCode | null>(null);
   const [refused, setRefused] = useState(refusedOnArrival);
   /* The two consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
@@ -187,6 +189,9 @@ export function SignUpFlow({
       setDateOfBirthError(dateCheck.code);
       return;
     }
+    /* Under MIN_AGE: the field already says so and the button is disabled; a scripted
+       submit stops here too, before any request. */
+    if (!meetsMinimumAge(dateOfBirth)) return;
     /* Defence in depth. A bare `new Event("submit")` bypasses HTML constraint
        validation, so `required` alone gates nothing against a scripted submit.
        Consent and confirmation are read from FormData, never the mirrors above. */
@@ -389,7 +394,9 @@ export function SignUpFlow({
         </div>
 
         {/* Date of birth — design document Turn 8 · 8a/8d: after Password, before the consent
-            group. It replaces the "I am 18 or over" tick box; the minimum age is never shown. */}
+            group. It replaces the "I am 18 or over" tick box. V 2026-09-29: a date under 18 is
+            refused right here — the minimum age is named under the field and Create account
+            stays disabled — rather than only after submitting. */}
         <div className="authField">
           <DateOfBirthField
             catalog={catalog}
@@ -401,6 +408,7 @@ export function SignUpFlow({
               setDateOfBirthError(null);
             }}
             disabled={busy || sent}
+            minimumAgeMessage={t(catalog, "auth.dob.underAge")}
           />
         </div>
 
@@ -471,7 +479,7 @@ export function SignUpFlow({
         <button
           className="authPrimary"
           type="submit"
-          disabled={busy || sent || !privacyAccepted || !termsAccepted}
+          disabled={busy || sent || !privacyAccepted || !termsAccepted || underAge}
         >
           {busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}
         </button>
