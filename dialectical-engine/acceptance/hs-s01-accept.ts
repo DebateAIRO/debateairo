@@ -1,5 +1,6 @@
 import { isAbsolute } from "node:path";
-import { AnswerSchema } from "@debateai/contract";
+import { AnswerSchema, AskAcceptedSchema, AskRequestSchema } from "@debateai/contract";
+import { decodeBase32, TOTP_PROFILE, totpCodeAtStep } from "@debateai/crypto";
 
 export const HS_S01_QUESTIONS = {
   "Q-N": "Should Romania cap immigration at 50,000 people a year because of housing costs?",
@@ -26,6 +27,156 @@ export interface HsS01Ports {
   readCensus(): Promise<readonly CensusRow[]>;
   readReceiptVersion(): Promise<string | null>;
   readText(absolutePath: string): Promise<string>;
+}
+
+type HttpPorts = Pick<HsS01Ports, "login" | "ask" | "waitForTerminal" | "readAnswer" | "readEvents">;
+export interface HttpPortDependencies {
+  fetch(input: string, init: RequestInit): Promise<Response>;
+  env: Readonly<Record<string, string | undefined>>;
+  origin: string;
+  sleep(ms: number): Promise<void>;
+}
+
+// One fixed code for every body outside its route's shape (content type, framing, JSON, schema).
+const responseInvalid = () => new TypeError("HS_S01_RESPONSE_INVALID");
+const mediaType = (response: Response) =>
+  (response.headers.get("content-type") ?? "").split(";", 1)[0]!.trim().toLowerCase();
+
+function expectStatus(response: Response, expected: number): void {
+  if (response.status !== expected) throw new TypeError(`HS_S01_HTTP_${response.status}`);
+}
+
+async function json(response: Response, expected = 200): Promise<unknown> {
+  expectStatus(response, expected);
+  if (mediaType(response) !== "application/json") throw responseInvalid();
+  try { return await response.json(); } catch { throw responseInvalid(); }
+}
+
+// GET /v1/runs/{id}/events answers text/event-stream: per event one `id:` / `event:` / `data: <json>` block
+// ended by a blank line, then the stream ends (apps/api/src/index.ts:2461-2473). Parsed by the event-stream
+// line rules (LF, CRLF or CR ends a line; `:` lines are comments; data lines join with "\n"); every block must
+// carry a JSON object whose event_id/event_type equal its id/event fields, and a block cut before its blank
+// line is a truncated stream, never a skipped event.
+export function parseRunEventStream(text: string): Record<string, unknown>[] {
+  const events: Record<string, unknown>[] = [];
+  let block: { id?: string; event?: string; data?: string[] } = {};
+  let open = false;
+  const lines = text.split(/\r\n|\r|\n/);
+  const terminated = lines.pop() === "";
+  for (const line of lines) {
+    if (line === "") {
+      if (open) events.push(runEvent(block));
+      block = {};
+      open = false;
+      continue;
+    }
+    if (line.startsWith(":")) continue;
+    const colon = line.indexOf(":");
+    const field = colon === -1 ? line : line.slice(0, colon);
+    const value = colon === -1 ? "" : line.slice(colon + 1).replace(/^ /, "");
+    if (field === "data") (block.data ??= []).push(value);
+    else if ((field === "id" || field === "event") && block[field] === undefined) block[field] = value;
+    else throw responseInvalid();
+    open = true;
+  }
+  if (open || !terminated) throw responseInvalid();
+  return events;
+}
+
+function runEvent(block: { id?: string; event?: string; data?: string[] }): Record<string, unknown> {
+  let value: unknown;
+  try { value = JSON.parse((block.data ?? []).join("\n")); } catch { throw responseInvalid(); }
+  const event = value as Record<string, unknown> | null;
+  if (typeof event !== "object" || event === null || Array.isArray(event)
+    || typeof event.event_id !== "string" || typeof event.event_type !== "string"
+    || (block.id !== undefined && block.id !== event.event_id)
+    || (block.event !== undefined && block.event !== event.event_type)) throw responseInvalid();
+  return event;
+}
+
+// The live HTTP ports, one per route the operator command reads through the :3000 /api proxy. The CLI composes
+// them with its database ports; tests drive them with a fake answering in each route's real wire shape.
+export function createHttpPorts(dependencies: HttpPortDependencies): HttpPorts {
+  const { env, origin, sleep } = dependencies;
+  const cookies = new Map<string, string>();
+  async function request(path: string, body?: unknown): Promise<Response> {
+    const headers: Record<string, string> = { origin };
+    if (cookies.size > 0) headers.cookie = [...cookies].map(([name, value]) => `${name}=${value}`).join("; ");
+    if (body !== undefined) {
+      headers["content-type"] = "application/json";
+      headers["x-csrf-token"] = cookies.get("__Host-debateai-csrf") ?? "";
+    }
+    let response: Response;
+    try {
+      response = await dependencies.fetch(`${origin}/api${path}`, { method: body === undefined ? "GET" : "POST", headers,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    } catch {
+      throw new TypeError("HS_S01_HTTP_REQUEST_FAILED");
+    }
+    for (const cookie of response.headers.getSetCookie()) {
+      const pair = cookie.split(";", 1)[0]!;
+      const separator = pair.indexOf("=");
+      const name = pair.slice(0, separator);
+      if (name === "__Host-debateai-session" || name === "__Host-debateai-csrf") cookies.set(name, pair.slice(separator + 1));
+    }
+    return response;
+  }
+  const runPath = (runRef: string) => `/v1/runs/${encodeURIComponent(runRef)}`;
+  return {
+    // POST /v1/auth/login: 202 {status, challenge_token}, then 200 with the session and CSRF cookies.
+    async login() {
+      const email = env.HS_ACCEPT_EMAIL;
+      const password = env.HS_ACCEPT_PASSWORD;
+      const secret = env.HS_ACCEPT_TOTP_SECRET;
+      if (!email || !password || !secret) throw new TypeError("HS_S01_CREDENTIALS_MISSING");
+      const challenge = await json(await request("/v1/auth/login", { email, password }), 202) as { challenge_token?: unknown } | null;
+      if (typeof challenge?.challenge_token !== "string") throw new TypeError("HS_S01_LOGIN_CHALLENGE_INVALID");
+      const code = totpCodeAtStep(decodeBase32(secret), Math.floor(Date.now() / 1000 / TOTP_PROFILE.periodSeconds));
+      await json(await request("/v1/auth/login", { challenge_token: challenge.challenge_token, code }));
+      if (!cookies.get("__Host-debateai-session") || !cookies.get("__Host-debateai-csrf")) {
+        throw new TypeError("HS_S01_LOGIN_COOKIES_MISSING");
+      }
+    },
+    // POST /v1/asks: 202 AskAccepted.
+    async ask(questionLine) {
+      const body = AskRequestSchema.parse({ question_line: questionLine, plan_tier: "free", risk_tier: "standard",
+        tier_source: "MACHINE_DEFAULT", tier_provenance_ref: "machine:plan-tier-free", composition_budget_tier: "low",
+        depth_params: { depth: 2 }, decision_scope: "personal", as_of: new Date().toISOString(),
+        steering_presets: [], steering_annotations: [] });
+      const accepted = AskAcceptedSchema.safeParse(await json(await request("/v1/asks", body), 202));
+      if (!accepted.success) throw responseInvalid();
+      return accepted.data.run_ref;
+    },
+    // GET /v1/runs/{id}: 200 RunProjection, whose state is a string.
+    async waitForTerminal(runRef) {
+      const minutes = Number(env.HS_ACCEPT_TIMEOUT_MINUTES ?? "60");
+      if (!Number.isFinite(minutes) || minutes <= 0) throw new TypeError("HS_S01_TIMEOUT_INVALID");
+      const deadline = Date.now() + minutes * 60_000;
+      let run: unknown = null;
+      while (Date.now() < deadline) {
+        run = await json(await request(runPath(runRef)));
+        const state = (run as { state?: unknown } | null)?.state;
+        if (typeof state !== "string") throw responseInvalid();
+        if (state === "SETTLED" || state === "FAILED") return { state, run };
+        await sleep(Math.min(10_000, Math.max(0, deadline - Date.now())));
+      }
+      return { state: "TIMEOUT", run };
+    },
+    // GET /v1/runs/{id}/answer: 200 Answer, or 404 ANSWER_NOT_SERVED (no answer); any other status fails.
+    async readAnswer(runRef) {
+      const response = await request(`${runPath(runRef)}/answer`);
+      return response.status === 404 ? null : json(response);
+    },
+    // GET /v1/runs/{id}/events: 200 text/event-stream.
+    async readEvents(runRef) {
+      const response = await request(`${runPath(runRef)}/events`);
+      expectStatus(response, 200);
+      if (mediaType(response) !== "text/event-stream") throw responseInvalid();
+      let text: string;
+      try { text = await response.text(); } catch { throw responseInvalid(); }
+      return parseRunEventStream(text);
+    }
+  };
 }
 
 export function parseHsS01Arguments(argv: readonly string[]): Arguments {
