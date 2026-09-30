@@ -1631,11 +1631,12 @@ export function generateVerificationToken(): string {
  * pins its bytes to `hashToken`'s, so the two constructions cannot drift.
  */
 export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant"
-  | "verification" | "support-session" | "support-case";
+  | "verification" | "support-session" | "support-case"
+  | "email-change-confirm" | "email-change-cancel";
 
 const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
   "session", "csrf", "login-challenge", "step-up-grant", "verification",
-  "support-session", "support-case"
+  "support-session", "support-case", "email-change-confirm", "email-change-cancel"
 ]);
 
 /**

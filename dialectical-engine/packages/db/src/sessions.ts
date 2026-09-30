@@ -589,7 +589,7 @@ export class PostgresSessionRepository {
     }> | Readonly<{
       grantId: string;
       grantTokenHash: string;
-      action: "DELETE_ACCOUNT";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL";
       expiresAt: Date;
     }>;
   }>): Promise<boolean> {
@@ -615,7 +615,7 @@ export class PostgresSessionRepository {
         input.grant?.grantId ?? null,
         input.grant?.grantTokenHash ?? null,
         input.grant?.action ?? null,
-        input.grant !== undefined && input.grant.action !== "DELETE_ACCOUNT"
+        input.grant !== undefined && "targetRunId" in input.grant
           ? input.grant.targetRunId : null,
         input.grant?.expiresAt ?? null,
         JSON.stringify({ ipArgon2id: prepared.ipArgon2id,

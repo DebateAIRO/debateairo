@@ -15,6 +15,7 @@ const ownedFiles = [
   "app/ai-transparency/page.tsx",
   "app/admin/workers/page.tsx",
   "components/SettingsPageClient.tsx",
+  "components/EmailSettings.tsx",
   "components/EvaluatorDevMenu.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");

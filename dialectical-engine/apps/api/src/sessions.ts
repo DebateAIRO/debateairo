@@ -103,7 +103,7 @@ export interface SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -602,7 +602,7 @@ export class SessionService implements SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -673,7 +673,7 @@ export class SessionService implements SessionApplication {
         source,
         ...(input.authorization === undefined || grantToken === undefined || grantExpiresAt === undefined
           ? {}
-          : { grant: input.authorization.action === "DELETE_ACCOUNT"
+          : { grant: !("targetRunId" in input.authorization)
               ? {
                   grantId: randomUUID(),
                   grantTokenHash: hashToken("step-up-grant", grantToken),

@@ -425,7 +425,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0077_age_gate.sql",
         // Sensitive-data consent (V's ruling of 2026-09-29): identity.sensitive_data_consent,
         // the one-time Article 9 consent before the first debate. The next free prefix, no pair.
-        "0078_sensitive_data_consent.sql"
+        "0078_sensitive_data_consent.sql",
+        // Turn 14 change email: identity.email_change_request, the CHANGE_EMAIL
+        // step-up grant and its six definer capabilities. The next free prefix, no pair.
+        "0079_email_change.sql"
       ]);
   });
 });
