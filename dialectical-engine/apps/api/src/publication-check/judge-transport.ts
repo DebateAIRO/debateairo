@@ -93,13 +93,16 @@ function perUserDirectory(base: string): string {
 }
 
 /**
- * FIX-HS2-v api-p3 N3: the privacy check and the use are one operation on one directory. Node offers no openat, and
- * `/dev/fd/<n>/<name>` does not resolve on macOS (measured: ENOENT), so the directory is pinned instead:
+ * FIX-HS2-v api-p3 N3 (wording corrected by FIX-HS2-v2 N4): ANOTHER ACCOUNT cannot swap the directory between the
+ * privacy check and the use; the SAME account can. The check and the use are NOT one operation — Node offers no
+ * openat, and `/dev/fd/<n>/<name>` does not resolve on macOS (measured: ENOENT) — so the directory is pinned instead:
  * 1. its parent must not let another account rename or replace it — no group/other write, or the sticky bit
  *    (Linux `/tmp`); a world-writable parent without the sticky bit is refused;
  * 2. the directory is opened ONCE with O_DIRECTORY|O_NOFOLLOW (a symlinked directory fails here) and the privacy
  *    check runs on that descriptor (fstat), not on a second lookup of the name;
- * 3. after `use`, the name must still be that same directory (dev/ino of the held descriptor).
+ * 3. after `use`, the name must still be that same directory (dev/ino of the held descriptor). This catches a swap
+ *    that is still in place at the re-check; a same-account swap that is undone before the re-check (ABA) is not
+ *    caught and can read ON — no privilege boundary is crossed, since that account can delete the flag itself.
  * Any failure returns `refused`; nothing throws.
  */
 function withPrivateDirectory<T>(directory: string, use: () => T, refused: T): T {

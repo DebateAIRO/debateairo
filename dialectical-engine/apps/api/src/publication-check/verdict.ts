@@ -14,9 +14,13 @@ const VERDICTS: readonly JudgeAnswer["verdict"][] = ["ALLOW", "BLOCK", "UNSURE"]
  * FIX-HS2-v V-21 (V's ruling, supersedes V-18): the answer is BOUND to its call. Every judge call's frame carries a
  * boundary marker of 128 CSPRNG bits minted per call, after the material is fixed
  * (packages/providers/src/prompt-frame.ts:222-235); the R5 answer form requires the judge to copy its 32 hexadecimal
- * characters into `call`. Text the owner wrote before the call existed cannot carry that value, so a verdict copied
- * out of the material — in any spelling, encoding or split — is never this call's answer. This replaces the
- * pass-1/pass-2 scan of the material for verdict-like keys, which was an open list and refused honest text.
+ * characters into `call`. Text the owner wrote before the call existed cannot carry that value, so an answer COPIED
+ * out of the material — a whole object in any spelling, encoding or split — is never this call's answer, and an answer
+ * that repeats any key (a bound head continued by a copied tail, FIX-HS2-v2 N1) is refused too. What this does NOT
+ * guarantee: a verdict the judge WRITES with this call's value — obeyed from the text, or completed from a fragment of
+ * it (a copied tail after its own `{"call":"<value>",`, a fake value it replaces with the real one) — is taken; that
+ * is V-16's residual, measured by the eval's injection block. This replaces the pass-1/pass-2 scan of the material for
+ * verdict-like keys, which was an open list and refused honest text.
  */
 const CALL_VALUE = /^[0-9a-f]{32}$/u;
 
@@ -28,9 +32,36 @@ export function judgeCallValue(fence: string): string {
 }
 
 /**
- * R5: `expectedCall` is judgeCallValue of THIS call's frame. An answer is taken only when it is exactly the five-key
- * object whose `call` is that value; missing, different, re-cased or padded values are JUDGE_ANSWER_SCHEMA
- * (fail closed, SPEC-v2 R7), whatever verdict the answer names.
+ * FIX-HS2-v2 N1: JSON.parse keeps the LAST copy of a repeated key, so the parsed object cannot show a repetition. This
+ * walks the (already valid) JSON text and reports any object in it that names the same key twice, comparing keys
+ * after JSON unescaping (`"\u0076erdict"` repeats `"verdict"`).
+ */
+function repeatsAKey(json: string): boolean {
+  const open: Set<string>[] = [];
+  for (let at = 0; at < json.length; at++) {
+    const ch = json[at];
+    if (ch === "{") open.push(new Set());
+    else if (ch === "}") open.pop();
+    else if (ch === '"') {
+      let end = at + 1;
+      while (json[end] !== '"') end += json[end] === "\\" ? 2 : 1;
+      const literal = json.slice(at, end + 1);
+      at = end;
+      let next = end + 1;
+      while (next < json.length && " \t\n\r".includes(json[next]!)) next++;
+      if (json[next] !== ":") continue;
+      const key = JSON.parse(literal) as string, keys = open[open.length - 1]!;
+      if (keys.has(key)) return true;
+      keys.add(key);
+    }
+  }
+  return false;
+}
+
+/**
+ * R5: `expectedCall` is judgeCallValue of THIS call's frame. An answer is taken only when its text is one object that
+ * names each of the five keys exactly once and whose `call` is that value; a repeated key, or a missing, different,
+ * re-cased or padded value, is JUDGE_ANSWER_SCHEMA (fail closed, SPEC-v2 R7), whatever verdict the answer names.
  */
 export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[], expectedCall: string): JudgeCallResult {
   let source = text.trim();
@@ -43,7 +74,7 @@ export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[]
   try { value = JSON.parse(source); }
   catch { return { ok: false, cause: "JUDGE_ANSWER_NOT_JSON" }; }
   const schemaFailure = { ok: false, cause: "JUDGE_ANSWER_SCHEMA" } as const;
-  if (!value || typeof value !== "object" || Array.isArray(value)) return schemaFailure;
+  if (!value || typeof value !== "object" || Array.isArray(value) || repeatsAKey(source)) return schemaFailure;
   const row = value as Record<string, unknown>;
   const keys = ["call", "verdict", "rules", "parts", "possibly_illegal"];
   if (Object.keys(row).length !== keys.length || !keys.every(key => Object.hasOwn(row, key))) return schemaFailure;
