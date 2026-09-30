@@ -6,3 +6,6 @@
 f76e47f945c8944694c1acfd8791ea37d2ee8836:dialectical-engine/apps/ui/messages/hr/compose.json:generic-api-key:41
 # 2026-09-26 — Turn 12 localization: generic-api-key matched Slovenian UI text ("Ni zapisa o nestrinjanju", "no disagreement record"), not a key.
 f76e47f945c8944694c1acfd8791ea37d2ee8836:dialectical-engine/apps/ui/messages/sl/compose.json:generic-api-key:41
+# 2026-09-30 — paid-plans plan (task X0's code, quoted in the plan): generic-api-key matched the dummy xMoney fixture
+# key "0123456789abcdef" written twice, a made-up test value; not a key. Owner's ruling on PR #48. The plan now writes it as a join.
+7270e3615c0bed144416cee543f99b46efea072c:dialectical-engine/docs/superpowers/plans/2026-09-29-paid-plans-and-payments.md:generic-api-key:28523
