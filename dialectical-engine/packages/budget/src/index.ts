@@ -86,6 +86,20 @@ export {
   type SpendScope
 } from "./person-allowance.js";
 
+/** Budget spec 2026-09-28 §2.5 (B2): the estimate a hold and a room are decided with. */
+export {
+  PostgresRecentRunUsageSource,
+  RecentRunsCostEstimator,
+  estimateFromSampleCosts,
+  priceRecentRun,
+  settingsClassKey,
+  type CostEstimator,
+  type RecentRunCharge,
+  type RecentRunUsage,
+  type RecentRunUsageSource,
+  type RunSettingsClass
+} from "./estimate.js";
+
 
 export const RATIFIED_BATTERY_ROW_IDS = [
   "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",

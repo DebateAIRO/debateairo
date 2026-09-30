@@ -528,6 +528,7 @@ packages/battery/src/index.ts
 packages/battery/src/split.ts
 packages/battery/src/terminal.ts
 packages/budget/src/cost-envelope.ts
+packages/budget/src/estimate.ts
 packages/budget/src/index.ts
 packages/budget/src/model-spend.ts
 packages/budget/src/person-allowance.ts
