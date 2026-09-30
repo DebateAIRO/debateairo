@@ -104,7 +104,7 @@ describe("Support navigation", () => {
       { id: "settings", label: "Setări", href: "/settings" },
       {
         id: "privacy-preferences",
-        label: "Preferințe de confidențialitate",
+        label: "Confidențialitate",
         href: "/settings#consent-privacy-heading",
       },
       { id: "public-catalog", label: "Dezbateri publice", href: "/?tab=public" },

@@ -322,7 +322,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "06703ff9df60a0c77261e0ab57a36d3180e7b6823d235f2751d57e4cfa851ee1",
+    "componentFileSha256": "825684a751c7fd2dc487370717708c9206352d33f35b6906024b3f753737cf59",
     "components": [
       {
         "id": "account-access",

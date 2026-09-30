@@ -69,16 +69,18 @@ const OWNER_REVIEW = Object.freeze({
   ratifiedOn: "2026-09-24",
 });
 
-// 2026-09-29: the owner read the seven Turn 15 legal-page entries (EN + RO labels) in chat
-// and signed the catalogue that adds them; the article pairs keep their earlier signatures.
-const CATALOG_REVIEW = Object.freeze({
+// cookie-compliance S02 (SPEC-v2 R10): the owner's V0 signature of the catalogue, the 8 rewritten articles and
+// their 8 recovery rows. The orchestrator writes reviewerSession, reviewedOn and ratifiedOn at V0
+// (probes/ARCH-CC-S02/s02-sign.py); until then this case is RED on the branch by design.
+const S02_OWNER_REVIEW = Object.freeze({
   reviewedBy: "OWNER",
-  reviewerSession: "d65424e5-27a7-40b7-8a4c-773e60cb404f (legal-notice session; the owner read the seven legal-page entries in chat and answered 'Signed')",
-  reviewedOn: "2026-09-29",
-  evidence: "docs/missions/legal-pages/OWNER-SIGNOFF-legal-pages-catalog.md",
+  reviewerSession: "PENDING-V0",
+  reviewedOn: "2026-09-30",
+  evidence: "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
   ratifiedBy: "V",
-  ratifiedOn: "2026-09-29",
+  ratifiedOn: "2026-09-30",
 });
+const S02_IDS = new Set(["privacy-consent", "settings-help-menus", "app-navigation", "account-settings"]);
 
 const QUALITY_REVIEW = Object.freeze({
   reviewedBy: "SOL",
@@ -105,12 +107,12 @@ const GUIDE_IDS = new Set([
 const EXPECTED = [
   ["account-access", "en", "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7", "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a", "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d"],
   ["account-access", "ro", "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410", "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98", "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0"],
-  ["account-settings", "en", "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628", "67f5ce1fd18952c94a981f772e32e29c8c526b5591d656c202260486826a0d62", "6d99d7eeb445525b3bf3cf55f4283ee24fec536ff4f9ccc3a3b1f928904091bf"],
-  ["account-settings", "ro", "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9", "f941492f0a6bed283a0fd70aa6ffeb20304b40c5bdfdd8e01f438cf3094f08f8", "1b7be7bebd1932a4630bea3df60d016218ecedca1ef538ac14510ef66d5f2aad"],
+  ["account-settings", "en", "e4299c87f0dfe85c1063b1f37c1d3206ce5ed8862bbac75333a883cebcd49e81", "974caea072e110bfa7f8940ab44bb2b60ea35db217c4c7eb4fa460a010ae943c", "cd6f4ffdcb225fa7bd8ca8f92b045f8fd8066288a752b51fa53121716150c852"],
+  ["account-settings", "ro", "591f1b47696ab061e4c5b3f6542c7cacf54d33aa74ce9fa1f3f65c2e321e80a4", "21c39fda0dc16e2f1a645c43f13cb667df5c160140ff3fb52c44d151b6e0fcf9", "6ccee10708d3ef136afc9a7782d2828c567ec4504af4ff5d1ebcc9e29858fe87"],
   ["ai-transparency", "en", "e7deab21d5d105769017fc40431c26ec94f3b8ea4385b2547d0eceac8a7f92a6", "fc313334a897d806c7c968752fb16eac7cb8ca4e5535ae18dc7b1ff89362c879", "611cf0c13e949362a3bd17c4e1c899fa291b9f6ed249b007ecc216de7601999a"],
   ["ai-transparency", "ro", "df69c138d5166b5070ff3156e2ce205e3f9509f7accb89fd4dcbe254af1f9822", "4c7cd7c97c6a43f34083acb72adb6dbf2f2fd4ad9b363601a7fb19d0f8ae7d7f", "ef0e8df3377df3e5c2cdb37ac04c4b1f479f5ec09c2ab1ba744773d8fc04fd82"],
-  ["app-navigation", "en", "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db", "3f17d7323fcd88f34b6f9f1a4da904b0da28a18a09f6fa7f814e6333f4b83b29", "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d"],
-  ["app-navigation", "ro", "a6f79cd55e0856780bff01ec3134df02a068b41453f44a8847c5c58050af8a23", "04001a0ddc6b3f743946fec81d2d3d5caed672f5f14d430eb3af74dc1421e3a3", "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde"],
+  ["app-navigation", "en", "a6984eff34d2abffc97aeae10cd3366ceff6fb5e2de402b2159276e0b5f36999", "3633136aac4a69337473bd7c218eca044f673496a6f5809f650f0809b43fd34d", "eadb3349e83a67241543f151e3b035d9838c1d91d57ca1f1d495009634587e5c"],
+  ["app-navigation", "ro", "dce074a234a4e83788f2d22ac179a47c71a8bc7cd2fc4391433544c4fd52c8f5", "9bb52ac9a822d19ae283340e3766d8e43261805aef8e15c8b0fde9b62496d683", "f413442c192e23c14e0d37a9d2072365c8e604ca0e316069d4204b96bec08567"],
   ["browse-public-debates", "en", "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad", "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034", "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"],
   ["browse-public-debates", "ro", "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241", "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897", "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d"],
   ["budget-tier-choice", "en", "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683", "e6d5adf85f44c3fd1aaa2c70d095f6f2474723a5b72393d4a006f0206fa64104", "cb920483c56311f42b1adf89c581320a4a5344dcc90028fa458ad6028867d601"],
@@ -127,8 +129,8 @@ const EXPECTED = [
   ["getting-started-debate", "ro", "f2a848dbaa9131d3165f50ce2004f1fba874032a48d7bdf1ba90f96c8aa205af", "23c930ba398c6bdf4c119b30bae509946ca8a483c9b0cb18e9ac6bd238220d80", "ef982f6420391eeaaf23c475afb230fcee91afc2183c4b945403283802d09e8a"],
   ["guide-how-it-works", "en", "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5", "758085d81051393bd3520c43c84a23689a652c5dc6b15e0154a46a1fcf7cd528", "c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265"],
   ["guide-how-it-works", "ro", "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000", "65482fb1f90d62942b4e6f87a289c151978250fb385efc10d12c8e239780c195", "cb344a791adc4616c177c993b4f186595725f6ea3de8b1f95fcd8a6f0ff07ed8"],
-  ["privacy-consent", "en", "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5", "5de30c60b097bc464f12d9aef13fbc67e0c15c6d5aa4ca1a91f82fe77fc394ae", "419fbdd08f1d581b9484d6df1cb6b63077aef93ab627b9ab87c0c6054ce66d49"],
-  ["privacy-consent", "ro", "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d", "7db208bec972f230adaddf05162305126e6aeeb431fd66bad468886e2c62710e", "940316e6b1a66598baa91183116c92477be57df65885dc22b1ce4954393e11f6"],
+  ["privacy-consent", "en", "0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f", "82d53e0bbffd4f4b5cf1e7be2d82fc8afaeb90e7f93c4365c90d788157baf3cb", "3fe7da1ecfe2848622b10234fac52d5283a30a4473a0adada8eb9e6555b24824"],
+  ["privacy-consent", "ro", "5bb725932c69bd7728c7b73080019e84fc90215af37e04ed2c2cbdc98890fa12", "793e94a5071acdf65d0d5cc40b255f5a6970d2d83d24f3297538cf1dd780d693", "5f68ed2fc6291417ad46337bff6b82dc05cd512f0f6fac816d7b6319734eeea5"],
   ["product-identity", "en", "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa", "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64", "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032"],
   ["product-identity", "ro", "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391", "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40", "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812"],
   ["public-answer-disclosure", "en", "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea", "1ee826de541e74d701fd502bfe70e85c009da2b94d3e6d38c1fc98924f251670", "9c733e8f40697f0cd9f15f5984947edaff532a10bc3375d10ca94747e10cc569"],
@@ -137,8 +139,8 @@ const EXPECTED = [
   ["publish-a-debate", "ro", "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c", "834ec781e6645753549cfca72d8d7bdc70ecb425f1eba125b25c5e04410ea598", "a6f1ef4a94b53df2d77fdd63a14c3f596adaac6b437ab3586424d21815284b26"],
   ["risk-tier-choice", "en", "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715", "37a5e399d53e5c284febfd79f40fe36bfc611eddb254ccb9a758469e66557929", "7908d0b36c5c62a863ee064095bc3f528792d9588fba9f88c523ea978dffb7f2"],
   ["risk-tier-choice", "ro", "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96", "0845807a9ba9cc68c608a5be752fdbaa08147fe8aed5a06a61021bb91675a34a", "d35f24c30f5998d0a8945f6efdd97cbebf45c0612b6181ff47c48c81951b02ab"],
-  ["settings-help-menus", "en", "2f1fd92ebe1f560f631a0990b8883e0aa857783114751f9532cabcf97ba86ede", "3677572a1b6fe513930ad82259a89b985f0c3ce023c57be4489794be27147a79", "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5"],
-  ["settings-help-menus", "ro", "57b5e6f5d34327177b504261fcc2b4f24e1e7693093f2d42cfd3348fc17872f7", "4c8e8ab9af79965af5234b0da312f2970bf9d36f3b131765c4ac31353c5d2495", "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc"],
+  ["settings-help-menus", "en", "53b4612d883133874617b1a8647df9450dc75e2301e8f93a56e7eceaa169a084", "291f2b5a3c95cf345d3d1794e2e0c2e7e5e88ccff5703a200ef89c8f28ad7108", "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5"],
+  ["settings-help-menus", "ro", "8eb4de26f2a64b2f5fc1c3ce3063e24b49976b8b98d533203146ec093257ff49", "652be8fd40fc5d4ee4ef04e899c4239a120c0211a4bb9bc26f88120aac64e08f", "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc"],
   ["support-cases", "en", "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e", "04ff511b177c062b1fa66397db84ac7295b75319e2c27fc870aaff171c43ae76", "df37d0f11029ff345c6f303c425bdeb36435ab0a51e0dbddf22ffd0877ca49a1"],
   ["support-cases", "ro", "4073ca95886bd56063c9f6ff49b959e3affa5c5a0a9000b6ecf6ff2171535977", "23df826d8a8701abb080a371df942b978885224bb612140c54221f2806615c2a", "62bbe76506089edca69ffca3d820f7ebd9610f831cf6a3b007efe00125cb971f"],
   ["support-status-limits", "en", "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7", "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385", "3aafc3b34626b517e8827a8ff0ab9fa6deadf978dee235bd6d78936f37354375"],
@@ -178,7 +180,9 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(id === "ai-transparency"
+        ...(S02_IDS.has(id)
+          ? S02_OWNER_REVIEW
+          : id === "ai-transparency"
           ? OWNER_REVIEW
           : id === "debate-workspace-menus"
           ? QUALITY_REVIEW
@@ -195,12 +199,12 @@ describe("production Support recovery attestation", () => {
       schemaVersion: 2,
       catalog: {
         sha256:
-          "ffd729867aa1ed250d142f1a82aee386f493a56a224193adf387c231da111854",
-        ...CATALOG_REVIEW,
+          "33bdc2ab16d94a704afc75d51531b1a9f534496c81a1301505b61817a374faa0",
+        ...S02_OWNER_REVIEW,
       },
       recovery: {
         componentFileSha256:
-          "06703ff9df60a0c77261e0ab57a36d3180e7b6823d235f2751d57e4cfa851ee1",
+          "825684a751c7fd2dc487370717708c9206352d33f35b6906024b3f753737cf59",
         components: expectedRows,
       },
     });
@@ -214,7 +218,7 @@ describe("production Support recovery attestation", () => {
       previewReviewedCount: 17,
       ownerRatifiedCount: 6,
       recoveryReviewedCount: 23,
-      recoveryOwnerRatifiedCount: 1,
+      recoveryOwnerRatifiedCount: 5,
     });
 
     for (const [index, expected] of EXPECTED.entries()) {

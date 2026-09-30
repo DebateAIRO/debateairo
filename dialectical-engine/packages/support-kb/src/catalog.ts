@@ -130,7 +130,7 @@ export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object
   action({ id: "sample-transcript", labels: labels("Sample debate", "Exemplu de dezbatere"), availability: "signed-out", href: "/#transcripts" }),
   action({ id: "settings", labels: labels("Settings", "Setări"), availability: "signed-in", href: "/settings" }),
   action({ id: "active-sessions", labels: labels("Active sessions", "Sesiuni active"), availability: "signed-in", href: "/settings#active-sessions-heading" }),
-  action({ id: "privacy-preferences", labels: labels("Privacy preferences", "Preferințe de confidențialitate"), availability: "signed-in", href: "/settings#consent-privacy-heading" }),
+  action({ id: "privacy-preferences", labels: labels("Privacy", "Confidențialitate"), availability: "signed-in", href: "/settings#consent-privacy-heading" }),
   action({ id: "claim-legacy", labels: labels("Claim legacy debates", "Revendică dezbaterile vechi"), availability: "signed-in", href: "/settings#legacy-run-claim-heading" }),
   action({ id: "delete-account", labels: labels("Delete account", "Șterge contul"), availability: "signed-in", href: "/settings#account-deletion-heading" }),
   action({ id: "public-catalog", labels: labels("Public debates", "Dezbateri publice"), availability: "signed-in", href: "/?tab=public" }),
