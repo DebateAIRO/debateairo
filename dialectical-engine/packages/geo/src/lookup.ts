@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { Reader, type CountryResponse } from "mmdb-lib";
 import { TypedDomainError } from "@debateai/kernel";
-import { ipKey, ipText, isPrivateOrReserved, parseIp } from "./ip.js";
+import { ipKey, ipText, isPrivateOrReserved, parseIp, type ParsedIp } from "./ip.js";
 
 /**
  * Paid plans G1 (spec 2026-09-29 §2.3.3) — WHERE AN ADDRESS IS.
@@ -11,7 +11,8 @@ import { ipKey, ipText, isPrivateOrReserved, parseIp } from "./ip.js";
  * the Tor Project's bulk exit list (one address per line) at TOR_EXIT_LIST_PATH. The refresh timer
  * (deploy/vps/geoip-refresh.sh) renames new files into place; this reader notices a changed file —
  * inode, size or modification time — at most once a minute, on the caller's clock, and swaps it in.
- * A replacement that does not load keeps the last good data and is reported by code.
+ * A replacement that does not load keeps the last good data and is reported by code. A lookup never
+ * throws while open: a record the loaded country file cannot answer is "XX" (see countryOf).
  *
  * "XX" is the one answer for "no country": unknown to the database, private or loopback, DB-IP's own
  * "ZZ", or not an address at all. The decisions (decide.ts) refuse sign-up and payment on it.
@@ -119,6 +120,17 @@ export function openGeoLookup(options: GeoLookupOptions): GeoLookup & RegionLook
   let torSignature = fileSignature(options.torListPath);
   let lastCheckedAt = clock();
   let closed = false;
+  /** Whether a record of the country file now loaded was already reported unreadable (M-1). */
+  let countryReadFailureReported = false;
+
+  /** Reports by code. A callback that throws is ignored: nothing a report does may break a lookup. */
+  const report = (code: GeoReloadFailureCode): void => {
+    try {
+      options.onReloadFailure?.(code);
+    } catch {
+      // Deliberately swallowed: the lookup runs on every request and stays total (final review M-1).
+    }
+  };
 
   const refresh = (now: number): void => {
     if (now - lastCheckedAt < reloadCheckMs) return;
@@ -128,8 +140,9 @@ export function openGeoLookup(options: GeoLookupOptions): GeoLookup & RegionLook
       try {
         countries = loadCountryDatabase(options.countryDbPath);
         countriesSignature = nextCountries;
+        countryReadFailureReported = false;
       } catch (error) {
-        options.onReloadFailure?.(failureCode(error, "GEOIP_COUNTRY_DB_INVALID"));
+        report(failureCode(error, "GEOIP_COUNTRY_DB_INVALID"));
       }
     }
     const nextTor = fileSignature(options.torListPath);
@@ -138,9 +151,31 @@ export function openGeoLookup(options: GeoLookupOptions): GeoLookup & RegionLook
         torExits = loadTorList(options.torListPath);
         torSignature = nextTor;
       } catch (error) {
-        options.onReloadFailure?.(failureCode(error, "TOR_EXIT_LIST_INVALID"));
+        report(failureCode(error, "TOR_EXIT_LIST_INVALID"));
       }
     }
+  };
+
+  /**
+   * TOTAL (final review M-1). mmdb-lib's Reader checks only the metadata and the first 96 tree nodes
+   * when a file opens, so a damaged tree or data section throws later, from get(). The lookup runs on
+   * every request (the API's sourceFor records the country for sign-in and every read), so a record
+   * that cannot be read answers "XX" — sign-up is then refused COUNTRY_UNKNOWN, closed, and nothing
+   * else changes — and GEOIP_COUNTRY_DB_INVALID is reported at most once per loaded file.
+   */
+  const countryOf = (parsed: ParsedIp): string => {
+    let iso: unknown;
+    try {
+      iso = countries.get(ipText(parsed))?.country?.iso_code;
+    } catch {
+      if (!countryReadFailureReported) {
+        countryReadFailureReported = true;
+        report("GEOIP_COUNTRY_DB_INVALID");
+      }
+      return UNKNOWN_COUNTRY;
+    }
+    return typeof iso === "string" && ISO_COUNTRY.test(iso) && iso !== DBIP_UNKNOWN_COUNTRY
+      ? iso : UNKNOWN_COUNTRY;
   };
 
   const lookup = (ip: string): GeoLookupResult => {
@@ -150,10 +185,7 @@ export function openGeoLookup(options: GeoLookupOptions): GeoLookup & RegionLook
     if (parsed === null || isPrivateOrReserved(parsed)) {
       return Object.freeze({ country: UNKNOWN_COUNTRY, tor: false });
     }
-    const iso = countries.get(ipText(parsed))?.country?.iso_code;
-    const country = typeof iso === "string" && ISO_COUNTRY.test(iso) && iso !== DBIP_UNKNOWN_COUNTRY
-      ? iso : UNKNOWN_COUNTRY;
-    return Object.freeze({ country, tor: torExits.has(ipKey(parsed)) });
+    return Object.freeze({ country: countryOf(parsed), tor: torExits.has(ipKey(parsed)) });
   };
 
   return Object.freeze({

@@ -131,6 +131,56 @@ describe("the country lookup (paid plans G1, spec §2.3.3)", () => {
     geo.close();
   });
 
+  /**
+   * Final review M-1. mmdb-lib's Reader checks only the metadata and the first 96 tree nodes when a
+   * file opens, so a damaged record throws later, from get() — and the lookup runs on every request
+   * (the API's sourceFor records the country for sign-in and every read). The lookup is total: a
+   * record it cannot read answers XX (sign-up then refuses COUNTRY_UNKNOWN, closed), the Tor answer
+   * still comes from the Tor list, and GEOIP_COUNTRY_DB_INVALID is reported once per loaded file.
+   */
+  function damagedCountryDatabase(): Buffer {
+    const bytes = writeCountryMmdb(NETWORKS);
+    // RO's record, the first in the data section: a map control byte followed by the key "country".
+    const record = bytes.indexOf(Buffer.concat([Buffer.from([0xe1, 0x47]), Buffer.from("country", "utf8")]));
+    expect(record).toBeGreaterThan(0);
+    bytes[record] = 0x00; // an "extended" control byte that names no type the reader knows
+    return bytes;
+  }
+
+  it("answers XX for a record it cannot read, keeps the Tor answer, and reports once per loaded file", async () => {
+    let now = 0;
+    const failures: string[] = [];
+    const files = await fixture(NETWORKS, "81.196.20.30\n185.220.101.7\n");
+    await writeFile(files.countryDbPath, damagedCountryDatabase());
+    // It opens: the damage lies past what the reader checks at open.
+    const geo = openGeoLookup({ ...files, clock: () => now, onReloadFailure: (code) => failures.push(code) });
+    expect(geo.lookup("81.196.20.30")).toEqual({ country: UNKNOWN_COUNTRY, tor: true });
+    expect(geo.lookup("2a02:2f00:1234::1")).toEqual({ country: UNKNOWN_COUNTRY, tor: false });
+    expect(geo.lookup("8.8.8.8")).toEqual({ country: "US", tor: false });
+    expect(geo.lookup("185.220.101.7")).toEqual({ country: "DE", tor: true });
+    expect(geo.lookupRegion("81.196.20.30")).toEqual({ country: UNKNOWN_COUNTRY, region: null });
+    expect(failures).toEqual(["GEOIP_COUNTRY_DB_INVALID"]);
+    // A good replacement answers again; a damaged one after it is a new file, reported once more.
+    await replace(files.root, files.countryDbPath, writeCountryMmdb(NETWORKS));
+    now += 60_000;
+    expect(geo.lookup("81.196.20.30")).toEqual({ country: "RO", tor: true });
+    await replace(files.root, files.countryDbPath, damagedCountryDatabase());
+    now += 60_000;
+    expect(geo.lookup("81.196.20.30").country).toBe(UNKNOWN_COUNTRY);
+    expect(geo.lookup("2a02:2f00:1234::1").country).toBe(UNKNOWN_COUNTRY);
+    expect(failures).toEqual(["GEOIP_COUNTRY_DB_INVALID", "GEOIP_COUNTRY_DB_INVALID"]);
+    geo.close();
+  });
+
+  it("stays total even when the report callback itself throws", async () => {
+    const files = await fixture();
+    await writeFile(files.countryDbPath, damagedCountryDatabase());
+    const geo = openGeoLookup({ ...files, onReloadFailure: () => { throw new Error("the log is full"); } });
+    expect(geo.lookup("81.196.20.30")).toEqual({ country: UNKNOWN_COUNTRY, tor: false });
+    expect(geo.lookup("8.8.8.8")).toEqual({ country: "US", tor: false });
+    geo.close();
+  });
+
   it("refuses to open over a missing or invalid file, and refuses a lookup after close", async () => {
     const files = await fixture();
     expect(codeOf(() => openGeoLookup({ ...files, countryDbPath: join(files.root, "absent.mmdb") })))
