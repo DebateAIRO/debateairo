@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI'ı nerelerde sunuyoruz",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI'ı [the European Union and the European Economic Area] sınırları içinde [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea] yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
+      { kind: "p", text: "DebateAI'ı [the European Union and the European Economic Area] sınırları içinde [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
     ]
   },
   {
@@ -298,7 +298,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Birleşik Krallık (yalnızca 2. bölümde sayılmışsa)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "UK GDPR'nin 27. maddesi uyarınca Birleşik Krallık temsilcimiz [name, address, email]'dir. Consumer Rights Act 2015 size uygulanır ve bu Koşullardaki hiçbir hüküm bu Kanun kapsamındaki haklarınızı sınırlandırmaz; [January 2027] tarihinden itibaren Digital Markets, Competition and Consumers Act 2024'ün abonelik kuralları, yenilemelerden ve ücretsiz denemelerden sonraki vazgeçme süresi dahil, ücretli planlara uygulanır. Kullanıcıları hukuka aykırı içerikten nasıl koruyoruz: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Kullandığımız proaktif teknoloji: [describe, or \"none\"]. Yaş güvencesi: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. 10. bölümdeki şikâyet usulü; hukuka aykırı içerik, içeriğinizin haksız yere kaldırılması, hesabınıza getirilen kısıtlamalar, içeriğinizi etkileyen otomatik araçların kullanımı ve sizi haksız yere engelleyen yaş değerlendirmeleri hakkındaki şikâyetleri kabul eder. Bu yol, içerikten etkilenen ve kullanıcı olmayan kişilere de açıktır." }
+      { kind: "p", text: "UK GDPR'nin 27. maddesi uyarınca Birleşik Krallık temsilcimiz [name, address, email]'dir. Consumer Rights Act 2015 size uygulanır ve bu Koşullardaki hiçbir hüküm bu Kanun kapsamındaki haklarınızı sınırlandırmaz; Digital Markets, Competition and Consumers Act 2024'ün abonelik kuralları yürürlüğe girdiğinde (2027'de bekleniyor), yenilemelerden ve ücretsiz denemelerden sonraki vazgeçme süresi dahil, ücretli planlara uygulanır. Kullanıcıları hukuka aykırı içerikten nasıl koruyoruz: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Kullandığımız proaktif teknoloji: [describe, or \"none\"]. Yaş güvencesi: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. 10. bölümdeki şikâyet usulü; hukuka aykırı içerik, içeriğinizin haksız yere kaldırılması, hesabınıza getirilen kısıtlamalar, içeriğinizi etkileyen otomatik araçların kullanımı ve sizi haksız yere engelleyen yaş değerlendirmeleri hakkındaki şikâyetleri kabul eder. Bu yol, içerikten etkilenen ve kullanıcı olmayan kişilere de açıktır. Verileriniz Gizlilik Politikamızın Ek B.2'sinde ele alınır." }
     ]
   },
   {
@@ -308,7 +308,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Tahkim anlaşması ve toplu dava hakkından feragat. Amerika Birleşik Devletleri'nde yaşıyorsanız siz ve DebateAIRO, bu Koşullardan veya hizmetten doğan her türlü uyuşmazlığı, taraflardan herhangi birinin küçük talepler mahkemesinde bireysel talepte bulunabilmesi dışında, mahkeme yerine [the American Arbitration Association / JAMS] tarafından kendi tüketici kuralları uyarınca yürütülen bağlayıcı bireysel tahkim yoluyla çözmeyi kabul edersiniz. Bu Koşulları ilk kez kabul etmenizden itibaren 30 gün içinde [address] adresine e-posta göndererek kapsam dışında kalmayı tercih edebilirsiniz. Bu anlaşma Federal Arbitration Act'e tabidir. Tahkim başvuru ücretlerini biz öderiz. Toplu, kolektif ve temsili davalardan hukukun izin verdiği ölçüde feragat edilir. Bu bölüm yalnızca ileriye dönük uygulanır ve kabulünüzden önce doğmuş taleplere uygulanmaz." },
       { kind: "p", text: "Bildirimler ve kaldırmalar. Rıza olmaksızın paylaşılan mahrem görüntüler, hesap olmaksızın [URL] adresinden bildirilebilir ve geçerli bir talebin ardından 48 saat içinde kaldırılır. Telif hakkı şikâyetleri 16. bölümde belirtilen atanmış temsilcimize iletilir." },
-      { kind: "p", text: "Eyalete özgü hükümler. Kaliforniya: 12. bölümdeki otomatik yenileme koşulları uygulanır; istediğiniz zaman çevrim içi iptal yapabilirsiniz; yenileme koşullarına verdiğiniz rızayı en az üç yıl saklarız. New York: artan fiyat üzerinden yapılan herhangi bir tahsilattan itibaren 14 gün içinde iptal edebilir ve orantılı geri ödeme alabilirsiniz. Teksas ve Nebraska: hassas kişisel veri satmayız; bu durum değişirse önce rızanızı alırız [statutory notice language]. Washington: [URL] adresindeki Tüketici Sağlık Verileri Gizlilik Bildirimimiz sağlıkla ilgili bilgilere uygulanır. Colorado: hizmet sizin hakkınızda önemli sonuç doğuran kararlar almaz." }
+      { kind: "p", text: "Eyalete özgü hükümler. Kaliforniya: 12. bölümdeki otomatik yenileme koşulları uygulanır; istediğiniz zaman çevrim içi iptal yapabilirsiniz; yenileme koşullarına verdiğiniz rızayı en az üç yıl saklarız. New York: artan fiyat üzerinden yapılan herhangi bir tahsilattan itibaren 14 gün içinde iptal edebilir ve orantılı geri ödeme alabilirsiniz. Teksas ve Nebraska: hassas kişisel veri satmayız. Washington: [URL] adresindeki Tüketici Sağlık Verileri Gizlilik Bildirimimiz sağlıkla ilgili bilgilere uygulanır. Colorado: hizmet sizin hakkınızda önemli sonuç doğuran kararlar almaz. Verileriniz ve eyalet gizlilik haklarınız Gizlilik Politikamızın Ek B.3'ünde ele alınır." }
     ]
   },
   {
@@ -316,7 +316,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ve Quebec (yalnızca sayılmışsa)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Gizlilik görevlimiz [name, email]'dir. Quebec: bu Koşullar [URL] adresinde Fransızca olarak sunulur ve ilk olarak Fransızca sürüm size sunulmuştur; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz." }
+      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi [name]'dir (privacy@dezbatere.ro). Verileriniz Gizlilik Politikamızın Ek B.4'ünde ele alınır. Quebec: bu Koşullar Fransızca olarak sunulur; dil seçiciden Fransızcayı seçin; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz; size hiçbir tahkim anlaşması veya toplu dava hakkından feragat uygulanmaz." }
     ]
   },
   {
@@ -329,32 +329,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latin Amerika (İspanyolca ek; yalnızca sayılmışsa)",
+    title: "İsviçre (yalnızca sayılmışsa)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Sözleşmenin ifası için zorunluluğun bulunmadığı durumlarda veri işlemenin dayanağı rızadır; dahil etmeyi seçtiğiniz her türlü hassas veri için ilk tartışmanızdan önce açıkça rıza verirsiniz. ARCO haklarınızı [address] adresinden kullanabilirsiniz; yanıt süreleri [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719] şeklindedir. Meksika: tam aviso de privacidad [URL] adresindedir; [5] gün içinde cayılabilir. Arjantin: [AAIP legend]; 10 gün içinde [URL] adresindeki botón de arrepentimiento düğmesini kullanın. Kolombiya: política de tratamiento [URL] adresindedir; 5 gün içinde cayılabilir. Şili (1 Aralık 2026'dan itibaren): Kurumun iletişim bilgisi […]; abone olduğunuz yöntemle iptal edebilirsiniz; dijital hizmetler için cayma hakkı uygulanmaz." }
+      { kind: "p", text: "İsviçre Federal Veri Koruma Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.6). İsviçre'de yaşadığınız yerin mahkemelerinde dava açabilirsiniz. Ücretli plan için kanuni bir cayma hakkı uygulanmaz; geri ödeme politikamız […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Körfez — Birleşik Arap Emirlikleri ve Suudi Arabistan (yalnızca sayılmışsa)",
+    title: "Moldova (yalnızca sayılmışsa)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Verilerinizi hizmeti sunmak dışındaki amaçlarla işlediğimiz durumlarda bunu geri çekebileceğiniz rızanıza dayanarak yaparız. Verileriniz, Avrupa Birliği ve Amerika Birleşik Devletleri dahil, [UAE / Kingdom of Saudi Arabia] dışında [SDAIA standard contractual clauses / the mechanism in the Register] uyarınca işlenir. Yayımladığınız her şeyin, din, kamu düzeni ve genel ahlaka ilişkin kanunlar dahil bulunduğunuz ülkenin hukukuna uygun olmasını sağlamak sizin sorumluluğunuzdadır; bölgenizde bu tür konulardaki tartışmaların yayımlanmasını kısıtlayabiliriz." }
+      { kind: "p", text: "Bu Koşullar kapsamında, 13. bölümdeki 14 günlük cayma hakkı dahil, Avrupa Birliği'ndeki bir tüketiciyle aynı haklara sahipsiniz. Moldova mahkemelerinde dava açabilirsiniz. Moldova'nın kişisel verilerin korunmasına ilişkin 195/2024 sayılı Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Asya-Pasifik (yalnızca sayılan bölgelere ilişkin satırlar)",
+    title: "Ukrayna (yalnızca sayılmışsa)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapur: Veri Koruma Görevlimiz [name, email]'dir; aktarımlar PDPA ile karşılaştırılabilir sözleşmesel korumalara dayanır; ücretli plan için kanuni bir vazgeçme hakkı uygulanmaz ve geri ödeme politikamız […]. Japonya: Specified Commercial Transactions Act kapsamındaki kanuni açıklama [URL] adresindedir; çevrim içi abonelikler için genel bir vazgeçme hakkı uygulanmaz ve geri ödeme politikamız […]; içeriğiniz [named countries] içindeki sağlayıcılara aktarılabilir ve kayıt sırasında verdiğiniz rızalarla bunu kabul edersiniz. Güney Kore: isteğe bağlı işleme ve pazarlama rızaları, hizmeti yürütmek için gerekli unsurlardan ayrı alınır; Gizlilik Görevlimiz [name]'dir; E-Commerce Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; yinelenen her fiyat artışından veya ücretsiz plandan ücretli plana geçişten önce yeniden rızanızı alırız; AI Basic Act gerektiriyorsa hizmetin yapay zekâ temelli olduğunu önceden bildirir ve çıktıları etiketleriz. Hindistan (DPDP kuralları uygulandığında): [URL] adresindeki rıza bildirimi uygulanır; 18 yaşından küçük kullanıcılar için doğrulanabilir ebeveyn rızası gerekir. Tayland: Tayland'daki temsilcimiz [name] [if appointed]. Filipinler: Internet Transactions Act kapsamındaki işletme kimliğimiz ve giderim mekanizmamız [URL] adresindedir; şikâyetler National Privacy Commission'a iletilebilir." }
+      { kind: "p", text: "DebateAI'ı, Ukrayna hükümetinin kontrolünde olmayan bölgeler dışında Ukrayna'da sunuyoruz. Ürün ve bu Koşullar Ukraynaca olarak sunulur. Ukrayna'nın \"Kişisel Verilerin Korunması Hakkında\" Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Ayrılmıştır",
+    title: "İsrail (yalnızca sayılmışsa)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Ücretli bir planı Consumer Protection Law, 5741-1981'in izin verdiği şekilde iptal edebilirsiniz [state the cancellation terms]. Bu Koşullar ve Gizlilik Politikamız İbranice olarak sunulur. İsrail'in Özel Hayatın Gizliliğinin Korunması Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Asya-Pasifik (yalnızca sayılan bölgelere ilişkin satırlar)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapur: Veri Koruma Görevlimiz [name, email]'dir; aktarımlar PDPA ile karşılaştırılabilir sözleşmesel korumalara dayanır; ücretli plan için kanuni bir vazgeçme hakkı uygulanmaz ve geri ödeme politikamız […]. Japonya: Specified Commercial Transactions Act kapsamındaki kanuni açıklama [URL] adresindedir; çevrim içi abonelikler için genel bir vazgeçme hakkı uygulanmaz ve geri ödeme politikamız […]; içeriğinizi Amerika Birleşik Devletleri ve Avrupa Birliği'ndeki yapay zekâ sağlayıcılarına, her biri Japonya'nın Kişisel Bilgilerin Korunması Hakkında Kanunu'na eşdeğer koruma gerektiren bir sözleşme kapsamında göndeririz ve talep üzerine bu önlemlerin neler olduğunu size bildiririz. Güney Kore: isteğe bağlı işleme ve pazarlama rızaları, hizmeti yürütmek için gerekli unsurlardan ayrı alınır; gizlilik görevlimiz [name]'dir (privacy@dezbatere.ro); E-Commerce Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; yinelenen her fiyat artışından veya ücretsiz plandan ücretli plana geçişten önce yeniden rızanızı alırız; hizmet üretken yapay zekâ kullanır, bunu siz kullanmadan önce size bildiririz ve yapay zekâ tarafından üretilen çıktıları etiketleriz. Tayvan: Consumer Protection Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; Tayvan'ın Kişisel Verilerin Korunması Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.10). Tayland: Tayland'daki temsilcimiz [name] [if appointed]. Filipinler: Internet Transactions Act kapsamındaki işletme kimliğimiz ve giderim mekanizmamız [URL] adresindedir; şikâyetler National Privacy Commission'a iletilebilir." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Ayrılmıştır",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Türkiye, Brezilya ve Endonezya'nın her biri yerel dilde bir ek, temsilci veya tescil ve bildirimler gerektirir. Bunlar burada taslak hâline getirilmemiştir ve bilinçli olarak eklenene kadar 2. bölümün kapsamı dışındadır. Çin, Vietnam ve Rusya'da hizmet sunulmaz." }
     ]
