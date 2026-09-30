@@ -929,15 +929,21 @@ its next start — a deploy, an unattended reboot — refuses to boot with `GEOI
 and then nothing is served, signing in and reading included. Damage deeper in the file passes the
 reader's open: a record it cannot read then answers "no country" for that address (sign-up is
 refused with `COUNTRY_UNKNOWN`; signing in and reading are untouched), logged once per file as
-`geo.reload.failed` with the same code.
+`geo.reload.failed` with the same code. An address with no country may still start new debates,
+because only the always-blocked countries are refused there: if the damaged record covers one of
+their ranges, that range can start debates until the file is replaced.
 
 **If the API refuses to boot with `GEOIP_COUNTRY_DB_INVALID` after a refresh:**
 
-1. Bring the site back without the gate: in both `api.env` and `runner.env`, set `REGISTER_VERSION`
-   back to a version with no `countryPolicy` row — the one pinned before the gate went on (if there
-   is none, remove the member from the hosted file and publish one, §11) — and restart both units.
-   With no row in force the API does not open the two files at all. Until step 4 sign-up is not
-   country-gated: every country, Tor included.
+1. Decide whether to stay down or to bring the site back without the gate; that is the owner's
+   call. Without the gate, until step 4, sign-up is open to every country, Tor included, and the
+   always-blocked countries (`"blocked": true` in `country-policy.example.json`) can start new
+   debates. To bring it back: in a migrator window remove the `countryPolicy` member from
+   `/etc/debateai/register/hosted-register.json`, publish (§11), pin the version it prints in both
+   `api.env` and `runner.env`, and restart both units. With no row in force the API does not open
+   the two files at all. Do not pin an older version instead: every version is a complete register,
+   so an older one also rolls back the vendors, ceilings and support rows sealed since, and a
+   changed vendor list refuses the boot (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`).
 2. Remove the refused file and fetch it again; the refresh fetches a missing country file at once:
 
 ```sh
@@ -948,7 +954,8 @@ journalctl -u debateai-geoip-refresh.service --since '15 minutes ago' --no-pager
 
 3. The journal must show `GEOIP_REFRESH_OK country-db`. After `GEOIP_REFRESH_REFUSED`, stay on the
    version of step 1 and run the block again later.
-4. Set `REGISTER_VERSION` back to the gated version in both files and restart both units. If the API
+4. Put the gate back: pin the gated version that was in force before step 1 in both files (or copy
+   the member back in and publish again) and restart both units. If the API
    refuses again with `GEOIP_COUNTRY_DB_INVALID`, the file DB-IP publishes is itself damaged: go back
    to step 1 and repeat steps 2 to 4 on a later day. The refresh keeps a file for 27 days, so remove
    it each time before you fetch it again.

@@ -40,9 +40,10 @@ fetch() {
     --max-time 300 --retry 3 --retry-delay 10 --output "$2" "$1"
 }
 
-# Prints "<address lines> <refused lines>" for one Tor list, judged exactly as the API's own parser
-# (packages/geo parseIp, via loadTorList) judges it, so a list this script accepts never refuses the
-# API boot with TOR_EXIT_LIST_INVALID. Accepted: dotted IPv4 without leading zeros (each octet 0-255),
+# Prints "<address lines> <refused lines>" for one Tor list, judged at least as strictly as the API's
+# own parser (packages/geo parseIp, via loadTorList): it trims only blanks, tabs and CR where the API
+# trims all whitespace, so a list this script accepts never refuses the API boot with
+# TOR_EXIT_LIST_INVALID. Accepted: dotted IPv4 without leading zeros (each octet 0-255),
 # and IPv6 of one to four hex digits per group with at most one "::" (no zone id). Blank lines and
 # "#" comments are neither, and surrounding blanks are trimmed, as the lookup trims them. Plain awk,
 # no interval expressions, so mawk, gawk and the BSD awk all read it the same.
