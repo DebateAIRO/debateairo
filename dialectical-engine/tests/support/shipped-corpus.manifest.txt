@@ -297,6 +297,7 @@ apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
 apps/ui/components/authRoutes.source-test.mjs
+apps/ui/components/billing/LegalAcceptGate.tsx
 apps/ui/components/consent/ConsentSettingsPanel.tsx
 apps/ui/components/consent/CookieBar.tsx
 apps/ui/components/consent/CookieConsent.tsx

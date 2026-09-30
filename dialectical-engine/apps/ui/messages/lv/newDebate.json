@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "Koordinatora atbildi neizdevās nolasīt, tāpēc iznākums nav zināms.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinators noraidīja plāna izvēli. Izvēlieties Bezmaksas vai Premium un pēc tam mēģiniet vēlreiz.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinators pieprasījumu noraidīja: kāds no šim plānam nepieciešamajiem modeļiem pašlaik nav pieejams. Mēģiniet vēlreiz vēlāk vai izvēlieties otru plānu.",
-  "requestFailure.kind.UNCLASSIFIED": "Darbība neizdevās, pirms tika saņemta atbilde, tāpēc iznākums nav zināms. Koordinators šādu lēmumu nepieņēma."
+  "requestFailure.kind.UNCLASSIFIED": "Darbība neizdevās, pirms tika saņemta atbilde, tāpēc iznākums nav zināms. Koordinators šādu lēmumu nepieņēma.",
+  "newDebate.legalGate.eyebrow": "Noteikumi un privātums",
+  "newDebate.legalGate.title": "Lūdzu, izlasiet un pieņemiet pašreizējos dokumentus",
+  "newDebate.legalGate.body": "Pirms turpināt, atveriet katru tālāk norādīto dokumentu, izlasiet to līdz beigām un pēc tam pieņemiet to.",
+  "newDebate.legalGate.readTerms": "Lasīt Pakalpojuma noteikumus",
+  "newDebate.legalGate.readPrivacy": "Lasīt Privātuma politiku",
+  "newDebate.legalGate.done": "Izlasīts",
+  "newDebate.legalGate.accept": "Pieņemt un turpināt",
+  "newDebate.legalGate.accepting": "Saglabā…",
+  "newDebate.legalGate.failed": "Jūsu piekrišanu neizdevās saglabāt. Lūdzu, mēģiniet vēlreiz.",
+  "newDebate.legalGate.stale": "Viens no dokumentiem tikko mainījās. Pārlādējiet lapu, lai izlasītu pašreizējo versiju.",
+  "newDebate.legalGate.manageAccount": "Pārvaldīt vai dzēst kontu",
+  "newDebate.legalGate.signOut": "Izrakstīties",
+  "newDebate.legalGate.signOutFailed": "Izrakstīšanās netika pabeigta. Lūdzu, mēģiniet vēlreiz."
 }

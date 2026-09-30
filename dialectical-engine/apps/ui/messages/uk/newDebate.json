@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "Не вдалося прочитати відповідь координатора, тому результат невідомий.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Координатор відхилив вибір плану. Виберіть «Безкоштовний» або «Преміум» і повторіть спробу.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Координатор відхилив запит: модель, потрібна для цього плану, зараз недоступна. Повторіть спробу пізніше або виберіть інший план.",
-  "requestFailure.kind.UNCLASSIFIED": "Помилка сталася ще до отримання відповіді, тому результат невідомий. Це не рішення координатора."
+  "requestFailure.kind.UNCLASSIFIED": "Помилка сталася ще до отримання відповіді, тому результат невідомий. Це не рішення координатора.",
+  "newDebate.legalGate.eyebrow": "Умови та конфіденційність",
+  "newDebate.legalGate.title": "Будь ласка, прочитайте й прийміть чинні документи",
+  "newDebate.legalGate.body": "Перш ніж продовжити, відкрийте кожен документ нижче, прочитайте його до кінця, а потім прийміть.",
+  "newDebate.legalGate.readTerms": "Прочитати «Умови надання послуг»",
+  "newDebate.legalGate.readPrivacy": "Прочитати «Політику конфіденційності»",
+  "newDebate.legalGate.done": "Прочитано",
+  "newDebate.legalGate.accept": "Прийняти й продовжити",
+  "newDebate.legalGate.accepting": "Збереження…",
+  "newDebate.legalGate.failed": "Не вдалося зберегти вашу згоду. Спробуйте ще раз.",
+  "newDebate.legalGate.stale": "Один із документів щойно змінився. Перезавантажте сторінку, щоб прочитати чинну версію.",
+  "newDebate.legalGate.manageAccount": "Керувати обліковим записом або видалити його",
+  "newDebate.legalGate.signOut": "Вийти",
+  "newDebate.legalGate.signOutFailed": "Не вдалося завершити вихід. Спробуйте ще раз."
 }

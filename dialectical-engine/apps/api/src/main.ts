@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -51,6 +51,7 @@ import {
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
+import { RepositoryLegalAcceptanceApplication } from "./legal.js";
 import { AdmissionLimiter } from "./admission.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
@@ -413,6 +414,15 @@ const registration = new RegistrationService({
   // Paid plans L3b: the acceptance record's evidence is sealed under the records key (L1).
   legalAcceptance: { recordsKey }
 });
+// Paid plans L4: re-acceptance of the Terms and the Privacy Policy, over the acceptance record.
+// Hosted: an account with no record owes both documents (it must accept before it can pay).
+// Local: only a manifest floor makes a document owed, so local mode keeps today's behaviour
+// (spec §2.2 rule 1, §2.3.2) until the owners move a floor.
+const legal = new RepositoryLegalAcceptanceApplication({
+  acceptances: new AcceptanceRepository(pool),
+  recordsKey,
+  owedWithoutRecord: environment.DEPLOYMENT_MODE === "hosted"
+});
 const mfa = new MfaEnrollmentService({
   repository: identityRepository,
   dekStore,
@@ -733,6 +743,7 @@ const api = buildApi({
   mfa,
   sessions,
   legacyRunClaim,
+  legal,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
   support: {

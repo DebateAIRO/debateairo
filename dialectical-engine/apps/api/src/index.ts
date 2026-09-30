@@ -53,7 +53,9 @@ import {
   AgeCheckRequestSchema,
   DateOfBirthSchema,
   RegisterLegalDocumentsSchema,
-  type RegisterLegalDocuments
+  type RegisterLegalDocuments,
+  LegalAcceptRequestSchema,
+  LegalStatusResponseSchema
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
@@ -102,6 +104,7 @@ import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+import type { LegalAcceptanceApplication } from "./legal.js";
 import type { RecoveryApplication } from "./recovery.js";
 import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import {
@@ -1105,6 +1108,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
@@ -1330,6 +1335,8 @@ export interface ApiOptions {
   readonly disclosures?: AnswerDisclosureApplication;
   readonly accountErasure?: AccountErasureApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
+  /** Paid plans L4: re-acceptance of the Terms and the Privacy Policy; the routes answer 503 without it. */
+  readonly legal?: LegalAcceptanceApplication;
   readonly allowedOrigin?: string;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
@@ -2179,6 +2186,42 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.send({ outcome: "refused" });
     });
   }
+  // Paid plans L4: re-acceptance. Mounted after the registration region (S04), whatever the list order.
+  const LegalLocaleSchema = z.string().regex(/^[a-z]{2}$/u);
+  api.get<{ Querystring: { locale?: string } }>(
+    "/v1/account/legal-status",
+    routePolicy("GET /v1/account/legal-status"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.legal === undefined) return reply.status(503).send({ error: "LEGAL_ACCEPTANCE_UNAVAILABLE" });
+      const locale = LegalLocaleSchema.safeParse(request.query.locale ?? "en");
+      if (!locale.success) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      const mustAccept = await options.legal.status(authenticated.ownerRef, locale.data);
+      return reply.send(LegalStatusResponseSchema.parse({ must_accept: mustAccept }));
+    }
+  );
+  api.post(
+    "/v1/account/legal-accept",
+    credentialRoutePolicy("POST /v1/account/legal-accept"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.legal === undefined) return reply.status(503).send({ error: "LEGAL_ACCEPTANCE_UNAVAILABLE" });
+      const input = parseRequest(LegalAcceptRequestSchema, request.body);
+      const source = sourceFor(request);
+      const outcome = await options.legal.accept({
+        ownerRef: authenticated.ownerRef,
+        locale: input.locale,
+        documents: input.documents,
+        source: { ip: source.ip, userAgent: source.userAgent }
+      });
+      if (outcome === "STALE") return reply.status(409).send({ error: "LEGAL_DOCUMENT_STALE" });
+      return reply.status(204).send();
+    }
+  );
 
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {

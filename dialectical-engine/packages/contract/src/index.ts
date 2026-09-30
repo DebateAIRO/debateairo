@@ -246,6 +246,20 @@ export const RegisterLegalDocumentsSchema = z.object({
   locale: z.string().regex(/^[a-z]{2}$/u)
 }).strict();
 export type RegisterLegalDocuments = z.infer<typeof RegisterLegalDocumentsSchema>;
+
+/** Paid plans L4. Only the Terms and the Privacy Policy are ever re-accepted. */
+export const LegalReacceptableKindSchema = z.enum(["TERMS", "PRIVACY"]);
+export const LegalStatusDocumentSchema = LegalDocumentPairSchema.extend({ kind: LegalReacceptableKindSchema }).strict();
+export const LegalStatusResponseSchema = z.object({
+  must_accept: z.array(LegalStatusDocumentSchema).max(2)
+}).strict();
+export type LegalStatusResponse = z.infer<typeof LegalStatusResponseSchema>;
+export const LegalAcceptRequestSchema = z.object({
+  documents: z.array(LegalStatusDocumentSchema).min(1).max(2)
+    .refine((documents) => new Set(documents.map((document) => document.kind)).size === documents.length),
+  locale: z.string().regex(/^[a-z]{2}$/u)
+}).strict();
+export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
 export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
   "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
@@ -781,6 +795,8 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
+    "GET /v1/account/legal-status",
+    "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
@@ -820,6 +836,7 @@ export const contractInventory = Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
+    LegalStatusResponseSchema, LegalAcceptRequestSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,

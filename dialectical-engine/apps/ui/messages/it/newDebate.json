@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "Non è stato possibile leggere la risposta del coordinatore, quindi l’esito è sconosciuto.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Il coordinatore ha rifiutato il piano selezionato. Scegli Gratuito o Premium, quindi riprova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Il coordinatore ha rifiutato la richiesta: un modello necessario per questo piano non è al momento disponibile. Riprova più tardi oppure scegli l’altro piano.",
-  "requestFailure.kind.UNCLASSIFIED": "Si è verificato un errore prima che arrivasse una risposta, quindi l’esito è sconosciuto. Non si tratta di una decisione del coordinatore."
+  "requestFailure.kind.UNCLASSIFIED": "Si è verificato un errore prima che arrivasse una risposta, quindi l’esito è sconosciuto. Non si tratta di una decisione del coordinatore.",
+  "newDebate.legalGate.eyebrow": "Condizioni e privacy",
+  "newDebate.legalGate.title": "Leggi e accetta i documenti in vigore",
+  "newDebate.legalGate.body": "Prima di continuare, apri ciascun documento qui sotto, leggilo fino in fondo e poi accettalo.",
+  "newDebate.legalGate.readTerms": "Leggi le Condizioni di servizio",
+  "newDebate.legalGate.readPrivacy": "Leggi l’Informativa sulla privacy",
+  "newDebate.legalGate.done": "Letto",
+  "newDebate.legalGate.accept": "Accetta e continua",
+  "newDebate.legalGate.accepting": "Salvataggio…",
+  "newDebate.legalGate.failed": "Non è stato possibile salvare la tua accettazione. Riprova.",
+  "newDebate.legalGate.stale": "Uno dei documenti è appena cambiato. Ricarica la pagina per leggere la versione in vigore.",
+  "newDebate.legalGate.manageAccount": "Gestisci o elimina il tuo account",
+  "newDebate.legalGate.signOut": "Disconnetti",
+  "newDebate.legalGate.signOutFailed": "La disconnessione non è stata completata. Riprova."
 }

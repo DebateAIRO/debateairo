@@ -38,6 +38,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },

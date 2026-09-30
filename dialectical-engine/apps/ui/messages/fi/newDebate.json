@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "Koordinaattorin vastausta ei voitu lukea, joten lopputulos ei ole tiedossa.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinaattori hylkäsi tilaustason valinnan. Valitse Maksuton tai Premium ja yritä sitten uudelleen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinaattori hylkäsi pyynnön: tämän tilaustason tarvitsema malli ei ole juuri nyt saatavilla. Yritä myöhemmin uudelleen tai valitse toinen tilaustaso.",
-  "requestFailure.kind.UNCLASSIFIED": "Pyyntö epäonnistui ennen vastauksen saapumista, joten lopputulos ei ole tiedossa. Tämä ei ole koordinaattorin tekemä päätös."
+  "requestFailure.kind.UNCLASSIFIED": "Pyyntö epäonnistui ennen vastauksen saapumista, joten lopputulos ei ole tiedossa. Tämä ei ole koordinaattorin tekemä päätös.",
+  "newDebate.legalGate.eyebrow": "Ehdot ja tietosuoja",
+  "newDebate.legalGate.title": "Lue ja hyväksy voimassa olevat asiakirjat",
+  "newDebate.legalGate.body": "Ennen kuin jatkat, avaa jokainen alla oleva asiakirja, lue se loppuun ja hyväksy se sitten.",
+  "newDebate.legalGate.readTerms": "Lue käyttöehdot",
+  "newDebate.legalGate.readPrivacy": "Lue tietosuojakäytäntö",
+  "newDebate.legalGate.done": "Luettu",
+  "newDebate.legalGate.accept": "Hyväksy ja jatka",
+  "newDebate.legalGate.accepting": "Tallennetaan…",
+  "newDebate.legalGate.failed": "Hyväksyntääsi ei voitu tallentaa. Yritä uudelleen.",
+  "newDebate.legalGate.stale": "Yksi asiakirjoista muuttui juuri. Lataa sivu uudelleen, niin voit lukea voimassa olevan version.",
+  "newDebate.legalGate.manageAccount": "Hallitse tiliäsi tai poista se",
+  "newDebate.legalGate.signOut": "Kirjaudu ulos",
+  "newDebate.legalGate.signOutFailed": "Uloskirjautuminen ei onnistunut. Yritä uudelleen."
 }

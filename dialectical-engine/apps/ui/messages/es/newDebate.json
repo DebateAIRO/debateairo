@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "No se pudo leer la respuesta del coordinador, por lo que se desconoce el resultado.",
   "requestFailure.kind.PLAN_TIER_INVALID": "El coordinador rechazó la elección del plan. Elija Gratuito o Premium y vuelva a intentarlo.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "El coordinador rechazó la solicitud: un modelo que necesita este plan no está disponible en este momento. Inténtelo de nuevo más tarde o elija el otro plan.",
-  "requestFailure.kind.UNCLASSIFIED": "La solicitud falló antes de que llegara ninguna respuesta, por lo que se desconoce el resultado. No se trata de una decisión del coordinador."
+  "requestFailure.kind.UNCLASSIFIED": "La solicitud falló antes de que llegara ninguna respuesta, por lo que se desconoce el resultado. No se trata de una decisión del coordinador.",
+  "newDebate.legalGate.eyebrow": "Términos y privacidad",
+  "newDebate.legalGate.title": "Lea y acepte los documentos vigentes",
+  "newDebate.legalGate.body": "Antes de continuar, abra cada documento de la lista, léalo hasta el final y, después, acéptelo.",
+  "newDebate.legalGate.readTerms": "Leer los Términos de servicio",
+  "newDebate.legalGate.readPrivacy": "Leer la Política de privacidad",
+  "newDebate.legalGate.done": "Leído",
+  "newDebate.legalGate.accept": "Aceptar y continuar",
+  "newDebate.legalGate.accepting": "Guardando…",
+  "newDebate.legalGate.failed": "No se pudo guardar su aceptación. Inténtelo de nuevo.",
+  "newDebate.legalGate.stale": "Uno de los documentos acaba de cambiar. Vuelva a cargar la página para leer la versión vigente.",
+  "newDebate.legalGate.manageAccount": "Gestionar o eliminar su cuenta",
+  "newDebate.legalGate.signOut": "Cerrar sesión",
+  "newDebate.legalGate.signOutFailed": "No se completó el cierre de sesión. Inténtelo de nuevo."
 }

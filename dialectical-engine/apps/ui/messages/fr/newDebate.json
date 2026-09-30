@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "La réponse du coordinateur n’a pas pu être lue ; l’issue de la demande est donc inconnue.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Le coordinateur a refusé la formule choisie. Choisissez Gratuite ou Premium, puis réessayez.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Le coordinateur a refusé la demande : un modèle nécessaire à cette formule est actuellement indisponible. Réessayez plus tard ou choisissez l’autre formule.",
-  "requestFailure.kind.UNCLASSIFIED": "La demande a échoué avant qu’une réponse ne soit reçue ; son issue est donc inconnue. Il ne s’agit pas d’une décision prise par le coordinateur."
+  "requestFailure.kind.UNCLASSIFIED": "La demande a échoué avant qu’une réponse ne soit reçue ; son issue est donc inconnue. Il ne s’agit pas d’une décision prise par le coordinateur.",
+  "newDebate.legalGate.eyebrow": "Conditions et confidentialité",
+  "newDebate.legalGate.title": "Veuillez lire et accepter les documents en vigueur",
+  "newDebate.legalGate.body": "Avant de continuer, ouvrez chaque document ci-dessous, lisez-le jusqu’au bout, puis acceptez-le.",
+  "newDebate.legalGate.readTerms": "Lire les Conditions d’utilisation",
+  "newDebate.legalGate.readPrivacy": "Lire la Politique de confidentialité",
+  "newDebate.legalGate.done": "Lu",
+  "newDebate.legalGate.accept": "Accepter et continuer",
+  "newDebate.legalGate.accepting": "Enregistrement…",
+  "newDebate.legalGate.failed": "Votre acceptation n’a pas pu être enregistrée. Veuillez réessayer.",
+  "newDebate.legalGate.stale": "L’un des documents vient de changer. Rechargez la page pour lire la version en vigueur.",
+  "newDebate.legalGate.manageAccount": "Gérer ou supprimer votre compte",
+  "newDebate.legalGate.signOut": "Se déconnecter",
+  "newDebate.legalGate.signOutFailed": "La déconnexion n’a pas abouti. Veuillez réessayer."
 }

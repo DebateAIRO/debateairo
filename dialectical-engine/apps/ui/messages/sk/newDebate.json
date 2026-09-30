@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "Odpoveď koordinátora sa nepodarilo prečítať, takže výsledok nie je známy.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinátor odmietol výber programu. Vyberte Bezplatný alebo Premium a potom to skúste znova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinátor požiadavku odmietol: model, ktorý tento program potrebuje, momentálne nie je dostupný. Skúste to znova neskôr alebo vyberte druhý program.",
-  "requestFailure.kind.UNCLASSIFIED": "Požiadavka zlyhala skôr, než prišla akákoľvek odpoveď, takže výsledok nie je známy. Nejde o rozhodnutie koordinátora."
+  "requestFailure.kind.UNCLASSIFIED": "Požiadavka zlyhala skôr, než prišla akákoľvek odpoveď, takže výsledok nie je známy. Nejde o rozhodnutie koordinátora.",
+  "newDebate.legalGate.eyebrow": "Podmienky a súkromie",
+  "newDebate.legalGate.title": "Prečítajte si, prosím, aktuálne dokumenty a prijmite ich",
+  "newDebate.legalGate.body": "Skôr než budete pokračovať, otvorte každý dokument nižšie, prečítajte si ho až do konca a potom ho prijmite.",
+  "newDebate.legalGate.readTerms": "Prečítať Podmienky poskytovania služby",
+  "newDebate.legalGate.readPrivacy": "Prečítať Zásady ochrany osobných údajov",
+  "newDebate.legalGate.done": "Prečítané",
+  "newDebate.legalGate.accept": "Prijať a pokračovať",
+  "newDebate.legalGate.accepting": "Ukladá sa…",
+  "newDebate.legalGate.failed": "Vaše prijatie sa nepodarilo uložiť. Skúste to znova.",
+  "newDebate.legalGate.stale": "Jeden z dokumentov sa práve zmenil. Znova načítajte stránku a prečítajte si aktuálnu verziu.",
+  "newDebate.legalGate.manageAccount": "Spravovať alebo odstrániť účet",
+  "newDebate.legalGate.signOut": "Odhlásiť sa",
+  "newDebate.legalGate.signOutFailed": "Odhlásenie sa nedokončilo. Skúste to znova."
 }

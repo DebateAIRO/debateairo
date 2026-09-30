@@ -26,7 +26,7 @@ export function SettingsPageClient({
   newDebateCatalog?: MessageCatalog;
 }) {
   return (
-    <AuthGate catalog={newDebateCatalog}>
+    <AuthGate catalog={newDebateCatalog} legalGate={false}>
       {() => <AccountSettingsScreen catalog={catalog} locale={locale} />}
     </AuthGate>
   );

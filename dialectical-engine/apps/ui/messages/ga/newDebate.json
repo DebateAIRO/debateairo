@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "Níorbh fhéidir freagra an chomhordaitheora a léamh, mar sin ní fios cén toradh a bhí ar an iarratas.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Dhiúltaigh an comhordaitheoir do rogha an phlean. Roghnaigh Saor in aisce nó Préimh, ansin bain triail eile as.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Dhiúltaigh an comhordaitheoir don iarratas: níl samhail atá de dhíth ar an bplean seo ar fáil faoi láthair. Bain triail eile as níos déanaí, nó roghnaigh an plean eile.",
-  "requestFailure.kind.UNCLASSIFIED": "Theip ar an iarratas sular tháinig aon fhreagra, mar sin ní fios cén toradh a bhí air. Ní cinneadh de chuid an chomhordaitheora é seo."
+  "requestFailure.kind.UNCLASSIFIED": "Theip ar an iarratas sular tháinig aon fhreagra, mar sin ní fios cén toradh a bhí air. Ní cinneadh de chuid an chomhordaitheora é seo.",
+  "newDebate.legalGate.eyebrow": "Téarmaí agus príobháideacht",
+  "newDebate.legalGate.title": "Léigh na doiciméid reatha agus glac leo, le do thoil",
+  "newDebate.legalGate.body": "Sula leanfaidh tú ar aghaidh, oscail gach doiciméad thíos, léigh go deireadh é, agus ansin glac leis.",
+  "newDebate.legalGate.readTerms": "Léigh na Téarmaí Seirbhíse",
+  "newDebate.legalGate.readPrivacy": "Léigh an Beartas Príobháideachais",
+  "newDebate.legalGate.done": "Léite",
+  "newDebate.legalGate.accept": "Glac leo agus lean ar aghaidh",
+  "newDebate.legalGate.accepting": "Á shábháil…",
+  "newDebate.legalGate.failed": "Níorbh fhéidir do ghlacadh a shábháil. Bain triail eile as.",
+  "newDebate.legalGate.stale": "Athraíodh ceann de na doiciméid díreach anois. Athlódáil an leathanach chun an leagan reatha a léamh.",
+  "newDebate.legalGate.manageAccount": "Bainistigh nó scrios do chuntas",
+  "newDebate.legalGate.signOut": "Sínigh amach",
+  "newDebate.legalGate.signOutFailed": "Níor críochnaíodh an síniú amach. Bain triail eile as."
 }

@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "The coordinator's reply could not be read, so the outcome is unknown.",
   "requestFailure.kind.PLAN_TIER_INVALID": "The coordinator refused the plan choice. Choose Free or Premium, then retry.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "The coordinator refused it: a model this plan needs is not available right now. Retry later, or choose the other plan.",
-  "requestFailure.kind.UNCLASSIFIED": "It failed before any answer arrived, so the outcome is unknown. This is not a decision the coordinator made."
+  "requestFailure.kind.UNCLASSIFIED": "It failed before any answer arrived, so the outcome is unknown. This is not a decision the coordinator made.",
+  "newDebate.legalGate.eyebrow": "Terms and privacy",
+  "newDebate.legalGate.title": "Please read and accept the current documents",
+  "newDebate.legalGate.body": "Before you continue, open each document below, read it to the end, then accept it.",
+  "newDebate.legalGate.readTerms": "Read the Terms of Service",
+  "newDebate.legalGate.readPrivacy": "Read the Privacy Policy",
+  "newDebate.legalGate.done": "Done",
+  "newDebate.legalGate.accept": "Accept and continue",
+  "newDebate.legalGate.accepting": "Saving…",
+  "newDebate.legalGate.failed": "Your acceptance could not be saved. Please try again.",
+  "newDebate.legalGate.stale": "One of the documents changed a moment ago. Reload the page to read the current version.",
+  "newDebate.legalGate.manageAccount": "Manage or delete your account",
+  "newDebate.legalGate.signOut": "Sign out",
+  "newDebate.legalGate.signOutFailed": "Signing out did not complete. Please try again."
 }

@@ -5,6 +5,9 @@ import {
   type AgeCheckResult,
   type AgeConfirmationStatus,
   type RegisterLegalDocuments,
+  LegalStatusResponseSchema,
+  type LegalAcceptRequest,
+  type LegalStatusResponse,
   AccountErasureCancelledSchema,
   AccountErasureStatusSchema,
   AnswerSchema,
@@ -159,6 +162,7 @@ async function requestNoContent(
     if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
     const csrf = auth.csrfToken?.() ?? browserCsrfToken();
     if (csrf !== null) headers.set("x-csrf-token", csrf);
+    if (init.body !== undefined) headers.set("content-type", "application/json");
     response = await fetchImplementation(new URL(path, baseUrl), {
       ...init,
       headers,
@@ -304,6 +308,9 @@ export interface ContractClient {
   claimLegacyRuns(legacyToken:string):Promise<{
     status:"CLAIMED"|"NO_MATCH";claimed_count:number;
   }>;
+  /** Paid plans L4: the documents this person must accept again before the page shows. */
+  getLegalStatus(locale: string): Promise<LegalStatusResponse>;
+  acceptLegal(input: LegalAcceptRequest): Promise<void>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
@@ -541,6 +548,14 @@ export function createContractClient(
       { method:"POST",body:JSON.stringify(LegacyRunClaimRequestSchema.parse({
           legacy_token:legacyToken
         })) }
+    ),
+    getLegalStatus: (locale: string) => request(
+      `/v1/account/legal-status?locale=${encodeURIComponent(locale)}`,
+      LegalStatusResponseSchema
+    ),
+    acceptLegal: (input: LegalAcceptRequest) => requestNoContent(
+      root.href, fetchImplementation, "/v1/account/legal-accept",
+      { method: "POST", body: JSON.stringify(input) }, auth
     ),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     readSession: () => request("/v1/session", SessionSchema),

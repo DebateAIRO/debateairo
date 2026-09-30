@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { sealRecord } from "@debateai/crypto";
-import type { SignUpAcceptanceRow } from "@debateai/db";
-import { isCurrentDocument, type LegalDocumentPair } from "@debateai/legal-manifest";
+import type { AcceptanceInput, AcceptanceKind, AcceptanceRepository, SignUpAcceptanceRow } from "@debateai/db";
+import {
+  currentDocument,
+  documentVersionAtLeast,
+  isCurrentDocument,
+  reacceptanceFloor,
+  type LegalDocumentPair
+} from "@debateai/legal-manifest";
 import type { RegisterLegalDocuments } from "@debateai/contract";
 
 /**
@@ -88,4 +94,117 @@ export function signUpAcceptanceRows(input: Readonly<{
     row("TERMS", input.documents.terms),
     row("PRIVACY_SHOWN", input.documents.privacy)
   ]);
+}
+
+export type ReacceptableKind = "TERMS" | "PRIVACY";
+export type LegalStatusDocument = Readonly<{ kind: ReacceptableKind; version: string; sha256: string }>;
+
+export interface LegalAcceptanceApplication {
+  /** The documents this person must accept again, in the locale they read in (English if absent). */
+  status(ownerRef: string, locale: string): Promise<ReadonlyArray<LegalStatusDocument>>;
+  /**
+   * The billing routes' gate (LEGAL_REACCEPTANCE_REQUIRED). An account with no record of a document
+   * owes it in hosted mode, whatever the floor, and in local mode only when the manifest's floor is
+   * set; an account with a record owes it once that record is below the floor.
+   */
+  requiresReacceptance(ownerRef: string): Promise<boolean>;
+  accept(input: Readonly<{
+    ownerRef: string;
+    locale: string;
+    documents: ReadonlyArray<LegalStatusDocument>;
+    source: Readonly<{ ip: string; userAgent: string }>;
+  }>): Promise<"ACCEPTED" | "STALE">;
+}
+
+const REACCEPTABLE: readonly ReacceptableKind[] = Object.freeze(["TERMS", "PRIVACY"]);
+const RECORD_KIND: Readonly<Record<ReacceptableKind, AcceptanceKind>> = Object.freeze({
+  TERMS: "TERMS", PRIVACY: "PRIVACY_SHOWN"
+});
+
+export class RepositoryLegalAcceptanceApplication implements LegalAcceptanceApplication {
+  private readonly clock: () => Date;
+  private readonly floorOf: (kind: ReacceptableKind) => string | null;
+
+  constructor(private readonly options: Readonly<{
+    acceptances: Pick<AcceptanceRepository, "latest" | "recordAll">;
+    recordsKey: Buffer;
+    /**
+     * true in hosted mode: an account with no record owes the document whatever the floor; false in
+     * local mode, where only a floor makes a document owed (spec §2.2 rule 1, §2.3.2). Required, so
+     * no composition can fall into either rule by omission.
+     */
+    owedWithoutRecord: boolean;
+    clock?: () => Date;
+    /** The manifest's floor unless a test supplies one. */
+    floorOf?: (kind: ReacceptableKind) => string | null;
+  }>) {
+    this.clock = options.clock ?? (() => new Date());
+    this.floorOf = options.floorOf ?? reacceptanceFloor;
+  }
+
+  /**
+   * The documents owed. A record below the floor is owed. No record at all is owed in hosted mode
+   * whatever the floor (the Terms and the Privacy Policy say a record exists; accounts created before
+   * L3b hold none), and in local mode only when the manifest's floor is set — so with null floors a
+   * local account sees no screen and accept() writes nothing for it. status(), requiresReacceptance()
+   * and accept() all go through here, so the three agree in each mode.
+   */
+  private async below(ownerRef: string): Promise<ReadonlyArray<ReacceptableKind>> {
+    const due: ReacceptableKind[] = [];
+    for (const kind of REACCEPTABLE) {
+      const latest = await this.options.acceptances.latest(ownerRef, RECORD_KIND[kind]);
+      if (latest === null) {
+        if (this.options.owedWithoutRecord || this.floorOf(kind) !== null) due.push(kind);
+        continue;
+      }
+      const floor = this.floorOf(kind);
+      if (floor !== null && !documentVersionAtLeast(latest.documentVersion, floor)) due.push(kind);
+    }
+    return due;
+  }
+
+  async status(ownerRef: string, locale: string): Promise<ReadonlyArray<LegalStatusDocument>> {
+    return Object.freeze((await this.below(ownerRef)).flatMap((kind) => {
+      const current = currentDocument(kind, locale) ?? currentDocument(kind, "en");
+      return current === null ? [] : [Object.freeze({ kind, ...current })];
+    }));
+  }
+
+  async requiresReacceptance(ownerRef: string): Promise<boolean> {
+    return (await this.below(ownerRef)).length > 0;
+  }
+
+  /**
+   * Every posted pair is checked FIRST, so one stale pair refuses the whole request. Then only the
+   * documents still owed are recorded: legal.acceptance is append-only for the life of the account,
+   * so a call when nothing is owed answers "ACCEPTED" and writes nothing (the route stays 204 and
+   * idempotent, and a signed-in account cannot grow the table by posting the current pairs again).
+   */
+  async accept(input: Parameters<LegalAcceptanceApplication["accept"]>[0]): Promise<"ACCEPTED" | "STALE"> {
+    const acceptedAt = this.clock();
+    const resolvedDocuments: Array<Readonly<{ kind: ReacceptableKind; resolved: ResolvedDocument }>> = [];
+    for (const document of input.documents) {
+      const resolved = resolveDocument(document.kind, input.locale, document);
+      if (resolved === null) return "STALE";
+      resolvedDocuments.push(Object.freeze({ kind: document.kind, resolved }));
+    }
+    const due = new Set(await this.below(input.ownerRef));
+    const rows: AcceptanceInput[] = resolvedDocuments.filter(({ kind }) => due.has(kind)).map(({ kind, resolved }) => {
+      const acceptanceId = randomUUID();
+      return Object.freeze({
+        acceptanceId,
+        ownerRef: input.ownerRef,
+        kind: RECORD_KIND[kind],
+        documentVersion: resolved.version,
+        documentSha256: resolved.sha256,
+        locale: resolved.locale,
+        surface: "REACCEPT" as const,
+        acceptedAt,
+        ...sealAcceptanceEvidence(this.options.recordsKey, acceptanceId, input.source)
+      });
+    });
+    if (rows.length === 0) return "ACCEPTED";
+    await this.options.acceptances.recordAll(rows);
+    return "ACCEPTED";
+  }
 }

@@ -81,5 +81,18 @@
   "requestFailure.kind.UNREADABLE": "Koordinatorens svar kunne ikke læses, så udfaldet er ukendt.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatoren afviste planvalget. Vælg Free eller Premium, og prøv derefter igen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatoren afviste anmodningen, fordi en model, som denne plan kræver, ikke er tilgængelig lige nu. Prøv igen senere, eller vælg den anden plan.",
-  "requestFailure.kind.UNCLASSIFIED": "Anmodningen mislykkedes, før der kom et svar, så udfaldet er ukendt. Det er ikke en afgørelse, som koordinatoren har truffet."
+  "requestFailure.kind.UNCLASSIFIED": "Anmodningen mislykkedes, før der kom et svar, så udfaldet er ukendt. Det er ikke en afgørelse, som koordinatoren har truffet.",
+  "newDebate.legalGate.eyebrow": "Vilkår og privatliv",
+  "newDebate.legalGate.title": "Læs og acceptér de gældende dokumenter",
+  "newDebate.legalGate.body": "Før du fortsætter, skal du åbne hvert dokument nedenfor, læse det til ende og derefter acceptere det.",
+  "newDebate.legalGate.readTerms": "Læs tjenestevilkårene",
+  "newDebate.legalGate.readPrivacy": "Læs privatlivspolitikken",
+  "newDebate.legalGate.done": "Læst",
+  "newDebate.legalGate.accept": "Acceptér og fortsæt",
+  "newDebate.legalGate.accepting": "Gemmer…",
+  "newDebate.legalGate.failed": "Din accept kunne ikke gemmes. Prøv igen.",
+  "newDebate.legalGate.stale": "Et af dokumenterne blev ændret for et øjeblik siden. Genindlæs siden for at læse den gældende version.",
+  "newDebate.legalGate.manageAccount": "Administrer eller slet din konto",
+  "newDebate.legalGate.signOut": "Log ud",
+  "newDebate.legalGate.signOutFailed": "Udlogningen blev ikke fuldført. Prøv igen."
 }
