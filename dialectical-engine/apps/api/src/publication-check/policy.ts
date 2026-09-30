@@ -13,7 +13,10 @@ export function publicationCheckContract(): PromptContract {
     instruction: "You are the publication check of DebateAI. The material is text that its owner asked to publish. Decide whether it may be published under these rules:"
       + "\n\n" + PUBLICATION_CHECK_RULES_1_2 + "\n\n" + PUBLICATION_CHECK_TEXT_OF_RECORD,
     // FIX-HS2-v V-21: `call` binds the answer to this call (verdict.ts judgeCallValue); the frame names the marker.
+    // FIX-HS2-v2 (REV-S02-v-ui-product N1): the form states every verdict/field combination parseJudgeAnswer refuses
+    // (verdict.ts, the three `verdict ===` lines), so an honest judge is never UNAVAILABLE for a rule it was not told.
     answerForm: 'A single JSON object and nothing else: {"call":"<the 32 hexadecimal characters inside this call\'s boundary marker, copied exactly>","verdict":"ALLOW"|"BLOCK"|"UNSURE","rules":[1 or 2, each at most once],"parts":[names of the material fields that do what rule 1 or rule 2 forbids, each at most once],"possibly_illegal":true|false}'
+      + ' With "ALLOW", rules and parts are empty and possibly_illegal is false. With "BLOCK", rules and parts each name at least one entry. With "UNSURE", rules is empty.'
   };
 }
 

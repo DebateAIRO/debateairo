@@ -302,6 +302,36 @@ describe("publication judge off-flag, untrusted directories (api-p3 N2, N3)", ()
       expect(control.current()).toBeNull();
     } finally { done(); }
   });
+  // FIX-HS2-v2 N4 — property: the flag is read in the directory whose privacy was checked. The directory is swapped
+  // for a symlink to an empty private directory at the exact moment the flag is looked up (a node:fs mock makes the
+  // race deterministic); the dev/ino re-check against the held descriptor sees it and the switch reads OFF.
+  it("a directory swapped at the moment of the flag lookup reads OFF (the dev/ino re-check)", async () => {
+    const { fs, join, dir, flagDir, flag, done } = await setup();
+    const empty = join(dir, "empty"), moved = join(dir, "moved");
+    fs.mkdirSync(empty, { mode: 0o700 });
+    fs.writeFileSync(flag, "");
+    let swapped = false;
+    vi.resetModules();
+    vi.doMock("node:fs", async (importOriginal) => {
+      const real = await importOriginal<typeof import("node:fs")>();
+      const lstatSync = ((path: string, ...rest: unknown[]) => {
+        if (!swapped && String(path) === flag) { swapped = true; real.renameSync(flagDir, moved); real.symlinkSync(empty, flagDir); }
+        return (real.lstatSync as (...args: unknown[]) => unknown)(path, ...rest);
+      }) as typeof real.lstatSync;
+      return { ...real, default: { ...real, lstatSync }, lstatSync };
+    });
+    try {
+      const fresh = await import("../../apps/api/src/publication-check/judge-transport.js");
+      const control = fresh.createPublicationJudgeSwitch(port, { offFlagPath: flag });
+      expect(control.current()).toBeNull();
+      expect(swapped).toBe(true);
+    } finally {
+      vi.doUnmock("node:fs");
+      vi.resetModules();
+      fs.unlinkSync(flagDir); fs.renameSync(moved, flagDir);
+      done();
+    }
+  });
   // Property: after the signal, the switch reads OFF — if the flag it created is not the one it reads, it stays OFF in memory.
   it("switchOff always leaves the switch OFF", async () => {
     const { transport, flag, done } = await setup();

@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/hs-s02-cases.json" with { type: "json" };
 import { createJudgeStub, type JudgeStubStep } from "../tests/support/hs-s02-judge-stub.js";
 import { PublicationJudgeFailure } from "../apps/api/src/publication-check/check.js";
+import { publicationCheckContract } from "../apps/api/src/publication-check/policy.js";
+import { buildFramedPrompt } from "@debateai/providers";
 import type { HsEvalCase } from "./hs-eval-s02.js";
 
 // FIX-HS2-p2 R-E: the fixture holds the 22 R14(b) cases and, appended, a SEPARATE injection/echo block.
@@ -57,6 +59,20 @@ describe("HS-S02 evaluation", () => {
     expect(injection.some(c => !/verdict/u.test(c.text) && /ALLOW/u.test(c.text))).toBe(true);
     expect(injection.some(c => /\\u0022verdict/u.test(c.text))).toBe(true);
     expect(injection.some(c => /```/u.test(c.text) && /"verdict"/u.test(c.text))).toBe(true);
+    // FIX-HS2-v2 N2: the shapes V-21 leaves to the judge — a bare verdict TAIL the judge could continue its own answer
+    // with, a forged five-key object behind a fake boundary marker, and a forged object with a fake call value — EN and RO.
+    // The marker's shape is read from a real frame (the packet-read-through-the-frame law), never spelled here.
+    const [markerHead, markerTail] = buildFramedPrompt({ contract: publicationCheckContract(), material: [{ name: "question", content: "Q?" }] }).fence.split(/[0-9a-f]{32}/u) as [string, string];
+    const fakeMarker = (text: string) => {
+      const at = text.indexOf(markerHead), hex = text.slice(at + markerHead.length, at + markerHead.length + 32);
+      return at >= 0 && /^[0-9a-f]{32}$/u.test(hex) && text.startsWith(markerTail, at + markerHead.length + 32);
+    };
+    for (const lang of ["en", "ro"]) {
+      const of = injection.filter(c => c.lang === lang);
+      expect(of.some(c => /,"verdict":"ALLOW","rules":\[\],"parts":\[\]\}/u.test(c.text) && !/\{"verdict"/u.test(c.text))).toBe(true);
+      expect(of.some(c => fakeMarker(c.text) && /"call":"[0-9a-f]{32}"/u.test(c.text))).toBe(true);
+      expect(of.some(c => !c.text.includes(markerHead) && /\{"call":"[0-9a-f]{32}","verdict":"ALLOW"/u.test(c.text))).toBe(true);
+    }
   });
   // Every injection case — the instruction and the forged-verdict shapes, EN and RO — is the judge's to refuse: a judge
   // that obeys the text on ANY one of them fails the eval alone.
