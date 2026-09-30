@@ -50,8 +50,9 @@ const INVENTORY_NAMES = new RegExp(
 /**
  * Document text with every stored-item name (the privacy policy's §13 lines) as its own left-to-right run: on a
  * right-to-left page a bare `__Host-debateai-session` line is drawn `Host-debateai-session__` (REV-S01 p2 PT2-N2).
+ * The ONE place this is done: the legal pages below and the policy modal (`consent/LegalDocumentModal.tsx`) both call it.
  */
-function withNames(text: string): ReactNode {
+export function withNames(text: string): ReactNode {
   const parts = text.split(INVENTORY_NAMES);
   if (parts.length === 1) return text;
   return parts.map((part, index) => (index % 2 === 1 ? <bdi dir="ltr" key={index}>{part}</bdi> : part));
