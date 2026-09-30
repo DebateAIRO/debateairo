@@ -1,13 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
-import { AskAcceptedSchema, AskRequestSchema } from "@debateai/contract";
-import { decodeBase32, TOTP_PROFILE, totpCodeAtStep } from "@debateai/crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
-import { runHsS01, type HsS01Ports } from "./hs-s01-accept.js";
+import { createHttpPorts, runHsS01, type HsS01Ports } from "./hs-s01-accept.js";
 
-const origin = "https://localhost:3000";
-const base = `${origin}/api`;
-const cookies = new Map<string, string>();
 let pool: Pool | undefined;
 let client: PoolClient | undefined;
 
@@ -37,74 +32,9 @@ async function query<T extends QueryResultRow>(sql: string, values: string[] = [
   }
 }
 
-async function request(path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { origin };
-  if (cookies.size > 0) headers.cookie = [...cookies].map(([name, value]) => `${name}=${value}`).join("; ");
-  if (body !== undefined) {
-    headers["content-type"] = "application/json";
-    headers["x-csrf-token"] = cookies.get("__Host-debateai-csrf") ?? "";
-  }
-  let response: Response;
-  try {
-    response = await fetch(`${base}${path}`, { method: body === undefined ? "GET" : "POST", headers,
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-  } catch {
-    throw new TypeError("HS_S01_HTTP_REQUEST_FAILED");
-  }
-  for (const cookie of response.headers.getSetCookie()) {
-    const pair = cookie.split(";", 1)[0]!;
-    const separator = pair.indexOf("=");
-    const name = pair.slice(0, separator);
-    if (name === "__Host-debateai-session" || name === "__Host-debateai-csrf") cookies.set(name, pair.slice(separator + 1));
-  }
-  return response;
-}
-
-async function json(response: Response, expected = 200): Promise<unknown> {
-  if (response.status !== expected) throw new TypeError(`HS_S01_HTTP_${response.status}`);
-  try { return await response.json(); } catch { throw new TypeError("HS_S01_RESPONSE_INVALID"); }
-}
-const runPath = (runRef: string) => `/v1/runs/${encodeURIComponent(runRef)}`;
-
+// The HTTP ports live in the core so a test can drive them against each route's real wire shape.
 const ports: HsS01Ports = {
-  async login() {
-    const email = process.env.HS_ACCEPT_EMAIL;
-    const password = process.env.HS_ACCEPT_PASSWORD;
-    const secret = process.env.HS_ACCEPT_TOTP_SECRET;
-    if (!email || !password || !secret) throw new TypeError("HS_S01_CREDENTIALS_MISSING");
-    const challenge = await json(await request("/v1/auth/login", { email, password }), 202) as { challenge_token?: unknown } | null;
-    if (typeof challenge?.challenge_token !== "string") throw new TypeError("HS_S01_LOGIN_CHALLENGE_INVALID");
-    const code = totpCodeAtStep(decodeBase32(secret), Math.floor(Date.now() / 1000 / TOTP_PROFILE.periodSeconds));
-    await json(await request("/v1/auth/login", { challenge_token: challenge.challenge_token, code }));
-    if (!cookies.get("__Host-debateai-session") || !cookies.get("__Host-debateai-csrf")) {
-      throw new TypeError("HS_S01_LOGIN_COOKIES_MISSING");
-    }
-  },
-  async ask(questionLine) {
-    const body = AskRequestSchema.parse({ question_line: questionLine, plan_tier: "free", risk_tier: "standard",
-      tier_source: "MACHINE_DEFAULT", tier_provenance_ref: "machine:plan-tier-free", composition_budget_tier: "low",
-      depth_params: { depth: 2 }, decision_scope: "personal", as_of: new Date().toISOString(),
-      steering_presets: [], steering_annotations: [] });
-    return AskAcceptedSchema.parse(await json(await request("/v1/asks", body), 202)).run_ref;
-  },
-  async waitForTerminal(runRef) {
-    const minutes = Number(process.env.HS_ACCEPT_TIMEOUT_MINUTES ?? "60");
-    if (!Number.isFinite(minutes) || minutes <= 0) throw new TypeError("HS_S01_TIMEOUT_INVALID");
-    const deadline = Date.now() + minutes * 60_000;
-    let run: unknown = null;
-    while (Date.now() < deadline) {
-      run = await json(await request(runPath(runRef)));
-      const state = (run as { state?: unknown } | null)?.state;
-      if (state === "SETTLED" || state === "FAILED") return { state, run };
-      await delay(Math.min(10_000, Math.max(0, deadline - Date.now())));
-    }
-    return { state: "TIMEOUT", run };
-  },
-  async readAnswer(runRef) {
-    const response = await request(`${runPath(runRef)}/answer`);
-    return response.status === 200 ? json(response) : null;
-  },
-  async readEvents(runRef) { return json(await request(`${runPath(runRef)}/events`)); },
+  ...createHttpPorts({ fetch: (input, init) => fetch(input, init), env: process.env, origin: "https://localhost:3000", sleep: delay }),
   async readWorkItemReasons(runRef) {
     return (await query<{ terminal_reason: string | null }>("SELECT terminal_reason FROM core.work_item WHERE run_id = $1", [runRef])).map(row => row.terminal_reason);
   },

@@ -28,6 +28,7 @@ import {
   bindWayOfKnowingDowngrade,
   createUnmeasuredDisagreement,
   measureDispersion,
+  parseStructuredArtifact,
   reduceAssessment,
   runJudgePanel,
   selectReducedJudgement,
@@ -1812,22 +1813,79 @@ function hash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T {
+/**
+ * FIX-HS1-eval-fence (hate-speech TEST rehearsal, 2026-09-30): a model reply
+ * read as a structured value. The evaluator and the composer used to read it
+ * with a strict `JSON.parse`, so a schema-valid verdict inside a ```json fence
+ * ended live runs `EVALUATOR_CONTRACT_ERROR`, while the judge and panel paths
+ * already read theirs with `parseStructuredArtifact` (raw, one fence, the first
+ * balanced object). Every runner reader decodes here, the judge path's way, so
+ * a call's classifier and its parser accept the same replies. A reply no
+ * strategy decodes is refused exactly as before: the raw parse's own message.
+ *
+ * FIX-HS1-eval-fence-r1 (re-check B1, ruling V-24): the judge path's fallback
+ * takes the FIRST balanced object, so "PASS, then FAIL" read as PASS and the
+ * synthesis loop stopped without the objection the final verdict asked for.
+ * A reply that is not raw JSON and opens two or more top-level objects is
+ * refused before any strategy runs — the pre-fix refusal, re-asked as before.
+ */
+type DecodedReply =
+  | { readonly decoded: true; readonly value: unknown }
+  | { readonly decoded: false; readonly message: string };
+
+/**
+ * How many top-level `{` a reply opens, counting at most two. Outside an
+ * object every character is prose, so a stray quote cannot hide a brace;
+ * inside one, JSON strings are skipped, so a brace an objection quotes is not
+ * a second object. An object left open (a cut reply) still counts. One linear
+ * pass: model text is untrusted (CI-1b).
+ */
+function topLevelObjectsOpened(content: string): number {
+  let opened = 0;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (const character of content) {
+    if (depth > 0 && inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === "\"") inString = false;
+      continue;
+    }
+    if (character === "{") {
+      if (depth === 0 && ++opened > 1) return opened;
+      depth += 1;
+    } else if (depth > 0 && character === "}") depth -= 1;
+    else if (depth > 0 && character === "\"") inString = true;
+  }
+  return opened;
+}
+
+function decodeStructuredReply(content: string): DecodedReply {
   try {
-    return schema.parse(JSON.parse(content));
+    return { decoded: true, value: JSON.parse(content) };
+  } catch (error) {
+    const refused: DecodedReply = { decoded: false, message: error instanceof Error ? error.message : String(error) };
+    if (topLevelObjectsOpened(content) > 1) return refused;
+    const tolerant = parseStructuredArtifact(content, z.unknown());
+    return tolerant.kind === "PARSED" ? { decoded: true, value: tolerant.value } : refused;
+  }
+}
+
+function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T {
+  const reply = decodeStructuredReply(content);
+  if (!reply.decoded) throw new TypedDomainError(code, reply.message);
+  try {
+    return schema.parse(reply.value);
   } catch (error) {
     throw new TypedDomainError(code, error instanceof Error ? error.message : String(error));
   }
 }
 
 function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): ContentClassification {
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(content);
-  } catch (error) {
-    return { parseStatus: "PARSE_FAILED", parseError: error instanceof Error ? error.message : String(error) };
-  }
-  const parsed = schema.safeParse(decoded);
+  const reply = decodeStructuredReply(content);
+  if (!reply.decoded) return { parseStatus: "PARSE_FAILED", parseError: reply.message };
+  const parsed = schema.safeParse(reply.value);
   return parsed.success
     ? { parseStatus: "PARSED", parseError: null }
     : { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
@@ -1904,7 +1962,7 @@ interface ComposedCitationContext {
 export function classifyComposedContent(content: string, citation: ComposedCitationContext): ContentClassification {
   const structured = classifyStructuredContent(content, compositionSchema);
   if (structured.parseStatus !== "PARSED") return structured;
-  const composed = compositionSchema.parse(JSON.parse(content));
+  const composed = parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
   const issues: ComposedCitationIssue[] = [];
   for (const [segmentIndex, segment] of composed.segments.entries()) {
     if (nodeIdsNamedInText(citation.digest, segment.text, citation.exemptTokens).length > 0) {
@@ -2527,6 +2585,16 @@ export function logServeDisclosure(event: string, detail: Readonly<Record<string
 
 export function parseComposerOutput(content: string): z.infer<typeof compositionSchema> {
   return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
+}
+
+/** The evaluator's verdict as the engine reads it (the parser of the EVALUATOR call). */
+export function parseEvaluatorOutput(content: string): z.infer<typeof evaluatorVerdictSchema> {
+  return parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+}
+
+/** The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. */
+export function classifyEvaluatorContent(content: string): ContentClassification {
+  return classifyStructuredContent(content, evaluatorVerdictSchema);
 }
 
 export interface DebateExpansionLeg {
@@ -6024,7 +6092,7 @@ export class WalkingSkeletonRunner {
          * verdict this reading refuses has left nothing to serve.
          */
         const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
-          const parsed = parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+          const parsed = parseEvaluatorOutput(content);
           return assertEvaluatorVerdict(Object.freeze({
             satisfied: parsed.satisfied,
             objection: parsed.objection,
@@ -6065,7 +6133,7 @@ export class WalkingSkeletonRunner {
           contractHash: this.settings.conformanceContractHash,
           providerRef: role.providerRef,
           packet,
-          classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
+          classifyContent: classifyEvaluatorContent,
           buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
           }
         }));

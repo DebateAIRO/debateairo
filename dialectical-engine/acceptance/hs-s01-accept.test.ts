@@ -1,8 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { AnswerSchema, AskAcceptedSchema, EVENT_TYPES, RunEventSchema, RunProjectionSchema } from "@debateai/contract";
 import { describe, expect, it } from "vitest";
 import {
-  collectSealCodes, firstSentence, judgeLegs, parseHsS01Arguments, runHsS01,
+  collectSealCodes, createHttpPorts, firstSentence, judgeLegs, parseHsS01Arguments, runHsS01,
   type HsS01Ports
 } from "./hs-s01-accept.js";
 
@@ -43,6 +44,58 @@ function ports(overrides: Partial<HsS01Ports> = {}): HsS01Ports {
     readCensus: async () => [census("6"), census("4"), census("5")], readReceiptVersion: async () => "6",
     readText: async () => before, ...overrides
   };
+}
+
+// A fake of the served API, each route answering in the wire shape its REAL handler writes (TEST rehearsal
+// t_c6155011: a port-level fake returned an array where the route streams SSE, and hid the CLI's json() read).
+// Every body passes the route's own schema first; content types are what Fastify's reply.send(object) and the
+// events route's writeHead send (apps/api/src/index.ts:1821-1848 login, :2255-2270 asks, :2455-2474 events,
+// :2475-2480 run, :2499-2503 answer); the proxy at :3000/api copies content-type and set-cookie through.
+const ORIGIN = "https://localhost:3000";
+const RUN = "0f5c2a64-8a1e-4c1b-9d4e-2b7f3c9a1e55";
+const JSON_TYPE = "application/json; charset=utf-8";
+const reply = (status: number, body: unknown, headers: [string, string][] = []) =>
+  new Response(JSON.stringify(body), { status, headers: [["content-type", JSON_TYPE], ...headers] });
+const event = (sequence: number, payload: Record<string, unknown> = {}) => RunEventSchema.parse({
+  event_id: `event_${sequence}`, event_type: EVENT_TYPES[0], run_ref: RUN, at_sequence: sequence, payload });
+// The events route's own frame, byte for byte (index.ts:2471).
+const frame = (events: readonly { event_id: string; event_type: string }[]) =>
+  events.map(e => `id: ${e.event_id}\nevent: ${e.event_type}\ndata: ${JSON.stringify(e)}\n\n`).join("");
+const stream = (body: string) => new Response(body, { status: 200, headers: [
+  ["content-type", "text/event-stream"], ["cache-control", "no-store"], ["connection", "keep-alive"]] });
+const run = (state: "RUNNING" | "SETTLED" | "FAILED") => RunProjectionSchema.parse({ run_ref: RUN, question_line: "Test question?",
+  state, terminal_reason: state === "FAILED" ? "WORKER_FAILED" : null, hold_until: null });
+type Route = (body: Record<string, unknown> | undefined) => Response;
+function server(overrides: Record<string, Route> = {}) {
+  const trace: { route: string; headers: Record<string, string> }[] = [];
+  const routes: Record<string, Route> = {
+    "POST /api/v1/auth/login": body => body?.challenge_token === undefined
+      ? reply(202, { status: "MFA_REQUIRED", challenge_token: "challenge_1" })
+      : reply(200, { status: "AUTHENTICATED", csrf_token: "csrf_1", session: {} }, [
+        ["set-cookie", "__Host-debateai-session=session_1; Path=/; Secure; HttpOnly; SameSite=Strict"],
+        ["set-cookie", "__Host-debateai-csrf=csrf_1; Path=/; Secure; SameSite=Strict"]]),
+    "POST /api/v1/asks": () => reply(202, AskAcceptedSchema.parse({ run_ref: RUN, status: "QUEUED" })),
+    [`GET /api/v1/runs/${RUN}`]: () => reply(200, run("SETTLED")),
+    [`GET /api/v1/runs/${RUN}/answer`]: () => reply(200, AnswerSchema.parse(answer())),
+    [`GET /api/v1/runs/${RUN}/events`]: () => stream(frame([event(1), event(2)])),
+    ...overrides
+  };
+  const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const url = new URL(String(input));
+    const route = `${init?.method ?? "GET"} ${url.pathname}`;
+    trace.push({ route, headers: Object.fromEntries(new Headers(init?.headers)) });
+    if (url.origin !== ORIGIN || routes[route] === undefined) throw new Error(`UNEXPECTED ${route}`);
+    return routes[route]!(typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : undefined);
+  };
+  return { fetch, trace };
+}
+// A 0.6 s poll window and a sleep that yields to the timer queue: a port that never sees a terminal ends as
+// TIMEOUT inside the test instead of spinning for the default 60 minutes.
+const credentials = { HS_ACCEPT_EMAIL: "accept@example.test", HS_ACCEPT_PASSWORD: "test-password",
+  HS_ACCEPT_TOTP_SECRET: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", HS_ACCEPT_TIMEOUT_MINUTES: "0.01" };
+function live(fake: ReturnType<typeof server>, sleeps: number[] = []): HsS01Ports {
+  return { ...ports(), ...createHttpPorts({ fetch: fake.fetch, env: credentials, origin: ORIGIN,
+    sleep: async ms => { sleeps.push(ms); await new Promise(resolve => setImmediate(resolve)); } }) };
 }
 
 describe("hs:accept-s01", () => {
@@ -270,5 +323,79 @@ describe("hs:accept-s01", () => {
     let touched = false;
     const noPorts = new Proxy({} as HsS01Ports, { get: () => { touched = true; throw new Error("PORT_TOUCHED"); } });
     expect({ result: await runHsS01(["--bogus"], noPorts), touched }).toEqual({ result: { lines: ["HS-S01-ACCEPT: FAIL HS_S01_ARGUMENTS_INVALID"], exitCode: 1 }, touched: false });
+  });
+});
+
+// Class "CLI-blind" (TEST rehearsal t_c6155011): each HTTP port is driven through a fake that answers in its
+// real route's wire shape, so a port reading a shape the route never sends cannot pass here and fail live.
+describe("hs:accept-s01 live HTTP ports against each route's real wire shape", () => {
+  // Property: the five HTTP ports read login (202 then 200 + cookies), asks (202), run, answer and the SSE
+  // events stream as the routes answer them, and the ask carries the session cookie and CSRF header.
+  // Mutant: readEvents parses the stream with response.json() (the rehearsal's FAIL HS_S01_RESPONSE_INVALID).
+  it("Q-N PASS when every route answers in its real shape, in route order", async () => {
+    const fake = server();
+    expect(await runHsS01([], live(fake)))
+      .toEqual({ lines: ["HS-S01 Q-N terminal=SERVED codes=none", "HS-S01-ACCEPT: PASS"], exitCode: 0 });
+    expect(fake.trace.map(entry => entry.route)).toEqual(["POST /api/v1/auth/login", "POST /api/v1/auth/login",
+      "POST /api/v1/asks", `GET /api/v1/runs/${RUN}`, `GET /api/v1/runs/${RUN}/answer`, `GET /api/v1/runs/${RUN}/events`]);
+    expect(fake.trace[2]!.headers).toMatchObject({ "x-csrf-token": "csrf_1", origin: ORIGIN,
+      cookie: "__Host-debateai-session=session_1; __Host-debateai-csrf=csrf_1" });
+  });
+  // Property: every SSE data block's JSON reaches the seal-code scan, across blocks. Mutant: keep only the
+  // first block, or drop the data field.
+  it("a seal code inside any SSE event's data fails Q-N with that code", async () => {
+    const fake = server({ [`GET /api/v1/runs/${RUN}/events`]: () => stream(frame([
+      event(1), event(2, { reason: "REGISTER_ROW_MISSING" }), event(3, { detail: { codes: ["PROMPT_FRAME_ABSENT"] } })])) });
+    expect(await runHsS01([], live(fake))).toEqual({ lines: [
+      "HS-S01 Q-N terminal=SERVED codes=PROMPT_FRAME_ABSENT,REGISTER_ROW_MISSING", "HS-S01-ACCEPT: FAIL PROMPT_FRAME_ABSENT"], exitCode: 1 });
+  });
+  // Property: the SSE reader follows the event-stream framing, not one byte layout: CRLF line ends, a comment
+  // line and an empty stream parse. Mutant: split blocks on "\n\n" only.
+  it("SSE framing: CRLF line ends and a comment line parse; an empty stream is no events", async () => {
+    const crlf = `: keep-alive\r\n\r\n${frame([event(1, { reason: "SEALED_CRLF" })]).replaceAll("\n", "\r\n")}`;
+    for (const [body, codes] of [[crlf, "SEALED_CRLF"], ["", "none"]] as const) {
+      const fake = server({ [`GET /api/v1/runs/${RUN}/events`]: () => stream(body) });
+      expect((await runHsS01([], live(fake))).lines[0]).toBe(`HS-S01 Q-N terminal=SERVED codes=${codes}`);
+    }
+  });
+  // Property: a body outside its route's shape (content type, framing, JSON, schema, status) fails with a fixed
+  // code, never a guessed PASS or a silent null. Mutants: drop the content-type check, accept an unterminated
+  // block, skip the id/data cross-check, read a non-200/404 answer as null, parse asks without its schema.
+  it("each HTTP port refuses a body outside its route's shape with a fixed code", async () => {
+    const events = `GET /api/v1/runs/${RUN}/events`;
+    const whole = frame([event(1)]);
+    const cases: [string, Record<string, Route>, string][] = [
+      ["events as a JSON array (the old port-level fake)", { [events]: () => reply(200, [event(1)]) }, "HS_S01_RESPONSE_INVALID"],
+      ["events data that is not JSON", { [events]: () => stream("id: event_1\nevent: x\ndata: {oops\n\n") }, "HS_S01_RESPONSE_INVALID"],
+      ["events data that is a JSON string", { [events]: () => stream('data: "PROMPT_X"\n\n') }, "HS_S01_RESPONSE_INVALID"],
+      ["events SSE body under application/json", { [events]: () => new Response(whole, { headers: { "content-type": JSON_TYPE } }) }, "HS_S01_RESPONSE_INVALID"],
+      ["events cut mid-block (no blank-line terminator)", { [events]: () => stream(whole.slice(0, -1)) }, "HS_S01_RESPONSE_INVALID"],
+      ["events cut inside a block's first line", { [events]: () => stream(`${whole}id: event_2`) }, "HS_S01_RESPONSE_INVALID"],
+      ["events id: not the data's event_id", { [events]: () => stream(whole.replace("id: event_1", "id: event_9")) }, "HS_S01_RESPONSE_INVALID"],
+      ["events event: not the data's event_type", { [events]: () => stream(whole.replace(`event: ${EVENT_TYPES[0]}`, "event: other")) }, "HS_S01_RESPONSE_INVALID"],
+      ["events field the route never writes", { [events]: () => stream(`retry: 10\n${whole}`) }, "HS_S01_RESPONSE_INVALID"],
+      ["events RUN_NOT_FOUND", { [events]: () => reply(404, { error: "RUN_NOT_FOUND" }) }, "HS_S01_HTTP_404"],
+      ["run as text/html", { [`GET /api/v1/runs/${RUN}`]: () => new Response(JSON.stringify(run("SETTLED")), { headers: { "content-type": "text/html" } }) }, "HS_S01_RESPONSE_INVALID"],
+      ["run without a state", { [`GET /api/v1/runs/${RUN}`]: () => reply(200, { run_ref: RUN }) }, "HS_S01_RESPONSE_INVALID"],
+      ["answer 500", { [`GET /api/v1/runs/${RUN}/answer`]: () => reply(500, { error: "INTERNAL" }) }, "HS_S01_HTTP_500"],
+      ["asks outside AskAccepted", { "POST /api/v1/asks": () => reply(202, { run_ref: RUN, status: "QUEUED", extra: 1 }) }, "HS_S01_RESPONSE_INVALID"],
+      ["login challenge as text/plain", { "POST /api/v1/auth/login": () => new Response("{}", { status: 202, headers: { "content-type": "text/plain" } }) }, "HS_S01_RESPONSE_INVALID"],
+      ["login 200 without cookies", { "POST /api/v1/auth/login": body => body?.challenge_token === undefined
+        ? reply(202, { status: "MFA_REQUIRED", challenge_token: "challenge_1" }) : reply(200, { status: "AUTHENTICATED" }) }, "HS_S01_LOGIN_COOKIES_MISSING"]
+    ];
+    for (const [name, overrides, code] of cases) {
+      expect({ name, last: (await runHsS01([], live(server(overrides)))).lines.at(-1) }).toEqual({ name, last: `HS-S01-ACCEPT: FAIL ${code}` });
+    }
+  });
+  // Property: a FAILED run's answer route answers 404 ANSWER_NOT_SERVED, which reads as no answer, so the
+  // terminal prints FAILED; a RUNNING projection is polled again after one sleep. Mutant: treat 404 as an error.
+  it("answer 404 on a FAILED run reads as no answer; a RUNNING run is polled until terminal", async () => {
+    const states = ["RUNNING", "FAILED"] as const;
+    const sleeps: number[] = [];
+    const fake = server({ [`GET /api/v1/runs/${RUN}`]: () => reply(200, run(states[Math.min(sleeps.length, 1)]!)),
+      [`GET /api/v1/runs/${RUN}/answer`]: () => reply(404, { error: "ANSWER_NOT_SERVED" }) });
+    expect(await runHsS01([], live(fake, sleeps)))
+      .toEqual({ lines: ["HS-S01 Q-N terminal=FAILED codes=none", "HS-S01-ACCEPT: FAIL TERMINAL_FAILED"], exitCode: 1 });
+    expect({ polls: fake.trace.filter(entry => entry.route === `GET /api/v1/runs/${RUN}`).length, sleeps: sleeps.length }).toEqual({ polls: 2, sleeps: 1 });
   });
 });
