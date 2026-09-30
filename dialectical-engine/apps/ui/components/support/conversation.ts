@@ -92,6 +92,8 @@ export type StoredSupportConversation = Readonly<{
   /** The identity this transcript belongs to: signed-in, or anonymous. */
   identityBound: boolean;
   messages: readonly SupportConversationMessage[];
+  /** Whole seconds since 1970, from the UI server's `Date` header of the latest support response (R05). */
+  serverTime?: number;
 }>;
 
 /** The slice of the Storage interface this module uses, so tests need no DOM. */
@@ -101,8 +103,47 @@ export type SupportConversationStorage = Readonly<{
   removeItem(key: string): void;
 }>;
 
+/**
+ * S04-R06 (SD3-N1): the one place the tab's storage is resolved. A browser that blocks storage throws from the
+ * `sessionStorage` getter itself (SecurityError), before any method is called, so the read sits in a `try` here
+ * and every caller receives `null` — absent and blocked look the same to them.
+ */
 export function browserSupportConversationStorage(): SupportConversationStorage | null {
-  return typeof sessionStorage === "undefined" ? null : sessionStorage;
+  try { return typeof sessionStorage === "undefined" ? null : sessionStorage; } catch { return null; }
+}
+
+/** S04-R05: the one stored time is a whole, non-negative number of seconds, or it is not stored. */
+function isStoredServerTime(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+/**
+ * S04-R05 (D-S04-15): the UI server's `Date` response header, floored to whole seconds, or `undefined` when there
+ * is no header or it is not a date. It is a server's time, never the browser's clock.
+ */
+export function serverTimeFromDateHeader(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds)) return undefined;
+  const seconds = Math.floor(milliseconds / 1000);
+  return seconds >= 0 ? seconds : undefined;
+}
+
+/** What a waking tab reads from the server: signed in now, and when the current session began (API clock). */
+export type WakeFacts = Readonly<{ signedIn: boolean; currentSessionStartedAtMs: number | null }>;
+
+/**
+ * S04-R02 (PLAN §3): may this stored transcript be shown in this tab now? E4 (a)/(b) first; then (c): a transcript
+ * written signed in is kept only when it carries its server time and the current session began before it. It
+ * compares one server time with another and reads no clock.
+ */
+export function storedConversationVerdict(
+  stored: StoredSupportConversation, facts: WakeFacts
+): "keep" | "erase" {
+  if (stored.identityBound !== facts.signedIn) return "erase";               // (a), (b)
+  if (!stored.identityBound) return "keep";                                   // (d): not required either way; V-14 default
+  if (stored.serverTime === undefined || facts.currentSessionStartedAtMs === null) return "erase"; // (c) second sentence; D-S04-20
+  return facts.currentSessionStartedAtMs >= stored.serverTime * 1000 ? "erase" : "keep";            // (c) / R04 keep
 }
 
 function isMessage(value: unknown): value is SupportConversationMessage {
@@ -291,6 +332,12 @@ export function readStoredSupportConversation(
       clearStoredSupportConversation(storage);
       return null;
     }
+    // S04-R05: absent is "no server time"; present, it is a whole non-negative second count or the payload goes (E6).
+    const serverTime: unknown = value.serverTime;
+    if (serverTime !== undefined && !isStoredServerTime(serverTime)) {
+      clearStoredSupportConversation(storage);
+      return null;
+    }
     const language = value.language;
     const identityBound = value.identityBound;
     // DL1-F5c: a tab open across the deploy keeps its sessionStorage, so the
@@ -306,7 +353,8 @@ export function readStoredSupportConversation(
     return Object.freeze({
       language,
       identityBound,
-      messages: Object.freeze(messages as SupportConversationMessage[])
+      messages: Object.freeze(messages as SupportConversationMessage[]),
+      ...(serverTime === undefined ? {} : { serverTime })
     });
   } catch {
     // Unparsable is still readable as text: erase it rather than step over it.
@@ -316,8 +364,9 @@ export function readStoredSupportConversation(
 }
 
 /**
- * Writes exactly the three stored fields and nothing else, each message through
- * the same door. The whitelist is the control: a caller holding a live session
+ * Writes exactly the three stored fields — plus, when it is valid, the one server
+ * time (S04-R05) — and nothing else, each message through the same door. The
+ * whitelist is the control: a caller holding a live session
  * — or a live case bearer (DL1-F5c) — cannot persist it by accident. A message
  * whose decorations are not the reviewed shapes is not written at all.
  */
@@ -335,7 +384,8 @@ export function writeStoredSupportConversation(
           message, index, conversation.identityBound, conversation.language
         );
         return stored === null ? [] : [stored];
-      })
+      }),
+      ...(isStoredServerTime(conversation.serverTime) ? { serverTime: conversation.serverTime } : {})
     }));
   } catch {
     // A storage that refuses to write costs continuity, never correctness.
