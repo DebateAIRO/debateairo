@@ -17,6 +17,7 @@ import {
   LEGAL_COOKIES,
   LEGAL_PAGES,
   MODEL_PROVIDERS,
+  PROVIDER_REGISTER,
   TERMS_VERSIONS
 } from "../../apps/ui/lib/legal/pages.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
@@ -329,13 +330,75 @@ describe("the model providers page lists the model families the product runs", (
   it("has one row per family the model registry knows", () => {
     const registry = source("apps/ui/lib/models.ts");
     const families = [...(registry.match(/const NAMES[^}]+}/)?.[0] ?? "").matchAll(/^\s+(\w+):/gm)].map((match) => match[1]);
-    expect(MODEL_PROVIDERS.map(({ family }) => family)).toEqual(families);
+    expect(MODEL_PROVIDERS.map(({ key }) => key)).toEqual(families);
   });
 
-  it("renders the table with every provider and its models", () => {
+  it("renders one register entry per provider, the support chat's model last", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
-    const rows = [...view.querySelectorAll(".legalTable tbody tr")];
-    expect(rows.map((row) => row.querySelector("th")?.textContent)).toEqual(MODEL_PROVIDERS.map(({ provider }) => provider));
+    const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
+    expect(headings).toEqual([...MODEL_PROVIDERS.map(({ provider }) => provider), "Support chat model"]);
+    expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
+  });
+
+  it("states the Privacy Policy's Register facts for every provider (PP §5, Japan and Korea)", () => {
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    const entries = [...view.querySelectorAll(".legalProviderEntry")];
+    expect(entries).toHaveLength(PROVIDER_REGISTER.length);
+    for (const entry of entries) {
+      expect(texts(entry.querySelectorAll("tbody th"))).toEqual([
+        "Models",
+        "Company",
+        "Home country",
+        "What it receives, and why",
+        "Where it processes",
+        "How long it keeps data",
+        "Zero data retention",
+        "May it train on your data?",
+        "Transfer basis",
+        "Contact",
+        "Last checked"
+      ]);
+      for (const cell of entry.querySelectorAll("tbody td")) expect(cell.textContent?.trim()).not.toBe("");
+    }
+  });
+
+  it("names the four jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
+    expect([...jobs].sort()).toEqual(
+      [
+        "Debate text — to write the arguments",
+        "Debate text — to judge and check the arguments",
+        "The finished debate — to write the verdict story",
+        "What you type in the support chat — to answer you"
+      ].sort()
+    );
+    PROVIDER_REGISTER.forEach((entry, index) => {
+      const note = view.querySelectorAll(".legalProviderEntry")[index]?.querySelector(".legalProviderPurposes .legalFactNote");
+      expect(note === null).toBe(entry.purposesConfirmed);
+    });
+  });
+
+  it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
+    for (const entry of PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null)) {
+      if (entry.key === "qwen") continue;
+      expect(isUnverified(entry.entity)).toBe(true);
+      expect(isUnverified(entry.contact)).toBe(true);
+      expect(entry.training).toBe("unconfirmed");
+      expect(entry.zeroRetention).toBe("unconfirmed");
+      expect(entry.retentionKey).toBe("legal.providers.unconfirmed");
+      expect(entry.locationKey).toBe("legal.providers.unconfirmed");
+    }
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    expect(view.textContent).toContain("[not checked yet]");
+  });
+
+  it("shows every register label in every locale's catalogue", () => {
+    const englishKeys = Object.keys(legalEnglish).filter((key) => key.startsWith("legal.providers."));
+    expect(englishKeys).not.toContain("legal.providers.colProvider");
+    for (const locale of readdirSync(resolve(process.cwd(), "apps/ui/messages"))) {
+      expect(Object.keys(catalog(locale, "legal")).filter((key) => key.startsWith("legal.providers.")).sort(), locale).toEqual([...englishKeys].sort());
+    }
   });
 });
 
