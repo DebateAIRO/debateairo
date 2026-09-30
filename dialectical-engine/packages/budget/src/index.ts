@@ -20,6 +20,7 @@ export {
   COST_MICROS_PER_USD,
   DAILY_COST_ENVELOPE_REACHED,
   MAX_REPORTED_USAGE_COUNTER,
+  PERSON_ALLOWANCE_REACHED,
   PROJECTED_INPUT_BYTES_PER_TOKEN,
   PROVIDER_USAGE_UNREPORTED,
   RUN_COST_ENVELOPE_MONEY_REACHED,
@@ -36,6 +37,7 @@ export {
   readReportedUsage,
   readUsageCounters,
   runCostEnvelopeReached,
+  sharedWallReached,
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
   type DailyCostEnvelopeDecision,
@@ -61,7 +63,10 @@ export {
   type ModelSpendStore,
   type ProviderCostSeam,
   type ProviderSeamInput,
-  type RunProviderSeamInput
+  type RunProviderSeamInput,
+  type RunOwnerSpendReader,
+  type SharedWallApplication,
+  type SharedWallInput
 } from "./model-spend.js";
 
 /**
