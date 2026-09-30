@@ -49,6 +49,18 @@ type JudgeOptions = { judge: PublicationJudgePort | null; deadlineMs?: number; m
 export const PUBLICATION_CHECK_DEADLINE_MS = 60_000;
 
 /**
+ * FIX-HS2-t-r1 (TEST rehearsal 2): every judge call of an attempt runs in ONE wave, up to this bound. With one part
+ * kind per call (D-S02-28) a served debate needs 5–7 calls; at 4 in flight the 5th and 6th calls waited for a free
+ * slot, so the wall-clock was two call latencies. Measured on the served relay at host load ~35: two waves took
+ * 42.4 s, 50.2 s and then JUDGE_DEADLINE at 60 s; one wave took 24.5 s, 23.1 s and 21.4 s. 8 covers the debates the
+ * stack builds (up to two chunks of arguments and of reviews) and bounds the CLI processes the dev relay spawns (one
+ * per request). What one wave cannot remove: a single call slower than D (the dev-relay tail, V-15/V-20).
+ * Module-private: the source-purity law (tools/orphan-audit auditSourceRules) refuses an exported numeric literal;
+ * tests/unit/hs-s02-check.test.ts pins the bound by behaviour (peak in flight).
+ */
+const PUBLICATION_CHECK_MAX_CALLS_IN_FLIGHT = 8;
+
+/**
  * FIX-HS2-p1 sd-N1: the record's `judge_provider_ref` / `judge_model_id` hold operator identifiers, never text.
  * The same grammar is a CHECK on the table (migrations/0079_publication_check_record_identifiers.sql): no space,
  * no `@`, 1–256 characters, and never uuid-shaped. A judge whose identifiers fail it is not a configured judge.
@@ -86,7 +98,7 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
   if (judge === null) return { result: { outcome: "UNAVAILABLE", cause: "JUDGE_NOT_CONFIGURED" }, rules: [], partKinds: [], ground: null, judgeCallCount: 0 };
   const calls = packJudgeCalls(parts, options.maxMaterialCodePoints);
   const signal = AbortSignal.timeout(options.deadlineMs ?? PUBLICATION_CHECK_DEADLINE_MS);
-  const concurrency = options.maxConcurrentCalls ?? 4;
+  const concurrency = options.maxConcurrentCalls ?? PUBLICATION_CHECK_MAX_CALLS_IN_FLIGHT;
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("Invalid judge concurrency");
   const results: JudgeCallResult[] = new Array(calls.length);
   const sentFieldNames = new Set<string>();
