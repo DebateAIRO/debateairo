@@ -541,6 +541,7 @@ packages/db/src/auth-risk.ts
 packages/db/src/identity.ts
 packages/db/src/index.ts
 packages/db/src/legacy-claim.ts
+packages/db/src/legal-acceptance.ts
 packages/db/src/obs-schema.ts
 packages/db/src/publication-lease.ts
 packages/db/src/publication.ts

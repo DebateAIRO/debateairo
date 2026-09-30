@@ -27,7 +27,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // compared with this list, so a new schema fails the test rather than silently
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
-  "core", "evaluator", "evidence", "identity", "ledger", "memory",
+  "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
   "obs", "observation", "register", "scorecard", "serve", "support"
 ] as const;
 
@@ -421,7 +421,12 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0076_serve_disclosure.sql",
         // Age gate (Turn 8 implementation prompt): identity.age_check, the result-only
         // age record, and the 'age_frozen' account state. The next free prefix, no pair.
-        "0077_age_gate.sql"
+        "0077_age_gate.sql",
+        // Paid plans L3a (spec 2026-09-29 §2.3.2 and §2.16, amendments R1 A14/A15, RULINGS-R3 R3-1):
+        // legal.acceptance, the retention purge, the sign-up consent wrapper (with the age record)
+        // and the G3a country-gate audit capability. 0078 is reserved for the colleague's
+        // sensitive-data consent, so this is 0079; no pair.
+        "0079_legal_acceptance.sql"
       ]);
   });
 });

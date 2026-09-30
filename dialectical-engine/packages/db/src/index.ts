@@ -1795,6 +1795,13 @@ export {
   type ResendPreparation,
   type TotpEnrollmentRecord
 } from "./identity.js";
+export {
+  AcceptanceRepository,
+  type AcceptanceInput,
+  type AcceptanceKind,
+  type AcceptanceSurface,
+  type SignUpAcceptanceRow
+} from "./legal-acceptance.js";
 export * from "./obs-schema.js";
 export {
   accountRecoveryChannelRefsAad,
