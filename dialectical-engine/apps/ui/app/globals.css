@@ -8958,16 +8958,26 @@ a:focus-visible {
 }
 /* === end verdict-story === */
 
-/* hate-speech S02: the owner's Visibility card on the debate page (D-S02-24) */
+/* hate-speech S02: the owner's Visibility card on the debate page (D-S02-24)
+   V-19: the debate column is 100dvh with overflow:hidden, and the story strip, language offer and AI notice above the
+   card do not shrink. The card therefore shrinks first (flex 0 1 auto, down to min-height) and, when the siblings alone
+   still leave it no room (a landscape phone), sticks to the column's bottom edge (`bottom: 0`: the column's effective
+   bottom padding is 0: the later .debateView rule sets padding-bottom to 0), so the whole card stays inside the column and
+   every control is reachable by scrolling the card. In portrait and desktop the shrink alone fits and nothing moves.
+   min-height 6rem: on a 390 px-tall landscape phone the worst locale leaves 106 px under the story strip's summary, so
+   the stuck card never covers the strip's Show/Hide control (measured, 35 locales). */
 .debateView > section.card.publicationControl {
-  position: static !important;
+  position: sticky !important;
+  bottom: 0;
+  z-index: 1;
   width: auto !important;
   height: auto !important;
   overflow: auto !important;
   clip: auto !important;
   clip-path: none !important;
   white-space: normal !important;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: min(6rem, 25dvh);
   max-height: 45dvh;
   box-sizing: border-box;
   padding: 12px 18px;
@@ -8985,6 +8995,10 @@ a:focus-visible {
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   padding: 6px 10px;
+}
+/* ui-p3 N1: a typed field's boundary must reach 3 : 1 against the card (WCAG 1.4.11); --line-strong measured 1.47 / 1.63. */
+.debateView > section.card.publicationControl input:not([type="checkbox"]) {
+  border-color: var(--muted);
 }
 .debateView > section.card.publicationControl button:disabled {
   opacity: .55;

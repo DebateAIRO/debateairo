@@ -311,13 +311,25 @@ describe("locales", () => {
     expect(terms?.trim()).toBeTruthy();
     expect(read("public")[prefix + "groundTerms"]!.toLocaleLowerCase(locale)).toContain(terms!.toLocaleLowerCase(locale));
   });
-  // Property (ui-N2): the ground line cites section 7 and no other number, and section 7 exists as a heading in that
-  // locale's own Terms of Service (the acceptable-use section the line paraphrases). Break caught: a locale citing
-  // section 8 (the p2 reviewer's mutant-section7.zsh) while every other suite stays green.
-  it.each(locales)("cites section 7 of that locale's Terms in %s", (locale) => {
+  // Property (ui-N2, ui-p3 N2): the ground line cites section 7 and no other number, and section 7 of that locale's own
+  // Terms of Service IS the acceptable-use section the line paraphrases (not merely "some section 7"). Oracle: the
+  // acceptable-use heading of each locale's Terms, hand-read at 333d79e0b (every title below means "acceptable use").
+  // Breaks caught: a locale citing section 8 (mutant-section7.zsh) · a Terms edit that moves acceptable use away from
+  // section 7 or swaps the 7/8 headings (the p3 lens's tosswap mutant) while the statement still cites 7.
+  const ACCEPTABLE_USE: Record<string, string> = {
+    ar: "الاستخدام المقبول", bg: "Допустима употреба", cs: "Přijatelné užívání", da: "Acceptabel brug", de: "Zulässige Nutzung",
+    el: "Αποδεκτή χρήση", en: "Acceptable use", es: "Uso aceptable", et: "Lubatud kasutus", fi: "Hyväksyttävä käyttö",
+    fr: "Utilisation acceptable", ga: "Úsáid inghlactha", he: "שימוש מקובל", hi: "स्वीकार्य उपयोग", hr: "Prihvatljiva uporaba",
+    hu: "Elfogadható használat", id: "Penggunaan yang dapat diterima", it: "Uso consentito", ja: "許容される利用", ko: "허용되는 이용",
+    lt: "Priimtinas naudojimas", lv: "Pieņemama lietošana", mt: "Użu aċċettabbli", nl: "Toegestaan gebruik", pl: "Dozwolone korzystanie",
+    pt: "Utilização aceitável", ro: "Utilizarea acceptabilă", ru: "Допустимое использование", sk: "Prijateľné používanie", sl: "Dopustna uporaba",
+    sv: "Tillåten användning", tr: "Kabul edilebilir kullanım", uk: "Допустиме використання", vi: "Sử dụng được chấp nhận", zh: "可接受使用"
+  };
+  it.each(locales)("cites section 7 of that locale's Terms, the acceptable-use section, in %s", (locale) => {
     const ground = (JSON.parse(readFileSync(resolve(process.cwd(), `apps/ui/messages/${locale}/public.json`), "utf8")) as Record<string, string>)[prefix + "groundTerms"]!;
     const terms = readFileSync(resolve(process.cwd(), `apps/ui/legal/${locale}/terms-of-service.md`), "utf8");
-    expect({ numbers: ground.match(/\p{Nd}+/gu), section7Heading: /^## 7\. \S/mu.test(terms) }).toEqual({ numbers: ["7"], section7Heading: true });
+    const headingOf = (title: string) => /^## (\d+)\. (.+)$/mu.exec(terms.split("\n").find((line) => line.endsWith(` ${title}`) && line.startsWith("## ")) ?? "")?.[1];
+    expect({ numbers: ground.match(/\p{Nd}+/gu), acceptableUseSection: headingOf(ACCEPTABLE_USE[locale]!) }).toEqual({ numbers: ["7"], acceptableUseSection: "7" });
   });
   // Property: the authoritative English copy matches the SPEC, and Romanian has no untranslated message.
   it("uses the English oracle and translated Romanian values", () => {
@@ -339,7 +351,7 @@ describe("card is not clipped", () => {
   // colours are measured by the p2 ui-product controls-contrast harness in headless Chromium.
   it("gives the card's controls a token pair that reaches 4.5 : 1 in both modes, scoped to the card", () => {
     const css = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
-    const block = css.slice(css.indexOf("/* hate-speech S02: the owner's Visibility card"), css.indexOf("/* === consent-ui S01 === */"));
+    const block = css.slice(css.indexOf("/* hate-speech S02: the owner's Visibility card"), css.indexOf("/* === consent-ui S01 === */")).replace(/\/\*[\s\S]*?\*\//g, "");
     const rules = [...block.matchAll(/([^{}]+)\{([^}]+)\}/g)].map(([, selector, body]) => ({ selector: selector!.replace(/\/\*[\s\S]*?\*\//g, "").trim(),
       decl: Object.fromEntries(body!.split(";").filter((line) => line.includes(":")).map((line) => { const i = line.indexOf(":"); return [line.slice(0, i).trim(), line.slice(i + 1).trim()]; })) }));
     const controls = rules.filter(({ selector }) => /button/.test(selector) && /input/.test(selector));
@@ -360,6 +372,30 @@ describe("card is not clipped", () => {
     const beforeConsent = css.slice(0, css.indexOf("/* === consent-ui S01 === */"));
     const body = beforeConsent.match(/\.debateView\s*>\s*section\.card\.publicationControl\s*\{([^}]+)\}/)?.[1] ?? "";
     const declarations = Object.fromEntries(body.split(";").filter((line) => line.includes(":")).map((line) => line.split(":").map((part) => part.trim())));
-    expect(declarations).toEqual({ position: "static !important", width: "auto !important", height: "auto !important", overflow: "auto !important", clip: "auto !important", "clip-path": "none !important", "white-space": "normal !important", flex: "0 0 auto", "max-height": "45dvh", "box-sizing": "border-box", padding: "12px 18px", "border-top": "1px solid var(--line)", background: "var(--surface-2)", color: "var(--text)" });
+    // V-19: `position: sticky` (not static) + `bottom: 0` (the column's effective bottom padding is 0) keeps the whole card inside
+    // the 100dvh overflow:hidden column when the siblings above it (story strip, language offer) leave no room;
+    // `flex: 0 1 auto` + `min-height` lets it shrink first. The geometry is measured by the p3 reach-p3.mjs probe.
+    expect(declarations).toEqual({ position: "sticky !important", bottom: "0", "z-index": "1", width: "auto !important", height: "auto !important", overflow: "auto !important", clip: "auto !important", "clip-path": "none !important", "white-space": "normal !important", flex: "0 1 auto", "min-height": "min(6rem, 25dvh)", "max-height": "45dvh", "box-sizing": "border-box", padding: "12px 18px", "border-top": "1px solid var(--line)", background: "var(--surface-2)", color: "var(--text)" });
+  });
+  // Property (ui-p3 N1): the card's typed text fields keep a visible boundary — their border colour reaches WCAG 1.4.11's
+  // 3 : 1 against the card's background in both modes. Break caught: a border token at 1.47 / 1.63 : 1 (--line-strong).
+  it("gives the card's text fields a 3 : 1 boundary against the card in both modes", () => {
+    const css = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
+    const block = css.slice(css.indexOf("/* hate-speech S02: the owner's Visibility card"), css.indexOf("/* === consent-ui S01 === */")).replace(/\/\*[\s\S]*?\*\//g, "");
+    const rules = [...block.matchAll(/([^{}]+)\{([^}]+)\}/g)].map(([, selector, body]) => ({ selector: selector!.replace(/\/\*[\s\S]*?\*\//g, "").trim(),
+      decl: Object.fromEntries(body!.split(";").filter((line) => line.includes(":")).map((line) => { const i = line.indexOf(":"); return [line.slice(0, i).trim(), line.slice(i + 1).trim()]; })) }));
+    // the LAST declaration of border-color (or border) that applies to the card's text inputs wins, as in the cascade
+    let border = ""; for (const { selector, decl } of rules) if (/input:not\(\[type="checkbox"\]\)/.test(selector)) border = decl["border-color"] ?? /var\(--[\w-]+\)/.exec(decl.border ?? "")?.[0] ?? border;
+    const cardBg = rules.find(({ selector }) => selector === ".debateView > section.card.publicationControl")!.decl.background!;
+    // token values: #rrggbb, or rgba(r,g,b,a) composited over the card background (the --line* tokens are translucent)
+    const tokens = (open: string) => { const at = css.indexOf(open); return Object.fromEntries([...css.slice(at, css.indexOf("\n}", at)).matchAll(/(--[\w-]+):\s*(#[0-9A-Fa-f]{6}|rgba\([^)]*\))/g)].map(([, k, v]) => [k, v])); };
+    const rgb = (value: string, under?: number[]): number[] => { if (value.startsWith("#")) return [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16));
+      const [r, g, b, a] = value.slice(5, -1).split(",").map(Number); return [r!, g!, b!].map((c, i) => c * a! + under![i]! * (1 - a!)); };
+    const lum = (c: number[]) => { const [r, g, b] = c.map((x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!; };
+    const name = (value: string) => /var\((--[\w-]+)\)/.exec(value)?.[1] ?? "";
+    const boundary = (mode: Record<string, string>) => { const bg = rgb(mode[name(cardBg)]!); const line = mode[name(border)]; if (!line) return 0;
+      const [x, y] = [lum(rgb(line, bg)), lum(bg)].sort((m, n) => n - m); return Math.round(((x! + 0.05) / (y! + 0.05)) * 100) / 100; };
+    const measured = { light: boundary(tokens(":root {")), dark: boundary(tokens('html[data-mode="chamber"] {')) };
+    expect({ light: measured.light >= 3, dark: measured.dark >= 3, measured }).toEqual({ light: true, dark: true, measured });
   });
 });
