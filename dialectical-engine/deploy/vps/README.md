@@ -809,8 +809,9 @@ Their PATHS are required in every hosted `api.env` (`GEOIP_COUNTRY_DB_PATH`, `TO
 without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist from the moment the
 register version in force publishes a `countryPolicy` row: the API then opens them at boot, and a
 missing file refuses the boot with `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a
-malformed one with `GEOIP_COUNTRY_DB_INVALID` or `TOR_EXIT_LIST_INVALID`; the refresh below checks
-each file the same way before it renames it into place). A Tor list with no address in it — an
+malformed one with `GEOIP_COUNTRY_DB_INVALID` or `TOR_EXIT_LIST_INVALID`; what the refresh checks
+before it renames a file into place, and where that falls short of the API's own check, is at the
+end of this section). A Tor list with no address in it — an
 empty file, or only blank lines and `#` comments — counts as malformed: the boot refuses it with
 `TOR_EXIT_LIST_INVALID`, and a running API keeps its last good list and logs the code
 (`geo.reload.failed`), because an empty list would let every Tor exit through. So never create the
@@ -871,6 +872,42 @@ fresh) or `GEOIP_REFRESH_REFUSED` with the reason. To refresh now:
 ```sh
 systemctl start debateai-geoip-refresh.service
 ```
+
+**What each side checks.** For the Tor list the refresh applies the API's own rules (every line an
+address, as the API's parser reads it) and asks for more (at least 500 addresses), so a list it
+installs always opens. The country file it checks less: the download must succeed (https only,
+`curl --fail`), decompress cleanly (gzip's checksum), be at least 1 000 000 bytes and carry the MMDB
+metadata marker; the script never opens the database. The API does open it, with the real reader,
+which also parses the metadata and the first nodes of the search tree, at boot and at each reload;
+a file that fails is `GEOIP_COUNTRY_DB_INVALID`. So the refresh can install a country file the API
+refuses. A running API keeps its last good data and logs `geo.reload.failed` with that code, but
+its next start — a deploy, an unattended reboot — refuses to boot with `GEOIP_COUNTRY_DB_INVALID`,
+and then nothing is served, signing in and reading included. Damage deeper in the file passes the
+reader's open: a record it cannot read then answers "no country" for that address (sign-up is
+refused with `COUNTRY_UNKNOWN`; signing in and reading are untouched), logged once per file as
+`geo.reload.failed` with the same code.
+
+**If the API refuses to boot with `GEOIP_COUNTRY_DB_INVALID` after a refresh:**
+
+1. Bring the site back without the gate: in both `api.env` and `runner.env`, set `REGISTER_VERSION`
+   back to a version with no `countryPolicy` row — the one pinned before the gate went on (if there
+   is none, remove the member from the hosted file and publish one, §11) — and restart both units.
+   With no row in force the API does not open the two files at all. Until step 4 sign-up is not
+   country-gated: every country, Tor included.
+2. Remove the refused file and fetch it again; the refresh fetches a missing country file at once:
+
+```sh
+rm -f /var/lib/debateai-geoip/dbip-country-lite.mmdb
+systemctl start debateai-geoip-refresh.service
+journalctl -u debateai-geoip-refresh.service --since '15 minutes ago' --no-pager
+```
+
+3. The journal must show `GEOIP_REFRESH_OK country-db`. After `GEOIP_REFRESH_REFUSED`, stay on the
+   version of step 1 and run the block again later.
+4. Set `REGISTER_VERSION` back to the gated version in both files and restart both units. If the API
+   refuses again with `GEOIP_COUNTRY_DB_INVALID`, the file DB-IP publishes is itself damaged: go back
+   to step 1 and repeat steps 2 to 4 on a later day. The refresh keeps a file for 27 days, so remove
+   it each time before you fetch it again.
 
 ---
 
