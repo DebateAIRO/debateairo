@@ -64,6 +64,28 @@ export {
   type RunProviderSeamInput
 } from "./model-spend.js";
 
+/**
+ * Budget spec 2026-09-28 §2.3 with the paid-plans spec §2.4.1 (B1): the room for
+ * one scope, the admission over every scope, the running wall, and the person's
+ * windows as billing supplies them.
+ */
+export {
+  decideAdmission,
+  decideRoom,
+  decideSharedWall,
+  waitingUntil,
+  type Admission,
+  type Room,
+  type ScopeRoom,
+  type Wall
+} from "./room.js";
+export {
+  NO_PERSON_ALLOWANCE,
+  type PersonAllowanceSource,
+  type PersonWindow,
+  type SpendScope
+} from "./person-allowance.js";
+
 
 export const RATIFIED_BATTERY_ROW_IDS = [
   "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",
