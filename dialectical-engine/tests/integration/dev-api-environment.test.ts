@@ -62,7 +62,8 @@ async function fixture() {
     writeFile(join(custodyRoot, "secrets", "support-kek.bin"), Buffer.alloc(32, 5), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "corpus-kek.bin"), Buffer.alloc(32, 4), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "blind-index-key.bin"), Buffer.alloc(32, 2), { mode: 0o600 }),
-    writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 3), { mode: 0o600 })
+    writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 3), { mode: 0o600 }),
+    writeFile(join(custodyRoot, "secrets", "records-key.bin"), Buffer.alloc(32, 9), { mode: 0o600 })
   ]);
   const databaseCredentials = DEVELOPMENT_DATABASE_PRINCIPALS.map((principal, index) =>
     `${principal.environmentKey}=postgresql://${principal.roleName}:dev-password-${index}-abcdefghijklmnopqrstuvwxyz@127.0.0.1:55432/debateai`
@@ -145,8 +146,9 @@ describe("DEV-09 private local API environment", () => {
       environment.get("KEK_PATH"),
       environment.get("CORPUS_KEK_PATH"),
       environment.get("BLIND_INDEX_KEY_PATH"),
-      environment.get("AUDIT_SOURCE_IP_SALT_PATH")
-    ])).toHaveLength(5);
+      environment.get("AUDIT_SOURCE_IP_SALT_PATH"),
+      environment.get("RECORDS_KEY_PATH")
+    ])).toHaveLength(6);
     expect(environment.get("SUPPORT_DATABASE_URL")).toContain("debateai_dev_support");
     expect(environment.get("SUPPORT_DATABASE_URL")).toBe(supportUrl);
     expect(environment.get("SUPPORT_DATABASE_URL")).not.toBe(environment.get("DATABASE_URL"));
@@ -342,8 +344,13 @@ describe("DEV-09 private local API environment", () => {
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
     const ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
-    expect(current.endsWith(`\n${ROW}`)).toBe(true);
-    const v1 = current.slice(0, -ROW.length);
+    // Paid plans L1: the records row now follows the mode row, so a file written before the mode
+    // row existed lacks BOTH rows, and must upgrade to exactly the current file.
+    const RECORDS_ROW = current.slice(current.lastIndexOf("RECORDS_KEY_PATH="));
+    expect(RECORDS_ROW).toBe(`RECORDS_KEY_PATH=${join(test.custodyRoot, "secrets", "records-key.bin")}\n`);
+    const beforeRecords = current.slice(0, -RECORDS_ROW.length);
+    expect(beforeRecords.endsWith(`\n${ROW}`)).toBe(true);
+    const v1 = beforeRecords.slice(0, -ROW.length);
     const v2 = v1.replace("PROVIDER_PROBE_TIMEOUT_MS=180000\n", "PROVIDER_PROBE_TIMEOUT_MS=5000\n");
     expect(v2).not.toBe(v1);
     for (const previous of [v1, v2]) {
@@ -359,7 +366,8 @@ describe("DEV-09 private local API environment", () => {
     await assemble(test.repositoryRoot);
     const current = await readFile(test.outputFilePath, "utf8");
     const ROW = "DEBATEAI_DEPLOYMENT_MODE=local\n";
-    const previous = current.slice(0, -ROW.length);
+    const RECORDS_ROW = current.slice(current.lastIndexOf("RECORDS_KEY_PATH="));
+    const previous = current.slice(0, -RECORDS_ROW.length).slice(0, -ROW.length);
     const w1 = previous.replace("API_PORT=8790\n", "API_PORT=8791\n");
     const w2 = previous + "DEBATEAI_DEPLOYMENT_MODE=hosted\n";
     expect(w1).not.toBe(previous);
@@ -369,6 +377,36 @@ describe("DEV-09 private local API environment", () => {
       await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
       expect(await readFile(test.outputFilePath, "utf8")).toBe(drifted);
     }
+  });
+
+  it("atomically adds the records key to the exact environment assembled before it (paid plans L1)", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const RECORDS_ROW = current.slice(current.lastIndexOf("RECORDS_KEY_PATH="));
+    const withoutRecords = current.slice(0, -RECORDS_ROW.length);
+    expect(withoutRecords.endsWith("\nDEBATEAI_DEPLOYMENT_MODE=local\n")).toBe(true);
+    const withLegacyTimeout = withoutRecords
+      .replace("PROVIDER_PROBE_TIMEOUT_MS=180000\n", "PROVIDER_PROBE_TIMEOUT_MS=5000\n");
+    expect(withLegacyTimeout).not.toBe(withoutRecords);
+    for (const previous of [withoutRecords, withLegacyTimeout]) {
+      await writeFile(test.outputFilePath, previous, { mode: 0o600 });
+      await expect(assemble(test.repositoryRoot))
+        .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
+      expect(await readFile(test.outputFilePath, "utf8")).toBe(current);
+    }
+  });
+
+  it("refuses to add the records key over an environment that drifts elsewhere (paid plans L1)", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const RECORDS_ROW = current.slice(current.lastIndexOf("RECORDS_KEY_PATH="));
+    const drifted = current.slice(0, -RECORDS_ROW.length).replace("API_PORT=8790\n", "API_PORT=8791\n");
+    expect(drifted).toContain("API_PORT=8791\n");
+    await writeFile(test.outputFilePath, drifted, { mode: 0o600 });
+    await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+    expect(await readFile(test.outputFilePath, "utf8")).toBe(drifted);
   });
 
   it("rejects an earlier environment that drops a required field", async () => {

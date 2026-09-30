@@ -9,6 +9,7 @@ import { setPathname } from "next/navigation";
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { TopBar } from "../../apps/ui/components/TopBar.js";
+import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 
 const REGISTRATION_MESSAGE =
   "If this address can be registered, verification instructions will arrive. Check your spam folder.";
@@ -350,7 +351,8 @@ describe("rendered auth flow integration", () => {
       "person@example.test",
       "correct horse battery staple",
       "recovery@example.test",
-      "1990-01-01"
+      "1990-01-01",
+      DISPLAYED_LEGAL_EN
     );
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
     expect(document.body.textContent).toContain("No account status is revealed here.");

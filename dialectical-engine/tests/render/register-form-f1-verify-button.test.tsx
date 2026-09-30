@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import authEnglish from "../../apps/ui/messages/en/auth.json";
+import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 
 let host: HTMLDivElement;
 let root: Root;
@@ -88,14 +89,16 @@ describe("register form F1", () => {
   });
 
   // The 4th argument is the ISO date of birth, not `true`: the age gate replaced the 18+ box (Turn 8).
-  it("submits the four registration arguments unchanged", async () => {
+  // The 5th is the pair of each document the page displayed (paid plans L3b).
+  it("submits the four registration arguments and the displayed document pairs unchanged", async () => {
     const register = await mount();
     await submitValidForm();
     expect(register).toHaveBeenCalledWith(
       "Person@Example.test",
       " Correct horse 7! ",
       "Recovery@Example.test",
-      "1990-01-01"
+      "1990-01-01",
+      DISPLAYED_LEGAL_EN
     );
   });
 

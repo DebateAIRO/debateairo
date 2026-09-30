@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "Nie udało się odczytać odpowiedzi koordynatora, dlatego nie wiadomo, jaki jest wynik żądania.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordynator odrzucił wybór planu. Wybierz Bezpłatny lub Premium, a następnie ponów próbę.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordynator odrzucił żądanie: model wymagany przez ten plan jest obecnie niedostępny. Ponów próbę później lub wybierz inny plan.",
-  "requestFailure.kind.UNCLASSIFIED": "Błąd wystąpił przed nadejściem odpowiedzi, dlatego nie wiadomo, jaki jest wynik żądania. Nie jest to decyzja koordynatora."
+  "requestFailure.kind.UNCLASSIFIED": "Błąd wystąpił przed nadejściem odpowiedzi, dlatego nie wiadomo, jaki jest wynik żądania. Nie jest to decyzja koordynatora.",
+  "newDebate.legalGate.eyebrow": "Warunki i prywatność",
+  "newDebate.legalGate.title": "Przeczytaj i zaakceptuj aktualne dokumenty",
+  "newDebate.legalGate.body": "Zanim przejdziesz dalej, otwórz każdy dokument poniżej, przeczytaj go do końca, a następnie go zaakceptuj.",
+  "newDebate.legalGate.readTerms": "Przeczytaj Warunki świadczenia usług",
+  "newDebate.legalGate.readPrivacy": "Przeczytaj Politykę prywatności",
+  "newDebate.legalGate.done": "Przeczytano",
+  "newDebate.legalGate.accept": "Zaakceptuj i kontynuuj",
+  "newDebate.legalGate.accepting": "Zapisywanie…",
+  "newDebate.legalGate.failed": "Nie udało się zapisać akceptacji. Spróbuj jeszcze raz.",
+  "newDebate.legalGate.stale": "Jeden z dokumentów właśnie się zmienił. Załaduj ponownie stronę, aby przeczytać aktualną wersję.",
+  "newDebate.legalGate.reload": "Załaduj ponownie stronę",
+  "newDebate.legalGate.manageAccount": "Zarządzaj kontem lub je usuń",
+  "newDebate.legalGate.signOut": "Wyloguj się",
+  "newDebate.legalGate.signOutFailed": "Wylogowanie nie zostało dokończone. Spróbuj jeszcze raz.",
+  "newDebate.room.locationBlocked": "Z Twojej obecnej lokalizacji nie można rozpoczynać nowych debat. Twoje debaty pozostają dostępne do czytania."
 }

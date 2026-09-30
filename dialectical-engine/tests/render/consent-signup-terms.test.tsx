@@ -20,6 +20,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 
 const PRIVACY_ROW_TEXT = "I have read the Privacy Policy.";
 const TERMS_ROW_TEXT = "I have read and agree to the Terms of Service.";
@@ -372,7 +373,8 @@ describe("sign-up — the Terms of Service row", () => {
       "person@example.test",
       "correct horse battery staple",
       "recovery@example.test",
-      "1990-01-01"
+      "1990-01-01",
+      DISPLAYED_LEGAL_EN
     );
     expect(field("terms-accepted").disabled, "terms-accepted disabled when sent").toBe(true);
   });

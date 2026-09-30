@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "Não foi possível ler a resposta do coordenador, pelo que se desconhece o resultado.",
   "requestFailure.kind.PLAN_TIER_INVALID": "O coordenador recusou a escolha do plano. Escolha Gratuito ou Premium e tente novamente.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "O coordenador recusou o pedido: um modelo necessário para este plano não está disponível neste momento. Tente novamente mais tarde ou escolha o outro plano.",
-  "requestFailure.kind.UNCLASSIFIED": "A falha ocorreu antes de ser recebida qualquer resposta, pelo que se desconhece o resultado. Não se trata de uma decisão tomada pelo coordenador."
+  "requestFailure.kind.UNCLASSIFIED": "A falha ocorreu antes de ser recebida qualquer resposta, pelo que se desconhece o resultado. Não se trata de uma decisão tomada pelo coordenador.",
+  "newDebate.legalGate.eyebrow": "Termos e privacidade",
+  "newDebate.legalGate.title": "Leia e aceite os documentos em vigor",
+  "newDebate.legalGate.body": "Antes de continuar, abra cada documento abaixo, leia-o até ao fim e, depois, aceite-o.",
+  "newDebate.legalGate.readTerms": "Ler os Termos de Serviço",
+  "newDebate.legalGate.readPrivacy": "Ler a Política de Privacidade",
+  "newDebate.legalGate.done": "Lido",
+  "newDebate.legalGate.accept": "Aceitar e continuar",
+  "newDebate.legalGate.accepting": "A guardar…",
+  "newDebate.legalGate.failed": "Não foi possível guardar a sua aceitação. Tente novamente.",
+  "newDebate.legalGate.stale": "Um dos documentos mudou há instantes. Recarregue a página para ler a versão em vigor.",
+  "newDebate.legalGate.reload": "Recarregar a página",
+  "newDebate.legalGate.manageAccount": "Gerir ou eliminar a sua conta",
+  "newDebate.legalGate.signOut": "Terminar sessão",
+  "newDebate.legalGate.signOutFailed": "Não foi possível terminar a sessão. Tente novamente.",
+  "newDebate.room.locationBlocked": "Não é possível iniciar novos debates a partir da sua localização atual. Os seus debates continuam disponíveis para leitura."
 }

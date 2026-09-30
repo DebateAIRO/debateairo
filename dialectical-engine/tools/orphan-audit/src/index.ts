@@ -10,11 +10,13 @@ const rows: readonly Row[] = [
   ["kernel", "packages/kernel", []],
   ["crypto", "packages/crypto", []],
   ["published-arithmetic", "packages/published-arithmetic", []],
+  ["legal-manifest", "packages/legal-manifest", []],
   ["propagation", "packages/propagation", ["kernel", "published-arithmetic"]],
   ["battery-decision", "packages/battery/decision", ["kernel"]],
   ["contract", "packages/contract", ["kernel"]],
   ["db", "packages/db", ["kernel", "crypto"]],
   ["register", "packages/register", ["kernel", "db", "contract"]],
+  ["geo", "packages/geo", ["kernel", "register"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
   ["providers", "packages/providers", ["kernel", "register", "ledger"]],
   ["graph", "packages/graph", ["kernel", "db", "ledger", "register"]],
@@ -38,7 +40,7 @@ const rows: readonly Row[] = [
   // SUP-01 C1 — schema, role grants, kill switch, reservation, status"); the table
   // lagged the product only because this audit was crashing on the retired `web`
   // manifest read and had never reported a verdict. Both rows are the same commit.
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers", "support-kb", "story"]],
+  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers", "support-kb", "story", "legal-manifest", "geo"]],
   ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "contract", "support-kb", "story"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],

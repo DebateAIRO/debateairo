@@ -98,8 +98,9 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(topBar, /href="\/settings"[\s\S]*?>\s*\{t\(catalog, "chrome\.account"\)\}\s*</);
   // Review F2 (REV-FIX-CATALOGS): the gate now receives the served newDebate
   // catalogue; the route (settings behind the AuthGate) is unchanged.
+  // L4: the settings page is never covered by the accept screen.
   assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} \/>/);
-  assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\}>/);
+  assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\} legalGate=\{false\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
   assert.match(login, /useState\("\/sign-up"\)/);

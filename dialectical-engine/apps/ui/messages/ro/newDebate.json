@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "Răspunsul coordonatorului nu a putut fi citit, astfel că rezultatul este necunoscut.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Coordonatorul a refuzat alegerea planului. Alegeți Gratuit sau Premium, apoi încercați din nou.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Coordonatorul a refuzat solicitarea: un model necesar acestui plan nu este disponibil momentan. Încercați din nou mai târziu sau alegeți celălalt plan.",
-  "requestFailure.kind.UNCLASSIFIED": "Eroarea s-a produs înainte de primirea oricărui răspuns, astfel că rezultatul este necunoscut. Nu este o decizie luată de coordonator."
+  "requestFailure.kind.UNCLASSIFIED": "Eroarea s-a produs înainte de primirea oricărui răspuns, astfel că rezultatul este necunoscut. Nu este o decizie luată de coordonator.",
+  "newDebate.legalGate.eyebrow": "Termeni și confidențialitate",
+  "newDebate.legalGate.title": "Vă rugăm să citiți și să acceptați documentele actuale",
+  "newDebate.legalGate.body": "Înainte să continuați, deschideți fiecare document de mai jos, citiți-l până la capăt, apoi acceptați-l.",
+  "newDebate.legalGate.readTerms": "Citiți Termenii serviciului",
+  "newDebate.legalGate.readPrivacy": "Citiți Politica de confidențialitate",
+  "newDebate.legalGate.done": "Citit",
+  "newDebate.legalGate.accept": "Acceptați și continuați",
+  "newDebate.legalGate.accepting": "Se salvează…",
+  "newDebate.legalGate.failed": "Acceptarea dvs. nu a putut fi salvată. Încercați din nou.",
+  "newDebate.legalGate.stale": "Unul dintre documente s-a schimbat chiar acum. Reîncărcați pagina pentru a citi versiunea actuală.",
+  "newDebate.legalGate.reload": "Reîncărcați pagina",
+  "newDebate.legalGate.manageAccount": "Gestionați sau ștergeți contul",
+  "newDebate.legalGate.signOut": "Deconectați-vă",
+  "newDebate.legalGate.signOutFailed": "Deconectarea nu s-a finalizat. Încercați din nou.",
+  "newDebate.room.locationBlocked": "Nu se pot începe dezbateri noi din locația dvs. actuală. Dezbaterile dvs. rămân disponibile pentru citire."
 }

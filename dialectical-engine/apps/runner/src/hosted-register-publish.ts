@@ -14,9 +14,13 @@
  *    (`readDevelopmentRunnerPolicy`) refuses runner rows whose provenance is not
  *    exactly those builders' source refs, so any other composition would publish
  *    a register the hosted runner cannot start on;
- *  - the two OPERATOR-OWNED rows, read from the operator's file: the vetted
- *    `configuredProviderSet` (V-9(4), built by `buildConfiguredProviderSetDeploymentRow`)
- *    and the `costEnvelopePolicy` (V-28, validated by the register's own schema).
+ *  - the OPERATOR-OWNED rows, read from the operator's file: the vetted
+ *    `configuredProviderSet` (V-9(4), built by `buildConfiguredProviderSetDeploymentRow`),
+ *    the `costEnvelopePolicy` (V-28, validated by the register's own schema) and, only
+ *    when the file carries the member, the `countryPolicy` (paid plans G2, checked by
+ *    the register's own schema and sealed under the file's `sourceRef`). Without the
+ *    member the seeder's code-owned `countryPolicy` row is dropped, so that version has
+ *    no country gate (A14).
  * The historical bootstrap is imported first, exactly as the seeder imports it,
  * and stays the sealed base: these rows are DEPLOYMENT rows, never bootstrap rows.
  *
@@ -56,6 +60,7 @@ import {
   ALGORITHM_REGISTER_ROW_KEYS,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
+  COUNTRY_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   admissionPolicyFromValue,
   assertHostedCostEnvelopesSealed,
@@ -63,6 +68,7 @@ import {
   buildConfiguredProviderSetDeploymentRow,
   computeRegisterSnapshotSha256,
   costEnvelopePolicyFromValue,
+  countryPolicyFromValue,
   createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
@@ -71,6 +77,7 @@ import {
   readAdmissionPolicy,
   readAuthPolicy,
   readCostEnvelopePolicy,
+  readCountryPolicy,
   readDeploymentRiskTier,
   readEnvelopeFormulaInputs,
   readMfaPolicy,
@@ -119,7 +126,7 @@ const EXAMPLE_MAKER_PREFIX = "Example";
 const MAX_FILE_BYTES = 64 * 1_024;
 const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
-  "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy",
+  "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy", "countryPolicy",
   "providerTargets", "synthesisRoles"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
@@ -270,6 +277,13 @@ export type HostedRegisterFile = Readonly<{
   configuredProviderSet: z.infer<typeof configuredProviderSetSchema>;
   /** Validated in the plan by the register's own strict schema, so the refusal keeps its own code. */
   costEnvelopePolicy: unknown;
+  /**
+   * Paid plans G2: the operator's countryPolicy (the member's raw value), validated in the plan by its
+   * own schema. null = the member is absent: no countryPolicy row is published, so the version has no
+   * country gate (A14). A member that is present with the JSON value null is refused by the parser
+   * (COUNTRY_POLICY_INVALID); it never means "no gate".
+   */
+  countryPolicy: unknown;
   /** Validated in the plan by the boot's own parser and hosted checks. NEVER published and never printed. */
   providerTargets: unknown;
   synthesisRoles: z.infer<typeof synthesisRolesSchema> | null;
@@ -315,11 +329,17 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     if (!roles.success) refuse("HOSTED_REGISTER_FILE_INVALID");
     synthesisRoles = roles.data;
   }
+  // Paid plans G2: an explicit null is not "left out". It is refused by the register's own check,
+  // with its own code, so only a file WITHOUT the member publishes no countryPolicy row (A14).
+  if (Object.hasOwn(record, "countryPolicy") && record.countryPolicy === null) {
+    countryPolicyFromValue(null, sourceRef);
+  }
   return Object.freeze({
     format: HOSTED_REGISTER_FILE_FORMAT,
     sourceRef,
     configuredProviderSet: providerSet.data,
     costEnvelopePolicy: record.costEnvelopePolicy,
+    countryPolicy: Object.hasOwn(record, "countryPolicy") ? record.countryPolicy : null,
     providerTargets: record.providerTargets,
     synthesisRoles
   });
@@ -465,6 +485,9 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
+  // Paid plans G2: the operator's country switches, by the register's own schema
+  // (COUNTRY_POLICY_INVALID). Absent member = no row, no gate (A14).
+  if (file.countryPolicy !== null) countryPolicyFromValue(file.countryPolicy, file.sourceRef);
   const configured: readonly DevelopmentConfiguredProvider[] = Object.freeze(
     file.configuredProviderSet.providers.map((provider) => Object.freeze({
       providerRef: provider.providerRef, adapterKind: provider.adapterKind, maker: provider.maker
@@ -485,13 +508,18 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
 
   const bootstrap = await loadBootstrapRegister();
   // The seeder's builders take a panel; only its two provider-set members are read.
-  const codeOwnedRows = await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, {
+  const seededRows = await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, {
     configuredProviders: configured,
     requiredDistinctMakers: file.configuredProviderSet.requiredDistinctMakers,
     healthyProviderRefs: Object.freeze([]),
     targets,
     targetsJson
   }, synthesisRoles, "hosted");
+  // A14: a hosted file without countryPolicy publishes no countryPolicy row (no gate), exactly as
+  // before this member existed. The development seeder always publishes it (local mode reads none).
+  const codeOwnedRows = file.countryPolicy === null
+    ? seededRows.filter((row) => row.rowKey !== COUNTRY_POLICY_ROW_KEY)
+    : seededRows;
   const operatorRows = new Map<string, RegisterPublicationRow>([
     [CONFIGURED_PROVIDER_SET_ROW_KEY, Object.freeze({
       rowKey: CONFIGURED_PROVIDER_SET_ROW_KEY,
@@ -504,6 +532,13 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
       sourceRef: file.sourceRef
     })]
   ]);
+  if (file.countryPolicy !== null) {
+    operatorRows.set(COUNTRY_POLICY_ROW_KEY, Object.freeze({
+      rowKey: COUNTRY_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.countryPolicy),
+      sourceRef: file.sourceRef
+    }));
+  }
   const replaced = codeOwnedRows.filter((row) => operatorRows.has(row.rowKey));
   if (replaced.length !== operatorRows.size) refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
   const rows = Object.freeze(codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row));
@@ -675,7 +710,10 @@ export async function verifyHostedRegisterBootReadiness(
   await readMfaPolicy(pool, version);
   await readSessionPolicy(pool, version);
   await readRecoveryPolicy(pool, version);
-  assertHostedSupportAdmissionSealed("hosted", await readAdmissionPolicy(pool, version));
+  const admission = await readAdmissionPolicy(pool, version);
+  // Paid plans G3a: main.ts's country-policy and country-gate-admission stages, in their order.
+  if (await readCountryPolicy(pool, version) !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
+  assertHostedSupportAdmissionSealed("hosted", admission);
   await readCostEnvelopePolicy(pool, version);
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);

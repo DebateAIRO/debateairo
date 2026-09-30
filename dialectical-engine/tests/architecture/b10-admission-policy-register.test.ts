@@ -34,6 +34,7 @@ describe("B10 sealed admission-policy register row", () => {
       supportReads: null,
       supportSessions: null,
       supportModelCalls: null,
+      geoAvailability: null,
       sourceRef: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     });
     expect(Object.isFrozen(policy)).toBe(true);

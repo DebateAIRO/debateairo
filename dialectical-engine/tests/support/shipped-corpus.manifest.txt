@@ -14,11 +14,13 @@ apps/api/src/account-erasure.ts
 apps/api/src/admission.ts
 apps/api/src/boot-custody.ts
 apps/api/src/client-ip.ts
+apps/api/src/country-gate.ts
 apps/api/src/disclosures.ts
 apps/api/src/email-change.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
 apps/api/src/legacy-claim.ts
+apps/api/src/legal.ts
 apps/api/src/mail-channel.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
@@ -300,6 +302,7 @@ apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
 apps/ui/components/authRoutes.source-test.mjs
+apps/ui/components/billing/LegalAcceptGate.tsx
 apps/ui/components/consent/ConsentSettingsPanel.tsx
 apps/ui/components/consent/CookieBar.tsx
 apps/ui/components/consent/CookieConsent.tsx
@@ -511,6 +514,8 @@ apps/ui/next.config.mjs
 apps/ui/scripts/assert-production-auth-routes.mjs
 apps/ui/scripts/generate-legal-data.d.mts
 apps/ui/scripts/generate-legal-data.mjs
+apps/ui/scripts/legal-consent-manifest.d.mts
+apps/ui/scripts/legal-consent-manifest.mjs
 apps/ui/scripts/legal-locale-check.d.mts
 apps/ui/scripts/legal-locale-check.mjs
 apps/ui/scripts/next-config-csp.test.mjs
@@ -577,12 +582,14 @@ packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
 packages/crypto/src/argon2-worker.ts
 packages/crypto/src/index.ts
+packages/crypto/src/records.ts
 packages/db/src/account-erasure.ts
 packages/db/src/auth-risk.ts
 packages/db/src/email-change.ts
 packages/db/src/identity.ts
 packages/db/src/index.ts
 packages/db/src/legacy-claim.ts
+packages/db/src/legal-acceptance.ts
 packages/db/src/obs-schema.ts
 packages/db/src/publication-lease.ts
 packages/db/src/publication.ts
@@ -600,6 +607,10 @@ packages/evaluator/src/harvest-constants.ts
 packages/evaluator/src/index.ts
 packages/evaluator/src/public-aggregate-provider.ts
 packages/evidence/src/index.ts
+packages/geo/src/decide.ts
+packages/geo/src/index.ts
+packages/geo/src/ip.ts
+packages/geo/src/lookup.ts
 packages/graph/src/index.ts
 packages/judgement/src/index.ts
 packages/judgement/src/prompts.ts
@@ -610,6 +621,7 @@ packages/kernel/src/index.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts
 packages/ledger/src/index.ts
+packages/legal-manifest/src/index.ts
 packages/liveness/src/index.ts
 packages/memory/src/index.ts
 packages/obs-capture/install/api.ts
@@ -641,6 +653,7 @@ packages/register/src/auth-policy.ts
 packages/register/src/compose-env.ts
 packages/register/src/configured-provider-set.ts
 packages/register/src/cost-envelope-policy.ts
+packages/register/src/country-policy.ts
 packages/register/src/engine-shape.ts
 packages/register/src/index.ts
 packages/register/src/mfa-policy.ts

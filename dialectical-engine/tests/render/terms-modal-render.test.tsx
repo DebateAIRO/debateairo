@@ -169,11 +169,11 @@ describe("terms of service modal — rendered", () => {
     }
   });
 
-  it("renders the thirty sections in order, with their paragraphs, bullets and accent tokens", async () => {
+  it("renders the thirty-two sections in order, with their paragraphs, bullets and accent tokens", async () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     const sections = [...dialog().querySelectorAll<HTMLElement>('[id^="terms-section-"]')];
-    expect(TERMS_SECTIONS.length).toBe(30);
+    expect(TERMS_SECTIONS.length).toBe(32);
     expect(sections.map((section) => section.id)).toEqual(
       TERMS_SECTIONS.map((section) => `terms-section-${section.no}`)
     );
@@ -202,7 +202,7 @@ describe("terms of service modal — rendered", () => {
       expect(number.dataset.accent).toBe(token);
       expect(number.style.getPropertyValue("--accent")).toBe(`var(${token})`);
     }
-    expect(dialog().querySelectorAll(".policyText").length).toBe(104);
+    expect(dialog().querySelectorAll(".policyText").length).toBe(106);
     expect(dialog().querySelectorAll(".policyItem").length).toBe(12);
   });
 

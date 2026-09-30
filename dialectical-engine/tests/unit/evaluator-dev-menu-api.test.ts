@@ -39,6 +39,7 @@ describe("dev-only evaluator API", () => {
       BLIND_INDEX_KEY_PATH: "/run/secrets/email-blind-index",
       AUDIT_KEY_STORE_PATH: "/run/secrets/audit-users",
       AUDIT_SOURCE_IP_SALT_PATH: "/run/secrets/audit-source-ip-salt",
+      RECORDS_KEY_PATH: "/run/secrets/records-key",
       USER_DEK_STORE_PATH: "/run/secrets/user-deks",
       MAIL_SENDMAIL_PATH: "/usr/sbin/sendmail",
       MAIL_FROM: "noreply@debateai.test",

@@ -44,7 +44,7 @@ export function SettingsPageClient({
     return <EmailChangeLinkScreen catalog={catalog} link={emailLink} onDone={() => setEmailLink(null)} />;
   }
   return (
-    <AuthGate catalog={newDebateCatalog}>
+    <AuthGate catalog={newDebateCatalog} legalGate={false}>
       {() => <AccountSettingsScreen catalog={catalog} locale={locale} />}
     </AuthGate>
   );

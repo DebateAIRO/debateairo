@@ -4,6 +4,7 @@ import {
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
+import type { SignUpAcceptanceRow } from "./legal-acceptance.js";
 
 export interface AuthSourceContext {
   readonly ip: string;
@@ -27,6 +28,12 @@ export interface PendingAccountInput {
   readonly verificationExpiresAt: Date;
   readonly occurredAt: Date;
   readonly source: AuthSourceContext;
+  /**
+   * Paid plans L3: the ADULT, TERMS and PRIVACY_SHOWN rows, evidence already sealed. When present the
+   * account is created through identity.create_pending_account_with_consent (0080), in the SAME
+   * transaction. Absent only in test compositions that predate the acceptance record.
+   */
+  readonly acceptances?: ReadonlyArray<SignUpAcceptanceRow>;
 }
 
 export interface RegistrationAgeCheck {
@@ -185,13 +192,7 @@ export class PostgresIdentityRepository {
     // audit KDF work and neither branch is distinguishable by timing.
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
-      const created = await client.query<{
-        status: "CREATED" | "EMAIL_DUPLICATE" | "PSEUDONYM_COLLISION";
-        user_id: string | null;
-        channel_binding_id: string | null;
-      }>(`SELECT * FROM identity.create_pending_account_with_audit(
-        $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb
-      )`, [
+      const parameters: unknown[] = [
         input.userId,
         input.emailBlindIndex,
         JSON.stringify(input.emailCiphertext),
@@ -206,7 +207,36 @@ export class PostgresIdentityRepository {
           ipArgon2id: prepared.ipArgon2id,
           userAgentArgon2id: prepared.userAgentArgon2id
         })
-      ]);
+      ];
+      const created = input.acceptances === undefined
+        ? await client.query<{
+          status: "CREATED" | "EMAIL_DUPLICATE" | "PSEUDONYM_COLLISION";
+          user_id: string | null;
+          channel_binding_id: string | null;
+        }>(`SELECT * FROM identity.create_pending_account_with_audit(
+          $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb
+        )`, parameters)
+        : await client.query<{
+          status: "CREATED" | "EMAIL_DUPLICATE" | "PSEUDONYM_COLLISION";
+          user_id: string | null;
+          channel_binding_id: string | null;
+        }>(`SELECT * FROM identity.create_pending_account_with_consent(
+          $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::smallint,$13,$14,$15::jsonb
+        )`, [
+          ...parameters,
+          input.ageCheck.minAgeApplied,
+          input.ageCheck.countryCode,
+          input.ageCheck.ruleVersion,
+          JSON.stringify(input.acceptances.map((row) => ({
+            acceptance_id: row.acceptanceId,
+            kind: row.kind,
+            document_version: row.documentVersion,
+            document_sha256: row.documentSha256,
+            locale: row.locale,
+            evidence_ciphertext: row.evidenceCiphertext.toString("base64"),
+            key_id: row.keyId
+          })))
+        ]);
       const row = created.rows[0];
       if (row === undefined) throw new Error("ACCOUNT_CREATE_OUTCOME_MISSING");
       if (row.status === "PSEUDONYM_COLLISION") {
@@ -219,13 +249,16 @@ export class PostgresIdentityRepository {
       if (row.user_id === null || row.channel_binding_id === null) {
         throw new Error("ACCOUNT_CREATE_RECEIPT_INVALID");
       }
-      await client.query("SELECT identity.record_registration_age_check($1,$2::smallint,$3,$4,$5)", [
-        row.user_id,
-        input.ageCheck.minAgeApplied,
-        input.ageCheck.countryCode,
-        input.ageCheck.ruleVersion,
-        input.occurredAt
-      ]);
+      // The consent wrapper (0080) writes the age record inside its own call; only the old path writes it here.
+      if (input.acceptances === undefined) {
+        await client.query("SELECT identity.record_registration_age_check($1,$2::smallint,$3,$4,$5)", [
+          row.user_id,
+          input.ageCheck.minAgeApplied,
+          input.ageCheck.countryCode,
+          input.ageCheck.ruleVersion,
+          input.occurredAt
+        ]);
+      }
       await beforeCommit();
       return Object.freeze({
         status: "created" as const,
@@ -407,6 +440,34 @@ export class PostgresIdentityRepository {
       await client.query("SELECT identity.audit_rate_limit_refused($1::jsonb,$2)", [
         source,justification
       ]);
+    });
+  }
+
+  /**
+   * Paid plans G3a: ONE aggregated audit row per route, refusal code and country per window — the
+   * caller (apps/api/src/country-gate.ts) aggregates, so a flood of refused requests costs one
+   * Argon2 derivation per window, never one per request. Content-free: code, ISO country, the
+   * fact that the evidence was the IP, and the window. The capability (0080) refuses anything else.
+   */
+  async recordCountryGateRefusal(input: {
+    readonly route: "register" | "asks";
+    readonly code: "COUNTRY_SIGNUP_UNAVAILABLE" | "COUNTRY_UNKNOWN" | "TOR_REFUSED" | "COUNTRY_ASK_BLOCKED";
+    readonly country: string;
+    readonly windowStartedAt: Date;
+    readonly source: AuthSourceContext;
+  }): Promise<void> {
+    if (!/^[A-Z]{2}$/u.test(input.country) || !Number.isFinite(input.windowStartedAt.getTime())) {
+      throw new TypeError("COUNTRY_GATE_AUDIT_INVALID");
+    }
+    const prepared = await this.prepareAuditContext(input.source);
+    const justification = `aggregate:country-gate;route:${input.route};code:${input.code}`
+      + `;country:${input.country};evidence:ip;window:${input.windowStartedAt.toISOString()}`;
+    const source = JSON.stringify({
+      ipArgon2id: prepared.ipArgon2id,
+      userAgentArgon2id: prepared.userAgentArgon2id
+    });
+    await this.transaction(async (client) => {
+      await client.query("SELECT identity.audit_country_gate_refused($1::jsonb,$2)", [source, justification]);
     });
   }
 
