@@ -53,6 +53,18 @@ export {
   type StoredServeFloor
 } from "./serve-disclosure.js";
 
+// Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): who has which plan and
+// which person a run counts against (migration 0082).
+export {
+  ENTITLEMENT_CAUSES,
+  ENTITLEMENT_PLAN_IDS,
+  EntitlementRepository,
+  type Entitlement,
+  type EntitlementAppend,
+  type EntitlementCause,
+  type EntitlementPlanId
+} from "./billing-entitlement.js";
+
 // Budget spec 2026-09-28 §2.7 (migration 0081): the waiting line, read through
 // core.run_waiting_v so no owner is stored beside a wait.
 export {

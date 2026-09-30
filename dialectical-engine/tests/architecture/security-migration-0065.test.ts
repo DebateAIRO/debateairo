@@ -27,7 +27,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // compared with this list, so a new schema fails the test rather than silently
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
-  "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
+  "billing", "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
   "obs", "observation", "register", "scorecard", "serve", "support"
 ] as const;
 
@@ -438,7 +438,12 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // cheaper models, and the ALLOWANCE stop kind on serve.serve_disclosure. The
         // spec named it 0077; dev's age gate took 0077, the sensitive-data consent holds
         // 0078, the change-email turn 0079 and legal acceptance is 0080 (RULINGS-R3). A new prefix, no pair.
-        "0081_budget_holds_waiting_line.sql"
+        "0081_budget_holds_waiting_line.sql",
+        // Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): the entitlement,
+        // the run's charge scope and the runner's windows view. The next free
+        // prefix after dev's 0077 (age gate), the colleague's 0078
+        // (sensitive-data consent) and 0079 (change email), L3a's 0080 and B3's 0081. No pair.
+        "0082_billing_entitlement.sql"
       ]);
   });
 });

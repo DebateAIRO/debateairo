@@ -527,6 +527,7 @@ packages/battery/decision/src/index.ts
 packages/battery/src/index.ts
 packages/battery/src/split.ts
 packages/battery/src/terminal.ts
+packages/billing-core/src/allowance-source.ts
 packages/billing-core/src/index.ts
 packages/billing-core/src/plan-lookup.ts
 packages/billing-core/src/windows.ts
@@ -551,6 +552,7 @@ packages/crypto/src/index.ts
 packages/crypto/src/records.ts
 packages/db/src/account-erasure.ts
 packages/db/src/auth-risk.ts
+packages/db/src/billing-entitlement.ts
 packages/db/src/email-change.ts
 packages/db/src/identity.ts
 packages/db/src/index.ts
