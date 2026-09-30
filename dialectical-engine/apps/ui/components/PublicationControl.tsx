@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { contractClient } from "@/lib/api";
 import { ContractHttpError } from "@debateai/contract";
 import type { ContractClient, PublicationPartKind, PublicationRefusalStatement } from "@debateai/contract";
@@ -38,6 +38,21 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  // Every finished action bumps this, so the card can bring its answer into view (ui-B1): the card is height-capped and
+  // scrolls (globals.css, D-S02-24), and the owner scrolled it down to reach the button that produced the answer.
+  const [answered, setAnswered] = useState(0);
+  const cardRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    const answer = card?.querySelector<HTMLElement>(':scope > [role="status"]');
+    if (answered === 0 || !card || !answer) return;
+    // Put the answer's top at the top of the card's visible box, whatever the owner's scroll position and whatever
+    // the browser's scroll anchoring did when the answer was inserted above the controls.
+    // The card's own window, not a global: the component also mounts where only window/document are installed.
+    const paddingTop = Number.parseFloat(card.ownerDocument.defaultView?.getComputedStyle(card).paddingTop ?? "") || 0;
+    card.scrollTop += answer.getBoundingClientRect().top - (card.getBoundingClientRect().top + card.clientTop + paddingTop);
+  }, [answered]);
 
   useEffect(() => {
     let active = true;
@@ -85,6 +100,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       }
     } finally {
       setBusy(false);
+      setAnswered((count) => count + 1);
     }
   }
 
@@ -124,6 +140,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       }
     } finally {
       setBusy(false);
+      setAnswered((count) => count + 1);
     }
   }
 
@@ -150,7 +167,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   }
 
   return (
-    <section className="card publicationControl" data-support-primary-control aria-label={t(catalog, "public.publication.controlsAria")}>
+    <section ref={cardRef} className="card publicationControl" data-support-primary-control aria-label={t(catalog, "public.publication.controlsAria")}>
       <h2>{t(catalog, "public.publication.visibility")}</h2>
       <p>
         {visibility === null

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createContractClient } from "@debateai/contract";
 import { PublicationControl } from "../../apps/ui/components/PublicationControl.js";
 import english from "../../apps/ui/messages/en/public.json";
@@ -193,6 +193,68 @@ describe("publication statement", () => {
     expect(host.querySelector('[role="status"]')?.textContent).toBe("Private debate deletion was not authorized. Recheck your credentials.");
     expect(statusPrecedesEveryControl()).toEqual({ slot: 2, controlsBefore: 0 });
   });
+  // Property (ui-B1): after ANY answer the answer's first line is inside the card's visible box, whatever the card's
+  // scroll position was when the owner pressed the button (first attempt, retry in place, card scrolled to its end).
+  // A layout model stands in for the browser (jsdom has none): every top-level child of the card is 100 px tall, the card
+  // box starts at y = 500 and shows 380 px. The real geometry is measured by the p2 ui-product drive harness.
+  // Break caught: submit()/deletePrivate() leaving the card's scroll where the owner left it (the pass-1 state).
+  function cardLayoutModel() {
+    const card = host.querySelector<HTMLElement>("section.publicationControl")!;
+    let scrollTop = 0;
+    Object.defineProperty(card, "scrollTop", { configurable: true, get: () => scrollTop, set: (value: number) => { scrollTop = Math.max(0, value); } });
+    const CARD_TOP = 500, CARD_VISIBLE = 380, ROW = 100;
+    const rect = (top: number) => ({ top, bottom: top + ROW, left: 0, right: 390, width: 390, height: ROW, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if (this === card) return { ...rect(CARD_TOP), bottom: CARD_TOP + CARD_VISIBLE, height: CARD_VISIBLE } as DOMRect;
+      const row = [...card.children].findIndex((child) => child === this || child.contains(this));
+      return rect(row < 0 ? 0 : CARD_TOP + row * ROW - scrollTop);
+    });
+    return {
+      scrollTo: (value: number) => { scrollTop = value; },
+      answerTopInView: () => {
+        const top = card.querySelector('[role="status"]')!.getBoundingClientRect().top;
+        return top >= CARD_TOP && top + 24 <= CARD_TOP + CARD_VISIBLE;
+      },
+      restore: () => spy.mockRestore()
+    };
+  }
+  it.each([
+    ["BLOCK statement", async () => Response.json(refusal, { status: 409 })],
+    ["check unavailable", async () => Response.json({ error: "PUBLICATION_CHECK_UNAVAILABLE" }, { status: 503 })],
+    ["other failure", async () => Response.json({ error: "STEP_UP_REQUIRED" }, { status: 401 })],
+    ["server failure", async () => Response.json({ error: "INTERNAL_ERROR" }, { status: 500 })],
+    ["success", async () => Response.json({ state: "PUBLISHED", public_ref: publicRef }, { status: 201 })]
+  ] as const)("brings the %s into the card's view from the owner's scroll position, first attempt and retry", async (_name, answer) => {
+    await mount();
+    const layout = cardLayoutModel();
+    try {
+      await click("Publish…");
+      await fill('input[type="password"]', "test-password");
+      await fill('input[autocomplete="one-time-code"]', "123456");
+      await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+      layout.scrollTo(600); // the owner scrolled the card down to reach "Publish publicly"
+      respond = async () => Response.json(refusal, { status: 409 });
+      await submit();
+      const first = layout.answerTopInView();
+      layout.scrollTo(900); // R11's retry in place: the owner scrolls down to the code field and the button again
+      respond = answer;
+      await fill('input[autocomplete="one-time-code"]', "654321");
+      await submit();
+      expect({ first, retry: layout.answerTopInView() }).toEqual({ first: true, retry: true });
+    } finally { layout.restore(); }
+  });
+  it("brings a failed deletion's message into the card's view", async () => {
+    await mount();
+    const layout = cardLayoutModel();
+    try {
+      await click("Delete private debate…");
+      await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+      respondStepUp = async () => Response.json({ error: "STEP_UP_REFUSED" }, { status: 401 });
+      layout.scrollTo(700);
+      await submit();
+      expect(layout.answerTopInView()).toBe(true);
+    } finally { layout.restore(); }
+  });
   // Property: successful publication still reports success and exposes the actual returned public link.
   it("renders success and the public link", async () => {
     respond = async () => Response.json({ state: "PUBLISHED", public_ref: publicRef }, { status: 201 });
@@ -249,6 +311,14 @@ describe("locales", () => {
     expect(terms?.trim()).toBeTruthy();
     expect(read("public")[prefix + "groundTerms"]!.toLocaleLowerCase(locale)).toContain(terms!.toLocaleLowerCase(locale));
   });
+  // Property (ui-N2): the ground line cites section 7 and no other number, and section 7 exists as a heading in that
+  // locale's own Terms of Service (the acceptable-use section the line paraphrases). Break caught: a locale citing
+  // section 8 (the p2 reviewer's mutant-section7.zsh) while every other suite stays green.
+  it.each(locales)("cites section 7 of that locale's Terms in %s", (locale) => {
+    const ground = (JSON.parse(readFileSync(resolve(process.cwd(), `apps/ui/messages/${locale}/public.json`), "utf8")) as Record<string, string>)[prefix + "groundTerms"]!;
+    const terms = readFileSync(resolve(process.cwd(), `apps/ui/legal/${locale}/terms-of-service.md`), "utf8");
+    expect({ numbers: ground.match(/\p{Nd}+/gu), section7Heading: /^## 7\. \S/mu.test(terms) }).toEqual({ numbers: ["7"], section7Heading: true });
+  });
   // Property: the authoritative English copy matches the SPEC, and Romanian has no untranslated message.
   it("uses the English oracle and translated Romanian values", () => {
     expect(Object.fromEntries(Object.keys(copy).map((key) => [key, (english as Record<string, string>)[prefix + key]]))).toEqual(copy);
@@ -261,6 +331,28 @@ describe("card is not clipped", () => {
   it("marks the rendered visibility card", async () => {
     await mount();
     expect(host.querySelector("section[data-support-primary-control]")?.className).toBe("card publicationControl");
+  });
+  // Property (ui-N1): inside the Visibility card, every text control (button, typed input) paints its OWN background and
+  // text from one token pair, and that pair reaches 4.5 : 1 in light (:root) and dark (html[data-mode="chamber"]); the rule
+  // is scoped to the card, never the global control rule other pages use. Break caught: controls left on the user agent's
+  // white/grey background with the dark theme's inherited near-white text (1.04–1.20 : 1). Geometry-free; the rendered
+  // colours are measured by the p2 ui-product controls-contrast harness in headless Chromium.
+  it("gives the card's controls a token pair that reaches 4.5 : 1 in both modes, scoped to the card", () => {
+    const css = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8");
+    const block = css.slice(css.indexOf("/* hate-speech S02: the owner's Visibility card"), css.indexOf("/* === consent-ui S01 === */"));
+    const rules = [...block.matchAll(/([^{}]+)\{([^}]+)\}/g)].map(([, selector, body]) => ({ selector: selector!.replace(/\/\*[\s\S]*?\*\//g, "").trim(),
+      decl: Object.fromEntries(body!.split(";").filter((line) => line.includes(":")).map((line) => { const i = line.indexOf(":"); return [line.slice(0, i).trim(), line.slice(i + 1).trim()]; })) }));
+    const controls = rules.filter(({ selector }) => /button/.test(selector) && /input/.test(selector));
+    const tokens = (open: string) => { const at = css.indexOf(open); return Object.fromEntries([...css.slice(at, css.indexOf("\n}", at)).matchAll(/(--[\w-]+):\s*(#[0-9A-Fa-f]{6})/g)].map(([, k, v]) => [k, v])); };
+    const lum = (hex: string) => { const [r, g, b] = [1, 3, 5].map((i) => { const v = parseInt(hex.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!; };
+    const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x! + 0.05) / (y! + 0.05); };
+    const pair = (decl: Record<string, string>, mode: Record<string, string>) => [decl.color, decl.background].map((value) => mode[/var\((--[\w-]+)\)/.exec(value ?? "")?.[1] ?? ""] ?? "missing");
+    expect(controls.map(({ selector, decl }) => {
+      const [lightFg, lightBg] = pair(decl, tokens(":root {"));
+      const [darkFg, darkBg] = pair(decl, tokens('html[data-mode="chamber"] {'));
+      return { scoped: selector.split(",").every((part) => part.trim().startsWith(".debateView > section.card.publicationControl ")),
+        light: ratio(lightFg!, lightBg!) >= 4.5, dark: ratio(darkFg!, darkBg!) >= 4.5 };
+    })).toEqual([{ scoped: true, light: true, dark: true }]);
   });
   // Property: the specific card override beats every legacy clipping declaration before the consent block.
   it("overrides the seven clipping declarations before consent", () => {

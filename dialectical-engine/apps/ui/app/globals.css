@@ -8975,6 +8975,21 @@ a:focus-visible {
   background: var(--surface-2);
   color: var(--text);
 }
+/* The card's controls paint their own background from the same token pair as their text (ui-N1): the global rule gives
+   every control `color: inherit` and leaves the user agent's white/grey background, which in dark mode sat under the
+   theme's near-white text (1.04–1.20 : 1). Scoped to this card only; the checkbox keeps its native rendering. */
+.debateView > section.card.publicationControl button,
+.debateView > section.card.publicationControl input:not([type="checkbox"]) {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.debateView > section.card.publicationControl button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
 
 /* === consent-ui S01 === */
 /* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
