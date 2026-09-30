@@ -148,13 +148,81 @@ describe("FIX-HS1-eval-fence — the composer reads a fenced draft the way the j
   });
 });
 
+/**
+ * FIX-HS1-eval-fence-r1 — re-check finding B1, ruling V-24. The fallback used
+ * to take the FIRST balanced object, so "PASS, then FAIL" was read as PASS and
+ * the synthesis loop stopped without the objection the model's final verdict
+ * asked for (packages/serve/src/synthesis.ts:1441). A reply holding two or more
+ * objects is refused as before the fence fix: PARSE_FAILED, the raw parse's own
+ * message, the call's own code — and re-asked. The FIRST and the SECOND body
+ * always differ here, so a reader that takes either one is caught.
+ */
+const FAIL_VERDICT = {
+  satisfied: false,
+  objection: "The candidate overstates the winner.",
+  criteria: { ...VERDICT.criteria, no_overstatement: false }
+};
+const PASS = JSON.stringify(VERDICT);
+const FAIL = JSON.stringify(FAIL_VERDICT);
+const DRAFT_ONE = composition("First draft holds.");
+const DRAFT_TWO = composition("Second draft differs.");
+
+const MULTI_OBJECT_REPLIES: readonly (readonly [string, string])[] = [
+  ["two raw objects, PASS then FAIL", `${PASS}\n${FAIL}`],
+  ["two fences, PASS then FAIL", `${fenced(PASS)}\n${fenced(FAIL)}`],
+  ["two fences, FAIL then PASS", `${fenced(FAIL)}\n${fenced(PASS)}`],
+  ["two objects inside one fence", fenced(`${PASS}\n${FAIL}`)],
+  ["prose: draft PASS, final FAIL", `Draft verdict: ${PASS}\nOn reflection, the final verdict is: ${FAIL}`],
+  ["an array of two verdicts inside prose", `Verdicts: [${PASS},${FAIL}]`],
+  ["an array of two verdicts inside a fence", fenced(`[${PASS},${FAIL}]`)],
+  ["PASS then a truncated correction", `${PASS}\nWait, correction: ${FAIL.slice(0, 50)}`],
+  ["a stray quote in the prose, then two verdicts", `The checker said "draft: ${PASS}\nfinal: ${FAIL}`],
+  ["two fenced compositions", `${fenced(DRAFT_ONE)}\n${fenced(DRAFT_TWO)}`],
+  ["two raw compositions, back to back", `${DRAFT_ONE}${DRAFT_TWO}`],
+  ["two compositions inside one fence", fenced(`${DRAFT_ONE}\n${DRAFT_TWO}`)],
+  ["a composition, then a verdict", `${fenced(DRAFT_ONE)}\n${fenced(PASS)}`]
+];
+
+describe("FIX-HS1-eval-fence-r1 — a reply holding two or more objects is refused and re-asked (V-24)", () => {
+  it.each(MULTI_OBJECT_REPLIES)("the evaluator refuses %s: PARSE_FAILED, the raw parse message, EVALUATOR_CONTRACT_ERROR", (_name, reply) => {
+    expect(classifyEvaluatorContent(reply)).toEqual({ parseStatus: "PARSE_FAILED", parseError: strictParseMessage(reply) });
+    expect(refusalCodeOf(() => parseEvaluatorOutput(reply))).toBe("EVALUATOR_CONTRACT_ERROR");
+  });
+
+  it.each(MULTI_OBJECT_REPLIES)("the composer refuses %s: PARSE_FAILED, the raw parse message, COMPOSITION_CONTRACT_ERROR", (_name, reply) => {
+    expect(classifyComposedContent(reply, citation)).toEqual({ parseStatus: "PARSE_FAILED", parseError: strictParseMessage(reply) });
+    expect(refusalCodeOf(() => parseComposerOutput(reply))).toBe("COMPOSITION_CONTRACT_ERROR");
+  });
+
+  it("keeps every one-object shape: raw, fenced (any tag), prose around it, prose after the fence, a cut closing fence", () => {
+    for (const reply of [
+      PASS,
+      fenced(FAIL),
+      fenced(FAIL, "jsonc"),
+      `Here is my verdict:\n${FAIL}\nThat is all.`,
+      `${fenced(FAIL)}\nNote: I am not fully sure.`,
+      `\`\`\`json\n${FAIL}\n\`\``,
+      `\`\`\`json\n${FAIL}\n`,
+      fenced(JSON.stringify({ ...FAIL_VERDICT, objection: "Braces {like these} and a quote \" stay inside the string." })),
+      `Verdict: ${JSON.stringify({ ...FAIL_VERDICT, objection: "A lone } closes nothing and a lone { opens nothing." })}`
+    ]) {
+      expect(classifyEvaluatorContent(reply), reply).toEqual({ parseStatus: "PARSED", parseError: null });
+      expect(parseEvaluatorOutput(reply).satisfied, reply).toBe(reply === PASS);
+    }
+    expect(parseComposerOutput(`Draft:\n${DRAFT_TWO}\nEnd.`).segments[0]?.text).toBe("Second draft differs.");
+  });
+});
+
 describe("FIX-HS1-eval-fence — one call's classifier and parser accept exactly the same replies", () => {
-  const corpus = (body: string): readonly string[] => [
+  const corpus = (body: string, other: string): readonly string[] => [
     body,
     fenced(body),
     fenced(body, ""),
     `Here is the verdict:\n${body}\nDone.`,
-    `${fenced(body)}\n${fenced(body)}`,
+    `${fenced(body)}\n${fenced(other)}`,
+    `${fenced(other)}\n${fenced(body)}`,
+    fenced(`${body}\n${other}`),
+    `${body}\n${other}`,
     fenced(`${body} trailing`),
     "",
     "[]",
@@ -163,8 +231,8 @@ describe("FIX-HS1-eval-fence — one call's classifier and parser accept exactly
   ];
 
   it("the evaluator: PARSED exactly when the parser returns", () => {
-    for (const body of [JSON.stringify(VERDICT), JSON.stringify({ ...VERDICT, satisfied: "yes" })]) {
-      for (const reply of corpus(body)) {
+    for (const [body, other] of [[PASS, FAIL], [FAIL, PASS], [JSON.stringify({ ...VERDICT, satisfied: "yes" }), PASS]] as const) {
+      for (const reply of corpus(body, other)) {
         const classified = classifyEvaluatorContent(reply).parseStatus === "PARSED";
         const parsed = refusalCodeOf(() => parseEvaluatorOutput(reply)) === null;
         expect(parsed, JSON.stringify(reply)).toBe(classified);
@@ -173,8 +241,8 @@ describe("FIX-HS1-eval-fence — one call's classifier and parser accept exactly
   });
 
   it("the composer: whatever the classifier accepts the parser accepts, and whatever the parser refuses the classifier refuses", () => {
-    for (const body of [composition("The answer holds."), JSON.stringify({ segments: [] })]) {
-      for (const reply of corpus(body)) {
+    for (const [body, other] of [[DRAFT_ONE, DRAFT_TWO], [JSON.stringify({ segments: [] }), DRAFT_ONE]] as const) {
+      for (const reply of corpus(body, other)) {
         const classified = classifyComposedContent(reply, citation).parseStatus === "PARSED";
         const parsed = refusalCodeOf(() => parseComposerOutput(reply)) === null;
         if (classified) expect(parsed, JSON.stringify(reply)).toBe(true);

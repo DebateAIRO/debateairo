@@ -1822,19 +1822,53 @@ function hash(value: unknown): string {
  * balanced object). Every runner reader decodes here, the judge path's way, so
  * a call's classifier and its parser accept the same replies. A reply no
  * strategy decodes is refused exactly as before: the raw parse's own message.
+ *
+ * FIX-HS1-eval-fence-r1 (re-check B1, ruling V-24): the judge path's fallback
+ * takes the FIRST balanced object, so "PASS, then FAIL" read as PASS and the
+ * synthesis loop stopped without the objection the final verdict asked for.
+ * A reply that is not raw JSON and opens two or more top-level objects is
+ * refused before any strategy runs — the pre-fix refusal, re-asked as before.
  */
 type DecodedReply =
   | { readonly decoded: true; readonly value: unknown }
   | { readonly decoded: false; readonly message: string };
 
+/**
+ * How many top-level `{` a reply opens, counting at most two. Outside an
+ * object every character is prose, so a stray quote cannot hide a brace;
+ * inside one, JSON strings are skipped, so a brace an objection quotes is not
+ * a second object. An object left open (a cut reply) still counts. One linear
+ * pass: model text is untrusted (CI-1b).
+ */
+function topLevelObjectsOpened(content: string): number {
+  let opened = 0;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (const character of content) {
+    if (depth > 0 && inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === "\"") inString = false;
+      continue;
+    }
+    if (character === "{") {
+      if (depth === 0 && ++opened > 1) return opened;
+      depth += 1;
+    } else if (depth > 0 && character === "}") depth -= 1;
+    else if (depth > 0 && character === "\"") inString = true;
+  }
+  return opened;
+}
+
 function decodeStructuredReply(content: string): DecodedReply {
   try {
     return { decoded: true, value: JSON.parse(content) };
   } catch (error) {
+    const refused: DecodedReply = { decoded: false, message: error instanceof Error ? error.message : String(error) };
+    if (topLevelObjectsOpened(content) > 1) return refused;
     const tolerant = parseStructuredArtifact(content, z.unknown());
-    return tolerant.kind === "PARSED"
-      ? { decoded: true, value: tolerant.value }
-      : { decoded: false, message: error instanceof Error ? error.message : String(error) };
+    return tolerant.kind === "PARSED" ? { decoded: true, value: tolerant.value } : refused;
   }
 }
 
