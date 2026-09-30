@@ -187,7 +187,42 @@ const DAILY_LIMIT_MESSAGE_KEYS = Object.freeze([
  * catalogue.
  */
 export function dailyLimitMessageCatalog(catalog: MessageCatalog): MessageCatalog {
+  return pickMessages(catalog, DAILY_LIMIT_MESSAGE_KEYS);
+}
+
+/**
+ * The only keys of the `newDebate` catalogue the blocking accept screen prints
+ * (paid plans L4, spec 2026-09-29 §2.3.2): its "checking" line and its own
+ * thirteen sentences.
+ */
+const LEGAL_GATE_MESSAGE_KEYS = Object.freeze([
+  "newDebate.checkingSession",
+  "newDebate.legalGate.eyebrow",
+  "newDebate.legalGate.title",
+  "newDebate.legalGate.body",
+  "newDebate.legalGate.readTerms",
+  "newDebate.legalGate.readPrivacy",
+  "newDebate.legalGate.done",
+  "newDebate.legalGate.accept",
+  "newDebate.legalGate.accepting",
+  "newDebate.legalGate.failed",
+  "newDebate.legalGate.stale",
+  "newDebate.legalGate.manageAccount",
+  "newDebate.legalGate.signOut",
+  "newDebate.legalGate.signOutFailed"
+] as const);
+
+/**
+ * The part of a `newDebate` catalogue the home page hands the accept screen, a
+ * client component, when documents are owed: these values, as M8's rule wants,
+ * not the whole catalogue.
+ */
+export function legalGateMessageCatalog(catalog: MessageCatalog): MessageCatalog {
+  return pickMessages(catalog, LEGAL_GATE_MESSAGE_KEYS);
+}
+
+function pickMessages(catalog: MessageCatalog, keys: readonly string[]): MessageCatalog {
   return Object.freeze(Object.fromEntries(
-    DAILY_LIMIT_MESSAGE_KEYS.flatMap((key) => (Object.hasOwn(catalog, key) ? [[key, catalog[key]!]] : []))
+    keys.flatMap((key) => (Object.hasOwn(catalog, key) ? [[key, catalog[key]!]] : []))
   ));
 }
