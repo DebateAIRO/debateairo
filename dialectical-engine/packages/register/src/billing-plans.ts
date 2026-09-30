@@ -175,9 +175,12 @@ export function planById(plans: BillingPlans, id: PlanId): BillingPlan {
 
 /**
  * A plan's cap in micro-units: `credit x basis points / 10000`, rounded DOWN
- * like every other ceiling share. It is the one place the share is computed:
- * `@debateai/billing-core` and the hosted publish command both read it. Null
- * when the plan has no such cap (Free has no day or week cap).
+ * like every other ceiling share. The hosted publish command reads it.
+ * `@debateai/billing-core` may import register for types only (R-1), so it
+ * restates this rule privately (`planShareMicros`);
+ * tests/unit/b4-billing-windows.test.ts pins the two equal, so a change here
+ * changes both. Null when the plan has no such cap (Free has no day or week
+ * cap).
  */
 export function planCapMicros(plan: BillingPlan, cap: "DAY" | "WEEK" | "MONTH"): number | null {
   if (cap === "MONTH") return plan.monthlyCreditMicros;
