@@ -1,0 +1,337 @@
+{
+  "RO:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://amf-b.ro/desprehub/",
+    "evidence_quote": "0374.456.420 ... deschis 24/7 ... Helpline Anti Anxietate gratuit"
+  },
+  "MD:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://ms.gov.md/comunicare/10-septembrie-ziua-mondiala-de-prevenire-a-suicidului/",
+    "evidence_quote": "YK Support Line, 080080022, care funcționează în regim 24/7"
+  },
+  "MD:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://pentruviata.md/",
+    "evidence_quote": "Scrie-ne prin site ... AJUTOR@PENTRUVIATA.MD ... la orice oră de zi sau noapte"
+  },
+  "GB:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.samaritans.org/how-we-can-help/contact-samaritan/",
+    "evidence_quote": "Call us free, day or night, 365 days a year"
+  },
+  "GB:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://giveusashout.org/get-help/",
+    "evidence_quote": "85258 ... free, confidential and 24/7 text messaging service"
+  },
+  "IE:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www2.hse.ie/mental-health/services-support/get-urgent-help/",
+    "evidence_quote": "Freephone: 116 123 ... available 24 hours a day"
+  },
+  "IE:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www2.hse.ie/mental-health/services-support/get-urgent-help/",
+    "evidence_quote": "Free-text: HELLO to 50808 for an anonymous chat with a trained volunteer, any time"
+  },
+  "US:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://988lifeline.org/",
+    "evidence_quote": "The 988 Lifeline is available 24/7/365 ... Call ... Text 988"
+  },
+  "US:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.crisistextline.org/",
+    "evidence_quote": "Text HOME to 741741 from anywhere in the United States – 24/7, free, confidential."
+  },
+  "CA:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.canada.ca/en/public-health/services/mental-health-services/mental-health-get-help.html",
+    "evidence_quote": "call or text 9-8-8. Support is available 24 hours a day, 7 days a week"
+  },
+  "CA:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.canada.ca/en/public-health/services/mental-health-services/mental-health-get-help.html",
+    "evidence_quote": "Call 1-800-668-6868 (toll-free) or text CONNECT to 686868. Available 24 hours a day, 7 days a week"
+  },
+  "AU:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.healthdirect.gov.au/suicide-prevention",
+    "evidence_quote": "Call Lifeline for 24-hour crisis support on 13 11 14"
+  },
+  "AU:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.suicidecallbackservice.org.au/",
+    "evidence_quote": "1300 659 467 ... 24/7 phone and online counselling ... free nationwide service"
+  },
+  "NZ:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://1737.org.nz/",
+    "evidence_quote": "Free, confidential support – 24/7. Call or text 1737"
+  },
+  "DE:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.telefonseelsorge.de/",
+    "evidence_quote": "Tag und Nacht erreichbar ... 0800 1110111"
+  },
+  "DE:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.telefonseelsorge.de/",
+    "evidence_quote": "Tag und Nacht erreichbar ... 116 123"
+  },
+  "AT:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.telefonseelsorge.at/",
+    "evidence_quote": "142 ... 0–24 Uhr ... Kostenlos"
+  },
+  "CH:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.143.ch/en/a-conversation-often-helps/",
+    "evidence_quote": "you may also try to call 143. It's open 7/24."
+  },
+  "CH:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.147.ch/de/",
+    "evidence_quote": "147 ... rund um die Uhr ... Dein Anruf ist kostenlos"
+  },
+  "FR:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://3114.fr/",
+    "evidence_quote": "3114 ... Numéro national de prévention du suicide ... 24h/24 et 7j/7"
+  },
+  "FR:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.sosamitie.org/besoin-aide/telephone",
+    "evidence_quote": "09 72 39 40 50 ... 24h/24 ... au prix d'un appel local"
+  },
+  "BE:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.zelfmoord1813.be/",
+    "evidence_quote": "1813 ... 24/7 bereikbaar ... anoniem en gratis"
+  },
+  "BE:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.preventionsuicide.be/la-ligne-decoute-0800-32-123",
+    "evidence_quote": "0800 32 123 ... 24h/24 et 7j/7 ... anonyme, gratuite"
+  },
+  "NL:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.113.nl/actueel/telefoonnummer-113-vanaf-nu-gratis",
+    "evidence_quote": "vanaf nu gratis bellen met 113 ... Dag en nacht anoniem kunnen bellen of chatten"
+  },
+  "NL:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.113.nl/i/telefonische-hulplijn",
+    "evidence_quote": "Je kunt ons bellen op 113 of 0800-0113 (gratis) ... Wij zijn dag en nacht open."
+  },
+  "ES:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.sanidad.gob.es/linea024/home.htm",
+    "evidence_quote": "024 ... disponible las 24 horas del día, los 365 días del año ... gratuito"
+  },
+  "ES:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.madrid.es/portales/munimadrid/es/AyuntamientodeMadrid/Telefono-de-la-Esperanza/?vgnextfmt=default&vgnextoid=ca6c9cd2554b2610VgnVCM2000001f4a900aRCRD&vgnextchannel=2af809f68134b010VgnVCM1000000b205a0aRCRD",
+    "evidence_quote": "717 003 717 / 914 590 055 / 914 590 050 ... 24 horas"
+  },
+  "PT:0": {
+    "confirmed_247": false,
+    "evidence_url": "https://portugal.gov.pt/pt/gc25/comunicacao/noticias/nova-linha-de-prevencao-do-suicidio-entra-em-funcionamento",
+    "evidence_quote": "Fetched government and INEM pages state no hours; sns24.gov.pt page renders empty. 24h only in press."
+  },
+  "PT:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://portugal.gov.pt/gc23/comunicacao/noticias/linha-de-apoio-psicologico-do-sns-24-ja-atendeu-mais-de-240-mil-chamadas",
+    "evidence_quote": "disponível 24 horas por dia, 7 dias por semana"
+  },
+  "IT:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.telefonoamico.it/",
+    "evidence_quote": "Chiamaci al numero 02 2327 2327, tutti i giorni 24 ore su 24"
+  },
+  "MT:0": {
+    "confirmed_247": false,
+    "evidence_url": "https://hpdp.gov.mt/hpu/mental_health_and_wellbeing",
+    "evidence_quote": "Fetched page gives no hours; health.gov.mt (\"24hr\" per search snippet) returned 403."
+  },
+  "GR:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.klimaka.org.gr/19-xronia-grammis-paremvasis-gia-tin-aytoktonia-1018-klimaka-org/",
+    "evidence_quote": "Η Γραμμή λειτουργεί σε εικοσιτετράωρη βάση ... με αστική χρέωση"
+  },
+  "BG:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.mlsp.government.bg/nay-brziyat-nachin-za-podavane-na-signal-za-dete-v-risk-e-na-telefon-116-111",
+    "evidence_quote": "116 111 ... Тя работи денонощно, без почивен ден и е безплатна."
+  },
+  "HR:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://mentalnozdravlje.zagreb.hr/centar-za-krizna-stanja-i-prevenciju-suicida-kbc-a-zagreb-obavijest-o-izmjenama/",
+    "evidence_quote": "telefonska „tele apel\" linija ( 01 2376 470 ) na kojoj tijekom 24 sata, svaki dan u godini"
+  },
+  "CZ:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.linkapsychickepomoci.cz/",
+    "evidence_quote": "116 123 ... nonstop ... Zdarma"
+  },
+  "CZ:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.linkabezpeci.cz/",
+    "evidence_quote": "116 111 ... Nonstop ... Služba je zdarma"
+  },
+  "SK:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.bratislava.sk/socialne-sluzby-a-byvanie/pomoc-a-podpora/linky-pomoci",
+    "evidence_quote": "0800 800 566 (nonstop, bezplatne, anonymne)"
+  },
+  "SK:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.bratislava.sk/socialne-sluzby-a-byvanie/pomoc-a-podpora/linky-pomoci",
+    "evidence_quote": "0800 500 333 (nonstop, anonymne, bezplatne)"
+  },
+  "SI:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://zivziv.si/sos/",
+    "evidence_quote": "116 123 – Zaupni telefon Samarijan in Sopotnik (24h/dan)"
+  },
+  "HU:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://sos116-123.hu/",
+    "evidence_quote": "116-123 ... A nap 24 órájában"
+  },
+  "PL:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://centrumwsparcia.pl/",
+    "evidence_quote": "800 70 2222 ... Całodobowo ... 7 dni w tygodniu ... Bezpłatnie"
+  },
+  "PL:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://116sos.pl/",
+    "evidence_quote": "116 123 ... dostępny 24/7 ... Bezpłatne"
+  },
+  "LT:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://pagalbasau.lt/gauk-pagalba/pagalbos-linijos/",
+    "evidence_quote": "Vilties linija ... 116 123 ... I-VII visą parą"
+  },
+  "LT:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://pagalbasau.lt/gauk-pagalba/pagalbos-linijos/",
+    "evidence_quote": "Jaunimo linija ... +370 800 28888 ... I-VII visą parą"
+  },
+  "LV:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.skalbes.lv/",
+    "evidence_quote": "Valsts apmaksāts diennakts krīzes tālrunis - pirmā psiholoģiskā palīdzība ... 116123"
+  },
+  "FI:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://mieli.fi/tukea-ja-apua/kriisipuhelin/",
+    "evidence_quote": "09 2525 0111 ... joka päivä 24 tuntia vuorokaudessa"
+  },
+  "NO:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.mentalhelse.no/fa-hjelp/hjelpetelefonen",
+    "evidence_quote": "116 123 ... døgnåpen ... alle dager, året rundt ... gratis"
+  },
+  "NO:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.kirkens-sos.no/",
+    "evidence_quote": "22 40 00 40 ... døgnet rundt"
+  },
+  "IS:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.raudikrossinn.is/verkefni/innanlandsverkefni/heilbrigdi-og-velferd/hjalparsiminn-1717-og-netspjallid/",
+    "evidence_quote": "1717 ... Það er opið alla daga ársins, allan sólarhringinn"
+  },
+  "IN:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://dhubri-mch.assam.gov.in/services/tele-manas-call-14416-24%C3%977-mental-health-helpline",
+    "evidence_quote": "free, 24×7 mental health support ... toll-free helpline number 14416 or 1-800-891-4416"
+  },
+  "IN:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://dhubri-mch.assam.gov.in/services/tele-manas-call-14416-24%C3%977-mental-health-helpline",
+    "evidence_quote": "free, 24×7 mental health support ... toll-free helpline number 14416 or 1-800-891-4416"
+  },
+  "JP:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.mhlw.go.jp/mamorouyokokoro/soudan/tel/",
+    "evidence_quote": "#いのちSOS 0120-061-338 ... 24時間 365日"
+  },
+  "JP:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.mhlw.go.jp/mamorouyokokoro/soudan/tel/",
+    "evidence_quote": "よりそいホットライン 0120-279-338 ... 24時間対応"
+  },
+  "KR:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.129.go.kr/109",
+    "evidence_quote": "24시간 자살예방상담전화 109"
+  },
+  "TW:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://dep.mohw.gov.tw/DOMHAOH/cp-4906-54077-107.html",
+    "evidence_quote": "1925 ... 24小時全年無休 ... 免費"
+  },
+  "HK:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.info.gov.hk/gia/general/202312/27/P2023122700238.htm",
+    "evidence_quote": "18111 - Mental Health Support Hotline ... dedicated personnel answering the phone 24 hours a day"
+  },
+  "HK:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.sbhk.org.hk/",
+    "evidence_quote": "24小時情緒支援熱線 2389 2222"
+  },
+  "SG:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.sos.org.sg/",
+    "evidence_quote": "24-hour Hotline: 1767"
+  },
+  "SG:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.moh.gov.sg/newsroom/national-mindline-1771-to-provide--round-the-clock-support-for-mental-health/",
+    "evidence_quote": "Dial 1771 ... WhatsApp: Text +65-6669-1771 ... round-the-clock support for mental health"
+  },
+  "MX:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.gob.mx/conasama/articulos/linea-de-la-vida-800-911-2000",
+    "evidence_quote": "800-911-2000 ... las 24 horas del día, los 365 días del año ... servicio gratuito"
+  },
+  "BR:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://cvv.org.br/",
+    "evidence_quote": "LIGUE 188 ... 24 horas por dia"
+  },
+  "CO:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://bogota.gov.co/mi-ciudad/salud/linea-106-para-apoyo-psicologico-y-mas-en-bogota-este-2025",
+    "evidence_quote": "disponible las 24 horas del día, los 365 días del año"
+  },
+  "CL:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.crececontigo.gob.cl/noticias/no-estas-solo-no-estas-sola-ministerio-de-salud-tiene-disponible-el-fono-4141-linea-prevencion-del-suicidio/",
+    "evidence_quote": "*4141 ... de lunes a domingo, las 24 horas del día ... completamente gratuita"
+  },
+  "ZA:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.sadag.org/",
+    "evidence_quote": "Suicide Crisis Helpline 0800 567 567 ... 24-HOUR TOLL-FREE EMERGENCY HELPLINES"
+  },
+  "ZA:1": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.lifeline.org.za/",
+    "evidence_quote": "0861-322-322 ... 24 hours / 7 days per week"
+  },
+  "AE:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.doh.gov.ae/en/news/doh-activates-247-mental-health-support-hotline-800-sakina-(725462)",
+    "evidence_quote": "800-SAKINA or 800 - 725462 ... 24/7 mental health support hotline"
+  },
+  "MY:0": {
+    "confirmed_247": true,
+    "evidence_url": "https://www.befrienders.org.my/",
+    "evidence_quote": "03-7627 2929 ... 24 hours a day, every day"
+  }
+}

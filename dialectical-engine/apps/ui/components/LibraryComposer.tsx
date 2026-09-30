@@ -6,6 +6,7 @@ import { COOKIE_SESSION_MARKER, createDebate, validateSession } from "@/lib/api"
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
+import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
 
 /* The claim field rests at one line and grows with what is typed. */
 function grow(field: HTMLTextAreaElement | null): void {
@@ -18,24 +19,31 @@ function grow(field: HTMLTextAreaElement | null): void {
 export function LibraryComposer({
   catalog,
   newDebateCatalog,
-  locale
+  locale,
+  crisisCountryHint = null
 }: {
   catalog: MessageCatalog;
   /** The interface locale's `newDebate` catalogue: the refusal words /new uses. */
   newDebateCatalog: MessageCatalog;
   /** The interface locale, recorded with the sensitive-data consent. */
   locale: string;
+  /** The edge's country, so the crisis screen shows that country's helplines first. */
+  crisisCountryHint?: string | null;
 }) {
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const consent = useSensitiveDataConsent({ catalog, locale });
+  const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint });
 
   const ready = topic.trim().length > 6;
 
   async function start() {
     if (!ready || busy) return;
+    // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
+    // debate — and before anything else, the consent screen included.
+    if (crisis.offerIfCrisis(topic)) return;
     setBusy(true);
     setError(null);
     try {
@@ -62,6 +70,11 @@ export function LibraryComposer({
       router.push(`/debate/${debate.id}`);
       return;
     } catch (exc) {
+      if (isCrisisSupportRefusal(exc)) {
+        crisis.offer();
+        setBusy(false);
+        return;
+      }
       // Task M8 (spec 2026-09-26 §14.4.7): today's limit for new debates is an
       // answer, not a detour. /new would only refuse the same ask again, so the
       // person reads it here, where they typed, in the words /new uses.
@@ -111,6 +124,7 @@ export function LibraryComposer({
         ) : null}
       </div>
       {consent.dialog}
+      {crisis.dialog}
     </div>
   );
 }

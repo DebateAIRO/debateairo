@@ -12,6 +12,7 @@ import { requestFailureMessage } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
+import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
@@ -69,18 +70,21 @@ export default function NewDebatePageClient({
   catalog,
   homeCatalog,
   chromeCatalog,
-  locale = "en"
+  locale = "en",
+  crisisCountryHint = null
 }: {
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
   /** The interface locale, recorded with the sensitive-data consent. */
   locale?: string;
+  /** The edge's country, so the crisis screen shows that country's helplines first. */
+  crisisCountryHint?: string | null;
 }) {
   return (
     <Suspense fallback={null}>
       <AuthGate catalog={catalog}>{(token) => (
-        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} />
+        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} crisisCountryHint={crisisCountryHint} />
       )}</AuthGate>
     </Suspense>
   );
@@ -91,13 +95,15 @@ function NewDebateForm({
   catalog,
   homeCatalog,
   chromeCatalog,
-  locale
+  locale,
+  crisisCountryHint
 }: {
   token: string;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
   locale: string;
+  crisisCountryHint: string | null;
 }) {
   // Everything the AI notice can read, in every variant: home + chrome (+ newDebate).
   const noticeCatalog = { ...homeCatalog, ...chromeCatalog, ...catalog };
@@ -121,6 +127,7 @@ function NewDebateForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
+  const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
 
   useEffect(() => {
     let active = true;
@@ -167,6 +174,9 @@ function NewDebateForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!ready) return;
+    // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
+    // debate — and before anything else, the consent screen included.
+    if (crisis.offerIfCrisis(topic)) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -194,6 +204,10 @@ function NewDebateForm({
       }
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (exc) {
+      if (isCrisisSupportRefusal(exc)) {
+        crisis.offer();
+        return;
+      }
       // DL3-F7: see lib/v3/requestFailure.ts — the banner states what this page
       // observed, not whatever sentence arrived from upstream.
       setError(requestFailureMessage("DEBATE_CREATE",exc,catalog));
@@ -423,6 +437,7 @@ function NewDebateForm({
           </div>
         </form>
         {consent.dialog}
+        {crisis.dialog}
       </div>
       <SupportWidget />
     </div>
