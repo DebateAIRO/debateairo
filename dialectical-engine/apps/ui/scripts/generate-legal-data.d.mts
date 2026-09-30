@@ -36,6 +36,8 @@ export function legalArchiveProblems(repoRoot: string, archive: LegalArchiveInde
 export function buildLegalManifest(
   readDraft: (locale: string, kind: LegalManifestKind) => string,
   consentEntries?: Readonly<Record<string, Readonly<Partial<Record<LegalManifestConsentKind, Pair>>>>>,
-  archiveHistory?: LegalArchiveIndex
+  archiveHistory?: LegalArchiveIndex,
+  /** The re-acceptance floors; the DOCUMENTS config's when left out. Refused above a current draft. */
+  floors?: Readonly<Partial<Record<LegalManifestKind, string | null>>>
 ): LegalManifest;
 export function renderLegalManifest(manifest: LegalManifest): string;

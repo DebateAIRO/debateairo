@@ -110,8 +110,11 @@ function parseArchive(value: unknown): LegalManifestIndex["archive"] {
  * The manifest's own grammar, refused whole (LEGAL_MANIFEST_INVALID) rather than half-read: an
  * unknown kind, a bad locale, a pair of the wrong shape for its kind, a re-acceptance floor on
  * a consent sentence (a changed sentence is simply a new version, asked for at the next checkout),
- * an archive entry off its path, or a current TERMS/PRIVACY pair the archive does not hold (Q-3:
- * whatever a person accepts today must be attachable later).
+ * an archive entry off its path, a current TERMS/PRIVACY pair the archive does not hold (Q-3:
+ * whatever a person accepts today must be attachable later), or a TERMS/PRIVACY floor above the
+ * current version of any locale (final review I-2: the accept screen would ask for the current
+ * version, record it, and still find it below the floor — a lockout no one can clear, one more
+ * REACCEPT row per click). The owner raises the floor together with the drafts' version.
  */
 export function parseLegalManifest(value: unknown): LegalManifestIndex {
   const root = record(value);
@@ -139,9 +142,11 @@ export function parseLegalManifest(value: unknown): LegalManifestIndex {
     byKind[kind] = locales;
   }
   for (const kind of ARCHIVE_KINDS) {
+    const floor = floors[kind];
     for (const [locale, pair] of byKind[kind]) {
       const archived = archive[kind].get(locale)?.get(pair.sha256);
       if (archived === undefined || archived.version !== pair.version) invalid();
+      if (floor !== null && !documentVersionAtLeast(pair.version, floor)) invalid();
     }
   }
   return Object.freeze({ reacceptance: Object.freeze(floors), documents: Object.freeze(byKind), archive });
@@ -165,8 +170,9 @@ export function isCurrentDocument(
 /**
  * The version from which people who accepted an OLDER version must accept again, or null when no
  * re-acceptance is required. Set in the generator's DOCUMENTS config (`reacceptanceFrom`) when a
- * draft's change is material; the generator carries it into manifest.json. Always null for the two
- * consent kinds.
+ * draft's change is material; the generator carries it into manifest.json. Never above the current
+ * version of that document in any locale (both the generator and parseLegalManifest refuse it).
+ * Always null for the two consent kinds.
  */
 export function reacceptanceFloor(kind: LegalDocumentKind): string | null {
   return MANIFEST.reacceptance[kind] ?? null;

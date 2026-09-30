@@ -38,6 +38,10 @@ const ACCENT_CYCLE = ["--ok-dot", "--gold", "--reasoning", "--con", "--ink", "--
 /**
  * Per-document structural invariants. Reader-visible chrome is locale-owned and parsed from
  * each draft's `legal-chrome` comment.
+ *
+ * `reacceptanceFrom` (paid plans L4): the version from which people who accepted an older one must
+ * accept again, or null. Raise it together with the drafts' version, never above it: a floor above
+ * any locale's current draft is refused (LEGAL_MANIFEST_REACCEPTANCE_FLOOR_INVALID, final review I-2).
  */
 const DOCUMENTS = {
   privacy: {
@@ -608,6 +612,40 @@ function mergeArchive(archiveHistory, currentByKind) {
   return archive;
 }
 
+const FLOOR_VERSION = /^([0-9]{1,4})\.([0-9]{1,4})$/;
+
+/** `N.M` as [N, M], or null. The package's documentVersionAtLeast reads versions the same way. */
+function versionParts(version) {
+  const match = typeof version === "string" ? FLOOR_VERSION.exec(version) : null;
+  return match === null ? null : [Number(match[1]), Number(match[2])];
+}
+
+/**
+ * Final review I-2: a re-acceptance floor must be an `N.M` version that EVERY locale's current draft
+ * of its document has reached. A floor above one could never be cleared — the accept screen asks for
+ * the current version, records it, and the record is still below the floor — so every signed-in
+ * person would be locked behind it, one more REACCEPT row per click. packages/legal-manifest's
+ * parseLegalManifest refuses the same manifest (LEGAL_MANIFEST_INVALID); this refuses it before
+ * anything is written. The rule is spelled twice because the generator never imports what it
+ * generates. The error carries a code only: no version, no locale.
+ */
+function assertReacceptanceFloor(floor, byLocale) {
+  if (floor === null) return;
+  const floorParts = versionParts(floor);
+  if (floorParts === null) throw new Error("LEGAL_MANIFEST_REACCEPTANCE_FLOOR_INVALID");
+  for (const pair of Object.values(byLocale)) {
+    const current = versionParts(pair.version);
+    if (current === null || current[0] < floorParts[0] || (current[0] === floorParts[0] && current[1] < floorParts[1])) {
+      throw new Error("LEGAL_MANIFEST_REACCEPTANCE_FLOOR_INVALID");
+    }
+  }
+}
+
+/** The floors the DOCUMENTS config sets, by manifest kind. */
+function configuredReacceptanceFloors() {
+  return Object.fromEntries(["privacy", "terms"].map((key) => [DOCUMENTS[key].manifestKind, DOCUMENTS[key].reacceptanceFrom]));
+}
+
 /**
  * Every locale x both documents -> { version, sha256 }, plus each document's re-acceptance floor,
  * plus the checkout consent pairs of the locales that have them (`consentEntries`, the shape
@@ -615,20 +653,24 @@ function mergeArchive(archiveHistory, currentByKind) {
  * plus the archive index (`archiveHistory` carried forward, every current draft added — Q-3).
  * `readDraft(locale, kind)` returns the draft's text; a missing or invalid draft throws, so the
  * manifest is either whole or not written. A kind with no entry at all is left out of `documents`
- * (the package reads it as empty). Keys are sorted, so the output is deterministic.
+ * (the package reads it as empty). Keys are sorted, so the output is deterministic. `floors`
+ * (TERMS / PRIVACY -> `N.M` or null) defaults to the DOCUMENTS config; a floor above any locale's
+ * current draft throws LEGAL_MANIFEST_REACCEPTANCE_FLOOR_INVALID.
  */
-export function buildLegalManifest(readDraft, consentEntries = {}, archiveHistory = {}) {
+export function buildLegalManifest(readDraft, consentEntries = {}, archiveHistory = {}, floors = configuredReacceptanceFloors()) {
   const documents = {};
   const reacceptance = {};
   for (const key of ["privacy", "terms"]) {
     const config = DOCUMENTS[key];
-    reacceptance[config.manifestKind] = config.reacceptanceFrom;
+    const floor = floors[config.manifestKind] ?? null;
+    reacceptance[config.manifestKind] = floor;
     const byLocale = {};
     for (const code of LOCALES.map(({ code: locale }) => locale).sort()) {
       const markdown = readDraft(code, config.manifestKind);
       const document = buildLegalDocument(markdown, key);
       byLocale[code] = { version: document.version, sha256: document.sha256 };
     }
+    assertReacceptanceFloor(floor, byLocale);
     documents[config.manifestKind] = byLocale;
   }
   const archive = mergeArchive(archiveHistory, { PRIVACY: documents.PRIVACY, TERMS: documents.TERMS });

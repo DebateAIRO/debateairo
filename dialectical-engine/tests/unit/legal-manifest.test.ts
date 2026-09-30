@@ -112,6 +112,49 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
     expect(() => documentVersionAtLeast("sha256-0123456789ab", "2.0")).toThrow("LEGAL_DOCUMENT_VERSION_INVALID");
   });
 
+  /**
+   * Final review I-2. A floor above a current version can never be cleared: the accept screen asks for
+   * the current document, records it, and the record is still below the floor — every signed-in person
+   * locked out, one more REACCEPT row per click. Both the package (the API's boot) and the generator
+   * refuse it; a floor AT the current version (the owner raising both together) is the valid move.
+   */
+  it("refuses a re-acceptance floor above any locale's current version, in the package and in the generator", () => {
+    const terms = currentDocument("TERMS", "en")!.version;
+    const privacy = currentDocument("PRIVACY", "en")!.version;
+    expect([terms, privacy]).toEqual(["2.0", "3.0"]);
+    const manifest = JSON.parse(renderLegalManifest(buildLegalManifest(readDraft, {}, committedArchive()))) as {
+      reacceptance: Record<string, unknown>;
+      documents: Record<string, Record<string, { version: string; sha256: string }>>;
+      archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
+    };
+    const withFloors = (floors: Record<string, unknown>) => ({
+      ...structuredClone(manifest), reacceptance: { ...manifest.reacceptance, ...floors }
+    });
+    for (const floors of [{ TERMS: "2.1" }, { TERMS: "3.0" }, { PRIVACY: "3.1" }, { TERMS: "2.0", PRIVACY: "4.0" }]) {
+      expect(() => parseLegalManifest(withFloors(floors)), JSON.stringify(floors)).toThrow("LEGAL_MANIFEST_INVALID");
+    }
+    for (const floors of [{ TERMS: "2.0" }, { TERMS: "1.9", PRIVACY: "3.0" }, { PRIVACY: "2.10" }]) {
+      expect(parseLegalManifest(withFloors(floors)).reacceptance, JSON.stringify(floors)).toMatchObject(floors);
+    }
+    // Every locale's current pair must have reached the floor, not only English.
+    const lagging = withFloors({ TERMS: "2.0" });
+    const deSha = lagging.documents.TERMS!.de!.sha256;
+    lagging.documents.TERMS!.de!.version = "1.9";
+    lagging.archive.TERMS!.de![deSha]!.version = "1.9";
+    expect(() => parseLegalManifest(lagging)).toThrow("LEGAL_MANIFEST_INVALID");
+    expect(parseLegalManifest({ ...lagging, reacceptance: { ...lagging.reacceptance, TERMS: "1.9" } })
+      .documents.TERMS.get("de")?.version).toBe("1.9");
+
+    // The generator refuses the same configuration before it writes anything, by a code alone.
+    for (const floors of [{ TERMS: "2.1", PRIVACY: null }, { TERMS: null, PRIVACY: "3.1" }, { TERMS: "v2", PRIVACY: null }]) {
+      expect(() => buildLegalManifest(readDraft, {}, committedArchive(), floors), JSON.stringify(floors))
+        .toThrow(/^LEGAL_MANIFEST_REACCEPTANCE_FLOOR_INVALID$/u);
+    }
+    const raised = buildLegalManifest(readDraft, {}, committedArchive(), { TERMS: "2.0", PRIVACY: "3.0" });
+    expect(raised.reacceptance).toEqual({ PRIVACY: "3.0", TERMS: "2.0" });
+    expect(parseLegalManifest(JSON.parse(renderLegalManifest(raised))).reacceptance.TERMS).toBe("2.0");
+  });
+
   it("stamps each generated module with the same version and hash as the manifest", () => {
     expect(TERMS_OF_SERVICE.version).toBe(currentDocument("TERMS", "en")!.version);
     expect(TERMS_OF_SERVICE.sha256).toBe(currentDocument("TERMS", "en")!.sha256);

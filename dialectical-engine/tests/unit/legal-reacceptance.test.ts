@@ -72,14 +72,17 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
   });
 
   it("requires nothing of an account WITH records while no floor is set, and every document below a floor once one is", async () => {
-    const { repository } = fakeAcceptances({ TERMS: "2.0", PRIVACY_SHOWN: "3.0" });
+    // A valid manifest's floor never exceeds the current version (final review I-2; parseLegalManifest
+    // refuses it): the owner raises the floor TO the current Terms, and a person whose last acceptance is
+    // an older version owes them.
+    const { repository } = fakeAcceptances({ TERMS: "1.9", PRIVACY_SHOWN: "3.0" });
     const today = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW
     });
     await expect(today.status(IDENTITY.authenticated.ownerRef, "ro")).resolves.toEqual([]);
     await expect(today.requiresReacceptance(IDENTITY.authenticated.ownerRef)).resolves.toBe(false);
 
-    const floors = { TERMS: "2.1", PRIVACY: null } as const;
+    const floors = { TERMS: currentDocument("TERMS", "ro")!.version, PRIVACY: null } as const;
     const moved = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW,
       floorOf: (kind) => floors[kind]
@@ -146,8 +149,10 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
   });
 
   it("records only the documents owed when some are posted that are not", async () => {
-    const { repository, recorded } = fakeAcceptances({ TERMS: "2.0", PRIVACY_SHOWN: "3.0" });
-    const floors = { TERMS: "2.1", PRIVACY: null } as const;
+    // The floor sits AT the current Terms (a valid manifest, final review I-2), the last Terms acceptance
+    // below it; the Privacy Policy has no floor and a record, so it is not owed.
+    const { repository, recorded } = fakeAcceptances({ TERMS: "1.9", PRIVACY_SHOWN: "3.0" });
+    const floors = { TERMS: currentDocument("TERMS", "ro")!.version, PRIVACY: null } as const;
     const legal = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW,
       floorOf: (kind) => floors[kind]
@@ -158,6 +163,8 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
     })).resolves.toBe("ACCEPTED");
     expect(recorded.map((row) => row.kind)).toEqual(["TERMS"]);
     expect(repository.recordAll).toHaveBeenCalledTimes(1);
+    // The row it wrote carries the current version, which has reached the floor: the screen clears.
+    expect(recorded[0]!.documentVersion).toBe(floors.TERMS);
   });
 
   it("serves both routes to a signed-in person only, with CSRF on the POST", async () => {
