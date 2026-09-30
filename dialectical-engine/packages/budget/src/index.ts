@@ -100,6 +100,9 @@ export {
   type RunSettingsClass
 } from "./estimate.js";
 
+/** Budget spec 2026-09-28 §2.6 (B3): the day lock, then the person lock, for every room decision. */
+export { withSpendDecisionLock } from "./spend-lock.js";
+
 
 export const RATIFIED_BATTERY_ROW_IDS = [
   "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",

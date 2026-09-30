@@ -28,7 +28,7 @@ import {
   type CostEnvelopePolicy,
   type StoryPolicy
 } from "@debateai/register";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   chargeMicrosForUsage,
@@ -626,6 +626,55 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   async readDaySpentMicros(day: string): Promise<number> {
     const result = await this.pool.query<{ total: string }>(
       "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE charged_on = $1::date",
+      [day]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * Budget spec §2.6 — THE HOLD a started run carries: the estimate, written once
+   * in the locked transaction that started it (the ask's START or the waker's).
+   * The caller then queues the run's first job on the SAME transaction
+   * (`WorkItemRepository.enqueueOn`), so the hold and its job commit together:
+   * a committed hold always has its job, and a READY job always has its hold.
+   * Nothing ever releases it.
+   */
+  async openHold(
+    client: Pick<PoolClient, "query">,
+    input: Readonly<{ runId: string; heldMicros: number }>
+  ): Promise<void> {
+    if (typeof input?.runId !== "string" || input.runId.trim() === "") {
+      throw new TypeError("MODEL_SPEND_HOLD_RUN_REQUIRED");
+    }
+    if (!Number.isSafeInteger(input.heldMicros) || input.heldMicros < 1) {
+      throw new TypeError("MODEL_SPEND_HOLD_INVALID");
+    }
+    await client.query(
+      `INSERT INTO ledger.model_spend_hold (hold_id, run_id, held_micros, opened_at)
+       VALUES (gen_random_uuid(), $1, $2, clock_timestamp())`,
+      [input.runId, input.heldMicros]
+    );
+  }
+
+  /**
+   * Budget spec §2.2/§2.6 — THE COUNTED HOLDS ON THE SITE'S DAY: for every run that
+   * still has a READY or CLAIMED job and whose hold was opened no later than that
+   * UTC day, the part of its hold it has not yet spent (RUN + STORY), never less
+   * than zero. Read from the live jobs outward (`work_item_live_run_idx`).
+   */
+  async readSiteCountedHoldsMicros(day: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
+       FROM (
+         SELECT DISTINCT work.run_id FROM core.work_item AS work
+         WHERE work.run_id IS NOT NULL AND work.state IN ('READY','CLAIMED')
+       ) AS live
+       JOIN ledger.model_spend_hold AS hold ON hold.run_id = live.run_id
+       LEFT JOIN LATERAL (
+         SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
+         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
+       ) AS spent ON true
+       WHERE hold.opened_at < (($1::date + 1)::timestamp AT TIME ZONE 'UTC')`,
       [day]
     );
     return this.#total(result.rows[0]?.total);

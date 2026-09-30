@@ -433,7 +433,12 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // legal.acceptance, the retention purge, the sign-up consent wrapper (with the age record)
         // and the G3a country-gate audit capability. 0078 and 0079 are the colleague's consent and
         // change-email files, so R3-1 moves this to 0080; no pair.
-        "0080_legal_acceptance.sql"
+        "0080_legal_acceptance.sql",
+        // Budget spec 2026-09-28 (B3): the holds, the waiting line, the owner record of
+        // cheaper models, and the ALLOWANCE stop kind on serve.serve_disclosure. The
+        // spec named it 0077; dev's age gate took 0077, the sensitive-data consent holds
+        // 0078, the change-email turn 0079 and legal acceptance is 0080 (RULINGS-R3). A new prefix, no pair.
+        "0081_budget_holds_waiting_line.sql"
       ]);
   });
 });

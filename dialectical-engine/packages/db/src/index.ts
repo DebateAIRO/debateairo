@@ -53,6 +53,15 @@ export {
   type StoredServeFloor
 } from "./serve-disclosure.js";
 
+// Budget spec 2026-09-28 §2.7 (migration 0081): the waiting line, read through
+// core.run_waiting_v so no owner is stored beside a wait.
+export {
+  RunWaitRepository,
+  type WaitReason,
+  type WaitingRun,
+  type WaitingRunRef
+} from "./run-wait.js";
+
 export {
   assertSupportKeyCoverage,
   assertSupportDatabaseRole,

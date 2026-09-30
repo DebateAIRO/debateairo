@@ -1,5 +1,5 @@
 import type { ActivationState } from "@debateai/kernel";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 
 export {
@@ -275,19 +275,28 @@ export class WorkItemRepository {
     })));
   }
 
+  /**
+   * Queues a job on a transaction the caller owns and will commit — the room's
+   * locked decision (budget spec §2.6, B6b/B7b): the job then commits with the
+   * run's hold, its charge scope and its start mark, or not at all, so no READY
+   * job can exist without what counts it. `allocateSequence` locks the one shared
+   * sequence row until that COMMIT, so the caller runs this as its LAST statement.
+   */
+  async enqueueOn(client: PoolClient, input: EnqueueWorkInput): Promise<string> {
+    const sequence = await allocateSequence(client);
+    const result = await client.query<{ work_item_id: string }>(
+      `INSERT INTO core.work_item (
+        run_id, battery_row_id, node_set, command_key, state, created_at_seq
+      ) VALUES ($1,$2,$3::jsonb,$4,'READY',$5)
+      ON CONFLICT (command_key) DO UPDATE SET command_key = EXCLUDED.command_key
+      RETURNING work_item_id`,
+      [input.runId, input.batteryRowId, JSON.stringify(input.nodeSet), input.commandKey, sequence]
+    );
+    return result.rows[0]!.work_item_id;
+  }
+
   async enqueue(input: EnqueueWorkInput): Promise<string> {
-    return withWriteTransaction(this.pool, async (client) => {
-      const sequence = await allocateSequence(client);
-      const result = await client.query<{ work_item_id: string }>(
-        `INSERT INTO core.work_item (
-          run_id, battery_row_id, node_set, command_key, state, created_at_seq
-        ) VALUES ($1,$2,$3::jsonb,$4,'READY',$5)
-        ON CONFLICT (command_key) DO UPDATE SET command_key = EXCLUDED.command_key
-        RETURNING work_item_id`,
-        [input.runId, input.batteryRowId, JSON.stringify(input.nodeSet), input.commandKey, sequence]
-      );
-      return result.rows[0]!.work_item_id;
-    });
+    return withWriteTransaction(this.pool, (client) => this.enqueueOn(client, input));
   }
 
   async claimNext(input: { readonly workerId: string; readonly claimSeconds: number }): Promise<ClaimedWorkItem | null> {

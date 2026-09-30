@@ -533,6 +533,7 @@ packages/budget/src/index.ts
 packages/budget/src/model-spend.ts
 packages/budget/src/person-allowance.ts
 packages/budget/src/room.ts
+packages/budget/src/spend-lock.ts
 packages/contract/src/client.ts
 packages/contract/src/disclosure.ts
 packages/contract/src/generate.ts
@@ -556,6 +557,7 @@ packages/db/src/obs-schema.ts
 packages/db/src/publication-lease.ts
 packages/db/src/publication.ts
 packages/db/src/recovery.ts
+packages/db/src/run-wait.ts
 packages/db/src/schema.ts
 packages/db/src/serve-disclosure.ts
 packages/db/src/sessions.ts
