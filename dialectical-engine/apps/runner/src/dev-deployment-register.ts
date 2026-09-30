@@ -702,7 +702,8 @@ function developmentRows(
     COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
     // Paid plans G2 (A14): the country switches. Published for local mode too, where no gate reads
     // it; a hosted version carries it only when the operator's file has the member (its own copy,
-    // as hosted-register.example.json does) — planHostedRegisterPublication drops it otherwise.
+    // from deploy/vps/register/country-policy.example.json — the kit's hosted-register.example.json
+    // leaves it out, so no gate by default) — planHostedRegisterPublication drops it otherwise.
     COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
     ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs),

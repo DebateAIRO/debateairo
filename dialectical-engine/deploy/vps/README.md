@@ -677,6 +677,9 @@ install -d -m 0700 -o root -g root /etc/debateai/register
 test ! -e /etc/debateai/register/hosted-register.json && install -m 0600 -o root -g root deploy/vps/register/hosted-register.example.json /etc/debateai/register/hosted-register.json
 ```
 
+The example carries no `countryPolicy` member, so the version you publish from it has no country
+gate; §5 "Country data" says what must hold before you add one.
+
 Edit `/etc/debateai/register/hosted-register.json` as §11 says (the real vendors and their
 vetting, `providerTargets` equal to `runner.env`'s `PROVIDER_DISCOVERY_TARGETS_JSON`), then
 validate it without writing anything, then publish:
@@ -820,18 +823,41 @@ country file when it is older than 27 days; the API notices a replaced file with
 refused download keeps the previous file. Addresses are looked up on this host: no visitor's
 address is ever sent anywhere.
 
-The country gate only runs once the register version in force publishes a `countryPolicy` row. A
-hosted register file publishes that row only when it carries the `countryPolicy` member
-(`deploy/vps/register/hosted-register.example.json` carries the §1.5 switches; a file without the
-member publishes no row, and so no gate): add the member and publish the register, §11. Signing in
+**The country gate is off in this kit, and stays off until the four conditions below hold.** It
+runs only once the register version in force publishes a `countryPolicy` row, and a hosted register
+file publishes that row only when it carries the `countryPolicy` member. The kit's example
+(`deploy/vps/register/hosted-register.example.json`, the file §4 step 4b copies into
+`/etc/debateai/register/hosted-register.json`) does NOT carry it, so a register published from it
+has no country gate (A14). The §1.5 switches are kept apart, in
+`deploy/vps/register/country-policy.example.json`, which holds exactly that one member. Signing in
 and reading one's debates are never gated.
 
-Attribution: DB-IP's Lite data is licensed CC BY 4.0, and its licence requires the credit
-`IP Geolocation by DB-IP` linking to `https://db-ip.com`. The site footer
-(`apps/ui/components/SiteFooter.tsx`, PR #42's) carries it in its full shape: on the landing, on
-every legal page and on every page that takes money, billing on or off. Task P21 adds it there.
-Keep it there. The one-line footer of the other screens does not carry it; if counsel wants the
-credit on every page, it is one fixed link in that shape.
+Publish no register version that carries `countryPolicy` until ALL of these hold:
+
+1. **The site shows the DB-IP credit.** DB-IP's Lite data is licensed CC BY 4.0, and its licence
+   requires the credit `IP Geolocation by DB-IP` linking to `https://db-ip.com` wherever its results
+   are used. The site does NOT show it yet: task P21 adds it to the full site footer
+   (`apps/ui/components/SiteFooter.tsx`, the footer of the landing page and the legal pages). Open
+   the landing page, signed out, and check that its footer shows `IP Geolocation by DB-IP`
+   linking to `https://db-ip.com`. Whether the one-line footer of the other screens must carry it
+   too is counsel's open question (P21).
+2. **The owner has ruled that the Terms' list of served countries and the `countryPolicy` switches
+   match.** The Terms' list is filled from `countryPolicy` (spec §2.12 item 1); the Terms' Annex A
+   changed on 2026-09-30 and no longer matches the switches in the example. Whichever side changes,
+   a new value of the switches is a new register version, never an edit of a sealed one.
+3. **The Privacy Policy says that the address is looked up locally,** in DB-IP's database and
+   against the Tor exit list, at sign-up and at each new debate (spec §2.12 item 5). It does not
+   say so yet.
+4. **The two files are installed and refreshed:** the `debateai-geoip` user exists (§2), the
+   refresh unit and timer are installed and enabled (§5), and the last run's journal (below) shows
+   `GEOIP_REFRESH_OK tor-list` and, for the country file, `GEOIP_REFRESH_OK` or
+   `GEOIP_REFRESH_SKIPPED`.
+
+Then turn the gate on: open a migrator window (§4 steps 2 and 5), copy the `countryPolicy` member
+from `deploy/vps/register/country-policy.example.json` into the top-level object of
+`/etc/debateai/register/hosted-register.json`, beside `costEnvelopePolicy`, and publish as §11
+"Publishing the settings register on this host" says; pin the version it prints. To turn the gate
+off again, remove the member and publish again: that new version has no row.
 
 To check the last refresh:
 
@@ -1411,7 +1437,7 @@ version must carry, besides the algorithm's own rows:
   changed file is a new version; the same file again returns the version that already holds it;
 - seals the file's `countryPolicy`, when the file carries it, as that version's `countryPolicy`
   row; a file without it publishes no `countryPolicy` row, so that version has no country gate
-  (A14);
+  (A14). The kit's example leaves it out; §5 "Country data" says what must hold before you add it;
 - then runs the start-up readers against the new version, and only then prints the version to pin.
 
 `providerTargets` in the file (prices, addresses, credential paths) is never sealed: it is there

@@ -5,6 +5,10 @@ publishes the hosted deployment's settings register (the sealed, versioned setti
 reads at start-up) as ONE new register version. The command, its checks and its refusal codes are
 in `apps/runner/src/hosted-register-publish.ts`; the runbook step is in the kit's main README.
 
+`country-policy.example.json` holds the one member the example leaves out on purpose,
+`countryPolicy`: the country gate's switches. See "The country gate's switches" below before you
+add it to a hosted file.
+
 ## Everything named "example" in the example file is fake
 
 The two vendors in the example — `vendor:example-alpha` and `vendor:example-beta`, their makers,
@@ -37,13 +41,28 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `sourceRef` | a short, non-secret line saying why this version exists; it is sealed into the register (see "What `sourceRef` becomes" below) | the command |
 | `configuredProviderSet` | `requiredDistinctMakers` and the vendor list: `providerRef`, `adapterKind` (`openai-compatible-http`), `maker`, `vetting` | `buildConfiguredProviderSetDeploymentRow` — `PROVIDER_VENDOR_NOT_VETTED` |
 | `costEnvelopePolicy` | the V-28 ceilings in USD micro-units, as the register row stores them; optionally `serve_reserve_basis_points` (the share kept for writing the answer) and `serve_overrun_basis_points` (how far the answer may go over), both 0 when left out — see "The cost envelopes" in `deploy/vps/README.md` | the register's own schema — `COST_ENVELOPE_POLICY_INVALID` |
-| `countryPolicy` | optional: for every country, the two switches `signup` and `pay`, the reason, and `blocked`; unknown connections and Tor are refused. Left out, no `countryPolicy` row is published and that register version has no country gate (A14); include the member to turn the gate on | the register's own parser — `COUNTRY_POLICY_INVALID` (a `pay: true` with `signup: false`, or a blocked country with a switch on, is refused; so are a `null` member and `"blocked": false` — `blocked` is `true` or left out) |
+| `countryPolicy` | optional, and NOT in the example: for every country, the two switches `signup` and `pay`, the reason, and `blocked`; unknown connections and Tor are refused. Left out, no `countryPolicy` row is published and that register version has no country gate (A14); the member turns the gate on, and is added only as "The country gate's switches" below says | the register's own parser — `COUNTRY_POLICY_INVALID` (a `pay: true` with `signup: false`, or a blocked country with a switch on, is refused; so are a `null` member and `"blocked": false` — `blocked` is `true` or left out) |
 | `providerTargets` | the SAME array you put in `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` | the checks both services run at boot — relays, loopback and private addresses, inline credentials, missing or zero prices |
 | `synthesisRoles` | optional: `synthesizerRoleRef` and `evaluatorRoleRef`. Leave it out and the first two different makers are used; with a single maker you must name them | the command — `HOSTED_REGISTER_ROLE_REF_UNCONFIGURED` |
 
 Any other member is refused (`HOSTED_REGISTER_FILE_KEY_UNKNOWN`). `providerTargets` is checked and
 **never published**: prices, addresses and credential paths stay in the two `EnvironmentFile`s,
 and the command never prints them.
+
+## The country gate's switches
+
+`country-policy.example.json` holds exactly one member, `countryPolicy`, with the §1.5 switches of
+the paid-plans spec — the same value the development seeder publishes. It is kept out of
+`hosted-register.example.json` because bring-up copies that example into the live hosted file, and
+the gate must not turn on by default.
+
+Do not add the member to `/etc/debateai/register/hosted-register.json`, or publish any version that
+carries it, until every condition in the kit's main README (§5 "Country data") holds: the site shows
+the DB-IP credit (`IP Geolocation by DB-IP`, linking to `https://db-ip.com`; the site does not show
+it yet), the owner has ruled that the Terms' list of served countries matches the switches, the
+Privacy Policy says that addresses are looked up locally, and the two data files are installed and
+refreshed. Then copy the member into the hosted file's top-level object and publish; a changed
+switch later is a new version, never an edit of a sealed one.
 
 ## What `sourceRef` becomes
 

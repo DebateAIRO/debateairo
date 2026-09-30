@@ -7,10 +7,12 @@ import { ipKey, ipText, isPrivateOrReserved, parseIp, type ParsedIp } from "./ip
  * Paid plans G1 (spec 2026-09-29 §2.3.3) — WHERE AN ADDRESS IS.
  *
  * Two public data files, read locally (no address ever leaves this process): DB-IP's Lite country
- * database (MMDB, CC BY 4.0 — the site footer carries its credit link) at GEOIP_COUNTRY_DB_PATH, and
- * the Tor Project's bulk exit list (one address per line) at TOR_EXIT_LIST_PATH. The refresh timer
- * (deploy/vps/geoip-refresh.sh) renames new files into place; this reader notices a changed file —
- * inode, size or modification time — at most once a minute, on the caller's clock, and swaps it in.
+ * database at GEOIP_COUNTRY_DB_PATH (MMDB, CC BY 4.0; its licence requires a credit link on the site,
+ * which task P21 adds, and no countryPolicy row may be published before it is there —
+ * deploy/vps/README.md "Country data"), and the Tor Project's bulk exit list (one address per line)
+ * at TOR_EXIT_LIST_PATH. The refresh timer (deploy/vps/geoip-refresh.sh) renames new files into
+ * place; this reader notices a changed file — inode, size or modification time — at most once a
+ * minute, on the caller's clock, and swaps it in.
  * A replacement that does not load keeps the last good data and is reported by code. A lookup never
  * throws while open: a record the loaded country file cannot answer is "XX" (see countryOf).
  *

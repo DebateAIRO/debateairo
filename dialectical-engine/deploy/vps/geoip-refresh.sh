@@ -4,7 +4,9 @@
 # Refreshes the two PUBLIC data files the API's country gate reads:
 #   - DB-IP's Lite country database (MMDB, CC BY 4.0, monthly), from
 #     https://download.db-ip.com/free/dbip-country-lite-YYYY-MM.mmdb.gz
-#     The site footer carries the credit link its licence requires (README "Country data").
+#     Its licence requires a credit link on the site, which the site does not show yet (task
+#     P21); no register version carrying countryPolicy is published before it does (README
+#     "Country data").
 #   - the Tor Project's bulk exit list, one address per line, daily, from
 #     https://check.torproject.org/torbulkexitlist
 # Run by debateai-geoip-refresh.service (a daily timer) as debateai-geoip, a user that owns nothing

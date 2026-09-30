@@ -29,6 +29,18 @@ const GROUPS = [
 const policy: CountryPolicy = countryPolicyFromValue(
   COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
 );
+/**
+ * Final review I-3: the kit's main example publishes NO country gate (it is what §4 step 4b copies into
+ * the live hosted file); the §1.5 switches live in their own example, holding exactly that one member,
+ * merged in only once the gate's preconditions hold (deploy/vps/README.md "Country data").
+ */
+const HOSTED_EXAMPLE = "deploy/vps/register/hosted-register.example.json";
+const COUNTRY_POLICY_EXAMPLE = "deploy/vps/register/country-policy.example.json";
+const readExample = async (path: string): Promise<Record<string, unknown>> =>
+  JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+/** The hosted file an operator writes to turn the gate on: the main example plus the country member. */
+const gatedExample = async (): Promise<Record<string, unknown>> =>
+  ({ ...(await readExample(HOSTED_EXAMPLE)), ...(await readExample(COUNTRY_POLICY_EXAMPLE)) });
 
 function invalid(mutate: (value: Record<string, unknown>) => void): string | undefined {
   const value = structuredClone(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value) as unknown as Record<string, unknown>;
@@ -146,7 +158,10 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
     expect(seeded).toHaveLength(1);
     expect(JSON.parse(seeded[0]!.valueJsonText)).toEqual(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value);
 
-    const example = JSON.parse(await readFile("deploy/vps/register/hosted-register.example.json", "utf8")) as Record<string, unknown>;
+    const switches = await readExample(COUNTRY_POLICY_EXAMPLE);
+    expect(Object.keys(switches)).toEqual(["countryPolicy"]);
+    expect(switches.countryPolicy).toEqual(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value);
+    const example = await gatedExample();
     expect(example.countryPolicy).toEqual(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value);
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(example), "utf8")));
     const published = plan.rows.filter((row) => row.rowKey === COUNTRY_POLICY_ROW_KEY);
@@ -160,20 +175,19 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
   });
 
   it("publishes NO countryPolicy row from a hosted file without the member: absent row, no gate (A14)", async () => {
-    const example = JSON.parse(await readFile("deploy/vps/register/hosted-register.example.json", "utf8")) as Record<string, unknown>;
-    const withRow = await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(example), "utf8")));
-    const older: Record<string, unknown> = { ...example };
-    delete older.countryPolicy;
+    const withRow = await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(await gatedExample()), "utf8")));
+    expect(withRow.rows.filter((row) => row.rowKey === COUNTRY_POLICY_ROW_KEY)).toHaveLength(1);
+    // The kit's default is no gate: the main example carries no countryPolicy member (final review I-3),
+    // and neither does an older v1 file republished to change a provider target, say.
+    const older = await readExample(HOSTED_EXAMPLE);
     expect(Object.hasOwn(older, "countryPolicy")).toBe(false);
-    // An older v1 file, republished (to change a provider target, say), keeps its meaning: no gate.
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(older), "utf8")));
     expect(plan.rows.some((row) => row.rowKey === COUNTRY_POLICY_ROW_KEY)).toBe(false);
     expect(plan.rows).toHaveLength(withRow.rows.length - 1);
   });
 
   it("refuses a hosted file whose countryPolicy member is present with the value null: null is not \"left out\"", async () => {
-    const example = JSON.parse(await readFile("deploy/vps/register/hosted-register.example.json", "utf8")) as Record<string, unknown>;
-    const withNull: Record<string, unknown> = { ...example, countryPolicy: null };
+    const withNull: Record<string, unknown> = { ...(await readExample(HOSTED_EXAMPLE)), countryPolicy: null };
     expect(Object.hasOwn(withNull, "countryPolicy")).toBe(true);
     const bytes = Buffer.from(JSON.stringify(withNull), "utf8");
     await expect((async () => planHostedRegisterPublication(parseHostedRegisterFile(bytes)))())
