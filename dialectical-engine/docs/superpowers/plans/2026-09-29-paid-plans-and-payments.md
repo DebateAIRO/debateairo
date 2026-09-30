@@ -100,6 +100,7 @@ Two more, pinned in their owning tasks:
 - **R2.** The subscription's current state is folded in TypeScript (`foldSubscription`), not in a SQL view. SQL keeps only `billing.subscription_latest_v` for queries such as due renewals.
 - **R3.** `GET /v1/asks/room` also returns `scope` and `plan_id`, so the UI can pick sentences A–D or P1–P5.
 - **R4.** The xMoney customer id is kept in an append-only `billing.customer_xmoney` table (added by P1), because `billing.customer` rows are never updated.
+- **R5.** Amendment A27 (spec §2.15, 30 September 2026) moved the `countryPolicy` member out of `hosted-register.example.json` into `deploy/vps/register/country-policy.example.json`, to be merged into the hosted file only when its four conditions hold; where a task below says the hosted example carries `countryPolicy`, re-anchor on the new file (P21 and P22 carry a note). `dev`'s `0079_email_change.sql` already replaces `identity.rotate_session_after_step_up`, so P12a builds on that body.
 
 ---
 
