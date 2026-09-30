@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import { PLAN_TIER_ROSTERS, type AskRequest } from "@debateai/contract";
-import { TypedDomainError } from "@debateai/kernel";
+import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   costEnvelopeDay,
   decideAdmission,
@@ -146,6 +146,19 @@ export interface AskRoomPort {
   expectedStart(runId: string): Promise<Readonly<{ waitsUntil: Date; scope: SpendScope }> | null>;
 }
 
+/** Budget spec §2.7 (B7a): what GET /v1/asks/room answers, before the wire's snake case. */
+export type AskRoomAnswer = Readonly<{
+  room: "FITS" | "CLOSE" | "FULL" | "ALREADY_WAITING";
+  scope: SpendScope | null;
+  resetsAt: Date | null;
+  waitingRunRef: string | null;
+  planId: PlanId | null;
+}>;
+
+export interface AskRoomReader {
+  readRoom(question: RoomQuestion): Promise<AskRoomAnswer>;
+}
+
 /** Every scope's room, the person's windows as measured for them, and why a question so measured would wait. */
 type RoomMeasure = Readonly<{
   rooms: ReadonlyArray<ScopeRoom>;
@@ -218,7 +231,7 @@ function alreadyWaiting(evaluation: RoomEvaluation): AskAlreadyWaitingError {
   return new AskAlreadyWaitingError(oldest.runId, evaluation.expected.waitsUntil);
 }
 
-export class AskRoom implements AskRoomPort {
+export class AskRoom implements AskRoomPort, AskRoomReader {
   readonly #options: AskRoomOptions;
   readonly #clock: () => Date;
   /** Why the decision on each open transaction would make its question wait; set and cleared by `decide`. */
@@ -304,6 +317,46 @@ export class AskRoom implements AskRoomPort {
     const { rooms } = await this.#measure(accessOfWaitingRun(run), estimateMicros, now);
     const until = waitingUntil({ rooms, nextTickAt: nextWholeMinute(now) });
     return Object.freeze({ waitsUntil: until.waitsUntil, scope: until.worstScope });
+  }
+
+  /** GET /v1/asks/room: the admission's shape, deciding nothing and writing nothing. */
+  async readRoom(question: RoomQuestion): Promise<AskRoomAnswer> {
+    const now = this.#clock();
+    const evaluation = await this.#evaluate(question, now);
+    const ownerRef = question.access.ownerRef;
+    const planId = this.#options.entitlements === null || ownerRef === null
+      ? null
+      : (await this.#options.entitlements.current(ownerRef, now)).planId;
+    const admission = evaluation.admission;
+    switch (admission.kind) {
+      case "REFUSE_ALREADY_WAITING":
+        return Object.freeze({
+          room: "ALREADY_WAITING" as const,
+          scope: evaluation.expected.worstScope,
+          resetsAt: evaluation.expected.waitsUntil,
+          waitingRunRef: evaluation.waiting[0]?.runId ?? null,
+          planId
+        });
+      case "WAIT":
+        return Object.freeze({
+          room: "FULL" as const, scope: admission.worstScope, resetsAt: admission.waitsUntil, waitingRunRef: null, planId
+        });
+      case "START": {
+        const scope = admission.worstScope;
+        if (admission.worst === "FITS" || scope === null) {
+          return Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId });
+        }
+        return Object.freeze({
+          room: "CLOSE" as const,
+          scope,
+          resetsAt: evaluation.rooms.find((entry) => entry.scope === scope)?.resetsAt ?? null,
+          waitingRunRef: null,
+          planId
+        });
+      }
+      default:
+        return exhaustive(admission);
+    }
   }
 
   /**

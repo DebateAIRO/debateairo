@@ -26,6 +26,8 @@ import {
   AnswerStorySchema,
   AnswerDisclosureSchema,
   AskAcceptedSchema,
+  AskRoomResponseSchema,
+  BillingUsageResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
   InspectionSchema,
@@ -50,6 +52,8 @@ import {
   type AnswerDisclosure,
   type AskAccepted,
   type AskRequest,
+  type AskRoomResponse,
+  type BillingUsageResponse,
   type Deployment,
   type EmailChangePending,
   type ExecutionLedgerDigest,
@@ -57,6 +61,7 @@ import {
   type InvestigationAccepted,
   type InvestigationRequest,
   type Node,
+  type PlanTier,
   type PublicDebate,
   type RunEvent,
   type RunProjection,
@@ -337,6 +342,14 @@ export interface ContractClient {
   confirmEmailChange(token: string): Promise<{ status: "CONFIRMED" }>;
   cancelEmailChangeByLink(token: string): Promise<{ status: "CANCELLED" }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
+  /** Budget spec §2.7: the room this ask would find — a word, never a figure. */
+  getAskRoom(input: Readonly<{
+    plan_tier: PlanTier;
+    composition_budget_tier: "low" | "medium" | "high";
+    depth: number;
+  }>): Promise<AskRoomResponse>;
+  /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
+  getBillingUsage(): Promise<BillingUsageResponse>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -611,6 +624,16 @@ export function createContractClient(
     ),
     getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    getAskRoom: (input: Readonly<{
+      plan_tier: PlanTier;
+      composition_budget_tier: "low" | "medium" | "high";
+      depth: number;
+    }>) => request(`/v1/asks/room?${new URLSearchParams({
+      plan_tier: input.plan_tier,
+      composition_budget_tier: input.composition_budget_tier,
+      depth: String(input.depth)
+    }).toString()}`, AskRoomResponseSchema),
+    getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),

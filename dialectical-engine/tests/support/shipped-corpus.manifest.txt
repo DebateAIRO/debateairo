@@ -13,6 +13,8 @@
 apps/api/src/account-erasure.ts
 apps/api/src/admission.ts
 apps/api/src/ask-room.ts
+apps/api/src/billing/index.ts
+apps/api/src/billing/usage.ts
 apps/api/src/boot-custody.ts
 apps/api/src/client-ip.ts
 apps/api/src/country-gate.ts

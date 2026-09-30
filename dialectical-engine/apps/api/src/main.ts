@@ -70,6 +70,8 @@ import { AdmissionLimiter } from "./admission.js";
 import { openGeoLookup } from "@debateai/geo";
 import { CountryGate, countryPolicyInForce } from "./country-gate.js";
 import { AskRoom } from "./ask-room.js";
+import { PersonUsageReader } from "./billing/usage.js";
+import type { BillingRouteOptions } from "./billing/index.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
@@ -864,6 +866,21 @@ const supportAnswers = createSupportAnswerService({
   modelFor: () => supportAdmittedModel
 });
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
+/**
+ * Paid plans (B7a onward): the billing routes' dependencies, only while billing is
+ * on (hosted, and the room composed with entitlements). Later billing tasks ADD
+ * their members to this one object; absent, every billing route answers 404.
+ */
+const billingRouteOptions: BillingRouteOptions | undefined =
+  askRoomComposition === undefined || askRoomComposition.entitlements === null
+    ? undefined
+    : Object.freeze({
+        usage: new PersonUsageReader({
+          entitlements: askRoomComposition.entitlements,
+          allowance: askRoomComposition.personAllowance,
+          spend: askRoomComposition.spend
+        })
+      });
 const api = buildApi({
   application,
   stories: new RepositoryAnswerStoryApplication(storyRepository),
@@ -880,6 +897,10 @@ const api = buildApi({
   emailChange,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
+  // B7a: the room read and, while billing is on, the usage read. Absent, the
+  // room answers FITS and the usage route 404.
+  ...(askRoom === undefined ? {} : { askRoom }),
+  ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   ...(countryGate === undefined ? {} : { countryGate }),
   support: {
     configuration: supportConfiguration,

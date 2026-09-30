@@ -187,6 +187,52 @@ export const AskAlreadyWaitingSchema = z.object({
 }).strict();
 export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
 
+/** Paid-plans spec §1.2: the four plans, as billingPlans names them (`PlanId` in @debateai/register). */
+export const PlanIdSchema = z.enum(["FREE", "PLUS", "PRO", "MAX"]);
+
+/** Budget spec §2.7: GET /v1/asks/room — the ask's settings class, as query parameters. */
+export const AskRoomQuerySchema = z.object({
+  plan_tier: PlanTierSchema,
+  composition_budget_tier: CompositionBudgetTierSchema,
+  depth: z.string().regex(/^[0-9]{1,2}$/u).transform(Number).pipe(ExpansionDepthSchema)
+}).strict();
+
+/**
+ * Budget spec §2.7 / AMENDMENTS-R1 A16 — THE ROOM READ: a word, the limit it is
+ * about, when that limit resets or the waiting question starts, the person's own
+ * waiting run, and their plan. Never a figure (I6: figures are a capacity oracle).
+ */
+export const AskRoomResponseSchema = z.object({
+  room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
+  scope: SpendScopeSchema.nullable(),
+  resets_at: z.iso.datetime().nullable(),
+  waiting_run_ref: z.string().min(1).nullable(),
+  plan_id: PlanIdSchema.nullable()
+}).strict().superRefine((answer, context) => {
+  const fits = answer.room === "FITS";
+  if (fits !== (answer.scope === null) || (fits && answer.resets_at !== null)) {
+    context.addIssue({ code: "custom", message: "FITS names no scope and no reset; every other room names its scope" });
+  }
+  if ((answer.room === "ALREADY_WAITING") !== (answer.waiting_run_ref !== null)) {
+    context.addIssue({ code: "custom", message: "only ALREADY_WAITING names the waiting run" });
+  }
+  if ((answer.room === "FULL" || answer.room === "ALREADY_WAITING") && answer.resets_at === null) {
+    context.addIssue({ code: "custom", message: "a question that would wait says when it would start" });
+  }
+});
+export type AskRoomResponse = z.infer<typeof AskRoomResponseSchema>;
+
+/** Paid-plans spec §1.2 (U1): GET /v1/billing/usage — whole percentages per window, never an amount. */
+export const BillingUsageResponseSchema = z.object({
+  plan_id: PlanIdSchema,
+  windows: z.array(z.object({
+    scope: z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]),
+    percent: z.number().int().min(0).max(110),
+    resets_at: z.iso.datetime()
+  }).strict()).max(3)
+}).strict();
+export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
+
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
  * `core.run.argument_language_tag` (a BCP-47 tag, "und" when detection was not
@@ -919,6 +965,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/support/case/messages",
     "GET /v1/support/status",
     "POST /v1/asks",
+    "GET /v1/asks/room",
     "GET /v1/session",
     "GET /v1/deployment",
     "GET /v1/dev/evaluator",
@@ -937,10 +984,12 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/events",
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
-    "POST /v1/runs/{id}/unpublish"
+    "POST /v1/runs/{id}/unpublish",
+    "GET /v1/billing/usage"
   ]),
   resources: Object.freeze({
-    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
+    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
+    BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
     LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,

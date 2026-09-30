@@ -66,7 +66,9 @@ import {
   type RegisterLegalDocuments,
   LegalAcceptRequestSchema,
   LegalStatusResponseSchema,
-  GeoAvailabilityResponseSchema
+  GeoAvailabilityResponseSchema,
+  AskRoomQuerySchema,
+  AskRoomResponseSchema
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
@@ -109,7 +111,13 @@ import {
   type RegistrationApplication
 } from "./registration.js";
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
-import { AskAlreadyWaitingError, nextWholeMinute, runSettingsClassOfAsk, type AskRoomPort } from "./ask-room.js";
+import {
+  AskAlreadyWaitingError,
+  nextWholeMinute,
+  runSettingsClassOfAsk,
+  type AskRoomPort,
+  type AskRoomReader
+} from "./ask-room.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
@@ -135,6 +143,7 @@ import {
   type SupportApplication,
   type SupportRoutePath
 } from "./support/index.js";
+import { installBillingRoutes, type BillingRouteOptions } from "./billing/index.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
@@ -1168,6 +1177,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/support/case/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+  { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
@@ -1186,7 +1196,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
-  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" }
+  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
+  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
@@ -1194,7 +1205,7 @@ export const authorizationPolicyInventory = Object.freeze([
   session?: RouteSessionPolicy;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status" | "geo";
+    "support-status" | "geo" | "billing";
   action: string;
 }>[]);
 
@@ -1407,6 +1418,14 @@ export interface ApiOptions {
   /** B10 admission budgets; optional for test compositions, always supplied by main. */
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
+  /** Budget spec §2.7 (B7a): the room read. Absent (local mode, or no band) answers FITS. */
+  readonly askRoom?: AskRoomReader;
+  /**
+   * Paid plans (spec 2026-09-29 §2.5; B7a onward): the billing routes' dependencies,
+   * supplied by main only when hosted with billing on; each route whose member is
+   * absent answers the house 404, which is local mode and billing off alike.
+   */
+  readonly billing?: BillingRouteOptions;
   readonly support?: SupportApplication;
   /**
    * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
@@ -2595,6 +2614,28 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.status(202).send(accepted);
   });
 
+  api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {
+    const query = AskRoomQuerySchema.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    const answer = options.askRoom === undefined
+      ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
+      : await options.askRoom.readRoom({
+          access: ownershipFor(request),
+          settingsClass: runSettingsClassOfAsk({
+            plan_tier: query.data.plan_tier,
+            composition_budget_tier: query.data.composition_budget_tier,
+            depth_params: { depth: query.data.depth }
+          })
+        });
+    return reply.send(AskRoomResponseSchema.parse({
+      room: answer.room,
+      scope: answer.scope,
+      resets_at: answer.resetsAt?.toISOString() ?? null,
+      waiting_run_ref: answer.waitingRunRef,
+      plan_id: answer.planId
+    }));
+  });
+
   api.get<{ Querystring: { limit?: string; offset?: string } }>("/v1/answers", routePolicy("GET /v1/answers"), async (request, reply) => {
     const limit = Number(request.query.limit);
     const offset = Number(request.query.offset);
@@ -2943,6 +2984,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   installSupportRoutes(
     api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
   );
+  // Paid plans (R-3): the one billing routes module, always installed.
+  installBillingRoutes(api, { ...options.billing, policy: (route) => routePolicy(route) });
   return api;
 }
 
