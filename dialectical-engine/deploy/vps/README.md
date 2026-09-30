@@ -1356,9 +1356,12 @@ version must carry, besides the algorithm's own rows:
   loopback or private address, TLS only, no inline credential, every target priced, every vendor
   vetted, envelopes well formed) before anything is written — `--dry-run` stops there;
 - imports the sealed historical bootstrap first (refusing a database that holds a different one),
-  then publishes ONE new version: the engine's code-owned rows plus the two rows the file
+  then publishes ONE new version: the engine's code-owned rows plus the rows the file
   supplies, `configuredProviderSet` and `costEnvelopePolicy`. It never edits a sealed version. A
   changed file is a new version; the same file again returns the version that already holds it;
+- seals the file's `countryPolicy`, when the file carries it, as that version's `countryPolicy`
+  row; a file without it publishes no `countryPolicy` row, so that version has no country gate
+  (A14);
 - then runs the start-up readers against the new version, and only then prints the version to pin.
 
 `providerTargets` in the file (prices, addresses, credential paths) is never sealed: it is there

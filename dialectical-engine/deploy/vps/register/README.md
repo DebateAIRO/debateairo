@@ -37,6 +37,7 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `sourceRef` | a short, non-secret line saying why this version exists; it is sealed into the register (see "What `sourceRef` becomes" below) | the command |
 | `configuredProviderSet` | `requiredDistinctMakers` and the vendor list: `providerRef`, `adapterKind` (`openai-compatible-http`), `maker`, `vetting` | `buildConfiguredProviderSetDeploymentRow` — `PROVIDER_VENDOR_NOT_VETTED` |
 | `costEnvelopePolicy` | the V-28 ceilings in USD micro-units, as the register row stores them; optionally `serve_reserve_basis_points` (the share kept for writing the answer) and `serve_overrun_basis_points` (how far the answer may go over), both 0 when left out — see "The cost envelopes" in `deploy/vps/README.md` | the register's own schema — `COST_ENVELOPE_POLICY_INVALID` |
+| `countryPolicy` | optional: for every country, the two switches `signup` and `pay`, the reason, and `blocked`; unknown connections and Tor are refused. Left out, no `countryPolicy` row is published and that register version has no country gate (A14); include the member to turn the gate on | the register's own parser — `COUNTRY_POLICY_INVALID` (a `pay: true` with `signup: false`, or a blocked country with a switch on, is refused; so are a `null` member and `"blocked": false` — `blocked` is `true` or left out) |
 | `providerTargets` | the SAME array you put in `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` | the checks both services run at boot — relays, loopback and private addresses, inline credentials, missing or zero prices |
 | `synthesisRoles` | optional: `synthesizerRoleRef` and `evaluatorRoleRef`. Leave it out and the first two different makers are used; with a single maker you must name them | the command — `HOSTED_REGISTER_ROLE_REF_UNCONFIGURED` |
 
@@ -46,10 +47,11 @@ and the command never prints them.
 
 ## What `sourceRef` becomes
 
-Your `sourceRef` is sealed in three places, and only there:
+Your `sourceRef` is sealed in these places, and only there:
 
 - the publication's own source reference (why this version exists);
 - the `costEnvelopePolicy` row's source reference, verbatim;
+- the `countryPolicy` row's source reference, verbatim, when the file carries the member;
 - the `configuredProviderSet` row's source reference: your `sourceRef` followed by the fixed V-9
   sentence `+ V-9 ruled 2026-09-22 (V, chat): versioned configuredProviderSet row carrying each
   vendor's V-9(4) vetting record, superseding the sealed row without altering it`. That sentence

@@ -70,7 +70,15 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
     expect(invalid((value) => { value.default_rule = { signup: false, pay: false, reason: "SANCTIONS", blocked: true }; }))
       .toBe("COUNTRY_POLICY_INVALID");
     expect(invalid((value) => { value.tor = "ALLOW"; })).toBe("COUNTRY_POLICY_INVALID");
-    expect(() => countryPolicyFromValue(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, " ")).toThrow();
+    const blankSourceRef = (() => {
+      try {
+        countryPolicyFromValue(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, " ");
+        return undefined;
+      } catch (error) {
+        return (error as { code?: string }).code;
+      }
+    })();
+    expect(blankSourceRef).toBe("COUNTRY_POLICY_INVALID");
   });
 
   it("reads null for a version that never published the row, and refuses a malformed one", async () => {
@@ -161,5 +169,14 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(older), "utf8")));
     expect(plan.rows.some((row) => row.rowKey === COUNTRY_POLICY_ROW_KEY)).toBe(false);
     expect(plan.rows).toHaveLength(withRow.rows.length - 1);
+  });
+
+  it("refuses a hosted file whose countryPolicy member is present with the value null: null is not \"left out\"", async () => {
+    const example = JSON.parse(await readFile("deploy/vps/register/hosted-register.example.json", "utf8")) as Record<string, unknown>;
+    const withNull: Record<string, unknown> = { ...example, countryPolicy: null };
+    expect(Object.hasOwn(withNull, "countryPolicy")).toBe(true);
+    const bytes = Buffer.from(JSON.stringify(withNull), "utf8");
+    await expect((async () => planHostedRegisterPublication(parseHostedRegisterFile(bytes)))())
+      .rejects.toMatchObject({ code: "COUNTRY_POLICY_INVALID" });
   });
 });

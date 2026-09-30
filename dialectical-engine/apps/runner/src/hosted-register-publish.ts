@@ -14,9 +14,13 @@
  *    (`readDevelopmentRunnerPolicy`) refuses runner rows whose provenance is not
  *    exactly those builders' source refs, so any other composition would publish
  *    a register the hosted runner cannot start on;
- *  - the two OPERATOR-OWNED rows, read from the operator's file: the vetted
- *    `configuredProviderSet` (V-9(4), built by `buildConfiguredProviderSetDeploymentRow`)
- *    and the `costEnvelopePolicy` (V-28, validated by the register's own schema).
+ *  - the OPERATOR-OWNED rows, read from the operator's file: the vetted
+ *    `configuredProviderSet` (V-9(4), built by `buildConfiguredProviderSetDeploymentRow`),
+ *    the `costEnvelopePolicy` (V-28, validated by the register's own schema) and, only
+ *    when the file carries the member, the `countryPolicy` (paid plans G2, checked by
+ *    the register's own schema and sealed under the file's `sourceRef`). Without the
+ *    member the seeder's code-owned `countryPolicy` row is dropped, so that version has
+ *    no country gate (A14).
  * The historical bootstrap is imported first, exactly as the seeder imports it,
  * and stays the sealed base: these rows are DEPLOYMENT rows, never bootstrap rows.
  *
@@ -273,8 +277,10 @@ export type HostedRegisterFile = Readonly<{
   /** Validated in the plan by the register's own strict schema, so the refusal keeps its own code. */
   costEnvelopePolicy: unknown;
   /**
-   * Paid plans G2: the operator's countryPolicy, validated in the plan by its own schema. null = the
-   * member is absent: no countryPolicy row is published, so the version has no country gate (A14).
+   * Paid plans G2: the operator's countryPolicy (the member's raw value), validated in the plan by its
+   * own schema. null = the member is absent: no countryPolicy row is published, so the version has no
+   * country gate (A14). A member that is present with the JSON value null is refused by the parser
+   * (COUNTRY_POLICY_INVALID); it never means "no gate".
    */
   countryPolicy: unknown;
   /** Validated in the plan by the boot's own parser and hosted checks. NEVER published and never printed. */
@@ -321,6 +327,11 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     const roles = synthesisRolesSchema.safeParse(record.synthesisRoles);
     if (!roles.success) refuse("HOSTED_REGISTER_FILE_INVALID");
     synthesisRoles = roles.data;
+  }
+  // Paid plans G2: an explicit null is not "left out". It is refused by the register's own check,
+  // with its own code, so only a file WITHOUT the member publishes no countryPolicy row (A14).
+  if (Object.hasOwn(record, "countryPolicy") && record.countryPolicy === null) {
+    countryPolicyFromValue(null, sourceRef);
   }
   return Object.freeze({
     format: HOSTED_REGISTER_FILE_FORMAT,
