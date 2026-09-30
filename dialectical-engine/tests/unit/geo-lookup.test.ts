@@ -106,6 +106,31 @@ describe("the country lookup (paid plans G1, spec §2.3.3)", () => {
     geo.close();
   });
 
+  // Final review I-1: a list with no address would answer every Tor exit `tor: false`, so it is refused
+  // like a malformed one — at open (the boot refuses) and on reload (the last good list stays).
+  it("refuses to open over a Tor list that holds no address: empty, blank lines only, comments only", async () => {
+    for (const tor of ["", "\n \n\t\n", "# the Tor Project's header\n# nothing else\n"]) {
+      const files = await fixture(NETWORKS, tor);
+      expect(codeOf(() => openGeoLookup(files)), JSON.stringify(tor)).toBe("TOR_EXIT_LIST_INVALID");
+    }
+  });
+
+  it("keeps the last good Tor list when a replacement holds no address, and says so by code", async () => {
+    let now = 0;
+    const failures: string[] = [];
+    const files = await fixture();
+    const geo = openGeoLookup({ ...files, clock: () => now, onReloadFailure: (code) => failures.push(code) });
+    await replace(files.root, files.torListPath, "");
+    now += 60_000;
+    expect(geo.lookup("185.220.101.7")).toEqual({ country: "DE", tor: true });
+    await replace(files.root, files.torListPath, "# comments only\n\n");
+    now += 60_000;
+    expect(geo.lookup("185.220.101.7")).toEqual({ country: "DE", tor: true });
+    expect(geo.lookup("2a0b:f4c2::1").tor).toBe(true);
+    expect(failures).toEqual(["TOR_EXIT_LIST_INVALID", "TOR_EXIT_LIST_INVALID"]);
+    geo.close();
+  });
+
   it("refuses to open over a missing or invalid file, and refuses a lookup after close", async () => {
     const files = await fixture();
     expect(codeOf(() => openGeoLookup({ ...files, countryDbPath: join(files.root, "absent.mmdb") })))

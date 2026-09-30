@@ -69,6 +69,13 @@ function loadCountryDatabase(path: string): Reader<CountryResponse> {
   }
 }
 
+/**
+ * One address per line; blank lines and `#` comments are skipped. A line that is not an address
+ * refuses the whole list, and so does a list with NO address at all (empty, blank or comments
+ * only): loaded, it would answer every Tor exit `tor: false` and switch the Tor refusal off
+ * without a word (final review I-1). At open that refuses the boot; on reload the last good list
+ * stays and the failure is reported by code.
+ */
 function loadTorList(path: string): ReadonlySet<string> {
   let text: string;
   try {
@@ -84,6 +91,7 @@ function loadTorList(path: string): ReadonlySet<string> {
     if (parsed === null) refuse("TOR_EXIT_LIST_INVALID");
     keys.add(ipKey(parsed));
   }
+  if (keys.size === 0) refuse("TOR_EXIT_LIST_INVALID");
   return keys;
 }
 

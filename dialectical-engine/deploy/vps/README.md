@@ -807,7 +807,12 @@ without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist 
 register version in force publishes a `countryPolicy` row: the API then opens them at boot, and a
 missing file refuses the boot with `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a
 malformed one with `GEOIP_COUNTRY_DB_INVALID` or `TOR_EXIT_LIST_INVALID`; the refresh below checks
-each file the same way before it renames it into place). `debateai-geoip-refresh.service` writes
+each file the same way before it renames it into place). A Tor list with no address in it — an
+empty file, or only blank lines and `#` comments — counts as malformed: the boot refuses it with
+`TOR_EXIT_LIST_INVALID`, and a running API keeps its last good list and logs the code
+(`geo.reload.failed`), because an empty list would let every Tor exit through. So never create the
+file by hand to get past a first boot's `TOR_EXIT_LIST_UNAVAILABLE`: run the refresh (below) until
+it prints `GEOIP_REFRESH_OK tor-list`. `debateai-geoip-refresh.service` writes
 both into `/var/lib/debateai-geoip`, as its own user `debateai-geoip`, which owns nothing else. §5
 starts it once, and waits for it, before enabling the API, so the files are there before any
 register version turns the gate on. The daily timer then refreshes the Tor list every day and the
