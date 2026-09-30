@@ -5,17 +5,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE, ContractHttpError } from "@debateai/contract";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 
-const mocks = vi.hoisted(() => ({ availability: vi.fn(), cookies: new Map<string, string>() }));
+const mocks = vi.hoisted(() => ({
+  availability: vi.fn(),
+  cookies: new Map<string, string>(),
+  clientArgs: [] as unknown[][]
+}));
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
-  createServerContractClient: () => ({ getGeoAvailability: mocks.availability })
+  createServerContractClient: (...args: unknown[]) => {
+    mocks.clientArgs.push(args);
+    return { getGeoAvailability: mocks.availability };
+  }
 }));
 // The page reads the age gate's lockout cookie (PR #41); each case sets exactly the cookies it needs.
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) => (mocks.cookies.has(name) ? { value: mocks.cookies.get(name)! } : undefined)
   }),
-  headers: async () => new Headers({ "user-agent": "vitest-render-browser" })
+  headers: async () => new Headers({ "user-agent": "vitest-render-browser", "x-debateai-client-ip": "203.0.113.9" })
 }));
 
 import SignUpPage from "../../apps/ui/app/sign-up/page.js";
@@ -39,7 +46,9 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
     document.body.replaceChildren();
     mocks.availability.mockReset();
     mocks.cookies.clear();
+    mocks.clientArgs.length = 0;
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("shows G1 and no form when sign-up is closed for this visitor", async () => {
@@ -57,6 +66,23 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
     mocks.availability.mockRejectedValue(new Error("unreachable"));
     await mount(await SignUpPage());
     expect(document.querySelector('form[data-form="signup"]')).not.toBeNull();
+  });
+
+  it("asks with the visitor's address and user agent, and vouches for the address only behind server.mjs", async () => {
+    // Hosted mode: without the address every visitor looks like the loopback SSR hop, which the
+    // country gate reads as unknown (COUNTRY_UNKNOWN), so everyone would see G1 and no form.
+    vi.stubEnv("DIALECTICAL_UI_EDGE", "server.mjs");
+    mocks.availability.mockResolvedValue({ signup: true, pay: false });
+    await SignUpPage();
+    expect(mocks.clientArgs).toHaveLength(1);
+    expect(mocks.clientArgs[0]![1]).toBeUndefined();
+    expect(mocks.clientArgs[0]![2]).toBe("vitest-render-browser");
+    expect(mocks.clientArgs[0]![3]).toBe("203.0.113.9");
+    // A bare `next start` (no server.mjs in front) must not trust the header.
+    vi.stubEnv("DIALECTICAL_UI_EDGE", "");
+    await SignUpPage();
+    expect(mocks.clientArgs).toHaveLength(2);
+    expect(mocks.clientArgs[1]![3]).toBeUndefined();
   });
 
   it("keeps the age lockout first: while it lasts the refusal is all the browser sees, and nothing is asked (8j)", async () => {
