@@ -27,7 +27,7 @@
     "@debateai/valuation": "workspace:*",
     "@debateai/support-kb": "workspace:*",
     "@debateai/story": "workspace:*",
-    "@hatchet-dev/typescript-sdk": "1.28.1",
-    "zod": "4.4.3"
+    "@hatchet-dev/typescript-sdk": "1.33.1",
+    "zod": "4.6.5"
   }
 }
