@@ -105,6 +105,7 @@ Create the three service users, the custody group and the runtime trees:
 for service in api ui runner; do
   adduser --system --group --no-create-home --home /nonexistent "debateai-$service"
 done
+adduser --system --group --no-create-home --home /nonexistent debateai-geoip
 adduser debateai-api postdrop     # postfix maildrop is setgid; NoNewPrivileges neuters setgid
 groupadd --system debateai-custody
 usermod -a -G debateai-custody debateai-api
@@ -162,6 +163,7 @@ process start: restart both units after either change.
 | `/var/lib/debateai/api/user-deks` | `2750` | `debateai-api:debateai-custody` | user-DEK store — the one tree the runner also reads (V-19) |
 | `/var/lib/debateai/api/publication-keys` | `0700` | `debateai-api` | publication-key store |
 | `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
+| `/var/lib/debateai-geoip` | `0755` | `debateai-geoip` | the DB-IP Lite country file and the Tor exit list (public data, `0644`), written only by `debateai-geoip-refresh.service` (§5 "Country data") |
 
 `/etc/default/caddy` carries `DEBATEAI_PUBLIC_HOSTNAME` and `DEBATEAI_ACME_EMAIL`.
 
@@ -717,8 +719,9 @@ baseline test checks that list against the P3-01 manifest.
 ```sh
 install -m 0644 deploy/vps/systemd/*.service deploy/vps/systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
+systemctl start debateai-geoip-refresh.service
 systemctl enable --now debateai-hatchet debateai-api debateai-ui debateai-runner \
-  debateai-backup.timer
+  debateai-backup.timer debateai-geoip-refresh.timer
 ```
 
 `debateai-observation-agent.service` is installed by the first line and deliberately **not**
@@ -795,6 +798,46 @@ these are advisory: the process exits.
 `deploy/dev-auth/` stack — the local CA, the sendmail capture, the dev principals, the dev Hatchet
 token, `DEBATEAI_DEV_CUSTODY_ROOT` — exist only for a workstation. No `DEBATEAI_DEV_` variable
 appears in any file under `/etc/debateai`, and the architecture test pins that.
+
+### Country data — the GeoIP and Tor refresh (paid plans G4)
+
+The country gate reads two public data files: DB-IP's Lite country database and the Tor exit list.
+Their PATHS are required in every hosted `api.env` (`GEOIP_COUNTRY_DB_PATH`, `TOR_EXIT_LIST_PATH`;
+without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist from the moment the
+register version in force publishes a `countryPolicy` row: the API then opens them at boot, and a
+missing file refuses the boot with `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a
+malformed one with `GEOIP_COUNTRY_DB_INVALID` or `TOR_EXIT_LIST_INVALID`; the refresh below checks
+each file the same way before it renames it into place). `debateai-geoip-refresh.service` writes
+both into `/var/lib/debateai-geoip`, as its own user `debateai-geoip`, which owns nothing else. §5
+starts it once, and waits for it, before enabling the API, so the files are there before any
+register version turns the gate on. The daily timer then refreshes the Tor list every day and the
+country file when it is older than 27 days; the API notices a replaced file within a minute, and a
+refused download keeps the previous file. Addresses are looked up on this host: no visitor's
+address is ever sent anywhere.
+
+The country gate only runs once the register version in force publishes a `countryPolicy` row. A
+hosted register file publishes that row only when it carries the `countryPolicy` member
+(`deploy/vps/register/hosted-register.example.json` carries the §1.5 switches; a file without the
+member publishes no row, and so no gate): add the member and publish the register, §11. Signing in
+and reading one's debates are never gated.
+
+Attribution: DB-IP's Lite data is licensed CC BY 4.0. Every page footer must carry the credit
+`IP Geolocation by DB-IP` linking to `https://db-ip.com` (the site footer,
+`apps/ui/components/SiteFooter.tsx`, is PR #42's; task P21 adds the credit to it in both of its
+shapes — keep it there).
+
+To check the last refresh:
+
+```sh
+journalctl -u debateai-geoip-refresh.service --since yesterday --no-pager
+```
+
+Each run prints one line per file: `GEOIP_REFRESH_OK`, `GEOIP_REFRESH_SKIPPED` (the country file is
+fresh) or `GEOIP_REFRESH_REFUSED` with the reason. To refresh now:
+
+```sh
+systemctl start debateai-geoip-refresh.service
+```
 
 ---
 

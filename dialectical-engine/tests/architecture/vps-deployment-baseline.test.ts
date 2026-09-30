@@ -74,7 +74,9 @@ const EDGE_FILES = [
   "deploy/vps/systemd/debateai-ui.service",
   "deploy/vps/systemd/debateai-runner.service",
   "deploy/vps/systemd/debateai-hatchet.service",
-  "deploy/vps/systemd/debateai-observation-agent.service"
+  "deploy/vps/systemd/debateai-observation-agent.service",
+  "deploy/vps/systemd/debateai-geoip-refresh.service",
+  "deploy/vps/systemd/debateai-geoip-refresh.timer"
 ] as const;
 const BACKUP_FILES = [
   "deploy/vps/backup.sh",
@@ -300,7 +302,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(unit).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/observation-agent/src/main.ts");
     expect(unit).toMatch(/^After=.*\bpostgresql\.service\b/m);
     const readme = read("deploy/vps/README.md");
-    const enable = /systemctl enable --now ([^\n]*(?:\\\n[^\n]*)*)/u.exec(readme)?.[1] ?? "";
+    const enable = /systemctl enable --now ([^\n\\]*(?:\\\n[^\n\\]*)*)/u.exec(readme)?.[1] ?? "";
     expect(enable).toContain("debateai-api");
     expect(enable).not.toContain("debateai-observation-agent");
   });
@@ -853,3 +855,55 @@ describe("VPS baseline: runbook and environment templates", () => {
   });
 });
 
+describe("VPS baseline: the country data refresh (paid plans G4)", () => {
+  it("ships the script, the unit and the timer", () => {
+    for (const file of ["deploy/vps/geoip-refresh.sh", "deploy/vps/systemd/debateai-geoip-refresh.service",
+      "deploy/vps/systemd/debateai-geoip-refresh.timer"]) expect(exists(file), file).toBe(true);
+  });
+
+  it("geoip-refresh.sh: strict bash, its own state directory, https only, checked before an atomic rename", () => {
+    const script = read("deploy/vps/geoip-refresh.sh");
+    expect(script.startsWith("#!/usr/bin/env bash\n")).toBe(true);
+    for (const needle of [
+      "set -euo pipefail", "umask 022", ': "${STATE_DIRECTORY:?',
+      "https://download.db-ip.com/free/dbip-country-lite-", "https://check.torproject.org/torbulkexitlist",
+      "--proto '=https'", "--tlsv1.2", "MaxMind.com", 'mktemp -d "$DIR/.refresh.XXXXXXXX"', "mv -f",
+      "GEOIP_REFRESH_OK", "GEOIP_REFRESH_SKIPPED", "GEOIP_REFRESH_REFUSED"
+    ]) expect(script, needle).toContain(needle);
+    expect(script).not.toMatch(/\bsudo\b|\bchmod\b|\bchown\b|\/etc\/debateai/u);
+  });
+
+  it("debateai-geoip-refresh.service: its own user, no custody, hardened, writes only its state directory", () => {
+    const unit = read("deploy/vps/systemd/debateai-geoip-refresh.service");
+    for (const needle of [
+      "Type=oneshot", "User=debateai-geoip", "Group=debateai-geoip", "StateDirectory=debateai-geoip",
+      "StateDirectoryMode=0755", "UMask=0022", "ExecStart=/opt/debateai/dialectical-engine/deploy/vps/geoip-refresh.sh",
+      "NoNewPrivileges=true", "ProtectSystem=strict", "ProtectHome=true", "PrivateTmp=true", "PrivateDevices=true",
+      "CapabilityBoundingSet=", "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", "SystemCallFilter=@system-service"
+    ]) expect(unit, needle).toContain(needle);
+    for (const forbidden of ["EnvironmentFile=", "ReadWritePaths=", "debateai-custody", "DynamicUser=yes"]) {
+      expect(unit, forbidden).not.toContain(forbidden);
+    }
+    const timer = read("deploy/vps/systemd/debateai-geoip-refresh.timer");
+    expect(timer).toMatch(/^OnCalendar=\*-\*-\* \d{2}:\d{2}:\d{2}$/mu);
+    expect(timer).toContain("Persistent=true");
+    expect(timer).toContain("Unit=debateai-geoip-refresh.service");
+  });
+
+  it("the API reads the files the timer writes, and the runbook starts it before the API", () => {
+    const env = envKeys(read("deploy/vps/env/api.env.example"));
+    expect(env.get("GEOIP_COUNTRY_DB_PATH")).toBe("/var/lib/debateai-geoip/dbip-country-lite.mmdb");
+    expect(env.get("TOR_EXIT_LIST_PATH")).toBe("/var/lib/debateai-geoip/tor-exit-list.txt");
+    const readme = read("deploy/vps/README.md");
+    for (const needle of [
+      "### Country data — the GeoIP and Tor refresh", "adduser --system --group --no-create-home --home /nonexistent debateai-geoip",
+      "IP Geolocation by DB-IP", "https://db-ip.com", "CC BY 4.0", "GEOIP_PATHS_REQUIRED", "GEOIP_COUNTRY_DB_UNAVAILABLE",
+      "journalctl -u debateai-geoip-refresh.service"
+    ]) expect(readme, needle).toContain(needle);
+    const enable = /systemctl enable --now ([^\n\\]*(?:\\\n[^\n\\]*)*)/u.exec(readme)?.[1] ?? "";
+    expect(enable).toContain("debateai-geoip-refresh.timer");
+    expect(readme.indexOf("systemctl start debateai-geoip-refresh.service"))
+      .toBeLessThan(readme.indexOf("systemctl enable --now debateai-hatchet debateai-api"));
+    expect(readme.indexOf("systemctl start debateai-geoip-refresh.service")).toBeGreaterThan(-1);
+  });
+});
