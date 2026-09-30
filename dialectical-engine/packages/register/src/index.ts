@@ -869,6 +869,29 @@ export {
   type CountryReason,
   type CountryRule
 } from "./country-policy.js";
+// Paid plans (spec 2026-09-29 §2.5.1): the plans row and the billing switch.
+export {
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+  BILLING_PLANS_ROW_KEY,
+  PLAN_IDS,
+  billingPlansFromValue,
+  planById,
+  planCapMicros,
+  readBillingPlans,
+  type BillingPlan,
+  type BillingPlans,
+  type FreeFixedGauges,
+  type PlanId
+} from "./billing-plans.js";
+export {
+  BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
+  BILLING_POLICY_ROW_KEY,
+  assertBillingReady,
+  billingPolicyFromValue,
+  readBillingPolicy,
+  type BillingPolicy,
+  type BillingReadinessEnvelope
+} from "./billing-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,
