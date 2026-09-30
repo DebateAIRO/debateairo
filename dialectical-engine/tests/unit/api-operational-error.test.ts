@@ -350,6 +350,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
   "RUN_CEILING_BELOW_FIRST_CALL",
+  "RUN_CEILING_BELOW_ONE_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
@@ -881,7 +882,7 @@ describe("API operational error diagnostics", () => {
         // knew the three prefixes round 2 happened to have written. The whole
         // `COST_ENVELOPE_` family is swept now, so the next one is covered
         // before anyone notices it exists.
-        /"((?:COST_ENVELOPE|RUN_COST_ENVELOPE|DAILY_COST_ENVELOPE|PROVIDER_USAGE|PERSON_ALLOWANCE)_[A-Z_]+)"/gu
+        /"((?:COST_ENVELOPE|RUN_COST_ENVELOPE|DAILY_COST_ENVELOPE|PROVIDER_USAGE|PERSON_ALLOWANCE|RUN_CEILING_BELOW)_[A-Z_]+)"/gu
       )) swept.add(match[1]!);
     }
 

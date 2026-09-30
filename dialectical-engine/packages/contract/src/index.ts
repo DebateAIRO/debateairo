@@ -119,6 +119,16 @@ export const ExpansionDepthSchema = z.number().int().min(EXPANSION_DEPTH_MIN).ma
 export type ExpansionDepth = z.infer<typeof ExpansionDepthSchema>;
 
 /**
+ * The largest question an ask may carry, in UTF-8 bytes: the API refuses a
+ * larger one, and the boot check (B9, budget spec §2.10) prices the first
+ * position's own call at it. A function, not an exported number: numbers live
+ * in register rows or inside functions.
+ */
+export function askQuestionMaxBytes(): number {
+  return 8_192;
+}
+
+/**
  * The ruled domain, DERIVED from the bound above. Selectors and option lists
  * import this instead of enumerating the values by hand, so widening the bound
  * widens every chooser without touching a consumer.

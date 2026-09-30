@@ -15,6 +15,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
   costEnvelopeBand,
+  costEnvelopeCeilings,
   loadRunnerEnvironment,
   readBillingPlans,
   readCostEnvelopePolicy,
@@ -23,10 +24,13 @@ import {
 import {
   CostEnvelopeGuard,
   PostgresModelSpendStore,
+  assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
   type CostEnvelopePhase,
   type SharedWallApplication
 } from "@debateai/budget";
+import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
+import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
@@ -244,6 +248,27 @@ const costEnvelopeGuard = costEnvelopePolicy === null
       policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy),
       ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms })
     });
+/**
+ * B9 (budget spec §2.10) — A LIMIT BELOW ONE CALL REFUSES THIS BOOT
+ * (RUN_CEILING_BELOW_ONE_CALL), instead of failing a person's first debate.
+ * Hosted, and only with the costEnvelopePolicy row's three band members (the
+ * same `envelopeBand` that builds the shared wall's site-day half, B9b).
+ * Priced per plan: the cheapest price among each plan's models, and every
+ * plan's cheapest must fit.
+ */
+if (costEnvelopePolicy !== null && envelopeBand !== null) {
+  assertRunCeilingCoversOneCall({
+    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,
+    firstCallsByRoster: firstCallsByPlanRoster({
+      projections: firstPositionCallProjections({
+        targets: declaredProviderTargets,
+        judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
+        questionMaxBytes: askQuestionMaxBytes()
+      }),
+      rosters: PLAN_TIER_ROSTERS
+    })
+  });
+}
 const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
   const price = providerTargetPrice(target);
   if (costEnvelopeGuard !== undefined && price === null) {

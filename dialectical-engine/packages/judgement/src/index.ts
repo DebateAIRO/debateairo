@@ -14,10 +14,13 @@ import {
   ProviderContentUnacceptedError,
   buildFramedPrompt,
   buildFramedRepairPrompt,
+  lengthRetryTokenCeiling,
+  providerTargetPrice,
   schemaFailureLocator,
   type CallBound,
   type FramedPrompt,
   type PromptContract,
+  type ProviderDiscoveryTarget,
   type ProviderGateway
 } from "@debateai/providers";
 import {
@@ -335,6 +338,98 @@ function judgeLegMaterial(
   return Object.freeze(fields);
 }
 
+/**
+ * THE ONE FRAMING OF A JUDGE LEG: `Judge.judge` sends exactly this, and the
+ * boot check (below) prices exactly this. `claim` is the code classifier's
+ * verdict on the question, which picks one of the two sealed contract variants.
+ */
+function framedJudgePrompt(
+  leg: JudgeLeg,
+  questionLine: string,
+  argumentLanguageName: string | undefined,
+  claim: "unknown" | "resolved"
+): FramedPrompt {
+  return buildFramedPrompt({
+    contract: promptContractInArgumentLanguage(judgePromptContract(leg.kind, claim), argumentLanguageName),
+    material: judgeLegMaterial(leg, questionLine)
+  });
+}
+
+/**
+ * B9 (budget spec §2.10) — WHAT THE FIRST POSITION'S OWN CALL COSTS AT MOST,
+ * per configured target, for the boot check that refuses a run ceiling below
+ * one call.
+ *
+ * The request is the one `Judge.judge` frames for the primary root and the
+ * gateway sends (`{model, max_tokens, messages}`), for a question of
+ * `questionMaxBytes` bytes made of the character whose encoding grows most on
+ * the way: a C0 control character (U+0001), 1 UTF-8 byte, which the material
+ * block escapes to `\u0001` (6 bytes) and the body escapes again to `\\u0001`
+ * (7 bytes). No other character grows more per byte an ask is counted in (a
+ * double quote grows 1 → 2 → 4), and nothing at the ask refuses one: the schema
+ * only trims `question_line` and the route counts its UTF-8 bytes. It uses the
+ * fallback language directive (longer than any language name) and both
+ * claim-type variants of the contract, the larger kept. So the figure is never
+ * below any first call an admitted ask can make. The completion bound is the
+ * judge bound's first-attempt max_tokens. Each projection names its target's
+ * `model`, so the boot can group the calls by plan (`firstCallsByPlanRoster`).
+ * A target with no price (local mode) is left out.
+ */
+export function firstPositionCallProjections(input: Readonly<{
+  targets: readonly ProviderDiscoveryTarget[];
+  judgeTokenCeiling: number;
+  questionMaxBytes: number;
+}>): readonly Readonly<{
+  providerRef: string;
+  model: string;
+  price: Readonly<{ inputMicrosPerMillionTokens: number; outputMicrosPerMillionTokens: number }>;
+  requestBytes: number;
+  completionTokenCeiling: number;
+}>[] {
+  if (!Number.isSafeInteger(input?.questionMaxBytes) || input.questionMaxBytes < 1
+    || !Number.isSafeInteger(input.judgeTokenCeiling) || input.judgeTokenCeiling < 1) {
+    throw new TypeError("FIRST_POSITION_PROJECTION_INPUT_INVALID");
+  }
+  const question = "\u0001".repeat(input.questionMaxBytes);
+  const leg: JudgeLeg = Object.freeze({ kind: "primary-root" });
+  const packets = (["unknown", "resolved"] as const)
+    .map((claim) => framedJudgePrompt(leg, question, undefined, claim).packet);
+  const completionTokenCeiling = lengthRetryTokenCeiling(input.judgeTokenCeiling, 0);
+  return Object.freeze(input.targets.flatMap((target) => {
+    const price = providerTargetPrice(target);
+    if (price === null) return [];
+    const requestBytes = Math.max(...packets.map((packet) => Buffer.byteLength(JSON.stringify({
+      model: target.model,
+      max_tokens: completionTokenCeiling,
+      messages: packet.messages
+    }), "utf8")));
+    return [Object.freeze({ providerRef: target.providerRef, model: target.model, price, requestBytes, completionTokenCeiling })];
+  }));
+}
+
+/**
+ * B9 (budget spec §2.10) — THE FIRST CALLS EACH PLAN CAN MAKE, one group per
+ * plan. A run's makers are its plan's roster only (the API keeps each ask's
+ * discovered panel to `PLAN_TIER_ROSTERS[planTier]`, apps/api/src/index.ts),
+ * and the first call's cheaper-model try (B9c) moves only among the run's own
+ * makers, so each plan is priced on its own models and every plan's cheapest
+ * must fit. A plan takes part only when EVERY model on its roster has a priced
+ * configured target: the API refuses every ask on a plan that misses one
+ * (ASK_PLAN_TIER_MODEL_UNAVAILABLE), so its debates never reach a first call.
+ * A target on no roster (an answer-only or support model) is in no group. The
+ * rosters are the caller's, so this package knows no plan.
+ */
+export function firstCallsByPlanRoster<T extends Readonly<{ model: string }>>(input: Readonly<{
+  projections: readonly T[];
+  rosters: Readonly<Record<string, readonly string[]>>;
+}>): readonly (readonly T[])[] {
+  return Object.freeze(Object.values(input.rosters).flatMap((roster) => {
+    const wholly = roster.length > 0
+      && roster.every((model) => input.projections.some((call) => call.model === model));
+    return wholly ? [Object.freeze(input.projections.filter((call) => roster.includes(call.model)))] : [];
+  }));
+}
+
 export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 
@@ -351,13 +446,12 @@ export class Judge {
      */
     const classificationLine = input.questionLine;
     const codeClaim = classifyClaimText(classificationLine);
-    const framed = buildFramedPrompt({
-      contract: promptContractInArgumentLanguage(
-        judgePromptContract(input.leg.kind, codeClaim.claimType === "unknown" ? "unknown" : "resolved"),
-        input.argumentLanguageName
-      ),
-      material: judgeLegMaterial(input.leg, input.questionLine)
-    });
+    const framed = framedJudgePrompt(
+      input.leg,
+      input.questionLine,
+      input.argumentLanguageName,
+      codeClaim.claimType === "unknown" ? "unknown" : "resolved"
+    );
     const packet = framed.packet;
     let response;
     try {

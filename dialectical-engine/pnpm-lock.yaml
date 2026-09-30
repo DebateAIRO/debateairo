@@ -168,6 +168,9 @@ importers:
       '@debateai/geo':
         specifier: workspace:*
         version: link:../../packages/geo
+      '@debateai/judgement':
+        specifier: workspace:*
+        version: link:../../packages/judgement
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel

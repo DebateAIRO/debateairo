@@ -336,6 +336,42 @@ export function costEnvelopeGuardPolicy(
   return policy;
 }
 
+/**
+ * B9 (budget spec §2.10) — A LIMIT BELOW ONE CALL REFUSES THE BOOT, not a
+ * person's debate. Beside `costEnvelopeGuardPolicy`, where both inputs are
+ * known: the arguing ceiling (`costEnvelopeCeilings(...).bodyMicros`) must hold
+ * the first position's own call at the cheapest price among each plan's models
+ * — every plan's cheapest must fit — because a run's makers are its plan's
+ * roster and its first call can move only among them. The caller hands one
+ * group of first calls per plan (`firstCallsByPlanRoster`); this function knows
+ * no plan. It refuses when the ceiling is below the LARGEST of the per-group
+ * minima; equality fits, as it does in the seam; no group (or only empty ones)
+ * means nothing to refuse. The prices live in the environment, not the
+ * register, so this cannot run at register publish. No figure in the message;
+ * the runbook gives the fix.
+ */
+export function assertRunCeilingCoversOneCall(input: Readonly<{
+  bodyCeilingMicros: number;
+  firstCallsByRoster: ReadonlyArray<ReadonlyArray<Readonly<{
+    price: ProviderTargetPrice;
+    requestBytes: number;
+    completionTokenCeiling: number;
+  }>>>;
+}>): void {
+  const cheapestPerPlan = input.firstCallsByRoster
+    .filter((group) => group.length > 0)
+    .map((group) => Math.min(...group.map((call) => projectedCallCeilingMicros(call.price, call))));
+  if (cheapestPerPlan.length === 0) return;
+  if (input.bodyCeilingMicros < Math.max(...cheapestPerPlan)) {
+    throw new TypedDomainError(
+      "RUN_CEILING_BELOW_ONE_CALL",
+      "The run's ceiling for arguing is below the projected cost of the first position's own call at the cheapest"
+        + " price among each plan's models (every plan's cheapest must fit): raise per_run_ceiling_micros, or lower"
+        + " serve_reserve_basis_points, in a new register version"
+    );
+  }
+}
+
 /** The two spend sources a gateway money seam charges (the support chat keeps its own accounting). */
 type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY">;
 

@@ -455,6 +455,30 @@ export async function readStructuralCeilingPolicyInputs(pool: Pool, registerVers
   });
 }
 
+/**
+ * B9 (budget spec §2.10) — the judge bound's `max_tokens`, for the boot check
+ * that prices the first position's own call. The runner reads the same member
+ * through its own policy reader (`policy.bounds.JUDGE.tokenCeiling`); the API
+ * reads only this. A register without it cannot boot the runner either.
+ */
+export async function readJudgeTokenCeiling(pool: Pool, registerVersion: number): Promise<number> {
+  const result = await pool.query<{ value_json: unknown }>(
+    `SELECT value_json FROM register.register_row
+     WHERE register_version=$1 AND row_key='acceptanceOrganCostBounds'`,
+    [registerVersion]
+  );
+  const parsed = z.object({
+    kind: z.literal("ACCEPTANCE_ORGAN_COST_BOUNDS"),
+    organs: z.object({
+      JUDGE: z.object({ tokenCeiling: z.number().int().positive() }).passthrough()
+    }).passthrough()
+  }).passthrough().safeParse(result.rows[0]?.value_json);
+  if (!parsed.success) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "The judge bound's token ceiling is absent");
+  }
+  return parsed.data.organs.JUDGE.tokenCeiling;
+}
+
 export async function readPanelDiscoveryPolicy(pool: Pool, registerVersion: number): Promise<{
   readonly probeFreshnessMs: number;
   readonly probeMaxAttempts: 1;

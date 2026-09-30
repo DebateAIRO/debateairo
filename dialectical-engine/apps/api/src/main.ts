@@ -17,7 +17,7 @@ import {
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
-import type { AskRequest } from "@debateai/contract";
+import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
@@ -25,6 +25,7 @@ import {
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
   costEnvelopeBand,
+  costEnvelopeCeilings,
   readBillingPlans,
   readBillingPolicy,
   loadApiEnvironment,
@@ -38,6 +39,7 @@ import {
   readCountryPolicy,
   readStoryPolicyFromRegister,
   readAuthPolicy,
+  readJudgeTokenCeiling,
   readMfaPolicy,
   readProductRolePolicy,
   readRecoveryPolicy,
@@ -53,9 +55,11 @@ import {
   PostgresModelSpendStore,
   PostgresRecentRunUsageSource,
   RecentRunsCostEstimator,
+  assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
   mostOneRunMaySpendMicros
 } from "@debateai/budget";
+import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
@@ -401,6 +405,29 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
   // accounting.
   assertPricedProviderTargets(declared, environment.DEPLOYMENT_MODE);
   return declared;
+});
+/**
+ * B9 (budget spec §2.10) — the API refuses to boot, like the runner, when the
+ * run's ceiling for arguing is below the first position's own call at the
+ * cheapest price among each plan's models — every plan's cheapest must fit —
+ * (RUN_CEILING_BELOW_ONE_CALL). Hosted (B6b read the policy row only there),
+ * and only with the row's three band members (the same `costEnvelopeBand`
+ * question B6b's room asks); the boot ledger names the stage when it refuses.
+ * The row is not read a second time.
+ */
+await boot.run("run-ceiling-covers-one-call", async () => {
+  if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
+  assertRunCeilingCoversOneCall({
+    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,
+    firstCallsByRoster: firstCallsByPlanRoster({
+      projections: firstPositionCallProjections({
+        targets: declaredProviderTargets,
+        judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),
+        questionMaxBytes: askQuestionMaxBytes()
+      }),
+      rosters: PLAN_TIER_ROSTERS
+    })
+  });
 });
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.

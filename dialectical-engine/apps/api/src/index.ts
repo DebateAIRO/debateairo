@@ -19,6 +19,7 @@ import {
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
   AskRequestSchema,
+  askQuestionMaxBytes,
   DeploymentSchema,
   EventTypeSchema,
   ExecutionLedgerDigestSchema,
@@ -576,6 +577,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
   "RUN_CEILING_BELOW_FIRST_CALL",
+  "RUN_CEILING_BELOW_ONE_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
@@ -1291,7 +1293,7 @@ export const AUTH_PASSWORD_MAX_BYTES = 1_024 as const;
  * verbatim on every model attempt — so an unbounded question turns one ask into unbounded model
  * spend. Bounded at the route (no contract edit) in UTF-8 bytes, measured after the contract trim.
  */
-export const ASK_QUESTION_MAX_BYTES = 8_192 as const;
+export const ASK_QUESTION_MAX_BYTES = askQuestionMaxBytes();
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
