@@ -29,8 +29,10 @@ import { pathToFileURL } from "node:url";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   createPool,
+  RunCostSubstitutionRepository,
   ServeDisclosureRepository,
   type Pool,
+  type RunCostSubstitution,
   type ServeDisclosureModel,
   type ServeDisclosureRead
 } from "@debateai/db";
@@ -42,9 +44,19 @@ export type ServeDisclosureCliOutput = Readonly<{
   stderr(text: string): void;
 }>;
 
+/**
+ * B9 (budget spec §2.9): the report's read — the answer's disclosure row, and
+ * the run's cost substitutions when the reader supplies them (the shipped
+ * reader always does): every call moved to a cheaper maker while arguing (B9)
+ * and, when billing chose the Free roster for a paid ask, B8's roster swap
+ * (`ASK:roster`). Both live in `core.run_cost_substitution`, read through
+ * B8's one reader (ruling R-2). This report is the owner's record of them.
+ */
+export type ServeDisclosureReport = ServeDisclosureRead & Readonly<{ substitutions?: readonly RunCostSubstitution[] }>;
+
 /** Opened only after the arguments are accepted; closed whatever happens. */
 export type OpenServeDisclosureReader = () => Promise<Readonly<{
-  read(answerOrRunId: string): Promise<ServeDisclosureRead | null>;
+  read(answerOrRunId: string): Promise<ServeDisclosureReport | null>;
   close(): Promise<void>;
 }>>;
 
@@ -87,8 +99,30 @@ function usedWords(model: ServeDisclosureModel | null, providerRef: string | nul
   return providerRef === null ? "none (no checked round was served)" : modelWords(model, providerRef);
 }
 
+/** Why a model was chosen for cost, in words (B9; the reasons are B8's `RUN_COST_SUBSTITUTION_REASONS`). */
+const SUBSTITUTION_WORDS: Readonly<Record<string, string>> = Object.freeze({
+  RUN_ARGUING: "the run's own money while arguing",
+  RUN_FIRST_CALL: "the run's own money on the first position's call",
+  SITE_DAY: "the daily ceiling",
+  PERSON: "the person's allowance"
+});
+
+/** B8's roster swap is recorded at this call-site key; it happened at the ask, not while arguing. */
+const ASK_ROSTER_CALL_SITE = "ASK:roster";
+
+function substitutionLines(substitutions: readonly RunCostSubstitution[] | undefined): readonly string[] {
+  if (substitutions === undefined) return [];
+  if (substitutions.length === 0) return ["models chosen for cost: none"];
+  return [
+    `models chosen for cost: ${String(substitutions.length)}`,
+    ...substitutions.map((moved) => `  ${moved.callSiteKey === ASK_ROSTER_CALL_SITE ? "the question's roster" : moved.callSiteKey}:`
+      + ` ${moved.plannedProviderRef} -> ${moved.usedProviderRef},`
+      + ` because of ${SUBSTITUTION_WORDS[moved.reason] ?? moved.reason}`)
+  ];
+}
+
 /** The report: one fact per line, ending with a newline. */
-export function renderServeDisclosure(read: ServeDisclosureRead): string {
+export function renderServeDisclosure(read: ServeDisclosureReport): string {
   const { row, models } = read;
   const floor = row.floorVerdictState !== null && row.floorLeadingNodeId !== null;
   const lines = [
@@ -117,7 +151,8 @@ export function renderServeDisclosure(read: ServeDisclosureRead): string {
     `points left without a cross-review: ${row.pointsWithoutReview === null ? "not counted" : String(row.pointsWithoutReview)}`,
     `answer-writing cut short by: ${stopWords(row.serveStop)}`,
     `digest the answer-writer read: ${rungWords(row.digestRung)}`,
-    `points left out of that digest: ${row.digestPointsOmitted === null ? "not counted" : String(row.digestPointsOmitted)}`
+    `points left out of that digest: ${row.digestPointsOmitted === null ? "not counted" : String(row.digestPointsOmitted)}`,
+    ...substitutionLines(read.substitutions)
   ];
   return `${lines.join("\n")}\n`;
 }
@@ -159,7 +194,7 @@ export async function openServeDisclosureReader(
   databaseUrl: string,
   production: boolean
 ): Promise<Readonly<{
-  read(answerOrRunId: string): Promise<ServeDisclosureRead | null>;
+  read(answerOrRunId: string): Promise<ServeDisclosureReport | null>;
   close(): Promise<void>;
 }>> {
   const pool = createPool(databaseUrl, { max: 1 });
@@ -173,8 +208,14 @@ export async function openServeDisclosureReader(
     throw error;
   }
   const repository = new ServeDisclosureRepository(pool);
+  const substitutions = new RunCostSubstitutionRepository(pool);
   return Object.freeze({
-    read: (answerOrRunId: string) => repository.readLatestForOperator(answerOrRunId),
+    read: async (answerOrRunId: string) => {
+      const read = await repository.readLatestForOperator(answerOrRunId);
+      return read === null
+        ? null
+        : Object.freeze({ ...read, substitutions: await substitutions.listForRun(read.row.runId) });
+    },
     close: () => pool.end()
   });
 }

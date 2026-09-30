@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import {
   ProviderProbeRepository,
+  RunCostSubstitutionRepository,
   RunRepository,
   ServeDisclosureRepository,
   assertNoOpenWriteTransaction,
@@ -10,6 +11,7 @@ import {
   withWriteTransaction,
   type CompletionActivationResolution,
   type DiscoveredPanelMember,
+  type RunCostSubstitutionReason,
   type ServeDisclosureRecord
 } from "@debateai/db";
 import {
@@ -1779,6 +1781,35 @@ export interface WalkingSkeletonSettings {
     store?: Pick<ServeDisclosureRepository, "insert">;
     log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
   }>;
+  /**
+   * B9 (budget spec §2.9): a call made while arguing that is refused for money —
+   * the run's own ceiling, the site's day or the owner's window at a finish
+   * edge — is retried at the same call site with the same framed prompt on the
+   * run's other claim-eligible makers, cheapest first (`providerPrices`); the
+   * first position's own call gets the same try. A cheaper maker that cannot
+   * serve (a dead transport, content refused after its repairs) hands the
+   * search on, and when nobody serves the planned refusal travels: while
+   * arguing, a clean stop, never a failed run. On the first position's own
+   * call a cheaper maker whose transport died hands its ProviderCallFailedError
+   * back, so the cooldown holds and retries; RUN_CEILING_BELOW_FIRST_CALL is
+   * raised only when every maker refused. Panel seats never move; a seat
+   * refused for money is left out, as a failed seat is today, on every panel.
+   * `true` only in hosted mode with the costEnvelopePolicy row's three band
+   * members (the shipped main.ts: `envelopeBand !== null`); absent is today's
+   * behaviour: no call while arguing ever moves, and a money-refused seat
+   * stops the arguing as M2 rules.
+   */
+  readonly bodyCostFallback?: boolean;
+  /**
+   * B9: where each moved call's owner record goes (default:
+   * `RunCostSubstitutionRepository` on the runner's pool) and where the moved
+   * call and a failed write are logged (default: `logBodyCostFallback`). The
+   * record can never change the debate: its writer never throws.
+   */
+  readonly costSubstitutions?: Readonly<{
+    store?: Pick<RunCostSubstitutionRepository, "record">;
+    log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
+  }>;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -2267,6 +2298,205 @@ export function storyCostFallback(
   prices: ProviderPriceMap
 ): StoryCostFallback {
   return (input) => callServeRoleWithFallback({ ...input, claimEligible, prices });
+}
+
+/**
+ * B9 (budget spec §2.9) — CHEAPER MODELS WHILE ARGUING: the body's twin of
+ * `servePhaseFallbackOrder` and `callServeRoleWithFallback`.
+ *
+ * WHICH REFUSALS MOVE A CALL. Money only: the run's own ceiling for arguing
+ * (MONEY), the site's day at its finish edge (DAILY) and the run owner's
+ * window at its finish edge (ALLOWANCE) — each raised by the seam before
+ * anything is sent, so every refused try is free. The attempt ceiling and a
+ * vendor that reports no usage never move a call: another model changes neither.
+ */
+export type BodyFallbackStop = Extract<EnvelopeStopKind, "MONEY" | "DAILY" | "ALLOWANCE">;
+
+const BODY_FALLBACK_STOPS: readonly EnvelopeStopKind[] = Object.freeze(["MONEY", "DAILY", "ALLOWANCE"]);
+
+export function bodyRefusedForMoney(error: unknown): BodyFallbackStop | null {
+  const stop = envelopeStopKind(error);
+  return stop !== null && BODY_FALLBACK_STOPS.includes(stop) ? stop as BodyFallbackStop : null;
+}
+
+/**
+ * WHICH CALLS MAY MOVE: the authoring legs — the first position's own call
+ * included — the defender, critic and cross-root legs, and the reviews. NEVER a
+ * panel seat (`PANEL:`): every run model already sits on the panel, so a swap
+ * would give one model two votes. Under the same setting a seat refused for
+ * money is LEFT OUT, as a failed seat is today (`runJudgePanel`'s
+ * `leaveOutMoneyRefusedSeats`, budget spec §2.9's Panel seats row), and the
+ * panel carries on. Answer-writing calls keep their own fallback (M3).
+ */
+export function bodyCallMayMove(request: Pick<ProviderCallRequest, "role" | "lane" | "callSiteKey">): boolean {
+  return request.role === "JUDGE"
+    && request.lane === "served"
+    && providerCallCostEnvelopePhase(request) === "BODY"
+    && (request.callSiteKey === FIRST_POSITION_CALL_SITE_KEY
+      || request.callSiteKey.startsWith(`${FIRST_POSITION_CALL_SITE_KEY}:`));
+}
+
+/** Why the planned maker could not be paid, as the owner's record names it. */
+export function substitutionReason(stop: BodyFallbackStop, callSiteKey: string): RunCostSubstitutionReason {
+  switch (stop) {
+    case "MONEY":
+      return callSiteKey === FIRST_POSITION_CALL_SITE_KEY ? "RUN_FIRST_CALL" : "RUN_ARGUING";
+    case "DAILY":
+      return "SITE_DAY";
+    case "ALLOWANCE":
+      return "PERSON";
+    default:
+      return exhaustive(stop);
+  }
+}
+
+export interface BodyCallOutcome<T extends ServeRoleMaker> {
+  readonly result: ProviderCallResult;
+  /** The maker that actually wrote the answer to this call: the node's author, or its reviewer. */
+  readonly servedBy: T;
+  readonly substitution: Readonly<{ plannedProviderRef: string; reason: RunCostSubstitutionReason }> | null;
+}
+
+/**
+ * ONE CALL WHILE ARGUING, WITH THE COST FALLBACK. The planned maker is always
+ * asked first. Only a money refusal moves the SAME request — the same call
+ * site, the same framed prompt object, the same bound and contract — to the
+ * next maker in `servePhaseFallbackOrder` (cheapest first by this request's own
+ * projection at each maker's price; every other eligible maker once). The
+ * seam decides what fits.
+ *
+ * WHAT A CHEAPER MAKER'S OWN FAILURE DOES — the body's version of the serve
+ * twin's FINAL REVIEW, Important 1 (`fallbackContentRefusal`). A cheaper maker
+ * is asked only because the planned one could not be paid, so:
+ *  · refused for money too → the next maker;
+ *  · it could not serve — its transport died after its attempts
+ *    (`ProviderCallFailedError`) or its content was refused after its repairs
+ *    (`ProviderContentUnacceptedError`) → the next maker. While arguing,
+ *    nothing it did can turn the planned money stop into a failure: never a
+ *    cooldown hold (`withCooldownRetry` holds only on a transport failure it
+ *    is handed), never JUDGE_SCHEMA_FAILURE or NODE_REVIEW_UNAVAILABLE;
+ *  · anything else — an untyped error, a database or ledger error, the attempt
+ *    ceiling, a vendor with no usage, PRODUCER_GRADING_FORBIDDEN,
+ *    PROVIDER_PACKET_TOO_LARGE, any other typed code — travels unchanged and
+ *    ends the search (J24: a sealed identity is substituted for cost only).
+ * Nobody serves → the PLANNED refusal travels, as it always has: a clean MONEY,
+ * DAILY or ALLOWANCE stop while arguing, and the answer is still written (budget
+ * spec §1.1, §2.9). On the first position's own call, a cheaper maker whose
+ * transport died hands its ProviderCallFailedError back, so the cooldown holds
+ * and retries; RUN_CEILING_BELOW_FIRST_CALL is raised only when every maker
+ * refused (budget spec §2.9, "The first call"). There a money stop is not clean
+ * — root 0 fails it as a ceiling below one call — and a maker whose transport
+ * died did not refuse: after the hold, root 0's final attempt asks the planned
+ * maker first again (refused before sending, free) and then the cheaper makers
+ * with the larger attempt count; a second transport death halts the position
+ * (MAKER_POSITION_UNAVAILABLE), exactly as the planned maker's own would.
+ *
+ * Accepted gap, stated: the Judge's own checks after the gateway returned (its
+ * re-parse, `resolveClaimType`, a review's bearing count) are not seen here.
+ * None can fail for content the gateway's `classifyContent` accepted — the
+ * same schema, `claim_type` bound to the closed vocabulary, the bearings'
+ * length pinned by the review schema — so a cheaper maker that returned from the
+ * gateway has served.
+ */
+export async function callBodyRoleWithFallback<T extends ServeRoleMaker>(input: Readonly<{
+  planned: T;
+  eligible: readonly T[];
+  prices: ProviderPriceMap;
+  request: ProviderCallRequest;
+}>): Promise<BodyCallOutcome<T>> {
+  try {
+    return Object.freeze({
+      result: await input.planned.provider.call(input.request), servedBy: input.planned, substitution: null
+    });
+  } catch (refusal) {
+    const stop = bodyRefusedForMoney(refusal);
+    if (stop === null) throw refusal;
+    // The last cheaper maker whose transport died, handed back on the first
+    // position's own call (see above); ignored everywhere else.
+    let transportDeath: ProviderCallFailedError | null = null;
+    for (const maker of servePhaseFallbackOrder({
+      planned: input.planned.providerRef,
+      claimEligible: input.eligible,
+      prices: input.prices,
+      request: input.request,
+      preferNot: null
+    })) {
+      try {
+        const result = await maker.provider.call({ ...input.request, providerRef: maker.providerRef });
+        return Object.freeze({
+          result,
+          servedBy: maker as T,
+          substitution: Object.freeze({
+            plannedProviderRef: input.planned.providerRef,
+            reason: substitutionReason(stop, input.request.callSiteKey)
+          })
+        });
+      } catch (error) {
+        // Refused for money too, or it could not serve: the next maker.
+        if (bodyRefusedForMoney(error) !== null) continue;
+        if (error instanceof ProviderCallFailedError) {
+          transportDeath = error;
+          continue;
+        }
+        if (error instanceof ProviderContentUnacceptedError) continue;
+        // Anything else travels unchanged (J24).
+        throw error;
+      }
+    }
+    // Budget spec §2.9: on the first position's own call a maker whose
+    // transport died did not refuse, so its failure goes to root 0's cooldown.
+    if (transportDeath !== null && input.request.callSiteKey === FIRST_POSITION_CALL_SITE_KEY) throw transportDeath;
+    throw refusal;
+  }
+}
+
+/** One moved call, as the owner's record and the log line carry it: ids and a code, never text. */
+export type BodyCostSubstitutionEvent = Readonly<{
+  callSiteKey: string;
+  plannedProviderRef: string;
+  usedProviderRef: string;
+  reason: RunCostSubstitutionReason;
+}>;
+
+/**
+ * THE GATEWAY A MAKER'S JUDGE IS GIVEN FOR ONE RUN, under the new settings.
+ * A call that may move goes through `callBodyRoleWithFallback` over the makers
+ * `eligibleFor` names (for a review, every claim-eligible maker but the node's
+ * ACTUAL author); every other call — panel seats, anything not arguing — goes
+ * to the planned maker alone, exactly as before. `onServed` tells the runner
+ * who actually wrote each movable call, so a node's author is the model that
+ * wrote it; `onMoved` records a substitution.
+ */
+export function bodyCostFallbackGateway<T extends ServeRoleMaker>(input: Readonly<{
+  planned: T;
+  eligibleFor: (request: ProviderCallRequest) => readonly T[];
+  prices: ProviderPriceMap;
+  onServed: (callSiteKey: string, servedBy: T) => void;
+  onMoved: (event: BodyCostSubstitutionEvent) => Promise<void>;
+}>): ProviderGateway {
+  return Object.freeze({
+    call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
+      if (!bodyCallMayMove(request)) return input.planned.provider.call(request);
+      const outcome = await callBodyRoleWithFallback({
+        planned: input.planned, eligible: input.eligibleFor(request), prices: input.prices, request
+      });
+      input.onServed(request.callSiteKey, outcome.servedBy);
+      if (outcome.substitution !== null) {
+        await input.onMoved(Object.freeze({
+          callSiteKey: request.callSiteKey,
+          plannedProviderRef: outcome.substitution.plannedProviderRef,
+          usedProviderRef: outcome.servedBy.providerRef,
+          reason: outcome.substitution.reason
+        }));
+      }
+      return outcome.result;
+    }
+  });
+}
+
+/** B9 (budget spec §2.12): the runner's content-free line for a moved call (`runner.body.cheaper_model`) and for a record it could not write. */
+export function logBodyCostFallback(event: string, detail: Readonly<Record<string, unknown>>): void {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_BODY_COST_FALLBACK", event }));
 }
 
 /**
@@ -3428,6 +3658,7 @@ export class WalkingSkeletonRunner {
   readonly #memory: MemoryRepository;
   readonly #providerProbes: ProviderProbeRepository;
   readonly #serveDisclosure: Pick<ServeDisclosureRepository, "insert">;
+  readonly #costSubstitutions: Pick<RunCostSubstitutionRepository, "record">;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly provider: ProviderGateway;
@@ -3452,6 +3683,7 @@ export class WalkingSkeletonRunner {
     this.#memory = new MemoryRepository(pool);
     this.#providerProbes = new ProviderProbeRepository(pool);
     this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
+    this.#costSubstitutions = settings.costSubstitutions?.store ?? new RunCostSubstitutionRepository(pool);
     this.#configuredMakers = Object.freeze([
       Object.freeze({ judge: this.#judge, provider, providerRef: settings.providerRef, maker: settings.maker }),
       ...(settings.critique === undefined ? [] : [Object.freeze({
@@ -3504,6 +3736,35 @@ export class WalkingSkeletonRunner {
         // A log line can never cost the answer either.
       }
       return false;
+    }
+  }
+
+  /**
+   * B9 — ONE MOVED CALL'S OWNER RECORD AND ITS LOG LINE. Never throws, like the
+   * serve disclosure row: the record can never change the debate. A failed
+   * write is logged with its code (or UNTYPED) and the ids, never text.
+   */
+  async #recordCostSubstitution(runId: string, moved: BodyCostSubstitutionEvent): Promise<void> {
+    const log = this.settings.costSubstitutions?.log ?? logBodyCostFallback;
+    try {
+      log("runner.body.cheaper_model", { runId, ...moved });
+    } catch {
+      // A log line can never cost the debate.
+    }
+    try {
+      await this.#costSubstitutions.record({ runId, ...moved, recordedAt: new Date() });
+    } catch (error) {
+      try {
+        log("RUN_COST_SUBSTITUTION_WRITE_FAILED", {
+          code: error instanceof TypedDomainError ? error.code
+            : error instanceof TypeError && /^[A-Z][A-Z0-9_]{2,95}$/u.test(error.message) ? error.message : "UNTYPED",
+          sqlState: databaseStateOf(error),
+          runId,
+          callSiteKey: moved.callSiteKey
+        });
+      } catch {
+        // Nor can its failure line.
+      }
     }
   }
 
@@ -3925,6 +4186,47 @@ export class WalkingSkeletonRunner {
         "Every provider pinned at ask time was absent when the runner claimed the work item"
       );
     }
+    /**
+     * B9 (budget spec §2.9) — CHEAPER MODELS WHILE ARGUING, under the new
+     * settings. Each claim-eligible maker's judge is given a gateway for this
+     * run (`bodyCostFallbackGateway`): a call while arguing refused for money
+     * moves to the cheapest other claim-eligible maker that fits, at the same
+     * call site with the same framed prompt. Two records make the rules hold:
+     *
+     *  · `bodyServedBy` — who actually wrote each movable call, so a node's
+     *    author (its `maker`, its panel's producer) is the model that wrote it;
+     *  · `reviewAuthorMakers` — the node a review call is about, so a review
+     *    never moves onto the node's ACTUAL author.
+     *
+     * Without the setting the judges are untouched, byte-for-byte today's run.
+     */
+    const bodyServedBy = new Map<string, string>();
+    const reviewAuthorMakers = new Map<string, string>();
+    if (this.settings.bodyCostFallback === true) {
+      const bodyMakers = Object.freeze([...configuredMakers]);
+      const bodyPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+      bodyMakers.forEach((planned, index) => {
+        configuredMakers[index] = Object.freeze({
+          ...planned,
+          judge: new Judge(bodyCostFallbackGateway({
+            planned,
+            prices: bodyPrices,
+            eligibleFor: (request) => {
+              const author = reviewAuthorMakers.get(request.callSiteKey);
+              return author === undefined ? bodyMakers : bodyMakers.filter((candidate) => candidate.maker !== author);
+            },
+            onServed: (callSiteKey, servedBy) => { bodyServedBy.set(callSiteKey, servedBy.providerRef); },
+            onMoved: (moved) => this.#recordCostSubstitution(run.runId, moved)
+          }))
+        });
+      });
+    }
+    /** B9: the maker that actually answered a movable call — the planned one unless the call moved. */
+    const actualAuthor = (callSiteKey: string, planned: typeof configuredMakers[number]): typeof configuredMakers[number] => {
+      const servedRef = bodyServedBy.get(callSiteKey);
+      if (servedRef === undefined || servedRef === planned.providerRef) return planned;
+      return configuredMakers.find((candidate) => candidate.providerRef === servedRef) ?? planned;
+    };
     const synthesisRolePolicy = this.settings.synthesisRolePolicy;
     if (synthesisRolePolicy === undefined) {
       // Unreachable: the pre-claim gate refuses first. Typed rather than
@@ -4143,7 +4445,14 @@ export class WalkingSkeletonRunner {
         })),
         // Task M2: only the first root's panel keeps the voices it heard when a
         // spend stop cuts it short; every other panel lets the stop travel.
-        onRunLevelSpendStop: input.onSpendStop === "AUTHOR_ONLY" ? "RETURN_HEARD" : "RETHROW"
+        onRunLevelSpendStop: input.onSpendStop === "AUTHOR_ONLY" ? "RETURN_HEARD" : "RETHROW",
+        // B9 (budget spec §2.9, the Panel seats row): with cheaper models on, a
+        // seat refused for money is left out as a failed seat is, on EVERY panel
+        // (root 0's included), and the panel carries on; the attempt ceiling and
+        // a vendor with no usage keep the rule above. It never sets
+        // runBodyBudgetStop: the next authoring call gets its own (free) fallback
+        // try, and the arguing stops only when a movable call fits no maker.
+        leaveOutMoneyRefusedSeats: this.settings.bodyCostFallback === true
       });
       /**
        * Task M2 — THE FIRST ROOT'S PANEL, CUT SHORT BY A SPEND STOP.
@@ -4240,7 +4549,12 @@ export class WalkingSkeletonRunner {
       // by a spend stop also names the stop, which is why the members after it never
       // spoke.
       const panelFailureReasons = [
-        ...memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`),
+        ...memberFailures.filter((note) => note.failureKind !== "SPEND_REFUSED")
+          .map((note) => `${note.memberRole}: ${note.failureKind}`),
+        // B9: a seat left out for money names the stop's own code, once, exactly
+        // as a stop on the first root's panel does (and the honesty drawer's
+        // `panelSpendStopKind` reads it the same way: the budget).
+        ...new Set(memberFailures.filter((note) => note.failureKind === "SPEND_REFUSED").map((note) => note.reason)),
         ...(spendStop === null ? [] : [ENVELOPE_STOP_REASONS[spendStop]])
       ];
       const panelFailureReason = panelFailureReasons.length === 0 ? null : panelFailureReasons.join("; ");
@@ -4418,6 +4732,9 @@ export class WalkingSkeletonRunner {
       );
     }
     const judged = primaryAttempt.value;
+    // B9: the node's author is the model that actually wrote it — the planned
+    // primary, or the cheaper maker its refused first call moved to.
+    const rootAuthor = actualAuthor(FIRST_POSITION_CALL_SITE_KEY, primaryMaker);
     const reduced = reduceAssessment({
       claimType: judged.normalizedClaim.claimType,
       assessment: judged.assessment,
@@ -4428,8 +4745,8 @@ export class WalkingSkeletonRunner {
       throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${reduced.claimType}`);
     }
     const selection = await runNodePanel({
-      authorMaker: primaryMaker.maker,
-      authorProviderRef: primaryMaker.providerRef,
+      authorMaker: rootAuthor.maker,
+      authorProviderRef: rootAuthor.providerRef,
       authorJudgementRef: judged.provenanceRef,
       authorAssessment: judged.assessment,
       authorTau: reduced.tau,
@@ -4538,7 +4855,7 @@ export class WalkingSkeletonRunner {
       reversalPoint: judged.assessment.critic.summary,
       panelDispersion: selection.dispersion,
       authorIndex: 0,
-      maker: primaryMaker.maker
+      maker: rootAuthor.maker
     })]]);
     const haltedExpansionRecords: HaltedExpansionRecord[] = [];
     // S2-3 / J5: way-of-knowing downgrades are bound to the node the graph
@@ -4628,6 +4945,8 @@ export class WalkingSkeletonRunner {
       });
       if (childAttempt.kind === "HALTED") return childAttempt;
       const childJudged = childAttempt.value;
+      // B9: the author is the model that actually wrote this node (a moved call's cheaper maker).
+      const author = actualAuthor(input.callSiteKey, selectedMaker);
       const childReduced = reduceAssessment({
           claimType: childJudged.normalizedClaim.claimType,
           assessment: childJudged.assessment,
@@ -4638,8 +4957,8 @@ export class WalkingSkeletonRunner {
           throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${childReduced.claimType}`);
         }
         const childSelection = await runNodePanel({
-          authorMaker: selectedMaker.maker,
-          authorProviderRef: selectedMaker.providerRef,
+          authorMaker: author.maker,
+          authorProviderRef: author.providerRef,
           authorJudgementRef: childJudged.provenanceRef,
           authorAssessment: childJudged.assessment,
           authorTau: childReduced.tau,
@@ -4737,7 +5056,7 @@ export class WalkingSkeletonRunner {
           reversalPoint: childJudged.assessment.critic.summary,
           panelDispersion: childSelection.dispersion,
           authorIndex: input.authorIndex,
-          maker: selectedMaker.maker
+          maker: author.maker
         }) };
     };
 
@@ -4825,6 +5144,8 @@ export class WalkingSkeletonRunner {
         const reviewer = selectDifferentMakerReviewer(authoredNode.maker, configuredMakers, latestReviewerMaker);
         try {
           const callSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+          // B9: a review that has to move never moves onto the node's ACTUAL author.
+          reviewAuthorMakers.set(callSiteKey, authoredNode.maker);
           const reviewAttempt = await cooldownAttempt({
             callSiteKey,
             parentNodeId: authoredNode.nodeId,

@@ -39,7 +39,7 @@ import {
   resolveStoryPackDir,
   type StoryPack
 } from "@debateai/story";
-import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
+import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -381,11 +381,23 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
   providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
+  // B9 (budget spec §2.9, §2.4): a call while arguing refused for money moves
+  // to a cheaper claim-eligible maker — hosted, and only with the
+  // costEnvelopePolicy row's three band members: the same `envelopeBand` that
+  // builds the shared wall's site-day half. (The wall's person half is on
+  // whenever hosted; without the band nothing moves.)
+  bodyCostFallback: envelopeBand !== null,
   // Engine money rule, Task M3 (spec §14.4.5): the row goes to the runner's own
   // pool (the default store); a failure to write it is the runner's one
   // code-only DEBATEAI_SERVE_DISCLOSURE line, named here so the shipped wiring
   // says where it goes.
   serveDisclosure: { log: logServeDisclosure },
+  // B9 (budget spec §2.9, §2.12): each moved call's owner record goes to the
+  // runner's own pool (the default store, B8's RunCostSubstitutionRepository);
+  // the moved call and a failed write are the runner's content-free
+  // DEBATEAI_BODY_COST_FALLBACK lines, named here so the shipped wiring says
+  // where they go.
+  costSubstitutions: { log: logBodyCostFallback },
   claimTimeSynthesisRoleProbe: async (providerRef) => {
     const target = providerTargets.find((candidate) => candidate.providerRef === providerRef);
     if (target === undefined) {
