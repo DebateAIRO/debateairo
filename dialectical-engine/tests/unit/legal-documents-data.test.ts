@@ -84,12 +84,12 @@ describe("legal documents — generated data", () => {
       expect(TERMS_OF_SERVICE.sections).toBe(TERMS_SECTIONS);
     });
 
-    it("numbers the summary 00, the nineteen sections 01–19, the annex A and its parts A.1–A.9", () => {
+    it("numbers the summary 00, the nineteen sections 01–19, the annex A and its parts A.1–A.11", () => {
       expect(TERMS_SECTIONS.map((entry) => entry.no)).toEqual([
         "00",
         ...twoDigit(19),
         "A",
-        ...Array.from({ length: 9 }, (_, index) => `A.${index + 1}`)
+        ...Array.from({ length: 11 }, (_, index) => `A.${index + 1}`)
       ]);
       const titles = TERMS_SECTIONS.map((entry) => entry.title);
       expect(titles[0]).toBe("In short");
@@ -98,7 +98,9 @@ describe("legal documents — generated data", () => {
       expect(titles[20]).toBe("Annex A — Regional terms");
       expect(titles[21]).toBe("European Union and European Economic Area");
       expect(titles[22]).toBe("United Kingdom (only if listed in section 2)");
-      expect(titles[29]).toBe("Reserved");
+      expect(titles[26]).toBe("Switzerland (only if listed)");
+      expect(titles[30]).toBe("Asia-Pacific (only the lines for regions listed)");
+      expect(titles[31]).toBe("Reserved");
     });
 
     it("keeps the summary paragraph without its bold lead-in", () => {
@@ -197,12 +199,12 @@ describe("legal documents — generated data", () => {
       expect(PRIVACY_POLICY.sections).toBe(POLICY_SECTIONS);
     });
 
-    it("numbers the summary 00, the fourteen sections 01–14, the annex B and its parts B.1–B.9", () => {
+    it("numbers the summary 00, the fourteen sections 01–14, the annex B and its parts B.1–B.11", () => {
       expect(POLICY_SECTIONS.map((entry) => entry.no)).toEqual([
         "00",
         ...twoDigit(14),
         "B",
-        ...Array.from({ length: 9 }, (_, index) => `B.${index + 1}`)
+        ...Array.from({ length: 11 }, (_, index) => `B.${index + 1}`)
       ]);
       const titles = POLICY_SECTIONS.map((entry) => entry.title);
       expect(titles[0]).toBe("In short");
@@ -210,7 +212,9 @@ describe("legal documents — generated data", () => {
       expect(titles[14]).toBe("Changes to this policy");
       expect(titles[15]).toBe("Annex B — Regional privacy terms");
       expect(titles[16]).toBe("European Union and European Economic Area");
-      expect(titles[24]).toBe("Reserved");
+      expect(titles[21]).toBe("Switzerland (only if listed)");
+      expect(titles[25]).toBe("Asia-Pacific (only the lines for regions listed)");
+      expect(titles[26]).toBe("Reserved");
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 

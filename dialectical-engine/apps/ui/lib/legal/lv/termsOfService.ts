@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur mēs piedāvājam DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Mēs piedāvājam DebateAI personām, kuras dzīvo [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
+      { kind: "p", text: "Mēs piedāvājam DebateAI personām, kuras dzīvo [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
     ]
   },
   {
@@ -298,7 +298,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Apvienotā Karaliste (tikai tad, ja norādīta 2. sadaļā)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Mūsu pārstāvis Apvienotajā Karalistē saskaņā ar UK GDPR 27. pantu ir [name, address, email]. Jums piemēro Consumer Rights Act 2015, un nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar to; no [January 2027] maksas plāniem piemēro Digital Markets, Competition and Consumers Act 2024 abonementu noteikumus, tostarp pārdomu periodu pēc atjaunošanas un pēc bezmaksas izmēģinājuma. Kā mēs aizsargājam lietotājus no nelikumīga satura: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Mūsu izmantotā proaktīvā tehnoloģija: [describe, or \"none\"]. Vecuma pārbaude: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. 10. sadaļā noteiktā sūdzību procedūra pieņem sūdzības par nelikumīgu saturu, nepamatotu jūsu satura noņemšanu, jūsu konta ierobežojumiem, automatizētu rīku lietošanu, kas ietekmē jūsu saturu, un jebkādu vecuma novērtējumu, kas jūs nepamatoti bloķē. Tā ir pieejama arī satura skartajām personām, kuras nav lietotāji." }
+      { kind: "p", text: "Mūsu pārstāvis Apvienotajā Karalistē saskaņā ar UK GDPR 27. pantu ir [name, address, email]. Jums piemēro Consumer Rights Act 2015, un nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar to; kad stāsies spēkā Digital Markets, Competition and Consumers Act 2024 abonementu noteikumi (paredzams 2027. gadā), tos piemēros maksas plāniem, tostarp pārdomu periodu pēc atjaunošanas un pēc bezmaksas izmēģinājuma. Kā mēs aizsargājam lietotājus no nelikumīga satura: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Mūsu izmantotā proaktīvā tehnoloģija: [describe, or \"none\"]. Vecuma pārbaude: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. 10. sadaļā noteiktā sūdzību procedūra pieņem sūdzības par nelikumīgu saturu, nepamatotu jūsu satura noņemšanu, jūsu konta ierobežojumiem, automatizētu rīku lietošanu, kas ietekmē jūsu saturu, un jebkādu vecuma novērtējumu, kas jūs nepamatoti bloķē. Tā ir pieejama arī satura skartajām personām, kuras nav lietotāji. Jūsu datiem piemēro mūsu Privātuma politikas B.2 pielikumu." }
     ]
   },
   {
@@ -308,7 +308,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Šķīrējtiesas līgums un atteikšanās no kolektīvas prasības. Ja dzīvojat Amerikas Savienotajās Valstīs, jūs un DebateAIRO vienojaties jebkuru no šiem Noteikumiem vai pakalpojuma izrietošu strīdu izšķirt saistošā individuālā šķīrējtiesā, ko pārvalda [the American Arbitration Association / JAMS] saskaņā ar tās patērētāju noteikumiem, nevis tiesā, izņemot to, ka ikviena puse var celt individuālu prasību maza apmēra prasību tiesā. Jūs varat atteikties, nosūtot e-pasta ziņojumu uz [address] 30 dienu laikā pēc pirmās piekrišanas šiem Noteikumiem. Šo līgumu reglamentē Federal Arbitration Act. Mēs sedzam šķīrējtiesas iesniegšanas nodevas. Kolektīvas, kopīgas un pārstāvības prasības tiek izslēgtas tiktāl, cik to atļauj tiesību akti. Šī sadaļa attiecas tikai uz nākotni un neattiecas uz prasījumiem, kas radušies pirms tās pieņemšanas." },
       { kind: "p", text: "Paziņojumi un noņemšana. Par bez piekrišanas kopīgotiem intīmiem attēliem var ziņot vietnē [URL] bez konta, un pēc derīga pieprasījuma tie tiek noņemti 48 stundu laikā. Autortiesību sūdzības tiek nosūtītas mūsu 16. sadaļā norādītajai pilnvarotajai personai." },
-      { kind: "p", text: "Štatu īpašie noteikumi. Kalifornija: piemēro 12. sadaļā noteiktos automātiskās atjaunošanas noteikumus; jūs jebkurā laikā varat atcelt abonementu tiešsaistē; mēs glabājam jūsu piekrišanu atjaunošanas noteikumiem vismaz trīs gadus. Ņujorka: varat atcelt abonementu 14 dienu laikā pēc jebkura maksājuma par paaugstinātu cenu un saņemt proporcionālu atmaksu. Teksasa un Nebraska: mēs nepārdodam sensitīvus personas datus; ja tas kādreiz mainīsies, vispirms saņemsim jūsu piekrišanu [statutory notice language]. Vašingtona: mūsu Patērētāju veselības datu privātuma paziņojums vietnē [URL] attiecas uz informāciju par veselību. Kolorādo: nekas pakalpojumā nepieņem par jums lēmumus ar būtiskām sekām." }
+      { kind: "p", text: "Štatu īpašie noteikumi. Kalifornija: piemēro 12. sadaļā noteiktos automātiskās atjaunošanas noteikumus; jūs jebkurā laikā varat atcelt abonementu tiešsaistē; mēs glabājam jūsu piekrišanu atjaunošanas noteikumiem vismaz trīs gadus. Ņujorka: varat atcelt abonementu 14 dienu laikā pēc jebkura maksājuma par paaugstinātu cenu un saņemt proporcionālu atmaksu. Teksasa un Nebraska: mēs nepārdodam sensitīvus personas datus. Vašingtona: mūsu Patērētāju veselības datu privātuma paziņojums vietnē [URL] attiecas uz informāciju par veselību. Kolorādo: nekas pakalpojumā nepieņem par jums lēmumus ar būtiskām sekām. Jūsu datiem un jūsu štata privātuma tiesībām piemēro mūsu Privātuma politikas B.3 pielikumu." }
     ]
   },
   {
@@ -316,7 +316,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanāda un Kvebeka (tikai tad, ja norādītas)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Mūsu privātuma speciālists ir [name, email]. Kvebeka: šie Noteikumi franču valodā ir pieejami vietnē [URL], un franču valodas versija jums tika parādīta pirmā; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem." }
+      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir [name], privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.4 pielikumu. Kvebeka: šie Noteikumi ir pieejami franču valodā; izvēlieties franču valodu ar valodas pārslēgu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem; uz jums neattiecas šķīrējtiesas līgums un atteikšanās no kolektīvas prasības." }
     ]
   },
   {
@@ -329,32 +329,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latīņamerika (pielikums spāņu valodā; tikai tad, ja norādīta)",
+    title: "Šveice (tikai tad, ja norādīta)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Piekrišana ir apstrādes pamats, ja nav līguma nepieciešamības; pirms savām pirmajām debatēm jūs nepārprotami piekrītat to sensitīvo datu apstrādei, kurus izvēlaties iekļaut. Jūsu ARCO tiesības var īstenot, rakstot uz [address], un atbildes tiek sniegtas [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719] laikā. Meksika: pilnais aviso de privacidad ir pieejams vietnē [URL]; atteikums [5] dienu laikā. Argentīna: [AAIP legend]; izmantojiet botón de arrepentimiento vietnē [URL] 10 dienu laikā. Kolumbija: política de tratamiento ir pieejama vietnē [URL]; atteikums 5 dienu laikā. Čīle (no 2026. gada 1. decembra): Aģentūras kontaktinformācija ir […]; jūs varat atcelt abonementu tādā pašā veidā, kādā to noformējāt; digitālajiem pakalpojumiem atteikuma tiesības nepiemēro." }
+      { kind: "p", text: "Jūsu datiem piemēro Šveices Federālo datu aizsardzības likumu (Privātuma politikas B.6 pielikums). Jūs varat celt prasību tās vietas tiesās Šveicē, kur dzīvojat. Maksas plānam nav likumā noteiktu atteikuma tiesību; mūsu atmaksas politika ir […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Persijas līča valstis — Apvienotie Arābu Emirāti un Saūda Arābija (tikai tad, ja norādītas)",
+    title: "Moldova (tikai tad, ja norādīta)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Ja apstrādājam jūsu datus citiem nolūkiem, nevis pakalpojuma sniegšanai, mēs to darām ar jūsu piekrišanu, kuru varat atsaukt. Jūsu dati tiek apstrādāti ārpus [UAE / Kingdom of Saudi Arabia], tostarp Eiropas Savienībā un Amerikas Savienotajās Valstīs, saskaņā ar [SDAIA standard contractual clauses / the mechanism in the Register]. Jūs atbildat par to, lai viss jūsu publicētais atbilstu tās valsts tiesību aktiem, kurā atrodaties, tostarp tiesību aktiem par reliģiju, sabiedrisko kārtību un tikumību; mēs varam ierobežot debašu publicēšanu par šādām tēmām jūsu reģionā." }
+      { kind: "p", text: "Jums ir tādas pašas tiesības saskaņā ar šiem Noteikumiem kā patērētājam Eiropas Savienībā, tostarp 13. sadaļā noteiktās 14 dienu atteikuma tiesības. Jūs varat celt prasību Moldovas tiesās. Jūsu datiem piemēro Moldovas Likumu Nr. 195/2024 par personas datu aizsardzību (Privātuma politikas B.7 pielikums)." }
     ]
   },
   {
     no: "A.8",
-    title: "Āzijas un Klusā okeāna reģions (tikai norādīto reģionu rindas)",
+    title: "Ukraina (tikai tad, ja norādīta)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapūra: mūsu datu aizsardzības speciālists ir [name, email]; nosūtīšana balstās uz līgumiskiem aizsardzības pasākumiem, kas pielīdzināmi PDPA; maksas plānam nav likumā noteikta pārdomu perioda, un mūsu atmaksas politika ir […]. Japāna: Specified Commercial Transactions Act paredzētā informācija ir pieejama vietnē [URL]; tiešsaistes abonementiem nav vispārēja pārdomu perioda, un mūsu atmaksas politika ir […]; jūsu saturs var tikt nosūtīts pakalpojumu sniedzējiem šādās valstīs: [named countries], un jūs tam piekrītat, reģistrācijas laikā sniedzot piekrišanu. Dienvidkoreja: piekrišanas neobligātai apstrādei un tirgvedībai tiek iegūtas atsevišķi no pakalpojuma darbībai nepieciešamajiem elementiem; mūsu privātuma speciālists ir [name]; saskaņā ar E-Commerce Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; pirms katra regulāra cenas paaugstinājuma vai bezmaksas plāna pārvēršanas maksas plānā mēs no jauna saņemam jūsu piekrišanu; ja to prasa AI Basic Act, mēs jūs iepriekš informējam, ka pakalpojuma pamatā ir MI, un marķējam rezultātus. Indija (kad stājas spēkā DPDP noteikumi): piemēro piekrišanas paziņojumu vietnē [URL]; lietotājiem, kas jaunāki par 18 gadiem, nepieciešama pārbaudāma vecāku piekrišana. Taizeme: mūsu pārstāvis Taizemē ir [name] [if appointed]. Filipīnas: mūsu uzņēmuma identifikācijas informācija un tiesiskās aizsardzības mehānisms saskaņā ar Internet Transactions Act ir pieejami vietnē [URL]; sūdzības var iesniegt National Privacy Commission." }
+      { kind: "p", text: "Mēs piedāvājam DebateAI Ukrainā, izņemot teritorijas, kuras nekontrolē Ukrainas valdība. Produkts un šie Noteikumi ir pieejami ukraiņu valodā. Jūsu datiem piemēro Ukrainas likumu „Par personas datu aizsardzību” (Privātuma politikas B.8 pielikums)." }
     ]
   },
   {
     no: "A.9",
-    title: "Rezervēts",
+    title: "Izraēla (tikai tad, ja norādīta)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Jūs varat atcelt maksas plānu, kā to atļauj Patērētāju aizsardzības likums, 5741-1981 [state the cancellation terms]. Šie Noteikumi un mūsu Privātuma politika ir pieejami ivritā. Jūsu datiem piemēro Izraēlas Privātuma aizsardzības likumu (Privātuma politikas B.9 pielikums)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Āzijas un Klusā okeāna reģions (tikai norādīto reģionu rindas)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapūra: mūsu datu aizsardzības speciālists ir [name, email]; nosūtīšana balstās uz līgumiskiem aizsardzības pasākumiem, kas pielīdzināmi PDPA; maksas plānam nav likumā noteikta pārdomu perioda, un mūsu atmaksas politika ir […]. Japāna: Specified Commercial Transactions Act paredzētā informācija ir pieejama vietnē [URL]; tiešsaistes abonementiem nav vispārēja pārdomu perioda, un mūsu atmaksas politika ir […]; mēs nosūtām jūsu saturu MI pakalpojumu sniedzējiem Amerikas Savienotajās Valstīs un Eiropas Savienībā, katram saskaņā ar līgumu, kas prasa aizsardzību, kura ir līdzvērtīga Japānas Act on the Protection of Personal Information prasībām, un pēc pieprasījuma mēs jums pastāstām, kādi ir šie pasākumi. Dienvidkoreja: piekrišanas neobligātai apstrādei un tirgvedībai tiek iegūtas atsevišķi no pakalpojuma darbībai nepieciešamajiem elementiem; mūsu privātuma speciālists ir [name], privacy@dezbatere.ro; saskaņā ar E-Commerce Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; pirms katra regulāra cenas paaugstinājuma vai bezmaksas plāna pārvēršanas maksas plānā mēs no jauna saņemam jūsu piekrišanu; pakalpojumā tiek izmantots ģeneratīvais MI, mēs jūs par to informējam, pirms to izmantojat, un marķējam MI ģenerētos rezultātus. Taivāna: saskaņā ar Consumer Protection Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; jūsu datiem piemēro Taivānas Personal Data Protection Act (Privātuma politikas B.10 pielikums). Taizeme: mūsu pārstāvis Taizemē ir [name] [if appointed]. Filipīnas: mūsu uzņēmuma identifikācijas informācija un tiesiskās aizsardzības mehānisms saskaņā ar Internet Transactions Act ir pieejami vietnē [URL]; sūdzības var iesniegt National Privacy Commission." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Rezervēts",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Katrā no šīm valstīm — Turcijā, Brazīlijā un Indonēzijā — ir vajadzīgs pielikums vietējā valodā, pārstāvis vai reģistrācija un dokumentu iesniegšana. Šīs valstis šeit nav aplūkotas un neietilpst 2. sadaļā, kamēr tās netiek apzināti pievienotas. Ķīnā, Vjetnamā un Krievijā pakalpojums netiek piedāvāts." }
     ]

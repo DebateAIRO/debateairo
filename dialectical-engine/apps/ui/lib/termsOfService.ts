@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Where we offer DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "We offer DebateAI to people who live in [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
+      { kind: "p", text: "We offer DebateAI to people who live in [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
     ]
   },
   {
@@ -298,7 +298,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "United Kingdom (only if listed in section 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Our UK representative under Article 27 UK GDPR is [name, address, email]. The Consumer Rights Act 2015 applies to you and nothing in these Terms limits your rights under it; from [January 2027], the subscription rules of the Digital Markets, Competition and Consumers Act 2024 apply to paid plans, including a cooling-off period after renewals and after free trials. How we protect users from illegal content: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proactive technology we use: [describe, or \"none\"]. Age assurance: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. The complaints procedure in section 10 accepts complaints about illegal content, wrongful removal of your content, restrictions on your account, the use of automated tools affecting your content, and any age assessment that wrongly blocks you. It is open to people affected by content who are not users." }
+      { kind: "p", text: "Our UK representative under Article 27 UK GDPR is [name, address, email]. The Consumer Rights Act 2015 applies to you and nothing in these Terms limits your rights under it; when the subscription rules of the Digital Markets, Competition and Consumers Act 2024 come into force (expected in 2027), they apply to paid plans, including a cooling-off period after renewals and after free trials. How we protect users from illegal content: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proactive technology we use: [describe, or \"none\"]. Age assurance: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. The complaints procedure in section 10 accepts complaints about illegal content, wrongful removal of your content, restrictions on your account, the use of automated tools affecting your content, and any age assessment that wrongly blocks you. It is open to people affected by content who are not users. Our Privacy Policy, Annex B.2, covers your data." }
     ]
   },
   {
@@ -308,7 +308,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Arbitration agreement and class-action waiver. If you live in the United States, you and DebateAIRO agree to resolve any dispute arising out of these Terms or the service by binding individual arbitration administered by [the American Arbitration Association / JAMS] under its consumer rules, rather than in court, except that either of us may bring an individual claim in small-claims court. You may opt out by emailing [address] within 30 days of first accepting these Terms. This agreement is governed by the Federal Arbitration Act. We pay the arbitration filing fees. Class, collective and representative actions are waived to the extent the law allows. This section applies prospectively only and does not apply to claims that arose before you accepted it." },
       { kind: "p", text: "Notices and takedowns. Non-consensual intimate imagery may be reported at [URL] without an account and is removed within 48 hours of a valid request. Copyright complaints go to our designated agent named in section 16." },
-      { kind: "p", text: "State-specific. California: the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. New York: you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. Texas and Nebraska: we do not sell sensitive personal data; if that ever changes we obtain your consent first [statutory notice language]. Washington: our Consumer Health Data Privacy Notice at [URL] applies to health-related information. Colorado: nothing in the service makes consequential decisions about you." }
+      { kind: "p", text: "State-specific. California: the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. New York: you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. Texas and Nebraska: we do not sell sensitive personal data. Washington: our Consumer Health Data Privacy Notice at [URL] applies to health-related information. Colorado: nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.3, covers your data and your state privacy rights." }
     ]
   },
   {
@@ -316,7 +316,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada and Quebec (only if listed)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Our privacy officer is [name, email]. Quebec: these Terms are available in French at [URL], and the French version was presented to you first; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you." }
+      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is [name], privacy@dezbatere.ro. Our Privacy Policy, Annex B.4, covers your data. Quebec: these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you; no arbitration agreement or class-action waiver applies to you." }
     ]
   },
   {
@@ -329,32 +329,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latin America (Spanish-language annex; only if listed)",
+    title: "Switzerland (only if listed)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Consent is the basis for processing where no contract necessity exists; you consent expressly, before your first debate, to any sensitive data you choose to include. Your ARCO rights may be exercised at [address], with responses within [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexico: the full aviso de privacidad is at [URL]; withdrawal within [5] days. Argentina: [AAIP legend]; use the botón de arrepentimiento at [URL] within 10 days. Colombia: the política de tratamiento is at [URL]; withdrawal within 5 days. Chile (from 1 December 2026): the Agency's contact is […]; you may cancel by the same means you subscribed; no withdrawal right applies to digital services." }
+      { kind: "p", text: "The Swiss Federal Act on Data Protection applies to your data (Privacy Policy, Annex B.6). You may bring proceedings in the courts of the place in Switzerland where you live. No statutory withdrawal right applies to the paid plan; our refund policy is […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Gulf — United Arab Emirates and Saudi Arabia (only if listed)",
+    title: "Moldova (only if listed)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Where we process your data for purposes other than providing the service, we do so with your consent, which you may withdraw. Your data is processed outside the [UAE / Kingdom of Saudi Arabia], including in the European Union and the United States, under [SDAIA standard contractual clauses / the mechanism in the Register]. You are responsible for ensuring that anything you publish complies with the law of the country you are in, including laws concerning religion, public order and morality; we may restrict publication of debates on such topics in your region." }
+      { kind: "p", text: "You have the same rights under these Terms as a consumer in the European Union, including the 14-day withdrawal right in section 13. You may bring proceedings in the courts of Moldova. Moldova's Law No. 195/2024 on personal data protection applies to your data (Privacy Policy, Annex B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Asia-Pacific (only the lines for regions listed)",
+    title: "Ukraine (only if listed)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapore: our Data Protection Officer is [name, email]; transfers rest on contractual protections comparable to the PDPA; no statutory cooling-off applies to the paid plan and our refund policy is […]. Japan: the statutory disclosure under the Specified Commercial Transactions Act is at [URL]; no general cooling-off applies to online subscriptions, and our refund policy is […]; your content may be transferred to providers in [named countries], and you agree to this by the consents at sign-up. South Korea: consents to optional processing and marketing are collected separately from the items needed to run the service; our Privacy Officer is [name]; you may withdraw from a paid plan within 7 days of subscribing subject to the E-Commerce Act; we obtain your fresh consent before any recurring price increase or free-to-paid conversion; where the AI Basic Act requires it, we notify you in advance that the service is AI-based and label outputs. India (once the DPDP rules apply): the consent notice at [URL] applies; users under 18 require verifiable parental consent. Thailand: our representative in Thailand is [name] [if appointed]. Philippines: our business identification and redress mechanism under the Internet Transactions Act are at [URL]; complaints may be lodged with the National Privacy Commission." }
+      { kind: "p", text: "We offer DebateAI in Ukraine except in the areas not controlled by the Ukrainian government. The product and these Terms are available in Ukrainian. The Law of Ukraine \"On Personal Data Protection\" applies to your data (Privacy Policy, Annex B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Reserved",
+    title: "Israel (only if listed)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "You may cancel a paid plan as the Consumer Protection Law, 5741-1981, allows [state the cancellation terms]. These Terms and our Privacy Policy are available in Hebrew. Israel's Protection of Privacy Law applies to your data (Privacy Policy, Annex B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Asia-Pacific (only the lines for regions listed)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapore: our Data Protection Officer is [name, email]; transfers rest on contractual protections comparable to the PDPA; no statutory cooling-off applies to the paid plan and our refund policy is […]. Japan: the statutory disclosure under the Specified Commercial Transactions Act is at [URL]; no general cooling-off applies to online subscriptions, and our refund policy is […]; we send your content to AI providers in the United States and the European Union, each under a contract that requires protection equivalent to Japan's Act on the Protection of Personal Information, and on request we tell you what those measures are. South Korea: consents to optional processing and marketing are collected separately from the items needed to run the service; our privacy officer is [name], privacy@dezbatere.ro; you may withdraw from a paid plan within 7 days of subscribing subject to the E-Commerce Act; we obtain your fresh consent before any recurring price increase or free-to-paid conversion; the service uses generative AI, we tell you so before you use it, and we label AI-generated output. Taiwan: you may withdraw from a paid plan within 7 days of subscribing, under the Consumer Protection Act; Taiwan's Personal Data Protection Act applies to your data (Privacy Policy, Annex B.10). Thailand: our representative in Thailand is [name] [if appointed]. Philippines: our business identification and redress mechanism under the Internet Transactions Act are at [URL]; complaints may be lodged with the National Privacy Commission." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Reserved",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Turkey, Brazil and Indonesia each require a local-language annex, a representative or registration, and filings. They are not drafted here and are outside section 2 until entered deliberately. China, Vietnam and Russia are not offered." }
     ]
