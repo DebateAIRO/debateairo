@@ -65,6 +65,16 @@ export {
   type EntitlementPlanId
 } from "./billing-entitlement.js";
 
+// Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0081).
+// B8 records the interim roster swap; B9c the runner's cheaper-model calls.
+export {
+  RUN_COST_SUBSTITUTION_REASONS,
+  RunCostSubstitutionRepository,
+  type RunCostSubstitution,
+  type RunCostSubstitutionInput,
+  type RunCostSubstitutionReason
+} from "./run-cost-substitution.js";
+
 // Budget spec 2026-09-28 §2.7 (migration 0081): the waiting line, read through
 // core.run_waiting_v so no owner is stored beside a wait.
 export {

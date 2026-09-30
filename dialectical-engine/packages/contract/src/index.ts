@@ -157,13 +157,28 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
  */
 export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
 
+/**
+ * Paid plans (spec 2026-09-29 §2.3.4): the gauges the SERVER applied to an ask,
+ * present only when billing decided them (hosted, billing on). A Free person's
+ * controls stay disabled in the UI, and this says what actually ran. It never
+ * names a cheaper roster: a swap for cost is the owner's record only.
+ */
+export const AskAppliedSchema = z.object({
+  plan_tier: PlanTierSchema,
+  risk_tier: RiskTierSchema,
+  composition_budget_tier: CompositionBudgetTierSchema,
+  depth: ExpansionDepthSchema
+}).strict();
+export type AskApplied = z.infer<typeof AskAppliedSchema>;
+
 export const AskAcceptedSchema = z.object({
   run_ref: z.string().min(1),
   status: z.enum(["QUEUED", "WAITING"]),
   // Budget spec §2.7 and AMENDMENTS-R1 A16: a question that waits in line says
   // when it is expected to start and which limit it waits for. Present iff WAITING.
   waits_until: z.iso.datetime().optional(),
-  waiting_scope: SpendScopeSchema.optional()
+  waiting_scope: SpendScopeSchema.optional(),
+  applied: AskAppliedSchema.optional()
 }).strict().superRefine((accepted, context) => {
   const waiting = accepted.status === "WAITING";
   if (waiting !== (accepted.waits_until !== undefined) || waiting !== (accepted.waiting_scope !== undefined)) {

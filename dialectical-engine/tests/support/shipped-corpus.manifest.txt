@@ -12,6 +12,7 @@
 
 apps/api/src/account-erasure.ts
 apps/api/src/admission.ts
+apps/api/src/ask-billing.ts
 apps/api/src/ask-room.ts
 apps/api/src/billing/index.ts
 apps/api/src/billing/usage.ts
@@ -565,6 +566,7 @@ packages/db/src/obs-schema.ts
 packages/db/src/publication-lease.ts
 packages/db/src/publication.ts
 packages/db/src/recovery.ts
+packages/db/src/run-cost-substitution.ts
 packages/db/src/run-wait.ts
 packages/db/src/schema.ts
 packages/db/src/serve-disclosure.ts

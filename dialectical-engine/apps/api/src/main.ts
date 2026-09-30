@@ -70,6 +70,7 @@ import { AdmissionLimiter } from "./admission.js";
 import { openGeoLookup } from "@debateai/geo";
 import { CountryGate, countryPolicyInForce } from "./country-gate.js";
 import { AskRoom, everyWholeMinute } from "./ask-room.js";
+import type { AskBilling } from "./ask-billing.js";
 import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
@@ -472,6 +473,26 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
     })
   : undefined;
 const askRoom = askRoomComposition?.room;
+/**
+ * Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; rulings R-5, R-28):
+ * the server decides the ask ONLY when the room's composition carries billing —
+ * hosted, the band published, and a billingPolicy saying enabled: true with its
+ * plans (B6b's `ask-room` step asked `assertBillingReady`). The coarse fit reads
+ * the room's own person windows, spend store and estimator.
+ */
+const askBilling: AskBilling | undefined = askRoomComposition === undefined
+  || askRoomComposition.entitlements === null || askRoomComposition.billingPlans === null
+  ? undefined
+  : Object.freeze({
+      plans: askRoomComposition.billingPlans,
+      entitlements: askRoomComposition.entitlements,
+      coarseFit: Object.freeze({
+        personAllowance: askRoomComposition.personAllowance,
+        spend: askRoomComposition.spend,
+        estimator: askRoomComposition.estimator
+      }),
+      clock: () => new Date()
+    });
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
 // V-3: over the RING, so a record still wrapped by the previous key opens for
 // the length of a changeover. Writes stay under the current key. Under the
@@ -591,6 +612,7 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     : costEnvelopeGuard === undefined ? {} : {
         assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
       }),
+  ...(askBilling === undefined ? {} : { billing: askBilling }),
   resolveDiscoveredPanel: resolveProviderPanel,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
@@ -913,6 +935,7 @@ const api = buildApi({
   // B7a: the room read and, while billing is on, the usage read. Absent, the
   // room answers FITS and the usage route 404.
   ...(askRoom === undefined ? {} : { askRoom }),
+  ...(askBilling === undefined ? {} : { askBilling }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   ...(countryGate === undefined ? {} : { countryGate }),
   support: {

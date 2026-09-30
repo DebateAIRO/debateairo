@@ -46,6 +46,7 @@ import {
   type AnswerStory,
   type ArgumentLanguage,
   type AskAccepted,
+  type AskApplied,
   type AskRequest,
   type Deployment,
   type ExecutionLedgerDigest,
@@ -70,11 +71,12 @@ import {
   AskRoomQuerySchema,
   AskRoomResponseSchema
 } from "@debateai/contract";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { SpendScope } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
+  RunCostSubstitutionRepository,
   RunRepository,
   decryptLeasedContentForRun,
   prepareLeasedContentEncryptionForRun,
@@ -121,6 +123,14 @@ import {
   type AskWaitingLinePort,
   type WaitingStart
 } from "./ask-room.js";
+import {
+  ASK_SIGN_IN_REQUIRED,
+  appliedAskOf,
+  coarseFitFor,
+  decideRoomSettings,
+  resolveBillingAsk,
+  type AskBilling
+} from "./ask-billing.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
@@ -1424,6 +1434,12 @@ export interface ApiOptions {
   /** Budget spec §2.7 (B7a): the room read. Absent (local mode, or no band) answers FITS. */
   readonly askRoom?: AskRoomReader;
   /**
+   * Paid plans (B8, ruling R-28): with billing on, the room read decides its
+   * query's settings as `submit` would (the plan's tier; Free's fixed gauges).
+   * Absent, the room is read for the settings as sent.
+   */
+  readonly askBilling?: AskBilling;
+  /**
    * Paid plans (spec 2026-09-29 §2.5; B7a onward): the billing routes' dependencies,
    * supplied by main only when hosted with billing on; each route whose member is
    * absent answers the house 404, which is local mode and billing off alike.
@@ -1462,7 +1478,8 @@ export interface EvaluatorDevMenuApplication {
  * resets — so a caller waits the right amount of time instead of hammering the
  * surface or giving up on a debate it could still have.
  */
-export function askRefusalStatus(code: string): 422 | 429 {
+export function askRefusalStatus(code: string): 401 | 422 | 429 {
+  if (code === ASK_SIGN_IN_REQUIRED) return 401;
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
 
@@ -2620,15 +2637,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    const access = ownershipFor(request);
     const answer = options.askRoom === undefined
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
       : await options.askRoom.readRoom({
-          access: ownershipFor(request),
-          settingsClass: runSettingsClassOfAsk({
+          access,
+          // B8 (R-28): with billing on, the room is read for the ask the server would run.
+          settingsClass: runSettingsClassOfAsk(await decideRoomSettings({
             plan_tier: query.data.plan_tier,
             composition_budget_tier: query.data.composition_budget_tier,
             depth_params: { depth: query.data.depth }
-          })
+          }, access.ownerRef, options.askBilling))
         });
     return reply.send(AskRoomResponseSchema.parse({
       room: answer.room,
@@ -3045,6 +3064,13 @@ export interface RunCreationSettings {
    * or the other, never both.
    */
   readonly room?: AskRoomPort;
+  /**
+   * Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7): present ONLY in hosted
+   * mode with billing on. It makes the server decide the ask's plan tier, Free's
+   * fixed gauges and the interim cheaper roster, and refuses a request with no
+   * signed-in owner (ASK_SIGN_IN_REQUIRED). Absent means today's ask exactly.
+   */
+  readonly billing?: AskBilling;
   /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
   readonly waitingLine?: AskWaitingLinePort;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
@@ -3176,10 +3202,20 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
  * so `WORK_QUEUE` covers the job and the decision's commit: a failed commit
  * rolls the READY job back with everything else. And one the waker records
  * (B7b): `PLAN_CHANGED`, a waiting premium question whose owner's plan dropped
- * to Free before room freed up.
+ * to Free before room freed up. And one with billing on (B8): `COST_RECORD`,
+ * the owner's record of the interim roster swap, written before the run's first
+ * job on either path; no run spends on the swapped roster without it.
  */
 type RunSetupStep =
-  | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED";
+  | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED"
+  | "COST_RECORD";
+
+/**
+ * What `evaluateAskAdmission` admits an ask with. B8 keeps two inside
+ * `#submitWithRoom` when the interim coarse fit swapped the roster: the swapped
+ * ask's (a START runs on it) and the plan's own (a WAIT keeps it).
+ */
+type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
 
 /** What the room's locked decision produced inside the lease. */
 type RoomOutcome =
@@ -3211,6 +3247,7 @@ export class PostgresAskApplication implements AskApplication {
   readonly #serve: ServeRepository;
   readonly #splitLifecycle: Pick<SplitLifecycleProjection, "read">;
   readonly #liveness: LivenessRepository;
+  readonly #substitutions: RunCostSubstitutionRepository;
   readonly #serverAskAdmissionPool: Pool;
   readonly #legacyAskAdmissionPool: Pool;
   /** B7b: set once a tick of this process has read the whole line with every person-recorded run in it. */
@@ -3235,6 +3272,7 @@ export class PostgresAskApplication implements AskApplication {
     this.#serve = new ServeRepository(pool);
     this.#splitLifecycle = splitLifecycle ?? new SplitLifecycleProjection(pool);
     this.#liveness = new LivenessRepository(pool);
+    this.#substitutions = new RunCostSubstitutionRepository(pool);
     this.#serverAskAdmissionPool=askAdmissionPools.server;
     this.#legacyAskAdmissionPool=askAdmissionPools.legacy;
   }
@@ -3244,7 +3282,7 @@ export class PostgresAskApplication implements AskApplication {
   }
 
   async submit(
-    ask: AskRequest,
+    requestedAsk: AskRequest,
     session: Session,
     principal: AskPrincipal
   ): Promise<AskAccepted> {
@@ -3255,13 +3293,44 @@ export class PostgresAskApplication implements AskApplication {
     } else if (session.ownership_provenance === "server_session" || session.asker_id !== principal.legacyAskerId) {
       throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "Legacy scope is valid only for an exact legacy session");
     }
+    // Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; ruling R-28).
+    // With billing on, the SERVER decides the ask. Every later step reads `ask`
+    // — B6b's room branch and B6a's `runSettingsClassOfAsk` included — so each
+    // sees the decided one. `plannedAsk` is the plan-decided ask before the
+    // interim swap: B6b's room creates a question that WAITs from it, so only a
+    // START runs on the Free roster (A5). Without a swap the two are the same.
+    let ask: AskRequest = requestedAsk;
+    let plannedAsk: AskRequest = requestedAsk;
+    let applied: AskApplied | null = null;
+    let substitutedAt: Date | null = null;
+    const billing = this.settings.billing;
+    if (billing !== undefined) {
+      if (principal.kind !== "server") {
+        markAskRefusal(new TypedDomainError(ASK_SIGN_IN_REQUIRED, "Sign in to ask a question"));
+      }
+      const now = billing.clock();
+      const resolved = await resolveBillingAsk(requestedAsk, principal.ownerRef, billing, now);
+      ask = resolved.ask;
+      plannedAsk = resolved.ask;
+      applied = appliedAskOf(resolved.ask);
+      if (await coarseFitFor(ask, principal.ownerRef, billing, now) === "FREE_ROSTER") {
+        ask = Object.freeze({ ...ask, plan_tier: "free" as const });
+        substitutedAt = now;
+      }
+    }
+    const appliedField = applied === null ? {} : { applied };
     const ownership: RunOwnershipAccess = principal.kind === "legacy"
       ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
       : Object.freeze({ ownerRef: principal.ownerRef, legacyAskerId: null });
-    // Budget spec §2.7 (B6b): hosted with the band, the room decides. Every
-    // other composition continues below, exactly as today.
+    // Budget spec §2.7 (B6b): hosted with the band, the room decides. B8: the
+    // room creates the run from `ask` on a START, recording the interim swap
+    // inside its decision (`substitutedAt`), and from `plannedAsk` on a WAIT;
+    // the reply carries what the server applied (QUEUED or WAITING).
     if (this.settings.room !== undefined) {
-      return this.#submitWithRoom(ask, session, principal, ownership, this.settings.room);
+      const accepted = await this.#submitWithRoom(
+        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt
+      );
+      return Object.freeze({ ...accepted, ...appliedField });
     }
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
@@ -3318,8 +3387,19 @@ export class PostgresAskApplication implements AskApplication {
     // start-up recovery re-sends existing jobs and no sweep looks at runs. So a
     // throw from here on records the run FAILED, naming the step, before the
     // asker's 500 — otherwise the owner's list shows it generating forever.
-    let setupStep: RunSetupStep = "MEMORY_QUESTION";
+    let setupStep: RunSetupStep = substitutedAt === null ? "MEMORY_QUESTION" : "COST_RECORD";
     try {
+      // B8 (budget spec §2.9): the interim swap's owner record comes BEFORE the
+      // run's first job is queued, so a run on the swapped roster never runs
+      // without it. `startRun` committed its own transaction on the lease
+      // client (the content-provision role for a server principal, which holds
+      // no grant on the table), so the record goes on the runtime pool. A
+      // failure records the run FAILED (RUN_SETUP_FAILED:COST_RECORD) and
+      // reaches the asker as their error, exactly like every other setup step.
+      if (substitutedAt !== null) {
+        await this.#recordRosterSubstitution(runId, substitutedAt);
+        setupStep = "MEMORY_QUESTION";
+      }
       await this.#serve.recordMemoryQuestion({
         runId,
         questionLine: ask.question_line,
@@ -3341,7 +3421,7 @@ export class PostgresAskApplication implements AskApplication {
       await this.#recordRunSetupFailure(runId, setupStep);
       throw error;
     }
-    return { run_ref: runId, status: "QUEUED" };
+    return { run_ref: runId, status: "QUEUED", ...appliedField };
   }
 
   /**
@@ -3361,6 +3441,25 @@ export class PostgresAskApplication implements AskApplication {
         diagnostic: apiOperationalErrorDiagnostic(recordError)
       })));
     }
+  }
+
+  /**
+   * The interim coarse fit's owner record (reason PERSON; R-2's one writer).
+   * Every cost substitution is a row (budget spec §2.9), so a failure is NOT
+   * swallowed: the caller records the run FAILED before its first job exists.
+   * `executor` is the room decision's transaction when a room decides.
+   */
+  async #recordRosterSubstitution(runId: string, recordedAt: Date, executor?: PoolClient): Promise<void> {
+    const swap = Object.freeze({
+      runId,
+      callSiteKey: "ASK:roster",
+      plannedProviderRef: "roster:premium",
+      usedProviderRef: "roster:free",
+      reason: "PERSON" as const,
+      recordedAt
+    });
+    if (executor === undefined) await this.#substitutions.record(swap);
+    else await this.#substitutions.record(swap, executor);
   }
 
   async unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null> {
@@ -3383,13 +3482,22 @@ export class PostgresAskApplication implements AskApplication {
    *     it), so the job commits with what counts it or not at all.
    * The run input is the one `submit` builds, kept apart so today's path stays
    * byte-for-byte what it is for every composition without a room.
+   * B8 (spec 2026-09-29 §2.3.4, §2.6 item 7; A5): `ask` may carry the interim
+   * cheaper roster (`substitutedAt` set), and `plannedAsk` is the plan's own
+   * ask. Only a START runs on the swapped roster, with its owner record in the
+   * decision's transaction. A question that WAITs is created from `plannedAsk`
+   * and the plan's own admission, so it waits on its plan's roster and
+   * settings: B7b's PLAN_CHANGED guard sees it as premium, and the waker starts
+   * it on that roster (Q-11: the waker does not re-pick).
    */
   async #submitWithRoom(
     ask: AskRequest,
+    plannedAsk: AskRequest,
     session: Session,
     principal: AskPrincipal,
     ownership: RunOwnershipAccess,
-    room: AskRoomPort
+    room: AskRoomPort,
+    substitutedAt: Date | null
   ): Promise<AskAccepted> {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
@@ -3404,38 +3512,71 @@ export class PostgresAskApplication implements AskApplication {
     try {
       outcome = await withOwnerAskAdmissionLease(admissionPool, ownership, async (lease) => {
         await room.precheck(question);
-        const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
+        const swappedEvaluation = await evaluateAskAdmission(this.settings, ask);
+        // B8 (A5): the locked decision may still say WAIT (the site's day, the
+        // line, or a person window that turned FULL after the coarse fit's
+        // unlocked read), and a waiting question keeps its plan's ask. So when
+        // the roster was swapped, the plan's own admission is taken here too,
+        // still outside the decision's locks (the provider probe is cached
+        // within probeFreshnessMs). Its refusal is kept as a value, not thrown:
+        // it matters only if the decision says WAIT. Without a swap `plannedAsk`
+        // is `ask`, and so is its evaluation.
+        let plannedEvaluation: AskEvaluation | AskRefusal = swappedEvaluation;
+        if (substitutedAt !== null) {
+          try {
+            plannedEvaluation = await evaluateAskAdmission(this.settings, plannedAsk);
+          } catch (error) {
+            if (!(error instanceof AskRefusal)) throw error;
+            plannedEvaluation = error;
+          }
+        }
         const decided = await room.decide(question, async ({ admission, estimateMicros, now, tx }): Promise<RoomOutcome> => {
+          // B8 (A5, spec §2.3.4): only a START runs on the swapped roster. A
+          // question that WAITs is stored on its plan's roster and settings.
+          // Nothing is written yet, so a refusal of the plan's own admission
+          // rolls the decision back and no run exists.
+          const keepsPlan = substitutedAt !== null && admission.kind === "WAIT";
+          const runAsk = keepsPlan ? plannedAsk : ask;
+          const evaluated = keepsPlan ? plannedEvaluation : swappedEvaluation;
+          if (evaluated instanceof AskRefusal) throw evaluated;
           await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
           const runId = await this.#runs.startRun({
-            questionLine: ask.question_line,
+            questionLine: runAsk.question_line,
             argumentLanguageTag: argumentLanguage.tag,
             argumentLanguageName: argumentLanguage.nameEn,
             principal,
             sessionId: session.session_id,
             callerScope: session.caller_scope,
-            asOf: new Date(ask.as_of),
-            askerRiskTier: ask.risk_tier,
-            effectiveRiskTier: risk.effectiveRiskTier,
-            tierSource: risk.tierSource,
-            tierProvenanceRef: risk.tierProvenanceRef,
-            compositionBudgetTier: ask.composition_budget_tier,
-            planTier: ask.plan_tier,
-            depthParams: ask.depth_params,
-            discoveredPanel,
+            asOf: new Date(runAsk.as_of),
+            askerRiskTier: runAsk.risk_tier,
+            effectiveRiskTier: evaluated.risk.effectiveRiskTier,
+            tierSource: evaluated.risk.tierSource,
+            tierProvenanceRef: evaluated.risk.tierProvenanceRef,
+            compositionBudgetTier: runAsk.composition_budget_tier,
+            planTier: runAsk.plan_tier,
+            depthParams: runAsk.depth_params,
+            discoveredPanel: evaluated.discoveredPanel,
             strangerSampleRate: this.settings.strangerSampleRate,
-            envelopeBasis,
+            envelopeBasis: evaluated.envelopeBasis,
             registerVersion: this.settings.registerVersion,
             batteryVersion: this.settings.batteryVersion,
             askContract: {
-              decision_scope: ask.decision_scope,
-              steering_presets: ask.steering_presets,
-              steering_annotations: ask.steering_annotations,
-              critic_unavailable_cap: criticUnavailableCap
+              decision_scope: runAsk.decision_scope,
+              steering_presets: runAsk.steering_presets,
+              steering_annotations: runAsk.steering_annotations,
+              critic_unavailable_cap: evaluated.criticUnavailableCap
             },
             batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
           }, lease.client);
           createdRunId = runId;
+          if (substitutedAt !== null && admission.kind === "START") {
+            // B8 (budget spec §2.9): the interim swap's owner record, in the room
+            // decision's own transaction. It commits with the run's hold (START),
+            // or not at all; a failure rolls the decision back and records the
+            // run FAILED (RUN_SETUP_FAILED:COST_RECORD). A WAIT swapped nothing.
+            setupStep = "COST_RECORD";
+            await this.#recordRosterSubstitution(runId, substitutedAt, tx);
+          }
           setupStep = "MEMORY_QUESTION";
           await this.#serve.recordMemoryQuestion({
             runId,
