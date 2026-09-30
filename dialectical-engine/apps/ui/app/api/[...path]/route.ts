@@ -47,10 +47,11 @@ const MAX_PROXY_BODY_BYTES = 1_048_576;
 const UPSTREAM_TIMEOUT_MS = 30_000;
 /**
  * hate-speech S02 (ruling R-D, V-13): `POST /v1/runs/{id}/publish` runs the content check, whose deadline D is
- * 50 000 ms (`PUBLICATION_CHECK_DEADLINE_MS`, apps/api/src/publication-check/check.ts), before the publish itself.
- * Its ceiling is D plus 25 s for the rest of the attempt; every other route keeps UPSTREAM_TIMEOUT_MS.
+ * 60 000 ms (`PUBLICATION_CHECK_DEADLINE_MS`, apps/api/src/publication-check/check.ts; ruling R-D2), before the
+ * publish itself. Its ceiling is D plus 25 s for the rest of the attempt (preflight, three lease phases, the record,
+ * encryption and the transition); every other route keeps UPSTREAM_TIMEOUT_MS.
  */
-const PUBLISH_UPSTREAM_TIMEOUT_MS = 75_000;
+const PUBLISH_UPSTREAM_TIMEOUT_MS = 85_000;
 const RUN_PUBLISH_PATH = /^v1\/runs\/[^/]+\/publish$/u;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";

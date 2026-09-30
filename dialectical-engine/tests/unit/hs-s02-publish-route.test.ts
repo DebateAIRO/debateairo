@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -636,6 +636,26 @@ describe("hate-speech S02 publish path", () => {
       // The check reads the switch through its detached supplier, and the switch exists before the check.
       expect(main).toMatch(/judge:\s*publicationJudgeSwitch\.current\b/u);
       expect(main.indexOf("createPublicationJudgeSwitch(")).toBeLessThan(main.indexOf("createPublicationContentCheck("));
+    });
+
+    // FIX-HS2-p2 api-N2: the signal listener never throws into the process — a failing switch logs a content-free code.
+    it("SIGUSR2 never throws: a directory at the flag path, and a switch that throws, each log one content-free line", async () => {
+      const signals = new EventEmitter();
+      const lines: string[] = [];
+      const dir = mkdtempSync(join(tmpdir(), "hs-s02-signal-n2-"));
+      try {
+        const flag = join(dir, "off");
+        mkdirSync(flag);
+        installPublicationJudgeSwitchSignal(signals, createPublicationJudgeSwitch(createJudgeStub([ALLOW]), { offFlagPath: flag }), (line) => lines.push(line));
+        expect(() => signals.emit("SIGUSR2")).not.toThrow();
+        const throwing = new EventEmitter();
+        installPublicationJudgeSwitchSignal(throwing, { switchOff: () => { throw Object.assign(new Error("secret /home/owner path"), { code: "EISDIR" }); } }, (line) => lines.push(line));
+        expect(() => throwing.emit("SIGUSR2")).not.toThrow();
+        expect(lines).toEqual([
+          "{\"event\":\"api.publication_check.switch\",\"configured\":false}",
+          "{\"event\":\"api.publication_check.switch\",\"error\":\"PUBLICATION_JUDGE_SWITCH_FAILED\"}"
+        ]);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
     });
 
     it("SIGUSR2 switches the judge OFF idempotently and logs one content-free line per signal; removing the flag restores it", async () => {

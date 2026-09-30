@@ -224,7 +224,7 @@ test("hate-speech S02 R-D: only POST /v1/runs/{id}/publish gets the longer upstr
       { params: Promise.resolve({ path }) });
     return [...armed];
   };
-  const PUBLISH_CEILING_MS = 75_000;
+  const PUBLISH_CEILING_MS = 85_000;
   const DEFAULT_CEILING_MS = 30_000;
   const only = (values) => { assert.equal(values.length, 1, "exactly one ceiling is armed"); return values[0]; };
   try {
@@ -233,6 +233,8 @@ test("hate-speech S02 R-D: only POST /v1/runs/{id}/publish gets the longer upstr
       ["POST", ["v1", "runs", RUN, "unpublish"]],
       ["POST", ["v1", "asks"]],
       ["POST", ["v1", "runs", RUN, "publish", "extra"]],
+      // FIX-HS2-p2 (REV p2 survivor P6): a deeper path that also ends in /publish is not the publish route
+      ["POST", ["v1", "runs", RUN, "answers", "publish"]],
       ["POST", ["v1", "publish"]],
       ["GET", ["v1", "runs", RUN, "publish"]],
       ["GET", ["v1", "session"]]

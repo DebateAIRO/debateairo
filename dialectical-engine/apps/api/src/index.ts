@@ -1371,8 +1371,15 @@ export function installPublicationJudgeSwitchSignal(
   judgeSwitch: Readonly<{ switchOff(): boolean }>,
   log: (line: string) => void = (line) => { console.error(line); }
 ): void {
+  // FIX-HS2-p2 api-N2: a listener that throws would take the API down; the failure is logged as a content-free code.
   target.on("SIGUSR2", () => {
-    log(JSON.stringify({ event: "api.publication_check.switch", configured: judgeSwitch.switchOff() }));
+    let line: string;
+    try {
+      line = JSON.stringify({ event: "api.publication_check.switch", configured: judgeSwitch.switchOff() });
+    } catch {
+      line = JSON.stringify({ event: "api.publication_check.switch", error: "PUBLICATION_JUDGE_SWITCH_FAILED" });
+    }
+    try { log(line); } catch { /* a failing log sink must not end the process either */ }
   });
 }
 

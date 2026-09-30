@@ -41,11 +41,12 @@ type JudgeOptions = { judge: PublicationJudgePort | null; deadlineMs?: number; m
 
 /**
  * The deadline D of one publish check (SPEC-v2 R7: D ≤ 60 s): every judge call of the attempt shares ONE
- * `AbortSignal.timeout(D)`. FIX-HS2-p1 pt-B1 / R-D: 50 000 ms, measured against the dev judge (8 of 89 real calls
- * outran the former 20 s; a debate needing 5 calls needs two ~12 s waves). main.ts wires this constant and the
- * UI proxy's publish ceiling exceeds it (tests/unit/hs-s02-publish-route.test.ts "composition").
+ * `AbortSignal.timeout(D)`. FIX-HS2-p2 ui-B2 / ruling R-D2: 60 000 ms, SPEC-v2 R7's cap. At 50 s the §4 eval against
+ * the dev judge still failed one run in three (one call past 50 s); what stays slower than 60 s is the dev judge's
+ * own tail (V-15). main.ts wires this constant and the UI proxy's publish ceiling exceeds it
+ * (tests/unit/hs-s02-publish-route.test.ts "composition").
  */
-export const PUBLICATION_CHECK_DEADLINE_MS = 50_000;
+export const PUBLICATION_CHECK_DEADLINE_MS = 60_000;
 
 /**
  * FIX-HS2-p1 sd-N1: the record's `judge_provider_ref` / `judge_model_id` hold operator identifiers, never text.

@@ -9,12 +9,53 @@ export type JudgeAnswer = Readonly<{
 export type JudgeCallResult = { ok: true; answer: JudgeAnswer } | { ok: false; cause: JudgeFailureCause };
 
 const VERDICTS: readonly JudgeAnswer["verdict"][] = ["ALLOW", "BLOCK", "UNSURE"];
-const squeeze = (text: string) => text.replace(/\s+/gu, "");
+const JSON_ESCAPES: Readonly<Record<string, string>> = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+const NAMED_ENTITIES: Readonly<Record<string, string>> = { quot: '"', apos: "'", amp: "&", colon: ":", lbrace: "{", rbrace: "}", lcub: "{", rcub: "}" };
+const codePoint = (value: number, fallback: string) => value <= 0x10ffff ? String.fromCodePoint(value) : fallback;
+/** One layer of the encodings a judge can undo while copying: JSON/JS escapes and HTML character references. */
+function decodeOnce(text: string): string {
+  return text
+    .replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})/gu, (match, braced?: string, four?: string, two?: string) =>
+      codePoint(parseInt((braced ?? four ?? two)!, 16), match))
+    .replace(/\\(["\\/bfnrt])/gu, (_match, escaped: string) => JSON_ESCAPES[escaped]!)
+    .replace(/&#x([0-9a-fA-F]{1,6});?|&#([0-9]{1,7});?/gu, (match, hex?: string, decimal?: string) =>
+      codePoint(hex === undefined ? Number(decimal) : parseInt(hex, 16), match))
+    .replace(/&([a-zA-Z]+);/gu, (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match);
+}
+/**
+ * The text a judge can hand back from `text` without writing anything of its own: every escape layer undone
+ * (at most four), compatibility forms folded (NFKC: fullwidth, ligatures), format characters, separators and
+ * whitespace removed, and typographic quotes read as ASCII quotes.
+ */
+function canonicalText(text: string): string {
+  let decoded = text;
+  for (let layer = 0; layer < 4; layer++) {
+    const next = decodeOnce(decoded);
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return decoded.normalize("NFKC")
+    .replace(/[\p{Cf}\p{Z}\s]/gu, "")
+    .replace(/[\u2018\u2019\u201a\u201b\u2032\u2035`\u00b4]/gu, "'")
+    .replace(/[\u201c\u201d\u201e\u201f\u2033\u2036\u00ab\u00bb]/gu, '"');
+}
+/** A JSON key named `verdict` (any case), in the shape the answer form requires: quoted, then a colon. */
+const VERDICT_KEY = /["']verdict["']:/iu;
+/**
+ * FIX-HS2-p2 api-B1: true when the call's material can supply a verdict object — a quoted `verdict` key followed by
+ * a colon in any single field, or across the fields read in the order they were sent, once every copying
+ * transformation of canonicalText is undone. The judge can only return such an object by copying it or by writing
+ * it itself; a copy must never decide publication, so no answer of that call is taken.
+ */
+export function materialCarriesVerdict(sentMaterial: readonly string[]): boolean {
+  return [...sentMaterial, sentMaterial.join("")].some(text => VERDICT_KEY.test(canonicalText(text)));
+}
 
 /**
- * FIX-HS2-p1 sd-B2: `sentMaterial` is the content of every material field of THIS call. An answer whose text, or
- * whose canonical JSON, occurs inside one of them is a copy of the owner's text, not the judge's verdict: it is
- * refused as JUDGE_ANSWER_SCHEMA (fail closed, SPEC-v2 R7), whatever verdict it names.
+ * FIX-HS2-p1 sd-B2, widened by FIX-HS2-p2 api-B1: `sentMaterial` is the content of every material field of THIS
+ * call. When that material itself carries a verdict key (materialCarriesVerdict), any answer — literal copy,
+ * decoded copy, reordered copy, a copy joined from pieces in several fields — may be a copy of the owner's text,
+ * not the judge's verdict: it is refused as JUDGE_ANSWER_SCHEMA (fail closed, SPEC-v2 R7), whatever verdict it names.
  */
 export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[], sentMaterial: readonly string[] = []): JudgeCallResult {
   let source = text.trim();
@@ -40,8 +81,7 @@ export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[]
   if (verdict === "BLOCK" && (rules.length === 0 || parts.length === 0)) return schemaFailure;
   if (verdict === "UNSURE" && rules.length !== 0) return schemaFailure;
   if (parts.some(part => !sentFieldNames.includes(part))) return { ok: false, cause: "JUDGE_ANSWER_UNKNOWN_PART" };
-  const copied = [squeeze(source), squeeze(JSON.stringify({ verdict, rules, parts, possibly_illegal }))];
-  if (sentMaterial.some(content => { const field = squeeze(content); return copied.some(form => field.includes(form)); })) return schemaFailure;
+  if (materialCarriesVerdict(sentMaterial)) return schemaFailure;
   return { ok: true, answer: { verdict: verdict as JudgeAnswer["verdict"], rules, parts, possibly_illegal } };
 }
 
