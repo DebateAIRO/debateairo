@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Един от документите току-що се промени. Презаредете страницата, за да прочетете актуалната версия.",
   "newDebate.legalGate.manageAccount": "Управлявайте или изтрийте профила си",
   "newDebate.legalGate.signOut": "Излизане",
-  "newDebate.legalGate.signOutFailed": "Излизането не завърши. Моля, опитайте отново."
+  "newDebate.legalGate.signOutFailed": "Излизането не завърши. Моля, опитайте отново.",
+  "newDebate.room.locationBlocked": "От текущото ви местоположение не могат да се започват нови дебати. Вашите дебати остават достъпни за четене."
 }

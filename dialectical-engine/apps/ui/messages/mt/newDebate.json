@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Wieħed mid-dokumenti nbidel ftit ilu. Erġa’ tella’ l-paġna biex taqra l-verżjoni kurrenti.",
   "newDebate.legalGate.manageAccount": "Immaniġġja jew ħassar il-kont tiegħek",
   "newDebate.legalGate.signOut": "Oħroġ mill-kont",
-  "newDebate.legalGate.signOutFailed": "Il-ħruġ mill-kont ma tlestiex. Jekk jogħġbok erġa’ pprova."
+  "newDebate.legalGate.signOutFailed": "Il-ħruġ mill-kont ma tlestiex. Jekk jogħġbok erġa’ pprova.",
+  "newDebate.room.locationBlocked": "Ma jistgħux jinbdew dibattiti ġodda mill-post fejn tinsab bħalissa. Id-dibattiti tiegħek jibqgħu disponibbli biex taqrahom."
 }

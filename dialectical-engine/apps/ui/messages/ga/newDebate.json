@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Athraíodh ceann de na doiciméid díreach anois. Athlódáil an leathanach chun an leagan reatha a léamh.",
   "newDebate.legalGate.manageAccount": "Bainistigh nó scrios do chuntas",
   "newDebate.legalGate.signOut": "Sínigh amach",
-  "newDebate.legalGate.signOutFailed": "Níor críochnaíodh an síniú amach. Bain triail eile as."
+  "newDebate.legalGate.signOutFailed": "Níor críochnaíodh an síniú amach. Bain triail eile as.",
+  "newDebate.room.locationBlocked": "Ní féidir díospóireachtaí nua a thosú ón áit ina bhfuil tú faoi láthair. Tá do chuid díospóireachtaí fós ar fáil le léamh."
 }

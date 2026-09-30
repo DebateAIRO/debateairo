@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "L’un des documents vient de changer. Rechargez la page pour lire la version en vigueur.",
   "newDebate.legalGate.manageAccount": "Gérer ou supprimer votre compte",
   "newDebate.legalGate.signOut": "Se déconnecter",
-  "newDebate.legalGate.signOutFailed": "La déconnexion n’a pas abouti. Veuillez réessayer."
+  "newDebate.legalGate.signOutFailed": "La déconnexion n’a pas abouti. Veuillez réessayer.",
+  "newDebate.room.locationBlocked": "Il n’est pas possible de lancer de nouveaux débats depuis votre emplacement actuel. Vos débats restent disponibles en lecture."
 }

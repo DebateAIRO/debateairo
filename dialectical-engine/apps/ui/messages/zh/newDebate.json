@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "其中一份文件刚刚发生变更。请重新加载页面，阅读当前版本。",
   "newDebate.legalGate.manageAccount": "管理或删除您的账户",
   "newDebate.legalGate.signOut": "退出登录",
-  "newDebate.legalGate.signOutFailed": "退出登录未完成。请重试。"
+  "newDebate.legalGate.signOutFailed": "退出登录未完成。请重试。",
+  "newDebate.room.locationBlocked": "无法从您当前所在的位置发起新辩论。您的辩论仍可继续阅读。"
 }

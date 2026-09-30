@@ -157,12 +157,30 @@ export function classifyRequestFailure(
   });
 }
 
+/**
+ * Paid plans G3b (sentence G4). POST /v1/asks answers 403 COUNTRY_ASK_BLOCKED from an always-blocked
+ * place. It is an observed refusal with its own plain sentence — never the coordinator clause, never
+ * the code — and the person's debates stay readable, which the sentence says.
+ */
+const LOCATION_BLOCKED_SERVER_CODE = "COUNTRY_ASK_BLOCKED";
+const LOCATION_BLOCKED_KEY = "newDebate.room.locationBlocked";
+const LOCATION_BLOCKED_ENGLISH =
+  "New debates can't be started from your current location. Your debates stay available to read.";
+
+export function isCountryAskBlocked(error: unknown): boolean {
+  return error instanceof ContractHttpError && error.status === 403
+    && error.serverCode === LOCATION_BLOCKED_SERVER_CODE;
+}
+
 /** The user-facing line for a banner. Never a sentence a server wrote. */
 export function requestFailureMessage(
   subject: RequestFailureSubject,
   error: unknown,
   catalog?: MessageCatalog
 ): string {
+  if (subject === "DEBATE_CREATE" && isCountryAskBlocked(error)) {
+    return catalog === undefined ? LOCATION_BLOCKED_ENGLISH : t(catalog, LOCATION_BLOCKED_KEY);
+  }
   const classified = classifyRequestFailure(subject,error);
   if (catalog === undefined) return classified.message;
   return `${t(catalog,`requestFailure.subject.${classified.subject}`)} ${

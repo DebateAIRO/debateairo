@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Az egyik dokumentum az imént megváltozott. Töltse be újra az oldalt a hatályos változat elolvasásához.",
   "newDebate.legalGate.manageAccount": "Fiók kezelése vagy törlése",
   "newDebate.legalGate.signOut": "Kijelentkezés",
-  "newDebate.legalGate.signOutFailed": "A kijelentkezés nem fejeződött be. Kérjük, próbálja újra."
+  "newDebate.legalGate.signOutFailed": "A kijelentkezés nem fejeződött be. Kérjük, próbálja újra.",
+  "newDebate.room.locationBlocked": "Jelenlegi tartózkodási helyéről nem indíthat új vitákat. A vitái továbbra is olvashatók."
 }

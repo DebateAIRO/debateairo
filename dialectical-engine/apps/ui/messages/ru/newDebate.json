@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Один из документов только что изменился. Перезагрузите страницу, чтобы прочитать действующую версию.",
   "newDebate.legalGate.manageAccount": "Управлять аккаунтом или удалить его",
   "newDebate.legalGate.signOut": "Выйти",
-  "newDebate.legalGate.signOutFailed": "Не удалось завершить выход. Повторите попытку."
+  "newDebate.legalGate.signOutFailed": "Не удалось завершить выход. Повторите попытку.",
+  "newDebate.room.locationBlocked": "Из вашего текущего местоположения нельзя начинать новые дебаты. Ваши дебаты по-прежнему доступны для чтения."
 }

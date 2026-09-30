@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Um dos documentos mudou há instantes. Recarregue a página para ler a versão em vigor.",
   "newDebate.legalGate.manageAccount": "Gerir ou eliminar a sua conta",
   "newDebate.legalGate.signOut": "Terminar sessão",
-  "newDebate.legalGate.signOutFailed": "Não foi possível terminar a sessão. Tente novamente."
+  "newDebate.legalGate.signOutFailed": "Não foi possível terminar a sessão. Tente novamente.",
+  "newDebate.room.locationBlocked": "Não é possível iniciar novos debates a partir da sua localização atual. Os seus debates continuam disponíveis para leitura."
 }

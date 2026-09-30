@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Yksi asiakirjoista muuttui juuri. Lataa sivu uudelleen, niin voit lukea voimassa olevan version.",
   "newDebate.legalGate.manageAccount": "Hallitse tiliäsi tai poista se",
   "newDebate.legalGate.signOut": "Kirjaudu ulos",
-  "newDebate.legalGate.signOutFailed": "Uloskirjautuminen ei onnistunut. Yritä uudelleen."
+  "newDebate.legalGate.signOutFailed": "Uloskirjautuminen ei onnistunut. Yritä uudelleen.",
+  "newDebate.room.locationBlocked": "Uusia väittelyitä ei voi aloittaa nykyisestä sijainnistasi. Väittelysi ovat edelleen luettavissa."
 }

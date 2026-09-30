@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Uno dei documenti è appena cambiato. Ricarica la pagina per leggere la versione in vigore.",
   "newDebate.legalGate.manageAccount": "Gestisci o elimina il tuo account",
   "newDebate.legalGate.signOut": "Disconnetti",
-  "newDebate.legalGate.signOutFailed": "La disconnessione non è stata completata. Riprova."
+  "newDebate.legalGate.signOutFailed": "La disconnessione non è stata completata. Riprova.",
+  "newDebate.room.locationBlocked": "Non è possibile avviare nuovi dibattiti dalla tua posizione attuale. I tuoi dibattiti restano disponibili per la lettura."
 }

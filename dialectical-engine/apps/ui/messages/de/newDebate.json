@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Eines der Dokumente wurde gerade geändert. Laden Sie die Seite neu, um die aktuelle Fassung zu lesen.",
   "newDebate.legalGate.manageAccount": "Konto verwalten oder löschen",
   "newDebate.legalGate.signOut": "Abmelden",
-  "newDebate.legalGate.signOutFailed": "Die Abmeldung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut."
+  "newDebate.legalGate.signOutFailed": "Die Abmeldung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut.",
+  "newDebate.room.locationBlocked": "Von Ihrem aktuellen Standort aus können keine neuen Debatten gestartet werden. Ihre Debatten können Sie weiterhin lesen."
 }

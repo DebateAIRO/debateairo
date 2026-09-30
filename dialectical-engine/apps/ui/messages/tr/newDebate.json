@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Belgelerden biri az önce değişti. Güncel sürümü okumak için sayfayı yeniden yükleyin.",
   "newDebate.legalGate.manageAccount": "Hesabınızı yönetin veya silin",
   "newDebate.legalGate.signOut": "Oturumu kapat",
-  "newDebate.legalGate.signOutFailed": "Oturum kapatma tamamlanamadı. Lütfen tekrar deneyin."
+  "newDebate.legalGate.signOutFailed": "Oturum kapatma tamamlanamadı. Lütfen tekrar deneyin.",
+  "newDebate.room.locationBlocked": "Bulunduğunuz konumdan yeni tartışma başlatılamaz. Tartışmalarınızı okumaya devam edebilirsiniz."
 }

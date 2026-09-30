@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Üks dokumentidest muutus just praegu. Laadige leht uuesti, et lugeda kehtivat versiooni.",
   "newDebate.legalGate.manageAccount": "Hallake oma kontot või kustutage see",
   "newDebate.legalGate.signOut": "Logige välja",
-  "newDebate.legalGate.signOutFailed": "Väljalogimine ei lõppenud. Palun proovige uuesti."
+  "newDebate.legalGate.signOutFailed": "Väljalogimine ei lõppenud. Palun proovige uuesti.",
+  "newDebate.room.locationBlocked": "Teie praegusest asukohast ei saa uusi väitlusi alustada. Teie väitlused jäävad lugemiseks kättesaadavaks."
 }

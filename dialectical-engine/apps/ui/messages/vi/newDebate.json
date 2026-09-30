@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Một trong các tài liệu vừa thay đổi. Hãy tải lại trang để đọc phiên bản hiện hành.",
   "newDebate.legalGate.manageAccount": "Quản lý hoặc xóa tài khoản của bạn",
   "newDebate.legalGate.signOut": "Đăng xuất",
-  "newDebate.legalGate.signOutFailed": "Đăng xuất không hoàn tất. Vui lòng thử lại."
+  "newDebate.legalGate.signOutFailed": "Đăng xuất không hoàn tất. Vui lòng thử lại.",
+  "newDebate.room.locationBlocked": "Không thể bắt đầu cuộc tranh luận mới từ vị trí hiện tại của bạn. Các cuộc tranh luận của bạn vẫn có thể đọc được."
 }

@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "방금 문서 중 하나가 변경되었습니다. 페이지를 새로고침하여 현재 버전을 읽어 주세요.",
   "newDebate.legalGate.manageAccount": "계정 관리 또는 삭제",
   "newDebate.legalGate.signOut": "로그아웃",
-  "newDebate.legalGate.signOutFailed": "로그아웃을 완료하지 못했습니다. 다시 시도해 주세요."
+  "newDebate.legalGate.signOutFailed": "로그아웃을 완료하지 못했습니다. 다시 시도해 주세요.",
+  "newDebate.room.locationBlocked": "현재 위치에서는 새 토론을 시작할 수 없습니다. 기존 토론은 계속 읽을 수 있습니다."
 }

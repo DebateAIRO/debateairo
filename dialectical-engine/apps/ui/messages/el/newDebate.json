@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Ένα από τα έγγραφα άλλαξε μόλις τώρα. Φορτώστε ξανά τη σελίδα για να διαβάσετε την τρέχουσα έκδοση.",
   "newDebate.legalGate.manageAccount": "Διαχείριση ή διαγραφή του λογαριασμού σας",
   "newDebate.legalGate.signOut": "Αποσύνδεση",
-  "newDebate.legalGate.signOutFailed": "Η αποσύνδεση δεν ολοκληρώθηκε. Δοκιμάστε ξανά."
+  "newDebate.legalGate.signOutFailed": "Η αποσύνδεση δεν ολοκληρώθηκε. Δοκιμάστε ξανά.",
+  "newDebate.room.locationBlocked": "Δεν είναι δυνατή η έναρξη νέων αντιπαραθέσεων από την τρέχουσα τοποθεσία σας. Οι αντιπαραθέσεις σας παραμένουν διαθέσιμες για ανάγνωση."
 }

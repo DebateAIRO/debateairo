@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "文書のひとつがたった今変更されました。ページを再読み込みして最新版をお読みください。",
   "newDebate.legalGate.manageAccount": "アカウントの管理または削除",
   "newDebate.legalGate.signOut": "サインアウト",
-  "newDebate.legalGate.signOutFailed": "サインアウトが完了しませんでした。もう一度お試しください。"
+  "newDebate.legalGate.signOutFailed": "サインアウトが完了しませんでした。もう一度お試しください。",
+  "newDebate.room.locationBlocked": "現在の場所からは新しいディベートを開始できません。これまでのディベートは引き続きお読みいただけます。"
 }

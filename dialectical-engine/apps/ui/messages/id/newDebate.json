@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Salah satu dokumen baru saja berubah. Muat ulang halaman untuk membaca versi terbaru.",
   "newDebate.legalGate.manageAccount": "Kelola atau hapus akun Anda",
   "newDebate.legalGate.signOut": "Keluar",
-  "newDebate.legalGate.signOutFailed": "Proses keluar tidak selesai. Silakan coba lagi."
+  "newDebate.legalGate.signOutFailed": "Proses keluar tidak selesai. Silakan coba lagi.",
+  "newDebate.room.locationBlocked": "Debat baru tidak dapat dimulai dari lokasi Anda saat ini. Debat Anda tetap dapat dibaca."
 }

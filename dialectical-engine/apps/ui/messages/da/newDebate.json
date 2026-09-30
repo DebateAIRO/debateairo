@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Et af dokumenterne blev ændret for et øjeblik siden. Genindlæs siden for at læse den gældende version.",
   "newDebate.legalGate.manageAccount": "Administrer eller slet din konto",
   "newDebate.legalGate.signOut": "Log ud",
-  "newDebate.legalGate.signOutFailed": "Udlogningen blev ikke fuldført. Prøv igen."
+  "newDebate.legalGate.signOutFailed": "Udlogningen blev ikke fuldført. Prøv igen.",
+  "newDebate.room.locationBlocked": "Nye debatter kan ikke startes fra din nuværende placering. Dine debatter kan stadig læses."
 }

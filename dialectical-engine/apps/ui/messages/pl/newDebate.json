@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Jeden z dokumentów właśnie się zmienił. Załaduj ponownie stronę, aby przeczytać aktualną wersję.",
   "newDebate.legalGate.manageAccount": "Zarządzaj kontem lub je usuń",
   "newDebate.legalGate.signOut": "Wyloguj się",
-  "newDebate.legalGate.signOutFailed": "Wylogowanie nie zostało dokończone. Spróbuj jeszcze raz."
+  "newDebate.legalGate.signOutFailed": "Wylogowanie nie zostało dokończone. Spróbuj jeszcze raz.",
+  "newDebate.room.locationBlocked": "Z Twojej obecnej lokalizacji nie można rozpoczynać nowych debat. Twoje debaty pozostają dostępne do czytania."
 }

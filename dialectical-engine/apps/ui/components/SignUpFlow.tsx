@@ -269,6 +269,12 @@ export function SignUpFlow({
         setError(t(catalog, "auth.signUp.documentsUpdated"));
         return;
       }
+      if (failure instanceof ContractHttpError && (failure.serverCode === "COUNTRY_SIGNUP_UNAVAILABLE"
+        || failure.serverCode === "COUNTRY_UNKNOWN" || failure.serverCode === "TOR_REFUSED")) {
+        // Paid plans G3b (sentence G1): the register gate refused this address's country.
+        setError(t(catalog, "auth.signUp.countryUnavailable"));
+        return;
+      }
       setError(t(catalog, "auth.signUp.creationFailed"));
     } finally {
       setBusy(false);

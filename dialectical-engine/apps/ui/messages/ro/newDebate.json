@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Unul dintre documente s-a schimbat chiar acum. Reîncărcați pagina pentru a citi versiunea actuală.",
   "newDebate.legalGate.manageAccount": "Gestionați sau ștergeți contul",
   "newDebate.legalGate.signOut": "Deconectați-vă",
-  "newDebate.legalGate.signOutFailed": "Deconectarea nu s-a finalizat. Încercați din nou."
+  "newDebate.legalGate.signOutFailed": "Deconectarea nu s-a finalizat. Încercați din nou.",
+  "newDebate.room.locationBlocked": "Nu se pot începe dezbateri noi din locația dvs. actuală. Dezbaterile dvs. rămân disponibile pentru citire."
 }

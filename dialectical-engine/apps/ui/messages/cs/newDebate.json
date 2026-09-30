@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Jeden z dokumentů se právě změnil. Znovu načtěte stránku a přečtěte si aktuální verzi.",
   "newDebate.legalGate.manageAccount": "Spravovat nebo smazat účet",
   "newDebate.legalGate.signOut": "Odhlásit se",
-  "newDebate.legalGate.signOutFailed": "Odhlášení se nedokončilo. Zkuste to prosím znovu."
+  "newDebate.legalGate.signOutFailed": "Odhlášení se nedokončilo. Zkuste to prosím znovu.",
+  "newDebate.room.locationBlocked": "Z vašeho současného umístění nelze zahájit nové debaty. Vaše debaty zůstávají dostupné ke čtení."
 }

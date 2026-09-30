@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Eden od dokumentov se je pravkar spremenil. Znova naložite stran, da preberete trenutno različico.",
   "newDebate.legalGate.manageAccount": "Upravljajte ali izbrišite svoj račun",
   "newDebate.legalGate.signOut": "Odjava",
-  "newDebate.legalGate.signOutFailed": "Odjava ni bila dokončana. Poskusite znova."
+  "newDebate.legalGate.signOutFailed": "Odjava ni bila dokončana. Poskusite znova.",
+  "newDebate.room.locationBlocked": "Z vaše trenutne lokacije ni mogoče začeti novih razprav. Vaše razprave ostajajo na voljo za branje."
 }

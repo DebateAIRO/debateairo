@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Viens no dokumentiem tikko mainījās. Pārlādējiet lapu, lai izlasītu pašreizējo versiju.",
   "newDebate.legalGate.manageAccount": "Pārvaldīt vai dzēst kontu",
   "newDebate.legalGate.signOut": "Izrakstīties",
-  "newDebate.legalGate.signOutFailed": "Izrakstīšanās netika pabeigta. Lūdzu, mēģiniet vēlreiz."
+  "newDebate.legalGate.signOutFailed": "Izrakstīšanās netika pabeigta. Lūdzu, mēģiniet vēlreiz.",
+  "newDebate.room.locationBlocked": "No jūsu pašreizējās atrašanās vietas nevar sākt jaunas debates. Jūsu debates joprojām ir pieejamas lasīšanai."
 }

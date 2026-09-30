@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Ett av dokumenten ändrades nyss. Ladda om sidan för att läsa den gällande versionen.",
   "newDebate.legalGate.manageAccount": "Hantera eller radera ditt konto",
   "newDebate.legalGate.signOut": "Logga ut",
-  "newDebate.legalGate.signOutFailed": "Utloggningen slutfördes inte. Försök igen."
+  "newDebate.legalGate.signOutFailed": "Utloggningen slutfördes inte. Försök igen.",
+  "newDebate.room.locationBlocked": "Nya debatter kan inte startas från din nuvarande plats. Dina debatter finns kvar att läsa."
 }

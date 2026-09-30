@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Vienas iš dokumentų ką tik pasikeitė. Iš naujo įkelkite puslapį, kad perskaitytumėte galiojančią versiją.",
   "newDebate.legalGate.manageAccount": "Tvarkyti arba ištrinti paskyrą",
   "newDebate.legalGate.signOut": "Atsijungti",
-  "newDebate.legalGate.signOutFailed": "Atsijungimas nebaigtas. Bandykite dar kartą."
+  "newDebate.legalGate.signOutFailed": "Atsijungimas nebaigtas. Bandykite dar kartą.",
+  "newDebate.room.locationBlocked": "Iš dabartinės jūsų buvimo vietos negalima pradėti naujų debatų. Jūsų debatus ir toliau galima skaityti."
 }

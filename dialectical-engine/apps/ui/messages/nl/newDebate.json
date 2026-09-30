@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "Een van de documenten is zojuist gewijzigd. Laad de pagina opnieuw om de huidige versie te lezen.",
   "newDebate.legalGate.manageAccount": "Uw account beheren of verwijderen",
   "newDebate.legalGate.signOut": "Afmelden",
-  "newDebate.legalGate.signOutFailed": "Het afmelden is niet voltooid. Probeer het opnieuw."
+  "newDebate.legalGate.signOutFailed": "Het afmelden is niet voltooid. Probeer het opnieuw.",
+  "newDebate.room.locationBlocked": "Vanaf uw huidige locatie kunnen geen nieuwe debatten worden gestart. Uw debatten blijven beschikbaar om te lezen."
 }

@@ -94,5 +94,6 @@
   "newDebate.legalGate.stale": "One of the documents changed a moment ago. Reload the page to read the current version.",
   "newDebate.legalGate.manageAccount": "Manage or delete your account",
   "newDebate.legalGate.signOut": "Sign out",
-  "newDebate.legalGate.signOutFailed": "Signing out did not complete. Please try again."
+  "newDebate.legalGate.signOutFailed": "Signing out did not complete. Please try again.",
+  "newDebate.room.locationBlocked": "New debates can't be started from your current location. Your debates stay available to read."
 }
