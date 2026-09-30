@@ -31,7 +31,7 @@ import {
 import { createPublicationJudgeSwitch } from "../../apps/api/src/publication-check/judge-transport.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import { STORY_TEST_BODY } from "../support/storyApiFixtures.js";
-import { createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
+import { bindJudgeAnswer, createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 
 /**
@@ -528,7 +528,7 @@ describe("hate-speech S02 publish path", () => {
       let calls = 0;
       const counting: PublicationJudgePort = {
         providerRef: "test:judge", modelId: "test-model",
-        complete: async () => { calls += 1; return { text: ALLOW }; }
+        complete: async ({ packet }) => { calls += 1; return { text: bindJudgeAnswer(ALLOW, packet) }; }
       };
       const { check } = contentCheck(counting);
       const blocked = servedAnswer({ terminal: "BLOCKED" });

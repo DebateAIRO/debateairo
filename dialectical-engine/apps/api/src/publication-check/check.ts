@@ -4,7 +4,7 @@ import type { PromptPacket } from "../../../../packages/providers/src/index.js";
 import { buildFramedPrompt } from "../../../../packages/providers/src/prompt-frame.js";
 import { extractCheckedText, packJudgeCalls, type CheckedText } from "./material.js";
 import { publicationCheckContract, PUBLICATION_CHECK_POLICY_VERSION } from "./policy.js";
-import { combineJudgeCalls, parseJudgeAnswer, type JudgeCallResult } from "./verdict.js";
+import { combineJudgeCalls, judgeCallValue, parseJudgeAnswer, type JudgeCallResult } from "./verdict.js";
 
 export type JudgeFailureCause = "JUDGE_NOT_CONFIGURED" | "JUDGE_DOOR_REFUSED" | "JUDGE_TRANSPORT_FAILED"
   | "JUDGE_HTTP_STATUS" | "JUDGE_DEADLINE" | "JUDGE_ANSWER_NOT_JSON" | "JUDGE_ANSWER_SCHEMA" | "JUDGE_ANSWER_UNKNOWN_PART";
@@ -96,11 +96,12 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
       const index = next++, call = calls[index]!;
       if (signal.aborted) { results[index] = { ok: false, cause: "JUDGE_DEADLINE" }; continue; }
       try {
-        const { packet } = buildFramedPrompt({ contract: publicationCheckContract(), material: call.fields });
+        const { packet, fence } = buildFramedPrompt({ contract: publicationCheckContract(), material: call.fields });
+        const expectedCall = judgeCallValue(fence);
         judgeCallCount++;
         for (const field of call.fields) sentFieldNames.add(field.name);
         const response = await withinDeadline(judge!, packet, signal);
-        results[index] = parseJudgeAnswer(response.text, call.fields.map(field => field.name), call.fields.map(field => field.content));
+        results[index] = parseJudgeAnswer(response.text, call.fields.map(field => field.name), expectedCall);
       } catch (error) {
         const cause = error instanceof TypedDomainError && error.code.startsWith("PROMPT_") ? "JUDGE_DOOR_REFUSED"
           : signal.aborted ? "JUDGE_DEADLINE"

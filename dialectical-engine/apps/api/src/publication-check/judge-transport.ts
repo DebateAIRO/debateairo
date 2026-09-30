@@ -1,4 +1,4 @@
-import { closeSync, constants, lstatSync, mkdirSync, openSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, statSync, type Stats } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { TypedDomainError } from "../../../../packages/kernel/src/index.js";
@@ -61,7 +61,7 @@ export function createPublicationJudgeTransport(target: SupportModelTarget, opti
  * directory (macOS `$TMPDIR`: 0700, per user); when that directory is group- or world-writable (Linux `/tmp`, mode
  * 1777, shared by every account) the flag goes into a `debateai-<uid>` subdirectory created 0700. (The process
  * environment is read only by the register loader — tests/architecture/scaffold.test.ts — so no XDG lookup here.) Whether the directory really is private is checked on every read
- * (privateDirectory), not trusted from here: a subdirectory pre-created by another account fails that check and
+ * (withPrivateDirectory), not trusted from here: a subdirectory pre-created by another account fails that check and
  * the switch reads OFF.
  */
 export function publicationJudgeOffFlagPath(apiPort: number, directory: string = tmpdir()): string {
@@ -70,12 +70,17 @@ export function publicationJudgeOffFlagPath(apiPort: number, directory: string =
 
 const currentUid = (): number | undefined => typeof process.getuid === "function" ? process.getuid() : undefined;
 
-/** A real directory (not a link), owned by this user, that no group or other account can write. Never throws. */
+/** A directory owned by this user that no group or other account can write. */
+function privateStat(stat: Stats): boolean {
+  const uid = currentUid();
+  return stat.isDirectory() && (uid === undefined || stat.uid === uid) && (stat.mode & 0o022) === 0;
+}
+
+/** A real directory (not a link) that is private — used to CHOOSE the flag's directory. Never throws. */
 function privateDirectory(path: string): boolean {
   try {
     const stat = lstatSync(path);
-    const uid = currentUid();
-    return stat.isDirectory() && !stat.isSymbolicLink() && (uid === undefined || stat.uid === uid) && (stat.mode & 0o022) === 0;
+    return !stat.isSymbolicLink() && privateStat(stat);
   } catch {
     return false;
   }
@@ -87,20 +92,57 @@ function perUserDirectory(base: string): string {
   return path;
 }
 
-/** The judge is OFF unless the path provably holds nothing: only ENOENT inside a private directory reads ON. */
-function flagAbsent(flag: string): boolean {
-  if (!privateDirectory(dirname(flag))) return false;
+/**
+ * FIX-HS2-v api-p3 N3: the privacy check and the use are one operation on one directory. Node offers no openat, and
+ * `/dev/fd/<n>/<name>` does not resolve on macOS (measured: ENOENT), so the directory is pinned instead:
+ * 1. its parent must not let another account rename or replace it — no group/other write, or the sticky bit
+ *    (Linux `/tmp`); a world-writable parent without the sticky bit is refused;
+ * 2. the directory is opened ONCE with O_DIRECTORY|O_NOFOLLOW (a symlinked directory fails here) and the privacy
+ *    check runs on that descriptor (fstat), not on a second lookup of the name;
+ * 3. after `use`, the name must still be that same directory (dev/ino of the held descriptor).
+ * Any failure returns `refused`; nothing throws.
+ */
+function withPrivateDirectory<T>(directory: string, use: () => T, refused: T): T {
   try {
-    lstatSync(flag);
-    return false;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "ENOENT";
+    const parent = statSync(dirname(directory));
+    if ((parent.mode & 0o022) !== 0 && (parent.mode & 0o1000) === 0) return refused;
+  } catch {
+    return refused;
   }
+  let descriptor: number;
+  try {
+    descriptor = openSync(directory, constants.O_RDONLY | (constants.O_DIRECTORY ?? 0) | (constants.O_NOFOLLOW ?? 0));
+  } catch {
+    return refused;
+  }
+  try {
+    const held = fstatSync(descriptor);
+    if (!privateStat(held)) return refused;
+    const result = use();
+    const named = lstatSync(directory);
+    return named.isDirectory() && named.dev === held.dev && named.ino === held.ino ? result : refused;
+  } catch {
+    return refused;
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+/** The judge is OFF unless the path provably holds nothing: only ENOENT inside a pinned private directory reads ON. */
+function flagAbsent(flag: string): boolean {
+  return withPrivateDirectory(dirname(flag), () => {
+    try {
+      lstatSync(flag);
+      return false;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT";
+    }
+  }, false);
 }
 
 /**
  * `switchOff` creates the flag with O_CREAT|O_EXCL (which never follows a symlink, live or dangling) and O_NOFOLLOW,
- * mode 0600, and never throws. When the path already holds something the switch did not make — a directory, a link,
+ * mode 0600, inside the pinned directory (withPrivateDirectory), and never throws. When the path already holds something the switch did not make — a directory, a link,
  * another account's file — or the directory is not private, the switch stays OFF in memory until the API restarts,
  * so removing that thing cannot turn the judge back on behind the signal.
  */
@@ -123,14 +165,15 @@ export function createPublicationJudgeSwitch(port: PublicationJudgePort | null, 
     current: () => port === null || off() ? null : port,
     switchOff: () => {
       if (flag !== null) {
-        if (!privateDirectory(dirname(flag))) forcedOff = true;
-        else {
+        const made = withPrivateDirectory(dirname(flag), () => {
           try {
             closeSync(openSync(flag, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600));
+            return true;
           } catch (error) {
-            if (!((error as NodeJS.ErrnoException).code === "EEXIST" && operatorFlag(flag))) forcedOff = true;
+            return (error as NodeJS.ErrnoException).code === "EEXIST" && operatorFlag(flag);
           }
-        }
+        }, false);
+        if (!made) forcedOff = true;
       }
       return port !== null && !off();
     }

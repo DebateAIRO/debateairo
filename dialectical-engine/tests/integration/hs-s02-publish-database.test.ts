@@ -21,7 +21,7 @@ import {
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import type { PublicationContentLease } from "../../apps/api/src/publications.js";
 import { PUBLICATION_CHECK_POLICY_VERSION } from "../../apps/api/src/publication-check/policy.js";
-import { createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
+import { bindJudgeAnswer, createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun,
@@ -343,10 +343,10 @@ describe("hate-speech S02 publish path — the runtime pool under concurrent att
     let judgeCalls = 0;
     const judge: PublicationJudgePort = {
       providerRef: "test:judge", modelId: "test-model",
-      complete: async () => {
+      complete: async ({ packet }) => {
         judgeCalls += 1;
         await new Promise((resolve) => setTimeout(resolve, judgeLatencyMs));
-        return { text: JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["question"], possibly_illegal: false }) };
+        return { text: bindJudgeAnswer(JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["question"], possibly_illegal: false }), packet) };
       }
     };
     const contentCheck = createPublicationContentCheck({

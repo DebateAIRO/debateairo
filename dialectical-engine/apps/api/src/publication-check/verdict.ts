@@ -1,3 +1,4 @@
+import { TypedDomainError } from "../../../../packages/kernel/src/index.js";
 import type { JudgeFailureCause } from "./check.js";
 
 export type JudgeAnswer = Readonly<{
@@ -9,55 +10,29 @@ export type JudgeAnswer = Readonly<{
 export type JudgeCallResult = { ok: true; answer: JudgeAnswer } | { ok: false; cause: JudgeFailureCause };
 
 const VERDICTS: readonly JudgeAnswer["verdict"][] = ["ALLOW", "BLOCK", "UNSURE"];
-const JSON_ESCAPES: Readonly<Record<string, string>> = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
-const NAMED_ENTITIES: Readonly<Record<string, string>> = { quot: '"', apos: "'", amp: "&", colon: ":", lbrace: "{", rbrace: "}", lcub: "{", rcub: "}" };
-const codePoint = (value: number, fallback: string) => value <= 0x10ffff ? String.fromCodePoint(value) : fallback;
-/** One layer of the encodings a judge can undo while copying: JSON/JS escapes and HTML character references. */
-function decodeOnce(text: string): string {
-  return text
-    .replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})/gu, (match, braced?: string, four?: string, two?: string) =>
-      codePoint(parseInt((braced ?? four ?? two)!, 16), match))
-    .replace(/\\(["\\/bfnrt])/gu, (_match, escaped: string) => JSON_ESCAPES[escaped]!)
-    .replace(/&#x([0-9a-fA-F]{1,6});?|&#([0-9]{1,7});?/gu, (match, hex?: string, decimal?: string) =>
-      codePoint(hex === undefined ? Number(decimal) : parseInt(hex, 16), match))
-    .replace(/&([a-zA-Z]+);/gu, (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match);
-}
 /**
- * The text a judge can hand back from `text` without writing anything of its own: every escape layer undone
- * (at most four), compatibility forms folded (NFKC: fullwidth, ligatures), format characters, separators and
- * whitespace removed, and typographic quotes read as ASCII quotes.
+ * FIX-HS2-v V-21 (V's ruling, supersedes V-18): the answer is BOUND to its call. Every judge call's frame carries a
+ * boundary marker of 128 CSPRNG bits minted per call, after the material is fixed
+ * (packages/providers/src/prompt-frame.ts:222-235); the R5 answer form requires the judge to copy its 32 hexadecimal
+ * characters into `call`. Text the owner wrote before the call existed cannot carry that value, so a verdict copied
+ * out of the material — in any spelling, encoding or split — is never this call's answer. This replaces the
+ * pass-1/pass-2 scan of the material for verdict-like keys, which was an open list and refused honest text.
  */
-function canonicalText(text: string): string {
-  let decoded = text;
-  for (let layer = 0; layer < 4; layer++) {
-    const next = decodeOnce(decoded);
-    if (next === decoded) break;
-    decoded = next;
-  }
-  return decoded.normalize("NFKC")
-    .replace(/[\p{Cf}\p{Z}\s]/gu, "")
-    .replace(/[\u2018\u2019\u201a\u201b\u2032\u2035`\u00b4]/gu, "'")
-    .replace(/[\u201c\u201d\u201e\u201f\u2033\u2036\u00ab\u00bb]/gu, '"');
-}
-/** A JSON key named `verdict` (any case), in the shape the answer form requires: quoted, then a colon. */
-const VERDICT_KEY = /["']verdict["']:/iu;
-/**
- * FIX-HS2-p2 api-B1: true when the call's material can supply a verdict object — a quoted `verdict` key followed by
- * a colon in any single field, or across the fields read in the order they were sent, once every copying
- * transformation of canonicalText is undone. The judge can only return such an object by copying it or by writing
- * it itself; a copy must never decide publication, so no answer of that call is taken.
- */
-export function materialCarriesVerdict(sentMaterial: readonly string[]): boolean {
-  return [...sentMaterial, sentMaterial.join("")].some(text => VERDICT_KEY.test(canonicalText(text)));
+const CALL_VALUE = /^[0-9a-f]{32}$/u;
+
+/** The call's one-time value: the 32 lowercase hexadecimal characters of the frame's boundary marker. */
+export function judgeCallValue(fence: string): string {
+  const hex = fence.match(/[0-9a-f]{32}/gu);
+  if (hex === null || hex.length !== 1) throw new TypedDomainError("PROMPT_FRAME_ABSENT", "The frame carries no single per-call value");
+  return hex[0]!;
 }
 
 /**
- * FIX-HS2-p1 sd-B2, widened by FIX-HS2-p2 api-B1: `sentMaterial` is the content of every material field of THIS
- * call. When that material itself carries a verdict key (materialCarriesVerdict), any answer — literal copy,
- * decoded copy, reordered copy, a copy joined from pieces in several fields — may be a copy of the owner's text,
- * not the judge's verdict: it is refused as JUDGE_ANSWER_SCHEMA (fail closed, SPEC-v2 R7), whatever verdict it names.
+ * R5: `expectedCall` is judgeCallValue of THIS call's frame. An answer is taken only when it is exactly the five-key
+ * object whose `call` is that value; missing, different, re-cased or padded values are JUDGE_ANSWER_SCHEMA
+ * (fail closed, SPEC-v2 R7), whatever verdict the answer names.
  */
-export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[], sentMaterial: readonly string[] = []): JudgeCallResult {
+export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[], expectedCall: string): JudgeCallResult {
   let source = text.trim();
   if (source.startsWith("```")) {
     const match = /^```(?:json)?\r?\n([^]*?)\r?\n```$/.exec(source);
@@ -70,8 +45,9 @@ export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[]
   const schemaFailure = { ok: false, cause: "JUDGE_ANSWER_SCHEMA" } as const;
   if (!value || typeof value !== "object" || Array.isArray(value)) return schemaFailure;
   const row = value as Record<string, unknown>;
-  const keys = ["verdict", "rules", "parts", "possibly_illegal"];
-  if (Object.keys(row).length !== 4 || !keys.every(key => Object.hasOwn(row, key))) return schemaFailure;
+  const keys = ["call", "verdict", "rules", "parts", "possibly_illegal"];
+  if (Object.keys(row).length !== keys.length || !keys.every(key => Object.hasOwn(row, key))) return schemaFailure;
+  if (!CALL_VALUE.test(expectedCall) || row.call !== expectedCall) return schemaFailure;
   const { verdict, rules, parts, possibly_illegal } = row;
   if (typeof verdict !== "string" || !(VERDICTS as readonly string[]).includes(verdict)
     || !Array.isArray(rules) || !rules.every(rule => rule === 1 || rule === 2) || new Set(rules).size !== rules.length
@@ -81,7 +57,6 @@ export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[]
   if (verdict === "BLOCK" && (rules.length === 0 || parts.length === 0)) return schemaFailure;
   if (verdict === "UNSURE" && rules.length !== 0) return schemaFailure;
   if (parts.some(part => !sentFieldNames.includes(part))) return { ok: false, cause: "JUDGE_ANSWER_UNKNOWN_PART" };
-  if (materialCarriesVerdict(sentMaterial)) return schemaFailure;
   return { ok: true, answer: { verdict: verdict as JudgeAnswer["verdict"], rules, parts, possibly_illegal } };
 }
 

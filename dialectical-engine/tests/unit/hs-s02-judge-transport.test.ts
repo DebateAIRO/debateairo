@@ -226,3 +226,89 @@ describe("publication judge off-flag, hostile paths (api-N2)", () => {
     } finally { fs.chmodSync(dir, 0o700); done(); }
   });
 });
+
+// FIX-HS2-v residue api-p3 N2 (branches the p3 mutants survived) and N3 (the privacy check and the read are one
+// operation on one directory): every way the flag directory can be untrusted reads OFF.
+describe("publication judge off-flag, untrusted directories (api-p3 N2, N3)", () => {
+  const port = { providerRef: "test", modelId: "test", async complete() { return { text }; } };
+  const setup = async () => {
+    const fs = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const transport = await import("../../apps/api/src/publication-check/judge-transport.js");
+    const dir = fs.mkdtempSync(join(tmpdir(), "hs-s02-n3-"));
+    const flagDir = join(dir, "flags");
+    fs.mkdirSync(flagDir, { mode: 0o700 });
+    return { fs, join, transport, dir, flagDir, flag: join(flagDir, "debateai-publication-judge-3001.off"),
+      done: () => { try { fs.chmodSync(flagDir, 0o700); } catch { /* removed by the test */ } fs.rmSync(dir, { recursive: true, force: true }); } };
+  };
+  // Property (S2): only "no such file" reads ON — a flag that cannot be looked at (EACCES) reads OFF.
+  it("a flag the switch cannot look at (no search permission on its directory) reads OFF", async () => {
+    const { fs, transport, flagDir, flag, done } = await setup();
+    try {
+      const control = transport.createPublicationJudgeSwitch(port, { offFlagPath: flag });
+      expect(control.current()).toBe(port);
+      fs.chmodSync(flagDir, 0o600);
+      expect(control.current()).toBeNull();
+    } finally { done(); }
+  });
+  // Property (S6): a flag directory another account owns reads OFF — measured with a getuid stub (one account here).
+  it("a flag directory owned by another account reads OFF", async () => {
+    const { transport, flag, done } = await setup();
+    const spy = vi.spyOn(process, "getuid").mockReturnValue(process.getuid!() + 1);
+    try {
+      expect(transport.createPublicationJudgeSwitch(port, { offFlagPath: flag }).current()).toBeNull();
+    } finally { spy.mockRestore(); done(); }
+  });
+  // Property (S6b): a flag directory reached through a symlink reads OFF, even when the link's target is private.
+  it("a symlinked flag directory reads OFF, and the signal writes nothing through it", async () => {
+    const { fs, join, transport, dir, flagDir, done } = await setup();
+    try {
+      const link = join(dir, "link");
+      fs.symlinkSync(flagDir, link);
+      const control = transport.createPublicationJudgeSwitch(port, { offFlagPath: join(link, "debateai-publication-judge-3001.off") });
+      expect(control.current()).toBeNull();
+      expect(control.switchOff()).toBe(false);
+      expect(fs.readdirSync(flagDir)).toEqual([]);
+      expect(control.current()).toBeNull();
+    } finally { done(); }
+  });
+  // Property (N3): the directory's parent must not let another account swap the directory — a group- or
+  // world-writable parent WITHOUT the sticky bit reads OFF; the same parent WITH the sticky bit (Linux /tmp) is trusted.
+  it("a world-writable parent without the sticky bit reads OFF; with the sticky bit the flag directory is trusted", async () => {
+    const { fs, transport, dir, flag, done } = await setup();
+    try {
+      const control = transport.createPublicationJudgeSwitch(port, { offFlagPath: flag });
+      fs.chmodSync(dir, 0o777);
+      expect(control.current()).toBeNull();
+      fs.chmodSync(dir, 0o1777);
+      expect(control.current()).toBe(port);
+      fs.chmodSync(dir, 0o770);
+      expect(control.current()).toBeNull();
+    } finally { fs.chmodSync(dir, 0o700); done(); }
+  });
+  // Property (N3): the directory the read went through is the directory the privacy check opened — a directory
+  // swapped for a symlink to an empty private directory between the check and the read never reads ON.
+  it("a flag directory replaced by a symlink to an empty private directory reads OFF", async () => {
+    const { fs, join, transport, dir, flagDir, flag, done } = await setup();
+    try {
+      fs.writeFileSync(flag, "");
+      const control = transport.createPublicationJudgeSwitch(port, { offFlagPath: flag });
+      expect(control.current()).toBeNull();
+      const empty = join(dir, "empty");
+      fs.mkdirSync(empty, { mode: 0o700 });
+      fs.renameSync(flagDir, join(dir, "moved"));
+      fs.symlinkSync(empty, flagDir);
+      expect(control.current()).toBeNull();
+    } finally { done(); }
+  });
+  // Property: after the signal, the switch reads OFF — if the flag it created is not the one it reads, it stays OFF in memory.
+  it("switchOff always leaves the switch OFF", async () => {
+    const { transport, flag, done } = await setup();
+    try {
+      const control = transport.createPublicationJudgeSwitch(port, { offFlagPath: flag });
+      expect(control.switchOff()).toBe(false);
+      expect(control.current()).toBeNull();
+    } finally { done(); }
+  });
+});
