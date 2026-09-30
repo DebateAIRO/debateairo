@@ -346,6 +346,14 @@ const apiEnvironmentShape = {
      * it; the runner has no shape for it.
      */
     RECORDS_KEY_PATH: z.string().min(1),
+    /**
+     * Paid plans G1: the country data the country gate reads — DB-IP's Lite country MMDB and the Tor
+     * exit list. PUBLIC data, not custody files (the refresh timer writes them 0644). Optional in
+     * the shape and REQUIRED when hosted (validateApiEnvironment, GEOIP_PATHS_REQUIRED); local mode
+     * has no country gate and needs neither.
+     */
+    GEOIP_COUNTRY_DB_PATH: z.string().min(1).optional(),
+    TOR_EXIT_LIST_PATH: z.string().min(1).optional(),
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
     USER_DEK_STORE_PATH: z.string().min(1),
@@ -528,12 +536,12 @@ function validateApiEnvironment(
     throw new TypeError("RECORDS_KEY_PATH_MUST_BE_SEPARATE");
   }
   assertProductionFloors(environment);
-  return {
-    ...environment,
-    DEPLOYMENT_MODE: resolveDeploymentMode(
-      environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
-    )
-  };
+  const deploymentMode = resolveDeploymentMode(environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV);
+  if (deploymentMode === "hosted"
+    && (environment.GEOIP_COUNTRY_DB_PATH === undefined || environment.TOR_EXIT_LIST_PATH === undefined)) {
+    throw new TypeError("GEOIP_PATHS_REQUIRED");
+  }
+  return { ...environment, DEPLOYMENT_MODE: deploymentMode };
 }
 
 export function parseApiEnvironment(

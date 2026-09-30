@@ -561,6 +561,9 @@ packages/evaluator/src/harvest-constants.ts
 packages/evaluator/src/index.ts
 packages/evaluator/src/public-aggregate-provider.ts
 packages/evidence/src/index.ts
+packages/geo/src/index.ts
+packages/geo/src/ip.ts
+packages/geo/src/lookup.ts
 packages/graph/src/index.ts
 packages/judgement/src/index.ts
 packages/judgement/src/prompts.ts
