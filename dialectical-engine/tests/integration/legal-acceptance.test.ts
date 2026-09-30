@@ -137,6 +137,21 @@ describe("0079 legal.acceptance (paid plans L3a)", () => {
       WHERE table_schema='legal' AND table_name='acceptance' AND grantee='debateai_runtime'
       ORDER BY 1`);
     expect(grants.rows.map((row) => row.privilege_type)).toEqual(["INSERT", "SELECT"]);
+    // Every caller in the suites runs these two as the superuser, so only this pin would notice
+    // a later migration taking EXECUTE away from the runtime (every sign-up would then fail 42501).
+    const can = async (role: string, fn: string) => (await database.pool.query<{ ok: boolean }>(
+      "SELECT has_function_privilege($1,$2,'EXECUTE') AS ok", [role, fn]
+    )).rows[0]!.ok;
+    const signUpWithConsent =
+      "identity.create_pending_account_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb,smallint,text,text,jsonb)";
+    const countryGateRefused = "identity.audit_country_gate_refused(jsonb,text)";
+    for (const fn of [signUpWithConsent, countryGateRefused]) {
+      expect(await can("debateai_runtime", fn), fn).toBe(true);
+      expect(await can("public", fn), fn).toBe(false);
+      // The control: a principal 0079 revokes reads false, so this check can fail.
+      // (debateai_authorization_runtime is not pinned: it inherits debateai_runtime since 0039.)
+      expect(await can("debateai_replay", fn), fn).toBe(false);
+    }
   });
 
   it("writes ADULT, TERMS and PRIVACY_SHOWN with the account, keyed by owner_ref, evidence sealed", async () => {
