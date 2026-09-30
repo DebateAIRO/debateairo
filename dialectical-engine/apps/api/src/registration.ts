@@ -1415,7 +1415,8 @@ export class RegistrationService implements RegistrationApplication {
           || input.adultAffirmed !== true) {
           throw new AuthFlowError("AUTH_INPUT_INVALID");
         }
-        // Age gate: the edge's country is recorded with the result, never decisive.
+        // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
+        // recorded with the result, never decisive.
         const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
           ? rawSource.countryCode : null;
         // L3b: the pairs of the documents the person read. Input validation, so it runs before

@@ -1672,7 +1672,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? request.headers["user-agent"] as string
         : "unknown",
       requestId: request.id,
-      // Age gate: the edge's country for the source, only when it reported one.
+      // Age gate (R3-3): the country computed above (the edge's, else the country gate's lookup),
+      // left out when neither gives one.
       ...(countryCode === null ? {} : { countryCode }),
       ...(legal === undefined ? {} : { legal })
     });
