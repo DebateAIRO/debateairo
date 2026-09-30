@@ -20,6 +20,9 @@ export type WaitReason =
   | Readonly<{ waitsFor: "SITE"; personRecheckAt: null }>
   | Readonly<{ waitsFor: "PERSON"; personRecheckAt: Date }>;
 
+/** Where one page of the waker's read ended, in the line's own order: (waiting_since, run_id). */
+export type WaitingRunCursor = Readonly<{ waitingSince: Date; runId: string }>;
+
 export type WaitingRun = Readonly<{
   runId: string;
   waitingSince: Date;
@@ -193,5 +196,39 @@ export class RunWaitRepository {
       [now]
     );
     return result.rows[0]?.blocking === true;
+  }
+
+  /**
+   * Budget spec §2.7 / §2.3 rule 1 (B7b) — THE RUNS WORTH TRYING THIS TICK,
+   * oldest first, after `after` (a keyset cursor, never a fixed window): every
+   * run waiting for the site (or with no reason yet), and a run recorded as
+   * waiting for its own person only when that block may have lifted (the shared
+   * predicate), when its reason is over an hour old — the backstop for a change
+   * no event marks, such as a paid plan lapsing past its paid-through instant —
+   * or while the process has not yet swept the whole line once (`everyPerson`:
+   * a new register version arrives as a restart). A run whose own person is still
+   * full is never read, however many wait.
+   */
+  async wakeCandidates(input: Readonly<{
+    now: Date;
+    after: WaitingRunCursor | null;
+    limit: number;
+    everyPerson: boolean;
+  }>): Promise<ReadonlyArray<WaitingRun>> {
+    if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 1_000) {
+      throw new TypeError("RUN_WAIT_LIMIT_INVALID");
+    }
+    const result = await this.pool.query<WaitingRow>(
+      `SELECT ${WAITING_COLUMNS} FROM core.run_waiting_v AS line
+       WHERE ($2::timestamptz IS NULL OR (line.waiting_since, line.run_id) > ($2::timestamptz, $3::uuid))
+         AND (line.waits_for IS DISTINCT FROM 'PERSON'
+           OR $4::boolean
+           OR line.reason_at <= $1::timestamptz - interval '1 hour'
+           OR ${PERSON_BLOCK_MAY_HAVE_LIFTED})
+       ORDER BY line.waiting_since, line.run_id
+       LIMIT $5`,
+      [input.now, input.after?.waitingSince ?? null, input.after?.runId ?? null, input.everyPerson, input.limit]
+    );
+    return Object.freeze(result.rows.map(waitingRun));
   }
 }

@@ -47,7 +47,7 @@ describe("B6b the API root composes the room", () => {
 
   it("supplies the room instead of the daily guard, never both", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    expect(main).toContain("...(askRoom !== undefined\n    ? { room: askRoom }");
+    expect(main).toContain("...(askRoom !== undefined\n    ? { room: askRoom, waitingLine: askRoom }");
     expect(main).toContain("assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()");
   });
 

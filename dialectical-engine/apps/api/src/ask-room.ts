@@ -15,8 +15,8 @@ import {
   type ScopeRoom,
   type SpendScope
 } from "@debateai/budget";
-import type { RunOwnershipAccess, WaitReason, WaitingRun, WaitingRunRef } from "@debateai/db";
-import type { PlanId } from "@debateai/register";
+import type { RunOwnershipAccess, WaitReason, WaitingRun, WaitingRunCursor, WaitingRunRef } from "@debateai/db";
+import { planById, type BillingPlans, type PlanId } from "@debateai/register";
 
 /**
  * Budget spec 2026-09-28 §2.4–§2.7, amended by the paid-plans spec 2026-09-29
@@ -96,6 +96,13 @@ export interface AskRoomSpend {
 export interface AskRoomLine {
   /** Budget spec §2.3 rule 1: does any waiting run hold a new question back? One statement. */
   siteLineBlocking(now: Date): Promise<boolean>;
+  /** B7b: one page of the runs worth trying this tick, oldest first, after the cursor. */
+  wakeCandidates(input: Readonly<{
+    now: Date;
+    after: WaitingRunCursor | null;
+    limit: number;
+    everyPerson: boolean;
+  }>): Promise<ReadonlyArray<WaitingRun>>;
   waitingForOwner(ownerRef: string): Promise<ReadonlyArray<WaitingRunRef>>;
   waitingForLegacyAsker(legacyAskerId: string): Promise<ReadonlyArray<WaitingRunRef>>;
   readWaiting(runId: string): Promise<WaitingRun | null>;
@@ -125,6 +132,12 @@ export type AskRoomOptions = Readonly<{
   estimator: CostEstimator;
   personAllowance: PersonAllowanceSource;
   entitlements: AskRoomEntitlements | null;
+  /**
+   * B4a's plans while billing is on (absent or null while it is off). The waker
+   * checks a waking run's tier against its owner's plan NOW (B7b): a premium run
+   * is never started for a person whose plan has dropped to Free.
+   */
+  billingPlans?: BillingPlans | null;
   dailyCeilingMicros: number;
   closeBasisPoints: number;
   waitingLinePerPerson: number;
@@ -157,6 +170,46 @@ export type AskRoomAnswer = Readonly<{
 
 export interface AskRoomReader {
   readRoom(question: RoomQuestion): Promise<AskRoomAnswer>;
+}
+
+/** B7b: what trying to start one waiting run came to. */
+export type WaitingStart<T> =
+  | Readonly<{ kind: "STARTED"; value: T }>
+  | Readonly<{ kind: "SITE_FULL" | "PERSON_FULL" | "GONE" | "PLAN_CHANGED" }>;
+
+/** What the waker asks of the room (B7b). */
+export interface AskWaitingLinePort {
+  wakeCandidates(input: Readonly<{ after: WaitingRunCursor | null; everyPerson: boolean }>): Promise<ReadonlyArray<WaitingRun>>;
+  /** `enqueue` queues the run's first job on the transaction it is given: the start's own, as its last statement. */
+  startWaiting<T>(run: WaitingRun, enqueue: (tx: PoolClient) => Promise<T>): Promise<WaitingStart<T>>;
+}
+
+/**
+ * B7b — THE WAKER'S CLOCK: `tick` on every whole minute, the very instants
+ * `nextWholeMinute` announces to a question that waits for the waker (budget
+ * spec §2.7: "the next tick, the next whole minute"). Each tick schedules the
+ * next from the clock, so the ticks never drift off the minute. Unref'd: it never
+ * keeps a process alive; `stop` clears the pending tick.
+ */
+export function everyWholeMinute(tick: () => unknown, clock: () => Date = () => new Date()): Readonly<{ stop(): void }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let stopped = false;
+  const schedule = (): void => {
+    if (stopped) return;
+    const now = clock();
+    timer = setTimeout(() => {
+      schedule();
+      tick();
+    }, nextWholeMinute(now).getTime() - now.getTime());
+    timer.unref();
+  };
+  schedule();
+  return Object.freeze({
+    stop: () => {
+      stopped = true;
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  });
 }
 
 /** Every scope's room, the person's windows as measured for them, and why a question so measured would wait. */
@@ -231,7 +284,7 @@ function alreadyWaiting(evaluation: RoomEvaluation): AskAlreadyWaitingError {
   return new AskAlreadyWaitingError(oldest.runId, evaluation.expected.waitsUntil);
 }
 
-export class AskRoom implements AskRoomPort, AskRoomReader {
+export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   readonly #options: AskRoomOptions;
   readonly #clock: () => Date;
   /** Why the decision on each open transaction would make its question wait; set and cleared by `decide`. */
@@ -357,6 +410,73 @@ export class AskRoom implements AskRoomPort, AskRoomReader {
       default:
         return exhaustive(admission);
     }
+  }
+
+  /** B7b: one page (a hundred at most) of the runs worth trying this tick, oldest first, after the cursor. */
+  wakeCandidates(input: Readonly<{ after: WaitingRunCursor | null; everyPerson: boolean }>): Promise<ReadonlyArray<WaitingRun>> {
+    const pageSize = 100;
+    return this.#options.line.wakeCandidates({
+      now: this.#clock(), after: input.after, limit: pageSize, everyPerson: input.everyPerson
+    });
+  }
+
+  /**
+   * B7b — START ONE WAITING RUN if the room now holds it: under the same two
+   * locks an ask takes, at an instant read under them, re-checked as still
+   * waiting, evaluated as an admission over the site's day and its owner's
+   * windows (it IS the line, so the line cannot hold it back). With billing on,
+   * the owner's plan NOW is read once: a premium run is never started for a
+   * person now on Free (PLAN_CHANGED, nothing written); otherwise that same
+   * entitlement is the one the run is pinned to. A start writes its hold, its
+   * charge scope and its start mark, then queues its first job on the same
+   * transaction, LAST (see `withSpendDecisionLock`): all of it commits, or none.
+   * A run that does not fit gets a fresh reason when it changed or is a person's.
+   */
+  async startWaiting<T>(run: WaitingRun, enqueue: (tx: PoolClient) => Promise<T>): Promise<WaitingStart<T>> {
+    const access = accessOfWaitingRun(run);
+    return this.#locked(run.ownerRef, async (tx, now): Promise<WaitingStart<T>> => {
+      if (!(await this.#options.line.isWaiting(tx, run.runId))) return Object.freeze({ kind: "GONE" as const });
+      const entitlement = await this.#entitlementOf(run.ownerRef, now);
+      if (entitlement !== null && this.#tierOf(entitlement.planId) === "free" && (run.planTier ?? "premium") === "premium") {
+        return Object.freeze({ kind: "PLAN_CHANGED" as const });
+      }
+      // RULINGS-R2 Q-11: the hold is B2's estimate for the run's settings class; the
+      // waker never re-picks the run's models (a known limit, bounded by B9's wall).
+      const estimateMicros = await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run));
+      const { rooms, waitReason } = await this.#measure(access, estimateMicros, now);
+      const admission = decideAdmission({
+        rooms,
+        siteLineBlocking: false,
+        personWaitingCount: 0,
+        waitingLinePerPerson: this.#options.waitingLinePerPerson,
+        nextTickAt: nextWholeMinute(now)
+      });
+      if (admission.kind !== "START") {
+        // A still-SITE run writes nothing; any change, or a person's run measured again, is appended.
+        if (waitReason.waitsFor === "PERSON" || run.waitsFor !== "SITE") {
+          await this.#options.line.recordReason(tx, run.runId, Object.freeze({ ...waitReason, at: now }));
+        }
+        const siteFull = rooms.some((entry) => entry.scope === "SITE_DAY" && entry.room === "FULL");
+        return Object.freeze({ kind: siteFull ? "SITE_FULL" as const : "PERSON_FULL" as const });
+      }
+      await this.#openStartWith(tx, { runId: run.runId, access, heldMicros: estimateMicros, now }, entitlement);
+      await this.#options.line.markStarted(tx, run.runId, now);
+      const value = await enqueue(tx);
+      return Object.freeze({ kind: "STARTED" as const, value });
+    });
+  }
+
+  /** Billing on and an owner's run: the entitlement in force at `now`, read once; null otherwise. */
+  async #entitlementOf(ownerRef: string | null, now: Date): Promise<PinnedEntitlement | null> {
+    const entitlements = this.#options.entitlements;
+    if (entitlements === null || ownerRef === null) return null;
+    return entitlements.current(ownerRef, now);
+  }
+
+  /** The plan's tier (B4a's billingPlans row), or null while billing is off. */
+  #tierOf(planId: PlanId): "free" | "premium" | null {
+    const plans = this.#options.billingPlans ?? null;
+    return plans === null ? null : planById(plans, planId).tier;
   }
 
   /**

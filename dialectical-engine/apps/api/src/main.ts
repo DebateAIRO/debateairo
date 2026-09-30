@@ -69,7 +69,7 @@ import { RepositoryLegalAcceptanceApplication } from "./legal.js";
 import { AdmissionLimiter } from "./admission.js";
 import { openGeoLookup } from "@debateai/geo";
 import { CountryGate, countryPolicyInForce } from "./country-gate.js";
-import { AskRoom } from "./ask-room.js";
+import { AskRoom, everyWholeMinute } from "./ask-room.js";
 import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
@@ -461,6 +461,7 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
         estimator,
         personAllowance,
         entitlements,
+        billingPlans,
         dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
         closeBasisPoints: band.closeBasisPoints,
         waitingLinePerPerson: band.waitingLinePerPerson
@@ -586,7 +587,7 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   // B6b: the room when it is composed, INSTEAD of the daily guard; the guard
   // (today's 429) for every hosted register without the band; neither locally.
   ...(askRoom !== undefined
-    ? { room: askRoom }
+    ? { room: askRoom, waitingLine: askRoom }
     : costEnvelopeGuard === undefined ? {} : {
         assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
       }),
@@ -707,6 +708,18 @@ const authenticationRiskCleanupTimer=setInterval(
   triggerAuthenticationRiskCleanup,60_000
 );
 authenticationRiskCleanupTimer.unref();
+/**
+ * Budget spec 2026-09-28 §2.7 (B7b) — THE WAKER. Single-flight like every timer
+ * here; once right after listen (a raised site limit arrives as a restart, and
+ * the line must not sleep through it), then on every whole minute — the very
+ * instants `nextWholeMinute` tells a waiting question — unref'd and stopped on
+ * close. Only when the room is composed; nothing can wait otherwise.
+ */
+const triggerAskWake = createSingleFlightErasureReconciler(
+  async () => { await application.wakeWaitingRuns(); },
+  () => console.error("[ASK_WAITING_LINE_WAKE_PENDING]")
+);
+let askWaker: Readonly<{ stop(): void }> | undefined;
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
   ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!))
   : undefined;
@@ -945,6 +958,7 @@ if (publicationCleanupTimer !== undefined) {
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
+api.addHook("onClose",async () => askWaker?.stop());
 const startup = installStartupResourceOwner({
   api,
   registration,
@@ -1016,3 +1030,7 @@ await startup.run("listen", async () => {
 // user-key destruction before completion delivery succeeds.
 triggerErasureReconciliation();
 triggerAuthenticationRiskCleanup();
+if (askRoom !== undefined) {
+  triggerAskWake();
+  askWaker = everyWholeMinute(triggerAskWake);
+}

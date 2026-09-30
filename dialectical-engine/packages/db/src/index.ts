@@ -71,6 +71,7 @@ export {
   RunWaitRepository,
   type WaitReason,
   type WaitingRun,
+  type WaitingRunCursor,
   type WaitingRunRef
 } from "./run-wait.js";
 

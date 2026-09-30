@@ -58,6 +58,7 @@ function roomWith(input: {
     },
     line: {
       siteLineBlocking: async () => input.blocking ?? false,
+      wakeCandidates: async () => [],
       waitingForOwner: async () => input.mine ?? [],
       waitingForLegacyAsker: async () => input.mine ?? [],
       readWaiting: async () => null,

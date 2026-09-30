@@ -82,7 +82,8 @@ import {
   withRunContentLease,
   type CryptoEnvelope,
   type DiscoveredPanelMember,
-  type RunOwnershipAccess
+  type RunOwnershipAccess,
+  type WaitingRunCursor
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
@@ -116,7 +117,9 @@ import {
   nextWholeMinute,
   runSettingsClassOfAsk,
   type AskRoomPort,
-  type AskRoomReader
+  type AskRoomReader,
+  type AskWaitingLinePort,
+  type WaitingStart
 } from "./ask-room.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
@@ -3042,6 +3045,8 @@ export interface RunCreationSettings {
    * or the other, never both.
    */
   readonly room?: AskRoomPort;
+  /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
+  readonly waitingLine?: AskWaitingLinePort;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
@@ -3169,10 +3174,12 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
  * why it waits (`WAITING_LINE`, and its commit) and the hold with the run's
  * charge scope (`ROOM_HOLD`). There the first job is the decision's LAST write,
  * so `WORK_QUEUE` covers the job and the decision's commit: a failed commit
- * rolls the READY job back with everything else.
+ * rolls the READY job back with everything else. And one the waker records
+ * (B7b): `PLAN_CHANGED`, a waiting premium question whose owner's plan dropped
+ * to Free before room freed up.
  */
 type RunSetupStep =
-  | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD";
+  | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED";
 
 /** What the room's locked decision produced inside the lease. */
 type RoomOutcome =
@@ -3188,6 +3195,16 @@ function firstRunJob(runId: string): Readonly<{ batteryRowId: "Q1"; commandKey: 
   return Object.freeze({ batteryRowId: "Q1", commandKey: `S00:${runId}:Q1` });
 }
 
+/** B7b: what one tick of the waiting line did — counts only, for the operator's log. */
+export type WaitingLineTick = Readonly<{
+  /** The runs the tick looked at (only those worth trying: never a person-blocked run that is not due). */
+  waiting: number;
+  started: number;
+  skipped: number;
+  failed: number;
+  stopped: boolean;
+}>;
+
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
@@ -3196,6 +3213,8 @@ export class PostgresAskApplication implements AskApplication {
   readonly #liveness: LivenessRepository;
   readonly #serverAskAdmissionPool: Pool;
   readonly #legacyAskAdmissionPool: Pool;
+  /** B7b: set once a tick of this process has read the whole line with every person-recorded run in it. */
+  #wakeSweptEveryPerson = false;
 
   constructor(
     private readonly pool: Pool,
@@ -3467,6 +3486,84 @@ export class PostgresAskApplication implements AskApplication {
       throw error;
     }
     return Object.freeze({ run_ref: outcome.runId, status: "QUEUED" as const });
+  }
+
+  /**
+   * Budget spec 2026-09-28 §2.7 (B7b) — ONE TICK OF THE WAITING LINE. Only the
+   * runs worth trying, oldest first, page after page from a cursor; every
+   * person-recorded run too until one tick of this process has read the whole
+   * line. At most one run per person per tick. A run that now fits is started
+   * as `submit` starts one — its first job (`firstRunJob`) queued on the start's
+   * own transaction, then dispatch — and a dispatch that fails records it FAILED
+   * (`RUN_SETUP_FAILED:DISPATCH`, PR #33). A premium question whose owner is now
+   * on Free is recorded FAILED (`RUN_SETUP_FAILED:PLAN_CHANGED`) and leaves the
+   * line. The tick stops at the first run the site's day cannot hold, because
+   * nobody after it fits the day; a run whose own person is full is skipped. A
+   * start that throws wrote nothing and stays in line for the next tick. Ids and
+   * counts only.
+   */
+  async wakeWaitingRuns(): Promise<WaitingLineTick> {
+    const line = this.settings.waitingLine;
+    if (line === undefined) return Object.freeze({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false });
+    const everyPerson = !this.#wakeSweptEveryPerson;
+    const persons = new Set<string>();
+    let waiting = 0;
+    let started = 0;
+    let skipped = 0;
+    let failed = 0;
+    let stopped = false;
+    let after: WaitingRunCursor | null = null;
+    while (!stopped) {
+      const page = await line.wakeCandidates({ after, everyPerson });
+      if (page.length === 0) break;
+      for (const run of page) {
+        after = Object.freeze({ waitingSince: run.waitingSince, runId: run.runId });
+        waiting += 1;
+        const person = run.ownerRef === null ? `legacy:${run.legacyAskerId ?? ""}` : `owner:${run.ownerRef}`;
+        if (persons.has(person)) {
+          skipped += 1;
+          continue;
+        }
+        persons.add(person);
+        let outcome: WaitingStart<string>;
+        try {
+          outcome = await line.startWaiting(run, (tx) => this.#work.enqueueOn(tx, {
+            runId: run.runId, ...firstRunJob(run.runId), nodeSet: []
+          }));
+        } catch (error) {
+          failed += 1;
+          console.error(JSON.stringify(Object.freeze({
+            event: "api.wait.start_failed", runId: run.runId, diagnostic: apiOperationalErrorDiagnostic(error)
+          })));
+          continue;
+        }
+        if (outcome.kind === "SITE_FULL") {
+          stopped = true;
+          break;
+        }
+        if (outcome.kind === "PLAN_CHANGED") {
+          failed += 1;
+          await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");
+          continue;
+        }
+        if (outcome.kind !== "STARTED") {
+          skipped += 1;
+          continue;
+        }
+        try {
+          await this.dispatcher.dispatch({ runId: run.runId, workItemId: outcome.value });
+          started += 1;
+          console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: run.runId })));
+        } catch {
+          failed += 1;
+          await this.#recordRunSetupFailure(run.runId, "DISPATCH");
+        }
+      }
+    }
+    if (!stopped) this.#wakeSweptEveryPerson = true;
+    const tick: WaitingLineTick = Object.freeze({ waiting, started, skipped, failed, stopped });
+    if (waiting > 0) console.info(JSON.stringify(Object.freeze({ event: "api.wait.tick", ...tick })));
+    return tick;
   }
 
   readAnswer(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null> {

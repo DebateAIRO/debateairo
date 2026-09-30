@@ -89,6 +89,7 @@ function arrange(input: {
       questions.line += 1;
       return input.blocking ?? false;
     },
+    wakeCandidates: async () => [],
     waitingForOwner: async () => input.mine ?? [],
     waitingForLegacyAsker: async () => input.mine ?? [],
     readWaiting: async (runId) => (input.line ?? []).find((run) => run.runId === runId) ?? null,
