@@ -31,7 +31,7 @@ import {
 import { createPublicationJudgeSwitch } from "../../apps/api/src/publication-check/judge-transport.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import { STORY_TEST_BODY } from "../support/storyApiFixtures.js";
-import { bindJudgeAnswer, createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
+import { bindJudgeAnswer, createJudgeStub, createPartJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 
 /**
@@ -66,10 +66,16 @@ const authenticated = Object.freeze({
 }) satisfies AuthenticatedSession;
 
 const ALLOW = JSON.stringify({ verdict: "ALLOW", rules: [], parts: [], possibly_illegal: false });
-const BLOCK_ILLEGAL = JSON.stringify({ verdict: "BLOCK", rules: [1, 2], parts: ["arguments", "question"], possibly_illegal: true });
-const BLOCK_TERMS = JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["reviews"], possibly_illegal: false });
-const UNSURE_NO_PARTS = JSON.stringify({ verdict: "UNSURE", rules: [], parts: [], possibly_illegal: false });
-const UNSURE_PARTS = JSON.stringify({ verdict: "UNSURE", rules: [], parts: ["summary"], possibly_illegal: false });
+// FIX-HS2-t: one part kind per call — a scripted refusal is the answer for ONE part's call; every other part is ALLOW.
+const BLOCK_ILLEGAL: Record<string, JudgeStubStep> = {
+  question: JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["question"], possibly_illegal: true }),
+  arguments: JSON.stringify({ verdict: "BLOCK", rules: [2], parts: ["arguments"], possibly_illegal: false })
+};
+const BLOCK_TERMS = { reviews: JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["reviews"], possibly_illegal: false }) };
+const UNSURE_NO_PARTS = { question: JSON.stringify({ verdict: "UNSURE", rules: [], parts: [], possibly_illegal: false }) };
+const UNSURE_PARTS = { summary: JSON.stringify({ verdict: "UNSURE", rules: [], parts: ["summary"], possibly_illegal: false }) };
+/** The fixture answer publishes a question, a summary, claims and review reasons, and no story: four parts, four calls. */
+const FIXTURE_CALLS = 4;
 
 const REFUSED_MESSAGE = "The content check refused to publish this debate. It stays private.";
 const UNAVAILABLE_BODY = { error: "PUBLICATION_CHECK_UNAVAILABLE", message: "PUBLICATION_CHECK_UNAVAILABLE" };
@@ -243,7 +249,7 @@ function expectNoTextOrIdentifier(body: string, answer: Answer, publicRefs: read
 
 describe("hate-speech S02 publish path", () => {
   describe("application", () => {
-    const refusals: readonly [string, JudgeStubStep, object][] = [
+    const refusals: readonly [string, Record<string, JudgeStubStep>, object][] = [
       ["BLOCK", BLOCK_ILLEGAL, {
         state: "REFUSED",
         statement: { outcome: "BLOCK", parts: ["QUESTION", "ARGUMENTS"], ground: "TERMS_AND_POSSIBLY_ILLEGAL", automated: true, visibility: "PRIVATE" }
@@ -252,11 +258,11 @@ describe("hate-speech S02 publish path", () => {
         state: "REFUSED",
         statement: { outcome: "UNSURE", parts: ["SUMMARY"], ground: "TERMS", automated: true, visibility: "PRIVATE" }
       }],
-      ["UNAVAILABLE", new PublicationJudgeFailure("JUDGE_TRANSPORT_FAILED"), { state: "CHECK_UNAVAILABLE" }]
+      ["UNAVAILABLE", { question: new PublicationJudgeFailure("JUDGE_TRANSPORT_FAILED") }, { state: "CHECK_UNAVAILABLE" }]
     ];
     for (const [outcome, step, expected] of refusals) {
       it(`${outcome}: returns ${JSON.stringify(expected).slice(0, 40)}… and provisions, encrypts and publishes nothing`, async () => {
-        const judge = createJudgeStub([step]);
+        const judge = createPartJudgeStub(step);
         const { check } = contentCheck(judge);
         const { application, counts } = publicationFakes();
         const answer = servedAnswer();
@@ -266,13 +272,13 @@ describe("hate-speech S02 publish path", () => {
           contentCheck: check
         });
         expect(result).toEqual(expected);
-        expect(judge.packets.length).toBe(1);
+        expect(judge.calls).toEqual([["question"], ["summary"], ["arguments"], ["reviews"]]);
         expect(counts).toEqual({ prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 });
       });
     }
 
     it("ALLOW: publishes exactly as today — one provision, one cipher, one transition", async () => {
-      const judge = createJudgeStub([ALLOW]);
+      const judge = createPartJudgeStub({});
       const { check } = contentCheck(judge);
       const { application, counts } = publicationFakes();
       const result = await application.publish({
@@ -282,7 +288,7 @@ describe("hate-speech S02 publish path", () => {
       });
       expect(result).toEqual({ state: "PUBLISHED", public_ref: expect.stringMatching(/^[0-9a-f-]{36}$/u) });
       expect(Object.keys(result ?? {}).sort()).toEqual(["public_ref", "state"]);
-      expect(judge.packets.length).toBe(1);
+      expect(judge.packets.length).toBe(FIXTURE_CALLS);
       expect(counts).toEqual({ prepareKeyProvision: 1, publish: 1, abandonKeyProvision: 0, cipherCreate: 1 });
     });
 
@@ -331,7 +337,7 @@ describe("hate-speech S02 publish path", () => {
     // Property: no user, owner, session, run, publication, IP, user-agent, request or token identifier reached it.
     it("the judge read every checked leaf of the encrypted snapshot and no identifier", async () => {
       expect(STORY.paths.length).toBeGreaterThanOrEqual(2);
-      const judge = createJudgeStub([ALLOW, ALLOW, ALLOW, ALLOW]);
+      const judge = createPartJudgeStub({});
       const { check } = contentCheck(judge);
       const { application, decryptStored } = publicationFakes({ story: STORY });
       const answer = wideAnswer();
@@ -364,13 +370,13 @@ describe("hate-speech S02 publish path", () => {
     it("the route awaits the judge outside every content lease, and commits under a fresh one", async () => {
       const leases: LeaseProbe = { held: 0, opened: 0, answerReads: 0 };
       const heldAtJudge: number[] = [];
-      const judge = createJudgeStub([async () => { heldAtJudge.push(leases.held); return { text: ALLOW }; }]);
+      const judge = createPartJudgeStub({}, async () => { heldAtJudge.push(leases.held); return { text: ALLOW }; });
       const { check } = contentCheck(judge);
       const { api, publish, counts } = routeApi({ publicationContentCheck: check, leases });
       const response = await publish();
       await api.close();
       expect(response.statusCode).toBe(201);
-      expect(heldAtJudge).toEqual([0]);
+      expect(heldAtJudge).toEqual(Array(FIXTURE_CALLS).fill(0));
       expect(leases.opened).toBeGreaterThanOrEqual(2);
       expect(counts.publish).toBe(1);
     });
@@ -378,7 +384,7 @@ describe("hate-speech S02 publish path", () => {
     it("an answer version that changed during the check publishes nothing and answers 503", async () => {
       const first = servedAnswer();
       const leases: LeaseProbe = { held: 0, opened: 0, answerReads: 0, answers: [first, { ...first, answer_version: first.answer_version + 1 }] };
-      const { check, records } = contentCheck(createJudgeStub([ALLOW]));
+      const { check, records } = contentCheck(createPartJudgeStub({}));
       const { api, publish, counts } = routeApi({ publicationContentCheck: check, leases });
       const response = await publish();
       await api.close();
@@ -391,7 +397,7 @@ describe("hate-speech S02 publish path", () => {
     it("an answer that is gone at commit answers 404 and publishes nothing", async () => {
       const first = servedAnswer();
       const leases: LeaseProbe = { held: 0, opened: 0, answerReads: 0, answers: [first, null] };
-      const { check } = contentCheck(createJudgeStub([ALLOW]));
+      const { check } = contentCheck(createPartJudgeStub({}));
       const { api, publish, counts } = routeApi({ publicationContentCheck: check, leases });
       const response = await publish();
       await api.close();
@@ -402,7 +408,7 @@ describe("hate-speech S02 publish path", () => {
     // log line, nothing provisioned — never a 500 the UI reads as a wrong password.
     it("a record write that fails is 503 PUBLICATION_CHECK_UNAVAILABLE with one content-free log line", async () => {
       const failing = createPublicationContentCheck({
-        judge: () => createJudgeStub([ALLOW]),
+        judge: () => createPartJudgeStub({}),
         recorder: { record: async () => { throw new Error(`relation serve.publication_check_record: ${servedAnswer().question_line}`); } },
         clock: () => new Date("2026-09-29T12:00:00.000Z")
       });
@@ -425,7 +431,7 @@ describe("hate-speech S02 publish path", () => {
 
   describe("route", () => {
     it("ALLOW → 201 with exactly state and public_ref", async () => {
-      const { response, counts, publicRefs } = await attempt(createJudgeStub([ALLOW]));
+      const { response, counts, publicRefs } = await attempt(createPartJudgeStub({}));
       expect(response.statusCode).toBe(201);
       expect(response.json()).toEqual({ state: "PUBLISHED", public_ref: publicRefs[0] });
       expect(Object.keys(response.json()).sort()).toEqual(["public_ref", "state"]);
@@ -434,7 +440,7 @@ describe("hate-speech S02 publish path", () => {
 
     it("BLOCK with possibly_illegal → 409 EXACT, ground TERMS_AND_POSSIBLY_ILLEGAL, parts in §2 order", async () => {
       const answer = servedAnswer();
-      const { response, counts, publicRefs } = await attempt(createJudgeStub([BLOCK_ILLEGAL]), answer);
+      const { response, counts, publicRefs } = await attempt(createPartJudgeStub(BLOCK_ILLEGAL), answer);
       expect(response.statusCode).toBe(409);
       expect(response.json()).toStrictEqual({
         error: "PUBLICATION_CONTENT_REFUSED",
@@ -447,7 +453,7 @@ describe("hate-speech S02 publish path", () => {
 
     it("BLOCK without possibly_illegal → 409 with ground TERMS", async () => {
       const answer = servedAnswer();
-      const { response, publicRefs } = await attempt(createJudgeStub([BLOCK_TERMS]), answer);
+      const { response, publicRefs } = await attempt(createPartJudgeStub(BLOCK_TERMS), answer);
       expect(response.statusCode).toBe(409);
       expect(response.json()).toStrictEqual({
         error: "PUBLICATION_CONTENT_REFUSED",
@@ -459,7 +465,7 @@ describe("hate-speech S02 publish path", () => {
 
     it("UNSURE with parts [] → 409 naming every kind that was sent, ground TERMS", async () => {
       const answer = servedAnswer();
-      const { response, publicRefs } = await attempt(createJudgeStub([UNSURE_NO_PARTS]), answer);
+      const { response, publicRefs } = await attempt(createPartJudgeStub(UNSURE_NO_PARTS), answer);
       expect(response.statusCode).toBe(409);
       // The fixture publishes a question, a summary, two claims and two review reasons, and no story.
       expect(response.json()).toStrictEqual({
@@ -476,7 +482,7 @@ describe("hate-speech S02 publish path", () => {
     ] as const) {
       it(`UNAVAILABLE (${label}) → 503 EXACT and nothing published`, async () => {
         const answer = servedAnswer();
-        const { response, counts, publicRefs, records } = await attempt(createJudgeStub([step]), answer);
+        const { response, counts, publicRefs, records } = await attempt(createPartJudgeStub({ question: step }), answer);
         expect(response.statusCode).toBe(503);
         expect(response.json()).toStrictEqual(UNAVAILABLE_BODY);
         expectNoTextOrIdentifier(response.body, answer, publicRefs);
@@ -495,7 +501,7 @@ describe("hate-speech S02 publish path", () => {
     });
 
     it("the judge switch, passed as a DETACHED `current` supplier, turns publishing into 503 and back", async () => {
-      const judge = createJudgeStub([ALLOW, ALLOW]);
+      const judge = createPartJudgeStub({});
       const dir = mkdtempSync(join(tmpdir(), "hs-s02-route-switch-"));
       const flag = join(dir, "off");
       const judgeSwitch = createPublicationJudgeSwitch(judge, { offFlagPath: flag });
@@ -516,7 +522,7 @@ describe("hate-speech S02 publish path", () => {
       expect((await publish()).statusCode).toBe(201);
       await api.close();
       rmSync(dir, { recursive: true, force: true });
-      expect(judge.packets.length).toBe(2);
+      expect(judge.packets.length).toBe(2 * FIXTURE_CALLS);
       expect(records.map((row) => [row.outcome, row.failure_cause])).toEqual([
         ["ALLOW", null], ["UNAVAILABLE", "JUDGE_NOT_CONFIGURED"], ["ALLOW", null]
       ]);
@@ -661,7 +667,7 @@ describe("hate-speech S02 publish path", () => {
     it("SIGUSR2 switches the judge OFF idempotently and logs one content-free line per signal; removing the flag restores it", async () => {
       const signals = new EventEmitter();
       const lines: string[] = [];
-      const judge = createJudgeStub([ALLOW, ALLOW]);
+      const judge = createPartJudgeStub({});
       const dir = mkdtempSync(join(tmpdir(), "hs-s02-signal-"));
       const flag = join(dir, "off");
       const judgeSwitch = createPublicationJudgeSwitch(judge, { offFlagPath: flag });
