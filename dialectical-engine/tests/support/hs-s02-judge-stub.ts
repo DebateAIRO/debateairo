@@ -26,6 +26,32 @@ export function bindJudgeAnswer(text: string, packet: PromptPacket): string {
   return fenced ? "```" + (fenced[1] ?? "") + "\n" + bound + "\n```" : bound;
 }
 
+/** The material fields of a framed judge packet (the envelope between the fence lines of the user message). */
+export function fieldsOf(packet: PromptPacket): { name: string; content: string }[] {
+  return JSON.parse(packet.messages[1]!.content.split("\n").slice(1, -1).join("\n")).fields;
+}
+
+const HONEST_ALLOW = JSON.stringify({ verdict: "ALLOW", rules: [], parts: [], possibly_illegal: false });
+
+/**
+ * FIX-HS2-t: every judge call carries ONE part kind (material.ts packJudgeCalls), so a scripted judge answers per
+ * PART: the step for the call's field name (`question`, `summary`, `arguments`, `reviews`, `story`), `otherwise` for
+ * every part the script does not name (an honest ALLOW by default). `calls` lists each call's field names, in order.
+ */
+export function createPartJudgeStub(steps: Readonly<Record<string, JudgeStubStep>>, otherwise: JudgeStubStep = HONEST_ALLOW):
+  PublicationJudgePort & { packets: PromptPacket[]; calls: string[][] } {
+  const calls: string[][] = [], packets: PromptPacket[] = [];
+  return {
+    providerRef: "test:judge", modelId: "test-model", packets, calls,
+    complete(input) {
+      const names = fieldsOf(input.packet).map(field => field.name);
+      calls.push(names); packets.push(input.packet);
+      const step = names.length === 1 && Object.hasOwn(steps, names[0]!) ? steps[names[0]!]! : otherwise;
+      return createJudgeStub([step]).complete(input);
+    }
+  };
+}
+
 /** Only the external judge is scripted; framing, validation and recording remain real. */
 export function createJudgeStub(script: readonly JudgeStubStep[]): PublicationJudgePort & { packets: PromptPacket[] } {
   const packets: PromptPacket[] = [];

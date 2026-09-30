@@ -38,6 +38,13 @@ export function extractCheckedText(snapshot: PublicDebate): readonly CheckedText
   return CHECKED_TEXT_PATHS.flatMap(({ path, kind }) => leavesAt(snapshot, path.split(".")).map(text => ({ kind, text })));
 }
 
+/**
+ * FIX-HS2-t (TEST rehearsal, supersedes D-S02-15's cross-kind packing): every judge call carries exactly ONE part
+ * kind. Measured on the real judge: the §5 fallback question alone was BLOCK 4/4, packed in one call with a refuting
+ * summary it was ALLOW 3/4 — the other parts of a call dilute a part's verdict. With one kind per call no other part
+ * shares the call, so no other part can lower that part's verdict; R6 still combines the calls BLOCK > UNSURE >
+ * UNAVAILABLE > ALLOW. Leaves of one kind stay together in path order and are split only by the code-point budget.
+ */
 export function packJudgeCalls(leaves: readonly CheckedText[], maxCodePoints = 12_000): readonly {
   fields: readonly { name: string; content: string }[];
 }[] {
@@ -47,6 +54,7 @@ export function packJudgeCalls(leaves: readonly CheckedText[], maxCodePoints = 1
   const flush = () => { if (fields.length) calls.push({ fields }); fields = []; size = 0; };
   for (const leaf of leaves) {
     const points = [...leaf.text], name = leaf.kind.toLowerCase();
+    if (fields.length && fields[0]!.name !== name) flush();
     if (points.length > maxCodePoints) {
       flush();
       for (let offset = 0; offset < points.length; offset += maxCodePoints) {

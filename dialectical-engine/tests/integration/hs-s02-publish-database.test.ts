@@ -21,7 +21,7 @@ import {
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import type { PublicationContentLease } from "../../apps/api/src/publications.js";
 import { PUBLICATION_CHECK_POLICY_VERSION } from "../../apps/api/src/publication-check/policy.js";
-import { bindJudgeAnswer, createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
+import { bindJudgeAnswer, createJudgeStub, createPartJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun,
@@ -196,10 +196,11 @@ async function capturingLogs<T>(use: () => Promise<T>): Promise<{ result: T; lin
   }
 }
 
-async function attempt(label: string, step: JudgeStubStep) {
+/** FIX-HS2-t: one part kind per call — `steps` answers the named parts' calls; every other part is ALLOW. */
+async function attempt(label: string, steps: Readonly<Record<string, JudgeStubStep>>) {
   const canary = `HSCANARY-${randomUUID()}`;
   const { runId, answer } = await settledRun(label, canary);
-  const judge = createJudgeStub([step]);
+  const judge = createPartJudgeStub(steps);
   const contentCheck = createPublicationContentCheck({
     judge: () => judge,
     recorder: new PostgresPublicationCheckRecordRepository(database.pool),
@@ -216,7 +217,7 @@ async function attempt(label: string, step: JudgeStubStep) {
 
 function expectedRecord(runId: string, fields: Readonly<{
   outcome: string; failure_cause: string | null; rules: number[]; part_kinds: string[]; ground: string | null;
-}>) {
+}>, judgeCallCount: number) {
   return {
     run_id: runId,
     attempted_at: ATTEMPTED_AT,
@@ -224,7 +225,7 @@ function expectedRecord(runId: string, fields: Readonly<{
     judge_provider_ref: "test:judge",
     judge_model_id: "test-model",
     policy_version: PUBLICATION_CHECK_POLICY_VERSION,
-    judge_call_count: 1
+    judge_call_count: judgeCallCount
   };
 }
 
@@ -247,7 +248,10 @@ describe("hate-speech S02 publish path over the real database (R8, R10, R14(a))"
   const refusals = [
     {
       outcome: "BLOCK",
-      step: JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["question", "arguments"], possibly_illegal: true }),
+      step: {
+        question: JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["question"], possibly_illegal: true }),
+        arguments: JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["arguments"], possibly_illegal: false })
+      },
       result: {
         state: "REFUSED",
         statement: { outcome: "BLOCK", parts: ["QUESTION", "ARGUMENTS"], ground: "TERMS_AND_POSSIBLY_ILLEGAL", automated: true, visibility: "PRIVATE" }
@@ -256,7 +260,7 @@ describe("hate-speech S02 publish path over the real database (R8, R10, R14(a))"
     },
     {
       outcome: "UNSURE",
-      step: JSON.stringify({ verdict: "UNSURE", rules: [], parts: ["question"], possibly_illegal: false }),
+      step: { question: JSON.stringify({ verdict: "UNSURE", rules: [], parts: ["question"], possibly_illegal: false }) },
       result: {
         state: "REFUSED",
         statement: { outcome: "UNSURE", parts: ["QUESTION"], ground: "TERMS", automated: true, visibility: "PRIVATE" }
@@ -265,7 +269,7 @@ describe("hate-speech S02 publish path over the real database (R8, R10, R14(a))"
     },
     {
       outcome: "UNAVAILABLE",
-      step: new PublicationJudgeFailure("JUDGE_TRANSPORT_FAILED"),
+      step: { question: new PublicationJudgeFailure("JUDGE_TRANSPORT_FAILED") },
       result: { state: "CHECK_UNAVAILABLE" },
       record: { outcome: "UNAVAILABLE", failure_cause: "JUDGE_TRANSPORT_FAILED", rules: [], part_kinds: [], ground: null }
     }
@@ -275,7 +279,10 @@ describe("hate-speech S02 publish path over the real database (R8, R10, R14(a))"
     it(`${refusal.outcome}: the debate stays private and unchanged, one content-free record, the canary nowhere`, async () => {
       const run = await attempt(refusal.outcome.toLowerCase(), refusal.step);
       expect(run.result).toEqual(refusal.result);
-      expect(run.judge.packets.length).toBe(1);
+      // One call per part kind the debate carries, the question's first.
+      expect(run.judge.calls[0]).toEqual(["question"]);
+      expect(run.judge.calls.length).toBeGreaterThanOrEqual(2);
+      expect(run.judge.calls.every(names => names.length === 1)).toBe(true);
       // (a) still private
       await expect(application.readOwnedVisibility({ runId: run.runId, authenticated: ownerSession() }))
         .resolves.toEqual({ state: "PRIVATE", public_ref: null });
@@ -287,7 +294,7 @@ describe("hate-speech S02 publish path over the real database (R8, R10, R14(a))"
       // (d) exactly one record with the outcome's eleven fields
       expect(await checkRecords(run.runId)).toEqual([expectedRecord(run.runId, {
         ...refusal.record, rules: [...refusal.record.rules], part_kinds: [...refusal.record.part_kinds]
-      })]);
+      }, run.judge.calls.length)]);
       // (e) the canary is in no application row and no log line
       expect(await tablesHolding(run.canary)).toEqual([]);
       expect(run.lines.filter((line) => line.includes(run.canary))).toEqual([]);
@@ -295,14 +302,14 @@ describe("hate-speech S02 publish path over the real database (R8, R10, R14(a))"
   }
 
   it("ALLOW publishes, records ALLOW, and still writes the canary into no row and no log line", async () => {
-    const run = await attempt("allow", JSON.stringify({ verdict: "ALLOW", rules: [], parts: [], possibly_illegal: false }));
+    const run = await attempt("allow", {});
     expect(run.result).toEqual({ state: "PUBLISHED", public_ref: expect.stringMatching(/^[0-9a-f-]{36}$/u) });
     const publicRef = (run.result as { public_ref: string }).public_ref;
     await expect(application.readOwnedVisibility({ runId: run.runId, authenticated: ownerSession() }))
       .resolves.toEqual({ state: "PUBLISHED", public_ref: publicRef });
     expect(await checkRecords(run.runId)).toEqual([expectedRecord(run.runId, {
       outcome: "ALLOW", failure_cause: null, rules: [], part_kinds: [], ground: null
-    })]);
+    }, run.judge.calls.length)]);
     expect(await tablesHolding(run.canary)).toEqual([]);
     expect(run.lines.filter((line) => line.includes(run.canary))).toEqual([]);
     // The published snapshot carries the canary: the scan above is blind to ciphertext, not to the text.
@@ -389,7 +396,8 @@ describe("hate-speech S02 publish path — the runtime pool under concurrent att
     const run = await experiment(12, 3_000, 250);
     expect(run.verdict).toBe("SETTLED");
     expect(run.settled).toEqual(Array.from({ length: 12 }, () => "REFUSED"));
-    expect(run.judgeCalls).toBe(12);
+    // FIX-HS2-t: one call per part kind — each settled debate carries four (question, summary, arguments, reviews).
+    expect(run.judgeCalls).toBe(12 * 4);
     expect(run.records).toBe(12);
     expect(run.unrelatedMs).toBeLessThan(1_000);
     expect(run.stats.waiting).toBe(0);
