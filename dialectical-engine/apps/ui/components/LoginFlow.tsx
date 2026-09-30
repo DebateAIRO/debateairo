@@ -35,6 +35,11 @@ function emailValidity(value: string, catalog: MessageCatalog): { state: "idle" 
     : { state: "bad", text: t(catalog, "auth.invalidEmail") };
 }
 
+/* A 4xx answer is the server refusing the attempt: nobody was signed in. */
+function isRefusal(failure: unknown): boolean {
+  return failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500;
+}
+
 /* After sign-in, before anything else: an account created before the date-of-birth field
    answers its one-time age check first (8k). */
 async function navigateHome(): Promise<void> {
@@ -105,6 +110,10 @@ export function LoginFlow({
       }
       void onAuthenticated();
     } catch (failure) {
+      // Only a 4xx is the server refusing the code. Anything else (a 200 whose body the client rejects, a dropped body
+      // read, a 5xx) can follow a server that has already set the session cookie, so the transcript goes here too
+      // (REV-S01 p2 SD-N2).
+      if (!isRefusal(failure)) clearStoredSupportConversation();
       if (failure instanceof ContractHttpError && failure.status === 429) {
         setError(t(catalog, "auth.login.tooManyAttempts"));
       } else if (failure instanceof ContractHttpError && failure.status === 401

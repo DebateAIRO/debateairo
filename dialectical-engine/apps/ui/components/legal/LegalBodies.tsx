@@ -9,6 +9,7 @@ import {
   isUnverified,
   LEGAL_BROWSER_STORAGE,
   LEGAL_COOKIES,
+  LEGAL_INVENTORY,
   LEGAL_PAGES,
   MODEL_PROVIDERS,
   TERMS_VERSIONS,
@@ -38,6 +39,24 @@ function LegalSection({ no, title, children }: { no: string; title: string; chil
   );
 }
 
+/** The eight stored-item names of record, longest first, as one alternation (a fixed allow-list, never a pattern). */
+const INVENTORY_NAMES = new RegExp(
+  `(${LEGAL_INVENTORY.map(({ name }) => name)
+    .sort((a, b) => b.length - a.length)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})`
+);
+
+/**
+ * Document text with every stored-item name (the privacy policy's §13 lines) as its own left-to-right run: on a
+ * right-to-left page a bare `__Host-debateai-session` line is drawn `Host-debateai-session__` (REV-S01 p2 PT2-N2).
+ */
+function withNames(text: string): ReactNode {
+  const parts = text.split(INVENTORY_NAMES);
+  if (parts.length === 1) return text;
+  return parts.map((part, index) => (index % 2 === 1 ? <bdi dir="ltr" key={index}>{part}</bdi> : part));
+}
+
 function NumberedSections({ sections }: { sections: readonly NumberedSection[] }) {
   return (
     <div className="legalSections">
@@ -45,11 +64,11 @@ function NumberedSections({ sections }: { sections: readonly NumberedSection[] }
         <LegalSection no={no} title={title} key={no}>
           {blocks.map((block, index) =>
             block.kind === "p" ? (
-              <p key={index}>{block.text}</p>
+              <p key={index}>{withNames(block.text)}</p>
             ) : (
               <ul key={index}>
                 {block.items.map((item, itemIndex) => (
-                  <li key={itemIndex}>{item}</li>
+                  <li key={itemIndex}>{withNames(item)}</li>
                 ))}
               </ul>
             )
@@ -257,11 +276,13 @@ export function LegalVersionsBody({ legalCatalog }: { legalCatalog: MessageCatal
 /**
  * A stored item's name, breakable only after a dot (DONE.md default 8): each dot-ended part is one run that
  * `legal.css` keeps from wrapping, with a <wbr> after it. The text is the name exactly, so a copy is the real key.
+ * `dir="ltr"` makes it its own left-to-right run (DONE screen 18, as the card draws it): on a right-to-left page the
+ * neutral leading `__` of a `__Host-` name would otherwise be drawn at its right end (REV-S01 p2 PT2-N2).
  */
 function InventoryName({ name }: { name: string }) {
   const parts = name.split(/(?<=\.)/);
   return (
-    <code>
+    <code dir="ltr">
       {parts.map((part, index) => (
         <Fragment key={index}>
           <span className="legalNamePart">{part}</span>

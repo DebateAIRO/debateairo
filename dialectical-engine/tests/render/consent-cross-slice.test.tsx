@@ -166,7 +166,12 @@ describe("cross-slice integration — both consent surfaces in one document", ()
       privacyBox().click();
     });
     expect(policy(), "the consent-mode policy is open").not.toBeNull();
-    const consentButtons = [...policy()!.querySelectorAll("button")].map((b) =>
+    // The policy's own root is `.policyScrim` (it wraps `.policyBezel`), and the cookie card is closed by now: a bare
+    // `Close` anywhere in the scrim fails, not only inside the dialog (CT2-N1, REV-S01-p2).
+    const scrims = [...document.querySelectorAll<HTMLElement>(".policyScrim")];
+    expect(scrims.length, "exactly one policy scrim: the consent-mode policy's").toBe(1);
+    expect(scrims[0]!.contains(policy()), "the dialog sits inside its scrim").toBe(true);
+    const consentButtons = [...scrims[0]!.querySelectorAll("button")].map((b) =>
       b.textContent?.trim()
     );
     expect(consentButtons, "consent mode: `I have read it` present").toContain("I have read it");

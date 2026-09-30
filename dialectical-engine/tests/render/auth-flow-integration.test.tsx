@@ -9,6 +9,7 @@ import { setPathname } from "next/navigation";
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { TopBar } from "../../apps/ui/components/TopBar.js";
+import { SUPPORT_CONVERSATION_STORAGE_KEY } from "../../apps/ui/components/support/conversation.js";
 
 const REGISTRATION_MESSAGE =
   "If this address can be registered, verification instructions will arrive. Check your spam folder.";
@@ -426,6 +427,44 @@ describe("rendered auth flow integration", () => {
     );
     expect(document.querySelector("h1")?.textContent).toBe("Enter a recovery code.");
     expect(document.body.textContent).not.toMatch(/AUTH_CREDENTIALS_INVALID|owner:secret/);
+  });
+
+  /*
+   * REV-S01 p2 SD-N2 (/cookies row 8: "erased when someone signs in … in this tab"). The server sets the session cookie
+   * before the client reads the 200 body, so a completeLogin that throws may follow a sign-in that happened. Only a 4xx
+   * is the server refusing the code; every other outcome erases the previous person's help-chat transcript.
+   */
+  it("erases the help transcript whenever the server may have signed someone in, and keeps it when the code is refused", async () => {
+    const outcomes: ReadonlyArray<readonly [string, () => Promise<unknown>, "erased" | "kept"]> = [
+      ["200, authenticated", () => Promise.resolve({ status: "authenticated", csrf_token: "c".repeat(43), session: SESSION }), "erased"],
+      ["200 whose body the client rejects", () => Promise.reject(new ContractHttpError("INVALID_RESPONSE", 200, "Invalid response")), "erased"],
+      ["body read dropped", () => Promise.reject(new ContractHttpError("NETWORK_FAILURE", 0, "Network failure")), "erased"],
+      ["500 after the handler ran", () => Promise.reject(new ContractHttpError("INTERNAL_ERROR", 500, "boom")), "erased"],
+      ["a non-contract throw", () => Promise.reject(new Error("unexpected")), "erased"],
+      ["401 code rejected", () => Promise.reject(new ContractHttpError("SESSION_REQUIRED", 401, "no")), "kept"],
+      ["429 attempts locked", () => Promise.reject(new ContractHttpError("RATE_LIMITED", 429, "no")), "kept"],
+      ["400 malformed code", () => Promise.reject(new ContractHttpError("VALIDATION_FAILED", 400, "no")), "kept"]
+    ];
+    for (const [label, answer, expected] of outcomes) {
+      await remount();
+      sessionStorage.setItem(
+        SUPPORT_CONVERSATION_STORAGE_KEY,
+        JSON.stringify({ language: "en", identityBound: true, messages: [{ id: "a", role: "user", text: "PERSON-A" }] })
+      );
+      const client = {
+        beginLogin: vi.fn().mockResolvedValue({ status: "mfa_required" as const, challenge_token: "challenge" }),
+        completeLogin: vi.fn().mockImplementation(answer)
+      };
+      await act(async () => root!.render(<LoginFlow client={client} onAuthenticated={vi.fn()} />));
+      field("email").value = "person@example.test";
+      field("password").value = "password";
+      await submit();
+      field("code").value = "123456";
+      await submit();
+      expect(client.completeLogin, label).toHaveBeenCalledTimes(1);
+      expect(sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY) === null ? "erased" : "kept", label).toBe(expected);
+    }
+    sessionStorage.clear();
   });
 
   it("identifies the temporary MFA attempt lock without leaking server detail", async () => {

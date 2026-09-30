@@ -252,7 +252,7 @@ describe("the legal notice states the company and seller details from one consta
 });
 
 describe("the text pages render the same documents as the sign-up modals", () => {
-  it("renders every section of the privacy policy with its number, title and blocks", () => {
+  it("renders every section of the privacy policy with its number, title and blocks", async () => {
     const view = render(<LegalDocumentBody document={PRIVACY_POLICY} />);
     const sections = [...view.querySelectorAll("section.legalSection")];
     expect(sections).toHaveLength(PRIVACY_POLICY.sections.length);
@@ -265,6 +265,26 @@ describe("the text pages render the same documents as the sign-up modals", () =>
     // Ids are page-owned so they can never collide with the modal's `policy-section-*` ids.
     expect(sections[0]?.id).toBe(`legal-section-${PRIVACY_POLICY.sections[0]?.no}`);
     expect(view.querySelector("[id^='policy-section-']")).toBeNull();
+    // REV-S01 p2 PT2-N2: every stored-item name the policy text carries (the §13 lines) is drawn as its own
+    // left-to-right run, in every edition — on a right-to-left page a bare `__Host-…` line shows as `Host-…__`.
+    const editions = readdirSync(resolve(process.cwd(), "apps/ui/lib/legal"), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+    expect(editions).toEqual(expect.arrayContaining(["ar", "he", "ja"]));
+    for (const edition of ["en", ...editions]) {
+      const document = edition === "en"
+        ? PRIVACY_POLICY
+        : ((await import(resolve(process.cwd(), "apps/ui/lib/legal", edition, "privacyPolicy.ts"))) as {
+            PRIVACY_POLICY: typeof PRIVACY_POLICY;
+          }).PRIVACY_POLICY;
+      const page = render(<LegalDocumentBody document={document} />);
+      for (const { name } of LEGAL_INVENTORY) {
+        const written = (page.textContent ?? "").split(name).length - 1;
+        const isolated = [...page.querySelectorAll("[dir='ltr']")].filter((node) => node.textContent === name).length;
+        expect(written, `${edition}: ${name} is in the policy`).toBeGreaterThan(0);
+        expect(isolated, `${edition}: every ${name} is its own left-to-right run`).toBe(written);
+      }
+    }
   });
 
   it("renders the terms of service from the terms document", () => {
@@ -315,6 +335,9 @@ describe("the cookie policy describes the cookies the product really sets", () =
     // this tab that clear it: a sign-in (LoginFlow, once completeLogin succeeds) and a sign-out (SessionControls).
     expect(english["legal.cookies.supportConversation.purpose"]).toMatch(/erased when someone signs in or signs out in this tab/);
     expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/await client\.completeLogin\(challengeToken, code\);(?:\s*\/\/[^\n]*)*\s*clearStoredSupportConversation\(\);/);
+    // REV-S01 p2 SD-N2: a completeLogin that throws after the server set the cookie is a sign-in too; only a 4xx refusal
+    // keeps the transcript (behaviour: auth-flow-integration.test.tsx, "erases the help transcript whenever …").
+    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/catch \(failure\) \{(?:\s*\/\/[^\n]*)*\s*if \(!isRefusal\(failure\)\) clearStoredSupportConversation\(\);/);
     expect(source("apps/ui/components/SessionControls.tsx")).toMatch(/clearStoredSupportConversation\(\);/);
   });
 
@@ -341,8 +364,30 @@ describe("the cookie policy describes the cookies the product really sets", () =
       expect([...code.children].map((child) => child.tagName), name).toEqual(
         parts.flatMap((_, index) => (index === parts.length - 1 ? ["SPAN"] : ["SPAN", "WBR"]))
       );
+      // DONE screen 18 (REV-S01 p2 PT2-N2): on a right-to-left page the leading `__` of a `__Host-` name is neutral and
+      // would be drawn at the name's right end; the name is its own left-to-right run, as the card draws it.
+      expect(code.getAttribute("dir"), name).toBe("ltr");
     }
     expect(source("apps/ui/app/legal.css")).toMatch(/\.legalNamePart \{ white-space: nowrap; \}/);
+    // V-10 (REV-S01 p2 PT2-N3): the four fixed columns take 192.2+86+104+90 = 472.2px (the name column is 192.2, V-9) of a
+    // .legalMain that is the viewport minus 372px (48+48 padding, 220 nav, 56 gap), so below 995px the Purpose column gets
+    // under 150px. At every width up to 994px the cookie tables stack one card per row, as they do at 375: no header row,
+    // every cell a block of its own.
+    const style = document.createElement("style");
+    style.textContent = source("apps/ui/app/legal.css");
+    document.head.append(style);
+    const selectors = (rule: CSSRule): string[] =>
+      ((rule as CSSStyleRule).selectorText ?? "").split(",").map((part) => part.trim());
+    const stackedUpTo = [...style.sheet!.cssRules]
+      .filter((rule) => (rule as CSSMediaRule).media !== undefined)
+      .filter((rule) => {
+        const inner = [...(rule as CSSMediaRule).cssRules] as CSSStyleRule[];
+        return inner.some((r) => selectors(r).includes(".legalCookieTable thead") && r.style.display === "none")
+          && inner.some((r) => selectors(r).includes(".legalCookieTable td") && r.style.display === "block");
+      })
+      .map((rule) => Number(/max-width:\s*(\d+)px/.exec((rule as CSSMediaRule).media.mediaText)?.[1] ?? 0));
+    style.remove();
+    expect(Math.max(0, ...stackedUpTo), "the cookie tables stack at every width below 995px").toBeGreaterThanOrEqual(994);
     expect(cells.map((row) => row.length)).toEqual(Array(8).fill(5));
     expect(cells.map((row) => row[1])).toEqual(EN_KIND);
     expect(cells.map((row) => row[3])).toEqual(EN_RECIPIENT);
