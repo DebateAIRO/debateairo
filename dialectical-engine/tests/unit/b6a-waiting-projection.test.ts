@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import type { Pool, PoolClient, QueryResult } from "pg";
-import { OpenRunSummarySchema, RunProjectionSchema, type Session } from "@debateai/contract";
+import { OpenRunSummarySchema, RunProjectionSchema, SpendScopeSchema, type Session } from "@debateai/contract";
+import type { SpendScope } from "@debateai/budget";
 import { RunRepository } from "@debateai/db";
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import type { AskRoomPort } from "../../apps/api/src/ask-room.js";
@@ -27,6 +28,13 @@ describe("B6a the contract carries WAITING with its expected start (budget spec 
       run_ref: "run:waiting", question_line: "Messi or Ronaldo?", state: "WAITING",
       terminal_reason: null, created_at_sequence: 7
     }).state).toBe("WAITING");
+  });
+
+  it("names the same four scopes as SpendScope in @debateai/budget", () => {
+    const budgetScopes = {
+      SITE_DAY: true, PERSON_DAY: true, PERSON_WEEK: true, PERSON_MONTH: true
+    } satisfies Record<SpendScope, true>;
+    expect([...SpendScopeSchema.options].sort()).toEqual(Object.keys(budgetScopes).sort());
   });
 });
 
