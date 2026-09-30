@@ -4,6 +4,7 @@ import {
   AgeConfirmationStatusSchema,
   type AgeCheckResult,
   type AgeConfirmationStatus,
+  type RegisterLegalDocuments,
   AccountErasureCancelledSchema,
   AccountErasureStatusSchema,
   AnswerSchema,
@@ -231,7 +232,8 @@ export interface ContractClient {
     email: string,
     password: string,
     recoveryEmail: string,
-    dateOfBirth: string
+    dateOfBirth: string,
+    legal: RegisterLegalDocuments
   ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
   resendVerification(email: string): Promise<Readonly<{
     message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
@@ -382,7 +384,8 @@ export function createContractClient(
       email: string,
       password: string,
       recoveryEmail: string,
-      dateOfBirth: string
+      dateOfBirth: string,
+      legal: RegisterLegalDocuments
     ) => request(
       "/v1/auth/register",
       RegistrationPublicResponseSchema,
@@ -390,7 +393,11 @@ export function createContractClient(
           email,
           password,
           recovery_email: recoveryEmail,
-          date_of_birth: dateOfBirth
+          date_of_birth: dateOfBirth,
+          // Paid plans L3b (R3-2): the displayed documents, beside the age gate's date.
+          terms: legal.terms,
+          privacy: legal.privacy,
+          locale: legal.locale
         }) },
       202
     ),

@@ -232,6 +232,20 @@ export const AgeCheckResultSchema = z.object({ outcome: z.enum(["allowed", "refu
 export type AgeCheckResult = z.infer<typeof AgeCheckResultSchema>;
 export const AgeConfirmationStatusSchema = z.object({ status: z.enum(["required", "confirmed"]) }).strict();
 export type AgeConfirmationStatus = z.infer<typeof AgeConfirmationStatusSchema>;
+/** Paid plans L2/L3b: a legal document as the manifest names it — `Version N.M` and the draft's sha256. */
+export const LegalDocumentPairSchema = z.object({
+  version: z.string().regex(/^[0-9]{1,4}\.[0-9]{1,4}$/u),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/u)
+}).strict();
+export type LegalDocumentPairWire = z.infer<typeof LegalDocumentPairSchema>;
+
+/** What sign-up sends for the two documents it displayed, and the locale it displayed them in. */
+export const RegisterLegalDocumentsSchema = z.object({
+  terms: LegalDocumentPairSchema,
+  privacy: LegalDocumentPairSchema,
+  locale: z.string().regex(/^[a-z]{2}$/u)
+}).strict();
+export type RegisterLegalDocuments = z.infer<typeof RegisterLegalDocumentsSchema>;
 export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
   "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
@@ -805,7 +819,7 @@ export const contractInventory = Object.freeze({
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
-    AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema,
+    AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,

@@ -409,7 +409,9 @@ const registration = new RegistrationService({
     authPolicy.rateLimitBucketCapacity,
     authPolicy.rateLimitRefusalAuditIntervalMs
   ),
-  argon2: argon2Pool
+  argon2: argon2Pool,
+  // Paid plans L3b: the acceptance record's evidence is sealed under the records key (L1).
+  legalAcceptance: { recordsKey }
 });
 const mfa = new MfaEnrollmentService({
   repository: identityRepository,

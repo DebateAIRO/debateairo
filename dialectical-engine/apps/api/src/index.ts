@@ -51,7 +51,9 @@ import {
   AGE_REFUSAL_COOKIE_NAME,
   AGE_REFUSAL_COOKIE_VALUE,
   AgeCheckRequestSchema,
-  DateOfBirthSchema
+  DateOfBirthSchema,
+  RegisterLegalDocumentsSchema,
+  type RegisterLegalDocuments
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
@@ -1566,6 +1568,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.decorateRequest("session");
   api.decorateRequest("authenticatedSession");
   api.decorateRequest("cookieRefresh");
+  /**
+   * Paid plans L3b: the Terms and Privacy pairs a register request carried, keyed by the request object
+   * (filled by the register preHandler hook below, read by sourceFor). A WeakMap, so nothing outlives the
+   * request and no request decoration is added.
+   */
+  const registerLegalDocuments = new WeakMap<object, RegisterLegalDocuments>();
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
@@ -1573,6 +1581,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
   }) => {
     const countryCode = edgeCountry(request.headers);
+    // Paid plans L3b: present only on a register request whose hook parsed a well-formed triple.
+    const legal = registerLegalDocuments.get(request);
     return Object.freeze({
       // Registration, MFA and sessions share T2's one canonical public source.
       ip: normalizeClientIp(request.ip)
@@ -1583,7 +1593,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : "unknown",
       requestId: request.id,
       // Age gate: the edge's country for the source, only when it reported one.
-      ...(countryCode === null ? {} : { countryCode })
+      ...(countryCode === null ? {} : { countryCode }),
+      ...(legal === undefined ? {} : { legal })
     });
   };
   const admissionRefusalAuditedUntil = new Map<string, number>();
@@ -1725,6 +1736,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (body === null || dateOfBirth === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (!meetsMinimumAge(dateOfBirth)) return ageRefused(reply);
     body.adult_affirmed = true;
+  });
+  /**
+   * Paid plans L3b (spec §2.3.2): the pairs of the documents the sign-up page displayed. The registration
+   * mount region is frozen (S04), so — as the age gate does for the date — they are read here and travel to
+   * the service on the source (sourceFor), never in the region's four input members. A missing or malformed
+   * triple travels as absent, which the service refuses as LEGAL_DOCUMENT_STALE when the records key is
+   * composed. Runs after the age gate's hook, so a refused date never gets this far.
+   */
+  api.addHook("preHandler", async (request) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown>
+      : null;
+    if (body === null) return;
+    const legal = RegisterLegalDocumentsSchema.safeParse({
+      terms: body.terms, privacy: body.privacy, locale: body.locale
+    });
+    if (legal.success) registerLegalDocuments.set(request, legal.data);
   });
   /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
