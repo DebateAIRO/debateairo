@@ -780,6 +780,50 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created
 - After the upgrade, every story is stored as failed with `STORY_NOT_CONFIGURED` until the next
   hosted register publish (§11, "What the runner's log says about answers and stories").
 
+### Upgrading an existing host (paid plans Part 1a)
+
+This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
+sealed under a new key, and ships the country gate switched off. A host that already runs an
+earlier release does these, in this order, before the API next starts on this code (the new
+checkout in place, with its dependencies installed: this release adds the `mmdb-lib` package):
+
+1. **Apply the migration.** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then
+   `hardening.sql` as §4 step 3 does, and close the window (§4 step 5). This release's migration is
+   `migrations/0080_legal_acceptance.sql` (numbered 0079 until dev's 0078 and 0079 came first);
+   `pnpm db:migrate` applies it, and any other pending migration, in order.
+2. **Create the records key and name it in `api.env`.** Run the `records-key.bin` line of §3 "The
+   key-file contract": 32 random bytes in `/etc/debateai/api/records-key.bin`, `0600`, owned by
+   `debateai-api`. The line begins with `test ! -e`, so it never replaces a key that exists. Then
+   add `RECORDS_KEY_PATH=/etc/debateai/api/records-key.bin` to `/etc/debateai/api.env`, as
+   `env/api.env.example` has it. The key is required in every mode: without it the API refuses to
+   start, and a path that names another key file refuses with `RECORDS_KEY_PATH_MUST_BE_SEPARATE`.
+3. **Add the two country-data paths to `api.env`**, as `env/api.env.example` has them:
+   `GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb` and
+   `TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt`. Only the paths are needed now: a
+   hosted API without them refuses with `GEOIP_PATHS_REQUIRED`. The files themselves are needed
+   once a register version carrying `countryPolicy` is in force (§5 "Country data").
+4. **Add `RECORDS_KEY_PATH=/etc/debateai/api/records-key.bin` to `/etc/debateai/backup.conf`**, as
+   `backup.conf.example` has it. Without it `backup.sh` stops before it writes anything — the whole
+   nightly backup, not only the key — and the restore drill refuses too.
+5. **Escrow the records key, and prove it.** The next nightly backup escrows it as the sixth secret,
+   in a new escrow envelope (`BACKUP_ESCROW_WRITTEN` in its journal, because the set of secrets
+   changed). After that backup the owner runs the drill once: §9 "Owner confirmation — the records
+   key in escrow" (OWNER-RUN). Both scripts must be executable on this host; check with
+   `ls -l /opt/debateai/dialectical-engine/deploy/vps/backup.sh /opt/debateai/dialectical-engine/deploy/vps/restore-drill.sh`.
+   The kit commits them without the execute bit, a gap older than this release that is fixed
+   separately. Until both show `x`, `debateai-backup.service` cannot start `backup.sh` (`203/EXEC`),
+   so no nightly backup runs at all, and the drill cannot start.
+6. **Leave the country gate off.** Nothing in this release turns it on: a hosted file without the
+   `countryPolicy` member — every file copied from the kit's example — publishes no row. It stays
+   off until every condition in §5 "Country data" holds; that section says how to turn it on.
+7. **Expect one accept screen for every existing account.** In hosted mode an account with no
+   acceptance record owes both documents, and no account created before this release has one. So
+   each existing person sees the accept screen once, the next time they open a signed-in page: they
+   read the current Terms of Service and Privacy Policy to the end and accept them, and are not
+   asked again until a document's re-acceptance floor moves. `/settings` is never behind that
+   screen, so account deletion, consent withdrawal and sign-out stay reachable without accepting
+   anything.
+
 ### Production floors the code itself enforces
 
 `assertProductionFloors` (`packages/register/src/runtime-environment.ts`) refuses to boot when
