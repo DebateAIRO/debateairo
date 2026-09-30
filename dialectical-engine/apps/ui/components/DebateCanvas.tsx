@@ -25,7 +25,7 @@ import {
 import { isLowStrengthNode } from "@/lib/debateTreeUtils";
 import { CanvasViewport } from "@/components/CanvasViewport";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
-import type { Node as ContractNode } from "@debateai/contract";
+import type { ContractNode } from "@/lib/v3/adapter";
 import { v3NodeScoreState, v3ScorePresentation, type V3ScorePresentation } from "@/lib/v3/adapter";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";

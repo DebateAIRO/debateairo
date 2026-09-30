@@ -7,8 +7,10 @@ import {
   type Answer,
   type AnswerFloor,
   type Edge,
+  type MakerLineage,
   type Node,
   type PublicDebate,
+  type PublicMakerLineage,
   type PublicNode,
   type PublicStoryShort
 } from "@debateai/contract";
@@ -37,6 +39,10 @@ function redactLabeledNumber(
   };
 }
 
+function redactLineageForPublic(lineage: MakerLineage): PublicMakerLineage {
+  return { maker: lineage.maker, model_id: lineage.model_id };
+}
+
 function redactNodeForPublic(node: Node): PublicNode {
   return {
     node_id: node.node_id,
@@ -47,14 +53,14 @@ function redactNodeForPublic(node: Node): PublicNode {
       ? null
       : redactLabeledNumber(node.final_strength, { redactSource: true }),
     provenance_ref: "REDACTED_OWNER_ONLY",
-    maker_lineage: node.maker_lineage,
+    maker_lineage: node.maker_lineage === null ? null : redactLineageForPublic(node.maker_lineage),
     review: node.review === null
       ? null
       : {
           outcome: node.review.outcome,
           reasons: node.review.reasons,
           provenance_ref: "REDACTED_OWNER_ONLY",
-          reviewer_lineage: node.review.reviewer_lineage
+          reviewer_lineage: redactLineageForPublic(node.review.reviewer_lineage)
         },
     locator: node.locator,
     stranger_restatement: { check_status: node.stranger_restatement.check_status },

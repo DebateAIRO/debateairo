@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
-import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
+import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 
@@ -557,8 +557,15 @@ export const NodeSchema = z.object({
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
 
+export const PublicNodeReviewSchema = NodeReviewSchema.extend({
+  reviewer_lineage: PublicMakerLineageSchema
+});
+export type PublicNodeReview = z.infer<typeof PublicNodeReviewSchema>;
+
 export const PublicNodeSchema = NodeSchema.omit({ disagreement: true }).extend({
-  disagreement: z.null()
+  disagreement: z.null(),
+  maker_lineage: PublicMakerLineageSchema.nullable(),
+  review: PublicNodeReviewSchema.nullable()
 });
 export type PublicNode = z.infer<typeof PublicNodeSchema>;
 
