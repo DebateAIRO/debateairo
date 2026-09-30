@@ -135,6 +135,35 @@ describe("the blocking accept screen after sign-in (paid plans L4)", () => {
     expect(document.body.textContent).toContain("inside");
   });
 
+  // The acceptance is recorded once acceptLegal resolves; a failed re-read afterwards is a failed status
+  // read (ruling Q-10), never "Your acceptance could not be saved".
+  it("lets the page through when the acceptance is saved but the follow-up status read fails", async () => {
+    const client = {
+      getLegalStatus: vi.fn()
+        .mockResolvedValueOnce(OWED_TERMS)
+        .mockRejectedValueOnce(new Error("offline")),
+      acceptLegal: vi.fn().mockResolvedValue(undefined),
+      logout: vi.fn()
+    };
+    await act(async () => root!.render(
+      <LegalAcceptGate catalog={newDebateEnglish} client={client}><p>inside</p></LegalAcceptGate>
+    ));
+    await settle();
+    await act(async () => { button("Read the Terms of Service").click(); });
+    await settle();
+    metrics.scrollTop = metrics.scrollHeight - metrics.clientHeight;
+    await act(async () => { document.querySelector(".policyBody")!.dispatchEvent(new Event("scroll")); });
+    await settle();
+    await act(async () => { button("I have read it").click(); });
+    await settle();
+    await act(async () => { button("Accept and continue").click(); });
+    await settle();
+    expect(client.acceptLegal).toHaveBeenCalledTimes(1);
+    expect(client.getLegalStatus).toHaveBeenCalledTimes(2);
+    expect(document.body.textContent).toContain("inside");
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+  });
+
   // Ruling Q-10: the screen fails OPEN when the status read fails; the server's
   // LEGAL_REACCEPTANCE_REQUIRED refusal on the billing routes is the real guard.
   it("does not hold the page hostage when the status read fails", async () => {

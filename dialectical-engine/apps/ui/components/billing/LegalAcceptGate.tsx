@@ -80,6 +80,7 @@ export function LegalAcceptGate({
   async function acceptAll(): Promise<void> {
     setBusy(true);
     setError(null);
+    let saved = false;
     try {
       await client.acceptLegal({
         documents: required.map((kind) => {
@@ -88,11 +89,15 @@ export function LegalAcceptGate({
         }),
         locale
       });
+      saved = true;
       const after = await client.getLegalStatus(locale);
       if (after.must_accept.length === 0) setState("clear");
       else setRequired(after.must_accept.map((document) => document.kind));
     } catch (failure) {
-      setError(failure instanceof ContractHttpError && failure.serverCode === "LEGAL_DOCUMENT_STALE" ? "stale" : "failed");
+      // Once acceptLegal has resolved the acceptance IS recorded, so a failed re-read is only a failed
+      // status read: ruling Q-10 lets the page through, never "could not be saved".
+      if (saved) setState("clear");
+      else setError(failure instanceof ContractHttpError && failure.serverCode === "LEGAL_DOCUMENT_STALE" ? "stale" : "failed");
     } finally {
       setBusy(false);
     }
