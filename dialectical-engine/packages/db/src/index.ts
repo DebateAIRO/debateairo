@@ -719,6 +719,22 @@ async function argumentLanguageColumnsAreApplied(
   );
   return result.rows[0]?.applied === true;
 }
+
+/**
+ * Budget spec §2.7 (migration 0081). Written against information_schema.columns
+ * on purpose: the projection's unit stubs answer every such probe "not applied".
+ */
+async function runWaitingLineIsApplied(
+  executor: Pick<Pool, "query"> | PoolClient
+): Promise<boolean> {
+  const result = await executor.query<{ applied: boolean }>(
+    `SELECT count(*)=2 AS applied
+     FROM information_schema.columns
+     WHERE table_schema='core' AND table_name IN ('run_wait','run_wait_start')
+       AND column_name='run_id'`
+  );
+  return result.rows[0]?.applied === true;
+}
 type UntypedMethod = (...args: unknown[]) => unknown;
 
 function typedPoolFailure(error: unknown): TypedDomainError {
@@ -1131,7 +1147,7 @@ export interface CurrentRunState {
 export interface RunLoadingProjection {
   readonly runRef: string;
   readonly questionLine: string;
-  readonly state: "QUEUED" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
+  readonly state: "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
   readonly terminalReason: string | null;
   readonly holdUntil: Date | null;
   /**
@@ -1583,6 +1599,15 @@ export class RunRepository {
     const argumentLanguageProjection = await argumentLanguageColumnsAreApplied(this.pool)
       ? ", run.argument_language_tag, run.argument_language_name"
       : "";
+    // Budget spec §2.7: a run with a wait row, no start row and no job yet is
+    // WAITING, not QUEUED — it has no job for anyone to claim until the waker.
+    const waitingProjection = await runWaitingLineIsApplied(this.pool)
+      ? `WHEN count(work.work_item_id) = 0 AND EXISTS (
+             SELECT 1 FROM core.run_wait AS wait
+             WHERE wait.run_id = run.run_id
+               AND NOT EXISTS (SELECT 1 FROM core.run_wait_start AS started WHERE started.run_id = wait.run_id)
+           ) THEN 'WAITING'`
+      : "";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
@@ -1596,6 +1621,7 @@ export class RunRepository {
     }>(
       `SELECT run.run_id, run.question_line${contentCiphertextProjection}${argumentLanguageProjection},
          CASE
+           ${waitingProjection}
            WHEN count(work.work_item_id) = 0 THEN 'QUEUED'
            WHEN bool_or(work.state = 'FAILED') THEN 'FAILED'
            WHEN bool_or(work.state = 'CLAIMED') AND COALESCE((

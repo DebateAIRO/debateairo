@@ -716,7 +716,7 @@ export type DebateDetail = {
   topic: string;
   status: string;
   /** Ask-run lifecycle truth while no served answer exists. */
-  run_state?: "QUEUED" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
+  run_state?: "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
   /** Honest provider-recovery deadline when run_state is HOLDING. */
   hold_until?: string | null;
   config: DebateConfig;

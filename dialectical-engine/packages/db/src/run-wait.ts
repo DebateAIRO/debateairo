@@ -75,6 +75,21 @@ function waitingRef(row: Readonly<{ run_id: string; waiting_since: Date }>): Wai
   return Object.freeze({ runId: row.run_id, waitingSince: row.waiting_since });
 }
 
+/**
+ * Budget spec §2.3 rule 1 — A PERSON REASON THAT MAY BE STALE: its recheck
+ * instant has passed, or an entitlement event the room did not measure the run
+ * with is now in force (recorded after the reason — both database clocks — or
+ * taking effect after the instant it was measured at — both process clocks).
+ * `line` is `core.run_waiting_v`, `$1` is now. B7b's waker reads the same words.
+ */
+const PERSON_BLOCK_MAY_HAVE_LIFTED = `(line.person_recheck_at <= $1
+  OR EXISTS (
+    SELECT 1 FROM billing.entitlement_event AS event
+    WHERE event.owner_ref = line.owner_ref
+      AND event.effective_at <= $1
+      AND (event.recorded_at > line.reason_recorded_at OR event.effective_at > line.reason_at)
+  ))`;
+
 function validInstant(value: unknown): value is Date {
   return value instanceof Date && !Number.isNaN(value.getTime());
 }
@@ -160,5 +175,23 @@ export class RunWaitRepository {
       "SELECT count(*)::text AS count FROM core.run_waiting_v"
     );
     return Number(result.rows[0]?.count ?? "0");
+  }
+
+  /**
+   * Budget spec §2.3 rule 1 (B6a) — DOES ANY WAITING RUN HOLD A NEW QUESTION
+   * BACK? One statement, whatever the line's length. Yes for a run that waits for
+   * the site (or has no reason yet: the careful side), and for a run recorded as
+   * waiting for its own person whose block may have lifted, until the waker
+   * measures it again. A run whose own person is still full holds nobody back.
+   */
+  async siteLineBlocking(now: Date): Promise<boolean> {
+    const result = await this.pool.query<{ blocking: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM core.run_waiting_v AS line
+         WHERE line.waits_for IS DISTINCT FROM 'PERSON' OR ${PERSON_BLOCK_MAY_HAVE_LIFTED}
+       ) AS blocking`,
+      [now]
+    );
+    return result.rows[0]?.blocking === true;
   }
 }

@@ -681,6 +681,48 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   }
 
   /**
+   * Paid-plans spec §2.4.2 (B6) — WHAT ONE PERSON HAS SPENT IN A WINDOW: the RUN
+   * and STORY charges of the runs `billing.run_charge_scope` pins to them whose
+   * `recorded_at` falls in `[from, to)`. One indexed query per window.
+   */
+  async readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(spend.charge_micros),0)::text AS total
+       FROM billing.run_charge_scope AS scope
+       JOIN ledger.model_spend AS spend ON spend.run_id = scope.run_id
+       WHERE scope.owner_ref = $1::uuid
+         AND scope.admitted_at < $3
+         AND spend.spend_source IN ('RUN','STORY')
+         AND spend.recorded_at >= $2 AND spend.recorded_at < $3`,
+      [ownerRef, from, to]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * Paid-plans spec §2.4.2 (B6) — ONE PERSON'S COUNTED HOLDS: the unspent part
+   * of each hold whose run is pinned to them and still has a READY or CLAIMED job.
+   */
+  async readOwnerCountedHoldsMicros(ownerRef: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
+       FROM billing.run_charge_scope AS scope
+       JOIN ledger.model_spend_hold AS hold ON hold.run_id = scope.run_id
+       LEFT JOIN LATERAL (
+         SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
+         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
+       ) AS spent ON true
+       WHERE scope.owner_ref = $1::uuid
+         AND EXISTS (
+           SELECT 1 FROM core.work_item AS work
+           WHERE work.run_id = hold.run_id AND work.state IN ('READY','CLAIMED')
+         )`,
+      [ownerRef]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
    * I1 — the read, the decision and the reservation as ONE serialised operation.
    *
    * `pg_advisory_xact_lock` keyed on the day makes concurrent admissions queue

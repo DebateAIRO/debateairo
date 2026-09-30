@@ -107,6 +107,7 @@ import {
   type RegistrationApplication
 } from "./registration.js";
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
+import { nextWholeMinute, type AskRoomPort } from "./ask-room.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
@@ -2957,6 +2958,16 @@ export interface RunCreationSettings {
    * and finish.
    */
   readonly assertDailyCostEnvelope?: () => Promise<void>;
+  /**
+   * Budget spec 2026-09-28 §2.4–§2.7 with the paid-plans spec §2.4 (B6) — THE ROOM.
+   *
+   * Absent means today's behaviour exactly: local mode, or a hosted register whose
+   * costEnvelopePolicy carries no band, keeps `assertDailyCostEnvelope` and its
+   * 429. Present (hosted, band published), the ask is decided by the room instead:
+   * START with a hold, WAIT in line, or ASK_ALREADY_WAITING. main.ts supplies one
+   * or the other, never both.
+   */
+  readonly room?: AskRoomPort;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
@@ -3256,13 +3267,29 @@ export class PostgresAskApplication implements AskApplication {
 
   async readRun(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null> {
     const run = await this.#runs.readLoadingProjection(runId, ownership);
-    return run === null ? null : RunProjectionSchema.parse({
+    if (run === null) return null;
+    // Budget spec §2.7: a waiting run's expected start, recomputed on every read.
+    let waitsUntil: Date | null = null;
+    if (run.state === "WAITING") {
+      // With no room composed nothing would ever start it. B6b's boot refuses a
+      // hosted register without the band while any run waits, so this is a
+      // bypassed rule, said by name — never a start time that keeps moving.
+      const room = this.settings.room;
+      if (room === undefined) {
+        throw new TypedDomainError("WAITING_LINE_REQUIRES_BAND", "A run waits but no room is composed to start it");
+      }
+      // A run the line no longer lists (its owner's account is not active: suspended or
+      // age-frozen) keeps the next tick.
+      waitsUntil = (await room.expectedStart(runId))?.waitsUntil ?? nextWholeMinute(new Date());
+    }
+    return RunProjectionSchema.parse({
       run_ref: run.runRef,
       question_line: run.questionLine,
       state: run.state,
       terminal_reason: run.terminalReason,
       hold_until: run.holdUntil?.toISOString() ?? null,
-      argument_language: runArgumentLanguage(run.argumentLanguage)
+      argument_language: runArgumentLanguage(run.argumentLanguage),
+      ...(waitsUntil === null ? {} : { waits_until: waitsUntil.toISOString() })
     });
   }
 

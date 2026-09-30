@@ -149,6 +149,14 @@ export const AskRequestSchema = z.object({
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
+/**
+ * Budget spec 2026-09-28 §2.2 / paid-plans spec §2.4.1 — the limit a question
+ * waits for or is close to: the site's day, or one of the person's windows.
+ * The same four words as `SpendScope` in @debateai/budget (the contract cannot
+ * import it); tests/unit/b6a-waiting-projection.test.ts reads both.
+ */
+export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+
 export const AskAcceptedSchema = z.object({
   run_ref: z.string().min(1),
   status: z.literal("QUEUED")
@@ -171,12 +179,15 @@ export type ArgumentLanguage = z.infer<typeof ArgumentLanguageSchema>;
 export const RunProjectionSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
-  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
+  state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
   hold_until: z.iso.datetime().nullable(),
   // R2 (spec 2026-09-26 §14.3): null on a database without dev's migration
   // 0072; optional, so a reader built before the field still parses.
-  argument_language: ArgumentLanguageSchema.nullable().optional()
+  argument_language: ArgumentLanguageSchema.nullable().optional(),
+  // Budget spec §2.7: when a WAITING run is expected to start (recomputed on
+  // every read). Optional, so a reader built before the field still parses.
+  waits_until: z.iso.datetime().nullable().optional()
 }).strict().superRefine((run, context) => {
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
@@ -186,6 +197,9 @@ export const RunProjectionSchema = z.object({
   }
   if ((run.state === "HOLDING") !== (run.hold_until !== null)) {
     context.addIssue({ code: "custom", message: "HOLDING requires hold_until and other states forbid it" });
+  }
+  if ((run.state === "WAITING") !== (run.waits_until !== undefined && run.waits_until !== null)) {
+    context.addIssue({ code: "custom", message: "WAITING requires waits_until and other states forbid it" });
   }
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
@@ -539,7 +553,7 @@ export const AnswerSummarySchema = z.object({
 export const OpenRunSummarySchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
-  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
+  state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
   created_at_sequence: z.number().int().positive()
 }).strict().superRefine((run, context) => {
