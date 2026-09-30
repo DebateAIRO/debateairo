@@ -81,5 +81,18 @@
   "home.aiDisclosure": "AI संबंधी प्रकटीकरण",
   "home.aiSupportLead": "यह बातचीत AI सहायता सहायक के साथ है।",
   "home.aiLinkLabel": "हम AI सामग्री को कैसे चिह्नित करते हैं (नए टैब में खुलता है)",
-  "home.aiLink": "हम AI सामग्री को कैसे चिह्नित करते हैं"
+  "home.aiLink": "हम AI सामग्री को कैसे चिह्नित करते हैं",
+  "home.sensitiveConsent.eyebrow": "आपके पहले वाद-विवाद से पहले",
+  "home.sensitiveConsent.title": "आपके प्रश्नों से संवेदनशील जानकारी प्रकट हो सकती है",
+  "home.sensitiveConsent.lede": "राजनीति, धर्म, स्वास्थ्य, लैंगिकता या आस्था से जुड़ा कोई प्रश्न आपके बारे में कुछ बता सकता है। कानून इसे संवेदनशील जानकारी मानता है, इसलिए इसे संसाधित करने से पहले हमें आपकी स्पष्ट सहमति लेनी होती है।",
+  "home.sensitiveConsent.pointPurpose": "आप जो लिखते हैं, उसका उपयोग हम केवल आपके वाद-विवाद चलाने के लिए करते हैं।",
+  "home.sensitiveConsent.pointModels": "वाद-विवाद चलाने के लिए हम आपका प्रश्न उसमें भाग लेने वाले AI मॉडलों को भेजते हैं।",
+  "home.sensitiveConsent.pointOthers": "अन्य लोगों के बारे में संवेदनशील जानकारी शामिल न करें।",
+  "home.sensitiveConsent.pointDelete": "आप किसी भी समय कोई वाद-विवाद हटा सकते हैं।",
+  "home.sensitiveConsent.statement": "मैं सहमत हूँ कि DebateAI मेरे अपने प्रश्नों में मेरे द्वारा शामिल की गई संवेदनशील जानकारी को मेरे वाद-विवाद चलाने के उद्देश्य से संसाधित कर सकता है।",
+  "home.sensitiveConsent.privacyLink": "हम इसे कैसे संभालते हैं, यह गोपनीयता नीति में पढ़ें",
+  "home.sensitiveConsent.agree": "मैं सहमत हूँ",
+  "home.sensitiveConsent.decline": "मैं सहमत नहीं हूँ",
+  "home.sensitiveConsent.declined": "इस सहमति के बिना आप वाद-विवाद शुरू नहीं कर सकते। अगली बार जब आप वाद-विवाद शुरू करेंगे, तब हम फिर से पूछेंगे।",
+  "home.sensitiveConsent.failed": "आपका उत्तर सहेजा नहीं जा सका। फिर से प्रयास करें।"
 }

@@ -13,5 +13,5 @@ export default async function NewDebatePage() {
     loadNamespace(locale, "home"),
     loadNamespace(locale, "chrome")
   ]);
-  return <NewDebatePageClient catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />;
+  return <NewDebatePageClient catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} />;
 }

@@ -26,8 +26,10 @@ import {
   parseProviderDiscoveryTargets
 } from "../../packages/providers/src/index.js";
 import {
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
   assertHostedSupportAdmissionSealed,
   loadBootstrapRegister,
+  parseCanonicalRegisterJson,
   readAdmissionPolicy,
   readAuthPolicy,
   readCostEnvelopePolicy,
@@ -36,6 +38,7 @@ import {
   readMfaPolicy,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
+  readCountryPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -273,5 +276,50 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     const refused = await runCli(["--file", `${path}.absent`], environment);
     expect(refused.exitCode).not.toBe(0);
     expect(refused.stderr).toBe("HOSTED_REGISTER_FILE_ABSENT\n");
+  }, 120_000);
+
+  it("seals the operator's countryPolicy with the geoAvailability scope, and a version without the member has no country gate", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    // Paid plans G3a: the command's own boot check now reads the country row, as the API boot does.
+    const gated = await publishHostedRegister({
+      plan: await planOf({ ...hostedFile(), countryPolicy: COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value }),
+      operations
+    });
+    expect(gated.outcome).toBe("CREATED");
+    const gatedVersion = registerVersionToSafeLegacyNumber(gated.registerVersion);
+    await expect(readCountryPolicy(database.pool, gatedVersion)).resolves.toMatchObject({
+      unknownIp: "REFUSE", tor: "REFUSE", sourceRef: "task-14b integration: first hosted register"
+    });
+    expect((await readAdmissionPolicy(database.pool, gatedVersion)).geoAvailability).toEqual({
+      key: "source", limit: 60, windowMs: 60_000, capacity: 65_536
+    });
+
+    // Without the member (A14): no country row in that version.
+    const ungated = await publishHostedRegister({ plan: await planOf(hostedFile()), operations });
+    expect(ungated.outcome).toBe("CREATED");
+    await expect(readCountryPolicy(
+      database.pool, registerVersionToSafeLegacyNumber(ungated.registerVersion)
+    )).resolves.toBeNull();
+  }, 120_000);
+
+  it("refuses, after publishing, a countryPolicy version whose admission row lacks the geoAvailability scope", async () => {
+    const plan = await planOf({ ...hostedFile(), countryPolicy: COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value });
+    const rows = plan.rows.map((row) => {
+      if (row.rowKey !== "admissionPolicy") return row;
+      const value = JSON.parse(row.valueJsonText) as Record<string, unknown>;
+      expect(Object.hasOwn(value, "geo_availability")).toBe(true);
+      delete value.geo_availability;
+      return {
+        rowKey: row.rowKey,
+        valueJsonText: parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value), "utf8")),
+        sourceRef: row.sourceRef
+      };
+    });
+    await expect(publishHostedRegister({
+      plan: { ...plan, rows },
+      operations: createPostgresHostedRegisterOperations(database.pool)
+    })).rejects.toMatchObject({
+      code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:GEO_AVAILABILITY_ADMISSION_UNSEALED"
+    });
   }, 120_000);
 });

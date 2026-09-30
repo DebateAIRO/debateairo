@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "누락 항목",
   "debateDrawers.node.honestyAriaLabel": "V3 노드 정직성",
   "debateDrawers.node.noArgumentText": "아직 논거 내용이 없습니다.",
-  "debateDrawers.node.noCompletedReview": "이 노드에 완료된 다른 작성자의 검토가 기록되지 않았습니다.",
+  "debateDrawers.node.noCompletedReview": "이 노드에 대한 다른 개발사 모델의 완료된 검토가 기록되지 않았습니다.",
   "debateDrawers.node.noPreviousGenerations": "이전 생성 기록이 없습니다.",
   "debateDrawers.node.noScoringRecommendation": "이 논거에 제공할 채점 권장 사항이 없습니다.",
   "debateDrawers.node.notUseful": "유용하지 않음",

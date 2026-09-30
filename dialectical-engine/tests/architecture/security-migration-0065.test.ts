@@ -27,7 +27,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // compared with this list, so a new schema fails the test rather than silently
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
-  "core", "evaluator", "evidence", "identity", "ledger", "memory",
+  "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
   "obs", "observation", "register", "scorecard", "serve", "support"
 ] as const;
 
@@ -63,6 +63,8 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.authentication_risk_signal": "risk window rows are pruned",
   "identity.runtime_audit_attempt": "attempt rows are retried and pruned",
   "identity.account_recovery_binding": "recovery binding is rotated in place",
+  "identity.age_check": "0077 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
+  "identity.sensitive_data_consent": "0078 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.account_erasure_request": "erasure request state machine",
   "identity.account_erasure_notification_outbox": "outbox rows are sent then cleared",
   "identity.private_erasure_audit_binding": "erasure binding is cleared by the sweep",
@@ -417,7 +419,21 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // Engine money rule, Task M3 (spec 2026-09-26 §14.4.5): serve.serve_disclosure,
         // the owner-side, content-free record beside each served answer. The next
         // free prefix, no pair.
-        "0076_serve_disclosure.sql"
+        "0076_serve_disclosure.sql",
+        // Age gate (Turn 8 implementation prompt): identity.age_check, the result-only
+        // age record, and the 'age_frozen' account state. The next free prefix, no pair.
+        "0077_age_gate.sql",
+        // Sensitive-data consent (V's ruling of 2026-09-29): identity.sensitive_data_consent,
+        // the one-time Article 9 consent before the first debate. The next free prefix, no pair.
+        "0078_sensitive_data_consent.sql",
+        // Turn 14 change email: identity.email_change_request, the CHANGE_EMAIL
+        // step-up grant and its six definer capabilities. The next free prefix, no pair.
+        "0079_email_change.sql",
+        // Paid plans L3a (spec 2026-09-29 §2.3.2 and §2.16, amendments R1 A14/A15, RULINGS-R3 R3-1):
+        // legal.acceptance, the retention purge, the sign-up consent wrapper (with the age record)
+        // and the G3a country-gate audit capability. 0078 and 0079 are the colleague's consent and
+        // change-email files, so R3-1 moves this to 0080; no pair.
+        "0080_legal_acceptance.sql"
       ]);
   });
 });

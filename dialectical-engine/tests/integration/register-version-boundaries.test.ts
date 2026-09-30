@@ -133,6 +133,7 @@ describe("unsafe register versions fail inside every legacy-number family", () =
       BLIND_INDEX_KEY_PATH: "/run/secrets/blind",
       AUDIT_KEY_STORE_PATH: "/run/secrets/audit",
       AUDIT_SOURCE_IP_SALT_PATH: "/run/secrets/audit-ip",
+      RECORDS_KEY_PATH: "/run/secrets/records-key",
       USER_DEK_STORE_PATH: "/run/secrets/dek",
       CONTENT_PROVISION_DATABASE_URL: "postgresql://content:test@127.0.0.1:5432/debateai",
       ERASURE_DATABASE_URL: "postgresql://erasure:test@127.0.0.1:5432/debateai",

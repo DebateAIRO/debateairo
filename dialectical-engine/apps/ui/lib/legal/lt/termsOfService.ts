@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur siūlome DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI siūlome žmonėms, gyvenantiems [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
+      { kind: "p", text: "DebateAI siūlome žmonėms, gyvenantiems [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
     ]
   },
   {
@@ -113,7 +113,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Šios taisyklės taikomos jūsų pateikiamai informacijai, naudojimuisi paslauga ir skelbiamam turiniui." },
       { kind: "p", text: "Nepateikite kitų žmonių asmens duomenų. Klauskite apie problemas, argumentus ir visuomenei svarbius klausimus, o ne apie privačius asmenis, kurių tapatybę galima nustatyti. Nenurodykite vardų, kontaktinių duomenų, identifikacinių numerių, atvaizdų, sveikatos, finansinių ar kitų duomenų, pagal kuriuos galima nustatyti asmens tapatybę, ir nenaudokite DebateAI bylai, profiliui ar dosjė apie asmenį sudaryti. Klausimai apie viešus asmenis, veikiančius pagal savo viešą vaidmenį, yra priimtini; klausimai, nukreipti į privatų asmenį, nėra priimtini. Jei tokius duomenis vis dėlto pateikiate, už juos atsakote, o mes galime turinį pašalinti." },
-      { kind: "p", text: "Jūsų pačių neskelbtina informacija. Jūsų klausimai gali būti susiję su jūsų pačių sveikata, įsitikinimais, politinėmis pažiūromis ar kitais neskelbtinais dalykais. Su tuo sutikote registruodamiesi. Jei gyvenate vietoje, kurioje sveikatos duomenims taikomos specialios taisyklės, A priede gali būti pateikta nuoroda į atskirą pranešimą." },
+      { kind: "p", text: "Jūsų pačių neskelbtina informacija. Jūsų klausimai gali būti susiję su jūsų pačių sveikata, įsitikinimais, politinėmis pažiūromis ar kitais neskelbtinais dalykais. Su tuo sutinkate atskirame ekrane prieš pirmuosius savo debatus. Jei gyvenate vietoje, kurioje sveikatos duomenims taikomos specialios taisyklės, A priede gali būti pateikta nuoroda į atskirą pranešimą." },
       { kind: "p", text: "Nepateikite ir neskelbkite neteisėto turinio, įskaitant šmeižikišką, smurtą ar neapykantą kurstantį, priekabiaujantį ar grasinantį turinį, be sutikimo bendrinamus intymius atvaizdus, intelektinę nuosavybę ar konfidencialumą pažeidžiantį turinį, komercines paslaptis atskleidžiantį turinį, seksualinės prievartos prieš vaikus medžiagą arba sankcijas ar eksporto kontrolę pažeidžiantį turinį." },
       { kind: "p", text: "Nenaudokite DebateAI apgaulei. Nepateikite sugeneruoto rezultato kaip parašyto žmogaus, kai tai klaidintų, nepašalinkite žymos, kad turinys sugeneruotas DI, ir nenaudokite jo tariamam sutarimui, melagingiems įrodymams ar apsimetimui kitu asmeniu sukurti." },
       { kind: "p", text: "Neatakuokite paslaugos. Draudžiama automatizuota prieiga, duomenų rinkimas, naršymas robotais ar masinis paskelbtų debatų išgavimas, viršijantis tai, ką leidžia mūsų robotų failas; draudžiama apeiti dažnio ribojimą, autentifikavimą ar paskelbimo kontrolės priemones; bandyti išgauti raginimus ar sistemos nurodymus; naudoti raginimų injekciją siekiant priversti variklį nepaisyti apribojimų; be rašytinio mūsų leidimo ieškoti pažeidžiamumų ar atlikti apkrovos bandymus." },
@@ -298,7 +298,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Jungtinė Karalystė (tik jei nurodyta 2 skyriuje)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Mūsų atstovas Jungtinėje Karalystėje pagal JK GDPR 27 straipsnį yra [name, address, email]. Jums taikomas 2015 m. Vartotojų teisių įstatymas, ir jokia šių Sąlygų nuostata neriboja pagal jį turimų teisių; nuo [January 2027] mokamiems planams taikomos 2024 m. Skaitmeninių rinkų, konkurencijos ir vartotojų įstatymo prenumeratos taisyklės, įskaitant apsigalvojimo laikotarpį po atnaujinimo ir nemokamo bandomojo laikotarpio. Kaip saugome naudotojus nuo neteisėto turinio: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Mūsų naudojama aktyvi technologija: [describe, or \"none\"]. Amžiaus patikra: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Pagal 10 skyriuje nustatytą skundų teikimo tvarką priimami skundai dėl neteisėto turinio, neteisingo jūsų turinio pašalinimo, paskyros apribojimų, jūsų turiniui poveikį darančių automatizuotų priemonių naudojimo ir neteisingai jus užblokuojančio amžiaus nustatymo. Ja gali naudotis ir ne naudotojai, kuriems turinys padarė poveikį." }
+      { kind: "p", text: "Mūsų atstovas Jungtinėje Karalystėje pagal JK GDPR 27 straipsnį yra [name, address, email]. Jums taikomas 2015 m. Vartotojų teisių įstatymas, ir jokia šių Sąlygų nuostata neriboja pagal jį turimų teisių; kai įsigalios 2024 m. Skaitmeninių rinkų, konkurencijos ir vartotojų įstatymo prenumeratos taisyklės (tikimasi, kad 2027 m.), jos bus taikomos mokamiems planams, įskaitant apsigalvojimo laikotarpį po atnaujinimo ir nemokamo bandomojo laikotarpio. Kaip saugome naudotojus nuo neteisėto turinio: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Mūsų naudojama aktyvi technologija: [describe, or \"none\"]. Amžiaus patikra: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Pagal 10 skyriuje nustatytą skundų teikimo tvarką priimami skundai dėl neteisėto turinio, neteisingo jūsų turinio pašalinimo, paskyros apribojimų, jūsų turiniui poveikį darančių automatizuotų priemonių naudojimo ir neteisingai jus užblokuojančio amžiaus nustatymo. Ja gali naudotis ir ne naudotojai, kuriems turinys padarė poveikį. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.2 skirsnis." }
     ]
   },
   {
@@ -308,7 +308,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Arbitražinis susitarimas ir grupės ieškinio atsisakymas. Jei gyvenate Jungtinėse Amerikos Valstijose, jūs ir DebateAIRO sutinkate visus iš šių Sąlygų ar paslaugos kylančius ginčus spręsti ne teisme, o privalomu individualiu arbitražu, kurį pagal vartotojų taisykles administruoja [the American Arbitration Association / JAMS], išskyrus tai, kad kiekviena šalis gali pareikšti individualų ieškinį nedidelių sumų teisme. Galite atsisakyti arbitražo per 30 dienų nuo pirmojo sutikimo su šiomis Sąlygomis išsiųsdami el. laišką adresu [address]. Šiam susitarimui taikomas Federalinis arbitražo įstatymas. Mes sumokame arbitražo inicijavimo mokesčius. Grupinių, kolektyvinių ir atstovaujamųjų ieškinių atsisakoma tiek, kiek leidžia teisės aktai. Šis skyrius taikomas tik ateityje ir netaikomas reikalavimams, atsiradusiems prieš jums su juo sutinkant." },
       { kind: "p", text: "Pranešimai ir turinio pašalinimas. Apie be sutikimo bendrinamus intymius atvaizdus galima pranešti adresu [URL] neturint paskyros; gavus pagrįstą prašymą jie pašalinami per 48 valandas. Skundai dėl autorių teisių siunčiami 16 skyriuje nurodytam mūsų paskirtam atstovui." },
-      { kind: "p", text: "Konkrečios valstijos. Kalifornija: taikomos 12 skyriuje nustatytos automatinio atnaujinimo sąlygos; bet kada galite atšaukti internetu; jūsų sutikimą su atnaujinimo sąlygomis saugome bent trejus metus. Niujorkas: galite per 14 dienų nuo bet kokio nurašymo padidinta kaina atšaukti ir gauti proporcingą pinigų grąžinimą. Teksasas ir Nebraska: neparduodame neskelbtinų asmens duomenų; jei tai kada nors pasikeis, pirmiausia gausime jūsų sutikimą [statutory notice language]. Vašingtonas: mūsų Vartotojų sveikatos duomenų privatumo pranešimas adresu [URL] taikomas su sveikata susijusiai informacijai. Koloradas: paslauga nepriima jums reikšmingų sprendimų." }
+      { kind: "p", text: "Konkrečios valstijos. Kalifornija: taikomos 12 skyriuje nustatytos automatinio atnaujinimo sąlygos; bet kada galite atšaukti internetu; jūsų sutikimą su atnaujinimo sąlygomis saugome bent trejus metus. Niujorkas: galite per 14 dienų nuo bet kokio nurašymo padidinta kaina atšaukti ir gauti proporcingą pinigų grąžinimą. Teksasas ir Nebraska: neparduodame neskelbtinų asmens duomenų. Vašingtonas: mūsų Vartotojų sveikatos duomenų privatumo pranešimas adresu [URL] taikomas su sveikata susijusiai informacijai. Koloradas: paslauga nepriima jums reikšmingų sprendimų. Jūsų duomenims ir jūsų valstijos privatumo teisėms taikomas mūsų Privatumo politikos B priedo B.3 skirsnis." }
     ]
   },
   {
@@ -316,7 +316,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ir Kvebekas (tik jei nurodyti)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Mūsų privatumo pareigūnas yra [name, email]. Kvebekas: šios Sąlygos prancūzų kalba pateikiamos adresu [URL], o versija prancūzų kalba jums buvo pateikta pirmiausia; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų." }
+      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra [name], privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.4 skirsnis. Kvebekas: šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų; jums netaikomas joks arbitražinis susitarimas ar grupės ieškinio atsisakymas." }
     ]
   },
   {
@@ -329,32 +329,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Lotynų Amerika (priedas ispanų kalba; tik jei nurodyta)",
+    title: "Šveicarija (tik jei nurodyta)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Sutikimas yra duomenų tvarkymo pagrindas, kai nėra būtinybės vykdyti sutartį; registruodamiesi aiškiai sutinkate, kad būtų tvarkomi bet kokie neskelbtini duomenys, kuriuos nusprendžiate įtraukti. Savo ARCO teisėmis galite pasinaudoti adresu [address], o atsakymas pateikiamas per [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Meksika: visas aviso de privacidad pateiktas adresu [URL]; sutarties galima atsisakyti per [5] dienas. Argentina: [AAIP legend]; per 10 dienų pasinaudokite botón de arrepentimiento adresu [URL]. Kolumbija: política de tratamiento pateikta adresu [URL]; sutarties galima atsisakyti per 5 dienas. Čilė (nuo 2026 m. gruodžio 1 d.): Agentūros kontaktiniai duomenys yra […]; galite atšaukti tuo pačiu būdu, kuriuo užsiprenumeravote; skaitmeninėms paslaugoms teisė atsisakyti sutarties netaikoma." }
+      { kind: "p", text: "Jūsų duomenims taikomas Šveicarijos federalinis duomenų apsaugos įstatymas (Privatumo politikos B priedo B.6 skirsnis). Galite iškelti bylą tos Šveicarijos vietovės, kurioje gyvenate, teismuose. Mokamam planui netaikoma įstatymų nustatyta teisė atsisakyti sutarties; mūsų pinigų grąžinimo politika yra […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Persijos įlanka — Jungtiniai Arabų Emyratai ir Saudo Arabija (tik jei nurodyti)",
+    title: "Moldova (tik jei nurodyta)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Kai jūsų duomenis tvarkome kitais nei paslaugos teikimo tikslais, tai darome gavę jūsų sutikimą, kurį galite atšaukti. Jūsų duomenys tvarkomi už [UAE / Kingdom of Saudi Arabia] ribų, įskaitant Europos Sąjungą ir Jungtines Amerikos Valstijas, pagal [SDAIA standard contractual clauses / the mechanism in the Register]. Privalote užtikrinti, kad viskas, ką skelbiate, atitiktų šalies, kurioje esate, teisę, įskaitant įstatymus dėl religijos, viešosios tvarkos ir moralės; jūsų regione galime riboti debatų šiomis temomis skelbimą." }
+      { kind: "p", text: "Pagal šias Sąlygas turite tokias pačias teises kaip vartotojas Europos Sąjungoje, įskaitant 13 skyriuje nustatytą 14 dienų teisę atsisakyti sutarties. Galite iškelti bylą Moldovos teismuose. Jūsų duomenims taikomas Moldovos įstatymas Nr. 195/2024 dėl asmens duomenų apsaugos (Privatumo politikos B priedo B.7 skirsnis)." }
     ]
   },
   {
     no: "A.8",
-    title: "Azijos ir Ramiojo vandenyno regionas (tik nurodytiems regionams skirtos eilutės)",
+    title: "Ukraina (tik jei nurodyta)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapūras: mūsų duomenų apsaugos pareigūnas yra [name, email]; perdavimai grindžiami sutartinėmis apsaugos priemonėmis, panašiomis į PDPA; mokamam planui netaikomas įstatymų nustatytas apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra […]. Japonija: įstatymų nustatytas atskleidimas pagal Specialiųjų komercinių sandorių įstatymą pateiktas adresu [URL]; internetinėms prenumeratoms netaikomas bendrasis apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra […]; jūsų turinys gali būti perduotas paslaugų teikėjams [named countries], o registruodamiesi atitinkamais sutikimais su tuo sutinkate. Pietų Korėja: sutikimai dėl neprivalomo duomenų tvarkymo ir rinkodaros gaunami atskirai nuo paslaugai teikti būtinų dalykų; mūsų privatumo pareigūnas yra [name]; pagal Elektroninės prekybos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; prieš kiekvieną pasikartojantį kainos padidinimą ar nemokamo plano pakeitimą mokamu iš naujo gauname jūsų sutikimą; kai to reikalauja DI pagrindų įstatymas, iš anksto informuojame, kad paslauga pagrįsta DI, ir pažymime rezultatus. Indija (kai bus pradėtos taikyti DPDP taisyklės): taikomas pranešimas apie sutikimą adresu [URL]; jaunesniems nei 18 metų naudotojams būtinas patikrinamas tėvų sutikimas. Tailandas: mūsų atstovas Tailande yra [name] [if appointed]. Filipinai: mūsų verslo identifikavimo duomenys ir teisių gynimo mechanizmas pagal Internetinių sandorių įstatymą pateikti adresu [URL]; skundus galima pateikti Nacionalinei privatumo komisijai." }
+      { kind: "p", text: "DebateAI siūlome Ukrainoje, išskyrus Ukrainos vyriausybės nekontroliuojamas teritorijas. Produktas ir šios Sąlygos pateikiami ukrainiečių kalba. Jūsų duomenims taikomas Ukrainos įstatymas „Dėl asmens duomenų apsaugos“ (Privatumo politikos B priedo B.8 skirsnis)." }
     ]
   },
   {
     no: "A.9",
-    title: "Rezervuota",
+    title: "Izraelis (tik jei nurodyta)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Mokamą planą galite atšaukti taip, kaip leidžia Vartotojų apsaugos įstatymas, 5741-1981 [state the cancellation terms]. Šios Sąlygos ir mūsų Privatumo politika pateikiamos hebrajų kalba. Jūsų duomenims taikomas Izraelio privatumo apsaugos įstatymas (Privatumo politikos B priedo B.9 skirsnis)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Azijos ir Ramiojo vandenyno regionas (tik nurodytiems regionams skirtos eilutės)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapūras: mūsų duomenų apsaugos pareigūnas yra [name, email]; perdavimai grindžiami sutartinėmis apsaugos priemonėmis, panašiomis į PDPA; mokamam planui netaikomas įstatymų nustatytas apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra […]. Japonija: įstatymų nustatytas atskleidimas pagal Specialiųjų komercinių sandorių įstatymą pateiktas adresu [URL]; internetinėms prenumeratoms netaikomas bendrasis apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra […]; jūsų turinį siunčiame DI paslaugų teikėjams Jungtinėse Amerikos Valstijose ir Europos Sąjungoje, kiekvienam pagal sutartį, kuria reikalaujama apsaugos, lygiavertės Japonijos Asmeninės informacijos apsaugos įstatymo reikalavimams, o paprašius informuojame, kokios tai priemonės. Pietų Korėja: sutikimai dėl neprivalomo duomenų tvarkymo ir rinkodaros gaunami atskirai nuo paslaugai teikti būtinų dalykų; mūsų privatumo pareigūnas yra [name], privacy@dezbatere.ro; pagal Elektroninės prekybos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; prieš kiekvieną pasikartojantį kainos padidinimą ar nemokamo plano pakeitimą mokamu iš naujo gauname jūsų sutikimą; paslauga naudoja generatyvųjį DI, apie tai informuojame prieš jums pradedant ja naudotis, o DI sugeneruotą turinį pažymime. Taivanas: pagal Vartotojų apsaugos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; jūsų duomenims taikomas Taivano asmens duomenų apsaugos įstatymas (Privatumo politikos B priedo B.10 skirsnis). Tailandas: mūsų atstovas Tailande yra [name] [if appointed]. Filipinai: mūsų verslo identifikavimo duomenys ir teisių gynimo mechanizmas pagal Internetinių sandorių įstatymą pateikti adresu [URL]; skundus galima pateikti Nacionalinei privatumo komisijai." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Rezervuota",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Turkijai, Brazilijai ir Indonezijai reikia priedo vietos kalba, atstovo arba registracijos ir dokumentų pateikimo. Šie priedai čia neparengti, o šalys nepatenka į 2 skyriaus taikymo sritį, kol nebus sąmoningai įtrauktos. Kinijoje, Vietname ir Rusijoje paslauga nesiūloma." }
     ]
@@ -363,6 +379,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "7fd09db498f63032262b45930b4c8ef58272576a5869d98c09d4e1bf945f3866",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.0 · ĮSIGALIOJA [DATE]",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DebateAIRO S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

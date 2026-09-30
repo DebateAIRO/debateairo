@@ -42,7 +42,8 @@ test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
   assert.equal(authMessages["auth.login.backToSignIn"], "Back to sign in");
   assert.match(login, /replacement_recovery_code/);
   assert.match(login, /role="alert"/);
-  assert.match(login, /window\.location\.assign\(safeReturnPath\(next\)\)/);
+  // Age gate (8k): an account that still owes its one-time check goes to the interstitial first.
+  assert.match(login, /window\.location\.assign\(await ageConfirmationRequired\(\) \? ageConfirmationHref\(next\) : safeReturnPath\(next\)\)/);
   assert.doesNotMatch(login, /localStorage|sessionStorage|Bearer|keep me signed|forgot/i);
 });
 
@@ -51,7 +52,18 @@ test("sign-up exposes only fields backed by the registration contract", () => {
   assert.doesNotMatch(signUp, /client\.resendVerification/);
   assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
   assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
-  assert.match(signUp, /name="adult-affirmed"[\s\S]*?required/);
+  // Age gate (Turn 8): the date of birth replaced the 18+ tick box, and the separate age
+  // check runs before register — a refusal never reaches it.
+  assert.doesNotMatch(signUp, /adult-affirmed/);
+  assert.match(signUp, /<DateOfBirthField/);
+  // V 2026-09-29: a date under 18 is refused on the form — named under the field, and the
+  // Create account button stays disabled.
+  assert.match(signUp, /minimumAgeMessage=\{t\(catalog, "auth\.dob\.underAge"\)\}/);
+  // ...and so is any other complete date that is not a real one (before 1900, future, impossible).
+  assert.match(signUp, /const dateRefused = checkDob\(dateOfBirth\)\.code !== "incomplete" && !meetsMinimumAge\(dateOfBirth\);/);
+  assert.match(signUp, /disabled=\{busy \|\| sent \|\| !privacyAccepted \|\| !termsAccepted \|\| dateRefused\}/);
+  assert.ok(signUp.indexOf("await client.checkAge") > 0);
+  assert.ok(signUp.indexOf("await client.checkAge") < signUp.indexOf("await client.register"));
   assert.match(signUp, /await client\.register/);
   assert.match(signUp, /successMessage\(catalog, messageKey\)/);
   assert.equal(
@@ -86,8 +98,9 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(topBar, /href="\/settings"[\s\S]*?>\s*\{t\(catalog, "chrome\.account"\)\}\s*</);
   // Review F2 (REV-FIX-CATALOGS): the gate now receives the served newDebate
   // catalogue; the route (settings behind the AuthGate) is unchanged.
+  // L4: the settings page is never covered by the accept screen.
   assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} \/>/);
-  assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\}>/);
+  assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\} legalGate=\{false\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
   assert.match(login, /useState\("\/sign-up"\)/);
@@ -105,11 +118,12 @@ test("the project home confirms a real session before exposing its debate compos
   assert.match(home, /sessionConfirmed = true/);
   // Task M8 (spec 2026-09-26 §14.4.7): the composer also reads the newDebate
   // catalogue, to say today's limit for new debates where the person typed.
-  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>/);
+  // Sensitive-data consent (V, 2026-09-29): it also records the interface locale with the consent.
+  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} locale=\{locale\} \/>/);
   // Task 16 (M8 review): only the two values the daily-limit message prints ship to the browser.
   assert.match(home, /const newDebateCatalog = dailyLimitMessageCatalog\(await loadNamespace\(locale, "newDebate"\)\);/);
   assert.match(home, /id="start-a-debate"/);
-  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>[\s\S]*?\{error \?/);
+  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} locale=\{locale\} \/>[\s\S]*?\{error \?/);
 });
 
 test("the login route sends an already-authenticated browser back to its debate workspace", () => {

@@ -81,5 +81,18 @@
   "home.aiDisclosure": "Tekoälyä koskeva ilmoitus",
   "home.aiSupportLead": "Tämä keskustelu käydään tekoälypohjaisen tukipalveluavustajan kanssa.",
   "home.aiLinkLabel": "Näin merkitsemme tekoälyn tuottaman sisällön (avautuu uuteen välilehteen)",
-  "home.aiLink": "Näin merkitsemme tekoälyn tuottaman sisällön"
+  "home.aiLink": "Näin merkitsemme tekoälyn tuottaman sisällön",
+  "home.sensitiveConsent.eyebrow": "Ennen ensimmäistä väittelyäsi",
+  "home.sensitiveConsent.title": "Kysymyksesi voivat paljastaa arkaluonteisia tietoja",
+  "home.sensitiveConsent.lede": "Politiikkaa, uskontoa, terveyttä, seksuaalisuutta tai vakaumusta koskeva kysymys voi kertoa jotakin sinusta. Laki pitää tällaisia tietoja arkaluonteisina, joten tarvitsemme nimenomaisen suostumuksesi ennen kuin käsittelemme niitä.",
+  "home.sensitiveConsent.pointPurpose": "Käytämme kirjoittamaasi vain väittelyjesi toteuttamiseen.",
+  "home.sensitiveConsent.pointModels": "Väittelyn toteuttamiseksi lähetämme kysymyksesi siihen osallistuville tekoälymalleille.",
+  "home.sensitiveConsent.pointOthers": "Älä sisällytä kysymyksiisi muita ihmisiä koskevia arkaluonteisia tietoja.",
+  "home.sensitiveConsent.pointDelete": "Voit poistaa väittelyn milloin tahansa.",
+  "home.sensitiveConsent.statement": "Suostun siihen, että DebateAI käsittelee omiin kysymyksiini sisällyttämiäni arkaluonteisia tietoja väittelyjeni toteuttamista varten.",
+  "home.sensitiveConsent.privacyLink": "Lue tietosuojakäytännöstä, miten käsittelemme niitä",
+  "home.sensitiveConsent.agree": "Suostun",
+  "home.sensitiveConsent.decline": "En suostu",
+  "home.sensitiveConsent.declined": "Et voi aloittaa väittelyä ilman tätä suostumusta. Kysymme uudelleen, kun seuraavan kerran aloitat väittelyn.",
+  "home.sensitiveConsent.failed": "Vastaustasi ei voitu tallentaa. Yritä uudelleen."
 }

@@ -1,13 +1,13 @@
 {
   "schemaVersion": 2,
   "catalog": {
-    "sha256": "ebf458f1cceb6aa5681534a391f239466f92d68680e21af448bd4b7225436032",
+    "sha256": "ffd729867aa1ed250d142f1a82aee386f493a56a224193adf387c231da111854",
     "reviewedBy": "OWNER",
-    "reviewerSession": "64e6601d-82f1-4fa9-b44d-7ba92d6346ae (coordinator session; the owner read the EN and RO texts in chat and answered 'signed')",
-    "reviewedOn": "2026-09-24",
-    "evidence": "docs/missions/support-conversation-20260914/reviews/OWNER-SIGNOFF-ai-transparency.md",
+    "reviewerSession": "d65424e5-27a7-40b7-8a4c-773e60cb404f (legal-notice session; the owner read the seven legal-page entries in chat and answered 'Signed')",
+    "reviewedOn": "2026-09-29",
+    "evidence": "docs/missions/legal-pages/OWNER-SIGNOFF-legal-pages-catalog.md",
     "ratifiedBy": "V",
-    "ratifiedOn": "2026-09-24"
+    "ratifiedOn": "2026-09-29"
   },
   "articles": [
     {

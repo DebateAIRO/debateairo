@@ -81,5 +81,18 @@
   "home.aiDisclosure": "KI-Hinweis",
   "home.aiSupportLead": "Dieses Gespräch wird mit einem KI-Support-Assistenten geführt.",
   "home.aiLinkLabel": "So kennzeichnen wir KI-Inhalte (wird in einem neuen Tab geöffnet)",
-  "home.aiLink": "So kennzeichnen wir KI-Inhalte"
+  "home.aiLink": "So kennzeichnen wir KI-Inhalte",
+  "home.sensitiveConsent.eyebrow": "Vor Ihrer ersten Debatte",
+  "home.sensitiveConsent.title": "Ihre Fragen können sensible Informationen preisgeben",
+  "home.sensitiveConsent.lede": "Eine Frage zu Politik, Religion, Gesundheit, Sexualität oder Überzeugungen kann etwas über Sie aussagen. Das Gesetz stuft solche Angaben als sensible Informationen ein; deshalb benötigen wir Ihre ausdrückliche Einwilligung, bevor wir sie verarbeiten.",
+  "home.sensitiveConsent.pointPurpose": "Was Sie schreiben, verwenden wir ausschließlich zur Durchführung Ihrer Debatten.",
+  "home.sensitiveConsent.pointModels": "Zur Durchführung einer Debatte senden wir Ihre Frage an die daran beteiligten KI-Modelle.",
+  "home.sensitiveConsent.pointOthers": "Nehmen Sie keine sensiblen Informationen über andere Personen auf.",
+  "home.sensitiveConsent.pointDelete": "Sie können eine Debatte jederzeit löschen.",
+  "home.sensitiveConsent.statement": "Ich willige ein, dass DebateAI die sensiblen Informationen, die ich in meine eigenen Fragen aufnehme, zur Durchführung meiner Debatten verarbeiten darf.",
+  "home.sensitiveConsent.privacyLink": "Wie wir damit umgehen, lesen Sie in der Datenschutzerklärung",
+  "home.sensitiveConsent.agree": "Ich willige ein",
+  "home.sensitiveConsent.decline": "Ich willige nicht ein",
+  "home.sensitiveConsent.declined": "Ohne diese Einwilligung können Sie keine Debatte beginnen. Wir fragen Sie erneut, wenn Sie das nächste Mal eine Debatte beginnen.",
+  "home.sensitiveConsent.failed": "Ihre Antwort konnte nicht gespeichert werden. Versuchen Sie es erneut."
 }

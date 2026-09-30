@@ -81,5 +81,18 @@
   "home.aiDisclosure": "MI-tájékoztató",
   "home.aiSupportLead": "Ez a beszélgetés egy MI-alapú ügyfélszolgálati asszisztenssel zajlik.",
   "home.aiLinkLabel": "Hogyan jelöljük az MI-tartalmat? (új lapon nyílik meg)",
-  "home.aiLink": "Hogyan jelöljük az MI-tartalmat"
+  "home.aiLink": "Hogyan jelöljük az MI-tartalmat",
+  "home.sensitiveConsent.eyebrow": "Az első vitája előtt",
+  "home.sensitiveConsent.title": "Kérdései különleges adatokat fedhetnek fel",
+  "home.sensitiveConsent.lede": "A politikára, vallásra, egészségre, szexualitásra vagy meggyőződésre vonatkozó kérdés elárulhat valamit Önről. A jog ezt különleges adatnak tekinti, ezért kezelése előtt szükségünk van az Ön kifejezett hozzájárulására.",
+  "home.sensitiveConsent.pointPurpose": "Amit leír, azt kizárólag a vitái futtatására használjuk.",
+  "home.sensitiveConsent.pointModels": "A vita futtatásához elküldjük kérdését a vitában részt vevő MI-modelleknek.",
+  "home.sensitiveConsent.pointOthers": "Ne adjon meg más személyekre vonatkozó különleges adatokat.",
+  "home.sensitiveConsent.pointDelete": "Bármikor törölhet egy vitát.",
+  "home.sensitiveConsent.statement": "Hozzájárulok ahhoz, hogy a DebateAI a saját kérdéseimben általam megadott különleges adatokat a vitáim futtatása céljából kezelje.",
+  "home.sensitiveConsent.privacyLink": "Olvassa el az Adatvédelmi szabályzatban, hogyan kezeljük ezeket az adatokat",
+  "home.sensitiveConsent.agree": "Hozzájárulok",
+  "home.sensitiveConsent.decline": "Nem járulok hozzá",
+  "home.sensitiveConsent.declined": "E hozzájárulás nélkül nem indíthat vitát. Amikor legközelebb vitát indít, újra megkérdezzük.",
+  "home.sensitiveConsent.failed": "A válaszát nem sikerült menteni. Próbálja újra."
 }

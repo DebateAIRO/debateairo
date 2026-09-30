@@ -83,5 +83,18 @@
   "home.aiDisclosure": "Informacija apie DI",
   "home.aiSupportLead": "Šiame pokalbyje bendraujate su DI pagalbos agentu.",
   "home.aiLinkLabel": "Kaip žymime DI sukurtą turinį (atveriama naujame skirtuke)",
-  "home.aiLink": "Kaip žymime DI sukurtą turinį"
+  "home.aiLink": "Kaip žymime DI sukurtą turinį",
+  "home.sensitiveConsent.eyebrow": "Prieš pirmuosius jūsų debatus",
+  "home.sensitiveConsent.title": "Jūsų klausimai gali atskleisti neskelbtiną informaciją",
+  "home.sensitiveConsent.lede": "Klausimas apie politiką, religiją, sveikatą, seksualumą ar įsitikinimus gali ką nors pasakyti apie jus. Teisės aktai tokią informaciją laiko neskelbtina, todėl prieš ją tvarkydami turime gauti aiškų jūsų sutikimą.",
+  "home.sensitiveConsent.pointPurpose": "Tai, ką parašote, naudojame tik jūsų debatams vykdyti.",
+  "home.sensitiveConsent.pointModels": "Kad galėtume vykdyti debatus, jūsų klausimą siunčiame juose dalyvaujantiems DI modeliams.",
+  "home.sensitiveConsent.pointOthers": "Neįtraukite neskelbtinos informacijos apie kitus žmones.",
+  "home.sensitiveConsent.pointDelete": "Debatus galite ištrinti bet kada.",
+  "home.sensitiveConsent.statement": "Sutinku, kad DebateAI tvarkytų neskelbtiną informaciją, kurią įtraukiu į savo klausimus, mano debatų vykdymo tikslu.",
+  "home.sensitiveConsent.privacyLink": "Kaip tvarkome šią informaciją, skaitykite Privatumo politikoje",
+  "home.sensitiveConsent.agree": "Sutinku",
+  "home.sensitiveConsent.decline": "Nesutinku",
+  "home.sensitiveConsent.declined": "Be šio sutikimo negalite pradėti debatų. Vėl paklausime, kai kitą kartą pradėsite debatus.",
+  "home.sensitiveConsent.failed": "Jūsų atsakymo išsaugoti nepavyko. Bandykite dar kartą."
 }

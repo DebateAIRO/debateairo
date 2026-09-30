@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "Jezik te razprave: {language} ({nativeName}). Želite stran prikazati v jeziku: {language}?",
   "chrome.languageOffer.textNative": "Jezik te razprave: {language}. Želite stran prikazati v jeziku: {language}?",
   "chrome.languageOffer.switch": "Preklopi na jezik: {language}",
-  "chrome.languageOffer.dismiss": "Ne, hvala"
+  "chrome.languageOffer.dismiss": "Ne, hvala",
+  "chrome.legalPages": "Pravno",
+  "chrome.legal.notice": "Impresum",
+  "chrome.legal.terms": "Pogoji uporabe",
+  "chrome.legal.versions": "Različice pogojev",
+  "chrome.legal.privacy": "Pravilnik o zasebnosti",
+  "chrome.legal.cookies": "Pravilnik o piškotkih",
+  "chrome.legal.providers": "Ponudniki modelov",
+  "chrome.legal.health": "Zasebnost zdravstvenih podatkov (ZDA)",
+  "chrome.footer.label": "Noga spletnega mesta",
+  "chrome.footer.location": "Bukarešta, Romunija",
+  "chrome.footer.product": "Izdelek",
+  "chrome.footer.home": "Domov",
+  "chrome.footer.cookiePreferences": "Nastavitve piškotkov"
 }

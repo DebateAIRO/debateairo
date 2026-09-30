@@ -6,12 +6,13 @@
  * Added when the Terms became a document in the product: the row is the privacy row's twin
  * and follows the same ONE CLICK RULE — any click on the empty row OPENS the Terms and ticks
  * nothing; the ONLY route that ticks the box is the modal's `I have read it` after the end is
- * reached; every dismissal leaves the box empty. The register call keeps its shape: the Terms
- * box is a third gate on the same submit, refused from FormData exactly like the other two.
+ * reached; every dismissal leaves the box empty. The Terms box is a gate on the same submit,
+ * refused from FormData exactly like the privacy box. (The 18+ row that once opened the group
+ * is gone: the age gate replaced it with the date-of-birth field, Turn 8 — two rows remain.)
  *
  * The privacy row's own behaviour stays pinned in `consent-signup-modal.test.tsx`; this file
  * pins what is NEW: the third row, the Terms dialog being the one that opens, the two dialogs
- * being distinguishable, and the three-box gate. Idioms are the sign-up suites' — `.click()`
+ * being distinguishable, and the two-box gate. Idioms are the sign-up suites' — `.click()`
  * inside `act` for every box, the scroll metrics shadowed on `HTMLElement.prototype`.
  */
 
@@ -19,10 +20,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 
-const ROW_ONE_TEXT = "I am 18 or over.";
-const ROW_TWO_TEXT = "I have read the Privacy Policy.";
-const ROW_THREE_TEXT = "I have read and agree to the Terms of Service.";
+const PRIVACY_ROW_TEXT = "I have read the Privacy Policy.";
+const TERMS_ROW_TEXT = "I have read and agree to the Terms of Service.";
 
 let root: Root | null = null;
 
@@ -133,7 +134,7 @@ async function acknowledgeTerms(): Promise<void> {
   expect(dialog(), "acknowledging must close the Terms").toBeNull();
 }
 
-/** The privacy row's lawful route, for the cases that need all three boxes. */
+/** The privacy row's lawful route, for the cases that need both boxes. */
 async function acknowledgePolicy(): Promise<void> {
   metrics.scrollTop = TOP.scrollTop;
   await clickElement(field("privacy-accepted"));
@@ -152,10 +153,30 @@ async function submit(): Promise<void> {
   await settle();
 }
 
+/** Type into a controlled text input the way React sees it (prototype setter + `input`). */
+async function type(name: string, value: string): Promise<void> {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field(name), value);
+    field(name).dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+/* Age gate replaced the 18+ box (Turn 8): an adult date of birth, typed the way React sees it. */
+async function fillAdultDateOfBirth(): Promise<void> {
+  await type("dob-d", "01");
+  await type("dob-m", "01");
+  await type("dob-y", "1990");
+}
+
 async function mount(client?: {
   register: ReturnType<typeof vi.fn>;
+  checkAge: ReturnType<typeof vi.fn>;
 }): Promise<void> {
-  const stub = client ?? { register: vi.fn() };
+  /* A fresh fake per mount, so `checkAge` is reset exactly like `register`. */
+  const stub = client ?? {
+    register: vi.fn(),
+    checkAge: vi.fn().mockResolvedValue({ outcome: "allowed" })
+  };
   await act(async () => root!.render(<SignUpFlow client={stub} />));
   await settle();
 }
@@ -178,18 +199,18 @@ describe("sign-up — the Terms of Service row", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders three rows — 18+, privacy, terms — in that order, one required box each", async () => {
+  // Rewritten to two rows: the age gate replaced the 18+ row (Turn 8).
+  it("renders two rows — privacy, terms — in that order, one required box each", async () => {
     await mount();
 
     const consentRows = rows();
-    expect(consentRows).toHaveLength(3);
-    const adult = field("adult-affirmed");
+    expect(consentRows).toHaveLength(2);
+    expect(document.querySelector('input[name="adult-affirmed"]'), "the 18+ box is gone").toBeNull();
     const privacy = field("privacy-accepted");
     const terms = field("terms-accepted");
-    expect(consentRows[0]!.contains(adult)).toBe(true);
-    expect(consentRows[1]!.contains(privacy)).toBe(true);
-    expect(consentRows[2]!.contains(terms)).toBe(true);
-    expect(consentRows[2]!.contains(privacy)).toBe(false);
+    expect(consentRows[0]!.contains(privacy)).toBe(true);
+    expect(consentRows[1]!.contains(terms)).toBe(true);
+    expect(consentRows[1]!.contains(privacy)).toBe(false);
     expect(privacy.compareDocumentPosition(terms) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
@@ -201,18 +222,18 @@ describe("sign-up — the Terms of Service row", () => {
     expect(document.querySelectorAll("form")).toHaveLength(1);
   });
 
-  it("carries the three sentences verbatim, each control a non-submitting button", async () => {
+  // Two sentences now: the age gate replaced the 18+ row (Turn 8).
+  it("carries the two sentences verbatim, each control a non-submitting button", async () => {
     await mount();
 
     const consentRows = rows();
-    expect(consentRows[0]!.textContent?.trim()).toBe(ROW_ONE_TEXT);
-    expect(consentRows[1]!.textContent?.trim()).toBe(ROW_TWO_TEXT);
-    expect(consentRows[2]!.textContent?.trim()).toBe(ROW_THREE_TEXT);
+    expect(consentRows[0]!.textContent?.trim()).toBe(PRIVACY_ROW_TEXT);
+    expect(consentRows[1]!.textContent?.trim()).toBe(TERMS_ROW_TEXT);
 
-    const policyControl = consentRows[1]!.querySelector(".consentPolicyLink");
+    const policyControl = consentRows[0]!.querySelector(".consentPolicyLink");
     expect(policyControl!.textContent).toBe("Privacy Policy");
     expect(policyControl!.getAttribute("type")).toBe("button");
-    const termsControl = consentRows[2]!.querySelector(".consentPolicyLink");
+    const termsControl = consentRows[1]!.querySelector(".consentPolicyLink");
     expect(termsControl, "missing the Terms of Service control").not.toBeNull();
     expect(termsControl!.textContent).toBe("Terms of Service");
     expect(termsControl!.getAttribute("type")).toBe("button");
@@ -225,7 +246,7 @@ describe("sign-up — the Terms of Service row", () => {
     expect(labelledBy, "terms-accepted has no aria-labelledby").not.toBeNull();
     const named = document.getElementById(labelledBy!);
     expect(named, `aria-labelledby="${labelledBy}" names no element`).not.toBeNull();
-    expect(named!.textContent?.trim()).toBe(ROW_THREE_TEXT);
+    expect(named!.textContent?.trim()).toBe(TERMS_ROW_TEXT);
     expect(labelledBy).not.toBe(field("privacy-accepted").getAttribute("aria-labelledby"));
   });
 
@@ -240,9 +261,10 @@ describe("sign-up — the Terms of Service row", () => {
     expect(createAccountButton().disabled).toBe(true);
   });
 
+  // The terms row is now the second row: the age gate replaced the 18+ row (Turn 8).
   it("opens the Terms from the row's sentence and from the Terms of Service control", async () => {
     await mount();
-    const row = rows()[2]!;
+    const row = rows()[1]!;
 
     await clickElement(row.querySelector<HTMLElement>(".consentText")!);
     expectTermsOpen();
@@ -284,11 +306,12 @@ describe("sign-up — the Terms of Service row", () => {
     expect(document.activeElement, "focus returns to the terms input").toBe(field("terms-accepted"));
   });
 
+  // The terms row is now the second row: the age gate replaced the 18+ row (Turn 8).
   it("unchecks a ticked terms row directly, with no modal", async () => {
     await mount();
     await acknowledgeTerms();
 
-    await clickElement(rows()[2]!.querySelector<HTMLElement>(".consentText")!);
+    await clickElement(rows()[1]!.querySelector<HTMLElement>(".consentText")!);
 
     expect(field("terms-accepted").checked, "the box must uncheck").toBe(false);
     expect(dialog(), "unchecking must open no dialog").toBeNull();
@@ -309,33 +332,36 @@ describe("sign-up — the Terms of Service row", () => {
     expect(field("terms-accepted").checked).toBe(false);
   });
 
-  it("keeps Create account disabled until all three boxes are ticked", async () => {
+  // Rewritten to the two-box gate: the age gate replaced the 18+ box (Turn 8), and the date of
+  // birth does not gate the button.
+  it("keeps Create account disabled until both boxes are ticked", async () => {
     await mount();
 
-    await clickElement(field("adult-affirmed"));
     await acknowledgePolicy();
-    expect(field("adult-affirmed").checked).toBe(true);
     expect(field("privacy-accepted").checked).toBe(true);
-    expect(createAccountButton().disabled, "two of three boxes: still disabled").toBe(true);
+    expect(createAccountButton().disabled, "one of two boxes: still disabled").toBe(true);
 
     await acknowledgeTerms();
-    expect(createAccountButton().disabled, "all three boxes: enabled").toBe(false);
+    expect(createAccountButton().disabled, "both boxes: enabled").toBe(false);
 
-    await clickElement(rows()[2]!.querySelector<HTMLElement>(".consentText")!);
+    await clickElement(rows()[1]!.querySelector<HTMLElement>(".consentText")!);
     expect(field("terms-accepted").checked).toBe(false);
     expect(createAccountButton().disabled, "unticking the Terms disables it again").toBe(true);
   });
 
-  it("refuses a scripted submit with the Terms box empty, and registers with all three ticked", async () => {
+  // Rewritten to both boxes plus an adult date of birth: the age gate replaced the 18+ box (Turn 8).
+  it("refuses a scripted submit with the Terms box empty, and registers with both ticked", async () => {
     const register = vi.fn().mockResolvedValue({ message: "sent" });
-    await mount({ register });
+    const checkAge = vi.fn().mockResolvedValue({ outcome: "allowed" });
+    await mount({ register, checkAge });
 
+    // First: its re-renders would reset the controlled fields assigned directly below.
+    await fillAdultDateOfBirth();
     field("email").value = "person@example.test";
     field("confirm-email").value = "person@example.test";
     field("recovery-email").value = "recovery@example.test";
     field("password").value = "correct horse battery staple";
     field("confirm-password").value = "correct horse battery staple";
-    field("adult-affirmed").checked = true;
     field("privacy-accepted").checked = true;
     await submit();
     expect(register, "an empty Terms box must refuse the registration").not.toHaveBeenCalled();
@@ -347,7 +373,8 @@ describe("sign-up — the Terms of Service row", () => {
       "person@example.test",
       "correct horse battery staple",
       "recovery@example.test",
-      true
+      "1990-01-01",
+      DISPLAYED_LEGAL_EN
     );
     expect(field("terms-accepted").disabled, "terms-accepted disabled when sent").toBe(true);
   });

@@ -156,7 +156,8 @@ describe("DL1-F2 the support budgets supersede, never edit, the sealed row", () 
       // DL1-F7 rides the same unpublished deployment version; see its own test.
       support_model_calls: {
         key: "source", limit: 40, window_ms: 24 * 60 * 60_000, capacity: 65_536
-      }
+      },
+      geo_availability: { key: "source", limit: 60, window_ms: 60_000, capacity: 65_536 }
     });
     expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef)
       .toContain(ADMISSION_POLICY_REGISTER_ROW.sourceRef);

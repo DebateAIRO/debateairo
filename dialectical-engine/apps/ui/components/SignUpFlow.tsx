@@ -9,15 +9,21 @@ import {
   useRef,
   useState
 } from "react";
-import type { ContractClient } from "@debateai/contract";
+import { ContractHttpError, type ContractClient } from "@debateai/contract";
+import { checkDob, dobToIso, meetsMinimumAge, type DobErrorCode, type DobParts } from "@debateai/kernel";
+import { AgeRefusal } from "@/components/AgeRefusal";
 import { AuthShell } from "@/components/AuthShell";
+import { DateOfBirthField, EMPTY_DOB } from "@/components/DateOfBirthField";
 import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
 import { TermsOfServiceModal } from "@/components/consent/TermsOfServiceModal";
+import { useLegalDocument } from "@/components/consent/useLegalDocument";
 import { contractClient } from "@/lib/api";
+import { resolveDobLocale, type DobLocale } from "@/lib/dob/dobLocale";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import authEnglish from "@/messages/en/auth.json";
 
-type RegistrationClient = Pick<ContractClient, "register">;
+type RegistrationClient = Pick<ContractClient, "checkAge" | "register">;
 type SuccessMessageKey = "auth.signUp.registrationSent";
 
 type Validity = Readonly<{ state: "idle" | "ok" | "bad"; text: string }>;
@@ -132,8 +138,20 @@ function gatedRowClick(
 
 export function SignUpFlow({
   catalog = authEnglish,
-  client = contractClient
-}: Readonly<{ catalog?: MessageCatalog; client?: RegistrationClient }>) {
+  client = contractClient,
+  dobLocale = resolveDobLocale("en"),
+  refused: refusedOnArrival = false,
+  reloadPage = () => window.location.reload()
+}: Readonly<{
+  catalog?: MessageCatalog;
+  client?: RegistrationClient;
+  /** The date-of-birth widget's field order and direction, from the UI locale (8g). */
+  dobLocale?: DobLocale;
+  /** The page found the age-gate lockout cookie: the refusal is all this browser sees (8j). */
+  refused?: boolean;
+  /** Paid plans L3b: reloads the page after LEGAL_DOCUMENT_STALE (a prop so render tests stay in jsdom). */
+  reloadPage?: () => void;
+}>) {
   const [email, setEmail] = useState("");
   const [confirmEmail, setConfirmEmail] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
@@ -144,16 +162,31 @@ export function SignUpFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginHref, setLoginHref] = useState("/login");
-  /* The three consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
+  /* Date of birth (8d): the widget is controlled; its error is set on submit and cleared by
+     every edit. The date never leaves this form except to be checked. */
+  const [dateOfBirth, setDateOfBirth] = useState<DobParts>(EMPTY_DOB);
+  /* A complete date that is not a real date of birth of someone at least MIN_AGE: under 18,
+     before 1900, in the future or impossible (V 2026-09-29). The field says which; Create
+     account stays disabled. A date still being typed does not disable it. */
+  const dateRefused = checkDob(dateOfBirth).code !== "incomplete" && !meetsMinimumAge(dateOfBirth);
+  const [dateOfBirthError, setDateOfBirthError] = useState<DobErrorCode | null>(null);
+  const [refused, setRefused] = useState(refusedOnArrival);
+  /* The two consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
      computing the submit button's `disabled`, so it reflects the boxes live.
      FormData is the truth at submit — see submitRegistration. */
-  const [adultAffirmed, setAdultAffirmed] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const privacyInputRef = useRef<HTMLInputElement | null>(null);
   const termsInputRef = useRef<HTMLInputElement | null>(null);
+  /* L3b: the pairs of the documents THIS page displays — the same modules the two modals render,
+     in the same locale — so the server records exactly what the person read. */
+  const { locale } = useChromeI18n();
+  const termsDocument = useLegalDocument("terms");
+  const privacyDocument = useLegalDocument("privacy");
+  /* L3b: the server said the documents on this page are no longer the current ones. */
+  const [documentsStale, setDocumentsStale] = useState(false);
 
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
@@ -164,11 +197,19 @@ export function SignUpFlow({
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    /* The date of birth is checked first, so its validity line answers every submit (8f). */
+    const dateCheck = checkDob(dateOfBirth);
+    if (dateCheck.code !== "ok") {
+      setDateOfBirthError(dateCheck.code);
+      return;
+    }
+    /* Under MIN_AGE: the field already says so and the button is disabled; a scripted
+       submit stops here too, before any request. */
+    if (!meetsMinimumAge(dateOfBirth)) return;
     /* Defence in depth. A bare `new Event("submit")` bypasses HTML constraint
        validation, so `required` alone gates nothing against a scripted submit.
        Consent and confirmation are read from FormData, never the mirrors above. */
     if (
-      data.get("adult-affirmed") !== "on" ||
       data.get("privacy-accepted") !== "on" ||
       data.get("terms-accepted") !== "on" ||
       confirmEmailValidity(
@@ -187,16 +228,53 @@ export function SignUpFlow({
     const submitted = String(data.get("email") ?? "").trim();
     setBusy(true);
     setError(null);
+    setDocumentsStale(false);
+    const isoDate = dobToIso(dateOfBirth);
     try {
+      /* THE AGE GATE (8j). A separate check before register; a refusal shows the refusal and
+         register is never called. The API sets the 30-day lockout cookie with the refusal. */
+      const age = await client.checkAge(isoDate);
+      if (age.outcome === "refused") {
+        setRefused(true);
+        return;
+      }
       await client.register(
         submitted,
         String(data.get("password") ?? ""),
         String(data.get("recovery-email") ?? "").trim(),
-        data.get("adult-affirmed") === "on"
+        isoDate,
+        {
+          terms: { version: termsDocument.version, sha256: termsDocument.sha256 },
+          privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 },
+          locale
+        }
       );
       setSubmittedEmail(submitted);
       setMessageKey("auth.signUp.registrationSent");
-    } catch {
+    } catch (failure) {
+      if (failure instanceof ContractHttpError && failure.serverCode === "AUTH_AGE_REFUSED") {
+        setRefused(true);
+        return;
+      }
+      if (failure instanceof ContractHttpError && failure.serverCode === "LEGAL_DOCUMENT_STALE") {
+        /* Spec §2.3.2: "The UI then reloads the document." The documents ship with the page, so the
+           page is what reloads. Until it does, both document acknowledgements are withdrawn — the DOM
+           (FormData is the truth at submit) and the mirrors (the button's live `disabled`) — so this
+           page cannot send the stale pair again. The date of birth is kept: the age gate answered. */
+        if (privacyInputRef.current !== null) privacyInputRef.current.checked = false;
+        if (termsInputRef.current !== null) termsInputRef.current.checked = false;
+        setPrivacyAccepted(false);
+        setTermsAccepted(false);
+        setDocumentsStale(true);
+        setError(t(catalog, "auth.signUp.documentsUpdated"));
+        return;
+      }
+      if (failure instanceof ContractHttpError && (failure.serverCode === "COUNTRY_SIGNUP_UNAVAILABLE"
+        || failure.serverCode === "COUNTRY_UNKNOWN" || failure.serverCode === "TOR_REFUSED")) {
+        // Paid plans G3b (sentence G1): the register gate refused this address's country.
+        setError(t(catalog, "auth.signUp.countryUnavailable"));
+        return;
+      }
       setError(t(catalog, "auth.signUp.creationFailed"));
     } finally {
       setBusy(false);
@@ -251,6 +329,8 @@ export function SignUpFlow({
   const confirmPasswordState = confirmPasswordValidity(confirmPassword, password, catalog);
   const rules = passwordRules(catalog);
 
+  if (refused) return <AgeRefusal catalog={catalog} />;
+
   return (
     <AuthShell
       eyebrow={t(catalog, "auth.signUp.eyebrow")}
@@ -259,6 +339,11 @@ export function SignUpFlow({
       footer={null}
     >
       {error ? <div className="authAlert" role="alert">{error}</div> : null}
+      {documentsStale ? (
+        <button className="authTextButton" type="button" onClick={reloadPage}>
+          {t(catalog, "auth.signUp.reloadDocuments")}
+        </button>
+      ) : null}
 
       <form className="authForm" data-form="signup" method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
         <div className="authField">
@@ -352,27 +437,35 @@ export function SignUpFlow({
           <p className="authValidity" data-state={confirmPasswordState.state}>{confirmPasswordState.text}</p>
         </div>
 
+        {/* Date of birth — design document Turn 8 · 8a/8d: after Password, before the consent
+            group. It replaces the "I am 18 or over" tick box. V 2026-09-29: a date under 18 is
+            refused right here — the minimum age is named under the field and Create account
+            stays disabled — rather than only after submitting. */}
+        <div className="authField">
+          <DateOfBirthField
+            catalog={catalog}
+            locale={dobLocale}
+            value={dateOfBirth}
+            error={dateOfBirthError}
+            onChange={(next) => {
+              setDateOfBirth(next);
+              setDateOfBirthError(null);
+            }}
+            disabled={busy || sent}
+            minimumAgeMessage={t(catalog, "auth.dob.underAge")}
+          />
+        </div>
+
         {/* Consent group — design artboard 8a (turn-8a-checkbox-group.html:1-10), plus the
             Terms row that joined it when the Terms of Service became a document in the
-            product. Row 1 is a <label> wrapping its input, so the square, the text and the
-            row all toggle it natively. Rows 2 and 3 cannot be a <label>: their document
-            controls are interactive content, which the <label> content model forbids — so
-            each is a <div> and its input takes its name from aria-labelledby. The privacy
+            product (the 18+ row it once opened with is now the date-of-birth field above).
+            Neither row can be a <label>: their document controls are interactive content,
+            which the <label> content model forbids — so each is a <div> and its input takes
+            its name from aria-labelledby. The privacy
             row is a READ acknowledgement (the Terms say the policy is information owed, not
             a contract agreed to); the terms row is the agreement, in the words the Terms
             themselves use for it. */}
         <div className="consentGroup">
-          <label className="consentRow">
-            <input
-              className="consentBox"
-              name="adult-affirmed"
-              type="checkbox"
-              required
-              disabled={busy || sent}
-              onChange={(event) => setAdultAffirmed(event.currentTarget.checked)}
-            />
-            <span className="consentText">{t(catalog, "auth.signUp.adultAffirmation")}</span>
-          </label>
           {/* ONE onClick, on the ROW: the check square, the sentence and the document
               control are three entry points onto one behaviour, and a handler placed on any
               one of them covers only that one. */}
@@ -387,7 +480,7 @@ export function SignUpFlow({
               ref={privacyInputRef}
               /* The SETTLED value, not the in-flight one: a cancelled change never
                  reaches the DOM, so mirroring its `true` would record a state the box
-                 never holds. `adult-affirmed`'s handler is the literal form. */
+                 never holds. */
               onChange={(event) =>
                 setPrivacyAccepted(
                   event.currentTarget.checked && !event.nativeEvent.defaultPrevented
@@ -430,7 +523,7 @@ export function SignUpFlow({
         <button
           className="authPrimary"
           type="submit"
-          disabled={busy || sent || !adultAffirmed || !privacyAccepted || !termsAccepted}
+          disabled={busy || sent || !privacyAccepted || !termsAccepted || dateRefused}
         >
           {busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}
         </button>

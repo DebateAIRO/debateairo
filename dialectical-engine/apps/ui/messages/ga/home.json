@@ -84,5 +84,18 @@
   "home.aiDisclosure": "Nochtadh IS",
   "home.aiSupportLead": "Is le gníomhaire tacaíochta IS atá an comhrá seo.",
   "home.aiLinkLabel": "An chaoi a lipéadaímid ábhar IS (osclaítear i gcluaisín nua)",
-  "home.aiLink": "An chaoi a lipéadaímid ábhar IS"
+  "home.aiLink": "An chaoi a lipéadaímid ábhar IS",
+  "home.sensitiveConsent.eyebrow": "Roimh do chéad díospóireacht",
+  "home.sensitiveConsent.title": "D’fhéadfadh do cheisteanna faisnéis íogair a nochtadh",
+  "home.sensitiveConsent.lede": "Is féidir le ceist faoi pholaitíocht, reiligiún, sláinte, gnéasacht nó creideamh rud éigin a insint fút. Measann an dlí gur faisnéis íogair í seo, agus mar sin teastaíonn do thoiliú sainráite uainn sula bpróiseálaimid í.",
+  "home.sensitiveConsent.pointPurpose": "Ní úsáidimid an méid a scríobhann tú ach chun do dhíospóireachtaí a reáchtáil.",
+  "home.sensitiveConsent.pointModels": "Chun díospóireacht a reáchtáil, seolaimid do cheist chuig na samhlacha IS atá páirteach inti.",
+  "home.sensitiveConsent.pointOthers": "Ná cuir isteach faisnéis íogair faoi dhaoine eile.",
+  "home.sensitiveConsent.pointDelete": "Is féidir leat díospóireacht a scriosadh am ar bith.",
+  "home.sensitiveConsent.statement": "Aontaím go bhféadfaidh DebateAI an fhaisnéis íogair a chuirim i mo cheisteanna féin a phróiseáil, chun mo dhíospóireachtaí a reáchtáil.",
+  "home.sensitiveConsent.privacyLink": "Léigh sa Bheartas Príobháideachais an chaoi a láimhseálaimid an fhaisnéis sin",
+  "home.sensitiveConsent.agree": "Aontaím",
+  "home.sensitiveConsent.decline": "Ní aontaím",
+  "home.sensitiveConsent.declined": "Ní féidir leat díospóireacht a thosú gan an toiliú seo. Iarrfaimid arís ort an chéad uair eile a thosóidh tú ceann.",
+  "home.sensitiveConsent.failed": "Níorbh fhéidir d’fhreagra a shábháil. Bain triail eile as."
 }

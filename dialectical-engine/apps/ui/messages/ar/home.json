@@ -85,5 +85,18 @@
   "home.aiDisclosure": "الإفصاح عن الذكاء الاصطناعي",
   "home.aiSupportLead": "هذه المحادثة مع مساعد دعم يعمل بالذكاء الاصطناعي.",
   "home.aiLinkLabel": "كيف نوسم محتوى الذكاء الاصطناعي (يُفتح في علامة تبويب جديدة)",
-  "home.aiLink": "كيف نوسم محتوى الذكاء الاصطناعي"
+  "home.aiLink": "كيف نوسم محتوى الذكاء الاصطناعي",
+  "home.sensitiveConsent.eyebrow": "قبل مناظرتك الأولى",
+  "home.sensitiveConsent.title": "قد تكشف أسئلتك معلومات حساسة",
+  "home.sensitiveConsent.lede": "قد يدلّ سؤال عن السياسة أو الدين أو الصحة أو الحياة الجنسية أو المعتقدات على أمور تخصك. ويعدّ القانون ذلك معلومات حساسة، ولذلك نحتاج إلى موافقتك الصريحة قبل أن نعالجها.",
+  "home.sensitiveConsent.pointPurpose": "لا نستخدم ما تكتبه إلا لتشغيل مناظراتك.",
+  "home.sensitiveConsent.pointModels": "لتشغيل مناظرة، نرسل سؤالك إلى نماذج الذكاء الاصطناعي المشاركة فيها.",
+  "home.sensitiveConsent.pointOthers": "لا تُدرج معلومات حساسة عن أشخاص آخرين.",
+  "home.sensitiveConsent.pointDelete": "يمكنك حذف أي مناظرة متى شئت.",
+  "home.sensitiveConsent.statement": "أوافق على أن تعالج DebateAI المعلومات الحساسة التي أُدرجها في أسئلتي أنا، وذلك لغرض تشغيل مناظراتي.",
+  "home.sensitiveConsent.privacyLink": "اقرأ في سياسة الخصوصية كيف نتعامل معها",
+  "home.sensitiveConsent.agree": "أوافق",
+  "home.sensitiveConsent.decline": "لا أوافق",
+  "home.sensitiveConsent.declined": "لا يمكنك بدء مناظرة دون هذه الموافقة. وسنسألك مجددًا عندما تبدأ مناظرتك التالية.",
+  "home.sensitiveConsent.failed": "تعذّر حفظ إجابتك. حاول مجددًا."
 }

@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "Ответ координатора не удалось прочитать, поэтому результат неизвестен.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Координатор отклонил выбранный тариф. Выберите «Бесплатный» или «Премиум», затем повторите попытку.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Координатор отклонил запрос: модель, необходимая для этого тарифа, сейчас недоступна. Повторите попытку позже или выберите другой тариф.",
-  "requestFailure.kind.UNCLASSIFIED": "Сбой произошёл до получения ответа, поэтому результат неизвестен. Это не решение координатора."
+  "requestFailure.kind.UNCLASSIFIED": "Сбой произошёл до получения ответа, поэтому результат неизвестен. Это не решение координатора.",
+  "newDebate.legalGate.eyebrow": "Условия и конфиденциальность",
+  "newDebate.legalGate.title": "Пожалуйста, прочитайте и примите действующие документы",
+  "newDebate.legalGate.body": "Прежде чем продолжить, откройте каждый документ ниже, прочитайте его до конца, а затем примите.",
+  "newDebate.legalGate.readTerms": "Прочитать «Условия использования»",
+  "newDebate.legalGate.readPrivacy": "Прочитать «Политику конфиденциальности»",
+  "newDebate.legalGate.done": "Прочитано",
+  "newDebate.legalGate.accept": "Принять и продолжить",
+  "newDebate.legalGate.accepting": "Сохранение…",
+  "newDebate.legalGate.failed": "Не удалось сохранить ваше согласие. Повторите попытку.",
+  "newDebate.legalGate.stale": "Один из документов только что изменился. Перезагрузите страницу, чтобы прочитать действующую версию.",
+  "newDebate.legalGate.reload": "Перезагрузить страницу",
+  "newDebate.legalGate.manageAccount": "Управлять аккаунтом или удалить его",
+  "newDebate.legalGate.signOut": "Выйти",
+  "newDebate.legalGate.signOutFailed": "Не удалось завершить выход. Повторите попытку.",
+  "newDebate.room.locationBlocked": "Из вашего текущего местоположения нельзя начинать новые дебаты. Ваши дебаты по-прежнему доступны для чтения."
 }

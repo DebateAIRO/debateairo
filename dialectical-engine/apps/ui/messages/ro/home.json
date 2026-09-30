@@ -82,5 +82,18 @@
   "home.aiDisclosure": "Informare privind IA",
   "home.aiSupportLead": "Această conversație are loc cu un agent de asistență bazat pe IA.",
   "home.aiLinkLabel": "Cum etichetăm conținutul generat de IA (se deschide într-o filă nouă)",
-  "home.aiLink": "Cum etichetăm conținutul generat de IA"
+  "home.aiLink": "Cum etichetăm conținutul generat de IA",
+  "home.sensitiveConsent.eyebrow": "Înainte de prima dezbatere",
+  "home.sensitiveConsent.title": "Întrebările dvs. pot dezvălui informații sensibile",
+  "home.sensitiveConsent.lede": "O întrebare despre politică, religie, sănătate, sexualitate sau convingeri poate spune ceva despre dumneavoastră. Legea consideră astfel de informații ca fiind sensibile, motiv pentru care avem nevoie de consimțământul dvs. explicit înainte de a le prelucra.",
+  "home.sensitiveConsent.pointPurpose": "Folosim ceea ce scrieți numai pentru desfășurarea dezbaterilor dvs.",
+  "home.sensitiveConsent.pointModels": "Pentru a desfășura o dezbatere, trimitem întrebarea dvs. modelelor IA care participă la ea.",
+  "home.sensitiveConsent.pointOthers": "Nu includeți informații sensibile despre alte persoane.",
+  "home.sensitiveConsent.pointDelete": "Puteți șterge oricând o dezbatere.",
+  "home.sensitiveConsent.statement": "Sunt de acord ca DebateAI să prelucreze informațiile sensibile pe care le includ în propriile mele întrebări, în scopul desfășurării dezbaterilor mele.",
+  "home.sensitiveConsent.privacyLink": "Citiți în Politica de confidențialitate cum le gestionăm",
+  "home.sensitiveConsent.agree": "Sunt de acord",
+  "home.sensitiveConsent.decline": "Nu sunt de acord",
+  "home.sensitiveConsent.declined": "Nu puteți începe o dezbatere fără acest consimțământ. Vă vom întreba din nou data viitoare când veți începe una.",
+  "home.sensitiveConsent.failed": "Răspunsul dvs. nu a putut fi salvat. Încercați din nou."
 }

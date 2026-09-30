@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu DebateAI ponúkame",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu DebateAI ponúkame osobám, ktoré žijú v [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
+      { kind: "p", text: "Službu DebateAI ponúkame osobám, ktoré žijú v [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
     ]
   },
   {
@@ -113,7 +113,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Tieto pravidlá sa vzťahujú na to, čo zadávate, ako službu používate a čo zverejňujete." },
       { kind: "p", text: "Nezadávajte osobné údaje iných osôb. Pýtajte sa na témy, argumenty a verejné otázky, nie na identifikovateľné súkromné osoby. Neuvádzajte mená, kontaktné údaje, identifikačné čísla, fotografie ani zdravotné, finančné či iné údaje, podľa ktorých možno niekoho identifikovať, a nepoužívajte DebateAI na zhromažďovanie podkladov proti určitej osobe ani na tvorbu jej profilu či spisu o nej. Otázky týkajúce sa verejne činných osôb v ich verejnej úlohe sú prípustné; otázky zamerané na súkromnú osobu nie. Ak takéto údaje napriek tomu zadáte, zodpovedáte za ne a my môžeme obsah odstrániť." },
-      { kind: "p", text: "Vaše vlastné citlivé informácie. Otázky, ktoré kladiete, sa môžu týkať vášho zdravia, presvedčenia, politických názorov alebo iných citlivých záležitostí. Pri registrácii ste s tým vyslovili súhlas. Ak žijete na mieste s osobitnými pravidlami pre údaje o zdravotnom stave, príloha A vás môže odkázať na samostatné oznámenie." },
+      { kind: "p", text: "Vaše vlastné citlivé informácie. Otázky, ktoré kladiete, sa môžu týkať vášho zdravia, presvedčenia, politických názorov alebo iných citlivých záležitostí. Súhlas s tým vyslovujete na samostatnej obrazovke pred svojou prvou debatou. Ak žijete na mieste s osobitnými pravidlami pre údaje o zdravotnom stave, príloha A vás môže odkázať na samostatné oznámenie." },
       { kind: "p", text: "Nezadávajte ani nezverejňujte nezákonný obsah, vrátane obsahu, ktorý je hanlivý, podnecuje k násiliu alebo nenávisti, obťažuje či sa vyhráža, predstavuje intímne snímky zdieľané bez súhlasu, porušuje práva duševného vlastníctva alebo dôvernosť, vyzrádza obchodné tajomstvá, predstavuje materiál zobrazujúci sexuálne zneužívanie detí alebo porušuje sankcie či pravidlá kontroly vývozu." },
       { kind: "p", text: "Nepoužívajte DebateAI na klamanie. Nevydávajte vygenerovaný výstup za text napísaný človekom, ak by to bolo zavádzajúce, neodstraňujte z neho označenie, že ho vytvorila umelá inteligencia, a nepoužívajte ho na vytváranie zdania konsenzu, falošných dôkazov alebo na vydávanie sa za inú osobu." },
       { kind: "p", text: "Nenapádajte službu. Nie je dovolené automatizovane pristupovať k zverejneným debatám ani ich sťahovať, prehľadávať či hromadne získavať nad rámec toho, čo dovoľuje náš súbor robots; obchádzať obmedzenia frekvencie požiadaviek, overovanie alebo kontrolné mechanizmy zverejňovania; pokúšať sa získať zadania alebo systémové pokyny; používať prompt injection s cieľom prinútiť systém ignorovať jeho obmedzenia; ani bez nášho písomného súhlasu vykonávať prieskumné či záťažové testy." },
@@ -298,7 +298,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Spojené kráľovstvo (iba ak je uvedené v časti 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Naším zástupcom v Spojenom kráľovstve podľa článku 27 UK GDPR je [name, address, email]. Vzťahuje sa na vás Consumer Rights Act 2015 a nič v týchto Podmienkach neobmedzuje vaše práva podľa neho; od [January 2027] sa na platené programy uplatnia pravidlá predplatného podľa Digital Markets, Competition and Consumers Act 2024 vrátane lehoty na rozmyslenie po obnovení a po bezplatných skúšobných obdobiach. Ako chránime používateľov pred nezákonným obsahom: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktívna technológia, ktorú používame: [describe, or \"none\"]. Overenie veku: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Postup vybavovania sťažností podľa časti 10 prijíma sťažnosti na nezákonný obsah, neoprávnené odstránenie vášho obsahu, obmedzenia vášho účtu, použitie automatizovaných nástrojov ovplyvňujúcich váš obsah a akékoľvek posúdenie veku, ktoré vás nesprávne zablokuje. Je dostupný aj osobám dotknutým obsahom, ktoré nie sú používateľmi." }
+      { kind: "p", text: "Naším zástupcom v Spojenom kráľovstve podľa článku 27 UK GDPR je [name, address, email]. Vzťahuje sa na vás Consumer Rights Act 2015 a nič v týchto Podmienkach neobmedzuje vaše práva podľa neho; keď nadobudnú účinnosť pravidlá predplatného podľa Digital Markets, Competition and Consumers Act 2024 (očakáva sa to v roku 2027), uplatnia sa na platené programy vrátane lehoty na rozmyslenie po obnovení a po bezplatných skúšobných obdobiach. Ako chránime používateľov pred nezákonným obsahom: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktívna technológia, ktorú používame: [describe, or \"none\"]. Overenie veku: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Postup vybavovania sťažností podľa časti 10 prijíma sťažnosti na nezákonný obsah, neoprávnené odstránenie vášho obsahu, obmedzenia vášho účtu, použitie automatizovaných nástrojov ovplyvňujúcich váš obsah a akékoľvek posúdenie veku, ktoré vás nesprávne zablokuje. Je dostupný aj osobám dotknutým obsahom, ktoré nie sú používateľmi. Vaše údaje upravuje príloha B.2 našich Zásady ochrany osobných údajov." }
     ]
   },
   {
@@ -308,7 +308,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Rozhodcovská zmluva a vzdanie sa práva na hromadnú žalobu. Ak žijete v Spojených štátoch, vy a DebateAIRO súhlasíte s riešením všetkých sporov vyplývajúcich z týchto Podmienok alebo služby záväzným individuálnym rozhodcovským konaním vedeným [the American Arbitration Association / JAMS] podľa jej spotrebiteľských pravidiel namiesto súdu; každý z nás však môže uplatniť individuálny nárok na súde pre drobné nároky. Rozhodcovskú zmluvu môžete odmietnuť zaslaním e-mailu na [address] do 30 dní od prvého prijatia týchto Podmienok. Táto dohoda sa riadi Federal Arbitration Act. Hradíme poplatky za začatie rozhodcovského konania. Vy aj DebateAIRO sa v rozsahu povolenom zákonom vzdávate práva na hromadné, kolektívne a zastupiteľské žaloby. Táto časť sa uplatňuje iba do budúcnosti a nevzťahuje sa na nároky, ktoré vznikli pred jej prijatím." },
       { kind: "p", text: "Oznámenia a odstraňovanie. Intímne snímky zdieľané bez súhlasu možno bez účtu nahlásiť na adrese [URL] a budú odstránené do 48 hodín od platnej žiadosti. Sťažnosti týkajúce sa autorských práv sa zasielajú nášmu určenému zástupcovi uvedenému v časti 16." },
-      { kind: "p", text: "Ustanovenia pre jednotlivé štáty. Kalifornia: uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. New York: do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. Texas a Nebraska: citlivé osobné údaje nepredávame; ak by sa to niekedy zmenilo, najprv získame váš súhlas [statutory notice language]. Washington: na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese [URL]. Colorado: nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami." }
+      { kind: "p", text: "Ustanovenia pre jednotlivé štáty. Kalifornia: uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. New York: do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. Texas a Nebraska: citlivé osobné údaje nepredávame. Washington: na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese [URL]. Colorado: nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami. Vaše údaje a vaše práva na ochranu súkromia podľa práva vášho štátu upravuje príloha B.3 našich Zásady ochrany osobných údajov." }
     ]
   },
   {
@@ -316,7 +316,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada a Quebec (iba ak sú uvedené)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov je [name, email]. Quebec: tieto Podmienky sú vo francúzštine dostupné na adrese [URL] a francúzska verzia vám bola predložená ako prvá; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania." }
+      { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je [name], privacy@dezbatere.ro. Vaše údaje upravuje príloha B.4 našich Zásady ochrany osobných údajov. Quebec: tieto Podmienky sú dostupné vo francúzštine; francúzštinu si zvolíte v prepínači jazykov; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania; nevzťahuje sa na vás žiadna rozhodcovská zmluva ani vzdanie sa práva na hromadnú žalobu." }
     ]
   },
   {
@@ -329,32 +329,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latinská Amerika (príloha v španielčine; iba ak je uvedená)",
+    title: "Švajčiarsko (iba ak je uvedené)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Súhlas je právnym základom spracúvania, ak spracúvanie nie je nevyhnutné na plnenie zmluvy; pri registrácii výslovne súhlasíte so spracúvaním citlivých údajov, ktoré sa rozhodnete uviesť. Svoje práva ARCO môžete uplatniť na adrese [address], pričom odpoveď dostanete do [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexiko: úplné aviso de privacidad je na adrese [URL]; odstúpenie do [5] dní. Argentína: [AAIP legend]; použite botón de arrepentimiento na adrese [URL] do 10 dní. Kolumbia: política de tratamiento je na adrese [URL]; odstúpenie do 5 dní. Čile (od 1. decembra 2026): kontakt na agentúru je […]; zmluvu môžete zrušiť rovnakým spôsobom, akým ste ju uzavreli; na digitálne služby sa právo na odstúpenie nevzťahuje." }
+      { kind: "p", text: "Na vaše údaje sa vzťahuje švajčiarsky spolkový zákon o ochrane údajov (Zásady ochrany osobných údajov, príloha B.6). Žalobu môžete podať na súde v mieste vo Švajčiarsku, kde žijete. Na platený program sa nevzťahuje žiadne zákonné právo na odstúpenie; naše pravidlá vrátenia peňazí sú […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Perzský záliv — Spojené arabské emiráty a Saudská Arábia (iba ak sú uvedené)",
+    title: "Moldavsko (iba ak je uvedené)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Ak vaše údaje spracúvame na iné účely než poskytovanie služby, robíme tak s vaším súhlasom, ktorý môžete odvolať. Vaše údaje sa spracúvajú mimo [UAE / Kingdom of Saudi Arabia], okrem iného v Európskej únii a Spojených štátoch, na základe [SDAIA standard contractual clauses / the mechanism in the Register]. Zodpovedáte za to, že všetko, čo zverejníte, je v súlade s právom krajiny, v ktorej sa nachádzate, vrátane právnych predpisov týkajúcich sa náboženstva, verejného poriadku a morálky; zverejňovanie debát o takýchto témach môžeme vo vašom regióne obmedziť." }
+      { kind: "p", text: "Podľa týchto Podmienok máte rovnaké práva ako spotrebiteľ v Európskej únii vrátane 14-dňového práva na odstúpenie podľa časti 13. Žalobu môžete podať na súdoch Moldavska. Na vaše údaje sa vzťahuje moldavský zákon č. 195/2024 o ochrane osobných údajov (Zásady ochrany osobných údajov, príloha B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Ázia a Tichomorie (iba riadky pre uvedené regióny)",
+    title: "Ukrajina (iba ak je uvedená)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapur: našou zodpovednou osobou pre ochranu osobných údajov je [name, email]; prenosy sa opierajú o zmluvnú ochranu porovnateľnú s PDPA; na platený program sa nevzťahuje zákonná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú […]. Japonsko: zákonné informácie podľa Specified Commercial Transactions Act sú na adrese [URL]; na online predplatné sa nevzťahuje všeobecná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú […]; váš obsah sa môže prenášať poskytovateľom v [named countries] a súhlasíte s tým prostredníctvom súhlasov pri registrácii. Južná Kórea: súhlasy s voliteľným spracúvaním a marketingom sa získavajú oddelene od položiek potrebných na prevádzku služby; našou zodpovednou osobou pre ochranu osobných údajov je [name]; od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia v súlade s E-Commerce Act; pred každým zvýšením ceny opakujúcej sa platby alebo prechodom z bezplatnej na platenú službu získame váš nový súhlas; ak to vyžaduje AI Basic Act, vopred vás upozorníme, že je služba založená na umelej inteligencii, a označíme výstupy. India (keď sa uplatnia pravidlá DPDP): uplatní sa oznámenie o súhlase na adrese [URL]; používatelia mladší ako 18 rokov potrebujú overiteľný súhlas rodiča. Thajsko: naším zástupcom v Thajsku je [name] [if appointed]. Filipíny: naše identifikačné údaje podniku a mechanizmus nápravy podľa Internet Transactions Act sú na adrese [URL]; sťažnosti možno podať Národnej komisii pre ochranu súkromia." }
+      { kind: "p", text: "DebateAI ponúkame na Ukrajine okrem oblastí, ktoré nekontroluje ukrajinská vláda. Produkt a tieto Podmienky sú dostupné v ukrajinčine. Na vaše údaje sa vzťahuje zákon Ukrajiny „O ochrane osobných údajov“ (Zásady ochrany osobných údajov, príloha B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Vyhradené",
+    title: "Izrael (iba ak je uvedený)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Platený program môžete zrušiť v rozsahu, ktorý umožňuje zákon o ochrane spotrebiteľa 5741-1981 [state the cancellation terms]. Tieto Podmienky a naše Zásady ochrany osobných údajov sú dostupné v hebrejčine. Na vaše údaje sa vzťahuje izraelský zákon o ochrane súkromia (Zásady ochrany osobných údajov, príloha B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Ázia a Tichomorie (iba riadky pre uvedené regióny)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapur: našou zodpovednou osobou pre ochranu osobných údajov je [name, email]; prenosy sa opierajú o zmluvnú ochranu porovnateľnú s PDPA; na platený program sa nevzťahuje zákonná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú […]. Japonsko: zákonné informácie podľa Specified Commercial Transactions Act sú na adrese [URL]; na online predplatné sa nevzťahuje všeobecná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú […]; váš obsah posielame poskytovateľom umelej inteligencie v Spojených štátoch a Európskej únii, každému na základe zmluvy, ktorá vyžaduje ochranu rovnocennú japonskému Act on the Protection of Personal Information, a na požiadanie vám povieme, aké sú tieto opatrenia. Južná Kórea: súhlasy s voliteľným spracúvaním a marketingom sa získavajú oddelene od položiek potrebných na prevádzku služby; našou zodpovednou osobou pre ochranu osobných údajov je [name], privacy@dezbatere.ro; od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia v súlade s E-Commerce Act; pred každým zvýšením ceny opakujúcej sa platby alebo prechodom z bezplatnej na platenú službu získame váš nový súhlas; služba využíva generatívnu umelú inteligenciu, upozorníme vás na to skôr, ako ju začnete používať, a výstupy vytvorené umelou inteligenciou označujeme. Taiwan: od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia podľa Consumer Protection Act; na vaše údaje sa vzťahuje taiwanský Personal Data Protection Act (Zásady ochrany osobných údajov, príloha B.10). Thajsko: naším zástupcom v Thajsku je [name] [if appointed]. Filipíny: naše identifikačné údaje podniku a mechanizmus nápravy podľa Internet Transactions Act sú na adrese [URL]; sťažnosti možno podať Národnej komisii pre ochranu súkromia." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Vyhradené",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Turecko, Brazília a Indonézia vyžadujú prílohu v miestnom jazyku, zástupcu alebo registráciu a podania. Nie sú tu vypracované a nespadajú do časti 2, kým nebudú výslovne doplnené. V Číne, Vietname a Rusku službu neponúkame." }
     ]
@@ -363,6 +379,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "475066bff324999a34b8d1cee2a41d531eaaf806f183d1c31ddaa1aef99f7092",
   eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.0 · ÚČINNÉ OD [DATE]",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DebateAIRO S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",

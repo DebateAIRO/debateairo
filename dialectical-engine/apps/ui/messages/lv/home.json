@@ -82,5 +82,18 @@
   "home.aiDisclosure": "Informācija par MI",
   "home.aiSupportLead": "Šī ir saruna ar MI atbalsta asistentu.",
   "home.aiLinkLabel": "Kā mēs marķējam MI saturu (atveras jaunā cilnē)",
-  "home.aiLink": "Kā mēs marķējam MI saturu"
+  "home.aiLink": "Kā mēs marķējam MI saturu",
+  "home.sensitiveConsent.eyebrow": "Pirms pirmajām debatēm",
+  "home.sensitiveConsent.title": "Jūsu jautājumi var atklāt sensitīvu informāciju",
+  "home.sensitiveConsent.lede": "Jautājums par politiku, reliģiju, veselību, seksualitāti vai pārliecību var kaut ko atklāt par jums. Tiesību akti šādu informāciju uzskata par sensitīvu, tāpēc pirms tās apstrādes mums ir nepieciešama jūsu nepārprotama piekrišana.",
+  "home.sensitiveConsent.pointPurpose": "To, ko rakstāt, mēs izmantojam tikai jūsu debašu vadīšanai.",
+  "home.sensitiveConsent.pointModels": "Lai vadītu debates, mēs nosūtām jūsu jautājumu MI modeļiem, kas tajās piedalās.",
+  "home.sensitiveConsent.pointOthers": "Neiekļaujiet sensitīvu informāciju par citām personām.",
+  "home.sensitiveConsent.pointDelete": "Jūs jebkurā laikā varat dzēst debates.",
+  "home.sensitiveConsent.statement": "Piekrītu, ka DebateAI drīkst apstrādāt sensitīvu informāciju, kuru iekļauju savos jautājumos, lai vadītu manas debates.",
+  "home.sensitiveConsent.privacyLink": "Kā mēs ar to rīkojamies, lasiet Privātuma politikā",
+  "home.sensitiveConsent.agree": "Piekrītu",
+  "home.sensitiveConsent.decline": "Nepiekrītu",
+  "home.sensitiveConsent.declined": "Bez šīs piekrišanas jūs nevarat sākt debates. Mēs jautāsim vēlreiz, kad nākamreiz sāksiet debates.",
+  "home.sensitiveConsent.failed": "Jūsu atbildi neizdevās saglabāt. Mēģiniet vēlreiz."
 }

@@ -83,5 +83,18 @@
   "home.aiDisclosure": "Informácie o AI",
   "home.aiSupportLead": "Túto konverzáciu vediete s agentom podpory AI.",
   "home.aiLinkLabel": "Ako označujeme obsah vytvorený AI (otvorí sa na novej karte)",
-  "home.aiLink": "Ako označujeme obsah vytvorený AI"
+  "home.aiLink": "Ako označujeme obsah vytvorený AI",
+  "home.sensitiveConsent.eyebrow": "Pred vašou prvou debatou",
+  "home.sensitiveConsent.title": "Vaše otázky môžu prezradiť citlivé informácie",
+  "home.sensitiveConsent.lede": "Otázka o politike, náboženstve, zdraví, sexualite alebo presvedčení môže o vás niečo vypovedať. Zákon takéto informácie považuje za citlivé, a preto pred ich spracúvaním potrebujeme váš výslovný súhlas.",
+  "home.sensitiveConsent.pointPurpose": "To, čo napíšete, používame len na uskutočnenie vašich debát.",
+  "home.sensitiveConsent.pointModels": "Aby sme mohli debatu uskutočniť, posielame vašu otázku modelom AI, ktoré sa na nej zúčastňujú.",
+  "home.sensitiveConsent.pointOthers": "Neuvádzajte citlivé informácie o iných osobách.",
+  "home.sensitiveConsent.pointDelete": "Debatu môžete kedykoľvek odstrániť.",
+  "home.sensitiveConsent.statement": "Súhlasím s tým, že DebateAI môže spracúvať citlivé informácie, ktoré uvediem vo svojich vlastných otázkach, na účely uskutočnenia mojich debát.",
+  "home.sensitiveConsent.privacyLink": "Ako s nimi zaobchádzame, sa dočítate v Zásadách ochrany osobných údajov",
+  "home.sensitiveConsent.agree": "Súhlasím",
+  "home.sensitiveConsent.decline": "Nesúhlasím",
+  "home.sensitiveConsent.declined": "Bez tohto súhlasu nemôžete začať debatu. Opýtame sa znova, keď budete nabudúce začínať debatu.",
+  "home.sensitiveConsent.failed": "Vašu odpoveď sa nepodarilo uložiť. Skúste to znova."
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { SiteFooter } from "@/components/SiteFooter";
 import { TopBar } from "@/components/TopBar";
 import { CookieConsent } from "@/components/consent/CookieConsent";
 import { LegalDocumentsProvider } from "@/components/consent/LegalDocumentsProvider";
@@ -14,6 +15,7 @@ import { loadLegalDocument } from "@/lib/legal/server";
 import { NONCE_REQUEST_HEADER } from "../content-security-policy.mjs";
 import "./globals.css";
 import "./language-switcher.css";
+import "./legal.css";
 
 const display = Fraunces({
   subsets: ["latin"],
@@ -105,6 +107,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <TopBar />
                 {children}
                 <CookieConsent />
+                <SiteFooter variant="line" />
               </div>
             </LegalDocumentsProvider>
           </ConsentCatalogProvider>

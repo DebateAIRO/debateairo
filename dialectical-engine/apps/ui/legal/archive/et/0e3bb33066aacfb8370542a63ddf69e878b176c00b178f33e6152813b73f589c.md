@@ -1,0 +1,214 @@
+# DebateAI — Privaatsuspoliitika
+
+<!-- legal-chrome
+summaryTitle: Lühidalt
+eyebrow: PRIVAATSUSPOLIITIKA · v3.0 · KEHTIB ALATES [DATE]
+title: Mida ja miks me talletame
+lede: Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.
+endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.0
+bodyLabel: Privaatsuspoliitika tekst
+annexTitle: Lisa B — Piirkondlikud privaatsustingimused
+jumps:
+01 VASTUTAV TÖÖTLEJA
+02 MIDA ME KOGUME
+04 ÕIGUSLIK ALUS
+05 MUDELID JA EDASTAMINE
+06 AVALDAMINE
+07 SÄILITAMINE
+10 TEIE GDPR-I ÕIGUSED
+13 KÜPSISED
+-->
+
+2026-09-21 · @Someone
+
+**Versiooni v3.0 kavand õigusnõustajale läbivaatamiseks — asendab kasutusele võetud versiooni v2.1 (`apps/ui/lib/privacyPolicy.ts`). See ei ole õigusnõuanne.** Käesolev versioon kirjeldab koodi tegelikku toimimist ja parandab viis versiooni v2.1 väidet, millega kood oli vastuolus: seansiandmed, säilitamisperioodid, analüütika, eksport ja see, mis juhtub avaldatud väitlustega kustutamisel. Nurksulgudes on märgitud teave, mille saate sisestada ainult teie; [pending] tähistab poliitikas kirjeldatud funktsiooni, mida ei ole veel loodud ja mis peab olema olemas enne poliitika avaldamist.
+
+**Version 3.0 · Effective [date] · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DebateAIRO S.R.L., Bukarest**
+
+**In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie andmete võtmed ja teie avaldatud väitlused eemaldatakse. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
+
+## 1. Kes vastutab teie andmete eest
+
+Teie isikuandmete vastutav töötleja on **DebateAIRO S.R.L.**, [address], Bukarest, Rumeenia, äriregistri number [J40/…], CUI […]. Kõigis selle poliitikaga seotud küsimustes kirjutage aadressil **privacy@dezbatere.ro**; vastame ühe kuu jooksul. Me ei ole määranud andmekaitsespetsialisti, sest seadus ei nõua seda; seda aadressi jälgib [role]. Kui oleme määranud konkreetse riigi jaoks esindaja või privaatsusametniku, on ta nimetatud lisas B.
+
+## 2. Mida me kogume ja kust see pärineb
+
+Kogume ainult seda, mida konto toimimiseks vajab, mida otsustate meile anda ja mida seadus kohustab meid säilitama.
+
+| Kategooria | Täpne sisu | Allikas |
+| --- | --- | --- |
+| **Konto** | E-posti aadress ja taastamise e-posti aadress (säilitatakse krüpteeritult koos võtmestatud indeksiga, et saaksime konto leida ilma aadressi lugemata); parool (säilitatakse räsina, mitte kunagi avatekstina); teie kaheastmelise autentimise saladus (krüpteeritud); kümme taastekoodi (säilitatakse räsidena); teie pseudonüüm; aeg, mil kinnitasite, et olete vähemalt 18-aastane | Teie, registreerumisel |
+| **Seansid ja turvalisus** | Räsitud seansitõend; teie brauseri user-agent'i stringi võtmestatud räsi, mida kasutatakse tuvastamaks, kui seanss liigub teise brauserisse; loomise, viimase kasutamise ja aegumise ajatemplid. Me **ei** salvesta seansiga koos teie IP-aadressi, seadme nime ega brauseri üksikasju ning seadetes kuvatavas seansiloendis on ainult ajatemplid | Teie brauser |
+| **Turbeauditilogi** | Ainult lisatav logi turvalisusega seotud sündmustest — registreerimine, kinnitamine, sisselogimiskatsed, taastamine, avaldamine ja kustutamine. Iga sündmuse IP-aadress ja user-agent salvestatakse ainult ühesuunaliste võtmestatud sõnumilühenditena (Argon2id), mistõttu neid ei saa tagasi lugeda, kuid neid saab kindla ajavahemiku jooksul võrrelda. Sisselogimise ja taastamise riskisignaale säilitatakse krüpteeritult 90 päeva | Teie brauser iga sündmuse ajal |
+| **Väitluse sisu** | Teie sisestatud küsimus; teie määratud suunavad annotatsioonid; mootori loodud väited, kriitika, tõendiviited, hinded ja otsused; iga tehisintellekti pakkuja vastuse sõnasõnaline kirje; otsingupäringud ja allikaviited. Kõike seda säilitatakse krüpteeritult teie kontole omase võtmega | Teie ja teie küsimust töötlevad tehisintellektimudelid |
+| **Kasutajatugi** | Sõnumid, mida vahetate kasutajatoe assistendi või inimesega ja mida säilitatakse krüpteeritult; kasutatud keel; kas lubasite assistendil näha oma väitluste olekut (mitte kunagi nende sisu); teie antud hinnangud. Kui sõnum käivitab kuritarvitamise kontrollimehhanismid, säilitame sõnumi räsi ja selle saatmise IP-aadressi räsi | Teie |
+| **Nõustumise ja nõusoleku kirjed** | Tingimuste, millega nõustusite, ja teile näidatud poliitika versioon ning sisu räsi; aeg; kasutatud kuva ja mehhanism; teie keel; teie IP-aadress ja user-agent sellel hetkel; iga teie antud või tagasivõetud nõusolek ja selle aeg | Teie brauser registreerumisel ja iga kord, kui valikut muudate |
+| **Maksed** [pending — once a paid plan exists] | Pakett, hind, arveldusperiood, tehinguviited, maksuresidentsuse tõendid. Kaardiandmeid hoiab meie makseteenuse pakkuja, mitte kunagi meie | Teie ja makseteenuse pakkuja |
+| **Inimesed, kes ei ole meie kasutajad** | Teiste inimeste isikuandmed, mille lisate küsimusse või mille mootor vastust koostades loob. Palume teil seda mitte teha; jaotis 11 selgitab, mida teeme, kui see siiski juhtub | Kaudselt teie kaudu |
+
+Me **ei** kogu analüüsi- ega telemeetriaandmeid selle kohta, kuidas te toodet kasutate, ega paigalda selleks küpsiseid. Kui see muutub, muudetakse esmalt käesolevat poliitikat ja Küpsisepoliitikat ning teilt küsitakse nõusolekut.
+
+## 3. Tundlik teave
+
+Väitlusmootor ajendab esitama küsimusi poliitika, religiooni, tervise, seksuaalsuse ja veendumuste kohta. Need on GDPR-i artikli 9 kohaselt eriliiki andmed ning võivad sisalduda teie küsimustes olenemata sellest, kas kavatseme neid koguda.
+
+**Teie kohta.** Registreerumisel annate eraldi lausega selgesõnalise nõusoleku, et töötleme tundlikku teavet, mille otsustate lisada oma küsimustesse, teie väitluste läbiviimise eesmärgil. Võite nõusoleku igal ajal tagasi võtta, jättes sellise teabe lisamata või kustutades väitluse. Enda kohta avaldatud andmed olete ise otsustanud avalikustada.
+
+**Teiste inimeste kohta.** Ükski õiguslik tingimus ei luba meil töödelda küsimuses nimetatud kolmanda isiku tundlikke andmeid ning ka ühelgi meie tehisintellekti pakkujal ei ole selleks alust. Seepärast on see Tingimustes keelatud, seepärast minimeerime saadetavaid andmeid ja seepärast eemaldame sellise sisu taotluse korral kiiresti — jaotis 11.
+
+**Terviseandmed.** Mõnes riigis reguleerivad terviseandmeid, sealhulgas järeldusi, eriseadused. Kui elate piirkonnas [the State of Washington], kohaldatakse eraldi teadet [Consumer Health Data Privacy Notice].
+
+## 4. Miks ja millisel alusel me teie andmeid kasutame
+
+Igal eesmärgil on üks õiguslik alus GDPR-i artikli 6(1) kohaselt ning me ei kasuta ühel eesmärgil kogutud andmeid muul eesmärgil.
+
+| Eesmärk | Andmed | Alus |
+| --- | --- | --- |
+| Teie konto loomine ja käitamine, teie autentimine ning väitluste läbiviimine ja säilitamine, et saaksite need uuesti avada ja taasesitada | Konto, seansid, väitluse sisu | **Leping** — Art. 6(1)(b) |
+| Teie küsimuse ja mootori väidete saatmine tehisintellekti pakkujatele väitluse loomiseks | Väitluse sisu | **Leping** — Art. 6(1)(b) |
+| Teenuse turvalisuse tagamine, kuritarvitamise tuvastamine, võimaldamine märgata sisselogimist, mida te ei teinud, ja auditilogi pidamine | Seansid, turbeauditilogi, kasutajatoe kuritarvitamise räsid | **Õigustatud huvid** — Art. 6(1)(f): meie ja teie huvi turvalise teenuse vastu. Võite esitada vastuväite; jaotis 10 |
+| Tõendamine, et nõustusite Tingimustega ning andsite või võtsite tagasi nõusoleku | Nõustumise ja nõusoleku kirjed | **Juriidiline kohustus** — Art. 6(1)(c), meie kohustus tõendada nõusolekut Art. 7(1) alusel — ja õigustatud huvi lepingu tõendamise vastu |
+| Kasutajatoe päringutele vastamine | Kasutajatugi | **Leping** — Art. 6(1)(b) |
+| Enda kohta lisatud tundliku teabe töötlemine | Väitluse sisu | **Selgesõnaline nõusolek** — Art. 9(2)(a), antakse registreerumisel eraldi |
+| Teie valitud väitluse avaldamine | Väitluse sisu, pseudonüüm | **Leping** — Art. 6(1)(b), teie juhise alusel; teid puudutavate tundlike andmete puhul Art. 9(2)(e) — andmed, mille olete ilmselgelt avalikustanud |
+| Teile tooteuudiste saatmine | E-posti aadress | **Nõusolek** — Art. 6(1)(a), märkimata märkeruut; võite igal ajal loobuda mis tahes e-kirja kaudu või seadetes |
+| Maksu-, raamatupidamis- ja juriidiliste kohustuste täitmine [pending paid plans] | Maksed, nõustumise kirjed | **Juriidiline kohustus** — Art. 6(1)(c) |
+| Õiguslike taotluste ja ebaseadusliku sisu teadete käsitlemine ning meie kohustuste täitmine majutusteenusena | Kõik taotluse jaoks asjakohased andmed | **Juriidiline kohustus** — Art. 6(1)(c) — ja õigustatud huvid |
+
+Me ei tee teie kohta profiilianalüüsi, ei kasuta teie andmeid reklaamiks ega müü neid. Me ei kasuta teie sisu mudelite treenimiseks ega luba seda teha oma pakkujatel — jaotis 5.
+
+## 5. Tehisintellekti pakkujad ja rahvusvaheline edastamine
+
+**Mida saadetakse.** Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele tehisintellekti pakkujale: teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse arenedes mootori koostatud väited. Seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti. Ta ei saa kunagi teie e-posti aadressi, konto- ega seansitunnuseid, IP-aadressi ega makseandmeid.
+
+**Millised pakkujad.** Need on loetletud meie **tehisintellekti pakkujate registris** aadressil [dezbatere.ro/providers], mis on selle poliitika osa. Iga pakkuja kohta on registris märgitud tema juriidiline isik ja asutamisriik; mida ja mis eesmärgil ta saab; riigid või piirkonnad, kus ta andmeid töötleb; säilitamistingimused ning kas meie kasutatavas otspunktis ja funktsioonides rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad muutuda; registril on versioonid ja muudatus märgitakse sinna.
+
+**Treenimine ja säilitamine on eri asjad.** Meie lepingud pakkujatega välistavad teie sisu kasutamise nende mudelite treenimiseks või täiustamiseks. [Publish only once verified per route.] Mõned pakkujad säilitavad viipasid ja vastuseid piiratud aja turvalisuse, kuritarvitamise ennetamise või oma juriidiliste kohustuste tõttu; registris on märgitud, kui kaua ja miks. Kui rakendatakse andmete säilitamata jätmist, märgitakse registris, milliste funktsioonide suhtes see kehtib. Me ei kirjelda sisu mittesäilitatavana, kui seda tegelikult säilitatakse.
+
+**Edastamine väljapoole EMP-d.** Ameerika Ühendriikides asutatud pakkujad saavad andmeid ühe GDPR-i V peatükis sätestatud mehhanismi alusel: ELi-USA andmekaitseraamistik, kui konkreetne lepingupool on nende andmete jaoks sertifitseeritud, või Euroopa Komisjoni lepingu tüüptingimused (teine moodul, vastutavalt töötlejalt volitatud töötlejale), mida toetavad edastamise riskihinnang ja lisameetmed. Registris on märgitud iga pakkuja mehhanism. Saate meie aluseks olevate tingimuste koopia, kirjutades aadressil privacy@dezbatere.ro. Kui meie kasutatav mehhanism tunnistatakse kehtetuks, võtame enne edastamise jätkamist kasutusele teise mehhanismi ja teavitame teid.
+
+**Muud vastuvõtjad.** Meie majutusteenuse pakkuja [Hetzner, Germany — region …]; meie sisu edastamise ja transpordi pakkuja [Cloudflare]; meie meiliedastusteenus […]; [our payment provider, once a paid plan exists]. Igaüks tegutseb meie dokumenteeritud juhiste järgi andmetöötluslepingu alusel koos artiklis 28 nõutud kaitsemeetmetega ning igaüks on koos oma asukoha ja edastusmehhanismiga registris. Me ei luba ühelgi volitatud töötlejal kasutada teie andmeid oma eesmärkidel. Kui pakkuja seda teeks, oleks ta iseseisev vastutav töötleja ja me ei saadaks talle teie andmeid.
+
+**Avaliku sektori asutused.** Avaldame isikuandmeid kohtutele, järelevalve- või õiguskaitseasutustele, kui seadus seda nõuab, ning teavitame teid, kui seadus seda ei keela.
+
+## 6. Avaldamine ja nähtavus
+
+Väitlused on privaatsed, kuni te need avaldate. Avaldamine on teadlik ja eraldi kinnitatav toiming. Avaldatud väitluses kuvatakse teie **pseudonüüm**, küsimus sellisel kujul, nagu selle kirjutasite, argumentide puu, hinded, otsus ja kindlusaste ning nähtav märgis, et sisu on loonud tehisintellekt. Seal ei kuvata kunagi teie e-posti aadressi, seansikirjeid ega konto ajalugu. [Published debates are / are not] otsingumootorites indekseeritud [unless you choose].
+
+Avaldamise tühistamisel eemaldatakse väitlus DebateAI-st ja hävitatakse meie avaliku koopia võti. Lugejate, otsingumootorite või arhiivide juba tehtud koopiad ei ole meie kontrolli all ning me ei saa neid tagasi võtta.
+
+Kui kustutate konto, eemaldame kõik teie avaldatud väitlused avalikust vaatest põhjendamatu viivituseta ja hiljemalt 30 päeva jooksul, välja arvatud juhul, kui seadus nõuab konkreetse üksuse säilitamist. [Option B — a product change; see the Terms, section 9.]
+
+## 7. Kui kaua me andmeid säilitame
+
+| Andmed | Kui kaua | Seejärel |
+| --- | --- | --- |
+| Konto | Konto olemasolu ajal ja 7-päevase ajapikenduse jooksul pärast sulgemistaotlust | Võtmed hävitatakse; kirje kustutatakse |
+| Seansikirjed | 14 päeva pärast viimast kasutamist või 90 päeva pärast loomist, olenevalt sellest, kumb saabub varem | Kustutatakse |
+| E-posti kinnitamise lingid | 24 tundi | Kustutatakse |
+| Sisselogimise ja taastamise riskisignaalid | 90 päeva, mida jõustab andmebaas | Kõrvaldatakse |
+| Turbeauditilogi | Teenuse kogu kasutusaja jooksul | Ainult lisatav; IP-aadress ja user-agent on ühesuunalised sõnumilühendid ning neid ei saa tagasi lugeda |
+| Väitluse sisu (privaatne) | Konto olemasolu ajal | Sulgemisel hävitatakse võtmed, mistõttu sisu muutub loetamatuks |
+| Väitluse sisu (avaldatud) | Avaldamise ja konto olemasolu ajal | Avaldamise tühistamisel või sulgemisel eemaldatakse avalikust vaatest; võtmed hävitatakse |
+| Pakkuja tagastatud kirjed ja otsinguviited | Sama kaua kui väitlus, mille juurde need kuuluvad | Sama |
+| Kasutajatoe vestlused ja juhtumid | [Until closed plus 12 months] | Võtmed hävitatakse |
+| Nõustumise ja nõusoleku kirjed | Konto kasutusaeg ja 6 aastat — pikim meile kohalduv aegumistähtaeg | Kustutatakse |
+| Makseandmed [pending] | 10 aastat, nagu nõuab Rumeenia raamatupidamisõigus | Kustutatakse |
+| Varukoopiad [pending] | [… days] pärast aktiivse koopia kustutamist | Kirjutatakse üle |
+
+**Mida kustutamine tegelikult teeb.** Teie väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnevast ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; ja juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine.
+
+&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]
+
+## 8. Automatiseeritud otsused ja profiilianalüüs
+
+Väitluse hinded, tingimusmärgid ja otsused on **argumentide, mitte inimeste** automatiseeritud hinnangud. Need ei too teile kaasa õiguslikke tagajärgi ega mõjuta teid muul viisil sarnaselt märkimisväärselt. Me ei tee teie kohta üksnes automatiseeritud töötlusel põhinevaid otsuseid, millel on õiguslik või sarnaselt oluline mõju, ega tee teie kohta profiilianalüüsi.
+
+Kui kunagi automatiseerime teie kontot puudutava otsuse — selle peatamise või väitluse avaldamisest keeldumise — vaatab inimene sellise otsuse enne jõustumist või teie taotlusel läbi, teil on võimalik esitada oma seisukoht ja otsus vaidlustada. Tingimustes kirjeldatakse, kuidas seda teha.
+
+## 9. Turvalisus ja mis juhtub, kui midagi läheb valesti
+
+Paroolid räsitakse Argon2id abil. Kaheastmeline autentimine on kohustuslik. Teie e-posti aadressi, väitlusi, kasutajatoe vestlusi ja autentimissaladusi säilitatakse teie kontole omaste võtmetega krüpteerituna ning avaldatud väitluste võtmeid hoitakse privaatsete väitluste võtmetest eraldi. Juurdepääs tootmisandmetele logitakse. Meie turbelogis olevaid IP-aadresse ja brauseriandmeid säilitatakse ainult ühesuunaliste sõnumilühenditena.
+
+Isikuandmetega seotud rikkumise korral teavitame Rumeenia järelevalveasutust 72 tunni jooksul, kui seadus seda nõuab, ning teavitame teid otse ja põhjendamatu viivituseta, kui rikkumine tõenäoliselt kujutab endast suurt ohtu teie õigustele ja vabadustele. Lisas B on loetletud teistes meie teenindatavates piirkondades kohalduvad teavitamisreeglid.
+
+## 10. Teie õigused ja nende kasutamine
+
+Võite kõiki neid õigusi tasuta kasutada, kirjutades aadressil **privacy@dezbatere.ro**, või valides **Seaded → Privaatsus**, kui vastav juhtelement on olemas. Vastame ühe kuu jooksul; keeruka taotluse korral võime vajada kuni kaks kuud lisaaega ja selgitame teile selle põhjust. Võime paluda teil oma isikut konto kaudu kinnitada.
+
+| Õigus | Mida see siin tähendab |
+| --- | --- |
+| **Juurdepääs** (Art. 15) | Koopia teie isikuandmetest, mida säilitame, ja käesolev teave. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.] |
+| **Parandamine** (Art. 16) | Parandage seadetes oma e-posti aadress või taastamise e-posti aadress. Teie pseudonüümi ei saa Tingimustes esitatud põhjustel muuta; võite konto sulgeda ja uue avada |
+| **Kustutamine** (Art. 17) | Kustutage privaatne väitlus igal ajal väitluse lehel. Sulgege konto seadetes; jaotis 7 selgitab täpselt selle tagajärgi. Paluge meil eemaldada teie andmeid sisaldav avaldatud väitlus olenemata sellest, kas olete selle autor |
+| **Piiramine** (Art. 18) | Paluge meil peatada konkreetsete andmete töötlemine, kuni neid puudutav vaidlus lahendatakse |
+| **Vastuväide** (Art. 21) | Esitage vastuväide õigustatud huvidel põhinevale töötlemisele — jaotises 4 kirjeldatud turbe- ja audititöötlusele — ning lõpetame selle, kui me ei suuda tõendada ülekaalukaid põhjuseid. Esitage igal ajal vastuväide turundusele ja lõpetame selle |
+| **Andmete ülekantavus** (Art. 20) | Teie väitlused ja kontoandmed üldkasutatavas masinloetavas vormingus. [Pending: same export as Access.] Teie loodud mitteisiklik sisu, näiteks küsimused, tagastatakse teile taotluse korral lepingu lõppemisel |
+| **Nõusoleku tagasivõtmine** (Art. 7(3)) | Võtke turundusnõusolek tagasi mis tahes e-kirja kaudu või seadetes; võtke tundlike andmete nõusolek tagasi, jättes sellised andmed lisamata või kustutades väitluse. Tagasivõtmine ei mõjuta juba toimunud töötlemist |
+| **Kaebuse esitamine** | Rumeenia järelevalveasutusele **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, või teie elukohariigi asutusele. Eelistaksime siiski, et pöörduksite esmalt meie poole |
+
+Me ei võta taotluse eest kunagi tasu ega kohtle teid taotluse esitamise tõttu ebasoodsamalt.
+
+## 11. Väitlustes nimetatud inimesed, kes ei ole meie kasutajad
+
+Kui keegi esitab DebateAI-le küsimuse, milles teid nimetatakse, võime säilitada teie isikuandmeid, kuigi te pole teenust kunagi kasutanud. Tingimused keelavad kasutajatel seda teha ja me minimeerime tehisintellekti pakkujatele saadetavaid andmeid, kuid seda juhtub.
+
+See jaotis on teade, mille peame teile GDPR-i artikli 14 kohaselt esitama. Andmed on kasutaja sisestatud teave ja mootori loodud vastus; allikas on see kasutaja; eesmärgid ja õiguslikud alused on esitatud jaotises 4; vastuvõtjad on registris olevad tehisintellekti pakkujad; säilitamine toimub jaotise 7 kohaselt. Teil on kõik jaotises 10 nimetatud õigused ning eelkõige võite paluda meil eemaldada teie andmeid sisaldav avaldatud või privaatne väitlus ja selgitada, milliseid andmeid säilitame. Selleks ei ole kontot vaja. Kirjutage aadressil **privacy@dezbatere.ro** või kasutage avaldatud väitluse juures juhtelementi **Teatage** ning täidame põhjendatud taotlused põhjendamatu viivituseta. Me ei saa teid sellise juhtumi korral isiklikult teavitada, sest me ei tea, kes te olete või kuidas teiega ühendust saada; selle asemel võtame meetmetena kasutusele käesoleva avaliku teate ja eemaldamisvõimaluse.
+
+Sama kehtib tundliku teabe kohta — poliitika, tervis, religioon — mis esineb kellegi teise küsimuses. Ükski õiguslik tingimus ei luba meil pärast teie vastuväidet selle töötlemist jätkata ja me ei tee seda.
+
+## 12. Lapsed
+
+DebateAI on mõeldud täiskasvanutele. Registreerumisel kinnitate, et olete vähemalt 18-aastane, ning me ei töötle teadlikult alla 18-aastaste andmeid. Kui saame teada, et konto kuulub alla 18-aastasele, sulgeme selle ja kustutame andmed jaotises 7 kirjeldatud viisil. Mõni riik peab kinnitust ebapiisavaks või nõuab enamat; lisas B on märgitud, mida kus kohaldatakse, ja Tingimustes selgitatakse, mida me selle suhtes teeme.
+
+## 13. Küpsised
+
+Paigaldame kaks küpsist, mis on mõlemad rangelt vajalikud: üks hoiab teid sisselogituna ja teine kaitseb vorme võltsimise eest. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. **Küpsisepoliitikas** aadressil [dezbatere.ro/cookies] on need loetletud koos kestusega, selgitatud, kuidas teie valik salvestatakse, ning seda muudetakse enne mis tahes muu küpsise lisamist. Kui teie piirkonna õigus käsitleb mõnda küpsist teisiti — näiteks Ühendkuningriigi analüütikast loobumise reegel — on see Küpsisepoliitikas kirjas.
+
+## 14. Selle poliitika muudatused
+
+Kui muudame seda poliitikat, avaldame uue versiooni koos muudatuste kokkuvõtte ja uue jõustumiskuupäevaga ning säilitame varasemad versioonid aadressil [dezbatere.ro/privacy/versions]. Uue eesmärgi või vastuvõtja lisamisel teavitame teid enne uue töötlemise algust e-posti teel ja tootes ning anname teile aega vastuväite esitamiseks. Kui uus eesmärk sõltub teie nõusolekust — näiteks kui sooviksime kunagi kasutada sisu mudelite täiustamiseks — küsime selleks eraldi ja konkreetset nõusolekut; me ei käsita uuendatud Tingimustega nõustumist kunagi nõusolekuna uueks töötlemiseks. Selgituste korral, mis ei muuda meie tegevust, avaldame lihtsalt uue versiooni.
+
+Seda poliitikat ajakohastati viimati [date]. Versioon 3.0 asendas versiooni 2.1, milles kirjeldati seansiandmeid, säilitamisperioode, analüütikat, eksporti ja kustutamise mõju avaldatud väitlustele viisil, mis ei vastanud enam teenusele.
+
+## Annex B — Piirkondlikud privaatsustingimused
+
+Iga kirje kehtib ainult juhul, kui selle piirkond on loetletud Tingimuste jaotises 2, ning kirjeldab ainult erinevusi selle poliitika põhiosast.
+
+### B.1 Euroopa Liit ja Euroopa Majanduspiirkond
+
+Selle poliitika põhiosa on kirjutatud teile. Meie järelevalveasutus on Rumeenia **ANSPDCP**; võite esitada kaebuse ka oma elukohariigi asutusele. Rumeenia kasutajad: see poliitika on rumeenia keeles saadaval aadressil [URL].
+
+### B.2 Ühendkuningriik *(ainult kui loetletud)*
+
+Meie Ühendkuningriigi esindaja Ühendkuningriigi GDPR-i artikli 27 alusel on **[name, address, email]**; võite temaga ühendust võtta kõigis selle poliitikaga seotud küsimustes. Järelevalveasutus on **Information Commissioner's Office**, [ico.org.uk](https://ico.org.uk). Võite esitada meile kaebuse vormil [URL] ja kinnitame selle kättesaamist 30 päeva jooksul. Teie andmete edastamine Ühendkuningriigist Ameerika Ühendriikides asuvatele tehisintellekti pakkujatele põhineb mehhanismil [the UK Extension to the EU–US Data Privacy Framework, where the provider is certified / the UK International Data Transfer Addendum to the EU standard contractual clauses], mida toetab edastamise riskihinnang. Kui kunagi paigaldame analüütikaküpsiseid, kohaldatakse neile Ühendkuningriigis nõusoleku asemel loobumisvõimalust; praegu me neid ei paigalda. Kui olete alla 18-aastane ja pääsete meie vanusereeglist hoolimata teenusele juurde, kohaldatakse teie andmete töötlemisele ICO lastekoodeksi standardeid.
+
+### B.3 Ameerika Ühendriigid *(ainult kui loetletud)*
+
+**Teade kogumisel.** Jaotise 2 tabelis on loetletud kõik meie kogutavate isikuandmete kategooriad, nende eesmärk ja säilitamisaeg (jaotis 7). Kogume järgmisi *tundlike* isikuandmete kategooriaid ainult juhul, kui lisate need oma küsimustesse: [health, religious or philosophical beliefs, sexual orientation, union membership, political views], ja kasutame neid ainult teie väitluste läbiviimiseks. **Me ei müü ega jaga isikuandmeid ega ole seda teinud eelneva kaheteistkümne kuu jooksul.** Me ei kasuta tundlikke isikuandmeid muul eesmärgil kui teie taotletud teenuse osutamiseks. **Loobumiseelistuse signaalid:** austame Global Privacy Controli signaale taotlusena loobuda müügist või jagamisest, mida me niikuinii ei tee. **Teie õigused:** saada teavet, kustutada, parandada, loobuda, piirata tundlike isikuandmete kasutamist ning mitte kogeda nende õiguste kasutamise tõttu diskrimineerimist; esitage taotlus aadressil privacy@dezbatere.ro või [toll-free number / form]. **Rahalised stiimulid:** me ei paku neid; tasuta ja tasulised paketid ei erine selle poolest, kuidas teie andmeid töötleme. **Säilitamist** käsitletakse jaotises 7. Seda teadet ajakohastatakse vähemalt iga kaheteistkümne kuu järel; viimati ajakohastatud [date].
+
+*Washington:* meie eraldiseisev **tarbija terviseandmete privaatsusteade** aadressil [URL] kehtib kogu tervisega seotud teabe, sealhulgas järelduste kohta. *Texas ja Nebraska:* me ei müü tundlikke isikuandmeid; kui see kunagi muutuks, küsiksime esmalt teie nõusolekut [statutory language]. *Colorado, Connecticut, Virginia ja teised ulatuslike privaatsusseadustega osariigid:* eespool nimetatud õigused kehtivad teile, kui seadus kehtib meie suhtes; tagasilükatud taotlus vaidlustage, kirjutades aadressil [appeals@dezbatere.ro].
+
+### B.4 Kanada ja Quebec *(ainult kui loetletud)*
+
+Meie privaatsusametnik on **[name, email]**. Vastutame jätkuvalt isikuandmete eest, mille edastame tehisintellekti pakkujatele väljaspool Kanadat, ja kasutame võrreldava kaitse nõudmiseks lepinguid; nende pakkujate suhtes võivad kehtida nende tegevusriikide seadused, sealhulgas ametiasutuste seaduslik juurdepääs. Turundusmeile saadetakse CASL-i alusel ainult teie selgesõnalisel nõusolekul. **Quebec:** enne isikuandmete edastamist väljapoole Quebeci viime läbi andmekaitsealase mõjuhinnangu; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite paluda meil teie isikuandmed otsingumootorite indeksist eemaldada või nende levitamine lõpetada; võite taotleda oma andmeid struktureeritud ja üldkasutatavas vormingus; jaotis 8 kirjeldab meie automatiseeritud töötlust.
+
+### B.5 Austraalia ja Uus-Meremaa *(ainult kui loetletud)*
+
+**Austraalia.** Teie isikuandmete välismaised vastuvõtjad on registris loetletud tehisintellekti pakkujad ja volitatud töötlejad, kes asuvad piirkonnas [the United States and the European Union]; võtame mõistlikke meetmeid tagamaks, et nad töötlevad andmeid kooskõlas Austraalia privaatsuspõhimõtetega. **Automatiseeritud otsused:** alates 10. detsembrist 2026 nimetatakse selles poliitikas arvutiprogrammide tehtavate ja teie õigusi või huve märkimisväärselt mõjutavate otsuste liigid — neid ei ole; hinded ja otsused puudutavad argumente, mitte teid — ning nendes kasutatavad isikuandmed. Kaebuse võib esitada **Office of the Australian Information Commissionerile**. **Uus-Meremaa.** Meie privaatsusametnik on [name]. Kui kogume teie kohta isikuandmeid kaudselt — kuna teine kasutaja lisas need küsimusse — on käesolev poliitika ja jaotis 11 teile antav teade. Avaldame andmeid oma esindajatena tegutsevatele registris loetletud tehisintellekti pakkujatele lepingute alusel, mis nõuavad võrreldavaid kaitsemeetmeid. Kaebuse võib esitada **Office of the Privacy Commissionerile**.
+
+### B.6 Ladina-Ameerika *(hispaaniakeelne lisa; ainult kui loetletud)*
+
+&#91;Published in Spanish.] Nõusolek on töötlemise alus, kui lepinguline vajadus puudub. ARCO õigusi — juurdepääs, parandamine, tühistamine, vastuväide — saab kasutada aadressil privacy@dezbatere.ro ning vastame [per country] jooksul. *Mehhiko:* täielik kohustuslike elementidega *aviso de privacidad* on aadressil [URL]. *Argentina:* [AAIP mandatory legend]; andmed on registreeritud asutuses […]. *Kolumbia:* meie *política de tratamiento de datos* on aadressil [URL]; pädev asutus on SIC. *Tšiili* (alates 1. detsembrist 2026): ameti kontaktandmed on […]; jaotis 8 selgitab meie automatiseeritud töötlust.
+
+### B.7 Pärsia lahe piirkond — AÜE ja Saudi Araabia *(ainult kui loetletud)*
+
+Kui töötleme teie andmeid muul eesmärgil kui teenuse osutamine, tugineme teie nõusolekule, mille võite tagasi võtta. Teie andmed lahkuvad piirkonnast [UAE / Kingdom of Saudi Arabia] ning neid töödeldakse Euroopa Liidus ja Ameerika Ühendriikides [SDAIA standard contractual clauses / the mechanism in the Register] alusel. Turundust saadetakse ainult teie nõusolekul. Ärge lisage oma küsimustesse tundlikke isikuandmeid.
+
+### B.8 Aasia ja Vaikse ookeani piirkond *(ainult loetletud piirkondade read)*
+
+*Singapur:* meie andmekaitsespetsialist on **[name, email]**; edastamine põhineb lepingulistel kohustustel, mis tagavad PDPA-ga võrreldava kaitse; teavitame PDPC-d teatamiskohustuslikest rikkumistest 3 päeva jooksul. *Jaapan:* kasutame teie isikuandmeid jaotises 4 sätestatud eesmärkidel ja mitte muudel eesmärkidel; teie sisu edastatakse pakkujatele riikides [named countries — e.g. the United States], mille privaatsuskorda ja kaitsemeetmeid kirjeldatakse registris, ning te nõustute sellega registreerumisel. *Lõuna-Korea:* meie privaatsusametnik on **[name]**; välismaale edastatavate andmete liigid, sihtkoht, ajastus, vastuvõtja, eesmärk ja säilitamine on registris; teie küsimustes sisalduvad poliitilised arvamused on tundlik teave ja töötleme neid ainult teie väitluste läbiviimiseks; vabatahtliku töötlemise nõusolekud kogutakse eraldi. *India* (kui DPDP reeglid hakkavad kehtima): kohaldatakse eraldiseisvat nõusolekuteadet aadressil [URL]; taotlustele vastatakse 90 päeva jooksul; alla 18-aastased kasutajad vajavad kontrollitavat vanema nõusolekut. *Filipiinid:* meie andmekaitsespetsialist on [name]; kaebuse võib esitada National Privacy Commissionile; jaotis 8 kirjeldab automatiseeritud töötlust. *Tai:* meie esindaja on [name] [if appointed].
+
+### B.9 Reserveeritud
+
+Türgi, Brasiilia ja Indoneesia nõuavad igaüks kohalikus keeles teadet, esindajat või registreerimist ning dokumentide esitamist ja neid ei ole siin käsitletud. Hiinat, Vietnami ega Venemaad ei teenindata.

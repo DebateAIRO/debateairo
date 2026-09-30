@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "לא ניתן היה לבנות תקציר במסגרת תקציב הניסוח",
   "debateChrome.condition.protectedCoreGuardRetired": "ההרצה נעצרה עקב מגבלת התקציב; בדיקת הניסוח מחדש כבר לא הייתה תנאי להמשך",
   "debateChrome.condition.hiddenUnjudgeable": "מוסתר: לא ניתן היה לשפוט אותו — הציגו פריטים מוסתרים כדי לקרוא אותו",
-  "debateChrome.condition.derivedStandingUnreviewed": "מעמדו נשען על הטיעונים שקיבלו ציון — חסרה לו ביקורת משלו בידי יוצר אחר",
+  "debateChrome.condition.derivedStandingUnreviewed": "מעמדו נשען על הטיעונים שנשפטו — חסרה לו ביקורת משלו בידי יוצר אחר",
   "debateChrome.condition.hiddenLowScore": "מוסתר: קיבל ציון נמוך מהסף המוצג",
   "debateChrome.condition.unauthoredBranchHalted": "ההרחבה נעצרה כאן — לא נכתב דבר שאפשר להסתיר או להציג",
   "debateChrome.condition.labelBasisIncomplete": "בסיס ההכרעה אינו מלא — אין עמדה מתחרה או שופט שני להשוואה",

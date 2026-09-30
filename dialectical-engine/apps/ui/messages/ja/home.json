@@ -80,5 +80,18 @@
   "home.aiDisclosure": "AIに関する開示",
   "home.aiSupportLead": "この会話の相手はAIサポートエージェントです。",
   "home.aiLinkLabel": "AIコンテンツの表示方法（新しいタブで開きます）",
-  "home.aiLink": "AI生成コンテンツの表示方法"
+  "home.aiLink": "AI生成コンテンツの表示方法",
+  "home.sensitiveConsent.eyebrow": "初めてのディベートの前に",
+  "home.sensitiveConsent.title": "お客様の質問から機微情報が明らかになる場合があります",
+  "home.sensitiveConsent.lede": "政治、宗教、健康、性生活または信条に関する質問は、お客様自身について何かを明らかにすることがあります。法律上、これは機微情報として扱われるため、当社がこれを処理するには、事前にお客様の明示的な同意が必要です。",
+  "home.sensitiveConsent.pointPurpose": "ご入力いただいた内容は、お客様のディベートを実行するためにのみ使用します。",
+  "home.sensitiveConsent.pointModels": "ディベートを実行するため、お客様の質問を、そのディベートに参加するAIモデルに送信します。",
+  "home.sensitiveConsent.pointOthers": "他者に関する機微情報は含めないでください。",
+  "home.sensitiveConsent.pointDelete": "ディベートはいつでも削除できます。",
+  "home.sensitiveConsent.statement": "私は、自分自身の質問に含める機微情報を、自分のディベートを実行する目的でDebateAIが処理することに同意します。",
+  "home.sensitiveConsent.privacyLink": "当社での取り扱いについては、プライバシーポリシーをご覧ください",
+  "home.sensitiveConsent.agree": "同意します",
+  "home.sensitiveConsent.decline": "同意しません",
+  "home.sensitiveConsent.declined": "この同意がない場合、ディベートを開始できません。次回ディベートを開始する際に、改めて確認します。",
+  "home.sensitiveConsent.failed": "回答を保存できませんでした。もう一度お試しください。"
 }

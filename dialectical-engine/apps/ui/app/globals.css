@@ -22,6 +22,9 @@
   --con-bg: #F6E8E0; --con-border: #E4B9A8;
   --gold: #A8823E; --gold-text: #826530; --gold-line: #A5803D;
   --gold-bg: #F3ECE0; --gold-border: #D9C8A9;
+  /* Turn 14 change-email pending pill: tint(gold, .10/.45); the Email card pill hover */
+  --eml-pending-bg: rgba(168,130,62,.1); --eml-pending-border: rgba(168,130,62,.45);
+  --eml-pill-hover: rgba(128,120,104,.12);
   --reasoning: #3D5A80; --reasoning-text: #3D5A80; --reasoning-line: #3D5A80;
   --reasoning-bg: #E6E8E8; --reasoning-border: #ACB7C4;
 
@@ -48,6 +51,7 @@
 
   /* brand and elevation */
   --accent: #C15F3C; --link: #3D5A80; --focus: #C15F3C;
+  --focus-halo: rgba(193,95,60,.2);
   --shadow-card: 0 18px 40px -20px rgba(41,38,31,.24);
   --shadow-pop: 0 30px 60px -26px rgba(41,38,31,.32);
   --shadow-drawer: -22px 0 54px -22px rgba(41,38,31,.32);
@@ -130,6 +134,9 @@ html[data-mode="chamber"] {
   --con-bg: #34261A; --con-border: #704C30;
   --gold: #C8A055; --gold-text: #C8A055; --gold-line: #C8A055;
   --gold-bg: #342A1B; --gold-border: #705A33;
+  /* Turn 14 change-email pending pill: tint(gold, .13/.50) */
+  --eml-pending-bg: rgba(200,160,85,.13); --eml-pending-border: rgba(200,160,85,.5);
+  --eml-pill-hover: rgba(128,120,104,.12);
   --reasoning: #C8A055; --reasoning-text: #C8A055; --reasoning-line: #C8A055;
   --reasoning-bg: #342A1B; --reasoning-border: #705A33;
 
@@ -153,6 +160,7 @@ html[data-mode="chamber"] {
   --m-default-bg: #2A2723; --m-default-border: #504E4C;
 
   --accent: #C8834F; --link: #C8A055; --focus: #C8834F;
+  --focus-halo: rgba(200,131,79,.32);
   --shadow-card: 0 22px 48px -22px rgba(0,0,0,.8);
   --shadow-pop: 0 36px 70px -30px rgba(0,0,0,.9);
   --shadow-drawer: -26px 0 62px -26px rgba(0,0,0,.9);
@@ -1948,6 +1956,179 @@ a:focus-visible {
 .authRule[data-met="true"] { color: var(--ok-text); }
 .authRule[data-met="false"] { color: var(--dispute-text); }
 
+/* Date of birth — design document Turn 8 · 8d/8f/8g/8l. Typed + select: three
+   inputs, each with a ▾ grid picker at its inline end. Order and direction come
+   from the locale; digits stay left to right inside every input. */
+.dobFieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.dobFieldset .dobLegend {
+  padding: 0;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+}
+.dobFieldset .dobRow { display: flex; flex-wrap: wrap; gap: 8px; }
+.dobFieldset .dobPart { display: flex; flex-direction: column; gap: 4px; }
+.dobFieldset .dobPartLabel {
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+}
+.dobFieldset .dobControl { position: relative; }
+.dobFieldset .dobInput {
+  display: block;
+  min-height: 0;
+  width: 72px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  outline: none;
+  background: var(--shell);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.dobFieldset .dobPart[data-part="y"] .dobInput { width: 96px; }
+.dobFieldset .dobInput[aria-invalid="true"] { border-color: var(--dispute); }
+.dobFieldset .dobInput:focus, 
+.dobFieldset .dobInput[aria-invalid="true"]:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.dobFieldset .dobPickerToggle {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  inset-inline-end: 4px;
+  width: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+.dobFieldset .dobPickerToggle:hover { background: var(--surface-2); }
+.dobFieldset .dobPickerToggle:focus-visible, 
+.dobFieldset .dobDecadeButton:focus-visible, 
+.dobFieldset .dobCell:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.dobFieldset .dobPopover {
+  position: absolute;
+  top: 46px;
+  inset-inline-start: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--core);
+  box-shadow: var(--shadow-pop);
+}
+.dobFieldset .dobPopover[data-anchor="end"] { inset-inline-start: auto; inset-inline-end: 0; }
+.dobFieldset .dobPopover[data-part="d"] { width: 244px; }
+.dobFieldset .dobPopover[data-part="m"] { width: 222px; }
+.dobFieldset .dobPopover[data-part="y"] { width: 262px; }
+.dobFieldset .dobDecade { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.dobFieldset .dobDecadeButton {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  cursor: pointer;
+}
+.dobFieldset .dobDecadeButton:disabled { opacity: 0.3; cursor: default; }
+.dobFieldset .dobDecadeLabel {
+  flex: 1;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.dobFieldset .dobGrid { display: grid; gap: 3px; }
+.dobFieldset .dobCell {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+}
+.dobFieldset .dobCell:hover { background: var(--surface-sunken); }
+.dobFieldset .dobCell[data-selected="true"] { background: var(--ink); color: var(--bg); }
+.dobFieldset .dobCell[aria-disabled="true"] { opacity: 0.3; cursor: default; }
+.dobFieldset .dobCell[aria-disabled="true"]:hover { background: transparent; }
+.dobFieldset .dobMessage { min-height: 13px; text-wrap: pretty; }
+.dobFieldset .dobMessage[data-state="ok"] { color: var(--agree); }
+.dobFieldset .dobMessage[data-state="bad"] { color: var(--dispute); }
+
+/* Age-gate refusal — 8j. The panel follows the brand directly; one heading, one link. */
+.authBrand + .authPanel { margin-top: 0; }
+.authPanelCore.ageRefusal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 36px 26px 32px;
+}
+.ageRefusalMark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+.ageRefusalMark > span {
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--muted);
+}
+.ageRefusalTitle {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+.ageRefusalHome {
+  align-self: flex-start;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ageRefusalHome:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 3px; }
+
 .authFieldHint {
   display: block;
   margin: 5px 0 0;
@@ -2011,6 +2192,24 @@ a:focus-visible {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* Paid plans L4: the blocking accept screen's document rows and its two ways out
+   (the account link and Sign out). Layout only. */
+.legalGateList {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legalGateExits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-top: 16px;
 }
 
 .authMfaForm {
@@ -4611,6 +4810,20 @@ a:focus-visible {
   .authPrimary {
     min-height: 58px;
   }
+  /* 8h: 84/84/120 × 52. Inside the auth card's bezel a 375px screen leaves ~226px, so the
+     three keep that ratio and shrink together instead of wrapping the year onto a new line. */
+  .dobFieldset .dobRow { gap: 10px; flex-wrap: nowrap; }
+  .dobFieldset .dobPart { gap: 5px; flex: 0 1 84px; min-width: 0; }
+  .dobFieldset .dobPart[data-part="y"] { flex: 0 1 120px; }
+  .dobFieldset .dobPartLabel { font-size: 11px; }
+  .dobFieldset .dobInput,
+  .dobFieldset .dobPart[data-part="y"] .dobInput {
+    width: 100%; height: 52px; min-height: 0; padding: 0 26px 0 6px; border-radius: 10px; font-size: 18px;
+  }
+  .dobFieldset[dir="rtl"] .dobInput,
+  .dobFieldset[dir="rtl"] .dobPart[data-part="y"] .dobInput { padding: 0 6px 0 26px; }
+  .dobFieldset .dobPickerToggle { inset-inline-end: 6px; font-size: 11px; }
+  .dobFieldset .dobPopover { top: 58px; }
   .authCheckEmail,
   .authSuccessWarning {
     padding: 22px;
@@ -5968,6 +6181,194 @@ a:focus-visible {
   background: var(--dispute-bg);
   color: var(--dispute);
   font-size: 11.5px;
+}
+
+/* ============================================================
+   Change email — the design document's Turn 14: 14a Email card,
+   14b change form, 14c pending state. Values are the artboards'
+   own; tA.* maps onto the token contract (page → --bg, hint →
+   --text-2, mute → --muted, hair → --line, hairStrong →
+   --line-strong, vOk → --ok-dot, vBad → --dispute). The pending
+   pill is the document's tint(gold, .10/.45) and, in Chamber,
+   tint(gold, .13/.50).
+   ============================================================ */
+
+/* 14a — Email card */
+.emlCardRow { display: flex; align-items: center; gap: 16px; }
+.emlCardMain { flex: 1; min-width: 0; }
+.emlCardHead { display: flex; align-items: center; gap: 10px; }
+.emlCardTitle { margin: 0; font-size: 13.5px; font-weight: 700; }
+.emlVerified { font-size: 10.5px; font-weight: 600; color: var(--ok-dot); }
+.emlAddress { margin: 4px 0 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.emlRecovery { margin: 2px 0 0; font-size: 11px; color: var(--text-2); overflow-wrap: anywhere; }
+.emlPill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.emlPill:hover { background: var(--eml-pill-hover); }
+.emlPill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlPill:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 14c — pending state of the same card */
+.emlCard[data-state="pending"] { position: relative; overflow: hidden; padding: 18px 18px 16px; }
+.emlPendingTab {
+  position: absolute;
+  top: 0;
+  left: 18px;
+  width: 52px;
+  height: 4px;
+  border-radius: 0 0 5px 5px;
+  background: var(--gold);
+}
+.emlPendingBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--eml-pending-border);
+  background: var(--eml-pending-bg);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+.emlPendingGrid {
+  margin: 10px 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 12px;
+}
+.emlPendingGrid dt {
+  padding-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.emlPendingGrid dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.emlPendingHint { margin: 10px 0 0; font-size: 11px; line-height: 1.55; color: var(--text-2); text-wrap: pretty; }
+.emlPendingActions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.emlPillSmall { padding: 7px 15px; }
+.emlPillQuiet { color: var(--muted); }
+
+/* 14b — change form, and the screen a mailed link opens */
+.emlScreen {
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+.emlScreenBody { padding: clamp(28px, 4.4vw, 44px) clamp(16px, 4.8vw, 48px) 48px; }
+.emlScreenInner { max-width: 444px; margin: 0 auto; }
+.emlBack {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.emlBack:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlEyebrow {
+  margin: 22px 0 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+}
+.emlTitle {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.emlLede { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--text-2); text-wrap: pretty; }
+.emlShell {
+  margin-top: 22px;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  padding: 7px;
+  box-shadow: var(--shadow-card);
+}
+.emlCore {
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.emlLabel { display: block; margin: 0 0 6px; padding: 0; font-size: 11px; font-weight: 700; color: var(--ink); }
+.emlCurrent {
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px dashed var(--line-strong);
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.emlInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--shell);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink);
+}
+.emlInput::placeholder { color: var(--muted); }
+.emlInput:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.emlInput[data-check="invalid"],
+.emlInput[data-check="same"],
+.emlInput[data-check="mismatch"] { border-color: var(--dispute); }
+.emlCheck { margin: 5px 0 0; font-size: 10.5px; font-weight: 600; color: var(--dispute); }
+.emlCheck[data-check="valid"] { color: var(--ok-dot); }
+.emlRule { height: 1px; background: var(--line); }
+.emlVerify { margin: 0; padding: 0; border: 0; min-width: 0; }
+.emlVerify > .emlLabel { margin: 0; }
+.emlVerifyHint { margin: 3px 0 0; font-size: 10.5px; color: var(--text-2); }
+.emlVerifyRow { display: flex; gap: 10px; margin-top: 9px; }
+.emlPassword { flex: 1; min-width: 0; }
+.emlPassword:not(:placeholder-shown) { letter-spacing: 0.2em; }
+.emlCode { flex: 0 0 130px; font-family: var(--font-mono); }
+/* The artboard draws "6-digit code" as a span; in a 130px input its .24em tracking
+   clips the placeholder, so the tracking applies to the typed digits only. */
+.emlCode:not(:placeholder-shown) { letter-spacing: 0.24em; }
+.emlSubmit {
+  width: 100%;
+  padding: 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.emlSubmit:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlSubmit:disabled { opacity: 0.5; cursor: not-allowed; }
+.emlNote { margin: 0; font-size: 10.5px; line-height: 1.55; color: var(--text-2); text-align: center; text-wrap: pretty; }
+.emlContinue { width: auto; margin-top: 22px; padding: 11px 22px; }
+
+@media (max-width: 480px) {
+  .emlCardRow { flex-wrap: wrap; }
+  .emlVerifyRow { flex-direction: column; }
+  .emlCode { flex-basis: auto; }
 }
 
 /* ============================================================
@@ -8768,6 +9169,100 @@ a:focus-visible {
   .languageOfferActions { margin-inline-start: 0; }
 }
 /* === end verdict-story === */
+
+/* === sensitive-data consent (V, 2026-09-29) ===
+   The one-time screen before the first debate. It wears the legal-document modal's
+   frame (.policyScrim/.policyBezel/.policyCore/.policyHead/.policyFoot/.policyPrimary)
+   and adds only its body, its decline button and the line shown after a decline. */
+.sensitiveConsent {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.sensitiveConsentBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 24px 18px;
+}
+
+.sensitiveConsentPoints {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.sensitiveConsentStatement {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  background: var(--shell);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.sensitiveConsentLink {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sensitiveConsentBody .authAlert {
+  margin-top: 14px;
+}
+
+.sensitiveConsentDecline {
+  padding: 10px 18px;
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sensitiveConsentDecline:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+.sensitiveConsentDecline:focus-visible,
+.sensitiveConsentLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.sensitiveConsentDeclined {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+@media (max-width: 480px) {
+  .sensitiveConsent .policyFoot {
+    flex-wrap: wrap;
+  }
+  .sensitiveConsent .policyFoot .policyFootSpacer {
+    display: none;
+  }
+  .sensitiveConsent .policyFoot button {
+    flex: 1 1 100%;
+  }
+}
+/* === end sensitive-data consent === */
 
 /* === consent-ui S01 === */
 /* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).

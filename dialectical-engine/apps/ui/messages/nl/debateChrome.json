@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "Binnen het samenstellingsbudget kon geen samenvatting worden gemaakt",
   "debateChrome.condition.protectedCoreGuardRetired": "Uitvoering gestopt wegens budget; de controle van de herformulering hield deze niet langer tegen",
   "debateChrome.condition.hiddenUnjudgeable": "Verborgen: kon niet worden beoordeeld — toon verborgen items om dit te lezen",
-  "debateChrome.condition.derivedStandingUnreviewed": "Blijft staan op basis van de beoordeelde argumenten — de eigen modeloverschrijdende beoordeling ontbreekt",
+  "debateChrome.condition.derivedStandingUnreviewed": "Blijft staan op basis van de beoordeelde argumenten — de eigen beoordeling door een model van een andere maker ontbreekt",
   "debateChrome.condition.hiddenLowScore": "Verborgen: scoorde onder de getoonde drempel",
   "debateChrome.condition.unauthoredBranchHalted": "De uitbreiding is hier gestopt — er is niets geschreven om te verbergen of te tonen",
   "debateChrome.condition.labelBasisIncomplete": "Grondslag van oordeel onvolledig — geen concurrerend standpunt of geen tweede beoordelaar ter vergelijking",

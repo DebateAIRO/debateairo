@@ -50,8 +50,17 @@ overrides:
   # compilers and the Hatchet SDK. Every floor below was published at least 19 days ago, so
   # the 7-day cooldown is satisfied with NO new minimumReleaseAgeExclude row; fastify itself
   # is pinned to 5.12.1 (31 days) rather than 5.12.5 (2 days old at the time of writing).
-  'fast-uri@<3.1.6': '3.1.6'
-  'fast-uri@>=4.0.0 <4.1.3': '4.1.3'
+  # 2026-09-29: GHSA-qw65-cvwx-89v3 / GHSA-58mr-gqgx-xq4g (fast-uri) and GHSA-3wwx-pv8p-q78v
+  # (undici, test tooling only: jsdom, testcontainers) turned pnpm audit red. The floors below
+  # were published 2026-09-02 (fast-uri) and 2026-09-04 (undici): cooldown satisfied, no exclusion.
+  # 2026-09-30: GHSA-hrr3-gc8f-f4qj / GHSA-jvvf-x445-j334 (fast-uri <3.1.8, 4.x <4.1.5) and
+  # GHSA-6j4f-fj2g-mc7p / GHSA-qhr7-859c-m2p7 / GHSA-q2hr-2g5m-vwhr (brace-expansion 2.x <2.1.7,
+  # test tooling only: testcontainers > archiver > minimatch). Floors published 2026-09-14/15:
+  # cooldown satisfied, no exclusion.
+  'fast-uri@<3.1.8': '3.1.8'
+  'fast-uri@>=4.0.0 <4.1.5': '4.1.5'
+  'brace-expansion@>=2.0.0 <2.1.7': '2.1.7'
+  'undici@>=8.1.0 <8.10.2': '8.10.2'
   'qs@<6.16.0': '6.16.0'
   'postcss@<8.5.23': '8.5.23'
   'sharp@<0.35.4': '0.35.4'
