@@ -17,7 +17,12 @@ const mocks = vi.hoisted(() => ({
     readAccountErasure: vi.fn(),
     scheduleAccountErasure: vi.fn(),
     cancelAccountErasure: vi.fn(),
-    claimLegacyRuns: vi.fn()
+    claimLegacyRuns: vi.fn(),
+    // The settings page's email card (dev's change-email turn) reads the account's address on mount.
+    readAccountEmail: vi.fn(),
+    requestEmailChange: vi.fn(),
+    resendEmailChange: vi.fn(),
+    cancelEmailChange: vi.fn()
   }
 }));
 vi.mock("@/lib/api", async (importOriginal) => ({
@@ -79,6 +84,7 @@ beforeEach(() => {
   for (const method of Object.values(mocks.client)) method.mockReset();
   mocks.client.listSessions.mockResolvedValue({ sessions: [] });
   mocks.client.readAccountErasure.mockRejectedValue(new Error("offline"));
+  mocks.client.readAccountEmail.mockRejectedValue(new Error("offline"));
   const container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
