@@ -4,7 +4,7 @@ import type { PromptPacket } from "../../../../packages/providers/src/index.js";
 import { buildFramedPrompt } from "../../../../packages/providers/src/prompt-frame.js";
 import { extractCheckedText, packJudgeCalls, type CheckedText } from "./material.js";
 import { publicationCheckContract, PUBLICATION_CHECK_POLICY_VERSION } from "./policy.js";
-import { combineJudgeCalls, parseJudgeAnswer, type JudgeCallResult } from "./verdict.js";
+import { combineJudgeCalls, judgeCallValue, parseJudgeAnswer, type JudgeCallResult } from "./verdict.js";
 
 export type JudgeFailureCause = "JUDGE_NOT_CONFIGURED" | "JUDGE_DOOR_REFUSED" | "JUDGE_TRANSPORT_FAILED"
   | "JUDGE_HTTP_STATUS" | "JUDGE_DEADLINE" | "JUDGE_ANSWER_NOT_JSON" | "JUDGE_ANSWER_SCHEMA" | "JUDGE_ANSWER_UNKNOWN_PART";
@@ -38,6 +38,29 @@ export interface PublicationContentCheck {
   check(input: { runId: string; snapshot: PublicDebate }): Promise<PublicationCheckResult>;
 }
 type JudgeOptions = { judge: PublicationJudgePort | null; deadlineMs?: number; maxMaterialCodePoints?: number; maxConcurrentCalls?: number };
+
+/**
+ * The deadline D of one publish check (SPEC-v2 R7: D ≤ 60 s): every judge call of the attempt shares ONE
+ * `AbortSignal.timeout(D)`. FIX-HS2-p2 ui-B2 / ruling R-D2: 60 000 ms, SPEC-v2 R7's cap. At 50 s the §4 eval against
+ * the dev judge still failed one run in three (one call past 50 s); what stays slower than 60 s is the dev judge's
+ * own tail (V-15). main.ts wires this constant and the UI proxy's publish ceiling exceeds it
+ * (tests/unit/hs-s02-publish-route.test.ts "composition").
+ */
+export const PUBLICATION_CHECK_DEADLINE_MS = 60_000;
+
+/**
+ * FIX-HS2-p1 sd-N1: the record's `judge_provider_ref` / `judge_model_id` hold operator identifiers, never text.
+ * The same grammar is a CHECK on the table (migrations/0079_publication_check_record_identifiers.sql): no space,
+ * no `@`, 1–256 characters, and never uuid-shaped. A judge whose identifiers fail it is not a configured judge.
+ */
+const JUDGE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$/u;
+const UUID_SHAPED = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu;
+export function isJudgeIdentifier(value: string): boolean {
+  return JUDGE_IDENTIFIER.test(value) && !UUID_SHAPED.test(value);
+}
+function configuredJudge(judge: PublicationJudgePort | null): PublicationJudgePort | null {
+  return judge !== null && isJudgeIdentifier(judge.providerRef) && isJudgeIdentifier(judge.modelId) ? judge : null;
+}
 export type JudgedParts = {
   result: PublicationCheckResult;
   rules: readonly (1 | 2)[];
@@ -59,10 +82,10 @@ async function withinDeadline(judge: PublicationJudgePort, packet: PromptPacket,
 }
 
 export async function judgeParts(options: JudgeOptions, parts: readonly CheckedText[]): Promise<JudgedParts> {
-  const { judge } = options;
+  const judge = configuredJudge(options.judge);
   if (judge === null) return { result: { outcome: "UNAVAILABLE", cause: "JUDGE_NOT_CONFIGURED" }, rules: [], partKinds: [], ground: null, judgeCallCount: 0 };
   const calls = packJudgeCalls(parts, options.maxMaterialCodePoints);
-  const signal = AbortSignal.timeout(options.deadlineMs ?? 20_000);
+  const signal = AbortSignal.timeout(options.deadlineMs ?? PUBLICATION_CHECK_DEADLINE_MS);
   const concurrency = options.maxConcurrentCalls ?? 4;
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("Invalid judge concurrency");
   const results: JudgeCallResult[] = new Array(calls.length);
@@ -73,11 +96,12 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
       const index = next++, call = calls[index]!;
       if (signal.aborted) { results[index] = { ok: false, cause: "JUDGE_DEADLINE" }; continue; }
       try {
-        const { packet } = buildFramedPrompt({ contract: publicationCheckContract(), material: call.fields });
+        const { packet, fence } = buildFramedPrompt({ contract: publicationCheckContract(), material: call.fields });
+        const expectedCall = judgeCallValue(fence);
         judgeCallCount++;
         for (const field of call.fields) sentFieldNames.add(field.name);
         const response = await withinDeadline(judge!, packet, signal);
-        results[index] = parseJudgeAnswer(response.text, call.fields.map(field => field.name));
+        results[index] = parseJudgeAnswer(response.text, call.fields.map(field => field.name), expectedCall);
       } catch (error) {
         const cause = error instanceof TypedDomainError && error.code.startsWith("PROMPT_") ? "JUDGE_DOOR_REFUSED"
           : signal.aborted ? "JUDGE_DEADLINE"
@@ -109,7 +133,7 @@ export function createPublicationContentCheck(deps: {
   maxConcurrentCalls?: number;
 }): PublicationContentCheck {
   return { async check({ runId, snapshot }) {
-    const attemptedAt = deps.clock(), judge = deps.judge();
+    const attemptedAt = deps.clock(), judge = configuredJudge(deps.judge());
     const judged = await judgeParts({ ...deps, judge }, extractCheckedText(snapshot));
     await deps.recorder.record({
       run_id: runId, attempted_at: attemptedAt, outcome: judged.result.outcome,

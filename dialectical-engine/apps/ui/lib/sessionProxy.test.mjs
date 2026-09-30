@@ -209,6 +209,43 @@ test("L3-F12: an upstream timeout is reported as 504, never as a fabricated API 
   assert.equal((await response.json()).error, "API_UPSTREAM_TIMEOUT");
 });
 
+test("hate-speech S02 R-D: only POST /v1/runs/{id}/publish gets the longer upstream ceiling; every other route keeps 30 s", async () => {
+  process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+  globalThis.fetch = async () => new Response("{}");
+  const { GET, POST } = await loadRoute();
+  const armed = [];
+  const original = AbortSignal.timeout;
+  AbortSignal.timeout = (ms) => { armed.push(ms); return original.call(AbortSignal, ms); };
+  const RUN = "11111111-1111-4111-8111-111111111111";
+  const call = async (method, path) => {
+    armed.length = 0;
+    const handler = method === "POST" ? POST : GET;
+    await handler(new Request(`https://app.test/api/${path.join("/")}`, method === "POST" ? { method, body: "{}" } : {}),
+      { params: Promise.resolve({ path }) });
+    return [...armed];
+  };
+  const PUBLISH_CEILING_MS = 85_000;
+  const DEFAULT_CEILING_MS = 30_000;
+  const only = (values) => { assert.equal(values.length, 1, "exactly one ceiling is armed"); return values[0]; };
+  try {
+    assert.equal(only(await call("POST", ["v1", "runs", RUN, "publish"])), PUBLISH_CEILING_MS);
+    for (const [method, path] of [
+      ["POST", ["v1", "runs", RUN, "unpublish"]],
+      ["POST", ["v1", "asks"]],
+      ["POST", ["v1", "runs", RUN, "publish", "extra"]],
+      // FIX-HS2-p2 (REV p2 survivor P6): a deeper path that also ends in /publish is not the publish route
+      ["POST", ["v1", "runs", RUN, "answers", "publish"]],
+      ["POST", ["v1", "publish"]],
+      ["GET", ["v1", "runs", RUN, "publish"]],
+      ["GET", ["v1", "session"]]
+    ]) {
+      assert.equal(only(await call(method, path)), DEFAULT_CEILING_MS, `${method} ${path.join("/")} keeps the 30 s ceiling`);
+    }
+  } finally {
+    AbortSignal.timeout = original;
+  }
+});
+
 // ---------------------------------------------------------------- B23b: L3-F6, L3-F7, DL3-F5
 
 async function forwardedHeadersFor(requestHeaders, upstreamHeaders = { "content-type": "application/json" }) {

@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
@@ -9,24 +10,28 @@ import {
   SESSION_COOKIE_NAME,
   type AskApplication
 } from "@debateai/api";
-import type { Answer } from "@debateai/contract";
+import { PublicDebateSchema, type Answer, type PublicDebate, type PublicStoryShort } from "@debateai/contract";
 import {
   MemoryPublicationKeyStore,
   PublicationCipher,
-  loadKek
+  loadKek,
+  type CryptoEnvelope
 } from "../../packages/crypto/src/index.js";
 import type { PostgresPublicationRepository } from "@debateai/db";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
 import {
   createPublicationContentCheck,
+  PUBLICATION_CHECK_DEADLINE_MS,
   PublicationJudgeFailure,
   type PublicationCheckRecord,
   type PublicationContentCheck,
   type PublicationJudgePort
 } from "../../apps/api/src/publication-check/check.js";
 import { createPublicationJudgeSwitch } from "../../apps/api/src/publication-check/judge-transport.js";
-import { createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
+import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
+import { STORY_TEST_BODY } from "../support/storyApiFixtures.js";
+import { bindJudgeAnswer, createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 
 /**
@@ -87,15 +92,18 @@ function publishedTexts(answer: Answer): string[] {
 }
 
 /** Memory fakes in the `publicationHarness` shape (s8-publication.test.ts), counting every side effect. */
-function publicationFakes(options: { preflight?: boolean } = {}) {
+function publicationFakes(options: { preflight?: boolean; story?: PublicStoryShort } = {}) {
   const counts = { prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 };
+  const stored: { publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }[] = [];
   const repository = {
     preflightGrant: async () => options.preflight ?? true,
     auditAuthenticatedPreflightDenial: async () => true,
     readAuthorPseudonym: async () => PSEUDONYM,
     readArgumentLanguageTag: async () => null,
     prepareKeyProvision: async () => { counts.prepareKeyProvision += 1; return true; },
-    publish: async () => { counts.publish += 1; return true; },
+    publish: async (input: { publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }) => {
+      counts.publish += 1; stored.push(input); return true;
+    },
     abandonKeyProvision: async () => { counts.abandonKeyProvision += 1; return true; },
     claimKeyProvisionCleanup: async () => [],
     claimKeyCleanup: async () => [],
@@ -109,8 +117,15 @@ function publicationFakes(options: { preflight?: boolean } = {}) {
     counts.cipherCreate += 1;
     return create(...args);
   }) as PublicationCipher["create"];
-  const application = new PostgresPublicationApplication(repository, cipher, () => new Date("2026-09-29T12:00:00.000Z"));
-  return { application, counts };
+  const application = new PostgresPublicationApplication(repository, cipher, () => new Date("2026-09-29T12:00:00.000Z"),
+    repository, options.story === undefined ? undefined : { readStoryShort: async () => options.story! });
+  /** The snapshot that was encrypted and handed to the repository, decrypted back. */
+  const decryptStored = async (): Promise<PublicDebate> => {
+    const last = stored.at(-1)!;
+    const prepared = await cipher.open(last.publicationRef, last.runId);
+    try { return PublicDebateSchema.parse(prepared.decrypt(last.contentCiphertext)); } finally { prepared.close(); }
+  };
+  return { application, counts, stored, decryptStored };
 }
 
 function contentCheck(judge: PublicationJudgePort | null) {
@@ -132,12 +147,20 @@ function observed(check: PublicationContentCheck) {
   };
 }
 
-function askApplication(answer: Answer, runRequests: { answerReads: number } = { answerReads: 0 }): AskApplication {
+/** FIX-HS2-p1 sd-B1: counts how many content leases are open, so a judge can assert it runs outside all of them. */
+type LeaseProbe = { held: number; opened: number; answerReads: number; answers?: readonly (Answer | null)[] };
+function askApplication(answer: Answer, runRequests: LeaseProbe = { held: 0, opened: 0, answerReads: 0 }): AskApplication {
   return {
-    withContentLease: async (_runId, use) => use(),
+    withContentLease: async (_runId, use) => {
+      runRequests.held += 1; runRequests.opened += 1;
+      try { return await use(); } finally { runRequests.held -= 1; }
+    },
     submit: async () => ({ run_ref: RUN_ID, status: "QUEUED" }),
     readAnswer: async () => null,
-    readRunAnswer: async () => { runRequests.answerReads += 1; return answer; },
+    readRunAnswer: async () => {
+      const index = runRequests.answerReads++;
+      return runRequests.answers === undefined ? answer : runRequests.answers[Math.min(index, runRequests.answers.length - 1)]!;
+    },
     readRun: async (runId) => ({
       run_ref: runId, question_line: "Owned run", state: "SETTLED",
       terminal_reason: null, hold_until: null
@@ -186,10 +209,11 @@ function routeApi(input: {
   answer?: Answer;
   publicationContentCheck?: PublicationContentCheck;
   preflight?: boolean;
+  leases?: LeaseProbe;
 }) {
   const fakes = publicationFakes(input.preflight === undefined ? {} : { preflight: input.preflight });
   const api = buildApi({
-    application: askApplication(input.answer ?? servedAnswer()),
+    application: askApplication(input.answer ?? servedAnswer(), input.leases),
     sessions: sessions(),
     publications: fakes.application,
     allowedOrigin: ORIGIN,
@@ -199,7 +223,7 @@ function routeApi(input: {
     method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers: mutationHeaders,
     payload: { step_up_grant: GRANT_TOKEN, warning_acknowledged: true }
   });
-  return { api, publish, counts: fakes.counts };
+  return { api, publish, counts: fakes.counts, fakes };
 }
 
 async function attempt(judge: PublicationJudgePort, answer: Answer = servedAnswer()) {
@@ -282,6 +306,123 @@ describe("hate-speech S02 publish path", () => {
     });
   });
 
+  describe("R2 + R3 at the publish path (FIX-HS2-p1 ct-B1, ct-B2)", () => {
+    const SOURCE = Object.freeze({ ip: "198.51.100.77", userAgent: "hs-s02-agent-CANARY-UA", requestId: "request:hs-s02-CANARY-REQ" });
+    const STORY: PublicStoryShort = {
+      headline: STORY_TEST_BODY.short.headline, summary: STORY_TEST_BODY.short.summary, confidence: STORY_TEST_BODY.short.confidence,
+      paths: [...STORY_TEST_BODY.short.paths, { ...STORY_TEST_BODY.short.paths[0]!, line: "STORY-PATH-TWO-MARK" }],
+      change: STORY_TEST_BODY.short.change, reviewer_note: null
+    };
+    /** Two members in every array the answer carries, so a first-member-only extraction is visible. */
+    function wideAnswer(): Answer {
+      const served = servedAnswer();
+      return {
+        ...served,
+        composed_text: [...served.composed_text, { ...served.composed_text[0]!, text: "SECOND-SEGMENT-MARK" }],
+        badges: ["BADGE-ONE-MARK", "BADGE-TWO-MARK"],
+        residual_objections: ["OBJECTION-ONE-MARK", "OBJECTION-TWO-MARK"],
+        nodes: served.nodes.map((node, i) => ({
+          ...node, claim: `${node.claim} CLAIM-${i}-MARK`,
+          review: node.review === null ? null : { ...node.review, reasons: [`REASON-${i}a-MARK`, `REASON-${i}b-MARK`] }
+        }))
+      };
+    }
+    // Property: every checked leaf of the snapshot that was ENCRYPTED reached the judge — all members, the story included.
+    // Property: no user, owner, session, run, publication, IP, user-agent, request or token identifier reached it.
+    it("the judge read every checked leaf of the encrypted snapshot and no identifier", async () => {
+      expect(STORY.paths.length).toBeGreaterThanOrEqual(2);
+      const judge = createJudgeStub([ALLOW, ALLOW, ALLOW, ALLOW]);
+      const { check } = contentCheck(judge);
+      const { application, decryptStored } = publicationFakes({ story: STORY });
+      const answer = wideAnswer();
+      const result = await application.publish({
+        runId: RUN_ID, answer, authenticated, grantToken: GRANT_TOKEN, source: SOURCE, contentCheck: check
+      });
+      expect(result?.state).toBe("PUBLISHED");
+      const snapshot = await decryptStored();
+      expect(snapshot.story_short).toBeDefined();
+      const leaves = extractCheckedText(snapshot);
+      for (const kind of ["QUESTION", "SUMMARY", "ARGUMENTS", "REVIEWS", "STORY"]) expect(leaves.some(l => l.kind === kind), kind).toBe(true);
+      for (const marker of ["SECOND-SEGMENT-MARK", "BADGE-TWO-MARK", "OBJECTION-TWO-MARK", "CLAIM-1-MARK", "REASON-1b-MARK", "STORY-PATH-TWO-MARK"]) {
+        expect(leaves.some(l => l.text.includes(marker)), marker).toBe(true);
+      }
+      const material = judge.packets.map(packet => JSON.parse(packet.messages[1]!.content.split("\n").slice(1, -1).join("\n"))
+        .fields.map((field: { content: string }) => field.content).join("\n\n")).join("\n\n");
+      for (const leaf of leaves) expect(material, leaf.text).toContain(leaf.text);
+      const wire = JSON.stringify(judge.packets);
+      for (const identifier of [RUN_ID, authenticated.userId, authenticated.ownerRef, authenticated.session.session_id,
+        authenticated.tokenHash, authenticated.csrfTokenHash, GRANT_TOKEN, SOURCE.ip, SOURCE.userAgent, SOURCE.requestId,
+        PSEUDONYM, snapshot.public_ref, snapshot.published_at]) {
+        expect(wire, identifier).not.toContain(identifier);
+      }
+    });
+  });
+
+  describe("pool safety (FIX-HS2-p1 sd-B1, R-P) and a failing check (sd-N4)", () => {
+    // Property: the judge is awaited while NO content lease is open; the snapshot is built under one and the
+    // publication is committed under another.
+    it("the route awaits the judge outside every content lease, and commits under a fresh one", async () => {
+      const leases: LeaseProbe = { held: 0, opened: 0, answerReads: 0 };
+      const heldAtJudge: number[] = [];
+      const judge = createJudgeStub([async () => { heldAtJudge.push(leases.held); return { text: ALLOW }; }]);
+      const { check } = contentCheck(judge);
+      const { api, publish, counts } = routeApi({ publicationContentCheck: check, leases });
+      const response = await publish();
+      await api.close();
+      expect(response.statusCode).toBe(201);
+      expect(heldAtJudge).toEqual([0]);
+      expect(leases.opened).toBeGreaterThanOrEqual(2);
+      expect(counts.publish).toBe(1);
+    });
+    // Property: an answer that changed while the judge was working is not published under the old check.
+    it("an answer version that changed during the check publishes nothing and answers 503", async () => {
+      const first = servedAnswer();
+      const leases: LeaseProbe = { held: 0, opened: 0, answerReads: 0, answers: [first, { ...first, answer_version: first.answer_version + 1 }] };
+      const { check, records } = contentCheck(createJudgeStub([ALLOW]));
+      const { api, publish, counts } = routeApi({ publicationContentCheck: check, leases });
+      const response = await publish();
+      await api.close();
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toStrictEqual(UNAVAILABLE_BODY);
+      expect(records.map(r => r.outcome)).toEqual(["ALLOW"]);
+      expect(counts).toEqual({ prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 });
+    });
+    // Property: an answer erased during the check is not found, and nothing is published.
+    it("an answer that is gone at commit answers 404 and publishes nothing", async () => {
+      const first = servedAnswer();
+      const leases: LeaseProbe = { held: 0, opened: 0, answerReads: 0, answers: [first, null] };
+      const { check } = contentCheck(createJudgeStub([ALLOW]));
+      const { api, publish, counts } = routeApi({ publicationContentCheck: check, leases });
+      const response = await publish();
+      await api.close();
+      expect(response.statusCode).toBe(404);
+      expect(counts.publish).toBe(0);
+    });
+    // Property (sd-N4): a check that cannot record its attempt is UNAVAILABLE — the typed 503, one content-free
+    // log line, nothing provisioned — never a 500 the UI reads as a wrong password.
+    it("a record write that fails is 503 PUBLICATION_CHECK_UNAVAILABLE with one content-free log line", async () => {
+      const failing = createPublicationContentCheck({
+        judge: () => createJudgeStub([ALLOW]),
+        recorder: { record: async () => { throw new Error(`relation serve.publication_check_record: ${servedAnswer().question_line}`); } },
+        clock: () => new Date("2026-09-29T12:00:00.000Z")
+      });
+      const lines: string[] = [];
+      const spy = vi.spyOn(console, "error").mockImplementation((...values: unknown[]) => { lines.push(values.map(String).join(" ")); });
+      try {
+        const { api, publish, counts } = routeApi({ publicationContentCheck: failing });
+        const response = await publish();
+        await api.close();
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toStrictEqual(UNAVAILABLE_BODY);
+        expect(counts).toEqual({ prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 });
+      } finally { spy.mockRestore(); }
+      const checkLines = lines.filter(line => line.includes("api.publication.check_failed"));
+      expect(checkLines).toHaveLength(1);
+      expect(JSON.parse(checkLines[0]!)).toEqual({ event: "api.publication.check_failed", requestId: expect.any(String), diagnostic: "Error" });
+      expect(lines.join("\n")).not.toContain(servedAnswer().question_line);
+    });
+  });
+
   describe("route", () => {
     it("ALLOW → 201 with exactly state and public_ref", async () => {
       const { response, counts, publicRefs } = await attempt(createJudgeStub([ALLOW]));
@@ -355,8 +496,10 @@ describe("hate-speech S02 publish path", () => {
 
     it("the judge switch, passed as a DETACHED `current` supplier, turns publishing into 503 and back", async () => {
       const judge = createJudgeStub([ALLOW, ALLOW]);
-      const judgeSwitch = createPublicationJudgeSwitch(judge);
-      const { current, toggle } = judgeSwitch;
+      const dir = mkdtempSync(join(tmpdir(), "hs-s02-route-switch-"));
+      const flag = join(dir, "off");
+      const judgeSwitch = createPublicationJudgeSwitch(judge, { offFlagPath: flag });
+      const { current, switchOff } = judgeSwitch;
       const records: PublicationCheckRecord[] = [];
       const check = createPublicationContentCheck({
         judge: current,
@@ -365,13 +508,14 @@ describe("hate-speech S02 publish path", () => {
       });
       const { api, publish } = routeApi({ publicationContentCheck: check });
       expect((await publish()).statusCode).toBe(201);
-      expect(toggle()).toBe(false);
+      expect(switchOff()).toBe(false);
       const off = await publish();
       expect(off.statusCode).toBe(503);
       expect(off.json()).toStrictEqual(UNAVAILABLE_BODY);
-      expect(toggle()).toBe(true);
+      rmSync(flag);
       expect((await publish()).statusCode).toBe(201);
       await api.close();
+      rmSync(dir, { recursive: true, force: true });
       expect(judge.packets.length).toBe(2);
       expect(records.map((row) => [row.outcome, row.failure_cause])).toEqual([
         ["ALLOW", null], ["UNAVAILABLE", "JUDGE_NOT_CONFIGURED"], ["ALLOW", null]
@@ -384,7 +528,7 @@ describe("hate-speech S02 publish path", () => {
       let calls = 0;
       const counting: PublicationJudgePort = {
         providerRef: "test:judge", modelId: "test-model",
-        complete: async () => { calls += 1; return { text: ALLOW }; }
+        complete: async ({ packet }) => { calls += 1; return { text: bindJudgeAnswer(ALLOW, packet) }; }
       };
       const { check } = contentCheck(counting);
       const blocked = servedAnswer({ terminal: "BLOCKED" });
@@ -450,13 +594,40 @@ describe("hate-speech S02 publish path", () => {
   describe("composition", () => {
     const main = readFileSync(join(REPOSITORY_ROOT, "apps/api/src/main.ts"), "utf8");
 
-    it("main.ts composes the check from the support target, the record repository and the SIGUSR2 switch", () => {
+    /** The object literal passed to the ONE `createPublicationContentCheck(` call of main.ts. */
+    function checkComposition(): string {
+      const calls = main.split("createPublicationContentCheck(").length - 1;
+      expect(calls).toBe(1);
+      const start = main.indexOf("createPublicationContentCheck(");
+      return main.slice(start, main.indexOf("});", start) + 3);
+    }
+    // FIX-HS2-p1 ct-B4: the RUNNING deployment's D is the constant — a wired literal, or no deadline, is red.
+    it("main.ts wires D = PUBLICATION_CHECK_DEADLINE_MS into the composed check, and nothing else", () => {
+      const composition = checkComposition();
+      expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: PUBLICATION_CHECK_DEADLINE_MS"]);
+      expect(main).toMatch(/import \{[^}]*\bPUBLICATION_CHECK_DEADLINE_MS\b[^}]*\} from "\.\/publication-check\/check\.js"/u);
+      expect(composition).not.toMatch(/\b\d[\d_]*\b/u);
+    });
+    // R-D: the UI proxy lifts its 30 s ceiling for the publish route ONLY, above the API's whole publish budget.
+    it("the UI proxy's publish ceiling exceeds D by at least 20 s, and every other route keeps 30 s", () => {
+      const route = readFileSync(join(REPOSITORY_ROOT, "apps/ui/app/api/[...path]/route.ts"), "utf8");
+      const constant = (name: string) => Number(new RegExp(`const ${name} = ([\\d_]+);`, "u").exec(route)?.[1]?.replaceAll("_", ""));
+      expect(constant("UPSTREAM_TIMEOUT_MS")).toBe(30_000);
+      expect(constant("PUBLISH_UPSTREAM_TIMEOUT_MS")).toBeGreaterThanOrEqual(PUBLICATION_CHECK_DEADLINE_MS + 20_000);
+    });
+
+    it("main.ts composes the check from the support target, the record repository and the local-only switch", () => {
       expect(main).toContain("createPublicationContentCheck(");
       expect(main).toContain("createPublicationJudgeTransport(supportModelTarget");
       expect(main).toContain("new PostgresPublicationCheckRecordRepository(pool)");
       // The boot script owns no process signal (tests/architecture/t1-argon2-worker-contract.test.ts:495,
       // :706-707): it hands the real process to the installer, which the next test drives.
-      expect(main).toContain("installPublicationJudgeSwitchSignal(process, publicationJudgeSwitch)");
+      // FIX-HS2-p1 sd-N5: only a LOCAL deployment has the switch — its flag path and its signal.
+      expect(main).toMatch(/const publicationJudgeOffFlag = environment\.DEPLOYMENT_MODE === "hosted"\s*\?\s*null\s*:\s*publicationJudgeOffFlagPath\(environment\.API_PORT\);/u);
+      expect(main).toContain("createPublicationJudgeSwitch(");
+      expect(main).toMatch(/\{ offFlagPath: publicationJudgeOffFlag \}\)/u);
+      expect(main).toMatch(/if \(publicationJudgeOffFlag !== null\) installPublicationJudgeSwitchSignal\(process, publicationJudgeSwitch\);/u);
+      expect(main.split("installPublicationJudgeSwitchSignal(process").length - 1).toBe(1);
       expect(main).not.toMatch(/process\.(on|once|addListener)\(\s*["']SIG/u);
       const start = main.indexOf("const api = buildApi({");
       expect(start).toBeGreaterThan(-1);
@@ -467,11 +638,33 @@ describe("hate-speech S02 publish path", () => {
       expect(main.indexOf("createPublicationJudgeSwitch(")).toBeLessThan(main.indexOf("createPublicationContentCheck("));
     });
 
-    it("SIGUSR2 toggles the judge and logs one content-free line per toggle (SPEC-v2 §6 step 9, D-S02-21)", async () => {
+    // FIX-HS2-p2 api-N2: the signal listener never throws into the process — a failing switch logs a content-free code.
+    it("SIGUSR2 never throws: a directory at the flag path, and a switch that throws, each log one content-free line", async () => {
+      const signals = new EventEmitter();
+      const lines: string[] = [];
+      const dir = mkdtempSync(join(tmpdir(), "hs-s02-signal-n2-"));
+      try {
+        const flag = join(dir, "off");
+        mkdirSync(flag);
+        installPublicationJudgeSwitchSignal(signals, createPublicationJudgeSwitch(createJudgeStub([ALLOW]), { offFlagPath: flag }), (line) => lines.push(line));
+        expect(() => signals.emit("SIGUSR2")).not.toThrow();
+        const throwing = new EventEmitter();
+        installPublicationJudgeSwitchSignal(throwing, { switchOff: () => { throw Object.assign(new Error("secret /home/owner path"), { code: "EISDIR" }); } }, (line) => lines.push(line));
+        expect(() => throwing.emit("SIGUSR2")).not.toThrow();
+        expect(lines).toEqual([
+          "{\"event\":\"api.publication_check.switch\",\"configured\":false}",
+          "{\"event\":\"api.publication_check.switch\",\"error\":\"PUBLICATION_JUDGE_SWITCH_FAILED\"}"
+        ]);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    });
+
+    it("SIGUSR2 switches the judge OFF idempotently and logs one content-free line per signal; removing the flag restores it", async () => {
       const signals = new EventEmitter();
       const lines: string[] = [];
       const judge = createJudgeStub([ALLOW, ALLOW]);
-      const judgeSwitch = createPublicationJudgeSwitch(judge);
+      const dir = mkdtempSync(join(tmpdir(), "hs-s02-signal-"));
+      const flag = join(dir, "off");
+      const judgeSwitch = createPublicationJudgeSwitch(judge, { offFlagPath: flag });
       installPublicationJudgeSwitchSignal(signals, judgeSwitch, (line) => lines.push(line));
       expect(signals.listenerCount("SIGUSR2")).toBe(1);
       const records: PublicationCheckRecord[] = [];
@@ -484,13 +677,16 @@ describe("hate-speech S02 publish path", () => {
       signals.emit("SIGUSR2");
       expect((await publish()).statusCode).toBe(503);
       signals.emit("SIGUSR2");
+      expect((await publish()).statusCode).toBe(503);
+      rmSync(flag);
       expect((await publish()).statusCode).toBe(201);
       await api.close();
+      rmSync(dir, { recursive: true, force: true });
       expect(lines).toEqual([
         "{\"event\":\"api.publication_check.switch\",\"configured\":false}",
-        "{\"event\":\"api.publication_check.switch\",\"configured\":true}"
+        "{\"event\":\"api.publication_check.switch\",\"configured\":false}"
       ]);
-      expect(records.map((row) => row.failure_cause)).toEqual(["JUDGE_NOT_CONFIGURED", null]);
+      expect(records.map((row) => row.failure_cause)).toEqual(["JUDGE_NOT_CONFIGURED", "JUDGE_NOT_CONFIGURED", null]);
     });
   });
 });

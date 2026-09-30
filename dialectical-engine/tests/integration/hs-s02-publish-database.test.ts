@@ -9,16 +9,19 @@ import {
   loadKek,
   type AuditContextHasher
 } from "../../packages/crypto/src/index.js";
-import { PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, migrate } from "@debateai/db";
+import { createPool, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, migrate, withRunContentLease, type Pool } from "@debateai/db";
 import type { Answer } from "@debateai/contract";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 import {
   createPublicationContentCheck,
-  PublicationJudgeFailure
+  PublicationJudgeFailure,
+  type PublicationJudgePort
 } from "../../apps/api/src/publication-check/check.js";
+import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
+import type { PublicationContentLease } from "../../apps/api/src/publications.js";
 import { PUBLICATION_CHECK_POLICY_VERSION } from "../../apps/api/src/publication-check/policy.js";
-import { createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
+import { bindJudgeAnswer, createJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun,
@@ -305,5 +308,108 @@ describe("hate-speech S02 publish path over the real database (R8, R10, R14(a))"
     // The published snapshot carries the canary: the scan above is blind to ciphertext, not to the text.
     const debate = await application.readPublicDebate(publicRef);
     expect(debate?.question).toContain(run.canary);
+    // FIX-HS2-p1 ct-B1 / ct-B2: the judge read every checked leaf of the snapshot that was stored — every node,
+    // every review reason — and none of the owner's, the session's, the run's or the publication's identifiers.
+    const material = run.judge.packets.map(packet => JSON.parse(packet.messages[1]!.content.split("\n").slice(1, -1).join("\n"))
+      .fields.map((field: { content: string }) => field.content).join("\n\n")).join("\n\n");
+    const leaves = extractCheckedText(debate!);
+    expect(leaves.filter(leaf => leaf.kind === "ARGUMENTS").length).toBeGreaterThanOrEqual(2);
+    for (const leaf of leaves) expect(material, leaf.text).toContain(leaf.text);
+    const wire = JSON.stringify(run.judge.packets);
+    const { userId, ownerRef, sessionId } = theOwner();
+    for (const identifier of [run.runId, userId, ownerRef, sessionId, publicRef, source.ip, source.requestId, source.userAgent, debate!.author_pseudonym]) {
+      expect(wire, identifier).not.toContain(identifier);
+    }
+  }, 120_000);
+});
+
+/**
+ * FIX-HS2-p1 sd-B1 (ruling R-P), re-derived from the security lens's wedge probe
+ * (.hermes/reports/hate-speech/probes/REV-HS-S02-p1-security-data-safety/rev-hs-s02-p1-sd-db-probe.test.ts):
+ * the pool is main.ts's (createPool, pg's default max 10, no acquire timeout), the recorder writes on the SAME
+ * pool, and publish is composed exactly as the route composes it — its lease is `withRunContentLease(pool, [runId])`
+ * and its answer re-read runs under that lease. The probe's pre-fix composition (publish INSIDE one lease) is the
+ * last case: the product now refuses it before any judge call instead of wedging.
+ */
+describe("hate-speech S02 publish path — the runtime pool under concurrent attempts (sd-B1)", () => {
+  async function experiment(attempts: number, judgeLatencyMs: number, staggerMs: number) {
+    const pool: Pool = createPool(database.connectionString);
+    const app = new PostgresPublicationApplication(
+      new PostgresPublicationRepository(pool, fakeAuditHasher),
+      new PublicationCipher(new MemoryPublicationKeyStore(loadKek(Buffer.alloc(32, 0xa7))))
+    );
+    const { runId, answer } = await settledRun("pool", `HSCANARY-${randomUUID()}`);
+    const grantToken = await publishGrant(runId);
+    let judgeCalls = 0;
+    const judge: PublicationJudgePort = {
+      providerRef: "test:judge", modelId: "test-model",
+      complete: async ({ packet }) => {
+        judgeCalls += 1;
+        await new Promise((resolve) => setTimeout(resolve, judgeLatencyMs));
+        return { text: bindJudgeAnswer(JSON.stringify({ verdict: "BLOCK", rules: [1], parts: ["question"], possibly_illegal: false }), packet) };
+      }
+    };
+    const contentCheck = createPublicationContentCheck({
+      judge: () => judge, recorder: new PostgresPublicationCheckRecordRepository(pool), clock: () => new Date()
+    });
+    const contentLease: PublicationContentLease = {
+      run: (use) => withRunContentLease(pool, [runId], async () => use()),
+      readAnswer: async () => answer
+    };
+    const started = Date.now();
+    const settled: string[] = [];
+    const attemptsDone = Promise.allSettled(Array.from({ length: attempts }, async (_value, index) => {
+      await new Promise((resolve) => setTimeout(resolve, index * staggerMs));
+      const current = await contentLease.run(contentLease.readAnswer);
+      const result = await app.publish({
+        runId, answer: current!, authenticated: ownerSession(), grantToken, source, contentCheck, contentLease
+      });
+      settled.push(result?.state ?? "null");
+    }));
+    // An unrelated request on the same pool while the judges are still answering.
+    await new Promise((resolve) => setTimeout(resolve, Math.min(attempts * staggerMs, 3_000) + 200));
+    const unrelatedStart = Date.now();
+    await pool.query("SELECT 1");
+    const unrelatedMs = Date.now() - unrelatedStart;
+    const verdict = await Promise.race([
+      attemptsDone.then(() => "SETTLED"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("WEDGED"), 30_000))
+    ]);
+    const records = (await database.pool.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM serve.publication_check_record WHERE run_id=$1", [runId])).rows[0]!.n;
+    const stats = { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount };
+    console.info(`POOL attempts=${attempts} judge=${judgeLatencyMs}ms stagger=${staggerMs}ms → ${verdict} after ${Date.now() - started}ms; settled=${settled.length}/${attempts}; judgeCalls=${judgeCalls}; records=${records}; unrelated SELECT 1 = ${unrelatedMs}ms; pool=${JSON.stringify(stats)}`);
+    if (verdict === "SETTLED") await pool.end();
+    return { verdict, settled, judgeCalls, records, unrelatedMs, stats };
+  }
+
+  // Property: 12 attempts 250 ms apart with a 3 s judge (the lens's wedge shape, above the pool max) all settle,
+  // each is judged and recorded once, and an unrelated query is served while the judges are answering.
+  it("12 attempts 250 ms apart, judge 3 s: all settle, all recorded, an unrelated SELECT 1 returns", async () => {
+    const run = await experiment(12, 3_000, 250);
+    expect(run.verdict).toBe("SETTLED");
+    expect(run.settled).toEqual(Array.from({ length: 12 }, () => "REFUSED"));
+    expect(run.judgeCalls).toBe(12);
+    expect(run.records).toBe(12);
+    expect(run.unrelatedMs).toBeLessThan(1_000);
+    expect(run.stats.waiting).toBe(0);
+  }, 90_000);
+
+  // Property: the pre-fix composition — publish INSIDE the run's content lease — is refused before the judge is
+  // called, so it can never hold a pooled client across the judge's wait.
+  it("publish composed inside a content lease throws PUBLICATION_CHECK_UNDER_CONTENT_LEASE before any judge call", async () => {
+    const { runId, answer } = await settledRun("lease", `HSCANARY-${randomUUID()}`);
+    const grantToken = await publishGrant(runId);
+    const judge = createJudgeStub([JSON.stringify({ verdict: "ALLOW", rules: [], parts: [], possibly_illegal: false })]);
+    const contentCheck = createPublicationContentCheck({
+      judge: () => judge, recorder: new PostgresPublicationCheckRecordRepository(database.pool), clock: () => ATTEMPTED_AT
+    });
+    const countsBefore = await tableCounts();
+    await expect(withRunContentLease(database.pool, [runId], () => application.publish({
+      runId, answer, authenticated: ownerSession(), grantToken, source, contentCheck
+    }))).rejects.toThrow("PUBLICATION_CHECK_UNDER_CONTENT_LEASE");
+    expect(judge.packets).toHaveLength(0);
+    expect(await checkRecords(runId)).toEqual([]);
+    expect(await tableCounts()).toEqual(countsBefore);
   }, 120_000);
 });

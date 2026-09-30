@@ -12,7 +12,8 @@ export function publicationCheckContract(): PromptContract {
     contractId: PUBLICATION_CHECK_CONTRACT_ID,
     instruction: "You are the publication check of DebateAI. The material is text that its owner asked to publish. Decide whether it may be published under these rules:"
       + "\n\n" + PUBLICATION_CHECK_RULES_1_2 + "\n\n" + PUBLICATION_CHECK_TEXT_OF_RECORD,
-    answerForm: 'A single JSON object and nothing else: {"verdict":"ALLOW"|"BLOCK"|"UNSURE","rules":[1 or 2, each at most once],"parts":[names of the material fields that do what rule 1 or rule 2 forbids, each at most once],"possibly_illegal":true|false}'
+    // FIX-HS2-v V-21: `call` binds the answer to this call (verdict.ts judgeCallValue); the frame names the marker.
+    answerForm: 'A single JSON object and nothing else: {"call":"<the 32 hexadecimal characters inside this call\'s boundary marker, copied exactly>","verdict":"ALLOW"|"BLOCK"|"UNSURE","rules":[1 or 2, each at most once],"parts":[names of the material fields that do what rule 1 or rule 2 forbids, each at most once],"possibly_illegal":true|false}'
   };
 }
 

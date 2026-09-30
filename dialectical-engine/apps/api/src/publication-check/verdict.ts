@@ -1,3 +1,4 @@
+import { TypedDomainError } from "../../../../packages/kernel/src/index.js";
 import type { JudgeFailureCause } from "./check.js";
 
 export type JudgeAnswer = Readonly<{
@@ -8,7 +9,30 @@ export type JudgeAnswer = Readonly<{
 }>;
 export type JudgeCallResult = { ok: true; answer: JudgeAnswer } | { ok: false; cause: JudgeFailureCause };
 
-export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[]): JudgeCallResult {
+const VERDICTS: readonly JudgeAnswer["verdict"][] = ["ALLOW", "BLOCK", "UNSURE"];
+/**
+ * FIX-HS2-v V-21 (V's ruling, supersedes V-18): the answer is BOUND to its call. Every judge call's frame carries a
+ * boundary marker of 128 CSPRNG bits minted per call, after the material is fixed
+ * (packages/providers/src/prompt-frame.ts:222-235); the R5 answer form requires the judge to copy its 32 hexadecimal
+ * characters into `call`. Text the owner wrote before the call existed cannot carry that value, so a verdict copied
+ * out of the material — in any spelling, encoding or split — is never this call's answer. This replaces the
+ * pass-1/pass-2 scan of the material for verdict-like keys, which was an open list and refused honest text.
+ */
+const CALL_VALUE = /^[0-9a-f]{32}$/u;
+
+/** The call's one-time value: the 32 lowercase hexadecimal characters of the frame's boundary marker. */
+export function judgeCallValue(fence: string): string {
+  const hex = fence.match(/[0-9a-f]{32}/gu);
+  if (hex === null || hex.length !== 1) throw new TypedDomainError("PROMPT_FRAME_ABSENT", "The frame carries no single per-call value");
+  return hex[0]!;
+}
+
+/**
+ * R5: `expectedCall` is judgeCallValue of THIS call's frame. An answer is taken only when it is exactly the five-key
+ * object whose `call` is that value; missing, different, re-cased or padded values are JUDGE_ANSWER_SCHEMA
+ * (fail closed, SPEC-v2 R7), whatever verdict the answer names.
+ */
+export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[], expectedCall: string): JudgeCallResult {
   let source = text.trim();
   if (source.startsWith("```")) {
     const match = /^```(?:json)?\r?\n([^]*?)\r?\n```$/.exec(source);
@@ -21,10 +45,11 @@ export function parseJudgeAnswer(text: string, sentFieldNames: readonly string[]
   const schemaFailure = { ok: false, cause: "JUDGE_ANSWER_SCHEMA" } as const;
   if (!value || typeof value !== "object" || Array.isArray(value)) return schemaFailure;
   const row = value as Record<string, unknown>;
-  const keys = ["verdict", "rules", "parts", "possibly_illegal"];
-  if (Object.keys(row).length !== 4 || !keys.every(key => Object.hasOwn(row, key))) return schemaFailure;
+  const keys = ["call", "verdict", "rules", "parts", "possibly_illegal"];
+  if (Object.keys(row).length !== keys.length || !keys.every(key => Object.hasOwn(row, key))) return schemaFailure;
+  if (!CALL_VALUE.test(expectedCall) || row.call !== expectedCall) return schemaFailure;
   const { verdict, rules, parts, possibly_illegal } = row;
-  if (typeof verdict !== "string" || !["ALLOW", "BLOCK", "UNSURE"].includes(verdict)
+  if (typeof verdict !== "string" || !(VERDICTS as readonly string[]).includes(verdict)
     || !Array.isArray(rules) || !rules.every(rule => rule === 1 || rule === 2) || new Set(rules).size !== rules.length
     || !Array.isArray(parts) || !parts.every(part => typeof part === "string") || new Set(parts).size !== parts.length
     || typeof possibly_illegal !== "boolean") return schemaFailure;
@@ -43,8 +68,18 @@ export type CombinedJudgeCalls = Readonly<{
   cause?: JudgeFailureCause;
 }>;
 
+/**
+ * SPEC-v2 R6 order BLOCK > UNSURE > UNAVAILABLE > ALLOW. FIX-HS2-p1 ct-B3 / sd-N2: ALLOW is EARNED — every call
+ * answered, every answer is exactly "ALLOW". No calls at all, or an answer outside the closed verdict set that
+ * reached this point, is UNAVAILABLE JUDGE_ANSWER_SCHEMA, never a fall-through ALLOW.
+ */
 export function combineJudgeCalls(results: readonly JudgeCallResult[]): CombinedJudgeCalls {
+  const unknown = results.length === 0
+    || results.some(result => result.ok && !VERDICTS.includes(result.answer.verdict));
   for (const outcome of ["BLOCK", "UNSURE", "UNAVAILABLE", "ALLOW"] as const) {
+    if (outcome === "ALLOW" && unknown) {
+      return { outcome: "UNAVAILABLE", cause: "JUDGE_ANSWER_SCHEMA", rules: [], parts: [], possibly_illegal: false };
+    }
     if (outcome === "UNAVAILABLE") {
       const failed = results.find(result => !result.ok);
       if (failed && !failed.ok) return { outcome, cause: failed.cause, rules: [], parts: [], possibly_illegal: false };
