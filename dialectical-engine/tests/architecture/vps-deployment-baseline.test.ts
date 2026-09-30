@@ -2,6 +2,7 @@
 // Pins the VPS deployment baseline (PLAN §8 C3, §9.1 C3 amendments, audit corrections
 // L2-F3, L5-F6/F7/F8/F11, L7-F2/F3/F7). Every assertion is a floor on a file under
 // deploy/; the files are configuration, so the pins are textual and deliberately exact.
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -859,6 +860,10 @@ describe("VPS baseline: the country data refresh (paid plans G4)", () => {
   it("ships the script, the unit and the timer", () => {
     for (const file of ["deploy/vps/geoip-refresh.sh", "deploy/vps/systemd/debateai-geoip-refresh.service",
       "deploy/vps/systemd/debateai-geoip-refresh.timer"]) expect(exists(file), file).toBe(true);
+    // The unit runs the file directly (ExecStart=), so git must keep its executable bit; the
+    // behaviour tests run it through bash and would stay green without it.
+    expect(execFileSync("git", ["ls-files", "-s", "--", "deploy/vps/geoip-refresh.sh"],
+      { cwd: engineRoot, encoding: "utf8" })).toMatch(/^100755 /u);
   });
 
   it("geoip-refresh.sh: strict bash, its own state directory, https only, checked before an atomic rename", () => {

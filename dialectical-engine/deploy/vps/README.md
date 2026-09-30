@@ -821,10 +821,12 @@ hosted register file publishes that row only when it carries the `countryPolicy`
 member publishes no row, and so no gate): add the member and publish the register, §11. Signing in
 and reading one's debates are never gated.
 
-Attribution: DB-IP's Lite data is licensed CC BY 4.0. Every page footer must carry the credit
-`IP Geolocation by DB-IP` linking to `https://db-ip.com` (the site footer,
-`apps/ui/components/SiteFooter.tsx`, is PR #42's; task P21 adds the credit to it in both of its
-shapes — keep it there).
+Attribution: DB-IP's Lite data is licensed CC BY 4.0, and its licence requires the credit
+`IP Geolocation by DB-IP` linking to `https://db-ip.com`. The site footer
+(`apps/ui/components/SiteFooter.tsx`, PR #42's) carries it in its full shape: on the landing, on
+every legal page and on every page that takes money, billing on or off. Task P21 adds it there.
+Keep it there. The one-line footer of the other screens does not carry it; if counsel wants the
+credit on every page, it is one fixed link in that shape.
 
 To check the last refresh:
 

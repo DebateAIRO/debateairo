@@ -83,16 +83,20 @@ tor_counts() {
   ' "$1"
 }
 
+# Both refresh functions run under `|| status=1`, where bash ignores set -e: every step refuses by itself.
 refresh_tor() {
   local counts lines invalid
   if ! fetch "$TOR_URL" "$WORK/tor.txt"; then
     printf 'GEOIP_REFRESH_REFUSED tor-list download\n' >&2
     return 1
   fi
-  counts="$(tor_counts "$WORK/tor.txt")"
+  if ! counts="$(tor_counts "$WORK/tor.txt")"; then
+    printf 'GEOIP_REFRESH_REFUSED tor-list check\n' >&2
+    return 1
+  fi
   lines="${counts% *}"
   invalid="${counts#* }"
-  if [ "$lines" -lt "$TOR_MIN_LINES" ] || [ "$invalid" -ne 0 ]; then
+  if ! { [ "$lines" -ge "$TOR_MIN_LINES" ] && [ "$invalid" -eq 0 ]; }; then
     printf 'GEOIP_REFRESH_REFUSED tor-list lines=%s invalid=%s\n' "$lines" "$invalid" >&2
     return 1
   fi
@@ -121,8 +125,11 @@ refresh_country() {
         printf 'GEOIP_REFRESH_REFUSED country-db month=%s not-gzip\n' "$candidate" >&2
         return 1
       fi
-      bytes="$(wc -c < "$WORK/country.mmdb" | tr -d ' ')"
-      if [ "$bytes" -lt "$COUNTRY_MIN_BYTES" ] || ! LC_ALL=C grep -qaF "$MMDB_MARKER" "$WORK/country.mmdb"; then
+      if ! bytes="$(wc -c < "$WORK/country.mmdb" | tr -d ' ')"; then
+        printf 'GEOIP_REFRESH_REFUSED country-db month=%s check\n' "$candidate" >&2
+        return 1
+      fi
+      if ! { [ "$bytes" -ge "$COUNTRY_MIN_BYTES" ] && LC_ALL=C grep -qaF "$MMDB_MARKER" "$WORK/country.mmdb"; }; then
         printf 'GEOIP_REFRESH_REFUSED country-db month=%s bytes=%s\n' "$candidate" "$bytes" >&2
         return 1
       fi

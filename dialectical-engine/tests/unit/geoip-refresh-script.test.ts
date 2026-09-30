@@ -151,6 +151,46 @@ describe("deploy/vps/geoip-refresh.sh (paid plans G4)", () => {
     expect((await readdir(staged.state)).sort()).toEqual(["tor-exit-list.txt"]);
   });
 
+  // Both refresh functions run under `|| status=1`, where bash ignores set -e: a failing check step
+  // must refuse by itself. A tool that dies stands in for SIGSYS from SystemCallFilter, running out
+  // of memory, or a missing binary.
+  it("refuses the Tor list when its check fails or prints no numbers, and keeps the previous one", async () => {
+    const staged = await stage();
+    await refresh(staged);
+    const before = await readFile(torPath(staged.state), "utf8");
+    await writeFile(join(staged.fake, "tor.txt"), "1.2.3.4\nexit-node\n5.6.7.8\n");
+    await writeFile(join(staged.bin, "awk"), "#!/usr/bin/env bash\nexit 1\n");
+    await chmod(join(staged.bin, "awk"), 0o755);
+    const failed = await refresh(staged);
+    expect(failed.code).toBe(1);
+    expect(failed.stderr).toMatch(/GEOIP_REFRESH_REFUSED tor-list check/u);
+    expect(failed.stdout).not.toMatch(/GEOIP_REFRESH_OK tor-list/u);
+    expect(await readFile(torPath(staged.state), "utf8")).toBe(before);
+    await writeFile(join(staged.bin, "awk"), "#!/usr/bin/env bash\nprintf 'x y\\n'\nexit 0\n");
+    const garbled = await refresh(staged);
+    expect(garbled.code).toBe(1);
+    expect(garbled.stderr).toMatch(/GEOIP_REFRESH_REFUSED tor-list lines=x invalid=y/u);
+    expect(garbled.stdout).not.toMatch(/GEOIP_REFRESH_OK tor-list/u);
+    expect(await readFile(torPath(staged.state), "utf8")).toBe(before);
+  });
+
+  it("refuses the country file when its size check fails, and keeps the previous one", async () => {
+    const staged = await stage();
+    await refresh(staged);
+    const before = await readFile(countryPath(staged.state));
+    const old = new Date(Date.now() - 40 * 86_400_000);
+    await utimes(countryPath(staged.state), old, old);
+    await writeFile(join(staged.fake, "country.mmdb.gz"),
+      gzipSync(writeCountryMmdb([{ network: "81.196.0.0/16", country: "IT" }])));
+    await writeFile(join(staged.bin, "wc"), "#!/usr/bin/env bash\nexit 1\n");
+    await chmod(join(staged.bin, "wc"), 0o755);
+    const failed = await refresh(staged);
+    expect(failed.code).toBe(1);
+    expect(failed.stderr).toMatch(/GEOIP_REFRESH_REFUSED country-db month=\d{4}-\d{2} check/u);
+    expect(failed.stdout).not.toMatch(/GEOIP_REFRESH_OK country-db/u);
+    expect((await readFile(countryPath(staged.state))).equals(before)).toBe(true);
+  });
+
   it("refuses to run outside its systemd unit", async () => {
     const result = await refresh(await stage(), false);
     expect(result.code).not.toBe(0);
