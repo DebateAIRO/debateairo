@@ -277,5 +277,6 @@
   "requestFailure.kind.UNREADABLE": "Het antwoord van de coördinator kon niet worden gelezen, waardoor de uitkomst onbekend is.",
   "requestFailure.kind.PLAN_TIER_INVALID": "De coördinator heeft de abonnementskeuze afgewezen. Kies Gratis of Premium en probeer het opnieuw.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "De coördinator heeft het verzoek afgewezen: een model dat voor dit abonnement nodig is, is momenteel niet beschikbaar. Probeer het later opnieuw of kies het andere abonnement.",
+  "requestFailure.kind.ALREADY_WAITING": "Er kan maar één vraag tegelijk wachten. Stel deze vraag zodra uw wachtende debat is gestart.",
   "requestFailure.kind.UNCLASSIFIED": "Het verzoek is mislukt voordat er een antwoord is ontvangen, waardoor de uitkomst onbekend is. De coördinator heeft hierover geen beslissing genomen."
 }

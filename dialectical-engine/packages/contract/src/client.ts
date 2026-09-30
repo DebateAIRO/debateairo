@@ -26,6 +26,7 @@ import {
   AnswerStorySchema,
   AnswerDisclosureSchema,
   AskAcceptedSchema,
+  AskAlreadyWaitingSchema,
   AskRoomResponseSchema,
   BillingUsageResponseSchema,
   DeploymentSchema,
@@ -85,7 +86,14 @@ export class ContractHttpError extends Error {
     readonly code: ContractErrorCode,
     readonly status: number,
     message: string,
-    readonly serverCode: string | null = null
+    readonly serverCode: string | null = null,
+    /**
+     * Budget spec §2.7: set only for 422 ASK_ALREADY_WAITING whose body parses
+     * as `AskAlreadyWaitingSchema`: the waiting run and its expected start (no
+     * figure). The ask page shows sentence D with that time when its room
+     * re-read fails.
+     */
+    readonly waiting: Readonly<{ runRef: string; waitsUntil: string }> | null = null
   ) {
     super(message);
     this.name = "ContractHttpError";
@@ -105,12 +113,17 @@ function codeForStatus(status: number): ContractErrorCode {
 async function contractErrorForResponse(response: Response): Promise<ContractHttpError> {
   let serverCode: string | null = null;
   let serverMessage: string | null = null;
+  let waiting: Readonly<{ runRef: string; waitsUntil: string }> | null = null;
   try {
     const candidate: unknown = await response.json();
     if (typeof candidate === "object" && candidate !== null) {
       const body = candidate as Record<string, unknown>;
       serverCode = typeof body.error === "string" && body.error.trim().length > 0 ? body.error : null;
       serverMessage = typeof body.message === "string" && body.message.trim().length > 0 ? body.message : null;
+      const refusal = response.status === 422 ? AskAlreadyWaitingSchema.safeParse(body) : null;
+      if (refusal?.success === true) {
+        waiting = Object.freeze({ runRef: refusal.data.run_ref, waitsUntil: refusal.data.waits_until });
+      }
     }
   } catch {
     // A non-JSON failure still retains its transport status below.
@@ -118,7 +131,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   const detail = serverCode !== null && serverMessage !== null
     ? `${serverCode}: ${serverMessage}`
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
-  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode);
+  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode, waiting);
 }
 
 async function requestJson<T>(

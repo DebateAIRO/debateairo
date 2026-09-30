@@ -15,6 +15,7 @@ import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
+import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ export default async function HomePage({
   // debates in the words /new uses, so it reads that catalogue too — only the
   // two values that message prints, as the composer's props ship to the browser.
   const newDebateCatalog = dailyLimitMessageCatalog(await loadNamespace(locale, "newDebate"));
+  const roomCatalog = composerRoomCatalog(await loadNamespace(locale, "newDebate"));
   let debates: DebateSummary[] = [];
   let error: string | null = null;
   let sessionConfirmed = false;
@@ -139,7 +141,7 @@ export default async function HomePage({
             session; an unconfirmed one gets the notice above instead. */}
         {sessionConfirmed ? (
           <section data-support-primary-control id="start-a-debate" aria-label={t(catalog, "home.startDebateLabel")}>
-            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} locale={locale} />
+            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} roomCatalog={roomCatalog} locale={locale} />
           </section>
         ) : null}
 

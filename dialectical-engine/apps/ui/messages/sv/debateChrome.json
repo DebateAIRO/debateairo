@@ -277,5 +277,6 @@
   "requestFailure.kind.UNREADABLE": "Koordinatorns svar kunde inte läsas, så resultatet är okänt.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatorn avvisade valet av abonnemang. Välj ”Kostnadsfri” eller ”Premium” och försök sedan igen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatorn avvisade begäran: en modell som krävs för det här abonnemanget är inte tillgänglig just nu. Försök igen senare eller välj det andra abonnemanget.",
+  "requestFailure.kind.ALREADY_WAITING": "Bara en fråga kan vänta åt gången. Ställ den här frågan när din väntande debatt har startat.",
   "requestFailure.kind.UNCLASSIFIED": "Begäran misslyckades innan något svar kom, så resultatet är okänt. Det här är inte ett beslut som koordinatorn har fattat."
 }

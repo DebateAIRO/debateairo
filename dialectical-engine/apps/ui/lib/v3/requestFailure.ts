@@ -55,6 +55,14 @@ export type RequestFailureKind =
   | "PLAN_TIER_INVALID"
   /** SYNC3: the coordinator refused the ask: a model its plan needs is not available (422). */
   | "PLAN_TIER_UNAVAILABLE"
+  /**
+   * Budget spec §2.7/§2.11: the coordinator answered 422 ASK_ALREADY_WAITING.
+   * This person already has a question waiting, and one may wait at a time.
+   * The page shows sentence D with its start time, from the room re-read or
+   * from the refusal's body (`ContractHttpError.waiting`); this clause is the
+   * banner only when neither carries a time.
+   */
+  | "ALREADY_WAITING"
   /** Something failed that this seam cannot classify; say exactly that. */
   | "UNCLASSIFIED";
 
@@ -84,6 +92,7 @@ const KIND_CLAUSE: Readonly<Record<RequestFailureKind, string>> = Object.freeze(
   PLAN_TIER_UNAVAILABLE:
     "The coordinator refused it: a model this plan needs is not available right now. "
     + "Retry later, or choose the other plan.",
+  ALREADY_WAITING: "One question can wait at a time. Ask this one after your waiting debate has started.",
   UNCLASSIFIED:
     "It failed before any answer arrived, so the outcome is unknown. "
     + "This is not a decision the coordinator made."
@@ -114,11 +123,20 @@ const PLAN_TIER_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.
   ASK_PLAN_TIER_MODEL_UNAVAILABLE: "PLAN_TIER_UNAVAILABLE"
 });
 
+/** Budget spec §2.7: the one room refusal an ask can get (422). */
+const ROOM_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.freeze({
+  ASK_ALREADY_WAITING: "ALREADY_WAITING"
+});
+
 function kindOf(error: unknown): RequestFailureKind {
   if (!(error instanceof ContractHttpError)) return "UNCLASSIFIED";
   if (error.status === 422 && error.serverCode !== null
     && Object.hasOwn(PLAN_TIER_REFUSALS, error.serverCode)) {
     return PLAN_TIER_REFUSALS[error.serverCode]!;
+  }
+  if (error.status === 422 && error.serverCode !== null
+    && Object.hasOwn(ROOM_REFUSALS, error.serverCode)) {
+    return ROOM_REFUSALS[error.serverCode]!;
   }
   if (error.code === "RATE_LIMITED" && error.serverCode === DAILY_LIMIT_SERVER_CODE) {
     return "DAILY_LIMIT_REACHED";

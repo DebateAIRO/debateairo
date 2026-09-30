@@ -306,6 +306,8 @@ apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
 apps/ui/components/authRoutes.source-test.mjs
 apps/ui/components/billing/LegalAcceptGate.tsx
+apps/ui/components/billing/ResetSentence.tsx
+apps/ui/components/billing/RoomNotice.tsx
 apps/ui/components/consent/ConsentSettingsPanel.tsx
 apps/ui/components/consent/CookieBar.tsx
 apps/ui/components/consent/CookieConsent.tsx
@@ -352,6 +354,9 @@ apps/ui/lib/ageConfirmation.ts
 apps/ui/lib/aiDisclosure.ts
 apps/ui/lib/api.ts
 apps/ui/lib/authNavigationGuard.ts
+apps/ui/lib/billing/formatReset.ts
+apps/ui/lib/billing/room.ts
+apps/ui/lib/billing/roomCatalog.ts
 apps/ui/lib/canvasViewport.ts
 apps/ui/lib/consent.ts
 apps/ui/lib/contentSecurityPolicy.test.mjs

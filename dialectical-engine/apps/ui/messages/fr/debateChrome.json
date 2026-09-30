@@ -284,5 +284,6 @@
   "requestFailure.kind.UNREADABLE": "La réponse du coordinateur n’a pas pu être lue ; l’issue de la demande est donc inconnue.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Le coordinateur a refusé la formule choisie. Choisissez Gratuite ou Premium, puis réessayez.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Le coordinateur a refusé la demande : un modèle nécessaire à cette formule est actuellement indisponible. Réessayez plus tard ou choisissez l’autre formule.",
+  "requestFailure.kind.ALREADY_WAITING": "Une seule question peut attendre à la fois. Posez celle-ci une fois votre débat en attente démarré.",
   "requestFailure.kind.UNCLASSIFIED": "La demande a échoué avant qu’une réponse ne soit reçue ; son issue est donc inconnue. Il ne s’agit pas d’une décision prise par le coordinateur."
 }

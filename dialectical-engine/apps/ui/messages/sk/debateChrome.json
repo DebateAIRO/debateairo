@@ -277,6 +277,7 @@
   "requestFailure.kind.UNREADABLE": "Odpoveď koordinátora sa nepodarilo prečítať, takže výsledok nie je známy.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinátor odmietol výber programu. Vyberte Bezplatný alebo Premium a potom to skúste znova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinátor požiadavku odmietol: model, ktorý tento program potrebuje, momentálne nie je dostupný. Skúste to znova neskôr alebo vyberte druhý program.",
+  "requestFailure.kind.ALREADY_WAITING": "Naraz môže čakať iba jedna otázka. Túto položte, keď sa začne vaša čakajúca debata.",
   "requestFailure.kind.UNCLASSIFIED": "Požiadavka zlyhala skôr, než prišla akákoľvek odpoveď, takže výsledok nie je známy. Nejde o rozhodnutie koordinátora.",
   "debateChrome.score.distinctPair.few": "{count} odlišné dvojice doména zdroja/metóda",
   "debateChrome.score.distinctPair.many": "{count} odlišnej dvojice doména zdroja/metóda",

@@ -277,5 +277,6 @@
   "requestFailure.kind.UNREADABLE": "Die Antwort des Koordinators konnte nicht gelesen werden; daher ist das Ergebnis unbekannt.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Der Koordinator hat die Tarifwahl abgelehnt. Wählen Sie „Kostenlos“ oder „Premium“ und versuchen Sie es dann erneut.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Der Koordinator hat die Anfrage abgelehnt: Ein für diesen Tarif benötigtes Modell ist derzeit nicht verfügbar. Versuchen Sie es später erneut oder wählen Sie den anderen Tarif.",
+  "requestFailure.kind.ALREADY_WAITING": "Es kann immer nur eine Frage warten. Stellen Sie diese, sobald Ihre wartende Debatte gestartet ist.",
   "requestFailure.kind.UNCLASSIFIED": "Der Fehler trat auf, bevor eine Antwort einging; daher ist das Ergebnis unbekannt. Dies war keine Entscheidung des Koordinators."
 }
