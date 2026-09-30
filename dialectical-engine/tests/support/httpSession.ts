@@ -69,6 +69,9 @@ export function testSessionApplication(
     listSessions: async () => [],
     revokeSession: async () => true,
     revokeAllSessions: async () => identities.length,
+    // Test identities are established accounts that already agreed before their first debate.
+    readSensitiveDataConsent: async () => "given" as const,
+    recordSensitiveDataConsent: async () => "given" as const,
     stepUp: async () => {
       const identity = identities[0];
       if (identity === undefined) throw new Error("TEST_SESSION_IDENTITY_REQUIRED");

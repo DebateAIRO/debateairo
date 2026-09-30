@@ -55,7 +55,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "account_recovery_state_event", "age_check", "audit_event", "authentication_risk_signal",
       "channel_binding", "login_challenge", "mfa_factor", "private_erasure_audit_binding",
       "publication_event_binding", "recovery_code", "run_execution_binding", "runtime_audit_attempt",
-      "session", "step_up_grant", "user",
+      "sensitive_data_consent", "session", "step_up_grant", "user",
       "verification_token_credential"
     ]);
 

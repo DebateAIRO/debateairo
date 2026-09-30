@@ -82,5 +82,18 @@
   "home.aiDisclosure": "Informação sobre IA",
   "home.aiSupportLead": "Esta conversa é com um assistente de apoio de IA.",
   "home.aiLinkLabel": "Como identificamos o conteúdo de IA (abre num novo separador)",
-  "home.aiLink": "Como identificamos o conteúdo de IA"
+  "home.aiLink": "Como identificamos o conteúdo de IA",
+  "home.sensitiveConsent.eyebrow": "Antes do seu primeiro debate",
+  "home.sensitiveConsent.title": "As suas perguntas podem revelar informações sensíveis",
+  "home.sensitiveConsent.lede": "Uma pergunta sobre política, religião, saúde, sexualidade ou crenças pode dizer algo sobre si. A lei qualifica essas informações como sensíveis, pelo que precisamos do seu consentimento explícito antes de as tratarmos.",
+  "home.sensitiveConsent.pointPurpose": "Utilizamos o que escreve apenas para realizar os seus debates.",
+  "home.sensitiveConsent.pointModels": "Para realizar um debate, enviamos a sua pergunta aos modelos de IA que nele participam.",
+  "home.sensitiveConsent.pointOthers": "Não inclua informações sensíveis sobre outras pessoas.",
+  "home.sensitiveConsent.pointDelete": "Pode eliminar um debate a qualquer momento.",
+  "home.sensitiveConsent.statement": "Concordo que a DebateAI trate as informações sensíveis que incluo nas minhas próprias perguntas, com a finalidade de realizar os meus debates.",
+  "home.sensitiveConsent.privacyLink": "Leia na Política de Privacidade como as tratamos",
+  "home.sensitiveConsent.agree": "Concordo",
+  "home.sensitiveConsent.decline": "Não concordo",
+  "home.sensitiveConsent.declined": "Não pode iniciar um debate sem este consentimento. Voltaremos a pedi-lo da próxima vez que iniciar um.",
+  "home.sensitiveConsent.failed": "Não foi possível guardar a sua resposta. Tente novamente."
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
-import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
+import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 
@@ -263,6 +263,21 @@ export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
 /** Paid plans G3a: two booleans — never the country the server saw. */
 export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean() }).strict();
 export type GeoAvailabilityResponse = z.infer<typeof GeoAvailabilityResponseSchema>;
+
+/**
+ * Sensitive-data consent (V's ruling of 2026-09-29). Before the first debate an account
+ * agrees, once, to the processing of sensitive information (politics, religion, health,
+ * sexuality) in its own questions. Without it `POST /v1/asks` answers 403 with
+ * `SENSITIVE_DATA_CONSENT_REQUIRED`. The version names the wording agreed to.
+ */
+export const SENSITIVE_DATA_NOTICE_VERSION = "2026-09-29" as const;
+export const SENSITIVE_DATA_CONSENT_REQUIRED = "SENSITIVE_DATA_CONSENT_REQUIRED" as const;
+export const SensitiveDataConsentRequestSchema = z.object({
+  notice_version: z.literal(SENSITIVE_DATA_NOTICE_VERSION),
+  locale: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/)
+}).strict();
+export const SensitiveDataConsentStatusSchema = z.object({ status: z.enum(["required", "given"]) }).strict();
+export type SensitiveDataConsentStatus = z.infer<typeof SensitiveDataConsentStatusSchema>;
 export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
   "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
@@ -272,7 +287,8 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
     action: RunTargetedGrantActionSchema,
     target_run_id: z.uuid()
   }).strict(),
-  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict()
+  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
+  z.object({ action: z.literal("CHANGE_EMAIL") }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
@@ -284,6 +300,11 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     action: z.literal("DELETE_ACCOUNT"),
+    expires_at: z.iso.datetime()
+  }).strict(),
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: z.literal("CHANGE_EMAIL"),
     expires_at: z.iso.datetime()
   }).strict()
 ]);
@@ -322,6 +343,35 @@ export const AccountErasureCancelRequestSchema = z.object({
 export const AccountErasureCancelledSchema = z.object({
   status:z.literal("CANCELLED")
 }).strict();
+// Turn 14 — change email. The request needs a CHANGE_EMAIL step-up grant; the
+// two link routes carry only the bearer mailed to the new (confirm) or the
+// current (cancel) address.
+const EmailAddressSchema = z.string().min(3).max(254);
+export const AccountEmailSchema = z.object({
+  email: EmailAddressSchema,
+  recovery_email: EmailAddressSchema,
+  pending: z.object({
+    new_email: EmailAddressSchema,
+    expires_at: z.iso.datetime()
+  }).strict().nullable()
+}).strict();
+export type AccountEmail = z.infer<typeof AccountEmailSchema>;
+export const EmailChangeRequestSchema = z.object({
+  new_email: EmailAddressSchema,
+  step_up_grant: StepUpGrantTokenSchema
+}).strict();
+export const EmailChangePendingSchema = z.object({
+  status: z.literal("PENDING"),
+  new_email: EmailAddressSchema,
+  expires_at: z.iso.datetime()
+}).strict();
+export type EmailChangePending = z.infer<typeof EmailChangePendingSchema>;
+export const EmailChangeLinkRequestSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+}).strict();
+export const EmailChangeConfirmedSchema = z.object({ status: z.literal("CONFIRMED") }).strict();
+export const EmailChangeCancelledSchema = z.object({ status: z.literal("CANCELLED") }).strict();
+
 export const PrivateDebateErasureRequestSchema = z.object({
   step_up_grant:StepUpGrantTokenSchema
 }).strict();
@@ -538,8 +588,15 @@ export const NodeSchema = z.object({
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
 
+export const PublicNodeReviewSchema = NodeReviewSchema.extend({
+  reviewer_lineage: PublicMakerLineageSchema
+});
+export type PublicNodeReview = z.infer<typeof PublicNodeReviewSchema>;
+
 export const PublicNodeSchema = NodeSchema.omit({ disagreement: true }).extend({
-  disagreement: z.null()
+  disagreement: z.null(),
+  maker_lineage: PublicMakerLineageSchema.nullable(),
+  review: PublicNodeReviewSchema.nullable()
 });
 export type PublicNode = z.infer<typeof PublicNodeSchema>;
 
@@ -795,12 +852,20 @@ export const contractInventory = Object.freeze({
     "POST /v1/auth/step-up",
     "GET /v1/auth/age-confirmation",
     "POST /v1/auth/age-confirmation",
+    "GET /v1/account/sensitive-data-consent",
+    "POST /v1/account/sensitive-data-consent",
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
+    "GET /v1/account/email",
+    "POST /v1/account/email/change",
+    "POST /v1/account/email/change/resend",
+    "DELETE /v1/account/email/change",
+    "POST /v1/account/email/change/confirm",
+    "POST /v1/account/email/change/cancel",
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
@@ -841,12 +906,15 @@ export const contractInventory = Object.freeze({
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
     LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
+    SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
+    AccountEmailSchema,EmailChangeRequestSchema,EmailChangePendingSchema,EmailChangeLinkRequestSchema,
+    EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,

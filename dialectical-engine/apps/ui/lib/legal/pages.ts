@@ -117,25 +117,118 @@ export const LEGAL_BROWSER_STORAGE: readonly LegalStorageItem[] = Object.freeze(
   { name: "debateai.mode", purposeKey: "legal.cookies.mode.purpose" }
 ]);
 
-export type ModelProvider = Readonly<{
-  /** The family key in `lib/models.ts`. */
-  family: string;
-  provider: string;
+/** The jobs a provider can be given, and so why it receives text (PP §5 "what it receives and for what purpose"). */
+export type ProviderPurpose = "arguments" | "judging" | "story" | "support";
+
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "support"]);
+
+/** A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. */
+export type ContractFlag = "yes" | "no" | "unconfirmed";
+
+/**
+ * One row of the AI Provider Register, which the Privacy Policy (§5) makes part of the policy and
+ * which Japan (APPI Art. 28) and South Korea (PIPA Art. 28-8) require for overseas transfers. It is
+ * shown to every user, not only in those two countries.
+ *
+ * Bracketed facts and "unconfirmed" flags are placeholders (R4): the production roster and the
+ * contracts are settled when the product is hosted, and a row is only filled in, and given a
+ * `checkedOn` date, once someone has checked it against the provider's current terms.
+ */
+export type ProviderRegisterEntry = Readonly<{
+  /** The family key in `lib/models.ts`, or "support" for the support chat's model. */
+  key: string;
+  /** The row heading: a brand name, or null when `nameKey` names the row. */
+  provider: string | null;
+  nameKey: string | null;
   models: string;
   /** A message key when the value is prose, or null when the models column is a brand name. */
   modelsKey: string | null;
+  /** The legal entity we contract with — a fact, bracketed until the contract names it. */
+  entity: string;
+  homeCountryKey: string;
+  /** Every job this provider can be given; `purposesConfirmed` is false until the roster is fixed. */
+  purposes: readonly ProviderPurpose[];
+  purposesConfirmed: boolean;
   locationKey: string;
+  retentionKey: string;
+  /** Zero data retention for the endpoint and features we use; "notNeeded" when the text never leaves our servers. */
+  zeroRetention: ContractFlag | "notNeeded";
+  training: ContractFlag;
   basisKey: string;
+  /** Where to write to the provider about your data (Korea) — a fact, bracketed until confirmed. */
+  contact: string;
+  /** The ISO date (YYYY-MM-DD) the row was last checked against the provider's terms, or null. */
+  checkedOn: string | null;
 }>;
 
+/** The fields a cloud model provider shares until its contract has been checked. */
+const UNCHECKED_CLOUD = Object.freeze({
+  nameKey: null,
+  modelsKey: null,
+  homeCountryKey: "legal.providers.unitedStates",
+  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story"]),
+  purposesConfirmed: false,
+  /** Set by the endpoint and region chosen at hosting time, so unconfirmed until then. */
+  locationKey: "legal.providers.unconfirmed",
+  retentionKey: "legal.providers.unconfirmed",
+  zeroRetention: "unconfirmed",
+  training: "unconfirmed",
+  basisKey: "legal.providers.usBasis",
+  contact: "[…]",
+  checkedOn: null
+} as const);
+
 /** One row per model family the product runs, in the registry's order. */
-export const MODEL_PROVIDERS: readonly ModelProvider[] = Object.freeze([
-  { family: "claude", provider: "Anthropic", models: "Claude", modelsKey: null, locationKey: "legal.providers.unitedStates", basisKey: "legal.providers.usBasis" },
-  { family: "gpt", provider: "OpenAI", models: "GPT", modelsKey: null, locationKey: "legal.providers.unitedStates", basisKey: "legal.providers.usBasis" },
-  { family: "gemini", provider: "Google", models: "Gemini", modelsKey: null, locationKey: "legal.providers.unitedStates", basisKey: "legal.providers.usBasis" },
-  { family: "grok", provider: "xAI", models: "Grok", modelsKey: null, locationKey: "legal.providers.unitedStates", basisKey: "legal.providers.usBasis" },
-  { family: "qwen", provider: "Qwen", models: "Qwen", modelsKey: "legal.providers.ownServers", locationKey: "legal.providers.ownLocation", basisKey: "legal.providers.noTransfer" }
+export const MODEL_PROVIDERS: readonly ProviderRegisterEntry[] = Object.freeze([
+  { ...UNCHECKED_CLOUD, key: "claude", provider: "Anthropic", models: "Claude", entity: "[Anthropic …]" },
+  { ...UNCHECKED_CLOUD, key: "gpt", provider: "OpenAI", models: "GPT", entity: "[OpenAI …]" },
+  { ...UNCHECKED_CLOUD, key: "gemini", provider: "Google", models: "Gemini", entity: "[Google …]" },
+  { ...UNCHECKED_CLOUD, key: "grok", provider: "xAI", models: "Grok", entity: "[xAI …]" },
+  {
+    key: "qwen",
+    provider: "Qwen",
+    nameKey: null,
+    models: "Qwen",
+    modelsKey: "legal.providers.ownServers",
+    entity: COMPANY.legalName,
+    homeCountryKey: "legal.providers.romania",
+    purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story"]),
+    purposesConfirmed: false,
+    locationKey: "legal.providers.ownLocation",
+    retentionKey: "legal.providers.retentionAsDebate",
+    zeroRetention: "notNeeded",
+    training: "no",
+    basisKey: "legal.providers.noTransfer",
+    contact: COMPANY.emails.privacy,
+    checkedOn: null
+  }
 ]);
+
+/**
+ * The support chat calls one model of its own (`apps/api/src/support/model.ts`), chosen when the
+ * product is hosted; until then every fact about it is a placeholder.
+ */
+export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  key: "support",
+  provider: null,
+  nameKey: "legal.providers.supportName",
+  models: "[…]",
+  modelsKey: null,
+  entity: "[…]",
+  homeCountryKey: "legal.providers.unconfirmed",
+  purposes: Object.freeze<ProviderPurpose[]>(["support"]),
+  purposesConfirmed: true,
+  locationKey: "legal.providers.unconfirmed",
+  retentionKey: "legal.providers.unconfirmed",
+  zeroRetention: "unconfirmed",
+  training: "unconfirmed",
+  basisKey: "legal.providers.unconfirmed",
+  contact: "[…]",
+  checkedOn: null
+});
+
+/** The whole Register, in the order `/providers` shows it. */
+export const PROVIDER_REGISTER: readonly ProviderRegisterEntry[] = Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
 
 export type TermsVersion = Readonly<{
   version: string;

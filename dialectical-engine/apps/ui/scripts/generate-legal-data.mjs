@@ -51,6 +51,7 @@ const DOCUMENTS = {
     versionAnchor: "Version 3.0",
     numberedSections: 14,
     annexLetter: "B",
+    annexParts: 11,
     contact: { constant: "privacy@dezbatere.ro" },
     sectionIdPrefix: "policy-section-",
     titleId: "policy-modal-title",
@@ -68,6 +69,7 @@ const DOCUMENTS = {
     versionAnchor: "Version 2.0",
     numberedSections: 19,
     annexLetter: "A",
+    annexParts: 11,
     // This frozen token is found in the table without depending on the translated row label.
     contact: { tableToken: "[legal@dezbatere.ro]" },
     sectionIdPrefix: "terms-section-",
@@ -413,9 +415,9 @@ function validateFrozenAnchors(markdown, config) {
     const match = new RegExp(`^###\\s+(${config.annexLetter}\\.\\d+)\\s+`).exec(line);
     return match === null ? [] : [match[1]];
   });
-  const expectedParts = Array.from({ length: 9 }, (_, index) => `${config.annexLetter}.${index + 1}`);
+  const expectedParts = Array.from({ length: config.annexParts }, (_, index) => `${config.annexLetter}.${index + 1}`);
   if (JSON.stringify(annexParts) !== JSON.stringify(expectedParts)) {
-    throw new Error(`Frozen annex parts must be ${config.annexLetter}.1–${config.annexLetter}.9 in order`);
+    throw new Error(`Frozen annex parts must be ${config.annexLetter}.1–${config.annexLetter}.${config.annexParts} in order`);
   }
 }
 

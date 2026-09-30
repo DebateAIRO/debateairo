@@ -254,9 +254,10 @@
 .legalCookieTable td:last-child { width: 90px; }
 .legalTagEssential { font-size: 11px; font-weight: 700; color: var(--ok-text) !important; }
 .legalTagPreference { font-size: 11px; font-weight: 700; color: var(--gold-text) !important; }
-.legalProviderTable th:first-child { width: 110px; }
-.legalProviderTable td:nth-child(3) { width: 140px; }
-.legalProviderTable td:last-child { width: 170px; }
+.legalProviderEntry { margin-top: 28px; }
+.legalProviderEntry h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--ink); }
+.legalProviderEntry .legalTable { margin-top: 10px; }
+.legalProviderPurposes ul { margin: 0; padding-inline-start: 16px; }
 .legalAction { margin-top: 20px; }
 
 /* Legal notice: label/value fact tables and inline links */

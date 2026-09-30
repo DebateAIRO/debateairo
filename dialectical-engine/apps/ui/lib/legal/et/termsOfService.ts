@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kus me DebateAI-d pakume",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Pakume DebateAI-d inimestele, kes elavad [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
+      { kind: "p", text: "Pakume DebateAI-d inimestele, kes elavad [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
     ]
   },
   {
@@ -113,7 +113,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Need reeglid kehtivad teie esitatud sisu, teenuse kasutamise viisi ja avaldatava sisu suhtes." },
       { kind: "p", text: "Ärge esitage teiste inimeste isikuandmeid. Esitage küsimusi teemade, argumentide ja avalike küsimuste, mitte tuvastatavate eraisikute kohta. Ärge lisage nime, kontaktandmeid, isikukoode, pilte, tervise-, finants- ega muid kedagi tuvastavaid andmeid ning ärge kasutage DebateAI-d isiku kohta süüdistusmaterjali, profiili või toimiku koostamiseks. Avaliku elu tegelaste kohta nende avalikus rollis esitatud küsimused on lubatud; eraisikule suunatud küsimused ei ole. Kui te selliseid andmeid siiski esitate, vastutate nende eest ja me võime sisu eemaldada." },
-      { kind: "p", text: "Teie enda tundlik teave. Teie küsimused võivad puudutada teie enda tervist, veendumusi, poliitilisi vaateid või muid tundlikke teemasid. Andsite registreerumisel selleks nõusoleku. Kui elate kohas, kus kehtivad terviseandmete erireeglid, võib lisa A suunata teid eraldi teate juurde." },
+      { kind: "p", text: "Teie enda tundlik teave. Teie küsimused võivad puudutada teie enda tervist, veendumusi, poliitilisi vaateid või muid tundlikke teemasid. Annate selleks nõusoleku eraldi ekraanikuval enne oma esimest väitlust. Kui elate kohas, kus kehtivad terviseandmete erireeglid, võib lisa A suunata teid eraldi teate juurde." },
       { kind: "p", text: "Ärge esitage ega avaldage ebaseaduslikku sisu, sealhulgas sisu, mis on laimav, õhutab vägivallale või vihkamisele, ahistab või ähvardab, kujutab nõusolekuta jagatud intiimkujutisi, rikub intellektuaalomandit või konfidentsiaalsust, avaldab ärisaladusi, kujutab laste seksuaalset väärkohtlemist või rikub sanktsioone või ekspordikontrolli." },
       { kind: "p", text: "Ärge kasutage DebateAI-d petmiseks. Ärge esitage loodud väljundit inimese kirjutatuna, kui see oleks eksitav, ärge eemaldage sellelt tehisintellekti loodud sisu märgist ega kasutage seda näilise üksmeele, võltstõendite või kellegi teisena esinemise loomiseks." },
       { kind: "p", text: "Ärge rünnake teenust. Keelatud on automatiseeritud juurdepääs avaldatud väitlustele, nende kraapimine, roomamine või massiline väljavõtmine ulatuses, mida meie robotifail ei luba; kiiruspiirangutest, autentimisest või avaldamiskontrollidest möödahiilimine; viipade või süsteemijuhiste väljavõtmise katsed; viipade sisestamine eesmärgiga panna mootor oma piiranguid eirama; sondimine või koormustestimine ilma meie kirjaliku loata." },
@@ -298,7 +298,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ühendkuningriik (ainult kui loetletud jaotises 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Meie Ühendkuningriigi esindaja Ühendkuningriigi GDPR-i artikli 27 alusel on [name, address, email]. Teile kohaldatakse 2015. aasta tarbijaõiguste seadust ja miski neis Tingimustes ei piira sellest tulenevaid õigusi; alates [January 2027] kohaldatakse tasulistele pakettidele 2024. aasta digitaalturgude, konkurentsi ja tarbijate seaduse tellimisreegleid, sealhulgas uuendamise ja tasuta prooviperioodi järel kehtivat järelemõtlemisaega. Kuidas kaitseme kasutajaid ebaseadusliku sisu eest: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Meie kasutatav ennetav tehnoloogia: [describe, or \"none\"]. Vanuse kontroll: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Jaotise 10 kohases kaebuste menetluses saab esitada kaebusi ebaseadusliku sisu, teie sisu alusetu eemaldamise, teie konto piirangute, teie sisu mõjutavate automatiseeritud tööriistade kasutamise ja teid alusetult blokeeriva vanuse hindamise kohta. Seda saavad kasutada ka sisust mõjutatud inimesed, kes ei ole kasutajad." }
+      { kind: "p", text: "Meie Ühendkuningriigi esindaja Ühendkuningriigi GDPR-i artikli 27 alusel on [name, address, email]. Teile kohaldatakse 2015. aasta tarbijaõiguste seadust ja miski neis Tingimustes ei piira sellest tulenevaid õigusi; kui 2024. aasta digitaalturgude, konkurentsi ja tarbijate seaduse tellimisreeglid jõustuvad (eeldatavasti 2027. aastal), kohaldatakse neid tasulistele pakettidele, sealhulgas uuendamise ja tasuta prooviperioodi järel kehtivat järelemõtlemisaega. Kuidas kaitseme kasutajaid ebaseadusliku sisu eest: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Meie kasutatav ennetav tehnoloogia: [describe, or \"none\"]. Vanuse kontroll: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Jaotise 10 kohases kaebuste menetluses saab esitada kaebusi ebaseadusliku sisu, teie sisu alusetu eemaldamise, teie konto piirangute, teie sisu mõjutavate automatiseeritud tööriistade kasutamise ja teid alusetult blokeeriva vanuse hindamise kohta. Seda saavad kasutada ka sisust mõjutatud inimesed, kes ei ole kasutajad. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.2." }
     ]
   },
   {
@@ -308,7 +308,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Vahekohtukokkulepe ja kollektiivhagi esitamisest loobumine. Kui elate Ameerika Ühendriikides, nõustute teie ja DebateAIRO lahendama kõik nendest Tingimustest või teenusest tulenevad vaidlused kohtu asemel siduvas individuaalses vahekohtumenetluses, mida korraldab [the American Arbitration Association / JAMS] oma tarbijareeglite alusel, välja arvatud see, et kumbki meist võib esitada individuaalse nõude väiksemate nõuete kohtule. Võite loobuda, saates 30 päeva jooksul pärast nende Tingimustega esmakordset nõustumist e-kirja aadressile [address]. Kokkulepet reguleerib föderaalne vahekohtuseadus. Meie tasume vahekohtumenetluse algatamise tasud. Kollektiiv-, ühis- ja esindushagidest loobutakse seadusega lubatud ulatuses. Seda jaotist kohaldatakse ainult edasiulatuvalt ja see ei kehti nõuetele, mis tekkisid enne sellega nõustumist." },
       { kind: "p", text: "Teated ja sisu eemaldamine. Nõusolekuta jagatud intiimkujutistest võib ilma kontota teatada aadressil [URL] ning need eemaldatakse 48 tunni jooksul pärast kehtiva taotluse saamist. Autoriõiguse rikkumise kaebused esitatakse jaotises 16 nimetatud määratud esindajale." },
-      { kind: "p", text: "Osariigipõhised sätted. California: kohaldatakse jaotise 12 automaatse uuendamise tingimusi; võite igal ajal veebis tühistada; säilitame teie nõusoleku uuendamistingimustega vähemalt kolm aastat. New York: võite 14 päeva jooksul pärast kõrgema hinnaga tasu võtmist tühistada ja saada proportsionaalse tagasimakse. Texas ja Nebraska: me ei müü tundlikke isikuandmeid; kui see kunagi muutub, küsime esmalt teie nõusolekut [statutory notice language]. Washington: meie tarbija terviseandmete privaatsusteade aadressil [URL] kehtib tervisega seotud teabe kohta. Colorado: miski teenuses ei tee teie kohta oluliste tagajärgedega otsuseid." }
+      { kind: "p", text: "Osariigipõhised sätted. California: kohaldatakse jaotise 12 automaatse uuendamise tingimusi; võite igal ajal veebis tühistada; säilitame teie nõusoleku uuendamistingimustega vähemalt kolm aastat. New York: võite 14 päeva jooksul pärast kõrgema hinnaga tasu võtmist tühistada ja saada proportsionaalse tagasimakse. Texas ja Nebraska: me ei müü tundlikke isikuandmeid. Washington: meie tarbija terviseandmete privaatsusteade aadressil [URL] kehtib tervisega seotud teabe kohta. Colorado: miski teenuses ei tee teie kohta oluliste tagajärgedega otsuseid. Teie andmeid ja teie osariigi seadustest tulenevaid privaatsusõigusi käsitleb meie Privaatsuspoliitika lisa B.3." }
     ]
   },
   {
@@ -316,7 +316,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ja Quebec (ainult kui loetletud)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Meie privaatsusametnik on [name, email]. Quebec: need Tingimused on prantsuse keeles kättesaadavad aadressil [URL] ja prantsuskeelne versioon esitati teile esimesena; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist." }
+      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on [name], privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.4. Quebec: need Tingimused on kättesaadavad prantsuse keeles; valige keelevalijast prantsuse keel; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist; teile ei kohaldata vahekohtukokkulepet ega kollektiivhagi esitamisest loobumist." }
     ]
   },
   {
@@ -329,32 +329,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Ladina-Ameerika (hispaaniakeelne lisa; ainult kui loetletud)",
+    title: "Šveits (ainult kui loetletud)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Nõusolek on töötlemise alus, kui lepinguline vajadus puudub; annate registreerumisel sõnaselge nõusoleku mis tahes tundlike andmete suhtes, mille otsustate lisada. Oma ARCO õigusi saate kasutada aadressil [address], vastused esitatakse [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719] jooksul. Mehhiko: täielik aviso de privacidad on aadressil [URL]; taganemine [5] päeva jooksul. Argentina: [AAIP legend]; kasutage 10 päeva jooksul aadressil [URL] olevat botón de arrepentimiento nuppu. Kolumbia: política de tratamiento on aadressil [URL]; taganemine 5 päeva jooksul. Tšiili (alates 1. detsembrist 2026): ameti kontaktandmed on […]; võite tühistada samal viisil, nagu tellisite; digiteenustele taganemisõigust ei kohaldata." }
+      { kind: "p", text: "Teie andmetele kohaldatakse Šveitsi föderaalset andmekaitseseadust (Privaatsuspoliitika, lisa B.6). Võite pöörduda kohtusse selle Šveitsi paiga kohtus, kus elate. Tasulisele paketile ei kohaldata seadusest tulenevat taganemisõigust; meie tagasimaksepoliitika on […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Pärsia lahe piirkond — Araabia Ühendemiraadid ja Saudi Araabia (ainult kui loetletud)",
+    title: "Moldova (ainult kui loetletud)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Kui töötleme teie andmeid muul eesmärgil kui teenuse osutamine, teeme seda teie nõusolekul, mille võite tagasi võtta. Teie andmeid töödeldakse väljaspool [UAE / Kingdom of Saudi Arabia], sealhulgas Euroopa Liidus ja Ameerika Ühendriikides, [SDAIA standard contractual clauses / the mechanism in the Register] alusel. Vastutate selle eest, et kõik, mida avaldate, vastaks teie asukohariigi õigusele, sealhulgas religiooni, avaliku korra ja kõlbluse suhtes kehtivatele õigusnormidele; võime teie piirkonnas selliseid teemasid käsitlevate väitluste avaldamist piirata." }
+      { kind: "p", text: "Teil on nende Tingimuste alusel samad õigused nagu tarbijal Euroopa Liidus, sealhulgas jaotises 13 sätestatud 14-päevane taganemisõigus. Võite pöörduda Moldova kohtutesse. Teie andmetele kohaldatakse Moldova isikuandmete kaitse seadust nr 195/2024 (Privaatsuspoliitika, lisa B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Aasia ja Vaikse ookeani piirkond (ainult loetletud piirkondade read)",
+    title: "Ukraina (ainult kui loetletud)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapur: meie andmekaitsespetsialist on [name, email]; andmete edastamine põhineb PDPA-ga võrreldavat kaitset pakkuvatel lepingulistel kaitsemeetmetel; tasulisele paketile ei kohaldata seadusest tulenevat järelemõtlemisõigust ja meie tagasimaksepoliitika on […]. Jaapan: kaubanduslike eritehingute seaduse kohane seadusjärgne teave asub aadressil [URL]; internetitellimustele ei kohaldata üldist järelemõtlemisõigust ja meie tagasimaksepoliitika on […]; teie sisu võidakse edastada pakkujatele riikides [named countries] ja nõustute sellega registreerumisel antavate nõusolekutega. Lõuna-Korea: vabatahtliku töötlemise ja turunduse nõusolekud kogutakse teenuse osutamiseks vajalikest nõusolekutest eraldi; meie privaatsusametnik on [name]; võite tasulisest paketist e-kaubanduse seaduse kohaselt 7 päeva jooksul pärast tellimist taganeda; enne korduva hinnatõusu või tasuta paketilt tasulisele üleminekut küsime teie uut nõusolekut; kui seda nõuab tehisintellekti raamseadus, teatame teile ette, et teenus põhineb tehisintellektil, ning märgistame väljundid. India (pärast DPDP reeglite kohaldumist): kohaldatakse nõusolekuteadet aadressil [URL]; alla 18-aastased kasutajad vajavad kontrollitavat vanema nõusolekut. Tai: meie esindaja Tais on [name] [if appointed]. Filipiinid: meie äriidentifitseerimise andmed ja internetitehingute seaduse kohane õiguskaitsemehhanism asuvad aadressil [URL]; kaebusi võib esitada National Privacy Commissionile." }
+      { kind: "p", text: "Pakume DebateAI-d Ukrainas, välja arvatud aladel, mis ei ole Ukraina valitsuse kontrolli all. Toode ja need Tingimused on kättesaadavad ukraina keeles. Teie andmetele kohaldatakse Ukraina seadust „Isikuandmete kaitse kohta“ (Privaatsuspoliitika, lisa B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Reserveeritud",
+    title: "Iisrael (ainult kui loetletud)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Võite tasulise paketi tühistada tarbijakaitseseaduse 5741-1981 lubatud viisil [state the cancellation terms]. Need Tingimused ja meie Privaatsuspoliitika on kättesaadavad heebrea keeles. Teie andmetele kohaldatakse Iisraeli eraelu kaitse seadust (Privaatsuspoliitika, lisa B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Aasia ja Vaikse ookeani piirkond (ainult loetletud piirkondade read)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapur: meie andmekaitsespetsialist on [name, email]; andmete edastamine põhineb PDPA-ga võrreldavat kaitset pakkuvatel lepingulistel kaitsemeetmetel; tasulisele paketile ei kohaldata seadusest tulenevat järelemõtlemisõigust ja meie tagasimaksepoliitika on […]. Jaapan: kaubanduslike eritehingute seaduse kohane seadusjärgne teave asub aadressil [URL]; internetitellimustele ei kohaldata üldist järelemõtlemisõigust ja meie tagasimaksepoliitika on […]; saadame teie sisu tehisintellekti pakkujatele Ameerika Ühendriikides ja Euroopa Liidus, igaühele lepingu alusel, mis nõuab Jaapani isikuandmete kaitse seadusega samaväärset kaitset, ning teie taotlusel teatame, millised need meetmed on. Lõuna-Korea: vabatahtliku töötlemise ja turunduse nõusolekud kogutakse teenuse osutamiseks vajalikest nõusolekutest eraldi; meie privaatsusametnik on [name], privacy@dezbatere.ro; võite tasulisest paketist e-kaubanduse seaduse kohaselt 7 päeva jooksul pärast tellimist taganeda; enne korduva hinnatõusu või tasuta paketilt tasulisele üleminekut küsime teie uut nõusolekut; teenus kasutab generatiivset tehisintellekti, teatame teile sellest enne, kui seda kasutate, ning märgistame tehisintellekti loodud väljundid. Taiwan: võite tasulisest paketist tarbijakaitseseaduse alusel 7 päeva jooksul pärast tellimist taganeda; teie andmetele kohaldatakse Taiwani isikuandmete kaitse seadust (Privaatsuspoliitika, lisa B.10). Tai: meie esindaja Tais on [name] [if appointed]. Filipiinid: meie äriidentifitseerimise andmed ja internetitehingute seaduse kohane õiguskaitsemehhanism asuvad aadressil [URL]; kaebusi võib esitada National Privacy Commissionile." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Reserveeritud",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Türgi, Brasiilia ja Indoneesia nõuavad igaüks kohalikus keeles lisa, esindajat või registreerimist ja dokumentide esitamist. Neid ei ole siin kavandatud ning need jäävad jaotise 2 kohaldamisalast välja, kuni need lisatakse teadlikult. Hiinas, Vietnamis ja Venemaal teenust ei pakuta." }
     ]
@@ -364,7 +380,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "90dee1565a182a763e8aa2bebc39bb66e4774a6b4fda6244a44ab56999bc8942",
+  sha256: "9ab96efe3b77b28db339a5e5e9a2f6aeac4598e9736706e56c05ebea577158e2",
   eyebrow: "TEENUSETINGIMUSED · v2.0 · KEHTIB ALATES [DATE]",
   title: "Millega te nõustute",
   lede: "Teie ja DebateAIRO S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",

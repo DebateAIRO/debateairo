@@ -20,6 +20,16 @@ export {
 } from "./sessions.js";
 
 export {
+  PostgresEmailChangeRepository,
+  type EmailChangeCancelOutcome,
+  type EmailChangeConfirmOutcome,
+  type EmailChangePendingRecord,
+  type EmailChangeRequestOutcome,
+  type EmailChangeResendOutcome,
+  type EmailSettingsRecord
+} from "./email-change.js";
+
+export {
   PostgresLegacyRunClaimRepository,
   type LegacyRunClaimOutcome
 } from "./legacy-claim.js";

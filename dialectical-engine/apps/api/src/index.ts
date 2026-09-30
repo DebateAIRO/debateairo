@@ -2,9 +2,15 @@ import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
+  AccountEmailSchema,
   AccountErasureScheduleRequestSchema,
   AccountErasureCancelRequestSchema,
   AccountErasureStatusSchema,
+  EmailChangeCancelledSchema,
+  EmailChangeConfirmedSchema,
+  EmailChangeLinkRequestSchema,
+  EmailChangePendingSchema,
+  EmailChangeRequestSchema,
   AnswerSchema,
   AnswerIndexSchema,
   AnswerStorySchema,
@@ -47,6 +53,9 @@ import {
   type Node,
   type RunProjection,
   type Session,
+  SENSITIVE_DATA_CONSENT_REQUIRED,
+  SENSITIVE_DATA_NOTICE_VERSION,
+  SensitiveDataConsentRequestSchema,
   AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
   AGE_REFUSAL_COOKIE_NAME,
   AGE_REFUSAL_COOKIE_VALUE,
@@ -99,6 +108,7 @@ import {
 } from "./registration.js";
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
 import type { MfaApplication } from "./mfa.js";
+import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
 import type { AnswerStoryApplication } from "./stories.js";
@@ -107,6 +117,13 @@ import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { LegalAcceptanceApplication } from "./legal.js";
 import type { CountryGate } from "./country-gate.js";
+import {
+  EmailChangeError,
+  type EmailChangeErrorCode,
+  type EmailChangePending,
+  type EmailChangeSession,
+  type EmailSettings
+} from "./email-change.js";
 import type { RecoveryApplication } from "./recovery.js";
 import { clientIpNetworkScope, normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import {
@@ -1107,12 +1124,23 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
   { route: "GET /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "read-age-confirmation" },
   { route: "POST /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "confirm-age" },
+  // Sensitive-data consent (V, 2026-09-29): the one-time agreement before the first debate.
+  { route: "GET /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "read-sensitive-data-consent" },
+  { route: "POST /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "give-sensitive-data-consent" },
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
+  // Turn 14 — change email. The owner routes ride the cookie session and CSRF;
+  // the two link routes need only the first-party Origin and the mailed bearer.
+  { route: "GET /v1/account/email", auth: "user", resource: "identity", action: "read-email" },
+  { route: "POST /v1/account/email/change", auth: "user", resource: "identity", action: "request-email-change" },
+  { route: "POST /v1/account/email/change/resend", auth: "user", resource: "identity", action: "resend-email-change" },
+  { route: "DELETE /v1/account/email/change", auth: "user", resource: "identity", action: "cancel-email-change" },
+  { route: "POST /v1/account/email/change/confirm", auth: "public", origin: "trusted", resource: "identity", action: "confirm-email-change" },
+  { route: "POST /v1/account/email/change/cancel", auth: "public", origin: "trusted", resource: "identity", action: "cancel-email-change-link" },
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
@@ -1315,6 +1343,30 @@ export type AskPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
 
+export interface EmailChangeApplication {
+  settings(session: EmailChangeSession): Promise<EmailSettings | null>;
+  request(
+    session: EmailChangeSession,
+    input: Readonly<{ newEmail: string; grantToken: string }>,
+    source: AuthSourceContext
+  ): Promise<EmailChangePending>;
+  resend(session: EmailChangeSession, source: AuthSourceContext): Promise<EmailChangePending>;
+  cancel(session: EmailChangeSession, source: AuthSourceContext): Promise<void>;
+  confirm(token: string, source: AuthSourceContext): Promise<void>;
+  cancelByLink(token: string, source: AuthSourceContext): Promise<void>;
+}
+
+const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Object.freeze({
+  EMAIL_INVALID: 422,
+  EMAIL_UNCHANGED: 422,
+  STEP_UP_REQUIRED: 403,
+  RESEND_COOLDOWN: 429,
+  NO_PENDING_CHANGE: 404,
+  LINK_INVALID: 404,
+  LINK_EXPIRED: 410,
+  ADDRESS_UNAVAILABLE: 409
+});
+
 export interface ApiOptions {
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
@@ -1340,6 +1392,8 @@ export interface ApiOptions {
   readonly legacyRunClaim?: LegacyRunClaimApplication;
   /** Paid plans L4: re-acceptance of the Terms and the Privacy Policy; the routes answer 503 without it. */
   readonly legal?: LegalAcceptanceApplication;
+  /** Turn 14 — change email; the routes answer a closed 503 when it is absent. */
+  readonly emailChange?: EmailChangeApplication;
   readonly allowedOrigin?: string;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
@@ -1533,6 +1587,13 @@ function requestDateOfBirth(body: unknown): ReturnType<typeof dobFromIso> {
 function ageRefused(reply: FastifyReply): FastifyReply {
   return reply.status(403).header("set-cookie", ageRefusalCookie())
     .send({ error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" });
+}
+
+/** Fails closed: without the consent store, no debate can be admitted and none is recorded. */
+function sensitiveDataConsentUnavailable(reply: FastifyReply): FastifyReply {
+  return reply.status(503).send({
+    error: "SENSITIVE_DATA_CONSENT_UNAVAILABLE", message: "SENSITIVE_DATA_CONSENT_UNAVAILABLE"
+  });
 }
 
 function refreshedCookies(input: Readonly<{
@@ -1967,6 +2028,26 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       reply.header("set-cookie", [...expiredCookies(), ageRefusalCookie()]);
       return reply.send({ outcome: "refused" });
     });
+    // Sensitive-data consent (V, 2026-09-29): read and give the one-time agreement.
+    api.get("/v1/account/sensitive-data-consent", routePolicy("GET /v1/account/sensitive-data-consent"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      return reply.send({ status: await options.sessions!.readSensitiveDataConsent(authenticated) });
+    });
+    api.post("/v1/account/sensitive-data-consent", credentialRoutePolicy("POST /v1/account/sensitive-data-consent"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.recordSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      const body = SensitiveDataConsentRequestSchema.safeParse(request.body);
+      if (!body.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      const outcome = await options.sessions!.recordSensitiveDataConsent(authenticated, {
+        noticeVersion: SENSITIVE_DATA_NOTICE_VERSION,
+        locale: body.data.locale
+      });
+      if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      return reply.send({ status: "given" });
+    });
     api.post("/v1/auth/step-up", credentialRoutePolicy("POST /v1/auth/step-up"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
@@ -1983,7 +2064,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         password: typeof body.password === "string" ? body.password : "",
         code: typeof body.code === "string" ? body.code : "",
         ...(authorization === undefined ? {} : { authorization:
-          authorization.action === "DELETE_ACCOUNT"
+          !("target_run_id" in authorization)
             ? { action: authorization.action }
             : { action: authorization.action, targetRunId: authorization.target_run_id }
         })
@@ -1999,7 +2080,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           || rotated.grantToken === undefined
           || rotated.grantExpiresAt === undefined
           ? {}
-          : { step_up_grant: authorization.action === "DELETE_ACCOUNT"
+          : { step_up_grant: !("target_run_id" in authorization)
               ? {
                   token: rotated.grantToken,
                   action: authorization.action,
@@ -2095,6 +2176,93 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }));
     }
   );
+  // Turn 14 — change email (design doc 14A/14B/14C).
+  const emailChangeSession = (authenticated: AuthenticatedSession): EmailChangeSession =>
+    Object.freeze({ userId: authenticated.userId, sessionId: authenticated.session.session_id });
+  const pendingBody = (pending: EmailChangePending) => EmailChangePendingSchema.parse({
+    status: "PENDING", new_email: pending.newEmail, expires_at: pending.expiresAt.toISOString()
+  });
+  const emailChangeRefusal = (reply: FastifyReply, error: unknown) => {
+    if (error instanceof EmailChangeError) {
+      return reply.status(EMAIL_CHANGE_STATUS[error.code]).send({ error: error.code });
+    }
+    throw error;
+  };
+  api.get("/v1/account/email", routePolicy("GET /v1/account/email"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+    const settings = await options.emailChange.settings(emailChangeSession(authenticated));
+    if (settings === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    return reply.send(AccountEmailSchema.parse({
+      email: settings.email,
+      recovery_email: settings.recoveryEmail,
+      pending: settings.pending === null ? null : {
+        new_email: settings.pending.newEmail, expires_at: settings.pending.expiresAt.toISOString()
+      }
+    }));
+  });
+  api.post("/v1/account/email/change", credentialRoutePolicy("POST /v1/account/email/change"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeRequestSchema, request.body);
+      try {
+        const pending = await options.emailChange.request(emailChangeSession(authenticated), {
+          newEmail: input.new_email, grantToken: input.step_up_grant
+        }, sourceFor(request));
+        return reply.status(202).send(pendingBody(pending));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/resend", credentialRoutePolicy("POST /v1/account/email/change/resend"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      try {
+        const pending = await options.emailChange.resend(emailChangeSession(authenticated), sourceFor(request));
+        return reply.status(202).send(pendingBody(pending));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.delete("/v1/account/email/change", credentialRoutePolicy("DELETE /v1/account/email/change"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      try {
+        await options.emailChange.cancel(emailChangeSession(authenticated), sourceFor(request));
+        return reply.status(204).send();
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/confirm", credentialRoutePolicy("POST /v1/account/email/change/confirm"),
+    async (request, reply) => {
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeLinkRequestSchema, request.body);
+      try {
+        await options.emailChange.confirm(input.token, sourceFor(request));
+        return reply.send(EmailChangeConfirmedSchema.parse({ status: "CONFIRMED" }));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/cancel", credentialRoutePolicy("POST /v1/account/email/change/cancel"),
+    async (request, reply) => {
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeLinkRequestSchema, request.body);
+      try {
+        await options.emailChange.cancelByLink(input.token, sourceFor(request));
+        return reply.send(EmailChangeCancelledSchema.parse({ status: "CANCELLED" }));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
   api.delete<{ Params:{ id:string } }>(
     "/v1/debates/:id",
     credentialRoutePolicy("DELETE /v1/debates/{id}"),
@@ -2363,6 +2531,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
+    // Sensitive-data consent (V, 2026-09-29): an account that has not agreed starts no
+    // debate. Checked before admission, so a refusal here spends none of the account's quota.
+    const asker = request.authenticatedSession;
+    if (asker !== undefined) {
+      if (options.sessions?.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      if (await options.sessions.readSensitiveDataConsent(asker) !== "given") {
+        return reply.status(403).send({
+          error: SENSITIVE_DATA_CONSENT_REQUIRED, message: SENSITIVE_DATA_CONSENT_REQUIRED
+        });
+      }
+    }
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
     // Paid plans G3a: no new debate from an always-blocked country. Reading is never gated.

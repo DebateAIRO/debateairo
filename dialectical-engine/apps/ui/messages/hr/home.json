@@ -82,5 +82,18 @@
   "home.aiDisclosure": "Obavijest o umjetnoj inteligenciji",
   "home.aiSupportLead": "Ovaj razgovor vodite s pomoćnikom za podršku koji se temelji na umjetnoj inteligenciji.",
   "home.aiLinkLabel": "Kako označavamo sadržaj umjetne inteligencije (otvara se u novoj kartici)",
-  "home.aiLink": "Kako označavamo sadržaj umjetne inteligencije"
+  "home.aiLink": "Kako označavamo sadržaj umjetne inteligencije",
+  "home.sensitiveConsent.eyebrow": "Prije vaše prve rasprave",
+  "home.sensitiveConsent.title": "Vaša pitanja mogu otkriti osjetljive informacije",
+  "home.sensitiveConsent.lede": "Pitanje o politici, vjeri, zdravlju, seksualnosti ili uvjerenjima može ponešto reći o vama. Zakon takve informacije smatra osjetljivima, pa nam je prije njihove obrade potrebna vaša izričita privola.",
+  "home.sensitiveConsent.pointPurpose": "Ono što napišete upotrebljavamo isključivo za vođenje vaših rasprava.",
+  "home.sensitiveConsent.pointModels": "Kako bismo vodili raspravu, vaše pitanje šaljemo modelima umjetne inteligencije koji u njoj sudjeluju.",
+  "home.sensitiveConsent.pointOthers": "Nemojte uključivati osjetljive informacije o drugim osobama.",
+  "home.sensitiveConsent.pointDelete": "Raspravu možete izbrisati u bilo kojem trenutku.",
+  "home.sensitiveConsent.statement": "Pristajem na to da DebateAI obrađuje osjetljive informacije koje uključim u vlastita pitanja, radi vođenja mojih rasprava.",
+  "home.sensitiveConsent.privacyLink": "Pročitajte kako s njima postupamo u Pravilima o privatnosti",
+  "home.sensitiveConsent.agree": "Pristajem",
+  "home.sensitiveConsent.decline": "Ne pristajem",
+  "home.sensitiveConsent.declined": "Bez ove privole ne možete započeti raspravu. Ponovno ćemo vas pitati kada sljedeći put započnete raspravu.",
+  "home.sensitiveConsent.failed": "Vaš odgovor nije bilo moguće spremiti. Pokušajte ponovno."
 }

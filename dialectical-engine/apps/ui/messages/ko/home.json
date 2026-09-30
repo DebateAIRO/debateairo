@@ -80,5 +80,18 @@
   "home.aiDisclosure": "AI 관련 고지",
   "home.aiSupportLead": "이 대화의 상대는 AI 지원 에이전트입니다.",
   "home.aiLinkLabel": "AI 콘텐츠 표시 방식(새 탭에서 열림)",
-  "home.aiLink": "AI 콘텐츠 표시 방식"
+  "home.aiLink": "AI 콘텐츠 표시 방식",
+  "home.sensitiveConsent.eyebrow": "첫 토론을 시작하기 전에",
+  "home.sensitiveConsent.title": "질문을 통해 민감정보가 드러날 수 있습니다",
+  "home.sensitiveConsent.lede": "정치, 종교, 건강, 성생활 또는 신념에 관한 질문은 귀하에 대해 무언가를 드러낼 수 있습니다. 법률은 이를 민감정보로 취급하므로, 당사가 이를 처리하기 전에 귀하의 명시적 동의를 받아야 합니다.",
+  "home.sensitiveConsent.pointPurpose": "작성하신 내용은 귀하의 토론을 실행하는 데에만 사용합니다.",
+  "home.sensitiveConsent.pointModels": "토론을 실행하기 위해 귀하의 질문을 해당 토론에 참여하는 AI 모델에 전송합니다.",
+  "home.sensitiveConsent.pointOthers": "다른 사람에 관한 민감정보는 포함하지 마세요.",
+  "home.sensitiveConsent.pointDelete": "토론은 언제든지 삭제할 수 있습니다.",
+  "home.sensitiveConsent.statement": "본인은 DebateAI가 본인의 토론을 실행할 목적으로, 본인이 자신의 질문에 포함하는 민감정보를 처리하는 데 동의합니다.",
+  "home.sensitiveConsent.privacyLink": "당사의 처리 방식은 개인정보 처리방침에서 확인하세요",
+  "home.sensitiveConsent.agree": "동의합니다",
+  "home.sensitiveConsent.decline": "동의하지 않습니다",
+  "home.sensitiveConsent.declined": "이 동의 없이는 토론을 시작할 수 없습니다. 다음에 토론을 시작할 때 다시 묻겠습니다.",
+  "home.sensitiveConsent.failed": "응답을 저장하지 못했습니다. 다시 시도하세요."
 }

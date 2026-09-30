@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -64,7 +64,8 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
-import { SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
+import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
+import { EMAIL_CHANGE_LINK_TTL_MS, EMAIL_CHANGE_RESEND_COOLDOWN_MS, EmailChangeService } from "./email-change.js";
 import {
   AccountErasureNotificationReconciler,
   createSingleFlightErasureReconciler,
@@ -474,6 +475,21 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   sessionPolicy,
   blindIndexKey
 }));
+// Turn 14 — change email: the capabilities of migration 0079 are granted to the
+// authorization role, beside the step-up that mints their CHANGE_EMAIL grant.
+const emailChange = new EmailChangeService({
+  repository: new PostgresEmailChangeRepository(authorizationPool, auditContextHasher),
+  users: dekStore,
+  blindIndexKey,
+  mail: new SendmailEmailChangeMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    publicAppUrl: environment.PUBLIC_APP_URL,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  tokenTtlMs: EMAIL_CHANGE_LINK_TTL_MS,
+  resendCooldownMs: EMAIL_CHANGE_RESEND_COOLDOWN_MS
+});
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
@@ -776,6 +792,7 @@ const api = buildApi({
   sessions,
   legacyRunClaim,
   legal,
+  emailChange,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
   ...(countryGate === undefined ? {} : { countryGate }),

@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Wo wir DebateAI anbieten",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wir bieten DebateAI Personen an, die in [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea] leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
+      { kind: "p", text: "Wir bieten DebateAI Personen an, die in [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
     ]
   },
   {
@@ -113,7 +113,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Diese Regeln gelten für Ihre Eingaben, Ihre Nutzung des Dienstes und Ihre Veröffentlichungen." },
       { kind: "p", text: "Übermitteln Sie keine personenbezogenen Daten anderer Personen. Fragen Sie nach Themen, Argumenten und öffentlichen Fragestellungen statt nach identifizierbaren Privatpersonen. Geben Sie keine Namen, Kontaktdaten, Identifikationsnummern, Bilder, Gesundheits-, Finanz- oder sonstigen Angaben an, anhand derer eine Person identifiziert werden kann, und verwenden Sie DebateAI nicht, um einen Fall, ein Profil oder ein Dossier über eine Person zu erstellen. Fragen über Personen des öffentlichen Lebens in Ausübung ihrer öffentlichen Funktion sind zulässig; Fragen, die auf eine Privatperson abzielen, sind es nicht. Wenn Sie solche Daten dennoch übermitteln, sind Sie dafür verantwortlich, und wir können die Inhalte entfernen." },
-      { kind: "p", text: "Ihre eigenen sensiblen Informationen. Ihre Fragen können Ihre eigene Gesundheit, Ihre Überzeugungen, Ihre politischen Ansichten oder andere sensible Angelegenheiten betreffen. Dem haben Sie bei der Registrierung zugestimmt. Wenn Sie an einem Ort mit besonderen Vorschriften für Gesundheitsdaten leben, verweist Anhang A gegebenenfalls auf einen gesonderten Hinweis." },
+      { kind: "p", text: "Ihre eigenen sensiblen Informationen. Ihre Fragen können Ihre eigene Gesundheit, Ihre Überzeugungen, Ihre politischen Ansichten oder andere sensible Angelegenheiten betreffen. Dem stimmen Sie auf einem gesonderten Bildschirm vor Ihrer ersten Debatte zu. Wenn Sie an einem Ort mit besonderen Vorschriften für Gesundheitsdaten leben, verweist Anhang A gegebenenfalls auf einen gesonderten Hinweis." },
       { kind: "p", text: "Übermitteln oder veröffentlichen Sie keine rechtswidrigen Inhalte, einschließlich verleumderischer Inhalte, Aufrufen zu Gewalt oder Hass, Belästigungen oder Drohungen, ohne Einwilligung geteilter intimer Abbildungen, Verletzungen geistigen Eigentums oder der Vertraulichkeit, Offenlegungen von Geschäftsgeheimnissen, Darstellungen sexuellen Kindesmissbrauchs oder Verstößen gegen Sanktionen oder Ausfuhrkontrollen." },
       { kind: "p", text: "Verwenden Sie DebateAI nicht zur Täuschung. Stellen Sie erzeugte Ergebnisse nicht als von Menschen verfasst dar, wenn dies irreführend wäre, entfernen Sie nicht deren Kennzeichnung als KI-generiert und verwenden Sie sie nicht, um einen vermeintlichen Konsens, gefälschte Beweise oder eine Identitätstäuschung zu erzeugen." },
       { kind: "p", text: "Greifen Sie den Dienst nicht an. Kein automatisierter Zugriff, Scraping, Crawling oder massenhaftes Extrahieren veröffentlichter Debatten über das hinaus, was unsere Robots-Datei zulässt; keine Umgehung von Ratenbegrenzungen, Authentifizierungs- oder Veröffentlichungskontrollen; keine Versuche, Prompts oder Systemanweisungen zu extrahieren; keine Prompt-Injection mit dem Ziel, das System dazu zu bringen, seine Beschränkungen zu missachten; keine Sondierungen oder Lasttests ohne unsere schriftliche Genehmigung." },
@@ -298,7 +298,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Vereinigtes Königreich (nur wenn in Abschnitt 2 aufgeführt)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Unser Vertreter im Vereinigten Königreich nach Artikel 27 UK GDPR ist [name, address, email]. Der Consumer Rights Act 2015 gilt für Sie, und nichts in diesen Nutzungsbedingungen beschränkt Ihre Rechte daraus; ab [January 2027] gelten für kostenpflichtige Tarife die Abonnementvorschriften des Digital Markets, Competition and Consumers Act 2024, einschließlich eines Rücktrittsrechts nach Verlängerungen und nach kostenlosen Testzeiträumen. Wie wir nutzende Personen vor rechtswidrigen Inhalten schützen: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Von uns eingesetzte proaktive Technologie: [describe, or \"none\"]. Altersprüfung: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Das Beschwerdeverfahren nach Abschnitt 10 erfasst Beschwerden über rechtswidrige Inhalte, die unrechtmäßige Entfernung Ihrer Inhalte, Beschränkungen Ihres Kontos, den Einsatz automatisierter Werkzeuge mit Auswirkungen auf Ihre Inhalte und jede Altersprüfung, durch die Sie zu Unrecht gesperrt werden. Es steht auch Personen offen, die von Inhalten betroffen sind, ohne den Dienst selbst zu nutzen." }
+      { kind: "p", text: "Unser Vertreter im Vereinigten Königreich nach Artikel 27 UK GDPR ist [name, address, email]. Der Consumer Rights Act 2015 gilt für Sie, und nichts in diesen Nutzungsbedingungen beschränkt Ihre Rechte daraus; sobald die Abonnementvorschriften des Digital Markets, Competition and Consumers Act 2024 in Kraft treten (voraussichtlich 2027), gelten sie für kostenpflichtige Tarife, einschließlich eines Rücktrittsrechts nach Verlängerungen und nach kostenlosen Testzeiträumen. Wie wir nutzende Personen vor rechtswidrigen Inhalten schützen: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Von uns eingesetzte proaktive Technologie: [describe, or \"none\"]. Altersprüfung: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Das Beschwerdeverfahren nach Abschnitt 10 erfasst Beschwerden über rechtswidrige Inhalte, die unrechtmäßige Entfernung Ihrer Inhalte, Beschränkungen Ihres Kontos, den Einsatz automatisierter Werkzeuge mit Auswirkungen auf Ihre Inhalte und jede Altersprüfung, durch die Sie zu Unrecht gesperrt werden. Es steht auch Personen offen, die von Inhalten betroffen sind, ohne den Dienst selbst zu nutzen. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.2." }
     ]
   },
   {
@@ -308,7 +308,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Schiedsvereinbarung und Verzicht auf Sammelklagen. Wenn Sie in den Vereinigten Staaten leben, vereinbaren Sie und DebateAIRO, alle Streitigkeiten aus diesen Nutzungsbedingungen oder dem Dienst durch ein verbindliches individuelles Schiedsverfahren beizulegen, das von [the American Arbitration Association / JAMS] nach deren Verbraucherschiedsordnung durchgeführt wird, statt vor Gericht; beide Parteien dürfen jedoch einen individuellen Anspruch vor einem Gericht für geringfügige Forderungen geltend machen. Sie können widersprechen, indem Sie innerhalb von 30 Tagen nach der erstmaligen Annahme dieser Nutzungsbedingungen eine E-Mail an [address] senden. Diese Vereinbarung unterliegt dem Federal Arbitration Act. Wir tragen die Anmeldegebühren des Schiedsverfahrens. Auf Sammel-, Kollektiv- und Verbandsklagen wird im gesetzlich zulässigen Umfang verzichtet. Dieser Abschnitt gilt nur für die Zukunft und nicht für Ansprüche, die vor seiner Annahme entstanden sind." },
       { kind: "p", text: "Mitteilungen und Entfernung. Intime Abbildungen, die ohne Einwilligung veröffentlicht wurden, können ohne Konto unter [URL] gemeldet werden und werden innerhalb von 48 Stunden nach Eingang eines wirksamen Antrags entfernt. Urheberrechtsbeschwerden sind an unseren in Abschnitt 16 genannten Beauftragten zu richten." },
-      { kind: "p", text: "Bundesstaatsspezifische Regelungen. Kalifornien: Es gelten die Bestimmungen zur automatischen Verlängerung in Abschnitt 12; Sie können jederzeit online kündigen; wir bewahren Ihre Zustimmung zu den Verlängerungsbedingungen mindestens drei Jahre lang auf. New York: Sie können innerhalb von 14 Tagen nach jeder Abbuchung zu einem erhöhten Preis kündigen und eine anteilige Erstattung erhalten. Texas und Nebraska: Wir verkaufen keine sensiblen personenbezogenen Daten; sollte sich dies jemals ändern, holen wir zuvor Ihre Einwilligung ein [statutory notice language]. Washington: Unser Datenschutzhinweis zu Verbrauchergesundheitsdaten unter [URL] gilt für gesundheitsbezogene Informationen. Colorado: Der Dienst trifft keine Entscheidungen mit erheblichen Folgen über Sie." }
+      { kind: "p", text: "Bundesstaatsspezifische Regelungen. Kalifornien: Es gelten die Bestimmungen zur automatischen Verlängerung in Abschnitt 12; Sie können jederzeit online kündigen; wir bewahren Ihre Zustimmung zu den Verlängerungsbedingungen mindestens drei Jahre lang auf. New York: Sie können innerhalb von 14 Tagen nach jeder Abbuchung zu einem erhöhten Preis kündigen und eine anteilige Erstattung erhalten. Texas und Nebraska: Wir verkaufen keine sensiblen personenbezogenen Daten. Washington: Unser Datenschutzhinweis zu Verbrauchergesundheitsdaten unter [URL] gilt für gesundheitsbezogene Informationen. Colorado: Der Dienst trifft keine Entscheidungen mit erheblichen Folgen über Sie. Für Ihre Daten und Ihre Datenschutzrechte nach dem Recht der Bundesstaaten gilt unsere Datenschutzerklärung, Anhang B.3." }
     ]
   },
   {
@@ -316,7 +316,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada und Quebec (nur wenn aufgeführt)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Unser Datenschutzbeauftragter ist [name, email]. Quebec: Diese Nutzungsbedingungen sind auf Französisch unter [URL] verfügbar, und Ihnen wurde die französische Fassung zuerst vorgelegt; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen." }
+      { kind: "p", text: "Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist [name], privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.4. Quebec: Diese Nutzungsbedingungen sind auf Französisch verfügbar; wählen Sie Französisch über die Sprachauswahl; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen; eine Schiedsvereinbarung oder ein Verzicht auf Sammelklagen gilt für Sie nicht." }
     ]
   },
   {
@@ -329,32 +329,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Lateinamerika (spanischsprachiger Anhang; nur wenn aufgeführt)",
+    title: "Schweiz (nur wenn aufgeführt)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Die Einwilligung ist die Grundlage der Verarbeitung, soweit keine Notwendigkeit zur Vertragserfüllung besteht; bei der Registrierung willigen Sie ausdrücklich in die Verarbeitung aller sensiblen Daten ein, die Sie aufnehmen möchten. Sie können Ihre ARCO-Rechte unter [address] ausüben; Antworten erfolgen innerhalb von [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexiko: Der vollständige aviso de privacidad ist unter [URL] verfügbar; Widerruf innerhalb von [5] Tagen. Argentinien: [AAIP legend]; verwenden Sie innerhalb von 10 Tagen den botón de arrepentimiento unter [URL]. Kolumbien: Die política de tratamiento ist unter [URL] verfügbar; Widerruf innerhalb von 5 Tagen. Chile (ab 1. Dezember 2026): Die Kontaktangaben der Behörde lauten […]; Sie können mit denselben Mitteln kündigen, mit denen Sie das Abonnement abgeschlossen haben; für digitale Dienste besteht kein Widerrufsrecht." }
+      { kind: "p", text: "Für Ihre Daten gilt das Schweizer Bundesgesetz über den Datenschutz (Datenschutzerklärung, Anhang B.6). Sie können vor den Gerichten des Ortes in der Schweiz klagen, an dem Sie leben. Für den kostenpflichtigen Tarif besteht kein gesetzliches Widerrufsrecht; unsere Erstattungsrichtlinie lautet […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Golfregion — Vereinigte Arabische Emirate und Saudi-Arabien (nur wenn aufgeführt)",
+    title: "Moldau (nur wenn aufgeführt)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Soweit wir Ihre Daten zu anderen Zwecken als zur Bereitstellung des Dienstes verarbeiten, erfolgt dies mit Ihrer Einwilligung, die Sie widerrufen können. Ihre Daten werden außerhalb von [UAE / Kingdom of Saudi Arabia], unter anderem in der Europäischen Union und den Vereinigten Staaten, auf Grundlage von [SDAIA standard contractual clauses / the mechanism in the Register] verarbeitet. Sie sind dafür verantwortlich, sicherzustellen, dass alles, was Sie veröffentlichen, dem Recht des Landes entspricht, in dem Sie sich befinden, einschließlich der Gesetze zu Religion, öffentlicher Ordnung und Sittlichkeit; wir können die Veröffentlichung von Debatten zu solchen Themen in Ihrer Region beschränken." }
+      { kind: "p", text: "Sie haben nach diesen Nutzungsbedingungen dieselben Rechte wie Verbraucher in der Europäischen Union, einschließlich des 14-tägigen Widerrufsrechts nach Abschnitt 13. Sie können vor den Gerichten der Republik Moldau klagen. Für Ihre Daten gilt das moldauische Gesetz Nr. 195/2024 über den Schutz personenbezogener Daten (Datenschutzerklärung, Anhang B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Asien-Pazifik (nur die Zeilen für aufgeführte Regionen)",
+    title: "Ukraine (nur wenn aufgeführt)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapur: Unser Datenschutzbeauftragter ist [name, email]; Übermittlungen beruhen auf vertraglichen Schutzvorkehrungen, die mit dem PDPA vergleichbar sind; für den kostenpflichtigen Tarif besteht kein gesetzliches Rücktrittsrecht, und unsere Erstattungsrichtlinie lautet […]. Japan: Die gesetzliche Offenlegung nach dem Specified Commercial Transactions Act ist unter [URL] verfügbar; für Online-Abonnements besteht kein allgemeines Rücktrittsrecht, und unsere Erstattungsrichtlinie lautet […]; Ihre Inhalte können an Anbieter in [named countries] übermittelt werden, und Sie stimmen dem durch die Einwilligungen bei der Registrierung zu. Südkorea: Einwilligungen in optionale Verarbeitung und Werbung werden getrennt von den Angaben eingeholt, die für den Betrieb des Dienstes erforderlich sind; unser Datenschutzbeauftragter ist [name]; Sie können einen kostenpflichtigen Tarif nach Maßgabe des E-Commerce Act innerhalb von 7 Tagen nach Abschluss widerrufen; vor jeder wiederkehrenden Preiserhöhung oder Umwandlung eines kostenlosen in einen kostenpflichtigen Tarif holen wir erneut Ihre Einwilligung ein; soweit der AI Basic Act dies verlangt, informieren wir Sie im Voraus, dass der Dienst KI-basiert ist, und kennzeichnen Ergebnisse. Indien (sobald die DPDP-Vorschriften gelten): Der Einwilligungshinweis unter [URL] findet Anwendung; Personen unter 18 Jahren benötigen eine nachprüfbare elterliche Einwilligung. Thailand: Unser Vertreter in Thailand ist [name] [if appointed]. Philippinen: Unsere Unternehmensidentifikation und unser Beschwerdemechanismus nach dem Internet Transactions Act sind unter [URL] verfügbar; Beschwerden können bei der National Privacy Commission eingereicht werden." }
+      { kind: "p", text: "Wir bieten DebateAI in der Ukraine an, ausgenommen die Gebiete, die nicht von der ukrainischen Regierung kontrolliert werden. Das Produkt und diese Nutzungsbedingungen sind auf Ukrainisch verfügbar. Für Ihre Daten gilt das Gesetz der Ukraine „Über den Schutz personenbezogener Daten“ (Datenschutzerklärung, Anhang B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Vorbehalten",
+    title: "Israel (nur wenn aufgeführt)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Sie können einen kostenpflichtigen Tarif kündigen, wie es das Consumer Protection Law, 5741-1981, zulässt [state the cancellation terms]. Diese Nutzungsbedingungen und unsere Datenschutzerklärung sind auf Hebräisch verfügbar. Für Ihre Daten gilt das israelische Protection of Privacy Law (Datenschutzerklärung, Anhang B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Asien-Pazifik (nur die Zeilen für aufgeführte Regionen)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapur: Unser Datenschutzbeauftragter ist [name, email]; Übermittlungen beruhen auf vertraglichen Schutzvorkehrungen, die mit dem PDPA vergleichbar sind; für den kostenpflichtigen Tarif besteht kein gesetzliches Rücktrittsrecht, und unsere Erstattungsrichtlinie lautet […]. Japan: Die gesetzliche Offenlegung nach dem Specified Commercial Transactions Act ist unter [URL] verfügbar; für Online-Abonnements besteht kein allgemeines Rücktrittsrecht, und unsere Erstattungsrichtlinie lautet […]; wir senden Ihre Inhalte an KI-Anbieter in den Vereinigten Staaten und der Europäischen Union, jeweils auf Grundlage eines Vertrags, der einen dem japanischen Act on the Protection of Personal Information gleichwertigen Schutz verlangt, und teilen Ihnen auf Anfrage mit, welche Maßnahmen dies sind. Südkorea: Einwilligungen in optionale Verarbeitung und Werbung werden getrennt von den Angaben eingeholt, die für den Betrieb des Dienstes erforderlich sind; unser Datenschutzbeauftragter ist [name], privacy@dezbatere.ro; Sie können einen kostenpflichtigen Tarif nach Maßgabe des E-Commerce Act innerhalb von 7 Tagen nach Abschluss widerrufen; vor jeder wiederkehrenden Preiserhöhung oder Umwandlung eines kostenlosen in einen kostenpflichtigen Tarif holen wir erneut Ihre Einwilligung ein; der Dienst nutzt generative KI, wir weisen Sie vor der Nutzung darauf hin, und wir kennzeichnen KI-generierte Ergebnisse. Taiwan: Sie können einen kostenpflichtigen Tarif nach Maßgabe des Consumer Protection Act innerhalb von 7 Tagen nach Abschluss widerrufen; für Ihre Daten gilt der taiwanische Personal Data Protection Act (Datenschutzerklärung, Anhang B.10). Thailand: Unser Vertreter in Thailand ist [name] [if appointed]. Philippinen: Unsere Unternehmensidentifikation und unser Beschwerdemechanismus nach dem Internet Transactions Act sind unter [URL] verfügbar; Beschwerden können bei der National Privacy Commission eingereicht werden." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Vorbehalten",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Die Türkei, Brasilien und Indonesien erfordern jeweils einen Anhang in der Landessprache, einen Vertreter oder eine Registrierung sowie Einreichungen. Diese Länder sind hier nicht ausgearbeitet und liegen außerhalb von Abschnitt 2, bis sie ausdrücklich aufgenommen werden. In China, Vietnam und Russland wird der Dienst nicht angeboten." }
     ]
@@ -364,7 +380,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "24e993501307367c591f4d7d369c0e1ce5140e2531b9e96ee83f25768259eebf",
+  sha256: "9fe42b496f3e12ddd7019f03bcd12f7a4ea629ed7f36febc140356c3c1ae05c7",
   eyebrow: "NUTZUNGSBEDINGUNGEN · v2.0 · GÜLTIG AB [DATE]",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DebateAIRO S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",

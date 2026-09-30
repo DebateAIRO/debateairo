@@ -82,5 +82,18 @@
   "home.aiDisclosure": "גילוי נאות בדבר בינה מלאכותית",
   "home.aiSupportLead": "השיחה הזו מתנהלת עם סוכן תמיכה מבוסס בינה מלאכותית.",
   "home.aiLinkLabel": "כיצד אנו מסמנים תוכן שנוצר בידי בינה מלאכותית (נפתח בכרטיסייה חדשה)",
-  "home.aiLink": "כיצד אנו מסמנים תוכן שנוצר בידי בינה מלאכותית"
+  "home.aiLink": "כיצד אנו מסמנים תוכן שנוצר בידי בינה מלאכותית",
+  "home.sensitiveConsent.eyebrow": "לפני הדיון הראשון שלכם",
+  "home.sensitiveConsent.title": "השאלות שלכם עשויות לחשוף מידע רגיש",
+  "home.sensitiveConsent.lede": "שאלה על פוליטיקה, דת, בריאות, מיניות או אמונות עשויה לומר משהו עליכם. החוק רואה בכך מידע רגיש, ולכן אנו זקוקים להסכמתכם המפורשת לפני שנעבד אותו.",
+  "home.sensitiveConsent.pointPurpose": "אנו משתמשים במה שאתם כותבים אך ורק לצורך הרצת הדיונים שלכם.",
+  "home.sensitiveConsent.pointModels": "כדי להריץ דיון, אנו שולחים את שאלתכם למודלים של בינה מלאכותית המשתתפים בו.",
+  "home.sensitiveConsent.pointOthers": "אין לכלול מידע רגיש על אנשים אחרים.",
+  "home.sensitiveConsent.pointDelete": "ניתן למחוק דיון בכל עת.",
+  "home.sensitiveConsent.statement": "אני מסכים/ה לכך ש-DebateAI יעבד את המידע הרגיש שאני כולל/ת בשאלות שלי, לצורך הרצת הדיונים שלי.",
+  "home.sensitiveConsent.privacyLink": "קראו במדיניות הפרטיות כיצד אנו מטפלים במידע זה",
+  "home.sensitiveConsent.agree": "אני מסכים/ה",
+  "home.sensitiveConsent.decline": "אני לא מסכים/ה",
+  "home.sensitiveConsent.declined": "לא ניתן להתחיל דיון ללא הסכמה זו. נשאל שוב בפעם הבאה שתתחילו דיון.",
+  "home.sensitiveConsent.failed": "לא ניתן היה לשמור את תשובתכם. יש לנסות שוב."
 }

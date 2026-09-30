@@ -139,7 +139,7 @@ export default async function HomePage({
             session; an unconfirmed one gets the notice above instead. */}
         {sessionConfirmed ? (
           <section data-support-primary-control id="start-a-debate" aria-label={t(catalog, "home.startDebateLabel")}>
-            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} />
+            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} locale={locale} />
           </section>
         ) : null}
 

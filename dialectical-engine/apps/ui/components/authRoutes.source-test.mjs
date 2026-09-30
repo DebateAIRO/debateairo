@@ -118,11 +118,12 @@ test("the project home confirms a real session before exposing its debate compos
   assert.match(home, /sessionConfirmed = true/);
   // Task M8 (spec 2026-09-26 §14.4.7): the composer also reads the newDebate
   // catalogue, to say today's limit for new debates where the person typed.
-  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>/);
+  // Sensitive-data consent (V, 2026-09-29): it also records the interface locale with the consent.
+  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} locale=\{locale\} \/>/);
   // Task 16 (M8 review): only the two values the daily-limit message prints ship to the browser.
   assert.match(home, /const newDebateCatalog = dailyLimitMessageCatalog\(await loadNamespace\(locale, "newDebate"\)\);/);
   assert.match(home, /id="start-a-debate"/);
-  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>[\s\S]*?\{error \?/);
+  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} locale=\{locale\} \/>[\s\S]*?\{error \?/);
 });
 
 test("the login route sends an already-authenticated browser back to its debate workspace", () => {

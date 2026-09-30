@@ -514,6 +514,36 @@ export class PostgresSessionRepository {
     });
   }
 
+  /** Sensitive-data consent: true once the account has agreed (it starts no debate before). */
+  async readSensitiveDataConsent(userId: string): Promise<boolean> {
+    const result = await this.pool.query<{ given: boolean }>(
+      "SELECT identity.read_sensitive_data_consent($1) AS given",
+      [userId]
+    );
+    const given = result.rows[0]?.given;
+    if (typeof given !== "boolean") throw new Error("SENSITIVE_DATA_CONSENT_READ_INVALID");
+    return given;
+  }
+
+  /** Records the consent from a live session the account owns; the first agreement stands. */
+  async recordSensitiveDataConsent(input: Readonly<{
+    userId: string;
+    sessionId: string;
+    noticeVersion: string;
+    locale: string;
+    occurredAt: Date;
+  }>): Promise<"given" | "SESSION_NOT_FOUND"> {
+    const result = await this.pool.query<{ outcome: "given" | "SESSION_NOT_FOUND" }>(
+      "SELECT identity.record_sensitive_data_consent($1,$2,$3,$4,$5) AS outcome",
+      [input.userId, input.sessionId, input.noticeVersion, input.locale, input.occurredAt]
+    );
+    const outcome = result.rows[0]?.outcome;
+    if (outcome !== "given" && outcome !== "SESSION_NOT_FOUND") {
+      throw new Error("SENSITIVE_DATA_CONSENT_OUTCOME_INVALID");
+    }
+    return outcome;
+  }
+
   async readStepUpIdentity(userId: string): Promise<LoginIdentityRecord | null> {
     const result = await this.pool.query<{
       user_id: string; owner_ref: string; audit_token: string; password_hash: string;
@@ -559,7 +589,7 @@ export class PostgresSessionRepository {
     }> | Readonly<{
       grantId: string;
       grantTokenHash: string;
-      action: "DELETE_ACCOUNT";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL";
       expiresAt: Date;
     }>;
   }>): Promise<boolean> {
@@ -585,7 +615,7 @@ export class PostgresSessionRepository {
         input.grant?.grantId ?? null,
         input.grant?.grantTokenHash ?? null,
         input.grant?.action ?? null,
-        input.grant !== undefined && input.grant.action !== "DELETE_ACCOUNT"
+        input.grant !== undefined && "targetRunId" in input.grant
           ? input.grant.targetRunId : null,
         input.grant?.expiresAt ?? null,
         JSON.stringify({ ipArgon2id: prepared.ipArgon2id,

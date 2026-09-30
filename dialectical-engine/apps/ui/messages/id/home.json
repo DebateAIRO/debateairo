@@ -80,5 +80,18 @@
   "home.aiDisclosure": "Pengungkapan AI",
   "home.aiSupportLead": "Percakapan ini berlangsung dengan asisten dukungan AI.",
   "home.aiLinkLabel": "Cara kami memberi label pada konten AI (dibuka di tab baru)",
-  "home.aiLink": "Cara kami memberi label pada konten AI"
+  "home.aiLink": "Cara kami memberi label pada konten AI",
+  "home.sensitiveConsent.eyebrow": "Sebelum debat pertama Anda",
+  "home.sensitiveConsent.title": "Pertanyaan Anda dapat mengungkap informasi sensitif",
+  "home.sensitiveConsent.lede": "Pertanyaan tentang politik, agama, kesehatan, seksualitas, atau keyakinan dapat menunjukkan sesuatu tentang diri Anda. Hukum memperlakukannya sebagai informasi sensitif, sehingga kami memerlukan persetujuan tegas Anda sebelum memprosesnya.",
+  "home.sensitiveConsent.pointPurpose": "Kami menggunakan apa yang Anda tulis hanya untuk menjalankan debat Anda.",
+  "home.sensitiveConsent.pointModels": "Untuk menjalankan debat, kami mengirimkan pertanyaan Anda kepada model AI yang ikut serta dalam debat tersebut.",
+  "home.sensitiveConsent.pointOthers": "Jangan sertakan informasi sensitif tentang orang lain.",
+  "home.sensitiveConsent.pointDelete": "Anda dapat menghapus debat kapan saja.",
+  "home.sensitiveConsent.statement": "Saya setuju bahwa DebateAI dapat memproses informasi sensitif yang saya sertakan dalam pertanyaan saya sendiri, untuk tujuan menjalankan debat saya.",
+  "home.sensitiveConsent.privacyLink": "Baca cara kami menanganinya dalam Kebijakan Privasi",
+  "home.sensitiveConsent.agree": "Saya setuju",
+  "home.sensitiveConsent.decline": "Saya tidak setuju",
+  "home.sensitiveConsent.declined": "Anda tidak dapat memulai debat tanpa persetujuan ini. Kami akan memintanya lagi saat Anda memulai debat berikutnya.",
+  "home.sensitiveConsent.failed": "Jawaban Anda tidak dapat disimpan. Coba lagi."
 }

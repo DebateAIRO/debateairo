@@ -81,5 +81,18 @@
   "home.aiDisclosure": "Tehisintellekti teade",
   "home.aiSupportLead": "See vestlus toimub tehisintellektil põhineva kasutajatoe agendiga.",
   "home.aiLinkLabel": "Kuidas märgistame tehisintellekti loodud sisu (avaneb uuel vahelehel)",
-  "home.aiLink": "Kuidas märgistame tehisintellekti loodud sisu"
+  "home.aiLink": "Kuidas märgistame tehisintellekti loodud sisu",
+  "home.sensitiveConsent.eyebrow": "Enne teie esimest väitlust",
+  "home.sensitiveConsent.title": "Teie küsimused võivad paljastada tundlikku teavet",
+  "home.sensitiveConsent.lede": "Küsimus poliitika, religiooni, tervise, seksuaalsuse või veendumuste kohta võib teie kohta midagi öelda. Seadus käsitab sellist teavet tundlikuna, seega vajame enne selle töötlemist teie selgesõnalist nõusolekut.",
+  "home.sensitiveConsent.pointPurpose": "Kasutame teie kirjutatut ainult teie väitluste läbiviimiseks.",
+  "home.sensitiveConsent.pointModels": "Väitluse läbiviimiseks saadame teie küsimuse selles osalevatele tehisintellektimudelitele.",
+  "home.sensitiveConsent.pointOthers": "Ärge lisage tundlikku teavet teiste inimeste kohta.",
+  "home.sensitiveConsent.pointDelete": "Võite väitluse igal ajal kustutada.",
+  "home.sensitiveConsent.statement": "Nõustun, et DebateAI töötleb tundlikku teavet, mille lisan oma küsimustesse, minu väitluste läbiviimise eesmärgil.",
+  "home.sensitiveConsent.privacyLink": "Lugege privaatsuspoliitikast, kuidas me sellist teavet käsitleme",
+  "home.sensitiveConsent.agree": "Nõustun",
+  "home.sensitiveConsent.decline": "Ei nõustu",
+  "home.sensitiveConsent.declined": "Ilma selle nõusolekuta ei saa te väitlust alustada. Küsime uuesti, kui järgmine kord väitlust alustate.",
+  "home.sensitiveConsent.failed": "Teie vastust ei õnnestunud salvestada. Proovige uuesti."
 }

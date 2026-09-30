@@ -35,8 +35,14 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // 2026-09-29: GHSA-qw65-cvwx-89v3 (all of 3.x < 3.1.7 and 4.x < 4.1.4) and GHSA-58mr-gqgx-xq4g
   // (exactly the 3.1.6 / 4.1.3 the floors above used to pin) turned pnpm audit red; 3.1.7 and
   // 4.1.4 were published 2026-09-02, so they clear the 7-day cooldown on their own.
-  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.7") < 0)
-    || (v.startsWith("4.") && compare(v, "4.1.4") < 0),
+  // 2026-09-30: GHSA-hrr3-gc8f-f4qj (3.x < 3.1.8, 4.x < 4.1.5) and GHSA-jvvf-x445-j334;
+  // 3.1.8 and 4.1.5 were published 2026-09-15.
+  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.8") < 0)
+    || (v.startsWith("4.") && compare(v, "4.1.5") < 0),
+  // 2026-09-30: GHSA-6j4f-fj2g-mc7p / GHSA-qhr7-859c-m2p7 / GHSA-q2hr-2g5m-vwhr (2.x < 2.1.7),
+  // reached through testcontainers > archiver > minimatch (test tooling only); 2.1.7 was
+  // published 2026-09-14.
+  "brace-expansion": (v) => v.startsWith("2.") && compare(v, "2.1.7") < 0,
   // 2026-09-29: GHSA-3wwx-pv8p-q78v (>=8.1.0 <8.10.2), reached through jsdom and testcontainers
   // (test tooling only); 8.10.2 was published 2026-09-04.
   undici: (v) => v.startsWith("8.") && compare(v, "8.10.2") < 0,

@@ -80,5 +80,18 @@
   "home.aiDisclosure": "Thông báo về AI",
   "home.aiSupportLead": "Đây là cuộc trò chuyện với trợ lý hỗ trợ AI.",
   "home.aiLinkLabel": "Cách chúng tôi gắn nhãn nội dung AI (mở trong thẻ mới)",
-  "home.aiLink": "Cách chúng tôi gắn nhãn nội dung AI"
+  "home.aiLink": "Cách chúng tôi gắn nhãn nội dung AI",
+  "home.sensitiveConsent.eyebrow": "Trước cuộc tranh luận đầu tiên của bạn",
+  "home.sensitiveConsent.title": "Câu hỏi của bạn có thể tiết lộ thông tin nhạy cảm",
+  "home.sensitiveConsent.lede": "Một câu hỏi về chính trị, tôn giáo, sức khỏe, tình dục hoặc niềm tin có thể cho thấy điều gì đó về bạn. Pháp luật coi đây là thông tin nhạy cảm, vì vậy chúng tôi cần sự đồng ý rõ ràng của bạn trước khi xử lý thông tin đó.",
+  "home.sensitiveConsent.pointPurpose": "Chúng tôi chỉ sử dụng nội dung bạn viết để vận hành các cuộc tranh luận của bạn.",
+  "home.sensitiveConsent.pointModels": "Để vận hành một cuộc tranh luận, chúng tôi gửi câu hỏi của bạn đến các mô hình AI tham gia cuộc tranh luận đó.",
+  "home.sensitiveConsent.pointOthers": "Không đưa vào thông tin nhạy cảm về người khác.",
+  "home.sensitiveConsent.pointDelete": "Bạn có thể xóa một cuộc tranh luận bất cứ lúc nào.",
+  "home.sensitiveConsent.statement": "Tôi đồng ý cho phép DebateAI xử lý thông tin nhạy cảm mà tôi đưa vào câu hỏi của chính mình, nhằm mục đích vận hành các cuộc tranh luận của tôi.",
+  "home.sensitiveConsent.privacyLink": "Đọc cách chúng tôi xử lý thông tin này trong Chính sách quyền riêng tư",
+  "home.sensitiveConsent.agree": "Tôi đồng ý",
+  "home.sensitiveConsent.decline": "Tôi không đồng ý",
+  "home.sensitiveConsent.declined": "Bạn không thể bắt đầu một cuộc tranh luận nếu không có sự đồng ý này. Chúng tôi sẽ hỏi lại vào lần tới khi bạn bắt đầu một cuộc tranh luận.",
+  "home.sensitiveConsent.failed": "Không thể lưu câu trả lời của bạn. Hãy thử lại."
 }
