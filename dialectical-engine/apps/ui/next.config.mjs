@@ -9,7 +9,7 @@ import { API_CONTENT_SECURITY_POLICY } from "./content-security-policy.mjs";
  */
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@debateai/contract", "@debateai/kernel"],
+  transpilePackages: ["@debateai/contract", "@debateai/kernel", "@debateai/legal-manifest"],
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // L3-F9: no framework fingerprint on responses.
   poweredByHeader: false,

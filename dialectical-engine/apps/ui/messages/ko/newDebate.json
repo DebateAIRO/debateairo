@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "조정자의 응답을 읽을 수 없어 결과를 알 수 없습니다.",
   "requestFailure.kind.PLAN_TIER_INVALID": "조정자가 선택한 요금제를 거부했습니다. 무료 또는 프리미엄을 선택한 후 다시 시도하세요.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "조정자가 요청을 거부했습니다. 이 요금제에 필요한 모델을 현재 사용할 수 없습니다. 나중에 다시 시도하거나 다른 요금제를 선택하세요.",
-  "requestFailure.kind.UNCLASSIFIED": "응답이 도착하기 전에 실패해 결과를 알 수 없습니다. 조정자가 내린 결정은 아닙니다."
+  "requestFailure.kind.UNCLASSIFIED": "응답이 도착하기 전에 실패해 결과를 알 수 없습니다. 조정자가 내린 결정은 아닙니다.",
+  "newDebate.legalGate.eyebrow": "약관 및 개인정보",
+  "newDebate.legalGate.title": "현재 문서를 읽고 동의해 주세요",
+  "newDebate.legalGate.body": "계속하기 전에 아래의 각 문서를 열어 끝까지 읽은 뒤 동의해 주세요.",
+  "newDebate.legalGate.readTerms": "서비스 이용약관 읽기",
+  "newDebate.legalGate.readPrivacy": "개인정보 처리방침 읽기",
+  "newDebate.legalGate.done": "읽음",
+  "newDebate.legalGate.accept": "동의하고 계속",
+  "newDebate.legalGate.accepting": "저장 중…",
+  "newDebate.legalGate.failed": "동의 내용을 저장하지 못했습니다. 다시 시도해 주세요.",
+  "newDebate.legalGate.stale": "방금 문서 중 하나가 변경되었습니다. 페이지를 새로고침하여 현재 버전을 읽어 주세요.",
+  "newDebate.legalGate.reload": "페이지 새로고침",
+  "newDebate.legalGate.manageAccount": "계정 관리 또는 삭제",
+  "newDebate.legalGate.signOut": "로그아웃",
+  "newDebate.legalGate.signOutFailed": "로그아웃을 완료하지 못했습니다. 다시 시도해 주세요.",
+  "newDebate.room.locationBlocked": "현재 위치에서는 새 토론을 시작할 수 없습니다. 기존 토론은 계속 읽을 수 있습니다."
 }

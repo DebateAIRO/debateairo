@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "コーディネーターからの応答を読み取れなかったため、結果は不明です。",
   "requestFailure.kind.PLAN_TIER_INVALID": "コーディネーターがプランの選択を拒否しました。無料またはプレミアムを選択してから、再試行してください。",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "コーディネーターがリクエストを拒否しました。このプランに必要なモデルが現在利用できません。後でもう一度試すか、別のプランを選択してください。",
-  "requestFailure.kind.UNCLASSIFIED": "応答を受信する前に失敗したため、結果は不明です。これはコーディネーターによる判断ではありません。"
+  "requestFailure.kind.UNCLASSIFIED": "応答を受信する前に失敗したため、結果は不明です。これはコーディネーターによる判断ではありません。",
+  "newDebate.legalGate.eyebrow": "規約とプライバシー",
+  "newDebate.legalGate.title": "最新の文書をお読みのうえ、同意してください",
+  "newDebate.legalGate.body": "続行する前に、以下の各文書を開いて最後までお読みになり、同意してください。",
+  "newDebate.legalGate.readTerms": "利用規約を読む",
+  "newDebate.legalGate.readPrivacy": "プライバシーポリシーを読む",
+  "newDebate.legalGate.done": "読了",
+  "newDebate.legalGate.accept": "同意して続行",
+  "newDebate.legalGate.accepting": "保存中…",
+  "newDebate.legalGate.failed": "同意を保存できませんでした。もう一度お試しください。",
+  "newDebate.legalGate.stale": "文書のひとつがたった今変更されました。ページを再読み込みして最新版をお読みください。",
+  "newDebate.legalGate.reload": "ページを再読み込み",
+  "newDebate.legalGate.manageAccount": "アカウントの管理または削除",
+  "newDebate.legalGate.signOut": "サインアウト",
+  "newDebate.legalGate.signOutFailed": "サインアウトが完了しませんでした。もう一度お試しください。",
+  "newDebate.room.locationBlocked": "現在の場所からは新しいディベートを開始できません。これまでのディベートは引き続きお読みいただけます。"
 }

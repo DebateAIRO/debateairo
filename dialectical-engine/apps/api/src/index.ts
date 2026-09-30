@@ -60,7 +60,12 @@ import {
   AGE_REFUSAL_COOKIE_NAME,
   AGE_REFUSAL_COOKIE_VALUE,
   AgeCheckRequestSchema,
-  DateOfBirthSchema
+  DateOfBirthSchema,
+  RegisterLegalDocumentsSchema,
+  type RegisterLegalDocuments,
+  LegalAcceptRequestSchema,
+  LegalStatusResponseSchema,
+  GeoAvailabilityResponseSchema
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
@@ -110,6 +115,8 @@ import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+import type { LegalAcceptanceApplication } from "./legal.js";
+import type { CountryGate } from "./country-gate.js";
 import {
   EmailChangeError,
   type EmailChangeErrorCode,
@@ -118,7 +125,7 @@ import {
   type EmailSettings
 } from "./email-change.js";
 import type { RecoveryApplication } from "./recovery.js";
-import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+import { clientIpNetworkScope, normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import {
   installSupportRoutes,
   type SupportAdmission,
@@ -1123,6 +1130,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   // Turn 14 — change email. The owner routes ride the cookie session and CSRF;
   // the two link routes need only the first-party Origin and the mailed bearer.
@@ -1135,6 +1144,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+  { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // DL1-F7: every mutating support route requires the exact first-party Origin,
   // for anonymous callers too. Without it a page on any site could drive every
   // one of its visitors' browsers into the support surface — spending the shared
@@ -1178,7 +1188,7 @@ export const authorizationPolicyInventory = Object.freeze([
   session?: RouteSessionPolicy;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status";
+    "support-status" | "geo";
   action: string;
 }>[]);
 
@@ -1380,6 +1390,8 @@ export interface ApiOptions {
   readonly disclosures?: AnswerDisclosureApplication;
   readonly accountErasure?: AccountErasureApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
+  /** Paid plans L4: re-acceptance of the Terms and the Privacy Policy; the routes answer 503 without it. */
+  readonly legal?: LegalAcceptanceApplication;
   /** Turn 14 — change email; the routes answer a closed 503 when it is absent. */
   readonly emailChange?: EmailChangeApplication;
   readonly allowedOrigin?: string;
@@ -1390,6 +1402,11 @@ export interface ApiOptions {
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
   readonly support?: SupportApplication;
+  /**
+   * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
+   * register version in force publishes `countryPolicy`; absent, every route behaves exactly as before.
+   */
+  readonly countryGate?: CountryGate;
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -1627,24 +1644,38 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.decorateRequest("session");
   api.decorateRequest("authenticatedSession");
   api.decorateRequest("cookieRefresh");
+  /**
+   * Paid plans L3b: the Terms and Privacy pairs a register request carried, keyed by the request object
+   * (filled by the register preHandler hook below, read by sourceFor). A WeakMap, so nothing outlives the
+   * request and no request decoration is added.
+   */
+  const registerLegalDocuments = new WeakMap<object, RegisterLegalDocuments>();
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
     readonly headers: Readonly<Record<string, unknown>>;
     readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
   }) => {
-    const countryCode = edgeCountry(request.headers);
+    // Registration, MFA and sessions share T2's one canonical public source.
+    const ip = normalizeClientIp(request.ip)
+      ?? normalizeClientIp(request.raw.socket.remoteAddress)
+      ?? "unknown";
+    // Age gate + paid plans G3a (RULINGS-R3 R3-3): the country recorded with an age check — the edge's
+    // cf-ipcountry when a Cloudflare edge reported one, else the country gate's own lookup of this
+    // address when a gate is composed (the V3 kit has Caddy, no Cloudflare). Recorded, never decisive.
+    const countryCode = edgeCountry(request.headers) ?? options.countryGate?.recordedCountry(ip) ?? null;
+    // Paid plans L3b: present only on a register request whose hook parsed a well-formed triple.
+    const legal = registerLegalDocuments.get(request);
     return Object.freeze({
-      // Registration, MFA and sessions share T2's one canonical public source.
-      ip: normalizeClientIp(request.ip)
-        ?? normalizeClientIp(request.raw.socket.remoteAddress)
-        ?? "unknown",
+      ip,
       userAgent: typeof request.headers["user-agent"] === "string"
         ? request.headers["user-agent"] as string
         : "unknown",
       requestId: request.id,
-      // Age gate: the edge's country for the source, only when it reported one.
-      ...(countryCode === null ? {} : { countryCode })
+      // Age gate (R3-3): the country computed above (the edge's, else the country gate's lookup),
+      // left out when neither gives one.
+      ...(countryCode === null ? {} : { countryCode }),
+      ...(legal === undefined ? {} : { legal })
     });
   };
   const admissionRefusalAuditedUntil = new Map<string, number>();
@@ -1770,6 +1801,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
   /**
+   * Paid plans G3a (spec §2.3.3): the country gate in front of register. The registration mount region
+   * is frozen (S04), so — like the age gate below — the refusal is decided in a hook, before the date of
+   * birth is judged and before any account work. The answer is the code only.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
+    if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
+  });
+  /**
    * Age gate (8d → 8j) in front of register. The registration mount region is frozen (S04), so
    * the date is decided here: a browser inside its 30-day lockout, or an under-age date, is
    * refused with the lockout cookie and the service is never called; a malformed or impossible
@@ -1786,6 +1827,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (body === null || dateOfBirth === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (!meetsMinimumAge(dateOfBirth)) return ageRefused(reply);
     body.adult_affirmed = true;
+  });
+  /**
+   * Paid plans L3b (spec §2.3.2): the pairs of the documents the sign-up page displayed. The registration
+   * mount region is frozen (S04), so — as the age gate does for the date — they are read here and travel to
+   * the service on the source (sourceFor), never in the region's four input members. A missing or malformed
+   * triple travels as absent, which the service refuses as LEGAL_DOCUMENT_STALE when the records key is
+   * composed. Runs after the age gate's hook, so a refused date never gets this far.
+   */
+  api.addHook("preHandler", async (request) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown>
+      : null;
+    if (body === null) return;
+    const legal = RegisterLegalDocumentsSchema.safeParse({
+      terms: body.terms, privacy: body.privacy, locale: body.locale
+    });
+    if (legal.success) registerLegalDocuments.set(request, legal.data);
   });
   /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
@@ -1956,12 +2015,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (dateOfBirth === null) {
         return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
+      const source = sourceFor(request);
       const outcome = await options.sessions!.confirmAccountAge(authenticated, {
         passed: meetsMinimumAge(dateOfBirth),
         minAgeApplied: MIN_AGE,
-        countryCode: edgeCountry(request.headers),
+        // R3-3: the same recorded country as registration — the edge's, else the country gate's.
+        countryCode: source.countryCode ?? null,
         ruleVersion: AGE_RULE_VERSION
-      }, sourceFor(request));
+      }, source);
       if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       if (outcome === "passed") return reply.send({ outcome: "allowed" });
       // Frozen: every session of the account is gone; this browser keeps the refusal.
@@ -2318,6 +2379,56 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.send({ outcome: "refused" });
     });
   }
+  // Paid plans L4: re-acceptance. Mounted after the registration region (S04), whatever the list order.
+  const LegalLocaleSchema = z.string().regex(/^[a-z]{2}$/u);
+  api.get<{ Querystring: { locale?: string } }>(
+    "/v1/account/legal-status",
+    routePolicy("GET /v1/account/legal-status"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.legal === undefined) return reply.status(503).send({ error: "LEGAL_ACCEPTANCE_UNAVAILABLE" });
+      const locale = LegalLocaleSchema.safeParse(request.query.locale ?? "en");
+      if (!locale.success) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      const mustAccept = await options.legal.status(authenticated.ownerRef, locale.data);
+      return reply.send(LegalStatusResponseSchema.parse({ must_accept: mustAccept }));
+    }
+  );
+  api.post(
+    "/v1/account/legal-accept",
+    credentialRoutePolicy("POST /v1/account/legal-accept"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.legal === undefined) return reply.status(503).send({ error: "LEGAL_ACCEPTANCE_UNAVAILABLE" });
+      const input = parseRequest(LegalAcceptRequestSchema, request.body);
+      const source = sourceFor(request);
+      const outcome = await options.legal.accept({
+        ownerRef: authenticated.ownerRef,
+        locale: input.locale,
+        documents: input.documents,
+        source: { ip: source.ip, userAgent: source.userAgent }
+      });
+      if (outcome === "STALE") return reply.status(409).send({ error: "LEGAL_DOCUMENT_STALE" });
+      return reply.status(204).send();
+    }
+  );
+  // Paid plans G3a: the sign-up page's country check. Public, after the registration region (S04), and
+  // keyed by the source's NETWORK scope (DL5-F3: an IPv6 address counts as its /64).
+  api.get("/v1/geo/availability", routePolicy("GET /v1/geo/availability"), async (request, reply) => {
+    const source = sourceFor(request);
+    if (options.admission?.configured("geoAvailability") === true
+      && !admitOrRefuse(reply, "geoAvailability", "GET /v1/geo/availability", clientIpNetworkScope(source.ip))) {
+      return reply;
+    }
+    // No gate composed (local mode, or hosted without countryPolicy): sign-up is open and payment is
+    // not offered through this answer.
+    return reply.send(GeoAvailabilityResponseSchema.parse(
+      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false }
+    ));
+  });
 
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
@@ -2434,6 +2545,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
+    // Paid plans G3a: no new debate from an always-blocked country. Reading is never gated.
+    const countryRefusal = options.countryGate?.ask(sourceFor(request)) ?? null;
+    if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
     const ask = parseRequest(AskRequestSchema, request.body);
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });

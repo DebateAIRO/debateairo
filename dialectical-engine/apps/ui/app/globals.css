@@ -2194,6 +2194,24 @@ a:focus-visible {
   text-underline-offset: 3px;
 }
 
+/* Paid plans L4: the blocking accept screen's document rows and its two ways out
+   (the account link and Sign out). Layout only. */
+.legalGateList {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legalGateExits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-top: 16px;
+}
+
 .authMfaForm {
   max-width: 560px;
 }

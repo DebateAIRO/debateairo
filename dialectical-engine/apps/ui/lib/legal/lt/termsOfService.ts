@@ -379,6 +379,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "7fd09db498f63032262b45930b4c8ef58272576a5869d98c09d4e1bf945f3866",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.0 · ĮSIGALIOJA [DATE]",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DebateAIRO S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

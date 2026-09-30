@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "Die Antwort des Koordinators konnte nicht gelesen werden; daher ist das Ergebnis unbekannt.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Der Koordinator hat die Tarifwahl abgelehnt. Wählen Sie „Kostenlos“ oder „Premium“ und versuchen Sie es dann erneut.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Der Koordinator hat die Anfrage abgelehnt: Ein für diesen Tarif benötigtes Modell ist derzeit nicht verfügbar. Versuchen Sie es später erneut oder wählen Sie den anderen Tarif.",
-  "requestFailure.kind.UNCLASSIFIED": "Der Fehler trat auf, bevor eine Antwort einging; daher ist das Ergebnis unbekannt. Dies war keine Entscheidung des Koordinators."
+  "requestFailure.kind.UNCLASSIFIED": "Der Fehler trat auf, bevor eine Antwort einging; daher ist das Ergebnis unbekannt. Dies war keine Entscheidung des Koordinators.",
+  "newDebate.legalGate.eyebrow": "Bedingungen und Datenschutz",
+  "newDebate.legalGate.title": "Bitte lesen und akzeptieren Sie die aktuellen Dokumente",
+  "newDebate.legalGate.body": "Bevor Sie fortfahren, öffnen Sie jedes Dokument unten, lesen Sie es bis zum Ende und akzeptieren Sie es dann.",
+  "newDebate.legalGate.readTerms": "Nutzungsbedingungen lesen",
+  "newDebate.legalGate.readPrivacy": "Datenschutzerklärung lesen",
+  "newDebate.legalGate.done": "Gelesen",
+  "newDebate.legalGate.accept": "Akzeptieren und fortfahren",
+  "newDebate.legalGate.accepting": "Wird gespeichert…",
+  "newDebate.legalGate.failed": "Ihre Zustimmung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
+  "newDebate.legalGate.stale": "Eines der Dokumente wurde gerade geändert. Laden Sie die Seite neu, um die aktuelle Fassung zu lesen.",
+  "newDebate.legalGate.reload": "Seite neu laden",
+  "newDebate.legalGate.manageAccount": "Konto verwalten oder löschen",
+  "newDebate.legalGate.signOut": "Abmelden",
+  "newDebate.legalGate.signOutFailed": "Die Abmeldung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut.",
+  "newDebate.room.locationBlocked": "Von Ihrem aktuellen Standort aus können keine neuen Debatten gestartet werden. Ihre Debatten können Sie weiterhin lesen."
 }

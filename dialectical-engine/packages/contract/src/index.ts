@@ -232,6 +232,37 @@ export const AgeCheckResultSchema = z.object({ outcome: z.enum(["allowed", "refu
 export type AgeCheckResult = z.infer<typeof AgeCheckResultSchema>;
 export const AgeConfirmationStatusSchema = z.object({ status: z.enum(["required", "confirmed"]) }).strict();
 export type AgeConfirmationStatus = z.infer<typeof AgeConfirmationStatusSchema>;
+/** Paid plans L2/L3b: a legal document as the manifest names it — `Version N.M` and the draft's sha256. */
+export const LegalDocumentPairSchema = z.object({
+  version: z.string().regex(/^[0-9]{1,4}\.[0-9]{1,4}$/u),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/u)
+}).strict();
+export type LegalDocumentPairWire = z.infer<typeof LegalDocumentPairSchema>;
+
+/** What sign-up sends for the two documents it displayed, and the locale it displayed them in. */
+export const RegisterLegalDocumentsSchema = z.object({
+  terms: LegalDocumentPairSchema,
+  privacy: LegalDocumentPairSchema,
+  locale: z.string().regex(/^[a-z]{2}$/u)
+}).strict();
+export type RegisterLegalDocuments = z.infer<typeof RegisterLegalDocumentsSchema>;
+
+/** Paid plans L4. Only the Terms and the Privacy Policy are ever re-accepted. */
+export const LegalReacceptableKindSchema = z.enum(["TERMS", "PRIVACY"]);
+export const LegalStatusDocumentSchema = LegalDocumentPairSchema.extend({ kind: LegalReacceptableKindSchema }).strict();
+export const LegalStatusResponseSchema = z.object({
+  must_accept: z.array(LegalStatusDocumentSchema).max(2)
+}).strict();
+export type LegalStatusResponse = z.infer<typeof LegalStatusResponseSchema>;
+export const LegalAcceptRequestSchema = z.object({
+  documents: z.array(LegalStatusDocumentSchema).min(1).max(2)
+    .refine((documents) => new Set(documents.map((document) => document.kind)).size === documents.length),
+  locale: z.string().regex(/^[a-z]{2}$/u)
+}).strict();
+export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
+/** Paid plans G3a: two booleans — never the country the server saw. */
+export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean() }).strict();
+export type GeoAvailabilityResponse = z.infer<typeof GeoAvailabilityResponseSchema>;
 
 /**
  * Sensitive-data consent (V's ruling of 2026-09-29). Before the first debate an account
@@ -826,6 +857,8 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
+    "GET /v1/account/legal-status",
+    "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
     "GET /v1/account/email",
     "POST /v1/account/email/change",
@@ -836,6 +869,7 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
+    "GET /v1/geo/availability",
     "POST /v1/support/sessions",
     "GET /v1/support/sessions/{id}",
     "POST /v1/support/sessions/{id}/messages",
@@ -870,7 +904,8 @@ export const contractInventory = Object.freeze({
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
-    AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema,
+    AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
+    LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,

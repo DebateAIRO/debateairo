@@ -412,11 +412,17 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     // publication. They are DEPLOYMENT rows, so `historicalRows` stays 14 and
     // the legacy hash below is untouched: 57 with no duplicate keys, and 51
     // with exactly the six story keys removed.
+    //
+    // PAID PLANS G2: 57 -> 58. The development deployment now also seals
+    // `countryPolicy` (packages/register/src/country-policy.ts). A DEPLOYMENT
+    // row, so `historicalRows` stays 14: 58 with no duplicate keys, 57 with it
+    // removed.
     const storyKeys: readonly string[] = STORY_ROW_KEYS;
-    expect(developmentRows).toHaveLength(57);
-    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(51);
-    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(56);
-    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(56);
+    expect(developmentRows).toHaveLength(58);
+    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(52);
+    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(57);
+    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(57);
+    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(57);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
 

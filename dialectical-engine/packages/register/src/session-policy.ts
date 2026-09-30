@@ -133,7 +133,8 @@ const admissionPolicyValueSchema = z.object({
   recovery_start: admissionScopeValueSchema("source"),
   support_reads: admissionScopeValueSchema("source").optional(),
   support_sessions: admissionScopeValueSchema("owner").optional(),
-  support_model_calls: admissionScopeValueSchema("source").optional()
+  support_model_calls: admissionScopeValueSchema("source").optional(),
+  geo_availability: admissionScopeValueSchema("source").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -154,6 +155,8 @@ export type AdmissionPolicy = Readonly<{
   supportSessions: AdmissionScopePolicy<"owner"> | null;
   /** DL1-F7. One source's share of the global daily model-call cap. */
   supportModelCalls: AdmissionScopePolicy<"source"> | null;
+  /** Paid plans G3a: GET /v1/geo/availability, per source. */
+  geoAvailability: AdmissionScopePolicy<"source"> | null;
   sourceRef: string;
 }>;
 
@@ -216,7 +219,8 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: ADMISSION_POLICY_ROW_KEY,
   sourceRef: `${ADMISSION_POLICY_REGISTER_ROW.sourceRef}`
     + " + DL1-F2 support_reads/support_sessions and DL1-F7 support_model_calls,"
-    + " V ratification pending (V-1)",
+    + " V ratification pending (V-1)"
+    + " + paid plans G3a geo_availability, V ratification pending (V-1)",
   value: Object.freeze({
     ...ADMISSION_POLICY_REGISTER_ROW.value,
     support_reads: Object.freeze({
@@ -227,6 +231,11 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     }),
     support_model_calls: Object.freeze({
       key: "source" as const, limit: 40, window_ms: 24 * 60 * 60_000, capacity: 65_536
+    }),
+    // Paid plans G3a: the sign-up page's country check — 60 per minute per source. A page load makes
+    // one call; this refuses only a scraper walking addresses through the gate.
+    geo_availability: Object.freeze({
+      key: "source" as const, limit: 60, window_ms: 60_000, capacity: 65_536
     })
   })
 });
@@ -273,6 +282,12 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.support_model_calls.limit,
       windowMs: policy.support_model_calls.window_ms,
       capacity: policy.support_model_calls.capacity
+    }),
+    geoAvailability: policy.geo_availability === undefined ? null : Object.freeze({
+      key: policy.geo_availability.key,
+      limit: policy.geo_availability.limit,
+      windowMs: policy.geo_availability.window_ms,
+      capacity: policy.geo_availability.capacity
     }),
     sourceRef
   });
