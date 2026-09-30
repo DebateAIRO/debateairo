@@ -68,9 +68,12 @@ function NumberedSections({ sections }: { sections: readonly NumberedSection[] }
               <p key={index}>{withNames(block.text)}</p>
             ) : (
               <ul key={index}>
-                {block.items.map((item, itemIndex) => (
-                  <li key={itemIndex}>{withNames(item)}</li>
-                ))}
+                {block.items.map((item, itemIndex) => {
+                  // `.legalSection li` is a flex row: a line with an isolated name goes in ONE span, or the name's <bdi>
+                  // becomes its own flex item, gets a column of its own and breaks mid-word (REV-S01 p3 PT3-B1).
+                  const line = withNames(item);
+                  return <li key={itemIndex}>{typeof line === "string" ? line : <span>{line}</span>}</li>;
+                })}
               </ul>
             )
           )}

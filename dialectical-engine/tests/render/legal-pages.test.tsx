@@ -284,6 +284,12 @@ describe("the text pages render the same documents as the sign-up modals", () =>
         expect(written, `${edition}: ${name} is in the policy`).toBeGreaterThan(0);
         expect(isolated, `${edition}: every ${name} is its own left-to-right run`).toBe(written);
       }
+      // REV-S01 p3 PT3-B1: `.legalSection li` is a flex row (legal.css), so every child node of a list line is its own
+      // flex item. A line is ONE child — its text, or one wrapper holding the text and the name's <bdi> — or the name gets
+      // a column of its own and breaks mid-word (`debateai.l` / `ocale`). DONE screen 15 draws each line as one run.
+      for (const line of page.querySelectorAll(".legalSection li")) {
+        expect(line.childNodes.length, `${edition}: one flex item in «${line.textContent?.slice(0, 40)}»`).toBe(1);
+      }
     }
   });
 
@@ -382,8 +388,16 @@ describe("the cookie policy describes the cookies the product really sets", () =
       .filter((rule) => (rule as CSSMediaRule).media !== undefined)
       .filter((rule) => {
         const inner = [...(rule as CSSMediaRule).cssRules] as CSSStyleRule[];
+        // Both cells — the name is a `<th scope="row">`, the rest are `<td>` — become full-width blocks: `display: block`
+        // and `width: auto !important` over the fixed column widths (REV-S01 p3 CT3-N2).
+        const blockCell = (r: CSSStyleRule, cell: "th" | "td"): boolean =>
+          selectors(r).includes(`.legalCookieTable ${cell}`)
+          && r.style.display === "block"
+          && r.style.getPropertyValue("width") === "auto"
+          && r.style.getPropertyPriority("width") === "important";
         return inner.some((r) => selectors(r).includes(".legalCookieTable thead") && r.style.display === "none")
-          && inner.some((r) => selectors(r).includes(".legalCookieTable td") && r.style.display === "block");
+          && inner.some((r) => blockCell(r, "th"))
+          && inner.some((r) => blockCell(r, "td"));
       })
       .map((rule) => Number(/max-width:\s*(\d+)px/.exec((rule as CSSMediaRule).media.mediaText)?.[1] ?? 0));
     style.remove();
