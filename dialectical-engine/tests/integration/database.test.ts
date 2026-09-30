@@ -12,7 +12,15 @@ import {
   WorkItemRepository
 } from "@debateai/battery";
 import { LedgerRepository } from "@debateai/ledger";
-import { BudgetRepository, type CostEnvelopePhase } from "@debateai/budget";
+import {
+  BudgetRepository,
+  CostEnvelopeGuard,
+  projectedCallCeilingMicros,
+  type CostEnvelopePhase,
+  type PersonAllowanceSource,
+  type ProviderTargetPrice,
+  type SharedWallApplication
+} from "@debateai/budget";
 import { ProviderProbeRepository, RunRepository, ServeDisclosureRepository, migrate, type StoredServeDisclosure } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
@@ -600,9 +608,9 @@ async function executeResil01Scenario(input: {
   readonly beforeExecute?: (context: { runId: string; workItemId: string }) => Promise<void>;
   /** Engine money rule, Task M2: the run's receipt, when a test pins its own. */
   readonly envelopeBasis?: Readonly<Record<string, unknown>>;
-  /** Engine money rule, Task M2: each maker's money seam, as a hosted runner builds one per call. */
-  readonly primaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
-  readonly secondaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+  /** Engine money rule, Task M2: each maker's money seam, as a hosted runner builds one per call (B9: with the wall's application). */
+  readonly primaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => ProviderCostEnvelopeSeam;
+  readonly secondaryCostEnvelope?: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => ProviderCostEnvelopeSeam;
   /** Engine money rule, Task M3: settings a test adds on top of the scenario's own. */
   readonly settings?: Partial<WalkingSkeletonSettings>;
   /** Engine money rule, Task M3: every request each maker's gateway is handed, before the seam. */
@@ -8577,4 +8585,366 @@ describe("F-H-2 · liveness refresh with content encryption off", () => {
 
     expect(archived).not.toContain(runId);
   });
+});
+
+/**
+ * B9b (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE ARGUING, over the production
+ * runner and a REAL CostEnvelopeGuard. The wall is "fused": its reads report nothing spent before the
+ * `fuseAt`-th counted walled read, and a crossed edge from then on, for every maker — the site's day (2 300 000
+ * is 115% of 2 000 000) or the run owner's week (1 100 000 is 110% of 1 000 000). Each walled attempt makes
+ * exactly ONE counted read in either scope (the day's in SITE_DAY; in PERSON the day reads nothing and the
+ * owner's one window is the counted read), so the n-th read is the n-th walled attempt in both scopes. The
+ * doubles report no usage, so the seam does not require it.
+ *
+ * With no `prices` (every B9b caller) both makers are priced at B9_TINY_PRICE, one micro-unit per million
+ * tokens: the run's own ceiling never speaks, and no call can move, because every maker is refused alike.
+ *
+ * B9c's `prices` (each maker's own price) opens a MOVE WINDOW of `moveWindowReads` reads from the fuse. There a
+ * read reports the edge less THIS attempt's projection at the cheaper of the two prices — the projection the
+ * gateway hands the seam, recorded just before the guard reads — so the cheaper maker's attempt fits by exact
+ * equality (equality at the edge is WITHIN) and the dearer maker's attempt (the same request at nine times the
+ * price) crosses. Taking the attempt's own projection keeps the margin strictly between the two makers for
+ * every leg's size without a guessed byte count. After the window the crossed edge returns for every maker.
+ * With prices the run's own ceiling is 1 000 000 micro-units, far above any one call's projection, and every
+ * refusal it makes is counted so a case can prove it never spoke.
+ *
+ * `observe` pairs with the scenario's own `observe` hook: the gateway is handed each request just before it
+ * builds that call's seam, so every read and every refusal is filed under the call site that made it.
+ */
+const B9_TINY_PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1, outputMicrosPerMillionTokens: 1 });
+const B9_OWNER = randomUUID();
+
+type B9WallScope = "SITE_DAY" | "PERSON";
+type B9Maker = "primary" | "secondary";
+type B9WallPrices = Readonly<Record<B9Maker, ProviderTargetPrice>>;
+/**
+ * B9c's options for the invariant: each maker's own price and the move window (see `b9WallGuard`), and
+ * `cheaperModelsOn` — the runner under test moves calls and leaves money-refused seats out (the caller passes
+ * `bodyCostFallback: true` in `settings`, a setting B9c adds, so this helper never reads it).
+ */
+type B9WallOptions = Readonly<{ prices?: B9WallPrices; moveWindowReads?: number; cheaperModelsOn?: boolean }>;
+type B9WallCase = Readonly<{ label: string; scope: B9WallScope; fuseAt: number; runId: string }>;
+
+function b9WallGuard(input: Readonly<{
+  scope: B9WallScope;
+  fuseAt: number;
+  prices?: B9WallPrices;
+  moveWindowReads?: number;
+}>) {
+  const edge = input.scope === "SITE_DAY" ? 2_300_000 : 1_100_000;
+  const moveWindowReads = input.prices === undefined ? 0 : input.moveWindowReads ?? 0;
+  const builds: { maker: B9Maker; phase: CostEnvelopePhase; sharedWall: SharedWallApplication }[] = [];
+  const reads: Readonly<{ callSiteKey: string; maker: B9Maker }>[] = [];
+  const refusals: string[] = [];
+  let runCeilingRefusals = 0;
+  let lastRequest: Readonly<{ callSiteKey: string; maker: B9Maker }> = Object.freeze({ callSiteKey: "", maker: "primary" });
+  let lastProjection: Readonly<{ requestBytes: number; completionTokenCeiling: number }> | null = null;
+  const fusedSpend = (): number => {
+    reads.push(lastRequest);
+    if (reads.length < input.fuseAt) return 0;
+    if (reads.length < input.fuseAt + moveWindowReads && input.prices !== undefined && lastProjection !== null) {
+      return edge - Math.min(
+        projectedCallCeilingMicros(input.prices.primary, lastProjection),
+        projectedCallCeilingMicros(input.prices.secondary, lastProjection)
+      );
+    }
+    return edge;
+  };
+  const persons: PersonAllowanceSource = {
+    read: async () => (input.scope === "PERSON" ? [Object.freeze({
+      scope: "PERSON_WEEK" as const,
+      limitMicros: 1_000_000,
+      periodStart: new Date(Date.now() - 86_400_000),
+      resetsAt: new Date(Date.now() + 86_400_000),
+      finishBasisPoints: 11_000,
+      closeBasisPoints: 9_500
+    })] : [])
+  };
+  const guard = new CostEnvelopeGuard({
+    store: {
+      recordSpend: async () => undefined,
+      readRunSpentMicros: async () => 0,
+      readRunStorySpentMicros: async () => 0,
+      readDaySpentMicros: async () => (input.scope === "SITE_DAY" ? fusedSpend() : 0),
+      admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
+    },
+    policy: { perRunCeilingMicros: input.prices === undefined ? 250_000 : 1_000_000, dailyCeilingMicros: 2_000_000 },
+    sharedWall: {
+      finishBasisPoints: 11_500,
+      persons,
+      owners: {
+        readRunChargeOwnerRef: async () => (input.scope === "PERSON" ? B9_OWNER : null),
+        readOwnerSpentMicros: async () => fusedSpend()
+      }
+    }
+  });
+  return Object.freeze({
+    wallReads: () => reads.length,
+    /** The call site and maker of every counted walled read, in order. */
+    reads: () => Object.freeze([...reads]),
+    /** Every call site whose try the wall refused, in order (a refused call that moves is tried again at the same site). */
+    refusals: () => Object.freeze([...refusals]),
+    runCeilingRefusals: () => runCeilingRefusals,
+    builds: () => Object.freeze([...builds]),
+    observe: (maker: B9Maker, request: ProviderCallRequest) => {
+      lastRequest = Object.freeze({ callSiteKey: request.callSiteKey, maker });
+    },
+    buildFor: (maker: B9Maker) =>
+      (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication): ProviderCostEnvelopeSeam => {
+        builds.push({ maker, phase, sharedWall });
+        const site = lastRequest.callSiteKey;
+        const seam = guard.providerSeam({
+          runId, price: input.prices?.[maker] ?? B9_TINY_PRICE, requireReportedUsage: false, phase, sharedWall
+        });
+        return {
+          ...seam,
+          assertCallAllowed: async (projection) => {
+            lastProjection = projection;
+            try {
+              await seam.assertCallAllowed(projection);
+            } catch (error) {
+              const code = error instanceof TypedDomainError ? error.code : null;
+              if (code === "DAILY_COST_ENVELOPE_REACHED" || code === "PERSON_ALLOWANCE_REACHED") refusals.push(site);
+              if (code === "RUN_COST_ENVELOPE_MONEY_REACHED") runCeilingRefusals += 1;
+              throw error;
+            }
+          }
+        };
+      }
+  });
+}
+
+function b9Debate(label: string) {
+  const primary = fullDebate(`${label} primary`);
+  const secondary = fullDebate(`${label} secondary`);
+  // One spare judgement and review each, so no case can run a double dry.
+  return Object.freeze({
+    primary: [...primary.judgements, judgementDouble(`${label} primary spare`), ...primary.reviews,
+      reviewDouble("agree", `${label} primary spare review`), resil01Composition, evaluatorSatisfied()],
+    secondary: [...secondary.judgements, judgementDouble(`${label} secondary spare`), ...secondary.reviews,
+      reviewDouble("agree", `${label} secondary spare review`)]
+  });
+}
+
+/** Who made each recorded call at one call site (a try refused before sending leaves no row). */
+async function b9Callers(runId: string, callSiteKey: string): Promise<readonly string[]> {
+  const rows = await database.pool.query<{ actor_ref: string }>(
+    `SELECT actor_ref FROM ledger.ledger_entry
+      WHERE run_id=$1 AND action_kind='MODEL_CALL' AND call_site_key=$2 ORDER BY sequence`,
+    [runId, callSiteKey]
+  );
+  return rows.rows.map((row) => row.actor_ref);
+}
+
+/** The places the invariant must wall first at least once (budget spec §2.9's list), by call-site family. */
+const B9_WALL_FAMILIES: readonly (readonly [string, RegExp])[] = Object.freeze([
+  ["the first root's panel", /^PANEL:root:/u],
+  ["the secondary root", /^JUDGE:root:secondary$/u],
+  ["the secondary root's panel", /^PANEL:JUDGE:root:secondary:/u],
+  ["a review", /^JUDGE:review:/u],
+  ["an expansion leg", /^JUDGE:(?:defender|critic):/u],
+  ["a child's panel", /^PANEL:JUDGE:(?:defender|critic):/u],
+  ["a cross-root exchange", /^JUDGE:cross-root:/u]
+]);
+
+/**
+ * THE TESTED INVARIANT (budget spec §2.9): with the new settings no run ever ends FAILED with
+ * DAILY_COST_ENVELOPE_REACHED or PERSON_ALLOWANCE_REACHED, wherever the wall falls.
+ *
+ * A PROBE debate, fused never, lists every counted walled read in order. The fuse points are chosen from it: a
+ * few early ordinals, the first read of each of B9_WALL_FAMILIES and, with prices, the first expansion or
+ * cross-root leg planned on the secondary (the dearer maker), so that a call can move. Before its fuse a case
+ * runs exactly as the probe did, so each case must first meet the wall at the probe's call site for its
+ * ordinal, and together the cases must meet the wall first at every family: a change of call order or depth
+ * that stops walling one of them fails here instead of passing quietly.
+ *
+ * Every case is answered. Without the cheaper-models setting every refused call cuts the arguing short (a seat
+ * on the first root's panel included, M2's AUTHOR_ONLY). With it (B9c, `cheaperModelsOn`) a refused panel seat is left out, as a
+ * failed seat is, and a refused movable call moves when another maker fits, so the arguing is cut short only by
+ * a movable call no maker could make: one the ledger holds no recorded call for. A case cut short says so on
+ * the answer under the wall's own reason, and no work item is ever terminated with either code. The cases are
+ * returned for B9c's own assertions.
+ */
+async function runB9WallInvariant(
+  settings: Partial<WalkingSkeletonSettings>,
+  wallOptions: B9WallOptions = {}
+): Promise<readonly B9WallCase[]> {
+  const scenarioFor = async (label: string, wall: ReturnType<typeof b9WallGuard>) => {
+    const debate = b9Debate(`B9 invariant ${label}`);
+    return executeResil01Scenario({
+      label: `b9-invariant-${label}`,
+      primary: debate.primary,
+      secondary: debate.secondary,
+      primaryCostEnvelope: wall.buildFor("primary"),
+      secondaryCostEnvelope: wall.buildFor("secondary"),
+      observe: (maker, request) => wall.observe(maker, request),
+      settings
+    });
+  };
+  const probeWall = b9WallGuard({
+    scope: "SITE_DAY", fuseAt: Number.POSITIVE_INFINITY,
+    ...(wallOptions.prices === undefined ? {} : { prices: wallOptions.prices }),
+    ...(wallOptions.moveWindowReads === undefined ? {} : { moveWindowReads: wallOptions.moveWindowReads })
+  });
+  const probe = await scenarioFor("probe", probeWall);
+  expect(probe.error, "probe").toBeNull();
+  expect(probeWall.refusals(), "probe").toEqual([]);
+  const reads = probeWall.reads();
+  // A review's call site names the reviewed node's id, which is minted afresh in every debate, so two
+  // debates' sites are compared with each node id read as one placeholder (`JUDGE:review:<node>`).
+  const siteOf = (callSiteKey: string | undefined): string | undefined =>
+    callSiteKey?.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu, "<node>");
+  const firstReadAt = (matches: (read: typeof reads[number]) => boolean): number => reads.findIndex(matches) + 1;
+  const familyOrdinals = B9_WALL_FAMILIES.map(([name, pattern]) => {
+    const ordinal = firstReadAt((read) => pattern.test(read.callSiteKey));
+    expect(ordinal, `the debate reaches ${name}`).toBeGreaterThan(0);
+    return ordinal;
+  });
+  const movableSecondaryLeg = wallOptions.prices === undefined
+    ? []
+    : [firstReadAt((read) => read.maker === "secondary" && /^JUDGE:(?:defender|critic|cross-root):/u.test(read.callSiteKey))]
+      .filter((ordinal) => ordinal > 0);
+  const fusePoints = (early: readonly number[]): readonly number[] =>
+    [...new Set([...early, ...familyOrdinals, ...movableSecondaryLeg])].sort((left, right) => left - right);
+  const plan = [
+    ...fusePoints([1, 2, 3, 4]).map((fuseAt) => ({ scope: "SITE_DAY" as const, fuseAt })),
+    ...fusePoints([1, 2]).map((fuseAt) => ({ scope: "PERSON" as const, fuseAt }))
+  ];
+  const firstMet = new Set<string>();
+  const cases: B9WallCase[] = [];
+  for (const walled of plan) {
+    const label = `${walled.scope}-${String(walled.fuseAt)}`;
+    const wall = b9WallGuard({
+      ...walled,
+      ...(wallOptions.prices === undefined ? {} : { prices: wallOptions.prices }),
+      ...(wallOptions.moveWindowReads === undefined ? {} : { moveWindowReads: wallOptions.moveWindowReads })
+    });
+    const scenario = await scenarioFor(label, wall);
+    expect(scenario.error, label).toBeNull();
+    expect(scenario.result?.kind, label).toBe("COMPLETED");
+    expect(SERVED_TERMINALS, label).toContain(scenario.answer?.terminal);
+    expect(wall.runCeilingRefusals(), label).toBe(0);
+    // Before its fuse the case ran as the probe did, so it first met the wall where the probe says.
+    const met = wall.reads()[walled.fuseAt - 1]?.callSiteKey;
+    expect(siteOf(met), label).toBe(siteOf(reads[walled.fuseAt - 1]?.callSiteKey));
+    if (met !== undefined) firstMet.add(met);
+    const expected = walled.scope === "SITE_DAY" ? "DAILY_COST_ENVELOPE_REACHED" : "PERSON_ALLOWANCE_REACHED";
+    const refused = wall.refusals();
+    const cutShort = wallOptions.cheaperModelsOn === true
+      ? (await Promise.all(refused.filter((key) => !key.startsWith("PANEL:"))
+        .map((key) => b9Callers(scenario.runId, key)))).some((callers) => callers.length === 0)
+      : refused.length > 0;
+    const stops = (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === "ENVELOPE_EXHAUSTED").map((record) => record.reason);
+    expect(stops, label).toEqual(cutShort ? [expected] : []);
+    const reasons = await database.pool.query<{ terminal_reason: string }>(
+      "SELECT terminal_reason FROM core.work_item WHERE run_id=$1 AND terminal_reason IS NOT NULL",
+      [scenario.runId]
+    );
+    for (const row of reasons.rows) {
+      expect(row.terminal_reason, label).not.toMatch(/DAILY_COST_ENVELOPE_REACHED|PERSON_ALLOWANCE_REACHED/u);
+    }
+    cases.push(Object.freeze({ label, scope: walled.scope, fuseAt: walled.fuseAt, runId: scenario.runId }));
+  }
+  for (const [name, pattern] of B9_WALL_FAMILIES) {
+    expect([...firstMet].some((key) => pattern.test(key)), `some case meets the wall first at ${name}`).toBe(true);
+  }
+  return Object.freeze(cases);
+}
+
+describe("B9b — the shared wall stops the arguing, never the debate (production runner)", () => {
+  it("measures every call while arguing but the first position's own, and no answer-writing call", async () => {
+    const wall = b9WallGuard({ scope: "SITE_DAY", fuseAt: Number.POSITIVE_INFINITY });
+    const debate = b9Debate("B9 exemptions");
+    const firstPrimaryCall: string[] = [];
+    const scenario = await executeResil01Scenario({
+      label: "b9-wall-exemptions",
+      primary: debate.primary,
+      secondary: debate.secondary,
+      primaryCostEnvelope: wall.buildFor("primary"),
+      secondaryCostEnvelope: wall.buildFor("secondary"),
+      observe: (maker, request) => {
+        if (maker === "primary" && firstPrimaryCall.length === 0) firstPrimaryCall.push(request.callSiteKey);
+      }
+    });
+
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(firstPrimaryCall).toEqual(["JUDGE"]);
+    const builds = wall.builds();
+    // The first position's own call: the primary's first seam, made while arguing and exempt.
+    expect(builds.find((build) => build.maker === "primary")).toEqual({ maker: "primary", phase: "BODY", sharedWall: "EXEMPT" });
+    const walled = builds.filter((build) => build.phase === "BODY" && build.sharedWall === "APPLY");
+    expect(builds.filter((build) => build.phase === "BODY" && build.sharedWall === "EXEMPT")).toHaveLength(1);
+    // Every other call while arguing read the day (once per attempt; a repair attempt reads again).
+    expect(walled.length).toBeGreaterThan(10);
+    expect(wall.wallReads()).toBeGreaterThanOrEqual(walled.length);
+    const serve = builds.filter((build) => build.phase === "SERVE");
+    expect(serve.length).toBeGreaterThan(0);
+    expect(serve.every((build) => build.sharedWall === "EXEMPT")).toBe(true);
+  });
+
+  it("stops the arguing at the site day's finish edge, and the debate is still answered", async () => {
+    const wall = b9WallGuard({ scope: "SITE_DAY", fuseAt: 1 });
+    const debate = b9Debate("B9 site day");
+    const scenario = await executeResil01Scenario({
+      label: "b9-wall-site-day",
+      primary: debate.primary,
+      secondary: debate.secondary,
+      primaryCostEnvelope: wall.buildFor("primary"),
+      secondaryCostEnvelope: wall.buildFor("secondary")
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.answer?.verdict_state).not.toBeNull();
+    // The first walled call is the first root's panel seat: root 0 stands on its author, and nothing more is argued.
+    expect(scenario.snapshot.nodes).toHaveLength(1);
+    const reasonsOf = (mark: string) => (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === mark).map((record) => record.reason);
+    expect(reasonsOf("PANEL-DEGRADED-SINGLE-VOICE")).toEqual(["DAILY_COST_ENVELOPE_REACHED"]);
+    expect(reasonsOf("ENVELOPE_EXHAUSTED")).toEqual(["DAILY_COST_ENVELOPE_REACHED"]);
+    expect(await disclosureRowOf(answerId)).toMatchObject({ bodyStop: "DAILY", serveStop: null });
+  });
+
+  it("stops the arguing at a person's window, under its own reason, and the owner's row records ALLOWANCE", async () => {
+    const wall = b9WallGuard({ scope: "PERSON", fuseAt: 1 });
+    const debate = b9Debate("B9 person week");
+    const scenario = await executeResil01Scenario({
+      label: "b9-wall-person",
+      primary: debate.primary,
+      secondary: debate.secondary,
+      primaryCostEnvelope: wall.buildFor("primary"),
+      secondaryCostEnvelope: wall.buildFor("secondary")
+    });
+
+    expect(scenario.error).toBeNull();
+    const answerId = answerIdOf(scenario);
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(scenario.snapshot.nodes).toHaveLength(1);
+    const reasonsOf = (mark: string) => (scenario.answer?.condition_mark_records ?? [])
+      .filter((record) => record.mark === mark).map((record) => record.reason);
+    expect(reasonsOf("ENVELOPE_EXHAUSTED")).toEqual(["PERSON_ALLOWANCE_REACHED"]);
+    // 0076's CHECK knew four stop kinds; the row is written only because 0081 widened it (B3, ruling R-20).
+    expect(await disclosureRowOf(answerId)).toMatchObject({ bodyStop: "ALLOWANCE" });
+  });
+
+  it("lets the owner's disclosure row name the person's allowance (0081 widened 0076's two stop CHECKs, R-20)", async () => {
+    const definitions = await database.pool.query<{ conname: string; definition: string }>(
+      `SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint
+        WHERE conrelid = 'serve.serve_disclosure'::regclass
+          AND conname IN ('serve_disclosure_body_stop_check', 'serve_disclosure_serve_stop_check')
+        ORDER BY conname`
+    );
+    expect(definitions.rows.map((row) => row.conname))
+      .toEqual(["serve_disclosure_body_stop_check", "serve_disclosure_serve_stop_check"]);
+    for (const row of definitions.rows) expect(row.definition, row.conname).toContain("'ALLOWANCE'");
+  });
+
+  it("never ends a run FAILED with the site's or a person's wall, wherever the wall falls (the tested invariant)", async () => {
+    // Without the cheaper-models setting nothing moves: every case's rows are B9c's to read, none here.
+    const cases = await runB9WallInvariant({});
+    expect(cases.length).toBeGreaterThan(B9_WALL_FAMILIES.length);
+  }, 1_200_000);
 });

@@ -284,6 +284,7 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PANEL_WEIGHTING_CONTROLS_UNRESOLVED",
   "PANEL_WEIGHTING_UNRESOLVED",
   "PARTIAL_SCORE_RUN_IDENTITY",
+  "PERSON_ALLOWANCE_REACHED",
   "POSITIVE_CAPTURE_REQUIRED",
   "PRESENT_SIGNAL_FRESHNESS_UNKNOWN",
   "PRIVATE_CONTENT_ERASED",
@@ -880,7 +881,7 @@ describe("API operational error diagnostics", () => {
         // knew the three prefixes round 2 happened to have written. The whole
         // `COST_ENVELOPE_` family is swept now, so the next one is covered
         // before anyone notices it exists.
-        /"((?:COST_ENVELOPE|RUN_COST_ENVELOPE|DAILY_COST_ENVELOPE|PROVIDER_USAGE)_[A-Z_]+)"/gu
+        /"((?:COST_ENVELOPE|RUN_COST_ENVELOPE|DAILY_COST_ENVELOPE|PROVIDER_USAGE|PERSON_ALLOWANCE)_[A-Z_]+)"/gu
       )) swept.add(match[1]!);
     }
 

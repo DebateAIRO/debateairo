@@ -55,9 +55,12 @@ import {
   attemptCeilingForPhase,
   parseCostEnvelopeBasis,
   projectedCallCeilingMicros,
+  sharedWallReached,
   type BudgetPressureDecision,
   type CostEnvelopePhase,
-  type ProviderTargetPrice
+  type PersonAllowanceSource,
+  type ProviderTargetPrice,
+  type SharedWallApplication
 } from "@debateai/budget";
 import {
   countMeasuredEdges,
@@ -200,18 +203,26 @@ export const ENVELOPE_STOP_CODES = Object.freeze({
    */
   PROVIDER_USAGE_UNREPORTED: "USAGE",
   /**
-   * SMALL (round 3): a dead path today — the daily envelope is asked only when a
-   * NEW run is admitted, never mid-run — and listed anyway, for consistency with
-   * `RUN_LEVEL_SPEND_STOP_CODES` in the kernel. If it is ever raised while a run
-   * is under way, the difference between being listed and not is the difference
-   * between the run keeping its work and failing outright.
+   * B9 (budget spec §2.9): under the new costEnvelopePolicy members the seam's
+   * shared wall raises it mid-run, at the site day's finish edge; under the old
+   * ones it is still asked only when a NEW run is admitted. It is listed for
+   * consistency with `RUN_LEVEL_SPEND_STOP_CODES` in the kernel. Raised while a
+   * run is under way, the difference between being listed and not is the
+   * difference between the run keeping its work and failing outright.
    *
    * ROUND 4, RULING R-C: its OWN kind. Round 3 filed it under `MONEY`, so the
    * record it would have minted carried the per-run reason and sent the
    * operator to raise the wrong ceiling. A spent day is lifted by waiting for
    * the next one, not by re-sealing the per-run envelope.
    */
-  DAILY_COST_ENVELOPE_REACHED: "DAILY"
+  DAILY_COST_ENVELOPE_REACHED: "DAILY",
+  /**
+   * B9 (budget spec §2.9, paid-plans spec §2.4.1): one of the run owner's
+   * allowance windows would be crossed at its finish edge (110%). Its OWN
+   * kind, for ruling R-C's reason: it is lifted by the person's window
+   * resetting or a larger plan, not by the site's day or the run's ceiling.
+   */
+  PERSON_ALLOWANCE_REACHED: "ALLOWANCE"
 } as const);
 
 export type EnvelopeStopKind = typeof ENVELOPE_STOP_CODES[keyof typeof ENVELOPE_STOP_CODES];
@@ -226,7 +237,8 @@ export const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> =
   ATTEMPTS: "RUN_COST_ENVELOPE_EXHAUSTED",
   MONEY: "RUN_COST_ENVELOPE_MONEY_REACHED",
   USAGE: "PROVIDER_USAGE_UNREPORTED",
-  DAILY: "DAILY_COST_ENVELOPE_REACHED"
+  DAILY: "DAILY_COST_ENVELOPE_REACHED",
+  ALLOWANCE: "PERSON_ALLOWANCE_REACHED"
 });
 
 /**
@@ -237,12 +249,18 @@ export const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> =
  * The ATTEMPT ceiling was listed only for completeness of the record while it
  * failed the run instead of stopping it; since Task M2 it is a run-body stop
  * (`RUN_BODY_STOP_KINDS`) and its lift is used like the others.
+ *
+ * B9: the ALLOWANCE lift is the OPERATOR's. It stays on the record, and the
+ * reader's honesty drawer never prints it (`liftPathIsOperatorOnly`,
+ * apps/ui/lib/v3/labels.ts), because it is English and names engine words and
+ * the run owner in the third person.
  */
 const SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
   ATTEMPTS: "Re-ask under a larger attempt ceiling so the other maker positions can be authored",
   MONEY: "Re-ask under a larger per-run cost envelope so the other maker positions can be afforded",
   USAGE: "Restore a vendor that reports usage, then re-ask so the other maker positions can be billed",
-  DAILY: "Re-ask after the daily cost envelope resets so the other maker positions can be afforded"
+  DAILY: "Re-ask after the daily cost envelope resets so the other maker positions can be afforded",
+  ALLOWANCE: "Re-ask after the run owner's allowance window resets, or on a larger plan, so the other maker positions can be afforded"
 });
 
 /**
@@ -306,10 +324,11 @@ export function envelopeStopPendingAttempts(stop: EnvelopeStopKind): Readonly<{
 /**
  * The kinds that stop a run-body phase, enumerated POSITIVELY: a fifth kind
  * added tomorrow does not become a phase stop by omission, it has to be listed
- * and reasoned about. Since Task M2 that is all four of today's: `ATTEMPTS` was
- * deliberately absent until the engine money rule (see above).
+ * and reasoned about. Since Task M2 that is every kind: `ATTEMPTS` was
+ * deliberately absent until the engine money rule (see above), and B9 added
+ * `ALLOWANCE`, the run owner's window.
  */
-const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["ATTEMPTS", "MONEY", "USAGE", "DAILY"]);
+const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["ATTEMPTS", "MONEY", "USAGE", "DAILY", "ALLOWANCE"]);
 
 export function expansionPhaseStop(error: unknown): EnvelopeStopKind | null {
   const stop = envelopeStopKind(error);
@@ -4368,14 +4387,14 @@ export class WalkingSkeletonRunner {
       finishedAt: new Date()
     });
     const primaryAttempt = await cooldownAttempt({
-      callSiteKey: "JUDGE",
+      callSiteKey: FIRST_POSITION_CALL_SITE_KEY,
       parentNodeId: null,
       plannedLegCount: 1,
       failureScope: "MAKER_POSITION",
       attempt: (maxAttempts) => primaryMaker.judge.judge({
         runId: run.runId,
         subjectItemId: claimed.workItemId,
-        callSiteKey: "JUDGE",
+        callSiteKey: FIRST_POSITION_CALL_SITE_KEY,
         // DL4-F4: the question travels as the question, in its own fenced
         // field; the leg's directive is code's and rides the system message.
         questionLine: run.questionLine,
@@ -6853,6 +6872,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PANEL_WEIGHTING_CONTROLS_UNRESOLVED",
   "PANEL_WEIGHTING_UNRESOLVED",
   "PARTIAL_SCORE_RUN_IDENTITY",
+  "PERSON_ALLOWANCE_REACHED",
   "POSITIVE_CAPTURE_REQUIRED",
   "PRESENT_SIGNAL_FRESHNESS_UNKNOWN",
   "PRIVATE_CONTENT_ERASED",
@@ -7677,6 +7697,46 @@ export function providerCallCostEnvelopePhase(
     : "BODY";
 }
 
+/**
+ * B9 (budget spec §2.9) — THE FIRST POSITION'S OWN CALL SITE. The primary
+ * root author's judgement is asked at exactly this key; every other authoring
+ * leg is `JUDGE:<leg>…`, every panel seat `PANEL:…`.
+ */
+export const FIRST_POSITION_CALL_SITE_KEY = "JUDGE" as const;
+
+/**
+ * B9 (budget spec §2.9) — WHICH CALLS THE SHARED WALL MEASURES. A debate call
+ * made while arguing (BODY, on the served lane) is walled. Exempt: the first
+ * position's own call — a started debate always gets its first position — and
+ * every answer-writing call (the seam never walls SERVE either), the story's
+ * calls and the evaluator add-on's, none of which is the debate's arguing.
+ */
+export function providerCallSharedWall(
+  request: Pick<ProviderCallRequest, "role" | "lane" | "callSiteKey">
+): SharedWallApplication {
+  if (request.lane !== "served" || providerCallCostEnvelopePhase(request) !== "BODY") return "EXEMPT";
+  return request.callSiteKey === FIRST_POSITION_CALL_SITE_KEY ? "EXEMPT" : "APPLY";
+}
+
+/**
+ * B9 (budget spec §2.9, ruling R-19) — THE PERSON WALL WHEN THE RUNNER'S
+ * REGISTER VERSION SEALED NO billingPlans. B6 writes a run's charge scope only
+ * when hosted billing is on, so a run that HAS one was admitted, and is charged,
+ * against a person's windows this runner cannot read (the API and the runner
+ * are on different register versions: a mismatched REGISTER_VERSION, or a
+ * staggered restart). It fails CLOSED: every walled call of such a run is
+ * refused as the person's month (PERSON_ALLOWANCE_REACHED), so the arguing
+ * stops and the answer is still written. A run with no charge scope never
+ * reaches it: the wall asks for windows only for a pinned owner.
+ */
+export function plansUnresolvedPersonAllowance(): PersonAllowanceSource {
+  return Object.freeze({
+    read: async () => {
+      throw sharedWallReached("PERSON_MONTH");
+    }
+  });
+}
+
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction">
@@ -7691,8 +7751,14 @@ export function createPostgresProviderGateway(
        * Task M1: and from the call's PHASE (`providerCallCostEnvelopePhase`),
        * because an answer-writing call and a call made while the debate is
        * argued are held to different ceilings over the same run total.
+       * B9: and whether the call is measured against the shared wall
+       * (`providerCallSharedWall`).
        */
-      readonly buildCostEnvelopeSeam?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+      readonly buildCostEnvelopeSeam?: (
+        runId: string,
+        phase: CostEnvelopePhase,
+        sharedWall: SharedWallApplication
+      ) => ProviderCostEnvelopeSeam;
       /**
        * Verdict story (spec §8): the STORY's own money bound, built per call
        * from the leased run exactly as the run's is. A story call on a metered
@@ -7828,7 +7894,7 @@ export function createPostgresProviderGateway(
               costEnvelope: buildStoryCostEnvelopeSeam(leasedRunId)
             })
             : (buildCostEnvelopeSeam === undefined ? {} : {
-              costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase)
+              costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase, providerCallSharedWall(request))
             }))
         });
       } catch (error) {

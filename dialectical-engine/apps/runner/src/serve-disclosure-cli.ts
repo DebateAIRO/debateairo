@@ -58,6 +58,7 @@ const STOP_WORDS: Readonly<Record<string, string>> = Object.freeze({
   ATTEMPTS: "the attempt ceiling",
   USAGE: "a vendor that reported no usage",
   DAILY: "the daily ceiling",
+  ALLOWANCE: "the person's allowance",
   TRANSPORT_DEATH: "a dead model connection",
   NO_ARTIFACT: "a draft with nothing to serve"
 });

@@ -945,11 +945,12 @@ export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
   // HERE, inside the attempt loop, and a retry would be a second billed call
   // for the same unrepresentable number.
   "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
-  // SMALL (round 3): the gateway's seam cannot raise this today — the daily
-  // envelope is asked when a NEW run is admitted, not per call — but retrying a
-  // day that is spent would be as pointless as retrying a run that is, and the
-  // list is the kernel's, minus the one the gateway never sees.
-  "DAILY_COST_ENVELOPE_REACHED"
+  // B9 (budget spec §2.9): the seam's shared wall raises the day mid-run under
+  // the new settings, before sending; retrying a day that is spent would be as
+  // pointless as retrying a run that is.
+  "DAILY_COST_ENVELOPE_REACHED",
+  // B9: and one of the run owner's windows, the same way.
+  "PERSON_ALLOWANCE_REACHED"
 ] as const);
 
 /** L4-F3: a provider body is streamed and abandoned past this many bytes; nothing of it is persisted. */

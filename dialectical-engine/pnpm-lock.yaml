@@ -253,6 +253,9 @@ importers:
       '@debateai/battery':
         specifier: workspace:*
         version: link:../../packages/battery
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../../packages/billing-core
       '@debateai/budget':
         specifier: workspace:*
         version: link:../../packages/budget

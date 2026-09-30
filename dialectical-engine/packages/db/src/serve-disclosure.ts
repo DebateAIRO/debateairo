@@ -41,7 +41,7 @@ import { normalizeRunOwnership } from "./index.js";
  * floor with no such receipt is a row that breaks its rules
  * (`SERVE_DISCLOSURE_ROW_INVALID`).
  */
-export const SERVE_DISCLOSURE_BODY_STOPS = Object.freeze(["MONEY", "ATTEMPTS", "USAGE", "DAILY"] as const);
+export const SERVE_DISCLOSURE_BODY_STOPS = Object.freeze(["MONEY", "ATTEMPTS", "USAGE", "DAILY", "ALLOWANCE"] as const);
 export type ServeDisclosureBodyStop = typeof SERVE_DISCLOSURE_BODY_STOPS[number];
 
 /**
@@ -50,7 +50,7 @@ export type ServeDisclosureBodyStop = typeof SERVE_DISCLOSURE_BODY_STOPS[number]
  * transport, or a draft with nothing to serve — whether or not a round was kept.
  */
 export const SERVE_DISCLOSURE_SERVE_STOPS = Object.freeze([
-  "MONEY", "ATTEMPTS", "USAGE", "DAILY", "TRANSPORT_DEATH", "NO_ARTIFACT"
+  "MONEY", "ATTEMPTS", "USAGE", "DAILY", "ALLOWANCE", "TRANSPORT_DEATH", "NO_ARTIFACT"
 ] as const);
 export type ServeDisclosureServeStop = typeof SERVE_DISCLOSURE_SERVE_STOPS[number];
 
