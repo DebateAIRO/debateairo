@@ -28,6 +28,11 @@ const rows: readonly Row[] = [
   ["settlement", "packages/settlement", ["kernel", "db", "ledger", "providers", "register", "graph"]],
   ["valuation", "packages/valuation", ["kernel", "db", "ledger", "register", "graph", "propagation"]],
   ["budget", "packages/budget", ["kernel", "db", "ledger", "register", "contract"]],
+  // Paid plans (spec 2026-09-29 §2.4, R1 A26(a), ruling R-1): pure billing rules.
+  // The manifest lists kernel alone: the plan rows (register) and the person-window
+  // types (budget) are TYPE imports, so db and the connector packages may depend
+  // on billing-core without a cycle (register already depends on db).
+  ["billing-core", "packages/billing-core", ["kernel"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
   // Verdict story (2026-09-26): the story package. The edges its later tasks need

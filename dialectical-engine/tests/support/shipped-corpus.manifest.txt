@@ -527,6 +527,9 @@ packages/battery/decision/src/index.ts
 packages/battery/src/index.ts
 packages/battery/src/split.ts
 packages/battery/src/terminal.ts
+packages/billing-core/src/index.ts
+packages/billing-core/src/plan-lookup.ts
+packages/billing-core/src/windows.ts
 packages/budget/src/cost-envelope.ts
 packages/budget/src/estimate.ts
 packages/budget/src/index.ts
