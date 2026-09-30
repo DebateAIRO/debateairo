@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
@@ -153,5 +154,78 @@ describe("B7a installBillingRoutes(api, deps) — the one billing routes module 
     expect(asked).toEqual(["GET /v1/billing/usage"]);
     expect(response.json()).toEqual({ plan_id: "PLUS", windows: [] });
     expect(seen).toEqual([NOW]);
+  });
+});
+
+/**
+ * The F33 class (tests/unit/v28-envelope-wiring.test.ts, tests/unit/b6b-room-wiring.test.ts):
+ * a reader that is built, optional, and wired into nothing. The API root must build the
+ * usage reader only while billing is on, from the room's own composition, and hand both
+ * the room read and the billing options to buildApi. The patterns tolerate whitespace and
+ * the shapes the later tasks give this wiring: P8a moves the reader into its own
+ * `billingUsageReader` binding and spreads it into the same `billingRouteOptions` object,
+ * and B8 adds its own spread between the two lines pinned here.
+ */
+describe("B7a the API root supplies the room read and the usage read", () => {
+  const BILLING_ON_GUARD = String.raw`askRoomComposition\s*===\s*undefined\s*\|\|\s*askRoomComposition\.entitlements\s*===\s*null\s*\?\s*undefined\s*:\s*`;
+  const READER = String.raw`new\s+PersonUsageReader\(\s*\{\s*entitlements:\s*askRoomComposition\.entitlements\s*,\s*allowance:\s*askRoomComposition\.personAllowance\s*,\s*spend:\s*askRoomComposition\.spend\s*,?\s*\}\s*\)`;
+
+  function billingRouteOptionsStatement(main: string): string {
+    const start = main.search(/const\s+billingRouteOptions\s*:\s*BillingRouteOptions\s*\|\s*undefined\s*=/u);
+    expect(start).toBeGreaterThan(-1);
+    const end = main.indexOf(";", start);
+    expect(end).toBeGreaterThan(start);
+    return main.slice(start, end + 1);
+  }
+
+  function buildApiCall(main: string): string {
+    const start = main.search(/const\s+api\s*=\s*buildApi\(\s*\{/u);
+    expect(start).toBeGreaterThan(-1);
+    const support = main.slice(start).search(/\n\s*support\s*:\s*\{/u);
+    expect(support).toBeGreaterThan(0);
+    return main.slice(start, start + support);
+  }
+
+  it("builds the usage reader once, only behind billing-on (the room composed with entitlements)", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    expect(main.match(/new\s+PersonUsageReader\(/gu)?.length).toBe(1);
+    // B7a: `? undefined : Object.freeze({ usage: new PersonUsageReader(`;
+    // P8a: `const billingUsageReader = … ? undefined : new PersonUsageReader(`.
+    expect(main).toMatch(new RegExp(
+      `${BILLING_ON_GUARD}(?:Object\\.freeze\\(\\s*\\{\\s*usage:\\s*)?new\\s+PersonUsageReader\\(`, "u"
+    ));
+  });
+
+  it("builds it from the room's entitlements, allowance and spend, as the billing options' usage member", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    expect(main).toMatch(new RegExp(READER, "u"));
+    const statement = billingRouteOptionsStatement(main);
+    const inline = new RegExp(`usage:\\s*${READER}`, "u");
+    const bound = /\busage:\s*([A-Za-z_$][\w$]*)\s*\}/u.exec(statement);
+    if (inline.test(statement)) {
+      // B7a: the reader is built inside the one billing options object (R-3).
+      expect(statement).toMatch(new RegExp(`${BILLING_ON_GUARD}Object\\.freeze\\(\\s*\\{\\s*usage:\\s*${READER}`, "u"));
+    } else {
+      // P8a: the reader has its own binding, spread into the same object as `usage`.
+      expect(bound, "billingRouteOptions carries no usage member").not.toBeNull();
+      const name = bound?.[1] ?? "";
+      expect(name).not.toBe("");
+      expect(main).toMatch(new RegExp(`const\\s+${name}\\s*=\\s*${BILLING_ON_GUARD}${READER}`, "u"));
+      expect(statement).toMatch(new RegExp(`\\.\\.\\.\\(\\s*${name}\\s*===\\s*undefined\\s*\\?\\s*\\{\\s*\\}\\s*:\\s*\\{\\s*usage:\\s*${name}\\s*\\}\\s*\\)`, "u"));
+    }
+  });
+
+  it("hands buildApi the room read", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    expect(buildApiCall(main)).toMatch(
+      /\.\.\.\(\s*askRoom\s*===\s*undefined\s*\?\s*\{\s*\}\s*:\s*\{\s*askRoom\s*\}\s*\)\s*,/u
+    );
+  });
+
+  it("hands buildApi the billing options", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    expect(buildApiCall(main)).toMatch(
+      /\.\.\.\(\s*billingRouteOptions\s*===\s*undefined\s*\?\s*\{\s*\}\s*:\s*\{\s*billing\s*:\s*billingRouteOptions\s*\}\s*\)\s*,/u
+    );
   });
 });
