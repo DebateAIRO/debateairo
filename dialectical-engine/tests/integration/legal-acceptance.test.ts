@@ -118,7 +118,7 @@ afterAll(async () => {
   await argon2?.close();
 });
 
-describe("0079 legal.acceptance (paid plans L3a)", () => {
+describe("0080 legal.acceptance (paid plans L3a)", () => {
   it("installs the guards it claims, and runtime may only read and insert", async () => {
     const triggers = await database.pool.query<{ relation: string; fn: string }>(`
       SELECT trigger.tgrelid::regclass::text AS relation, trigger.tgfoid::regprocedure::text AS fn
@@ -148,7 +148,7 @@ describe("0079 legal.acceptance (paid plans L3a)", () => {
     for (const fn of [signUpWithConsent, countryGateRefused]) {
       expect(await can("debateai_runtime", fn), fn).toBe(true);
       expect(await can("public", fn), fn).toBe(false);
-      // The control: a principal 0079 revokes reads false, so this check can fail.
+      // The control: a principal 0080 revokes reads false, so this check can fail.
       // (debateai_authorization_runtime is not pinned: it inherits debateai_runtime since 0039.)
       expect(await can("debateai_replay", fn), fn).toBe(false);
     }

@@ -19,7 +19,7 @@ afterAll(async () => {
   await argon2?.close();
 });
 
-describe("the country-gate audit capability (0079, G3a)", () => {
+describe("the country-gate audit capability (0080, G3a)", () => {
   it("chains one content-free DENY row and never stores the raw address", async () => {
     const identity = new PostgresIdentityRepository(database.pool, new AuditContextHasher(
       argon2, Buffer.alloc(32, 0x6e), authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS).auditSourceIpKdf

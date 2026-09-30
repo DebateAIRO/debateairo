@@ -1,7 +1,7 @@
--- 0079 — legal groundwork (paid plans program, Part 1a, tasks L3a/L4/G3a; spec
+-- 0080 — legal groundwork (paid plans program, Part 1a, tasks L3a/L4/G3a; spec
 -- docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md §2.3.2, §2.3.3 and §2.16,
--- amendments R1 A14 and A15). RULINGS-R3 R3-1 numbers this file 0079: 0077 is dev's age gate and
--- 0078 is reserved for the colleague's sensitive-data consent (the spec's older "0078" is superseded).
+-- amendments R1 A14 and A15). RULINGS-R3 R3-1 numbers this file 0080: 0077 is dev's age gate, 0078
+-- the colleague's sensitive-data consent and 0079 dev's change-email turn (the spec's older "0078" is superseded).
 --
 -- THE ACCEPTANCE RECORD. The Terms (§3) and the Privacy Policy say the service keeps a record of
 -- which version of each document a person accepted, when, and from where. Until this file only

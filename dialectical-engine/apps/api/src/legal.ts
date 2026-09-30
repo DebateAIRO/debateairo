@@ -51,7 +51,7 @@ export function resolveSignUpDocuments(raw: RegisterLegalDocuments | undefined):
  * {ip, user_agent} at that moment, sealed under the records key and bound to its own row. The ONE
  * sealer, so the ONE place the values are bounded: every caller (sign-up, re-acceptance, P8c's
  * checkout, P15's erasure rows) passes the raw request source, and a user agent near Node's 16 KiB
- * header limit would otherwise raise 0079's CHECK (octet_length <= 4096) as a 500.
+ * header limit would otherwise raise 0080's CHECK (octet_length <= 4096) as a 500.
  */
 export function sealAcceptanceEvidence(
   recordsKey: Buffer,

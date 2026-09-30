@@ -431,9 +431,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0079_email_change.sql",
         // Paid plans L3a (spec 2026-09-29 §2.3.2 and §2.16, amendments R1 A14/A15, RULINGS-R3 R3-1):
         // legal.acceptance, the retention purge, the sign-up consent wrapper (with the age record)
-        // and the G3a country-gate audit capability. 0078 is reserved for the colleague's
-        // sensitive-data consent, so this is 0079; no pair.
-        "0079_legal_acceptance.sql"
+        // and the G3a country-gate audit capability. 0078 and 0079 are the colleague's consent and
+        // change-email files, so R3-1 moves this to 0080; no pair.
+        "0080_legal_acceptance.sql"
       ]);
   });
 });

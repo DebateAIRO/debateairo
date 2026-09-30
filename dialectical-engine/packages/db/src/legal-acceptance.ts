@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 
 /**
- * Paid plans L3a (spec 2026-09-29 §2.3.2) — the acceptance record, legal.acceptance (0079).
+ * Paid plans L3a (spec 2026-09-29 §2.3.2) — the acceptance record, legal.acceptance (0080).
  *
  * Append-only and keyed by owner_ref with no foreign key: it outlives the account. The evidence
  * ({ip, user_agent}) arrives ALREADY sealed under the records key; this package never holds that
@@ -23,7 +23,7 @@ export type AcceptanceInput = Readonly<{
   keyId: string;
 }>;
 
-/** A sign-up row before the account (and so its owner_ref) exists: 0079's consent wrapper fills it in. */
+/** A sign-up row before the account (and so its owner_ref) exists: 0080's consent wrapper fills it in. */
 export type SignUpAcceptanceRow = Readonly<{
   acceptanceId: string;
   kind: "ADULT" | "TERMS" | "PRIVACY_SHOWN";

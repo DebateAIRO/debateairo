@@ -30,7 +30,7 @@ export interface PendingAccountInput {
   readonly source: AuthSourceContext;
   /**
    * Paid plans L3: the ADULT, TERMS and PRIVACY_SHOWN rows, evidence already sealed. When present the
-   * account is created through identity.create_pending_account_with_consent (0079), in the SAME
+   * account is created through identity.create_pending_account_with_consent (0080), in the SAME
    * transaction. Absent only in test compositions that predate the acceptance record.
    */
   readonly acceptances?: ReadonlyArray<SignUpAcceptanceRow>;
@@ -249,7 +249,7 @@ export class PostgresIdentityRepository {
       if (row.user_id === null || row.channel_binding_id === null) {
         throw new Error("ACCOUNT_CREATE_RECEIPT_INVALID");
       }
-      // The consent wrapper (0079) writes the age record inside its own call; only the old path writes it here.
+      // The consent wrapper (0080) writes the age record inside its own call; only the old path writes it here.
       if (input.acceptances === undefined) {
         await client.query("SELECT identity.record_registration_age_check($1,$2::smallint,$3,$4,$5)", [
           row.user_id,
@@ -447,7 +447,7 @@ export class PostgresIdentityRepository {
    * Paid plans G3a: ONE aggregated audit row per route, refusal code and country per window — the
    * caller (apps/api/src/country-gate.ts) aggregates, so a flood of refused requests costs one
    * Argon2 derivation per window, never one per request. Content-free: code, ISO country, the
-   * fact that the evidence was the IP, and the window. The capability (0079) refuses anything else.
+   * fact that the evidence was the IP, and the window. The capability (0080) refuses anything else.
    */
   async recordCountryGateRefusal(input: {
     readonly route: "register" | "asks";

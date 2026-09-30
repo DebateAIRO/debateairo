@@ -86,7 +86,7 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
     }
   });
 
-  it("bounds what it seals, so no header can push the evidence past 0079's 4096-byte CHECK", () => {
+  it("bounds what it seals, so no header can push the evidence past 0080's 4096-byte CHECK", () => {
     const recordsKey = randomBytes(32);
     const acceptanceId = randomUUID();
     const aad = { table: "legal.acceptance", column: "evidence_ciphertext", rowId: acceptanceId };
