@@ -9218,6 +9218,19 @@ describe("B9c — a cheaper maker while arguing, the first call's try, the owner
     expect(await b9Substitutions(scenario.runId)).toEqual([{
       callSiteKey: "JUDGE:root:secondary", plannedProviderRef: SECONDARY_REF, usedProviderRef: PRIMARY_REF, reason: "RUN_ARGUING"
     }]);
+    // Budget spec §2.9: the move is "shown in the operator's run report". The SHIPPED command over the
+    // SHIPPED reader, asked by the ANSWER's id, so the list is also proved to be read by the row's runId.
+    const printed: string[] = [];
+    const refused: string[] = [];
+    expect(await runServeDisclosureCli(
+      [answerIdOf(scenario)],
+      { stdout: (text) => printed.push(text), stderr: (text) => refused.push(text) },
+      () => openServeDisclosureReader(database.connectionString, false)
+    )).toBe(0);
+    expect(refused).toEqual([]);
+    expect(printed.join("")).toContain(
+      `models chosen for cost: 1\n  JUDGE:root:secondary: ${SECONDARY_REF} -> ${PRIMARY_REF}, because of the run's own money while arguing\n`
+    );
     expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
     expect(JSON.stringify(scenario.answer?.composed_text ?? [])).not.toContain("lower-cost");
   });
