@@ -185,6 +185,27 @@ describe("B6b an ask with a room", () => {
     expect(recorded).toEqual([]);
   });
 
+  // Budget spec §2.7: "run creation happens as today". #submitWithRoom holds a
+  // hand copy of today's startRun input and memory question; this pins the two
+  // copies to each other, so a field changed or dropped in one alone breaks it.
+  it("creates the run and its memory question from exactly what today's path uses (budget spec §2.7)", async () => {
+    const hosted = arrange();
+    await expect(hosted.submit()).resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });
+    const hostedRuns = vi.mocked(RunRepository.prototype.startRun).mock.calls.map(([input]) => input);
+    const hostedQuestions = vi.mocked(ServeRepository.prototype.recordMemoryQuestion).mock.calls.map((call) => [...call]);
+    vi.restoreAllMocks();
+
+    // Today's path reaches `enqueue`, which this harness refuses, only after both inputs are taken.
+    const today = arrange({ withoutRoom: {} });
+    await today.submit().catch(() => undefined);
+    const todayRuns = vi.mocked(RunRepository.prototype.startRun).mock.calls.map(([input]) => input);
+    const todayQuestions = vi.mocked(ServeRepository.prototype.recordMemoryQuestion).mock.calls.map((call) => [...call]);
+
+    expect(hostedRuns).toHaveLength(1);
+    expect(hostedRuns).toEqual(todayRuns);
+    expect(hostedQuestions).toEqual(todayQuestions);
+  });
+
   it("WAIT: inside the lease, creates the run and its place in line, queues nothing, dispatches nothing, and says when", async () => {
     const { submit, order, logged, enqueueOn } = arrange({ decision: WAIT });
     await expect(submit()).resolves.toEqual({

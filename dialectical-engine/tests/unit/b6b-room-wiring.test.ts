@@ -28,6 +28,12 @@ describe("B6b the API root composes the room", () => {
     expect(step).toContain("lockPool: roomDecisionPool");
     expect(step).toContain("new BillingPersonAllowanceSource(");
     expect(step).toContain("NO_PERSON_ALLOWANCE");
+    // R-19's API half: billing off builds no entitlement repository and no
+    // person allowance, so openStart neither appends a lazy free entitlement
+    // nor writes a charge scope the runner would wall at Free's windows.
+    expect(step).toContain("const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);");
+    expect(step).toContain("const personAllowance = entitlements === null || billingPlans === null");
+    expect(step).toContain("        personAllowance,\n        entitlements,\n");
     expect(step).toContain("buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE)");
     expect(step).toContain("mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)");
   });

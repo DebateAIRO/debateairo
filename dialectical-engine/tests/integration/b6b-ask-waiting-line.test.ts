@@ -178,6 +178,8 @@ describe("B6b a hosted ask through the room", () => {
       "SELECT run_id FROM core.run WHERE core.run_is_owned_by(run_id,NULL,$1)", [askerId]
     )).rows[0]!.run_id;
     expect(await jobsOf(runId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:DISPATCH" }]);
+    // The hold exists (budget spec §2.6: holds are never released); it only stops counting.
+    expect(await holdOf(runId)).toBe(1_234);
     expect(await new PostgresModelSpendStore(database.pool).readSiteCountedHoldsMicros(costEnvelopeDay(now))).toBe(0);
   });
 
@@ -193,6 +195,9 @@ describe("B6b a hosted ask through the room", () => {
       seenOutside.push((await database.pool.query("SELECT 1 FROM core.work_item WHERE run_id=$1", [input.runId])).rowCount ?? 0);
       throw new Error("test: the decision's commit failed");
     });
+    // enqueue queues on a transaction of its own; it calls through here, so a job
+    // queued apart from the decision is seen, not mistaken for the decision's.
+    const apart = vi.spyOn(WorkItemRepository.prototype, "enqueue");
     await expect(submitAs(application, askerId)).rejects.toThrow("test: the decision's commit failed");
     expect(seenOutside).toEqual([0]);
     const runId = (await database.pool.query<{ run_id: string }>(
@@ -202,6 +207,7 @@ describe("B6b a hosted ask through the room", () => {
     expect(await jobsOf(runId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:WORK_QUEUE" }]);
     expect(await holdOf(runId)).toBeNull();
     expect((await new WorkItemRepository(database.pool).listDispatchable(1_000)).map((item) => item.runId)).not.toContain(runId);
+    expect(apart).not.toHaveBeenCalled();
   });
 
   it("records a START whose hold is refused FAILED as ROOM_HOLD, with no job queued at all", async () => {
