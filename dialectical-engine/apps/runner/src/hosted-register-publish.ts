@@ -56,6 +56,7 @@ import {
   ALGORITHM_REGISTER_ROW_KEYS,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
+  COUNTRY_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   admissionPolicyFromValue,
   assertHostedCostEnvelopesSealed,
@@ -63,6 +64,7 @@ import {
   buildConfiguredProviderSetDeploymentRow,
   computeRegisterSnapshotSha256,
   costEnvelopePolicyFromValue,
+  countryPolicyFromValue,
   createPostgresRegisterPublicationPort,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
@@ -119,7 +121,7 @@ const EXAMPLE_MAKER_PREFIX = "Example";
 const MAX_FILE_BYTES = 64 * 1_024;
 const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
-  "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy",
+  "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy", "countryPolicy",
   "providerTargets", "synthesisRoles"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
@@ -270,6 +272,11 @@ export type HostedRegisterFile = Readonly<{
   configuredProviderSet: z.infer<typeof configuredProviderSetSchema>;
   /** Validated in the plan by the register's own strict schema, so the refusal keeps its own code. */
   costEnvelopePolicy: unknown;
+  /**
+   * Paid plans G2: the operator's countryPolicy, validated in the plan by its own schema. null = the
+   * member is absent: no countryPolicy row is published, so the version has no country gate (A14).
+   */
+  countryPolicy: unknown;
   /** Validated in the plan by the boot's own parser and hosted checks. NEVER published and never printed. */
   providerTargets: unknown;
   synthesisRoles: z.infer<typeof synthesisRolesSchema> | null;
@@ -320,6 +327,7 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     sourceRef,
     configuredProviderSet: providerSet.data,
     costEnvelopePolicy: record.costEnvelopePolicy,
+    countryPolicy: Object.hasOwn(record, "countryPolicy") ? record.countryPolicy : null,
     providerTargets: record.providerTargets,
     synthesisRoles
   });
@@ -465,6 +473,9 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
+  // Paid plans G2: the operator's country switches, by the register's own schema
+  // (COUNTRY_POLICY_INVALID). Absent member = no row, no gate (A14).
+  if (file.countryPolicy !== null) countryPolicyFromValue(file.countryPolicy, file.sourceRef);
   const configured: readonly DevelopmentConfiguredProvider[] = Object.freeze(
     file.configuredProviderSet.providers.map((provider) => Object.freeze({
       providerRef: provider.providerRef, adapterKind: provider.adapterKind, maker: provider.maker
@@ -485,13 +496,18 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
 
   const bootstrap = await loadBootstrapRegister();
   // The seeder's builders take a panel; only its two provider-set members are read.
-  const codeOwnedRows = await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, {
+  const seededRows = await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, {
     configuredProviders: configured,
     requiredDistinctMakers: file.configuredProviderSet.requiredDistinctMakers,
     healthyProviderRefs: Object.freeze([]),
     targets,
     targetsJson
   }, synthesisRoles, "hosted");
+  // A14: a hosted file without countryPolicy publishes no countryPolicy row (no gate), exactly as
+  // before this member existed. The development seeder always publishes it (local mode reads none).
+  const codeOwnedRows = file.countryPolicy === null
+    ? seededRows.filter((row) => row.rowKey !== COUNTRY_POLICY_ROW_KEY)
+    : seededRows;
   const operatorRows = new Map<string, RegisterPublicationRow>([
     [CONFIGURED_PROVIDER_SET_ROW_KEY, Object.freeze({
       rowKey: CONFIGURED_PROVIDER_SET_ROW_KEY,
@@ -504,6 +520,13 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
       sourceRef: file.sourceRef
     })]
   ]);
+  if (file.countryPolicy !== null) {
+    operatorRows.set(COUNTRY_POLICY_ROW_KEY, Object.freeze({
+      rowKey: COUNTRY_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.countryPolicy),
+      sourceRef: file.sourceRef
+    }));
+  }
   const replaced = codeOwnedRows.filter((row) => operatorRows.has(row.rowKey));
   if (replaced.length !== operatorRows.size) refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
   const rows = Object.freeze(codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row));

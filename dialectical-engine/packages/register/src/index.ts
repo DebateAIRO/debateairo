@@ -855,6 +855,18 @@ export {
   type StoryEnvelopeCeilings,
   type StoryEnvelopeCeilingTerms
 } from "./cost-envelope-policy.js";
+// Paid plans G2: which countries may sign up and pay (optional row: absent = no country gate).
+export {
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COUNTRY_POLICY_ROW_KEY,
+  countryPolicyFromValue,
+  countryRule,
+  readCountryPolicy,
+  type CountryPolicy,
+  type CountryPolicyValue,
+  type CountryReason,
+  type CountryRule
+} from "./country-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,

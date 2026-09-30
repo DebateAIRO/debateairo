@@ -561,6 +561,7 @@ packages/evaluator/src/harvest-constants.ts
 packages/evaluator/src/index.ts
 packages/evaluator/src/public-aggregate-provider.ts
 packages/evidence/src/index.ts
+packages/geo/src/decide.ts
 packages/geo/src/index.ts
 packages/geo/src/ip.ts
 packages/geo/src/lookup.ts
@@ -606,6 +607,7 @@ packages/register/src/auth-policy.ts
 packages/register/src/compose-env.ts
 packages/register/src/configured-provider-set.ts
 packages/register/src/cost-envelope-policy.ts
+packages/register/src/country-policy.ts
 packages/register/src/engine-shape.ts
 packages/register/src/index.ts
 packages/register/src/mfa-policy.ts
