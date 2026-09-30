@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sütik",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Két sütit helyezünk el, mindkettő feltétlenül szükséges: az egyik bejelentkezve tartja Önt, a másik megvédi az űrlapokat a hamisítástól. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A [dezbatere.ro/cookies] címen található Sütiszabályzat felsorolja őket élettartamukkal együtt, ismerteti, hogyan tároljuk az Ön választását, és bármely más süti hozzáadása előtt módosulni fog. Ha az Ön régiójának joga egyes sütiket eltérően kezel — például az Egyesült Királyság leiratkozási szabálya az analitikára —, a Sütiszabályzat ezt közli." }
+      { kind: "p", text: "A DebateAI nyolc elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a DebateAI helyezi el: négy sütit és négy bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A [dezbatere.ro/cookies] címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Süti (HttpOnly) — Bejelentkezve tartja Önt. A szolgáltatás használata közben folyamatosan megújul. — 14 nap",
+        "__Host-debateai-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — 14 nap",
+        "__Host-debateai-age-refusal — Süti (HttpOnly) — Elutasított életkor-ellenőrzés után 30 napig megakadályozza, hogy ez a böngésző újra próbálkozzon. Csak az „elutasítva” szót tartalmazza, személyes adatot nem. — 30 nap",
+        "debateai.locale — Süti — Megjegyzi, milyen nyelvű felületet választott. — 1 év",
+        "debateai.consent — Helyi tárhely — Megjegyzi, hogy Ön már látta a sütikről szóló értesítést, így az csak egyszer jelenik meg. — Amíg Ön nem törli",
+        "debateai.mode — Helyi tárhely — Megjegyzi, hogy a világos vagy a sötét módot használja. — Amíg Ön nem törli",
+        "debateai.languageOffer.dismissed — Munkamenet-tárhely — Megjegyzi ennél a lapnál, hogy Ön elutasította az ajánlatot, hogy egy vitát más nyelven mutassunk meg. — Amíg be nem zárja a lapot",
+        "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. — Amíg be nem zárja a lapot"
+        ]
+      },
+      { kind: "p", text: "Semmilyen más fél nem gyűjt a DebateAI-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },
+      { kind: "p", text: "A böngészők küldhetnek „Do Not Track” jelzést vagy hasonló jelzést. A DebateAI nem követi Önt, így egy ilyen jelzésnek nincs mit kikapcsolnia: a szolgáltatás a jelzéssel és anélkül is ugyanúgy működik." },
+      { kind: "p", text: "Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban tiltsa le vagy törölje ennek az oldalnak a sütijeit és webhelyadatait. Ami ezután nem működik: a bejelentkezés, valamint a nyelv- és megjelenítési választásának megjegyzése; a sütikről szóló tájékoztatás is ismét megjelenik." }
     ]
   },
   {

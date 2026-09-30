@@ -9,7 +9,7 @@ import { useLegalDocument } from "./useLegalDocument";
  * The privacy policy modal (design 10c): the shared `LegalDocumentModal` over the Privacy Policy
  * data. It owns no consent state, reads and writes no storage, and holds no policy prose of its
  * own — every string it shows comes from `apps/ui/lib/privacyPolicy.ts`, which is generated from
- * `apps/ui/legal/privacy-policy.md` (or, for another interface locale, from that locale's
+ * `apps/ui/legal/en/privacy-policy.md` (or, for another interface locale, from that locale's
  * generated edition under `apps/ui/lib/legal/<locale>/`, exactly as the Terms twin does).
  *
  * The prop type is a cross-slice contract: `slices/S02/SPEC.md` R14 and `slices/S01/SPEC.md`

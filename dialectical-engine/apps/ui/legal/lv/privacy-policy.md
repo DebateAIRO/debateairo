@@ -163,7 +163,24 @@ DebateAI ir paredzēts pieaugušajiem. Reģistrējoties jūs apstiprināt, ka es
 
 ## 13. Sīkdatnes
 
-Mēs iestatām divas sīkdatnes, un abas ir absolūti nepieciešamas: viena nodrošina, ka pierakstīšanās saglabājas aktīva, bet otra aizsargā veidlapas pret viltošanu. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. **Sīkdatņu politikā** vietnē \[dezbatere.ro/cookies\] tās ir uzskaitītas kopā ar to darbības ilgumu, paskaidrots, kā tiek saglabāta jūsu izvēle, un Sīkdatņu politika tiks mainīta pirms jebkuras citas sīkdatnes pievienošanas. Ja jūsu reģiona tiesību aktos pret dažām sīkdatnēm izturas atšķirīgi — piemēram, Apvienotās Karalistes atteikšanās noteikums attiecībā uz analītikas sīkdatnēm —, tas ir norādīts Sīkdatņu politikā.
+DebateAI izmanto astoņus elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai DebateAI: četras sīkdatnes un četrus ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. **Sīkdatņu politikā** vietnē \[dezbatere.ro/cookies\] tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits.
+
+| Nosaukums | Veids | Nolūks | Ilgums |
+|---|---|---|---|
+| `__Host-debateai-session` | Sīkdatne (HttpOnly) | Saglabā jūsu pierakstīšanās sesiju. Tā tiek atjaunota, kamēr lietojat pakalpojumu. | 14 dienas |
+| `__Host-debateai-csrf` | Sīkdatne | Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. | 14 dienas |
+| `__Host-debateai-age-refusal` | Sīkdatne (HttpOnly) | Pēc noraidītas vecuma pārbaudes 30 dienas neļauj šai pārlūkprogrammai mēģināt vēlreiz. Tajā ir tikai vārds “noraidīts”, nekādu personas datu. | 30 dienas |
+| `debateai.locale` | Sīkdatne | Atceras jūsu izvēlēto saskarnes valodu. | 1 gads |
+| `debateai.consent` | Lokālā krātuve | Atceras, ka esat redzējis paziņojumu par sīkdatnēm, tāpēc tas tiek parādīts tikai vienreiz. | Līdz jūs to notīrāt |
+| `debateai.mode` | Lokālā krātuve | Vai izmantojat gaišo vai tumšo režīmu. | Līdz jūs to notīrāt |
+| `debateai.languageOffer.dismissed` | Sesijas krātuve | Atceras šai cilnei, ka atteicāties no piedāvājuma rādīt debates citā valodā. | Līdz jūs aizverat cilni |
+| `debateai.support.conversation.v2` | Sesijas krātuve | Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad šajā cilnē kāds pierakstās vai izrakstās. | Līdz jūs aizverat cilni |
+
+Neviena cita puse ar DebateAI starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs.
+
+Pārlūkprogrammas var sūtīt signālu “Do Not Track” vai līdzīgu signālu. DebateAI jūs neizseko, tāpēc šādam signālam nav ko izslēgt: pakalpojums darbojas vienādi gan ar to, gan bez tā.
+
+Lai atteiktos no šiem elementiem, pārlūkprogrammas iestatījumos bloķējiet vai dzēsiet šīs vietnes sīkdatnes un vietnes datus. Kas tad pārstāj darboties: pierakstīšanās un jūsu valodas un attēlojuma izvēles atcerēšanās; arī paziņojums par sīkdatnēm tiks parādīts atkārtoti.
 
 ## 14. Šīs politikas izmaiņas
 

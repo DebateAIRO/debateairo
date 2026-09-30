@@ -163,7 +163,24 @@ DebateAI is for adults. You confirm that you are 18 or over when you register, a
 
 ## 13. Cookies
 
-We set two cookies, both strictly necessary: one that keeps you signed in, and one that protects forms against forgery. We set no analytics, advertising or tracking cookies. The **Cookie Policy** at \[dezbatere.ro/cookies\] lists them with their durations, explains how your choice is stored, and will change before any other cookie is added. Where the law of your region treats some cookies differently — for example the United Kingdom's opt-out rule for analytics — the Cookie Policy says so.
+DebateAI uses eight items, all strictly necessary for the service you asked for and all set only by DebateAI: four cookies and four entries in your browser's storage. We set no analytics, advertising or tracking cookies. The **Cookie Policy** at \[dezbatere.ro/cookies\] lists them with what each one does and who receives it, and will change before anything else is added.
+
+| Name | Type | Purpose | Lasts |
+|---|---|---|---|
+| `__Host-debateai-session` | Cookie (HttpOnly) | Keeps you signed in. It is renewed while you use the service. | 14 days |
+| `__Host-debateai-csrf` | Cookie | Stops other websites from submitting forms in your name. | 14 days |
+| `__Host-debateai-age-refusal` | Cookie (HttpOnly) | After an age check is refused, stops this browser from trying again for 30 days. It holds only the word “refused”, no personal data. | 30 days |
+| `debateai.locale` | Cookie | Remembers the interface language you picked. | 1 year |
+| `debateai.consent` | Local storage | Remembers that you have seen the cookie notice, so it is shown once. | Until you clear it |
+| `debateai.mode` | Local storage | Whether you use the light or the dark display. | Until you clear it |
+| `debateai.languageOffer.dismissed` | Session storage | Remembers, for this tab, that you declined the offer to show a debate in another language. | Until you close the tab |
+| `debateai.support.conversation.v2` | Session storage | Keeps your help-chat conversation on screen while the tab stays open. It is erased when someone signs in or signs out in this tab. | Until you close the tab |
+
+No other party collects information about your online activities over time and across websites through DebateAI.
+
+Browsers can send a “Do Not Track” signal or a similar signal. DebateAI does not track you, so there is nothing for such a signal to switch off: the service works the same with or without it.
+
+To refuse these items, block or delete cookies and site data for this site in your browser settings. What then stops working: signing in, and the remembering of your language and display choices; the cookie notice will also show again.
 
 ## 14. Changes to this policy
 

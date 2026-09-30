@@ -9,6 +9,8 @@ import type { MessageCatalog } from "../../apps/ui/lib/i18n/translate.js";
 import type { LegalDocument } from "../../apps/ui/lib/legalDocument.js";
 import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
 import consentJapanese from "../../apps/ui/messages/ja/consent.json" with { type: "json" };
+import consentArabic from "../../apps/ui/messages/ar/consent.json" with { type: "json" };
+import consentHebrew from "../../apps/ui/messages/he/consent.json" with { type: "json" };
 
 const I18nTestContext = createContext<Readonly<{
   locale: LocaleCode;
@@ -38,6 +40,9 @@ import { TermsOfServiceModal } from "../../apps/ui/components/consent/TermsOfSer
 // catalogue next to the legal documents, so a non-English mount carries it the
 // way the app does (the hook no longer paints English while a chunk loads).
 import { ConsentCatalogProvider } from "../../apps/ui/components/consent/useConsentCatalog.js";
+import { LEGAL_INVENTORY } from "../../apps/ui/lib/legal/pages.js";
+import { PRIVACY_POLICY as PRIVACY_AR } from "../../apps/ui/lib/legal/ar/privacyPolicy.js";
+import { PRIVACY_POLICY as PRIVACY_HE } from "../../apps/ui/lib/legal/he/privacyPolicy.js";
 
 const localizedPrivacy: LegalDocument = {
   key: "privacy",
@@ -157,5 +162,33 @@ describe("legal documents follow the interface locale", () => {
     );
 
     expect(container.querySelector('[role="dialog"]')?.hasAttribute("dir")).toBe(false);
+
+    // REV-S01 p2 PT2-N2, Amendment 1: the dialog still inherits RTL, but every stored-item name in the policy (the §13
+    // lines) is its own left-to-right run — the Privacy notice layer (read mode) and the sign-up policy (consent mode)
+    // drew `__Host-debateai-session` as `Host-debateai-session__` in ar and he.
+    for (const [locale, consent, privacy, mode] of [
+      ["ar", consentArabic, PRIVACY_AR, "read"],
+      ["he", consentHebrew, PRIVACY_HE, "consent"]
+    ] as const) {
+      await render(
+        <div dir="rtl">
+          <I18nProvider locale={locale} catalog={consentEnglish}>
+            <ConsentCatalogProvider catalog={consent}>
+              <LegalDocumentsProvider locale={locale} privacy={privacy} terms={localizedTerms}>
+                <PrivacyPolicyModal open mode={mode} onClose={vi.fn()} />
+              </LegalDocumentsProvider>
+            </ConsentCatalogProvider>
+          </I18nProvider>
+        </div>
+      );
+      const dialog = container.querySelector('[role="dialog"]')!;
+      expect(dialog.hasAttribute("dir"), `${locale}: the dialog sets no dir`).toBe(false);
+      for (const { name } of LEGAL_INVENTORY) {
+        const written = (dialog.textContent ?? "").split(name).length - 1;
+        const isolated = [...dialog.querySelectorAll("[dir='ltr']")].filter((node) => node.textContent === name).length;
+        expect(written, `${locale}: ${name} is in the policy`).toBeGreaterThan(0);
+        expect(isolated, `${locale} ${mode}: every ${name} is its own left-to-right run`).toBe(written);
+      }
+    }
   });
 });

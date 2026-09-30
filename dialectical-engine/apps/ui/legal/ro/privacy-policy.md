@@ -163,7 +163,24 @@ DebateAI este destinat adulților. La înregistrare confirmați că aveți cel p
 
 ## 13. Module cookie
 
-Setăm două module cookie, ambele strict necesare: unul care menține autentificarea și unul care protejează formularele împotriva falsificării. Nu setăm module cookie analitice, publicitare sau de urmărire. **Politica privind modulele cookie** de la \[dezbatere.ro/cookies\] le enumeră împreună cu duratele lor, explică modul în care este stocată opțiunea dumneavoastră și va fi modificată înainte de adăugarea oricărui alt modul cookie. Dacă legislația din regiunea dumneavoastră tratează diferit anumite module cookie — de exemplu, regula Regatului Unit privind renunțarea la analiza utilizării — Politica privind modulele cookie precizează acest lucru.
+DebateAI folosește opt elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de DebateAI: patru module cookie și patru intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. **Politica privind modulele cookie** de la \[dezbatere.ro/cookies\] le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element.
+
+| Denumire | Tip | Scop | Durată |
+|---|---|---|---|
+| `__Host-debateai-session` | Modul cookie (HttpOnly) | Vă menține autentificat. Se reînnoiește cât timp folosiți serviciul. | 14 zile |
+| `__Host-debateai-csrf` | Modul cookie | Împiedică alte site-uri să trimită formulare în numele dumneavoastră. | 14 zile |
+| `__Host-debateai-age-refusal` | Modul cookie (HttpOnly) | După ce o verificare a vârstei este refuzată, împiedică acest browser să încerce din nou timp de 30 de zile. Conține doar cuvântul „refuzat”, fără date personale. | 30 de zile |
+| `debateai.locale` | Modul cookie | Reține limba interfeței pe care ați ales-o. | 1 an |
+| `debateai.consent` | Stocare locală | Reține că ați văzut deja notificarea despre cookie-uri, ca să fie afișată o singură dată. | Până când îl ștergeți |
+| `debateai.mode` | Stocare locală | Dacă folosiți modul luminos sau modul întunecat. | Până când îl ștergeți |
+| `debateai.languageOffer.dismissed` | Stocare de sesiune | Reține, pentru această filă, că ați refuzat propunerea de a afișa o dezbatere în altă limbă. | Până când închideți fila |
+| `debateai.support.conversation.v2` | Stocare de sesiune | Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă. | Până când închideți fila |
+
+Nicio altă parte nu colectează, prin intermediul DebateAI, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web.
+
+Browserele pot trimite un semnal „Do Not Track” sau un semnal similar. DebateAI nu vă urmărește, așa că un astfel de semnal nu are nimic de oprit: serviciul funcționează la fel cu sau fără el.
+
+Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și datele site-ului pentru acest site din setările browserului dumneavoastră. Ce nu mai funcționează atunci: autentificarea și reținerea alegerilor dumneavoastră privind limba și modul de afișare; notificarea privind modulele cookie va fi, de asemenea, afișată din nou.
 
 ## 14. Modificări ale acestei politici
 

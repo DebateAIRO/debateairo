@@ -163,7 +163,24 @@ DebateAI je určena dospělým. Při registraci potvrzujete, že je vám alespo�
 
 ## 13. Soubory cookie
 
-Nastavujeme dva soubory cookie, oba nezbytně nutné: jeden vás udržuje přihlášené a druhý chrání formuláře před paděláním. Nenastavujeme žádné analytické, reklamní ani sledovací soubory cookie. **Zásady používání souborů cookie** na adrese \[dezbatere.ro/cookies\] je uvádějí společně s dobou platnosti, vysvětlují ukládání vaší volby a budou změněny před přidáním jakéhokoli dalšího souboru cookie. Pokud právní předpisy vašeho regionu zacházejí s některými soubory cookie odlišně — například britské pravidlo odhlášení analytiky — uvádějí to Zásady používání souborů cookie.
+DebateAI používá osm položek, všechny nezbytně nutné pro službu, o kterou jste požádali, a všechny nastavované pouze službou DebateAI: čtyři soubory cookie a čtyři záznamy v úložišti vašeho prohlížeče. Nenastavujeme žádné analytické, reklamní ani sledovací soubory cookie. **Zásady používání souborů cookie** na adrese \[dezbatere.ro/cookies\] je uvádějí spolu s tím, k čemu každá z nich slouží a kdo ji obdrží, a budou změněny dříve, než bude přidáno cokoli dalšího.
+
+| Název | Typ | Účel | Platnost |
+|---|---|---|---|
+| `__Host-debateai-session` | Soubor cookie (HttpOnly) | Udržuje vás přihlášené. Během používání služby se průběžně obnovuje. | 14 dní |
+| `__Host-debateai-csrf` | Soubor cookie | Brání jiným webům v odesílání formulářů vaším jménem. | 14 dní |
+| `__Host-debateai-age-refusal` | Soubor cookie (HttpOnly) | Po zamítnuté kontrole věku zabrání tomuto prohlížeči pokusit se znovu po dobu 30 dní. Obsahuje jen slovo „zamítnuto“, žádné osobní údaje. | 30 dní |
+| `debateai.locale` | Soubor cookie | Pamatuje si, jaký jazyk rozhraní jste zvolili. | 1 rok |
+| `debateai.consent` | Místní úložiště | Pamatuje si, že jste oznámení o souborech cookie už viděli, takže se zobrazí jen jednou. | Do vymazání |
+| `debateai.mode` | Místní úložiště | Zda používáte světlý, nebo tmavý režim zobrazení. | Do vymazání |
+| `debateai.languageOffer.dismissed` | Úložiště relace | Pamatuje si pro tuto kartu, že jste odmítli nabídku zobrazit debatu v jiném jazyce. | Do zavření karty |
+| `debateai.support.conversation.v2` | Úložiště relace | Drží vaši konverzaci s nápovědou na obrazovce, dokud je karta otevřená. Smaže se, když se na této kartě kdokoli přihlásí nebo odhlásí. | Do zavření karty |
+
+Žádná jiná strana prostřednictvím DebateAI neshromažďuje informace o vašich online aktivitách v průběhu času a napříč webovými stránkami.
+
+Prohlížeče mohou odesílat signál „Do Not Track“ (nesledovat) nebo podobný signál. DebateAI vás nesleduje, takže takový signál nemá co vypnout: služba funguje stejně s ním i bez něj.
+
+Chcete-li tyto položky odmítnout, zablokujte nebo smažte soubory cookie a data webu pro tento web v nastavení prohlížeče. Co pak přestane fungovat: přihlášení a zapamatování vaší volby jazyka a režimu zobrazení; oznámení o souborech cookie se také zobrazí znovu.
 
 ## 14. Změny těchto zásad
 

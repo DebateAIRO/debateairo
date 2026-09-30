@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Súbory cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Nastavujeme dva súbory cookie, pričom oba sú nevyhnutné: jeden zachováva vaše prihlásenie a druhý chráni formuláre pred falšovaním. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. Zásady používania súborov cookie na [dezbatere.ro/cookies] uvádzajú tieto súbory a dobu ich platnosti, vysvetľujú uchovávanie vašej voľby a zmenia sa pred pridaním akéhokoľvek ďalšieho súboru cookie. Ak právo vášho regiónu upravuje niektoré súbory cookie odlišne — napríklad pravidlo Spojeného kráľovstva o odmietnutí analytiky — uvádzajú to Zásady používania súborov cookie." }
+      { kind: "p", text: "DebateAI používa osem položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne DebateAI: štyri súbory cookie a štyri záznamy v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. Zásady používania súborov cookie na [dezbatere.ro/cookies] ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Súbor cookie (HttpOnly) — Zachováva vaše prihlásenie. Počas používania služby sa priebežne obnovuje. — 14 dní",
+        "__Host-debateai-csrf — Súbor cookie — Bráni iným webom odosielať formuláre vo vašom mene. — 14 dní",
+        "__Host-debateai-age-refusal — Súbor cookie (HttpOnly) — Po zamietnutej kontrole veku zabráni tomuto prehliadaču skúsiť to znova počas 30 dní. Obsahuje iba slovo „zamietnuté“, žiadne osobné údaje. — 30 dní",
+        "debateai.locale — Súbor cookie — Pamätá si, aký jazyk rozhrania ste si zvolili. — 1 rok",
+        "debateai.consent — Lokálne úložisko — Pamätá si, že ste oznámenie o súboroch cookie už videli, takže sa zobrazí iba raz. — Do vymazania",
+        "debateai.mode — Lokálne úložisko — Či používate svetlý, alebo tmavý režim zobrazenia. — Do vymazania",
+        "debateai.languageOffer.dismissed — Úložisko relácie — Pamätá si pre túto kartu, že ste odmietli ponuku zobraziť debatu v inom jazyku. — Do zatvorenia karty",
+        "debateai.support.conversation.v2 — Úložisko relácie — Drží vašu konverzáciu s chatom pomoci na obrazovke, kým je karta otvorená. Vymaže sa, keď sa na tejto karte ktokoľvek prihlási alebo odhlási. — Do zatvorenia karty"
+        ]
+      },
+      { kind: "p", text: "Žiadna iná strana prostredníctvom DebateAI nezhromažďuje informácie o vašich online aktivitách v priebehu času a naprieč webovými stránkami." },
+      { kind: "p", text: "Prehliadače môžu odosielať signál „Do Not Track“ alebo podobný signál. DebateAI vás nesleduje, takže takýto signál nemá čo vypnúť: služba funguje rovnako s ním aj bez neho." },
+      { kind: "p", text: "Ak chcete tieto položky odmietnuť, zablokujte alebo vymažte súbory cookie a údaje stránky pre túto stránku v nastaveniach prehliadača. Čo potom prestane fungovať: prihlásenie a zapamätanie vašej voľby jazyka a režimu zobrazenia; oznámenie o súboroch cookie sa tiež znova zobrazí." }
     ]
   },
   {

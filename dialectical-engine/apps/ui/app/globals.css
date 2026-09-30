@@ -9053,10 +9053,12 @@ a:focus-visible {
 /* === end sensitive-data consent === */
 
 /* === consent-ui S01 === */
-/* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
-   The ONE delimited block this slice may append, at the very end of the file
-   (S01-R25). Every colour here is a var(--token) reference; the ten tokens the
-   slice adds live in the two token blocks at the top, which S01 also owns. */
+/* Slice S01 — the cookie notice: the bar (10a) and the storage card (10b), a
+   read-only list of the eight items DebateAI stores (mission cookie-compliance,
+   DONE.md artboards S01-01..S01-18). The ONE delimited block this slice may
+   append, at the very end of the file (S01-R25). Every colour here is a
+   var(--token) reference; the tokens it uses live in the two token blocks at
+   the top. */
 
 .consentBar {
   position: fixed;
@@ -9150,9 +9152,11 @@ a:focus-visible {
 
 .consentGhostStrong { color: var(--ink); }
 
-/* Borderless, because the design is: 10a's `Accept all` and 10b's `Save
-   choices` are drawn with padding and no border (turn-10-cookie-consent.html:39,
-   :130). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
+/* The bar's `Cookie policy` link keeps its label on one line (DONE.md 10a). */
+.consentActions .consentLink { white-space: nowrap; }
+
+/* Borderless, because the design is: 10a's `OK` and 10b's `Close` are drawn
+   with padding and no border (turn-10-cookie-consent.html:39, :130; DONE.md). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
    used size is content + padding + border, so a 1px edge the artboard omits
    ships the primary 2px taller and 2px wider — and breaks the equality the
    design builds on, where a ghost pill's `9px 15px` + 1px border and a
@@ -9179,7 +9183,7 @@ a:focus-visible {
 
 /* 10a's own spring, transcribed from the artboard
    (turn-10-cookie-consent.html:39) and scoped to the BAR's primary: 10b draws
-   `Save choices` with no transition, and one class serving two artboards must
+   `Close` with no transition, and one class serving two artboards must
    take each artboard's values (CODE-REV-S01-C3C4 r1 N1's class, N4's ruling).
    Its reduced-motion counterpart is the block at the end of this file. */
 .consentBar .consentPrimary {
@@ -9188,9 +9192,8 @@ a:focus-visible {
 
 .consentBar .consentPrimary:hover { transform: scale(1.04); }
 
-/* --- 10b: the preferences card. One presentation serves both entry points
-   (the bar's "Choose what to store" and Settings -> Privacy), because there is
-   no bar in Settings to replace or to grow from (S01-R14). --- */
+/* --- 10b: the storage card. One presentation serves every door (the bar's
+   "What we store", both footers, Settings -> Privacy and /cookies). --- */
 
 .consentScrim {
   position: fixed;
@@ -9265,13 +9268,22 @@ a:focus-visible {
 
 .consentCatMain { flex: 1; min-width: 0; }
 
-.consentCatHead { align-items: center; display: flex; gap: 8px; }
+.consentCatHead {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 4px;
+}
 
-.consentCatName {
+/* The item's stored name, never translated; a long name breaks rather than
+   widening the card (DONE.md 10b, S01-05 at 375). */
+.consentItemName {
   color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .consentTag {
@@ -9283,22 +9295,12 @@ a:focus-visible {
   padding: 2px 8px;
 }
 
-.consentTag-essential {
-  background: var(--ok-bg);
-  border: 1px solid var(--ok-border);
-  color: var(--ok-dot);
-}
-
-.consentTag-quality {
-  background: var(--gold-bg);
-  border: 1px solid var(--gold-border);
-  color: var(--gold);
-}
-
-.consentTag-analytics {
+/* The kind pill, in the item's exact case (DONE.md default 5). */
+.consentTag-kind {
   background: var(--muted-bg);
   border: 1px solid var(--muted-border);
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .consentCatDesc {
@@ -9316,46 +9318,6 @@ a:focus-visible {
   margin-top: 5px;
 }
 
-.consentSwitch {
-  align-items: center;
-  background: var(--shell);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-pill);
-  box-sizing: border-box;
-  cursor: pointer;
-  display: flex;
-  flex: 0 0 auto;
-  height: 22px;
-  justify-content: flex-start;
-  margin-top: 2px;
-  padding: 2px;
-  width: 38px;
-}
-
-.consentSwitch[aria-checked="true"] {
-  background: var(--ok-dot);
-  border-color: var(--ok-edge);
-  justify-content: flex-end;
-}
-
-/* The locked track keeps the design's softer fill so "on and not yours to
-   change" reads differently from "on because you chose it" (design-data.js:44). */
-.consentSwitch[aria-checked="true"][aria-disabled="true"] { background: var(--ok-soft); }
-
-.consentSwitch[aria-disabled="true"] { cursor: not-allowed; }
-
-.consentSwitch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-
-.consentKnob {
-  background: var(--muted);
-  border-radius: var(--r-dot);
-  box-shadow: var(--shadow-knob);
-  height: 16px;
-  width: 16px;
-}
-
-.consentSwitch[aria-checked="true"] .consentKnob { background: var(--core); }
-
 .consentCardFooter {
   align-items: center;
   display: flex;
@@ -9363,9 +9325,9 @@ a:focus-visible {
   margin-top: 18px;
 }
 
-/* 10b draws `Save choices` one pixel tighter each side than 10a draws `Accept
-   all` (`padding:10px 18px` at turn-10-cookie-consent.html:130, against
-   `10px 19px` at :39). One class serves both surfaces, so the second artboard
+/* 10b draws `Close` one pixel tighter each side than 10a draws `OK`
+   (`padding:10px 18px` at turn-10-cookie-consent.html:130, against `10px 19px`
+   at :39; DONE.md S01-04). One class serves both surfaces, so the second artboard
    states its own value here rather than inheriting the first's
    (CODE-REV-S01-C3C4 r1 N1). */
 .consentCardFooter .consentPrimary { padding: 10px 18px; }
@@ -9405,6 +9367,8 @@ a:focus-visible {
   }
 
   .consentActions { flex-wrap: wrap; }
+
+  .consentActions .consentLink { flex: 0 0 auto; }
 
   .consentGhost,
   .consentPrimary {

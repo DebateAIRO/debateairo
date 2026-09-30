@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Chúng tôi đặt hai cookie, cả hai đều thực sự cần thiết: một cookie duy trì trạng thái đăng nhập của bạn và một cookie bảo vệ biểu mẫu khỏi hành vi giả mạo. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. Chính sách Cookie tại [dezbatere.ro/cookies] liệt kê các cookie cùng thời hạn, giải thích cách lựa chọn của bạn được lưu trữ và sẽ được thay đổi trước khi bất kỳ cookie nào khác được thêm vào. Khi pháp luật tại khu vực của bạn áp dụng cách xử lý khác đối với một số cookie — ví dụ quy tắc từ chối tham gia của Vương quốc Anh đối với dữ liệu phân tích — Chính sách Cookie sẽ nêu rõ." }
+      { kind: "p", text: "DebateAI sử dụng tám mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do DebateAI đặt: bốn cookie và bốn mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. Chính sách Cookie tại [dezbatere.ro/cookies] liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Tệp cookie (HttpOnly) — Duy trì trạng thái đăng nhập của bạn. Cookie này được gia hạn trong thời gian bạn sử dụng dịch vụ. — 14 ngày",
+        "__Host-debateai-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — 14 ngày",
+        "__Host-debateai-age-refusal — Tệp cookie (HttpOnly) — Sau khi một lần kiểm tra độ tuổi bị từ chối, ngăn trình duyệt này thử lại trong 30 ngày. Nó chỉ chứa từ “bị từ chối”, không có dữ liệu cá nhân. — 30 ngày",
+        "debateai.locale — Tệp cookie — Ghi nhớ ngôn ngữ giao diện bạn đã chọn. — 1 năm",
+        "debateai.consent — Bộ nhớ cục bộ — Ghi nhớ rằng bạn đã xem thông báo về cookie, để thông báo chỉ hiện một lần. — Cho đến khi bạn xóa",
+        "debateai.mode — Bộ nhớ cục bộ — Ghi nhớ bạn dùng chế độ hiển thị sáng hay tối. — Cho đến khi bạn xóa",
+        "debateai.languageOffer.dismissed — Bộ nhớ phiên — Ghi nhớ, cho thẻ này, rằng bạn đã từ chối đề nghị hiển thị một cuộc tranh luận bằng ngôn ngữ khác. — Cho đến khi bạn đóng thẻ",
+        "debateai.support.conversation.v2 — Bộ nhớ phiên — Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi có người đăng nhập hoặc đăng xuất trong thẻ này. — Cho đến khi bạn đóng thẻ"
+        ]
+      },
+      { kind: "p", text: "Không có bên nào khác thu thập, thông qua DebateAI, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau." },
+      { kind: "p", text: "Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín hiệu tương tự. DebateAI không theo dõi bạn, vì vậy không có gì để tín hiệu đó tắt đi: dịch vụ hoạt động như nhau dù có hay không có tín hiệu đó." },
+      { kind: "p", text: "Để từ chối các mục này, hãy chặn hoặc xóa cookie và dữ liệu trang web của trang này trong phần cài đặt trình duyệt. Khi đó, những gì ngừng hoạt động: việc đăng nhập và việc ghi nhớ lựa chọn ngôn ngữ và chế độ hiển thị của bạn; thông báo cookie cũng sẽ hiển thị lại." }
     ]
   },
   {

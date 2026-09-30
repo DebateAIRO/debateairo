@@ -163,7 +163,24 @@ DebateAI er for voksne. Du bekræfter ved registreringen, at du er fyldt 18 år,
 
 ## 13. Cookies
 
-Vi sætter to cookies, som begge er strengt nødvendige: én, der holder dig logget ind, og én, der beskytter formularer mod forfalskning. Vi sætter ingen cookies til analyse, reklame eller sporing. **Cookiepolitikken** på \[dezbatere.ro/cookies\] angiver dem og deres varighed, forklarer, hvordan dit valg opbevares, og ændres, før nogen anden cookie tilføjes. Hvor loven i din region behandler visse cookies anderledes — eksempelvis Storbritanniens fravalgsregel for analyse — fremgår det af Cookiepolitikken.
+DebateAI bruger otte elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af DebateAI: fire cookies og fire poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. **Cookiepolitikken** på \[dezbatere.ro/cookies\] angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes.
+
+| Navn | Type | Formål | Varighed |
+|---|---|---|---|
+| `__Host-debateai-session` | Cookiefil (HttpOnly) | Holder dig logget ind. Den fornyes, mens du bruger tjenesten. | 14 dage |
+| `__Host-debateai-csrf` | Cookiefil | Forhindrer andre websteder i at indsende formularer i dit navn. | 14 dage |
+| `__Host-debateai-age-refusal` | Cookiefil (HttpOnly) | Når en alderskontrol er afvist, forhindrer den denne browser i at prøve igen i 30 dage. Den indeholder kun ordet „afvist“ og ingen personoplysninger. | 30 dage |
+| `debateai.locale` | Cookiefil | Husker det brugerfladesprog, du har valgt. | 1 år |
+| `debateai.consent` | Lokal lagring | Husker, at du har set cookiemeddelelsen, så den kun vises én gang. | Indtil du sletter det |
+| `debateai.mode` | Lokal lagring | Om du bruger lys eller mørk tilstand. | Indtil du sletter det |
+| `debateai.languageOffer.dismissed` | Sessionslagring | Husker for denne fane, at du har takket nej til at se en debat på et andet sprog. | Indtil du lukker fanen |
+| `debateai.support.conversation.v2` | Sessionslagring | Holder din samtale med hjælpechatten på skærmen, så længe fanen er åben. Den slettes, når nogen logger ind eller ud i denne fane. | Indtil du lukker fanen |
+
+Ingen anden part indsamler via DebateAI oplysninger om dine onlineaktiviteter over tid og på tværs af websteder.
+
+Browsere kan sende et „Do Not Track“-signal eller et lignende signal. DebateAI sporer dig ikke, så der er intet for et sådant signal at slå fra: tjenesten fungerer på samme måde med eller uden det.
+
+For at afvise disse elementer skal du blokere eller slette cookies og webstedsdata for dette websted i dine browserindstillinger. Hvad der så holder op med at virke: at logge ind og at huske dine valg af sprog og visning; cookiemeddelelsen vises også igen.
 
 ## 14. Ændringer af denne politik
 

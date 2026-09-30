@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Nużaw żewġ cookies, it-tnejn strettament meħtieġa: waħda żżomm is-sessjoni tiegħek miftuħa, u waħda tipproteġi l-formoli kontra l-falsifikazzjoni. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-Politika dwar il-Cookies fuq [dezbatere.ro/cookies] telenkahom bit-tul ta’ żmien tagħhom, tispjega kif tinħażen l-għażla tiegħek, u tinbidel qabel tiżdied kwalunkwe cookie oħra. Fejn il-liġi tar-reġjun tiegħek tittratta xi cookies b’mod differenti — pereżempju r-regola tar-Renju Unit li tippermetti l-għażla li wieħed ma jipparteċipax fl-analitika — il-Politika dwar il-Cookies tgħid dan." }
+      { kind: "p", text: "DebateAI juża tmien elementi, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn DebateAI: erba’ cookies u erba’ entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-Politika dwar il-Cookies fuq [dezbatere.ro/cookies] telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Fajl cookie (HttpOnly) — Iżżommok fil-kont. Tiġġedded sakemm tibqa’ tuża s-servizz. — 14-il jum",
+        "__Host-debateai-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — 14-il jum",
+        "__Host-debateai-age-refusal — Fajl cookie (HttpOnly) — Wara li verifika tal-età tiġi rrifjutata, iżomm lil dan il-browser milli jerġa’ jipprova għal 30 jum. Fih biss il-kelma “irrifjutat”, l-ebda data personali. — 30 jum",
+        "debateai.locale — Fajl cookie — Tiftakar il-lingwa tal-interfaċċja li għażilt. — 1 sena",
+        "debateai.consent — Ħażna lokali — Jiftakar li rajt l-avviż dwar il-cookies, biex jintwera darba biss. — Sakemm tħassarha",
+        "debateai.mode — Ħażna lokali — Jekk tużax il-modalità ċara jew dik skura. — Sakemm tħassarha",
+        "debateai.languageOffer.dismissed — Ħażna tas-sessjoni — Jiftakar, għal din it-tab, li rrifjutajt l-offerta li jintwera dibattitu b’lingwa oħra. — Sakemm tagħlaq it-tab",
+        "debateai.support.conversation.v2 — Ħażna tas-sessjoni — Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta xi ħadd jidħol jew joħroġ mill-kont f’din it-tab. — Sakemm tagħlaq it-tab"
+        ]
+      },
+      { kind: "p", text: "L-ebda parti oħra ma tiġbor, permezz ta’ DebateAI, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web." },
+      { kind: "p", text: "Il-browsers jistgħu jibagħtu sinjal “Do Not Track” jew sinjal simili. DebateAI ma jsegwikx, għalhekk m’hemm xejn x’jitfi sinjal bħal dan: is-servizz jaħdem bl-istess mod bih jew mingħajru." },
+      { kind: "p", text: "Biex tirrifjuta dawn l-elementi, imblokka jew ħassar il-cookies u d-data tas-sit għal dan is-sit fis-settings tal-browser tiegħek. X’jieqaf jaħdem imbagħad: id-dħul fil-kont, u t-tfakkir tal-għażliet tiegħek tal-lingwa u tal-wiri; l-avviż dwar il-cookies jerġa’ jidher ukoll." }
     ]
   },
   {

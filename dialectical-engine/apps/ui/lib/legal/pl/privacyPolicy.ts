@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Pliki cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Ustawiamy dwa pliki cookie, oba bezwzględnie konieczne: jeden utrzymuje zalogowanie, a drugi chroni formularze przed fałszowaniem. Nie ustawiamy plików cookie do celów analitycznych, reklamowych ani śledzenia. Polityka plików cookie pod adresem [dezbatere.ro/cookies] wymienia je wraz z okresami obowiązywania, wyjaśnia sposób przechowywania Twojego wyboru i zostanie zmieniona przed dodaniem jakiegokolwiek innego pliku cookie. Jeżeli prawo danego regionu traktuje niektóre pliki cookie odmiennie — na przykład obowiązująca w Zjednoczonym Królestwie zasada rezygnacji w przypadku analityki — wyjaśnia to Polityka plików cookie." }
+      { kind: "p", text: "DebateAI używa ośmiu elementów, z których wszystkie są bezwzględnie konieczne do świadczenia usługi, o którą prosisz, i wszystkie są ustawiane wyłącznie przez DebateAI: czterech plików cookie i czterech wpisów w pamięci Twojej przeglądarki. Nie ustawiamy plików cookie do celów analitycznych, reklamowych ani śledzenia. Polityka plików cookie pod adresem [dezbatere.ro/cookies] wymienia je wraz z opisem tego, do czego służy każdy z nich i kto go otrzymuje, i zostanie zmieniona, zanim zostanie dodane cokolwiek innego." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Plik cookie (HttpOnly) — Utrzymuje Twoją sesję logowania. Jest odnawiany, gdy korzystasz z serwisu. — 14 dni",
+        "__Host-debateai-csrf — Plik cookie — Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. — 14 dni",
+        "__Host-debateai-age-refusal — Plik cookie (HttpOnly) — Po odrzuconej weryfikacji wieku uniemożliwia tej przeglądarce ponowną próbę przez 30 dni. Zawiera tylko słowo „odrzucono”, żadnych danych osobowych. — 30 dni",
+        "debateai.locale — Plik cookie — Zapamiętuje wybrany przez Ciebie język interfejsu. — 1 rok",
+        "debateai.consent — Pamięć lokalna — Zapamiętuje, że komunikat o plikach cookie był już wyświetlony, więc pokazuje się tylko raz. — Do wyczyszczenia",
+        "debateai.mode — Pamięć lokalna — Czy korzystasz z trybu jasnego, czy ciemnego. — Do wyczyszczenia",
+        "debateai.languageOffer.dismissed — Pamięć sesji — Zapamiętuje dla tej karty, że odrzucono propozycję pokazania debaty w innym języku. — Do zamknięcia karty",
+        "debateai.support.conversation.v2 — Pamięć sesji — Utrzymuje Twoją rozmowę z czatem pomocy na ekranie, dopóki karta jest otwarta. Zostaje usunięta, gdy ktokolwiek zaloguje się lub wyloguje w tej karcie. — Do zamknięcia karty"
+        ]
+      },
+      { kind: "p", text: "Żaden inny podmiot nie zbiera za pośrednictwem DebateAI informacji o Twojej aktywności w internecie na przestrzeni czasu i w różnych witrynach." },
+      { kind: "p", text: "Przeglądarki mogą wysyłać sygnał „Do Not Track” lub podobny sygnał. DebateAI Cię nie śledzi, więc taki sygnał nie ma czego wyłączyć: usługa działa tak samo z nim i bez niego." },
+      { kind: "p", text: "Aby odmówić tych elementów, zablokuj lub usuń pliki cookie i dane witryny dla tej witryny w ustawieniach przeglądarki. Co wtedy przestaje działać: logowanie oraz zapamiętywanie Twojego wyboru języka i trybu wyświetlania; powiadomienie o plikach cookie również pojawi się ponownie." }
     ]
   },
   {
