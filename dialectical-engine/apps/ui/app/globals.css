@@ -22,6 +22,9 @@
   --con-bg: #F6E8E0; --con-border: #E4B9A8;
   --gold: #A8823E; --gold-text: #826530; --gold-line: #A5803D;
   --gold-bg: #F3ECE0; --gold-border: #D9C8A9;
+  /* Turn 14 change-email pending pill: tint(gold, .10/.45); the Email card pill hover */
+  --eml-pending-bg: rgba(168,130,62,.1); --eml-pending-border: rgba(168,130,62,.45);
+  --eml-pill-hover: rgba(128,120,104,.12);
   --reasoning: #3D5A80; --reasoning-text: #3D5A80; --reasoning-line: #3D5A80;
   --reasoning-bg: #E6E8E8; --reasoning-border: #ACB7C4;
 
@@ -131,6 +134,9 @@ html[data-mode="chamber"] {
   --con-bg: #34261A; --con-border: #704C30;
   --gold: #C8A055; --gold-text: #C8A055; --gold-line: #C8A055;
   --gold-bg: #342A1B; --gold-border: #705A33;
+  /* Turn 14 change-email pending pill: tint(gold, .13/.50) */
+  --eml-pending-bg: rgba(200,160,85,.13); --eml-pending-border: rgba(200,160,85,.5);
+  --eml-pill-hover: rgba(128,120,104,.12);
   --reasoning: #C8A055; --reasoning-text: #C8A055; --reasoning-line: #C8A055;
   --reasoning-bg: #342A1B; --reasoning-border: #705A33;
 
@@ -6157,6 +6163,194 @@ a:focus-visible {
   background: var(--dispute-bg);
   color: var(--dispute);
   font-size: 11.5px;
+}
+
+/* ============================================================
+   Change email — the design document's Turn 14: 14a Email card,
+   14b change form, 14c pending state. Values are the artboards'
+   own; tA.* maps onto the token contract (page → --bg, hint →
+   --text-2, mute → --muted, hair → --line, hairStrong →
+   --line-strong, vOk → --ok-dot, vBad → --dispute). The pending
+   pill is the document's tint(gold, .10/.45) and, in Chamber,
+   tint(gold, .13/.50).
+   ============================================================ */
+
+/* 14a — Email card */
+.emlCardRow { display: flex; align-items: center; gap: 16px; }
+.emlCardMain { flex: 1; min-width: 0; }
+.emlCardHead { display: flex; align-items: center; gap: 10px; }
+.emlCardTitle { margin: 0; font-size: 13.5px; font-weight: 700; }
+.emlVerified { font-size: 10.5px; font-weight: 600; color: var(--ok-dot); }
+.emlAddress { margin: 4px 0 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.emlRecovery { margin: 2px 0 0; font-size: 11px; color: var(--text-2); overflow-wrap: anywhere; }
+.emlPill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.emlPill:hover { background: var(--eml-pill-hover); }
+.emlPill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlPill:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 14c — pending state of the same card */
+.emlCard[data-state="pending"] { position: relative; overflow: hidden; padding: 18px 18px 16px; }
+.emlPendingTab {
+  position: absolute;
+  top: 0;
+  left: 18px;
+  width: 52px;
+  height: 4px;
+  border-radius: 0 0 5px 5px;
+  background: var(--gold);
+}
+.emlPendingBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--eml-pending-border);
+  background: var(--eml-pending-bg);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+.emlPendingGrid {
+  margin: 10px 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 12px;
+}
+.emlPendingGrid dt {
+  padding-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.emlPendingGrid dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.emlPendingHint { margin: 10px 0 0; font-size: 11px; line-height: 1.55; color: var(--text-2); text-wrap: pretty; }
+.emlPendingActions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.emlPillSmall { padding: 7px 15px; }
+.emlPillQuiet { color: var(--muted); }
+
+/* 14b — change form, and the screen a mailed link opens */
+.emlScreen {
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+.emlScreenBody { padding: clamp(28px, 4.4vw, 44px) clamp(16px, 4.8vw, 48px) 48px; }
+.emlScreenInner { max-width: 444px; margin: 0 auto; }
+.emlBack {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.emlBack:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlEyebrow {
+  margin: 22px 0 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+}
+.emlTitle {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.emlLede { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--text-2); text-wrap: pretty; }
+.emlShell {
+  margin-top: 22px;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  padding: 7px;
+  box-shadow: var(--shadow-card);
+}
+.emlCore {
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.emlLabel { display: block; margin: 0 0 6px; padding: 0; font-size: 11px; font-weight: 700; color: var(--ink); }
+.emlCurrent {
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px dashed var(--line-strong);
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.emlInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--shell);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink);
+}
+.emlInput::placeholder { color: var(--muted); }
+.emlInput:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.emlInput[data-check="invalid"],
+.emlInput[data-check="same"],
+.emlInput[data-check="mismatch"] { border-color: var(--dispute); }
+.emlCheck { margin: 5px 0 0; font-size: 10.5px; font-weight: 600; color: var(--dispute); }
+.emlCheck[data-check="valid"] { color: var(--ok-dot); }
+.emlRule { height: 1px; background: var(--line); }
+.emlVerify { margin: 0; padding: 0; border: 0; min-width: 0; }
+.emlVerify > .emlLabel { margin: 0; }
+.emlVerifyHint { margin: 3px 0 0; font-size: 10.5px; color: var(--text-2); }
+.emlVerifyRow { display: flex; gap: 10px; margin-top: 9px; }
+.emlPassword { flex: 1; min-width: 0; }
+.emlPassword:not(:placeholder-shown) { letter-spacing: 0.2em; }
+.emlCode { flex: 0 0 130px; font-family: var(--font-mono); }
+/* The artboard draws "6-digit code" as a span; in a 130px input its .24em tracking
+   clips the placeholder, so the tracking applies to the typed digits only. */
+.emlCode:not(:placeholder-shown) { letter-spacing: 0.24em; }
+.emlSubmit {
+  width: 100%;
+  padding: 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.emlSubmit:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlSubmit:disabled { opacity: 0.5; cursor: not-allowed; }
+.emlNote { margin: 0; font-size: 10.5px; line-height: 1.55; color: var(--text-2); text-align: center; text-wrap: pretty; }
+.emlContinue { width: auto; margin-top: 22px; padding: 11px 22px; }
+
+@media (max-width: 480px) {
+  .emlCardRow { flex-wrap: wrap; }
+  .emlVerifyRow { flex-direction: column; }
+  .emlCode { flex-basis: auto; }
 }
 
 /* ============================================================

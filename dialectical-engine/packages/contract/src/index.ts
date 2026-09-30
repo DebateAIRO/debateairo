@@ -256,7 +256,8 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
     action: RunTargetedGrantActionSchema,
     target_run_id: z.uuid()
   }).strict(),
-  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict()
+  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
+  z.object({ action: z.literal("CHANGE_EMAIL") }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
@@ -268,6 +269,11 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     action: z.literal("DELETE_ACCOUNT"),
+    expires_at: z.iso.datetime()
+  }).strict(),
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: z.literal("CHANGE_EMAIL"),
     expires_at: z.iso.datetime()
   }).strict()
 ]);
@@ -306,6 +312,35 @@ export const AccountErasureCancelRequestSchema = z.object({
 export const AccountErasureCancelledSchema = z.object({
   status:z.literal("CANCELLED")
 }).strict();
+// Turn 14 — change email. The request needs a CHANGE_EMAIL step-up grant; the
+// two link routes carry only the bearer mailed to the new (confirm) or the
+// current (cancel) address.
+const EmailAddressSchema = z.string().min(3).max(254);
+export const AccountEmailSchema = z.object({
+  email: EmailAddressSchema,
+  recovery_email: EmailAddressSchema,
+  pending: z.object({
+    new_email: EmailAddressSchema,
+    expires_at: z.iso.datetime()
+  }).strict().nullable()
+}).strict();
+export type AccountEmail = z.infer<typeof AccountEmailSchema>;
+export const EmailChangeRequestSchema = z.object({
+  new_email: EmailAddressSchema,
+  step_up_grant: StepUpGrantTokenSchema
+}).strict();
+export const EmailChangePendingSchema = z.object({
+  status: z.literal("PENDING"),
+  new_email: EmailAddressSchema,
+  expires_at: z.iso.datetime()
+}).strict();
+export type EmailChangePending = z.infer<typeof EmailChangePendingSchema>;
+export const EmailChangeLinkRequestSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+}).strict();
+export const EmailChangeConfirmedSchema = z.object({ status: z.literal("CONFIRMED") }).strict();
+export const EmailChangeCancelledSchema = z.object({ status: z.literal("CANCELLED") }).strict();
+
 export const PrivateDebateErasureRequestSchema = z.object({
   step_up_grant:StepUpGrantTokenSchema
 }).strict();
@@ -785,6 +820,12 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
     "POST /v1/account/legacy-runs/claim",
+    "GET /v1/account/email",
+    "POST /v1/account/email/change",
+    "POST /v1/account/email/change/resend",
+    "DELETE /v1/account/email/change",
+    "POST /v1/account/email/change/confirm",
+    "POST /v1/account/email/change/cancel",
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
@@ -830,6 +871,8 @@ export const contractInventory = Object.freeze({
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
+    AccountEmailSchema,EmailChangeRequestSchema,EmailChangePendingSchema,EmailChangeLinkRequestSchema,
+    EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,

@@ -1,4 +1,5 @@
 import {
+  AccountEmailSchema,
   AccountErasureCancelRequestSchema,
   AgeCheckResultSchema,
   AgeConfirmationStatusSchema,
@@ -7,6 +8,11 @@ import {
   type SensitiveDataConsentStatus,
   type AgeCheckResult,
   type AgeConfirmationStatus,
+  EmailChangeCancelledSchema,
+  EmailChangeConfirmedSchema,
+  EmailChangeLinkRequestSchema,
+  EmailChangePendingSchema,
+  EmailChangeRequestSchema,
   AccountErasureCancelledSchema,
   AccountErasureStatusSchema,
   AnswerSchema,
@@ -34,10 +40,12 @@ import {
   type Answer,
   type AnswerIndex,
   type AnswerStory,
+  type AccountEmail,
   type AnswerDisclosure,
   type AskAccepted,
   type AskRequest,
   type Deployment,
+  type EmailChangePending,
   type ExecutionLedgerDigest,
   type Inspection,
   type InvestigationAccepted,
@@ -266,7 +274,7 @@ export interface ContractClient {
       action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
       target_run_id: string;
     }>
-    | Readonly<{ action: "DELETE_ACCOUNT" }>): Promise<{
+    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" }>): Promise<{
     status: "step_up_complete";
     csrf_token: string;
     step_up_grant?: ({
@@ -276,7 +284,7 @@ export interface ContractClient {
       expires_at: string;
     } | {
       token: string;
-      action: "DELETE_ACCOUNT";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL";
       expires_at: string;
     }) | undefined;
   }>;
@@ -309,6 +317,12 @@ export interface ContractClient {
   claimLegacyRuns(legacyToken:string):Promise<{
     status:"CLAIMED"|"NO_MATCH";claimed_count:number;
   }>;
+  readAccountEmail(): Promise<AccountEmail>;
+  requestEmailChange(newEmail: string, stepUpGrant: string): Promise<EmailChangePending>;
+  resendEmailChange(): Promise<EmailChangePending>;
+  cancelEmailChange(): Promise<void>;
+  confirmEmailChange(token: string): Promise<{ status: "CONFIRMED" }>;
+  cancelEmailChangeByLink(token: string): Promise<{ status: "CANCELLED" }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
@@ -482,7 +496,7 @@ export function createContractClient(
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         target_run_id: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" }>) => request(
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" }>) => request(
       "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,
@@ -531,6 +545,27 @@ export function createContractClient(
     }),
     readAccountErasure:()=>request(
       "/v1/account/erasure",AccountErasureStatusSchema
+    ),
+    readAccountEmail: () => request("/v1/account/email", AccountEmailSchema),
+    requestEmailChange: (newEmail: string, stepUpGrant: string) => request(
+      "/v1/account/email/change", EmailChangePendingSchema,
+      { method: "POST", body: JSON.stringify(EmailChangeRequestSchema.parse({
+          new_email: newEmail, step_up_grant: stepUpGrant
+        })) }
+    ),
+    resendEmailChange: () => request(
+      "/v1/account/email/change/resend", EmailChangePendingSchema, { method: "POST", body: "{}" }
+    ),
+    cancelEmailChange: () => requestNoContent(
+      root.href, fetchImplementation, "/v1/account/email/change", { method: "DELETE" }, auth
+    ),
+    confirmEmailChange: (token: string) => request(
+      "/v1/account/email/change/confirm", EmailChangeConfirmedSchema,
+      { method: "POST", body: JSON.stringify(EmailChangeLinkRequestSchema.parse({ token })) }
+    ),
+    cancelEmailChangeByLink: (token: string) => request(
+      "/v1/account/email/change/cancel", EmailChangeCancelledSchema,
+      { method: "POST", body: JSON.stringify(EmailChangeLinkRequestSchema.parse({ token })) }
     ),
     cancelAccountErasure:(cancellationRef:string)=>request(
       "/v1/account/erasure/cancel",AccountErasureCancelledSchema,

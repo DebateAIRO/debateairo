@@ -15,6 +15,7 @@ apps/api/src/admission.ts
 apps/api/src/boot-custody.ts
 apps/api/src/client-ip.ts
 apps/api/src/disclosures.ts
+apps/api/src/email-change.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
 apps/api/src/legacy-claim.ts
@@ -266,6 +267,7 @@ apps/ui/components/DebateThread.tsx
 apps/ui/components/DebateTree.tsx
 apps/ui/components/DebateWorkspaceDrawer.tsx
 apps/ui/components/DebatesBuffer.tsx
+apps/ui/components/EmailSettings.tsx
 apps/ui/components/EvaluatorDevMenu.tsx
 apps/ui/components/FloorAnswer.tsx
 apps/ui/components/GuideModal.tsx
@@ -536,6 +538,7 @@ packages/crypto/src/argon2-worker.ts
 packages/crypto/src/index.ts
 packages/db/src/account-erasure.ts
 packages/db/src/auth-risk.ts
+packages/db/src/email-change.ts
 packages/db/src/identity.ts
 packages/db/src/index.ts
 packages/db/src/legacy-claim.ts
