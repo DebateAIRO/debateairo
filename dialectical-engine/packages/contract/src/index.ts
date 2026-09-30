@@ -159,9 +159,33 @@ export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK",
 
 export const AskAcceptedSchema = z.object({
   run_ref: z.string().min(1),
-  status: z.literal("QUEUED")
-}).strict();
+  status: z.enum(["QUEUED", "WAITING"]),
+  // Budget spec §2.7 and AMENDMENTS-R1 A16: a question that waits in line says
+  // when it is expected to start and which limit it waits for. Present iff WAITING.
+  waits_until: z.iso.datetime().optional(),
+  waiting_scope: SpendScopeSchema.optional()
+}).strict().superRefine((accepted, context) => {
+  const waiting = accepted.status === "WAITING";
+  if (waiting !== (accepted.waits_until !== undefined) || waiting !== (accepted.waiting_scope !== undefined)) {
+    context.addIssue({
+      code: "custom",
+      message: "WAITING requires waits_until and waiting_scope, and QUEUED forbids both"
+    });
+  }
+});
 export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
+
+/**
+ * Budget spec §2.7 — the 422 body of ASK_ALREADY_WAITING: the waiting run and its
+ * expected start, and nothing else (no figure, no limit, no count).
+ */
+export const AskAlreadyWaitingSchema = z.object({
+  error: z.literal("ASK_ALREADY_WAITING"),
+  message: z.literal("ASK_ALREADY_WAITING"),
+  run_ref: z.string().min(1),
+  waits_until: z.iso.datetime()
+}).strict();
+export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
 
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
@@ -916,7 +940,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/runs/{id}/unpublish"
   ]),
   resources: Object.freeze({
-    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
+    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
     LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,

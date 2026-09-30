@@ -17,6 +17,7 @@ import {
   AnswerDisclosureSchema,
   ArgumentLanguageSchema,
   AskAcceptedSchema,
+  AskAlreadyWaitingSchema,
   AskRequestSchema,
   DeploymentSchema,
   EventTypeSchema,
@@ -69,6 +70,7 @@ import {
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
+import type { SpendScope } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RunRepository,
@@ -107,7 +109,7 @@ import {
   type RegistrationApplication
 } from "./registration.js";
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
-import { nextWholeMinute, type AskRoomPort } from "./ask-room.js";
+import { AskAlreadyWaitingError, nextWholeMinute, runSettingsClassOfAsk, type AskRoomPort } from "./ask-room.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
@@ -1479,6 +1481,22 @@ export class AskRefusal extends Error {
   }
 }
 
+/**
+ * Budget spec §2.7 (B6b) — ASK_ALREADY_WAITING: the one ask refusal whose body
+ * names something, the person's own waiting run and its expected start.
+ */
+export class AskAlreadyWaitingRefusal extends AskRefusal {
+  readonly runRef: string;
+  readonly waitsUntil: Date;
+
+  constructor(refusal: AskAlreadyWaitingError) {
+    super(refusal);
+    this.name = "AskAlreadyWaitingRefusal";
+    this.runRef = refusal.runRef;
+    this.waitsUntil = refusal.waitsUntil;
+  }
+}
+
 class MalformedRequestError extends Error {
   /**
    * L1-F5: a ZodError message is the entire issue list — every field path,
@@ -1888,6 +1906,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(transportFault.statusCode).send({
         error: transportFault.code, message: transportFault.code
       });
+    }
+    // Budget spec §2.7 (B6b): 422 with the waiting run and its expected start,
+    // and nothing else. Every other refusal keeps the envelope below.
+    if (knownError instanceof AskAlreadyWaitingRefusal) {
+      return reply.status(422).send(AskAlreadyWaitingSchema.parse({
+        error: "ASK_ALREADY_WAITING",
+        message: "ASK_ALREADY_WAITING",
+        run_ref: knownError.runRef,
+        waits_until: knownError.waitsUntil.toISOString()
+      }));
     }
     const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
     const authFlow = knownError instanceof AuthFlowError;
@@ -3092,8 +3120,21 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
   return parsed.success ? parsed.data : null;
 }
 
-/** The step of `submit` after the run row exists; its failure reason is `RUN_SETUP_FAILED:<step>`. */
-type RunSetupStep = "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH";
+/**
+ * The step of `submit` after the run row exists; its failure reason is
+ * `RUN_SETUP_FAILED:<step>`. With a room (B6b) two more: the place in line with
+ * why it waits (`WAITING_LINE`, and its commit) and the hold with the run's
+ * charge scope (`ROOM_HOLD`). There the first job is the decision's LAST write,
+ * so `WORK_QUEUE` covers the job and the decision's commit: a failed commit
+ * rolls the READY job back with everything else.
+ */
+type RunSetupStep =
+  | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD";
+
+/** What the room's locked decision produced inside the lease. */
+type RoomOutcome =
+  | Readonly<{ kind: "START"; runId: string; workItemId: string }>
+  | Readonly<{ kind: "WAIT"; runId: string; waitsUntil: Date; scope: SpendScope }>;
 
 /**
  * A run's first job, named once: `submit` queues it, and a failed setup records
@@ -3155,6 +3196,11 @@ export class PostgresAskApplication implements AskApplication {
     const ownership: RunOwnershipAccess = principal.kind === "legacy"
       ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
       : Object.freeze({ ownerRef: principal.ownerRef, legacyAskerId: null });
+    // Budget spec §2.7 (B6b): hosted with the band, the room decides. Every
+    // other composition continues below, exactly as today.
+    if (this.settings.room !== undefined) {
+      return this.#submitWithRoom(ask, session, principal, ownership, this.settings.room);
+    }
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     let runId:string;
@@ -3258,6 +3304,126 @@ export class PostgresAskApplication implements AskApplication {
   async unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null> {
     const result = await this.#serve.unlinkMemoryForAnswer(answerId, ownership, `asker:${session.asker_id}`);
     return result === null ? null : Object.freeze({ memory_link_id: result.memoryLinkId, state: "UNLINKED" });
+  }
+
+  /**
+   * Budget spec 2026-09-28 §2.7 with the paid-plans spec §2.4.2 (B6b) — THE ASK
+   * WITH A ROOM. The owner's lease is taken FIRST and covers the whole decision,
+   * so one person's two tabs can never both see "nothing waiting". Inside it:
+   *  1. the plan tier's own check, then the room without locks — a question that
+   *     may not even wait is refused before any vendor is probed;
+   *  2. the ask's own checks and panel discovery, exactly as today;
+   *  3. under the site's day lock and the person's lock, the room again, and in
+   *     that SAME transaction the run's place in line and why it waits (WAIT), or
+   *     its hold and charge scope and THEN its first job (START) — the job queued
+   *     on the decision's transaction as its last statement (`enqueueOn`: the one
+   *     shared sequence row it takes is held until COMMIT, so nothing may follow
+   *     it), so the job commits with what counts it or not at all.
+   * The run input is the one `submit` builds, kept apart so today's path stays
+   * byte-for-byte what it is for every composition without a room.
+   */
+  async #submitWithRoom(
+    ask: AskRequest,
+    session: Session,
+    principal: AskPrincipal,
+    ownership: RunOwnershipAccess,
+    room: AskRoomPort
+  ): Promise<AskAccepted> {
+    if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
+      throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
+    }
+    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask) });
+    const argumentLanguage = detectArgumentLanguage(ask.question_line);
+    const admissionPool = principal.kind === "server"
+      ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
+    let createdRunId: string | undefined;
+    let setupStep: RunSetupStep = "ADMISSION_RELEASE";
+    let outcome: RoomOutcome;
+    try {
+      outcome = await withOwnerAskAdmissionLease(admissionPool, ownership, async (lease) => {
+        await room.precheck(question);
+        const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
+        const decided = await room.decide(question, async ({ admission, estimateMicros, now, tx }): Promise<RoomOutcome> => {
+          await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
+          const runId = await this.#runs.startRun({
+            questionLine: ask.question_line,
+            argumentLanguageTag: argumentLanguage.tag,
+            argumentLanguageName: argumentLanguage.nameEn,
+            principal,
+            sessionId: session.session_id,
+            callerScope: session.caller_scope,
+            asOf: new Date(ask.as_of),
+            askerRiskTier: ask.risk_tier,
+            effectiveRiskTier: risk.effectiveRiskTier,
+            tierSource: risk.tierSource,
+            tierProvenanceRef: risk.tierProvenanceRef,
+            compositionBudgetTier: ask.composition_budget_tier,
+            planTier: ask.plan_tier,
+            depthParams: ask.depth_params,
+            discoveredPanel,
+            strangerSampleRate: this.settings.strangerSampleRate,
+            envelopeBasis,
+            registerVersion: this.settings.registerVersion,
+            batteryVersion: this.settings.batteryVersion,
+            askContract: {
+              decision_scope: ask.decision_scope,
+              steering_presets: ask.steering_presets,
+              steering_annotations: ask.steering_annotations,
+              critic_unavailable_cap: criticUnavailableCap
+            },
+            batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+          }, lease.client);
+          createdRunId = runId;
+          setupStep = "MEMORY_QUESTION";
+          await this.#serve.recordMemoryQuestion({
+            runId,
+            questionLine: ask.question_line,
+            callerScope: session.caller_scope,
+            askerScope: session.asker_id,
+            asOf: ask.as_of,
+            policyVersion: this.settings.registerVersion,
+            ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+          }, ownership);
+          if (admission.kind === "WAIT") {
+            setupStep = "WAITING_LINE";
+            await room.enterWait(tx, runId, now);
+            return Object.freeze({ kind: "WAIT" as const, runId, waitsUntil: admission.waitsUntil, scope: admission.worstScope });
+          }
+          setupStep = "ROOM_HOLD";
+          await room.openStart(tx, { runId, access: ownership, heldMicros: estimateMicros, now });
+          // LAST: nothing may follow the first job inside the decision (see RunSetupStep).
+          setupStep = "WORK_QUEUE";
+          const workItemId = await this.#work.enqueueOn(tx, { runId, ...firstRunJob(runId), nodeSet: [] });
+          return Object.freeze({ kind: "START" as const, runId, workItemId });
+        });
+        // The decision committed: what can still fail inside the lease is its release.
+        setupStep = "ADMISSION_RELEASE";
+        return decided;
+      });
+    } catch (error) {
+      if (createdRunId !== undefined) await this.#recordRunSetupFailure(createdRunId, setupStep);
+      if (error instanceof AskAlreadyWaitingError) throw new AskAlreadyWaitingRefusal(error);
+      if (error instanceof TypedDomainError && error.code === "OWNER_PRIVATE_HISTORY_SCAN_SATURATED") {
+        throw new AskRefusal(error);
+      }
+      throw error;
+    }
+    if (outcome.kind === "WAIT") {
+      console.info(JSON.stringify(Object.freeze({ event: "api.ask.waiting", runId: outcome.runId, scope: outcome.scope })));
+      return Object.freeze({
+        run_ref: outcome.runId,
+        status: "WAITING" as const,
+        waits_until: outcome.waitsUntil.toISOString(),
+        waiting_scope: outcome.scope
+      });
+    }
+    try {
+      await this.dispatcher.dispatch({ runId: outcome.runId, workItemId: outcome.workItemId });
+    } catch (error) {
+      await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
+      throw error;
+    }
+    return Object.freeze({ run_ref: outcome.runId, status: "QUEUED" as const });
   }
 
   readAnswer(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null> {
