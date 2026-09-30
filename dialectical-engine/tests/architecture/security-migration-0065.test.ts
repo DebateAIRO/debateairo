@@ -423,7 +423,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // age record, and the 'age_frozen' account state. The next free prefix, no pair.
         "0077_age_gate.sql",
         // Hate-speech S02 R10: append-only, content-free publication check record.
-        "0078_publication_check_record.sql"
+        "0078_publication_check_record.sql",
+        // Hate-speech S02 FIX p1 (sd-N1, sd-N2): identifier grammar, call count and distinct members on the record.
+        "0079_publication_check_record_identifiers.sql"
       ]);
   });
 });

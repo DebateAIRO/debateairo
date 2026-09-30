@@ -45,6 +45,13 @@ const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
 const MAX_PROXY_BODY_BYTES = 1_048_576;
 /** L3-F12: ceiling for a non-stream upstream request; event streams are open-ended by design. */
 const UPSTREAM_TIMEOUT_MS = 30_000;
+/**
+ * hate-speech S02 (ruling R-D, V-13): `POST /v1/runs/{id}/publish` runs the content check, whose deadline D is
+ * 50 000 ms (`PUBLICATION_CHECK_DEADLINE_MS`, apps/api/src/publication-check/check.ts), before the publish itself.
+ * Its ceiling is D plus 25 s for the rest of the attempt; every other route keeps UPSTREAM_TIMEOUT_MS.
+ */
+const PUBLISH_UPSTREAM_TIMEOUT_MS = 75_000;
+const RUN_PUBLISH_PATH = /^v1\/runs\/[^/]+\/publish$/u;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
@@ -226,9 +233,11 @@ async function readBoundedBody(request: Request): Promise<BufferSource | null> {
 function upstreamSignal(request: Request, path: readonly string[]): AbortSignal {
   const streaming = (request.headers.get("accept") ?? "").includes("text/event-stream")
     || path[path.length - 1] === "events";
+  const ceiling = request.method === "POST" && RUN_PUBLISH_PATH.test(path.join("/"))
+    ? PUBLISH_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS;
   return streaming
     ? request.signal
-    : AbortSignal.any([request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
+    : AbortSignal.any([request.signal, AbortSignal.timeout(ceiling)]);
 }
 
 async function proxyApi(request: Request, context: ProxyContext): Promise<Response> {

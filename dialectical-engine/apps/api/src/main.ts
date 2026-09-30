@@ -57,8 +57,8 @@ import { createSupportCaseMaterial, createSupportCaseService, createSupportMessa
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
-import { createPublicationContentCheck } from "./publication-check/check.js";
-import { createPublicationJudgeSwitch, createPublicationJudgeTransport } from "./publication-check/judge-transport.js";
+import { createPublicationContentCheck, PUBLICATION_CHECK_DEADLINE_MS } from "./publication-check/check.js";
+import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
@@ -632,18 +632,23 @@ const supportModels = new Map<string,SupportModelPort>(supportModelTarget === un
 // every publish answers UNAVAILABLE `JUDGE_NOT_CONFIGURED`. SIGUSR2 toggles the
 // judge off and back on (SPEC-v2 §6 step 9) — it can only make publishing
 // refuse, never skip the check.
+// FIX-HS2-p1 sd-N5: only a LOCAL deployment has the switch — a flag file named by the API port (`touch` = off,
+// `rm` = on, read per attempt, so it survives a restart) and SIGUSR2, which writes the file. Hosted has neither.
+// sd-N6: the transport prefixes the judge's diagnostics `PUBLICATION_JUDGE:`. ct-B4: D is the one constant.
+const publicationJudgeOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : publicationJudgeOffFlagPath(environment.API_PORT);
 const publicationJudgeSwitch = createPublicationJudgeSwitch(supportModelTarget === undefined
   ? null
   : createPublicationJudgeTransport(supportModelTarget, {
     readAuthorizationHeader: readCustodyAuthorizationHeader,
     reportDiagnostic: reportSupportDiagnostic
-  }));
+  }), { offFlagPath: publicationJudgeOffFlag });
 const publicationContentCheck = createPublicationContentCheck({
   judge: publicationJudgeSwitch.current,
   recorder: new PostgresPublicationCheckRecordRepository(pool),
-  clock: () => new Date()
+  clock: () => new Date(),
+  deadlineMs: PUBLICATION_CHECK_DEADLINE_MS
 });
-installPublicationJudgeSwitchSignal(process, publicationJudgeSwitch);
+if (publicationJudgeOffFlag !== null) installPublicationJudgeSwitchSignal(process, publicationJudgeSwitch);
 const supportModelReservations = new SupportModelReservationLedger({
   processId: `support-api-${process.pid}`,
   processPid: process.pid,

@@ -1359,20 +1359,20 @@ const UNCONFIGURED_PUBLICATION_CONTENT_CHECK: PublicationContentCheck = Object.f
 });
 
 /**
- * hate-speech S02 (D-S02-21, SPEC-v2 §6 step 9): SIGUSR2 flips the publish
- * check's judge between configured and absent, and writes one content-free
- * line per flip. Absent means every publish answers 503 — the switch can make
- * publishing refuse, never skip the check. It is installed from main.ts with the
- * real process; the boot script itself registers no process signal
- * (tests/architecture/t1-argon2-worker-contract.test.ts:495, :706-707).
+ * hate-speech S02 (D-S02-21, SPEC-v2 §6 step 9; FIX-HS2-p1 sd-N5): in a LOCAL deployment, SIGUSR2 switches the
+ * publish check's judge OFF — idempotently: it writes the switch's flag file, and a second signal leaves it off —
+ * and writes one content-free line per signal. Removing the flag file switches the judge back on; the state lives
+ * in the file, so it survives an API restart. Off means every publish answers 503 — the switch can make publishing
+ * refuse, never skip the check. main.ts installs it only when the deployment is not hosted; the boot script itself
+ * registers no process signal (tests/architecture/t1-argon2-worker-contract.test.ts:495, :706-707).
  */
 export function installPublicationJudgeSwitchSignal(
   target: Readonly<{ on(event: "SIGUSR2", listener: () => void): unknown }>,
-  judgeSwitch: Readonly<{ toggle(): boolean }>,
+  judgeSwitch: Readonly<{ switchOff(): boolean }>,
   log: (line: string) => void = (line) => { console.error(line); }
 ): void {
   target.on("SIGUSR2", () => {
-    log(JSON.stringify({ event: "api.publication_check.switch", configured: judgeSwitch.toggle() }));
+    log(JSON.stringify({ event: "api.publication_check.switch", configured: judgeSwitch.switchOff() }));
   });
 }
 
@@ -2565,21 +2565,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         });
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
-      const published = await options.application.withContentLease(runId.data, async () => {
-        const answer = await options.application.readRunAnswer(
-          runId.data,
-          request.session,
-          ownershipFor(request)
-        );
-        if (answer === null) return null;
-        return options.publications!.publish({
-          runId: runId.data,
-          answer,
-          authenticated,
-          grantToken: input.step_up_grant,
-          source: sourceFor(request),
-          contentCheck: options.publicationContentCheck ?? UNCONFIGURED_PUBLICATION_CONTENT_CHECK
-        });
+      // FIX-HS2-p1 sd-B1 (ruling R-P): each private-content phase holds the run's lease (one pooled client) only
+      // for its own reads and writes; `publish` awaits the content check — up to D on an external judge — under
+      // none, and re-reads the answer under a fresh lease before it commits.
+      const contentLease = {
+        run: <T>(use: () => Promise<T>) => options.application.withContentLease(runId.data, use),
+        readAnswer: () => options.application.readRunAnswer(runId.data, request.session, ownershipFor(request))
+      };
+      const answer = await contentLease.run(contentLease.readAnswer);
+      const published = answer === null ? null : await options.publications.publish({
+        runId: runId.data,
+        answer,
+        authenticated,
+        grantToken: input.step_up_grant,
+        source: sourceFor(request),
+        contentCheck: options.publicationContentCheck ?? UNCONFIGURED_PUBLICATION_CONTENT_CHECK,
+        contentLease
       });
       if (published === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       // hate-speech S02 (SPEC-v2 R6, R9): a refusal is 409 with the closed-code

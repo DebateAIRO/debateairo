@@ -138,7 +138,20 @@ describe("publication check record table", () => {
     ["provider edge whitespace", { judge_provider_ref: "\tprovider" }, "provider"],
     ["model edge whitespace", { judge_model_id: "model\n" }, "model"],
     ["free-text policy", { policy_version: "arbitrary text" }, "policy"],
-    ["negative count", { judge_call_count: -1 }, "count"]
+    ["negative count", { judge_call_count: -1 }, "count"],
+    // FIX-HS2-p1 sd-N1 (migration 0079): the identifier columns hold identifiers, never text, an email or a uuid.
+    ["provider with a space", { judge_provider_ref: "test judge" }, "provider_grammar"],
+    ["provider that is an email", { judge_provider_ref: "victim.owner@example.com" }, "provider_grammar"],
+    ["provider that is a user uuid", { judge_provider_ref: "66666666-6666-4666-8666-666666666666" }, "provider_grammar"],
+    ["provider of 256 emoji", { judge_provider_ref: "🧪".repeat(256) }, "provider_grammar"],
+    ["model with debate text", { judge_model_id: "Roma are vermin; the country must be cleansed of them." }, "model_grammar"],
+    ["model that embeds an upper-case uuid", { judge_model_id: "m-66666666-6666-4666-8666-66666666666A" }, "model_grammar"],
+    ["model with an inner newline", { judge_model_id: "a\nb" }, "model_grammar"],
+    // FIX-HS2-p1 sd-N2: an ALLOW or a refusal was judged by at least one call; members appear once.
+    ["ALLOW with zero judge calls", { judge_call_count: 0 }, "count_outcome"],
+    ["BLOCK with zero judge calls", { outcome: "BLOCK", rules: [1], part_kinds: ["QUESTION"], ground: "TERMS", judge_call_count: 0 }, "count_outcome"],
+    ["duplicate part kinds", { outcome: "BLOCK", rules: [1], part_kinds: ["QUESTION", "QUESTION"], ground: "TERMS" }, "distinct"],
+    ["duplicate rules", { outcome: "BLOCK", rules: [1, 1], part_kinds: ["QUESTION"], ground: "TERMS" }, "distinct"]
   ];
   it.each(invalid)("rejects %s with its own CHECK", async (_name, changes, constraint) => {
     await expect(insertRow({ ...allowRow(), ...changes })).rejects.toMatchObject({
@@ -154,8 +167,8 @@ describe("publication check record table", () => {
   });
 
   // Property: every closed failure code is writable, including the absent-judge
-  // case with null identities; code-point length must not become a byte limit.
-  // Mutants: remove a cause from the allowed set; replace length with octet_length.
+  // case with null identities, and a 256-character identifier is the longest one.
+  // Mutants: remove a cause from the allowed set; shorten the identifier grammar.
   it.each([
     "JUDGE_TRANSPORT_FAILED", "JUDGE_HTTP_STATUS", "JUDGE_DEADLINE",
     "JUDGE_ANSWER_NOT_JSON", "JUDGE_ANSWER_SCHEMA", "JUDGE_ANSWER_UNKNOWN_PART",
@@ -164,8 +177,8 @@ describe("publication check record table", () => {
     await asRuntime(async (client) => {
       await insertRow({
         ...allowRow(), outcome: "UNAVAILABLE", failure_cause: cause,
-        judge_provider_ref: cause === "JUDGE_NOT_CONFIGURED" ? null : "🧪".repeat(256),
-        judge_model_id: cause === "JUDGE_NOT_CONFIGURED" ? null : "🧠".repeat(256),
+        judge_provider_ref: cause === "JUDGE_NOT_CONFIGURED" ? null : `development:${"p".repeat(244)}`,
+        judge_model_id: cause === "JUDGE_NOT_CONFIGURED" ? null : `z-ai/${"m".repeat(251)}`,
         judge_call_count: 0
       }, client);
     });
@@ -188,6 +201,14 @@ describe("publication check record repository", () => {
     { outcome: "UNAVAILABLE", failure_cause: "JUDGE_NOT_CONFIGURED", rules: [], part_kinds: [],
       ground: null, judge_provider_ref: null, judge_model_id: null, judge_call_count: 0 }
   ] satisfies Omit<PublicationCheckRecordRow, "run_id" | "attempted_at" | "policy_version">[];
+
+  // FIX-HS2-p1 sd-N1: the identifiers the product composes today are accepted by the 0079 grammar.
+  it.each([["development:hermes-glm-5.3-flash", "z-ai/glm-5.3-flash"], ["vendor:acme", "Acme-Large_2.1+beta"]])(
+    "accepts the configured identifier pair %s / %s as debateai_runtime", async (provider, model) => {
+      await asRuntime(async (client) => {
+        await insertRow({ ...allowRow(), judge_provider_ref: provider, judge_model_id: model }, client);
+      });
+    });
 
   it.each(records)("persists $outcome exactly once as debateai_runtime", async (record) => {
     const { PostgresPublicationCheckRecordRepository } = await import("../../packages/db/src/index.js");

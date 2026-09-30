@@ -410,6 +410,14 @@ export async function acquireRunContentLease(
   }
 }
 
+/**
+ * FIX-HS2-p1 sd-B1: true while the calling async context holds a run content lease (a pooled client). A caller
+ * that is about to await an external service asserts it is false, so no pooled client waits on that service.
+ */
+export function isRunContentLeaseHeld(): boolean {
+  return contentLeaseScope.getStore() !== undefined;
+}
+
 export async function withRunContentLease<T>(
   pool: Pool,
   runIds: readonly string[],
