@@ -77,6 +77,7 @@ import {
   readAdmissionPolicy,
   readAuthPolicy,
   readCostEnvelopePolicy,
+  readCountryPolicy,
   readDeploymentRiskTier,
   readEnvelopeFormulaInputs,
   readMfaPolicy,
@@ -709,7 +710,10 @@ export async function verifyHostedRegisterBootReadiness(
   await readMfaPolicy(pool, version);
   await readSessionPolicy(pool, version);
   await readRecoveryPolicy(pool, version);
-  assertHostedSupportAdmissionSealed("hosted", await readAdmissionPolicy(pool, version));
+  const admission = await readAdmissionPolicy(pool, version);
+  // Paid plans G3a: main.ts's country-policy and country-gate-admission stages, in their order.
+  if (await readCountryPolicy(pool, version) !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
+  assertHostedSupportAdmissionSealed("hosted", admission);
   await readCostEnvelopePolicy(pool, version);
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);
