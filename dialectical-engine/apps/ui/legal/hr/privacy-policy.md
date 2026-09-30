@@ -52,7 +52,7 @@ Prikupljamo samo ono što je potrebno za rad računa, ono što nam odlučite dat
 
 Sustav za rasprave potiče pitanja o politici, vjeri, zdravlju, seksualnosti i uvjerenjima. To su posebne kategorije podataka prema članku 9. GDPR-a i mogu se pojaviti u vašim pitanjima neovisno o tome namjeravamo li ih prikupljati.
 
-**O vama.** Pri registraciji u zasebnoj rečenici dajete izričitu privolu za našu obradu osjetljivih informacija koje odlučite uključiti u vlastita pitanja radi vođenja vaših rasprava. Možete je povući u bilo kojem trenutku tako da ne uključite takve informacije ili izbrišete raspravu. Ono što objavite o sebi podaci su koje ste odlučili učiniti javnima.
+**O vama.** Prije svoje prve rasprave na zasebnom zaslonu dajete izričitu privolu za našu obradu osjetljivih informacija koje odlučite uključiti u vlastita pitanja radi vođenja vaših rasprava. Bilježimo verziju teksta na koji ste pristali, vaš jezik i vrijeme. Bez te privole ne možete započeti raspravu. Možete je povući u bilo kojem trenutku tako da ne uključite takve informacije ili izbrišete raspravu. Ono što objavite o sebi podaci su koje ste odlučili učiniti javnima.
 
 **O drugim osobama.** Nijedan pravni uvjet ne dopušta nam obradu osjetljivih podataka o trećoj osobi koju imenujete u pitanju, a takav uvjet nema ni jedan od naših pružatelja usluga umjetne inteligencije. Zato je to zabranjeno Uvjetima, zato svodimo na najmanju mjeru ono što šaljemo i zato takav sadržaj brzo uklanjamo na zahtjev — odjeljak 11.
 
@@ -69,7 +69,7 @@ Svaka svrha ima jednu pravnu osnovu prema članku 6. stavku 1. GDPR-a i podatke 
 | Održavanje sigurnosti usluge, otkrivanje zlouporabe, omogućavanje uočavanja prijave koju niste izvršili, vođenje revizijskog traga | Sesije, sigurnosni revizijski trag, sažeci iz podrške povezani sa zlouporabom | **Legitimni interesi** — Art. 6(1)(f): naši i vaši interesi za sigurnu uslugu. Možete uložiti prigovor; odjeljak 10 |
 | Dokazivanje da ste prihvatili Uvjete te dali ili povukli privolu | Evidencija prihvaćanja i privola | **Pravna obveza** — Art. 6(1)(c), naša dužnost dokazivanja privole prema Art. 7(1) — i legitimni interesi za dokazivanje ugovora |
 | Odgovaranje na zahtjeve za podršku | Podrška | **Ugovor** — Art. 6(1)(b) |
-| Obrada osjetljivih informacija koje uključite o sebi | Sadržaj rasprave | **Izričita privola** — Art. 9(2)(a), dana zasebno pri registraciji |
+| Obrada osjetljivih informacija koje uključite o sebi | Sadržaj rasprave | **Izričita privola** — Art. 9(2)(a), dana na zasebnom zaslonu prije vaše prve rasprave |
 | Objavljivanje rasprave koju odlučite objaviti | Sadržaj rasprave, pseudonim | **Ugovor** — Art. 6(1)(b), prema vašoj uputi; za osjetljive podatke o vama, Art. 9(2)(e) — podaci koje ste očito učinili javnima |
 | Slanje novosti o proizvodu | Adresa e-pošte | **Privola** — Art. 6(1)(a), neoznačeno polje; povucite je u bilo kojem trenutku iz bilo koje poruke e-pošte ili u Postavkama |
 | Ispunjavanje poreznih, računovodstvenih i pravnih obveza \[pending paid plans\] | Plaćanja, evidencija prihvaćanja | **Pravna obveza** — Art. 6(1)(c) |

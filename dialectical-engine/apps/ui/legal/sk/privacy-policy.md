@@ -52,7 +52,7 @@ Zhromažďujeme iba údaje potrebné na fungovanie účtu, údaje, ktoré sa ná
 
 Systém na debaty podnecuje otázky o politike, náboženstve, zdraví, sexualite a presvedčení. Podľa článku 9 GDPR ide o osobitné kategórie údajov, ktoré sa môžu objaviť vo vašich otázkach bez ohľadu na to, či ich zamýšľame zhromažďovať.
 
-**O vás.** Pri registrácii udeľujete samostatnou vetou výslovný súhlas so spracúvaním citlivých informácií, ktoré sa rozhodnete uviesť vo vlastných otázkach, na účely uskutočnenia vašich debát. Súhlas môžete kedykoľvek odvolať tým, že takéto informácie neuvediete, alebo odstránením debaty. Informácie, ktoré o sebe zverejníte, sú údaje, ktoré ste sa rozhodli sprístupniť verejnosti.
+**O vás.** Pred svojou prvou debatou udeľujete na samostatnej obrazovke výslovný súhlas so spracúvaním citlivých informácií, ktoré sa rozhodnete uviesť vo vlastných otázkach, na účely uskutočnenia vašich debát. Zaznamenávame verziu znenia, s ktorým ste súhlasili, váš jazyk a čas. Bez tohto súhlasu nemôžete začať debatu. Súhlas môžete kedykoľvek odvolať tým, že takéto informácie neuvediete, alebo odstránením debaty. Informácie, ktoré o sebe zverejníte, sú údaje, ktoré ste sa rozhodli sprístupniť verejnosti.
 
 **O iných osobách.** Žiadna právna podmienka nám neumožňuje spracúvať citlivé údaje o tretej osobe, ktorú uvediete v otázke, a takú podmienku nemá ani žiadny z našich poskytovateľov umelej inteligencie. Preto to podmienky zakazujú, preto minimalizujeme odosielané údaje a preto takýto obsah na požiadanie rýchlo odstránime — pozri časť 11.
 
@@ -69,7 +69,7 @@ Každý účel má jeden právny základ podľa článku 6 ods. 1 GDPR a údaje 
 | Zabezpečenie služby, odhaľovanie zneužitia, umožnenie rozpoznať prihlásenie, ktoré ste nevykonali, a vedenie auditného záznamu | Relácie, bezpečnostný auditný záznam, haše z podpory súvisiace so zneužitím | **Oprávnené záujmy** — Art. 6(1)(f): naše aj vaše záujmy na bezpečnej službe. Môžete namietať; pozri časť 10 |
 | Preukázanie, že ste prijali podmienky a udelili alebo odvolali súhlas | Záznamy o prijatí a súhlase | **Zákonná povinnosť** — Art. 6(1)(c), naša povinnosť preukázať súhlas podľa Art. 7(1) — a oprávnené záujmy na preukázaní zmluvy |
 | Vybavovanie žiadostí o podporu | Podpora | **Zmluva** — Art. 6(1)(b) |
-| Spracúvanie citlivých informácií, ktoré o sebe uvediete | Obsah debaty | **Výslovný súhlas** — Art. 9(2)(a), udelený samostatne pri registrácii |
+| Spracúvanie citlivých informácií, ktoré o sebe uvediete | Obsah debaty | **Výslovný súhlas** — Art. 9(2)(a), udelený na samostatnej obrazovke pred vašou prvou debatou |
 | Zverejnenie debaty, ktorú sa rozhodnete zverejniť | Obsah debaty, pseudonym | **Zmluva** — Art. 6(1)(b), na váš pokyn; v prípade citlivých údajov o vás Art. 9(2)(e) — údaje, ktoré ste preukázateľne zverejnili |
 | Zasielanie noviniek o produkte | E-mailová adresa | **Súhlas** — Art. 6(1)(a), nezačiarknuté políčko; môžete ho kedykoľvek odvolať v ktoromkoľvek e-maile alebo v Nastaveniach |
 | Plnenie daňových, účtovných a zákonných povinností [pending paid plans] | Platby, záznamy o prijatí | **Zákonná povinnosť** — Art. 6(1)(c) |

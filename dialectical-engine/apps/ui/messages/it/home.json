@@ -82,5 +82,18 @@
   "home.aiDisclosure": "Informativa sull’IA",
   "home.aiSupportLead": "Questa conversazione è con un assistente di supporto basato sull’IA.",
   "home.aiLinkLabel": "Come etichettiamo i contenuti generati dall’IA (si apre in una nuova scheda)",
-  "home.aiLink": "Come etichettiamo i contenuti generati dall’IA"
+  "home.aiLink": "Come etichettiamo i contenuti generati dall’IA",
+  "home.sensitiveConsent.eyebrow": "Prima del tuo primo dibattito",
+  "home.sensitiveConsent.title": "Le tue domande possono rivelare informazioni sensibili",
+  "home.sensitiveConsent.lede": "Una domanda su politica, religione, salute, sessualità o convinzioni può dire qualcosa di te. Per la legge si tratta di informazioni sensibili, perciò abbiamo bisogno del tuo consenso esplicito prima di trattarle.",
+  "home.sensitiveConsent.pointPurpose": "Usiamo ciò che scrivi solo per svolgere i tuoi dibattiti.",
+  "home.sensitiveConsent.pointModels": "Per svolgere un dibattito, inviamo la tua domanda ai modelli di IA che vi partecipano.",
+  "home.sensitiveConsent.pointOthers": "Non includere informazioni sensibili su altre persone.",
+  "home.sensitiveConsent.pointDelete": "Puoi cancellare un dibattito in qualsiasi momento.",
+  "home.sensitiveConsent.statement": "Acconsento al trattamento da parte di DebateAI delle informazioni sensibili che includo nelle mie domande, allo scopo di svolgere i miei dibattiti.",
+  "home.sensitiveConsent.privacyLink": "Leggi come le trattiamo nell’Informativa sulla privacy",
+  "home.sensitiveConsent.agree": "Acconsento",
+  "home.sensitiveConsent.decline": "Non acconsento",
+  "home.sensitiveConsent.declined": "Non puoi avviare un dibattito senza questo consenso. Te lo chiederemo di nuovo la prossima volta che ne avvierai uno.",
+  "home.sensitiveConsent.failed": "Non è stato possibile salvare la tua risposta. Riprova."
 }

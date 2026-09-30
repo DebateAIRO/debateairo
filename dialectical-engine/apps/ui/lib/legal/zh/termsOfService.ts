@@ -113,7 +113,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "本规则适用于您提交的内容、您使用服务的方式以及您发布的内容。" },
       { kind: "p", text: "不得提交他人的个人数据。 请就议题、论点及公共问题提问，而不要针对可识别的私人个体。不得包含姓名、联系方式、身份识别号码、图像、健康、财务或其他可识别某人的详情，也不得利用 DebateAI 建立针对个人的案卷、画像或档案。可以就公众人物履行公共职责的行为提问；不得以私人个体为目标提出问题。如果您确实提交此类数据，应对此负责，我们也可能移除相关内容。" },
-      { kind: "p", text: "您自己的敏感信息。 您提出的问题可能涉及您本人的健康、信仰、政治立场或其他敏感事项。您在注册时已对此表示同意。如果您居住地对健康数据有特别规定，附件 A 可能会指引您参阅单独的通知。" },
+      { kind: "p", text: "您自己的敏感信息。 您提出的问题可能涉及您本人的健康、信仰、政治立场或其他敏感事项。您会在首次辩论之前于单独的页面上对此表示同意。如果您居住地对健康数据有特别规定，附件 A 可能会指引您参阅单独的通知。" },
       { kind: "p", text: "不得提交或发布违法内容，包括诽谤性内容，煽动暴力或仇恨的内容，骚扰或威胁性内容，未经同意分享的私密影像，侵犯知识产权或保密义务的内容，泄露商业秘密的内容，构成儿童性虐待材料的内容，或违反制裁或出口管制的内容。" },
       { kind: "p", text: "不得利用 DebateAI 实施欺骗。 如可能造成误导，不得将生成输出冒充为人类撰写的内容；不得移除其 AI 生成标识，也不得利用其制造虚假共识、伪造证据或冒充他人。" },
       { kind: "p", text: "不得攻击本服务。 除 robots 文件所允许的范围外，不得自动访问、抓取、爬取或批量提取已发布辩论；不得规避速率限制、身份验证或发布控制；不得试图提取提示词或系统指令；不得通过提示词注入企图使引擎忽略其约束；未经我们书面许可，不得进行探测或负载测试。" },
@@ -332,7 +332,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "拉丁美洲 (西班牙语附件；仅在列明时适用)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] 在不存在合同必要性的情况下，同意是处理的依据；您在注册时明确同意我们处理您选择加入的任何敏感数据。您可以通过 [address] 行使 ARCO 权利，答复期限为 [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]。墨西哥：完整的 aviso de privacidad 见 [URL]；撤回期限为 [5] 天。阿根廷：[AAIP legend]；请在 10 天内使用 [URL] 的 botón de arrepentimiento。哥伦比亚： política de tratamiento 见 [URL]；撤回期限为 5 天。智利（自 2026 年 12 月 1 日起）：主管机构的联系方式为 […]；您可以通过订阅时使用的相同方式取消；数字服务不适用撤回权。" }
+      { kind: "p", text: "[Published in Spanish.] 在不存在合同必要性的情况下，同意是处理的依据；您在首次辩论之前明确同意我们处理您选择加入的任何敏感数据。您可以通过 [address] 行使 ARCO 权利，答复期限为 [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]。墨西哥：完整的 aviso de privacidad 见 [URL]；撤回期限为 [5] 天。阿根廷：[AAIP legend]；请在 10 天内使用 [URL] 的 botón de arrepentimiento。哥伦比亚： política de tratamiento 见 [URL]；撤回期限为 5 天。智利（自 2026 年 12 月 1 日起）：主管机构的联系方式为 […]；您可以通过订阅时使用的相同方式取消；数字服务不适用撤回权。" }
     ]
   },
   {

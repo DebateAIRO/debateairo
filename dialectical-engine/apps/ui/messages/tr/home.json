@@ -81,5 +81,18 @@
   "home.aiDisclosure": "Yapay zekâ bildirimi",
   "home.aiSupportLead": "Bu görüşme bir yapay zekâ destek görevlisiyle yapılmaktadır.",
   "home.aiLinkLabel": "Yapay zekâ içeriğini nasıl etiketliyoruz (yeni sekmede açılır)",
-  "home.aiLink": "Yapay zekâ içeriğini nasıl etiketliyoruz"
+  "home.aiLink": "Yapay zekâ içeriğini nasıl etiketliyoruz",
+  "home.sensitiveConsent.eyebrow": "İlk tartışmanızdan önce",
+  "home.sensitiveConsent.title": "Sorularınız hassas bilgileri açığa çıkarabilir",
+  "home.sensitiveConsent.lede": "Siyaset, din, sağlık, cinsellik veya inançlar hakkındaki bir soru, sizin hakkınızda bir şeyler söyleyebilir. Kanun bunu hassas bilgi olarak kabul eder; bu nedenle bu bilgileri işlemeden önce açık rızanızı almamız gerekir.",
+  "home.sensitiveConsent.pointPurpose": "Yazdıklarınızı yalnızca tartışmalarınızı yürütmek için kullanırız.",
+  "home.sensitiveConsent.pointModels": "Bir tartışmayı yürütmek için sorunuzu, o tartışmaya katılan yapay zekâ modellerine göndeririz.",
+  "home.sensitiveConsent.pointOthers": "Başka kişiler hakkındaki hassas bilgilere yer vermeyin.",
+  "home.sensitiveConsent.pointDelete": "Bir tartışmayı istediğiniz zaman silebilirsiniz.",
+  "home.sensitiveConsent.statement": "DebateAI'ın, kendi sorularıma dâhil ettiğim hassas bilgileri tartışmalarımı yürütme amacıyla işleyebileceğini kabul ediyorum.",
+  "home.sensitiveConsent.privacyLink": "Bu bilgileri nasıl ele aldığımızı Gizlilik Politikası'nda okuyun",
+  "home.sensitiveConsent.agree": "Kabul ediyorum",
+  "home.sensitiveConsent.decline": "Kabul etmiyorum",
+  "home.sensitiveConsent.declined": "Bu rıza olmadan tartışma başlatamazsınız. Bir sonraki tartışmayı başlattığınızda yeniden soracağız.",
+  "home.sensitiveConsent.failed": "Yanıtınız kaydedilemedi. Tekrar deneyin."
 }

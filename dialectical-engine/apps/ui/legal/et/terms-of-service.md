@@ -96,7 +96,7 @@ Need reeglid kehtivad teie esitatud sisu, teenuse kasutamise viisi ja avaldatava
 
 **Ärge esitage teiste inimeste isikuandmeid.** Esitage küsimusi teemade, argumentide ja avalike küsimuste, mitte tuvastatavate eraisikute kohta. Ärge lisage nime, kontaktandmeid, isikukoode, pilte, tervise-, finants- ega muid kedagi tuvastavaid andmeid ning ärge kasutage DebateAI-d isiku kohta süüdistusmaterjali, profiili või toimiku koostamiseks. Avaliku elu tegelaste kohta nende avalikus rollis esitatud küsimused on lubatud; eraisikule suunatud küsimused ei ole. Kui te selliseid andmeid siiski esitate, vastutate nende eest ja me võime sisu eemaldada.
 
-**Teie enda tundlik teave.** Teie küsimused võivad puudutada teie enda tervist, veendumusi, poliitilisi vaateid või muid tundlikke teemasid. Andsite registreerumisel selleks nõusoleku. Kui elate kohas, kus kehtivad terviseandmete erireeglid, võib lisa A suunata teid eraldi teate juurde.
+**Teie enda tundlik teave.** Teie küsimused võivad puudutada teie enda tervist, veendumusi, poliitilisi vaateid või muid tundlikke teemasid. Annate selleks nõusoleku eraldi ekraanikuval enne oma esimest väitlust. Kui elate kohas, kus kehtivad terviseandmete erireeglid, võib lisa A suunata teid eraldi teate juurde.
 
 **Ärge esitage ega avaldage ebaseaduslikku sisu**, sealhulgas sisu, mis on laimav, õhutab vägivallale või vihkamisele, ahistab või ähvardab, kujutab nõusolekuta jagatud intiimkujutisi, rikub intellektuaalomandit või konfidentsiaalsust, avaldab ärisaladusi, kujutab laste seksuaalset väärkohtlemist või rikub sanktsioone või ekspordikontrolli.
 
@@ -295,7 +295,7 @@ Meie privaatsusametnik on \[name, email\]. **Quebec:** need Tingimused on prants
 
 ### A.6 Ladina-Ameerika *(hispaaniakeelne lisa; ainult kui loetletud)*
 
-&#91;Published in Spanish.\] Nõusolek on töötlemise alus, kui lepinguline vajadus puudub; annate registreerumisel sõnaselge nõusoleku mis tahes tundlike andmete suhtes, mille otsustate lisada. Oma ARCO õigusi saate kasutada aadressil \[address\], vastused esitatakse \[Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719\] jooksul. *Mehhiko:* täielik *aviso de privacidad* on aadressil \[URL\]; taganemine \[5\] päeva jooksul. *Argentina:* \[AAIP legend\]; kasutage 10 päeva jooksul aadressil \[URL\] olevat *botón de arrepentimiento* nuppu. *Kolumbia:* *política de tratamiento* on aadressil \[URL\]; taganemine 5 päeva jooksul. *Tšiili* (alates 1. detsembrist 2026): ameti kontaktandmed on \[…\]; võite tühistada samal viisil, nagu tellisite; digiteenustele taganemisõigust ei kohaldata.
+&#91;Published in Spanish.\] Nõusolek on töötlemise alus, kui lepinguline vajadus puudub; annate enne oma esimest väitlust sõnaselge nõusoleku mis tahes tundlike andmete suhtes, mille otsustate lisada. Oma ARCO õigusi saate kasutada aadressil \[address\], vastused esitatakse \[Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719\] jooksul. *Mehhiko:* täielik *aviso de privacidad* on aadressil \[URL\]; taganemine \[5\] päeva jooksul. *Argentina:* \[AAIP legend\]; kasutage 10 päeva jooksul aadressil \[URL\] olevat *botón de arrepentimiento* nuppu. *Kolumbia:* *política de tratamiento* on aadressil \[URL\]; taganemine 5 päeva jooksul. *Tšiili* (alates 1. detsembrist 2026): ameti kontaktandmed on \[…\]; võite tühistada samal viisil, nagu tellisite; digiteenustele taganemisõigust ei kohaldata.
 
 ### A.7 Pärsia lahe piirkond — Araabia Ühendemiraadid ja Saudi Araabia *(ainult kui loetletud)*
 

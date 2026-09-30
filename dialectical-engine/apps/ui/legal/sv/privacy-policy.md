@@ -52,7 +52,7 @@ Vi samlar **inte** in analysdata eller telemetri om hur du använder produkten, 
 
 En debattmotor inbjuder till frågor om politik, religion, hälsa, sexualitet och övertygelse. Dessa är särskilda kategorier av uppgifter enligt artikel 9 i GDPR och de kan förekomma i dina frågor oavsett om vi avser att samla in dem eller inte.
 
-**Om dig.** När du registrerar dig lämnar du, i en separat mening, uttryckligt samtycke till att vi behandlar känsliga uppgifter som du väljer att ta med i dina egna frågor i syfte att genomföra dina debatter. Du kan när som helst återkalla det genom att inte ta med sådana uppgifter eller genom att radera en debatt. Det du publicerar om dig själv är uppgifter som du har valt att offentliggöra.
+**Om dig.** Före din första debatt lämnar du, på en separat skärm, uttryckligt samtycke till att vi behandlar känsliga uppgifter som du väljer att ta med i dina egna frågor i syfte att genomföra dina debatter. Vi dokumenterar vilken version av formuleringen du godkände, ditt språk och tidpunkten. Utan detta samtycke kan du inte starta en debatt. Du kan när som helst återkalla det genom att inte ta med sådana uppgifter eller genom att radera en debatt. Det du publicerar om dig själv är uppgifter som du har valt att offentliggöra.
 
 **Om andra personer.** Inget av undantagen i artikel 9.2 i GDPR tillåter oss att behandla känsliga uppgifter om en tredje person som du namnger i en fråga, och inte heller någon av våra AI-leverantörer kan åberopa ett sådant undantag. Därför förbjuder villkoren detta, därför minimerar vi det vi skickar och därför tar vi snabbt bort sådant innehåll på begäran — se avsnitt 11.
 
@@ -69,7 +69,7 @@ Varje ändamål har en enda rättslig grund enligt artikel 6.1 i GDPR, och vi å
 | Hålla tjänsten säker, upptäcka missbruk, låta dig upptäcka en inloggning som du inte har gjort och föra en granskningslogg | Sessioner, säkerhetslogg, hashvärden från supportens missbrukskontroller | **Berättigade intressen** — Art. 6(1)(f): våra och dina intressen av en säker tjänst. Du kan invända; se avsnitt 10 |
 | Bevisa att du godkände villkoren och lämnade eller återkallade ett samtycke | Uppgifter om godkännanden och samtycken | **Rättslig förpliktelse** — Art. 6(1)(c), vår skyldighet att kunna visa samtycke enligt Art. 7(1), samt berättigade intressen av att styrka avtalet |
 | Besvara supportförfrågningar | Support | **Avtal** — Art. 6(1)(b) |
-| Behandla känsliga uppgifter som du tar med om dig själv | Debattinnehåll | **Uttryckligt samtycke** — Art. 9(2)(a), lämnat separat vid registreringen |
+| Behandla känsliga uppgifter som du tar med om dig själv | Debattinnehåll | **Uttryckligt samtycke** — Art. 9(2)(a), lämnat på en separat skärm före din första debatt |
 | Publicera en debatt som du väljer att publicera | Debattinnehåll, pseudonym | **Avtal** — Art. 6(1)(b), på din instruktion; för känsliga uppgifter om dig, Art. 9(2)(e) — uppgifter som du på ett tydligt sätt har offentliggjort |
 | Skicka produktnyheter till dig | E-postadress | **Samtycke** — Art. 6(1)(a), en omarkerad ruta; kan när som helst återkallas via ett e-postmeddelande eller Inställningar |
 | Uppfylla skatte-, bokförings- och rättsliga skyldigheter [pending paid plans] | Betalningar, uppgifter om godkännanden | **Rättslig förpliktelse** — Art. 6(1)(c) |

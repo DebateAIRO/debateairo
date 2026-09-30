@@ -11,6 +11,7 @@ import { SCRUTINY_DEPTHS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { requestFailureMessage } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { SupportWidget } from "@/components/support/SupportWidget";
+import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
@@ -67,16 +68,19 @@ function grow(field: HTMLTextAreaElement | null): void {
 export default function NewDebatePageClient({
   catalog,
   homeCatalog,
-  chromeCatalog
+  chromeCatalog,
+  locale = "en"
 }: {
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
+  /** The interface locale, recorded with the sensitive-data consent. */
+  locale?: string;
 }) {
   return (
     <Suspense fallback={null}>
       <AuthGate catalog={catalog}>{(token) => (
-        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} />
+        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} />
       )}</AuthGate>
     </Suspense>
   );
@@ -86,12 +90,14 @@ function NewDebateForm({
   token,
   catalog,
   homeCatalog,
-  chromeCatalog
+  chromeCatalog,
+  locale
 }: {
   token: string;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
+  locale: string;
 }) {
   // Everything the AI notice can read, in every variant: home + chrome (+ newDebate).
   const noticeCatalog = { ...homeCatalog, ...chromeCatalog, ...catalog };
@@ -114,6 +120,7 @@ function NewDebateForm({
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
 
   useEffect(() => {
     let active = true;
@@ -163,6 +170,8 @@ function NewDebateForm({
     setSubmitting(true);
     setError(null);
     try {
+      // V, 2026-09-29: no debate starts before the one-time sensitive-data consent.
+      if (!await consent.ensureConsent()) return;
       const submitTime = new Date();
       setAsOf(dateTimeLocalValue(submitTime));
       const config = buildNewDebateAskConfig({
@@ -175,7 +184,14 @@ function NewDebateForm({
         asOfWasEdited: false,
         riskTierWasEdited
       }, submitTime, catalog);
-      const debate = await createDebate(topic.trim(), config, token);
+      let debate;
+      try {
+        debate = await createDebate(topic.trim(), config, token);
+      } catch (refusal) {
+        if (!isSensitiveDataConsentRefusal(refusal)) throw refusal;
+        if (!await consent.ensureConsent({ known: "required" })) return;
+        debate = await createDebate(topic.trim(), config, token);
+      }
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (exc) {
       // DL3-F7: see lib/v3/requestFailure.ts — the banner states what this page
@@ -202,6 +218,9 @@ function NewDebateForm({
         <div className="ndAiDisclosure"><AiNotice catalog={noticeCatalog} body={t(catalog, "newDebate.aiNotice")} /></div>
         <form onSubmit={submit} onKeyDown={onKeyDown}>
           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
+          {consent.declined ? (
+            <p className="sensitiveConsentDeclined" role="status">{t(homeCatalog, "home.sensitiveConsent.declined")}</p>
+          ) : null}
 
           <div className="ndTier" role="radiogroup" aria-label={t(catalog, "newDebate.planTier")}>
             {PLAN_TIER_OPTIONS.map((option) => (
@@ -403,6 +422,7 @@ function NewDebateForm({
             <span className="ndKeyHint">{t(catalog, "newDebate.keyHint")}</span>
           </div>
         </form>
+        {consent.dialog}
       </div>
       <SupportWidget />
     </div>

@@ -52,7 +52,7 @@ Recopilamos únicamente lo que una cuenta necesita para funcionar, lo que usted 
 
 Un motor de debate invita a formular preguntas sobre política, religión, salud, sexualidad y convicciones. Estas son categorías especiales de datos conforme al artículo 9 del RGPD y pueden aparecer en sus preguntas, tengamos o no intención de recopilarlas.
 
-**Sobre usted.** Cuando se registra, presta su consentimiento explícito, en una frase independiente, para que tratemos la información sensible que decida incluir en sus propias preguntas con el fin de ejecutar sus debates. Puede retirarlo en cualquier momento no incluyendo dicha información o eliminando un debate. Lo que publique sobre usted mismo son datos que ha decidido hacer públicos.
+**Sobre usted.** Antes de su primer debate, presta su consentimiento explícito, en una pantalla independiente, para que tratemos la información sensible que decida incluir en sus propias preguntas con el fin de ejecutar sus debates. Registramos la versión del texto que aceptó, su idioma y el momento en que lo hizo. Sin este consentimiento no puede iniciar un debate. Puede retirarlo en cualquier momento no incluyendo dicha información o eliminando un debate. Lo que publique sobre usted mismo son datos que ha decidido hacer públicos.
 
 **Sobre otras personas.** Ninguna condición jurídica nos permite tratar datos sensibles de un tercero al que usted mencione en una pregunta, y tampoco la tiene ninguno de nuestros proveedores de IA. Por eso los Términos lo prohíben, minimizamos lo que enviamos y retiramos rápidamente dicho contenido previa solicitud; véase la sección 11.
 
@@ -69,7 +69,7 @@ Cada finalidad tiene una única base jurídica conforme al artículo 6, apartado
 | Mantener la seguridad del servicio, detectar abusos, permitirle advertir un inicio de sesión que no realizó y conservar un registro de auditoría | Sesiones, registro de auditoría de seguridad, hashes de soporte contra abusos | **Intereses legítimos** — Art. 6(1)(f): nuestros y suyos en disponer de un servicio seguro. Puede oponerse; véase la sección 10 |
 | Demostrar que aceptó los Términos y que otorgó o retiró un consentimiento | Registros de aceptación y consentimiento | **Obligación legal** — Art. 6(1)(c), nuestro deber de demostrar el consentimiento conforme al Art. 7(1), e intereses legítimos en acreditar el contrato |
 | Responder a solicitudes de soporte | Soporte | **Contrato** — Art. 6(1)(b) |
-| Tratar información sensible que incluya sobre usted mismo | Contenido de los debates | **Consentimiento explícito** — Art. 9(2)(a), otorgado por separado al registrarse |
+| Tratar información sensible que incluya sobre usted mismo | Contenido de los debates | **Consentimiento explícito** — Art. 9(2)(a), otorgado en una pantalla independiente antes de su primer debate |
 | Publicar un debate que usted decide publicar | Contenido del debate, seudónimo | **Contrato** — Art. 6(1)(b), siguiendo sus instrucciones; respecto de datos sensibles sobre usted, Art. 9(2)(e): datos que ha hecho manifiestamente públicos |
 | Enviarle novedades del producto | Dirección de correo electrónico | **Consentimiento** — Art. 6(1)(a), una casilla sin marcar; puede retirarlo en cualquier momento desde cualquier correo electrónico o desde Configuración |
 | Cumplir obligaciones fiscales, contables y legales [pending paid plans] | Pagos, registros de aceptación | **Obligación legal** — Art. 6(1)(c) |

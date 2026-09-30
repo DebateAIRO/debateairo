@@ -82,5 +82,18 @@
   "home.aiDisclosure": "Información sobre la IA",
   "home.aiSupportLead": "Está conversando con un agente de soporte basado en IA.",
   "home.aiLinkLabel": "Cómo etiquetamos el contenido generado por IA (se abre en una pestaña nueva)",
-  "home.aiLink": "Cómo etiquetamos el contenido generado por IA"
+  "home.aiLink": "Cómo etiquetamos el contenido generado por IA",
+  "home.sensitiveConsent.eyebrow": "Antes de su primer debate",
+  "home.sensitiveConsent.title": "Sus preguntas pueden revelar información sensible",
+  "home.sensitiveConsent.lede": "Una pregunta sobre política, religión, salud, sexualidad o creencias puede decir algo sobre usted. La ley considera que se trata de información sensible, por lo que necesitamos su consentimiento explícito antes de tratarla.",
+  "home.sensitiveConsent.pointPurpose": "Solo utilizamos lo que escribe para llevar a cabo sus debates.",
+  "home.sensitiveConsent.pointModels": "Para llevar a cabo un debate, enviamos su pregunta a los modelos de IA que participan en él.",
+  "home.sensitiveConsent.pointOthers": "No incluya información sensible sobre otras personas.",
+  "home.sensitiveConsent.pointDelete": "Puede eliminar un debate en cualquier momento.",
+  "home.sensitiveConsent.statement": "Acepto que DebateAI trate la información sensible que yo incluya en mis propias preguntas, con el fin de llevar a cabo mis debates.",
+  "home.sensitiveConsent.privacyLink": "Lea en la Política de privacidad cómo la tratamos",
+  "home.sensitiveConsent.agree": "Acepto",
+  "home.sensitiveConsent.decline": "No acepto",
+  "home.sensitiveConsent.declined": "No puede iniciar un debate sin este consentimiento. Volveremos a pedírselo la próxima vez que inicie uno.",
+  "home.sensitiveConsent.failed": "No se pudo guardar su respuesta. Inténtelo de nuevo."
 }

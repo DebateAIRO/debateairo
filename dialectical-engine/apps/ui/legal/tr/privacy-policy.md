@@ -52,7 +52,7 @@ Yalnızca bir hesabın çalışması için gerekenleri, bize vermeyi seçtiğini
 
 Bir tartışma motoru siyaset, din, sağlık, cinsellik ve inanç hakkında sorular sorulmasına imkân verir. Bunlar GDPR'ın 9. maddesi kapsamında özel veri kategorileridir ve toplamayı amaçlayıp amaçlamadığımıza bakılmaksızın sorularınızda yer alabilirler.
 
-**Sizin hakkınızda.** Kayıt olurken, kendi sorularınıza dâhil etmeyi seçtiğiniz hassas bilgileri tartışmalarınızı yürütme amacıyla işlememize ayrı bir cümleyle açık rıza verirsiniz. Bu tür bilgilere yer vermeyerek veya bir tartışmayı silerek rızanızı istediğiniz zaman geri çekebilirsiniz. Kendiniz hakkında yayımladığınız bilgiler, alenileştirmeyi seçtiğiniz verilerdir.
+**Sizin hakkınızda.** İlk tartışmanızdan önce, kendi sorularınıza dâhil etmeyi seçtiğiniz hassas bilgileri tartışmalarınızı yürütme amacıyla işlememize ayrı bir ekranda açık rıza verirsiniz. Kabul ettiğiniz metnin sürümünü, dilinizi ve zamanı kaydederiz. Bu rıza olmadan tartışma başlatamazsınız. Bu tür bilgilere yer vermeyerek veya bir tartışmayı silerek rızanızı istediğiniz zaman geri çekebilirsiniz. Kendiniz hakkında yayımladığınız bilgiler, alenileştirmeyi seçtiğiniz verilerdir.
 
 **Diğer kişiler hakkında.** Bir soruda adını verdiğiniz üçüncü kişiye ait hassas verileri işlememize izin veren hiçbir hukuki şart yoktur; yapay zekâ sağlayıcılarımızdan hiçbiri için de böyle bir şart bulunmamaktadır. Koşulların bunu yasaklamasının, gönderdiklerimizi asgariye indirmemizin ve talep üzerine bu tür içeriği hızla kaldırmamızın nedeni budur — bölüm 11.
 
@@ -69,7 +69,7 @@ Her amacın GDPR'ın 6(1). maddesi kapsamında tek bir hukuki dayanağı vardır
 | Hizmeti güvenli tutmak, kötüye kullanımı tespit etmek, yapmadığınız bir oturum açma işlemini fark etmenizi sağlamak, denetim izi tutmak | Oturumlar, güvenlik denetim izi, desteğe iletilen kötüye kullanım içeriklerinin karmaları | **Meşru menfaatler** — Art. 6(1)(f): güvenli bir hizmet konusunda bizim ve sizin menfaatiniz. İtiraz edebilirsiniz; bölüm 10 |
 | Koşulları kabul ettiğinizi ve bir rıza verdiğinizi veya geri çektiğinizi kanıtlamak | Kabul ve rıza kayıtları | **Hukuki yükümlülük** — Art. 6(1)(c), Art. 7(1) kapsamında rızayı kanıtlama görevimiz — ve sözleşmeyi belgelendirmeye yönelik meşru menfaatler |
 | Destek taleplerini yanıtlamak | Destek | **Sözleşme** — Art. 6(1)(b) |
-| Kendiniz hakkında dâhil ettiğiniz hassas bilgileri işlemek | Tartışma içeriği | **Açık rıza** — Art. 9(2)(a), kayıt sırasında ayrıca verilir |
+| Kendiniz hakkında dâhil ettiğiniz hassas bilgileri işlemek | Tartışma içeriği | **Açık rıza** — Art. 9(2)(a), ilk tartışmanızdan önce ayrı bir ekranda verilir |
 | Yayımlamayı seçtiğiniz bir tartışmayı yayımlamak | Tartışma içeriği, takma ad | **Sözleşme** — Art. 6(1)(b), talimatınız üzerine; hakkınızdaki hassas veriler bakımından Art. 9(2)(e) — açıkça alenileştirdiğiniz veriler |
 | Size ürün haberleri göndermek | E-posta adresi | **Rıza** — Art. 6(1)(a), önceden işaretlenmemiş bir kutu; herhangi bir e-postadan veya Ayarlar'dan istediğiniz zaman geri çekebilirsiniz |
 | Vergi, muhasebe ve hukuki yükümlülükleri yerine getirmek \[pending paid plans\] | Ödemeler, kabul kayıtları | **Hukuki yükümlülük** — Art. 6(1)(c) |

@@ -2,6 +2,9 @@ import {
   AccountErasureCancelRequestSchema,
   AgeCheckResultSchema,
   AgeConfirmationStatusSchema,
+  SENSITIVE_DATA_NOTICE_VERSION,
+  SensitiveDataConsentStatusSchema,
+  type SensitiveDataConsentStatus,
   type AgeCheckResult,
   type AgeConfirmationStatus,
   AccountErasureCancelledSchema,
@@ -254,6 +257,10 @@ export interface ContractClient {
   readAgeConfirmation(): Promise<AgeConfirmationStatus>;
   /** `refused` freezes the account, ends its sessions and sets the lockout cookie. */
   confirmAge(dateOfBirth: string): Promise<AgeCheckResult>;
+  /** `required` until the account agrees, once, before its first debate. */
+  readSensitiveDataConsent(): Promise<SensitiveDataConsentStatus>;
+  /** Agrees to the current sensitive-data notice, shown in `locale`. */
+  giveSensitiveDataConsent(locale: string): Promise<SensitiveDataConsentStatus>;
   stepUp(password: string, code: string, authorization?:
     | Readonly<{
       action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
@@ -399,6 +406,12 @@ export function createContractClient(
       "/v1/auth/age-confirmation",
       AgeCheckResultSchema,
       { method: "POST", body: JSON.stringify({ date_of_birth: dateOfBirth }) }
+    ),
+    readSensitiveDataConsent: () => request("/v1/account/sensitive-data-consent", SensitiveDataConsentStatusSchema),
+    giveSensitiveDataConsent: (locale: string) => request(
+      "/v1/account/sensitive-data-consent",
+      SensitiveDataConsentStatusSchema,
+      { method: "POST", body: JSON.stringify({ notice_version: SENSITIVE_DATA_NOTICE_VERSION, locale }) }
     ),
     resendVerification: (email: string) => request(
       "/v1/auth/resend-verification",

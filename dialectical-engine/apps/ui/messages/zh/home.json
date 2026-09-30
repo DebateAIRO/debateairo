@@ -80,5 +80,18 @@
   "home.aiDisclosure": "AI 信息披露",
   "home.aiSupportLead": "您正在与 AI 支持助手对话。",
   "home.aiLinkLabel": "我们如何标识 AI 内容（在新标签页中打开）",
-  "home.aiLink": "我们如何标识 AI 内容"
+  "home.aiLink": "我们如何标识 AI 内容",
+  "home.sensitiveConsent.eyebrow": "开始首次辩论之前",
+  "home.sensitiveConsent.title": "您的问题可能会透露敏感信息",
+  "home.sensitiveConsent.lede": "有关政治、宗教、健康、性或信念的问题，可能会透露您的某些情况。法律将此类信息视为敏感信息，因此我们在处理之前需要征得您的明确同意。",
+  "home.sensitiveConsent.pointPurpose": "您所写的内容仅用于运行您的辩论。",
+  "home.sensitiveConsent.pointModels": "为运行辩论，我们会将您的问题发送给参与该辩论的 AI 模型。",
+  "home.sensitiveConsent.pointOthers": "请勿包含有关他人的敏感信息。",
+  "home.sensitiveConsent.pointDelete": "您可以随时删除辩论。",
+  "home.sensitiveConsent.statement": "我同意 DebateAI 以运行我的辩论为目的，处理我在自己的问题中包含的敏感信息。",
+  "home.sensitiveConsent.privacyLink": "阅读隐私政策，了解我们如何处理这些信息",
+  "home.sensitiveConsent.agree": "我同意",
+  "home.sensitiveConsent.decline": "我不同意",
+  "home.sensitiveConsent.declined": "若未给予此项同意，您将无法开始辩论。下次您开始辩论时，我们会再次询问。",
+  "home.sensitiveConsent.failed": "无法保存您的回答。请重试。"
 }

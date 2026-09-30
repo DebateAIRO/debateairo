@@ -81,7 +81,9 @@ vi.mock("@/components/AuthGate", () => ({
 }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/api.js")>()),
-  contractClient: { readDeployment: pageMocks.readDeployment, readSession: pageMocks.readSession },
+  // This account already gave its one-time sensitive-data consent (V, 2026-09-29).
+  contractClient: { readDeployment: pageMocks.readDeployment, readSession: pageMocks.readSession,
+    readSensitiveDataConsent: async () => ({ status: "given" as const }) },
   createDebate: pageMocks.createDebate
 }));
 

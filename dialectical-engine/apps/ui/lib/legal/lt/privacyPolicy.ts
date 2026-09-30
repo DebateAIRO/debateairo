@@ -65,7 +65,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Debatų variklis skatina kelti klausimus apie politiką, religiją, sveikatą, seksualumą ir įsitikinimus. Pagal GDPR 9 straipsnį tai yra specialių kategorijų duomenys, kurie gali patekti į jūsų klausimus nepriklausomai nuo to, ar ketiname juos rinkti." },
-      { kind: "p", text: "Apie jus. Registruodamiesi atskiru sakiniu duodate aiškų sutikimą, kad debatų vykdymo tikslu tvarkytume neskelbtiną informaciją, kurią nusprendžiate įtraukti į savo klausimus. Sutikimą galite bet kada atšaukti tokios informacijos neįtraukdami arba ištrindami debatus. Tai, ką paskelbiate apie save, yra duomenys, kuriuos patys nusprendėte paviešinti." },
+      { kind: "p", text: "Apie jus. Prieš pirmuosius savo debatus atskirame ekrane duodate aiškų sutikimą, kad debatų vykdymo tikslu tvarkytume neskelbtiną informaciją, kurią nusprendžiate įtraukti į savo klausimus. Užfiksuojame formuluotės, su kuria sutikote, versiją, jūsų kalbą ir laiką. Be šio sutikimo negalite pradėti debatų. Sutikimą galite bet kada atšaukti tokios informacijos neįtraukdami arba ištrindami debatus. Tai, ką paskelbiate apie save, yra duomenys, kuriuos patys nusprendėte paviešinti." },
       { kind: "p", text: "Apie kitus asmenis. Jokia teisinė sąlyga neleidžia mums tvarkyti neskelbtinų duomenų apie trečiąjį asmenį, kurį įvardijate klausime, ir tokios sąlygos neturi nė vienas mūsų DI paslaugų teikėjas. Todėl Sąlygos tai draudžia, todėl kuo labiau ribojame siunčiamus duomenis ir todėl gavę prašymą tokį turinį greitai pašaliname — žr. 11 skyrių." },
       { kind: "p", text: "Sveikatos informacija. Kai kurios šalys su sveikata susijusius duomenis, įskaitant išvadas, reglamentuoja specialiais įstatymais. Jei gyvenate [the State of Washington], taikomas atskiras [Consumer Health Data Privacy Notice]." }
     ]
@@ -84,7 +84,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Užtikrinti paslaugos saugumą, nustatyti piktnaudžiavimą, leisti jums pastebėti ne jūsų atliktą prisijungimą, tvarkyti audito žurnalą — Seansai, saugumo audito žurnalas, pagalbos piktnaudžiavimo maišos — Teisėti interesai — Art. 6(1)(f): mūsų ir jūsų interesas naudotis saugia paslauga. Galite nesutikti; žr. 10 skyrių",
         "Įrodyti, kad sutikote su Sąlygomis ir davėte arba atšaukėte sutikimą — Sutikimo su sąlygomis ir kitų sutikimų įrašai — Teisinė prievolė — Art. 6(1)(c), mūsų pareiga įrodyti sutikimą pagal Art. 7(1), ir teisėtas interesas įrodyti sutarties sudarymą",
         "Atsakyti į pagalbos prašymus — Pagalbos duomenys — Sutartis — Art. 6(1)(b)",
-        "Tvarkyti neskelbtiną informaciją, kurią apie save įtraukiate — Debatų turinys — Aiškus sutikimas — Art. 9(2)(a), duotas atskirai registruojantis",
+        "Tvarkyti neskelbtiną informaciją, kurią apie save įtraukiate — Debatų turinys — Aiškus sutikimas — Art. 9(2)(a), duotas atskirame ekrane prieš pirmuosius jūsų debatus",
         "Paskelbti debatus, kuriuos nusprendžiate paskelbti — Debatų turinys, slapyvardis — Sutartis — Art. 6(1)(b), pagal jūsų nurodymą; jūsų neskelbtiniems duomenims — Art. 9(2)(e), duomenys, kuriuos akivaizdžiai paviešinote",
         "Siųsti jums produkto naujienas — El. pašto adresas — Sutikimas — Art. 6(1)(a), iš anksto nepažymėtas langelis; bet kada atšaukite bet kuriame el. laiške arba Nustatymuose",
         "Vykdyti mokestines, apskaitos ir teisines prievoles [pending paid plans] — Mokėjimai, sutikimo įrašai — Teisinė prievolė — Art. 6(1)(c)",

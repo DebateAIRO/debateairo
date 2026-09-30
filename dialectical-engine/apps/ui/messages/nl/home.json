@@ -81,5 +81,18 @@
   "home.aiDisclosure": "AI-melding",
   "home.aiSupportLead": "U voert dit gesprek met een AI-ondersteuningsagent.",
   "home.aiLinkLabel": "Hoe wij AI-inhoud aanduiden (wordt geopend in een nieuw tabblad)",
-  "home.aiLink": "Hoe wij AI-inhoud aanduiden"
+  "home.aiLink": "Hoe wij AI-inhoud aanduiden",
+  "home.sensitiveConsent.eyebrow": "Vóór uw eerste debat",
+  "home.sensitiveConsent.title": "Uw vragen kunnen gevoelige informatie prijsgeven",
+  "home.sensitiveConsent.lede": "Een vraag over politiek, religie, gezondheid, seksualiteit of overtuigingen kan iets over u zeggen. De wet beschouwt dit als gevoelige informatie; daarom hebben wij uw uitdrukkelijke toestemming nodig voordat wij die verwerken.",
+  "home.sensitiveConsent.pointPurpose": "Wij gebruiken wat u schrijft uitsluitend om uw debatten uit te voeren.",
+  "home.sensitiveConsent.pointModels": "Om een debat uit te voeren, sturen wij uw vraag naar de AI-modellen die eraan deelnemen.",
+  "home.sensitiveConsent.pointOthers": "Neem geen gevoelige informatie over andere personen op.",
+  "home.sensitiveConsent.pointDelete": "U kunt een debat op elk moment verwijderen.",
+  "home.sensitiveConsent.statement": "Ik ga ermee akkoord dat DebateAI de gevoelige informatie die ik in mijn eigen vragen opneem, mag verwerken met als doel mijn debatten uit te voeren.",
+  "home.sensitiveConsent.privacyLink": "Lees in het privacybeleid hoe wij daarmee omgaan",
+  "home.sensitiveConsent.agree": "Ik ga akkoord",
+  "home.sensitiveConsent.decline": "Ik ga niet akkoord",
+  "home.sensitiveConsent.declined": "Zonder deze toestemming kunt u geen debat starten. Wij vragen het u opnieuw wanneer u de volgende keer een debat start.",
+  "home.sensitiveConsent.failed": "Uw antwoord kon niet worden opgeslagen. Probeer het opnieuw."
 }

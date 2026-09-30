@@ -23,7 +23,8 @@ vi.mock("@/components/AuthGate", () => ({
 
 vi.mock("@/lib/api", () => ({
   createDebate: mocks.createDebate,
-  contractClient: { readSession: mocks.readSession }
+  // This account already gave its one-time sensitive-data consent (V, 2026-09-29).
+  contractClient: { readSession: mocks.readSession, readSensitiveDataConsent: async () => ({ status: "given" as const }) }
 }));
 
 import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
