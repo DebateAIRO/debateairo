@@ -56,6 +56,11 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
     await mount(await SignUpPage());
     expect(document.body.textContent).toContain(G1);
     expect(document.querySelector('form[data-form="signup"]')).toBeNull();
+    // G1 is said once, and signing in stays reachable (spec §2.3.3, §1.5).
+    expect(document.body.textContent!.split(G1).length - 1).toBe(1);
+    const logIn = document.querySelector<HTMLAnchorElement>('a[href="/login"]');
+    expect(logIn).not.toBeNull();
+    expect(logIn!.textContent).toBe("Log in");
   });
 
   it("shows the form when sign-up is open, and when the check itself fails", async () => {

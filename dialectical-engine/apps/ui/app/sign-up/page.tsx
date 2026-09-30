@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
@@ -44,7 +45,9 @@ export default async function SignUpPage() {
         description={t(catalog, "auth.signUp.countryUnavailable")}
         footer={null}
       >
-        <p className="authFinePrint" role="status">{t(catalog, "auth.signUp.countryUnavailable")}</p>
+        <p className="authPanelFooter">
+          {t(catalog, "auth.signUp.alreadyHaveOne")} <Link href="/login">{t(catalog, "auth.signUp.logIn")}</Link>
+        </p>
       </AuthShell>
     );
   }
