@@ -31,6 +31,7 @@ import {
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
+  readCountryPolicy,
   readStoryPolicyFromRegister,
   readAuthPolicy,
   readMfaPolicy,
@@ -53,6 +54,8 @@ import {
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
 import { RepositoryLegalAcceptanceApplication } from "./legal.js";
 import { AdmissionLimiter } from "./admission.js";
+import { openGeoLookup } from "@debateai/geo";
+import { CountryGate, countryPolicyInForce } from "./country-gate.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
@@ -228,6 +231,29 @@ const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(p
 const recoveryPolicy = await boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION));
 /**
+ * Paid plans G3a (amendment A14): the country gate runs only in hosted mode AND when the register
+ * version in force publishes `countryPolicy` — one decision, countryPolicyInForce, which never reads
+ * the row in local mode. The row is read under the ledger; the data files are opened
+ * (GEOIP_PATHS_REQUIRED already guaranteed their paths in hosted mode) and held, so a missing file
+ * refuses the boot with its own code and zeroes nothing it should not.
+ */
+const countryPolicy = await boot.run("country-policy", () => countryPolicyInForce(
+  environment.DEPLOYMENT_MODE,
+  () => readCountryPolicy(pool, environment.REGISTER_VERSION)
+));
+await boot.run("country-gate-admission", async () => {
+  if (countryPolicy !== null && admissionPolicy.geoAvailability === null) {
+    throw new TypedDomainError("GEO_AVAILABILITY_ADMISSION_UNSEALED",
+      "A hosted register with countryPolicy must also seal the geoAvailability admission scope");
+  }
+});
+const geoLookup = countryPolicy === null ? undefined : boot.runSync("geo-lookup", () => openGeoLookup({
+  countryDbPath: environment.GEOIP_COUNTRY_DB_PATH!,
+  torListPath: environment.TOR_EXIT_LIST_PATH!,
+  onReloadFailure: (code) => console.error(JSON.stringify({ event: "geo.reload.failed", code }))
+}));
+if (geoLookup !== undefined) boot.hold({ end: async () => { geoLookup.close(); } });
+/**
  * TASK 11 AMENDMENT (V-28, from task 8's review). The support chat's three
  * admission budgets are OPTIONAL members of the row, so a host pinned to an
  * older `REGISTER_VERSION` runs unmetered support reads and an unshared model
@@ -295,6 +321,12 @@ const auditContextHasher = new AuditContextHasher(
 // The hasher holds the Argon2 salt copy; it closes with the rest of the boot.
 boot.hold({ end: async () => auditContextHasher.close() });
 const identityRepository = new PostgresIdentityRepository(pool, auditContextHasher);
+const countryGate = countryPolicy === null || geoLookup === undefined ? undefined : new CountryGate({
+  policy: countryPolicy,
+  lookup: geoLookup,
+  audit: identityRepository,
+  onAuditFailure: (code) => console.error(JSON.stringify({ event: "api.country_gate.audit_failed", code }))
+});
 sourceIpSalt.fill(0);
 const hatchet = new Hatchet({
   token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
@@ -746,6 +778,7 @@ const api = buildApi({
   legal,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
+  ...(countryGate === undefined ? {} : { countryGate }),
   support: {
     configuration: supportConfiguration,
     // DL5-F3: the caller's network is pseudonymised under a key derived from
@@ -815,6 +848,8 @@ const startup = installStartupResourceOwner({
     supportRelayLeasePool,
     { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() },
+    // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
+    { end: async () => { geoLookup?.close(); } },
     // L1: the records key outlives the boot ledger; it is zeroed after every pool has closed.
     { end: async () => { recordsKey.fill(0); } }
   ],

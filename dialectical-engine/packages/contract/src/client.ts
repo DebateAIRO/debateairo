@@ -8,6 +8,8 @@ import {
   LegalStatusResponseSchema,
   type LegalAcceptRequest,
   type LegalStatusResponse,
+  GeoAvailabilityResponseSchema,
+  type GeoAvailabilityResponse,
   AccountErasureCancelledSchema,
   AccountErasureStatusSchema,
   AnswerSchema,
@@ -311,6 +313,8 @@ export interface ContractClient {
   /** Paid plans L4: the documents this person must accept again before the page shows. */
   getLegalStatus(locale: string): Promise<LegalStatusResponse>;
   acceptLegal(input: LegalAcceptRequest): Promise<void>;
+  /** Paid plans G3a: whether this address may sign up and pay — two booleans, never the country. */
+  getGeoAvailability(): Promise<GeoAvailabilityResponse>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
@@ -557,6 +561,7 @@ export function createContractClient(
       root.href, fetchImplementation, "/v1/account/legal-accept",
       { method: "POST", body: JSON.stringify(input) }, auth
     ),
+    getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),

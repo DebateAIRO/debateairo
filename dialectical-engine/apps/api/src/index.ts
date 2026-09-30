@@ -55,7 +55,8 @@ import {
   RegisterLegalDocumentsSchema,
   type RegisterLegalDocuments,
   LegalAcceptRequestSchema,
-  LegalStatusResponseSchema
+  LegalStatusResponseSchema,
+  GeoAvailabilityResponseSchema
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
@@ -105,8 +106,9 @@ import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { LegalAcceptanceApplication } from "./legal.js";
+import type { CountryGate } from "./country-gate.js";
 import type { RecoveryApplication } from "./recovery.js";
-import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+import { clientIpNetworkScope, normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import {
   installSupportRoutes,
   type SupportAdmission,
@@ -1114,6 +1116,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+  { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // DL1-F7: every mutating support route requires the exact first-party Origin,
   // for anonymous callers too. Without it a page on any site could drive every
   // one of its visitors' browsers into the support surface — spending the shared
@@ -1157,7 +1160,7 @@ export const authorizationPolicyInventory = Object.freeze([
   session?: RouteSessionPolicy;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status";
+    "support-status" | "geo";
   action: string;
 }>[]);
 
@@ -1345,6 +1348,11 @@ export interface ApiOptions {
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
   readonly support?: SupportApplication;
+  /**
+   * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
+   * register version in force publishes `countryPolicy`; absent, every route behaves exactly as before.
+   */
+  readonly countryGate?: CountryGate;
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -1587,14 +1595,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     readonly headers: Readonly<Record<string, unknown>>;
     readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
   }) => {
-    const countryCode = edgeCountry(request.headers);
+    // Registration, MFA and sessions share T2's one canonical public source.
+    const ip = normalizeClientIp(request.ip)
+      ?? normalizeClientIp(request.raw.socket.remoteAddress)
+      ?? "unknown";
+    // Age gate + paid plans G3a (RULINGS-R3 R3-3): the country recorded with an age check — the edge's
+    // cf-ipcountry when a Cloudflare edge reported one, else the country gate's own lookup of this
+    // address when a gate is composed (the V3 kit has Caddy, no Cloudflare). Recorded, never decisive.
+    const countryCode = edgeCountry(request.headers) ?? options.countryGate?.recordedCountry(ip) ?? null;
     // Paid plans L3b: present only on a register request whose hook parsed a well-formed triple.
     const legal = registerLegalDocuments.get(request);
     return Object.freeze({
-      // Registration, MFA and sessions share T2's one canonical public source.
-      ip: normalizeClientIp(request.ip)
-        ?? normalizeClientIp(request.raw.socket.remoteAddress)
-        ?? "unknown",
+      ip,
       userAgent: typeof request.headers["user-agent"] === "string"
         ? request.headers["user-agent"] as string
         : "unknown",
@@ -1725,6 +1737,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return;
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
+  });
+  /**
+   * Paid plans G3a (spec §2.3.3): the country gate in front of register. The registration mount region
+   * is frozen (S04), so — like the age gate below — the refusal is decided in a hook, before the date of
+   * birth is judged and before any account work. The answer is the code only.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
+    if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
   });
   /**
    * Age gate (8d → 8j) in front of register. The registration mount region is frozen (S04), so
@@ -1931,12 +1953,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (dateOfBirth === null) {
         return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
+      const source = sourceFor(request);
       const outcome = await options.sessions!.confirmAccountAge(authenticated, {
         passed: meetsMinimumAge(dateOfBirth),
         minAgeApplied: MIN_AGE,
-        countryCode: edgeCountry(request.headers),
+        // R3-3: the same recorded country as registration — the edge's, else the country gate's.
+        countryCode: source.countryCode ?? null,
         ruleVersion: AGE_RULE_VERSION
-      }, sourceFor(request));
+      }, source);
       if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       if (outcome === "passed") return reply.send({ outcome: "allowed" });
       // Frozen: every session of the account is gone; this browser keeps the refusal.
@@ -2222,6 +2246,20 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(204).send();
     }
   );
+  // Paid plans G3a: the sign-up page's country check. Public, after the registration region (S04), and
+  // keyed by the source's NETWORK scope (DL5-F3: an IPv6 address counts as its /64).
+  api.get("/v1/geo/availability", routePolicy("GET /v1/geo/availability"), async (request, reply) => {
+    const source = sourceFor(request);
+    if (options.admission?.configured("geoAvailability") === true
+      && !admitOrRefuse(reply, "geoAvailability", "GET /v1/geo/availability", clientIpNetworkScope(source.ip))) {
+      return reply;
+    }
+    // No gate composed (local mode, or hosted without countryPolicy): sign-up is open and payment is
+    // not offered through this answer.
+    return reply.send(GeoAvailabilityResponseSchema.parse(
+      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false }
+    ));
+  });
 
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
@@ -2327,6 +2365,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
+    // Paid plans G3a: no new debate from an always-blocked country. Reading is never gated.
+    const countryRefusal = options.countryGate?.ask(sourceFor(request)) ?? null;
+    if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
     const ask = parseRequest(AskRequestSchema, request.body);
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });

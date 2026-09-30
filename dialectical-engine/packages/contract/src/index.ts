@@ -260,6 +260,9 @@ export const LegalAcceptRequestSchema = z.object({
   locale: z.string().regex(/^[a-z]{2}$/u)
 }).strict();
 export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
+/** Paid plans G3a: two booleans — never the country the server saw. */
+export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean() }).strict();
+export type GeoAvailabilityResponse = z.infer<typeof GeoAvailabilityResponseSchema>;
 export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
   "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
@@ -801,6 +804,7 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
+    "GET /v1/geo/availability",
     "POST /v1/support/sessions",
     "GET /v1/support/sessions/{id}",
     "POST /v1/support/sessions/{id}/messages",
@@ -836,7 +840,7 @@ export const contractInventory = Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
-    LegalStatusResponseSchema, LegalAcceptRequestSchema,
+    LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
