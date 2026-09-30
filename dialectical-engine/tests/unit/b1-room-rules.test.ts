@@ -72,13 +72,13 @@ describe("B1 decideSharedWall — the running wall, real spend only", () => {
     decideSharedWall({ spentMicros, projectedMicros: 0, limitMicros: LIMIT, finishBasisPoints });
 
   it.each([[109_990, "WITHIN"], [110_000, "WITHIN"], [110_010, "WOULD_CROSS"]] as const)(
-    "a person window (finish 110%%): %i spent is %s", (spent, expected) => {
+    "a person window (finish 110 percent): %i spent is %s", (spent, expected) => {
       expect(wall(spent, 11_000)).toBe(expected);
     }
   );
 
   it.each([[114_990, "WITHIN"], [115_000, "WITHIN"], [115_010, "WOULD_CROSS"]] as const)(
-    "the site's day (finish 115%%): %i spent is %s", (spent, expected) => {
+    "the site's day (finish 115 percent): %i spent is %s", (spent, expected) => {
       expect(wall(spent, 11_500)).toBe(expected);
     }
   );
