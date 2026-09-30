@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Á shábháil…",
   "newDebate.legalGate.failed": "Níorbh fhéidir do ghlacadh a shábháil. Bain triail eile as.",
   "newDebate.legalGate.stale": "Athraíodh ceann de na doiciméid díreach anois. Athlódáil an leathanach chun an leagan reatha a léamh.",
+  "newDebate.legalGate.reload": "Athlódáil an leathanach",
   "newDebate.legalGate.manageAccount": "Bainistigh nó scrios do chuntas",
   "newDebate.legalGate.signOut": "Sínigh amach",
   "newDebate.legalGate.signOutFailed": "Níor críochnaíodh an síniú amach. Bain triail eile as.",

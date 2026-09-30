@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Opslaan…",
   "newDebate.legalGate.failed": "Uw acceptatie kon niet worden opgeslagen. Probeer het opnieuw.",
   "newDebate.legalGate.stale": "Een van de documenten is zojuist gewijzigd. Laad de pagina opnieuw om de huidige versie te lezen.",
+  "newDebate.legalGate.reload": "Pagina opnieuw laden",
   "newDebate.legalGate.manageAccount": "Uw account beheren of verwijderen",
   "newDebate.legalGate.signOut": "Afmelden",
   "newDebate.legalGate.signOutFailed": "Het afmelden is niet voltooid. Probeer het opnieuw.",

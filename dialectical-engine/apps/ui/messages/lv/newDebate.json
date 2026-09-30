@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Saglabā…",
   "newDebate.legalGate.failed": "Jūsu piekrišanu neizdevās saglabāt. Lūdzu, mēģiniet vēlreiz.",
   "newDebate.legalGate.stale": "Viens no dokumentiem tikko mainījās. Pārlādējiet lapu, lai izlasītu pašreizējo versiju.",
+  "newDebate.legalGate.reload": "Pārlādēt lapu",
   "newDebate.legalGate.manageAccount": "Pārvaldīt vai dzēst kontu",
   "newDebate.legalGate.signOut": "Izrakstīties",
   "newDebate.legalGate.signOutFailed": "Izrakstīšanās netika pabeigta. Lūdzu, mēģiniet vēlreiz.",

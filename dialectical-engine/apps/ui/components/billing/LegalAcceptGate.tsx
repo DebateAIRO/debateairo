@@ -28,18 +28,25 @@ type GateError = "failed" | "stale" | "signOutFailed";
  * TWO WAYS OUT. Declining new terms never costs a person their account rights: the screen offers
  * sign-out and a link to /settings, which AuthGate never covers (legalGate={false}), so account
  * deletion, consent withdrawal and sign-out stay reachable without accepting anything.
+ *
+ * A STALE PAIR (final review M-3), handled as sign-up handles it (SignUpFlow): the documents ship
+ * with the page, so the page is what reloads, and the screen offers that reload. Until it happens
+ * the read marks are withdrawn, so "Accept and continue" cannot send the stale pair again.
  */
 export function LegalAcceptGate({
   catalog,
   children,
   client = contractClient,
-  onSignedOut = () => window.location.assign("/login")
+  onSignedOut = () => window.location.assign("/login"),
+  reloadPage = () => window.location.reload()
 }: Readonly<{
   catalog?: MessageCatalog | undefined;
   children: ReactNode;
   client?: GateClient;
   /** Where a signed-out person goes; a prop so render tests never navigate jsdom. */
   onSignedOut?: () => void;
+  /** Reloads the page after LEGAL_DOCUMENT_STALE, as sign-up does; a prop so render tests stay in jsdom. */
+  reloadPage?: () => void;
 }>) {
   const { locale } = useChromeI18n();
   const terms = useLegalDocument("terms");
@@ -97,7 +104,11 @@ export function LegalAcceptGate({
       // Once acceptLegal has resolved the acceptance IS recorded, so a failed re-read is only a failed
       // status read: ruling Q-10 lets the page through, never "could not be saved".
       if (saved) setState("clear");
-      else setError(failure instanceof ContractHttpError && failure.serverCode === "LEGAL_DOCUMENT_STALE" ? "stale" : "failed");
+      else if (failure instanceof ContractHttpError && failure.serverCode === "LEGAL_DOCUMENT_STALE") {
+        // The pair on this page is no longer current: withdraw the read marks until the page reloads.
+        setRead(new Set());
+        setError("stale");
+      } else setError("failed");
     } finally {
       setBusy(false);
     }
@@ -131,6 +142,11 @@ export function LegalAcceptGate({
                 : t(catalog, "newDebate.legalGate.failed")}
           </div>
         )}
+        {error === "stale" ? (
+          <button className="authTextButton" type="button" onClick={reloadPage}>
+            {t(catalog, "newDebate.legalGate.reload")}
+          </button>
+        ) : null}
         <ul className="legalGateList">
           {required.includes("TERMS") ? (
             <li>

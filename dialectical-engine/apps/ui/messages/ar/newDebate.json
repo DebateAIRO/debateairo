@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "جارٍ الحفظ…",
   "newDebate.legalGate.failed": "تعذّر حفظ قبولك. يُرجى المحاولة مرة أخرى.",
   "newDebate.legalGate.stale": "تغيّر أحد المستندات قبل لحظات. أعد تحميل الصفحة لقراءة النسخة الحالية.",
+  "newDebate.legalGate.reload": "إعادة تحميل الصفحة",
   "newDebate.legalGate.manageAccount": "إدارة حسابك أو حذفه",
   "newDebate.legalGate.signOut": "تسجيل الخروج",
   "newDebate.legalGate.signOutFailed": "لم يكتمل تسجيل الخروج. يُرجى المحاولة مرة أخرى.",

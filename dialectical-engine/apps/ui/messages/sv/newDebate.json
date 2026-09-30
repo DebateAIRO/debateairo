@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Sparar…",
   "newDebate.legalGate.failed": "Ditt godkännande kunde inte sparas. Försök igen.",
   "newDebate.legalGate.stale": "Ett av dokumenten ändrades nyss. Ladda om sidan för att läsa den gällande versionen.",
+  "newDebate.legalGate.reload": "Ladda om sidan",
   "newDebate.legalGate.manageAccount": "Hantera eller radera ditt konto",
   "newDebate.legalGate.signOut": "Logga ut",
   "newDebate.legalGate.signOutFailed": "Utloggningen slutfördes inte. Försök igen.",

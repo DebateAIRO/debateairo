@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Mentés…",
   "newDebate.legalGate.failed": "Az elfogadását nem sikerült menteni. Kérjük, próbálja újra.",
   "newDebate.legalGate.stale": "Az egyik dokumentum az imént megváltozott. Töltse be újra az oldalt a hatályos változat elolvasásához.",
+  "newDebate.legalGate.reload": "Oldal újratöltése",
   "newDebate.legalGate.manageAccount": "Fiók kezelése vagy törlése",
   "newDebate.legalGate.signOut": "Kijelentkezés",
   "newDebate.legalGate.signOutFailed": "A kijelentkezés nem fejeződött be. Kérjük, próbálja újra.",

@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Tallennetaan…",
   "newDebate.legalGate.failed": "Hyväksyntääsi ei voitu tallentaa. Yritä uudelleen.",
   "newDebate.legalGate.stale": "Yksi asiakirjoista muuttui juuri. Lataa sivu uudelleen, niin voit lukea voimassa olevan version.",
+  "newDebate.legalGate.reload": "Lataa sivu uudelleen",
   "newDebate.legalGate.manageAccount": "Hallitse tiliäsi tai poista se",
   "newDebate.legalGate.signOut": "Kirjaudu ulos",
   "newDebate.legalGate.signOutFailed": "Uloskirjautuminen ei onnistunut. Yritä uudelleen.",

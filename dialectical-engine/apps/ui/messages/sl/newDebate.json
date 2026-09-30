@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Shranjevanje…",
   "newDebate.legalGate.failed": "Vašega sprejetja ni bilo mogoče shraniti. Poskusite znova.",
   "newDebate.legalGate.stale": "Eden od dokumentov se je pravkar spremenil. Znova naložite stran, da preberete trenutno različico.",
+  "newDebate.legalGate.reload": "Znova naloži stran",
   "newDebate.legalGate.manageAccount": "Upravljajte ali izbrišite svoj račun",
   "newDebate.legalGate.signOut": "Odjava",
   "newDebate.legalGate.signOutFailed": "Odjava ni bila dokončana. Poskusite znova.",

@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Запазване…",
   "newDebate.legalGate.failed": "Приемането ви не можа да бъде запазено. Моля, опитайте отново.",
   "newDebate.legalGate.stale": "Един от документите току-що се промени. Презаредете страницата, за да прочетете актуалната версия.",
+  "newDebate.legalGate.reload": "Презаредете страницата",
   "newDebate.legalGate.manageAccount": "Управлявайте или изтрийте профила си",
   "newDebate.legalGate.signOut": "Излизане",
   "newDebate.legalGate.signOutFailed": "Излизането не завърши. Моля, опитайте отново.",

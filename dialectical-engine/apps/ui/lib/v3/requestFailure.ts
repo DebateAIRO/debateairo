@@ -225,6 +225,7 @@ const LEGAL_GATE_MESSAGE_KEYS = Object.freeze([
   "newDebate.legalGate.accepting",
   "newDebate.legalGate.failed",
   "newDebate.legalGate.stale",
+  "newDebate.legalGate.reload",
   "newDebate.legalGate.manageAccount",
   "newDebate.legalGate.signOut",
   "newDebate.legalGate.signOutFailed"

@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "A guardar…",
   "newDebate.legalGate.failed": "Não foi possível guardar a sua aceitação. Tente novamente.",
   "newDebate.legalGate.stale": "Um dos documentos mudou há instantes. Recarregue a página para ler a versão em vigor.",
+  "newDebate.legalGate.reload": "Recarregar a página",
   "newDebate.legalGate.manageAccount": "Gerir ou eliminar a sua conta",
   "newDebate.legalGate.signOut": "Terminar sessão",
   "newDebate.legalGate.signOutFailed": "Não foi possível terminar a sessão. Tente novamente.",

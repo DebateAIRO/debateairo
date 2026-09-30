@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Сохранение…",
   "newDebate.legalGate.failed": "Не удалось сохранить ваше согласие. Повторите попытку.",
   "newDebate.legalGate.stale": "Один из документов только что изменился. Перезагрузите страницу, чтобы прочитать действующую версию.",
+  "newDebate.legalGate.reload": "Перезагрузить страницу",
   "newDebate.legalGate.manageAccount": "Управлять аккаунтом или удалить его",
   "newDebate.legalGate.signOut": "Выйти",
   "newDebate.legalGate.signOutFailed": "Не удалось завершить выход. Повторите попытку.",

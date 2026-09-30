@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "מתבצעת שמירה…",
   "newDebate.legalGate.failed": "לא ניתן היה לשמור את האישור. יש לנסות שוב.",
   "newDebate.legalGate.stale": "אחד המסמכים השתנה לפני רגע. יש לטעון מחדש את הדף כדי לקרוא את הגרסה העדכנית.",
+  "newDebate.legalGate.reload": "טעינת הדף מחדש",
   "newDebate.legalGate.manageAccount": "ניהול החשבון או מחיקתו",
   "newDebate.legalGate.signOut": "התנתקות",
   "newDebate.legalGate.signOutFailed": "ההתנתקות לא הושלמה. יש לנסות שוב.",

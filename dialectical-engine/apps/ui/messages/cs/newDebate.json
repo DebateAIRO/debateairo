@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Ukládání…",
   "newDebate.legalGate.failed": "Vaše přijetí se nepodařilo uložit. Zkuste to prosím znovu.",
   "newDebate.legalGate.stale": "Jeden z dokumentů se právě změnil. Znovu načtěte stránku a přečtěte si aktuální verzi.",
+  "newDebate.legalGate.reload": "Znovu načíst stránku",
   "newDebate.legalGate.manageAccount": "Spravovat nebo smazat účet",
   "newDebate.legalGate.signOut": "Odhlásit se",
   "newDebate.legalGate.signOutFailed": "Odhlášení se nedokončilo. Zkuste to prosím znovu.",

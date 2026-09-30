@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Đang lưu…",
   "newDebate.legalGate.failed": "Không thể lưu sự chấp nhận của bạn. Vui lòng thử lại.",
   "newDebate.legalGate.stale": "Một trong các tài liệu vừa thay đổi. Hãy tải lại trang để đọc phiên bản hiện hành.",
+  "newDebate.legalGate.reload": "Tải lại trang",
   "newDebate.legalGate.manageAccount": "Quản lý hoặc xóa tài khoản của bạn",
   "newDebate.legalGate.signOut": "Đăng xuất",
   "newDebate.legalGate.signOutFailed": "Đăng xuất không hoàn tất. Vui lòng thử lại.",

@@ -2,6 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ContractHttpError } from "@debateai/contract";
 
 // The settings page and the real AuthGate read `@/lib/api`; the gate tests below pass their own client.
 const mocks = vi.hoisted(() => ({
@@ -204,6 +205,55 @@ describe("the blocking accept screen after sign-in (paid plans L4)", () => {
     expect(sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY)).toBeNull();
     expect(onSignedOut).toHaveBeenCalledTimes(1);
     expect(client.acceptLegal).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Final review M-3, as sign-up does (SignUpFlow): the documents ship with the page, so after
+   * LEGAL_DOCUMENT_STALE the page is what reloads, and the screen offers it. Until then the read marks
+   * are withdrawn, so "Accept and continue" cannot send the stale pair again. Any other failure keeps
+   * the marks (the person just tries again) and offers no reload.
+   */
+  it("after LEGAL_DOCUMENT_STALE, withdraws the read marks and offers the reload; after any other failure, neither", async () => {
+    const reloadPage = vi.fn();
+    const client = {
+      getLegalStatus: vi.fn().mockResolvedValue(OWED_TERMS),
+      acceptLegal: vi.fn()
+        .mockRejectedValueOnce(new Error("offline"))
+        .mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 409, "LEGAL_DOCUMENT_STALE", "LEGAL_DOCUMENT_STALE")),
+      logout: vi.fn()
+    };
+    await act(async () => root!.render(
+      <LegalAcceptGate catalog={newDebateEnglish} client={client} reloadPage={reloadPage}><p>inside</p></LegalAcceptGate>
+    ));
+    await settle();
+    await act(async () => { button("Read the Terms of Service").click(); });
+    await settle();
+    metrics.scrollTop = metrics.scrollHeight - metrics.clientHeight;
+    await act(async () => { document.querySelector(".policyBody")!.dispatchEvent(new Event("scroll")); });
+    await settle();
+    await act(async () => { button("I have read it").click(); });
+    await settle();
+    const reloadButtons = () => [...document.querySelectorAll("button")].filter((node) => node.textContent === "Reload the page");
+
+    await act(async () => { button("Accept and continue").click(); });
+    await settle();
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe("Your acceptance could not be saved. Please try again.");
+    expect(reloadButtons()).toHaveLength(0);
+    expect(document.body.textContent).toContain("Done");
+    expect(button("Accept and continue").disabled).toBe(false);
+
+    await act(async () => { button("Accept and continue").click(); });
+    await settle();
+    expect(document.querySelector('[role="alert"]')?.textContent)
+      .toBe("One of the documents changed a moment ago. Reload the page to read the current version.");
+    expect(document.body.textContent).not.toContain("Done");
+    expect(button("Accept and continue").disabled).toBe(true);
+    await act(async () => { button("Accept and continue").click(); });
+    expect(client.acceptLegal).toHaveBeenCalledTimes(2);
+    expect(reloadButtons()).toHaveLength(1);
+    await act(async () => { reloadButtons()[0]!.click(); });
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toContain("inside");
   });
 
   it("stays on the screen and says so when signing out fails", async () => {

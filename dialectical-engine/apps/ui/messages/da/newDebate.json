@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Gemmer…",
   "newDebate.legalGate.failed": "Din accept kunne ikke gemmes. Prøv igen.",
   "newDebate.legalGate.stale": "Et af dokumenterne blev ændret for et øjeblik siden. Genindlæs siden for at læse den gældende version.",
+  "newDebate.legalGate.reload": "Genindlæs siden",
   "newDebate.legalGate.manageAccount": "Administrer eller slet din konto",
   "newDebate.legalGate.signOut": "Log ud",
   "newDebate.legalGate.signOutFailed": "Udlogningen blev ikke fuldført. Prøv igen.",

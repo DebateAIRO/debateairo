@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "保存中…",
   "newDebate.legalGate.failed": "同意を保存できませんでした。もう一度お試しください。",
   "newDebate.legalGate.stale": "文書のひとつがたった今変更されました。ページを再読み込みして最新版をお読みください。",
+  "newDebate.legalGate.reload": "ページを再読み込み",
   "newDebate.legalGate.manageAccount": "アカウントの管理または削除",
   "newDebate.legalGate.signOut": "サインアウト",
   "newDebate.legalGate.signOutFailed": "サインアウトが完了しませんでした。もう一度お試しください。",

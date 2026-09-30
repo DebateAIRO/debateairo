@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Menyimpan…",
   "newDebate.legalGate.failed": "Persetujuan Anda tidak dapat disimpan. Silakan coba lagi.",
   "newDebate.legalGate.stale": "Salah satu dokumen baru saja berubah. Muat ulang halaman untuk membaca versi terbaru.",
+  "newDebate.legalGate.reload": "Muat ulang halaman",
   "newDebate.legalGate.manageAccount": "Kelola atau hapus akun Anda",
   "newDebate.legalGate.signOut": "Keluar",
   "newDebate.legalGate.signOutFailed": "Proses keluar tidak selesai. Silakan coba lagi.",

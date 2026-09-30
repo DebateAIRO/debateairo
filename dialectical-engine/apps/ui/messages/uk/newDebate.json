@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Збереження…",
   "newDebate.legalGate.failed": "Не вдалося зберегти вашу згоду. Спробуйте ще раз.",
   "newDebate.legalGate.stale": "Один із документів щойно змінився. Перезавантажте сторінку, щоб прочитати чинну версію.",
+  "newDebate.legalGate.reload": "Перезавантажити сторінку",
   "newDebate.legalGate.manageAccount": "Керувати обліковим записом або видалити його",
   "newDebate.legalGate.signOut": "Вийти",
   "newDebate.legalGate.signOutFailed": "Не вдалося завершити вихід. Спробуйте ще раз.",

@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Salvestamine…",
   "newDebate.legalGate.failed": "Teie nõusolekut ei õnnestunud salvestada. Palun proovige uuesti.",
   "newDebate.legalGate.stale": "Üks dokumentidest muutus just praegu. Laadige leht uuesti, et lugeda kehtivat versiooni.",
+  "newDebate.legalGate.reload": "Laadige leht uuesti",
   "newDebate.legalGate.manageAccount": "Hallake oma kontot või kustutage see",
   "newDebate.legalGate.signOut": "Logige välja",
   "newDebate.legalGate.signOutFailed": "Väljalogimine ei lõppenud. Palun proovige uuesti.",

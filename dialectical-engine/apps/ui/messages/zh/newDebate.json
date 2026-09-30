@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "正在保存…",
   "newDebate.legalGate.failed": "无法保存您的接受记录。请重试。",
   "newDebate.legalGate.stale": "其中一份文件刚刚发生变更。请重新加载页面，阅读当前版本。",
+  "newDebate.legalGate.reload": "重新加载页面",
   "newDebate.legalGate.manageAccount": "管理或删除您的账户",
   "newDebate.legalGate.signOut": "退出登录",
   "newDebate.legalGate.signOutFailed": "退出登录未完成。请重试。",

@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Αποθήκευση…",
   "newDebate.legalGate.failed": "Δεν ήταν δυνατή η αποθήκευση της αποδοχής σας. Δοκιμάστε ξανά.",
   "newDebate.legalGate.stale": "Ένα από τα έγγραφα άλλαξε μόλις τώρα. Φορτώστε ξανά τη σελίδα για να διαβάσετε την τρέχουσα έκδοση.",
+  "newDebate.legalGate.reload": "Επαναφόρτωση σελίδας",
   "newDebate.legalGate.manageAccount": "Διαχείριση ή διαγραφή του λογαριασμού σας",
   "newDebate.legalGate.signOut": "Αποσύνδεση",
   "newDebate.legalGate.signOutFailed": "Η αποσύνδεση δεν ολοκληρώθηκε. Δοκιμάστε ξανά.",

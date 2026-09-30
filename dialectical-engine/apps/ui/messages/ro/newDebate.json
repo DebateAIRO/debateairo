@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Se salvează…",
   "newDebate.legalGate.failed": "Acceptarea dvs. nu a putut fi salvată. Încercați din nou.",
   "newDebate.legalGate.stale": "Unul dintre documente s-a schimbat chiar acum. Reîncărcați pagina pentru a citi versiunea actuală.",
+  "newDebate.legalGate.reload": "Reîncărcați pagina",
   "newDebate.legalGate.manageAccount": "Gestionați sau ștergeți contul",
   "newDebate.legalGate.signOut": "Deconectați-vă",
   "newDebate.legalGate.signOutFailed": "Deconectarea nu s-a finalizat. Încercați din nou.",

@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Spremanje…",
   "newDebate.legalGate.failed": "Vaše prihvaćanje nije moguće spremiti. Pokušajte ponovno.",
   "newDebate.legalGate.stale": "Jedan se dokument upravo promijenio. Ponovno učitajte stranicu kako biste pročitali trenutačnu verziju.",
+  "newDebate.legalGate.reload": "Ponovno učitajte stranicu",
   "newDebate.legalGate.manageAccount": "Upravljajte računom ili ga izbrišite",
   "newDebate.legalGate.signOut": "Odjavite se",
   "newDebate.legalGate.signOutFailed": "Odjava nije dovršena. Pokušajte ponovno.",

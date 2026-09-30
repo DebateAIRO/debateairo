@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Enregistrement…",
   "newDebate.legalGate.failed": "Votre acceptation n’a pas pu être enregistrée. Veuillez réessayer.",
   "newDebate.legalGate.stale": "L’un des documents vient de changer. Rechargez la page pour lire la version en vigueur.",
+  "newDebate.legalGate.reload": "Recharger la page",
   "newDebate.legalGate.manageAccount": "Gérer ou supprimer votre compte",
   "newDebate.legalGate.signOut": "Se déconnecter",
   "newDebate.legalGate.signOutFailed": "La déconnexion n’a pas abouti. Veuillez réessayer.",

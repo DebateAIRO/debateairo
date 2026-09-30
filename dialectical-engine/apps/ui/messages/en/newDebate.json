@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Saving…",
   "newDebate.legalGate.failed": "Your acceptance could not be saved. Please try again.",
   "newDebate.legalGate.stale": "One of the documents changed a moment ago. Reload the page to read the current version.",
+  "newDebate.legalGate.reload": "Reload the page",
   "newDebate.legalGate.manageAccount": "Manage or delete your account",
   "newDebate.legalGate.signOut": "Sign out",
   "newDebate.legalGate.signOutFailed": "Signing out did not complete. Please try again.",

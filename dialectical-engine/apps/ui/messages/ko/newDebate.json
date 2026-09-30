@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "저장 중…",
   "newDebate.legalGate.failed": "동의 내용을 저장하지 못했습니다. 다시 시도해 주세요.",
   "newDebate.legalGate.stale": "방금 문서 중 하나가 변경되었습니다. 페이지를 새로고침하여 현재 버전을 읽어 주세요.",
+  "newDebate.legalGate.reload": "페이지 새로고침",
   "newDebate.legalGate.manageAccount": "계정 관리 또는 삭제",
   "newDebate.legalGate.signOut": "로그아웃",
   "newDebate.legalGate.signOutFailed": "로그아웃을 완료하지 못했습니다. 다시 시도해 주세요.",

@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Salvataggio…",
   "newDebate.legalGate.failed": "Non è stato possibile salvare la tua accettazione. Riprova.",
   "newDebate.legalGate.stale": "Uno dei documenti è appena cambiato. Ricarica la pagina per leggere la versione in vigore.",
+  "newDebate.legalGate.reload": "Ricarica la pagina",
   "newDebate.legalGate.manageAccount": "Gestisci o elimina il tuo account",
   "newDebate.legalGate.signOut": "Disconnetti",
   "newDebate.legalGate.signOutFailed": "La disconnessione non è stata completata. Riprova.",

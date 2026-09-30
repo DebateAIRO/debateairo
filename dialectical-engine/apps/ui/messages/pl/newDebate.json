@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "Zapisywanie…",
   "newDebate.legalGate.failed": "Nie udało się zapisać akceptacji. Spróbuj jeszcze raz.",
   "newDebate.legalGate.stale": "Jeden z dokumentów właśnie się zmienił. Załaduj ponownie stronę, aby przeczytać aktualną wersję.",
+  "newDebate.legalGate.reload": "Załaduj ponownie stronę",
   "newDebate.legalGate.manageAccount": "Zarządzaj kontem lub je usuń",
   "newDebate.legalGate.signOut": "Wyloguj się",
   "newDebate.legalGate.signOutFailed": "Wylogowanie nie zostało dokończone. Spróbuj jeszcze raz.",

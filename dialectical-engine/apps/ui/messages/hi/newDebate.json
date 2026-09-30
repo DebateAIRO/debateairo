@@ -92,6 +92,7 @@
   "newDebate.legalGate.accepting": "सहेजा जा रहा है…",
   "newDebate.legalGate.failed": "आपकी स्वीकृति सहेजी नहीं जा सकी। कृपया फिर से कोशिश करें।",
   "newDebate.legalGate.stale": "अभी-अभी एक दस्तावेज़ बदल गया। मौजूदा संस्करण पढ़ने के लिए पेज फिर से लोड करें।",
+  "newDebate.legalGate.reload": "पेज फिर से लोड करें",
   "newDebate.legalGate.manageAccount": "अपना खाता प्रबंधित करें या हटाएँ",
   "newDebate.legalGate.signOut": "साइन-आउट करें",
   "newDebate.legalGate.signOutFailed": "साइन-आउट पूरा नहीं हुआ। कृपया फिर से कोशिश करें।",
