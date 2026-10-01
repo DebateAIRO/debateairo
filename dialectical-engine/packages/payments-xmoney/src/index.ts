@@ -10,3 +10,11 @@ export {
 export { parseJsonKeepingNumberText } from "./json.js";
 export { aesKeyFromPrivateKey, signOrderPayload, xmoneyEnvironmentOf } from "./signing.js";
 export { decryptNotice } from "./notice.js";
+export {
+  XMoneyClient,
+  XMoneyPaymentFailedError,
+  parseXMoneyTransaction,
+  type XMoneyRefundRow,
+  type XMoneyRefundsSeen,
+  type XMoneyTransactionListQuery
+} from "./client.js";
