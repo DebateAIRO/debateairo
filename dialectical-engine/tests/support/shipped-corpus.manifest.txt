@@ -330,6 +330,7 @@ apps/ui/components/modeTransition.test.mjs
 apps/ui/components/modeTransition.ts
 apps/ui/components/support/Assistant.tsx
 apps/ui/components/support/CaseView.tsx
+apps/ui/components/support/SupportConversationGuard.tsx
 apps/ui/components/support/SupportWidget.tsx
 apps/ui/components/support/caseLink.test.mjs
 apps/ui/components/support/caseLink.ts

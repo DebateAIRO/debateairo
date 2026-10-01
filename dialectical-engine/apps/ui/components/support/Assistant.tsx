@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { redactSupportText } from "@debateai/kernel";
 import type { SupportAction } from "@debateai/support-kb/catalog";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
@@ -18,6 +19,7 @@ import {
   clearStoredSupportConversation,
   hasExactKeys,
   restoreSupportConversation,
+  serverTimeFromDateHeader,
   supportActionsFrom,
   supportSourcesFrom,
   writeStoredSupportConversation,
@@ -26,6 +28,7 @@ import {
   type SupportSource
 } from "./conversation.js";
 import { isStaleSupportSession, supportPost, SupportHttpError } from "./http.js";
+import { onConversationReset, onConversationWake, settleStoredConversation } from "./sessionChange.js";
 
 export type SupportAssistantLanguage = LocaleCode;
 export type SupportAssistantOutcome =
@@ -61,6 +64,8 @@ type SupportSession = Readonly<{
   /** The language the session was opened in; its actions resolve in it. */
   language?: SupportAssistantLanguage;
   firstMessage?: string;
+  /** S04-R05: whole seconds from the UI server's `Date` header of the response that opened the session. */
+  serverTime?: number;
 }>;
 export type SupportCaseAcknowledgement = Readonly<{
   text: string;
@@ -76,7 +81,11 @@ type SupportReply = Readonly<{
   sources?: readonly SupportSource[];
   actions?: readonly SupportAction[];
   caseAcknowledgement?: SupportCaseAcknowledgement;
+  /** S04-R05: whole seconds from the UI server's `Date` header of this response. */
+  serverTime?: number;
 }>;
+/** S04-R05: the server time a support response carried, when its `Date` header could be read. */
+type ServerTimed = Readonly<{ serverTime?: number }>;
 type SupportSessionStart = SupportSession | SupportReply;
 export type SupportAssistantClient = Readonly<{
   createSession(language: SupportAssistantLanguage): Promise<SupportSessionStart>;
@@ -84,10 +93,11 @@ export type SupportAssistantClient = Readonly<{
   isSignedIn?(): Promise<boolean>;
   rate(
     session: SupportSession,messageId: string,rating: "yes" | "no"
-  ): Promise<SupportCaseAcknowledgement | SupportReply | null>;
+  ): Promise<(SupportCaseAcknowledgement & ServerTimed) | SupportReply | null>;
   escalate(session: SupportSession,language: SupportAssistantLanguage): Promise<SupportReply | Readonly<{
     token: string;
     text: string;
+    serverTime?: number;
   }>>;
 }>;
 
@@ -253,6 +263,16 @@ async function readJson(response: Response): Promise<Record<string,unknown>> {
   return body;
 }
 
+/**
+ * S04-R05 (D-S04-15): the one field the stored transcript may gain — the UI server's `Date` header of the newest
+ * support response, in whole seconds, never the browser's clock. Omitted when the header is absent or unreadable
+ * (a transport that hands back a response with no headers carries no server time).
+ */
+function withServerTime<T extends object>(value: T,response: Response): T & ServerTimed {
+  const serverTime = serverTimeFromDateHeader(response.headers?.get("date") ?? null);
+  return serverTime === undefined ? value : Object.freeze({ ...value,serverTime });
+}
+
 export const supportAssistantClient: SupportAssistantClient = Object.freeze({
   async isSignedIn() {
     return (await fetch("/api/v1/session",{
@@ -260,9 +280,10 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
     })).ok;
   },
   async createSession(language) {
-    const body = await readJson(await supportPost("/api/v1/support/sessions",{ language }));
+    const response = await supportPost("/api/v1/support/sessions",{ language });
+    const body = await readJson(response);
     const terminal = replyFrom(body);
-    if (terminal !== null) return terminal;
+    if (terminal !== null) return withServerTime(terminal,response);
     if (body.session === null || typeof body.session !== "object"
       || typeof (body.session as Record<string,unknown>).session_id !== "string"
       || typeof body.session_token !== "string") {
@@ -274,39 +295,43 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
       && typeof (body.first_message as Record<string,unknown>).text === "string"
       ? String((body.first_message as Record<string,unknown>).text)
       : undefined;
-    return Object.freeze({
+    return withServerTime(Object.freeze({
       sessionId: String(session.session_id),token: String(body.session_token),
       identityBound: session.identity_bound === true,language,
       ...(firstMessage === undefined ? {} : { firstMessage })
-    });
+    }),response);
   },
   async sendMessage(session,text) {
-    const body = await readJson(await supportPost(
+    const response = await supportPost(
       `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/messages`,
       { text },session.token
-    ));
+    );
+    const body = await readJson(response);
     const reply = replyFrom(body,{ signedIn: session.identityBound,language: session.language ?? "en" });
     if (reply === null) throw new Error("SUPPORT_RESPONSE_INVALID");
-    return reply;
+    return withServerTime(reply,response);
   },
   async rate(session,messageId,rating) {
-    const body = await readJson(await supportPost(
+    const response = await supportPost(
       `/api/v1/support/messages/${encodeURIComponent(messageId)}/rating`,
       { session_id: session.sessionId,rating },session.token
-    ));
-    return replyFrom(body) ?? caseAcknowledgement(body);
+    );
+    const body = await readJson(response);
+    const result = replyFrom(body) ?? caseAcknowledgement(body);
+    return result === null ? null : withServerTime(result,response);
   },
   async escalate(session,language) {
-    const body = await readJson(await supportPost(
+    const response = await supportPost(
       `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/escalate`,
       { language },session.token
-    ));
+    );
+    const body = await readJson(response);
     const terminal = replyFrom(body,{ signedIn: session.identityBound,language });
-    if (terminal !== null) return terminal;
+    if (terminal !== null) return withServerTime(terminal,response);
     if (typeof body.case_token !== "string" || typeof body.text !== "string") {
       throw new Error("SUPPORT_RESPONSE_INVALID");
     }
-    return Object.freeze({ token: body.case_token,text: body.text });
+    return withServerTime(Object.freeze({ token: body.case_token,text: body.text }),response);
   }
 });
 
@@ -370,7 +395,16 @@ export function Assistant({
   // DL3-F3: nothing stored is read back until the identity at the keyboard is
   // known, so a signed-out first paint can never show a signed-in transcript.
   const [identityResolved,setIdentityResolved] = useState(signedIn !== undefined);
-  const [restored,setRestored] = useState(false);
+  /**
+   * S04 (PLAN S3.2): the stored transcript is restored only through the gate. "pending" waits for the identity,
+   * "settling" awaits the gate, "done" lets the write effect run, "asleep" is a parked page: no gate, no fetch,
+   * no write until it wakes.
+   */
+  const [restorePhase,setRestorePhase] = useState<"pending" | "settling" | "done" | "asleep">("pending");
+  /** Incremented by a session change or a wake, so the identity effect resolves again on facts read now (B1). */
+  const [identityEpoch,setIdentityEpoch] = useState(0);
+  /** S04-R05: the server time of the newest support response, written with the transcript. */
+  const [serverTime,setServerTime] = useState<number | undefined>(undefined);
   const [activeTopic,setActiveTopic] = useState("reading");
   const [pageStatus,setPageStatus] = useState<SupportPageStatus | null>(null);
   const [statusUnavailable,setStatusUnavailable] = useState(false);
@@ -378,31 +412,60 @@ export function Assistant({
   const conversationPaneRef = useRef<HTMLDivElement>(null);
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
+  /**
+   * S04 (D-S04-17, D-S04-24): one more on every session change, sleep and wake. Every async path captures it
+   * before its first await and applies nothing when it moved.
+   */
+  const generationRef = useRef(0);
+  /**
+   * S04 (D-S04-32, D-ORCH-ARCHREV3): set before the sleep's flushSync, cleared on wake. React flushes the last
+   * commit's pending effects inside that flushSync; without this ref a restore effect left pending there runs the
+   * gate on the old facts and puts the old transcript on screen while the page sleeps. The ref keeps it off the
+   * screen; the wake's generation bump keeps its verdict out of storage. Both are required.
+   */
+  const parkedRef = useRef(false);
+  const mountedRef = useRef(false);
 
-  // DL3-F3: the transcript is restored once, against the identity that produced
-  // it. A transcript belonging to anyone else is erased on the way past.
   useEffect(() => {
-    if (!persistent || restored || !identityResolved) return;
-    setRestored(true);
-    const conversation = restoreSupportConversation(
-      browserSupportConversationStorage(),identityAvailable
-    );
-    if (conversation === null) return;
-    if (conversation.language !== language) {
-      clearStoredSupportConversation(browserSupportConversationStorage());
-      return;
-    }
-    setMessages(conversation.messages);
-  },[identityAvailable,identityResolved,language,persistent,restored]);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  },[]);
 
-  // DL3-F3: the transcript is restored once, against the identity that produced
-  // it. A transcript belonging to anyone else is erased on the way past.
+  // DL3-F3 + S04 (PLAN S3.2): the transcript is restored against the identity
+  // that produced it, and only after the gate has decided (R02 (a)-(c)). A
+  // transcript belonging to anyone else is erased on the way past.
   useEffect(() => {
-    if (!persistent || !restored) return;
-    writeStoredSupportConversation(browserSupportConversationStorage(),{
-      language,identityBound: identityAvailable,messages
+    if (!persistent || !identityResolved || restorePhase !== "pending") return;
+    if (parkedRef.current) return;
+    setRestorePhase("settling");
+    const generation = generationRef.current;
+    void settleStoredConversation().then(() => {
+      // A sleep, wake or session change landed while the gate settled: the newer one owns the phase.
+      if (!mountedRef.current || generationRef.current !== generation) return;
+      const conversation = restoreSupportConversation(
+        browserSupportConversationStorage(),identityAvailable
+      );
+      if (conversation !== null) {
+        if (conversation.language !== language) {
+          clearStoredSupportConversation(browserSupportConversationStorage());
+        } else {
+          setMessages(conversation.messages);
+          setServerTime(conversation.serverTime);
+        }
+      }
+      setRestorePhase("done");
     });
-  },[identityAvailable,language,messages,persistent,restored]);
+  },[identityAvailable,identityResolved,language,persistent,restorePhase]);
+
+  // DL3-F3: the transcript is written against the identity that produced it,
+  // and never while the gate is pending, settling or the page is parked (B1).
+  useEffect(() => {
+    if (!persistent || restorePhase !== "done") return;
+    writeStoredSupportConversation(browserSupportConversationStorage(),{
+      language,identityBound: identityAvailable,messages,
+      ...(serverTime === undefined ? {} : { serverTime })
+    });
+  },[identityAvailable,language,messages,persistent,restorePhase,serverTime]);
 
   useEffect(() => {
     if (!fullPage || !followLatestRef.current) return;
@@ -433,7 +496,45 @@ export function Assistant({
       setIdentityResolved(true);
     });
     return () => { active = false; };
-  },[client,signedIn]);
+  },[client,signedIn,identityEpoch]);
+
+  // S04 (PLAN S3.3, ADR-0033): a session change in any tab resets this panel to
+  // "New conversation"; a sleep parks it at once; a wake re-resolves identity
+  // and runs the gate on facts read after the wake.
+  useEffect(() => {
+    const clearConversation = () => {
+      clearConversationState();
+      setServerTime(undefined);
+      // A request in flight belongs to the old conversation and drops its result (S3.4).
+      setBusy(false);
+    };
+    const stopReset = onConversationReset((reason) => {
+      generationRef.current += 1;
+      if (reason === "sleep") {
+        parkedRef.current = true;
+        flushSync(() => {
+          clearConversation();
+          setRestorePhase("asleep");
+        });
+        return;
+      }
+      clearConversation();
+      setRestorePhase("pending");
+      setIdentityResolved(false);
+      setIdentityEpoch((epoch) => epoch + 1);
+    });
+    const stopWake = onConversationWake(() => {
+      parkedRef.current = false;
+      generationRef.current += 1;
+      setRestorePhase("pending");
+      setIdentityResolved(false);
+      setIdentityEpoch((epoch) => epoch + 1);
+    });
+    return () => {
+      stopReset();
+      stopWake();
+    };
+  },[]);
 
   useEffect(() => {
     if (!fullPage || !persistent) return;
@@ -467,17 +568,32 @@ export function Assistant({
     inputRef.current.focus();
   }
 
-  function beginNewConversation(): void {
+  /** The state "New conversation" leaves the panel in (S04-R03). */
+  function clearConversationState(): void {
     setSession(null);
     // DL1-F5c: the bearer goes with the transcript it belongs to.
     setCaseBearer(null);
     setMessages([]);
     setActiveTopic("reading");
     if (inputRef.current !== null) inputRef.current.value = "";
+  }
+
+  function beginNewConversation(): void {
+    clearConversationState();
     if (persistent) clearStoredSupportConversation(browserSupportConversationStorage());
   }
 
+  function rememberServerTime(value: number | undefined): void {
+    if (value !== undefined) setServerTime(value);
+  }
+
+  /** S04 (D-S04-17): true once a session change, sleep or wake moved past `generation`. */
+  function superseded(generation: number): boolean {
+    return generationRef.current !== generation;
+  }
+
   function appendReply(response: SupportReply): void {
+    rememberServerTime(response.serverTime);
     if (response.outcome === "SHREDDED") setSession(null);
     const acknowledgement = response.caseAcknowledgement;
     // DL1-F5c: the code and the link go to memory, the fact goes to the transcript.
@@ -513,23 +629,25 @@ export function Assistant({
     });
   }
 
-  async function activeSession(discardCurrent = false): Promise<SupportSession | null> {
+  async function activeSession(generation: number,discardCurrent = false): Promise<SupportSession | null> {
     let currentIdentity = identityAvailable;
     if (signedIn !== undefined) {
       currentIdentity = signedIn;
     } else if (client.isSignedIn !== undefined) {
       try {
         currentIdentity = await client.isSignedIn();
-        setIdentityAvailable(currentIdentity);
       } catch {
         currentIdentity = false;
-        setIdentityAvailable(false);
       }
+      if (superseded(generation)) return null;
+      setIdentityAvailable(currentIdentity);
     }
     if (!discardCurrent && session !== null && session.identityBound === currentIdentity) {
       return session;
     }
     const started = await client.createSession(language);
+    if (superseded(generation)) return null;
+    rememberServerTime(started.serverTime);
     if (isSupportReply(started)) {
       appendReply(started);
       return null;
@@ -552,21 +670,23 @@ export function Assistant({
    * second mismatch leaves no session held and surfaces as unavailable.
    */
   async function withSupportSession<T>(
-    run: (active: SupportSession) => Promise<T>
+    generation: number,run: (active: SupportSession) => Promise<T>
   ): Promise<T | null> {
-    const active = await activeSession();
+    const active = await activeSession(generation);
     if (active === null) return null;
     try {
       return await run(active);
     } catch (failure) {
+      if (superseded(generation)) return null;
       if (!isStaleSupportSession(failure)
         && !(failure instanceof SupportSnapshotUnavailableError)) throw failure;
       setSession(null);
-      const fresh = await activeSession(true);
+      const fresh = await activeSession(generation,true);
       if (fresh === null) return null;
       try {
         return await run(fresh);
       } catch (retryFailure) {
+        if (superseded(generation)) return null;
         if (retryFailure instanceof SupportSnapshotUnavailableError) setSession(null);
         throw retryFailure;
       }
@@ -576,18 +696,21 @@ export function Assistant({
   async function sendRequest(rawRequest: string,clearComposer?: () => void): Promise<void> {
     const request = redactSupportText(rawRequest.trim()).text;
     if (request.length === 0 || busy) return;
+    const generation = generationRef.current;
     setBusy(true);
     clearComposer?.();
     setMessages((current) => [...current,{
       id: `user-${current.length}`,role: "user",text: request
     }]);
     try {
-      const response = await withSupportSession((active) => client.sendMessage(active,request));
+      const response = await withSupportSession(generation,(active) => client.sendMessage(active,request));
+      if (superseded(generation)) return;
       if (response !== null) appendReply(response);
     } catch {
+      if (superseded(generation)) return;
       appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
     } finally {
-      setBusy(false);
+      if (!superseded(generation)) setBusy(false);
     }
   }
 
@@ -600,20 +723,23 @@ export function Assistant({
 
   async function escalate(): Promise<void> {
     if (busy) return;
+    const generation = generationRef.current;
     setBusy(true);
     try {
-      const opened = await withSupportSession((active) => client.escalate(active,language));
-      if (opened === null) return;
+      const opened = await withSupportSession(generation,(active) => client.escalate(active,language));
+      if (superseded(generation) || opened === null) return;
       if (isSupportReply(opened)) {
         appendReply(opened);
       } else {
+        rememberServerTime(opened.serverTime);
         setCaseBearer(caseBearerOf(opened.token,opened.text));
         setMessages((current) => [...current,caseOpenedMessage(current.length,chromeCatalog)]);
       }
     } catch {
+      if (superseded(generation)) return;
       appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
     } finally {
-      setBusy(false);
+      if (!superseded(generation)) setBusy(false);
     }
   }
 
@@ -622,16 +748,19 @@ export function Assistant({
 
   async function rateLast(messageId: string,rating: "yes" | "no"): Promise<void> {
     if (session === null) return;
+    const generation = generationRef.current;
     try {
       const acknowledgement = await client.rate(session,messageId,rating);
-      if (acknowledgement === null) return;
+      if (superseded(generation) || acknowledgement === null) return;
       if (isSupportReply(acknowledgement)) {
         appendReply(acknowledgement);
       } else {
+        rememberServerTime(acknowledgement.serverTime);
         setCaseBearer(caseBearerOf(acknowledgement.token,acknowledgement.text));
         setMessages((current) => [...current,caseOpenedMessage(current.length,chromeCatalog)]);
       }
     } catch {
+      if (superseded(generation)) return;
       appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
     }
   }
