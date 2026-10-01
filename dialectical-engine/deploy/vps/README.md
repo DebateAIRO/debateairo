@@ -1351,68 +1351,126 @@ service.
 
 ### The cost envelopes (V-28) — and the temporary values for the first paid run
 
-Two ceilings, both in money, both enforced in code in the hosted deployment only: **per run** and
-**per day** across every debate and vendor (no new debate starts until the next UTC day; debates
-under way finish). At the per-run ceiling the call that would cross it is refused before it is
-made, and since the engine money rule (V-28 amended 2026-09-28; spec 2026-09-26 §14.4) the debate
-still gets its answer: a stop while it is argued ends the arguing only, and the run goes on to
-write its answer from what it has, with money kept aside for that (the reserve and overrun below).
-If the planned answer-writing model cannot be paid, the same call is retried on a cheaper model
-the run may use. Only when no model can be paid does the sealed answer stay components-only,
-marked `ENVELOPE_EXHAUSTED`, and the page then shows the **floor** (the label and the debate's
-strongest position; see "One answer's record" below). Every charged call is one row in
-`ledger.model_spend`, and both ceilings are sums over those rows. The operator record is
-`docs/missions/2026-09-01-security-hardening/COST-ENVELOPES-2026-09-22.md`.
+Every limit here is in money, enforced in code, in the hosted deployment only. Local mode spends no money and has none of them.
+
+- **The site's limits.** **Per run** is what one debate may spend across every vendor it touches. **Per day** is what every debate and every verdict story may spend together in a UTC day.
+- **Each person's limits,** once billing is switched on. A monthly allowance comes with a daily and a weekly slice; see "Each person's windows" below.
+
+Every charged call is one row in `ledger.model_spend`, and every limit is a sum over those rows. The operator record is `docs/missions/2026-09-01-security-hardening/COST-ENVELOPES-2026-09-22.md`.
 
 **The values in force are temporary and deliberately low**, for the owner's first paid run:
 
-| Row member | Value | In dollars |
+| Row member | Value | Meaning |
 |---|---|---|
 | `per_run_ceiling_micros` | `250000` | 0.25 USD per debate |
 | `daily_ceiling_micros` | `2000000` | 2.00 USD per UTC day |
 | `serve_reserve_basis_points` | `3000` | 30% of each debate's money is kept for writing the answer |
 | `serve_overrun_basis_points` | `2000` | writing the answer may go 20% over the per-debate ceiling |
+| `admission_close_basis_points` | `9500` | from 95% of a limit, the ask page says the limit is close |
+| `finish_up_to_basis_points` | `11500` | a debate already running may take the site's day up to 115% so it can finish |
+| `waiting_line_per_person` | `1` | one question per person may wait for the reset |
 
-**The last two rows keep money for the answer** (engine money rule, spec 2026-09-26 §14.4.1).
-They are in basis points, where `10000` is the whole per-debate ceiling. With the values above,
-the calls made while a debate is argued may spend up to 70% of the per-debate ceiling
-(0.175 USD); the calls that write the answer may take the same debate's total up to 120% of it
-(0.30 USD). Both limits count the same running total, so the reserve is simply the part the
-arguing may not touch. The daily ceiling must hold one debate at its new maximum (per-debate
-ceiling plus the overrun, here 0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`);
-each new debate then reserves that maximum, plus the story's own ceiling, against the day.
-The verdict story's cap is a code-owned row the publication seals for you (`storyCostEnvelopePolicy`:
-0.05 USD per story, and since engine money rule task M7 a 20% margin over it,
-`per_story_overrun_basis_points` `2000`, so 0.06 USD). The day must hold one debate AND its story
-at their maxima, here 0.30 + 0.06 = 0.36 USD; a day below that is refused when you publish and
-when either service starts (`STORY_DAILY_CEILING_INSUFFICIENT`).
-Every debate charge written from now on is recorded with the part of the debate that spent it
-(`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer;
-empty for the support chat, the story and older rows), so the first paid run shows the two
-amounts separately.
+Basis points are hundredths of a percent, so `10000` is the whole limit.
 
-**Both are optional, and a version without them means 0: no money is kept back and the margin
-is off.** Every register version published before these members existed, and every file that
-leaves them out, keeps exactly the old single ceiling. The kit's example file carries `3000` and
-`2000`, but on this host they take effect only when you publish a register version whose
-`costEnvelopePolicy` carries them (§"Publishing the settings register on this host"; go-live
-checklist line 12). The file format stays `debateai.hosted-register.v1`: a v1 file without them
-is still valid and still means what it meant.
+#### Money kept for the answer (engine money rule)
 
-The `costEnvelopePolicy` row says so about itself: it carries `provisional: true` and a
-`provisional_reason` naming V-28. They are meant to stop things — a normal debate costs dollars,
-so the first paid run is expected to hit the per-run ceiling partway, and that stop is the
-measurement. The real values are sealed afterwards (per run about three times the measured cost of
-one normal debate; per day what the owner is comfortable losing on a bad day) as a **new version**
-of the row with `provisional: false`. The provisional row is never edited: it stays as the record
-of what the first paid run ran under (go-live checklist line 1).
+The reserve and the overrun keep money for writing the answer (spec 2026-09-26 §14.4.1).
 
-While a debate runs, the refusals are `RUN_COST_ENVELOPE_MONEY_REACHED`,
-`DAILY_COST_ENVELOPE_REACHED` (an ask after the day is spent is answered `429` with `Retry-After`
-at the next UTC midnight) and `PROVIDER_USAGE_UNREPORTED` (a vendor answered without usage
-figures, so its cost cannot be counted). Set a monthly spending cap on each vendor's own dashboard
-as well (go-live checklist line 8): the envelopes are the application's ceiling, the dashboard cap
-is the vendor's.
+- **The split.** With the values above, the calls made while a debate is argued may spend up to 70% of the per-debate ceiling (0.175 USD). The calls that write the answer may take the same debate's total up to 120% of it (0.30 USD). Both count the same running total, so the reserve is simply the part the arguing may not touch.
+- **The day must hold one debate at its maximum** (0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
+- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`: 0.05 USD, with a 20% margin, 0.06 USD). The day must hold one debate AND its story, here 0.36 USD, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
+- **Every debate charge records its part** (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer).
+- **A version without the two members means 0:** no money is kept back and the margin is off (go-live checklist line 12). The file format stays `debateai.hosted-register.v1`.
+
+#### The band, holds and the waiting line (budget rule, spec 2026-09-28)
+
+The last three rows switch on the budget rule of `docs/superpowers/specs/2026-09-28-budget-never-stops-a-debate-design.md`: a debate is almost never stopped for money. A limit bends from −5% to +15%.
+
+- **Used** means what has been spent **plus a hold** for every debate still running.
+  - The hold is the debate's estimate, written once when the debate starts.
+  - It counts only its unspent part, and stops counting when the debate has no job left.
+  - Holds replace the old 30-minute reservation, so a debate that dies at birth cannot wedge the day shut.
+- **The estimate** is the 75th percentile of the last 20 hosted debates with the same settings that settled in the last 30 days, at today's prices, capped at one debate's maximum.
+  - With fewer than 20 such debates, it is that maximum: the careful side.
+  - It is never sent to a browser.
+- **Asking:**
+  - Under 95%, when the question fits, the debate starts.
+  - From 95%, or when the question would cross 100%, the debate still starts, and the ask page says the limit is close.
+  - From 100%, the question is accepted (`202`, `WAITING`) and **waits in line**. The API's 60-second waker starts it by itself at the reset, oldest first and one per person.
+  - A second waiting question from the same person is refused `422 ASK_ALREADY_WAITING`, and the page names the time the first will start.
+- **While a debate runs** it is measured against real spend only, up to the **finish edge**: 115% of the site's day, 110% of a person's window.
+  - An arguing call that would cross it is retried on the debate's cheaper models first.
+  - Only when none fits does the arguing stop, and the answer is still written.
+  - The opening position and the answer are exempt.
+  - Every swap is one row in `core.run_cost_substitution`. The owner sees it; the person never does.
+- **Log lines** (content-free): `api.ask.waiting`, `api.wait.started`, `api.wait.tick` (with counts) and `runner.body.cheaper_model`.
+
+**All three members absent means today's behaviour, exactly.** A version without them keeps the `429 DAILY_COST_ENVELOPE_REACHED` with `Retry-After` at the next UTC midnight, keeps the 30-minute reservation, and has no waiting line and no running wall.
+
+The three are all or none (`COST_ENVELOPE_POLICY_INVALID` otherwise). Their ranges:
+- `admission_close_basis_points` from 5000 to 10000;
+- `finish_up_to_basis_points` from 10000 to 20000;
+- `waiting_line_per_person` from 1 to 10.
+
+**Publishing them** (go-live checklist line 13):
+1. Add them to `costEnvelopePolicy` in `/etc/debateai/register/hosted-register.json`. The kit's example carries `9500`, `11500` and `1`.
+2. Run the dry run. It prints `cost_envelope_band admission_close_basis_points=… finish_up_to_basis_points=… waiting_line_per_person=…`, and `cost_envelope_band absent` while they are missing.
+3. Publish.
+4. Pin `REGISTER_VERSION` in both `EnvironmentFile`s.
+5. Restart both units.
+
+Publish them only on a build that runs the whole rule. The waiting line, holds, the waker, the running wall and the boot check ship together.
+
+**Removing them again.** A version without the three members builds no room and therefore no waker, so a question already waiting could never start. The API therefore refuses to boot on such a version while `core.run_waiting_v` lists any run: its `ask-room` boot step stops with `WAITING_LINE_REQUIRES_BAND`, and a waiting debate's page read is refused by the same name instead of promising a start time. So publish such a version only when `sudo -u postgres psql -d debateai -Atc 'SELECT count(*) FROM core.run_waiting_v'` prints `0`. If it does not, wait for the reset that starts the line, check again, then publish. Billing switched on forbids the removal anyway (`BILLING_REQUIRES_ENVELOPE_MEMBERS`).
+
+**The boot check.** Both hosted services refuse to start with `RUN_CEILING_BELOW_ONE_CALL` when the arguing ceiling is below the projected cost of the opening position's call. The arguing ceiling is per run × (10000 − reserve) / 10000. The projected cost uses:
+- a question of the maximum size, made of the character that grows most on the way;
+- the judge's output token ceiling (the runner policy's `JUDGE` bound);
+- the cheapest price among each plan's models; every plan's cheapest must fit (a plan takes part only when every model on its roster is configured).
+
+A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
+
+#### Each person's windows (billing)
+
+With billing on (hosted, and a published `billingPolicy` saying `enabled: true`), each person also has three windows:
+- the **month**, from the day they subscribed (Free: the day they signed up);
+- the **week**, in 7-day blocks from the month start;
+- the **day**, in 24-hour blocks from the month start.
+
+All are in UTC, and each person sees them in their own time zone.
+
+- **The limits** come from the `billingPlans` row: the plan's monthly credit, and for paid plans a day and a week share of it. Free has its month only.
+- **A running debate may finish up to 110%** of any person window (`finish_bp` `11000`). The extra is on the site; it is not taken from the next month.
+- **The server decides the ask:**
+  - the plan's tier;
+  - for Free, the sealed fixed gauges;
+  - until the model scorecard merges, a paid ask that does not fit the person's room and starts now runs on the Free roster (owner record, reason `PERSON`). One that must wait keeps its plan's models and settings, and starts on them after the reset.
+  - A request with no signed-in account is refused `401 ASK_SIGN_IN_REQUIRED`.
+  - A running debate that reaches a person's finish edge stops arguing with `PERSON_ALLOWANCE_REACHED` and still writes its answer.
+- **Billing needs the budget rule.** A version whose `billingPolicy` says `enabled: true` is refused at publish and at boot:
+  - `BILLING_REQUIRES_ENVELOPE_MEMBERS` when `costEnvelopePolicy` lacks the three members above;
+  - `BILLING_PLANS_UNRESOLVED` when it seals no `billingPlans`.
+- **The publish command warns** `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` when a plan's smallest window (its day cap, or Free's whole month) is below the per-run ceiling.
+  - It does not refuse: admission uses the estimate, so a small window still fits a small debate.
+  - At today's 0.25 USD per debate, Free's 0.20 USD month triggers it. Publish realistic per-run and daily ceilings before switching billing on.
+- **The site's daily ceiling protects the company, not the person.** At launch it must be at least the expected daily spend of all subscribers: subscribers × each plan's day cap × 0.3, or better, the measured figure.
+
+#### The provisional values
+
+The `costEnvelopePolicy` row says so about itself: it carries `provisional: true` and a `provisional_reason` naming V-28. The values are meant to stop things. A normal debate costs dollars, so the first paid run is expected to hit the per-run ceiling partway, and that stop is the measurement.
+
+The real values are sealed afterwards as a **new version** of the row with `provisional: false`:
+- per run, about three times the measured cost of one normal debate;
+- per day, what the owner is comfortable losing on a bad day.
+
+The provisional row is never edited: it stays as the record of what the first paid run ran under (go-live checklist line 1).
+
+While a debate runs, the refusals are:
+- `RUN_COST_ENVELOPE_MONEY_REACHED`: one debate's own ceiling;
+- `DAILY_COST_ENVELOPE_REACHED` and `PERSON_ALLOWANCE_REACHED`: the shared walls. With the budget members published they only stop the arguing, never a debate.
+- `PROVIDER_USAGE_UNREPORTED`: a vendor answered without usage figures, so its cost cannot be counted.
+
+Set a monthly spending cap on each vendor's own dashboard as well (go-live checklist line 8): the envelopes are the application's ceiling, and the dashboard cap is the vendor's.
 
 #### One answer's record: what money and size did to it
 
@@ -1502,6 +1560,7 @@ version must carry, besides the algorithm's own rows:
 | Row key | Without it |
 |---|---|
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
+| `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` |
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |
@@ -1520,9 +1579,10 @@ version must carry, besides the algorithm's own rows:
   loopback or private address, TLS only, no inline credential, every target priced, every vendor
   vetted, envelopes well formed) before anything is written — `--dry-run` stops there;
 - imports the sealed historical bootstrap first (refusing a database that holds a different one),
-  then publishes ONE new version: the engine's code-owned rows plus the rows the file
-  supplies, `configuredProviderSet` and `costEnvelopePolicy`. It never edits a sealed version. A
-  changed file is a new version; the same file again returns the version that already holds it;
+  then publishes ONE new version: the engine's code-owned rows plus the rows the file supplies,
+  `configuredProviderSet` and `costEnvelopePolicy`, and `billingPlans` / `billingPolicy` when it
+  names them. It never edits a sealed version. A changed file is a new version; the same file
+  again returns the version that already holds it;
 - seals the file's `countryPolicy`, when the file carries it, as that version's `countryPolicy`
   row; a file without it publishes no `countryPolicy` row, so that version has no country gate
   (A14). The kit's example leaves it out; §5 "Country data" says what must hold before you add it;
@@ -1538,6 +1598,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | Output line | What to do |
 |---|---|
 | `HOSTED_REGISTER_PLAN …` | the plan: vendors, ceilings, row count, snapshot hash, `provenance=development-source-refs (known limitation)` (§10); nothing secret is printed |
+| `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` | a plan's smallest window is below one debate's ceiling: a warning, never a refusal (see "Each person's windows") |
 | `HOSTED_REGISTER_PUBLISHED outcome=CREATED` / `outcome=REPLAYED` | a new version was sealed / this exact content was already sealed and nothing was added |
 | `HOSTED_REGISTER_BOOT_READY register_version=N` then `REGISTER_VERSION=N` | both services' start-up readers accept version N in hosted mode: write `REGISTER_VERSION=N` into `api.env` and `runner.env`, restart both units |
 | `HOSTED_REGISTER_NOT_BOOT_READY register_version=N` | sealed, but a start-up reader refused it (`HOSTED_REGISTER_BOOT_CHECK_FAILED:` + the reader's code on stderr): pin nothing, correct the file, publish again |
@@ -1555,6 +1616,8 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `PROVIDER_VENDOR_NOT_VETTED:` + ref | the vendor's V-9(4) record is missing or incomplete |
 | `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000 |
 | `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin, 0.06 USD); raise `daily_ceiling_micros` |
+| `BILLING_PLANS_INVALID` / `BILLING_POLICY_INVALID` | a billing row in the file is not the register's shape: prices in whole cents, plans FREE, PLUS, PRO, MAX in price order; the policy is strict (no `xmoney_environment`, no owner address) |
+| `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
