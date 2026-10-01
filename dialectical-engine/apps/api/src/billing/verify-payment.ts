@@ -13,7 +13,7 @@ import type { NoticeOutcome, RequestedRefundReason } from "./codes.js";
 import { locationVerdict } from "./location-verdict.js";
 import { DONE, notFinalRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
-import { pendingRefund, refundedAlready, refundIntentOf, type RefundDesk } from "./refunds.js";
+import { covers, pendingRefund, refundedAlready, refundIntentOf, type RefundDesk } from "./refunds.js";
 import { chargeEvent, refundTarget, subscriptionEvent } from "./rows.js";
 import { enqueueInvoice, type ChargeSettlement, type SettlementContext, type SettlementPrepared } from "./settlement.js";
 
@@ -55,15 +55,6 @@ export type VerifyDeps = Readonly<{
 function amountMatches(decimal: string, micros: number): boolean {
   try {
     return decimalToMicros(decimal) === micros;
-  } catch {
-    return false;
-  }
-}
-
-/** A listed refund of `decimal` covers `micros` (an unreadable amount covers nothing). */
-function amountCovers(decimal: string, micros: number): boolean {
-  try {
-    return decimalToMicros(decimal) >= micros;
   } catch {
     return false;
   }
@@ -572,7 +563,7 @@ export class VerifyPaymentHandler {
     }
     const pending = pendingRefund(charge, paymentId);
     const intent = pending === null ? null : refundIntentOf(charge, pending);
-    if (intent !== null && amountCovers(transaction.amountDecimal, intent.amountMicros)) {
+    if (intent !== null && covers(transaction.amountDecimal, intent.amountMicros)) {
       await this.deps.refunds.recordRefunded(intent, now, transaction.transactionId, transaction.createdAt);
       await this.outcome(noticeId, now, "REFUNDED");
       return DONE;

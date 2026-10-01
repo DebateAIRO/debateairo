@@ -70,7 +70,7 @@ function isPartOf(amountMicros: number, transaction: XMoneyTransaction): boolean
 }
 
 /** Whether a listed refund of `decimal` covers `amountMicros` (an unreadable amount covers nothing: fail closed). */
-function covers(decimal: string, amountMicros: number): boolean {
+export function covers(decimal: string, amountMicros: number): boolean {
   try {
     return decimalToMicros(decimal) >= amountMicros;
   } catch {
