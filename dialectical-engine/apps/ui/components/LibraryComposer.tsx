@@ -54,7 +54,9 @@ export function LibraryComposer({
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
     // debate — and before anything else, the consent screen included.
     if (crisis.offerIfCrisis(topic)) return;
-    if (room?.room === "ALREADY_WAITING") return;
+    // While a question already waits (sentence D) the button stays active, so the line above
+    // can always offer help; any other question is refused by the server's 422
+    // ASK_ALREADY_WAITING and answered with D below.
     setBusy(true);
     setError(null);
     try {
@@ -133,7 +135,7 @@ export function LibraryComposer({
         <div className="libComposerFoot">
           <p className="libComposerHint">{t(catalog, "home.composerHint")}</p>
           <span className="libComposerSpacer" aria-hidden />
-          <button type="button" className="libStart" onClick={start} disabled={!ready || busy || room?.room === "ALREADY_WAITING"}>
+          <button type="button" className="libStart" onClick={start} disabled={!ready || busy}>
             {t(catalog, busy ? "home.starting" : "home.startDebate")} <span aria-hidden>→</span>
           </button>
         </div>

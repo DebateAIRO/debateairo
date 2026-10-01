@@ -14,8 +14,9 @@ import { ContractHttpError } from "@debateai/contract";
  *  - B or P5 when it is CLOSE;
  *  - A or P1–P4 when a limit is FULL. The ask button stays active, and the
  *    question will wait. The highest plan is offered no upgrade.
- *  - D when one question already waits. The ask button is disabled, with a
- *    link to the waiting debate.
+ *  - D when one question already waits, with a link to the waiting debate. The
+ *    ask button stays active so the crisis check can run first; any other question
+ *    is refused by the server (422 ASK_ALREADY_WAITING) and answered with D.
  * The room read is advisory: when it fails, nothing is shown and asking works
  * as before. When it names the server-decided plan (billing on), the Free/Premium
  * chooser is hidden and the page names that plan instead (ruling Q-8).
@@ -238,12 +239,12 @@ describe("/new reads the room for the ask it would send", () => {
     expect(container.querySelector<HTMLButtonElement>(".ndStart")!.disabled).toBe(false);
   });
 
-  it("disables the ask button while one question already waits (D)", async () => {
+  it("keeps the ask button active while one question already waits (D), so the crisis check can run first", async () => {
     mocks.getAskRoom.mockResolvedValue(room({ room: "ALREADY_WAITING", resets_at: RESET, waiting_run_ref: "run:waiting" }));
     const container = await mount(newPage());
     await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");
     expect(container.querySelector(".roomNoticeText")?.textContent).toBe(timed("newDebate.room.alreadyWaiting"));
-    expect(container.querySelector<HTMLButtonElement>(".ndStart")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>(".ndStart")!.disabled).toBe(false);
   });
 
   it("shows nothing and asks as before when the room read fails", async () => {
@@ -392,11 +393,11 @@ describe("the home composer shows the same sentences where the person types", ()
     expect(container.querySelector(".libComposer .roomNoticeText")?.textContent).toBe(timed("newDebate.room.personDayFull"));
   });
 
-  it("disables the start button while one question waits", async () => {
+  it("keeps the start button active while one question waits, so the crisis check can run first", async () => {
     mocks.getAskRoom.mockResolvedValue(room({ room: "ALREADY_WAITING", resets_at: RESET, waiting_run_ref: "run:waiting" }));
     const container = await mount(composer("ro"));
     await type(container.querySelector<HTMLTextAreaElement>("#library-claim")!, "Cities should ban cars downtown");
-    expect(container.querySelector<HTMLButtonElement>(".libStart")!.disabled).toBe(true);
+    expect(container.querySelector<HTMLButtonElement>(".libStart")!.disabled).toBe(false);
     expect(container.querySelector(".roomNoticeText")?.textContent).toBe(timed("newDebate.room.alreadyWaiting", "ro"));
   });
 });

@@ -492,7 +492,7 @@ function NewDebateForm({
 
           <RoomNotice room={room} catalog={catalog} locale={locale} />
           <div className="ndActions">
-            <button data-support-primary-control type="submit" className="ndStart" disabled={!ready || submitting || room?.room === "ALREADY_WAITING"}>
+            <button data-support-primary-control type="submit" className="ndStart" disabled={!ready || submitting}>
               {t(catalog, submitting ? "newDebate.starting" : "newDebate.startRun")} <span aria-hidden>→</span>
             </button>
             <button type="button" className="ndCancel" onClick={() => router.push("/")}>
