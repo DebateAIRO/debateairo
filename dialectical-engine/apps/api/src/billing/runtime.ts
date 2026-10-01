@@ -13,6 +13,7 @@ import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
+import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoice-quaderno.js";
 import { NoticeIntake } from "./notice-intake.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { QuoteService } from "./quote.js";
@@ -91,6 +92,14 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     repository, entitlements, acceptances, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl
   }));
   outbox.register("VERIFY_PAYMENT", verify.handle);
+  // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). No `orderText` yet: the task that adds the
+  // catalogue sentences passes its resolver here, as it does to the checkout below.
+  const invoiceDeps = {
+    repository, recordsKey: deps.connectors.recordsKey, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
+    audit: deps.audit
+  };
+  outbox.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
+  outbox.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
   const attachments = new Map<BillingAttachmentKind, AttachmentResolver>(deps.mail?.attachments ?? []);
   if (deps.mail !== undefined) {
     outbox.register("EMAIL", createEmailJobHandler({
