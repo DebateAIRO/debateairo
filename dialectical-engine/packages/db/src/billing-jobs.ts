@@ -214,6 +214,18 @@ export class BillingJobQueries {
     }));
   }
 
+  /** Subscriptions whose latest event is not terminal, in id order, one page after `after`. */
+  async liveSubscriptionIds(after: string | null, limit: number): Promise<string[]> {
+    const result = await this.pool.query<{ subscription_id: string }>(
+      `SELECT subscription_id FROM billing.subscription_latest_v
+        WHERE kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')
+          AND ($1::uuid IS NULL OR subscription_id > $1::uuid)
+        ORDER BY subscription_id LIMIT $2`,
+      [after, limit]
+    );
+    return result.rows.map((row) => row.subscription_id);
+  }
+
   async outboxJobExists(client: PoolClient, kind: string, ref: string): Promise<boolean> {
     const result = await client.query("SELECT 1 FROM billing.outbox WHERE kind=$1 AND ref=$2 LIMIT 1", [kind, ref]);
     return result.rowCount !== null && result.rowCount > 0;

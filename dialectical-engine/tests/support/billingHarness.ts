@@ -6,11 +6,13 @@ import type { XMoneyNotice, XMoneyStatus, XMoneyTransaction } from "@debateai/pa
 import type { BillingPlans } from "@debateai/register";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
 import { CheckoutService, type CheckoutDeps, type ConsentKind } from "../../apps/api/src/billing/checkout.js";
+import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { NoticeIntake } from "../../apps/api/src/billing/notice-intake.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
 import { QuoteService } from "../../apps/api/src/billing/quote.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { RenewalService, type RenewalDeps } from "../../apps/api/src/billing/renewal.js";
+import { createRenewalNoticeHandler } from "../../apps/api/src/billing/renewal-notice-job.js";
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
 import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
@@ -280,6 +282,8 @@ export type BillingHarness = Readonly<{
   /** The charge's event kinds as a sorted multiset: events written in one transaction share one instant. */
   eventKinds(chargeId: string): Promise<string[]>;
   renewal: RenewalService;
+  /** P11b: the maintenance pass (dunning retries, period-end endings, the yearly reminder, the look-ahead notice). */
+  maintenance: BillingMaintenance;
   /** A renewal service on its own pool: a second API process sharing the database. */
   renewalFor(pool: Pool): RenewalService;
   /** A renewal service with some deps replaced, e.g. `plans` from a later `billingPlans` version (Terms §12). */
@@ -348,6 +352,11 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   const worker = new BillingOutboxWorker({ repository, workerId: "harness", clock: clock.read, audit, batchSize: 20 });
   worker.register("VERIFY_PAYMENT", verify.handle);
   worker.register("XMONEY_REFUND", refunds.handle);
+  const maintenance = new BillingMaintenance({
+    repository, jobs, entitlements, renewal, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL,
+    audit, clock: clock.read
+  });
+  worker.register("RENEWAL_NOTICE", createRenewalNoticeHandler({ repository, jobs, renewal, policy: testBillingPolicy }));
   const noticeTokens = new Map<string, XMoneyNotice>();
   const notices = new NoticeIntake({
     repository, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
@@ -390,7 +399,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       });
     },
     refunds, verify, worker, notices,
-    renewal, erasures, frozen,
+    renewal, maintenance, erasures, frozen,
     renewalFor: (pool) => renewalOn(pool),
     renewalWith: (overrides) => new RenewalService({ ...renewalDeps(null), ...overrides }),
     async periodEndOf(subscriptionId) {

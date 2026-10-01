@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { addBusinessDays, type SubscriptionEvent } from "@debateai/billing-core";
 import {
-  addDays, dunningProgress, ordersHoldingCharge, recurringNetOf, renewalNoticeDecision, renewalPendingMs,
-  renewalPendingUntil
+  addDays, addYearsClamped, anniversaryDue, dunningProgress, ordersHoldingCharge, recurringNetOf, renewalNoticeDecision,
+  renewalPendingMs, renewalPendingUntil
 } from "../../apps/api/src/billing/renewal-rules.js";
 
 const NOW = new Date("2026-11-02T10:00:00.000Z");
@@ -137,5 +137,21 @@ describe("P11a where a lost rebill may sit (A2, A12: a card change moves the sub
 
   it("reads a card change at the charge's own instant as in force when it was made", () => {
     expect(ordersHoldingCharge([...history.slice(0, 3), on(changed, made, "4")], made)).toEqual(["4"]);
+  });
+});
+
+describe("P11b the yearly reminder window", () => {
+  it("clamps a 29 February anniversary to the 28th and counts whole years", () => {
+    expect(addYearsClamped(new Date("2028-02-29T09:00:00.000Z"), 1)).toEqual(new Date("2029-02-28T09:00:00.000Z"));
+    expect(addYearsClamped(new Date("2028-02-29T09:00:00.000Z"), 4)).toEqual(new Date("2032-02-29T09:00:00.000Z"));
+  });
+
+  it("is due only in the days right after an anniversary", () => {
+    const activated = new Date("2026-10-01T10:00:00.000Z");
+    expect(anniversaryDue(activated, new Date("2027-09-30T10:00:00.000Z"), 7)).toBeNull();
+    expect(anniversaryDue(activated, new Date("2027-10-01T10:00:00.000Z"), 7)).toBe(1);
+    expect(anniversaryDue(activated, new Date("2027-10-07T09:59:00.000Z"), 7)).toBe(1);
+    expect(anniversaryDue(activated, new Date("2027-10-09T10:00:00.000Z"), 7)).toBeNull();
+    expect(anniversaryDue(activated, new Date("2028-10-02T10:00:00.000Z"), 7)).toBe(2);
   });
 });

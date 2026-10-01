@@ -142,3 +142,22 @@ export function renewalNoticeDecision(input: Readonly<{
   }
   return Object.freeze({ kind: "CHARGE" });
 }
+
+/** The same instant `years` later; a 29 February falls back to the 28th in a common year. */
+export function addYearsClamped(from: Date, years: number): Date {
+  const target = new Date(Date.UTC(
+    from.getUTCFullYear() + years, from.getUTCMonth(), 1,
+    from.getUTCHours(), from.getUTCMinutes(), from.getUTCSeconds(), from.getUTCMilliseconds()
+  ));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(from.getUTCDate(), lastDay));
+  return target;
+}
+
+/** Terms §12's yearly reminder: the anniversary number when `now` is within `windowDays` after one. */
+export function anniversaryDue(activatedAt: Date, now: Date, windowDays: number): number | null {
+  let years = now.getUTCFullYear() - activatedAt.getUTCFullYear();
+  if (years >= 1 && addYearsClamped(activatedAt, years).getTime() > now.getTime()) years -= 1;
+  if (years < 1) return null;
+  return now.getTime() < addDays(addYearsClamped(activatedAt, years), windowDays).getTime() ? years : null;
+}

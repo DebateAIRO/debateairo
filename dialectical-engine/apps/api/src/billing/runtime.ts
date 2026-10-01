@@ -16,11 +16,13 @@ import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentK
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoice-quaderno.js";
 import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillPdfResolver } from "./invoice-smartbill.js";
+import { BillingMaintenance } from "./maintenance.js";
 import { NoticeIntake } from "./notice-intake.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { QuoteService } from "./quote.js";
 import { RefundDesk } from "./refunds.js";
 import { RenewalService } from "./renewal.js";
+import { createRenewalNoticeHandler } from "./renewal-notice-job.js";
 import { createInitialSettlement } from "./settlement-initial.js";
 import { createRenewalSettlement } from "./settlement-renewal.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
@@ -70,6 +72,12 @@ export type BillingRuntime = Readonly<{
   refunds: RefundDesk;
   /** P11a: the renewal timer's service; P11b's maintenance pass and P12 reuse its writers. */
   renewal: RenewalService;
+  /**
+   * P11b: the maintenance pass on the renewal timer, at most once every 10 minutes (dunning retries, the period-end
+   * endings, R-33's abandoned-checkout sweep, the yearly reminder and the look-ahead notice). P23's whole-flow
+   * harness drives it directly.
+   */
+  maintenance: BillingMaintenance;
   kick(): void;
   start(): void;
   stop(): void;
@@ -110,8 +118,21 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     publicAppUrl: deps.connectors.publicAppUrl, audit: deps.audit, clock: deps.clock, kick: () => drain(),
     xmoneyEnvironment: deps.connectors.xmoneyEnvironment
   });
+  const maintenance = new BillingMaintenance({
+    repository, jobs, entitlements, renewal, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
+    audit: deps.audit, clock: deps.clock
+  });
+  outbox.register("RENEWAL_NOTICE", createRenewalNoticeHandler({ repository, jobs, renewal, policy: deps.policy }));
+  let lastMaintenance = Number.NEGATIVE_INFINITY;
   const renewTick = createSingleFlightErasureReconciler(
-    async () => { await renewal.runOnce(); },
+    async () => {
+      await renewal.runOnce();
+      const now = deps.clock().getTime();
+      if (now - lastMaintenance >= 10 * 60_000) {
+        lastMaintenance = now;
+        await maintenance.runOnce();
+      }
+    },
     () => deps.reportPending("BILLING_RENEWAL_PENDING")
   );
   outbox.register("VERIFY_PAYMENT", verify.handle);
@@ -169,6 +190,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     verify,
     refunds,
     renewal,
+    maintenance,
     kick: drain,
     start() {
       if (timers.length > 0) return;
