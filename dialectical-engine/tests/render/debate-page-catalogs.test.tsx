@@ -93,7 +93,11 @@ function synthesisStrings(locale: string): string[] {
   });
 }
 
-/** The English page as fc3cb865a rendered it (see the byte-identical row). */
+/** The English page as fc3cb865a rendered it (see the byte-identical row), plus the
+ * deliberate later changes, each applied by hand as one tag in both files: b68f82dae
+ * dropped the language-switcher flag span; PR #56 (eb7269e1) added the
+ * publicationControl class to the publication card. A regeneration from fc3cb865a
+ * must re-apply both. */
 function headFixture(name: "queued" | "lens"): string {
   return readFileSync(resolve(process.cwd(), `tests/render/fixtures/debate-page-en.fc3cb865a.${name}.html`), "utf8");
 }
