@@ -12,18 +12,21 @@ import {
   type PublicDebate,
   type PublicMakerLineage,
   type PublicNode,
-  type PublicStoryShort
+  type PublicStoryShort,
+  type PublicationRefusalStatement
 } from "@debateai/contract";
 import {
   hashToken,
   PublicationCipher
 } from "@debateai/crypto";
 import {
+  isRunContentLeaseHeld,
   PostgresPublicationRepository,
   type AuthSourceContext
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
+import type { PublicationContentCheck } from "./publication-check/check.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
   n: LabeledNumber,
@@ -258,6 +261,35 @@ function logFloorNotPublished(requestId: string, diagnostic: string): void {
   })));
 }
 
+/**
+ * FIX-HS2-p1 sd-B1 (ruling R-P): how the publish path holds the run's private-content lease. `run` opens one lease
+ * (a pooled client) for the callback; `readAnswer` reads the owner's answer under it. `publish` builds the snapshot
+ * under one lease, awaits the content check under NONE, and commits under a fresh one after re-reading the answer.
+ * Absent, the phases run as given (callers that hold no lease, e.g. the database suites).
+ */
+export type PublicationContentLease = Readonly<{
+  run<T>(use: () => Promise<T>): Promise<T>;
+  readAnswer(): Promise<Answer | null>;
+}>;
+
+function logCheckFailed(requestId: string, diagnostic: string): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.publication.check_failed",
+    requestId,
+    diagnostic
+  })));
+}
+
+/**
+ * What one publish attempt ends in (hate-speech S02, SPEC-v2 R6). A refusal
+ * carries only the closed-code statement of reasons (R9); an unavailable check
+ * carries nothing. `null` stays today's "not found / not allowed".
+ */
+export type PublicationPublishResult =
+  | Readonly<{ state: "PUBLISHED"; public_ref: string }>
+  | Readonly<{ state: "REFUSED"; statement: PublicationRefusalStatement }>
+  | Readonly<{ state: "CHECK_UNAVAILABLE" }>;
+
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
   reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
@@ -284,7 +316,11 @@ export interface PublicationApplication {
     authenticated: AuthenticatedSession;
     grantToken: string;
     source: AuthSourceContext;
-  }>): Promise<Readonly<{ state: "PUBLISHED"; public_ref: string }> | null>;
+    /** hate-speech S02 (SPEC-v2 R1, D-S02-22): required, so every caller names the check it runs. */
+    contentCheck: PublicationContentCheck;
+    /** FIX-HS2-p1 sd-B1: the route's lease; the judge is awaited outside it. */
+    contentLease?: PublicationContentLease;
+  }>): Promise<PublicationPublishResult | null>;
   unpublish(input: Readonly<{
     runId: string;
     authenticated: AuthenticatedSession;
@@ -365,9 +401,50 @@ export class PostgresPublicationApplication implements PublicationApplication {
     authenticated: AuthenticatedSession;
     grantToken: string;
     source: AuthSourceContext;
-  }>): Promise<Readonly<{ state: "PUBLISHED"; public_ref: string }> | null> {
+    contentCheck: PublicationContentCheck;
+    contentLease?: PublicationContentLease;
+  }>): Promise<PublicationPublishResult | null> {
+    const lease: PublicationContentLease = input.contentLease
+      ?? { run: (use) => use(), readAnswer: async () => input.answer };
+    const staged = await lease.run(() => this.stagePublication(input));
+    if (staged === null) return null;
+    // hate-speech S02 (D-S02-14, amended by FIX-HS2-p1 sd-B1): the content check reads the exact snapshot that
+    // would be encrypted, holding NO pooled client while the judge answers (ruling R-P), and a refusal returns
+    // before any key provision, cipher, encryption or visibility transition exists for the attempt (SPEC-v2 R8).
+    if (isRunContentLeaseHeld()) throw new TypeError("PUBLICATION_CHECK_UNDER_CONTENT_LEASE");
+    let checked: Awaited<ReturnType<PublicationContentCheck["check"]>>;
+    try {
+      checked = await input.contentCheck.check({ runId: input.runId, snapshot: staged.publicDebate });
+    } catch (error) {
+      // sd-N4: a check that cannot finish (its record write refused) is the typed 503, never a 500.
+      logCheckFailed(input.source.requestId, storyReadDiagnostic(error));
+      return Object.freeze({ state: "CHECK_UNAVAILABLE" as const });
+    }
+    if (checked.outcome === "BLOCK" || checked.outcome === "UNSURE") {
+      return Object.freeze({ state: "REFUSED" as const, statement: checked.statement });
+    }
+    if (checked.outcome !== "ALLOW") return Object.freeze({ state: "CHECK_UNAVAILABLE" as const });
+    return lease.run(async () => {
+      const current = await lease.readAnswer();
+      if (current === null) return null;
+      // The checked snapshot is the one encrypted below; an answer that moved on while the judge worked is not it.
+      if (current.run_ref !== input.runId || current.answer_id !== input.answer.answer_id
+        || current.answer_version !== input.answer.answer_version) {
+        return Object.freeze({ state: "CHECK_UNAVAILABLE" as const });
+      }
+      return this.commitPublication(input, staged);
+    });
+  }
+
+  /** Everything the snapshot needs, read under the caller's lease; null is today's "not found / not allowed". */
+  private async stagePublication(input: Readonly<{
+    runId: string;
+    answer: Answer;
+    authenticated: AuthenticatedSession;
+    grantToken: string;
+    source: AuthSourceContext;
+  }>): Promise<Readonly<{ publicDebate: PublicDebate; publicationRef: string; occurredAt: Date; pseudonym: string }> | null> {
     if (input.answer.run_ref !== input.runId || input.answer.terminal === "BLOCKED") return null;
-    const grantTokenHash = hashToken("step-up-grant", input.grantToken);
     if (!await this.preflightGrant({
       runId: input.runId,
       authenticated: input.authenticated,
@@ -391,14 +468,6 @@ export class PostgresPublicationApplication implements PublicationApplication {
     const floor = await readPublishableFloor(this.repository, input);
     const publicationRef = randomUUID();
     const occurredAt = this.clock();
-    if (!await this.repository.prepareKeyProvision({
-      publicationRef,
-      runId: input.runId,
-      userId: input.authenticated.userId,
-      ownerRef: input.authenticated.ownerRef,
-      sessionId: input.authenticated.session.session_id,
-      grantTokenHash
-    })) return null;
     const publicDebate = PublicDebateSchema.parse({
       public_ref: publicationRef,
       author_pseudonym: pseudonym,
@@ -422,6 +491,27 @@ export class PostgresPublicationApplication implements PublicationApplication {
       ...(language === null ? {} : { language }),
       ...(floor === null ? {} : { floor })
     });
+    return Object.freeze({ publicDebate, publicationRef, occurredAt, pseudonym });
+  }
+
+  /** Provision, encrypt and publish the snapshot the check allowed, under the caller's (fresh) lease. */
+  private async commitPublication(input: Readonly<{
+    runId: string;
+    authenticated: AuthenticatedSession;
+    grantToken: string;
+    source: AuthSourceContext;
+  }>, staged: Readonly<{ publicDebate: PublicDebate; publicationRef: string; occurredAt: Date; pseudonym: string }>
+  ): Promise<PublicationPublishResult | null> {
+    const { publicDebate, publicationRef, occurredAt, pseudonym } = staged;
+    const grantTokenHash = hashToken("step-up-grant", input.grantToken);
+    if (!await this.repository.prepareKeyProvision({
+      publicationRef,
+      runId: input.runId,
+      userId: input.authenticated.userId,
+      ownerRef: input.authenticated.ownerRef,
+      sessionId: input.authenticated.session.session_id,
+      grantTokenHash
+    })) return null;
     let prepared: Awaited<ReturnType<PublicationCipher["create"]>>;
     try {
       prepared = await this.cipher.create(publicationRef, input.runId);

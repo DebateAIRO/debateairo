@@ -274,7 +274,7 @@ describe("/new reads the room for the ask it would send", () => {
       .mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 503, "down"));
     mocks.createDebate.mockRejectedValue(new ContractHttpError(
       "UNPROCESSABLE", 422, "ASK_ALREADY_WAITING: ASK_ALREADY_WAITING", "ASK_ALREADY_WAITING",
-      { runRef: "run:waiting", waitsUntil: RESET }
+      null, { runRef: "run:waiting", waitsUntil: RESET }
     ));
     const container = await mount(newPage());
     await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");

@@ -38,6 +38,8 @@ import {
   NodeSchema,
   PrivateDebateErasureStatusSchema,
   PublicationTransitionSchema,
+  PublicationContentRefusalSchema,
+  type PublicationRefusalStatement,
   PublicDebateListSchema,
   PublicDebateSchema,
   RunEventSchema,
@@ -90,6 +92,7 @@ export class ContractHttpError extends Error {
     readonly status: number,
     message: string,
     readonly serverCode: string | null = null,
+    readonly statement: PublicationRefusalStatement | null = null,
     /**
      * Budget spec §2.7: set only for 422 ASK_ALREADY_WAITING whose body parses
      * as `AskAlreadyWaitingSchema`: the waiting run and its expected start (no
@@ -117,9 +120,14 @@ function codeForStatus(status: number): ContractErrorCode {
 async function contractErrorForResponse(response: Response): Promise<ContractHttpError> {
   let serverCode: string | null = null;
   let serverMessage: string | null = null;
+  let statement: PublicationRefusalStatement | null = null;
   let waiting: ContractWaitingRefusal | null = null;
   try {
     const candidate: unknown = await response.json();
+    if (response.status === 409) {
+      const refusal = PublicationContentRefusalSchema.safeParse(candidate);
+      if (refusal.success) statement = refusal.data.statement;
+    }
     if (typeof candidate === "object" && candidate !== null) {
       const body = candidate as Record<string, unknown>;
       serverCode = typeof body.error === "string" && body.error.trim().length > 0 ? body.error : null;
@@ -139,7 +147,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   const detail = serverCode !== null && serverMessage !== null
     ? `${serverCode}: ${serverMessage}`
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
-  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode, waiting);
+  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode, statement, waiting);
 }
 
 async function requestJson<T>(

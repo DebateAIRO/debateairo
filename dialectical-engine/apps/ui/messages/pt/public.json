@@ -190,5 +190,20 @@
   "public.report.error.tryAgain": "Não foi possível preparar o relatório neste momento. Tente novamente daqui a pouco.",
   "public.story.morePaths.one": "e mais {count} posição",
   "public.story.morePaths.many": "e mais {count} posições",
-  "public.story.morePaths.other": "e mais {count} posições"
+  "public.story.morePaths.other": "e mais {count} posições",
+  "public.publication.contentCheck.refusedHeading": "Não publicámos este debate",
+  "public.publication.contentCheck.refusedWhatBlock": "Uma verificação automática encontrou neste debate texto que viola as nossas regras, pelo que o debate não foi publicado.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Uma verificação automática não conseguiu confirmar que este debate cumpre as nossas regras, pelo que o debate não foi publicado.",
+  "public.publication.contentCheck.partsIntro": "Onde a verificação encontrou o texto:",
+  "public.publication.contentCheck.part.question": "A pergunta",
+  "public.publication.contentCheck.part.summary": "O resumo, as notas sobre o veredicto e as objeções restantes",
+  "public.publication.contentCheck.part.arguments": "Os argumentos",
+  "public.publication.contentCheck.part.reviews": "Os comentários dos revisores",
+  "public.publication.contentCheck.part.story": "A narrativa do veredicto",
+  "public.publication.contentCheck.groundTerms": "Fundamento: os nossos Termos de Serviço, secção 7 (não é permitido conteúdo que incite à violência ou ao ódio).",
+  "public.publication.contentCheck.groundIllegal": "O texto poderá também ser ilegal.",
+  "public.publication.contentCheck.automated": "Esta decisão foi tomada por uma ferramenta automática. Ainda não foi analisada por nenhuma pessoa.",
+  "public.publication.contentCheck.stillPrivate": "O seu debate permanece privado e inalterado. Só pode ser visto por si.",
+  "public.publication.contentCheck.appeal": "Para solicitar a revisão desta decisão por uma pessoa, escreva para [appeals@dezbatere.ro] no prazo de seis meses.",
+  "public.publication.contentCheck.unavailable": "A verificação de conteúdo não está disponível de momento, pelo que nada foi publicado. O seu debate permanece privado. Tente novamente dentro de alguns minutos."
 }

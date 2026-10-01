@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Αυτή η αναφορά δεν είναι διαθέσιμη.",
   "public.report.error.tryAgain": "Δεν ήταν δυνατό να δημιουργηθεί η αναφορά αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο.",
   "public.story.morePaths.one": "και {count} ακόμη θέση",
-  "public.story.morePaths.other": "και {count} ακόμη θέσεις"
+  "public.story.morePaths.other": "και {count} ακόμη θέσεις",
+  "public.publication.contentCheck.refusedHeading": "Δεν δημοσιεύσαμε αυτή τη συζήτηση",
+  "public.publication.contentCheck.refusedWhatBlock": "Ένας αυτόματος έλεγχος εντόπισε σε αυτή τη συζήτηση κείμενο που παραβιάζει τους κανόνες μας, γι’ αυτό η συζήτηση δεν δημοσιεύτηκε.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Ένας αυτόματος έλεγχος δεν μπόρεσε να επιβεβαιώσει ότι αυτή η συζήτηση τηρεί τους κανόνες μας, γι’ αυτό η συζήτηση δεν δημοσιεύτηκε.",
+  "public.publication.contentCheck.partsIntro": "Πού εντόπισε ο έλεγχος το κείμενο:",
+  "public.publication.contentCheck.part.question": "Η ερώτηση",
+  "public.publication.contentCheck.part.summary": "Η σύνοψη, οι σημειώσεις για την ετυμηγορία και οι υπόλοιπες αντιρρήσεις",
+  "public.publication.contentCheck.part.arguments": "Τα επιχειρήματα",
+  "public.publication.contentCheck.part.reviews": "Τα σχόλια των αξιολογητών",
+  "public.publication.contentCheck.part.story": "Η ιστορία της ετυμηγορίας",
+  "public.publication.contentCheck.groundTerms": "Βάση: οι Όροι παροχής υπηρεσιών μας, ενότητα 7 (απαγορεύεται περιεχόμενο που υποκινεί βία ή μίσος).",
+  "public.publication.contentCheck.groundIllegal": "Το κείμενο ενδέχεται επίσης να είναι παράνομο.",
+  "public.publication.contentCheck.automated": "Η απόφαση αυτή ελήφθη από αυτοματοποιημένο εργαλείο. Κανένας άνθρωπος δεν την έχει εξετάσει ακόμη.",
+  "public.publication.contentCheck.stillPrivate": "Η συζήτησή σας παραμένει ιδιωτική και αμετάβλητη. Μόνο εσείς μπορείτε να τη δείτε.",
+  "public.publication.contentCheck.appeal": "Για να ζητήσετε από έναν άνθρωπο να επανεξετάσει αυτή την απόφαση, γράψτε στο [appeals@dezbatere.ro] εντός έξι μηνών.",
+  "public.publication.contentCheck.unavailable": "Ο έλεγχος περιεχομένου δεν είναι διαθέσιμος αυτή τη στιγμή, οπότε δεν δημοσιεύτηκε τίποτα. Η συζήτησή σας παραμένει ιδιωτική. Δοκιμάστε ξανά σε λίγα λεπτά."
 }

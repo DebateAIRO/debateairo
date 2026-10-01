@@ -1697,6 +1697,7 @@ describe("S8 publication on real PostgreSQL", () => {
     );
     const asOf = new Date().toISOString();
     await expect(application.publish({
+      contentCheck: { check: async () => ({ outcome: "ALLOW" }) },
       runId,
       // The second `as never` sat here. `publish` reads exactly three fields of
       // this object — `userId`, `ownerRef` and `session.session_id`

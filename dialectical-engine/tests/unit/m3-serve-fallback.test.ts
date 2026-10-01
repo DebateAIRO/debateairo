@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { projectedCallCeilingMicros, type ProviderTargetPrice } from "@debateai/budget";
+import {
+  PROJECTED_INPUT_BYTES_PER_TOKEN,
+  projectedCallCeilingMicros,
+  type ProviderTargetPrice
+} from "@debateai/budget";
 import { RUN_LEVEL_SPEND_STOP_CODES, TypedDomainError } from "@debateai/kernel";
 import {
   lengthRetryTokenCeiling,
@@ -101,7 +105,7 @@ const CODE_LABEL = Object.freeze({
 });
 
 /** A REAL framed synthesizer request, as the runner builds it. */
-function synthesizerCall(statement: string, providerRef = "provider:planned"): ProviderCallRequest {
+function synthesizerCall(statement: string, tokenCeiling = 2_048): ProviderCallRequest {
   const request = buildSynthesizerRequest({
     controls: CONTROLS, round: 1, digest: digestOf(statement), codeLabel: CODE_LABEL, prior: null
   });
@@ -111,23 +115,32 @@ function synthesizerCall(statement: string, providerRef = "provider:planned"): P
     callSiteKey: "COMPOSER:SYNTHESIZER:INITIAL:1",
     role: "SYNTHESIZER" as const,
     lane: "served" as const,
-    bound: Object.freeze({ maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 }),
+    bound: Object.freeze({ maxAttempts: 3, tokenCeiling, deadlineMs: 180_000 }),
     contractHash: "c".repeat(64),
-    providerRef,
+    providerRef: "provider:planned",
     packet: buildSynthesizerPromptPacket(request, "English")
   });
 }
 
-/** What the seam measures before sending — minus the target's own model name. */
+/** The bytes the seam measures before sending — minus the target's own model name. */
+function requestBytesOf(request: ProviderCallRequest): number {
+  return Buffer.byteLength(JSON.stringify({
+    max_tokens: lengthRetryTokenCeiling(request.bound.tokenCeiling, 0),
+    messages: request.packet.messages
+  }), "utf8");
+}
+
+/** What the seam projects for one call, from those bytes and the attempt's own bound. */
 function projectionOf(request: ProviderCallRequest, price: ProviderTargetPrice): number {
-  const completionTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, 0);
   return projectedCallCeilingMicros(price, {
-    requestBytes: Buffer.byteLength(JSON.stringify({
-      max_tokens: completionTokenCeiling,
-      messages: request.packet.messages
-    }), "utf8"),
-    completionTokenCeiling
+    requestBytes: requestBytesOf(request),
+    completionTokenCeiling: lengthRetryTokenCeiling(request.bound.tokenCeiling, 0)
   });
+}
+
+/** The prompt tokens the projection charges for: the bytes at the conservative floor. */
+function projectedPromptTokensOf(request: ProviderCallRequest): number {
+  return Math.ceil(requestBytesOf(request) / PROJECTED_INPUT_BYTES_PER_TOKEN);
 }
 
 type Recorded = { readonly providerRef: string; readonly request: ProviderCallRequest };
@@ -216,6 +229,26 @@ describe("M3 · the fallback order: cheapest first by THIS request's projection"
   const largeRequest = synthesizerCall("A long statement. ".repeat(2_000));
 
   it("orders by the seam's own projection, so the order follows the request's size", () => {
+    // The two mirror-image prices swap places where a request's projected
+    // PROMPT tokens cross its completion bound: below it the bound × output price
+    // dominates (cheap-output wins), above it the prompt × input price does
+    // (cheap-input wins). So the swap needs ONE bound that sits between the short
+    // and the long request's projected prompt tokens.
+    //
+    // That bound is DERIVED from the frame as it now is, never typed in. The frame
+    // sets a floor under every framed request: prompt frame v2 carries the ~1.9 kB
+    // content rule (hate-speech S01), whose 1 929 JSON bytes lifted "Short." to 5 440
+    // request bytes — 2 720 projected prompt tokens, past the 2 048 bound the other
+    // cases use, so under that bound NO framed request is short any more. Twice the
+    // short request's own projected prompt tokens keeps it below the bound whatever
+    // the frame weighs, and the long request (41 436 bytes, 20 718 tokens today) must
+    // stay above it; both are asserted, so a frame that outgrows the fixture fails
+    // on the precondition by name instead of flipping the order silently.
+    const swapBound = 2 * projectedPromptTokensOf(smallRequest);
+    const shortAtBound = synthesizerCall("Short.", swapBound);
+    const longAtBound = synthesizerCall("A long statement. ".repeat(2_000), swapBound);
+    expect(projectedPromptTokensOf(shortAtBound)).toBeLessThan(swapBound);
+    expect(projectedPromptTokensOf(longAtBound)).toBeGreaterThan(swapBound);
     const calls: Recorded[] = [];
     const claimEligible = [
       maker("provider:planned", "ANSWERS", calls),
@@ -236,11 +269,13 @@ describe("M3 · the fallback order: cheapest first by THIS request's projection"
 
     expect(orderFor(smallRequest)).toEqual(expectedFor(smallRequest));
     expect(orderFor(largeRequest)).toEqual(expectedFor(largeRequest));
-    // A plain price comparison could not do this: the same two makers swap
-    // places, because a short prompt is dominated by max_tokens × output and a
-    // long one by bytes/2 × input.
-    expect(orderFor(smallRequest)).toEqual(["provider:cheap-output", "provider:cheap-input"]);
-    expect(orderFor(largeRequest)).toEqual(["provider:cheap-input", "provider:cheap-output"]);
+    expect(orderFor(shortAtBound)).toEqual(expectedFor(shortAtBound));
+    expect(orderFor(longAtBound)).toEqual(expectedFor(longAtBound));
+    // A plain price comparison could not do this: under one bound the same two
+    // makers swap places, because a short prompt is dominated by max_tokens ×
+    // output and a long one by bytes/2 × input.
+    expect(orderFor(shortAtBound)).toEqual(["provider:cheap-output", "provider:cheap-input"]);
+    expect(orderFor(longAtBound)).toEqual(["provider:cheap-input", "provider:cheap-output"]);
   });
 
   it("never offers the refused maker again, and offers each other maker once", () => {
