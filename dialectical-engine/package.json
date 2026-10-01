@@ -80,6 +80,7 @@
     "@debateai/db": "workspace:*",
     "@debateai/geo": "workspace:*",
     "@debateai/graph": "workspace:*",
+    "@debateai/invoice-smartbill": "workspace:*",
     "@debateai/judgement": "workspace:*",
     "@debateai/kernel": "workspace:*",
     "@debateai/ledger": "workspace:*",

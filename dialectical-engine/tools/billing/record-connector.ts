@@ -5,6 +5,8 @@
 // printed or saved (the Authorization header is not recorded). Scrub the capture with scrub-connector-fixture.ts.
 //   quaderno --key-file F --base-url https://<account>.sandbox-quadernoapp.com/api --vat-id <a valid EU VAT id>
 //            --vat-country <its ISO2 country> --capture-dir D
+//   smartbill --credentials-file F --cif <company CIF> --series <a dedicated test series> --capture-dir D
+//             [--allow-writes | --draft]   (writes create legal documents: the accountant decides, X1 Step 3)
 // The Quaderno run books TWO sales and TWO refunds under two fresh transaction ids: a German consumer's sale and its
 // refund, then a reverse-charge company sale (the --vat-id company, 0 VAT) and its refund. The second pair's lookups
 // run while the first sale and credit already exist, so their recorded empty lists prove that Quaderno applies the
@@ -12,10 +14,12 @@
 // that sandbox invoice and its credit note in Quaderno and confirms that each shows 0 VAT and says "Reverse charge"
 // (the recorder prints a reminder line). If the wording is missing, the client must send Quaderno's reverse-charge
 // marker before billing goes on.
+import { randomBytes } from "node:crypto";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RefundRecord, SaleRecord } from "@debateai/billing-core";
+import { SmartBillInvoiceIssuer } from "@debateai/invoice-smartbill";
 import { QuadernoTaxEngine } from "@debateai/tax-quaderno";
 
 export const CONNECTOR_CAPTURE_FORMAT = "debateai.connector-capture.v1";
@@ -181,6 +185,90 @@ export class ConnectorRecorder {
   }
 }
 
+/** Always safe to record: two reads of the account's own settings (X1 row 7). */
+export const SMARTBILL_READ_STEPS = Object.freeze(["tax-list", "series-list"] as const);
+/**
+ * Only with the accountant's agreement, in a dedicated series, BEFORE automatic e-Factura sending is on (X1 Step 3):
+ * each creates a Romanian legal document. `storno-again` is the refused second reversal (X1 row 5).
+ */
+export const SMARTBILL_WRITE_STEPS = Object.freeze([
+  "issue", "pdf", "credit-partial", "issue-for-storno", "storno", "storno-again"
+] as const);
+/** When the accountant allows no real test invoice: the issue shape alone, as a SmartBill draft. */
+export const SMARTBILL_DRAFT_STEPS = Object.freeze(["issue-draft"] as const);
+
+/** The synthetic Romanian sale of the recording (one line: 1.00 net + 0.21 VAT, the charged gross 1.21). */
+export function smartbillRecordingSale(chargeId: string, issuedOn: Date): SaleRecord {
+  return {
+    chargeId, transactionId: "0", issuedOn,
+    customer: {
+      name: "Test Person", email: "person@example.test", country: "RO", region: "Cluj", postalCode: "400001",
+      city: "Cluj-Napoca", street: "Str. Exemplu 1", taxId: null, locale: "ro"
+    },
+    lines: [{ description: "DebateAI Plus, inregistrare de test", netMicros: 1_000_000, taxMicros: 210_000, taxRateBasisPoints: 2100 }],
+    taxCode: "saas",
+    evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" }
+  };
+}
+
+export function smartbillRecordingRefund(
+  chargeId: string, issuedOn: Date, original: Readonly<{ externalRef: string; number: string }>, refundTotalMicros: number
+): RefundRecord {
+  return {
+    chargeId, transactionId: "0", issuedOn, refundTotalMicros,
+    original: { documentId: original.externalRef, number: original.number },
+    description: "Rambursare DebateAI Plus"
+  };
+}
+
+async function recordSmartBill(argv: readonly string[]): Promise<ConnectorCapture> {
+  const baseUrl = "https://ws.smartbill.ro/SBORO/api";
+  const credentials = readTextSecret(argument(argv, "--credentials-file"));
+  const separator = credentials.indexOf(":");
+  if (separator < 1) throw new TypeError("CONNECTOR_KEY_FILE_INVALID");
+  const cif = argument(argv, "--cif");
+  const series = argument(argv, "--series");
+  const allowWrites = argv.includes("--allow-writes");
+  const draft = argv.includes("--draft");
+  if (allowWrites && draft) throw new TypeError("CONNECTOR_WRITES_OR_DRAFT");
+  const recorder = new ConnectorRecorder(baseUrl);
+  const authorization = `Basic ${Buffer.from(credentials, "utf8").toString("base64")}`;
+  const read = (path: string) => async () => {
+    const response = await recorder.fetch(`${baseUrl}${path}`, { method: "GET", headers: { authorization, accept: "application/json" } });
+    if (!response.ok) throw Object.assign(new Error(`SMARTBILL_HTTP_${response.status}`), { code: "INVOICE_SERVICE_REFUSED" });
+    return response.status;
+  };
+  await recorder.step("tax-list", read(`/tax?${new URLSearchParams({ cif }).toString()}`));
+  await recorder.step("series-list", read(`/series?${new URLSearchParams({ cif, type: "f" }).toString()}`));
+  const issuer = new SmartBillInvoiceIssuer({
+    baseUrl, username: credentials.slice(0, separator), token: credentials.slice(separator + 1), companyCif: cif, series,
+    fetch: recorder.fetch, draft
+  });
+  const issuedOn = new Date();
+  if (draft) {
+    await recorder.step("issue-draft", () => issuer.issue(smartbillRecordingSale(randomBytes(16).toString("hex"), issuedOn)));
+  } else if (allowWrites) {
+    const chargeId = randomBytes(16).toString("hex");
+    const sale = smartbillRecordingSale(chargeId, issuedOn);
+    const issued = await recorder.step("issue", () => issuer.issue(sale));
+    if (issued !== null) {
+      await recorder.step("pdf", () => issuer.pdf({ series: issued.series, number: issued.number }));
+      await recorder.step("credit-partial", () => issuer.creditPartial({
+        ...smartbillRecordingRefund(chargeId, issuedOn, issued, 500_000), series: issued.series, number: issued.number,
+        taxRateBasisPoints: 2100, customer: sale.customer
+      }));
+    }
+    const stornoChargeId = randomBytes(16).toString("hex");
+    const second = await recorder.step("issue-for-storno", () => issuer.issue(smartbillRecordingSale(stornoChargeId, issuedOn)));
+    if (second !== null) {
+      const whole = { ...smartbillRecordingRefund(stornoChargeId, issuedOn, second, 1_210_000), series: second.series, number: second.number };
+      await recorder.step("storno", () => issuer.storno(whole));
+      await recorder.step("storno-again", () => issuer.storno(whole));
+    }
+  }
+  return recorder.capture("smartbill");
+}
+
 /** One printable line from a 0600 file (the API key, SmartBill's `e-mail:token`). */
 function readTextSecret(path: string): string {
   const metadata = statSync(path);
@@ -243,7 +331,8 @@ export async function recordQuadernoRun(i: Readonly<{
 
 async function main(argv: readonly string[]): Promise<void> {
   const connector = argv[0];
-  const capture = connector === "quaderno" ? await recordQuaderno(argv) : undefined;
+  const capture = connector === "quaderno" ? await recordQuaderno(argv)
+    : connector === "smartbill" ? await recordSmartBill(argv) : undefined;
   if (capture === undefined) throw new TypeError("CONNECTOR_COMMAND_UNKNOWN");
   const target = join(argument(argv, "--capture-dir"), `${capture.connector}-capture-${Date.now()}.json`);
   writeFileSync(target, JSON.stringify(capture), { mode: 0o600 });

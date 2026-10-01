@@ -646,6 +646,7 @@ packages/geo/src/index.ts
 packages/geo/src/ip.ts
 packages/geo/src/lookup.ts
 packages/graph/src/index.ts
+packages/invoice-smartbill/src/index.ts
 packages/judgement/src/index.ts
 packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts

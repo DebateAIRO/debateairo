@@ -68,6 +68,9 @@ importers:
       '@debateai/graph':
         specifier: workspace:*
         version: link:packages/graph
+      '@debateai/invoice-smartbill':
+        specifier: workspace:*
+        version: link:packages/invoice-smartbill
       '@debateai/judgement':
         specifier: workspace:*
         version: link:packages/judgement
@@ -598,6 +601,15 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+
+  packages/invoice-smartbill:
+    dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
 
   packages/judgement:
     dependencies:

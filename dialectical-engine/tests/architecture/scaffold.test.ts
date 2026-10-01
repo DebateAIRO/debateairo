@@ -43,9 +43,10 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
   // 30 -> 31: the billing-core package row (A26(a)).
   // 31 -> 32: the payments-xmoney package row (A26(a)).
   // 32 -> 33: the tax-quaderno package row (A26(a)).
-  it("matches all 33 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
+  // 33 -> 34: the invoice-smartbill package row (A26(a)).
+  it("matches all 34 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
     const report = await auditArchitecture();
-    expect(report.edgeRowsChecked).toBe(33);
+    expect(report.edgeRowsChecked).toBe(34);
     expect(report.violations.filter((violation) => !DEV_F31_OBS_CAPTURE_EDGES.includes(violation)))
       .toEqual([]);
   });
