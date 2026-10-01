@@ -25,6 +25,7 @@ import {
   type HostedRegisterOperations
 } from "../../apps/runner/src/hosted-register-publish.js";
 import { runHostedRegisterPublishCli } from "../../apps/runner/src/hosted-register-publish-cli.js";
+import { PLAN_TIER_ROSTERS } from "../../packages/contract/src/index.js";
 import {
   ALGORITHM_REGISTER_ROW_KEYS,
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -716,5 +717,52 @@ describe("Paid plans · the billing rows and the budget band in the hosted regis
     const file = validFile();
     file[key] = value;
     expect(await planCode(file)).toBe(code);
+  });
+});
+
+/**
+ * Final review Part 1b, Important 3 (budget spec §2.10, B9d). The file's
+ * `providerTargets` carry the prices both units read at boot (they must equal
+ * PROVIDER_DISCOVERY_TARGETS_JSON) and the composed register carries the sealed
+ * JUDGE bound, so the boot's RUN_CEILING_BELOW_ONE_CALL check is asked of the
+ * plan: a dry run refuses a version both services would refuse to start on.
+ * As at boot, only with the band published.
+ */
+describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BELOW_ONE_CALL)", () => {
+  /** Both vendors serve the Free plan's whole roster at `prices`, with a 30% answer reserve: arguing gets 175 000 micros. */
+  function freeRosterFile(prices: Readonly<{ input: number; output: number }>, band: boolean): Record<string, unknown> {
+    const file = validFile();
+    (file.providerTargets as Array<Record<string, unknown>>).forEach((target, index) => {
+      target.model = PLAN_TIER_ROSTERS.free[index];
+      target.input_price_micros_per_million = prices.input;
+      target.output_price_micros_per_million = prices.output;
+    });
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      serve_reserve_basis_points: 3_000,
+      ...(band ? { admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1 } : {})
+    });
+    return file;
+  }
+
+  it("refuses at plan time, before anything is sealed, a band whose cheapest model cannot pay for one first call", async () => {
+    expect(await planCode(freeRosterFile({ input: 5_000_000, output: 25_000_000 }, true))).toBe("RUN_CEILING_BELOW_ONE_CALL");
+  });
+
+  it("lets the same prices through without the band (the boot asks only with it), and cheaper ones with it", async () => {
+    expect(await planCode(freeRosterFile({ input: 5_000_000, output: 25_000_000 }, false))).toBe("NO_REFUSAL");
+    expect(await planCode(freeRosterFile({ input: 1_000_000, output: 4_000_000 }, true))).toBe("NO_REFUSAL");
+  });
+
+  it("has nothing to ask while no plan's whole roster is configured, as at boot", async () => {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      serve_reserve_basis_points: 3_000, admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500,
+      waiting_line_per_person: 1
+    });
+    for (const target of file.providerTargets as Array<Record<string, unknown>>) {
+      target.input_price_micros_per_million = 5_000_000;
+      target.output_price_micros_per_million = 25_000_000;
+    }
+    expect(await planCode(file)).toBe("NO_REFUSAL");
   });
 });

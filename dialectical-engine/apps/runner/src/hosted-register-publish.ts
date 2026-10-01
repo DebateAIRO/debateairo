@@ -47,9 +47,11 @@ import { open, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Pool } from "pg";
 import { z } from "zod";
-import { costEnvelopeGuardPolicy } from "@debateai/budget";
+import { assertRunCeilingCoversOneCall, costEnvelopeGuardPolicy } from "@debateai/budget";
+import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
+import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
@@ -72,9 +74,12 @@ import {
   billingPolicyFromValue,
   buildConfiguredProviderSetDeploymentRow,
   computeRegisterSnapshotSha256,
+  costEnvelopeBand,
+  costEnvelopeCeilings,
   costEnvelopePolicyFromValue,
   countryPolicyFromValue,
   createPostgresRegisterPublicationPort,
+  judgeTokenCeilingFromValue,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
@@ -601,11 +606,31 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     })),
     bootstrap.registerVersion
   ));
-  // The billing rows as they will be sealed, read back from the composed set.
+  // The rows as they will be sealed, read back from the composed set.
   const sealed = (rowKey: string): Readonly<{ value: unknown; sourceRef: string }> | null => {
     const row = rows.find((candidate) => candidate.rowKey === rowKey);
     return row === undefined ? null : Object.freeze({ value: JSON.parse(row.valueJsonText) as unknown, sourceRef: row.sourceRef });
   };
+  // B9d (budget spec §2.10), final review Part 1b, Important 3: the check BOTH
+  // boots run (RUN_CEILING_BELOW_ONE_CALL), asked of the version about to be
+  // sealed, by the same functions over the same inputs: the file's priced
+  // targets (they must equal PROVIDER_DISCOVERY_TARGETS_JSON, which the units
+  // read), the composed JUDGE bound, the ask's largest question and each plan's
+  // roster. Only with the band, as at boot. The boots keep asking: the
+  // environment can still differ from the file.
+  if (costEnvelopeBand(costEnvelope) !== null) {
+    assertRunCeilingCoversOneCall({
+      bodyCeilingMicros: costEnvelopeCeilings(costEnvelope).bodyMicros,
+      firstCallsByRoster: firstCallsByPlanRoster({
+        projections: firstPositionCallProjections({
+          targets,
+          judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
+          questionMaxBytes: askQuestionMaxBytes()
+        }),
+        rosters: PLAN_TIER_ROSTERS
+      })
+    });
+  }
   const plansRow = sealed(BILLING_PLANS_ROW_KEY);
   const policyRow = sealed(BILLING_POLICY_ROW_KEY);
   const billingPlans = plansRow === null ? null : billingPlansFromValue(plansRow.value, plansRow.sourceRef);

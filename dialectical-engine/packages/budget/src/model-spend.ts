@@ -347,8 +347,11 @@ export function costEnvelopeGuardPolicy(
  * no plan. It refuses when the ceiling is below the LARGEST of the per-group
  * minima; equality fits, as it does in the seam; no group (or only empty ones)
  * means nothing to refuse. The prices live in the environment, not the
- * register, so this cannot run at register publish. No figure in the message;
- * the runbook gives the fix.
+ * register, so both boots ask it; the hosted publish command asks it too, of
+ * the operator file's priced targets (which must equal the environment's) and
+ * the JUDGE bound it is about to seal, so a dry run refuses by the same code
+ * (final review Part 1b, Important 3). No figure in the message; the runbook
+ * gives the fix.
  */
 export function assertRunCeilingCoversOneCall(input: Readonly<{
   bodyCeilingMicros: number;
