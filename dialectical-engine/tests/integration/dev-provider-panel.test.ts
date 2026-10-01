@@ -14,11 +14,15 @@ describe("real development CLI provider panel", () => {
     });
     expect(panel).toEqual(TEST_DEVELOPMENT_PROVIDER_PANEL);
     expect(panel.requiredDistinctMakers).toBe(DEVELOPMENT_MINIMUM_DISTINCT_MAKERS);
+    // The fixture declares the five roster slots (6a05a0d0: a free and a premium slot per
+    // maker, grok unavailable); nothing here reads this machine's CLIs or relays.
     expect(panel.healthyProviderRefs).toEqual([
-      "development:codex-cli", "development:claude-cli"
+      "development:codex-cli", "development:codex-premium-cli",
+      "development:claude-cli", "development:claude-premium-cli"
     ]);
     expect(panel.targets.map(({ providerRef }) => providerRef)).toEqual([
-      "development:codex-cli", "development:claude-cli", "development:grok-cli"
+      "development:codex-cli", "development:codex-premium-cli",
+      "development:claude-cli", "development:claude-premium-cli", "development:grok-cli"
     ]);
   });
 

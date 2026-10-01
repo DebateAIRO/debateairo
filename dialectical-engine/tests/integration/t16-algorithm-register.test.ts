@@ -165,9 +165,12 @@ const T16_EXPECTED_ROWS = [
     rulingRef: RULING_FAMILY_MAP,
     value: {
       kind: "PROVIDER_FAMILY_MAP",
+      // The roster gained one premium slot per maker in 6a05a0d0 (V, 2026-09-12: both
+      // tiers reachable at once). The map is read off the configured set by maker, so
+      // each family lists both of its slots; only grok has no premium slot.
       families: [
-        { familyRef: "OpenAI", providerRefs: ["development:codex-cli"] },
-        { familyRef: "Anthropic", providerRefs: ["development:claude-cli"] },
+        { familyRef: "OpenAI", providerRefs: ["development:codex-cli", "development:codex-premium-cli"] },
+        { familyRef: "Anthropic", providerRefs: ["development:claude-cli", "development:claude-premium-cli"] },
         { familyRef: "xAI", providerRefs: ["development:grok-cli"] }
       ],
       unmappedFamilyKind: "UNKNOWN",
