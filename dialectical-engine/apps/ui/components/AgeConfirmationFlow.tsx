@@ -5,6 +5,8 @@ import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { checkDob, dobToIso, type DobErrorCode, type DobParts } from "@debateai/kernel";
 import { AgeRefusal } from "@/components/AgeRefusal";
 import { AuthShell } from "@/components/AuthShell";
+import { clearStoredSupportConversation } from "@/components/support/conversation";
+import { announceSessionChange } from "@/components/support/sessionChange";
 import { DateOfBirthField, EMPTY_DOB } from "@/components/DateOfBirthField";
 import { contractClient } from "@/lib/api";
 import { resolveDobLocale, type DobLocale } from "@/lib/dob/dobLocale";
@@ -69,6 +71,10 @@ export function AgeConfirmationFlow({
     try {
       const result = await client.confirmAge(dobToIso(dateOfBirth));
       if (result.outcome === "refused") {
+        // The refusal revokes every session of the account (E7, D-S04-19): the help-chat transcript goes, here and in
+        // every other tab of this browser (S04-R01).
+        clearStoredSupportConversation();
+        announceSessionChange();
         setRefused(true);
         return;
       }
