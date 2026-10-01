@@ -58,13 +58,18 @@ import {
 } from "@debateai/providers";
 import {
   ALGORITHM_REGISTER_ROW_KEYS,
+  BILLING_PLANS_ROW_KEY,
+  BILLING_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
   COUNTRY_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   admissionPolicyFromValue,
+  assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
+  billingPlansFromValue,
+  billingPolicyFromValue,
   buildConfiguredProviderSetDeploymentRow,
   computeRegisterSnapshotSha256,
   costEnvelopePolicyFromValue,
@@ -74,8 +79,11 @@ import {
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   persistBootstrapRegister,
+  planCapMicros,
   readAdmissionPolicy,
   readAuthPolicy,
+  readBillingPlans,
+  readBillingPolicy,
   readCostEnvelopePolicy,
   readCountryPolicy,
   readDeploymentRiskTier,
@@ -89,6 +97,8 @@ import {
   readStructuralCeilingPolicyInputs,
   registerVersionToSafeLegacyNumber,
   warnOnIdenticalSynthesisRoleRefs,
+  type BillingPlans,
+  type BillingPolicy,
   type BootstrapRegister,
   type CostEnvelopePolicy,
   type GeneralRegisterPublication,
@@ -127,7 +137,10 @@ const MAX_FILE_BYTES = 64 * 1_024;
 const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
   "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy", "countryPolicy",
-  "providerTargets", "synthesisRoles"
+  "providerTargets", "synthesisRoles",
+  // Paid plans (spec 2026-09-29 §2.5.1): OPTIONAL. Left out, the engine's own
+  // rows are sealed (billing OFF); supplied, they supersede them.
+  "billingPlans", "billingPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -287,6 +300,9 @@ export type HostedRegisterFile = Readonly<{
   /** Validated in the plan by the boot's own parser and hosted checks. NEVER published and never printed. */
   providerTargets: unknown;
   synthesisRoles: z.infer<typeof synthesisRolesSchema> | null;
+  /** Paid plans: OPTIONAL operator rows, checked in the plan by the register's own parsers. */
+  billingPlans: Readonly<{ value: unknown }> | null;
+  billingPolicy: Readonly<{ value: unknown }> | null;
 }>;
 
 /**
@@ -341,7 +357,9 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     costEnvelopePolicy: record.costEnvelopePolicy,
     countryPolicy: Object.hasOwn(record, "countryPolicy") ? record.countryPolicy : null,
     providerTargets: record.providerTargets,
-    synthesisRoles
+    synthesisRoles,
+    billingPlans: Object.hasOwn(record, BILLING_PLANS_ROW_KEY) ? Object.freeze({ value: record.billingPlans }) : null,
+    billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null
   });
 }
 
@@ -428,6 +446,11 @@ export type HostedRegisterPlan = Readonly<{
   exampleSourceRef: boolean;
   /** The canonical targets JSON the boot readiness check re-parses. Never printed: it names credential files. */
   providerTargetsJson: string;
+  /** The billing rows as sealed: the operator's, or the engine's own (billing OFF). */
+  billingPlans: BillingPlans | null;
+  billingPolicy: BillingPolicy | null;
+  /** Things to know, never refusals: `BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` (spec §2.5.1). */
+  warnings: readonly string[];
 }>;
 
 function canonicalRowValue(value: unknown): RegisterPublicationRow["valueJsonText"] {
@@ -485,6 +508,10 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
+  // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
+  // the register's own parser, so its refusal keeps its own code.
+  if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
+  if (file.billingPolicy !== null) billingPolicyFromValue(file.billingPolicy.value, file.sourceRef);
   // Paid plans G2: the operator's country switches, by the register's own schema
   // (COUNTRY_POLICY_INVALID). Absent member = no row, no gate (A14).
   if (file.countryPolicy !== null) countryPolicyFromValue(file.countryPolicy, file.sourceRef);
@@ -539,6 +566,16 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
       sourceRef: file.sourceRef
     }));
   }
+  for (const [rowKey, supplied] of [
+    [BILLING_PLANS_ROW_KEY, file.billingPlans],
+    [BILLING_POLICY_ROW_KEY, file.billingPolicy]
+  ] as const) {
+    if (supplied !== null) {
+      operatorRows.set(rowKey, Object.freeze({
+        rowKey, valueJsonText: canonicalRowValue(supplied.value), sourceRef: file.sourceRef
+      }));
+    }
+  }
   const replaced = codeOwnedRows.filter((row) => operatorRows.has(row.rowKey));
   if (replaced.length !== operatorRows.size) refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
   const rows = Object.freeze(codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row));
@@ -564,6 +601,23 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     })),
     bootstrap.registerVersion
   ));
+  // The billing rows as they will be sealed, read back from the composed set.
+  const sealed = (rowKey: string): Readonly<{ value: unknown; sourceRef: string }> | null => {
+    const row = rows.find((candidate) => candidate.rowKey === rowKey);
+    return row === undefined ? null : Object.freeze({ value: JSON.parse(row.valueJsonText) as unknown, sourceRef: row.sourceRef });
+  };
+  const plansRow = sealed(BILLING_PLANS_ROW_KEY);
+  const policyRow = sealed(BILLING_POLICY_ROW_KEY);
+  const billingPlans = plansRow === null ? null : billingPlansFromValue(plansRow.value, plansRow.sourceRef);
+  const billingPolicy = policyRow === null ? null : billingPolicyFromValue(policyRow.value, policyRow.sourceRef);
+  // R1 A22: billing may be switched on only with its plans and the three budget
+  // members, asked here of the version about to be sealed, so a dry run says so.
+  assertBillingReady({ policy: billingPolicy, plans: billingPlans, envelope: costEnvelope });
+  // §2.5.1: WARN, never refuse, when a plan's smallest window (the day cap, or
+  // Free's whole month) is below what one debate may spend.
+  const warnings = Object.freeze(billingPlans === null ? [] : billingPlans.plans
+    .filter((plan) => (planCapMicros(plan, "DAY") ?? plan.monthlyCreditMicros) < costEnvelope.perRunCeilingMicros)
+    .map((plan) => `BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:${plan.planId}`));
 
   const exampleLiteralVendors = new Set(file.configuredProviderSet.providers
     .filter((provider) => provider.providerRef.startsWith(EXAMPLE_PROVIDER_REF_PREFIX)
@@ -590,7 +644,10 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
           && isReservedExampleHost(new URL(target.baseUrl).hostname)))
       .map((provider) => provider.providerRef)),
     exampleSourceRef: file.sourceRef === HOSTED_REGISTER_EXAMPLE_SOURCE_REF,
-    providerTargetsJson: targetsJson
+    providerTargetsJson: targetsJson,
+    billingPlans,
+    billingPolicy,
+    warnings
   });
 }
 
@@ -616,6 +673,16 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
       // Task M1: the answer's reserve and overrun, 0 when the file leaves them out.
       + ` serve_reserve_basis_points=${plan.costEnvelope.serveReserveBasisPoints}`
       + ` serve_overrun_basis_points=${plan.costEnvelope.serveOverrunBasisPoints}`,
+    // Budget rule (spec 2026-09-28 §2.4): the band and the waiting line, or
+    // "absent", which is today's behaviour exactly.
+    plan.costEnvelope.closeBasisPoints === null
+      ? "cost_envelope_band absent"
+      : `cost_envelope_band admission_close_basis_points=${plan.costEnvelope.closeBasisPoints}`
+        + ` finish_up_to_basis_points=${String(plan.costEnvelope.finishBasisPoints)}`
+        + ` waiting_line_per_person=${String(plan.costEnvelope.waitingLinePerPerson)}`,
+    `billing_policy ${plan.billingPolicy === null ? "absent" : `enabled=${String(plan.billingPolicy.enabled)}`}`,
+    `billing_plans ${plan.billingPlans === null ? "absent" : `plan_ids=${plan.billingPlans.plans.map((entry) => entry.planId).join(",")}`}`,
+    ...plan.warnings.map((warning) => `warning=${warning}`),
     `synthesis_roles synthesizer=${plan.synthesisRoles.synthesizerRoleRef}`
       + ` evaluator=${plan.synthesisRoles.evaluatorRoleRef}`,
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`
@@ -714,7 +781,14 @@ export async function verifyHostedRegisterBootReadiness(
   // Paid plans G3a: main.ts's country-policy and country-gate-admission stages, in their order.
   if (await readCountryPolicy(pool, version) !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
   assertHostedSupportAdmissionSealed("hosted", admission);
-  await readCostEnvelopePolicy(pool, version);
+  const envelope = await readCostEnvelopePolicy(pool, version);
+  // Paid plans (R1 A22, R-5): the readiness question the API asks at boot (B6b's
+  // ask-room step, P6a). The runner never asks it: it reads no billingPolicy (A20).
+  assertBillingReady({
+    policy: await readBillingPolicy(pool, version),
+    plans: await readBillingPlans(pool, version),
+    envelope
+  });
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);
   if (!makers.deploymentMakerCapability) refuse("HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT");
