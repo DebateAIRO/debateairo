@@ -8,6 +8,7 @@ import { useAskRoom, waitingRoomOf, type AskRoomQuery } from "@/lib/billing/room
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
+import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
 
 /* The composer asks with /new's Free defaults; the room depends on the ask's settings. */
 const COMPOSER_ROOM_QUERY: AskRoomQuery = Object.freeze({ plan_tier: "free", composition_budget_tier: "low", depth: 2 });
@@ -25,7 +26,8 @@ export function LibraryComposer({
   catalog,
   newDebateCatalog,
   roomCatalog = NO_ROOM_CATALOG,
-  locale
+  locale,
+  crisisCountryHint = null
 }: {
   catalog: MessageCatalog;
   /** The interface locale's `newDebate` catalogue: the refusal words /new uses. */
@@ -34,6 +36,8 @@ export function LibraryComposer({
   roomCatalog?: MessageCatalog;
   /** The interface locale, recorded with the sensitive-data consent. */
   locale: string;
+  /** The edge's country, so the crisis screen shows that country's helplines first. */
+  crisisCountryHint?: string | null;
 }) {
   const router = useRouter();
   const [topic, setTopic] = useState("");
@@ -41,11 +45,16 @@ export function LibraryComposer({
   const [error, setError] = useState<string | null>(null);
   const [room, setRoom, refreshRoom] = useAskRoom(contractClient, COMPOSER_ROOM_QUERY);
   const consent = useSensitiveDataConsent({ catalog, locale });
+  const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint });
 
   const ready = topic.trim().length > 6;
 
   async function start() {
-    if (!ready || busy || room?.room === "ALREADY_WAITING") return;
+    if (!ready || busy) return;
+    // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
+    // debate — and before anything else, the consent screen included.
+    if (crisis.offerIfCrisis(topic)) return;
+    if (room?.room === "ALREADY_WAITING") return;
     setBusy(true);
     setError(null);
     try {
@@ -72,6 +81,11 @@ export function LibraryComposer({
       router.push(`/debate/${debate.id}`);
       return;
     } catch (exc) {
+      if (isCrisisSupportRefusal(exc)) {
+        crisis.offer();
+        setBusy(false);
+        return;
+      }
       // Sentence D where the person typed: from the room re-read, or, when that
       // read fails, from the refusal's own body (its waiting run and start).
       if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "ALREADY_WAITING") {
@@ -130,6 +144,7 @@ export function LibraryComposer({
         ) : null}
       </div>
       {consent.dialog}
+      {crisis.dialog}
     </div>
   );
 }

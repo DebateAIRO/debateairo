@@ -15,6 +15,7 @@ import { UsageBars } from "@/components/billing/UsageBars";
 import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
+import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
@@ -83,7 +84,8 @@ export default function NewDebatePageClient({
   homeCatalog,
   chromeCatalog,
   locale = "en",
-  billingCatalog = billingEnglish
+  billingCatalog = billingEnglish,
+  crisisCountryHint = null
 }: {
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -92,11 +94,13 @@ export default function NewDebatePageClient({
   locale?: string;
   /** The locale's `billing` catalogue: the usage bars (paid-plans spec §2.10). */
   billingCatalog?: MessageCatalog;
+  /** The edge's country, so the crisis screen shows that country's helplines first. */
+  crisisCountryHint?: string | null;
 }) {
   return (
     <Suspense fallback={null}>
       <AuthGate catalog={catalog}>{(token) => (
-        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} billingCatalog={billingCatalog} />
+        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} billingCatalog={billingCatalog} crisisCountryHint={crisisCountryHint} />
       )}</AuthGate>
     </Suspense>
   );
@@ -108,7 +112,8 @@ function NewDebateForm({
   homeCatalog,
   chromeCatalog,
   locale,
-  billingCatalog
+  billingCatalog,
+  crisisCountryHint
 }: {
   token: string;
   catalog: MessageCatalog;
@@ -116,6 +121,7 @@ function NewDebateForm({
   chromeCatalog: MessageCatalog;
   locale: string;
   billingCatalog: MessageCatalog;
+  crisisCountryHint: string | null;
 }) {
   // Everything the AI notice can read, in every variant: home + chrome (+ newDebate).
   const noticeCatalog = { ...homeCatalog, ...chromeCatalog, ...catalog };
@@ -139,6 +145,7 @@ function NewDebateForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
+  const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
   // Budget spec §2.11: the room for the ask this form would send. It is a
   // word (FITS/CLOSE/FULL/ALREADY_WAITING), never a figure.
   const [room, setRoom] = useAskRoom(contractClient, {
@@ -212,6 +219,9 @@ function NewDebateForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!ready) return;
+    // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
+    // debate — and before anything else, the consent screen included.
+    if (crisis.offerIfCrisis(topic)) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -239,6 +249,10 @@ function NewDebateForm({
       }
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (exc) {
+      if (isCrisisSupportRefusal(exc)) {
+        crisis.offer();
+        return;
+      }
       // DL3-F7: see lib/v3/requestFailure.ts. ALREADY_WAITING is answered by
       // the room notice (sentence D, with its start time), not by a banner:
       // from the room re-read, or, when that read fails, from the refusal's
@@ -489,6 +503,7 @@ function NewDebateForm({
           </div>
         </form>
         {consent.dialog}
+        {crisis.dialog}
       </div>
       <SupportWidget />
     </div>

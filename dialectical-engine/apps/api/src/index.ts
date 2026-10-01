@@ -56,6 +56,9 @@ import {
   type Node,
   type RunProjection,
   type Session,
+  CRISIS_SUPPORT_OFFERED,
+  detectCrisis,
+  warmCrisisCheck,
   SENSITIVE_DATA_CONSENT_REQUIRED,
   SENSITIVE_DATA_NOTICE_VERSION,
   SensitiveDataConsentRequestSchema,
@@ -1682,6 +1685,8 @@ function refreshedCookies(input: Readonly<{
 }
 
 export function buildApi(options: ApiOptions): FastifyInstance {
+  // Crisis check: compile its patterns now, not on the first question (about a second, once).
+  warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
     ? undefined : new URL(options.allowedOrigin).origin;
   const api = Fastify({
@@ -2618,6 +2623,21 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
+    // Crisis check (V, 2026-09-30): a question that reads as a person in crisis gets help
+    // numbers, never a debate. First of all, so a person in crisis is refused before any
+    // consent or quota rule, and nothing of the question is kept. `country` is the edge's
+    // guess, only to pick which helplines the screen shows first.
+    const questionLine = typeof request.body === "object" && request.body !== null
+      && "question_line" in request.body && typeof request.body.question_line === "string"
+      ? request.body.question_line : "";
+    // Only a question the API would accept is checked: a longer one is refused as malformed
+    // below anyway, and checking 256 KB of text would hold the event loop for seconds.
+    if (Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES && detectCrisis(questionLine).crisis) {
+      return reply.status(422).send({
+        error: CRISIS_SUPPORT_OFFERED, message: CRISIS_SUPPORT_OFFERED,
+        country: edgeCountry(request.headers)
+      });
+    }
     // Sensitive-data consent (V, 2026-09-29): an account that has not agreed starts no
     // debate. Checked before admission, so a refusal here spends none of the account's quota.
     const asker = request.authenticatedSession;
