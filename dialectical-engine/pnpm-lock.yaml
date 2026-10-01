@@ -89,6 +89,9 @@ importers:
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:packages/obs-capture
+      '@debateai/payments-xmoney':
+        specifier: workspace:*
+        version: link:packages/payments-xmoney
       '@debateai/propagation':
         specifier: workspace:*
         version: link:packages/propagation
@@ -674,6 +677,12 @@ importers:
       pg:
         specifier: 8.22.0
         version: 8.22.0
+
+  packages/payments-xmoney:
+    dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
 
   packages/propagation:
     dependencies:

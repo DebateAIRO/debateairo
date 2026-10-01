@@ -87,6 +87,7 @@
     "@debateai/liveness": "workspace:*",
     "@debateai/memory": "workspace:*",
     "@debateai/obs-capture": "workspace:*",
+    "@debateai/payments-xmoney": "workspace:*",
     "@debateai/propagation": "workspace:*",
     "@debateai/providers": "workspace:*",
     "@debateai/published-arithmetic": "workspace:*",

@@ -676,6 +676,11 @@ packages/obs-capture/src/zone/classifier.ts
 packages/obs-capture/src/zone/counter.ts
 packages/obs-capture/src/zone/index.ts
 packages/obs-capture/src/zone/manifest.ts
+packages/payments-xmoney/src/index.ts
+packages/payments-xmoney/src/json.ts
+packages/payments-xmoney/src/notice.ts
+packages/payments-xmoney/src/signing.ts
+packages/payments-xmoney/src/types.ts
 packages/propagation/src/index.ts
 packages/providers/src/content-rule.ts
 packages/providers/src/index.ts

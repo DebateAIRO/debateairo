@@ -33,6 +33,8 @@ const rows: readonly Row[] = [
   // types (budget) are TYPE imports, so db and the connector packages may depend
   // on billing-core without a cycle (register already depends on db).
   ["billing-core", "packages/billing-core", ["kernel"]],
+  // Paid plans (A26(a)): xMoney order signing, notice decryption and (P3b) the HTTP client.
+  ["payments-xmoney", "packages/payments-xmoney", ["kernel"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
   // Verdict story (2026-09-26): the story package. The edges its later tasks need
