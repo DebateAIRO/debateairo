@@ -465,6 +465,47 @@ describe("R6 a part's verdict cannot be lowered by the parts packed with it (FIX
   });
 });
 
+describe("R7 every call of a debate runs in ONE wave (FIX-HS2-t-r1, TEST rehearsal 2)", () => {
+  // Measured on the served relay at load ~35 (c448fcab3): a 6-call Q-N debate ran 4 calls, then 2 more when slots
+  // freed — two waves of ~21–31 s each: 42.4 s, 50.2 s, then JUDGE_DEADLINE at 60 s. Property: a debate of up to
+  // PUBLICATION_CHECK_MAX_CALLS_IN_FLIGHT calls sends every call at once, so its wall-clock is its slowest call.
+  const sixCalls = [{ kind: "QUESTION", text: "q" }, { kind: "SUMMARY", text: "s" }, { kind: "ARGUMENTS", text: "a".repeat(20) },
+    { kind: "REVIEWS", text: "r" }, { kind: "STORY", text: "t" }] as const; // with a 10-code-point budget: 6 calls
+  const slowJudge = (ms: number) => {
+    let active = 0, peak = 0;
+    const judge: PublicationJudgePort & { peak: () => number } = { providerRef: "test:judge", modelId: "test-model", peak: () => peak,
+      async complete({ packet }) {
+        const { callValueOf } = await import("../support/hs-s02-judge-stub.js");
+        active++; peak = Math.max(peak, active);
+        await new Promise(resolve => setTimeout(resolve, ms)); active--;
+        return { text: JSON.stringify({ call: callValueOf(packet), ...allow }) };
+      } };
+    return judge;
+  };
+  it("a 6-call debate sends all 6 calls at once by default", async () => {
+    const { judgeParts } = await import("../../apps/api/src/publication-check/check.js");
+    const judge = slowJudge(20);
+    const judged = await judgeParts({ judge, maxMaterialCodePoints: 10 }, sixCalls);
+    expect(judged.judgeCallCount).toBe(6);
+    expect(judge.peak()).toBe(6);
+  });
+  // The finding's shape, scaled: calls of 300 ms under D = 500 ms. Two waves (4 + 2) need 600 ms → JUDGE_DEADLINE;
+  // one wave needs 300 ms → ALLOW.
+  it("6 calls of 300 ms publish inside D = 500 ms (two waves would need 600 ms)", async () => {
+    const { judgeParts } = await import("../../apps/api/src/publication-check/check.js");
+    const judged = await judgeParts({ judge: slowJudge(300), maxMaterialCodePoints: 10, deadlineMs: 500 }, sixCalls);
+    expect(judged.result).toEqual({ outcome: "ALLOW" });
+  });
+  // The bound: no attempt has more than 8 calls in flight (the module-private PUBLICATION_CHECK_MAX_CALLS_IN_FLIGHT).
+  it("never more than 8 calls in flight, however many calls the debate needs", async () => {
+    const c = await import("../../apps/api/src/publication-check/check.js");
+    const judge = slowJudge(10);
+    const judged = await c.judgeParts({ judge, maxMaterialCodePoints: 10 }, [{ kind: "ARGUMENTS", text: "x".repeat(120) }]);
+    expect(judged.judgeCallCount).toBe(12);
+    expect(judge.peak()).toBe(8);
+  });
+});
+
 describe("check", () => {
   const runId = "PRIVATE-RUN-ID";
   const now = new Date("2026-09-29T00:00:00.000Z");
